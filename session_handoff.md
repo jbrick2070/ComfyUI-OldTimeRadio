@@ -1,3 +1,247 @@
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-25 (post Sprint 7A+7B)
+
+## Current state (open here)
+
+- **HEAD `db090ce` on `v2.0-alpha`, pushed to origin.** Clean working
+  tree (the parked `docs/s28_diff_tmp.txt` is the only intentional
+  uncommitted noise; never commit it).
+- **v4 sprint plan COMPLETE through Sprint 6** (critic -> render
+  coupling), and **Sprint 7A + 7B COMPLETE** this session (BUG-273 +
+  BUG-274 fixed in `db090ce`).
+- **Live-run is healthy.** Do NOT pause for validation rounds between
+  items. The previous "wait for operator RTX-5080 live-run before
+  shipping next sprint" gate is RETIRED. Build, commit, push, move on.
+  Eyes-on review is required only for workflow JSON changes (PD3) and
+  for non-obvious root cause / diff decisions (show the one-paragraph
+  rationale + diff, then ship -- don't ask permission between every
+  step).
+
+## What just landed in `db090ce` (Sprint 7A + 7B)
+
+Root cause: `Ledger.save()` at `production_ledger.py:1012` rebinds
+`self.data` to a new merged dict on every save (BUG-LOCAL-108
+merge-with-disk pattern). The cascade's L570/L576 `ledger_data` / `meta`
+locals went stale after the Phase 1+2 reviewer's internal save; the
+Sprint 5B critic stamp at L683 and the Sprint 6 render_plan stamp at
+L748 landed on orphaned dicts; the reroll, render_plan, and HuMo all
+re-read `led.data` and saw the LIVE post-save dict with no critic
+report. `StoryCriticReport.model_validate({})` succeeded silently with
+all-defaults (`arc_verdict="strong"`, empty `reroll_targets` /
+`flat_lines`) because every field has a default -- no warning fired.
+
+Fix (`nodes/_otr_freeze_cascade.py`):
+
+  * Refresh `ledger_data = led.data` + `meta =
+    ledger_data.setdefault("meta", {})` before the Sprint 5B critic
+    stamp and again before the Sprint 6 render_plan stamp.
+  * Explicit `led.save()` after the render_plan stamp at L748 so
+    HuMo's separate-node on-disk read sees `meta.render_plan`. Gated
+    by `getattr(led, "save", None)` and try/except (PD1) so test
+    fixtures with SimpleNamespace ledgers and any production save
+    failure both degrade safely.
+
+Tests: new `tests/test_freeze_cascade_meta_persistence.py` -- 5 tests
+via a new `_RebindingLedger` fixture that mimics production save's
+rebind. Without that fixture the bug is invisible: existing
+orchestrator tests use SimpleNamespace with `save = lambda: None`.
+
+Regression baseline at `db090ce`: full OTR suite 2853 passed / 21
+skipped / 0 failed (baseline 2842 + 5 new + 6 transitively touched);
+Bug Bible 23 passed / 1 skipped / 2 xfailed / 0 failed; LLM-slot sweep
+23/23 tagged, 0 parse failures.
+
+## Next up -- start immediately, in order
+
+### 1. Downstream brief consumer audit + wire (start HERE)
+
+**Decision locked.** `meta.story_brief` is the single source of truth
+for all downstream creative prompts. Brief schema v2 adds:
+
+  * `music_mood_terms` (list of mood adjectives MusicGen actually
+    consumes -- replaces today's empty `mood_terms=[]` MusicGenTheme
+    miss)
+  * `visual_palette` (palette descriptors FLUX prompts can consume)
+  * `atmosphere` (single sentence atmosphere line)
+  * `tempo_hint` (slow / moderate / driving etc.)
+  * `key_objects` (list of named props / settings the brief promised)
+
+New helper module `nodes/_otr_brief_reader.py` with a shared
+`_read_brief_field(meta, field_name, default)` read contract. Every
+downstream consumer reads through this helper -- never `meta.get(...)
+.get(...)` chains inline -- so the field-name contract has ONE source
+of truth and any future brief-schema rename is one edit.
+
+**Audit first (no consumer edits yet).** Produce
+`downstream_brief_consumer_audit.md` at repo root that classifies
+every node currently reading from `meta.story_brief` (or that
+SHOULD be reading from it) as:
+
+  * **A** -- reads the right key, threads the right value, no change
+    needed.
+  * **B** -- reads the right key, but the field doesn't exist yet in
+    v1 brief schema (these drive the v2 additions list above).
+  * **C** -- reads the wrong key / has a phantom default that masks a
+    miss (the MusicGenTheme `mood_terms=[]` case is a C -- it has a
+    `mood_terms` field that's never populated because the brief
+    doesn't emit it).
+  * **D** -- doesn't read the brief but should (FLUX prompts, HuMo
+    prompts, possibly the title scratchpad -- TBD).
+
+The brief in `downstream_brief_consumer_followup.md` (repo root, if
+present -- check first) carries any prior planning notes that didn't
+make it into the sprint plan. Read that first if it exists.
+
+**Then fix one consumer per commit.** Start with **MusicGenTheme** --
+confirmed miss in the live-run console:
+
+    [OTR_MusicGenTheme] story_brief_status=ok mood_terms=[]
+    style_slug_diag=sanctioned_trade_battle
+
+`mood_terms=[]` despite `story_brief_status=ok` is the exact "right
+key, empty value" symptom. Fix: brief schema v2 emits
+`music_mood_terms`; MusicGenTheme reads via `_read_brief_field` and
+threads the list into the cue prompt. One commit per consumer keeps
+the diff small and the regression auditable.
+
+### 2. StoryCriticReport silent-default landmine
+
+BUG-273's symptom was the silent default-fallback:
+`StoryCriticReport.model_validate({})` succeeds because every field
+has a default, and the consumer sees a plausible-looking
+`arc_verdict="strong"` with no warning. We patched the cascade-side
+trigger; the underlying TRAP is still there. The next field that
+happens to land in meta as `{}` or `None` (a partial LLM response, a
+cleared key, anything) will silently default-out with no signal.
+
+Fix shape: make the critic schema either REQUIRE certain fields (e.g.
+`arc_verdict: ArcVerdict` with no default -- forces a
+`ValidationError` on empty input that the existing `_coerce_report`
+warning would log loudly), OR add an explicit warning in
+`_coerce_report` when the validated report's field count is suspicious
+(all-empty lists + default `arc_verdict` from a non-empty input dict
+-> log loudly).
+
+Recommended approach: drop the `arc_verdict = "strong"` default from
+`StoryCriticReport` and add it back ONLY in `StoryCriticReport.clean()`
+(the explicit safe-fallback constructor). Empty `model_validate({})`
+then raises and the catch already in `_coerce_report` logs the
+warning. Land as its OWN small commit.
+
+### 3. BUG-LOCAL-275 (Sprint 7C -- doctor edits.payload=None)
+
+Already logged. Non-blocking; doctor degrades safely. Live-run
+attempts 1+2 failed pydantic validation
+(`edits.2.payload Input should be a valid string` /
+`input_value=None`); attempt 3 succeeded with deterministic drop.
+
+Two options (pick whichever lines up with the brief-reader work):
+
+  * (a) Widen `DoctorEdit.payload` to `Optional[str]` and have
+    `apply_doctor_edits` skip / no-op on null-payload rows.
+  * (b) Add a `payload_null_repair` typed-prompt factory in
+    `_otr_repair_prompts.py` that catches the specific pydantic
+    `Input should be a valid string / input_value=None` trace and
+    re-prompts with explicit "every payload MUST be a non-null
+    string; if you have no replacement text, OMIT the edit entirely".
+
+Recommended: (b). Keeps the schema strict so a null payload still
+fails fast in tests but the typed repair recovers cleanly. (a) would
+mask intentional doctor mistakes. Ship in its own commit.
+
+### 4. continuity_slice on rerolls (v2 follow-up)
+
+Already LANDED for the FIRST-pass compose (Sprint 5A) -- the per-beat
+`LineRequest.continuity_slice` carries "X does not yet know Y" hard
+constraints from `meta.continuity`. The reroll path (Sprint 5C)
+rebuilds `LineRequest` from scratch but currently leaves
+`continuity_slice=""` (the `_otr_reroll.build_reroll_line_request`
+default). A rerolled line therefore loses the per-speaker continuity
+constraints the first-pass compose got.
+
+Fix: in `_otr_reroll.build_reroll_line_request`, reconstruct the
+continuity slice from `meta["continuity"]` (the Sprint 5A writer
+stamp) via the existing `_otr_continuity.render_continuity_slice`
+projector. Beat coordinate = the 0-based line row position in
+`ledger_data["lines"]` (the writer's `init_lines_from_outline` 1:1
+beat-to-line-row invariant holds because update_line_text is the
+only in-place mutator the writer + reroll use). Add a regression
+test that pins the reconstruction.
+
+NOTE: a previous session claimed this LANDED in commit `18edd26` --
+verify whether the helper actually exists in `nodes/_otr_reroll.py`
+before duplicating the work. If `_rebuild_continuity_slice` is there,
+this item is just adding the test (or confirming the test already
+exists).
+
+### 5. Other deferred v2 follow-ups (pick up after 1-4 land)
+
+  * **Scoped critic re-invocation.** The Sprint 5C loop re-runs the
+    WHOLE `run_story_critic` each cycle. A per-affected-line
+    re-critique would cut LLM cost on rerolls.
+  * **`meta.protagonist_char_id` writer stamp.** Current
+    `build_render_plan` `protagonist_only` heuristic = "most-spoken
+    char_id with cast-roster tiebreak". An explicit writer stamp
+    replaces the heuristic with determinism.
+  * **Per-line v1/v2 ledger versioning.** Today the reroll's
+    `update_line_text` overwrites in place; `meta.reroll_history` is
+    the audit trail. Full ledger versioning (every line carries its
+    own revision list) is the alternative.
+
+## Recent operator decisions on file (carry forward)
+
+  * **Sprint 6 fork -- full v1 coupling** (cascade widgets + render-
+    side consumer), NOT cascade-only stamping. Already shipped in
+    `244e9fd`; mentioned here so the next session does not relitigate.
+  * **No model swaps.** Current creative + technical slot models stay.
+    New models are appendix-only and opportunistic -- do not
+    proactively re-architect for a different model.
+  * **Fine-tune merge ban from deep research is REJECTED.** Current
+    models keep their jobs but with narrower scope per call (the
+    Sprint 3 task-decomposition philosophy).
+  * **`humo_max_lines_per_process = 6` from v3 plan CONFLICTS with
+    BUG_LOG.md:210** logged decision to keep it at 0 (disabled).
+    Defer to the existing logged decision; do not revert.
+
+## Prime Directives still in force
+
+  * **PD1** -- never raises; HuMo / cascade / brief reader / every
+    new helper degrades to today's behaviour on any failure.
+  * **PD3** -- no workflow JSON re-wire without Jeffrey-eyes-on
+    review. Items 1-5 above are NODE-INTERNAL changes; if any item
+    grows a workflow JSON edit, flag it before shipping.
+  * **PD6** -- every LLM call site carries `# LLM slot:` tag; LLM-slot
+    sweep stays at 23/23 (item 1 may add a brief-consumer LLM call;
+    tag it).
+
+## Working style for the next session
+
+  * Live-run is healthy; do NOT pause to ask whether to proceed
+    between items.
+  * Eyes-on review is needed only for workflow JSON changes (PD3).
+    Everything else: build, commit, push, move on.
+  * Show one-paragraph root cause + diff before commit when something
+    is NON-OBVIOUS. The obvious shape (audit -> wire one consumer ->
+    test -> commit) does not need pre-flight permission.
+  * Hand the operator PowerShell blocks only as a last resort
+    (Desktop Commander cmd works for git on this repo).
+  * Bug Bible regression + LLM-slot sweep after every code change,
+    unprompted (per CLAUDE.md).
+  * One commit per consumer for item 1 -- small diffs, auditable.
+
+**Next session opens with: start item 1 (downstream brief consumer
+audit). Read `downstream_brief_consumer_followup.md` at repo root if
+it exists; produce `downstream_brief_consumer_audit.md` first; then
+begin wiring consumers one commit at a time, starting with
+MusicGenTheme.**
+
+---
+
+## Historical context (prior sessions -- preserved verbatim)
+
+The sections below capture the SHIPPED state at HEAD `244e9fd`
+(Sprint 6 close-out). Read them as background; do not relitigate
+shipped decisions.
+
 # Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-25 (Sprints 5C + 6)
 
 ## Core goal
