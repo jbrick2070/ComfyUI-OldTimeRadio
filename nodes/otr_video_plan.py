@@ -324,6 +324,59 @@ def extract_scenes(derived: dict) -> list[dict]:
     return [s for s in scenes if isinstance(s, dict)]
 
 
+# Sprint 9 (Narrative Face): PASS 3 portrait truncation cap. The
+# CHARACTER VISUAL CONTRACT in casting produces character_descriptions
+# of ~150-400 chars (up from ~80 in the pre-Sprint-9 prose form). In
+# PASS 1 (portrait-only render) that's fine -- the portrait IS the
+# only subject, FLUX gets the full description. In PASS 3 composites
+# the portrait concatenates with scene_visual + shot_hint + era_tail
+# + style_tail, all of which compete for FLUX's effective CLIP
+# tokenization window (~77 tokens / ~310 chars before truncation
+# starts costing signal). A 400-char portrait would alone consume
+# the whole window before the scene context lands.
+#
+# 160 chars sits at the lead-sentence size the CONTRACT format
+# targets ("<age decade>, <story-linked role>. Face: <face shape>,
+# <eyes/brow>, <nose/mouth/jaw>, <hair/hairline>, <one distinctive
+# story-linked detail>.") -- big enough to carry age + role + the
+# full Face block, small enough to leave room for the remaining
+# four PASS 3 layers in the same window. Smart-trim at the second
+# sentence-end so the FACE block is preserved whole when present.
+_PASS3_PORTRAIT_HARD_MAX_CHARS: int = 160
+
+
+def _truncate_portrait_for_composite(portrait: str) -> str:
+    """Trim a portrait prompt to the PASS 3 char cap at a sentence
+    boundary.
+
+    Order of preference:
+      1. Trim at the rightmost period inside [0, cap]. Preserves one
+         or more whole sentences (typically Age+role and the Face:
+         block, dropping the Presence: / Voice: tails that PASS 3
+         cares about less than the visual geometry).
+      2. Trim at the rightmost comma inside [0, cap]. Preserves the
+         lead clauses; useful when the description is one long
+         clause-joined run with no internal periods.
+      3. Hard char-trim with an ellipsis. Degenerate fallback when
+         the first 160 chars are a single dense run with no
+         clause boundaries.
+
+    Returns the original portrait verbatim if it's already under cap.
+    """
+    if not portrait:
+        return portrait
+    if len(portrait) <= _PASS3_PORTRAIT_HARD_MAX_CHARS:
+        return portrait
+    window = portrait[:_PASS3_PORTRAIT_HARD_MAX_CHARS]
+    period_idx = window.rfind(".")
+    if period_idx >= 40:
+        return portrait[: period_idx + 1].rstrip()
+    comma_idx = window.rfind(",")
+    if comma_idx >= 40:
+        return portrait[: comma_idx].rstrip()
+    return window.rstrip(",.;:!? ") + "..."
+
+
 def compose_shot_prompt(
     portrait: str,
     scene_visual: str,
@@ -336,9 +389,18 @@ def compose_shot_prompt(
     Order matters: subject (character) first, scene context next,
     then shot-specific framing hint, era tail, style tail.  FLUX
     tends to weight earlier tokens more heavily.
+
+    Sprint 9 (Narrative Face): the portrait piece is now truncated
+    to `_PASS3_PORTRAIT_HARD_MAX_CHARS` at a sentence/clause
+    boundary so the richer CHARACTER VISUAL CONTRACT
+    character_descriptions don't blow CLIP's ~77-token PASS 3
+    budget. PASS 1 portrait render uses the full description -- this
+    cap applies ONLY when the portrait is being composed alongside
+    scene/era/style layers (i.e. at PASS 3 / composite call sites).
     """
     parts: list[str] = []
-    for piece in (portrait, scene_visual, shot_hint, era_tail, style_tail):
+    truncated_portrait = _truncate_portrait_for_composite(portrait)
+    for piece in (truncated_portrait, scene_visual, shot_hint, era_tail, style_tail):
         if piece:
             cleaned = piece.strip().rstrip(",").strip()
             if cleaned:

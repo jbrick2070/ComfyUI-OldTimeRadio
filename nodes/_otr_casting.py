@@ -326,7 +326,18 @@ def _build_user_prompt(
     if (timbre or "").strip():
         parts.append(f"Voice: {timbre.strip()}")
     if (role or "").strip():
-        parts.append(f"Role: {role.strip()}")
+        role_clean = role.strip()
+        parts.append(f"Role: {role_clean}")
+        # Sprint 9 (Narrative Face): Python-pinned face-pressure anchor.
+        # Same pattern as the timbre/role rotation above -- Python
+        # decides the fact (which dramatic pressure the role implies),
+        # the LLM writes facial geometry that earns it. The lookup
+        # falls through silently when the caller passes a role outside
+        # _FACE_PRESSURE_BY_ROLE so future role-vocab extensions don't
+        # break this surface.
+        pressure = _FACE_PRESSURE_BY_ROLE.get(role_clean.lower(), "")
+        if pressure:
+            parts.append(f"Face pressure: {pressure}")
 
     if prior_cast:
         parts.append("")
@@ -334,26 +345,91 @@ def _build_user_prompt(
         for c in prior_cast:
             parts.append(f"- {_format_prior_entry(c)}")
 
+    # Sprint 9 (Narrative Face): CHARACTER VISUAL CONTRACT block.
+    # The casting LLM's output is the single source of truth for BOTH
+    # voice-cast prose AND FLUX portrait composition (the writer K.5
+    # copies character_description verbatim into
+    # meta.visual_plan.characters[NAME].portrait_prompt). For FLUX to
+    # paint visually distinct faces, the description has to carry
+    # concrete facial geometry instead of mood adjectives. The
+    # CONTRACT below tells the LLM *how* to compose; the JSON template
+    # shows the format it must fit. Explicit rules survive model
+    # swaps better than examples alone.
+    parts.append("")
+    parts.append("CHARACTER VISUAL CONTRACT:")
+    parts.append(
+        "Write one compact character_description that serves both "
+        "audio and portrait generation."
+    )
+    parts.append("")
+    parts.append(
+        'Format: "<age decade>, <story-linked role>. Face: <face '
+        'shape>, <eyes/brow>, <nose/mouth/jaw>, <hair/hairline>, '
+        '<one distinctive story-linked detail>. Presence: <how the '
+        'character carries the episode pressure>. Voice: <radio-'
+        'performance cue>."'
+    )
+    parts.append("")
+    parts.append("Rules:")
+    parts.append(
+        "- The face must match the character's role and emotional "
+        "function in this story."
+    )
+    parts.append(
+        "- The distinctive detail must feel earned by the premise, "
+        "not random."
+    )
+    parts.append(
+        "- Use concrete facial geometry, not vague mood words."
+    )
+    parts.append(
+        "- Make this character visually distinct from the rest of "
+        "the cast."
+    )
+    parts.append(
+        "- Avoid glamour, fashion-model, influencer, symmetrical "
+        "stock-photo language."
+    )
     parts.append("")
     parts.append("JSON only:")
-    parts.append('{"character_description":"<vivid, 1-2 sentences>"}')
+    parts.append('{"character_description":"<as above>"}')
     return "\n".join(parts)
 
 
 def _format_prior_entry(row: dict) -> str:
     """Compact one-line summary of a prior cast row for the
     'Cast so far' block. Format: 'NAME (G, description)'.
+
+    Sprint 9 (Narrative Face): smart-trim at the first sentence
+    boundary instead of a hard char cut. The CHARACTER VISUAL
+    CONTRACT produces descriptions that lead with
+    "<age decade>, <story-linked role>." -- a full sentence sized
+    well to anchor a prior-cast echo. A hard 60-char cut would
+    chop mid-Face-block, leaving the next character's prompt
+    staring at "Late-30s mission technician, the person who
+    no..." with no useful signal beyond age + role. The smart
+    trim preserves the lead sentence whole; falls back to the
+    legacy char-trim when no period lands inside the cap (e.g.
+    a single-sentence ~150-char description with the period at
+    the very end).
     """
     name = (row.get("name") or "?").upper()
     g = (row.get("gender") or "?").lower()
     g_short = "M" if g == "male" else "F" if g == "female" else "X"
     desc = (row.get("character_description") or "").strip()
-    # Trim long descriptions so the prompt stays lean. Strip a wider
-    # set of trailing punctuation so the appended "..." doesn't read
-    # as e.g. "weary broadcaster!..." -- per round-robin nit
-    # 2026-05-10.
-    if len(desc) > 60:
-        desc = desc[:57].rstrip(",.;:!? ") + "..."
+    # Sprint 9: smart trim. Within the same 120-char cap (lean prompt
+    # discipline -- the lead sentence of the CONTRACT format target is
+    # ~30-60 chars), prefer trimming at the first period so the echo
+    # carries one whole sentence. If no period lands inside the cap,
+    # fall back to the char-trim path so degenerate single-sentence
+    # descriptions still get trimmed instead of overflowing.
+    _PRIOR_CAST_CAP: int = 120
+    if len(desc) > _PRIOR_CAST_CAP:
+        period_idx = desc.find(".", 0, _PRIOR_CAST_CAP)
+        if period_idx >= 20:
+            desc = desc[: period_idx + 1].rstrip()
+        else:
+            desc = desc[: _PRIOR_CAST_CAP - 3].rstrip(",.;:!? ") + "..."
     return f"{name} ({g_short}, {desc})"
 
 
@@ -389,6 +465,24 @@ _ROLE_VOCAB: tuple[str, ...] = (
     "support",
     "wildcard",
 )
+
+
+# Sprint 9 (Narrative Face): story-causal face-pressure anchors keyed
+# off the same _ROLE_VOCAB Python already rotates across the ensemble.
+# Each entry is a phrase the LLM weaves into the FACE block of the
+# character_description -- a structural anchor that does not depend on
+# the LLM faithfully following the CHARACTER VISUAL CONTRACT rules
+# alone. The pattern matches the existing Python-decides /
+# LLM-writes-prose split (gender / timbre / role rotation): Python
+# pins the dramatic pressure the role implies, the LLM writes facial
+# geometry that earns it. Survives LLM-prompt drift better than a
+# rule embedded only in the CONTRACT text body.
+_FACE_PRESSURE_BY_ROLE: dict[str, str] = {
+    "lead":     "face shows responsibility, fatigue, and moral pressure",
+    "foil":     "face shows skepticism, alertness, and controlled impatience",
+    "support":  "face shows practical competence and lived-in worry",
+    "wildcard": "face shows watchfulness, unpredictability, and survival instincts",
+}
 
 
 @dataclass(frozen=True)

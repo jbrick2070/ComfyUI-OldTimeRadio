@@ -165,8 +165,26 @@ def _build_portrait_prompt(
     ])
     if appearance:
         parts.append(appearance)
+    # Sprint 9 (Narrative Face): three-anti-pattern guard. FLUX's two
+    # dominant failure modes for headshots are stock-portrait
+    # composition (rigid centered crop, dead studio lighting,
+    # identical posing across faces) and glamour-photography skin
+    # (airbrushed, symmetrical, magazine-ready). Naming both anti-
+    # patterns explicitly hits them where a single "non-glamour" cue
+    # would catch only one. PASS 1 only -- this composition guidance
+    # is never persisted to the ledger, so the longer string costs
+    # zero tokens in PASS 3 composites.
+    parts.append(
+        "distinctive non-generic face, not a stock portrait, "
+        "not glamour photography"
+    )
     parts.extend([
-        "neutral expression",
+        # Sprint 9: story-linked expression instead of "neutral
+        # expression". The character_description carries the story-
+        # causal pressure signal (per CHARACTER VISUAL CONTRACT +
+        # _FACE_PRESSURE_BY_ROLE injection); this cue tells FLUX to
+        # honor it rather than smoothing every face to neutral.
+        "subtle expression matching the character's role in the story",
         "centered composition",
         "frontal pose facing camera",
         "soft studio lighting",

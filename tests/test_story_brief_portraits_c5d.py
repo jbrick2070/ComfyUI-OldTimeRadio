@@ -95,12 +95,14 @@ def test_portrait_prompt_includes_lighting_when_supplied():
         "lighting parameter not threaded through _build_portrait_prompt"
     )
     # Brief-leads order: the lighting block is FIRST -- before the
-    # style anchor, the appearance, and the "neutral expression"
-    # composition-guidance block.
+    # style anchor, the appearance, and the story-linked expression
+    # composition-guidance block (Sprint 9 Narrative Face).
     canary_idx = prompt.find(_CANARY)
     anchor_idx = prompt.find("head-and-shoulders studio portrait")
     appearance_idx = prompt.find("weathered face")
-    composition_idx = prompt.find("neutral expression")
+    composition_idx = prompt.find(
+        "subtle expression matching the character's role in the story"
+    )
     assert canary_idx > -1
     assert canary_idx < anchor_idx < appearance_idx < composition_idx, (
         f"brief-leads order wrong: canary@{canary_idx} "
@@ -118,7 +120,10 @@ def test_portrait_prompt_falls_through_when_lighting_empty():
         lighting="",
     )
     assert "tall detective" in prompt
-    assert "neutral expression" in prompt
+    assert (
+        "subtle expression matching the character's role in the story"
+        in prompt
+    )
     assert _CANARY not in prompt
 
 
