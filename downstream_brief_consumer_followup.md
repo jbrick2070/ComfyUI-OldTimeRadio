@@ -1,9 +1,9 @@
 # Follow-up: meta.story_brief as Single Source of Truth for Downstream Creative
 
-- **Status:** Wiring sprint in flight. Commit 1 (Sprint 8.1 -- producer v2 + reader + MusicGenTheme rewire) is landed. Six A-class consumers still pending (Sprints 8.2-8.7).
+- **Status:** **WIRING SPRINT COMPLETE.** All 7 commits landed (Sprint 8.1 producer v2 + reader + MusicGenTheme, Sprints 8.2-8.7 A-class consumers, Sprint 8.8 Bark/TTS audit -> D-class declination). PD1 live-run gate is the only carry-forward (operator-owned).
 - **Origin:** 2026-05-25 live-run log showed `[OTR_MusicGenTheme] story_brief_status=ok mood_terms=[] style_slug_diag=sanctioned_trade_battle` -- brief landed successfully, music node consumed nothing useful from it. Confirmed: brief was decoration for the music path.
-- **Current HEAD at last update:** Sprint 8.1 commit (this section's `Update` entry below records the exact hash post-push).
-- **Last refreshed:** 2026-05-25 (commit 1 land).
+- **Current HEAD at last update:** see `Update 2026-05-25 (closeout)` section below.
+- **Last refreshed:** 2026-05-25 (post-8.8 closeout).
 
 ---
 
@@ -15,9 +15,15 @@
 | Schema-shape decision (flat additive vs nested object) | **DONE** -- A1 flat additive chosen 2026-05-25 | Update 2026-05-25 (commit 1) section below |
 | `_otr_brief_reader.py` shared read helper | **DONE** -- shipped in Sprint 8.1 commit 1 | `nodes/_otr_brief_reader.py` |
 | Producer v2 schema add (`_otr_story_brief.py`) | **DONE** -- shipped in Sprint 8.1 commit 1, `_PROMPT_VERSION` bumped v1 -> v2 | `nodes/_otr_story_brief.py` |
-| Consumer wiring -- MusicGenTheme (Sprint 8.1, C-class) | **DONE** -- shipped in Sprint 8.1 commit 1 | `nodes/musicgen_theme.py` |
-| Consumer wiring -- FLUX env / portrait / radio bookend / LTX / HuMo / OTR_VideoPlan (Sprints 8.2-8.7, A-class) | **PENDING** -- one commit each, audit order | per-consumer files |
-| Bark / TTS deep audit (Sprint 8.8, carry-forward) | **PENDING** -- decision E placed after the visual rewires | TBD |
+| Consumer wiring -- MusicGenTheme (Sprint 8.1, C-class) | **DONE** -- `3296b12` | `nodes/musicgen_theme.py` |
+| Consumer wiring -- FLUX env (Sprint 8.2, A-class) | **DONE** -- `c36adc0` | `visual/batch_flux_render.py` |
+| Consumer wiring -- FLUX portrait (Sprint 8.3, A-class) | **DONE** -- `0ed24ea` | `visual/batch_flux_portrait_render.py` |
+| Consumer wiring -- FLUX radio bookend (Sprint 8.4, A-class) | **DONE** -- `9ae15f4` | `visual/batch_flux_render.py` |
+| Consumer wiring -- LTX motion (Sprint 8.5, A-class) | **DONE** -- `e4448cf` | `nodes/batch_ltx_render.py` |
+| Consumer wiring -- HuMo lip-sync (Sprint 8.6, A-class) | **DONE** -- `9fe95cd` | `nodes/batch_humo_render.py` |
+| Consumer wiring -- OTR_VideoPlan era tail (Sprint 8.7, A-class) | **DONE** -- `b8972a6` | `nodes/otr_video_plan.py` |
+| Bark / TTS deep audit (Sprint 8.8, carry-forward) | **DONE** -- D-class declination, see Update 2026-05-25 (closeout) | -- (no code change) |
+| PD1 live-run gate (operator-owned) | **PENDING** -- one ComfyUI episode on post-8.7 HEAD must show v2 brief readers firing | operator only |
 
 The audit's headline read: **one C-class consumer (MusicGenTheme)**, **six A-class consumers** (LTX, FLUX env, FLUX portrait, FLUX radio bookend, HuMo lip-sync, OTR_VideoPlan), **zero B-class**, and **the only D-class candidate (title scratchpad) declines** because Sprint 3E already grounds the title path on a rich excerpt set. Full classification table with file:line evidence lives in `downstream_brief_consumer_audit.md`.
 
@@ -248,3 +254,70 @@ This file is the canonical "big plan" doc. The discipline:
   - **PD6 (LLM-slot tagging).** Sprint 8.1 added zero LLM calls. Slot sweep stayed at 23/23.
 - **PD1 live-run gate signal (operator-owned):** one ComfyUI episode on the post-commit HEAD must show `[OTR_MusicGenTheme] story_brief_status=ok mood_terms=[<non-empty>] mood_source=v2_music_mood_terms` in the console for the v2 path to be confirmed live. v1-fallback observation (`mood_source=v1_atmosphere_vocab`) is also acceptable -- proves the rewire's resolution order kicked in -- but the v2 source confirms the producer v2 schema reached the consumer end-to-end.
 - **Next:** Sprint 8.2 -- FLUX env consumer (`nodes/...` -- `_parse_env_prompts`) reads `visual_palette` + `key_objects` via `_read_brief_field`. One commit per A-class consumer, audit order, until Sprint 8.7 closes the visual sweep.
+
+---
+
+## Update 2026-05-25 (closeout) -- Sprints 8.2-8.8 landed, A-class queue closed
+
+**Headline:** every post-script creative-pass consumer the audit classified is now reading the meta brief through the same `_read_brief_field` helper, same signature, same default-on-missing fallback. The 5-tuple (`music_mood_terms`, `visual_palette`, `key_objects`, `tempo_hint`, `atmosphere_line`) served all 7 wired consumers with **no field extensions and no new access patterns** -- "one stamp, many readers" landed as designed.
+
+### Sprints 8.2-8.7 -- A-class consumer wiring (all pushed)
+
+| Sprint | Consumer | File | Function | Fields read | Commit |
+|---|---|---|---|---|---|
+| 8.2 | FLUX env | `visual/batch_flux_render.py` | `_parse_env_prompts` | `visual_palette` + `key_objects` | `c36adc0` |
+| 8.3 | FLUX portrait | `visual/batch_flux_portrait_render.py` | `_build_portrait_prompt` (via caller) | `visual_palette` + `atmosphere_line` | `0ed24ea` |
+| 8.4 | FLUX radio bookend | `visual/batch_flux_render.py` | `_build_dynamic_radio_prompt` | `visual_palette` | `9ae15f4` |
+| 8.5 | LTX motion | `nodes/batch_ltx_render.py` | `_build_ltx_role_prompt` | `tempo_hint` | `e4448cf` |
+| 8.6 | HuMo lip-sync | `nodes/batch_humo_render.py` | `_build_pos_prompt` | `atmosphere_line` | `9fe95cd` |
+| 8.7 | OTR_VideoPlan era tail | `nodes/otr_video_plan.py` | `_resolve_era_tail` | `visual_palette` + `atmosphere_line` | `b8972a6` |
+
+**Pattern consistency across all six A-class consumers:**
+- Same helper: `_read_brief_field(meta, "<field>", default=<v1-fallback-shape>)`.
+- Same fallback discipline: v1-era ledgers and the v2 failure sentinel produce byte-identical renders to the pre-rewire path.
+- Same defensive guards: non-list / non-string / whitespace / None terminal values all degrade to safe-empty.
+- Same source-level test lock: every commit has a `TestReaderHelperUsed` class that pins `_read_brief_field` + the exact field key as the canonical access path (catches typo / rename drift).
+- Same top-3 slice convention on list fields (matches MusicGen v1 atmosphere[:3] slice from Sprint 8.1).
+
+**Audit naming-drift caught:** the 2026-05-25 audit named the LTX motion builder `_build_motion_prompt`; the actual function name is `_build_ltx_role_prompt`. The function does the job the audit described; the audit doc should be updated in a follow-up housekeeping pass.
+
+### Sprint 8.8 -- Bark / TTS deep audit: D-CLASS DECLINATION
+
+**Classification: D-class (causal block). No code change.**
+
+**Why Bark does not read the brief:**
+- Bark consumes script dialogue text directly from `ledger.lines[].text`, authored by the writer during `OTR_LedgerScriptWriter` (Sprint 3E).
+- Voice preset selection is entirely cast-driven (Gate 3, voice-path-cleanbreak 2026-05-12): Bark reads `cast.voice_preset` and hard-raises if it's missing or doesn't start with `"v2/"`. No brief read, no fallback.
+- Pipeline order: writer → freeze → Bark TTS (pre-compute) → SceneSequencer → composition → reflection (produces brief). **Bark executes BEFORE the brief exists.**
+- The only meta field Bark reads is `meta.freeze_unload_ok` -- an infrastructure signal for defensive VRAM recovery, not a creative control field.
+
+**Why wiring it would break things:**
+- (a) Re-running Bark post-brief breaks PD1 (audio is king -- byte-identical narrative audio is load-bearing; a second TTS pass loses reproducibility and adds latency).
+- (b) Inverting the pipeline (moving the reflection pass earlier to feed Bark) breaks post-script reflection semantics; the brief is generated FROM the locked script, not before it.
+
+The 5-tuple's creative latitude (mood / visual palette / objects / tempo / atmosphere) is for consumers that have rendering freedom AFTER the narrative is locked. TTS does not -- it executes against authored dialogue lines. Bark is correctly positioned outside the brief-consumer sweep.
+
+**Bark audit confirmed; close decision E.**
+
+### Regression baseline at closeout HEAD `b8972a6`
+
+- Full OTR suite: **2984 passed / 21 skipped / 0 failed** (was 2856/21/0 at Sprint 8.1 land; +128 new tests across 8.1-8.7).
+- Bug Bible: **16 passed / 7 skipped / 3 xfailed / 0 failed** (unchanged across the whole sprint).
+- LLM-slot sweep: **23/23 tagged, 0 untagged, 0 parse failures** (unchanged -- zero LLM calls added across 8.1-8.8).
+
+### PD invariants held across the whole sprint
+
+- **PD1 (audio is king).** Every commit preserved byte-identical narrative audio output. Sprints 8.1 (MusicGen) and 8.6 (HuMo) touched audio-adjacent paths -- both kept the v1 fallback behavior structurally identical when the v2 producer landed empty values. Failure sentinels are safe-empty across all five v2 fields.
+- **PD3 (workflow JSON).** Zero node-surface, widget, or socket changes across the sprint. The workflow JSON is untouched at HEAD.
+- **PD6 (LLM-slot tagging).** Zero LLM call sites added or removed. Slot sweep stayed at 23/23 across all 7 commits.
+
+### Open carry-forward (operator-owned)
+
+**PD1 live-run gate.** One ComfyUI episode on post-8.7 HEAD `b8972a6` should surface:
+
+- `[OTR_MusicGenTheme] story_brief_status=ok mood_terms=[<non-empty>] mood_source=v2_music_mood_terms` -- confirms v2 reached MusicGen.
+- `[BatchFluxRender] queued N env prompt(s) ... palette=[...] key_objects=[...]` -- confirms v2 reached FLUX env.
+- `OTR_VideoPlan: era tail story_brief_status=ok (atmosphere_line_chars=N palette_terms=M v1_chars=K total_chars=T)` -- confirms v2 reached VideoPlan.
+- Bark / TTS console output is **unchanged** (no v2 read by design, per the 8.8 D-class declination).
+
+The wiring sprint is now closed end-to-end on Claude's side; the live-run is operator territory.
