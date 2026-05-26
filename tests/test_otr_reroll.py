@@ -229,6 +229,130 @@ def test_build_reroll_line_request_target_words_fallback():
 
 
 # ---------------------------------------------------------------------------
+# 1b. continuity_slice rebuild on reroll (v2 follow-up, 2026-05-25)
+# ---------------------------------------------------------------------------
+
+
+def _continuity_dump(*, location="A shuttered bank, after hours.",
+                     active_props=None, facts=None):
+    """Build a meta['continuity'] dump in the ContinuityState shape.
+
+    Returns the JSON-friendly dict the writer stamps via
+    ``continuity_state.model_dump()`` so tests can drop it onto
+    ``meta['continuity']`` without importing pydantic.
+    """
+    return {
+        "location": location,
+        "active_props": list(active_props or []),
+        "facts": list(facts or []),
+    }
+
+
+def _fact(text, *, known_by=None, hidden_from=None, established_beat=0):
+    return {
+        "fact": text,
+        "known_by": list(known_by or []),
+        "hidden_from": list(hidden_from or []),
+        "established_beat": int(established_beat),
+    }
+
+
+def test_build_reroll_line_request_continuity_slice_surfaces_known_fact():
+    """A fact MARLOWE knows, established at beat 0, surfaces at index 1."""
+    data = _ledger_data()
+    data["meta"]["continuity"] = _continuity_dump(
+        active_props=["a forced lockbox"],
+        facts=[
+            _fact("Edna lied about the lockbox being sealed.",
+                  known_by=["MARLOWE"], established_beat=0),
+        ],
+    )
+    row = data["lines"][1]  # MARLOWE at index 1
+    req = build_reroll_line_request(data, row, data["cast"])
+
+    assert req.continuity_slice, "expected a non-empty continuity slice"
+    assert "CONTINUITY CONSTRAINTS" in req.continuity_slice
+    assert "MARLOWE KNOWS" in req.continuity_slice
+    assert "Edna lied about the lockbox" in req.continuity_slice
+    assert "A shuttered bank" in req.continuity_slice
+    assert "a forced lockbox" in req.continuity_slice
+
+
+def test_build_reroll_line_request_continuity_slice_filters_unestablished_fact():
+    """A fact with established_beat > line_index is filtered out for known_by."""
+    data = _ledger_data()
+    data["meta"]["continuity"] = _continuity_dump(
+        location="",  # drop the location header so we test facts in isolation
+        facts=[
+            _fact("Marlowe finds the second key in the desk.",
+                  known_by=["MARLOWE"], established_beat=2),
+        ],
+    )
+    row = data["lines"][1]  # MARLOWE at index 1 -- BEFORE the fact is true
+    req = build_reroll_line_request(data, row, data["cast"])
+
+    # The future-fact has nowhere else to surface and the location is
+    # empty, so the whole slice should collapse to "".
+    assert req.continuity_slice == ""
+
+
+def test_build_reroll_line_request_continuity_slice_surfaces_hidden_fact_always():
+    """A hidden_from fact ignores established_beat -- a secret stays a secret."""
+    data = _ledger_data()
+    data["meta"]["continuity"] = _continuity_dump(
+        location="",
+        facts=[
+            _fact("Edna is the saboteur the police are looking for.",
+                  hidden_from=["MARLOWE"], established_beat=99),
+        ],
+    )
+    row = data["lines"][1]  # MARLOWE at index 1, fact's established_beat=99
+    req = build_reroll_line_request(data, row, data["cast"])
+
+    assert "MARLOWE must NOT reference" in req.continuity_slice
+    assert "Edna is the saboteur" in req.continuity_slice
+
+
+def test_build_reroll_line_request_continuity_slice_empty_when_meta_missing():
+    """No meta['continuity'] -> empty slice (the writer never stamped it)."""
+    data = _ledger_data()
+    assert "continuity" not in data["meta"]
+    row = data["lines"][1]
+    req = build_reroll_line_request(data, row, data["cast"])
+    assert req.continuity_slice == ""
+
+
+def test_build_reroll_line_request_continuity_slice_empty_when_neutral():
+    """A neutral state -- no location, no props, no facts -- renders empty."""
+    data = _ledger_data()
+    data["meta"]["continuity"] = _continuity_dump(
+        location="", active_props=[], facts=[],
+    )
+    row = data["lines"][1]
+    req = build_reroll_line_request(data, row, data["cast"])
+    assert req.continuity_slice == ""
+
+
+def test_build_reroll_line_request_continuity_slice_never_raises_on_garbage():
+    """Malformed meta['continuity'] degrades to empty -- Prime Directive 1."""
+    data = _ledger_data()
+    # Wrong shape for ContinuityState.model_validate: facts is a string.
+    data["meta"]["continuity"] = {
+        "location": "fine",
+        "active_props": [],
+        "facts": "not a list of facts",
+    }
+    row = data["lines"][1]
+    req = build_reroll_line_request(data, row, data["cast"])
+    assert req.continuity_slice == ""
+
+    # And a totally wrong type for meta['continuity'] itself.
+    data["meta"]["continuity"] = "not even a dict"
+    req2 = build_reroll_line_request(data, row, data["cast"])
+    assert req2.continuity_slice == ""
+
+
+# ---------------------------------------------------------------------------
 # 2. REVISE block rendering in _build_user_prompt
 # ---------------------------------------------------------------------------
 

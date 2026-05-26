@@ -87,6 +87,14 @@ except ImportError:  # pragma: no cover - standalone / test load
         run_story_critic,
     )
 
+try:
+    from ._otr_continuity import ContinuityState, render_continuity_slice
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_continuity import (  # type: ignore
+        ContinuityState,
+        render_continuity_slice,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -258,14 +266,23 @@ def build_reroll_line_request(
     rolling `last_lines` window is rebuilt scene-locally from the
     preceding ledger rows.
 
-    `continuity_slice`, `position`, `sfx_cue`, `current_beat_block` are
-    intentionally left at their empty defaults: the critic's `hint`
-    (threaded separately as `reroll_hint`) carries the actionable signal
-    for a reroll, and those blocks would only be approximate
-    reconstructions. The phantom-name gate still runs on the reroll output
-    inside `compose_line` via `allowed_roster`, so cast safety is
-    unaffected. Re-rendering the continuity slice on a reroll is a noted
-    v2 follow-up.
+    `continuity_slice` is rebuilt from ``meta["continuity"]`` via
+    ``_rebuild_continuity_slice`` so the rerolled line gets the same
+    per-speaker hard constraints the first-pass compose received (Sprint
+    5C v2 follow-up, 2026-05-25). Beat coordinate: the 0-based position
+    of the line row in ``ledger_data["lines"]`` -- ``init_lines_from_outline``
+    stamps one ledger row per outline beat in beat order and rows are
+    only mutated in place after that, so the row position matches the
+    coordinate ``build_continuity_ledger`` used for ``established_beat``.
+    A missing or malformed ``meta["continuity"]`` renders empty (Prime
+    Directive 1).
+
+    `position`, `sfx_cue`, `current_beat_block` remain at their empty
+    defaults: those blocks would only be approximate reconstructions and
+    the critic's `hint` (threaded separately as `reroll_hint`) already
+    carries the actionable signal for a reroll. The phantom-name gate
+    still runs on the reroll output inside `compose_line` via
+    `allowed_roster`, so cast safety is unaffected.
     """
     meta = ledger_data.get("meta", {}) or {}
     cast_rows = cast_rows or []
@@ -310,6 +327,10 @@ def build_reroll_line_request(
     )
     prev_speaker = last_lines[-1][0] if last_lines else ""
 
+    continuity_slice = _rebuild_continuity_slice(
+        meta, speaker, line_index if line_index >= 0 else 0,
+    )
+
     return LineRequest(
         speaker=speaker,
         intent=intent,
@@ -327,6 +348,7 @@ def build_reroll_line_request(
         theme=str(meta.get("theme") or ""),
         all_voice_cards=all_voice_cards,
         speaker_role="character",
+        continuity_slice=continuity_slice,
     )
 
 
@@ -337,6 +359,63 @@ def _coerce_positive_int(value) -> int:
     except (TypeError, ValueError):
         return 0
     return out if out > 0 else 0
+
+
+def _rebuild_continuity_slice(
+    meta: dict,
+    speaker: str,
+    beat_index: int,
+) -> str:
+    """Reconstruct the per-speaker continuity slice for a reroll.
+
+    Mirrors the writer's first-pass per-beat call (see
+    ``OTR_LedgerScriptWriter._build_line_request_for_beat``): rebuilds the
+    episode `ContinuityState` from ``meta["continuity"]`` (the writer
+    stamps ``continuity_state.model_dump()`` at Sprint 5A) and projects it
+    through ``render_continuity_slice`` for the given speaker at the given
+    beat_index.
+
+    PRIME DIRECTIVE 1 -- NEVER raises. Returns ``""`` on every failure
+    path (no ``meta["continuity"]`` stamped, schema validation rejects the
+    dump, render itself throws). An empty string means "no continuity
+    block" -- ``_build_user_prompt`` drops the section entirely, so a
+    rerolled line still composes; it just loses the per-speaker hard
+    constraints the first pass enjoyed. The phantom-name gate inside
+    ``compose_line`` still runs via ``allowed_roster`` regardless, so
+    cast safety is unaffected.
+
+    `beat_index` is the 0-based position of the line row in
+    ``ledger_data["lines"]`` -- the same coordinate the first-pass
+    continuity render used, because ``init_lines_from_outline`` stamps
+    one ledger row per outline beat in beat order and the writer only
+    mutates row text in place via ``update_line_text``; no row is
+    inserted, deleted, or reordered after stamping. A negative index
+    (line not found) maps to 0, matching the writer's fallback
+    (``beat_index_by_id.get(beat.beat_id, 0)``).
+    """
+    if beat_index < 0:
+        beat_index = 0
+    raw = (meta or {}).get("continuity")
+    if not isinstance(raw, dict) or not raw:
+        return ""
+    try:
+        state = ContinuityState.model_validate(raw)
+    except Exception as exc:  # noqa: BLE001 - never block the reroll
+        log.warning(
+            "[OTR_Reroll] meta.continuity did not validate (%s); rerolled "
+            "line composes without a continuity slice",
+            exc,
+        )
+        return ""
+    try:
+        return render_continuity_slice(state, speaker, beat_index) or ""
+    except Exception as exc:  # noqa: BLE001 - render is pure but defensive
+        log.warning(
+            "[OTR_Reroll] render_continuity_slice raised for speaker=%r "
+            "beat_index=%d (%s); slice degraded to empty",
+            speaker, beat_index, exc,
+        )
+        return ""
 
 
 def _coerce_report(raw) -> StoryCriticReport:
