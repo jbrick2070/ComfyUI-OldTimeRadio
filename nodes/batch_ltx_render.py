@@ -426,6 +426,25 @@ def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
     Empirical LTX motion fidelity verification is Sprint A scope per
     ROADMAP.
 
+    Sprint 8.5 (2026-05-25): the v2 `meta.tempo_hint` field joins the
+    brief fragment via the canonical `_read_brief_field` reader.
+    Tempo (one or two words, e.g. "slow" / "hurried") is appended to
+    the brief fragment as a comma-suffixed pacing cue so LTX gets a
+    motion-register signal alongside the visual atmosphere. Order of
+    fragment resolution:
+
+      1. brief + tempo  -> "{brief}, {tempo}"   (preferred)
+      2. brief only     -> brief                 (legacy path)
+      3. tempo only     -> tempo                 (new path: usable
+                                                  even on a v1-brief
+                                                  failure if the v2
+                                                  producer landed
+                                                  tempo)
+      4. neither        -> legacy template only
+
+    The 240-char total + 140-char motion-position guards apply to
+    whatever combined fragment was chosen.
+
     The ``line`` argument is accepted for API stability with the prior
     signature and is currently unused -- the brief is per-episode
     (ledger-meta) not per-line. Re-introducing per-line context is a
@@ -439,26 +458,44 @@ def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
         get_story_brief_ltx,
         get_story_brief_status,
     )
+    # Sprint 8.5: pull tempo_hint via the canonical v2 reader. Safe-
+    # empty fallback covers v1-era ledger + failure sentinel.
+    from ._otr_brief_reader import _read_brief_field
     meta = ledger.get("meta") if isinstance(ledger, dict) else None
     if not isinstance(meta, dict):
         meta = {}
     brief_fragment = get_story_brief_ltx(meta, max_chars=90)
     brief_status = get_story_brief_status(meta)
+    tempo_raw = _read_brief_field(meta, "tempo_hint", default="")
+    tempo_hint = (
+        tempo_raw.strip() if isinstance(tempo_raw, str) else ""
+    )
 
-    if not brief_fragment:
+    # Sprint 8.5: choose the fragment to splice into the template.
+    # The four-way table in the docstring collapses to a simple
+    # "comma-join the non-empty signals" rule.
+    fragment_parts: list[str] = []
+    if brief_fragment:
+        fragment_parts.append(brief_fragment)
+    if tempo_hint:
+        fragment_parts.append(tempo_hint)
+    fragment = ", ".join(fragment_parts)
+
+    if not fragment:
         log.info(
             "[BatchLTXRender] role=%s story_brief_status=%s "
-            "(no brief fragment; legacy prompt)",
+            "tempo_hint='' (no fragment; legacy prompt)",
             role, brief_status,
         )
         return template
 
-    candidate = f"{template} {brief_fragment}".strip()
+    candidate = f"{template} {fragment}".strip()
     if len(candidate) > _LTX_TOTAL_CHAR_BUDGET:
         log.info(
             "[BatchLTXRender] role=%s story_brief_status=%s "
-            "(brief dropped: combined %d > %d budget)",
-            role, brief_status, len(candidate), _LTX_TOTAL_CHAR_BUDGET,
+            "tempo_hint=%r (fragment dropped: combined %d > %d budget)",
+            role, brief_status, tempo_hint,
+            len(candidate), _LTX_TOTAL_CHAR_BUDGET,
         )
         return template
 
@@ -470,16 +507,17 @@ def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
     if first_motion_idx > _LTX_MOTION_VERB_POSITION_CEILING:
         log.info(
             "[BatchLTXRender] role=%s story_brief_status=%s "
-            "(brief dropped: motion verb at char %d > %d ceiling)",
-            role, brief_status, first_motion_idx,
+            "tempo_hint=%r (fragment dropped: motion verb at char "
+            "%d > %d ceiling)",
+            role, brief_status, tempo_hint, first_motion_idx,
             _LTX_MOTION_VERB_POSITION_CEILING,
         )
         return template
 
     log.info(
         "[BatchLTXRender] role=%s story_brief_status=%s "
-        "(brief appended; %d total chars; motion@%d)",
-        role, brief_status, len(candidate), first_motion_idx,
+        "tempo_hint=%r (fragment appended; %d total chars; motion@%d)",
+        role, brief_status, tempo_hint, len(candidate), first_motion_idx,
     )
     return candidate
 
