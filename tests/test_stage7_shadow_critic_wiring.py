@@ -199,6 +199,65 @@ class TestAdapterPaddingAndFallbacks:
         assert plan is not None
         assert "Signal anomaly" in plan.premise
 
+    def test_news_seed_as_dict_does_not_raise(self):
+        """BUG-LOCAL-277 regression. Real soak run
+        signal_lost_..._154105 carried meta.news_seed as a dict
+        with keys {headline, source, url, date, body_chars, style,
+        selected_at} -- the current NewsFetcher shape. The adapter
+        was doing `(meta.get('news_seed') or '').strip()` which
+        raises AttributeError on a dict. With the
+        _coerce_news_seed_text helper, both shapes resolve cleanly.
+        """
+        led = _legacy_ledger()
+        led["meta"]["episode_canon"] = {}   # force fallback to news_seed
+        led["meta"]["news_seed"] = {
+            "headline": "Venomous Himalayan pit viper was actually 5 species",
+            "source": "Latest Science News -- ScienceDaily",
+            "url": "https://example.com/article",
+            "date": "2026-05-26",
+            "body_chars": 414,
+            "style": "noir",
+            "selected_at": "2026-05-26T15:41:05Z",
+        }
+        # Must not raise:
+        plan = legacy_ledger_to_stage1_plan(led)
+        assert plan is not None
+        # headline carries through as the premise excerpt:
+        assert "Venomous Himalayan pit viper" in plan.premise
+
+    def test_news_seed_dict_falls_back_to_source(self):
+        """If a dict-shaped news_seed has no headline, the adapter
+        falls back to the source. Ensures we never pass a dict into
+        .strip() and never produce a garbled premise.
+        """
+        led = _legacy_ledger()
+        led["meta"]["episode_canon"] = {}
+        led["meta"]["news_seed"] = {
+            "headline": "",
+            "source": "Wire service",
+            "url": "https://example.com",
+        }
+        plan = legacy_ledger_to_stage1_plan(led)
+        assert plan is not None
+        # Either the source carries through or the placeholder kicks
+        # in when the source string is too short for the >=10 bound.
+        assert plan.premise
+
+    def test_news_seed_dict_all_empty_falls_back_to_placeholder(self):
+        """Defensive: when both episode_canon AND news_seed are
+        unusable, the adapter must still produce a valid plan via
+        the placeholder premise.
+        """
+        led = _legacy_ledger()
+        led["meta"]["episode_canon"] = {}
+        led["meta"]["news_seed"] = {
+            "headline": None,
+            "source": None,
+        }
+        plan = legacy_ledger_to_stage1_plan(led)
+        assert plan is not None
+        assert len(plan.premise) >= 10   # schema floor
+
     def test_missing_arc_uses_placeholder(self):
         led = _legacy_ledger()
         led["meta"]["episode_canon"] = {

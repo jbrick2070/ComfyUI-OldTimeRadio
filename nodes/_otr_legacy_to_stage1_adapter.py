@@ -63,6 +63,47 @@ _PLACEHOLDER_ARC_PART: str = (
 # ---------------------------------------------------------------------------
 
 
+def _coerce_news_seed_text(raw: Any) -> str:
+    """Coerce meta.news_seed (which is a dict in current ledgers and was a
+    plain string in older ones) to a text excerpt the adapter can use as
+    a premise placeholder.
+
+    Current ledger shape (post-Sprint-10A NewsFetcher refactor):
+        meta.news_seed = {
+            "headline": str, "source": str, "url": str,
+            "date": str,     "body_chars": int, "style": str,
+            "selected_at": str
+        }
+    Older / handwritten ledgers may carry meta.news_seed as a single
+    string (the full body excerpt). We accept either shape.
+
+    BUG-LOCAL-277 (2026-05-26): the live soak run
+    signal_lost_..._154105 surfaced an AttributeError on the dict shape
+    because the adapter did `(meta.get('news_seed') or '').strip()`,
+    assuming the field was always a string. Fix: coerce centrally with
+    type-aware logic and let `.strip()` see real strings only.
+
+    Args:
+        raw: whatever lives at meta.news_seed -- str, dict, None,
+             or something unexpected.
+
+    Returns:
+        Best-effort text excerpt, possibly empty. Never raises.
+    """
+    if isinstance(raw, str):
+        return raw.strip()
+    if isinstance(raw, dict):
+        # Prefer the headline; fall back to source as a last resort so
+        # the critic at least sees a topic anchor.
+        headline = raw.get("headline")
+        if isinstance(headline, str) and headline.strip():
+            return headline.strip()
+        source = raw.get("source")
+        if isinstance(source, str) and source.strip():
+            return source.strip()
+    return ""
+
+
 def _gender_to_pronouns(gender: str) -> str:
     """Map cast_pools gender literal -> Stage 1 pronouns literal."""
     g = (gender or "").strip().lower()
@@ -160,7 +201,10 @@ def legacy_ledger_to_stage1_plan(led_data: dict) -> Optional[Stage1Plan]:
     if isinstance(episode_canon, dict):
         premise = (episode_canon.get("premise") or "").strip()
     if not premise:
-        news_seed = (meta.get("news_seed") or "").strip()
+        # BUG-LOCAL-277: news_seed is a dict in current ledgers; route
+        # through the type-aware coercion so the adapter handles both
+        # dict and legacy-string shapes without raising.
+        news_seed = _coerce_news_seed_text(meta.get("news_seed"))
         # Trim to fit the schema's 10..300 char band.
         if news_seed:
             premise = news_seed[:280]
