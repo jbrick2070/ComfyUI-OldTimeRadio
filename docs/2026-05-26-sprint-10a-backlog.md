@@ -19,14 +19,84 @@ plan did not originally name.
 | 3-A — Stage 1 schema | DONE | `cde7e4f` |
 | 3-B — Constrained-decode call site | DONE | `e46bd2f` |
 | 3-C — Shadow pass wired into writer | DONE | `fcbeadf` |
-| **3-D — Stage 1 prompt: length bound** | PENDING | scheduled after step 4 |
-| 4 — Cast audit | IN PROGRESS | — |
-| 5 — Stage 3 validators | PENDING | — |
-| 5+ conditional — numeric-range LogitsProcessor | PARKED | depends on 3-D soak |
-| 6 — Stage 2 multi-turn roleplay | PENDING | — |
-| 7 — Whole-episode critic | PENDING | — |
-| 8 — Operator E2E gate | OPERATOR | — |
-| 10A-LAB — A1 vs A2 listen test | OPTIONAL | — |
+| 3-D — Stage 1 prompt: length + gender bounds | DONE | `a61a8ba` |
+| 4 — Cast audit | DONE | `185814f` |
+| 5 — Stage 3 validators | DONE | `a48ccae` |
+| 6 — Stage 2 multi-turn + best-of-N | DONE | `6b50efc` |
+| 7 — Whole-episode critic (schema + module) | DONE | `ae1c006` |
+| 7-wire — Shadow critic into FreezeCascade | DONE | `c86fda8` |
+| Honorifics fix in name oracle | DONE | `1a6651d` |
+| **8 — Operator E2E gate** | OPERATOR / IN-PROGRESS | live soak running 2026-05-26 |
+| 5+ conditional — numeric-range LogitsProcessor | PARKED -- evidence trending toward NOT NEEDED | depends on 3-D soak (see below) |
+| 10A-LAB — A1 vs A2 listen test | DEFERRED to Sprint 10B per operator | — |
+
+**Operational hotfixes alongside Sprint 10A** (not part of the
+sprint plan but shipped during the same session):
+
+| Fix | Commit | Why |
+|-----|--------|-----|
+| BUG-LOCAL-276 freeze-verdict halt at Bark | `9a77144` | Run-3 crash 2026-05-26 |
+| BUG-LOCAL-276 message typo (271 -> 276) | `afd350b` | Self-spotted on 1st soak verification |
+| `bypass_freeze_halt` widget on Bark | `5896c10` | Operator-flagged smoke-loop regression |
+
+## Soak counter snapshot (live)
+
+Updated as each operator soak run lands. Counters reset only when a
+material change to the Stage 1 prompt or schema ships.
+
+  * **Stage 1 attempt 1 valid plans:** 2 / 2 = **100%** since 3-D
+    landed.
+      - `pending_20260526_135518` (HEAD `cde7e4f`, 100-word, 13:56):
+        valid_first_attempt in 44.98s. cast=2 beats=6 facts=3.
+      - `signal_lost_deciphering_the_ice_20260526_143355` (HEAD
+        `a48ccae`, 350-word, 14:33): valid_first_attempt in 56.39s.
+  * **Cast audit errors:** 0 / 2.
+  * **Cast audit warns:** 1 / 2 -- single `name_unknown_soft` on
+    'Dr. Anya Hayes'. Honorifics fix `1a6651d` should drop this
+    to 0 / N on the next run.
+  * **Step 7 shadow critic verdicts:** 0 runs so far. Wiring landed
+    `c86fda8`, awaiting first soak with the new build loaded.
+
+## Conditional step-5 numeric-range LogitsProcessor (task #16)
+
+**Trending toward NOT NEEDED.** The 3-D prompt-tightening fix has
+landed Stage 1 attempt 1 valid in 100% of soak runs so far (2/2).
+The plan's escalation criterion was:
+  > "Only build if 3-D's prompt tightening fails to get us above
+  >  ~17/20 first-attempt valid plans."
+
+At current trajectory we are well above that. **Decision rule for
+this backlog item:** if the Stage 1 attempt 1 rate stays at >= 90%
+across the first 10 soak runs after the sprint code-completes, the
+LogitsProcessor task is closed as NOT-NEEDED. If the rate drops
+below that threshold, the task reopens and we land token-level
+numeric enforcement.
+
+## Step 3-D follow-up status
+
+`length_target_words=0` failures: zero in the 2 soak runs since 3-D
+landed. The prompt bullet 'length_target_words MUST be an integer
+between 5 and 200 inclusive. Never emit 0, negative numbers, or
+values above 200. A typical beat is 15 to 45 words.' is converging
+Mistral-Nemo onto valid values first attempt.
+
+## Sprint 10A operator E2E gate (step 8)
+
+In progress as of 2026-05-26 ~15:40. Operator running with:
+  * `enable_stage1_shadow_pass` widget = True
+  * `bypass_freeze_halt` widget = True
+  * target_words = 110, creativity = "wild & rough"
+
+Expected ledger meta keys after run:
+  1. `meta.stage1_shadow_attempts` - Stage 1 attempt records
+  2. `meta.stage1_shadow_plan_present` - True / False
+  3. `meta.stage1_cast_audit` - findings list (with 0 warns now
+     that honorifics fix is loaded, if Desktop restarts pick it up)
+  4. `meta.stage7_shadow_critic` - rubric verdict + axis scores
+     (NEW; only present if Desktop loaded build >= c86fda8)
+
+If all four are present AND well-formed AND the operator listen-
+test confirms the audio shipped, Sprint 10A is DONE.
 
 ---
 
