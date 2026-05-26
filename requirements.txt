@@ -17,3 +17,12 @@ tokenizers>=0.15
 sentencepiece>=0.1.99
 
 bitsandbytes>=0.42.0
+
+# Sprint 10A step 3 -- grammar-constrained generation for the Stage 1
+# structural-plan call. Pure Python wheel, no compiled deps; works on
+# the project's torch 2.10 + CUDA 13 + Blackwell sm_120 + Windows stack
+# where prebuilt wheels for other constrained-decode libraries
+# (xgrammar, outlines binary backends) are scarce. transformers v5
+# compat is provided by nodes/_otr_lmfe_compat.py (the third-party
+# integration hard-imports PreTrainedTokenizerBase from the v4 path).
+lm-format-enforcer>=0.11.3,<1.0
