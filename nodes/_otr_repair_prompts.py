@@ -7,7 +7,7 @@ site used. This module ships the SIX bespoke per-failure-class
 factories the v4 plan (section 2C) calls for, plus a dispatcher that
 routes an Attempt-3 failure to the right one by inspecting the error.
 
-The six failure classes:
+The seven failure classes:
 
   json_syntax_repair     -- json.JSONDecodeError: output was not
                             parseable JSON at all.
@@ -21,6 +21,16 @@ The six failure classes:
                             a description meant to be purely visual.
   forbidden_name_repair  -- a character name appears where the pass is
                             forbidden to name characters.
+  payload_null_repair    -- pydantic.ValidationError where a required
+                            `payload` string field arrived as `None`.
+                            Specific to Sprint 7C / BUG-LOCAL-275 -- the
+                            Script Doctor edits pass keeps emitting
+                            null payloads on no-op / annotation-only
+                            edits. The generic schema_field_repair
+                            directive ("fix the field") was too vague
+                            to recover; this factory tells the model
+                            to either supply a real replacement string
+                            or OMIT the edit row entirely.
 
 `cast_membership_repair` is special. The v4 plan requires it to NEVER
 call the LLM when the project's existing Levenshtein matcher resolves
@@ -82,6 +92,7 @@ __all__ = [
     "too_many_words_repair",
     "narration_leak_repair",
     "forbidden_name_repair",
+    "payload_null_repair",
     "make_dispatching_repair_factory",
 ]
 
@@ -265,9 +276,74 @@ def forbidden_name_repair(
     )
 
 
+def payload_null_repair(
+    *,
+    original_prompt: Any,
+    failed_output: str,
+    error: BaseException,
+) -> list[dict[str, str]]:
+    """Repair prompt for a `payload: null` pydantic rejection.
+
+    Sprint 7C / BUG-LOCAL-275. The Script Doctor edits-pass schema
+    requires `payload: str` (`ReviewerEdit.payload`), but the technical-
+    slot model keeps emitting `payload: null` on no-op / annotation-
+    only edit rows. The generic `schema_field_repair` directive ("fix
+    the field named in the error") was too vague to recover -- the
+    model kept re-emitting the same null. This directive is explicit:
+    every `payload` MUST be a non-null replacement string; if the
+    model has no replacement text, it must DROP the entire edit row.
+    """
+    directive = (
+        "CRITICAL: Your previous response had a `payload` field set to "
+        f"null, which is not allowed: {_error_text(error)}. Every edit "
+        "row's `payload` field MUST be a non-null string containing the "
+        "actual replacement text. If you have no replacement text for a "
+        "line, OMIT the entire edit row -- do not emit it with "
+        "`payload: null`, `payload: \"\"`, or any other placeholder. "
+        "Return ONE valid JSON object, no Markdown, no prose."
+    )
+    return _compose_repair(
+        directive, failed_output=failed_output, original_prompt=original_prompt,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher -- routes an Attempt-3 failure to the matching typed factory
 # ---------------------------------------------------------------------------
+
+
+# Sprint 7C / BUG-LOCAL-275: pydantic v2 ValidationError repr for a
+# null-where-string-required failure includes BOTH the offending field
+# path and the `input_value=None` annotation, e.g.:
+#
+#   edits.2.payload
+#     Input should be a valid string [type=string_type,
+#     input_value=None, input_type=NoneType]
+#
+# The dispatcher matches on the lowered string. `payload` + the
+# `input_value=none` annotation is specific enough that no other
+# ValidationError in the project's schemas collides with it (no other
+# pydantic field in the structured-call call graph is named `payload`,
+# and `input_value=none` only appears when the model literally sent
+# `null`). If pydantic ever changes the repr we lose the typed route
+# and fall through to `schema_field_repair` -- behaviour-degraded but
+# never broken.
+_PAYLOAD_NULL_FIELD_TOKEN: str = "payload"
+_PAYLOAD_NULL_VALUE_TOKEN: str = "input_value=none"
+
+
+def _is_payload_null_validation_error(error: BaseException) -> bool:
+    """True iff `error` is a pydantic ValidationError whose repr names
+    a null `payload` field. See `_PAYLOAD_NULL_*` constants above for
+    the signal we match on.
+    """
+    if not isinstance(error, ValidationError):
+        return False
+    text = str(error).lower()
+    return (
+        _PAYLOAD_NULL_FIELD_TOKEN in text
+        and _PAYLOAD_NULL_VALUE_TOKEN in text
+    )
 
 
 # A deterministic-repair callback: given the raw failed output and the
@@ -286,7 +362,9 @@ def make_dispatching_repair_factory(
     The returned callable inspects the Attempt-3 error and routes:
 
       * `json.JSONDecodeError`      -> `json_syntax_repair`
-      * `pydantic.ValidationError`  -> `schema_field_repair`
+      * `pydantic.ValidationError`  -> classified:
+            null `payload` field           -> `payload_null_repair`
+            everything else                -> `schema_field_repair`
       * `PostValidationError`       -> classified by its message:
             "locked cast"                  -> cast membership
             "named_character"              -> forbidden name
@@ -326,6 +404,15 @@ def make_dispatching_repair_factory(
                 error=error,
             )
         if isinstance(error, ValidationError):
+            # Sprint 7C / BUG-LOCAL-275: a null `payload` rejection
+            # gets a dedicated directive; the generic field-repair
+            # prompt did not recover the Script Doctor edits pass.
+            if _is_payload_null_validation_error(error):
+                return payload_null_repair(
+                    original_prompt=original_prompt,
+                    failed_output=failed_output,
+                    error=error,
+                )
             return schema_field_repair(
                 original_prompt=original_prompt,
                 failed_output=failed_output,

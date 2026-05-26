@@ -79,7 +79,7 @@
 | 6 -- critic->render coupling | COMPLETE | -- | full v1 coupling per Jeffrey: 4 widgets on `OTR_LedgerFreezeCascade` (render_selection, render_max_n, protagonist_only, manual_line_ids), cascade stamps `meta.render_plan` from the post-reroll critic report, `OTR_BatchHumoRender` reads + filters; workflow JSON `widgets_values` re-wired (3 -> 7); `244e9fd` pushed 2026-05-25 |
 | 7A -- critic stamp/read mismatch | COMPLETE | BUG-LOCAL-273 [FIXED] | Root cause: `Ledger.save()` (production_ledger.py:1012) rebinds `self.data` on every save; the Phase 1+2 reviewer's internal save detached the cascade's L570/L576 `ledger_data`/`meta` locals. Fix: refresh both before each post-reviewer stamp (Sprint 5B + Sprint 6). |
 | 7B -- HuMo reads stale on-disk ledger | COMPLETE | BUG-LOCAL-274 [FIXED] | Same root cause as 7A. Fix: explicit `led.save()` after `_otr_freeze_cascade.py:748` so the post-cascade disk ledger carries `meta.render_plan` for HuMo's separate-node load. Defensive `getattr` covers test-fixture SimpleNamespace stubs. Bundled with 7A in the same commit. |
-| 7C -- Script Doctor edits.payload null | NOT STARTED | BUG-LOCAL-275 | Live-run punch list (non-blocking): doctor edits-pass attempts 1+2 failed pydantic validation (`edits.2.payload Input should be a valid string` / `input_value=None`); attempt 3 succeeded with deterministic drop. Typed-repair gap. |
+| 7C -- Script Doctor edits.payload null | COMPLETE | BUG-LOCAL-275 [FIXED] | option (b) shipped: new `payload_null_repair` typed factory + dispatcher hook on `payload` + `input_value=None` signal; schema stays strict; regression `tests/test_repair_prompts.py` 18 -> 21 (+3 incl. specificity guard) |
 
 **Round-robin consultation WAIVED 2026-05-24 (Jeffrey):** these changes were round-robined in earlier sessions, so no sprint carries a consultation gate -- the build runs sprint-after-sprint. No sprint is `BLOCKED`; that status is now reserved for a genuine hard dependency only.
 
@@ -268,14 +268,14 @@ Cascade stamps `meta["story_critic_report"] = story_critic_report.model_dump()` 
 
 **Two candidate root causes -- investigation owns the first work item:**
 
-- [ ] **Candidate A (pydantic round-trip):** `StoryCriticReport(arc_verdict="uneven", reroll_targets=[RerollTarget(...) x 4], ...).model_dump()` produces a dict; `StoryCriticReport.model_validate(dict)` is expected to reconstruct losslessly, but a strict field config / alias / `extra='forbid'` could silently drop list entries. Unit-test first: build a real report, round-trip it, assert `len(report.reroll_targets) == 4` post-validate.
-- [ ] **Candidate B (dict mutation between L683 and L505):** something replaces or empties `meta["story_critic_report"]` between the cascade stamp and the reroll read. Insert a sanity log between L683 and L710: `log.info("[LFC] post-stamp sanity: meta.story_critic_report.reroll_targets = %d", len(meta.get("story_critic_report", {}).get("reroll_targets", [])))`. If 4, the wipe is INSIDE the reroll's coercion. If 0, the wipe is in cascade-to-reroll handoff.
+- [x] **Candidate A (pydantic round-trip):** RULED OUT (`db090ce` investigation). The round-trip is lossless on the call path -- the cascade does NOT serialize via `model_dump()` -> `model_validate()` between L683 and L505; it stamps the dict directly and the consumers re-read from `led.data`.
+- [x] **Candidate B (dict mutation between L683 and L505):** CONFIRMED root cause (`db090ce`). The mutation lives in `production_ledger.Ledger.save()` (`p_ledger.py:1012`): every save rebinds `self.data` to a new merged dict (BUG-LOCAL-108 merge-with-disk pattern). The Phase 1+2 reviewer at cascade L622 calls `save()` internally, detaching the cascade's L570/L576 `ledger_data`/`meta` locals from the live ledger. The L683 critic stamp lands on the orphaned dict; the reroll at L505 re-reads `led.data` and gets the live post-save dict with no critic report. `StoryCriticReport.model_validate({})` succeeds with all-defaults (`arc_verdict="strong"`, empty `reroll_targets`/`flat_lines`) -- no warning fires because every field has a default.
 
 **Fix lanes (after root cause confirmed):**
 
-- [ ] Patch the offending code path (`_otr_story_critic.py` model config, OR `_otr_freeze_cascade.py` between-stamp mutation, OR `_otr_reroll.py` coercion).
-- [ ] Regression test: end-to-end fake-cascade scenario stamps a non-empty `story_critic_report` dict, calls `run_targeted_reroll`, asserts `report.reroll_targets` count matches stamp count.
-- [ ] Regression test: `build_render_plan` given `meta["story_critic_report"]={"arc_verdict": "uneven", "flat_lines": [...]}` returns `source_arc_verdict="uneven"` and `len(excluded_flat_lines) > 0`.
+- [x] **Patched (`db090ce`).** Refresh pair `ledger_data = led.data` + `meta = ledger_data.setdefault("meta", {})` inserted before the Sprint 5B critic stamp at L683 AND before the Sprint 6 render_plan stamp at L748. Both stamps now land on the live post-save dict.
+- [x] **Regression (`db090ce`).** `tests/test_freeze_cascade_meta_persistence.py::test_reroll_sees_real_critic_not_clean_fallback` -- a `_RebindingLedger` fixture mimics production save's rebind, the reroll's `_coerce_report` is asserted to see 2 targets + `arc_verdict='uneven'`, not `StoryCriticReport.clean()`. The `_RebindingLedger` fixture is the load-bearing piece -- existing `SimpleNamespace` ledger stubs preserved the pre-bug reference and never caught 273/274.
+- [x] **Regression (`db090ce`).** `tests/test_freeze_cascade_meta_persistence.py::test_arc_verdict_lifts_render_plan_blocking_correctly` -- asserts `render_plan["source_arc_verdict"] == "uneven"` (not the default `"strong"` the live run logged); the per-line `excluded_flat_lines` path is covered by the existing `test_otr_render_plan.py` suite.
 
 ### 7B -- HuMo reads stale on-disk ledger -> BUG-LOCAL-274
 
@@ -288,10 +288,10 @@ Cascade stamps `meta["story_critic_report"] = story_critic_report.model_dump()` 
 
 **Fix lanes:**
 
-- [ ] Audit `_otr_freeze_cascade.py` for every late-cascade `meta[...] = ...` mutation after Phase 10 begins. Verify which stamps make it to disk today (cycle_count? reroll_history?) and which silently die in-memory like `render_plan`.
-- [ ] Implement B1: explicit `led.save()` after the Sprint 6 render_plan stamp at L748 (and any other late stamps the audit surfaces). The save call must be inside the non-terminal path only; the terminal-skip path already preserves disk state.
-- [ ] Regression test: cascade fake-run on a tmp ledger file, assert `json.loads(Path(ledger_path).read_text())["meta"]["render_plan"]` matches the in-memory `meta.render_plan`.
-- [ ] Regression test: HuMo's `_load_ledger_with_path` on a ledger stamped with `meta.render_plan` sees the plan and fires `[BatchHumoRender] Sprint 6 render plan ACTIVE: ...` in the log.
+- [x] **Audited (`db090ce` investigation).** Late-cascade meta stamps: `cycle_count` / `reroll_history` are written by `run_targeted_reroll` which calls `led.save()` internally on every cycle (already disk-persisted). `render_plan` was the only late stamp that lived only in-memory.
+- [x] **Implemented B1 (`db090ce`).** Explicit `led.save()` after the Sprint 6 render_plan stamp at `_otr_freeze_cascade.py:748`, gated by `getattr(led, "save", None)` (covers `SimpleNamespace` test stubs) and wrapped in try/except (PD1 -- a save failure logs and HuMo falls back to render-all, never aborts). Non-terminal path only; terminal-skip path preserves disk state via the shared `_build_terminal_skip_disposition` helper.
+- [x] **Regression (`db090ce`).** `tests/test_freeze_cascade_meta_persistence.py::test_render_plan_persisted_via_explicit_save` -- asserts at least one save snapshot captured `meta.render_plan` (the BUG-274 disk-persistence proof using the `_RebindingLedger` fixture's save-history record).
+- [x] **Regression (`db090ce`).** `tests/test_freeze_cascade_meta_persistence.py::test_render_plan_present_on_live_meta_after_cascade` -- the live meta post-cascade carries the plan; HuMo's `_load_ledger_with_path` path is exercised end-to-end by the operator live-run gate (Wave 3).
 
 ### 7C -- Script Doctor edits.payload null -> BUG-LOCAL-275
 
@@ -299,9 +299,9 @@ Live-run noise (non-blocking, doctor degraded safely). Doctor edits-pass attempt
 
 **Investigation + fix:**
 
-- [ ] Read the doctor `edits` pydantic schema -- is `payload` typed `str` or `Optional[str]`? If `str`, the model is too strict for the doctor's "no-op / annotation-only" edit cases that the LLM keeps emitting.
-- [ ] Decide: widen `payload` to `Optional[str]` (with downstream null-payload handling) OR add a `payload_null_repair` typed-prompt factory in `_otr_repair_prompts.py` that catches `payload=None` and re-prompts with the exact pydantic trace.
-- [ ] Regression test: feed `edits.2.payload=None` through `structured_call` and confirm the typed repair recovers (or the widened schema accepts).
+- [x] **Confirmed.** `ReviewerEdit.payload: str` (strict) at `nodes/_otr_ledger_reviewer.py:212`. The model is too strict for the doctor's no-op / annotation-only edit cases -- the technical-slot LLM keeps emitting `payload: null` to skip rows.
+- [x] **Decided (Jeffrey 2026-05-25).** Option (b) -- typed repair, schema stays strict. Option (a) would mask intentional doctor mistakes. Shipped: new `payload_null_repair` factory in `_otr_repair_prompts.py` + dispatcher hook in `make_dispatching_repair_factory` that triggers on `payload` + `input_value=None` in the lowered ValidationError repr (constants `_PAYLOAD_NULL_FIELD_TOKEN` / `_PAYLOAD_NULL_VALUE_TOKEN` documented in source). Directive is explicit: every payload must be a non-null string; if no replacement text, OMIT the entire edit row.
+- [x] **Regression.** `tests/test_repair_prompts.py` 18 -> 21 (+3): builder directive test, dispatcher routing test, specificity guard (an unrelated null field must NOT take the Sprint 7C route -- pins the paired field+value signal). Full OTR suite 2856 passed / 0 failed; Bug Bible green; LLM-slot sweep 23/23 still tagged (no LLM call added).
 
 ### Parallelization map (3 subagent lanes)
 
@@ -319,11 +319,11 @@ Live-run noise (non-blocking, doctor degraded safely). Doctor edits-pass attempt
 
 ### Sprint 7 completion gate
 
-- [ ] Wave 1 (7A + 7C) committed; full OTR suite green; Bug Bible green; LLM-slot sweep 23/23 still tagged.
-- [ ] Wave 2 (7B) committed; ledger-persistence regression test green.
-- [ ] Operator live-run shows: `[OTR_Reroll] cycle 1/2: N reroll target(s)` OR `critic named no reroll targets` (with a known-clean critic); `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected`; `freeze_verdict=frozen_clean`; final mp4 lands.
-- [ ] BUG-LOCAL-273 / 274 / 275 all marked `[FIXED]` in `BUG_LOG.md`.
-- [ ] If any new bug surfaces -- log `BUG-LOCAL-NNN` immediately per CLAUDE.md; do not batch.
+- [x] **Wave 1 (7A + 7C) committed.** 7A bundled with 7B in `db090ce` (shared root cause -- see entry below). 7C shipped as its own commit (this entry). Full OTR suite green; Bug Bible green; LLM-slot sweep 23/23 still tagged.
+- [x] **Wave 2 (7B) committed.** Bundled with 7A in `db090ce`. Ledger-persistence regression test `tests/test_freeze_cascade_meta_persistence.py::test_render_plan_persisted_via_explicit_save` green.
+- [ ] **Operator live-run gate -- carried forward.** Audio-is-king reversion gate (PD1). Expected signal: `[OTR_Reroll] cycle 1/2: N reroll target(s)` (not the previous "critic named no reroll targets") AND `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected` with `(render_plan not_in_plan)` skip reasons on excluded character lines; 7C signal: a doctor edits-pass that hits `payload: null` should recover at attempt 3 with the model OMITTING the row rather than emitting null.
+- [x] **BUG-LOCAL-273 / 274 / 275 all `[FIXED]` in `BUG_LOG.md`.**
+- [x] **No new bugs surfaced.** Sprint 7 close.
 
 ---
 
@@ -694,3 +694,16 @@ gbnf_enforcement: removed                             # 2026-05-25: deleted -- l
 - **Sprint 7C still NOT STARTED.** Doctor `edits.payload=None` typed-repair gap (BUG-LOCAL-275). Non-blocking; doctor degrades safely. Separate scope, separate commit.
 - **New bug ids:** none beyond the 273/274/275 already logged this session.
 - **Sprint state:** Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6 COMPLETE. Sprint 7A + 7B COMPLETE. Sprint 7C NOT STARTED. Operator live-run is the audio-is-king reversion gate (Prime Directive 1) -- expected log signal: `[OTR_Reroll] cycle 1/2: N reroll target(s)` (not the previous "critic named no reroll targets") AND `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected` with `(render_plan not_in_plan)` skip reasons on excluded character lines.
+
+### 2026-05-25 -- Sprint 7C close (BUG-LOCAL-275: payload_null typed repair)
+
+- Commit TBD on `v2.0-alpha` -- 3 files: `nodes/_otr_repair_prompts.py` (+~90 lines new factory + dispatcher hook + two detection-token constants), `tests/test_repair_prompts.py` (+~90 lines: new builder fixture + 3 new tests + updated `_every_builder_returns_single_user_message` to include the seventh builder + coverage-map docstring update), `BUG_LOG.md` + `story_pipeline_sprint_plan_v4_audited.md` (this entry + Status Board flip + stale Sprint 7A/7B/7C checkboxes). Predecessor HEAD `db090ce`. Push pending.
+- **Sprint 7C COMPLETE.** Option (b) shipped per Jeffrey's decision (`session_handoff.md` recommendation): a dedicated `payload_null_repair` typed-prompt factory + dispatcher hook, schema stays strict. Option (a) -- widening `ReviewerEdit.payload` to `Optional[str]` -- was rejected because it would have masked intentional doctor mistakes (null payload becomes a silent no-op rather than a schema-gate trip).
+- **Fix surface (`nodes/_otr_repair_prompts.py`).** New `payload_null_repair` factory follows the established `_compose_repair` shape (CRITICAL prefix + truncated failed output + original instruction restated). The directive is explicit -- "every `payload` field MUST be a non-null string; if you have no replacement text, OMIT the entire edit row -- do not emit it with `payload: null`, `payload: \"\"`, or any other placeholder." `make_dispatching_repair_factory` gains an `_is_payload_null_validation_error` predicate (matches lowered repr containing BOTH the `payload` field token AND the `input_value=none` annotation; the paired signal is specific enough that no other ValidationError in the structured-call call graph collides with it -- no other pydantic field in scope is named `payload`, and `input_value=none` only appears when the model literally sent `null`). The `ValidationError` branch now checks the predicate FIRST and routes a null-payload trace to `payload_null_repair`; everything else still falls through to `schema_field_repair` (Sprint 2C generic path preserved). The detection-token constants `_PAYLOAD_NULL_FIELD_TOKEN` / `_PAYLOAD_NULL_VALUE_TOKEN` are documented at module scope -- if a future pydantic version reshapes the repr, the dispatcher falls through to `schema_field_repair` and we get behaviour-degraded recovery rather than a crash.
+- **Test surface (`tests/test_repair_prompts.py`).** New fixture `_payload_null_validation_error()` produces the BUG-LOCAL-275 trace against a local `_Edit` / `_Report` mirror of `ReviewerEdit` / `ScriptDoctorReport` (avoids coupling the test file to the reviewer module). Three new tests: `test_payload_null_repair_directive` (builder shape + load-bearing "OMIT" / "non-null string" wording); `test_dispatch_payload_null_routes_to_payload_null_repair` (dispatcher routes the real BUG-275-shape error correctly); `test_dispatch_payload_null_signal_is_specific` (a ValidationError on an unrelated null field does NOT take the Sprint 7C route -- pins the paired field+value signal). `test_every_builder_returns_single_user_message` extended to seven builders. Coverage-map docstring updated 18 -> 21 tests.
+- **Prime Directives.** PD1: factory builds a prompt and never raises; the dispatcher's predicate falls through to the existing `schema_field_repair` if pydantic ever changes the repr. PD2: no LLM call added, no VRAM impact -- the typed factory only reshapes the prompt of the existing Attempt 3 repair call. PD3: no node `INPUT_TYPES` / widget / output socket touched -- no workflow JSON re-wire. PD6: no new LLM call site -- LLM-slot sweep stays at 23/23 tagged.
+- **Regression:** `tests/test_repair_prompts.py` 21 passed (was 18 + 3 new); full OTR suite **2856 passed / 21 skipped / 0 failed** (baseline 2853 + 3 new from this commit); Bug Bible 16 passed / 7 skipped / 3 xfailed / 0 failed; LLM-slot sweep 23/23 tagged, 0 parse failures. AST + UTF-8 no-BOM on both touched files.
+- **Stale-checkbox cleanup landed in the same commit.** The Sprint 7A / 7B sub-section checkboxes (lines 271-272 candidate-cause investigation, 276-278 7A fix lanes, 291-294 7B fix lanes, 302-304 7C investigation+fix) were flipped from `[ ]` to `[x]` with one-line completion summaries pointing at the `db090ce` (7A+7B) and this commit (7C). The Sprint 7 completion gate (5 boxes) is now 4/5 ticked, with the operator live-run carried forward as the only open item.
+- **New bug ids:** none.
+- **Sprint state:** **Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6, 7A, 7B, 7C ALL COMPLETE.** The whole v4 plan is landed pending the operator live-run validation gate. Outstanding items: ONE live ComfyUI episode on the new HEAD (Prime Directive 1 audio-is-king reversion gate). Next session opens with the downstream brief consumer audit (see `session_handoff.md` item 1).
+- Built lead-only: a single shared-module change (`_otr_repair_prompts.py`) plus tightly coupled test edits in `test_repair_prompts.py`.

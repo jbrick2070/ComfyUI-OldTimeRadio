@@ -6,7 +6,7 @@ exception objects and a tiny pydantic schema.
 
 Coverage map:
 
-  The six typed builders:
+  The seven typed builders:
     1. json_syntax_repair    -- CRITICAL "not valid JSON" directive,
        echoes failed output, restates the original instruction.
     2. schema_field_repair   -- CRITICAL "valid JSON but failed schema
@@ -16,27 +16,31 @@ Coverage map:
     4. too_many_words_repair -- CRITICAL "over the length budget".
     5. narration_leak_repair -- CRITICAL "leaked narration".
     6. forbidden_name_repair -- CRITICAL "must not name anyone".
-    7. every builder returns a one-element `user` messages list.
+    7. payload_null_repair   -- CRITICAL "payload field set to null,
+       OMIT the entire edit row" (Sprint 7C / BUG-LOCAL-275).
+    8. every builder returns a one-element `user` messages list.
 
   make_dispatching_repair_factory (error -> builder routing):
-    8.  json.JSONDecodeError      -> json_syntax_repair.
-    9.  pydantic.ValidationError  -> schema_field_repair.
-    10. PostValidationError "...locked cast..." -> cast_membership LLM
+    9.  json.JSONDecodeError      -> json_syntax_repair.
+    10. pydantic.ValidationError  -> schema_field_repair (default).
+    11. pydantic.ValidationError on null `payload` field
+                                  -> payload_null_repair (Sprint 7C).
+    12. PostValidationError "...locked cast..." -> cast_membership LLM
         prompt when no deterministic callback is supplied.
-    11. PostValidationError "named_character" -> forbidden_name_repair.
-    12. PostValidationError "dialogue_verb" -> narration_leak_repair.
-    13. PostValidationError "plot_verb"     -> narration_leak_repair.
-    14. PostValidationError "too_long"      -> too_many_words_repair.
-    15. an unrecognised content failure (news V1) -> the generic
+    13. PostValidationError "named_character" -> forbidden_name_repair.
+    14. PostValidationError "dialogue_verb" -> narration_leak_repair.
+    15. PostValidationError "plot_verb"     -> narration_leak_repair.
+    16. PostValidationError "too_long"      -> too_many_words_repair.
+    17. an unrecognised content failure (news V1) -> the generic
         default_repair_prompt_factory.
 
   Deterministic cast-membership short-circuit:
-    16. a deterministic_repair callback that resolves the phantom ->
+    18. a deterministic_repair callback that resolves the phantom ->
         the dispatcher returns the callback's pydantic instance
         directly (no messages list built).
-    17. a deterministic_repair callback that returns None -> the
+    19. a deterministic_repair callback that returns None -> the
         dispatcher falls through to the cast_membership LLM prompt.
-    18. the deterministic callback is consulted ONLY for the locked-
+    20. the deterministic callback is consulted ONLY for the locked-
         cast branch, never for a JSON / schema / other-content error.
 """
 
@@ -80,6 +84,43 @@ def _validation_error() -> ValidationError:
     """A real pydantic ValidationError for _SampleSchema."""
     try:
         _SampleSchema.model_validate({"title": "ok", "score": 9999})
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("model_validate should have raised")  # pragma: no cover
+
+
+def _payload_null_validation_error() -> ValidationError:
+    """A real pydantic ValidationError mirroring the BUG-LOCAL-275 trace.
+
+    Reproduces the exact failure the Script Doctor edits pass surfaced
+    in the 2026-05-25 live run: a list of `ReviewerEdit`-shaped rows
+    where one row's `payload` arrived as `None`. Validating against the
+    real `ScriptDoctorReport` model would couple this test file to the
+    reviewer module; a local schema that uses the same `payload: str`
+    field shape produces a structurally identical error.
+    """
+
+    class _Edit(BaseModel):
+        line_id: str
+        action: str
+        payload: str
+        rationale: str = ""
+
+    class _Report(BaseModel):
+        edits: list[_Edit] = Field(default_factory=list)
+
+    try:
+        _Report.model_validate({
+            "edits": [
+                {"line_id": "b001", "action": "annotate",
+                 "payload": "ok", "rationale": ""},
+                {"line_id": "b002", "action": "skip",
+                 "payload": "ok", "rationale": ""},
+                # The pathological row -- payload is None.
+                {"line_id": "b003", "action": "rewrite",
+                 "payload": None, "rationale": "no replacement text"},
+            ],
+        })
     except ValidationError as exc:
         return exc
     raise AssertionError("model_validate should have raised")  # pragma: no cover
@@ -175,6 +216,24 @@ def test_forbidden_name_repair_directive():
     assert "generic noun" in text
 
 
+def test_payload_null_repair_directive():
+    # Sprint 7C / BUG-LOCAL-275. The directive must (a) tell the model
+    # the `payload` field cannot be null, (b) tell it to OMIT the edit
+    # row entirely rather than emitting a null / empty placeholder.
+    text = _content(rp.payload_null_repair(
+        original_prompt=_ORIGINAL_PROMPT,
+        failed_output=_FAILED_OUTPUT,
+        error=_payload_null_validation_error(),
+    ))
+    assert text.startswith("CRITICAL:")
+    assert "payload" in text.lower()
+    assert "null" in text.lower()
+    # The "omit the row" instruction is the load-bearing escape hatch
+    # the generic schema_field_repair was missing.
+    assert "OMIT" in text
+    assert "non-null string" in text
+
+
 def test_every_builder_returns_single_user_message():
     err = PostValidationError("named_character")
     builders = [
@@ -184,6 +243,7 @@ def test_every_builder_returns_single_user_message():
         rp.too_many_words_repair,
         rp.narration_leak_repair,
         rp.forbidden_name_repair,
+        rp.payload_null_repair,
     ]
     for builder in builders:
         messages = builder(
@@ -218,8 +278,51 @@ def test_dispatch_json_decode_error_routes_to_json_syntax():
 
 
 def test_dispatch_validation_error_routes_to_schema_field():
+    # The _validation_error() fixture is a `score=9999` out-of-range
+    # failure -- not a null-payload failure, so the dispatcher must
+    # fall through to the generic schema_field_repair directive.
     text = _content(_dispatch(_validation_error()))
     assert "valid JSON but failed schema validation" in text
+    # The Sprint 7C typed directive must NOT fire for this error class.
+    assert "OMIT the entire edit row" not in text
+
+
+def test_dispatch_payload_null_routes_to_payload_null_repair():
+    # Sprint 7C / BUG-LOCAL-275. A pydantic ValidationError whose repr
+    # names a null `payload` field must take the dedicated route, not
+    # the generic schema_field_repair fallback.
+    text = _content(_dispatch(_payload_null_validation_error()))
+    # The Sprint 7C directive's distinctive escape-hatch wording.
+    assert "OMIT" in text
+    assert "non-null string" in text
+    # The generic schema_field_repair directive must NOT fire.
+    assert "valid JSON but failed schema validation" not in text
+
+
+def test_dispatch_payload_null_signal_is_specific():
+    # A ValidationError that mentions some OTHER field being null must
+    # NOT trigger the payload_null route -- the signal is `payload` +
+    # `input_value=None` in the same error repr.
+
+    class _UnrelatedSchema(BaseModel):
+        rationale: str
+
+    try:
+        _UnrelatedSchema.model_validate({"rationale": None})
+    except ValidationError as exc:
+        err = exc
+    else:
+        raise AssertionError("model_validate should have raised")  # pragma: no cover
+
+    # Sanity: this error DOES carry `input_value=None` but the field
+    # path does NOT contain "payload" -- the dispatcher should not be
+    # tricked into the Sprint 7C route by the null annotation alone.
+    assert "input_value=none" in str(err).lower()
+    assert "payload" not in str(err).lower()
+
+    text = _content(_dispatch(err))
+    assert "valid JSON but failed schema validation" in text
+    assert "OMIT" not in text
 
 
 def test_dispatch_locked_cast_routes_to_cast_membership():
