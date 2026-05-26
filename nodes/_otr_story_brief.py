@@ -68,7 +68,18 @@ _BRIEF_HARD_MAX_CHARS: int = 300
 # Refinement section 4 prompt-version field stamped on every output.
 # Bump only when the prompt body changes in a way consumers must
 # observe (e.g. a new sidecar term family).
-_PROMPT_VERSION: str = "v1"
+#
+# Sprint 8.1 (decision A1, flat additive): bumped v1 -> v2 when the
+# reflection prompt body grew the five v2 fields consumed by the
+# downstream brief readers: music_mood_terms, visual_palette,
+# key_objects, tempo_hint, atmosphere_line. The v2 fields all carry
+# safe defaults on the schema side so a v1 producer-era LLM response
+# (missing the new keys) still validates -- the field is empty and
+# the consumer falls through to its v1 path. The eight v1 meta keys
+# stay untouched; v2 fields land alongside them as top-level meta
+# entries, so v1 consumers and the existing 8-key meta-shape tests
+# continue to pass.
+_PROMPT_VERSION: str = "v2"
 
 # Refinement section 4 source-tag stamped on every output -- documents
 # the lifecycle origin of the brief (post-composition reflection, not
@@ -156,21 +167,54 @@ _QUOTE_OR_MARKUP_REGEX: re.Pattern[str] = re.compile(
 # ---------------------------------------------------------------------------
 
 
+# Sprint 8.1: cap for `atmosphere_line` (one prose sentence) sized to
+# fit inside the same visual budget the prose `story_brief` uses --
+# this field is what HuMo lip-sync, portrait, and OTR_VideoPlan
+# consume when they want one sentence of mood without the full 300-
+# char brief. 200 chars is the tight-but-usable upper bound.
+_ATMOSPHERE_LINE_HARD_MAX_CHARS: int = 200
+
+# Sprint 8.1: cap for `tempo_hint` (one or two words, e.g. "slow",
+# "hurried"). Bounded small so an over-eager LLM cannot smuggle a
+# paragraph into the LTX motion prompt through this field.
+_TEMPO_HINT_HARD_MAX_CHARS: int = 80
+
+
 class StoryBriefModel(BaseModel):
     """Schema for the reflection-pass LLM output.
 
-    Shape: a single visual brief sentence plus three short sidecar
-    term arrays. The model enforces type + length only; content rules
-    (named characters, dialogue verbs, period literals) live in the
-    Python `_validate_brief` post-gate so the rejection-class
-    messages stay readable rather than leaking pydantic internals
-    into the repair-prompt body.
+    Shape (v1): a single visual brief sentence plus three short
+    sidecar term arrays. The model enforces type + length only;
+    content rules (named characters, dialogue verbs, period literals)
+    live in the Python `_validate_brief` post-gate so the rejection-
+    class messages stay readable rather than leaking pydantic
+    internals into the repair-prompt body.
+
+    Sprint 8.1 (v2, decision A1 flat additive). The v2 fields all
+    carry safe defaults so:
+      * A v1 producer-era LLM response (missing the new keys) still
+        validates -- the field is empty and the consumer falls
+        through to its v1 path.
+      * The MusicGenTheme rewire can read `music_mood_terms` first
+        and gracefully fall through to the existing atmosphere-as-
+        mood path on empty.
+      * The audit-recommended six A-class consumers (FLUX env / FLUX
+        portrait / FLUX radio bookend / LTX motion / HuMo lip-sync /
+        OTR_VideoPlan era tail) each have a v2 field shaped to their
+        prompt budget (see `downstream_brief_consumer_followup.md`
+        for the consumer-by-consumer mapping).
     """
 
     story_brief:      str       = Field(min_length=10, max_length=_BRIEF_HARD_MAX_CHARS)
     setting_terms:    list[str] = Field(default_factory=list, max_length=10)
     lighting_terms:   list[str] = Field(default_factory=list, max_length=10)
     atmosphere_terms: list[str] = Field(default_factory=list, max_length=10)
+    # Sprint 8.1 v2 additive fields.
+    music_mood_terms: list[str] = Field(default_factory=list, max_length=10)
+    visual_palette:   list[str] = Field(default_factory=list, max_length=10)
+    key_objects:      list[str] = Field(default_factory=list, max_length=10)
+    tempo_hint:       str       = Field(default="", max_length=_TEMPO_HINT_HARD_MAX_CHARS)
+    atmosphere_line:  str       = Field(default="", max_length=_ATMOSPHERE_LINE_HARD_MAX_CHARS)
 
 
 # ---------------------------------------------------------------------------
@@ -193,26 +237,34 @@ class StoryBriefModel(BaseModel):
 # input), so they continue to do real work. The schema-side reject
 # lists in `_validate_brief` remain the OUTPUT safety net unchanged.
 _REFLECTION_PROMPT: str = """\
-Write a one-sentence visual atmosphere brief for this audio drama.
-Return ONE JSON object, no Markdown:
+Write a visual + audio brief for this audio drama. Return ONE JSON
+object, no Markdown:
 
 {
   "story_brief":      "one clause under 300 chars",
   "setting_terms":    ["3-6 short setting nouns"],
   "lighting_terms":   ["3-6 short lighting nouns"],
-  "atmosphere_terms": ["3-6 short atmosphere nouns"]
+  "atmosphere_terms": ["3-6 short atmosphere nouns"],
+  "music_mood_terms": ["3-6 music mood adjectives"],
+  "visual_palette":   ["3-6 short color or texture terms"],
+  "key_objects":      ["3-6 short object nouns"],
+  "tempo_hint":       "one or two words (e.g. slow, hurried)",
+  "atmosphere_line":  "one sentence under 200 chars"
 }
 
 RULES:
-- ONE sentence, under 300 chars. No quotes. No Markdown.
-- Use no names. The context below is already anonymized; keep it that
-  way -- describe places, light, and mood, never people by name.
+- ONE sentence per string field. No quotes, no Markdown.
+- Use no names. The context below is anonymized; describe places,
+  light, and mood, never people by name.
 - No dialogue verbs (speaking, arguing) or plot verbs (interrogates,
   discovers).
-- No invented dates / decades / centuries / cities / countries / eras.
+- No invented dates, decades, centuries, cities, countries, or eras.
   If a period is implied, use atmosphere terms (smoke-filtered,
   incandescent glow) instead of dated ones (1940s, Victorian).
-- Each term under 24 chars.
+- Each list term under 24 chars.
+- music_mood_terms are for instrumental scoring (tense, sombre,
+  hopeful). visual_palette is colors / textures. key_objects are
+  concrete nouns the scene contains.
 
 Script context:
 """
@@ -709,12 +761,17 @@ def _failure_sentinel(
     technical_model_id: str,
     prompt_version: str,
 ) -> dict:
-    """Return the 8-key meta delta for a failed reflection pass.
+    """Return the meta delta for a failed reflection pass.
 
     `story_brief == ""` lets consumers fall through to legacy behavior.
     `story_brief_status == "failed"` makes the failure observable per
     refinement section 4.1; consumers (FLUX env, LTX, HuMo, MusicGen)
     log the status in their render output per E-07.
+
+    Sprint 8.1 (decision A1, flat additive): the v2 fields are stamped
+    with safe-empty defaults on failure so downstream readers can call
+    `_otr_brief_reader._read_brief_field` unconditionally and fall
+    through to their v1 paths on falsiness. v1 keys are unchanged.
     """
     return {
         "story_brief":               "",
@@ -729,6 +786,13 @@ def _failure_sentinel(
             "lighting":   [],
             "atmosphere": [],
         },
+        # Sprint 8.1 v2 fields -- safe-empty so reader returns the
+        # caller-supplied default on every consumer path.
+        "music_mood_terms":          [],
+        "visual_palette":            [],
+        "key_objects":               [],
+        "tempo_hint":                "",
+        "atmosphere_line":           "",
     }
 
 
@@ -738,8 +802,26 @@ def _success_delta(
     technical_model_id: str,
     prompt_version: str,
 ) -> dict:
-    """Return the 8-key meta delta for a successful reflection pass."""
+    """Return the meta delta for a successful reflection pass.
+
+    Sprint 8.1 (decision A1, flat additive): the 8 v1 meta keys land
+    unchanged. The 5 v2 fields are stamped as top-level meta entries
+    alongside them. v1 consumers that read `story_brief` /
+    `story_brief_terms` continue to work; v2 consumers (MusicGenTheme
+    first; the audit-recommended six A-class consumers in sprints
+    8.2-8.7) read through `_otr_brief_reader._read_brief_field`.
+    """
     text = brief_model.story_brief.strip()
+    tempo_hint = (
+        brief_model.tempo_hint.strip()
+        if isinstance(brief_model.tempo_hint, str)
+        else ""
+    )
+    atmosphere_line = (
+        brief_model.atmosphere_line.strip()
+        if isinstance(brief_model.atmosphere_line, str)
+        else ""
+    )
     return {
         "story_brief":               text,
         "story_brief_status":        "ok",
@@ -753,6 +835,12 @@ def _success_delta(
             "lighting":   list(brief_model.lighting_terms),
             "atmosphere": list(brief_model.atmosphere_terms),
         },
+        # Sprint 8.1 v2 fields -- top-level (A1 flat additive).
+        "music_mood_terms":          list(brief_model.music_mood_terms),
+        "visual_palette":            list(brief_model.visual_palette),
+        "key_objects":               list(brief_model.key_objects),
+        "tempo_hint":                tempo_hint,
+        "atmosphere_line":           atmosphere_line,
     }
 
 

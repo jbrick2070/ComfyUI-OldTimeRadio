@@ -365,13 +365,23 @@ class TestReflectionInputSanitization:
 # ---------------------------------------------------------------------------
 
 
-def test_reflection_prompt_under_250_tokens():
+def test_reflection_prompt_under_320_tokens():
     """Per refinement section 3 / hard rule 8: reflection prompt body
-    stays under 250 tokens. Char/4 is a rough but conservative proxy
-    that does not require tiktoken."""
+    stays under 320 tokens. Char/4 is a rough but conservative proxy
+    that does not require tiktoken.
+
+    Sprint 8.1 (decision A1, flat additive) bumped the cap from 250 to
+    320 when the schema grew from 4 fields to 9 (music_mood_terms,
+    visual_palette, key_objects, tempo_hint, atmosphere_line). The
+    audit (`downstream_brief_consumer_followup.md`) made these v2
+    fields a hard requirement for the six A-class consumers' rewire,
+    so the prompt body had to grow with them. 320 is still well below
+    linear scaling (4 -> 9 fields linear-scaled = ~540 tokens), so
+    the prompt remains tight relative to the schema breadth.
+    """
     approx_tokens = len(sb._REFLECTION_PROMPT) // 4
-    assert approx_tokens <= 250, (
-        f"_REFLECTION_PROMPT is ~{approx_tokens} tokens; cap is 250"
+    assert approx_tokens <= 320, (
+        f"_REFLECTION_PROMPT is ~{approx_tokens} tokens; cap is 320"
     )
 
 
@@ -689,3 +699,189 @@ def test_slot_tag_technical_present():
     assert "LLM slot: technical" in src, (
         "Missing `LLM slot: technical` tag in nodes/_otr_story_brief.py"
     )
+
+
+# ---------------------------------------------------------------------------
+# Sprint 8.1 v2 producer fields (decision A1, flat additive)
+# ---------------------------------------------------------------------------
+# The v2 fields land alongside the v1 8-key meta contract: music_mood_terms,
+# visual_palette, key_objects, tempo_hint, atmosphere_line. All five carry
+# safe defaults on the schema so a v1-era LLM response (missing the new
+# keys) still validates. The success delta + failure sentinel stamp the
+# fields at the top level (A1 flat additive) so downstream readers reach
+# them via `_read_brief_field(meta, "<field>", default=...)`.
+
+
+_V2_FIELD_KEYS = {
+    "music_mood_terms",
+    "visual_palette",
+    "key_objects",
+    "tempo_hint",
+    "atmosphere_line",
+}
+
+
+def _valid_brief_json_v2() -> str:
+    """A schema-valid v2 LLM response carrying every v2 field with
+    non-empty values -- the happy path for downstream consumers."""
+    return (
+        '{"story_brief": "a dim interrogation room under a swinging bare '
+        'bulb, rain-streaked window, sweat and smoke", '
+        '"setting_terms": ["interrogation room", "steel table"], '
+        '"lighting_terms": ["swinging bare bulb"], '
+        '"atmosphere_terms": ["sweat", "smoke", "tense"], '
+        '"music_mood_terms": ["tense", "sombre", "uneasy"], '
+        '"visual_palette": ["amber glow", "smoke-grey", "wet asphalt"], '
+        '"key_objects": ["steel table", "bare bulb", "ashtray"], '
+        '"tempo_hint": "slow", '
+        '"atmosphere_line": "smoke and sweat under a swinging bare bulb."}'
+    )
+
+
+class TestV2ProducerFields:
+
+    def test_prompt_version_bumped_to_v2(self):
+        """A consumer keying on prompt_version (or grepping for the
+        v2 contract in saved ledgers) must see `v2`."""
+        assert sb._PROMPT_VERSION == "v2"
+
+    def test_success_delta_stamps_v2_fields(self):
+        """Every v2 field lands at the top level of the meta delta
+        (decision A1, flat additive) with the values the LLM emitted."""
+        led = _mk_ledger()
+        spy = _make_spy_fn(responses=[_valid_brief_json_v2()])
+        result = sb.run_story_brief_reflection(
+            led, spy, technical_model_id="some/model-id",
+        )
+        assert result["story_brief_status"] == "ok"
+        assert _V2_FIELD_KEYS.issubset(result.keys()), (
+            f"v2 fields missing from success delta; have: "
+            f"{sorted(result.keys())}"
+        )
+        assert result["music_mood_terms"] == ["tense", "sombre", "uneasy"]
+        assert result["visual_palette"] == [
+            "amber glow", "smoke-grey", "wet asphalt",
+        ]
+        assert result["key_objects"] == [
+            "steel table", "bare bulb", "ashtray",
+        ]
+        assert result["tempo_hint"] == "slow"
+        assert result["atmosphere_line"] == (
+            "smoke and sweat under a swinging bare bulb."
+        )
+        # v2 is purely additive: the v1 8-key contract still holds.
+        assert _REQUIRED_META_KEYS.issubset(result.keys())
+        assert result["story_brief_prompt_version"] == "v2"
+
+    def test_success_delta_v1_response_fills_v2_defaults(self):
+        """A v1-era LLM response (4-field JSON without the v2 keys)
+        still validates -- the v2 fields fall through to safe-empty
+        defaults so downstream readers gracefully drop to v1 paths."""
+        led = _mk_ledger()
+        spy = _make_spy_fn(responses=[_valid_brief_json()])  # v1 shape
+        result = sb.run_story_brief_reflection(
+            led, spy, technical_model_id="some/model-id",
+        )
+        assert result["story_brief_status"] == "ok"
+        assert _V2_FIELD_KEYS.issubset(result.keys())
+        assert result["music_mood_terms"] == []
+        assert result["visual_palette"] == []
+        assert result["key_objects"] == []
+        assert result["tempo_hint"] == ""
+        assert result["atmosphere_line"] == ""
+
+    def test_failure_sentinel_stamps_v2_safe_defaults(self):
+        """On a slot-fn raise (technical_fn_exception path) the
+        sentinel must carry the v2 fields with safe-empty defaults
+        so downstream readers don't see KeyError or None."""
+        led = _mk_ledger()
+
+        def raising_fn(messages, *, temperature, max_new_tokens):
+            raise RuntimeError("simulated technical_fn failure")
+
+        result = sb.run_story_brief_reflection(led, raising_fn)
+        assert result["story_brief_status"] == "failed"
+        assert _V2_FIELD_KEYS.issubset(result.keys()), (
+            f"v2 fields missing from failure sentinel; have: "
+            f"{sorted(result.keys())}"
+        )
+        assert result["music_mood_terms"] == []
+        assert result["visual_palette"] == []
+        assert result["key_objects"] == []
+        assert result["tempo_hint"] == ""
+        assert result["atmosphere_line"] == ""
+
+    def test_failure_sentinel_on_parse_failure_stamps_v2_defaults(self):
+        """JSON parse failure path: same safe-empty v2 defaults."""
+        led = _mk_ledger()
+        spy = _make_spy_fn(responses=["this is not JSON {{{"])
+        result = sb.run_story_brief_reflection(led, spy)
+        assert result["story_brief_status"] == "failed"
+        assert _V2_FIELD_KEYS.issubset(result.keys())
+        for key in _V2_FIELD_KEYS:
+            value = result[key]
+            # Lists fall to []; strings fall to "".
+            assert value in ([], ""), (
+                f"v2 field {key!r} stamped as {value!r}; expected "
+                "safe-empty default ([] or '')"
+            )
+
+    def test_schema_caps_string_v2_fields(self):
+        """Schema-side length caps on the two string v2 fields fire
+        when the LLM produces over-long content. Locks the producer-
+        side defence so a runaway response cannot smuggle a paragraph
+        into the LTX motion prompt via tempo_hint."""
+        # tempo_hint cap is _TEMPO_HINT_HARD_MAX_CHARS (80).
+        oversized_tempo = "x" * (sb._TEMPO_HINT_HARD_MAX_CHARS + 5)
+        # atmosphere_line cap is _ATMOSPHERE_LINE_HARD_MAX_CHARS (200).
+        oversized_atmo = "y" * (sb._ATMOSPHERE_LINE_HARD_MAX_CHARS + 5)
+        bad_json = (
+            '{"story_brief": "a dim interrogation room under a swinging '
+            'bare bulb, rain-streaked window, sweat and smoke", '
+            '"setting_terms": ["room"], "lighting_terms": ["bulb"], '
+            '"atmosphere_terms": ["tense"], '
+            '"music_mood_terms": [], "visual_palette": [], '
+            '"key_objects": [], '
+            f'"tempo_hint": "{oversized_tempo}", '
+            f'"atmosphere_line": "{oversized_atmo}"}}'
+        )
+        spy = _make_spy_fn(
+            responses=[bad_json, _valid_brief_json_v2()],
+        )
+        result = sb.run_story_brief_reflection(led=_mk_ledger(), technical_fn=spy)
+        # Either we recovered (ladder re-rolled successfully) and got
+        # the good v2 response on the retry, or the ladder exhausted
+        # and stamped the failure sentinel. Both are acceptable -- the
+        # important contract is that the OVER-LONG values never reach
+        # the meta delta.
+        if result["story_brief_status"] == "ok":
+            assert len(result["tempo_hint"]) <= sb._TEMPO_HINT_HARD_MAX_CHARS
+            assert (
+                len(result["atmosphere_line"])
+                <= sb._ATMOSPHERE_LINE_HARD_MAX_CHARS
+            )
+        else:
+            # Sentinel path -- v2 fields are safe-empty regardless.
+            assert result["tempo_hint"] == ""
+            assert result["atmosphere_line"] == ""
+        # Either way: ladder re-rolled at least once (the over-long
+        # response was rejected on schema length validation).
+        assert len(spy.calls) >= 2, (
+            "schema-side length cap did not trigger a structural retry"
+        )
+
+    def test_prompt_lists_all_nine_field_names(self):
+        """The reflection prompt body explicitly names every v1 + v2
+        field so the LLM has the full schema in-context (no hidden
+        contract). Mechanical grep -- catches a future trim that
+        accidentally drops a field name from the prompt body."""
+        prompt = sb._REFLECTION_PROMPT
+        for field in (
+            "story_brief", "setting_terms", "lighting_terms",
+            "atmosphere_terms",
+            "music_mood_terms", "visual_palette", "key_objects",
+            "tempo_hint", "atmosphere_line",
+        ):
+            assert field in prompt, (
+                f"_REFLECTION_PROMPT does not mention field {field!r}"
+            )

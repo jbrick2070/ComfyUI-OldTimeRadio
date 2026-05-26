@@ -59,6 +59,7 @@ from . import _otr_ledger as _OTRL_PATHS
 # the freeze cascade for writer-slug drift validation; that import
 # lives there, not here. Per Jeffrey no-legacy-back-compat:
 # delete the dead import rather than keep as a shim.
+from ._otr_brief_reader import _read_brief_field
 from ._otr_story_brief_helpers import (
     get_story_brief_music_mood,
     get_story_brief_status,
@@ -331,7 +332,10 @@ def _compose_music_prompt(
 
     Pulls from L3 ledger meta (already passed via script_json
     linked input to node 14):
-      - meta.story_brief_terms.atmosphere  -> mood adjectives
+      - meta.music_mood_terms              -> music-tuned mood
+        adjectives (Sprint 8.1 v2; preferred when non-empty)
+      - meta.story_brief_terms.atmosphere  -> visual-tuned
+        atmosphere mood terms (v1 fallback)
       - meta.story_brief_terms.setting     -> scene context
       - meta.news.script_brief             -> keyword-mined mood
         tags (existing _MOOD_TAGS helper)
@@ -345,40 +349,66 @@ def _compose_music_prompt(
     Returns (prompt, duration_sec). Never raises on unknown slug
     -- there is no slug lookup. Falls back to a neutral
     atmospheric prompt when meta is absent or sparse.
+
+    Sprint 8.1 (decision A1 flat additive + decision C1 bundled):
+    music_mood_terms is the audit-recommended music-tuned signal --
+    the reflection pass scores it for instrumental mood vocabulary
+    (tense / sombre / hopeful), not the visual atmosphere terms
+    which were tuned for FLUX / LTX. The v2 path is preferred when
+    the producer emitted non-empty music_mood_terms; the v1 path
+    (atmosphere -> keyword mining) carries unchanged so legacy
+    ledgers and the failure sentinel still work.
     """
     terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
     if not isinstance(terms, dict):
         terms = {}
 
-    atmosphere_raw = terms.get("atmosphere") or []
     setting_raw = terms.get("setting") or []
-    if not isinstance(atmosphere_raw, list):
-        atmosphere_raw = []
     if not isinstance(setting_raw, list):
         setting_raw = []
-
-    atmosphere = [str(t).strip() for t in atmosphere_raw if str(t).strip()]
     setting_terms = [str(t).strip() for t in setting_raw if str(t).strip()]
 
-    # Mood: prefer atmosphere terms from the reflection pass. Top 3
-    # to keep the prompt under MusicGen's effective context window.
-    # If the reflection pass produced nothing, fall back to keyword
-    # mining of news.script_brief via the legacy _MOOD_TAGS helper
-    # (we already had that signal path; reusing it here keeps the
-    # fallback graceful when story_brief_status='absent' on legacy
-    # ledgers).
-    if atmosphere:
-        mood_terms = atmosphere[:3]
+    # Mood resolution -- Sprint 8.1 v2 path FIRST, v1 fallback after.
+    #
+    # v2 (preferred): music_mood_terms is a top-level meta field stamped
+    # by the reflection pass with music-tuned adjectives. Reader returns
+    # [] when the field is absent (legacy ledger or v1 producer) or when
+    # the brief failed (sentinel stamps []). On either of those, drop
+    # through to the v1 path below.
+    mood_terms: list[str] = []
+    music_mood_raw = _read_brief_field(meta, "music_mood_terms", default=[])
+    if isinstance(music_mood_raw, list):
+        mood_terms = [str(t).strip() for t in music_mood_raw if str(t).strip()]
+    # Top 3 to keep the prompt under MusicGen's effective context window
+    # (matches the v1 atmosphere[:3] slice).
+    if mood_terms:
+        mood_terms = mood_terms[:3]
     else:
-        news_meta = (meta.get("news") or {}) if isinstance(meta, dict) else {}
-        if not isinstance(news_meta, dict):
-            news_meta = {}
-        keyword_suffix = _mood_suffix(
-            news_meta.get("script_brief") or ""
-        )
-        # _mood_suffix returns ", tag1, tag2" or ""; strip and split.
-        kw_str = keyword_suffix.lstrip(", ").strip()
-        mood_terms = [t.strip() for t in kw_str.split(",") if t.strip()] if kw_str else []
+        # v1 fallback: visual atmosphere terms from the reflection pass.
+        atmosphere_raw = terms.get("atmosphere") or []
+        if not isinstance(atmosphere_raw, list):
+            atmosphere_raw = []
+        atmosphere = [
+            str(t).strip() for t in atmosphere_raw if str(t).strip()
+        ]
+        if atmosphere:
+            mood_terms = atmosphere[:3]
+        else:
+            # Final fallback: keyword-mined mood tags from
+            # news.script_brief (legacy signal path; keeps the
+            # fallback graceful when story_brief_status='absent' on
+            # legacy ledgers).
+            news_meta = (meta.get("news") or {}) if isinstance(meta, dict) else {}
+            if not isinstance(news_meta, dict):
+                news_meta = {}
+            keyword_suffix = _mood_suffix(
+                news_meta.get("script_brief") or ""
+            )
+            # _mood_suffix returns ", tag1, tag2" or ""; strip and split.
+            kw_str = keyword_suffix.lstrip(", ").strip()
+            mood_terms = [
+                t.strip() for t in kw_str.split(",") if t.strip()
+            ] if kw_str else []
 
     # Setting: top 2 terms keeps the prompt readable.
     setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""
@@ -541,12 +571,36 @@ class MusicGenTheme:
         for cue_id in CUE_IDS:
             prompt, duration = _compose_music_prompt(meta, cue_id)
             if not _brief_status_logged:
+                # Sprint 8.1: PD1 live-run gate signal. `mood_terms`
+                # in the log must reflect what _compose_music_prompt
+                # actually used -- prefer the v2 music_mood_terms
+                # field, fall back to the v1 vocab-filtered helper.
+                # `mood_source` annotates which path won so a future
+                # regression that silently flips back to v1 is
+                # observable without console-diving.
                 _brief_status = get_story_brief_status(meta)
-                _brief_mood_terms = get_story_brief_music_mood(meta)
+                _v2_mood_raw = _read_brief_field(
+                    meta, "music_mood_terms", default=[],
+                )
+                if isinstance(_v2_mood_raw, list):
+                    _v2_mood = [
+                        str(t).strip()
+                        for t in _v2_mood_raw
+                        if str(t).strip()
+                    ][:3]
+                else:
+                    _v2_mood = []
+                if _v2_mood:
+                    _resolved_mood = _v2_mood
+                    _mood_source = "v2_music_mood_terms"
+                else:
+                    _resolved_mood = get_story_brief_music_mood(meta)
+                    _mood_source = "v1_atmosphere_vocab"
                 log.info(
                     "[OTR_MusicGenTheme] story_brief_status=%s "
-                    "mood_terms=%s style_slug_diag=%s",
-                    _brief_status, _brief_mood_terms, style_for_log,
+                    "mood_terms=%s mood_source=%s style_slug_diag=%s",
+                    _brief_status, _resolved_mood, _mood_source,
+                    style_for_log,
                 )
                 _brief_status_logged = True
             cues[cue_id] = {"prompt": prompt, "duration_sec": duration}

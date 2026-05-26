@@ -1,9 +1,9 @@
 # Follow-up: meta.story_brief as Single Source of Truth for Downstream Creative
 
-- **Status:** Audit phase. Sprint 7 is closed (v4 plan landed pending operator live-run). This document is the canonical plan for the brief consumer wiring sprint -- update it in place as the work lands.
+- **Status:** Wiring sprint in flight. Commit 1 (Sprint 8.1 -- producer v2 + reader + MusicGenTheme rewire) is landed. Six A-class consumers still pending (Sprints 8.2-8.7).
 - **Origin:** 2026-05-25 live-run log showed `[OTR_MusicGenTheme] story_brief_status=ok mood_terms=[] style_slug_diag=sanctioned_trade_battle` -- brief landed successfully, music node consumed nothing useful from it. Confirmed: brief was decoration for the music path.
-- **Current HEAD at last update:** `91007e7` (Sprint 7C close -- payload_null typed repair).
-- **Last refreshed:** 2026-05-25 (post audit -- pre wiring).
+- **Current HEAD at last update:** Sprint 8.1 commit (this section's `Update` entry below records the exact hash post-push).
+- **Last refreshed:** 2026-05-25 (commit 1 land).
 
 ---
 
@@ -12,10 +12,12 @@
 | Phase | Status | Pointer |
 |---|---|---|
 | Audit -- classify every consumer A/B/C/D against the v1 schema | **DONE** 2026-05-25 | `downstream_brief_consumer_audit.md` at repo root |
-| Schema-shape decision (flat additive vs nested object) | **OPEN** -- decision A below | -- |
-| `_otr_brief_reader.py` shared read helper | **PENDING** (commit 1 of the wiring sprint, or its own preceding commit -- decision C below) | new module |
-| Producer v2 schema add (`_otr_story_brief.py`) | **PENDING** (folded into commit 1 -- the consumer needs the producer fields to read) | `nodes/_otr_story_brief.py` |
-| Consumer wiring -- one commit per consumer, order below | **PENDING** -- starts with MusicGenTheme | per-consumer files |
+| Schema-shape decision (flat additive vs nested object) | **DONE** -- A1 flat additive chosen 2026-05-25 | Update 2026-05-25 (commit 1) section below |
+| `_otr_brief_reader.py` shared read helper | **DONE** -- shipped in Sprint 8.1 commit 1 | `nodes/_otr_brief_reader.py` |
+| Producer v2 schema add (`_otr_story_brief.py`) | **DONE** -- shipped in Sprint 8.1 commit 1, `_PROMPT_VERSION` bumped v1 -> v2 | `nodes/_otr_story_brief.py` |
+| Consumer wiring -- MusicGenTheme (Sprint 8.1, C-class) | **DONE** -- shipped in Sprint 8.1 commit 1 | `nodes/musicgen_theme.py` |
+| Consumer wiring -- FLUX env / portrait / radio bookend / LTX / HuMo / OTR_VideoPlan (Sprints 8.2-8.7, A-class) | **PENDING** -- one commit each, audit order | per-consumer files |
+| Bark / TTS deep audit (Sprint 8.8, carry-forward) | **PENDING** -- decision E placed after the visual rewires | TBD |
 
 The audit's headline read: **one C-class consumer (MusicGenTheme)**, **six A-class consumers** (LTX, FLUX env, FLUX portrait, FLUX radio bookend, HuMo lip-sync, OTR_VideoPlan), **zero B-class**, and **the only D-class candidate (title scratchpad) declines** because Sprint 3E already grounds the title path on a rich excerpt set. Full classification table with file:line evidence lives in `downstream_brief_consumer_audit.md`.
 
@@ -209,3 +211,40 @@ This file is the canonical "big plan" doc. The discipline:
 - Schema-shape collision flagged as open decision A (flat additive recommended by audit; original nested-object proposal preserved verbatim above).
 - Carry-forward: Bark / TTS deep audit (decision E).
 - Sprint state: v4 plan COMPLETE (Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6, 7A-7C) at HEAD `91007e7`. Wiring sprint = "Sprint 8.x" by audit convention (rename if a different label is preferred).
+
+---
+
+## Update 2026-05-25 (commit 1) -- Sprint 8.1 producer v2 + reader + MusicGenTheme rewire
+
+- **Open decisions resolved by Jeffrey:**
+  - **A1 flat additive** -- v2 fields land as top-level meta keys alongside the v1 8-key contract. Zero rename of `meta.story_brief` prose-string. Six A-class consumers continue to read v1 fields unchanged.
+  - **B dotted-path** -- `_read_brief_field(meta, "story_brief_terms.atmosphere", default=[])` forward-compat regardless of A.
+  - **C1 bundled** -- producer v2 + reader + MusicGenTheme rewire in a single commit so the reader has a real first caller and the PD1 live-run signal (`mood_terms=[<non-empty>]`) is observable from one push.
+  - **D `meta.atmosphere_line` (bare)** -- consistent with the rest of the v2 bare-key group; v1 `story_brief_terms.atmosphere` list stays untouched, no collision.
+  - **E Bark / TTS audit deferred** -- after Sprint 8.7 visual rewires; Bark is a hygiene check, not a flagged miss.
+- **Producer changes (`nodes/_otr_story_brief.py`):**
+  - `StoryBriefModel` grew five v2 fields with safe defaults: `music_mood_terms: list[str]`, `visual_palette: list[str]`, `key_objects: list[str]`, `tempo_hint: str` (cap 80), `atmosphere_line: str` (cap 200). A v1-era LLM response missing these keys still validates -- field falls to its default and the consumer drops through to v1.
+  - `_REFLECTION_PROMPT` extended to ask for the five new fields. Prompt body grew from ~243 -> ~312 approx-tokens (linear scaling for 4 -> 9 fields would have predicted ~540). Test cap bumped 250 -> 320 with an inline explanation.
+  - `_success_delta` + `_failure_sentinel` stamp all five v2 fields as top-level meta entries (A1). On the failure path the v2 fields land safe-empty (`[]` / `""`) so downstream readers can call `_read_brief_field` unconditionally.
+  - `_PROMPT_VERSION` bumped `v1` -> `v2`.
+- **New reader (`nodes/_otr_brief_reader.py`):**
+  - Single public function `_read_brief_field(meta, dotted_path, default)`. Pure module, no GPU / I/O / ComfyUI imports. Accepts either a brief-shaped meta dict OR a parent dict carrying a `meta` sub-key (mirrors `_otr_story_brief_helpers._meta`).
+  - Dotted-path navigator returns `default` on missing segments, non-dict intermediates, empty meta, and terminal `None`. Raises `ValueError` on empty / whitespace / empty-segment paths -- catches typos before they degrade to a silent default.
+- **MusicGenTheme rewire (`nodes/musicgen_theme.py`):**
+  - `_compose_music_prompt` now reads `music_mood_terms` first (top 3, matches v1 atmosphere[:3] slice). On empty falls through to the existing `story_brief_terms.atmosphere` path, then to keyword-mining of `news.script_brief`, then to the neutral `atmospheric` default. The v1 paths are unchanged so legacy ledgers and the failure sentinel continue to work.
+  - PD1 live-run log line restructured: `mood_terms=` now reports the resolved list (v2 if present, v1 fallback otherwise) and a new `mood_source=v2_music_mood_terms|v1_atmosphere_vocab` annotation tells operators which path won.
+  - Class C resolved -- the audit's only C-class consumer is now reading music-tuned mood signal from the brief.
+- **Test additions (39 new passing tests):**
+  - `tests/test_brief_reader.py` (20 tests): every helper contract -- flat-key read, dotted-path traversal of v1 nested objects, default fallback paths, parent-dict normalization, None-terminal safety, typo-guard ValueErrors.
+  - `tests/test_musicgen_brief_rewire.py` (12 tests): v2 path preferred, top-3 slice, v1 atmosphere fallback, keyword-mining fallback, neutral default, composition spine still intact (setting clause + cue character + prompt tail), malformed v2 fields degrade gracefully.
+  - `tests/test_story_brief_c5a1.py` (+7 tests in `TestV2ProducerFields`): `_PROMPT_VERSION == "v2"`, v2 fields stamped on success delta, v1-era LLM response fills v2 safe defaults, failure sentinel stamps v2 safe defaults on both raise + parse-failure paths, schema length caps fire on over-long tempo_hint / atmosphere_line, prompt body lists all nine field names.
+- **Regression at HEAD post-push:**
+  - Full OTR suite: 2895 passed / 21 skipped / 0 failed (was 2856/21/0; +39 new tests).
+  - Bug Bible: 16 passed / 7 skipped / 3 xfailed / 0 failed (unchanged).
+  - LLM-slot sweep: 23/23 tagged, 0 untagged, 0 parse failures -- no LLM call added or removed.
+- **Out-of-scope confirmations (PD1, PD3, PD6):**
+  - **PD1 (audio is king).** Audio resolution path unchanged -- only the mood prefix on MusicGen prompts gained a new source. Failure sentinel keeps all v1 audio outputs working.
+  - **PD3 (workflow JSON).** N/A -- no node surface change, no widget rename, no input/output socket added.
+  - **PD6 (LLM-slot tagging).** Sprint 8.1 added zero LLM calls. Slot sweep stayed at 23/23.
+- **PD1 live-run gate signal (operator-owned):** one ComfyUI episode on the post-commit HEAD must show `[OTR_MusicGenTheme] story_brief_status=ok mood_terms=[<non-empty>] mood_source=v2_music_mood_terms` in the console for the v2 path to be confirmed live. v1-fallback observation (`mood_source=v1_atmosphere_vocab`) is also acceptable -- proves the rewire's resolution order kicked in -- but the v2 source confirms the producer v2 schema reached the consumer end-to-end.
+- **Next:** Sprint 8.2 -- FLUX env consumer (`nodes/...` -- `_parse_env_prompts`) reads `visual_palette` + `key_objects` via `_read_brief_field`. One commit per A-class consumer, audit order, until Sprint 8.7 closes the visual sweep.
