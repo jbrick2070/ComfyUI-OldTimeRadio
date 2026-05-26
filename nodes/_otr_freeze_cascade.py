@@ -704,6 +704,88 @@ def run_freeze_cascade(
         len(story_critic_report.render_priority),
     )
 
+    # ----------------------------------------------------------
+    # Sprint 10A step 7: whole-episode shadow critic
+    # ----------------------------------------------------------
+    # When the operator opted into shadow diagnostics earlier in the
+    # pipeline (writer's enable_stage1_shadow_pass widget = True --
+    # detected here by the presence of meta.stage1_shadow_attempts),
+    # ALSO run the Sprint 10A step 7 whole-episode critic against the
+    # rubric (docs/2026-05-26-sprint-10a-whole-episode-critic-rubric.md).
+    #
+    # The shadow critic:
+    #   * Reuses the technical-slot generate_fn already in scope.
+    #   * Adapts the legacy ledger -> a best-effort Stage1Plan via the
+    #     legacy-to-stage1 adapter so the critic has its required
+    #     input shape.
+    #   * Extracts the rendered transcript from the in-flight ledger.
+    #   * Scores all 10 rubric axes and stamps the verdict on
+    #     meta.stage7_shadow_critic.
+    #   * Does NOT change reroll loop / freeze verdict / any downstream
+    #     decision. Measurement only -- same pattern as the Stage 1
+    #     shadow pass in OTR_LedgerScriptWriter.
+    #   * Catch-all try/except: any failure logs a warning and stamps
+    #     a 'shadow_setup_failed' marker; the cascade continues.
+    #
+    # PD1 (audio is king): zero new code paths fire when the operator
+    # has not opted into shadow diagnostics. With the opt-in, the
+    # additional work is one technical-slot LLM call (~5-15s on
+    # Mistral-Nemo). No audio path touched.
+    if "stage1_shadow_attempts" in meta:
+        try:
+            from . import _otr_legacy_to_stage1_adapter as _OTRADAPT
+            from . import _otr_whole_episode_critic as _OTRWEC
+
+            shadow_plan = _OTRADAPT.legacy_ledger_to_stage1_plan(ledger_data)
+            if shadow_plan is None:
+                meta["stage7_shadow_critic"] = {
+                    "skipped": True,
+                    "reason": (
+                        "legacy_to_stage1 adapter returned None "
+                        "(ledger lacked cast or lines)"
+                    ),
+                }
+                log.info(
+                    "[Stage7Shadow] skipped: adapter could not build a "
+                    "Stage1Plan from the legacy ledger"
+                )
+            else:
+                shadow_lines = _OTRADAPT.extract_rendered_lines(ledger_data)
+                log.info(
+                    "[Stage7Shadow] running whole-episode critic on "
+                    "legacy ledger (cast=%d, lines=%d)",
+                    len(shadow_plan.cast), len(shadow_lines),
+                )
+                critic_result = _OTRWEC.run_whole_episode_critic(
+                    plan=shadow_plan,
+                    rendered_lines=shadow_lines,
+                    generate_fn=generate_fn,
+                )
+                meta["stage7_shadow_critic"] = critic_result.to_dict()
+                log.info(
+                    "[Stage7Shadow] verdict=%s mean=%.2f failing_axes=%s",
+                    critic_result.verdict,
+                    critic_result.mean_score,
+                    critic_result.failing_axes,
+                )
+        except Exception as _shadow_exc:
+            # Catch-all: shadow critic is diagnostic; a bug in it
+            # must NEVER halt the legacy pipeline. Stamp a marker and
+            # continue.
+            meta["stage7_shadow_critic"] = {
+                "ok": False,
+                "skipped": False,
+                "shadow_setup_failed": True,
+                "error_type": type(_shadow_exc).__name__,
+                "error_message": str(_shadow_exc)[:300],
+            }
+            log.warning(
+                "[Stage7Shadow] shadow critic raised %s: %s; stamping "
+                "marker and continuing.",
+                type(_shadow_exc).__name__,
+                str(_shadow_exc)[:200],
+            )
+
     # ---- Sprint 5C: targeted reroll loop ---------------------------
     # The Sprint 5B critic above stamped meta.story_critic_report but
     # changed no line text (advisory). Sprint 5C ACTS on it:

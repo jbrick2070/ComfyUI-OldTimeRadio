@@ -1,0 +1,430 @@
+"""Sprint 10A step 7 wiring helper -- legacy ledger -> Stage1Plan adapter.
+
+The whole-episode shadow critic (_otr_whole_episode_critic) needs a
+Stage1Plan + rendered_lines list to evaluate. The legacy writer
+pipeline produces a different shape: cast rows in led.data['cast'],
+beat/outline rows in led.data['lines'], premise/arc text in
+meta.episode_canon, etc. This module builds a best-effort Stage1Plan
+from the legacy ledger so the critic can still score the LEGACY
+episode being produced (the most operationally useful target while
+Sprint 10A coexists with the legacy path).
+
+Adapter philosophy: loss-tolerant + non-fatal. If the legacy ledger
+is missing a field the Stage 1 schema requires, we fill with a
+sensible placeholder so the critic prompt can still build. None is
+returned only when the adapter CANNOT produce a plan that would
+parse through Stage1Plan -- in which case the caller skips the
+shadow critic for this episode.
+
+Module is PURE: no LLM, no I/O.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, List, Optional
+
+from pydantic import ValidationError
+
+from ._otr_stage1_plan import (
+    Stage1Arc,
+    Stage1Beat,
+    Stage1CastMember,
+    Stage1Plan,
+)
+
+
+log = logging.getLogger("OTR")
+
+
+# ---------------------------------------------------------------------------
+# Constants -- gender/voice defaults for fields the legacy ledger lacks
+# ---------------------------------------------------------------------------
+
+# When the adapter can't resolve a field from legacy data, fall back to
+# placeholders that satisfy the schema. The critic still scores the
+# RENDERED transcript fine; these are background details.
+
+_PLACEHOLDER_PERSONA: str = (
+    "Legacy cast member -- persona not preserved by the v1 writer flow."
+)
+_PLACEHOLDER_ARC_ROLE: str = "supporting role"
+_PLACEHOLDER_VOICE_ID: str = "v2/en_speaker_5"
+_PLACEHOLDER_PREMISE: str = (
+    "Legacy episode -- premise not preserved by the v1 writer flow."
+)
+_PLACEHOLDER_ARC_PART: str = (
+    "(legacy ledger did not preserve this arc segment)"
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _gender_to_pronouns(gender: str) -> str:
+    """Map cast_pools gender literal -> Stage 1 pronouns literal."""
+    g = (gender or "").strip().lower()
+    if g == "female":
+        return "she/her"
+    if g == "nonbinary":
+        return "they/them"
+    return "he/him"   # default for 'male' AND for unknown / empty
+
+
+def _normalize_voice_preset(preset: Optional[str]) -> str:
+    """Map legacy voice_preset to a Stage 1 voice_id that matches the
+    schema regex. Kokoro presets (bm_*, bf_*) and missing values fall
+    back to a v2/en_speaker_* placeholder.
+    """
+    if isinstance(preset, str) and preset.startswith("v2/en_speaker_"):
+        # Match Stage 1 schema: only single-digit speaker indices.
+        # Strip anything past the first digit so 'v2/en_speaker_10' -> 'v2/en_speaker_1'.
+        rest = preset[len("v2/en_speaker_"):]
+        if rest and rest[0].isdigit():
+            return f"v2/en_speaker_{rest[0]}"
+    return _PLACEHOLDER_VOICE_ID
+
+
+# Reserved speakers used by both the legacy and Stage 1 schemas; these
+# are NOT cast rows.
+_RESERVED_SPEAKERS = frozenset({"ANNOUNCER", "MUSIC"})
+
+
+def _stage1_beat_role_from_legacy(role: str) -> str:
+    """Map legacy speaker_role to a Stage 1 beat speaker literal."""
+    r = (role or "").strip().lower()
+    if r == "announcer":
+        return "ANNOUNCER"
+    if r.startswith("music"):
+        return "MUSIC"
+    return ""  # 'character' -> resolved from cast lookup below
+
+
+def _safe_int(value: Any, default: int) -> int:
+    try:
+        n = int(value)
+        if n < 1:
+            return default
+        return n
+    except (TypeError, ValueError):
+        return default
+
+
+# ---------------------------------------------------------------------------
+# Adapter entry point
+# ---------------------------------------------------------------------------
+
+
+def legacy_ledger_to_stage1_plan(led_data: dict) -> Optional[Stage1Plan]:
+    """Build a best-effort Stage1Plan from a legacy ledger dict.
+
+    Returns None if the legacy ledger lacks essentials (no cast or
+    no lines) -- the caller should skip the shadow critic in that
+    case.
+
+    Args:
+        led_data: the in-memory ledger dict (production_ledger
+            .Ledger.data shape). Expected keys: 'cast' (list of cast
+            rows), 'lines' (list of line rows), 'meta' (dict).
+
+    Returns:
+        Stage1Plan if conversion succeeded, None otherwise.
+    """
+    if not isinstance(led_data, dict):
+        return None
+
+    cast_rows: List[dict] = led_data.get("cast") or []
+    line_rows: List[dict] = led_data.get("lines") or []
+    meta: dict = led_data.get("meta") or {}
+
+    if not cast_rows:
+        log.info(
+            "[Stage7Shadow] adapter: legacy ledger has no cast rows; "
+            "skipping shadow critic"
+        )
+        return None
+    if not line_rows:
+        log.info(
+            "[Stage7Shadow] adapter: legacy ledger has no line rows; "
+            "skipping shadow critic"
+        )
+        return None
+
+    # ---- Premise + arc ------------------------------------------------
+    # Legacy episode_canon JSON (when present) carries premise + arc;
+    # otherwise fall back to meta.news_seed prefix or placeholder.
+    premise = ""
+    episode_canon = meta.get("episode_canon") or {}
+    if isinstance(episode_canon, dict):
+        premise = (episode_canon.get("premise") or "").strip()
+    if not premise:
+        news_seed = (meta.get("news_seed") or "").strip()
+        # Trim to fit the schema's 10..300 char band.
+        if news_seed:
+            premise = news_seed[:280]
+    if len(premise) < 10:
+        premise = _PLACEHOLDER_PREMISE
+
+    arc_data = (episode_canon.get("arc") or {}) if isinstance(episode_canon, dict) else {}
+    setup = (arc_data.get("setup") or "").strip()
+    complication = (arc_data.get("complication") or "").strip()
+    resolution = (arc_data.get("resolution") or "").strip()
+    if len(setup) < 10:
+        setup = _PLACEHOLDER_ARC_PART
+    if len(complication) < 10:
+        complication = _PLACEHOLDER_ARC_PART
+    if len(resolution) < 10:
+        resolution = _PLACEHOLDER_ARC_PART
+
+    # ---- Cast ---------------------------------------------------------
+    stage1_cast: List[Stage1CastMember] = []
+    seen_names: set[str] = set()
+    seen_voices: set[str] = set()
+    for row in cast_rows:
+        if not isinstance(row, dict):
+            continue
+        name = (row.get("name") or "").strip()
+        if not name or name in _RESERVED_SPEAKERS:
+            continue   # skip ANNOUNCER row + invalid rows
+        if name in seen_names:
+            continue   # dedupe
+        seen_names.add(name)
+        gender_raw = row.get("gender") or "male"
+        gender = "male" if gender_raw not in ("male", "female", "nonbinary") else gender_raw
+        pronouns = _gender_to_pronouns(gender)
+        voice_id = _normalize_voice_preset(row.get("voice_preset"))
+        # Make voice_id unique by appending the cast-row index if collision.
+        if voice_id in seen_voices:
+            # Try the next available digit.
+            for d in range(10):
+                candidate = f"v2/en_speaker_{d}"
+                if candidate not in seen_voices:
+                    voice_id = candidate
+                    break
+        seen_voices.add(voice_id)
+        # Persona must satisfy Stage1CastMember.persona min_length=20.
+        # Legacy ledgers may carry short descriptions; pad with a
+        # neutral suffix rather than drop the cast row. Same for
+        # arc_role (min_length=3).
+        raw_persona = (row.get("character_description") or "").strip()
+        if len(raw_persona) < 20:
+            persona = (
+                f"{raw_persona} {_PLACEHOLDER_PERSONA}".strip()
+                if raw_persona
+                else _PLACEHOLDER_PERSONA
+            )
+        else:
+            persona = raw_persona
+        persona = persona[:400]
+        raw_arc_role = (row.get("role") or "").strip()
+        if len(raw_arc_role) < 3:
+            arc_role = _PLACEHOLDER_ARC_ROLE
+        else:
+            arc_role = raw_arc_role[:80]
+        try:
+            stage1_cast.append(Stage1CastMember(
+                name=name[:40],
+                gender=gender,
+                pronouns=pronouns,
+                voice_id=voice_id,
+                persona=persona,
+                arc_role=arc_role,
+            ))
+        except ValidationError as exc:
+            log.warning(
+                "[Stage7Shadow] adapter: dropping cast row %r due to "
+                "pydantic mismatch: %s", name, str(exc)[:200],
+            )
+            continue
+
+    if not stage1_cast:
+        log.info(
+            "[Stage7Shadow] adapter: no usable cast members after "
+            "filtering; skipping shadow critic"
+        )
+        return None
+
+    # Cap at Stage 1's max cast size (6 per schema).
+    stage1_cast = stage1_cast[:6]
+    valid_cast_names = {c.name for c in stage1_cast}
+
+    # ---- Beats --------------------------------------------------------
+    stage1_beats: List[Stage1Beat] = []
+    seen_beat_ids: set[str] = set()
+    for i, row in enumerate(line_rows):
+        if not isinstance(row, dict):
+            continue
+        beat_id_raw = row.get("beat_id") or row.get("line_id") or f"b{i+1:03d}"
+        # Coerce to bNNN format.
+        if isinstance(beat_id_raw, str) and beat_id_raw.startswith("b") and len(beat_id_raw) >= 2:
+            try:
+                # Match the schema's b\d{3} regex.
+                num_part = "".join(c for c in beat_id_raw[1:] if c.isdigit())
+                if num_part:
+                    beat_id = f"b{int(num_part):03d}"
+                else:
+                    beat_id = f"b{i+1:03d}"
+            except ValueError:
+                beat_id = f"b{i+1:03d}"
+        else:
+            beat_id = f"b{i+1:03d}"
+        if beat_id in seen_beat_ids:
+            beat_id = f"b{i+1:03d}"
+            if beat_id in seen_beat_ids:
+                continue
+        seen_beat_ids.add(beat_id)
+
+        # Resolve speaker: legacy uses speaker_role + char_id.
+        legacy_role = (row.get("speaker_role") or "").strip().lower()
+        reserved = _stage1_beat_role_from_legacy(legacy_role)
+        if reserved:
+            speaker = reserved
+        else:
+            # Lookup by char_id -> cast.name
+            char_id = row.get("char_id")
+            cast_row = next(
+                (c for c in cast_rows if c.get("char_id") == char_id),
+                None,
+            )
+            speaker = (cast_row.get("name") if cast_row else "") or ""
+            if not speaker or speaker not in valid_cast_names:
+                # Drop beats whose speaker can't be resolved to a valid
+                # Stage 1 cast member (already filtered reserved above).
+                continue
+
+        intent = (
+            row.get("beat_intent")
+            or row.get("intent")
+            or (row.get("text") or "")[:200]
+            or "Legacy beat (no intent preserved)."
+        )
+        if len(intent) < 5:
+            intent = "Legacy beat (no intent preserved)."
+        text = row.get("text") or ""
+        # Use actual rendered word count as the target -- the critic
+        # can still evaluate length-target-appropriateness.
+        actual_words = max(5, min(200, len([t for t in text.split() if t])))
+        register = (
+            row.get("emotional_register")
+            or row.get("register")
+            or "neutral"
+        )[:80] or "neutral"
+        try:
+            stage1_beats.append(Stage1Beat(
+                beat_id=beat_id,
+                speaker=speaker,
+                intent=intent[:200],
+                length_target_words=actual_words,
+                emotional_register=register,
+                callback_to=None,
+            ))
+        except ValidationError as exc:
+            log.warning(
+                "[Stage7Shadow] adapter: dropping beat %r: %s",
+                beat_id, str(exc)[:200],
+            )
+            continue
+
+    # Schema requires min 3 beats. If we don't have 3, pad with
+    # placeholder beats so the schema parses -- the critic will see
+    # the actual rendered transcript regardless.
+    while len(stage1_beats) < 3:
+        idx = len(stage1_beats) + 1
+        bid = f"b{900 + idx:03d}"   # 901, 902, 903 -- avoid collision
+        if bid in seen_beat_ids:
+            bid = f"b{990 + idx:03d}"
+        seen_beat_ids.add(bid)
+        stage1_beats.append(Stage1Beat(
+            beat_id=bid,
+            speaker=stage1_cast[0].name,
+            intent="Placeholder beat to satisfy Stage1 schema (legacy ledger had <3 valid beats).",
+            length_target_words=20,
+            emotional_register="neutral",
+            callback_to=None,
+        ))
+
+    # Cap at schema max 40.
+    stage1_beats = stage1_beats[:40]
+
+    # ---- Running facts ------------------------------------------------
+    running_facts: List[str] = []
+    continuity_ledger = meta.get("continuity_ledger") or {}
+    if isinstance(continuity_ledger, dict):
+        facts = continuity_ledger.get("facts") or []
+        if isinstance(facts, list):
+            for f in facts:
+                if isinstance(f, dict):
+                    txt = (f.get("text") or f.get("fact") or "").strip()
+                elif isinstance(f, str):
+                    txt = f.strip()
+                else:
+                    txt = ""
+                if txt:
+                    running_facts.append(txt[:400])
+                if len(running_facts) >= 20:
+                    break
+
+    # ---- Build the Stage1Plan ----------------------------------------
+    try:
+        plan = Stage1Plan(
+            premise=premise,
+            arc=Stage1Arc(
+                setup=setup,
+                complication=complication,
+                resolution=resolution,
+            ),
+            cast=stage1_cast,
+            beats=stage1_beats,
+            running_facts=running_facts,
+        )
+        return plan
+    except ValidationError as exc:
+        log.warning(
+            "[Stage7Shadow] adapter: Stage1Plan construction failed "
+            "after best-effort conversion: %s",
+            str(exc)[:300],
+        )
+        return None
+
+
+def extract_rendered_lines(led_data: dict) -> List[dict]:
+    """Extract the (beat_id, speaker, text) rows the critic needs from
+    the legacy ledger. Used by the FreezeCascade shadow critic call.
+
+    The critic's transcript formatter accepts dicts with 'beat_id',
+    'speaker' (or 'char_name'), and 'text' keys. Legacy line rows
+    have 'speaker_role' + 'char_id'; we resolve char_id to the cast
+    row name for display.
+    """
+    if not isinstance(led_data, dict):
+        return []
+    line_rows = led_data.get("lines") or []
+    cast_rows = led_data.get("cast") or []
+    char_id_to_name = {
+        c.get("char_id"): c.get("name", "")
+        for c in cast_rows
+        if isinstance(c, dict)
+    }
+    out: List[dict] = []
+    for row in line_rows:
+        if not isinstance(row, dict):
+            continue
+        bid = row.get("beat_id") or row.get("line_id") or ""
+        text = row.get("text") or ""
+        if not text.strip():
+            continue
+        role = (row.get("speaker_role") or "").strip().lower()
+        if role == "announcer":
+            speaker = "ANNOUNCER"
+        elif role.startswith("music"):
+            speaker = "MUSIC"
+        else:
+            speaker = char_id_to_name.get(row.get("char_id"), "") or "UNKNOWN"
+        out.append({
+            "beat_id": str(bid),
+            "speaker": speaker,
+            "text": text.strip(),
+        })
+    return out
