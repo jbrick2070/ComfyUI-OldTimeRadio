@@ -3338,11 +3338,14 @@ if __name__ == "__main__":
         # simplification, ROADMAP PRIORITY 2): of its VRAM tiers only
         # "Standard" was ever validated. _resolve_inputs keeps its
         # "Standard" default + meta plumbing, so the value still flows.
-        # Optional count 15 -> 14: 10 widget-surface + 4 Phase 4 v4
-        # sampling knobs.
-        assert n_optional == 14, (
+        # `lemmy_cameo` widget added (BUG-LOCAL-260) -- ungated cameo
+        # toggle, defaults False. Optional count history: 15 (pre-
+        # removal) -> 14 (optimization_profile removed) -> 15
+        # (lemmy_cameo added). Current: 11 widget-surface + 4 Phase 4
+        # v4 sampling knobs.
+        assert n_optional == 15, (
             f"optional widget count drift: {n_optional} "
-            f"(expected 14: 10 widget-surface + 4 Phase 4 v4 "
+            f"(expected 15: 11 widget-surface + 4 Phase 4 v4 "
             f"sampling knobs)"
         )
         # S30 B2a: both model widgets carry the catalog dropdown_choices()
@@ -3356,7 +3359,7 @@ if __name__ == "__main__":
             assert meta["default"] == _D, (
                 f"{slot_key} default drift: {meta['default']!r} != {_D!r}"
             )
-        print("[2/9] PASS: INPUT_TYPES schema (11 optional widgets after S30 B2a)")
+        print("[2/9] PASS: INPUT_TYPES schema (15 optional widgets)")
     except Exception:
         failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
         print("[2/9] FAIL: INPUT_TYPES schema")

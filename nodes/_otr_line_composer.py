@@ -2437,7 +2437,7 @@ if __name__ == "__main__":
     print("\n[Test 4] compose_line happy path")
     def mock_ok(messages, *, temperature, max_new_tokens):
         return "ALICE: I found something I cannot explain."
-    result = compose_line(mock_ok, req)
+    result = compose_line(creative_fn=mock_ok, req=req)
     assert isinstance(result, LineResult)
     assert result.text == "I found something I cannot explain."
     assert result.compose_flags == ()
@@ -2451,7 +2451,7 @@ if __name__ == "__main__":
         if call_count["n"] == 1:
             return "**[ALICE]**"  # strips to empty
         return "I see it now."
-    result = compose_line(mock_empty_then_ok, req)
+    result = compose_line(creative_fn=mock_empty_then_ok, req=req)
     assert result.text == "I see it now."
     assert call_count["n"] == 2
     print("  PASS")
@@ -2464,7 +2464,7 @@ if __name__ == "__main__":
         if call_count2["n"] == 1:
             return " ".join(["word"] * 200)  # way over cap
         return "Short reply."
-    result = compose_line(mock_oversize_then_ok, req)
+    result = compose_line(creative_fn=mock_oversize_then_ok, req=req)
     assert result.text == "Short reply."
     print("  PASS")
 
@@ -2473,7 +2473,7 @@ if __name__ == "__main__":
     def mock_always_empty(messages, *, temperature, max_new_tokens):
         return ""
     try:
-        compose_line(mock_always_empty, req)
+        compose_line(creative_fn=mock_always_empty, req=req)
         print("  FAIL: should have raised")
     except LineCompositionFailedError as e:
         assert len(e.attempts) == 2
@@ -2489,7 +2489,7 @@ if __name__ == "__main__":
         if call_count3["n"] == 1:
             raise RuntimeError("simulated CUDA OOM")
         return "Recovered line."
-    result = compose_line(mock_raise_then_ok, req)
+    result = compose_line(creative_fn=mock_raise_then_ok, req=req)
     assert result.text == "Recovered line."
     print("  PASS")
 
@@ -2533,7 +2533,7 @@ if __name__ == "__main__":
     )
     def mock_phantom(messages, *, temperature, max_new_tokens):
         return "Dr. Patel insists this is real."
-    res = compose_line(mock_phantom, req_with_roster)
+    res = compose_line(creative_fn=mock_phantom, req=req_with_roster)
     assert res.compose_flags == ("phantom_name:Dr. Patel",), \
         f"expected 1 phantom flag, got {res.compose_flags!r}"
     print("  PASS")

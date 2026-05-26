@@ -286,7 +286,7 @@ _PROPER_NOUN_STOPWORDS: frozenset[str] = frozenset({
     "scene", "interior", "exterior", "int", "ext", "night", "day",
     "morning", "evening", "afternoon", "dawn", "dusk", "later",
     "continuous", "sfx", "env", "music", "sound", "opening", "closing",
-    "title", "style", "cast", "rooftop", "interior", "no", "yes",
+    "title", "style", "cast", "rooftop", "no", "yes",
     "ok", "okay",
 })
 
