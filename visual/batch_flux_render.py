@@ -337,6 +337,11 @@ def _build_dynamic_radio_prompt(led):
     # full returns "" unless story_brief_status == "ok", so a failed or
     # absent brief falls through cleanly to the episode_id slug tier.
     # status is logged for E-07 observability regardless of outcome.
+    #
+    # Sprint 8.4: also pull `visual_palette` via the canonical reader so
+    # the radio bookend's tail can lean on the brief's palette signal
+    # when present, falling back to the always-on _RADIO_PROMPT_SUFFIX
+    # baseline on v1-era / failure-sentinel ledgers.
     try:
         get_story_brief_full, get_story_brief_status = _story_brief_helpers()
         brief = get_story_brief_full(meta)
@@ -347,9 +352,25 @@ def _build_dynamic_radio_prompt(led):
             "unavailable (%s) -> fallback", exc,
         )
         return _RADIO_FALLBACK_PROMPT
+    try:
+        read_brief_field = _brief_reader()
+        palette_raw = read_brief_field(meta, "visual_palette", default=[])
+    except Exception as exc:
+        log.warning(
+            "[BatchFluxRender] radio prompt: brief reader unavailable "
+            "(%s); skipping v2 palette enrichment", exc,
+        )
+        palette_raw = []
+    if isinstance(palette_raw, list):
+        palette = [
+            str(t).strip() for t in palette_raw if str(t).strip()
+        ][:3]
+    else:
+        palette = []
     log.info(
         "[BatchFluxRender] radio prompt: story_brief_status=%s "
-        "(brief_chars=%d)", brief_status, len(brief),
+        "(brief_chars=%d; palette=%s)",
+        brief_status, len(brief), palette,
     )
 
     # Tier 1: meta.story_brief -- primary, story-driven descriptor.
@@ -390,11 +411,21 @@ def _build_dynamic_radio_prompt(led):
         return _RADIO_FALLBACK_PROMPT
 
     body = f"radio broadcast unit, {context}"
+    # Sprint 8.4: insert v2 palette terms between the context and the
+    # always-on broadcast-distress suffix when present. The suffix is
+    # the BASELINE -- the palette ENRICHES it rather than replaces it,
+    # so the broadcast-distress identity stays locked even when the
+    # brief carries vivid palette tokens.
+    if palette:
+        tail = ", ".join(palette) + ", " + _RADIO_PROMPT_SUFFIX
+    else:
+        tail = _RADIO_PROMPT_SUFFIX
     log.info(
-        "[BatchFluxRender] radio prompt: branch=%s -> %s ...",
-        branch, body[:70],
+        "[BatchFluxRender] radio prompt: branch=%s palette_terms=%d "
+        "-> %s ...",
+        branch, len(palette), body[:70],
     )
-    return f"{body}, {_RADIO_PROMPT_SUFFIX}"
+    return f"{body}, {tail}"
 
 
 def _lazy_nodes():
