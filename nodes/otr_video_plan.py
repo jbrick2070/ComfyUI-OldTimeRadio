@@ -160,6 +160,18 @@ def _resolve_era_tail(meta: Any) -> str:
     story-writing LLM only; all downstream visuals derive from the
     brief (Jeffrey 2026-05-20, same directive as BUG-LOCAL-249).
 
+    Sprint 8.7 (2026-05-25): the two v2 top-level brief fields the
+    audit recommended for OTR_VideoPlan land via the canonical
+    `_read_brief_field` reader and enrich the tail order:
+
+      atmosphere_line -> visual_palette (top 3) -> v1 lighting+atmosphere
+
+    The v1 lighting + atmosphere path stays as the trailing baseline
+    so the era tail still carries the v1 signal when present.
+    v1-era ledgers and the v2 failure sentinel return empty v2
+    values and the function falls through to the legacy v1-only or
+    `_DEFAULT_ERA_TAIL` shapes.
+
     ``meta`` may be the ledger meta dict OR the whole ledger -- the
     helper's own ``_meta()`` coercion accepts either.
     """
@@ -174,11 +186,53 @@ def _resolve_era_tail(meta: Any) -> str:
             "using default era tail", exc,
         )
         return _DEFAULT_ERA_TAIL
-    tail = (get_story_brief_lighting(meta) or "").strip()
+    # Sprint 8.7: pull the v2 fields via the canonical reader. Safe-
+    # empty fallback covers every v1-era / failure / malformed path.
+    try:
+        from ._otr_brief_reader import _read_brief_field
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "OTR_VideoPlan: brief reader unavailable (%s); skipping "
+            "v2 enrichment", exc,
+        )
+        _read_brief_field = None  # type: ignore[assignment]
+    if _read_brief_field is not None:
+        atmosphere_line_raw = _read_brief_field(
+            meta, "atmosphere_line", default="",
+        )
+        palette_raw = _read_brief_field(meta, "visual_palette", default=[])
+    else:
+        atmosphere_line_raw = ""
+        palette_raw = []
+    atmosphere_line = (
+        atmosphere_line_raw.strip()
+        if isinstance(atmosphere_line_raw, str)
+        else ""
+    )
+    if isinstance(palette_raw, list):
+        palette = [
+            str(t).strip() for t in palette_raw if str(t).strip()
+        ][:3]
+    else:
+        palette = []
+    v1_tail = (get_story_brief_lighting(meta) or "").strip()
     status = get_story_brief_status(meta)
+    # Compose the tail. Each signal contributes only when non-empty,
+    # so an all-empty input still falls through to _DEFAULT_ERA_TAIL.
+    parts: list[str] = []
+    if atmosphere_line:
+        parts.append(atmosphere_line)
+    if palette:
+        parts.extend(palette)
+    if v1_tail:
+        parts.append(v1_tail)
+    tail = ", ".join(parts)
     log.info(
-        "OTR_VideoPlan: era tail story_brief_status=%s (chars=%d)",
-        status, len(tail),
+        "OTR_VideoPlan: era tail story_brief_status=%s "
+        "(atmosphere_line_chars=%d palette_terms=%d v1_chars=%d "
+        "total_chars=%d)",
+        status, len(atmosphere_line), len(palette), len(v1_tail),
+        len(tail),
     )
     return tail or _DEFAULT_ERA_TAIL
 
