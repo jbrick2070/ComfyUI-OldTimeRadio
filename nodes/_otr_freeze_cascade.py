@@ -445,6 +445,58 @@ def _phase_8_video_readiness(led, *, enable: bool = True):
 
 
 # ---------------------------------------------------------------------------
+# BUG-LOCAL-278: defensive cascade meta persistence
+# ---------------------------------------------------------------------------
+
+
+def _persist_cascade_meta(led) -> None:
+    """Persist the in-memory ledger to disk at every cascade exit.
+
+    BUG-LOCAL-278 fix. The freeze cascade modifies `meta` in place
+    (`freeze_verdict`, `freeze_disposition`, `story_critic_report`,
+    `stage7_shadow_critic`, etc.) but does not save the ledger to disk
+    at its exit points. Downstream consumers split into two camps:
+
+      * In-memory readers (BatchBarkGenerator, MusicGenTheme, the
+        SceneSequencer that flows the ledger socket-to-socket) SEE the
+        cascade's stamps from the live `led.data` reference -- the
+        bark halt for BUG-LOCAL-276 works correctly.
+
+      * Disk readers (KokoroAnnouncer's load_ledger_safe + write-back
+        path, post-run forensic tools, the operator's manual inspection
+        of `pending_*_ledger.json`) DO NOT see them. KokoroAnnouncer in
+        particular reads the pre-cascade ledger from disk, stamps its
+        own line_id fields, and writes back -- silently dropping every
+        cascade modification.
+
+    Symptom: Step 8 operator gate criteria (meta.stage7_shadow_critic,
+    meta.freeze_verdict, meta.story_critic_report) are MISSING from the
+    persisted ledger even when the in-memory log confirms they were
+    stamped. The operator cannot verify the gate criteria from the
+    .json after the run; the data exists only in the live log tail.
+
+    Fix: persist the ledger at every cascade exit (terminal-skip,
+    Phase 10 rejection, successful freeze, render-plan post-stamp
+    [BUG-LOCAL-274 precedent]). Production Ledger.save() never raises
+    (Prime Directive 1); defensive getattr handles test fixtures that
+    stub `led` as a SimpleNamespace without a save method.
+
+    PD1 (audio is king): N/A; persistence is forensic. Never raises.
+    """
+    _save_fn = getattr(led, "save", None)
+    if callable(_save_fn):
+        try:
+            _save_fn()
+        except Exception as _save_exc:  # noqa: BLE001 -- PD1
+            log.warning(
+                "[LFC] cascade meta persistence save failed (%s: %s); "
+                "cascade meta lives in-memory only -- downstream nodes "
+                "still see it, but the .json on disk is stale",
+                type(_save_exc).__name__, _save_exc,
+            )
+
+
+# ---------------------------------------------------------------------------
 # Terminal-skip disposition (shared by the reviewer-terminal and the
 # Sprint 5C reroll-exhaustion exits)
 # ---------------------------------------------------------------------------
@@ -658,6 +710,10 @@ def run_freeze_cascade(
             "(B7 fix: short-circuit moved before mutation phases)",
             interim_verdict,
         )
+        # BUG-LOCAL-278: persist cascade meta before the terminal exit
+        # so downstream disk readers (Kokoro, forensic tools) see the
+        # freeze verdict + disposition stamps. See _persist_cascade_meta.
+        _persist_cascade_meta(led)
         return disp
 
     # ---- Sprint 5B: whole-script story-quality critic --------------
@@ -820,6 +876,12 @@ def run_freeze_cascade(
             "still flagging targets -- skipping Phase 7..10, freeze "
             "verdict needs_full_rerun", reroll_disp.cycles_run,
         )
+        # BUG-LOCAL-278: persist cascade meta before the reroll-exhaustion
+        # terminal exit. This is the path that ships meta.stage7_shadow_critic
+        # + meta.story_critic_report + meta.freeze_verdict to disk so the
+        # Step 8 operator gate can verify all four signal keys from the
+        # persisted .json after the run. See _persist_cascade_meta.
+        _persist_cascade_meta(led)
         return disp
 
     # ---- Sprint 6: critic -> render coupling -----------------------
@@ -957,6 +1019,8 @@ def run_freeze_cascade(
             "[LFC] Phase 10 rejected freeze (%d critical gap(s))",
             len(exc.errors),
         )
+        # BUG-LOCAL-278: persist cascade meta on the Phase 10 reject path.
+        _persist_cascade_meta(led)
         return disp
 
     hash_after = _hash_lines_text(ledger_data)
@@ -997,4 +1061,6 @@ def run_freeze_cascade(
         final_verdict, reviewer_disp.verdict,
         len(pre_report.warnings), len(post_report.warnings),
     )
+    # BUG-LOCAL-278: persist cascade meta on the successful-freeze exit.
+    _persist_cascade_meta(led)
     return disp
