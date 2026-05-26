@@ -256,6 +256,29 @@ def _story_brief_helpers():
     return get_story_brief_full, get_story_brief_status
 
 
+def _brief_reader():
+    """Import the Sprint 8.1 brief reader from ``nodes/``.
+
+    Same sys.path-prepend pattern as ``_story_brief_helpers`` above
+    so the import resolves cleanly both in ComfyUI runtime and under
+    pytest. The reader is the canonical access path for every v2
+    consumer rewire (Sprints 8.2-8.7): one helper, dotted-path
+    forward-compat, uniform default-on-missing.
+
+    Returns the bare ``_read_brief_field`` callable.
+    """
+    import os as _os
+    import sys as _sys
+    _nodes_dir = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        "nodes",
+    )
+    if _nodes_dir not in _sys.path:
+        _sys.path.insert(0, _nodes_dir)
+    from _otr_brief_reader import _read_brief_field
+    return _read_brief_field
+
+
 def _build_dynamic_radio_prompt(led):
     """Build a radio still FLUX prompt from the episode's story brief.
 
@@ -411,7 +434,16 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
     # takes the highest-weighted leading position. Status is logged so
     # a failed reflection surfaces in the render log per E-07
     # ("story_brief_status=...").
+    #
+    # Sprint 8.2 (2026-05-25): adds v2 fields visual_palette + key_objects.
+    # Both are read via _read_brief_field (uniform helper, decision B
+    # dotted-path), capped at top-3 each to keep the FLUX prompt under
+    # composition-dilution length, and inserted between the env
+    # description and the cinematic style_suffix tail. A v1-era ledger
+    # or a failure sentinel returns empty lists and the function falls
+    # through to the legacy brief-leads-then-desc-then-suffix path.
     get_story_brief_full, get_story_brief_status = _story_brief_helpers()
+    read_brief_field = _brief_reader()
 
     if not script_json or not script_json.strip():
         log.info("[BatchFluxRender] empty script_json; using fallback x1")
@@ -438,24 +470,54 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
     selected = env_tokens[:limit]
     brief = get_story_brief_full(meta)
     brief_status = get_story_brief_status(meta)
+    # Sprint 8.2 v2 enrichment terms. Both fields are top-level meta
+    # keys (decision A1 flat additive). The reader returns the
+    # caller-supplied default ([]) on absent / non-list / non-dict /
+    # None terminal values, so v1-era ledgers and the v2 failure
+    # sentinel both drop through cleanly.
+    palette_raw = read_brief_field(meta, "visual_palette", default=[])
+    objects_raw = read_brief_field(meta, "key_objects", default=[])
+    palette = (
+        [str(t).strip() for t in palette_raw if str(t).strip()]
+        if isinstance(palette_raw, list) else []
+    )
+    key_objects = (
+        [str(t).strip() for t in objects_raw if str(t).strip()]
+        if isinstance(objects_raw, list) else []
+    )
+    # Top 3 each: matches the MusicGen v2 slice convention and keeps
+    # the env prompt under FLUX's effective composition-dilution
+    # length budget. Drop the slice if the audit ever demonstrates
+    # FLUX wants the full list.
+    palette = palette[:3]
+    key_objects = key_objects[:3]
     prompts = []
     for token in selected:
         desc = (token.get("description") or "").strip()
         if not desc:
             desc = fallback
         # BUG-LOCAL-250 follow-up: meta.story_brief LEADS, then the env
-        # description, then the generic cinematic style_suffix tail.
+        # description. Sprint 8.2: v2 visual_palette + key_objects land
+        # between the desc and the cinematic style_suffix tail so they
+        # reinforce the brief's atmosphere with concrete palette /
+        # object anchors without displacing it.
         parts = []
         if brief:
             parts.append(brief)
         parts.append(desc)
+        if palette:
+            parts.extend(palette)
+        if key_objects:
+            parts.extend(key_objects)
         if style_suffix and style_suffix.strip():
             parts.append(style_suffix.strip())
         prompts.append(", ".join(parts))
     log.info(
         "[BatchFluxRender] queued %d env prompt(s) from %d available "
-        "(story_brief_status=%s; brief_chars=%d)",
+        "(story_brief_status=%s; brief_chars=%d; palette=%s; "
+        "key_objects=%s)",
         len(prompts), len(env_tokens), brief_status, len(brief),
+        palette, key_objects,
     )
     return prompts
 
