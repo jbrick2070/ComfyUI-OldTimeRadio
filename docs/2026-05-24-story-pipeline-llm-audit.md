@@ -1,8 +1,8 @@
 # Story-Writing + Cleanup Pipeline -- LLM-Call Audit
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
-- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `3d6ad91`)
-- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: Sprint 4 close-out, 5, 6 -- Sprint 3A landed 2026-05-25 (`e24b327`, compose_line split + cast_strip) and Sprint 4's code-side verify landed (`6b9300e`). BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`) -- see the punch list. See the "Multi-agent execution plan" section for the lane map.
+- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `244e9fd`)
+- **Build status (2026-05-25, end of day):** **THE WHOLE v4 PLAN IS LANDED.** Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A, 5B, **5C**, **6** are ALL COMPLETE and pushed. Sprints 5C (`2387cef`, targeted reroll loop) and 6 (`244e9fd`, critic -> render coupling) landed in the 2026-05-25 evening session -- both fork-decisions are RESOLVED, both regression-green (full OTR 2842 passed / 21 skipped / 0 failed; Bug Bible 16 / 7 / 3; LLM-slot sweep 23/23). The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely. BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`). **The ONLY remaining gate is the operator RTX-5080 live-run** -- one ComfyUI episode validates 3A + 5A + 5B + 5C + 6 + the carried cast/style/seed batch in a single shot (PD1, audio is king). See the next-sprint punch list directly below.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -11,18 +11,16 @@
 
 ## Next-sprint punch list (added 2026-05-25 -- READ FIRST)
 
-**Status 2026-05-25:** punch-list items 1-3 (BUG-LOCAL-271, the 3C
-Doctor-row enrichment, WORD_BUDGET_DRIFT) are **RESOLVED and pushed**
-(commits `3e120df` / `14818bb` / `dfd63ee`). **Sprint 3A is DONE**
-(`e24b327` -- compose_line split into compose_line_draft + a thin
-orchestrator + the new cast_strip step) and **Sprint 4's code-side
-verify is DONE** (`6b9300e` -- VRAM bullets confirmed present +
-BUG-LOCAL-272 fixed). **Open work to move this audit to completion:
-item 4 (the live-run, which now also validates Sprint 3A) + Sprint 4
-close-out (the 14B VRAM-cap decision + the prompt-cache bullet + the
-operator RTX-5080 confirmation) + Sprints 5 and 6.** Items below stay
-in priority order; resolved items keep their detail inline for the
-build record.
+**Status 2026-05-25 (end of day):** the build is DONE. Items 1-3
+(BUG-LOCAL-271, 3C Doctor-row enrichment, WORD_BUDGET_DRIFT) RESOLVED
+(`3e120df` / `14818bb` / `dfd63ee`). Sprint 3A DONE (`e24b327`),
+Sprint 4 COMPLETE (`6b9300e` + docs close-out). **Sprint 5 (5A/5B/5C)
+COMPLETE** (`8fef3c5` / `4b7db99` / `2387cef`); **Sprint 6 COMPLETE**
+(`244e9fd`). **The ONLY remaining open item is item 4 -- the operator
+RTX-5080 live-run** -- which now validates the full 3A + 5A + 5B + 5C
++ 6 batch in one shot. Once the live-run goes green, the v4 plan is
+officially shipped. Items below stay in priority order with resolved
+items kept inline for the build record.
 
 **Bugs to fix**
 
@@ -73,18 +71,29 @@ build record.
    (`speaker_role == "character"`) beats only, mirroring
    `validate_outline_against_budget` validator #1. No `_otr_outline.py`
    change was needed.
-4. **Live-validate the open batch (now also covers Sprint 3A +
-   BUG-271).** One ComfyUI episode on current HEAD `ca6a727` confirms,
-   in a single run: **Sprint 3A** -- the episode composes + freezes
-   clean via the new `compose_line_draft` path and the final mp4 is
-   produced (Prime Directive 1 -- audio is king), and if a `cast_strip`
-   remap fires the console shows `cast_strip remapped N phantom(s)`
-   onto a real cast member; BUG-LOCAL-269/270 + the `seed`-widget
-   removal (the cast now varies, the writer node has no `seed` widget);
-   BUG-LOCAL-271 (`audit_cast_contract:pre` repairs `wrong_char_id`
-   violations instead of escalating all to the Script Doctor);
-   WORD_BUDGET_DRIFT no longer false-fires; the episode completes +
-   freezes clean. **This is the immediate next action.**
+4. **Live-validate the open batch (now covers 3A + 5A + 5B + 5C + 6 +
+   the carried fixes).** One ComfyUI episode on current HEAD `244e9fd`
+   validates, in a single run: **Sprint 3A** -- the episode composes +
+   freezes clean via the `compose_line_draft` path; a `cast_strip`
+   remap (when it fires) shows `cast_strip remapped N phantom(s)` onto
+   a real cast member. **Sprint 5A** -- `[OTR_LedgerScriptWriter]
+   Sprint 5A continuity ledger: N fact(s) ...` after the outline lands;
+   a per-speaker CONTINUITY CONSTRAINTS block in the per-beat compose
+   prompt. **Sprint 5B** -- `[OTR_StoryCritic] critic complete:
+   arc_verdict=...` once after the Script Doctor cleanup. **Sprint 5C**
+   -- `[OTR_Reroll] cycle N/2: M reroll target(s)` if the critic
+   flagged any (otherwise `critic named no reroll targets -- nothing
+   to do`); if the cap exhausts, the cascade restores lines and
+   freezes `needs_full_rerun`. **Sprint 6** -- `[LFC] Sprint 6 render
+   plan: mode=..., N line(s) ...` from the cascade; then
+   `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected
+   ...` if a non-default plan was stamped. Carried bugs:
+   BUG-LOCAL-269/270 + the `seed`-widget removal (cast varies, no
+   `seed` widget); BUG-LOCAL-271 (`audit_cast_contract:pre` repairs
+   `wrong_char_id` violations); WORD_BUDGET_DRIFT no longer false-fires.
+   Final mp4 produced (Prime Directive 1 -- audio is king).
+   **This is the ONLY remaining gate before the v4 plan officially
+   ships.**
 
 **Remaining build -- to "complete" this audit**
 
@@ -103,10 +112,45 @@ build record.
    same finding class as Sprint 2E's GBNF). The operator live-RTX-5080
    VRAM confirmation stays parked -- non-blocking, Prime Directive 1
    gate, tracked like the 3A operator live-run.
-7. **Sprint 5** -- continuity ledger + story-quality critic + targeted
-   reroll. This is the direct fix for Finding C below -- the validation
-   run is structurally clean but thin (21 words of character dialogue).
-8. **Sprint 6** -- critic -> render coupling (ships with Sprint 5).
+7. **Sprint 5 -- COMPLETE 2026-05-25.** Continuity ledger (`8fef3c5`,
+   5A) + whole-script story-quality critic (`4b7db99`, 5B) + targeted
+   reroll loop (`2387cef`, 5C). **This is the direct fix for Finding C
+   below.** Sprint 5C's fork was RESOLVED Option A -- technical-slot
+   in-cascade reroll, no creative-slot VRAM swap, no node-surface
+   change (PD2 + PD3 favour Option A). Five reroll-loop design
+   defaults all accepted as recommended in the handoff. New modules
+   `nodes/_otr_continuity.py` / `nodes/_otr_story_critic.py` /
+   `nodes/_otr_reroll.py`. Both 5C LLM calls (compose + critic re-run)
+   on the technical slot, tagged. Re-composition uses `compose_line`
+   with polish OFF (NOT bare `compose_line_draft`) so the deterministic
+   strip pipeline still guards the technical-model output -- documented
+   deviation from the plan's literal wording. On cap exhaustion the
+   reroll restores pre-reroll lines from a snapshot and stamps
+   `needs_full_rerun`; the cascade skips Phase 7/8/10 via the new
+   shared `_build_terminal_skip_disposition` helper. v2 follow-up
+   noted: `build_reroll_line_request` leaves `continuity_slice` empty
+   on rerolls (the critic hint carries the actionable signal; slice
+   re-render is straightforward via `meta.continuity` + beat index but
+   deliberately scoped out of v1).
+8. **Sprint 6 -- COMPLETE 2026-05-25** (`244e9fd`). Full v1 critic ->
+   render coupling per Jeffrey's pick (cascade-only stamping was
+   rejected). 4 new optional widgets on
+   `OTR_LedgerFreezeCascade.INPUT_TYPES`: `render_selection`
+   ("all"|"dramatic_peaks_only"), `render_max_n` (default 6),
+   `protagonist_only`, `manual_line_ids`. All default to
+   behave-as-before. New pure module `nodes/_otr_render_plan.py` (no
+   LLM call -- sweep stays at 23/23). Selection logic: arc-verdict
+   gate (cycle_count>=2 AND arc_verdict in mid_collapse/flat -> block);
+   `manual_line_ids` LIFTS the gate; `protagonist_only` = most-spoken
+   char with cast-roster tiebreak; `dramatic_peaks_only` reorders by
+   `render_priority`; `flat_lines` excluded UNLESS rerolled;
+   `render_max_n` cap last. Cascade stamps `meta.render_plan` AFTER
+   the 5C reroll, BEFORE Phase 7/8/10. `OTR_BatchHumoRender` per-line
+   loop reads `meta.render_plan` and SKIPs character lines not in the
+   plan (announcer/music/sfx untouched). Workflow JSON `widgets_values`
+   re-wired 3 -> 7; guardrail test updated 3 -> 7 with per-slot type
+   assertions. NEVER raises (PD1) -- a degraded computation returns
+   None and HuMo falls back to render-all.
 
 Per-sprint detail is in the "Multi-agent execution plan" section below
 and in `story_pipeline_sprint_plan_v4_audited.md`. Other carried bugs
@@ -180,6 +224,18 @@ Assignments are sound against the creative/technical definition, with caveats:
 
 ### C. Missing / underused passes -- the headline finding
 
+> **STATUS 2026-05-25: RESOLVED.** Finding C was the audit's
+> headline gap. It is now closed end-to-end by **Sprint 5A** (continuity
+> ledger, `8fef3c5`), **Sprint 5B** (whole-script story-quality critic,
+> `4b7db99`), **Sprint 5C** (targeted reroll loop, `2387cef`), and
+> **Sprint 6** (critic -> render coupling, `244e9fd`). Each gap below
+> now has a concrete pass behind it; the pipeline can no longer ship a
+> structurally-valid-but-dramatically-empty episode without the critic
+> seeing it, the reroll attempting to fix it, and the render plan
+> blocking when the arc still does not clear. The operator RTX-5080
+> live-run is the remaining gate (Prime Directive 1). Gap-by-gap
+> resolution is annotated inline below.
+
 **There is no LLM pass anywhere that judges story quality.** Every quality gate in the pipeline is either deterministic (word budgets, regex strips, phantom-name detection, vocative-strip) or structural (the cast-contract audit). What exists is a generator-with-mechanical-guards; what is absent:
 
 1. **No scene/beat continuity check.** Each `compose_line` call sees only a sliding `last_lines` window + the current beat + the outline spine. Nothing reviews the *assembled* dialogue for continuity contradictions -- a character knowing something they shouldn't, a prop appearing then vanishing, time/tense drift. Structural beat order is guaranteed; narrative coherence is not.
@@ -198,13 +254,13 @@ The LLM cleanup is well-engineered but deliberately narrow (cast hygiene only) a
 
 ## Recommendations (priority order)
 
-1. **Add a story-quality LLM pass.** The single highest-value gap. A pass that reads the assembled script and judges continuity / voice consistency / dramatic delivery -- at minimum a per-line or per-scene dialogue-quality critic that can flag or trigger a reroll. New LLM call -> Prime Directive 6 applies; an architecture-level addition -> round-robin gated. This is the direct fix for the `ozempics_glitch`-class failure.
+1. **Add a story-quality LLM pass.** The single highest-value gap. A pass that reads the assembled script and judges continuity / voice consistency / dramatic delivery -- at minimum a per-line or per-scene dialogue-quality critic that can flag or trigger a reroll. New LLM call -> Prime Directive 6 applies; an architecture-level addition -> round-robin gated. This is the direct fix for the `ozempics_glitch`-class failure. **RESOLVED 2026-05-25 via Sprints 5A + 5B + 5C + 6** -- continuity ledger (5A) + whole-script critic (5B) + targeted reroll loop (5C) + critic -> render coupling with operator widgets (6). The pipeline now has the full chain the recommendation called for.
 2. **Give the two cleanup passes a 1-repair retry.** Small, consistency fix -- bring the auditor and Script Doctor in line with the 3-attempt discipline used everywhere else, so a transient JSON glitch re-rolls one call instead of forcing a full episode rerun. **UPDATE: Sprint 2A/2D already did this** -- both `audit_cast_contract` and `run_script_doctor` now route through the 3-rung `structured_call` ladder. This recommendation is resolved.
 3. ~~**Decide GBNF: wire it or delete it.**~~ **RESOLVED: Sprint 2E (commit `b8ebdc8`) deleted all `.gbnf` files and scaffolding.** The 3-rung `structured_call` ladder (Sprint 2A/2B/2C) provides robust JSON/schema failure handling without grammar enforcement.
 4. ~~**Wrap the outline, title regen, and story-brief reflection in `helper_context`.**~~ **RESOLVED 2026-05-25 (Sprint 0, commit `e7a8eb6`):** all three call sites wrapped; `<unattributed>` bucket empty.
 5. ~~**Clean the two cosmetic issues.**~~ **RESOLVED 2026-05-25:** stale pick_style slot comment fixed (`e7a8eb6`); the dead `technical_fn` parameter dropped from `compose_line` (`6940209`).
 
-Recommendation 1 is the story-quality critic -- it is **Sprint 5** in `story_pipeline_sprint_plan_v4_audited.md` (round-robin consultation was waived 2026-05-24 for the whole plan). Recommendations 2, 3, 4, and 5 are all resolved. The remaining audited work -- Sprints 3A-3E + 4 + 5 + 6 -- is laid out as parallel-subagent lanes in the next section.
+**All five recommendations are RESOLVED as of 2026-05-25.** Recommendation 1 (story-quality critic) shipped end-to-end as Sprints 5A + 5B + 5C + 6 (continuity ledger + critic + reroll + render coupling); 2, 3, 4, and 5 were resolved in earlier sessions. The audited build is feature-complete; only the operator RTX-5080 live-run remains. The "Multi-agent execution plan" section below is retained as the build-pattern record -- it shipped Sprints 3F + 3G + the 3B/3C/3D/3E wave; Sprint 5C and Sprint 6 were lead-driven (shared-file integration + cross-cutting node + workflow JSON + HuMo consumer made parallel subagents not worth the integration overhead).
 
 ---
 
@@ -265,8 +321,8 @@ Each lane is one parallel subagent. The primary files are mutually disjoint, so 
 - **3B-3E change script-pipeline behaviour.** After the wave lands, ONE live ComfyUI episode run validates the batch -- the audio-is-king reversion gate (Prime Directive 1). This is operator-gated: Jeffrey starts the run and pastes the console output; the AI has no real-time ComfyUI log access. Plan the wave so a single live run covers all four sprints.
 - Any lane that changes a node `INPUT_TYPES` / widget / output socket must re-wire the workflow JSON in the same change set (Prime Directive 3). 3F + 3G did not need this (internal helpers only); 3C/3E are the likeliest to touch a node surface -- verify per lane.
 
-### Sprints 4 / 5 / 6 (later waves)
+### Sprints 4 / 5 / 6 (later waves) -- ALL COMPLETE 2026-05-25
 
-- **Sprint 4 -- VRAM hardening.** The behavioural HuMo VRAM gate already exists (`_otr_humo_tier_loader.py`); Sprint 4 is verify-and-extend, not build. Single lane, operator-gated (must be confirmed against live RTX 5080 hardware).
-- **Sprint 5 -- continuity ledger + story critic + targeted reroll.** New module `nodes/_otr_continuity.py` + a whole-script critic + a targeted-reroll loop. **Depends on Sprint 3A** -- the reroll hooks into `compose_line_draft`, which 3A creates. New LLM calls -> Prime Directive 6 each. This is the direct fix for the `ozempics_glitch`-class failure (Finding C). Not part of the 3B-3E wave.
-- **Sprint 6 -- critic -> render coupling.** Ships with Sprint 5.
+- **Sprint 4 -- VRAM hardening. COMPLETE** (`6b9300e` code-side verify + docs close-out). Zero-Prime Wash / Sovereignty 2.5 GB / 2B-12B caps / bf16+tf32 all confirmed present; BUG-LOCAL-272 fixed (attn-selector dead code); 14B 10.1 GiB cap resolved no-change (keep Sovereignty branch); prompt-cache bullet resolved N/A (llama.cpp param, no HF equivalent). Operator live-RTX-5080 confirmation pending (Prime Directive 1) -- folded into the single combined live-run.
+- **Sprint 5 -- continuity ledger + story critic + targeted reroll. COMPLETE.** 5A `8fef3c5` (`nodes/_otr_continuity.py`); 5B `4b7db99` (`nodes/_otr_story_critic.py`); 5C `2387cef` (`nodes/_otr_reroll.py`). The direct fix for the `ozempics_glitch`-class failure (Finding C). 5C fork RESOLVED Option A -- technical-slot in-cascade reroll; deviation from the plan's literal "compose_line_draft" wording is deliberate (uses `compose_line` polish-OFF so the strip pipeline guards technical-model output).
+- **Sprint 6 -- critic -> render coupling. COMPLETE** (`244e9fd`). Full v1 coupling per Jeffrey's pick (cascade-only stamping rejected). 4 cascade widgets (`render_selection` / `render_max_n` / `protagonist_only` / `manual_line_ids`); new pure module `nodes/_otr_render_plan.py`; HuMo per-line loop reads `meta.render_plan`; workflow JSON `widgets_values` 3 -> 7 + guardrail test updated.
