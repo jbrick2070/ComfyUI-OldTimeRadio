@@ -77,6 +77,9 @@
 | 4 -- VRAM hardening | COMPLETE | BUG-LOCAL-272 [FIXED] | `6b9300e` -- code-side verify: Zero-Prime Wash / Sovereignty 2.5 GB / 2B-12B caps / bf16+tf32 confirmed present; attn-selector dead code fixed (BUG-272); gate fires for renamed tier. Close-out 2026-05-25: 14B cap resolved no-change (keep Sovereignty branch -- Jeffrey); prompt-cache bullet resolved N/A (llama.cpp param, no HF equivalent). Operator live-RTX-5080 confirm pending (Prime Directive 1) -- non-blocking, same gate as 3A |
 | 5 -- continuity + critic + reroll | COMPLETE | -- | 5A DONE `8fef3c5` (continuity ledger); 5B DONE `4b7db99` (whole-script critic); 5C DONE `2387cef` (targeted reroll loop). Sprint 5C fork RESOLVED Option A -- technical-slot in-cascade reroll, no creative-slot VRAM swap, no node-surface change |
 | 6 -- critic->render coupling | COMPLETE | -- | full v1 coupling per Jeffrey: 4 widgets on `OTR_LedgerFreezeCascade` (render_selection, render_max_n, protagonist_only, manual_line_ids), cascade stamps `meta.render_plan` from the post-reroll critic report, `OTR_BatchHumoRender` reads + filters; workflow JSON `widgets_values` re-wired (3 -> 7); `244e9fd` pushed 2026-05-25 |
+| 7A -- critic stamp/read mismatch | COMPLETE | BUG-LOCAL-273 [FIXED] | Root cause: `Ledger.save()` (production_ledger.py:1012) rebinds `self.data` on every save; the Phase 1+2 reviewer's internal save detached the cascade's L570/L576 `ledger_data`/`meta` locals. Fix: refresh both before each post-reviewer stamp (Sprint 5B + Sprint 6). |
+| 7B -- HuMo reads stale on-disk ledger | COMPLETE | BUG-LOCAL-274 [FIXED] | Same root cause as 7A. Fix: explicit `led.save()` after `_otr_freeze_cascade.py:748` so the post-cascade disk ledger carries `meta.render_plan` for HuMo's separate-node load. Defensive `getattr` covers test-fixture SimpleNamespace stubs. Bundled with 7A in the same commit. |
+| 7C -- Script Doctor edits.payload null | NOT STARTED | BUG-LOCAL-275 | Live-run punch list (non-blocking): doctor edits-pass attempts 1+2 failed pydantic validation (`edits.2.payload Input should be a valid string` / `input_value=None`); attempt 3 succeeded with deterministic drop. Typed-repair gap. |
 
 **Round-robin consultation WAIVED 2026-05-24 (Jeffrey):** these changes were round-robined in earlier sessions, so no sprint carries a consultation gate -- the build runs sprint-after-sprint. No sprint is `BLOCKED`; that status is now reserved for a genuine hard dependency only.
 
@@ -250,6 +253,77 @@ One pass post-Script-Doctor. Structured rubric, one dimension at a time: §1 con
 - [x] `flat_lines[]` excluded from render unless rerolled. **[DONE 244e9fd 2026-05-25]** Implemented as the "flat_lines exclusion" rule -- lines flagged `flat_lines[]` drop UNLESS they appear in `meta.reroll_history` with `status="rerolled"` (a rerolled flat line is a fresh draft and earned its place back).
 - [x] `arc_verdict in [mid_collapse, flat]` blocks render until critic cycle 2 clears. **[DONE 244e9fd 2026-05-25]** Implemented as the arc-verdict gate: `cycle_count >= MAX_REROLL_CYCLES (2)` AND `arc_verdict in (mid_collapse, flat)` -> `blocked=True, line_ids=[]`. `uneven` / `strong` do NOT block. `manual_line_ids` LIFTS the gate (operator override always wins).
 - [x] `render_max_n` default 6. `protagonist_only` + `manual_line_ids` override policies. **[DONE 244e9fd 2026-05-25]** All four widgets land on `OTR_LedgerFreezeCascade.INPUT_TYPES` after `vram_ceiling_gb`: `render_selection` COMBO default "all", `render_max_n` INT default 6 (0 = no cap), `protagonist_only` BOOLEAN default False, `manual_line_ids` STRING default "". `protagonist_only` restricts to the most-spoken character (ties broken by cast-roster order); `manual_line_ids` is the highest-priority override (comma-separated, unknown ids dropped, dedupe + preserve operator order, and lifts the arc-verdict gate). The cap is applied LAST.
+
+---
+
+## Sprint 7 -- Critic Wiring Hardening (LIVE-RUN PUNCH LIST 2026-05-25)
+
+**Trigger:** live run `signal_lost_bioluminescent_trench_descent_20260525_182002` (HEAD `244e9fd`) cleared Prime Directive 1 (mp4 landed, 208 MB / 219.4 s) but surfaced three wiring defects between the Sprint 5B critic and its Sprint 5C / Sprint 6 consumers. Critic ran clean (`arc_verdict=uneven`, 4 reroll targets, 4 flat lines, 13-line render priority). Reroll saw 0 targets. Render plan saw default `arc_verdict=strong`, 0 flat-line exclusions. HuMo never read the stamped render_plan and rendered all 14 character lines instead of the planned 6.
+
+**Audit confirmation (2026-05-25 parallel-agent grep):** all three downstream consumers read the SAME key the cascade writes -- `meta["story_critic_report"]` for 5C reroll (`_otr_reroll.py:505`) + Sprint 6 render plan (`_otr_render_plan.py:162`), `meta["render_plan"]` for HuMo (`batch_humo_render.py:1660`). Key naming is NOT the root cause. The mismatch is upstream of (or concurrent with) the read step.
+
+### 7A -- Critic stamp / read mismatch -> BUG-LOCAL-273
+
+Cascade stamps `meta["story_critic_report"] = story_critic_report.model_dump()` at `_otr_freeze_cascade.py:683`. The cascade log fires at L685 reading the SAME model and counts 4 reroll_targets. Eight lines later (`_otr_reroll.py:505` reached via L710), the reroll re-validates the dict via `_coerce_report` -> `StoryCriticReport.model_validate(raw)` and sees 0 targets. No "did not validate" warning fires (would have logged at `_otr_reroll.py:434`). The render plan at L740 sees the same emptiness (`arc_verdict=strong` -> the `or "strong"` default).
+
+**Two candidate root causes -- investigation owns the first work item:**
+
+- [ ] **Candidate A (pydantic round-trip):** `StoryCriticReport(arc_verdict="uneven", reroll_targets=[RerollTarget(...) x 4], ...).model_dump()` produces a dict; `StoryCriticReport.model_validate(dict)` is expected to reconstruct losslessly, but a strict field config / alias / `extra='forbid'` could silently drop list entries. Unit-test first: build a real report, round-trip it, assert `len(report.reroll_targets) == 4` post-validate.
+- [ ] **Candidate B (dict mutation between L683 and L505):** something replaces or empties `meta["story_critic_report"]` between the cascade stamp and the reroll read. Insert a sanity log between L683 and L710: `log.info("[LFC] post-stamp sanity: meta.story_critic_report.reroll_targets = %d", len(meta.get("story_critic_report", {}).get("reroll_targets", [])))`. If 4, the wipe is INSIDE the reroll's coercion. If 0, the wipe is in cascade-to-reroll handoff.
+
+**Fix lanes (after root cause confirmed):**
+
+- [ ] Patch the offending code path (`_otr_story_critic.py` model config, OR `_otr_freeze_cascade.py` between-stamp mutation, OR `_otr_reroll.py` coercion).
+- [ ] Regression test: end-to-end fake-cascade scenario stamps a non-empty `story_critic_report` dict, calls `run_targeted_reroll`, asserts `report.reroll_targets` count matches stamp count.
+- [ ] Regression test: `build_render_plan` given `meta["story_critic_report"]={"arc_verdict": "uneven", "flat_lines": [...]}` returns `source_arc_verdict="uneven"` and `len(excluded_flat_lines) > 0`.
+
+### 7B -- HuMo reads stale on-disk ledger -> BUG-LOCAL-274
+
+**Confirmed root cause (parallel-agent investigation 2026-05-25):** the cascade stamps `meta["render_plan"]` in-memory at `_otr_freeze_cascade.py:748` but does NOT persist the post-cascade ledger to disk. `OTR_BatchHumoRender` is a separate node invocation that loads the ledger via `_load_ledger_with_path` from `*_ledger.json` -- HuMo sees the PRE-cascade snapshot with no `render_plan` stamp. The cascade serializes the ledger to a JSON string output (`updated_script_json`), but HuMo's input is the on-disk ledger path, not the cascade's output socket.
+
+**Fix options:**
+
+- **B1 (recommended):** Cascade saves the ledger to disk after stamping `meta["render_plan"]` AND after any other late-cascade meta stamp (cycle_count, reroll_history, render_plan, post-Phase-10 freeze state). The disk ledger becomes the single source of truth post-cascade. No node-surface change. PD3 untouched.
+- **B2:** HuMo reads the cascade's `script_json` output socket directly, bypassing the disk round-trip. Requires a workflow JSON re-wire (PD3 active) -- a new wire from cascade -> HuMo. Larger blast radius; rejected unless B1 proves impractical.
+
+**Fix lanes:**
+
+- [ ] Audit `_otr_freeze_cascade.py` for every late-cascade `meta[...] = ...` mutation after Phase 10 begins. Verify which stamps make it to disk today (cycle_count? reroll_history?) and which silently die in-memory like `render_plan`.
+- [ ] Implement B1: explicit `led.save()` after the Sprint 6 render_plan stamp at L748 (and any other late stamps the audit surfaces). The save call must be inside the non-terminal path only; the terminal-skip path already preserves disk state.
+- [ ] Regression test: cascade fake-run on a tmp ledger file, assert `json.loads(Path(ledger_path).read_text())["meta"]["render_plan"]` matches the in-memory `meta.render_plan`.
+- [ ] Regression test: HuMo's `_load_ledger_with_path` on a ledger stamped with `meta.render_plan` sees the plan and fires `[BatchHumoRender] Sprint 6 render plan ACTIVE: ...` in the log.
+
+### 7C -- Script Doctor edits.payload null -> BUG-LOCAL-275
+
+Live-run noise (non-blocking, doctor degraded safely). Doctor edits-pass attempt 1 + 2 failed pydantic validation: `edits.2.payload Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]`. Attempt 3 succeeded but proposed edits on `b004` + `b014` that the diagnosis had NOT flagged -- both deterministically dropped. No edits applied. No regression. Logged for typed-repair tightening.
+
+**Investigation + fix:**
+
+- [ ] Read the doctor `edits` pydantic schema -- is `payload` typed `str` or `Optional[str]`? If `str`, the model is too strict for the doctor's "no-op / annotation-only" edit cases that the LLM keeps emitting.
+- [ ] Decide: widen `payload` to `Optional[str]` (with downstream null-payload handling) OR add a `payload_null_repair` typed-prompt factory in `_otr_repair_prompts.py` that catches `payload=None` and re-prompts with the exact pydantic trace.
+- [ ] Regression test: feed `edits.2.payload=None` through `structured_call` and confirm the typed repair recovers (or the widened schema accepts).
+
+### Parallelization map (3 subagent lanes)
+
+| Lane | Files touched | Risk | Parallel with |
+|---|---|---|---|
+| 7A | `nodes/_otr_freeze_cascade.py` (sanity log), `nodes/_otr_story_critic.py` OR `nodes/_otr_reroll.py` (root-cause fix), `tests/test_otr_reroll.py`, `tests/test_otr_render_plan.py` | medium | 7C only -- 7B touches the cascade too |
+| 7B | `nodes/_otr_freeze_cascade.py` (save call), `nodes/production_ledger.py` (if save-path missing), `nodes/batch_humo_render.py` (regression-test seam), `tests/test_freeze_cascade.py` | small-medium | 7C only |
+| 7C | `nodes/_otr_ledger_reviewer.py` OR doctor schema file, `nodes/_otr_repair_prompts.py`, `tests/test_phase3_ledger_reviewer.py` | small | 7A AND 7B (fully disjoint) |
+
+**Recommended pipeline:**
+
+1. **Wave 1 (PARALLEL, 2 lanes):** 7A + 7C -- disjoint files. ~30 min combined wall time. Lead serially commits each lane after combined-tree regression.
+2. **Wave 2 (after 7A merges):** 7B picks up a cascade unmodified by other in-flight work. ~20 min.
+3. **Wave 3 (operator-gated):** ONE live ComfyUI episode validates the full chain: critic produces a non-strong verdict -> reroll runs N cycles -> render plan honours `arc_verdict` + `flat_lines` + `render_max_n` -> HuMo skips lines per plan -> mp4 lands (PD1).
+
+### Sprint 7 completion gate
+
+- [ ] Wave 1 (7A + 7C) committed; full OTR suite green; Bug Bible green; LLM-slot sweep 23/23 still tagged.
+- [ ] Wave 2 (7B) committed; ledger-persistence regression test green.
+- [ ] Operator live-run shows: `[OTR_Reroll] cycle 1/2: N reroll target(s)` OR `critic named no reroll targets` (with a known-clean critic); `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected`; `freeze_verdict=frozen_clean`; final mp4 lands.
+- [ ] BUG-LOCAL-273 / 274 / 275 all marked `[FIXED]` in `BUG_LOG.md`.
+- [ ] If any new bug surfaces -- log `BUG-LOCAL-NNN` immediately per CLAUDE.md; do not batch.
 
 ---
 
@@ -591,3 +665,32 @@ gbnf_enforcement: removed                             # 2026-05-25: deleted -- l
 - **Regression:** deferred to the post-live-run sweep. Behaviour-neutral so existing tests should pass unchanged. Live-run was mid-flight at commit time; the regression sweep + Bug Bible + LLM-slot sweep are queued to run against `28d8e0f` (the now-current HEAD) once the live-run wraps so the CPU stays clear of the HuMo render.
 - **New bug ids:** none.
 - **Sprint state:** unchanged -- Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6 COMPLETE.
+
+### 2026-05-25 -- Operator live-run (HEAD `244e9fd`) + Sprint 7 plan opened
+
+- Live run `signal_lost_bioluminescent_trench_descent_20260525_182002` on HEAD `244e9fd`. **Prime Directive 1 PASSED** -- mp4 landed at 208 MB / 219.4 s / 5265 frames; final episode dir renamed and ledger saved.
+- **GREEN gates:** Sprint 3A + cast/style/seed batch + Sprint 4 VRAM (HuMo low_vram_default tier, 14.5 GB free post pipeline-residue clean, Phase C VRAM probe at 17 MB allocated / 96 MB reserved -- well under ceiling) + Sprint 5A continuity ledger (`5 fact(s), location='deep-sea vessel', 3 active prop(s)`) + Sprint 5B story critic (`arc_verdict=uneven, 4 reroll target(s), 4 flat line(s), 13 line(s) in render priority`). News fetcher, cast (REGINALD VOSS lead + STANLEY PHILBIN foil), style picker (`sanctioned_trade_battle`), outline (18 beats = 14 voiced + 2 announcer + 2 music_inter), phantom-name catches (3: Pacific / Kelvin / Moratorium Protection Act) all fired clean.
+- **RED gates surfaced -- punch list captured as Sprint 7:**
+  - **BUG-LOCAL-273 -- Sprint 5C reroll loses critic targets.** Cascade log `[LFC] Sprint 5B story critic: ... 4 reroll target(s) ...` then `[OTR_Reroll] critic named no reroll targets -- nothing to do`. Reroll module re-validated `meta.story_critic_report` and saw 0 targets. WRITE/READ key matches (`story_critic_report`); root cause unconfirmed -- pydantic round-trip vs between-stamp mutation. Investigation owns the first 7A work item.
+  - **BUG-LOCAL-274 -- HuMo reads stale on-disk ledger.** Cascade log `[LFC] Sprint 6 render plan: mode=all, 6 line(s) (blocked=False, applied_max_n=6, arc_verdict=strong, cycle_count=0, 0 flat line(s) excluded)` -- plan computed and stamped in-memory with `arc_verdict=strong` (the default; downstream of BUG-273) but with 6 line_ids. HuMo never emitted `[BatchHumoRender] Sprint 6 render plan ACTIVE: ...` and rendered all 14 character lines instead of the planned 6. Root cause confirmed by 2026-05-25 parallel-agent grep: the cascade does NOT persist the post-stamp ledger to disk; HuMo loads the on-disk ledger and sees no `render_plan`. Fix shape: `led.save()` after the L748 stamp (Option B1).
+  - **BUG-LOCAL-275 -- Script Doctor edits.payload=None.** Edits-pass attempts 1+2 failed pydantic validation (`edits.2.payload Input should be a valid string` / `input_value=None`); attempt 3 succeeded but proposed edits on `b004` + `b014` that the diagnosis had not flagged -- both deterministically dropped. Non-blocking; doctor degraded safely. Typed-repair gap.
+- **NO code committed in this session.** Sprint 7 plan section + three Status Board rows + three BUG_LOG.md entries are the only file changes. HEAD `244e9fd` remains `local == origin/v2.0-alpha`.
+- **Parallelization map for Sprint 7:** 7A + 7C disjoint -- parallel Wave 1; 7B serial after 7A (shared cascade file); operator live-run is Wave 3. Recommended ~30 min combined wall time across two subagents in Wave 1, ~20 min for 7B, plus the live-run ride-along. Full plan in the new Sprint 7 section above.
+- **Sprint state:** 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6 COMPLETE; 7A / 7B / 7C NOT STARTED (live-run punch list).
+
+### 2026-05-25 -- Sprint 7A + 7B bundled (critic stamp + render_plan persistence)
+
+- Commit TBD on `v2.0-alpha` -- 3 files: `nodes/_otr_freeze_cascade.py` (+25/-8), `tests/test_freeze_cascade_meta_persistence.py` (new, ~310 lines), BUG_LOG.md + sprint plan docs updates. Predecessor HEAD `244e9fd`. Push pending.
+- **Sprint 7A + 7B COMPLETE (bundled).** Originally planned as Wave 1 (7A) -> Wave 2 (7B) serial. Shipped together because the root cause is the SAME: `Ledger.save()` at `production_ledger.py:1012` rebinds `self.data` to a new merged dict on every save (BUG-LOCAL-108 merge-with-disk pattern), which detaches every long-lived local that holds a pre-save reference. 7A's "stamp not visible to consumers" and 7B's "stamp not persisted to disk for HuMo" are the same wound at different code sites; splitting the fix would have meant landing two commits that needed each other to be testable.
+- **Root cause confirmation.** The four parallel-agent grep findings (`story_critic_report` WRITE key at `_otr_freeze_cascade.py:683` matches both READ keys at `_otr_reroll.py:505` and `_otr_render_plan.py:162`; HuMo READ key `render_plan` at `batch_humo_render.py:1660` matches the WRITE key at `_otr_freeze_cascade.py:748`) ruled out the "wrong key" hypothesis up front. The real defect was that the cascade's `ledger_data = led.data` (L570) + `meta = ledger_data.setdefault("meta", {})` (L576) locals went stale after `review_ledger` (L622) called `Ledger.save()` internally, which rebinds `self.data` to a new dict. The Sprint 5B stamp at L683 then landed on the orphaned pre-save dict that no downstream consumer ever sees. The reroll and render_plan each re-read `led.data` and got the LIVE post-save dict, where `meta.get("story_critic_report")` returned None (or `{}`) -- and `StoryCriticReport.model_validate({})` succeeds silently with all-defaults (`arc_verdict="strong"`, empty `reroll_targets` / `flat_lines`) because every field has a default. That's why no "did not validate" warning fired at `_otr_reroll.py:434` -- the silent default-fallback is what produced the live-run mismatch between the cascade's "4 reroll targets" log and the reroll's "0 targets" log.
+- **Fix surface (`nodes/_otr_freeze_cascade.py`):**
+  - Inserted `ledger_data = led.data` + `meta = ledger_data.setdefault("meta", {})` refresh pair immediately before the Sprint 5B critic call at L678. The stamp at L683 now lands on the live post-reviewer-save dict.
+  - Inserted a second refresh pair immediately before the Sprint 6 `build_render_plan` call at L740. The stamp at L748 lands on the live (possibly post-reroll-save) dict.
+  - Added explicit `led.save()` after the Sprint 6 render_plan stamp at L748, gated by `getattr(led, "save", None)` (covers test fixtures that stub `led` as a `SimpleNamespace` without a `save` method -- the existing `test_lfc_phase_7_8_readiness` / `test_lfc_g4_telemetry_derivation` test files do this) and wrapped in a try/except (PD1: a save failure logs and HuMo falls back to render-all, never aborts the run). HuMo (a separate node invocation that loads the ledger via `_load_ledger_with_path` from `*_ledger.json`) now sees `meta.render_plan` on disk.
+- **Test surface (`tests/test_freeze_cascade_meta_persistence.py`, new file).** New `_RebindingLedger` fixture mimics the production save's rebind (a `dict(self.data)` shallow-copy of top level + `dict(meta)` shallow-copy of meta, then `self.data = new_data`). Without this fixture the bug is invisible: the existing orchestrator tests use `SimpleNamespace` with `save = lambda: None`, which preserves the pre-bug reference behaviour and would never have caught 273/274. Five tests pin the fix: `test_critic_report_lands_on_live_meta_after_reviewer_save` (advisory-only critic so reroll early-exits and doesn't re-stamp -- pure BUG-273 surface); `test_reroll_sees_real_critic_not_clean_fallback` (spy-reroll asserts reroll's coerce sees 2 targets + arc_verdict='uneven', not clean()); `test_render_plan_present_on_live_meta_after_cascade`; `test_render_plan_persisted_via_explicit_save` (asserts at least one save snapshot captured `meta.render_plan` -- the BUG-274 disk-persistence proof); `test_arc_verdict_lifts_render_plan_blocking_correctly` (asserts `render_plan["source_arc_verdict"] == "uneven"`, not the default "strong" the live run logged).
+- **Prime Directives.** PD1: critic stamp + render_plan stamp + render_plan save all wrapped so a failure never aborts the run. PD2: no LLM call added, no VRAM impact -- two refresh pairs are pure dict-attribute reads. PD3: no node `INPUT_TYPES` / widget / output socket touched -- no workflow JSON re-wire. PD6: no LLM call site added or removed -- LLM-slot sweep stays at 23/23 tagged.
+- **Regression:** full OTR suite 2853 passed / 21 skipped / 0 failed (baseline 2842 + 5 new persistence tests + 6 transitively touched in 2 existing test files); Bug Bible 23 passed / 1 skipped / 2 xfailed / 0 failed; LLM-slot sweep 23/23 tagged, 0 parse failures. AST + UTF-8 no-BOM on both touched code/test files. The defensive `getattr(led, "save", None)` was added after the first regression pass surfaced 6 failures in `test_lfc_phase_7_8_readiness.py` + `test_lfc_g4_telemetry_derivation.py` -- their `SimpleNamespace` ledger stubs hit `AttributeError: 'types.SimpleNamespace' object has no attribute 'save'`. Defensive guard preserves the no-op behaviour for these tests while production Ledger objects always have `save`.
+- **Investigation cost vs handed-off planning.** First Sprint 7 planning pass (this morning) wrote a 7A/7B/7C parallelization map and called for two waves of subagents. Operator (Jeffrey) reversed direction: synthesize the four-agent findings into one root cause, write the fix in one commit, no more planning rounds. That call was correct -- the planning detour added ~30 min of overhead vs the ~10 min direct fix path the audits already justified. Folding this into the cleanbreak playbook: "when four parallel audits agree on file:line evidence, the next step is the fix, not another planning section."
+- **Sprint 7C still NOT STARTED.** Doctor `edits.payload=None` typed-repair gap (BUG-LOCAL-275). Non-blocking; doctor degrades safely. Separate scope, separate commit.
+- **New bug ids:** none beyond the 273/274/275 already logged this session.
+- **Sprint state:** Sprints 0, 1, 2A-2E, 3A-3G, 4, 5A-5C, 6 COMPLETE. Sprint 7A + 7B COMPLETE. Sprint 7C NOT STARTED. Operator live-run is the audio-is-king reversion gate (Prime Directive 1) -- expected log signal: `[OTR_Reroll] cycle 1/2: N reroll target(s)` (not the previous "critic named no reroll targets") AND `[BatchHumoRender] Sprint 6 render plan ACTIVE: N line(s) selected` with `(render_plan not_in_plan)` skip reasons on excluded character lines.

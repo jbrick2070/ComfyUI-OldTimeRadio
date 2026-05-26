@@ -675,6 +675,18 @@ def run_freeze_cascade(
     # tag lives at the structured_call site inside run_story_critic;
     # the critic reuses the technical model already resident in the
     # cascade -- no new widget, no VRAM swap (Prime Directive 6).
+    #
+    # BUG-LOCAL-273 fix: refresh ledger_data + meta from led.data BEFORE the
+    # critic stamp. The Phase 1+2 reviewer above calls Ledger.save()
+    # internally; production_ledger.py:1012 rebinds self.data to a new
+    # merged dict on every save, detaching the cascade's L570/L576 locals.
+    # Without this refresh the stamp lands on an orphaned dict and the
+    # reroll/render_plan/HuMo never see it (live run
+    # signal_lost_bioluminescent_trench_descent_20260525_182002: critic
+    # produced 4 reroll_targets / arc_verdict=uneven; reroll + render_plan
+    # both saw clean()/defaults).
+    ledger_data = led.data
+    meta = ledger_data.setdefault("meta", {})
     story_critic_report = _OTRSC.run_story_critic(
         generate_fn,
         ledger_data,
@@ -737,6 +749,14 @@ def run_freeze_cascade(
     # render_max_n. build_render_plan NEVER raises (PD1) -- a degraded
     # computation returns None and the stamp is skipped, which makes
     # HuMo fall back to its pre-Sprint-6 render-all behaviour.
+    #
+    # BUG-LOCAL-273 fix (cont.): refresh ledger_data + meta again before the
+    # Sprint 6 stamp. The Sprint 5C reroll above may have triggered an
+    # internal Ledger.save() (update_line_text on rerolled lines is followed
+    # by save() in some paths), rebinding self.data again. Same root cause
+    # as the 5B refresh above.
+    ledger_data = led.data
+    meta = ledger_data.setdefault("meta", {})
     render_plan = _OTRRP.build_render_plan(
         ledger_data,
         render_selection=render_selection,
@@ -756,6 +776,26 @@ def run_freeze_cascade(
             render_plan["source_cycle_count"],
             len(render_plan["excluded_flat_lines"]),
         )
+        # BUG-LOCAL-274 fix: persist the render_plan stamp to disk so
+        # OTR_BatchHumoRender (a separate node invocation that loads the
+        # ledger via _load_ledger_with_path from *_ledger.json) actually
+        # sees it. Phase 10's later save would normally cover this, but
+        # the belt-and-braces save here makes the contract explicit and
+        # survives any future Phase 10 refactor. Production Ledger.save()
+        # never raises (Prime Directive 1). Defensive getattr handles
+        # test fixtures that stub `led` as a SimpleNamespace without a
+        # save method (test_lfc_phase_7_8_readiness, etc.).
+        _save_fn = getattr(led, "save", None)
+        if callable(_save_fn):
+            try:
+                _save_fn()
+            except Exception as _save_exc:  # noqa: BLE001 -- PD1
+                log.warning(
+                    "[LFC] post-render-plan save failed (%s: %s); "
+                    "render_plan lives in-memory only -- HuMo will "
+                    "fall back to render-all", type(_save_exc).__name__,
+                    _save_exc,
+                )
 
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
