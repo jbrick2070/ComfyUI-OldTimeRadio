@@ -387,7 +387,7 @@ class BatchBarkGenerator:
 
         _meta = led.get("meta") or {}
 
-        # BUG-LOCAL-271 (run-3 crash 2026-05-26): halt before any Bark work
+        # BUG-LOCAL-276 (run-3 crash 2026-05-26): halt before any Bark work
         # if the freeze cascade stamped meta.freeze_verdict='needs_full_rerun'.
         # The cascade signals that the writer left the ledger in an unrenderable
         # state (cast-lock contract violations, role mismatches, etc.). Without
@@ -406,7 +406,7 @@ class BatchBarkGenerator:
                 "meta.freeze_verdict='needs_full_rerun' (writer left the "
                 "ledger in an unrenderable state). Refusing to render TTS "
                 "on a flagged ledger. Re-run the writer phase; do not "
-                "bypass this halt. See BUG-LOCAL-271."
+                "bypass this halt. See BUG-LOCAL-276."
             )
 
         # Sprint E E9 / M2: check meta.freeze_unload_ok. The cascade
