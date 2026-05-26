@@ -50,10 +50,23 @@ class TestWriterCanonicalModelSlots:
     pin here.
     """
 
-    def test_writer_both_slots_gemma_4(self):
-        """Sprint C3 destination + 2026-05-18 retest #11 flip:
-        canonical writer model is google/gemma-4-E4B-it on both
-        creative and technical slots.
+    def test_writer_both_slots_mistral_nemo(self):
+        """Sprint 10A step 2 reconciliation (2026-05-26):
+        canonical writer model is mistralai/Mistral-Nemo-Instruct-2407
+        on both creative and technical slots.
+
+        Replaces the prior Sprint C3 destination of google/gemma-4-E4B-it.
+        The three live runs on 2026-05-25 / 2026-05-26 (handoff entries
+        signal_lost_bioluminescent_trench_descent, pending_20260525_223109,
+        pending_20260526_053338) all ran on Mistral-Nemo per the soak
+        logs; the workflow JSON had drifted to gemma-4-E4B-it but the
+        running Desktop session was on Mistral-Nemo the whole time.
+        Sprint 10A step 2 picked Mistral-Nemo as canonical (rationale:
+        C7 byte-identical audio baseline, no auth gating, broad chat-
+        template + grammar-constrained-decoding support, validated in
+        3 live runs vs zero for gemma-4-E4B-it on the current pipeline
+        shape) and flipped the workflow JSON to match. This test pins
+        the new destination.
         """
         n = _node_by_id(_load_canonical_workflow(), 1)
         assert n.get("type") == "OTR_LedgerScriptWriter"
@@ -69,14 +82,14 @@ class TestWriterCanonicalModelSlots:
         #   [2] num_characters
         #   [3] creative_writing_model
         #   [4] technical_model
-        expected = "google/gemma-4-E4B-it"
+        expected = "mistralai/Mistral-Nemo-Instruct-2407"
         assert widgets[3] == expected, (
-            f"writer creative_writing_model must be {expected!r} for C7 "
-            f"baseline (Sprint C3 destination); got {widgets[3]!r}."
+            f"writer creative_writing_model must be {expected!r} per "
+            f"Sprint 10A step 2 reconciliation; got {widgets[3]!r}."
         )
         assert widgets[4] == expected, (
-            f"writer technical_model must be {expected!r} for C7 "
-            f"baseline (Sprint C3 destination); got {widgets[4]!r}."
+            f"writer technical_model must be {expected!r} per "
+            f"Sprint 10A step 2 reconciliation; got {widgets[4]!r}."
         )
 
 
