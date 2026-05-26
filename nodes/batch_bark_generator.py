@@ -385,6 +385,30 @@ class BatchBarkGenerator:
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
 
+        _meta = led.get("meta") or {}
+
+        # BUG-LOCAL-271 (run-3 crash 2026-05-26): halt before any Bark work
+        # if the freeze cascade stamped meta.freeze_verdict='needs_full_rerun'.
+        # The cascade signals that the writer left the ledger in an unrenderable
+        # state (cast-lock contract violations, role mismatches, etc.). Without
+        # this gate, BatchBarkGenerator continues anyway and crashes at the
+        # Gate 3 cast.voice_preset check below with a confusing "Writer cast-lock
+        # contract violation" error that hides the real reason (the freeze
+        # cascade already flagged the ledger upstream). Halt here with a clean,
+        # unambiguous message so the operator sees the actual signal.
+        #
+        # Missing meta.freeze_verdict (legacy graphs, tests) -> proceed as
+        # before. Only an explicit 'needs_full_rerun' verdict halts.
+        _verdict = _meta.get("freeze_verdict")
+        if _verdict == "needs_full_rerun":
+            raise ValueError(
+                "BatchBarkGenerator: freeze cascade stamped "
+                "meta.freeze_verdict='needs_full_rerun' (writer left the "
+                "ledger in an unrenderable state). Refusing to render TTS "
+                "on a flagged ledger. Re-run the writer phase; do not "
+                "bypass this halt. See BUG-LOCAL-271."
+            )
+
         # Sprint E E9 / M2: check meta.freeze_unload_ok. The cascade
         # stamps this at the finally block of run_freeze_cascade; False
         # means unload_llm() raised inside the cascade's teardown and
@@ -392,7 +416,6 @@ class BatchBarkGenerator:
         # Bark needs ~6 GB headroom, so attempt one defensive unload
         # here to avoid OOM on this node's torch.load. Logged at WARN
         # so the soak tail surfaces the recovery attempt.
-        _meta = led.get("meta") or {}
         if _meta.get("freeze_unload_ok") is False:
             log.warning(
                 "[BatchBark] meta.freeze_unload_ok=False -- cascade "
