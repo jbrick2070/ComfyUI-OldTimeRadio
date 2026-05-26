@@ -2209,6 +2209,7 @@ class OTR_LedgerScriptWriter:
             try:
                 from . import _otr_constrained_generate as _OTRCG
                 from . import _otr_stage1_call as _OTRS1
+                from . import _otr_stage1_cast_audit as _OTRS1CA
                 from . import _otr_stage1_plan as _OTRS1P
 
                 # Request the technical-slot cache_entry directly --
@@ -2263,6 +2264,52 @@ class OTR_LedgerScriptWriter:
                     len(_shadow_plan.beats),
                     len(_shadow_plan.running_facts),
                 )
+
+                # ----------------------------------------------------
+                # Sprint 10A step 4: Stage 1 cast audit
+                # ----------------------------------------------------
+                # Run the deterministic name -> gender -> pronouns ->
+                # voice audit on the freshly-parsed plan. Findings
+                # are stamped on meta.stage1_cast_audit so the soak
+                # gate (0 mismatches across 10 runs) can be measured
+                # directly from the saved ledger. The audit is PURE
+                # validation -- it does NOT repair or regenerate the
+                # plan. Repair / regenerate is later-step work.
+                try:
+                    _audit = _OTRS1CA.audit_cast(_shadow_plan)
+                    meta["stage1_cast_audit"] = _audit.to_dict()
+                    if _audit.ok:
+                        log.info(
+                            "[Stage1CastAudit] clean: 0 errors, "
+                            "%d warn(s)",
+                            len(_audit.warns),
+                        )
+                    else:
+                        log.warning(
+                            "[Stage1CastAudit] %d error(s), "
+                            "%d warn(s) on shadow plan; sample: %s",
+                            len(_audit.errors),
+                            len(_audit.warns),
+                            _audit.errors[0].message[:200],
+                        )
+                except Exception as _audit_exc:
+                    # Audit-side failure is non-fatal -- stamp a
+                    # marker and continue. The audit is diagnostic;
+                    # a bug in the audit must NEVER halt the writer.
+                    meta["stage1_cast_audit"] = {
+                        "ok": False,
+                        "error_count": -1,
+                        "warn_count": -1,
+                        "audit_setup_failed": True,
+                        "error_type": type(_audit_exc).__name__,
+                        "error_message": str(_audit_exc)[:300],
+                    }
+                    log.warning(
+                        "[Stage1CastAudit] audit raised %s: %s; "
+                        "stamping marker and continuing.",
+                        type(_audit_exc).__name__,
+                        str(_audit_exc)[:200],
+                    )
             except _OTRS1.Stage1PlanGenerationError as _exc:
                 # Shadow pass exhausted its retry budget. Stamp the
                 # attempt list for soak forensics; the existing
