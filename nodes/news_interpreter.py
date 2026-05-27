@@ -192,15 +192,47 @@ def v1_validate(
     brief: NewsBriefs,
     *,
     source_text: str,
+    judge_fn: Callable[..., str] | None = None,
 ) -> list[str]:
-    """V1 -- every key_term must word-boundary-match the source text.
+    """V1 -- every key_term must be present in source, either by
+    word-boundary regex OR (Sprint 10B Wave 1 Agent A) by a semantic
+    LLM-as-judge fallback when ``judge_fn`` is provided.
 
-    Word-boundary regex (not bare substring), per ADR section 4.1.
+    Strict word-boundary first (cheap, deterministic, ADR section 4.1).
     "Mars" matches "Mars rover" but NOT "Marsbar". "AI" matches "AI
-    model" but NOT "paid" / "afraid" / "available".
+    model" but NOT "paid" / "afraid" / "available". If strict accepts,
+    no LLM call fires.
+
+    BUG-LOCAL-264 family (logged 2026-05-24, recurring):
+    Live operator articles routinely paraphrase the headline term in
+    the body ("Epidermal Growth Factor Receptor" without the verbatim
+    "EGFR", "Dr. David Nathanson" but the LLM emits just "Nathanson",
+    "nasal spray reversing brain aging" but the LLM emits "brain-aging
+    nasal spray"). Strict word-boundary rejects these even though the
+    article DOES support the claim semantically. The 3-attempt retry
+    ladder retries the same prompt at lower temperature with no
+    semantic flexibility and exhausts on every hard article -- the
+    writer then falls back to raw news_seed with NO key_terms
+    enforcement at all. This is worse than accepting a paraphrase.
+
+    Sprint 10B Wave 1 Agent A fix: when ``judge_fn`` is provided, any
+    term that fails strict word-boundary escalates to a single
+    technical-slot LLM call asking "does this article support the
+    claim that this term is a key topic?" If the model answers yes,
+    the term is accepted. If no, it stays a failure.
+
+    ``judge_fn`` is the standard control-plane callable
+    ``generate_fn(messages, *, temperature, max_new_tokens) -> str``.
+    Routed by the caller (build_news_briefs) to the technical slot.
 
     `source_text` should be ``headline + summary + cleaned_body`` --
     the full article, NOT the truncated prompt slice.
+
+    # LLM slot: technical
+    # Reason: the optional judge call (one per failing term) is a
+    # structured yes/no semantic-presence check -- not creative
+    # dialogue. Routes through the technical slot the caller already
+    # has resident.
     """
     failures: list[str] = []
     for term in brief.key_terms:
@@ -209,9 +241,130 @@ def v1_validate(
             + re.escape(term)
             + r"(?![A-Za-z0-9])"
         )
-        if not re.search(pattern, source_text, re.IGNORECASE):
+        if re.search(pattern, source_text, re.IGNORECASE):
+            # Strict word-boundary accepted. No LLM call needed.
+            continue
+
+        if judge_fn is None:
+            # Strict-only mode (judge fallback disabled). Original
+            # behavior; preserved for unit tests that pin the strict
+            # contract and for callers that explicitly want strict.
             failures.append(f"V1: key_term {term!r} not in source")
+            continue
+
+        # Strict failed AND judge_fn is available -- escalate to the
+        # semantic-presence check.
+        if _judge_term_supported_by_source(
+            term=term,
+            source_text=source_text,
+            judge_fn=judge_fn,
+        ):
+            # LLM-judge accepted. The term is semantically supported by
+            # the article even though the verbatim string is absent.
+            # Continue without flagging.
+            continue
+
+        # Both strict AND judge rejected. Real failure.
+        failures.append(
+            f"V1: key_term {term!r} not in source (strict + LLM-judge)"
+        )
     return failures
+
+
+# Token cap for the source slice we hand to the LLM judge. Keeps the
+# judge call cheap and bounded; the article body can be 5-10k tokens,
+# we don't need the whole thing to answer the yes/no question.
+_JUDGE_SOURCE_CHAR_CAP = 4000
+
+# Per-term token budget for the judge response. The model only needs
+# to emit "yes" or "no" plus a one-line rationale at most; cap small
+# so a runaway generation doesn't burn the budget on every call.
+_JUDGE_MAX_NEW_TOKENS = 24
+
+# Low temperature for the judge: deterministic yes/no answers, not
+# creative reasoning.
+_JUDGE_TEMPERATURE = 0.10
+
+
+def _judge_term_supported_by_source(
+    *,
+    term: str,
+    source_text: str,
+    judge_fn: Callable[..., str],
+) -> bool:
+    """One LLM call per failing term. Returns True iff the model
+    affirms that ``term`` is a topic the article supports.
+
+    Conservative parser: only an unambiguous "yes" at the start of
+    the response (after trimming) counts as accept. Anything else --
+    "no", "maybe", "the article mentions ...", empty response,
+    exception -- counts as reject. False positives are worse than
+    false negatives here: an accepted paraphrase that doesn't really
+    fit the article propagates downstream as a key_term the writer
+    is asked to anchor to.
+
+    Never raises. Any judge_fn exception is swallowed and treated as
+    a rejection -- the original strict failure stands.
+    """
+    if not term or not source_text or judge_fn is None:
+        return False
+    source_slice = (source_text or "")[:_JUDGE_SOURCE_CHAR_CAP].strip()
+    if not source_slice:
+        return False
+
+    system = (
+        "You are an editorial fact-checker. You read a news article "
+        "excerpt and decide whether a candidate topic term is "
+        "supported by the article. A term is SUPPORTED if the article "
+        "discusses the concept, names a paraphrase, refers to it by "
+        "an obvious synonym, or includes the term as a substring of a "
+        "longer phrase the article uses. A term is NOT SUPPORTED if "
+        "the article does not discuss the concept at all -- a term "
+        "fabricated outside the article's content. Answer with a "
+        'single word, "yes" or "no", on its own line. No '
+        "explanation."
+    )
+    user = (
+        f"Article excerpt:\n[BEGIN]\n{source_slice}\n[END]\n\n"
+        f"Candidate term: {term!r}\n\n"
+        "Is this term supported by the article? Answer yes or no."
+    )
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+
+    try:
+        # LLM slot: technical
+        # Reason: structured yes/no semantic-presence judgment. One
+        # call per failing key_term per attempt; bounded by
+        # _MAX_KEY_TERMS (6) * max_attempts (3) = 18 calls in the
+        # worst case, typically 1-2 calls.
+        raw = judge_fn(
+            messages,
+            temperature=_JUDGE_TEMPERATURE,
+            max_new_tokens=_JUDGE_MAX_NEW_TOKENS,
+        )
+    except Exception:  # noqa: BLE001 -- never break the validator on
+        # a judge failure; the term stays rejected, the strict failure
+        # message lands, and the caller's existing retry ladder
+        # handles re-rolling the brief.
+        return False
+
+    if not isinstance(raw, str):
+        return False
+    # Conservative parser. Only "yes" (or "yes." / "Yes" with any
+    # capitalization) at the head of the first non-blank line accepts.
+    first_line = ""
+    for line in (raw or "").splitlines():
+        s = line.strip()
+        if s:
+            first_line = s
+            break
+    if not first_line:
+        return False
+    first_word = re.split(r"[^A-Za-z]+", first_line, maxsplit=1)[0]
+    return first_word.lower() == "yes"
 
 
 def v2_validate(
@@ -588,7 +741,17 @@ def build_news_briefs(
                 f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})"
             )
         v_failures: list[str] = []
-        v_failures.extend(v1_validate(brief, source_text=source_text_full))
+        # Sprint 10B Wave 1 Agent A (2026-05-27): v1_validate gains an
+        # optional judge_fn that escalates strict-word-boundary failures
+        # to a semantic LLM-as-judge check (BUG-LOCAL-264 family). The
+        # judge runs on the same technical slot the brief generator
+        # uses -- model already resident; one call per failing term per
+        # attempt, typically 0-2 calls per run.
+        v_failures.extend(v1_validate(
+            brief,
+            source_text=source_text_full,
+            judge_fn=_counting_slot_fn,
+        ))
         v_failures.extend(v2_validate(brief, source_text=source_text_full))
         v_failures.extend(v3_validate(brief, style=style))
         if v_failures:
