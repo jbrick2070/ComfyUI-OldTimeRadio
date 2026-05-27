@@ -112,7 +112,13 @@ def _plan() -> Stage1Plan:
 
 
 class TestPromptChainShape:
-    def test_priming_messages_length_six(self):
+    def test_priming_messages_length_seven(self):
+        """BUG-LOCAL-280 (2026-05-27): chain length bumped 6 -> 7 with
+        the addition of the leading user turn that asks for the Ready
+        ack. Mistral-Nemo's chat template requires user/assistant
+        alternation after the optional system message; the pre-fix
+        system -> assistant directly raised TemplateError on every
+        generate. The leading user turn restores alternation."""
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -121,10 +127,15 @@ class TestPromptChainShape:
             premise=plan.premise,
             running_facts=plan.running_facts,
         )
-        # 3 user/system + 3 assistant primes = 6 messages.
-        assert len(chain.priming_messages) == 6
+        # system + 3 user + 3 assistant primes = 7 messages
+        # post-BUG-LOCAL-280.
+        assert len(chain.priming_messages) == 7
 
     def test_priming_alternates_correctly(self):
+        """BUG-LOCAL-280: alternation is now
+        system -> user -> assistant -> user -> assistant -> user ->
+        assistant, which Mistral-Nemo's chat template renders cleanly.
+        """
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -134,12 +145,19 @@ class TestPromptChainShape:
             running_facts=plan.running_facts,
         )
         expected_roles = [
-            "system", "assistant", "user", "assistant", "user", "assistant",
+            "system",
+            "user", "assistant",
+            "user", "assistant",
+            "user", "assistant",
         ]
         got_roles = [m["role"] for m in chain.priming_messages]
         assert got_roles == expected_roles
 
     def test_turn1_system_carries_speaker_persona(self):
+        """BUG-LOCAL-280: the system prompt no longer carries the
+        'Reply Ready' instruction (that moved to the leading user
+        turn at index 1). System content stays focused on the
+        role-bind + persona."""
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -148,12 +166,30 @@ class TestPromptChainShape:
             premise=plan.premise,
             running_facts=plan.running_facts,
         )
-        turn1 = chain.priming_messages[0]
-        assert "DALE PORTER" in turn1["content"]
-        assert "measured cadences" in turn1["content"].lower()
-        assert TURN1_EXPECTED in turn1["content"].lower()
+        turn1_system = chain.priming_messages[0]
+        assert turn1_system["role"] == "system"
+        assert "DALE PORTER" in turn1_system["content"]
+        assert "measured cadences" in turn1_system["content"].lower()
+
+    def test_turn1_user_asks_for_ready_ack(self):
+        """BUG-LOCAL-280 new: the leading user turn (index 1) carries
+        the Ready ack instruction that used to be in the system
+        prompt. This restores user/assistant alternation."""
+        plan = _plan()
+        chain = build_stage2_prompt_chain(
+            speaker=plan.cast[0],
+            beat=plan.beats[1],
+            arc=plan.arc,
+            premise=plan.premise,
+            running_facts=plan.running_facts,
+        )
+        turn1_user = chain.priming_messages[1]
+        assert turn1_user["role"] == "user"
+        assert TURN1_EXPECTED in turn1_user["content"].lower()
 
     def test_turn2_user_carries_arc_and_premise(self):
+        """BUG-LOCAL-280: turn2 user moved from index 2 -> index 3
+        after the leading user-ack insertion at index 1."""
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -162,12 +198,15 @@ class TestPromptChainShape:
             premise=plan.premise,
             running_facts=plan.running_facts,
         )
-        turn2 = chain.priming_messages[2]
+        turn2 = chain.priming_messages[3]
+        assert turn2["role"] == "user"
         assert "Mars relay" in turn2["content"]
         # Arc setup phrase
         assert "Routine night shift" in turn2["content"]
 
     def test_turn3_user_carries_facts_and_pronouns(self):
+        """BUG-LOCAL-280: turn3 user moved from index 4 -> index 5
+        after the leading user-ack insertion at index 1."""
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -176,7 +215,8 @@ class TestPromptChainShape:
             premise=plan.premise,
             running_facts=plan.running_facts,
         )
-        turn3 = chain.priming_messages[4]
+        turn3 = chain.priming_messages[5]
+        assert turn3["role"] == "user"
         assert "Mars" in turn3["content"]   # from running_facts
         assert "he/him" in turn3["content"]   # speaker pronouns
         assert "anchor of competence" in turn3["content"]
@@ -224,6 +264,8 @@ class TestPromptChainShape:
         assert "Previous line" not in chain.turn4_user["content"]
 
     def test_assemble_full_chat_appends_turn4(self):
+        """BUG-LOCAL-280: full chat length bumped 7 -> 8 with the
+        leading user-ack turn added to the priming chain."""
         plan = _plan()
         chain = build_stage2_prompt_chain(
             speaker=plan.cast[0],
@@ -233,7 +275,7 @@ class TestPromptChainShape:
             running_facts=plan.running_facts,
         )
         full = assemble_full_chat(chain)
-        assert len(full) == 7  # 6 priming + Turn 4
+        assert len(full) == 8  # 7 priming + Turn 4 (post-BUG-LOCAL-280)
         assert full[-1] == chain.turn4_user
 
 

@@ -857,13 +857,52 @@ def run_freeze_cascade(
     # pre-reroll lines and returns the `needs_full_rerun` terminal
     # verdict, handled here exactly like a terminal reviewer verdict
     # (skip Phase 7 / 8 / 10 via the shared terminal-skip helper).
-    reroll_disp = _OTRRR.run_targeted_reroll(generate_fn, led)
-    log.info(
-        "[LFC] Sprint 5C targeted reroll: verdict=%s, %d cycle(s), "
-        "%d line(s) re-composed",
-        reroll_disp.verdict, reroll_disp.cycles_run,
-        reroll_disp.lines_rerolled,
-    )
+    # BUG-LOCAL-281 (Sprint 10B Wave 0 follow-on, 2026-05-27):
+    # Stage 7 ship-verdict gate on the legacy Sprint 5C reroll loop.
+    # Live operator soak 2026-05-27 surfaced a critic-disagreement
+    # gate failure: Stage 7 whole-episode critic returned
+    # verdict=ship mean=3.70 failing_axes=[] on a freshly composed
+    # ledger, but the legacy story critic (run inside the cascade
+    # above) independently flagged 2 reroll targets, which forced
+    # the Sprint 5C reroll loop, which exhausted both cycles trying
+    # to lengthen short-but-shippable lines, which stamped
+    # needs_full_rerun, which halted Bark per BUG-LOCAL-276.
+    # Stage 7 is the new authoritative critic (Sprint 10A step 7);
+    # legacy reroll only fires when Stage 7 has NOT confirmed a ship.
+    # When Stage 7 says ship, construct a no-op disposition and skip
+    # the reroll call entirely -- the composed lines ship as-is.
+    # Interim gate until Sprint 10B Wave 1 Agent C (critic-driven
+    # escalation) replaces the legacy reroll wholesale.
+    _w0f_s7 = meta.get("stage7_shadow_critic") or {}
+    _w0f_s7_verdict = ""
+    if isinstance(_w0f_s7, dict):
+        _w0f_s7_verdict = str(_w0f_s7.get("verdict") or "").strip().lower()
+    if _w0f_s7_verdict == "ship":
+        # Build a no-op RerollDisposition so downstream code that
+        # reads .verdict / .cycles_run / .lines_rerolled keeps
+        # working. final_report carries the unchanged story-critic
+        # report so the render-plan pass still sees the original
+        # reroll_targets list.
+        reroll_disp = _OTRRR.RerollDisposition(
+            verdict="no_reroll",
+            cycles_run=0,
+            lines_rerolled=0,
+            final_report=story_critic_report,
+        )
+        meta["reroll_skipped_by_stage7_ship"] = True
+        log.info(
+            "[LFC] Stage 7 verdict=ship (mean=%.2f) -- skipping "
+            "Sprint 5C legacy reroll loop; episode ships as composed.",
+            float(_w0f_s7.get("mean_score") or 0.0),
+        )
+    else:
+        reroll_disp = _OTRRR.run_targeted_reroll(generate_fn, led)
+        log.info(
+            "[LFC] Sprint 5C targeted reroll: verdict=%s, %d cycle(s), "
+            "%d line(s) re-composed",
+            reroll_disp.verdict, reroll_disp.cycles_run,
+            reroll_disp.lines_rerolled,
+        )
     if reroll_disp.verdict == "needs_full_rerun":
         disp = _build_terminal_skip_disposition(
             ledger_data,

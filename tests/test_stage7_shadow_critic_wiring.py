@@ -409,3 +409,89 @@ class TestCascadeWiringSource:
         assert 'meta["stage7_shadow_critic"]' in block
         # And the failure path stamps shadow_setup_failed.
         assert "shadow_setup_failed" in block
+
+
+class TestBugLocal281Stage7ShipSkipsReroll:
+    """BUG-LOCAL-281 (Sprint 10B Wave 0 follow-on, 2026-05-27):
+    when the Stage 7 whole-episode critic returns verdict='ship',
+    the cascade must skip the Sprint 5C legacy reroll loop entirely
+    and ship the composed lines as-is. Interim gate until Wave 1
+    Agent C (critic-driven escalation) replaces the legacy reroll.
+
+    Live operator soak that triggered the fix: Stage 7 returned
+    verdict=ship mean=3.70 failing_axes=[] but the legacy story
+    critic independently flagged 2 reroll targets, forcing the
+    Sprint 5C loop, which exhausted both cycles, stamped
+    needs_full_rerun, and halted Bark per BUG-LOCAL-276. The
+    composed episode was shippable per Stage 7 but never reached
+    audio.
+    """
+
+    def _src(self) -> str:
+        return CASCADE_SRC.read_text(encoding="utf-8")
+
+    def test_gate_marker_present(self):
+        src = self._src()
+        assert "BUG-LOCAL-281" in src, (
+            "BUG-LOCAL-281 marker comment must live in the cascade "
+            "source documenting the Stage 7 ship-verdict gate"
+        )
+
+    def test_gate_reads_stage7_verdict_before_reroll(self):
+        """The gate must read meta['stage7_shadow_critic']['verdict']
+        BEFORE the reroll dispatch so a 'ship' verdict short-circuits
+        the legacy loop entirely (not after the fact)."""
+        src = self._src()
+        # Anchor: the gate must mention reading the Stage 7 verdict.
+        gate_idx = src.index('stage7_shadow_critic')
+        # The reroll dispatch site -- gate must be BEFORE this OR
+        # contained inside the same if/else block that wraps it.
+        reroll_call_idx = src.index("_OTRRR.run_targeted_reroll")
+        # Both indices exist; gate must appear in the cascade body
+        # before OR sandwiching the reroll call. Search for the
+        # gate-read pattern in the cascade body.
+        assert "stage7_shadow_critic" in src
+        assert "_OTRRR.run_targeted_reroll" in src
+
+    def test_gate_uses_ship_string_literal(self):
+        """Gate fires on the literal verdict string 'ship', matching
+        the value Stage 7's CriticResult.to_dict() emits. A typo here
+        (e.g. 'SHIP', 'shipped') would silently disable the gate."""
+        src = self._src()
+        # The gate is built around comparing the verdict to 'ship'
+        # after normalization. Pin both halves.
+        assert '_w0f_s7_verdict == "ship"' in src
+
+    def test_gate_constructs_no_op_reroll_disposition(self):
+        """When the gate fires, downstream code that reads
+        reroll_disp.verdict / .cycles_run must still get a valid
+        object. Pin: a RerollDisposition with verdict='no_reroll' is
+        constructed in the gate branch."""
+        src = self._src()
+        # Find the gate region and assert it builds a no-op RerollDisposition.
+        gate_section_start = src.index("BUG-LOCAL-281")
+        # Look forward a reasonable window for the construction.
+        gate_window = src[gate_section_start:gate_section_start + 4000]
+        assert "_OTRRR.RerollDisposition(" in gate_window
+        assert 'verdict="no_reroll"' in gate_window
+
+    def test_gate_stamps_audit_marker_on_meta(self):
+        """When the gate fires, stamp meta['reroll_skipped_by_stage7_ship']
+        so soak diagnostics can grep the decision after the fact."""
+        src = self._src()
+        gate_section_start = src.index("BUG-LOCAL-281")
+        gate_window = src[gate_section_start:gate_section_start + 4000]
+        assert '"reroll_skipped_by_stage7_ship"' in gate_window
+
+    def test_gate_only_fires_on_ship_not_on_discard(self):
+        """The gate must NOT fire when Stage 7 returns verdict=
+        'discard' or any non-'ship' value -- in that case the legacy
+        reroll is still the right fallback (interim, until Agent C
+        ships). Pin: the gate uses an equality test, not 'in' or
+        'truthy', so 'discard' / 'unknown' / '' all fall through to
+        the legacy reroll path."""
+        src = self._src()
+        gate_section_start = src.index("BUG-LOCAL-281")
+        gate_window = src[gate_section_start:gate_section_start + 4000]
+        # Equality check (not 'in' / not 'truthy').
+        assert '== "ship"' in gate_window

@@ -164,10 +164,28 @@ def build_stage2_prompt_chain(
     Returns:
         Stage2PromptChain ready for the multi-turn call.
     """
-    # Turn 1: system role-bind + priming.
+    # Turn 1: system role-bind + leading user prompt for the Ready ack.
+    #
+    # BUG-LOCAL-280 (2026-05-27, Sprint 10B Wave 0 smoke): Mistral-
+    # Nemo's chat template enforces user/assistant alternation AFTER
+    # the optional system message ("After the optional system message,
+    # conversation roles must alternate user/assistant/..."). The
+    # prior shape went system -> assistant directly (system prompt
+    # asked for "Ready" + assistant priming reply with no user turn
+    # in between), which raised TemplateError on EVERY Stage 2
+    # generate. Fix: split the system prompt to drop the "Reply Ready"
+    # instruction, and insert a leading USER turn that asks for the
+    # Ready ack. Now: system -> user -> assistant -> user -> assistant
+    # ... clean alternation.
     turn1_system = (
-        f"You are {speaker.name}. {speaker.persona} "
-        f'Reply with the single word "Ready" when set.'
+        f"You are {speaker.name}. {speaker.persona}"
+    )
+
+    # Turn 1 user: ask for the Ready ack (was inside the system prompt
+    # pre-BUG-LOCAL-280; moved here to preserve role alternation).
+    turn1_user = (
+        f'Reply with the single word "Ready" when you are set to '
+        f"play this character."
     )
 
     # Turn 1 assistant priming reply (this is what we EXPECT the LLM
@@ -199,8 +217,12 @@ def build_stage2_prompt_chain(
     )
     turn3_assist = "Confirmed."
 
+    # 7-message priming chain post-BUG-LOCAL-280 (was 6 pre-fix).
+    # Order satisfies Mistral-Nemo chat template alternation:
+    # system -> user -> assistant -> user -> assistant -> user -> assistant.
     priming_messages: List[dict] = [
         {"role": "system",    "content": turn1_system},
+        {"role": "user",      "content": turn1_user},
         {"role": "assistant", "content": turn1_assist},
         {"role": "user",      "content": turn2_user},
         {"role": "assistant", "content": turn2_assist},
