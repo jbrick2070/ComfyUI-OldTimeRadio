@@ -90,7 +90,16 @@ _MAX_SCRIPT_BRIEF_CHARS = 350
 _MAX_NEWS_CLOSE_BRIEF_CHARS = 250
 _MAX_KEY_TERM_CHARS = 40
 _MIN_KEY_TERMS = 2
-_MAX_KEY_TERMS = 6
+# BUG-LOCAL-283 (2026-05-27): cap relaxed 6 -> 7. The LLM consistently
+# wants to emit one more term than the cap allows (NASA, FireSense,
+# Wildfire, Thermal Sensor, Fire Mission, Fire Bulldozer, Firefighter
+# = 7 distinct named terms) and the structural retry burns a 2nd call
+# to land back inside 6. Bumping to 7 keeps the news interpreter on
+# its first attempt without diluting the wave-1A semantic check the
+# downstream `_judge_term_supported_by_source` runs against the
+# article body (the judge does not care about the count, only that
+# each term semantically appears in the source).
+_MAX_KEY_TERMS = 7
 
 # ADR section 3.2 -- article body slicing.
 _BODY_HEAD_CHARS = 1500

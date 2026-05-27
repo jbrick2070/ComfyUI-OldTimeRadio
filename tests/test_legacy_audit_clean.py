@@ -114,6 +114,8 @@ FORENSIC_MARKERS = (
     "run_story_room",    # the Wave 2 loop entry-point fn name
     "writers'-room",     # any prose phrase referencing the writers'-room
     "writers' room",     #   role architecture (Section 1)
+    "director-locked",   # Wave 2 Agent G: "Director-locked cast names"
+    "director's locked", #   variant phrasing used inside Extract docstring
 )
 
 

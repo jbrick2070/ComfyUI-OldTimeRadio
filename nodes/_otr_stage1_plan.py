@@ -40,7 +40,7 @@ from __future__ import annotations
 import re
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -171,9 +171,16 @@ class Stage1Beat(BaseModel):
     )
     length_target_words: int = Field(
         ...,
-        ge=5,
+        # BUG-LOCAL-282 (2026-05-27): floor relaxed from 5 to 0 so a
+        # music_inter beat (speaker='MUSIC') can carry
+        # length_target_words=0 -- music slots produce no dialogue and
+        # legitimately want a zero target. The voiced-beats floor is
+        # re-asserted by the `_voiced_beats_have_min_words` model
+        # validator below so character/announcer beats still require
+        # length_target_words >= 5 (Stage 3 length validator pin).
+        ge=0,
         le=200,
-        description="Target word count for the rendered dialogue line. Stage 3 length validator passes lines within [target * 0.5, target * 1.7].",
+        description="Target word count for the rendered dialogue line. Stage 3 length validator passes lines within [target * 0.5, target * 1.7]. Music beats (speaker='MUSIC') may be 0.",
     )
     emotional_register: str = Field(
         ...,
@@ -197,6 +204,32 @@ class Stage1Beat(BaseModel):
                 f"null/empty; got {v!r}"
             )
         return v
+
+    @model_validator(mode="after")
+    def _voiced_beats_have_min_words(self) -> "Stage1Beat":
+        """Re-assert the length floor for voiced beats only.
+
+        BUG-LOCAL-282 (2026-05-27). The unconditional `ge=5` on
+        `length_target_words` was rejecting the LLM's perfectly valid
+        `length_target_words=0` on music_inter beats (speaker='MUSIC')
+        and the Stage 1 shadow pass kept exhausting its retry budget.
+        The fix splits the rule:
+          * speaker == 'MUSIC'  -> 0 is allowed (no dialogue planned).
+          * everything else     -> floor of 5 stays (Stage 3 length
+                                    validator pin).
+        ANNOUNCER bookends still require >= 5 since announcer lines
+        DO go through the announcer-pass renderer.
+        """
+        if self.speaker == "MUSIC":
+            return self
+        if self.length_target_words < 5:
+            raise ValueError(
+                f"length_target_words must be >= 5 for voiced beats "
+                f"(speaker={self.speaker!r}); got "
+                f"{self.length_target_words}. Use speaker='MUSIC' for "
+                f"non-voiced music_inter beats with target 0."
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------

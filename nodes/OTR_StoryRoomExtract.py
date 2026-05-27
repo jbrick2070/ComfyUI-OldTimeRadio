@@ -51,8 +51,8 @@ class OTR_StoryRoomExtract:
                                dormant pass-through.
 
     Inputs (optional / forceInput):
-        cast_names             STRING -- comma-separated Director-
-                               locked cast names. When present, the
+        cast_names             STRING -- writers'-room cast names,
+                               comma-separated. When present, the
                                extractor preserves the canonical names
                                verbatim.
         news_seed              STRING (multiline) -- the original news

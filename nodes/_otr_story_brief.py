@@ -50,9 +50,18 @@ log = logging.getLogger("OTR")
 # compliance-honest for JSON output. 0.3 is the centerpoint.
 _REFLECTION_TEMPERATURE: float = 0.3
 
-# Per refinement section 3.2: 120 tokens covers the JSON object plus
-# the 300-char prose brief without leaving room for chatty preamble.
-_REFLECTION_MAX_NEW_TOKENS: int = 160
+# BUG-LOCAL-285 (2026-05-27): bumped 160 -> 512. The v2 schema added
+# five new fields (music_mood_terms / visual_palette / key_objects /
+# tempo_hint / atmosphere_line) on top of the original four; the
+# combined JSON object easily wants 200-300 tokens once the prose
+# brief (300 chars) + atmosphere_line (200 chars) + five 3-6 term
+# arrays + field-name overhead are summed. The 160-token cap was
+# starving Mistral-Nemo into emitting an EMPTY string (line 1 col
+# 0) -- not a truncated JSON, an immediate stop_token before any
+# generation -- so all 3 ladder attempts failed with
+# "no decodable top-level JSON object found". 512 gives generous
+# headroom; the schema's hard caps still bound the actual prose.
+_REFLECTION_MAX_NEW_TOKENS: int = 512
 
 # Sprint 2A/2B: Attempt 2 structural-retry temperature for the shared
 # structured_call retry ladder. STRICTLY BELOW _REFLECTION_TEMPERATURE

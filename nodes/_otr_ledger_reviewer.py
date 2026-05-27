@@ -209,7 +209,17 @@ def _audit_failed_sentinel(reason: str) -> "PreAuditReport":
 class ReviewerEdit(BaseModel):
     line_id: str
     action: Literal["rewrite", "skip", "annotate"]
-    payload: str
+    # BUG-LOCAL-284 (2026-05-27): `payload` relaxed to optional with
+    # default "" so the doctor LLM can emit an annotate/skip row
+    # without inventing prose. The downstream consumers in
+    # `_apply_doctor_edits` already coerce via `edit.payload or ""`
+    # for the rewrite/skip branches; the annotate branch's
+    # `reviewer_note = edit.payload` line is updated in lockstep so
+    # an empty annotate row becomes a no-op rather than a NoneType.
+    # Prior shape (`payload: str` required) burned a structural-retry
+    # call every time the doctor wanted to flag a line without
+    # rewriting it, and the doctor never converged.
+    payload: str = ""
     rationale: str = ""
 
 
@@ -1404,6 +1414,44 @@ def run_script_doctor_edits(
             helper_name="run_script_doctor_edits",
         )
     except StructuredCallFailedError as exc:
+        # BUG-LOCAL-286 (2026-05-27). The structured_call retry ladder
+        # LOWERS temperature on every retry (0.5 -> 0.3 -> 0.1) -- the
+        # right rule when the LLM emits MALFORMED JSON (lower entropy
+        # to land back in-grammar) but the WRONG rule when the LLM
+        # emits NOTHING ("no decodable top-level JSON object found:
+        # line 1 column 1 (char 0)"). Lower temperature deepens
+        # determinism, making an empty-output stop MORE likely on the
+        # retry, not less. Result: a recurring 3-attempt exhaust on
+        # episodes where Mistral-Nemo silently chooses to emit no
+        # edits at all.
+        #
+        # The fix is verdict-side, not retry-side: treat an exhausted
+        # ladder whose last error is "empty output" as "no edits
+        # needed" (clean), not needs_full_rerun. The diagnosis pass
+        # has already named the per-line failures (they ride in
+        # meta.script_doctor_diagnosis for the operator's forensic
+        # trail); failing the edits pass should not blow up the
+        # whole episode. Other failure shapes (real schema errors,
+        # real validation errors) still route to needs_full_rerun
+        # because they signal a doctor LLM that disagrees with the
+        # diagnosis -- a more serious miscalibration.
+        last = exc.last_error
+        is_empty_output = (
+            isinstance(last, json.JSONDecodeError)
+            and "line 1 column 1 (char 0)" in str(last)
+        )
+        if is_empty_output:
+            log.warning(
+                "[OTR_LedgerReviewer:doctor] edits pass exhausted the "
+                "retry ladder after %d attempt(s) with EMPTY output "
+                "(the LLM declined to emit edits); returning CLEAN "
+                "verdict with empty edits list -- the diagnosis pass "
+                "has already named the per-line failures, so the "
+                "episode ships through and the operator inspects "
+                "meta.script_doctor_diagnosis for forensic detail.",
+                exc.attempts,
+            )
+            return ScriptDoctorReport(edits=[], overall_verdict="clean")
         log.warning(
             "[OTR_LedgerReviewer:doctor] edits pass exhausted the "
             "retry ladder after %d attempt(s) (last error: %s); "
@@ -1566,7 +1614,20 @@ def apply_doctor_edits(
             line["char_count"] = 0
             line["word_count"] = 0
         elif edit.action == "annotate":
-            line["reviewer_note"] = edit.payload
+            # BUG-LOCAL-284 belt-and-braces: `payload` was relaxed to
+            # default "" so the doctor LLM can flag a line without
+            # inventing a note. An empty annotate is a no-op that
+            # leaves the line text untouched while still satisfying
+            # the schema; we only stamp `reviewer_note` when the
+            # doctor wrote something.
+            note = (edit.payload or "").strip()
+            if note:
+                line["reviewer_note"] = note
+            else:
+                # Skip the annotation; the diagnosis log already
+                # carries the doctor's `rationale` for the forensic
+                # trail.
+                pass
         applied += 1
     if rejected:
         meta = candidate_ledger.setdefault("meta", {})
