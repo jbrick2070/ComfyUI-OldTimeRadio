@@ -306,6 +306,15 @@ _NODE_MODULES = {
     # contract: no model_id widget; technical_model flows over a STRING
     # input socket from the writer's broadcast output.
     "OTR_EditorPass": (".nodes.OTR_EditorPass", "OTR_EditorPass", " OTR Editor Pass (dormant)"),
+    # Sprint 10B Wave 2 Agent F (2026-05-27): Story Room loop. Wires the
+    # Director (Wave 1 Agent D), the Writer (creative slot, free-form
+    # prose), and the Editor (Wave 1 Agent E, technical slot) into a
+    # bounded conversation that converges on a publishable Writer draft.
+    # Emits a StoryRoomTranscript (design Section 3.3) for Wave 2 Agent G
+    # to extract structured artifacts from. Ships behind use_story_room:
+    # bool = False so PD1 byte-identity holds; Wave 3 operator A/B flips
+    # it on. PD6: both slot ids arrive over STRING forceInput sockets.
+    "OTR_StoryRoom": (".nodes.OTR_StoryRoom", "OTR_StoryRoom", " OTR Story Room (dormant)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

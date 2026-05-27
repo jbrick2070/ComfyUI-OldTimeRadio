@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 74,
-  "last_link_id": 219,
+  "last_node_id": 75,
+  "last_link_id": 222,
   "nodes": [
     {
       "id": 63,
@@ -112,7 +112,9 @@
         {
           "name": "creative_writing_model",
           "type": "STRING",
-          "links": null,
+          "links": [
+            221
+          ],
           "slot_index": 4
         },
         {
@@ -121,7 +123,8 @@
           "links": [
             115,
             218,
-            219
+            219,
+            222
           ],
           "slot_index": 5
         }
@@ -2155,7 +2158,9 @@
         {
           "name": "director_brief",
           "type": "STRING",
-          "links": null,
+          "links": [
+            220
+          ],
           "shape": 3,
           "slot_index": 0,
           "label": "director_brief"
@@ -2169,6 +2174,74 @@
         "",
         ""
       ]
+    },
+    {
+      "id": 75,
+      "type": "OTR_StoryRoom",
+      "pos": [
+        500,
+        520
+      ],
+      "size": [
+        440,
+        260
+      ],
+      "title": "Story Room (Sprint 10B Wave 2 Agent F, DORMANT)",
+      "flags": {},
+      "order": 100,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "director_brief",
+          "type": "STRING",
+          "link": 220
+        },
+        {
+          "name": "news_seed",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "cast_names",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "creative_writing_model",
+          "type": "STRING",
+          "link": 221,
+          "shape": 7
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 222,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "story_room_transcript",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_StoryRoom",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        false,
+        4,
+        3,
+        18
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     }
   ],
   "links": [
@@ -2738,6 +2811,30 @@
       5,
       74,
       0,
+      "STRING"
+    ],
+    [
+      220,
+      74,
+      0,
+      75,
+      0,
+      "STRING"
+    ],
+    [
+      221,
+      1,
+      4,
+      75,
+      3,
+      "STRING"
+    ],
+    [
+      222,
+      1,
+      5,
+      75,
+      4,
       "STRING"
     ]
   ],
