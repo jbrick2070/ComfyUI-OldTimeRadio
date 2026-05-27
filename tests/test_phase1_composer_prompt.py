@@ -891,21 +891,25 @@ class TestTier2NarrationLeak:
 class TestTier2LengthEnforcement:
     """Tier 2 fix #12 — two-sided word-count band."""
 
-    def test_below_floor_retries(self):
+    def test_one_word_drama_line_passes_first_try(self):
+        """BUG-LOCAL-279 follow-on (2026-05-27): the length floor is
+        gone. Drama may use one-word replies ("Yes." "No." "OK.") --
+        these now pass on attempt 1 without forcing a retry. Replaces
+        the legacy test_below_floor_retries which pinned the old
+        sub-floor retry contract.
+        """
         calls = []
         def mock(messages, *, temperature, max_new_tokens, stop=None):
             calls.append(temperature)
-            if len(calls) == 1:
-                return "Yes."        # 1 word, below floor for target=10
-            return "I will help you find them tonight okay sure."  # 9 words
+            return "Yes."        # 1 word, used to be sub-floor
         req = LineRequest(
             speaker="ALICE", intent="reveal", mood="tense",
             target_words=10, canon_header="x", last_lines=[],
         )
         res = compose_line(creative_fn=mock, req=req)
-        # Attempt 2 should have happened (drift retry on attempt 1).
-        assert len(calls) == 2
-        assert res.text.startswith("I will help")
+        # No retry: the 1-word line passes the band (floor=1 now).
+        assert len(calls) == 1
+        assert res.text == "Yes."
 
     def test_above_ceiling_retries(self):
         calls = []
@@ -939,65 +943,92 @@ class TestTier2LengthEnforcement:
 
 
 class TestBugLocal279SmallBudgetBand:
-    """BUG-LOCAL-279 regression: lower length-band floor on small
-    budgets so the legacy Sprint 5C reroll loop converges instead of
-    exhausting on Mistral-Nemo's natural 5-15 word distribution.
+    """BUG-LOCAL-279 regression: length-band floor evolution.
 
-    Pre-fix: target=20 -> min_words=int(20 * 0.5)=10. Live operator
-    runs 2026-05-26 shipped 5/8/5/6/13 word character lines, all sub-
-    floor; reroll exhausted; freeze_verdict=needs_full_rerun every
-    smoke. Post-fix: target=20 -> min_words=int(20 * 0.3)=6. The
-    model's natural distribution lands inside the band on small
-    budgets while the ceiling (1.7x) is unchanged.
+    Floor history:
+      * pre-2026-05-26    0.5x of target (Tier 2 fix #12)
+      * 2026-05-26 OptA   0.3x of target (BUG-LOCAL-279 first cut)
+      * 2026-05-27 final  1 word floor   (Sprint 10B Wave 0 smoke;
+                                          operator directive: "in
+                                          drama people may just say
+                                          one word -- yes, no, I
+                                          understand. Maybe we do not
+                                          have any restrictions.")
+
+    Final cut: the min floor was a defensive catch against degenerate
+    truncated-generate fragments, not a dramatic minimum. Drama
+    legitimately uses one-word replies. min_words = 1 lets every non-
+    empty word line through. If broken-truncation fragments slip
+    through downstream, the right fix is in the generate path, not
+    the band. The 1.7x ceiling stays untouched.
     """
 
-    def test_word_band_target_20_min_is_6(self):
-        """Operator-flagged regression case: 60-word smoke budget
-        with 1 character + 3 beats -> target=20 words/beat. The new
-        min floor of 6 (0.3 * 20) catches sub-3-word degenerate
-        output but accepts the model's typical ~6-15 word lines.
-        """
+    def test_word_band_min_is_1_at_target_20(self):
+        """60-word smoke budget per-beat target (~20 words). Floor
+        is 1 -- any non-empty word line passes."""
         from nodes._otr_line_composer import _word_bands
         word_cap, min_words, max_words = _word_bands(20)
-        assert min_words == 6, (
-            f"BUG-LOCAL-279: target=20 floor expected 6 (0.3 * 20), "
-            f"got {min_words}. The 0.3x floor lets Mistral-Nemo's "
-            f"natural ~5-15 word distribution land in band."
+        assert min_words == 1, (
+            f"BUG-LOCAL-279 follow-on final: target=20 floor "
+            f"expected 1 (operator directive: no length restriction "
+            f"on lower side); got {min_words}."
         )
         assert max_words == 34  # ceiling unchanged
         assert word_cap >= 15
 
-    def test_word_band_target_37_min_is_11(self):
-        """The 110-word smoke budget per-beat target (~37 words).
-        Old floor was 18 (0.5 * 37); new floor is 11 (0.3 * 37).
-        Sweep test verifies the relaxation extends to mid-range
-        targets, not just target=20.
-        """
+    def test_word_band_min_is_1_at_target_37(self):
+        """110-word smoke budget per-beat target (~37 words)."""
         from nodes._otr_line_composer import _word_bands
         _, min_words, max_words = _word_bands(37)
-        assert min_words == 11, (
-            f"BUG-LOCAL-279: target=37 floor expected 11, got {min_words}"
-        )
+        assert min_words == 1
         assert max_words == 62  # ceiling unchanged
 
-    def test_word_band_target_50_min_is_15(self):
-        """Larger production-budget target. 0.3 * 50 = 15 (floor)."""
-        from nodes._otr_line_composer import _word_bands
-        _, min_words, _ = _word_bands(50)
-        assert min_words == 15
-
-    def test_word_band_absolute_floor_3_words_holds(self):
-        """The 3-word absolute floor still binds when 0.3 * target
-        is too small. Prevents degenerate single-word outputs from
-        passing the band check.
+    def test_word_band_min_is_1_at_target_39(self):
+        """The 210-word Sprint 10B Wave 0 smoke per-beat target.
+        Live operator soak 2026-05-27 shipped 4/5/7/8/9/12 word
+        character lines that the 0.3x floor (=11) rejected. Floor=1
+        now accepts every one of them.
         """
         from nodes._otr_line_composer import _word_bands
-        # target=5 -> int(5*0.3) = 1, max(3, 1) = 3 (absolute floor binds).
+        _, min_words, max_words = _word_bands(39)
+        assert min_words == 1
+        assert max_words == 66  # ceiling unchanged
+
+    def test_word_band_min_is_1_at_target_50(self):
+        """Production-budget target. Floor still 1."""
+        from nodes._otr_line_composer import _word_bands
+        _, min_words, _ = _word_bands(50)
+        assert min_words == 1
+
+    def test_word_band_min_is_1_at_target_100(self):
+        """Full production episode target. Floor still 1 -- no
+        per-target scaling of the floor."""
+        from nodes._otr_line_composer import _word_bands
+        _, min_words, _ = _word_bands(100)
+        assert min_words == 1
+
+    def test_word_band_min_is_1_at_tiny_target(self):
+        """At target=5 the floor is still 1 (no target-dependent
+        floor anymore)."""
+        from nodes._otr_line_composer import _word_bands
         _, min_words, _ = _word_bands(5)
-        assert min_words == 3, (
-            f"BUG-LOCAL-279: 3-word absolute floor must bind when "
-            f"0.3 * target is below 3; got min={min_words}"
+        assert min_words == 1, (
+            f"BUG-LOCAL-279 follow-on final: floor is a constant 1, "
+            f"not target-dependent; got {min_words}"
         )
+
+    def test_word_band_one_word_drama_line_passes(self):
+        """The operator's worked example: a one-word 'Yes.' / 'No.'
+        / 'OK.' reply must pass the band on every realistic target.
+        Documents the directive intent.
+        """
+        from nodes._otr_line_composer import _word_bands
+        for tgt in (5, 10, 20, 30, 39, 50, 100):
+            _, min_words, _ = _word_bands(tgt)
+            assert min_words <= 1, (
+                f"target={tgt}: a one-word dramatic line must pass; "
+                f"got min={min_words}"
+            )
 
     def test_word_band_ceiling_unchanged(self):
         """BUG-LOCAL-279 only touched the floor. The 1.7x ceiling
@@ -1006,12 +1037,120 @@ class TestBugLocal279SmallBudgetBand:
         """
         from nodes._otr_line_composer import _word_bands
         for tgt in (10, 20, 30, 50, 100):
-            _, _, max_words = _word_bands(tgt)
-            expected_max = max(int(tgt * 0.3) + 1, int(tgt * 1.7))
+            _, min_words, max_words = _word_bands(tgt)
+            expected_max = max(min_words + 1, int(tgt * 1.7))
             assert max_words == expected_max, (
                 f"target={tgt}: ceiling drift, got max={max_words} "
                 f"expected={expected_max}"
             )
+
+
+class TestBugLocal279DegenerateLeakFilter:
+    """BUG-LOCAL-279 follow-on (2026-05-27): with the 1-word floor in
+    place, degenerate leak shapes that look like 1-word lines must
+    still be rejected. Two specific leak patterns:
+
+      1. The model emits ONLY the speaker's own name (e.g. line text
+         "REN BLACK" when the speaker IS REN BLACK). This is a
+         self-attribution leak, not dialogue.
+      2. The model emits ONLY the literal "ANNOUNCER" label. Also a
+         label leak, not dialogue.
+
+    Saying ANOTHER cast member's name as a one-word line is
+    legitimate drama ("Who did this?" "Maeve.") and must pass.
+    """
+
+    def test_speaker_self_name_alone_is_rejected_and_retried(self):
+        """Line text == speaker's own name -> drift, retry."""
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(temperature)
+            if len(calls) == 1:
+                return "REN BLACK"   # speaker leak
+            return "Code Red on the override panel."
+        req = LineRequest(
+            speaker="REN BLACK", intent="alert", mood="tight",
+            target_words=10, canon_header="x", last_lines=[],
+        )
+        res = compose_line(creative_fn=mock, req=req)
+        assert len(calls) == 2, (
+            "Expected attempt 2 (retry) after the self-name leak "
+            "rejection on attempt 1."
+        )
+        assert res.text.startswith("Code Red")
+
+    def test_speaker_self_name_with_trailing_punctuation_rejected(self):
+        """Trailing punctuation ('.', '!', '?') stripped before
+        compare so 'Ren.' / 'Ren Black!' still classify as leaks."""
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(temperature)
+            if len(calls) == 1:
+                return "Ren Black."
+            return "Hold the line."
+        req = LineRequest(
+            speaker="REN BLACK", intent="alert", mood="tight",
+            target_words=10, canon_header="x", last_lines=[],
+        )
+        res = compose_line(creative_fn=mock, req=req)
+        assert len(calls) == 2
+        assert res.text.startswith("Hold the line")
+
+    def test_literal_announcer_alone_is_rejected_and_retried(self):
+        """Line text == 'ANNOUNCER' -> drift, retry. Applies to any
+        speaker (a character beat whose text leaked the announcer
+        label is just as much a leak)."""
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(temperature)
+            if len(calls) == 1:
+                return "ANNOUNCER"
+            return "We move at dawn."
+        req = LineRequest(
+            speaker="REN BLACK", intent="alert", mood="tight",
+            target_words=10, canon_header="x", last_lines=[],
+        )
+        res = compose_line(creative_fn=mock, req=req)
+        assert len(calls) == 2
+        assert res.text.startswith("We move at dawn")
+
+    def test_other_cast_name_alone_is_accepted(self):
+        """'Who did this?' 'Maeve.' -- saying another character's name
+        as a one-word reply is drama, not a leak. Must pass on the
+        first attempt."""
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(temperature)
+            return "Maeve."
+        req = LineRequest(
+            speaker="REN BLACK", intent="accuse", mood="quiet",
+            target_words=10, canon_header="x", last_lines=[],
+        )
+        res = compose_line(creative_fn=mock, req=req)
+        assert len(calls) == 1, (
+            "A one-word reply naming a DIFFERENT cast member must "
+            "pass on first attempt -- it is real drama, not a leak."
+        )
+        assert res.text == "Maeve."
+
+    def test_one_word_affirmation_passes(self):
+        """'Yes.' / 'No.' / 'OK.' are real dramatic replies and must
+        pass without retry."""
+        from nodes._otr_line_composer import compose_line, LineRequest
+        for word_line in ("Yes.", "No.", "OK.", "Understood.", "Stop."):
+            calls = []
+            def mock(messages, *, temperature, max_new_tokens, stop=None, _w=word_line):
+                calls.append(temperature)
+                return _w
+            req = LineRequest(
+                speaker="REN BLACK", intent="reply", mood="brief",
+                target_words=10, canon_header="x", last_lines=[],
+            )
+            res = compose_line(creative_fn=mock, req=req)
+            assert len(calls) == 1, (
+                f"One-word reply {word_line!r} must pass on first try"
+            )
+            assert res.text == word_line
 
 
 class TestTier2PromptInjectionGuard:

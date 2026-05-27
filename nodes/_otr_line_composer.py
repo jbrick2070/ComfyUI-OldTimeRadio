@@ -1521,13 +1521,37 @@ def _word_bands(target_words: int) -> tuple[int, int, int]:
     workable range). The 1.7x ceiling is unchanged -- only undershoot,
     not overshoot, was the failure mode.
 
+    BUG-LOCAL-279 follow-on (2026-05-27, Sprint 10B Wave 0 smoke):
+    operator soak on 60-word AND 210-word runs still tripped the 0.3x
+    floor on target=39-word beats. Mistral-Nemo creative slot still
+    emits 4-15 word lines on those beats; critic flagged the short
+    ones as flat; Sprint 5C reroll loop exhausted both cycles trying
+    to lengthen them; cascade stamped needs_full_rerun; Bark halted
+    per BUG-LOCAL-276.
+
+    Operator directive 2026-05-27 (final): "in drama people may just
+    say one word -- yes, no, I understand. Maybe we don't have any
+    restrictions." Floor dropped entirely. The min was a defensive
+    catch against degenerate truncated-generate fragments, not a
+    dramatic minimum. Drama legitimately uses one-word replies ("Yes."
+    "No." "OK.") and the model's natural distribution should not be
+    policed by length on the lower side. min_words = 1 (any non-empty
+    word line passes). If broken-truncation fragments slip through,
+    the right fix is in the generate path, not the band.
+
+    Ceiling (1.7x) and word_cap (3x runaway) unchanged -- overshoot
+    was never the failure mode and a relaxed ceiling would mask other
+    bugs.
+
     Pure and deterministic -- the single source of truth shared by
     ``compose_line_draft`` (retry gating) and ``compose_line``'s
     post-polish word-cap recheck. Never raises.
     """
     word_cap = max(15, int(target_words * _MAX_OVERSIZE_RATIO))
-    # BUG-LOCAL-279 Option A: 0.3x floor (was 0.5x pre-2026-05-26).
-    min_words = max(3, int(target_words * 0.3))
+    # BUG-LOCAL-279 follow-on final (Sprint 10B Wave 0 smoke
+    # 2026-05-27): floor dropped from 0.3x to 1 word. Operator
+    # directive: "in drama people may just say one word."
+    min_words = 1
     max_words = max(min_words + 1, int(target_words * 1.7))
     return word_cap, min_words, max_words
 
@@ -1787,6 +1811,37 @@ def compose_line_draft(
             err_msg = "empty after format-strip"
             log.warning("[OTR_LineComposer] attempt %d failed: %s (raw=%r)",
                         attempt_idx + 1, err_msg, raw)
+            attempts.append((raw or "", err_msg))
+            continue
+
+        # BUG-LOCAL-279 follow-on (2026-05-27): degenerate-leak filter.
+        # The 1-word floor lets real one-word drama through ("Yes."
+        # "No." "OK." "Maeve.") but the model sometimes leaks JUST
+        # its own speaker label or the literal "ANNOUNCER" tag as
+        # the line text. Strip trailing punctuation + uppercase and
+        # compare to the speaker's own name AND to "ANNOUNCER" --
+        # those two shapes are leaks, not dialogue, and must retry.
+        # Saying ANOTHER cast member's name as a one-word line is
+        # legitimate drama ("Who did this?" "Maeve.") so we do NOT
+        # filter against the broader roster -- only the speaker's
+        # own name + the announcer label.
+        _norm_leak = (cleaned or "").strip().rstrip(".!?,;:").upper()
+        _speaker_self = (req.speaker or "").strip().upper()
+        if _norm_leak and (
+            _norm_leak == _speaker_self or _norm_leak == "ANNOUNCER"
+        ):
+            err_msg = (
+                f"speaker-self-name leak: line text {cleaned!r} equals "
+                f"speaker label {req.speaker!r}"
+                if _norm_leak == _speaker_self
+                else
+                f"announcer-label leak: line text {cleaned!r} equals "
+                f"literal 'ANNOUNCER'"
+            )
+            log.warning(
+                "[OTR_LineComposer] attempt %d retry: %s",
+                attempt_idx + 1, err_msg,
+            )
             attempts.append((raw or "", err_msg))
             continue
 
