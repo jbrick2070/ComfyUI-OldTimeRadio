@@ -657,20 +657,30 @@ class TestWriterB2aSurface:
         #  15  enable_polish_pass         False
         #  16  lemmy_cameo                "roll (~11% chance)"
         #  17  enable_stage1_shadow_pass  False     (Sprint 10A step 3-C)
+        #  18  use_multiturn_dialogue     False     (Sprint 10B Wave 0)
         # History: optimization_profile removed 2026-05-23; lemmy_cameo
         # appended 2026-05-23 (BUG-LOCAL-260); `seed` + its companion
         # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17;
         # enable_stage1_shadow_pass appended 2026-05-26 (Sprint 10A step
-        # 3-C) -- vector 17 -> 18.
-        assert len(wv) == 18, (
-            f"writer widgets_values length drift: {len(wv)} (expected 18 "
-            f"after the Sprint 10A step 3-C shadow-pass widget addition)"
+        # 3-C) -- vector 17 -> 18; use_multiturn_dialogue appended
+        # 2026-05-27 (Sprint 10B Wave 0) -- vector 18 -> 19.
+        assert len(wv) == 19, (
+            f"writer widgets_values length drift: {len(wv)} (expected 19 "
+            f"after the Sprint 10B Wave 0 multiturn-dispatch widget "
+            f"addition)"
         )
         # Slot 17: enable_stage1_shadow_pass must default to False so
         # the existing pipeline keeps its bit-identical behaviour.
         assert wv[17] is False, (
             f"enable_stage1_shadow_pass widget must default to False "
             f"(slot 17); got {wv[17]!r}"
+        )
+        # Slot 18: use_multiturn_dialogue must default to False so the
+        # legacy one-shot dialogue composer runs out-of-the-box and the
+        # PD1 byte-identity contract holds.
+        assert wv[18] is False, (
+            f"use_multiturn_dialogue widget must default to False "
+            f"(slot 18); got {wv[18]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

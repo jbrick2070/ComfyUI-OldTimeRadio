@@ -1195,6 +1195,9 @@ def _resolve_inputs(
     # Sprint 10A step 3-C: shadow-pass flag propagated into resolved
     # dict so the writer's main flow can branch on it after cast lock.
     enable_stage1_shadow_pass: bool = False,
+    # Sprint 10B Wave 0: multiturn dispatch flag propagated into
+    # resolved dict so the dialogue render loop can branch on it.
+    use_multiturn_dialogue: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1357,6 +1360,8 @@ def _resolve_inputs(
         "enable_polish_pass":   bool(enable_polish_pass),
         # Sprint 10A step 3-C shadow-pass flag.
         "enable_stage1_shadow_pass": bool(enable_stage1_shadow_pass),
+        # Sprint 10B Wave 0 multiturn dispatch flag.
+        "use_multiturn_dialogue":   bool(use_multiturn_dialogue),
     }
 
 
@@ -1799,6 +1804,43 @@ class OTR_LedgerScriptWriter:
                         "Mistral-Nemo)."
                     ),
                 }),
+                # Sprint 10B Wave 0 (2026-05-27): in-loop wire-up of
+                # the dormant Stage 2 multi-turn dialogue composer
+                # (nodes/_otr_stage2_call.py + _otr_stage2_prompt.py,
+                # 30 green tests already pin both modes). When OFF
+                # (default), the writer's existing one-shot
+                # _otr_line_composer.compose_line runs unchanged and
+                # the audio C7 byte-identity contract holds. When ON,
+                # character dialogue beats route to
+                # _otr_stage2_call.compose_line with the multi-turn
+                # role-play priming chain (mode='roleplay_multiturn',
+                # best-of-N=4). Announcer/MUSIC beats keep the legacy
+                # path unconditionally -- Stage 2 does not generate
+                # for reserved speakers. On any multiturn failure
+                # (empty record, exception), the writer falls back to
+                # the legacy composer automatically -- PD1 keeps audio
+                # output safe. The widget is the Wave 0 A/B switch
+                # against the Section 6.2 demo plan in
+                # `docs/2026-05-26-good-story-writer-architecture
+                # __02_design.md`.
+                "use_multiturn_dialogue": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 10B Wave 0 dispatch. OFF (default) "
+                        "keeps the legacy one-shot dialogue composer; "
+                        "PD1 byte-identity holds. ON routes character "
+                        "dialogue beats through the Stage 2 multi-turn "
+                        "roleplay chain "
+                        "(_otr_stage2_call.compose_line, mode="
+                        "'roleplay_multiturn', best-of-N=4). Announcer "
+                        "beats keep the legacy path -- Stage 2 does not "
+                        "generate for reserved speakers. Multiturn "
+                        "failure falls back to legacy automatically. "
+                        "Use during the Wave 0 A/B against the Section "
+                        "6.2 demo plan; stamp meta.dialogue_path per "
+                        "beat carries the path taken."
+                    ),
+                }),
             },
         }
 
@@ -1862,6 +1904,11 @@ class OTR_LedgerScriptWriter:
         # the existing pipeline behaviour bit-identical; True adds a
         # measurement-only Stage 1 LLM call after cast lock.
         enable_stage1_shadow_pass=False,
+        # Sprint 10B Wave 0 (2026-05-27): in-loop wire-up of the dormant
+        # Stage 2 multi-turn composer. Default False keeps PD1 byte-
+        # identity. True routes character dialogue beats through the
+        # multi-turn roleplay chain via _otr_wave0_multiturn.
+        use_multiturn_dialogue=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1887,6 +1934,8 @@ class OTR_LedgerScriptWriter:
             enable_polish_pass=enable_polish_pass,
             # Sprint 10A step 3-C: propagate shadow-pass flag.
             enable_stage1_shadow_pass=enable_stage1_shadow_pass,
+            # Sprint 10B Wave 0: propagate multiturn dispatch flag.
+            use_multiturn_dialogue=use_multiturn_dialogue,
         )
 
         log.info(
@@ -1919,6 +1968,9 @@ class OTR_LedgerScriptWriter:
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
         from . import _otr_continuity as _OTRCONT
+        # Sprint 10B Wave 0: in-loop multiturn dispatch helper. Pure
+        # module; no LLM, no model loads at import time.
+        from . import _otr_wave0_multiturn as _OTRW0MT
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -2848,6 +2900,54 @@ class OTR_LedgerScriptWriter:
                 ),
             )
 
+        # Sprint 10B Wave 0 (2026-05-27): hoist the Stage1Plan build
+        # once before the render loop. When use_multiturn_dialogue is
+        # False (default), this is a no-op and the legacy path runs
+        # unchanged -- PD1 byte-identity preserved.
+        #
+        # The plan is built from in-loop writer state (outline,
+        # cast_rows, meta). On any plan-build failure the dispatch
+        # wrapper falls back to legacy automatically. Per-beat dispatch
+        # path is stamped on meta.dialogue_path_per_beat for soak
+        # diagnostics; meta.dialogue_path is the predominant path
+        # ('multiturn' / 'legacy' / 'mixed') stamped post-loop.
+        _w0_use_multiturn: bool = bool(resolved.get(
+            "use_multiturn_dialogue", False,
+        ))
+        _w0_stage1_plan = None
+        if _w0_use_multiturn:
+            try:
+                _w0_stage1_plan = _OTRW0MT.build_inloop_stage1_plan(
+                    outline=outline,
+                    cast_rows=cast_rows,
+                    meta=meta,
+                )
+                if _w0_stage1_plan is None:
+                    log.warning(
+                        "[Wave0Dispatch] build_inloop_stage1_plan "
+                        "returned None; multiturn path disabled for "
+                        "this episode -- all beats use legacy"
+                    )
+                else:
+                    log.info(
+                        "[Wave0Dispatch] multiturn ENABLED; built "
+                        "in-loop Stage1Plan: cast=%d, beats=%d, "
+                        "running_facts=%d",
+                        len(_w0_stage1_plan.cast),
+                        len(_w0_stage1_plan.beats),
+                        len(_w0_stage1_plan.running_facts),
+                    )
+            except Exception as _w0_exc:  # noqa: BLE001 -- PD1
+                log.warning(
+                    "[Wave0Dispatch] build_inloop_stage1_plan raised "
+                    "%s: %s -- multiturn disabled for this episode",
+                    type(_w0_exc).__name__, str(_w0_exc)[:200],
+                )
+                _w0_stage1_plan = None
+        # Per-beat dispatch ledger -- list of {'beat_id', 'path',
+        # 'fallback_reason'?} dicts. Empty in legacy mode.
+        _w0_per_beat_paths: list[dict] = []
+
         for beat in outline.beats:
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
@@ -2859,27 +2959,71 @@ class OTR_LedgerScriptWriter:
                 line_req = _build_line_request_for_beat(
                     beat, is_announcer=False,
                 )
-                # LLM slot: creative -- dialogue composer per-beat
-                # narrative pass. Polish (creative; routed through
-                # polish_generate_fn from the scheduler) handles the
-                # narration-leak cleanup pass when enable_polish_pass
-                # is on.
-                # S32 B6: helper_context attribution. Per-beat
-                # invocation; the context-manager overhead is
-                # constant-time and negligible relative to the LLM
-                # call itself.
-                with slot_scheduler.helper_context("compose_line"):
-                    line_res = _OTRLC.compose_line(
-                        creative_fn=creative_generate_fn,
-                        req=line_req,
-                        base_temperature=base_temp,
-                        max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                        enable_polish_pass=resolved["enable_polish_pass"],
-                        polish_generate_fn=polish_generate_fn,
-                        creative_repo_id=resolved["creative_writing_model"],
+                # Sprint 10B Wave 0 dispatch. When the widget is OFF
+                # (default), _w0_use_multiturn is False, and we skip
+                # straight to the legacy composer with PD1 byte-
+                # identity preserved. When ON, route through the Stage
+                # 2 multi-turn composer; on any fallback path (None
+                # plan, reserved speaker, empty record, exception) the
+                # legacy composer runs unchanged so the beat still
+                # ships audio.
+                #
+                # LLM slot: creative -- multiturn dispatch forwards
+                # the creative_generate_fn into Stage 2 (tagged
+                # creative inside _otr_stage2_call.compose_line).
+                _w0_result = None
+                if _w0_use_multiturn:
+                    _w0_beat = _OTRW0MT.line_request_to_stage1_beat(
+                        beat,
+                        fallback_index=beat_index_by_id.get(
+                            beat.beat_id, 0,
+                        ),
                     )
-                cleaned = line_res.text
-                beat_compose_flags = line_res.compose_flags
+                    _w0_prev_speaker = None
+                    _w0_prev_line = None
+                    if last_lines:
+                        _w0_prev_speaker, _w0_prev_line = last_lines[-1]
+                    with slot_scheduler.helper_context(
+                        "compose_line_multiturn"
+                    ):
+                        _w0_result = _OTRW0MT.dispatch_compose_line(
+                            use_multiturn_dialogue=True,
+                            plan=_w0_stage1_plan,
+                            beat=_w0_beat,
+                            creative_generate_fn=creative_generate_fn,
+                            previous_speaker=_w0_prev_speaker,
+                            previous_line=_w0_prev_line,
+                        )
+                    _w0_per_beat_paths.append({
+                        "beat_id": beat.beat_id,
+                        "path": _w0_result.path,
+                        "fallback_reason": _w0_result.fallback_reason,
+                    })
+                if _w0_result is not None and _w0_result.path == "multiturn":
+                    cleaned = _w0_result.text
+                    beat_compose_flags = ()
+                else:
+                    # LLM slot: creative -- dialogue composer per-beat
+                    # narrative pass. Polish (creative; routed through
+                    # polish_generate_fn from the scheduler) handles
+                    # the narration-leak cleanup pass when
+                    # enable_polish_pass is on.
+                    # S32 B6: helper_context attribution. Per-beat
+                    # invocation; the context-manager overhead is
+                    # constant-time and negligible relative to the LLM
+                    # call itself.
+                    with slot_scheduler.helper_context("compose_line"):
+                        line_res = _OTRLC.compose_line(
+                            creative_fn=creative_generate_fn,
+                            req=line_req,
+                            base_temperature=base_temp,
+                            max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                            enable_polish_pass=resolved["enable_polish_pass"],
+                            polish_generate_fn=polish_generate_fn,
+                            creative_repo_id=resolved["creative_writing_model"],
+                        )
+                    cleaned = line_res.text
+                    beat_compose_flags = line_res.compose_flags
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
 
@@ -2930,6 +3074,22 @@ class OTR_LedgerScriptWriter:
                     line_req = _build_line_request_for_beat(
                         beat, is_announcer=True,
                     )
+                    # Sprint 10B Wave 0: mid-episode announcer beats
+                    # stay on the legacy composer unconditionally --
+                    # Stage 2 does not generate for reserved speakers.
+                    # When use_multiturn_dialogue is ON, stamp the
+                    # path so soak diagnostics can distinguish "legacy
+                    # by design (reserved speaker)" from "legacy
+                    # because multiturn fell back".
+                    if _w0_use_multiturn:
+                        _w0_per_beat_paths.append({
+                            "beat_id": beat.beat_id,
+                            "path": "legacy_reserved_speaker",
+                            "fallback_reason": (
+                                "mid-episode announcer beat; Stage 2 "
+                                "does not generate for reserved speakers"
+                            ),
+                        })
                     # LLM slot: creative -- a mid-episode announcer
                     # beat is a narrative write; keep the shared
                     # composer path. S32 B6: helper_context
@@ -3013,6 +3173,38 @@ class OTR_LedgerScriptWriter:
             )
             led.save()
             script_text_parts.append(token)
+
+        # Sprint 10B Wave 0: stamp per-beat + summary dispatch paths on
+        # meta so soak diagnostics can grep "how many beats took the
+        # multiturn path this episode" without re-deriving from logs.
+        # When use_multiturn_dialogue=False the lists stay empty and
+        # the summary is 'legacy'.
+        meta["dialogue_path_per_beat"] = list(_w0_per_beat_paths)
+        if not _w0_use_multiturn:
+            meta["dialogue_path"] = "legacy"
+        else:
+            _w0_path_counts: dict[str, int] = {}
+            for _row in _w0_per_beat_paths:
+                _p = _row.get("path") or "unknown"
+                _w0_path_counts[_p] = _w0_path_counts.get(_p, 0) + 1
+            meta["dialogue_path_counts"] = _w0_path_counts
+            _w0_char_paths = [
+                _row.get("path") for _row in _w0_per_beat_paths
+                if _row.get("path") != "legacy_reserved_speaker"
+            ]
+            if not _w0_char_paths:
+                meta["dialogue_path"] = "legacy"
+            elif all(p == "multiturn" for p in _w0_char_paths):
+                meta["dialogue_path"] = "multiturn"
+            elif all(p != "multiturn" for p in _w0_char_paths):
+                meta["dialogue_path"] = "legacy_fallback"
+            else:
+                meta["dialogue_path"] = "mixed"
+            log.info(
+                "[Wave0Dispatch] dialogue_path summary: %s (per-beat "
+                "counts: %s)",
+                meta["dialogue_path"], _w0_path_counts,
+            )
 
         # --- I.5. News-wiring overlay (Phase 2B: operates on ledger) --
         # Two operations on `led.data["lines"]` AFTER the progressive

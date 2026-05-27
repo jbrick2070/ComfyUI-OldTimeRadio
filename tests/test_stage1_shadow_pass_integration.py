@@ -58,18 +58,26 @@ class TestInputTypesExposesWidget:
             "existing pipeline keeps its bit-identical behaviour"
         )
 
-    def test_widget_is_last_in_optional(self):
-        """Slot 17 placement -- new widgets append at the END so older
-        workflow JSON files with 17-slot vectors keep loading (ComfyUI
-        fills missing trailing widgets from defaults)."""
+    def test_widget_is_second_to_last_in_optional(self):
+        """Slot 17 placement. Sprint 10B Wave 0 (2026-05-27) appended
+        use_multiturn_dialogue at slot 18, so enable_stage1_shadow_pass
+        is now the SECOND-TO-LAST optional widget. The append-only rule
+        still holds -- older 18-slot workflow JSON files keep loading
+        (ComfyUI fills missing trailing widgets from defaults)."""
         from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
 
         inputs = OTR_LedgerScriptWriter.INPUT_TYPES()
         optional_keys = list(inputs["optional"].keys())
-        assert optional_keys[-1] == "enable_stage1_shadow_pass", (
-            f"enable_stage1_shadow_pass must be the LAST optional widget "
-            f"to preserve backward compatibility with older workflows; "
-            f"current last is {optional_keys[-1]!r}"
+        assert optional_keys[-2] == "enable_stage1_shadow_pass", (
+            f"enable_stage1_shadow_pass must be the SECOND-TO-LAST "
+            f"optional widget (slot 17); current second-to-last is "
+            f"{optional_keys[-2]!r}, current last is "
+            f"{optional_keys[-1]!r}"
+        )
+        assert optional_keys[-1] == "use_multiturn_dialogue", (
+            f"Sprint 10B Wave 0: use_multiturn_dialogue must be the "
+            f"LAST optional widget (slot 18); current last is "
+            f"{optional_keys[-1]!r}"
         )
 
 
@@ -227,7 +235,10 @@ class TestSourceLevelPins:
 
 
 class TestWorkflowJsonPin:
-    def test_workflow_writer_widget_vector_is_18(self):
+    def test_workflow_writer_widget_vector_is_19(self):
+        """Sprint 10B Wave 0 (2026-05-27) bumped the vector from 18 to
+        19 -- slot 18 is `use_multiturn_dialogue` (default False).
+        Slot 17 (enable_stage1_shadow_pass) is still pinned False."""
         import json
         wf_path = (
             WRITER_SRC.parent.parent / "workflows" / "otr_scifi_16gb_full.json"
@@ -236,11 +247,16 @@ class TestWorkflowJsonPin:
         writer = next(n for n in wf["nodes"] if n.get("id") == 1)
         assert writer["type"] == "OTR_LedgerScriptWriter"
         wv = writer["widgets_values"]
-        assert len(wv) == 18, (
-            f"workflow JSON writer widgets_values length must be 18 "
-            f"post-step 3-C; got {len(wv)}"
+        assert len(wv) == 19, (
+            f"workflow JSON writer widgets_values length must be 19 "
+            f"post-Sprint-10B-Wave-0; got {len(wv)}"
         )
         assert wv[17] is False, (
             f"workflow JSON writer slot 17 (enable_stage1_shadow_pass) "
             f"must default False; got {wv[17]!r}"
+        )
+        assert wv[18] is False, (
+            f"workflow JSON writer slot 18 (use_multiturn_dialogue) "
+            f"must default False so the legacy byte-identity contract "
+            f"holds out-of-the-box; got {wv[18]!r}"
         )

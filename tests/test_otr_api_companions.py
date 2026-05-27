@@ -121,6 +121,11 @@ def _writer_schemas() -> dict:
                     "enable_stage1_shadow_pass": (
                         "BOOLEAN", {"default": False},
                     ),
+                    # Sprint 10B Wave 0 (2026-05-27): multiturn-dispatch
+                    # widget appended at slot 18 -- vector 18 -> 19.
+                    "use_multiturn_dialogue": (
+                        "BOOLEAN", {"default": False},
+                    ),
                 },
                 "optional": {},
             }
@@ -129,14 +134,15 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 18-entry widgets_values
+    """Workflow fixture with node 1 carrying the 19-entry widgets_values
     layout dumped from workflows/otr_scifi_16gb_full.json. The `seed`
     widget + its companion were removed in BUG-LOCAL-269/270 (vector
     19 -> 17). Sprint 10A step 3-C (2026-05-26) appended
-    enable_stage1_shadow_pass at slot 17 (vector 17 -> 18). The string
-    model ids reflect the slot-2 reconciliation in step 2 of the same
-    sprint -- 'mistralai/Mistral-Nemo-Instruct-2407' is the new
-    canonical, replacing the prior 'google/gemma-4-E4B-it' destination.
+    enable_stage1_shadow_pass at slot 17 (vector 17 -> 18). Sprint 10B
+    Wave 0 (2026-05-27) appended use_multiturn_dialogue at slot 18
+    (vector 18 -> 19). The string model ids reflect the slot-2
+    reconciliation -- 'mistralai/Mistral-Nemo-Instruct-2407' is the
+    canonical default.
     """
     return {
         "nodes": [
@@ -163,6 +169,7 @@ def _writer_node_fixture() -> dict:
                     False,                                    # 15 enable_polish_pass
                     "roll (~11% chance)",                     # 16 lemmy_cameo
                     False,                                    # 17 enable_stage1_shadow_pass
+                    False,                                    # 18 use_multiturn_dialogue
                 ],
             }
         ],
@@ -396,9 +403,12 @@ def test_round_trip_canonical_node1_inputs_correct():
 
     Sprint 10A step 3-C (2026-05-26) appended enable_stage1_shadow_pass
     at slot 17, bringing the vector length to 18.
+
+    Sprint 10B Wave 0 (2026-05-27) appended use_multiturn_dialogue at
+    slot 18, bringing the vector length to 19.
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 18, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 
