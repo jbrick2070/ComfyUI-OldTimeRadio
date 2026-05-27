@@ -288,6 +288,16 @@ _NODE_MODULES = {
     # workflows/_bisect_*.json after BUG-LOCAL-231 closes (Step 9
     # cleanup of the 9-step plan).
     "OTR_BisectStringSource": (".nodes._bisect_string_source", "BisectStringSource", " Bisect String Source (BUG-LOCAL-231 -- delete at close)"),
+    # Sprint 10B Wave 1 Agent E (2026-05-27): Editor agent (DORMANT).
+    # Consumes a DirectorBrief (Section 3.1) + Writer draft and emits a
+    # typed EditorVerdict (Section 3.2) scoring against the existing
+    # rubric axes via constrained decode against EditorVerdictSchema.
+    # Wave 1 registers the node; Wave 2 Agent F (Story Room loop) wires
+    # it into the Writer's revision cycles. Today's pipeline is
+    # unchanged (sockets ship disconnected in the workflow JSON). PD6
+    # contract: no model_id widget; technical_model flows over a STRING
+    # input socket from the writer's broadcast output.
+    "OTR_EditorPass": (".nodes.OTR_EditorPass", "OTR_EditorPass", " OTR Editor Pass (dormant)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 72,
-  "last_link_id": 217,
+  "last_node_id": 73,
+  "last_link_id": 218,
   "nodes": [
     {
       "id": 63,
@@ -118,7 +118,8 @@
           "name": "technical_model",
           "type": "STRING",
           "links": [
-            115
+            115,
+            218
           ],
           "slot_index": 5
         }
@@ -2067,6 +2068,62 @@
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
+    },
+    {
+      "id": 73,
+      "type": "OTR_EditorPass",
+      "pos": [
+        1800,
+        -260
+      ],
+      "size": [
+        380,
+        200
+      ],
+      "title": "Editor Pass (Sprint 10B Wave 1, DORMANT)",
+      "properties": {
+        "Node name for S&R": "OTR_EditorPass"
+      },
+      "widgets_values": [
+        "",
+        "",
+        0
+      ],
+      "inputs": [
+        {
+          "name": "director_brief",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "writer_draft",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "cycle",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 218
+        }
+      ],
+      "outputs": [
+        {
+          "name": "editor_verdict",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 99,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     }
   ],
   "links": [
@@ -2620,6 +2677,14 @@
       1,
       72,
       0,
+      "STRING"
+    ],
+    [
+      218,
+      1,
+      5,
+      73,
+      3,
       "STRING"
     ]
   ],
