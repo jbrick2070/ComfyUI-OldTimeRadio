@@ -72,6 +72,7 @@
         false,
         "roll (~11% chance)",
         false,
+        false,
         false
       ],
       "inputs": [],

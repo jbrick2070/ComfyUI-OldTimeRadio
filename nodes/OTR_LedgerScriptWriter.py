@@ -1198,6 +1198,8 @@ def _resolve_inputs(
     # Sprint 10B Wave 0: multiturn dispatch flag propagated into
     # resolved dict so the dialogue render loop can branch on it.
     use_multiturn_dialogue: bool = False,
+    # Sprint 10B Wave 1 Agent B: Stage 3 validators flag.
+    enable_production_stage3_validators: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1362,6 +1364,9 @@ def _resolve_inputs(
         "enable_stage1_shadow_pass": bool(enable_stage1_shadow_pass),
         # Sprint 10B Wave 0 multiturn dispatch flag.
         "use_multiturn_dialogue":   bool(use_multiturn_dialogue),
+        # Sprint 10B Wave 1 Agent B Stage 3 validators flag.
+        "enable_production_stage3_validators":
+            bool(enable_production_stage3_validators),
     }
 
 
@@ -1841,6 +1846,39 @@ class OTR_LedgerScriptWriter:
                         "beat carries the path taken."
                     ),
                 }),
+                # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
+                # Stage 3 validators on the legacy dialogue composer.
+                # Catches speaker leaks, banned phrases, length drift,
+                # pronoun mismatches, on-beat misses on the rendered
+                # text BEFORE the ledger is frozen. Lines with error-
+                # severity findings get ONE repair regenerate attempt
+                # with the finding messages threaded in as the reroll
+                # hint. Warn-severity findings are stamped without
+                # regenerating. The final findings (post-repair if it
+                # ran) land on meta.lines[].validation_findings for
+                # soak audit. Default OFF so the legacy PD1 byte-
+                # identity contract holds out-of-the-box; flip ON for
+                # production smokes + the Section 6.2 A/B.
+                "enable_production_stage3_validators": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 10B Wave 1 Agent B. OFF (default) "
+                        "preserves PD1 byte-identity on the legacy "
+                        "path -- no validators run. ON wires Stage 3 "
+                        "validators (speaker-leak, banned-phrase, "
+                        "length, pronoun, on-beat) into the production "
+                        "compose_line for every character dialogue "
+                        "beat. Errors trigger ONE repair regenerate "
+                        "(hint = the validator findings); warns stamp "
+                        "without regenerating. Findings stamped on "
+                        "meta.lines[].validation_findings. Adds at "
+                        "most one extra creative-slot LLM call per "
+                        "flagged beat (~1-3s on Mistral-Nemo); a "
+                        "clean line costs zero extra. Flip ON for "
+                        "production smokes; OFF for the byte-identity "
+                        "regression run."
+                    ),
+                }),
             },
         }
 
@@ -1909,6 +1947,10 @@ class OTR_LedgerScriptWriter:
         # identity. True routes character dialogue beats through the
         # multi-turn roleplay chain via _otr_wave0_multiturn.
         use_multiturn_dialogue=False,
+        # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3
+        # validators on the legacy compose_line path. Default False
+        # preserves PD1 byte-identity.
+        enable_production_stage3_validators=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1936,6 +1978,8 @@ class OTR_LedgerScriptWriter:
             enable_stage1_shadow_pass=enable_stage1_shadow_pass,
             # Sprint 10B Wave 0: propagate multiturn dispatch flag.
             use_multiturn_dialogue=use_multiturn_dialogue,
+            # Sprint 10B Wave 1 Agent B: propagate Stage 3 flag.
+            enable_production_stage3_validators=enable_production_stage3_validators,
         )
 
         log.info(
@@ -2914,8 +2958,14 @@ class OTR_LedgerScriptWriter:
         _w0_use_multiturn: bool = bool(resolved.get(
             "use_multiturn_dialogue", False,
         ))
+        # Sprint 10B Wave 1 Agent B (2026-05-27): plan is also needed
+        # when production Stage 3 validators are on (the validators
+        # consume the Stage1Plan + Stage1Beat to score lines).
+        _w1b_stage3_enabled: bool = bool(resolved.get(
+            "enable_production_stage3_validators", False,
+        ))
         _w0_stage1_plan = None
-        if _w0_use_multiturn:
+        if _w0_use_multiturn or _w1b_stage3_enabled:
             try:
                 _w0_stage1_plan = _OTRW0MT.build_inloop_stage1_plan(
                     outline=outline,
@@ -3012,6 +3062,28 @@ class OTR_LedgerScriptWriter:
                     # invocation; the context-manager overhead is
                     # constant-time and negligible relative to the LLM
                     # call itself.
+                    #
+                    # Sprint 10B Wave 1 Agent B (2026-05-27): pass
+                    # Stage 3 validator inputs when the widget is on
+                    # AND the in-loop Stage1Plan was built successfully.
+                    # The validators fire inside compose_line after the
+                    # strip pipeline; one repair regenerate on errors,
+                    # findings stamped on line_res.validation_findings.
+                    _w1b_s3_kwargs = {}
+                    if _w1b_stage3_enabled and _w0_stage1_plan is not None:
+                        _w1b_s3_beat = (
+                            _OTRW0MT.line_request_to_stage1_beat(
+                                beat,
+                                fallback_index=beat_index_by_id.get(
+                                    beat.beat_id, 0,
+                                ),
+                            )
+                        )
+                        _w1b_s3_kwargs = dict(
+                            enable_stage3_validators=True,
+                            stage3_plan=_w0_stage1_plan,
+                            stage3_beat=_w1b_s3_beat,
+                        )
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
@@ -3021,9 +3093,21 @@ class OTR_LedgerScriptWriter:
                             enable_polish_pass=resolved["enable_polish_pass"],
                             polish_generate_fn=polish_generate_fn,
                             creative_repo_id=resolved["creative_writing_model"],
+                            **_w1b_s3_kwargs,
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
+                    # Sprint 10B Wave 1 Agent B: stamp validator findings
+                    # on the ledger row via patch_line_fields below (the
+                    # _OTRL.patch_line_fields call inside this loop only
+                    # currently stamps char_id/traits/compose_flags --
+                    # extend the patch dict here when findings present).
+                    if line_res.validation_findings:
+                        meta.setdefault(
+                            "stage3_findings_per_beat", {},
+                        )[beat.beat_id] = list(
+                            line_res.validation_findings,
+                        )
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
 

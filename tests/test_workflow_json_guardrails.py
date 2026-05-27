@@ -656,18 +656,21 @@ class TestWriterB2aSurface:
         #  14  max_new_tokens_cap         200
         #  15  enable_polish_pass         False
         #  16  lemmy_cameo                "roll (~11% chance)"
-        #  17  enable_stage1_shadow_pass  False     (Sprint 10A step 3-C)
-        #  18  use_multiturn_dialogue     False     (Sprint 10B Wave 0)
+        #  17  enable_stage1_shadow_pass          False     (Sprint 10A step 3-C)
+        #  18  use_multiturn_dialogue             False     (Sprint 10B Wave 0)
+        #  19  enable_production_stage3_validators False    (Sprint 10B Wave 1 Agent B)
         # History: optimization_profile removed 2026-05-23; lemmy_cameo
         # appended 2026-05-23 (BUG-LOCAL-260); `seed` + its companion
         # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17;
         # enable_stage1_shadow_pass appended 2026-05-26 (Sprint 10A step
         # 3-C) -- vector 17 -> 18; use_multiturn_dialogue appended
-        # 2026-05-27 (Sprint 10B Wave 0) -- vector 18 -> 19.
-        assert len(wv) == 19, (
-            f"writer widgets_values length drift: {len(wv)} (expected 19 "
-            f"after the Sprint 10B Wave 0 multiturn-dispatch widget "
-            f"addition)"
+        # 2026-05-27 (Sprint 10B Wave 0) -- vector 18 -> 19;
+        # enable_production_stage3_validators appended 2026-05-27
+        # (Sprint 10B Wave 1 Agent B) -- vector 19 -> 20.
+        assert len(wv) == 20, (
+            f"writer widgets_values length drift: {len(wv)} (expected 20 "
+            f"after the Sprint 10B Wave 1 Agent B Stage 3 validators "
+            f"widget addition)"
         )
         # Slot 17: enable_stage1_shadow_pass must default to False so
         # the existing pipeline keeps its bit-identical behaviour.
@@ -681,6 +684,13 @@ class TestWriterB2aSurface:
         assert wv[18] is False, (
             f"use_multiturn_dialogue widget must default to False "
             f"(slot 18); got {wv[18]!r}"
+        )
+        # Slot 19: enable_production_stage3_validators must default to
+        # False so the legacy compose_line path does not run Stage 3
+        # validators and PD1 byte-identity holds out-of-the-box.
+        assert wv[19] is False, (
+            f"enable_production_stage3_validators widget must default "
+            f"to False (slot 19); got {wv[19]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

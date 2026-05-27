@@ -58,25 +58,34 @@ class TestInputTypesExposesWidget:
             "existing pipeline keeps its bit-identical behaviour"
         )
 
-    def test_widget_is_second_to_last_in_optional(self):
-        """Slot 17 placement. Sprint 10B Wave 0 (2026-05-27) appended
-        use_multiturn_dialogue at slot 18, so enable_stage1_shadow_pass
-        is now the SECOND-TO-LAST optional widget. The append-only rule
-        still holds -- older 18-slot workflow JSON files keep loading
-        (ComfyUI fills missing trailing widgets from defaults)."""
+    def test_widget_is_at_slot_17(self):
+        """Slot 17 placement of enable_stage1_shadow_pass. Sprint 10B
+        Wave 0 (2026-05-27) appended use_multiturn_dialogue at slot 18
+        and Sprint 10B Wave 1 Agent B (2026-05-27) appended
+        enable_production_stage3_validators at slot 19. The append-only
+        rule still holds -- older N-slot workflow JSON files keep
+        loading (ComfyUI fills missing trailing widgets from defaults).
+        """
         from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
 
         inputs = OTR_LedgerScriptWriter.INPUT_TYPES()
         optional_keys = list(inputs["optional"].keys())
-        assert optional_keys[-2] == "enable_stage1_shadow_pass", (
-            f"enable_stage1_shadow_pass must be the SECOND-TO-LAST "
-            f"optional widget (slot 17); current second-to-last is "
-            f"{optional_keys[-2]!r}, current last is "
-            f"{optional_keys[-1]!r}"
+        # Slot 17 = third-to-last after Wave 0 + Wave 1B appends.
+        assert optional_keys[-3] == "enable_stage1_shadow_pass", (
+            f"enable_stage1_shadow_pass must be the THIRD-TO-LAST "
+            f"optional widget (slot 17); current third-to-last is "
+            f"{optional_keys[-3]!r}, then {optional_keys[-2]!r}, "
+            f"then {optional_keys[-1]!r}"
         )
-        assert optional_keys[-1] == "use_multiturn_dialogue", (
-            f"Sprint 10B Wave 0: use_multiturn_dialogue must be the "
-            f"LAST optional widget (slot 18); current last is "
+        assert optional_keys[-2] == "use_multiturn_dialogue", (
+            f"Sprint 10B Wave 0: use_multiturn_dialogue must be at "
+            f"slot 18 (second-to-last); current second-to-last is "
+            f"{optional_keys[-2]!r}"
+        )
+        assert optional_keys[-1] == "enable_production_stage3_validators", (
+            f"Sprint 10B Wave 1 Agent B: "
+            f"enable_production_stage3_validators must be the LAST "
+            f"optional widget (slot 19); current last is "
             f"{optional_keys[-1]!r}"
         )
 
@@ -235,10 +244,10 @@ class TestSourceLevelPins:
 
 
 class TestWorkflowJsonPin:
-    def test_workflow_writer_widget_vector_is_19(self):
-        """Sprint 10B Wave 0 (2026-05-27) bumped the vector from 18 to
-        19 -- slot 18 is `use_multiturn_dialogue` (default False).
-        Slot 17 (enable_stage1_shadow_pass) is still pinned False."""
+    def test_workflow_writer_widget_vector_is_20(self):
+        """Sprint 10B Wave 1 Agent B (2026-05-27) bumped the vector
+        from 19 to 20 -- slot 19 is `enable_production_stage3_validators`
+        (default False). Slots 17/18 unchanged."""
         import json
         wf_path = (
             WRITER_SRC.parent.parent / "workflows" / "otr_scifi_16gb_full.json"
@@ -247,9 +256,9 @@ class TestWorkflowJsonPin:
         writer = next(n for n in wf["nodes"] if n.get("id") == 1)
         assert writer["type"] == "OTR_LedgerScriptWriter"
         wv = writer["widgets_values"]
-        assert len(wv) == 19, (
-            f"workflow JSON writer widgets_values length must be 19 "
-            f"post-Sprint-10B-Wave-0; got {len(wv)}"
+        assert len(wv) == 20, (
+            f"workflow JSON writer widgets_values length must be 20 "
+            f"post-Sprint-10B-Wave-1-Agent-B; got {len(wv)}"
         )
         assert wv[17] is False, (
             f"workflow JSON writer slot 17 (enable_stage1_shadow_pass) "
@@ -259,4 +268,10 @@ class TestWorkflowJsonPin:
             f"workflow JSON writer slot 18 (use_multiturn_dialogue) "
             f"must default False so the legacy byte-identity contract "
             f"holds out-of-the-box; got {wv[18]!r}"
+        )
+        assert wv[19] is False, (
+            f"workflow JSON writer slot 19 "
+            f"(enable_production_stage3_validators) must default False "
+            f"so PD1 byte-identity holds on the legacy path; got "
+            f"{wv[19]!r}"
         )

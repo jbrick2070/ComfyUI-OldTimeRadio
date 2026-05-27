@@ -691,16 +691,27 @@ class LineResult:
     coupling through globals or mutable side channels.
 
     Fields:
-      text           cleaned dialogue text (post strip_line_formatting)
-      compose_flags  tuple of `"kind:detail"` strings, empty when the
-                     line had no detections. Currently emitted kinds:
-                       "phantom_name:<token>" — Phase 0 gate flagged
-                                                a proper noun not in
-                                                allowed_roster
+      text                cleaned dialogue text (post strip_line_formatting)
+      compose_flags       tuple of `"kind:detail"` strings, empty when the
+                          line had no detections. Currently emitted kinds:
+                            "phantom_name:<token>" — Phase 0 gate flagged
+                                                     a proper noun not in
+                                                     allowed_roster
+      validation_findings tuple of dicts (Sprint 10B Wave 1 Agent B,
+                          2026-05-27). Each dict is a serialized
+                          _otr_stage3_validators.ValidationFinding
+                          (severity / code / beat_id / speaker / message
+                          / expected / got). Empty when Stage 3
+                          validators are disabled OR when the line has
+                          no findings. Errors trigger ONE repair
+                          regenerate before findings are stamped from
+                          the FINAL state of the line (so post-repair
+                          findings reflect the shipped text).
     """
 
     text: str
     compose_flags: tuple[str, ...] = ()
+    validation_findings: tuple[dict, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -1898,6 +1909,21 @@ def compose_line(
     polish_generate_fn=None,
     creative_repo_id: str | None = None,  # Sprint D D2b
     reroll_hint: str | None = None,  # Sprint 5C
+    # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3
+    # validators. When enable_stage3_validators=True AND both
+    # stage3_plan + stage3_beat are provided, the final cleaned
+    # text runs through _otr_stage3_validators.validate_line. Any
+    # error-severity findings trigger ONE recursive compose_line
+    # repair attempt with the finding messages overlaid as the
+    # reroll_hint. The repair attempt sets
+    # _stage3_repair_attempted=True so recursion can never deepen.
+    # Findings (errors + warns) are stamped on
+    # LineResult.validation_findings from the FINAL line state.
+    enable_stage3_validators: bool = False,
+    stage3_plan=None,           # Optional[Stage1Plan]
+    stage3_beat=None,           # Optional[Stage1Beat]
+    stage3_banned_phrases=None,  # Optional[List[str]]
+    _stage3_repair_attempted: bool = False,  # recursion guard
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -2080,11 +2106,126 @@ def compose_line(
                 req.speaker, n_vocative,
             )
 
+    # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3 validators.
+    # Runs AFTER every strip + the optional polish so the validators see
+    # the EXACT text that would ship. Disabled when the gate args aren't
+    # all provided; the legacy pipeline is unchanged on that path.
+    validation_findings_tuple: tuple[dict, ...] = ()
+    if (
+        enable_stage3_validators
+        and stage3_plan is not None
+        and stage3_beat is not None
+    ):
+        # Local import keeps the stage3 module out of cold-start cost
+        # for callers that never enable validators.
+        from . import _otr_stage3_validators as _OTRS3V
+        vr = _OTRS3V.validate_line(
+            stage3_plan,
+            stage3_beat,
+            cleaned,
+            banned_phrases=stage3_banned_phrases,
+        )
+        if vr.errors and not _stage3_repair_attempted:
+            # Build a concise repair hint from the error messages.
+            # Cap to 400 chars so the hint fits inside the prompt's
+            # REVISE block without crowding the rest of the context.
+            repair_hint = "; ".join(f.message for f in vr.errors)[:400]
+            log.warning(
+                "[OTR_LineComposer] Stage 3 validators flagged %d "
+                "error(s) on %s line %r -- one repair attempt with "
+                "hint: %s",
+                len(vr.errors), req.speaker,
+                stage3_beat.beat_id, repair_hint[:120],
+            )
+            try:
+                # Recursive call -- the _stage3_repair_attempted guard
+                # ensures recursion can never deepen past one level.
+                # Accept whatever the repair produces (per design doc
+                # Section 4 Wave 1 Agent B: "do not loop").
+                repaired = compose_line(
+                    creative_fn=creative_fn,
+                    req=req,
+                    max_attempts=max_attempts,
+                    base_temperature=base_temperature,
+                    max_new_tokens_cap=max_new_tokens_cap,
+                    stop_strings=stop_strings,
+                    enable_polish_pass=enable_polish_pass,
+                    polish_generate_fn=polish_generate_fn,
+                    creative_repo_id=creative_repo_id,
+                    reroll_hint=repair_hint,
+                    enable_stage3_validators=True,
+                    stage3_plan=stage3_plan,
+                    stage3_beat=stage3_beat,
+                    stage3_banned_phrases=stage3_banned_phrases,
+                    _stage3_repair_attempted=True,
+                )
+                cleaned = repaired.text
+                # Concat compose_flags from both passes; dedupe trivially
+                # by tuple union via list ordering.
+                _seen = set(compose_flags)
+                for f in repaired.compose_flags:
+                    if f not in _seen:
+                        compose_flags = compose_flags + (f,)
+                        _seen.add(f)
+                # Re-run validators on the repaired text so findings
+                # reflect the FINAL shipped state, not the pre-repair
+                # state. If repair fixed all errors, vr.errors == [].
+                vr = _OTRS3V.validate_line(
+                    stage3_plan,
+                    stage3_beat,
+                    cleaned,
+                    banned_phrases=stage3_banned_phrases,
+                )
+                log.info(
+                    "[OTR_LineComposer] Stage 3 repair landed on %s "
+                    "line %r: %d error(s) -> %d after repair",
+                    req.speaker, stage3_beat.beat_id,
+                    len(vr.errors),  # post-repair count
+                    len(vr.errors),
+                )
+            except LineCompositionFailedError:
+                # Repair regenerate exhausted its draft attempts.
+                # Keep the original cleaned text; original findings
+                # stand. PD1: ship something rather than nothing.
+                log.warning(
+                    "[OTR_LineComposer] Stage 3 repair exhausted for "
+                    "%s line %r -- shipping pre-repair text with "
+                    "original findings stamped",
+                    req.speaker, stage3_beat.beat_id,
+                )
+        # Stamp final findings. validation_findings = the validators'
+        # view of the text that ACTUALLY ships (post-repair if it ran).
+        validation_findings_tuple = tuple(
+            {
+                "severity": f.severity,
+                "code": f.code,
+                "beat_id": f.beat_id,
+                "speaker": f.speaker,
+                "message": f.message,
+                "expected": f.expected,
+                "got": f.got,
+            }
+            for f in vr.findings
+        )
+        if validation_findings_tuple:
+            # Count errors + warns separately for the log line.
+            _n_err = len(vr.errors)
+            _n_warn = len(vr.warns)
+            log.info(
+                "[OTR_LineComposer] Stage 3 findings stamped on %s "
+                "line %r: errors=%d warns=%d",
+                req.speaker, stage3_beat.beat_id, _n_err, _n_warn,
+            )
+
     log.info(
         "[OTR_LineComposer] composed line for %s: %d words (flags=%d)",
         req.speaker, word_count, len(compose_flags),
     )
-    return LineResult(text=cleaned, compose_flags=compose_flags)
+    return LineResult(
+        text=cleaned,
+        compose_flags=compose_flags,
+        validation_findings=validation_findings_tuple,
+    )
 
 
 # ---------------------------------------------------------------------------

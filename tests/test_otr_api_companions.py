@@ -126,6 +126,12 @@ def _writer_schemas() -> dict:
                     "use_multiturn_dialogue": (
                         "BOOLEAN", {"default": False},
                     ),
+                    # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
+                    # Stage 3 validators widget appended at slot 19 --
+                    # vector 19 -> 20.
+                    "enable_production_stage3_validators": (
+                        "BOOLEAN", {"default": False},
+                    ),
                 },
                 "optional": {},
             }
@@ -170,6 +176,7 @@ def _writer_node_fixture() -> dict:
                     "roll (~11% chance)",                     # 16 lemmy_cameo
                     False,                                    # 17 enable_stage1_shadow_pass
                     False,                                    # 18 use_multiturn_dialogue
+                    False,                                    # 19 enable_production_stage3_validators
                 ],
             }
         ],
@@ -406,9 +413,13 @@ def test_round_trip_canonical_node1_inputs_correct():
 
     Sprint 10B Wave 0 (2026-05-27) appended use_multiturn_dialogue at
     slot 18, bringing the vector length to 19.
+
+    Sprint 10B Wave 1 Agent B (2026-05-27) appended
+    enable_production_stage3_validators at slot 19, bringing the
+    vector length to 20.
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 20, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 
