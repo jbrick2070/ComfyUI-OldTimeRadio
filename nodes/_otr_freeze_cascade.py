@@ -873,16 +873,37 @@ def run_freeze_cascade(
     # the reroll call entirely -- the composed lines ship as-is.
     # Interim gate until Sprint 10B Wave 1 Agent C (critic-driven
     # escalation) replaces the legacy reroll wholesale.
+    # Sprint 10B Wave 1 Agent C (2026-05-27): critic-driven reroll
+    # escalation. Replaces the Wave 0 BUG-LOCAL-281 simple ship-gate
+    # with a typed scope decision. Structural failures (premise_clarity
+    # / continuity / resolution / emotional_arc) route to whole-episode
+    # regenerate immediately -- the line reroll loop cannot fix arc
+    # problems, so its cycles would exhaust pointlessly. Local
+    # failures fall back to the legacy line reroll. See
+    # nodes/_otr_reroll_escalation.decide_escalation_scope and
+    # docs/2026-05-26-good-story-writer-architecture__02_design.md
+    # Section 4 Wave 1 Agent C.
+    from . import _otr_reroll_escalation as _OTRRE
     _w0f_s7 = meta.get("stage7_shadow_critic") or {}
-    _w0f_s7_verdict = ""
-    if isinstance(_w0f_s7, dict):
-        _w0f_s7_verdict = str(_w0f_s7.get("verdict") or "").strip().lower()
-    if _w0f_s7_verdict == "ship":
-        # Build a no-op RerollDisposition so downstream code that
-        # reads .verdict / .cycles_run / .lines_rerolled keeps
-        # working. final_report carries the unchanged story-critic
-        # report so the render-plan pass still sees the original
-        # reroll_targets list.
+    _w1c_escalation = _OTRRE.decide_escalation_scope(
+        _w0f_s7,
+        story_critic_targets=(
+            getattr(story_critic_report, "reroll_targets", None)
+            or []
+        ),
+    )
+    meta["reroll_escalation"] = _w1c_escalation.to_dict()
+    log.info(
+        "[LFC] Wave 1 Agent C escalation: scope=%s reason=%s targets=%d",
+        _w1c_escalation.scope.value,
+        _w1c_escalation.reason[:120],
+        len(_w1c_escalation.target_beat_ids),
+    )
+
+    if _w1c_escalation.scope is _OTRRE.EscalationScope.NONE:
+        # Stage 7 ship verdict (or equivalent). Skip reroll. Construct
+        # a no-op RerollDisposition so downstream code that reads
+        # .verdict / .cycles_run / .lines_rerolled keeps working.
         reroll_disp = _OTRRR.RerollDisposition(
             verdict="no_reroll",
             cycles_run=0,
@@ -891,15 +912,40 @@ def run_freeze_cascade(
         )
         meta["reroll_skipped_by_stage7_ship"] = True
         log.info(
-            "[LFC] Stage 7 verdict=ship (mean=%.2f) -- skipping "
-            "Sprint 5C legacy reroll loop; episode ships as composed.",
-            float(_w0f_s7.get("mean_score") or 0.0),
+            "[LFC] Stage 7 verdict=ship -- skipping Sprint 5C legacy "
+            "reroll loop; episode ships as composed."
+        )
+    elif _w1c_escalation.scope is _OTRRE.EscalationScope.EPISODE:
+        # Structural failure -- the arc is broken, not the lines.
+        # Stamp needs_full_rerun immediately. Skips the wasted cycles
+        # the legacy line reroll would burn trying to fix an
+        # unfixable structural problem (BUG-LOCAL-279/280/281
+        # family). The downstream `if reroll_disp.verdict ==
+        # 'needs_full_rerun'` branch handles the terminal exit.
+        reroll_disp = _OTRRR.RerollDisposition(
+            verdict="needs_full_rerun",
+            cycles_run=0,
+            lines_rerolled=0,
+            final_report=story_critic_report,
+        )
+        meta["reroll_skipped_by_structural_escalation"] = True
+        if _w1c_escalation.regeneration_hint:
+            meta["regeneration_hint"] = _w1c_escalation.regeneration_hint
+        log.warning(
+            "[LFC] Wave 1 Agent C: structural failure -- skipping "
+            "line reroll, stamping needs_full_rerun immediately. "
+            "Hint: %s",
+            (_w1c_escalation.regeneration_hint or "")[:200],
         )
     else:
+        # BEAT or LINE scope -- both currently route through the
+        # legacy line reroll. Wave 2 can split beat-from-line if
+        # operator A/B finds a quality lift there.
         reroll_disp = _OTRRR.run_targeted_reroll(generate_fn, led)
         log.info(
-            "[LFC] Sprint 5C targeted reroll: verdict=%s, %d cycle(s), "
-            "%d line(s) re-composed",
+            "[LFC] Sprint 5C targeted reroll (scope=%s): verdict=%s, "
+            "%d cycle(s), %d line(s) re-composed",
+            _w1c_escalation.scope.value,
             reroll_disp.verdict, reroll_disp.cycles_run,
             reroll_disp.lines_rerolled,
         )

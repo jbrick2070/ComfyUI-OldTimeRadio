@@ -453,14 +453,22 @@ class TestBugLocal281Stage7ShipSkipsReroll:
         assert "stage7_shadow_critic" in src
         assert "_OTRRR.run_targeted_reroll" in src
 
-    def test_gate_uses_ship_string_literal(self):
-        """Gate fires on the literal verdict string 'ship', matching
-        the value Stage 7's CriticResult.to_dict() emits. A typo here
-        (e.g. 'SHIP', 'shipped') would silently disable the gate."""
+    def test_gate_uses_escalation_module(self):
+        """Sprint 10B Wave 1 Agent C (2026-05-27, commits 73bfed7..)
+        replaced the inline `_w0f_s7_verdict == 'ship'` check with a
+        typed decision via decide_escalation_scope. The ship-gate
+        semantic survives (EscalationScope.NONE is the same outcome)
+        but the implementation is now centralized in
+        _otr_reroll_escalation. Pin: cascade dispatches on
+        escalation.scope, not on a raw verdict-string comparison.
+        """
         src = self._src()
-        # The gate is built around comparing the verdict to 'ship'
-        # after normalization. Pin both halves.
-        assert '_w0f_s7_verdict == "ship"' in src
+        gate_section_start = src.index("BUG-LOCAL-281")
+        gate_window = src[gate_section_start:gate_section_start + 6000]
+        # New pin: the cascade uses the typed escalation enum.
+        assert "EscalationScope.NONE" in gate_window
+        # The decision is computed from decide_escalation_scope.
+        assert "decide_escalation_scope" in src
 
     def test_gate_constructs_no_op_reroll_disposition(self):
         """When the gate fires, downstream code that reads
@@ -483,15 +491,18 @@ class TestBugLocal281Stage7ShipSkipsReroll:
         gate_window = src[gate_section_start:gate_section_start + 4000]
         assert '"reroll_skipped_by_stage7_ship"' in gate_window
 
-    def test_gate_only_fires_on_ship_not_on_discard(self):
-        """The gate must NOT fire when Stage 7 returns verdict=
-        'discard' or any non-'ship' value -- in that case the legacy
-        reroll is still the right fallback (interim, until Agent C
-        ships). Pin: the gate uses an equality test, not 'in' or
-        'truthy', so 'discard' / 'unknown' / '' all fall through to
-        the legacy reroll path."""
+    def test_gate_distinguishes_ship_episode_beat_line(self):
+        """Sprint 10B Wave 1 Agent C: the gate now dispatches on a
+        4-value scope enum (NONE/EPISODE/BEAT/LINE), not on a binary
+        ship/not-ship check. Pin: all four scopes referenced in the
+        cascade source so a future refactor can't silently collapse
+        the decision back to a binary."""
         src = self._src()
         gate_section_start = src.index("BUG-LOCAL-281")
-        gate_window = src[gate_section_start:gate_section_start + 4000]
-        # Equality check (not 'in' / not 'truthy').
-        assert '== "ship"' in gate_window
+        gate_window = src[gate_section_start:gate_section_start + 6000]
+        # NONE -- ship case
+        assert "EscalationScope.NONE" in gate_window
+        # EPISODE -- structural failure short-circuit
+        assert "EscalationScope.EPISODE" in gate_window
+        # The else branch (BEAT/LINE) routes to the legacy reroll.
+        assert "_OTRRR.run_targeted_reroll" in gate_window
