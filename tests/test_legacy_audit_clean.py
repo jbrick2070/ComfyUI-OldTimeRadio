@@ -65,6 +65,22 @@ FORENSIC_MARKERS = (
     "pre-cleanbreak",
     # Catches "retired" / "retirement" common in test guardrail docs
     "retired",
+    # Sprint 10B Wave 1 (2026-05-27) writers'-room agents -- new
+    # Director / Editor / Story Room nodes that intentionally carry
+    # the word "Director" as the new role name (NOT the deleted
+    # legacy LLMDirector). The 10B design lives in docs/2026-05-26-
+    # good-story-writer-architecture__02_design.md Section 4 Wave 1.
+    # The substrings below anchor a mention to that design:
+    "wave 1 agent",      # "Sprint 10B Wave 1 Agent D / E / F"
+    "agent d's",         # cross-references inside Wave 1 Agent E -> D
+    "agent f's",         # cross-references inside Wave 1 Wave 2
+    "section 3.1",       # the frozen DirectorBrief dataclass shape
+    "directorbrief",     # mentions of the new typed brief shape
+    # Per the same Sprint 10B design, the new node title strings
+    # (e.g. workflow JSON `"title": "Director Brief (dormant, ...)"`)
+    # carry "dormant" as the load-bearing marker that Wave 1's
+    # nodes are register-only until Wave 2 Agent F wires them.
+    "(dormant",
 )
 
 
@@ -119,6 +135,29 @@ EXCLUDED_PATHS = frozenset({
     # raises. Forbidden names appear as widget.name / title / S&R
     # values in the test fixtures.
     "tests/test_workflow_validator_extended.py",
+    # justification: Sprint 10B Wave 1 Agent D Director module IS
+    # the writers'-room Director agent (design Section 4 Wave 1);
+    # not the deleted legacy LLMDirector. Every line names the new
+    # role by design (DirectorBrief dataclass, run_director, etc.).
+    # The legacy LLMDirector was retired in voice-path-cleanbreak
+    # S2 (2026-05-12) and is forbidden via DELETED_NODE_TYPES;
+    # this NEW director is the dormant writers'-room agent.
+    "nodes/_otr_director_brief.py",
+    # justification: Sprint 10B Wave 1 Agent D Director ComfyUI
+    # node wrapper around _otr_director_brief; same reasoning.
+    "nodes/OTR_DirectorBrief.py",
+    # justification: Sprint 10B Wave 1 Agent D Director test file;
+    # asserts on the new Director surface, every line names it by
+    # design (run_director, DirectorBrief, OTR_DirectorBrief).
+    "tests/test_otr_director_brief.py",
+    # justification: Sprint 10B Wave 1 Agent E Editor test file
+    # references the new writers'-room Director brief shape as a
+    # cross-reference (the Editor consumes the Director's brief per
+    # design Section 3). Mock payloads embed prose like "the
+    # Director's brief" which is content of the test fixture, not
+    # a legacy LLMDirector reference. Mirrors the Director test
+    # exclusion just above.
+    "tests/test_otr_editor_pass.py",
 })
 
 

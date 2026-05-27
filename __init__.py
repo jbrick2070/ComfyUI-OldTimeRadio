@@ -280,6 +280,14 @@ _NODE_MODULES = {
     # filename. Pure side-effect; passes the upstream path through
     # unchanged so production wiring is not affected.
     "OTR_SaveCopy": (".nodes.otr_save_copy", "SaveCopy", " Save Copy (per-stage QA tee)"),
+    # Sprint 10B Wave 1 Agent D (2026-05-27): Director agent. Reads a
+    # news seed + locked cast and emits a structured DirectorBrief
+    # (design Section 3.1). DORMANT in Wave 1: workflow JSON entry
+    # lands with the output socket disconnected; Wave 2 Agent F's
+    # Story Room loop wires the brief into the Writer's loop. PD6
+    # contract: no model_id widget, technical_model flows over a
+    # STRING input socket from the writer's broadcast output.
+    "OTR_DirectorBrief": (".nodes.OTR_DirectorBrief", "OTR_DirectorBrief", " OTR Director Brief (dormant)"),
     # BUG-LOCAL-231 Step 6 bisect (2026-05-19): minimal STRING-emit node
     # used to feed `gate_signal` (forceInput=True) on
     # OTR_DeferredCheckpointLoader / OTR_FluxBranchGate variants without

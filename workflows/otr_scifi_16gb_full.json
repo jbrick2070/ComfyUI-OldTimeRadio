@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 73,
-  "last_link_id": 218,
+  "last_node_id": 74,
+  "last_link_id": 219,
   "nodes": [
     {
       "id": 63,
@@ -119,7 +119,8 @@
           "type": "STRING",
           "links": [
             115,
-            218
+            218,
+            219
           ],
           "slot_index": 5
         }
@@ -2124,6 +2125,49 @@
       "mode": 0,
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
+    },
+    {
+      "id": 74,
+      "type": "OTR_DirectorBrief",
+      "pos": [
+        500,
+        200
+      ],
+      "size": [
+        400,
+        220
+      ],
+      "flags": {},
+      "order": 99,
+      "mode": 0,
+      "title": "Director Brief (dormant, Wave 1 Agent D)",
+      "inputs": [
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 219,
+          "shape": 7,
+          "label": "technical_model"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "director_brief",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 0,
+          "label": "director_brief"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_DirectorBrief",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        ""
+      ]
     }
   ],
   "links": [
@@ -2685,6 +2729,14 @@
       5,
       73,
       3,
+      "STRING"
+    ],
+    [
+      219,
+      1,
+      5,
+      74,
+      0,
       "STRING"
     ]
   ],
