@@ -1503,14 +1503,31 @@ def _word_bands(target_words: int) -> tuple[int, int, int]:
     """Return ``(word_cap, min_words, max_words)`` for a target length.
 
     ``word_cap`` is the legacy 3x runaway ceiling; ``min_words`` /
-    ``max_words`` are the two-sided drift band (Tier 2 fix #12,
-    2026-05-11: 0.5x..1.7x of target_words, clamped to a 3-word floor).
+    ``max_words`` are the two-sided drift band.
+
+    BUG-LOCAL-279 (2026-05-26): lowered the min floor from 0.5x to
+    0.3x of target_words. The original 0.5x floor was set Tier 2 fix
+    #12 2026-05-11 against normal-budget episodes (~30+ word/beat
+    targets) where it converges fine; on Sprint 10A small-budget
+    smokes (60-110 word total, 20 word/beat targets) the 0.5x floor
+    sits exactly where Mistral-Nemo's natural-output distribution
+    misses (model emits ~5-15 word lines, floor of 10 was unreachable).
+    4 consecutive operator soaks 2026-05-26 tripped the floor on every
+    character line, exhausting the Sprint 5C reroll loop and stamping
+    needs_full_rerun via the legacy critic. 0.3x relaxes the floor
+    enough for the model's natural distribution to land inside the band
+    on small budgets while preserving the band's shape on larger
+    targets (target=37 -> min=11 vs old 18, still inside the model's
+    workable range). The 1.7x ceiling is unchanged -- only undershoot,
+    not overshoot, was the failure mode.
+
     Pure and deterministic -- the single source of truth shared by
     ``compose_line_draft`` (retry gating) and ``compose_line``'s
     post-polish word-cap recheck. Never raises.
     """
     word_cap = max(15, int(target_words * _MAX_OVERSIZE_RATIO))
-    min_words = max(3, int(target_words * 0.5))
+    # BUG-LOCAL-279 Option A: 0.3x floor (was 0.5x pre-2026-05-26).
+    min_words = max(3, int(target_words * 0.3))
     max_words = max(min_words + 1, int(target_words * 1.7))
     return word_cap, min_words, max_words
 

@@ -580,8 +580,10 @@ class TestComposeLinePolishGating:
 
     def _req(self, **overrides):
         # target_words=6 chosen so the 5-6 word mock outputs in these
-        # tests pass the Tier-2-#12 two-sided length band (0.5x..1.7x
-        # of target -> [3..10]). Larger targets would force the band
+        # tests pass the two-sided length band (BUG-LOCAL-279 2026-05-26:
+        # 0.3x..1.7x of target -> target=6 -> [3..10], same band shape
+        # as before the floor relaxation since the 3-word absolute
+        # floor binds first). Larger targets would force the band
         # to reject the mocks as too-short and retry, masking the
         # polish-pass interaction the tests are really exercising.
         kwargs = {
@@ -924,7 +926,9 @@ class TestTier2LengthEnforcement:
         calls = []
         def mock(messages, *, temperature, max_new_tokens, stop=None):
             calls.append(temperature)
-            # 9 words, in band for target=10 -> [5..17].
+            # 9 words, in band for target=10 (BUG-LOCAL-279 2026-05-26:
+            # band relaxed from [5..17] to [3..17] -- 0.3x floor with
+            # 3-word absolute floor).
             return "Hold the line, we still have a chance now."
         req = LineRequest(
             speaker="ALICE", intent="reveal", mood="tense",
@@ -932,6 +936,82 @@ class TestTier2LengthEnforcement:
         )
         res = compose_line(creative_fn=mock, req=req)
         assert len(calls) == 1
+
+
+class TestBugLocal279SmallBudgetBand:
+    """BUG-LOCAL-279 regression: lower length-band floor on small
+    budgets so the legacy Sprint 5C reroll loop converges instead of
+    exhausting on Mistral-Nemo's natural 5-15 word distribution.
+
+    Pre-fix: target=20 -> min_words=int(20 * 0.5)=10. Live operator
+    runs 2026-05-26 shipped 5/8/5/6/13 word character lines, all sub-
+    floor; reroll exhausted; freeze_verdict=needs_full_rerun every
+    smoke. Post-fix: target=20 -> min_words=int(20 * 0.3)=6. The
+    model's natural distribution lands inside the band on small
+    budgets while the ceiling (1.7x) is unchanged.
+    """
+
+    def test_word_band_target_20_min_is_6(self):
+        """Operator-flagged regression case: 60-word smoke budget
+        with 1 character + 3 beats -> target=20 words/beat. The new
+        min floor of 6 (0.3 * 20) catches sub-3-word degenerate
+        output but accepts the model's typical ~6-15 word lines.
+        """
+        from nodes._otr_line_composer import _word_bands
+        word_cap, min_words, max_words = _word_bands(20)
+        assert min_words == 6, (
+            f"BUG-LOCAL-279: target=20 floor expected 6 (0.3 * 20), "
+            f"got {min_words}. The 0.3x floor lets Mistral-Nemo's "
+            f"natural ~5-15 word distribution land in band."
+        )
+        assert max_words == 34  # ceiling unchanged
+        assert word_cap >= 15
+
+    def test_word_band_target_37_min_is_11(self):
+        """The 110-word smoke budget per-beat target (~37 words).
+        Old floor was 18 (0.5 * 37); new floor is 11 (0.3 * 37).
+        Sweep test verifies the relaxation extends to mid-range
+        targets, not just target=20.
+        """
+        from nodes._otr_line_composer import _word_bands
+        _, min_words, max_words = _word_bands(37)
+        assert min_words == 11, (
+            f"BUG-LOCAL-279: target=37 floor expected 11, got {min_words}"
+        )
+        assert max_words == 62  # ceiling unchanged
+
+    def test_word_band_target_50_min_is_15(self):
+        """Larger production-budget target. 0.3 * 50 = 15 (floor)."""
+        from nodes._otr_line_composer import _word_bands
+        _, min_words, _ = _word_bands(50)
+        assert min_words == 15
+
+    def test_word_band_absolute_floor_3_words_holds(self):
+        """The 3-word absolute floor still binds when 0.3 * target
+        is too small. Prevents degenerate single-word outputs from
+        passing the band check.
+        """
+        from nodes._otr_line_composer import _word_bands
+        # target=5 -> int(5*0.3) = 1, max(3, 1) = 3 (absolute floor binds).
+        _, min_words, _ = _word_bands(5)
+        assert min_words == 3, (
+            f"BUG-LOCAL-279: 3-word absolute floor must bind when "
+            f"0.3 * target is below 3; got min={min_words}"
+        )
+
+    def test_word_band_ceiling_unchanged(self):
+        """BUG-LOCAL-279 only touched the floor. The 1.7x ceiling
+        and 3x word_cap are unchanged -- overshoot was never the
+        failure mode and a relaxed ceiling would mask other bugs.
+        """
+        from nodes._otr_line_composer import _word_bands
+        for tgt in (10, 20, 30, 50, 100):
+            _, _, max_words = _word_bands(tgt)
+            expected_max = max(int(tgt * 0.3) + 1, int(tgt * 1.7))
+            assert max_words == expected_max, (
+                f"target={tgt}: ceiling drift, got max={max_words} "
+                f"expected={expected_max}"
+            )
 
 
 class TestTier2PromptInjectionGuard:
