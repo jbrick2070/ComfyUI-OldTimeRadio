@@ -81,6 +81,39 @@ FORENSIC_MARKERS = (
     # carry "dormant" as the load-bearing marker that Wave 1's
     # nodes are register-only until Wave 2 Agent F wires them.
     "(dormant",
+    # Sprint 10B Wave 2 (2026-05-27) writers'-room Story Room agents --
+    # the loop body + transcript extractor in nodes/_otr_story_room.py
+    # + nodes/OTR_StoryRoom.py + nodes/_otr_story_room_extract.py +
+    # nodes/OTR_StoryRoomExtract.py + their tests all describe the
+    # Director / Writer / Editor as ROLES inside the writers' room loop
+    # (the design Section 1 architecture) rather than the deleted
+    # legacy LLMDirector node. The substrings below anchor a mention
+    # to that Wave 2 design.
+    "wave 2 agent",      # "Sprint 10B Wave 2 Agent F / G"
+    "story room",        # any mention of the Wave 2 loop body
+    "storyroomturn",     # Section 3.3 transcript dataclass field
+    "storyroomtranscript",   # Section 3.3 contract
+    "storyroomextraction",   # Section 3.4 contract
+    "section 3.3",       # the frozen StoryRoomTranscript shape
+    "section 3.4",       # the frozen StoryRoomExtraction shape
+    # Writers'-room role-phrase markers. Every one of these is a
+    # phrase that names a ROLE inside the Wave 2 writers' room loop
+    # (per design Section 1 architecture: Director / Writer / Editor
+    # roles on the same small LLM, different system prompts per
+    # turn). None of these phrases ever appeared in the deleted
+    # LLMDirector code path -- the legacy node had no concept of
+    # writer + editor as peer roles. So a line carrying one of these
+    # substrings is unambiguously a Wave 2 surface.
+    "director / editor",
+    "director + writer",
+    "director call",
+    "director brief",
+    "director turn",
+    "director's brief",
+    "section 1:",        # design Section 1 architecture quote anchor
+    "run_story_room",    # the Wave 2 loop entry-point fn name
+    "writers'-room",     # any prose phrase referencing the writers'-room
+    "writers' room",     #   role architecture (Section 1)
 )
 
 

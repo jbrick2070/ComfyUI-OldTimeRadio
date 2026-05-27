@@ -280,10 +280,11 @@ def test_loop_terminates_dirty_when_editor_never_passes(
     # Last good draft preserved as final_draft.
     assert t.final_draft == "SURI: draft 3"
     assert len(t.editor_verdicts) == 3
-    # Director(1) + cycle-0 writer(1) + editor cycle 0 fail(1) +
-    # revision writer(1) + editor cycle 1 fail(1) + revision writer(1) +
-    # editor cycle 2 fail(1) = 7. The final editor cycle skips its
-    # revision turn because cycle_idx + 1 >= max_editor_cycles.
+    # Story Room turn tally: Director(1) + cycle-0 writer(1) +
+    # editor cycle 0 fail(1) + revision writer(1) + editor cycle 1
+    # fail(1) + revision writer(1) + editor cycle 2 fail(1) = 7.
+    # The final editor cycle skips its revision turn because
+    # cycle_idx + 1 >= max_editor_cycles.
     assert t.total_turns == 7
 
 

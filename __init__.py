@@ -315,6 +315,17 @@ _NODE_MODULES = {
     # bool = False so PD1 byte-identity holds; Wave 3 operator A/B flips
     # it on. PD6: both slot ids arrive over STRING forceInput sockets.
     "OTR_StoryRoom": (".nodes.OTR_StoryRoom", "OTR_StoryRoom", " OTR Story Room (dormant)"),
+    # Sprint 10B Wave 2 Agent G (2026-05-27): Story Room transcript-to-
+    # structured extraction. Consumes the Wave 2 Agent F transcript and
+    # emits a typed StoryRoomExtraction (design Section 3.4) whose
+    # dict-shaped fields match the keys the announcer / continuity
+    # ledger / music+SFX cue builder / bark generator already consume.
+    # DORMANT in Wave 2: when the upstream payload is empty / dormant /
+    # malformed the node returns a sentinel without an LLM call. Wave 3's
+    # bridge wires the structured output into the legacy ledger when the
+    # operator A/B confirms use_story_room ships on by default. PD6:
+    # technical_model arrives over a STRING forceInput socket.
+    "OTR_StoryRoomExtract": (".nodes.OTR_StoryRoomExtract", "OTR_StoryRoomExtract", " OTR Story Room Extract (dormant)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

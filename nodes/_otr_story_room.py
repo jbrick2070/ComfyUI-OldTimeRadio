@@ -103,9 +103,10 @@ class StoryRoomTurn:
              pre-first-Editor (the initial Writer drafts ride cycle 0
              before any Editor pass has run); 1 means the cycle that
              follows the first Editor pass; etc.
-    content: free-form prose output for the turn. For Director and
-             Writer turns this is the raw model output (or a brief
-             string for the Director's brief); for Editor turns it is
+    content: free-form prose output for the writers'-room turn.
+             For Director and Writer turns this is the raw model
+             output (or a brief string for the Director's brief);
+             for Editor turns it is
              the JSON verdict serialized as a string (or
              EditorVerdict.to_dict() rendered as JSON by the caller).
     """

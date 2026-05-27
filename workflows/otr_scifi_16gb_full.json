@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 75,
-  "last_link_id": 222,
+  "last_node_id": 76,
+  "last_link_id": 224,
   "nodes": [
     {
       "id": 63,
@@ -124,7 +124,8 @@
             115,
             218,
             219,
-            222
+            222,
+            224
           ],
           "slot_index": 5
         }
@@ -2223,7 +2224,9 @@
         {
           "name": "story_room_transcript",
           "type": "STRING",
-          "links": null,
+          "links": [
+            223
+          ],
           "slot_index": 0
         }
       ],
@@ -2239,6 +2242,62 @@
         4,
         3,
         18
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 76,
+      "type": "OTR_StoryRoomExtract",
+      "pos": [
+        1100,
+        520
+      ],
+      "size": [
+        440,
+        220
+      ],
+      "title": "Story Room Extract (Sprint 10B Wave 2 Agent G, DORMANT)",
+      "flags": {},
+      "order": 101,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "story_room_transcript",
+          "type": "STRING",
+          "link": 223
+        },
+        {
+          "name": "cast_names",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "news_seed",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 224,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "story_room_extraction",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_StoryRoomExtract",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        ""
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2835,6 +2894,22 @@
       5,
       75,
       4,
+      "STRING"
+    ],
+    [
+      223,
+      75,
+      0,
+      76,
+      0,
+      "STRING"
+    ],
+    [
+      224,
+      1,
+      5,
+      76,
+      3,
       "STRING"
     ]
   ],
