@@ -365,3 +365,143 @@ def check_constraints(
         failing_constraints=[],
         repair_note="",
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Sprint 5.1 wire-up helper (2026-05-28)
+# ---------------------------------------------------------------------------
+
+
+__all__.append("check_constraints_from_ledger")
+
+
+class _BeatLike:
+    """Minimal Stage1Beat-shaped view for the constraint checker.
+
+    Reconstructed from a ledger line row + the matching outline beat
+    when possible. Carries only the attributes the checker reads
+    (beat_id / speaker / dialogue_slot_id / intent + the Sprint 2
+    state_* fields when present). Defaults to None for typed-state
+    fields so untyped beats are charitably skipped by validators 3
+    (each_beat_changes_situation) + 4 (NO_FINAL_THIRD_TURN).
+    """
+
+    def __init__(self, *, beat_id, speaker, dialogue_slot_id, intent="",
+                 state_before=None, state_after=None, objective=None,
+                 obstacle=None, turn=None, subtext=None,
+                 tension=None, next_turn=None):
+        self.beat_id = beat_id
+        self.speaker = speaker
+        self.dialogue_slot_id = dialogue_slot_id
+        self.intent = intent
+        self.state_before = state_before
+        self.state_after = state_after
+        self.objective = objective
+        self.obstacle = obstacle
+        self.turn = turn
+        self.subtext = subtext
+        self.tension = tension
+        self.next_turn = next_turn
+
+
+class _PlanLike:
+    """Stage1Plan-shaped view -- cast + beats + dramatic_state.
+
+    The constraint checker duck-types all three attributes, so this
+    is enough to run all five constraints against an in-flight
+    ledger without round-tripping through pydantic.
+    """
+
+    def __init__(self, *, cast, beats, dramatic_state):
+        self.cast = cast
+        self.beats = beats
+        self.dramatic_state = dramatic_state
+
+
+def _cast_view_from_ledger(ledger_data: dict):
+    """Map ledger.cast rows to objects exposing .name."""
+    rows = ledger_data.get("cast") or []
+    out = []
+    for row in rows:
+        if isinstance(row, dict):
+            nm = str(row.get("name", "") or "").strip()
+        else:
+            nm = str(getattr(row, "name", "") or "").strip()
+        if nm:
+            out.append(type("_CastRow", (), {"name": nm})())
+    return out
+
+
+def _beats_view_from_ledger(ledger_data: dict):
+    """Build _BeatLike rows from ledger.lines (Sprint 1 stamped
+    dialogue_slot_id; voiced rows carry char_id / text we don't
+    need for constraints, but we extract speaker from beat_id ->
+    cast lookup when possible)."""
+    lines = ledger_data.get("lines") or []
+    cast_id_by_name = {}
+    for c in (ledger_data.get("cast") or []):
+        if isinstance(c, dict):
+            cast_id_by_name[c.get("char_id", "")] = c.get("name", "")
+        else:
+            cast_id_by_name[getattr(c, "char_id", "")] = (
+                getattr(c, "name", "")
+            )
+    beats = []
+    for ln in lines:
+        if not isinstance(ln, dict):
+            continue
+        beat_id = str(ln.get("beat_id", "") or "").strip()
+        dsi = str(ln.get("dialogue_slot_id", "") or "").strip()
+        char_id = str(ln.get("char_id", "") or "").strip()
+        speaker_role = str(ln.get("speaker_role", "") or "").strip()
+        # Speaker resolution: announcer -> ANNOUNCER; otherwise look up
+        # cast_id_by_name; fall back to the raw char_id uppercased.
+        if speaker_role == "announcer":
+            speaker = "ANNOUNCER"
+        elif speaker_role in ("music_open", "music_close", "music_inter"):
+            speaker = "MUSIC"
+        else:
+            speaker = cast_id_by_name.get(char_id, char_id.upper())
+        intent = str(ln.get("beat_intent", "") or "").strip()
+        beats.append(_BeatLike(
+            beat_id=beat_id,
+            speaker=speaker,
+            dialogue_slot_id=(dsi or None),
+            intent=intent,
+        ))
+    return beats
+
+
+def check_constraints_from_ledger(
+    ledger_data: dict,
+    *,
+    cast_names_extra=None,
+    allowed_proper_nouns=None,
+) -> EditorConstraintVerdict:
+    """Run check_constraints against the in-flight ledger.
+
+    Reads ledger.cast / ledger.lines / ledger.meta.dramatic_state
+    and reconstructs a minimal Stage1Plan-shaped view so the pure-
+    Python check_constraints can run without round-tripping through
+    pydantic. Returns the same EditorConstraintVerdict
+    check_constraints would return.
+
+    The Sprint 5.1 wire-up calls this in OTR_LedgerScriptWriter
+    after DramaticState is stamped (Sprint 2.1 site) to produce a
+    diagnostic `meta.editor_constraints` audit. The live editor
+    cycle is unchanged this sprint -- the actual swap (replacing
+    the taste editor with the constraint editor at
+    max_editor_cycles=1) lives in a follow-up sprint that touches
+    run_story_room.
+    """
+    cast = _cast_view_from_ledger(ledger_data)
+    beats = _beats_view_from_ledger(ledger_data)
+    meta = ledger_data.get("meta") or {}
+    ds = meta.get("dramatic_state")  # dict OR None
+    plan_view = _PlanLike(cast=cast, beats=beats, dramatic_state=ds)
+    return check_constraints(
+        plan_view,
+        cast_names_extra=cast_names_extra,
+        allowed_proper_nouns=allowed_proper_nouns,
+    )
