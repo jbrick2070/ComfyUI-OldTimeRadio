@@ -1200,6 +1200,9 @@ def _resolve_inputs(
     use_multiturn_dialogue: bool = False,
     # Sprint 10B Wave 1 Agent B: Stage 3 validators flag.
     enable_production_stage3_validators: bool = False,
+    # Sprint 2.2 (2026-05-28): when True, news_interpreter exhaustion
+    # halts the run rather than graceful-degrading to meta["news"]=None.
+    news_briefs_required: bool = True,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1367,6 +1370,8 @@ def _resolve_inputs(
         # Sprint 10B Wave 1 Agent B Stage 3 validators flag.
         "enable_production_stage3_validators":
             bool(enable_production_stage3_validators),
+        # Sprint 2.2 (2026-05-28): news-brief hard-halt toggle.
+        "news_briefs_required": bool(news_briefs_required),
     }
 
 
@@ -1879,6 +1884,32 @@ class OTR_LedgerScriptWriter:
                         "regression run."
                     ),
                 }),
+                # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27
+                # directive: when build_news_briefs exhausts its
+                # retry budget, HALT the run rather than silently
+                # falling back to raw news_seed with no key_terms
+                # enforcement. Defaults TRUE per the directive:
+                # "the whole workflow needs to stop and re-roll news
+                # until it works and stamps the ledger." The
+                # operator re-queues on red graph; news_interpreter
+                # pulls fresh from RSS each queue, so the re-queue
+                # IS the re-roll. Set FALSE for the back-compat
+                # graceful-degrade path (early-stage tests + the
+                # rare "we know the brief is bad but want a draft
+                # anyway" operator workflow).
+                "news_briefs_required": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "Sprint 2.2 (2026-05-28). ON (default): "
+                        "build_news_briefs exhaustion HALTS the "
+                        "writer with a red graph; operator re-"
+                        "queues to re-roll news from RSS. OFF: "
+                        "graceful-degrade -- meta['news']=None, "
+                        "downstream consumers fall back to raw "
+                        "news_seed with no key_terms enforcement. "
+                        "Production should ship ON."
+                    ),
+                }),
             },
         }
 
@@ -1951,6 +1982,12 @@ class OTR_LedgerScriptWriter:
         # validators on the legacy compose_line path. Default False
         # preserves PD1 byte-identity.
         enable_production_stage3_validators=False,
+        # Sprint 2.2 (2026-05-28): hard-halt when news_interpreter
+        # exhausts retries. Default True per Jeffrey 2026-05-27
+        # directive ("news brief must write -- if it doesn't, the
+        # whole workflow needs to stop and re-roll news"). Set False
+        # for back-compat graceful-degrade.
+        news_briefs_required=True,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1980,6 +2017,8 @@ class OTR_LedgerScriptWriter:
             use_multiturn_dialogue=use_multiturn_dialogue,
             # Sprint 10B Wave 1 Agent B: propagate Stage 3 flag.
             enable_production_stage3_validators=enable_production_stage3_validators,
+            # Sprint 2.2 (2026-05-28): hard-halt toggle.
+            news_briefs_required=news_briefs_required,
         )
 
         log.info(
@@ -2232,10 +2271,50 @@ class OTR_LedgerScriptWriter:
                 len(briefs.key_terms), briefs.attempts,
             )
         except _OTRNI.NewsInterpreterError as exc:
+            # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27 directive:
+            # "news brief must write -- if it doesn't, the whole
+            # workflow needs to stop and re-roll news until it works
+            # and stamps the ledger." The pre-Sprint-2.2 graceful-
+            # degrade path (`meta["news"] = None`) silently lost the
+            # script_brief + key_terms enforcement that downstream
+            # consumers depend on, and Sprint 2.1's DramaticState
+            # stamp ended up keyed off an empty brief on every halt.
+            # The Sprint 2.2 fix: HALT loud by default; operator re-
+            # queues the run (which pulls fresh from RSS, effectively
+            # re-rolling news). The `news_briefs_required` toggle
+            # (default True) lets the original graceful-degrade
+            # surface persist for the tests + early-stage callers
+            # that depend on it.
+            _news_required = bool(
+                resolved.get("news_briefs_required", True)
+            )
+            if _news_required:
+                log.error(
+                    "[OTR_LedgerScriptWriter] news_interpreter "
+                    "FAILED after all attempts AND news_briefs_"
+                    "required=True (Sprint 2.2 default): %s -- "
+                    "HALTING the run. Operator should re-queue; "
+                    "news_interpreter will pull fresh from RSS.",
+                    exc,
+                )
+                # Stamp the failure on meta before raising so the
+                # operator (or a future re-queue heuristic) can see
+                # what the failed brief was.
+                meta["news"] = None
+                meta["news_briefs_halt_reason"] = (
+                    f"{type(exc).__name__}: {exc}"
+                )
+                try:
+                    led.save()
+                except Exception:  # noqa: BLE001
+                    pass
+                raise
             log.warning(
                 "[OTR_LedgerScriptWriter] news_interpreter FAILED after "
-                "all attempts: %s -- falling back to raw news_seed for "
-                "cast + outline (no key_terms enforcement)",
+                "all attempts: %s -- news_briefs_required=False; "
+                "falling back to raw news_seed for cast + outline "
+                "(no key_terms enforcement). Sprint 2.2: this is the "
+                "back-compat branch; production should ship True.",
                 exc,
             )
             meta["news"] = None

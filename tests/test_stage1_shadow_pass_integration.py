@@ -62,30 +62,36 @@ class TestInputTypesExposesWidget:
         """Slot 17 placement of enable_stage1_shadow_pass. Sprint 10B
         Wave 0 (2026-05-27) appended use_multiturn_dialogue at slot 18
         and Sprint 10B Wave 1 Agent B (2026-05-27) appended
-        enable_production_stage3_validators at slot 19. The append-only
-        rule still holds -- older N-slot workflow JSON files keep
-        loading (ComfyUI fills missing trailing widgets from defaults).
+        enable_production_stage3_validators at slot 19. Sprint 2.2
+        (2026-05-28) appended news_briefs_required at slot 20. The
+        append-only rule still holds -- older N-slot workflow JSON
+        files keep loading (ComfyUI fills missing trailing widgets
+        from defaults).
         """
         from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
 
         inputs = OTR_LedgerScriptWriter.INPUT_TYPES()
         optional_keys = list(inputs["optional"].keys())
-        # Slot 17 = third-to-last after Wave 0 + Wave 1B appends.
-        assert optional_keys[-3] == "enable_stage1_shadow_pass", (
-            f"enable_stage1_shadow_pass must be the THIRD-TO-LAST "
-            f"optional widget (slot 17); current third-to-last is "
-            f"{optional_keys[-3]!r}, then {optional_keys[-2]!r}, "
-            f"then {optional_keys[-1]!r}"
+        # Slot 17 = fourth-to-last after Wave 0 + Wave 1B + Sprint 2.2 appends.
+        assert optional_keys[-4] == "enable_stage1_shadow_pass", (
+            f"enable_stage1_shadow_pass must be the FOURTH-TO-LAST "
+            f"optional widget (slot 17); current fourth-to-last is "
+            f"{optional_keys[-4]!r}"
         )
-        assert optional_keys[-2] == "use_multiturn_dialogue", (
+        assert optional_keys[-3] == "use_multiturn_dialogue", (
             f"Sprint 10B Wave 0: use_multiturn_dialogue must be at "
-            f"slot 18 (second-to-last); current second-to-last is "
+            f"slot 18 (third-to-last); current third-to-last is "
+            f"{optional_keys[-3]!r}"
+        )
+        assert optional_keys[-2] == "enable_production_stage3_validators", (
+            f"Sprint 10B Wave 1 Agent B: "
+            f"enable_production_stage3_validators must be at slot 19 "
+            f"(second-to-last); current second-to-last is "
             f"{optional_keys[-2]!r}"
         )
-        assert optional_keys[-1] == "enable_production_stage3_validators", (
-            f"Sprint 10B Wave 1 Agent B: "
-            f"enable_production_stage3_validators must be the LAST "
-            f"optional widget (slot 19); current last is "
+        assert optional_keys[-1] == "news_briefs_required", (
+            f"Sprint 2.2: news_briefs_required must be the LAST "
+            f"optional widget (slot 20); current last is "
             f"{optional_keys[-1]!r}"
         )
 
