@@ -346,6 +346,15 @@ _NODE_MODULES = {
     # fails; operator wires upstream Stage 1 fan-out manually.
     # PD6: no model_id widget (no LLM call to slot).
     "OTR_BeatSelector": (".nodes.OTR_BeatSelector", "OTR_BeatSelector", " OTR Beat Selector (Sprint 4 best-of-N)"),
+
+    # Sprint 4.8 wire-up (2026-05-28): Stage 1 fan-out node wrapper.
+    # Runs 3 LLM calls with diversity knobs (moral_dilemma /
+    # bureaucratic_absurd / intimate_personal_cost), runs the
+    # Sprint 4 mechanical selector, emits 3 candidate plan JSONs +
+    # winning_plan_json + fanout_audit_json. Mirrors OTR_BeatSelector
+    # shape so the two chain naturally in the workflow. PD6: no
+    # model_id widget (technical_model arrives via forceInput).
+    "OTR_Stage1FanOut": (".nodes.OTR_Stage1FanOut", "OTR_Stage1FanOut", " OTR Stage 1 Fan-Out (Sprint 4 diversity knobs)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
