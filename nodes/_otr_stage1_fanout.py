@@ -224,3 +224,139 @@ def fan_out_stage1_plans(
         )
 
     return results
+
+
+
+# ---------------------------------------------------------------------------
+# Sprint 4.4 (2026-05-28) -- compose fan-out + selector
+# ---------------------------------------------------------------------------
+
+
+__all__.extend([
+    "FanOutAndSelectResult",
+    "fan_out_and_select_stage1_plan",
+])
+
+
+@dataclass
+class FanOutAndSelectResult:
+    """End-to-end fan-out + selection outcome.
+
+    Carries:
+      winner_plan        the Stage1Plan instance the selector picked.
+                         None when every candidate failed -- callers
+                         should re-roll or raise.
+      fan_out_results    the raw per-knob FanOutResult list (so the
+                         operator can inspect what each knob produced).
+      selector_audit     the BeatSelectorAudit (winner_index, reason,
+                         per-candidate scores + defects). None when
+                         winner_plan is None (no eligible candidate).
+      no_valid_error_msg human-readable summary of why no winner
+                         emerged. Empty string on success.
+    """
+
+    winner_plan: Any
+    fan_out_results: List["FanOutResult"]
+    selector_audit: Any
+    no_valid_error_msg: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.winner_plan is not None
+
+
+def fan_out_and_select_stage1_plan(
+    *,
+    generate_fn: Callable[..., str],
+    parse_fn: Callable[[str], Any],
+    base_system_prompt: str,
+    user_prompt: str,
+    knobs: Optional[List[str]] = None,
+    base_temperature: float = 0.8,
+    max_new_tokens: int = 4096,
+) -> FanOutAndSelectResult:
+    """Fan out N Stage 1 calls + run the Sprint 4 mechanical
+    selector on the validated candidates.
+
+    Returns a FanOutAndSelectResult capturing the winner (when any)
+    plus the full per-knob trail for operator inspection.
+
+    On all-invalid input the result carries winner_plan=None and
+    no_valid_error_msg=<reason>; callers decide whether to re-roll
+    the fan-out, halt the run, or fall back to the legacy
+    single-call generate_stage1_plan path.
+
+    The composition is intentionally thin: this function does not
+    own VRAM management, retry policy, or model-slot resolution --
+    the caller passes a generate_fn / parse_fn pair already bound to
+    Stage1Plan and a single technical-slot model id, and we run the
+    three knob calls sequentially through that pair. Sprint 4.4
+    wire-up at OTR_LedgerScriptWriter is a separate sprint because
+    it interacts with the Wave 0 VRAM context manager.
+    """
+    fan_out = fan_out_stage1_plans(
+        generate_fn=generate_fn,
+        parse_fn=parse_fn,
+        base_system_prompt=base_system_prompt,
+        user_prompt=user_prompt,
+        knobs=knobs,
+        base_temperature=base_temperature,
+        max_new_tokens=max_new_tokens,
+    )
+
+    # Lazy import the selector so this module stays stdlib + pydantic
+    # at load time (matching the rest of the Sprint 4 surface).
+    try:
+        from ._otr_beat_selector import (
+            NoValidBeatSheetError,
+            select_winning_beat_sheet,
+        )
+    except ImportError:  # pragma: no cover - standalone / test load
+        from _otr_beat_selector import (  # type: ignore
+            NoValidBeatSheetError,
+            select_winning_beat_sheet,
+        )
+
+    candidate_plans = [r.plan for r in fan_out if r.ok]
+    if not candidate_plans:
+        # Build a human-readable summary of why no candidate emerged
+        # so the operator can see at a glance whether the failures
+        # were generate-side, parse-side, or a mix.
+        msg_parts: list[str] = ["no eligible candidates after fan-out:"]
+        for r in fan_out:
+            msg_parts.append(
+                f"  {r.knob}: {r.error or '(no error captured)'}"
+            )
+        log.warning("[Stage1FanOut] %s", "; ".join(msg_parts))
+        return FanOutAndSelectResult(
+            winner_plan=None,
+            fan_out_results=fan_out,
+            selector_audit=None,
+            no_valid_error_msg="\n".join(msg_parts),
+        )
+
+    try:
+        winner, audit = select_winning_beat_sheet(candidate_plans)
+    except NoValidBeatSheetError as exc:
+        audit = getattr(exc, "audit", None)
+        return FanOutAndSelectResult(
+            winner_plan=None,
+            fan_out_results=fan_out,
+            selector_audit=audit,
+            no_valid_error_msg=(
+                f"all candidates failed validate_beat_sheet: {exc}"
+            ),
+        )
+
+    log.info(
+        "[Stage1FanOut] winner=candidate[%d] score=%d/5 "
+        "(eligible=%s)",
+        audit.winner_index,
+        audit.scores_per_candidate[audit.winner_index].total,
+        audit.eligible_indices,
+    )
+    return FanOutAndSelectResult(
+        winner_plan=winner,
+        fan_out_results=fan_out,
+        selector_audit=audit,
+    )
