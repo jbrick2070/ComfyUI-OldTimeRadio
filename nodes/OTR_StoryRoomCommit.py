@@ -432,6 +432,37 @@ class OTR_StoryRoomCommit:
             "premise": (extraction.get("premise") or "")[:300],
             **audit,
         }
+        # E (2026-05-28): persist Story Room CONTEXT proof onto the
+        # COMMITTED ledger meta. DirectorBrief / StoryRoom / Extract
+        # stamp transient payloads that die before FreezeCascade;
+        # downstream consumers read the saved ledger, so the proof has
+        # to live here. director_brief_status is NOT wired into this
+        # node (Commit only sees script_json + extraction + commit), so
+        # it is reported "unknown" rather than guessed.
+        #
+        # Fail-loud on empty context is intentionally NOT added here:
+        # the narrow extract_dialogue_only path emits {"dialogue": ...}
+        # with no cast/premise, so a cast_count==0 / premise_len==0
+        # raise would false-red every valid narrow-path run. Promoting
+        # this warning to a raise requires the narrow Extract to emit
+        # cast + premise first (cross-node change, tracked separately).
+        cast_count = len(extraction.get("cast") or [])
+        premise_len = len(str(extraction.get("premise") or ""))
+        meta["story_room_context"] = {
+            "extraction_status": extraction.get("status"),
+            "extracted_rows": len(dialogue_rows),
+            "cast_count": cast_count,
+            "premise_len": premise_len,
+            "director_brief_status": "unknown",
+        }
+        if cast_count == 0 or premise_len == 0:
+            log.warning(
+                "[OTR_StoryRoomCommit] committed with thin Story Room "
+                "context (cast_count=%d, premise_len=%d). The narrow "
+                "Extract path omits cast/premise; if you expected rich "
+                "context, verify the Extract mode.",
+                cast_count, premise_len,
+            )
         # Recompute totals so downstream consumers see consistent
         # numbers. word_count + char_count totals are the only
         # roll-ups the freeze cascade reads.

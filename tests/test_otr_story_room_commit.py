@@ -220,6 +220,14 @@ class TestActiveCommit:
         line_by_beat = {l["beat_id"]: l for l in ledger["lines"]}
         assert line_by_beat["b002"]["text"] == "I won't sign."
         assert line_by_beat["b003"]["text"] == "Then we wait."
+
+        # QA item E: context proof persisted on the COMMITTED ledger meta.
+        ctx = ledger["meta"]["story_room_context"]
+        assert ctx["extraction_status"] == "ok"
+        assert ctx["extracted_rows"] >= 1
+        assert "cast_count" in ctx
+        assert "premise_len" in ctx
+        assert "director_brief_status" in ctx
         assert line_by_beat["b001"]["text"] == "Open."
         assert line_by_beat["b004"]["text"] == "Good night."
 
