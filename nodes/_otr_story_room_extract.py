@@ -75,12 +75,21 @@ __all__ = [
 _EXTRACT_BASE_TEMPERATURE: float = 0.20
 _EXTRACT_STRUCTURAL_RETRY_TEMPERATURE: float = 0.10
 
-# Token budget. The Spray-of-Hope worked example in design Section
-# 2.5 is roughly 500 words of dialogue across ~12 beats. Schema-
-# wrapped JSON of a typical episode comfortably fits under 4k
-# tokens; we leave headroom so a longer transcript does not get
-# truncated mid-object.
-_EXTRACT_MAX_NEW_TOKENS: int = 4096
+# BUG-LOCAL-293 (2026-05-27): bumped 4096 -> 16384. Live evidence
+# (pending_20260527_212428, 18-line episode): Extract attempt 2
+# truncated mid-string at "char 12358" -- ~3-4 chars per token
+# puts the actual output at ~3000-4000 tokens of schema-wrapped
+# JSON for an 18-line episode (vs the design's Spray-of-Hope
+# 12-beat / 500-word example which fits in 4k). The 4096 cap was
+# starving Mistral-Nemo into truncating mid-string; the
+# structured_call ladder then retried at lower temp which produced
+# even longer JSON (more deterministic = longer strings) and
+# truncated again. Both attempts exhausted, Commit pass-through'd,
+# Story Room iteration didn't reach the ledger. 16384 gives 4x
+# headroom -- enough for ~30-line episodes with full sidecar
+# data. Schema-side per-row caps still bound the actual content;
+# the bump just gives the model room to close its JSON.
+_EXTRACT_MAX_NEW_TOKENS: int = 16384
 
 
 # ---------------------------------------------------------------------------
