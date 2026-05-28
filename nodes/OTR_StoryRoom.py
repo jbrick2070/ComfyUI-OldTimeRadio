@@ -163,6 +163,29 @@ class OTR_StoryRoom:
                         "the design ships at 18."
                     ),
                 }),
+                # Sprint 5.4 (2026-05-28) -- live opt-in for the
+                # constraint editor swap. When True the Editor turns
+                # use EditorConstraintVerdictSchema + EDITOR_CONSTRAINTS
+                # _SYSTEM_PROMPT (no taste verbs; 5 structural codes
+                # only) AND max_editor_cycles is clamped to 1 inside
+                # run_story_room (Sprint 5 cap; quality comes from
+                # Sprint 4's selector, not editor cycles). When False
+                # (default) the legacy taste editor + 3-cycle
+                # revision loop ships byte-identical.
+                "use_constraint_editor": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 5.4 (2026-05-28). OFF (default) -> "
+                        "taste-rubric editor + up to 3 revision "
+                        "cycles. ON -> constraint editor (5 codes: "
+                        "WRONG_SPEAKER, PHANTOM_CHARACTER, "
+                        "MISSING_COSTLY_CHOICE, NO_FINAL_THIRD_TURN, "
+                        "FORMAT_FAILURE) + 1 revision turn cap "
+                        "(Sprint 5 floor). Flip ON for soak A/B "
+                        "against the new floor; OFF for the "
+                        "byte-identity regression."
+                    ),
+                }),
             },
             "optional": {
                 "creative_writing_model": ("STRING", {
@@ -282,6 +305,10 @@ class OTR_StoryRoom:
         max_writer_turns: int = 4,
         max_editor_cycles: int = 3,
         max_total_turns: int = 18,
+        # Sprint 5.4 (2026-05-28): live constraint-editor opt-in.
+        # When True the Editor turns swap to the constraint editor
+        # (no taste verbs; 5 enum codes; 1 revision cycle cap).
+        use_constraint_editor: bool = False,
         creative_writing_model: str = "",
         technical_model: str = "",
     ):
@@ -353,14 +380,34 @@ class OTR_StoryRoom:
 
         # LLM slot: technical
         # Reason: Editor verdicts are JSON objects validated against
-        # EditorVerdictSchema. Per project rule 6 structured-JSON
-        # passes route to the writer's `technical_model` slot.
+        # EditorVerdictSchema (default) OR EditorConstraintVerdict
+        # Schema (Sprint 5.4 opt-in). Per project rule 6 structured-
+        # JSON passes route to the writer's `technical_model` slot
+        # in either case.
         editor_cache = _OTRML.request_slot(
             "technical", resolved_technical_id,
         )
-        editor_generate_fn = _OTRCG.make_constrained_generate_fn(
-            editor_cache, EditorVerdictSchema,
-        )
+        if use_constraint_editor:
+            # Sprint 5.4 (2026-05-28). Bind to the constraint-editor
+            # schema so the constrained sampler stays inside the 5
+            # canonical codes; run_story_room receives the flag and
+            # routes through _call_constraint_editor which calls
+            # run_constraint_editor + adapts the verdict back into
+            # an EditorVerdict shape for transcript compatibility.
+            from ._otr_editor_constraints import (
+                EditorConstraintVerdictSchema,
+            )
+            editor_generate_fn = _OTRCG.make_constrained_generate_fn(
+                editor_cache, EditorConstraintVerdictSchema,
+            )
+            log.info(
+                "[OTR_StoryRoom] use_constraint_editor=True -- "
+                "editor bound to EditorConstraintVerdictSchema."
+            )
+        else:
+            editor_generate_fn = _OTRCG.make_constrained_generate_fn(
+                editor_cache, EditorVerdictSchema,
+            )
 
         log.info(
             "[OTR_StoryRoom] running room: cast=%d brief.news_premise="
@@ -383,6 +430,8 @@ class OTR_StoryRoom:
                 max_writer_turns=int(max_writer_turns),
                 max_editor_cycles=int(max_editor_cycles),
                 max_total_turns=int(max_total_turns),
+                # Sprint 5.4: thread the live constraint-editor flag.
+                use_constraint_editor=bool(use_constraint_editor),
             )
         except StoryRoomCallFailedError as exc:
             log.warning(

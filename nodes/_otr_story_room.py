@@ -490,6 +490,97 @@ def _call_editor(
         )
 
 
+def _call_constraint_editor(
+    brief: DirectorBrief,
+    draft: str,
+    *,
+    editor_generate_fn: Callable[..., str],
+    cast: List[Any],
+    cycle: int,
+) -> EditorVerdict:
+    """Sprint 5.4 (2026-05-28) -- the constraint-editor sibling of
+    _call_editor. Delegates to `_otr_editor_constraints
+    .run_constraint_editor` and adapts the EditorConstraintVerdict
+    into an EditorVerdict-shaped object so the run_story_room loop
+    + transcript stay back-compat.
+
+    Adapter mapping:
+      EditorConstraintVerdict.pass_decision  -> EditorVerdict.pass_decision
+      EditorConstraintVerdict.failing_constraints -> failing_axes
+      EditorConstraintVerdict.repair_note    -> overall_note
+                                                (the Writer revision
+                                                turn reads this via
+                                                _format_editor_notes_block)
+      EditorConstraintVerdict.cycle          -> cycle
+      per_axis_notes                         -> {}  (no taste rubric)
+
+    On ConstraintEditorCallFailedError we soft-pass identically to the
+    taste editor's failure path so Section 4 Wave 2's "Editor call
+    fails -> soft-pass with note" contract still holds.
+
+    The editor_generate_fn passed in MUST be constrained-decode-bound
+    to EditorConstraintVerdictSchema (the OTR_StoryRoom node layer
+    binds this when use_constraint_editor=True is on the widget).
+    """
+    # LLM slot: technical
+    # Reason: structured constrained-decode verdict; rule 6.
+    from ._otr_editor_constraints import (
+        ConstraintEditorCallFailedError,
+        run_constraint_editor,
+    )
+
+    cast_names = []
+    for c in (cast or []):
+        nm = ""
+        if isinstance(c, dict):
+            nm = str(c.get("name", "") or "").strip()
+        else:
+            nm = str(getattr(c, "name", "") or "").strip()
+        if nm:
+            cast_names.append(nm)
+
+    try:
+        verdict = run_constraint_editor(
+            brief,
+            draft,
+            generate_fn=editor_generate_fn,
+            cast_names=cast_names or None,
+            cycle=cycle,
+        )
+    except ConstraintEditorCallFailedError as exc:
+        log.warning(
+            "[OTR_StoryRoom] constraint editor failed at cycle %d; "
+            "soft-passing the Writer's last draft so the episode "
+            "ships. Error: %s",
+            cycle, exc,
+        )
+        return EditorVerdict(
+            pass_decision=True,
+            failing_axes=[],
+            per_axis_notes={},
+            overall_note=(
+                f"ConstraintEditorCallFailedError at cycle {cycle} "
+                f"after {exc.attempts} attempt(s); soft-pass to keep "
+                f"the episode shippable. Last error: "
+                f"{type(exc.last_error).__name__}: {exc.last_error}"
+            ),
+            cycle=cycle,
+        )
+
+    # Adapter -> EditorVerdict shape. The Writer revision turn reads
+    # `overall_note` via _format_editor_notes_block; mapping
+    # `repair_note` here means the Writer sees the constraint
+    # editor's repair note as the revision directive without any
+    # other code change.
+    return EditorVerdict(
+        pass_decision=bool(verdict.pass_decision),
+        failing_axes=list(verdict.failing_constraints),
+        per_axis_notes={},
+        overall_note=str(verdict.repair_note or ""),
+        cycle=int(verdict.cycle),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public entry point -- run_story_room
 # ---------------------------------------------------------------------------
@@ -506,6 +597,7 @@ def run_story_room(
     max_writer_turns: int = DEFAULT_MAX_WRITER_TURNS,
     max_editor_cycles: int = DEFAULT_MAX_EDITOR_CYCLES,
     max_total_turns: int = DEFAULT_MAX_TOTAL_TURNS,
+    use_constraint_editor: bool = False,
 ) -> StoryRoomTranscript:
     """Run the writers' room loop and return a populated transcript.
 
@@ -583,6 +675,28 @@ def run_story_room(
     if max_total_turns < 2:
         # Need room for at least one Writer turn + one Editor turn.
         raise ValueError("max_total_turns must be >= 2")
+
+    # Sprint 5.4 (2026-05-28) -- when the constraint editor is on,
+    # honor the Sprint 5 hard cap of ONE editor cycle. Quality
+    # comes from the Sprint 4 selector (when wired) and the Sprint 4
+    # / 5 structural validators; the editor only enforces a floor.
+    # Pre-Sprint-5 max_editor_cycles widget defaults remain in
+    # place for the taste-editor path -- this cap only fires when
+    # use_constraint_editor is True.
+    if use_constraint_editor:
+        from ._otr_editor_constraints import (
+            DEFAULT_MAX_EDITOR_CONSTRAINT_CYCLES,
+        )
+        if max_editor_cycles > DEFAULT_MAX_EDITOR_CONSTRAINT_CYCLES:
+            log.info(
+                "[OTR_StoryRoom] use_constraint_editor=True -- "
+                "clamping max_editor_cycles %d -> %d (Sprint 5 cap; "
+                "the constraint editor enforces a structural floor, "
+                "not taste).",
+                max_editor_cycles,
+                DEFAULT_MAX_EDITOR_CONSTRAINT_CYCLES,
+            )
+            max_editor_cycles = DEFAULT_MAX_EDITOR_CONSTRAINT_CYCLES
 
     t_start = time.monotonic()
 
@@ -674,13 +788,29 @@ def run_story_room(
             )
             break
 
-        verdict = _call_editor(
-            brief=director_brief,
-            draft=current_draft,
-            editor_generate_fn=editor_generate_fn,
-            rubric=rubric,
-            cycle=cycle_idx,
-        )
+        # Sprint 5.4 (2026-05-28) -- pick the constraint editor when
+        # use_constraint_editor is on. The editor_generate_fn must be
+        # bound to EditorConstraintVerdictSchema in that case; the
+        # OTR_StoryRoom node layer handles the binding choice. The
+        # adapter inside _call_constraint_editor converts the
+        # EditorConstraintVerdict to an EditorVerdict-shape so the
+        # transcript + Writer revision turn stay byte-compat.
+        if use_constraint_editor:
+            verdict = _call_constraint_editor(
+                brief=director_brief,
+                draft=current_draft,
+                editor_generate_fn=editor_generate_fn,
+                cast=cast,
+                cycle=cycle_idx,
+            )
+        else:
+            verdict = _call_editor(
+                brief=director_brief,
+                draft=current_draft,
+                editor_generate_fn=editor_generate_fn,
+                rubric=rubric,
+                cycle=cycle_idx,
+            )
         transcript.editor_verdicts.append(verdict)
         transcript.turns.append(StoryRoomTurn(
             role="editor",
