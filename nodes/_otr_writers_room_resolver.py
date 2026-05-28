@@ -1,5 +1,14 @@
 """nodes/_otr_writers_room_resolver.py -- shared fallback resolver.
 
+2026-05-27 evening hotfix: even when `in_flight_ledger_path()` returns
+None (the writer's singleton may not survive across node executions
+inside one ComfyUI queue), the resolver now does its OWN mtime walk
+of `output/otr/episodes/*/audio/*_ledger.json` as a hard guarantee.
+Live evidence (writers'-room run pending_20260527_203427): Director got
+cast=0 / news_seed=0 chars despite the ledger on disk having
+cast=['ANNOUNCER','JOHN BEESLY','MINA TANAKA'] -- the singleton
+lookup silently bailed and there was no second-tier fallback.
+
 When the operator wants to run the writers' room end-to-end WITHOUT
 manually typing cast names or news seeds into the Director / Story
 Room / Extract widgets, this module reads them from the in-flight
@@ -43,22 +52,126 @@ _RESERVED_SPEAKERS: frozenset[str] = frozenset({
 def _load_in_flight_ledger() -> Optional[dict]:
     """Return the parsed in-flight ledger dict, or None on any miss.
 
-    Never raises.
+    Never raises. Logs WARN at every miss so a live operator soak
+    can tell which fallback step bailed out (the production runs
+    on 2026-05-27 found 0/0 cast/seed because the singleton lookup
+    silently returned None and the silent failure looked like the
+    resolver was a no-op).
     """
     try:
         from . import _otr_ledger as _OTRL
-    except ImportError:
+    except ImportError as exc:
+        log.warning(
+            "[WritersRoomResolver] _otr_ledger import failed: %s -- "
+            "cannot auto-resolve from in-flight ledger.", exc,
+        )
         return None
     try:
         led_path = _OTRL.in_flight_ledger_path()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] in_flight_ledger_path() raised "
+            "%s: %s -- cannot auto-resolve.",
+            type(exc).__name__, str(exc)[:200],
+        )
         return None
     if led_path is None:
+        log.warning(
+            "[WritersRoomResolver] in_flight_ledger_path() returned "
+            "None -- no in-flight ledger to read; auto-resolve "
+            "yielding empty defaults.",
+        )
         return None
     try:
-        return _OTRL.load_ledger_safe(led_path)
-    except Exception:  # noqa: BLE001
+        ledger = _OTRL.load_ledger_safe(led_path)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] load_ledger_safe(%s) raised "
+            "%s: %s -- auto-resolve yielding empty defaults.",
+            led_path, type(exc).__name__, str(exc)[:200],
+        )
         return None
+    if ledger is None:
+        log.warning(
+            "[WritersRoomResolver] load_ledger_safe(%s) returned "
+            "None -- auto-resolve yielding empty defaults.",
+            led_path,
+        )
+        return None
+    log.info(
+        "[WritersRoomResolver] loaded in-flight ledger from %s "
+        "(cast=%d lines=%d).",
+        led_path,
+        len(ledger.get("cast") or []),
+        len(ledger.get("lines") or []),
+    )
+    return ledger
+
+
+def _load_latest_ledger_by_mtime() -> Optional[dict]:
+    """Hard-guarantee fallback: walk `output/otr/episodes/*/audio/
+    *_ledger.json` directly and load the newest by mtime.
+
+    Used when `in_flight_ledger_path()` returns None inside the
+    ComfyUI cascade (the writer's singleton may not survive across
+    node executions). PURE stdlib: glob + max + json.load.
+    """
+    try:
+        try:
+            from . import _otr_paths as _P
+        except ImportError:
+            import _otr_paths as _P  # type: ignore
+        episodes_root = _P.otr_episodes_root()
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] hard-fallback: episodes_root "
+            "lookup raised %s: %s -- giving up.",
+            type(exc).__name__, str(exc)[:200],
+        )
+        return None
+    try:
+        candidates = list(
+            episodes_root.glob("*/audio/*_ledger.json")
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] hard-fallback: glob raised %s "
+            "in %s -- giving up.",
+            type(exc).__name__, str(exc)[:200],
+        )
+        return None
+    if not candidates:
+        log.warning(
+            "[WritersRoomResolver] hard-fallback: no ledgers found "
+            "under %s -- giving up.", episodes_root,
+        )
+        return None
+    try:
+        newest = max(candidates, key=lambda p: p.stat().st_mtime)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] hard-fallback: mtime sort raised "
+            "%s -- giving up.", type(exc).__name__,
+        )
+        return None
+    try:
+        import json as _j
+        with open(newest, "r", encoding="utf-8") as fh:
+            ledger = _j.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] hard-fallback: parse failed on "
+            "%s: %s -- giving up.", newest, str(exc)[:200],
+        )
+        return None
+    log.info(
+        "[WritersRoomResolver] hard-fallback loaded ledger from "
+        "%s (cast=%d lines=%d).",
+        newest,
+        len(ledger.get("cast") or []),
+        len(ledger.get("lines") or []),
+    )
+    return ledger
 
 
 def resolve_cast_names(
@@ -92,6 +205,10 @@ def resolve_cast_names(
     ledger = fallback_ledger
     if ledger is None:
         ledger = _load_in_flight_ledger()
+    if ledger is None or not isinstance(ledger, dict) or not ledger:
+        # Singleton was unavailable; try the hard mtime fallback
+        # before giving up.
+        ledger = _load_latest_ledger_by_mtime()
     if not ledger or not isinstance(ledger, dict):
         return []
 
@@ -146,6 +263,8 @@ def resolve_news_seed(
     ledger = fallback_ledger
     if ledger is None:
         ledger = _load_in_flight_ledger()
+    if ledger is None or not isinstance(ledger, dict) or not ledger:
+        ledger = _load_latest_ledger_by_mtime()
     if not ledger or not isinstance(ledger, dict):
         return ""
 
