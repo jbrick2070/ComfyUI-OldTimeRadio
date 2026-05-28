@@ -2678,6 +2678,51 @@ class OTR_LedgerScriptWriter:
             "%d line rows", len(led.data.get("lines", []) or []),
         )
 
+        # --- H.1. Sprint 2.1 (2026-05-28): stamp DramaticState ---------
+        # Cast + ledger lines exist now; the Sprint 1 keystone has
+        # already stamped dialogue_slot_id on voiced lines via
+        # init_lines_from_outline. Build a best-effort DramaticState
+        # from the news brief + cast + voice slot ids and stamp it on
+        # meta["dramatic_state"]. Sprint 4 selector + Sprint 5
+        # constraint checker + the Sprint 4.1 / 5.1 wire-ups read
+        # from here. Wrapped in try/except so any pydantic edge case
+        # logs + skips rather than crashing the writer (Prime
+        # Directive 1: never break audio).
+        try:
+            from ._otr_dramatic_state import (
+                derive_dramatic_state_from_meta as _derive_ds,
+            )
+            _voice_slot_ids: list[str] = [
+                str(ln.get("dialogue_slot_id") or "").strip()
+                for ln in (led.data.get("lines") or [])
+                if str(ln.get("dialogue_slot_id") or "").strip()
+            ]
+            _sb = ""
+            _news = (meta.get("news") or {})
+            if isinstance(_news, dict):
+                _sb = str(_news.get("script_brief") or "")
+            _dramatic_state = _derive_ds(
+                script_brief=_sb,
+                cast_rows=led.data.get("cast") or cast_rows or [],
+                voice_slot_ids=_voice_slot_ids,
+            )
+            meta["dramatic_state"] = _dramatic_state.model_dump()
+            led.save()
+            log.info(
+                "[OTR_LedgerScriptWriter] Sprint 2.1: dramatic_state "
+                "stamped (costly_choice_beat=%s, voice_slots=%d).",
+                _dramatic_state.costly_choice_beat,
+                len(_voice_slot_ids),
+            )
+        except Exception as _exc:  # noqa: BLE001 -- never break audio
+            log.warning(
+                "[OTR_LedgerScriptWriter] Sprint 2.1: dramatic_state "
+                "derivation failed (%s: %s); meta['dramatic_state'] "
+                "left absent. Sprint 4 selector + Sprint 5 constraint "
+                "checker fall back to the no-DramaticState branch.",
+                type(_exc).__name__, str(_exc)[:200],
+            )
+
         # --- H.5. Sprint 5A: continuity ledger -------------------------
         # One structured LLM call that reads the finished outline + the
         # locked cast and extracts the episode's ContinuityState -- the

@@ -40,6 +40,8 @@ from pydantic import BaseModel, Field, model_validator
 
 __all__ = [
     "DramaticState",
+    "derive_dramatic_state_from_meta",
+    "pick_costly_choice_slot",
 ]
 
 
@@ -145,3 +147,141 @@ class DramaticState(BaseModel):
                 f"ones: {self.character_a_wants!r}."
             )
         return self
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2.1 wire-up helpers (2026-05-28)
+# ---------------------------------------------------------------------------
+
+
+_DEFAULT_QUESTION = (
+    "Will the principals make the costly choice before the episode ends?"
+)
+_DEFAULT_A_WANTS = "honor the established commitment, whatever the cost"
+_DEFAULT_B_WANTS = "force a compromise that protects the status quo"
+_DEFAULT_ENDING = (
+    "the situation closes meaningfully different from where it opened"
+)
+
+
+def _first_two_cast_names(cast_rows) -> tuple[str, str]:
+    """Return (A, B) names from the cast roster. Falls back to
+    PROTAGONIST / ANTAGONIST when fewer than two cast rows exist."""
+    names: list[str] = []
+    for row in (cast_rows or []):
+        nm = ""
+        if isinstance(row, dict):
+            nm = str(row.get("name", "") or "").strip()
+        else:
+            nm = str(getattr(row, "name", "") or "").strip()
+        if nm:
+            names.append(nm)
+        if len(names) >= 2:
+            break
+    if not names:
+        return ("PROTAGONIST", "ANTAGONIST")
+    if len(names) == 1:
+        return (names[0], "OPPOSITION")
+    return (names[0], names[1])
+
+
+def pick_costly_choice_slot(voice_slot_ids) -> str:
+    """Pick a costly_choice_beat slot id from a list of voiced slot
+    ids. Heuristic: the LAST voiced beat before the close (i.e.
+    second-to-last if there are >= 4 slots, otherwise the last). The
+    Sprint 4 selector / Sprint 5 constraint checker can override.
+
+    Returns "d001" as a defensive last resort when the list is empty
+    (the DramaticState pattern validator demands a non-empty d-id).
+    """
+    ids = [str(s).strip() for s in (voice_slot_ids or []) if str(s).strip()]
+    if not ids:
+        return "d001"
+    if len(ids) >= 4:
+        return ids[-2]
+    return ids[-1]
+
+
+def _truncate(s: str, n: int) -> str:
+    s = " ".join((s or "").split())
+    if len(s) <= n:
+        return s
+    # Cut at a word boundary near n if possible so the pydantic
+    # constraint passes cleanly without mid-word truncation.
+    cut = s[: n - 1]
+    sp = cut.rfind(" ")
+    if sp > n // 2:
+        return cut[:sp].rstrip()
+    return cut.rstrip()
+
+
+def derive_dramatic_state_from_meta(
+    *,
+    script_brief: str,
+    cast_rows,
+    voice_slot_ids,
+    ending_change: str = "",
+) -> "DramaticState":
+    """Build a best-effort DramaticState from existing producer
+    outputs (news_interpreter brief + locked cast + Stage 1 voice
+    slot ids).
+
+    The Sprint 2.1 wire-up calls this AFTER:
+      * news_interpreter has run (or graceful-degraded -- the helper
+        defaults when script_brief is empty),
+      * the cast has been locked (cast_rows = ledger.data["cast"]),
+      * Stage 1 has stamped slot ids on ledger lines
+        (voice_slot_ids derived from ledger.data["lines"]).
+
+    All fields satisfy the DramaticState schema (the pydantic
+    constructor runs at the end; helper guarantees field lengths +
+    the wants-must-oppose floor). On any pydantic failure the
+    caller should log + skip stamping rather than crashing the
+    writer.
+
+    Tone: this is a STARTING POINT for the structural validators
+    to score against. Sprint 2.1's job is to make the surface
+    populated; later sprints (or operator edits) replace the
+    defaults with LLM-derived strings.
+    """
+    a_name, b_name = _first_two_cast_names(cast_rows)
+    # Question: derive from script_brief when it carries a question
+    # mark; else default.
+    sb = " ".join((script_brief or "").split())
+    if "?" in sb:
+        # Take the first sentence with a question mark.
+        for chunk in sb.split("?"):
+            candidate = (chunk.strip() + "?").strip()
+            if 10 <= len(candidate) <= 240:
+                question = candidate
+                break
+        else:
+            question = _truncate(_DEFAULT_QUESTION, 240)
+    elif sb:
+        # No question mark; convert the brief into a question template.
+        snip = _truncate(sb, 200)
+        question = f"How does this resolve: {snip}?"
+        question = _truncate(question, 240)
+    else:
+        question = _DEFAULT_QUESTION
+
+    # Wants: defaults that name the cast so they are non-trivially
+    # distinct (satisfies the wants-must-oppose validator).
+    a_wants = _truncate(f"{a_name}: {_DEFAULT_A_WANTS}", 120)
+    b_wants = _truncate(f"{b_name}: {_DEFAULT_B_WANTS}", 120)
+
+    # Costly choice slot: heuristic on voice slot ids.
+    cc_slot = pick_costly_choice_slot(voice_slot_ids)
+
+    # Ending change: use caller-supplied when present; else default.
+    ec = _truncate(ending_change.strip(), 200) if ending_change else ""
+    if not ec:
+        ec = _truncate(_DEFAULT_ENDING, 200)
+
+    return DramaticState(
+        dramatic_question=question,
+        character_a_wants=a_wants,
+        character_b_wants=b_wants,
+        costly_choice_beat=cc_slot,
+        ending_change=ec,
+    )
