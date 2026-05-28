@@ -325,6 +325,52 @@ def resolve_cast_names(
     return out
 
 
+def _extract_seed_from_ledger_with_source(
+    ledger: dict,
+) -> tuple[str, str]:
+    """Like `_extract_seed_from_ledger` but also returns a source
+    tag for log diagnostics.
+
+    Source tags:
+      'llm_briefs'        -- meta.news (script_brief + scene_atmosphere)
+      'raw_news_seed'     -- meta.news_seed (NewsFetcher raw RSS)
+      ''                  -- nothing found
+    """
+    if not isinstance(ledger, dict):
+        return ("", "")
+    meta = ledger.get("meta") or {}
+
+    briefs = meta.get("news") or {}
+    if isinstance(briefs, dict):
+        script_brief = str(briefs.get("script_brief") or "").strip()
+        scene_atmosphere = str(
+            briefs.get("scene_atmosphere") or "",
+        ).strip()
+        if script_brief and scene_atmosphere:
+            return (f"{script_brief}\n\n{scene_atmosphere}", "llm_briefs")
+        if script_brief:
+            return (script_brief, "llm_briefs")
+        if scene_atmosphere:
+            return (scene_atmosphere, "llm_briefs")
+
+    seed = meta.get("news_seed")
+    if isinstance(seed, dict):
+        headline = str(seed.get("headline") or "").strip()
+        body = str(
+            seed.get("body") or seed.get("source") or "",
+        ).strip()
+        if headline and body:
+            return (f"{headline}\n\n{body}", "raw_news_seed")
+        if headline:
+            return (headline, "raw_news_seed")
+        if body:
+            return (body, "raw_news_seed")
+    elif isinstance(seed, str) and seed.strip():
+        return (seed.strip(), "raw_news_seed")
+
+    return ("", "")
+
+
 def _extract_seed_from_ledger(ledger: dict) -> str:
     """Pull a usable news-seed string from the writer's ledger.
 
@@ -410,11 +456,18 @@ def resolve_news_seed(
         ledger = _load_latest_ledger_by_mtime()
 
     # Try the in-flight / latest ledger first.
-    resolved = _extract_seed_from_ledger(ledger or {})
+    resolved, source = _extract_seed_from_ledger_with_source(
+        ledger or {},
+    )
     if resolved:
+        # BUG-295: log differentiates LLM briefs vs raw RSS so the
+        # operator can tell at a glance which path fired.
         log.info(
-            "[WritersRoomResolver] resolved news_seed from in-flight "
-            "ledger (widget was empty; %d chars).",
+            "[WritersRoomResolver] resolved from %s "
+            "(in-flight ledger; widget was empty; %d chars).",
+            "LLM briefs (script_brief + scene_atmosphere)"
+            if source == "llm_briefs" else
+            "raw news_seed (RSS pick)",
             len(resolved),
         )
         return resolved
@@ -429,12 +482,17 @@ def resolve_news_seed(
     # typically does.
     older_ledger = _find_latest_ledger_with_news_seed()
     if older_ledger is not None:
-        resolved = _extract_seed_from_ledger(older_ledger)
+        resolved, source = _extract_seed_from_ledger_with_source(
+            older_ledger,
+        )
         if resolved:
             log.info(
                 "[WritersRoomResolver] BUG-LOCAL-294 cross-ledger "
-                "walker resolved news_seed (widget was empty; "
+                "walker resolved from %s (widget was empty; "
                 "%d chars).",
+                "LLM briefs (script_brief + scene_atmosphere)"
+                if source == "llm_briefs" else
+                "raw news_seed (RSS pick)",
                 len(resolved),
             )
             return resolved
