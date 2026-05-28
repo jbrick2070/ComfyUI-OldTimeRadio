@@ -2980,6 +2980,40 @@ class OTR_LedgerScriptWriter:
                 if is_announcer
                 else voice_card_by_name.get(beat.speaker, beat.speaker)
             )
+            # Sprint 3.1 (2026-05-28) -- DRAMATIC FRAME wiring.
+            # Threads dramatic_question from meta["dramatic_state"]
+            # (Sprint 2.1 stamp) and next_turn from the next voiced
+            # outline beat's intent. The other Sprint 3 fields
+            # (beat_objective / beat_obstacle / beat_turn /
+            # beat_subtext / beat_tension) stay empty for Path A
+            # since _otr_outline.Beat does not carry the Sprint 2
+            # typed-state fields; they activate when a future sprint
+            # lifts Path A's outline schema to mirror Stage1Beat.
+            # All fields default empty in LineRequest, so this is
+            # additive -- legacy callers with no DramaticState see
+            # the pre-Sprint-3 prompt byte-identical.
+            _ds_meta = meta.get("dramatic_state") or {}
+            _dramatic_question = (
+                str(_ds_meta.get("dramatic_question") or "").strip()
+                if isinstance(_ds_meta, dict) else ""
+            )
+            _next_turn_text = ""
+            try:
+                _voiced_beats = [
+                    b for b in (getattr(outline, "beats", []) or [])
+                    if getattr(b, "speaker_role", "") in (
+                        "character", "announcer",
+                    )
+                ]
+                _voiced_ids = [b.beat_id for b in _voiced_beats]
+                _here = _voiced_ids.index(beat.beat_id) if beat.beat_id in _voiced_ids else -1
+                if 0 <= _here < len(_voiced_beats) - 1:
+                    _next_turn_text = (
+                        getattr(_voiced_beats[_here + 1], "intent", "") or ""
+                    ).strip()
+            except Exception:  # noqa: BLE001 -- never break audio
+                _next_turn_text = ""
+
             return _OTRLC.LineRequest(
                 speaker=speaker,
                 intent=beat.intent,
@@ -3014,6 +3048,9 @@ class OTR_LedgerScriptWriter:
                     speaker,
                     beat_index_by_id.get(beat.beat_id, 0),
                 ),
+                # Sprint 3.1 (2026-05-28) -- DRAMATIC FRAME fields.
+                dramatic_question=_dramatic_question,
+                next_turn=_next_turn_text,
             )
 
         # Sprint 10B Wave 0 (2026-05-27): hoist the Stage1Plan build
