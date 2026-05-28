@@ -34,9 +34,13 @@ Output (1 slot): `script_json` passthrough so downstream wiring
 (the existing writer -> freeze cascade STRING link) doesn't need
 to change.
 
-PD1: never raises. Any failure logs a warning, stamps a marker on
-meta, and the writer's `script_json` passes through unchanged --
-the legacy lines stay in the ledger and the cascade renders them.
+PD1: when commit=False the node never raises -- it passes the
+writer's `script_json` through unchanged (legacy lines stay in the
+ledger; byte-identity holds). When commit=True the node FAILS LOUD
+(raises StoryRoomCommitError) on any integrity violation or
+uncommittable extraction (empty / invalid / dormant / failed /
+status != ok / zero rows / slot mismatch), so the graph cannot
+render green while silently shipping legacy audio (QA item C).
 
 PD3: workflow JSON wires this node BETWEEN the writer's
 script_json output and the freeze cascade's script_json input,
@@ -189,6 +193,31 @@ class OTR_StoryRoomCommit:
             return None
         return data
 
+    def _extraction_block_reason(self, payload_json: str) -> str:
+        """Classify WHY _parse_extraction rejected the payload, for the
+        commit=True hard-fail message (QA item C). Read-only; mirrors
+        the reject ladder in _parse_extraction so the operator sees the
+        exact cause on the red graph.
+        """
+        text = (payload_json or "").strip()
+        if not text:
+            return "empty"
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return "invalid_json"
+        if not isinstance(data, dict):
+            return "non_object_root"
+        status = data.get("status")
+        if status in ("dormant", "failed"):
+            return "status_" + str(status)
+        if status and status != "ok":
+            return "status_" + str(status)
+        dialogue = data.get("dialogue") or []
+        if not isinstance(dialogue, list) or not dialogue:
+            return "zero_dialogue_rows"
+        return "uncommittable"
+
     def _commit_dialogue(
         self,
         ledger_dict: Dict[str, Any],
@@ -313,7 +342,22 @@ class OTR_StoryRoomCommit:
 
         extraction = self._parse_extraction(story_room_extraction)
         if extraction is None:
-            return (script_json,)
+            # C fix (2026-05-28): commit=True is guaranteed here (the
+            # commit=False pass-through returned above). A None
+            # extraction (empty / invalid JSON / non-object root /
+            # status in {dormant, failed} / status != ok / zero
+            # dialogue rows) means the Story Room path did NOT land.
+            # Fail loud rather than silently shipping legacy audio
+            # under commit=True -- otherwise the graph renders green
+            # while the intended Story Room dialogue never reached the
+            # ledger (false-green, QA review item C).
+            reason = self._extraction_block_reason(story_room_extraction)
+            raise StoryRoomCommitError(
+                "commit=True but the Story Room extraction is not "
+                f"committable (reason={reason}). Refusing to silently "
+                "fall back to legacy lines. Fix the Story Room / Extract "
+                "path or set commit=False."
+            )
 
         # Lazy imports.
         try:

@@ -84,11 +84,17 @@ def _legacy_ledger() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Dormant pass-through
+# commit=False pass-through  /  commit=True fail-loud (QA item C, 2026-05-28)
 # ---------------------------------------------------------------------------
+#
+# QA item C flipped the commit=True behaviour: an uncommittable
+# extraction (empty / malformed / dormant / failed / status!=ok / zero
+# rows) used to pass the legacy script_json through SILENTLY, which let
+# the graph render green while the Story Room dialogue never landed
+# (false-green). commit=True now FAILS LOUD. commit=False is unchanged.
 
 
-class TestDormantPassThrough:
+class TestCommitFalsePassThrough:
     def test_commit_false_returns_input_unchanged(self):
         node = _make_node()
         out = node.run(
@@ -98,53 +104,70 @@ class TestDormantPassThrough:
         )
         assert out == ("legacy script",)
 
-    def test_empty_extraction_passes_through(self):
-        node = _make_node()
-        out = node.run(
-            script_json="legacy",
-            story_room_extraction="",
-            commit=True,
-        )
-        assert out == ("legacy",)
-
-    def test_dormant_status_passes_through(self):
-        node = _make_node()
-        payload = json.dumps({"status": "dormant", "dialogue": []})
-        out = node.run(
-            script_json="legacy",
-            story_room_extraction=payload,
-            commit=True,
-        )
-        assert out == ("legacy",)
-
-    def test_failed_status_passes_through(self):
+    def test_commit_false_passes_through_even_on_failed_status(self):
         node = _make_node()
         payload = json.dumps({"status": "failed", "reason": "test"})
         out = node.run(
             script_json="legacy",
             story_room_extraction=payload,
-            commit=True,
+            commit=False,
         )
         assert out == ("legacy",)
 
-    def test_malformed_json_passes_through(self):
+
+class TestCommitTrueFailsLoud:
+    def test_empty_extraction_raises(self):
         node = _make_node()
-        out = node.run(
-            script_json="legacy",
-            story_room_extraction="not valid json {",
-            commit=True,
-        )
-        assert out == ("legacy",)
+        with pytest.raises(StoryRoomCommitError) as exc:
+            node.run(
+                script_json="legacy",
+                story_room_extraction="",
+                commit=True,
+            )
+        assert "empty" in str(exc.value)
 
-    def test_extraction_with_no_dialogue_passes_through(self):
+    def test_dormant_status_raises(self):
+        node = _make_node()
+        payload = json.dumps({"status": "dormant", "dialogue": []})
+        with pytest.raises(StoryRoomCommitError) as exc:
+            node.run(
+                script_json="legacy",
+                story_room_extraction=payload,
+                commit=True,
+            )
+        assert "status_dormant" in str(exc.value)
+
+    def test_failed_status_raises(self):
+        node = _make_node()
+        payload = json.dumps({"status": "failed", "reason": "test"})
+        with pytest.raises(StoryRoomCommitError) as exc:
+            node.run(
+                script_json="legacy",
+                story_room_extraction=payload,
+                commit=True,
+            )
+        assert "status_failed" in str(exc.value)
+
+    def test_malformed_json_raises(self):
+        node = _make_node()
+        with pytest.raises(StoryRoomCommitError) as exc:
+            node.run(
+                script_json="legacy",
+                story_room_extraction="not valid json {",
+                commit=True,
+            )
+        assert "invalid_json" in str(exc.value)
+
+    def test_extraction_with_no_dialogue_raises(self):
         node = _make_node()
         payload = json.dumps({"status": "ok", "dialogue": []})
-        out = node.run(
-            script_json="legacy",
-            story_room_extraction=payload,
-            commit=True,
-        )
-        assert out == ("legacy",)
+        with pytest.raises(StoryRoomCommitError) as exc:
+            node.run(
+                script_json="legacy",
+                story_room_extraction=payload,
+                commit=True,
+            )
+        assert "zero_dialogue_rows" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
