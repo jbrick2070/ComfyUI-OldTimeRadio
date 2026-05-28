@@ -59,7 +59,20 @@ from typing import Any, Dict, List, Optional
 log = logging.getLogger("OTR")
 
 
-__all__ = ["OTR_StoryRoomCommit"]
+__all__ = ["OTR_StoryRoomCommit", "StoryRoomCommitError"]
+
+
+class StoryRoomCommitError(RuntimeError):
+    """Sprint 1 keystone (2026-05-28).
+
+    Raised when the slot-id join cannot land cleanly -- count
+    mismatch, order mismatch, empty text on a voiced slot, or
+    pre-Sprint-1 ledger that lacks `dialogue_slot_id` on its lines.
+    The node turns the ComfyUI graph red rather than silently falling
+    back to legacy compose output. Plan principle: integrity over
+    recovery; every prompt improvement is fake progress until the
+    Story Room draft demonstrably lands on every voiced row.
+    """
 
 
 class OTR_StoryRoomCommit:
@@ -181,66 +194,107 @@ class OTR_StoryRoomCommit:
         ledger_dict: Dict[str, Any],
         dialogue_rows: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        """Walk dialogue rows and overwrite ledger.lines[*].text by
-        beat_id match. Returns a per-row audit dict.
+        """Sprint 1 keystone (2026-05-28). Walk dialogue rows keyed by
+        `dialogue_slot_id` and overwrite the matching ledger line's
+        text. Fail loud on any integrity violation.
+
+        Failure modes that raise StoryRoomCommitError (no silent
+        fallback to legacy lines, no silent skip):
+          * The ledger lines lack `dialogue_slot_id` entirely
+            (pre-Sprint-1 ledger; operator must regenerate Stage 1).
+          * Draft row count != voice slot count.
+          * Draft slot id sequence != voice slot id sequence.
+          * Any draft row carries empty text on a voiced slot.
+
+        Returns the proof block stamped on
+        `meta.story_room_commit`:
+          {commit_mode, draft_rows, voice_slots, rows_committed,
+           rows_skipped (always 0 on success), fallback_to_legacy
+           (always False), committed_slot_ids}.
 
         PURE on the ledger_dict (mutates in place); the caller is
         responsible for saving.
         """
         lines = ledger_dict.get("lines") or []
-        # Index lines by beat_id for O(1) lookup.
-        idx: Dict[str, Dict[str, Any]] = {}
-        for ln in lines:
-            bid = str(ln.get("beat_id") or "").strip()
-            if bid:
-                idx[bid] = ln
+        voice_lines = [
+            ln for ln in lines
+            if str(ln.get("dialogue_slot_id") or "").strip()
+        ]
+        voice_slot_ids = [
+            str(ln.get("dialogue_slot_id") or "").strip()
+            for ln in voice_lines
+        ]
+        if not voice_slot_ids:
+            raise StoryRoomCommitError(
+                "no ledger lines carry `dialogue_slot_id` -- ledger "
+                "pre-dates Sprint 1 keystone. Regenerate the outline "
+                "so init_lines_from_outline stamps slot ids before "
+                "committing Story Room dialogue."
+            )
 
-        attempted = 0
-        committed_ids: List[str] = []
-        skipped: List[Dict[str, str]] = []
-
+        draft_slot_ids: List[str] = []
         for row in dialogue_rows:
             if not isinstance(row, dict):
-                continue
-            attempted += 1
-            bid = str(row.get("beat_id") or "").strip()
+                raise StoryRoomCommitError(
+                    f"dialogue row is not a dict: {type(row).__name__}"
+                )
+            sid = str(row.get("dialogue_slot_id") or "").strip()
+            if not sid:
+                raise StoryRoomCommitError(
+                    "draft row missing dialogue_slot_id "
+                    f"(row keys: {sorted(row.keys())[:8]}). The narrow "
+                    "extract_dialogue_only path emits one per row; "
+                    "verify OTR_StoryRoomExtract is on the narrow path."
+                )
+            draft_slot_ids.append(sid)
+
+        if len(draft_slot_ids) != len(voice_slot_ids):
+            raise StoryRoomCommitError(
+                f"slot count mismatch: draft={len(draft_slot_ids)} "
+                f"voice={len(voice_slot_ids)}. The narrow Extract "
+                "path is supposed to emit exactly one row per voiced "
+                "slot. Operator: inspect the Extract attempt logs."
+            )
+        if draft_slot_ids != voice_slot_ids:
+            head_draft = ", ".join(draft_slot_ids[:8])
+            head_voice = ", ".join(voice_slot_ids[:8])
+            raise StoryRoomCommitError(
+                f"slot order mismatch: draft=[{head_draft}...] "
+                f"voice=[{head_voice}...]. Slot ids must align "
+                "position-by-position; the Extract LLM reordered "
+                "rows or hallucinated a slot id."
+            )
+
+        idx = {sid: ln for sid, ln in zip(voice_slot_ids, voice_lines)}
+        committed: List[str] = []
+        for row in dialogue_rows:
+            sid = str(row["dialogue_slot_id"]).strip()
             text = str(row.get("text") or "").strip()
-            if not bid:
-                skipped.append({
-                    "row": json.dumps(row)[:120],
-                    "reason": "missing beat_id",
-                })
-                continue
             if not text:
-                skipped.append({
-                    "beat_id": bid,
-                    "reason": "empty text",
-                })
-                continue
-            target_line = idx.get(bid)
-            if target_line is None:
-                skipped.append({
-                    "beat_id": bid,
-                    "reason": "no matching line in legacy ledger",
-                })
-                continue
-            target_line["text"] = text
-            target_line["char_count"] = len(text)
+                raise StoryRoomCommitError(
+                    f"empty text for slot {sid}; fail loud rather "
+                    "than write an empty ledger line."
+                )
+            target = idx[sid]
+            target["text"] = text
+            target["char_count"] = len(text)
             # Match the writer's word count convention: tokenize
             # on letters + apostrophes (mirrors
             # `production_ledger._word_count`).
             import re as _re
-            target_line["word_count"] = len(_re.findall(
+            target["word_count"] = len(_re.findall(
                 r"[A-Za-z][A-Za-z0-9'\-]*", text,
             ))
-            committed_ids.append(bid)
+            committed.append(sid)
 
         return {
-            "rows_attempted": attempted,
-            "rows_committed": len(committed_ids),
-            "rows_skipped": len(skipped),
-            "committed_beat_ids": committed_ids,
-            "skipped": skipped,
+            "commit_mode": "dialogue_slot_order",
+            "draft_rows": len(draft_slot_ids),
+            "voice_slots": len(voice_slot_ids),
+            "rows_committed": len(committed),
+            "rows_skipped": 0,
+            "fallback_to_legacy": False,
+            "committed_slot_ids": committed,
         }
 
     def run(
@@ -287,9 +341,37 @@ class OTR_StoryRoomCommit:
             )
             return (script_json,)
 
+        # Sprint 1 keystone (2026-05-28): StoryRoomCommitError is the
+        # red-graph signal. The plan's commit gate ("5/5 episodes prove
+        # full commit") relies on operators seeing the failure rather
+        # than silently shipping legacy compose output. Any non-commit
+        # exception (e.g. unrelated bug) still falls through the broad
+        # except and pass-throughs, preserving the pre-Sprint-1 PD1
+        # contract for legacy code paths.
+        dialogue_rows = extraction.get("dialogue") or []
         try:
-            dialogue_rows = extraction.get("dialogue") or []
             audit = self._commit_dialogue(ledger, dialogue_rows)
+        except StoryRoomCommitError as exc:
+            meta = ledger.setdefault("meta", {})
+            meta["story_room_commit"] = {
+                "enabled": True,
+                "committed": False,
+                "commit_mode": "dialogue_slot_order",
+                "rows_committed": 0,
+                "rows_skipped": len(dialogue_rows),
+                "fallback_to_legacy": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            try:
+                _OTRL.save_ledger_safe(led_path, ledger)
+            except Exception:  # noqa: BLE001
+                pass
+            log.error(
+                "[OTR_StoryRoomCommit] StoryRoomCommitError -- HALTING "
+                "(no silent fallback to legacy lines): %s",
+                exc,
+            )
+            raise
         except Exception as exc:  # noqa: BLE001 -- defensive
             log.warning(
                 "[OTR_StoryRoomCommit] commit raised %s: %s -- "
@@ -301,6 +383,7 @@ class OTR_StoryRoomCommit:
         # Stamp meta with the audit trail.
         meta = ledger.setdefault("meta", {})
         meta["story_room_commit"] = {
+            "enabled": True,
             "committed": True,
             "premise": (extraction.get("premise") or "")[:300],
             **audit,
@@ -335,12 +418,13 @@ class OTR_StoryRoomCommit:
             return (script_json,)
 
         log.info(
-            "[OTR_StoryRoomCommit] BUG-WAVE3 commit: rewrote %d/%d "
-            "line(s) from Story Room extraction (skipped=%d). "
-            "Ledger saved to %s.",
+            "[OTR_StoryRoomCommit] Sprint 1 commit: rewrote %d/%d "
+            "voiced line(s) by dialogue_slot_id (skipped=%d, "
+            "fallback_to_legacy=%s). Ledger saved to %s.",
             audit["rows_committed"],
-            audit["rows_attempted"],
+            audit["voice_slots"],
             audit["rows_skipped"],
+            audit["fallback_to_legacy"],
             led_path,
         )
         return (script_json,)

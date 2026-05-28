@@ -60,6 +60,11 @@ __all__ = [
     "ExtractionCallFailedError",
     "build_extract_prompt",
     "extract_from_transcript",
+    # Sprint 1 (2026-05-28) -- narrow dialogue-only Extract path.
+    "DialogueOnlyRow",
+    "DialogueOnlySchema",
+    "build_dialogue_only_prompt",
+    "extract_dialogue_only",
 ]
 
 
@@ -155,6 +160,10 @@ class _DialogueRow(BaseModel):
 
     `beat_id` is the bridge to the ledger row -- Wave 3 passes it
     into `Ledger.update_line_text(beat_id, text)` verbatim.
+
+    Sprint 1 keystone (2026-05-28): adds optional `dialogue_slot_id`
+    so the legacy full-schema Extract path stays compatible while
+    the new narrow `extract_dialogue_only` path becomes canonical.
     """
 
     beat_id: str = Field(
@@ -184,6 +193,17 @@ class _DialogueRow(BaseModel):
             "no stage directions embedded in brackets. ANNOUNCER lines "
             "may carry up to ~80 words; character lines target the "
             "Stage1Beat.length_target_words band."
+        ),
+    )
+    dialogue_slot_id: Optional[str] = Field(
+        default=None,
+        pattern=r"^d\d{3}$",
+        description=(
+            "Sprint 1 keystone (2026-05-28). Voiced-slot id "
+            "(d001..dNNN) matching the corresponding ledger line. "
+            "Optional on this legacy schema for back-compat with "
+            "pre-Sprint-1 transcripts; required on `DialogueOnlyRow` "
+            "where OTR_StoryRoomCommit joins on it."
         ),
     )
 
@@ -490,6 +510,11 @@ def _schema_to_extraction(
             "beat_id": row.beat_id,
             "speaker": row.speaker,
             "text": row.text,
+            # Sprint 1 keystone (2026-05-28): forward dialogue_slot_id
+            # when the row carries one. Legacy transcripts may emit
+            # None; OTR_StoryRoomCommit treats None as a hard fail
+            # under the new slot-join contract.
+            "dialogue_slot_id": row.dialogue_slot_id,
         }
         for row in schema.dialogue
     ]
@@ -610,5 +635,294 @@ def extract_from_transcript(
             len(extraction.audio_cues),
         )
         return extraction
+
+    raise ExtractionCallFailedError(attempts=attempts, last_error=last_error)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 1 keystone (2026-05-28) -- narrow dialogue-only Extract path
+# ---------------------------------------------------------------------------
+#
+# Live observation 2026-05-27 (run pending_20260527_223452):
+# OTR_StoryRoomExtract attempt 1/2 at temp=0.20 was taking 5+ minutes
+# per attempt under the full StoryRoomExtractionSchema (cast + beats +
+# dialogue + audio_cues + running_facts + arc + premise = ~3000-4000
+# tokens of constrained JSON, Mistral-Nemo 12B NF4 ~10-15 tok/sec).
+#
+# Root cause: Extract was re-extracting structure Stage 1 already
+# produced. The Stage 1 plan + cast contract on the in-flight ledger
+# already carries cast / beats / arc / premise / running_facts. The
+# only genuinely new content from the Story Room transcript is the
+# dialogue lines.
+#
+# Fix: extract_dialogue_only emits ONLY the dialogue array keyed by
+# dialogue_slot_id. Output drops from ~3000-4000 tokens to ~500-800.
+# Per-attempt time drops from 5+ min to 30-60 sec on the same model.
+#
+# The full StoryRoomExtraction is reassembled IN THE NODE
+# (OTR_StoryRoomExtract.run) from the in-flight ledger plus this
+# narrow dialogue list. OTR_StoryRoomCommit joins by dialogue_slot_id
+# and raises StoryRoomCommitError on count or order mismatch.
+# ---------------------------------------------------------------------------
+
+
+class DialogueOnlyRow(BaseModel):
+    """One dialogue row for the narrow Extract path.
+
+    Schema is intentionally minimal -- the LLM is told exactly which
+    slot ids must appear (and how many) in the prompt; the
+    constrained-decode parser only has to validate shape, not invent
+    slot ids.
+    """
+
+    dialogue_slot_id: str = Field(
+        ...,
+        pattern=r"^d\d{3}$",
+        description=(
+            "Voiced-slot id from the in-flight ledger lines "
+            "(d001..dNNN). Required: OTR_StoryRoomCommit joins on it."
+        ),
+    )
+    speaker: str = Field(
+        ...,
+        min_length=1,
+        max_length=40,
+        description=(
+            "Cast name (matches a Director-locked cast member) OR "
+            "the literal 'ANNOUNCER' for the open/close bookends. "
+            "Case-sensitive; the prompt instructs verbatim copy from "
+            "the Writer's draft."
+        ),
+    )
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description=(
+            "The rendered line as plain prose (no JSON, no markdown, "
+            "no bracketed stage directions). Transcribe verbatim "
+            "from the Writer's draft for the named slot."
+        ),
+    )
+
+
+class DialogueOnlySchema(BaseModel):
+    """Constrained-decode binding for extract_dialogue_only.
+
+    The schema carries one field -- `dialogue` -- so the LLM cannot
+    spend output budget re-emitting structure the in-flight ledger
+    already owns. Row-count bounds match the full schema bounds.
+    """
+
+    dialogue: List[DialogueOnlyRow] = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description=(
+            "One row per voiced slot id supplied in the prompt, in "
+            "the order supplied. Row count MUST equal "
+            "len(voice_slot_ids). The consumer "
+            "(OTR_StoryRoomCommit) raises StoryRoomCommitError on "
+            "mismatch."
+        ),
+    )
+
+
+_DIALOGUE_ONLY_MAX_NEW_TOKENS: int = 4096
+"""Sprint 1 (2026-05-28): cap drops from 16384 (full schema, BUG-293)
+to 4096 since the narrow schema's expected output is ~500-800 tokens
+even at 30 voiced slots. 4096 gives 4x headroom on the canonical 18-
+line episode and stays well below the model's context budget."""
+
+_DIALOGUE_ONLY_SYSTEM_PROMPT = """\
+You are a TRANSCRIBER. The episode has already been written by the
+Writer; the Stage 1 plan already named every voiced slot. Your only
+job is to copy the Writer's lines into a structured JSON object,
+one row per voiced slot, in the order the slots are listed below.
+
+RULES:
+- Emit EXACTLY one dialogue row per slot id in the supplied order.
+  If the prompt lists 18 slot ids, emit exactly 18 rows.
+- dialogue_slot_id MUST be one of the listed ids; do NOT invent or
+  reorder slot ids.
+- speaker is a cast name from the locked roster OR the literal
+  "ANNOUNCER" for bookend slots. Case-sensitive verbatim copy.
+- text is the rendered line as plain prose, copied verbatim from
+  the Writer's draft for that slot. No markdown, no bracketed stage
+  directions, no JSON inside text.
+- Output a SINGLE JSON object: {"dialogue": [<row>, <row>, ...]}.
+  No prose preamble, no Markdown fences.
+"""
+
+
+def _format_slot_id_block(voice_slot_ids: List[str]) -> str:
+    """Render the slot id list for the prompt."""
+    rows = [str(s).strip() for s in (voice_slot_ids or []) if str(s).strip()]
+    if not rows:
+        return "(no voiced slot ids supplied -- nothing to extract)"
+    return "\n".join(f"- {sid}" for sid in rows)
+
+
+def build_dialogue_only_prompt(
+    transcript_payload: Dict[str, Any],
+    *,
+    voice_slot_ids: List[str],
+    cast_names: Optional[List[str]] = None,
+    news_seed: str = "",
+) -> List[dict]:
+    """Build the [system, user] messages for the narrow Extract call.
+
+    The voice_slot_ids list pins both the row count and the slot ids
+    the LLM must emit. The Writer's draft is the source of truth for
+    speaker and text; the slot id list is the source of truth for
+    sequencing.
+    """
+    draft = ""
+    if isinstance(transcript_payload, dict):
+        draft = str(transcript_payload.get("final_draft") or "").strip()
+    draft_block = draft if draft else "(empty draft -- nothing to extract)"
+    cast_block = _format_cast_hint(cast_names or [])
+    seed = (news_seed or "").strip() or "(no news seed supplied)"
+    slot_block = _format_slot_id_block(voice_slot_ids)
+    n = len(voice_slot_ids or [])
+
+    user = (
+        "NEWS SEED (context only):\n"
+        f"{seed}\n\n"
+        "CANONICAL CAST NAMES (use these verbatim if they appear in "
+        "the draft):\n"
+        f"{cast_block}\n\n"
+        f"VOICED SLOT IDS ({n} slots, emit one row per slot in this "
+        "order):\n"
+        f"{slot_block}\n\n"
+        "WRITER'S FINAL DRAFT (the source of truth for speaker + text):\n"
+        "--- begin draft ---\n"
+        f"{draft_block}\n"
+        "--- end draft ---\n\n"
+        f"Transcribe the draft now. Emit exactly {n} dialogue rows, "
+        "one per slot id above, in the supplied order. Output one "
+        'JSON object: {"dialogue": [<row>, <row>, ...]}.'
+    )
+    return [
+        {"role": "system", "content": _DIALOGUE_ONLY_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+
+
+def _parse_dialogue_only(raw: str) -> DialogueOnlySchema:
+    """Parse `raw` as JSON and validate against DialogueOnlySchema."""
+    payload = json.loads(raw or "")
+    return DialogueOnlySchema.model_validate(payload)
+
+
+def extract_dialogue_only(
+    transcript_payload: Dict[str, Any],
+    *,
+    generate_fn: Callable[..., str],
+    voice_slot_ids: List[str],
+    cast_names: Optional[List[str]] = None,
+    news_seed: str = "",
+    max_attempts: int = 2,
+) -> List[Dict[str, Any]]:
+    """Run the narrow Extract pass; return a list of dialogue dicts.
+
+    Args:
+        transcript_payload: dict-shaped StoryRoomTranscript.
+        generate_fn: ConstrainedGenerateFn bound to DialogueOnlySchema
+            (built via
+            _otr_constrained_generate.make_constrained_generate_fn).
+            Signature: (messages, *, temperature, max_new_tokens) -> str.
+        voice_slot_ids: ordered list of d001..dNNN ids from the
+            in-flight ledger lines. Pins row count and order. The
+            consumer treats `len(returned) != len(voice_slot_ids)` as
+            a hard fail (raises StoryRoomCommitError downstream).
+        cast_names: optional Director-locked cast names.
+        news_seed: optional plain prose for context.
+        max_attempts: retry budget (default 2: one base attempt + one
+            structural retry at lower temperature).
+
+    Returns:
+        A list of dicts shaped like StoryRoomExtraction.dialogue
+        rows: {dialogue_slot_id, speaker, text}. Caller reassembles
+        the full StoryRoomExtraction with cast/beats/arc/premise/
+        running_facts read from the in-flight ledger.
+
+    Raises:
+        ExtractionCallFailedError when the retry budget exhausts.
+
+    # LLM slot: technical
+    # Reason: structured constrained-decode pass per project rule 6.
+    """
+    messages = build_dialogue_only_prompt(
+        transcript_payload,
+        voice_slot_ids=voice_slot_ids,
+        cast_names=cast_names,
+        news_seed=news_seed,
+    )
+
+    last_error: Optional[BaseException] = None
+    attempts = 0
+
+    for attempt_idx in range(1, max_attempts + 1):
+        attempts = attempt_idx
+        temperature = (
+            _EXTRACT_BASE_TEMPERATURE
+            if attempt_idx == 1
+            else _EXTRACT_STRUCTURAL_RETRY_TEMPERATURE
+        )
+        log.info(
+            "[OTR_StoryRoomExtract] dialogue-only attempt %d/%d "
+            "(temperature=%.2f, voice_slots=%d, max_new_tokens=%d)",
+            attempt_idx, max_attempts, temperature,
+            len(voice_slot_ids or []),
+            _DIALOGUE_ONLY_MAX_NEW_TOKENS,
+        )
+        try:
+            # LLM slot: technical
+            # Reason: structured constrained-decode extraction against
+            # DialogueOnlySchema. Per project rule 6 structured-JSON
+            # passes route to the writer's `technical_model` slot.
+            raw = generate_fn(
+                messages,
+                temperature=temperature,
+                max_new_tokens=_DIALOGUE_ONLY_MAX_NEW_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+            log.warning(
+                "[OTR_StoryRoomExtract] dialogue-only attempt %d "
+                "generate_fn raised %s: %s",
+                attempt_idx, type(exc).__name__, str(exc)[:200],
+            )
+            last_error = exc
+            continue
+
+        try:
+            schema = _parse_dialogue_only(raw)
+        except (json.JSONDecodeError, ValidationError) as exc:
+            log.warning(
+                "[OTR_StoryRoomExtract] dialogue-only attempt %d "
+                "parse/validate failed: %s",
+                attempt_idx, str(exc)[:200],
+            )
+            last_error = exc
+            continue
+
+        rows: List[Dict[str, Any]] = [
+            {
+                "dialogue_slot_id": row.dialogue_slot_id,
+                "speaker": row.speaker,
+                "text": row.text,
+                # Legacy `beat_id` kept None on this path -- the
+                # consumer joins by slot id, not by beat_id.
+                "beat_id": None,
+            }
+            for row in schema.dialogue
+        ]
+        log.info(
+            "[OTR_StoryRoomExtract] dialogue-only success at attempt "
+            "%d (rows=%d, expected=%d).",
+            attempt_idx, len(rows), len(voice_slot_ids or []),
+        )
+        return rows
 
     raise ExtractionCallFailedError(attempts=attempts, last_error=last_error)

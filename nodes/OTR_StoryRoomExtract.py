@@ -227,12 +227,13 @@ class OTR_StoryRoomExtract:
 
         # Lazy imports keep node-load cheap.
         from . import _otr_constrained_generate as _OTRCG
+        from . import _otr_ledger as _OTRL
         from . import _otr_model_inputs as _OTRMI
         from . import _otr_model_loader as _OTRML
         from ._otr_story_room_extract import (
+            DialogueOnlySchema,
             ExtractionCallFailedError,
-            StoryRoomExtractionSchema,
-            extract_from_transcript,
+            extract_dialogue_only,
         )
 
         # PD6: fail loud if the technical_model socket is unwired.
@@ -241,6 +242,44 @@ class OTR_StoryRoomExtract:
             technical_model, slot="technical",
         )
 
+        # Sprint 1 keystone (2026-05-28). Read the voice slot ids
+        # from the in-flight ledger lines -- the ledger is the
+        # source of truth post-init_lines_from_outline. Extract no
+        # longer regenerates cast / beats / arc / premise /
+        # running_facts; the consumer (OTR_StoryRoomCommit) joins
+        # rows by dialogue_slot_id and raises StoryRoomCommitError
+        # on any integrity violation.
+        led_path = _OTRL.in_flight_ledger_path()
+        ledger = (
+            _OTRL.load_ledger_safe(led_path)
+            if led_path is not None else None
+        )
+        if not isinstance(ledger, dict):
+            log.warning(
+                "[OTR_StoryRoomExtract] no in-flight ledger; "
+                "pass-through dormant sentinel."
+            )
+            return (self._build_dormant_payload(
+                "no in-flight ledger to read voice slot ids from"
+            ),)
+        ledger_lines = ledger.get("lines") or []
+        voice_slot_ids: list[str] = [
+            str(ln.get("dialogue_slot_id") or "").strip()
+            for ln in ledger_lines
+            if str(ln.get("dialogue_slot_id") or "").strip()
+        ]
+        if not voice_slot_ids:
+            log.warning(
+                "[OTR_StoryRoomExtract] in-flight ledger lacks "
+                "dialogue_slot_id on its lines (pre-Sprint-1 "
+                "shape). Pass-through dormant sentinel so the "
+                "operator regenerates Stage 1 before committing."
+            )
+            return (self._build_dormant_payload(
+                "ledger lines pre-date Sprint 1; missing "
+                "dialogue_slot_id"
+            ),)
+
         # LLM slot: technical
         # Reason: structured constrained-decode extraction per
         # project rule 6.
@@ -248,7 +287,7 @@ class OTR_StoryRoomExtract:
             "technical", resolved_technical_id,
         )
         generate_fn = _OTRCG.make_constrained_generate_fn(
-            cache_entry, StoryRoomExtractionSchema,
+            cache_entry, DialogueOnlySchema,
         )
 
         # Auto-resolve cast + news_seed from in-flight ledger when
@@ -260,15 +299,16 @@ class OTR_StoryRoomExtract:
         resolved_cast = _resolve_cast(cast_names) or self._parse_cast(cast_names)
         resolved_seed = _resolve_seed(news_seed)
         try:
-            extraction = extract_from_transcript(
+            dialogue_rows = extract_dialogue_only(
                 transcript_payload,
                 generate_fn=generate_fn,
+                voice_slot_ids=voice_slot_ids,
                 cast_names=resolved_cast,
                 news_seed=resolved_seed,
             )
         except ExtractionCallFailedError as exc:
             log.warning(
-                "[OTR_StoryRoomExtract] extract_from_transcript "
+                "[OTR_StoryRoomExtract] extract_dialogue_only "
                 "exhausted retry budget after %d attempt(s); emitting "
                 "failure sentinel (last error: %s).",
                 exc.attempts, exc.last_error,
@@ -293,6 +333,30 @@ class OTR_StoryRoomExtract:
             }
             return (json.dumps(payload, ensure_ascii=False, indent=2),)
 
-        payload = extraction.to_dict()
-        payload["status"] = "ok"
+        # Reassemble the StoryRoomExtraction-shaped payload from the
+        # in-flight ledger (cast / beats / running_facts / premise)
+        # plus the LLM-extracted dialogue rows. Downstream consumers
+        # see the same shape they always have; only the LLM's job
+        # got narrower.
+        meta = ledger.get("meta") or {}
+        cast_rows = ledger.get("cast") or []
+        beat_rows = ledger.get("beats") or []
+        running_facts = (
+            meta.get("running_facts")
+            or (ledger.get("running_facts") or [])
+        )
+        premise_str = (
+            (meta.get("news") or {}).get("script_brief")
+            if isinstance(meta.get("news"), dict) else None
+        ) or meta.get("episode_title") or ""
+        payload = {
+            "status": "ok",
+            "cast": list(cast_rows),
+            "beats": list(beat_rows),
+            "dialogue": dialogue_rows,
+            "audio_cues": [],
+            "running_facts": list(running_facts),
+            "arc": meta.get("arc"),
+            "premise": str(premise_str or ""),
+        }
         return (json.dumps(payload, ensure_ascii=False, indent=2),)

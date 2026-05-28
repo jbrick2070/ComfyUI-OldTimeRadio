@@ -259,13 +259,23 @@ def test_extract_from_transcript_happy_path():
 
 
 def test_extract_dialogue_keys_match_section_3_4():
-    """dialogue rows MUST carry {beat_id, speaker, text}."""
+    """dialogue rows MUST carry {beat_id, speaker, text,
+    dialogue_slot_id}.
+
+    Sprint 1 keystone (2026-05-28): the legacy full-schema dialogue
+    row gained an optional `dialogue_slot_id` field. The narrow
+    extract_dialogue_only path emits required slot ids; this legacy
+    path leaves the field None when the LLM doesn't supply one
+    (back-compat for pre-Sprint-1 transcripts).
+    """
     gen = make_generate_stub([_good_extraction_payload()])
     extraction = ext_mod.extract_from_transcript(
         _transcript_payload(), generate_fn=gen,
     )
     for row in extraction.dialogue:
-        assert set(row.keys()) == {"beat_id", "speaker", "text"}, (
+        assert set(row.keys()) == {
+            "beat_id", "speaker", "text", "dialogue_slot_id",
+        }, (
             f"Section 3.4 contract drift: {row.keys()}"
         )
 

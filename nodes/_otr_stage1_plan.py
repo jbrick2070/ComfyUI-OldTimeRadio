@@ -192,6 +192,22 @@ class Stage1Beat(BaseModel):
         default=None,
         description="Optional beat_id (bNNN) of an earlier beat this one calls back to. Used for continuity threading; Stage 3 continuity validator confirms the referenced beat exists in this plan.",
     )
+    dialogue_slot_id: Optional[str] = Field(
+        default=None,
+        pattern=r"^d\d{3}$",
+        description=(
+            "Sprint 1 keystone (2026-05-28). Sequence id for voiced "
+            "beats only (d001, d002, ...), stamped post-parse by "
+            "`stamp_dialogue_slot_ids`. None on non-voiced beats "
+            "(speaker == 'MUSIC' for music_inter slots). For "
+            "Stage1Beat the voiced predicate is `speaker != 'MUSIC'` "
+            "-- both cast-name speakers and the literal 'ANNOUNCER' "
+            "bookend get a slot id. Mirrors the field on the Path A "
+            "`_otr_outline.Beat` so OTR_StoryRoomCommit can join "
+            "Story Room dialogue rows to ledger lines by slot id "
+            "rather than by raw beat_id."
+        ),
+    )
 
     @field_validator("callback_to", mode="before")
     @classmethod
@@ -400,6 +416,35 @@ def validate_plan_semantics(plan: Stage1Plan) -> None:
         seen_so_far.add(b.beat_id)
 
 
+def stamp_dialogue_slot_ids(plan: Stage1Plan) -> Stage1Plan:
+    """Stamp d001..dNNN on voiced beats in declaration order.
+
+    Sprint 1 keystone (2026-05-28). Voiced determination on Stage1Beat
+    is `speaker != "MUSIC"` -- cast-name speakers and the literal
+    "ANNOUNCER" bookend both get a slot id; only `speaker == "MUSIC"`
+    (music_inter slot) stays None.
+
+    Mutates beats in place and returns the same plan for chaining.
+    Called by `parse_and_validate_plan` after semantic validation so
+    every parsed plan carries slot ids; safe to call twice (the second
+    pass re-stamps from d001 and converges on identical ids).
+
+    Mirrors `_otr_outline.stamp_dialogue_slot_ids` on the Path A Beat
+    schema. The two stamping rules are intentionally identical in
+    shape (d001..dNNN, voiced declaration order) so an outline and a
+    Stage1Plan generated for the same episode produce aligned slot
+    ids -- the join invariant OTR_StoryRoomCommit relies on.
+    """
+    counter = 1
+    for beat in plan.beats:
+        if beat.speaker != "MUSIC":
+            beat.dialogue_slot_id = f"d{counter:03d}"
+            counter += 1
+        else:
+            beat.dialogue_slot_id = None
+    return plan
+
+
 def parse_and_validate_plan(plan_dict: dict) -> Stage1Plan:
     """Parse a dict into a Stage1Plan, then run semantic cross-validators.
 
@@ -407,12 +452,18 @@ def parse_and_validate_plan(plan_dict: dict) -> Stage1Plan:
     `Stage1Plan(**plan_dict)` directly so the semantic checks always
     run.
 
+    Sprint 1 (2026-05-28): stamps `dialogue_slot_id` on every voiced
+    beat after semantic validation so downstream consumers
+    (OTR_StoryRoomCommit, the Sprint 4 best-of-N selector) can join
+    by slot id.
+
     Raises:
         pydantic.ValidationError -- on schema-level failure
         ValueError -- on semantic cross-field failure
     """
     plan = Stage1Plan(**plan_dict)
     validate_plan_semantics(plan)
+    stamp_dialogue_slot_ids(plan)
     return plan
 
 

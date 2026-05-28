@@ -1,8 +1,10 @@
 """tests/test_otr_story_room_commit.py -- Wave 3 bridge.
 
 Pin contract: OTR_StoryRoomCommit takes a Story Room extraction
-payload and overwrites ledger.lines[*].text per beat_id when
-commit=True. Defaults dormant; never raises (PD1).
+payload and overwrites ledger.lines[*].text by `dialogue_slot_id`
+match when commit=True. Defaults dormant. Sprint 1 keystone
+(2026-05-28): commit FAILS LOUD on slot-id mismatch (count or order)
+or empty text -- no silent fallback to legacy lines.
 """
 from __future__ import annotations
 
@@ -12,7 +14,10 @@ from unittest.mock import patch
 
 import pytest
 
-from nodes.OTR_StoryRoomCommit import OTR_StoryRoomCommit
+from nodes.OTR_StoryRoomCommit import (
+    OTR_StoryRoomCommit,
+    StoryRoomCommitError,
+)
 
 
 def _make_node():
@@ -22,13 +27,22 @@ def _make_node():
 def _ok_extraction_payload(
     rows=None, premise: str = "test premise",
 ) -> str:
-    """Return a serialized StoryRoomExtraction JSON with status='ok'."""
+    """Return a serialized StoryRoomExtraction JSON with status='ok'.
+
+    Sprint 1 keystone (2026-05-28): rows are keyed by
+    `dialogue_slot_id`, not raw `beat_id`. OTR_StoryRoomCommit joins
+    by slot id and fails loud on mismatch.
+    """
     if rows is None:
         rows = [
-            {"beat_id": "b001", "speaker": "ANNOUNCER", "text": "Open."},
-            {"beat_id": "b002", "speaker": "REN BLACK", "text": "I won't sign."},
-            {"beat_id": "b003", "speaker": "DR MAEVE", "text": "Then we wait."},
-            {"beat_id": "b004", "speaker": "ANNOUNCER", "text": "Good night."},
+            {"dialogue_slot_id": "d001", "speaker": "ANNOUNCER",
+             "text": "Open."},
+            {"dialogue_slot_id": "d002", "speaker": "REN BLACK",
+             "text": "I won't sign."},
+            {"dialogue_slot_id": "d003", "speaker": "DR MAEVE",
+             "text": "Then we wait."},
+            {"dialogue_slot_id": "d004", "speaker": "ANNOUNCER",
+             "text": "Good night."},
         ]
     return json.dumps({
         "status": "ok",
@@ -43,6 +57,7 @@ def _ok_extraction_payload(
 
 
 def _legacy_ledger() -> dict:
+    """Sprint 1 ledger: voiced lines carry dialogue_slot_id."""
     return {
         "episode_id": "ep_test",
         "schema_version": "l3-2026-05-14",
@@ -50,19 +65,19 @@ def _legacy_ledger() -> dict:
             {"line_id": "l001", "beat_id": "b001",
              "speaker_role": "announcer", "char_id": "announcer",
              "text": "Legacy open", "word_count": 2, "char_count": 11,
-             "skip": False},
+             "dialogue_slot_id": "d001", "skip": False},
             {"line_id": "l002", "beat_id": "b002",
              "speaker_role": "character", "char_id": "c01",
              "text": "Legacy line 2", "word_count": 3, "char_count": 13,
-             "skip": False},
+             "dialogue_slot_id": "d002", "skip": False},
             {"line_id": "l003", "beat_id": "b003",
              "speaker_role": "character", "char_id": "c02",
              "text": "Legacy line 3", "word_count": 3, "char_count": 13,
-             "skip": False},
+             "dialogue_slot_id": "d003", "skip": False},
             {"line_id": "l004", "beat_id": "b004",
              "speaker_role": "announcer", "char_id": "announcer",
              "text": "Legacy close", "word_count": 2, "char_count": 12,
-             "skip": False},
+             "dialogue_slot_id": "d004", "skip": False},
         ],
         "meta": {"episode_title": "Test"},
     }
@@ -185,12 +200,18 @@ class TestActiveCommit:
         assert line_by_beat["b001"]["text"] == "Open."
         assert line_by_beat["b004"]["text"] == "Good night."
 
-        # Audit stamp landed.
+        # Sprint 1 audit stamp landed (new commit_mode shape).
         commit_meta = ledger["meta"]["story_room_commit"]
         assert commit_meta["committed"] is True
-        assert commit_meta["rows_attempted"] == 4
+        assert commit_meta["commit_mode"] == "dialogue_slot_order"
+        assert commit_meta["draft_rows"] == 4
+        assert commit_meta["voice_slots"] == 4
         assert commit_meta["rows_committed"] == 4
         assert commit_meta["rows_skipped"] == 0
+        assert commit_meta["fallback_to_legacy"] is False
+        assert commit_meta["committed_slot_ids"] == [
+            "d001", "d002", "d003", "d004",
+        ]
 
         # Totals recomputed.
         expected_total_words = sum(
@@ -198,50 +219,62 @@ class TestActiveCommit:
         )
         assert ledger["total_word_count"] == expected_total_words
 
-    def test_commit_skips_unknown_beat_ids(self, tmp_path):
+    def test_commit_raises_on_unknown_slot_id(self, tmp_path):
+        """Sprint 1: a draft row whose slot_id does not exist on the
+        ledger is a hard fail (StoryRoomCommitError), not a silent
+        skip. The order/count mismatch surfaces immediately."""
         led_path, fake_load, fake_save = self._patch_ledger_io(
             _legacy_ledger(), tmp_path,
         )
         rows = [
-            {"beat_id": "b002", "speaker": "REN", "text": "Refusal."},
-            {"beat_id": "b999", "speaker": "GHOST",
-             "text": "this beat doesn't exist"},
+            {"dialogue_slot_id": "d002", "speaker": "REN",
+             "text": "Refusal."},
+            {"dialogue_slot_id": "d999", "speaker": "GHOST",
+             "text": "this slot does not exist"},
         ]
         node = _make_node()
         with patch("nodes._otr_ledger.in_flight_ledger_path", return_value=led_path), \
              patch("nodes._otr_ledger.load_ledger_safe", side_effect=fake_load), \
              patch("nodes._otr_ledger.save_ledger_safe", side_effect=fake_save):
-            node.run(
-                script_json="x",
-                story_room_extraction=_ok_extraction_payload(rows=rows),
-                commit=True,
-            )
+            with pytest.raises(StoryRoomCommitError):
+                node.run(
+                    script_json="x",
+                    story_room_extraction=_ok_extraction_payload(rows=rows),
+                    commit=True,
+                )
+        # Forensic audit stamp landed (committed=False, error captured).
         ledger = json.loads(led_path.read_text(encoding="utf-8"))
         commit_meta = ledger["meta"]["story_room_commit"]
-        assert commit_meta["rows_attempted"] == 2
-        assert commit_meta["rows_committed"] == 1
-        assert commit_meta["rows_skipped"] == 1
+        assert commit_meta["committed"] is False
+        assert commit_meta["fallback_to_legacy"] is False
+        assert "error" in commit_meta
 
-    def test_commit_skips_empty_text_rows(self, tmp_path):
+    def test_commit_raises_on_empty_text(self, tmp_path):
+        """Sprint 1: empty text on a voiced slot is a hard fail."""
         led_path, fake_load, fake_save = self._patch_ledger_io(
             _legacy_ledger(), tmp_path,
         )
         rows = [
-            {"beat_id": "b002", "speaker": "REN", "text": ""},
+            {"dialogue_slot_id": "d001", "speaker": "ANNOUNCER",
+             "text": "Open."},
+            {"dialogue_slot_id": "d002", "speaker": "REN",
+             "text": ""},
+            {"dialogue_slot_id": "d003", "speaker": "DR MAEVE",
+             "text": "Then we wait."},
+            {"dialogue_slot_id": "d004", "speaker": "ANNOUNCER",
+             "text": "Good night."},
         ]
         node = _make_node()
         with patch("nodes._otr_ledger.in_flight_ledger_path", return_value=led_path), \
              patch("nodes._otr_ledger.load_ledger_safe", side_effect=fake_load), \
              patch("nodes._otr_ledger.save_ledger_safe", side_effect=fake_save):
-            node.run(
-                script_json="x",
-                story_room_extraction=_ok_extraction_payload(rows=rows),
-                commit=True,
-            )
-        ledger = json.loads(led_path.read_text(encoding="utf-8"))
-        # b002 text NOT overwritten.
-        b002 = next(l for l in ledger["lines"] if l["beat_id"] == "b002")
-        assert b002["text"] == "Legacy line 2"
+            with pytest.raises(StoryRoomCommitError) as ctx:
+                node.run(
+                    script_json="x",
+                    story_room_extraction=_ok_extraction_payload(rows=rows),
+                    commit=True,
+                )
+            assert "empty text" in str(ctx.value)
 
 
 # ---------------------------------------------------------------------------

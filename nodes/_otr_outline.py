@@ -54,6 +54,7 @@ __all__ = [
     "generate_outline",
     "OutlineBudgetViolation",
     "validate_outline_against_budget",
+    "stamp_dialogue_slot_ids",  # Sprint 1 keystone (2026-05-28)
 ]
 
 
@@ -141,6 +142,23 @@ class Beat(BaseModel):
             "Original D1 critique reversed on 2026-05-11 after the "
             "reviewer correctly observed that the validator-after-"
             "default path is bounded and converges."
+        ),
+    )
+    dialogue_slot_id: Optional[str] = Field(
+        default=None,
+        pattern=r"^d\d{3}$",
+        description=(
+            "Sprint 1 keystone (2026-05-28). Sequence id for voiced "
+            "beats only (d001, d002, ...), stamped in voiced-beat "
+            "declaration order by `stamp_dialogue_slot_ids` after "
+            "outline assembly. None on non-voiced beats (music_open, "
+            "music_close, music_inter, sfx). Mirrors onto every "
+            "ledger line via production_ledger.init_lines_from_outline "
+            "so OTR_StoryRoomCommit can join StoryRoom dialogue rows "
+            "to ledger lines by slot id rather than by raw beat_id. "
+            "Voiced determination here: speaker_role in {character, "
+            "announcer} -- announcer bookends are voiced (Kokoro "
+            "renders them) and therefore get a slot id."
         ),
     )
 
@@ -1389,6 +1407,41 @@ def _assemble_outline(
         time_of_day=macro.time_of_day,
         beats=beats,
     )
+    stamp_dialogue_slot_ids(outline)
+    return outline
+
+
+# ---------------------------------------------------------------------------
+# Sprint 1 keystone (2026-05-28) -- dialogue_slot_id stamping
+# ---------------------------------------------------------------------------
+
+
+def stamp_dialogue_slot_ids(outline: "Outline") -> "Outline":
+    """Stamp d001..dNNN on voiced beats in declaration order.
+
+    Voiced determination on the Path A `Beat` schema: speaker_role in
+    {"character", "announcer"}. Announcer bookends are voiced (Kokoro
+    renders them) and therefore get a slot id. Non-voiced beats
+    (music_open / music_close / music_inter / sfx) keep
+    `dialogue_slot_id = None`.
+
+    Mutates the outline's beats in place and returns the same Outline
+    for chaining. Safe to call more than once -- the second call
+    re-stamps from d001, so two stamping passes on the same outline
+    converge on identical ids.
+
+    The stamping invariant is what lets `OTR_StoryRoomCommit` join
+    extracted dialogue rows to ledger lines by slot id rather than by
+    raw beat_id. The ledger inherits the slot id via
+    `production_ledger.init_lines_from_outline`.
+    """
+    counter = 1
+    for beat in outline.beats:
+        if beat.speaker_role in ("character", "announcer"):
+            beat.dialogue_slot_id = f"d{counter:03d}"
+            counter += 1
+        else:
+            beat.dialogue_slot_id = None
     return outline
 
 

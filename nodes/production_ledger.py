@@ -734,6 +734,17 @@ class Ledger:
                 if _target_words_raw is not None
                 else None
             )
+            # Sprint 1 keystone (2026-05-28): copy dialogue_slot_id
+            # from the outline beat onto the ledger line so
+            # OTR_StoryRoomCommit can join StoryRoom dialogue rows by
+            # slot id rather than raw beat_id. Voiced beats carry a
+            # `d\d{3}` id stamped by `stamp_dialogue_slot_ids`;
+            # non-voiced beats (music_open / music_close /
+            # music_inter / sfx) stay None. The getattr default keeps
+            # the line schema additive -- pre-Sprint-1 outlines that
+            # never ran through the stamper just produce None slots,
+            # and the legacy compose path is byte-identical.
+            dialogue_slot_id = _g("dialogue_slot_id", None)
             if role == "character":
                 cid = char_id_by_name.get(speaker, "")
             elif role == "announcer":
@@ -767,6 +778,8 @@ class Ledger:
                 # not carry the value.
                 "beat_intent":   beat_intent,
                 "target_words":  target_words,
+                # Sprint 1 keystone (2026-05-28): voiced slot id.
+                "dialogue_slot_id": dialogue_slot_id,
             })
         self.data["lines"] = rows
         self._recompute_totals()
@@ -829,21 +842,30 @@ class Ledger:
             target_words = (
                 _safe_int(_tw_raw) if _tw_raw is not None else None
             )
+            # Sprint 1 keystone (2026-05-28): preserve dialogue_slot_id
+            # so set_lines stays schema-uniform with
+            # init_lines_from_outline. Callers that omit the key store
+            # None rather than a fabricated value.
+            _dsi_raw = r.get("dialogue_slot_id")
+            dialogue_slot_id = (
+                _safe_str(_dsi_raw) or None if _dsi_raw is not None else None
+            )
             rows.append({
-                "line_id":        _safe_str(r.get("line_id")),
-                "shot_id":        _safe_str(r.get("shot_id")) or None,
-                "beat_id":        _safe_str(r.get("beat_id")) or None,
-                "char_id":        _safe_str(r.get("char_id")) or None,
-                "text":           text,
-                "traits":         _safe_str(r.get("traits")) or None,
-                "boundary":       _safe_str(r.get("boundary")) or None,
-                "char_count":     _char_count(text),
-                "word_count":     _word_count(text),
-                "bark_wav_path":  _safe_str(r.get("bark_wav_path")) or None,
-                "start_s":        _safe_float(r.get("start_s")),
-                "dur_s":          _safe_float(r.get("dur_s")),
-                "beat_intent":    beat_intent,
-                "target_words":   target_words,
+                "line_id":          _safe_str(r.get("line_id")),
+                "shot_id":          _safe_str(r.get("shot_id")) or None,
+                "beat_id":          _safe_str(r.get("beat_id")) or None,
+                "char_id":          _safe_str(r.get("char_id")) or None,
+                "text":             text,
+                "traits":           _safe_str(r.get("traits")) or None,
+                "boundary":         _safe_str(r.get("boundary")) or None,
+                "char_count":       _char_count(text),
+                "word_count":       _word_count(text),
+                "bark_wav_path":    _safe_str(r.get("bark_wav_path")) or None,
+                "start_s":          _safe_float(r.get("start_s")),
+                "dur_s":            _safe_float(r.get("dur_s")),
+                "beat_intent":      beat_intent,
+                "target_words":     target_words,
+                "dialogue_slot_id": dialogue_slot_id,
             })
         self.data["lines"] = rows
         self._recompute_totals()
