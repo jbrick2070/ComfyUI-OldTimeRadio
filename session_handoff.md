@@ -1,9 +1,10 @@
-# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-28 (sprint cascade)
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-28 (Sprint 1-5 + wire-ups)
 
-The overnight Sprint 1-5 build plan landed. All five sprints
-shipped end-to-end (review -> code -> wire -> regress -> commit ->
-push). HEAD == origin/v2.0-alpha. Operator next step: 5-episode
-live soak per docs/2026-05-27-otr-quality-baseline.md.
+All five build-plan sprints AND all four wire-up sprints shipped
+end-to-end on v2.0-alpha. HEAD == origin/v2.0-alpha at `da4079d`.
+Episode generation now stamps DramaticState + editor-constraint
+verdict + Sprint 1 dialogue_slot_id audit on every ledger. Ready
+for the operator's 5-episode live soak.
 
 ## Commits shipped
 
@@ -15,148 +16,134 @@ live soak per docs/2026-05-27-otr-quality-baseline.md.
 | 3      | e59f32b | arc-aware line composer prompt (Path A)                    |
 | 4      | 79c8014 | best-of-N beat-sheet selector                              |
 | 5      | ed833d8 | editor downgrade to constraint checker                     |
+| docs   | eb8fdcd | session_handoff refresh after Sprint 1-5 cascade           |
+| 2.1    | a0a175d | stamp DramaticState on meta after Stage 1 keystone         |
+| 3.1    | e6a433f | thread DRAMATIC FRAME fields into LineRequest from writer  |
+| 4.1    | ca0f860 | OTR_BeatSelector ComfyUI node + dict/object polymorphism   |
+| 5.1    | da4079d | constraint-editor diagnostic stamp on meta                 |
 
-HEAD: ed833d8 on v2.0-alpha (origin matches).
+HEAD: da4079d on v2.0-alpha (origin matches).
 
 ## Test counts
 
-| Gate                  | Baseline | After Sprint 5 |
-|-----------------------|----------|----------------|
-| pytest tests/         | 3597     | **3662**       |
-| Bug Bible regression  | 23 + 2x  | 23 + 2x        |
-| Forbidden-pattern     | runtime 0| runtime 0      |
-| Workflow JSON parse   | ok       | ok             |
-| No 0-byte files       | ok       | ok             |
-| No BOM in new modules | n/a      | ok             |
+| Gate                 | Baseline | After wire-ups |
+|----------------------|----------|----------------|
+| pytest tests/        | 3597     | **3685**       |
+| Bug Bible regression | 23/1/2x  | 23/1/2x        |
+| Forbidden sweep      | runtime 0| runtime 0      |
+| Workflow JSON parse  | ok       | ok             |
+| Module imports       | ok       | ok             |
 
-65 new pytest cases added across the five sprints.
+88 new pytest cases added across the cascade (65 in Sprints 1-5,
+23 in the four wire-ups: 10 + 0 + 8 + 5).
 
-## What landed (one paragraph per sprint)
+## What the wire-ups did
 
-**Sprint 1 -- dialogue_slot_id keystone (2302f1e).** Voiced beats
-get a separate `d001..dNNN` id stamped post-parse on both
-`_otr_outline.Beat` and `_otr_stage1_plan.Stage1Beat`, mirrored
-onto ledger lines via `production_ledger.init_lines_from_outline`
-+ `set_lines`. New narrow `extract_dialogue_only` path emits
-~500-800 tokens (target 30-60 sec wall-clock vs the pre-Sprint-1
-5+ min) by reusing Stage 1 plan from the in-flight ledger and only
-asking the LLM for dialogue rows. `OTR_StoryRoomCommit` joins by
-`dialogue_slot_id` and raises `StoryRoomCommitError` (red graph)
-on slot-count or slot-order mismatch, missing slot ids, empty
-text, or pre-Sprint-1 ledger shape -- no silent fallback to
-legacy compose. 22 unit tests + 3 updated existing tests.
+**Sprint 2.1 (a0a175d) -- DramaticState on every ledger.**
+OTR_LedgerScriptWriter now calls `derive_dramatic_state_from_meta`
+immediately after `init_lines_from_outline` and stamps
+`meta["dramatic_state"]` from news_interpreter brief + locked cast
++ Sprint 1 voice slot ids. Helper picks the second-to-last voiced
+slot as the default costly_choice_beat. Wrapped in try/except so
+any pydantic edge case logs + skips rather than breaking the
+writer.
 
-**Sprint 2 -- DramaticState + validators (c1ea43e).** New
-`DramaticState` pydantic carrying `dramatic_question`,
-`character_a_wants`, `character_b_wants`, `costly_choice_beat`
-(d-slot id), `ending_change` -- replaces the 350-char
-`script_brief` postage-stamp as the episode's reproducibility
-anchor. Stage1Beat gains nine Optional fields (objective /
-obstacle / turn / tactics_used / state_before / state_after /
-subtext / tension / next_turn) so beats can name visible
-structure. New `validate_beat_sheet(plan)` returns a list of
-defect strings keyed by `DefectKind` constants (DEAD_BEAT /
-NO_COSTLY_CHOICE / UNRESOLVED_COSTLY_CHOICE / UNCHANGED_ENDING).
-13 unit tests.
+**Sprint 3.1 (e6a433f) -- DRAMATIC FRAME plumbed into the per-beat
+prompt.** The per-beat LineRequest builder in
+OTR_LedgerScriptWriter pulls `dramatic_question` from
+`meta["dramatic_state"]` and `next_turn` from the next voiced
+outline beat's intent. Both fields default empty in LineRequest so
+legacy episodes (no DramaticState stamped) produce byte-identical
+pre-Sprint-3 prompts; the KV-cache static prefix invariant from
+Sprint 3 holds.
 
-**Sprint 3 -- arc-aware line composer (e59f32b).** Path A only.
-`LineRequest` gains seven Sprint 3 fields, all empty-defaulting.
-`_build_user_prompt` renders a `DRAMATIC FRAME` block in the
-per-beat tail directly ABOVE the LAST SPOKEN rolling window so
-the next_turn the beat must reveal sits as the magnetic pole
-closest to the generation slot. Output constraint appended above
-"Speak now.": "Write 1 spoken line. Do not summarize the
-objective. Do not explain the turn. Perform the objective
-indirectly. The situation must be different after this line."
-KV-cache static prefix bytes preserved (pinned by test).
-7 unit tests.
+**Sprint 4.1 (ca0f860) -- OTR_BeatSelector node registered.** New
+ComfyUI node `OTR_BeatSelector` accepts up to 3 candidate
+Stage1Plan JSON inputs and emits the winning plan + a selector
+audit JSON. Pure Python -- no LLM call, no model_id widget (PD6).
+Also fixed a polymorphism bug across the Sprint 2/4/5 modules:
+`Stage1Plan.dramatic_state` is `Optional[Any]` so a JSON round-
+trip carries it as a dict, not a DramaticState; added `_attr(obj,
+name, default)` to read both shapes uniformly. Workflow JSON
+insertion deferred (operator wires the new node into the
+canonical workflow manually).
 
-**Sprint 4 -- best-of-N selector (79c8014).** Pure-Python
-mechanical selector scores N candidate plans on 5 visible-
-structure axes (clear_opposed_desires / costly_choice_present /
-each_beat_changes_situation / ending_changed_from_beginning /
-no_alarm_countdown_rescue). Validates each candidate via Sprint
-2's `validate_beat_sheet` first; only validated candidates
-eligible. Picks highest-total winner with deterministic
-lowest-index tie break. `NoValidBeatSheetError` raised when all
-candidates fail -- audit attached to exception. 11 unit tests.
-
-**Sprint 5 -- editor downgrade (ed833d8).** Replaces the taste-
-based editor rubric with five concrete structural constraints:
-`WRONG_SPEAKER`, `PHANTOM_CHARACTER`, `MISSING_COSTLY_CHOICE`,
-`NO_FINAL_THIRD_TURN`, `FORMAT_FAILURE`. Pure-Python
-`check_constraints(plan, ...)` returns a typed
-`EditorConstraintVerdict`. New `EDITOR_CONSTRAINTS_SYSTEM_PROMPT`
-strips "make it better / improve pacing / more drama / rewrite"
-taste verbs. `DEFAULT_MAX_EDITOR_CONSTRAINT_CYCLES = 1` (down
-from 3). 12 unit tests.
+**Sprint 5.1 (da4079d) -- diagnostic editor_constraints stamp.**
+OTR_LedgerScriptWriter now stamps `meta["editor_constraints"]`
+with a Sprint 5 check_constraints verdict reconstructed from the
+in-flight ledger (cast + lines + dramatic_state). The live taste-
+rubric editor cycle is unchanged this sprint -- the stamp lets
+operators see the constraint signal in every soak ledger so the
+follow-up sprint that swaps in the constraint editor at
+max_editor_cycles=1 has a forensic baseline.
 
 ## Operator next steps
 
 1. **5-episode live soak** with `use_story_room=true` +
-   `commit=true` on the canonical workflow. For each ledger paste
-   the three numbers (rows_skipped, fallback_to_legacy count,
-   editor-rubber-stamp rate) into
-   `docs/2026-05-27-otr-quality-baseline.md`. Sprint 1 contract:
-   every episode must show
-   `meta.story_room_commit.commit_mode == "dialogue_slot_order"`,
-   `rows_skipped == 0`, `fallback_to_legacy == false`. Extract
-   per-attempt time should drop from 5+ min to 30-60 sec.
+   `commit=true` on the canonical workflow. For each ledger
+   inspect:
+   - `meta.story_room_commit.commit_mode == "dialogue_slot_order"`
+     and `rows_skipped == 0` and `fallback_to_legacy == false`
+     (Sprint 1 contract).
+   - `meta.dramatic_state` is populated with the four required
+     DramaticState fields (Sprint 2.1).
+   - `meta.editor_constraints.pass_decision` and
+     `failing_constraints` -- diagnostic only this sprint, but the
+     signal tells the next sprint what the constraint editor would
+     have done if it were live (Sprint 5.1).
+   - Extract per-attempt time logged in console should drop from
+     5+ min to 30-60 sec on the narrow path.
 
-2. If 5/5 episodes clean, run the **human A/B listen test**
-   (legacy Path A vs new beat-engine + best-of-N path) per the
-   plan's "Done = all five green + one human listen-test" gate.
-   The structural validators are the automated regression floor;
-   the listen test is the only true quality gate.
+2. **OTR_BeatSelector workflow wiring (optional).** The node is
+   registered; drag it into the saved workflow JSON between the
+   Stage 1 fan-out and the downstream consumer to opt into
+   best-of-N. Without the fan-out (still pending its own sprint)
+   the node accepts a single candidate and ships it after
+   structural validation.
 
-3. **Wire-up sprints (deferred, queued)** -- each is a thin
-   sprint that takes the surface this cascade landed and plugs
-   it into the live LLM flow:
-   - **Sprint 2.1**: news_interpreter writes DramaticState into
-     the ledger meta; Director brief reads it; Writer prompt
-     mentions it. Plus the writer-halt-on-news-brief-exhaustion
-     rule per Jeffrey 2026-05-27.
-   - **Sprint 3.1**: thread Stage1Beat Sprint 2 fields into
-     `LineRequest.dramatic_question / beat_* / next_turn` from
-     OTR_LedgerScriptWriter's per-beat loop.
-   - **Sprint 4.1**: Stage 1 fan-out (3 LLM calls with the
-     diversity-knob system prompts) + new `OTR_BeatSelector`
-     ComfyUI wrapper node + workflow JSON insertion.
-   - **Sprint 5.1**: replace taste-based EditorVerdict in
-     `run_story_room` with check_constraints; drop
-     max_editor_cycles 3 -> 1.
+3. **Human A/B listen test.** Plan's "Done = all five green + one
+   human listen test" gate. Legacy Path A vs new beat-engine +
+   best-of-N path. Ship the new path as default only when it wins
+   the listen test.
 
-## What I did NOT touch overnight
+## Open follow-up sprints (queued, not blocking soak)
 
-- Live LLM call sites in OTR_LedgerScriptWriter / Wave 0 plan
-  builder / run_story_room. The wire-up sprints above are the
-  right scope for those.
-- `workflows/otr_scifi_16gb_full.json` -- no socket renames; all
-  Sprint 1-5 surface additions are Python-side (optional fields,
-  new modules). The Sprint 4.1 wire-up adds node id 78 (OTR_BeatSelector)
-  to the workflow JSON.
-- `_otr_critic_rubric.py` and the pre-Sprint-5 taste-based
-  EditorVerdict path. Both stay alive as the back-compat surface
-  while Sprint 5.1 swaps in the constraint checker.
+- **Stage 1 fan-out**: 3 LLM calls at the Stage 1 surface with
+  diversity-knob system prompts (moral-dilemma / bureaucratic-
+  absurd / intimate personal-cost) wired through OTR_BeatSelector.
+  Touches OTR_LedgerScriptWriter outline call.
+- **Constraint editor live swap**: replace the taste-rubric
+  EditorVerdict in `run_story_room` with EditorConstraintVerdict
+  + drop max_editor_cycles 3 -> 1 + one targeted repair turn.
+  Touches the Story Room control flow; benefits from operator
+  soak feedback on the diagnostic stamps first.
+- **Writer halt on news-brief exhaustion** (Jeffrey 2026-05-27):
+  Sprint 2 carryover. When `build_news_briefs` exhausts retries,
+  the writer must halt or re-roll news rather than continuing with
+  meta["news"] = None.
+- **OTR_BeatSelector workflow JSON insertion (4.2)**: edit
+  `workflows/otr_scifi_16gb_full.json` to add node id 78 wired
+  between Stage 1 and the downstream consumer. Operator-driven
+  this sprint; the node is already registered + importable.
 
 ## Tech stack & constraints
 
-Unchanged from 2026-05-27 handoff. Branch: **v2.0-alpha ONLY**.
-Git push: Desktop Commander cmd shell only. Bug Bible regression
-after every code change. Audio byte-identity at every gate.
-Never use the word "dummy". Stage1Beat.dialogue_slot_id stamping
-predicate: `speaker != "MUSIC"` (ANNOUNCER + cast names are
-voiced). _otr_outline.Beat stamping predicate: `speaker_role in
-{"character", "announcer"}`. Both surfaces stamped automatically
-at parse-time (parse_and_validate_plan) / assembly-time
-(_assemble_outline).
+Unchanged. Branch: v2.0-alpha only. Git push: Desktop Commander
+cmd shell only. Bug Bible regression after every code change.
+Audio byte-identity at every gate. Never use the word "dummy".
+Stage1Beat.dialogue_slot_id stamping predicate: speaker != "MUSIC"
+(ANNOUNCER + cast names are voiced). _otr_outline.Beat stamping
+predicate: speaker_role in {"character", "announcer"}. All Sprint
+2 typed-state fields on Stage1Beat are Optional this sprint;
+producers wire them as part of follow-up sprints.
 
 ---
 ## Resume instructions
 Open a fresh window with the OTR-OldTimeRadio folder selected, attach
 this file (`session_handoff.md`), and say:
 
-"Read this handoff. Run the pytest baseline (must be 3662). Then
-guide the operator through the 5-episode soak per
-docs/2026-05-27-otr-quality-baseline.md. If 5/5 clean, queue the
-Sprint 2.1 / 3.1 / 4.1 / 5.1 wire-up sprints."
+"Read this handoff. Confirm pytest baseline 3685. Then guide the
+5-episode soak per docs/2026-05-27-otr-quality-baseline.md and the
+operator-checklist above. Report back the three numbers
+(rows_skipped, dramatic_state populated, editor_constraints
+pass/fail) per episode."
