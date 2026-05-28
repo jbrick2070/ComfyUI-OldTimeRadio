@@ -2577,7 +2577,24 @@ class OTR_LedgerScriptWriter:
                 # Otherwise run the legacy single-call generator.
                 if _fanout_plan is not None:
                     _shadow_plan = _fanout_plan
-                    _shadow_attempts = []
+                    # B fix (2026-05-28): the fan-out winner skips the
+                    # single-call generator, so there are no real
+                    # attempt records. An empty list made
+                    # `_shadow_attempts[0].status` below raise
+                    # IndexError on the use_stage1_fanout=True path
+                    # (the baked all-on state). Stamp a synthetic
+                    # attempt so the audit trail is truthful and the
+                    # [0] reads are safe.
+                    import types as _types
+                    _shadow_attempts = [
+                        _types.SimpleNamespace(
+                            attempt=1,
+                            status="fanout_winner_used",
+                            elapsed_seconds=0.0,
+                            error_type="",
+                            error_message="",
+                        )
+                    ]
                 else:
                     _shadow_plan, _shadow_attempts = (
                         _OTRS1.generate_stage1_plan(
