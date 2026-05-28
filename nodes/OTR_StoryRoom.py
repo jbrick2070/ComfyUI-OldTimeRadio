@@ -399,6 +399,7 @@ class OTR_StoryRoom:
             )
             editor_generate_fn = _OTRCG.make_constrained_generate_fn(
                 editor_cache, EditorConstraintVerdictSchema,
+                heartbeat_label="EditorPass",
             )
             log.info(
                 "[OTR_StoryRoom] use_constraint_editor=True -- "
@@ -407,6 +408,7 @@ class OTR_StoryRoom:
         else:
             editor_generate_fn = _OTRCG.make_constrained_generate_fn(
                 editor_cache, EditorVerdictSchema,
+                heartbeat_label="EditorPass",
             )
 
         log.info(

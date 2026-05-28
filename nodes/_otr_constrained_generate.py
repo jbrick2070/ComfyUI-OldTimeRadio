@@ -31,7 +31,9 @@ technical slot per the project rule.
 # which transformers v5 moved. See _otr_lmfe_compat docstring.
 from __future__ import annotations
 
-from typing import Any, Callable, List, Type
+import logging
+import time
+from typing import Any, Callable, List, Optional, Type
 
 from pydantic import BaseModel
 
@@ -40,6 +42,96 @@ from ._otr_model_loader import (
     ModelLoaderError,
     _normalize_messages_for_cache_entry,
 )
+
+
+log = logging.getLogger("OTR")
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat streamer (opt-in live visibility)
+# ---------------------------------------------------------------------------
+#
+# A constrained-decode pass with a large max_new_tokens budget (e.g. the
+# Editor pass at 4096 tokens) runs as a single blocking model.generate()
+# call: the console prints the pass header, then goes silent for the whole
+# decode (100-200s at NF4 decode speed), then prints the verdict. That
+# silence is indistinguishable from a hang.
+#
+# _HeartbeatStreamer is a read-only transformers BaseStreamer. generate()
+# hands it each newly-sampled token id; the streamer NEVER feeds anything
+# back, so attaching it does not change the sampled tokens -- output stays
+# identical with or without it. Every `every` tokens it logs token count,
+# tok/s, elapsed, and a short decoded tail so the operator can watch the
+# JSON forming live instead of staring at a frozen console.
+try:
+    from transformers.generation.streamers import BaseStreamer as _BaseStreamer
+except Exception:  # pragma: no cover - transformers missing in some test envs
+    class _BaseStreamer:  # type: ignore[no-redef]
+        def put(self, value: Any) -> None: ...
+        def end(self) -> None: ...
+
+
+class _HeartbeatStreamer(_BaseStreamer):
+    """Read-only generate() observer that logs a live tok/s heartbeat.
+
+    Attaching this to model.generate(streamer=...) cannot alter the
+    generated tokens; it only reads them. Safe on any pass.
+    """
+
+    def __init__(self, tokenizer: Any, label: str, every: int = 32) -> None:
+        self._tokenizer = tokenizer
+        self._label = label
+        self._every = max(1, int(every))
+        self._ids: List[int] = []
+        self._count = 0
+        self._last_emit = 0
+        self._t0: Optional[float] = None
+        self._prompt_seen = False
+
+    def put(self, value: Any) -> None:
+        # The first put() carries the prompt input_ids -- start the clock
+        # there and skip it for the new-token count.
+        if not self._prompt_seen:
+            self._prompt_seen = True
+            self._t0 = time.monotonic()
+            return
+        try:
+            raw = value.tolist() if hasattr(value, "tolist") else list(value)
+        except Exception:
+            return
+        flat: List[int] = []
+        for item in raw:
+            if isinstance(item, list):
+                flat.extend(item)
+            else:
+                flat.append(item)
+        if not flat:
+            return
+        self._ids.extend(flat)
+        self._count += len(flat)
+        if self._count - self._last_emit >= self._every:
+            self._last_emit = self._count
+            self._emit()
+
+    def _emit(self) -> None:
+        elapsed = (time.monotonic() - self._t0) if self._t0 else 0.0
+        tps = (self._count / elapsed) if elapsed > 0 else 0.0
+        tail = ""
+        try:
+            text = self._tokenizer.decode(self._ids, skip_special_tokens=True)
+            tail = text[-80:].replace("\n", " ").replace("\r", " ")
+        except Exception:
+            tail = ""
+        log.info(
+            "[%s] heartbeat: %d tok | %.1f tok/s | %.1fs | ...%s",
+            self._label, self._count, tps, elapsed, tail,
+        )
+
+    def end(self) -> None:
+        # Final pulse so the operator sees the closing token count even if
+        # the last chunk was shorter than the heartbeat interval.
+        if self._count > self._last_emit:
+            self._emit()
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +161,7 @@ closes.
 def make_constrained_generate_fn(
     cache_entry: dict[str, Any],
     schema_model: Type[BaseModel],
+    heartbeat_label: Optional[str] = None,
 ) -> ConstrainedGenerateFn:
     """Wrap a cache_entry into a grammar-constrained generate closure.
 
@@ -79,6 +172,15 @@ def make_constrained_generate_fn(
             enforcer JsonSchemaParser binds to its
             model_json_schema(); generate() will only emit token
             sequences that the parser accepts.
+        heartbeat_label: opt-in live-visibility label. When set (e.g.
+            "EditorPass"), the closure attaches a read-only
+            _HeartbeatStreamer to model.generate() that logs token
+            count, tok/s, elapsed, and a decoded tail every ~32 tokens
+            so long blocking passes are visible in real time. The
+            streamer only observes tokens -- it never feeds any back,
+            so generated output is identical with or without it.
+            Default None -> no streamer -> byte-identical to the
+            prior behaviour for every existing caller.
 
     Returns:
         A callable (messages, *, temperature, max_new_tokens) -> str.
@@ -142,6 +244,13 @@ def make_constrained_generate_fn(
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
+        # Opt-in live heartbeat (read-only; does not alter sampled tokens).
+        streamer = (
+            _HeartbeatStreamer(tokenizer, heartbeat_label)
+            if heartbeat_label
+            else None
+        )
+
         with torch.no_grad():
             out = model.generate(
                 **inputs,
@@ -161,6 +270,9 @@ def make_constrained_generate_fn(
                 # state cost without quality gain on structured
                 # output.
                 num_beams=1,
+                # Read-only observer for live tok/s visibility on long
+                # passes; None when heartbeat_label is unset.
+                streamer=streamer,
             )
 
         prompt_len = inputs["input_ids"].shape[1]
