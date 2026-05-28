@@ -38,7 +38,7 @@ Bounds chosen to match existing OTR domain:
 from __future__ import annotations
 
 import re
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -193,17 +193,36 @@ class Stage1Beat(BaseModel):
         description="Optional beat_id (bNNN) of an earlier beat this one calls back to. Used for continuity threading; Stage 3 continuity validator confirms the referenced beat exists in this plan.",
     )
 
-    @field_validator("callback_to")
+    @field_validator("callback_to", mode="before")
     @classmethod
-    def _validate_callback_format(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or v == "":
+    def _validate_callback_format(cls, v: Any) -> Optional[str]:
+        # BUG-LOCAL-292 (2026-05-27): coerce LLM-emitted no-callback
+        # synonyms to None. Live evidence (pending_20260527_212428
+        # Story Room Extract): Mistral-Nemo emitted the literal
+        # string 'none' for callback_to on 17 beats; the strict
+        # validator rejected, Extract retry budget burned. The
+        # callback_to field is OPTIONAL by design -- treat any
+        # textual no-callback indicator as None rather than failing
+        # the whole schema gate.
+        if v is None:
             return None
-        if not _BEAT_ID_RE.match(v):
-            raise ValueError(
-                f"callback_to must be a bNNN beat-id (e.g. 'b002') or "
-                f"null/empty; got {v!r}"
-            )
-        return v
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                return None
+            # Case-insensitive synonyms for "no callback".
+            if stripped.lower() in {"none", "null", "n/a", "na",
+                                    "no", "nil", "nothing", "-"}:
+                return None
+            if not _BEAT_ID_RE.match(stripped):
+                raise ValueError(
+                    f"callback_to must be a bNNN beat-id (e.g. "
+                    f"'b002') or null/empty; got {v!r}"
+                )
+            return stripped
+        raise ValueError(
+            f"callback_to must be a string or null; got {type(v).__name__}"
+        )
 
     @model_validator(mode="after")
     def _voiced_beats_have_min_words(self) -> "Stage1Beat":
