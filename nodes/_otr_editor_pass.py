@@ -51,7 +51,22 @@ log = logging.getLogger("OTR")
 
 _EDITOR_BASE_TEMPERATURE: float = 0.30
 _EDITOR_RETRY_TEMPERATURE: float = 0.15
-_EDITOR_MAX_NEW_TOKENS: int = 1024
+# BUG-LOCAL-291 (2026-05-27): bumped 1024 -> 2048. Live evidence
+# from pending_20260527_205321 ("Winds of Despair") -- the Editor
+# pass exhausted its 2-attempt retry budget with
+# "JSONDecodeError: Unterminated string starting at: line 14
+# column 24 (char 4773)". The Editor verdict carries per-axis
+# notes for all 8-10 rubric axes (1-3 sentence notes each ~200
+# chars) + overall_note (up to 1200 chars) + JSON overhead. Real
+# EditorVerdict output easily sums to 3500-4500 chars (~1200-1500
+# tokens). The 1024-token cap was truncating mid-string, the
+# structured_call ladder lowered temp (correct for malformed JSON
+# but useless when truncation is the cause), and Story Room
+# soft-passed without ever getting a real revision verdict.
+# Same shape as BUG-LOCAL-285 on story_brief. Schema-side caps
+# still bound the actual content; the bump gives the model room
+# to close its JSON.
+_EDITOR_MAX_NEW_TOKENS: int = 2048
 _EDITOR_MAX_ATTEMPTS: int = 2
 
 
