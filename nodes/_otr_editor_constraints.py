@@ -505,3 +505,89 @@ def check_constraints_from_ledger(
         cast_names_extra=cast_names_extra,
         allowed_proper_nouns=allowed_proper_nouns,
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Sprint 5.2 wire-up helper (2026-05-28)
+# ---------------------------------------------------------------------------
+
+
+__all__.extend([
+    "derive_repair_prompt",
+    "MAX_REPAIR_TURNS",
+])
+
+
+# Sprint 5.2: hard cap on the number of repair turns the live swap
+# fires per failed constraint check. Sprint 5 default was 1 cycle;
+# the live swap honors that contract (one targeted repair turn then
+# ship-or-fail, no open-ended improvement loop).
+MAX_REPAIR_TURNS: int = 1
+
+
+_CONSTRAINT_REPAIR_HEADERS: dict[str, str] = {
+    EditorConstraint.WRONG_SPEAKER: (
+        "WRONG_SPEAKER: a line is attributed to a name not in the "
+        "locked cast. Use only the cast names supplied above."
+    ),
+    EditorConstraint.PHANTOM_CHARACTER: (
+        "PHANTOM_CHARACTER: a non-cast proper noun is named or "
+        "speaks. Drop or rename to a cast member; generic roles "
+        "like 'the tech' / 'the lab' are fine."
+    ),
+    EditorConstraint.MISSING_COSTLY_CHOICE: (
+        "MISSING_COSTLY_CHOICE: the dramatic_state.costly_choice_beat "
+        "does not resolve. The third act needs a beat whose "
+        "state_after differs concretely from its state_before."
+    ),
+    EditorConstraint.NO_FINAL_THIRD_TURN: (
+        "NO_FINAL_THIRD_TURN: the final third of the voiced beats "
+        "has no state change. Add a concrete turn before the close."
+    ),
+    EditorConstraint.FORMAT_FAILURE: (
+        "FORMAT_FAILURE: the draft carries bracket stage directions, "
+        "markdown fragments, or other malformed text. Emit plain "
+        "prose only."
+    ),
+}
+
+
+def derive_repair_prompt(verdict: EditorConstraintVerdict) -> str:
+    """Turn a failed EditorConstraintVerdict into a Writer-side
+    repair prompt block.
+
+    Sprint 5.2: the live constraint-editor swap in run_story_room
+    runs check_constraints (or the LLM-based variant via
+    EDITOR_CONSTRAINTS_SYSTEM_PROMPT) AFTER the Writer's first
+    draft. On verdict.pass_decision == False, the loop threads the
+    output of this helper into one targeted Writer revision turn
+    (per MAX_REPAIR_TURNS), then re-checks and ships or fails loud.
+
+    The returned string is a single, opinionated block: header +
+    per-constraint hint + concrete repair_note. The Writer reads
+    it as "fix these constraints; do not touch anything else."
+
+    Returns an empty string when verdict.pass_decision is True
+    (no repair needed) -- so callers can unconditionally splice
+    the helper into prompt construction.
+    """
+    if verdict.pass_decision:
+        return ""
+
+    lines: list[str] = [
+        "REVISE: the previous draft failed the editor's "
+        "constraint check. Fix the listed constraints below in "
+        "the revision; do not rewrite passing passages.",
+    ]
+    for constraint in verdict.failing_constraints:
+        header = _CONSTRAINT_REPAIR_HEADERS.get(constraint, "")
+        if header:
+            lines.append(f"  - {header}")
+        else:
+            lines.append(f"  - {constraint}")
+    note = (verdict.repair_note or "").strip()
+    if note:
+        lines.append("")
+        lines.append(f"Editor's note: {note}")
+    return "\n".join(lines)
