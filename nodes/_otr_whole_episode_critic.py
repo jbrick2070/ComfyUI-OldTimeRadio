@@ -184,7 +184,7 @@ class CriticResult:
     regeneration_hint: str = ""
 
     def to_dict(self) -> dict:
-        """Serialize for meta.whole_episode_critic ledger stamp."""
+        """Serialize for meta.stage7_shadow_critic ledger stamp."""
         return {
             "verdict": self.verdict,
             "mean_score": self.mean_score,

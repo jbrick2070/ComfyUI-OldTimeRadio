@@ -259,9 +259,9 @@ class Stage1Beat(BaseModel):
     )
     tension: Optional[int] = Field(
         default=None,
-        ge=1,
+        ge=0,
         le=5,
-        description="Sprint 2: 1..5 tension level. Strictly monotonic NOT required.",
+        description="Sprint 2: 0..5 tension level. 0 = no/idle tension. Strictly monotonic NOT required.",
     )
     next_turn: Optional[str] = Field(
         default=None,
