@@ -109,6 +109,68 @@ class TestResolveNewsSeed:
         assert out == "From ledger"
 
 
+class TestBugLocal294NewsBriefsPrimary:
+    """BUG-294: news_seed resolver prefers LLM-summarized briefs
+    (meta.news) over raw RSS dump (meta.news_seed). The briefs are
+    the deliberate writer-curated summary; the writers'-room
+    director (Wave 1 Agent D) should always ground on them when
+    available."""
+
+    def test_briefs_chosen_over_raw_seed(self):
+        led = {
+            "cast": [],
+            "meta": {
+                "news_seed": {
+                    "headline": "RAW headline",
+                    "body": "raw body text",
+                },
+                "news": {
+                    "script_brief": "Two researchers face a publication choice.",
+                    "scene_atmosphere": "Cold lab, low hum.",
+                },
+            },
+        }
+        out = resolve_news_seed("", fallback_ledger=led)
+        # Briefs win.
+        assert "Two researchers" in out
+        assert "Cold lab" in out
+        assert "RAW headline" not in out
+
+    def test_falls_back_to_raw_seed_when_briefs_missing(self):
+        led = {
+            "cast": [],
+            "meta": {
+                "news_seed": {"headline": "RAW headline only"},
+                "news": None,  # build_news_briefs exhausted retries
+            },
+        }
+        out = resolve_news_seed("", fallback_ledger=led)
+        assert out == "RAW headline only"
+
+    def test_returns_empty_when_both_missing(self):
+        led = {"cast": [], "meta": {}}
+        out = resolve_news_seed("", fallback_ledger=led)
+        assert out == ""
+
+    def test_script_brief_alone_works(self):
+        led = {
+            "meta": {
+                "news": {"script_brief": "Just the script brief."},
+            },
+        }
+        out = resolve_news_seed("", fallback_ledger=led)
+        assert out == "Just the script brief."
+
+    def test_scene_atmosphere_alone_works(self):
+        led = {
+            "meta": {
+                "news": {"scene_atmosphere": "Dim corridor, distant alarm."},
+            },
+        }
+        out = resolve_news_seed("", fallback_ledger=led)
+        assert out == "Dim corridor, distant alarm."
+
+
 class TestNodeWiring:
     """Pin: the three nodes import the resolver."""
 

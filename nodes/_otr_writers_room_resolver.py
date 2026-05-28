@@ -108,6 +108,89 @@ def _load_in_flight_ledger() -> Optional[dict]:
     return ledger
 
 
+def _find_latest_ledger_with_news_seed(
+    max_lookback: int = 8,
+) -> Optional[dict]:
+    """BUG-LOCAL-294 (2026-05-27): walk the N most-recent ledgers
+    backward looking for one with a populated `meta.news_seed`.
+
+    Background (writers'-room context, Wave 2 Agent F): NewsFetcher
+    and Writer are separate ComfyUI nodes, each instantiating their
+    own Ledger() with a time.time()-based episode_id. When they
+    land on different seconds (common -- the LLM-load latency
+    between fetch and writer-start is often >=1 sec), NewsFetcher
+    stamps news_seed into `pending_<T>_ledger` and Writer saves a
+    fresh skeleton into `pending_<T+1>_ledger` WITHOUT carrying
+    the news_seed forward. The writers'-room downstream nodes
+    (Wave 1 Agent D / Wave 2 Agent F / Wave 2 Agent G) then run on
+    the latest ledger (T+1) which lacks news_seed.
+
+    This walker scans the N most-recent ledgers ordered by mtime
+    descending and returns the first one whose `meta.news_seed` is
+    non-empty. The lookback is bounded so we don't drift to a
+    months-old episode -- N=8 covers normal NewsFetcher + Writer
+    pair-saves plus any retry / restart noise within the same run.
+
+    Returns the ledger dict (with `meta.news_seed` confirmed
+    populated), or None if no recent ledger carries one.
+
+    Never raises.
+    """
+    try:
+        try:
+            from . import _otr_paths as _P
+        except ImportError:
+            import _otr_paths as _P  # type: ignore
+        episodes_root = _P.otr_episodes_root()
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        candidates = sorted(
+            episodes_root.glob("*/audio/*_ledger.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[:max_lookback]
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[WritersRoomResolver] news_seed walker: glob/sort "
+            "raised %s -- giving up.", type(exc).__name__,
+        )
+        return None
+    import json as _j
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                ledger = _j.load(fh)
+        except Exception:  # noqa: BLE001
+            continue
+        if not isinstance(ledger, dict):
+            continue
+        meta = ledger.get("meta") or {}
+        seed = meta.get("news_seed")
+        # A real news_seed is either a non-empty string or a dict
+        # with at least one non-empty value.
+        has_seed = False
+        if isinstance(seed, str) and seed.strip():
+            has_seed = True
+        elif isinstance(seed, dict) and any(
+            (str(v or "").strip() for v in seed.values())
+        ):
+            has_seed = True
+        if has_seed:
+            log.info(
+                "[WritersRoomResolver] news_seed walker found "
+                "populated seed on %s (after scanning %d ledger(s)).",
+                path, candidates.index(path) + 1,
+            )
+            return ledger
+    log.warning(
+        "[WritersRoomResolver] news_seed walker scanned %d ledger(s) "
+        "under %s with no populated meta.news_seed -- giving up.",
+        len(candidates), episodes_root,
+    )
+    return None
+
+
 def _load_latest_ledger_by_mtime() -> Optional[dict]:
     """Hard-guarantee fallback: walk `output/otr/episodes/*/audio/
     *_ledger.json` directly and load the newest by mtime.
@@ -242,6 +325,66 @@ def resolve_cast_names(
     return out
 
 
+def _extract_seed_from_ledger(ledger: dict) -> str:
+    """Pull a usable news-seed string from the writer's ledger.
+
+    PRIMARY source: `meta.news` (the LLM-summarized briefs the
+    writer's `build_news_briefs` call already produced --
+    `script_brief` + `scene_atmosphere` + `casting_brief` + etc.).
+    This is the DELIBERATE writer-curated summary; the
+    writers'-room director (Wave 1 Agent D) should always prefer
+    it over the raw RSS dump because it has already been condensed
+    into prose ready for downstream consumption.
+
+    FALLBACK source: `meta.news_seed` (NewsFetcher's raw RSS
+    headline + body). Only used when `meta.news` is missing or
+    empty -- typically when `build_news_briefs` exhausted its
+    retry ladder and stamped `meta["news"] = None`.
+
+    Returns the best string available; never raises.
+    """
+    if not isinstance(ledger, dict):
+        return ""
+    meta = ledger.get("meta") or {}
+
+    # PRIMARY: LLM-summarized news briefs (build_news_briefs
+    # output stamped on meta["news"] -- see OTR_LedgerScriptWriter
+    # line 2225). script_brief is the concise prose summary the
+    # writers'-room director can ground on; scene_atmosphere adds
+    # setting flavor.
+    briefs = meta.get("news") or {}
+    if isinstance(briefs, dict):
+        script_brief = str(briefs.get("script_brief") or "").strip()
+        scene_atmosphere = str(
+            briefs.get("scene_atmosphere") or "",
+        ).strip()
+        if script_brief and scene_atmosphere:
+            return f"{script_brief}\n\n{scene_atmosphere}"
+        if script_brief:
+            return script_brief
+        if scene_atmosphere:
+            return scene_atmosphere
+
+    # FALLBACK: raw NewsFetcher news_seed dict / string. Used only
+    # when the LLM briefing pass failed (briefs missing / empty).
+    seed = meta.get("news_seed")
+    if isinstance(seed, dict):
+        headline = str(seed.get("headline") or "").strip()
+        body = str(
+            seed.get("body") or seed.get("source") or "",
+        ).strip()
+        if headline and body:
+            return f"{headline}\n\n{body}"
+        if headline:
+            return headline
+        if body:
+            return body
+    elif isinstance(seed, str) and seed.strip():
+        return seed.strip()
+
+    return ""
+
+
 def resolve_news_seed(
     widget_value: str,
     *,
@@ -265,34 +408,35 @@ def resolve_news_seed(
         ledger = _load_in_flight_ledger()
     if ledger is None or not isinstance(ledger, dict) or not ledger:
         ledger = _load_latest_ledger_by_mtime()
-    if not ledger or not isinstance(ledger, dict):
-        return ""
 
-    meta = ledger.get("meta") or {}
-    seed = meta.get("news_seed")
-    if isinstance(seed, dict):
-        # BUG-LOCAL-277 normalization: prefer headline + body shape.
-        headline = str(seed.get("headline") or "").strip()
-        body = str(
-            seed.get("body") or seed.get("source") or "",
-        ).strip()
-        if headline and body:
-            resolved = f"{headline}\n\n{body}"
-        elif headline:
-            resolved = headline
-        elif body:
-            resolved = body
-        else:
-            resolved = ""
-    elif isinstance(seed, str):
-        resolved = seed.strip()
-    else:
-        resolved = ""
-
+    # Try the in-flight / latest ledger first.
+    resolved = _extract_seed_from_ledger(ledger or {})
     if resolved:
         log.info(
             "[WritersRoomResolver] resolved news_seed from in-flight "
             "ledger (widget was empty; %d chars).",
             len(resolved),
         )
-    return resolved
+        return resolved
+
+    # BUG-LOCAL-294 cross-ledger walker: when the writer's own
+    # ledger lacks both meta.news and meta.news_seed (e.g.
+    # NewsFetcher and Writer raced on different episode_ids -- one
+    # second drift puts them in different pending_* dirs and the
+    # Writer's skeleton save doesn't carry the seed forward), scan
+    # the N most-recent ledgers for one that DOES carry it. The
+    # NewsFetcher-only ledger from the same queue's prior second
+    # typically does.
+    older_ledger = _find_latest_ledger_with_news_seed()
+    if older_ledger is not None:
+        resolved = _extract_seed_from_ledger(older_ledger)
+        if resolved:
+            log.info(
+                "[WritersRoomResolver] BUG-LOCAL-294 cross-ledger "
+                "walker resolved news_seed (widget was empty; "
+                "%d chars).",
+                len(resolved),
+            )
+            return resolved
+
+    return ""
