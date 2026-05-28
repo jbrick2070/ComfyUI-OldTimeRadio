@@ -166,6 +166,72 @@ def _coerce_regeneration_hint(critic_result: Any) -> str:
     return str(hint or "").strip()
 
 
+def _critic_call_failed(critic_result: Any) -> bool:
+    """BUG-LOCAL-287 (2026-05-27): detect a critic-failure marker.
+
+    The Stage 7 shadow critic's broad-except handler in
+    `_otr_freeze_cascade.py` stamps one of two shapes on
+    `meta['stage7_shadow_critic']` when the call itself failed
+    (NOT when the critic returned a real verdict):
+
+      * Setup failure (adapter could not build the ledger view):
+            {'ok': True/False, 'skipped': True, 'reason': '...'}
+
+      * Runtime failure (CriticCallFailedError -- typically
+        empty-output JSONDecodeError on the technical model;
+        Gemma 4B is a frequent offender):
+            {'ok': False, 'skipped': False,
+             'shadow_setup_failed': True,
+             'error_type': '...', 'error_message': '...'}
+
+    A real `CriticResult.to_dict()` carries a 'verdict' key with a
+    non-empty string. Distinguishing these two shapes lets the
+    escalation router treat 'critic dark' as 'ship' (no signal to
+    escalate on) rather than the default 'fall back to LINE reroll'
+    that historically exhausted on Sprint 5B story_critic targets.
+
+    Returns True iff `critic_result` looks like a failure marker.
+    Dataclass `CriticResult` instances always have a 'verdict' set
+    and never satisfy this predicate.
+    """
+    if critic_result is None:
+        return False
+    # Dataclass path -- check the verdict attr. A real CriticResult
+    # has a non-empty verdict ('ship' or 'discard').
+    if not isinstance(critic_result, dict):
+        verdict = getattr(critic_result, "verdict", "")
+        return not (verdict and str(verdict).strip())
+    # Dict path. The cascade coerces missing Stage 7 to {} via
+    # `meta.get("stage7_shadow_critic") or {}` -- an EMPTY dict
+    # means Stage 7 was never run (operator did not opt into
+    # shadow diagnostics), NOT that it ran and failed. Treat that
+    # as "no signal known" -- the existing legacy-LINE fallback
+    # path applies, same as the critic_result-is-None case in
+    # decide_escalation_scope. Only mark as failed when the dict
+    # carries one of the explicit failure-marker keys.
+    if not critic_result:
+        return False
+    # Explicit failure-marker keys the shadow stamps on a runtime
+    # or setup failure.
+    if critic_result.get("ok") is False:
+        return True
+    if critic_result.get("shadow_setup_failed") is True:
+        return True
+    if critic_result.get("skipped") is True:
+        return True
+    if "error_type" in critic_result or "error_message" in critic_result:
+        return True
+    # A real CriticResult.to_dict() always carries a non-empty
+    # 'verdict' key. A dict that lacks one but doesn't trip any
+    # marker above is a shape we have not seen -- conservatively
+    # treat as failed so the cascade ships rather than burns
+    # reroll cycles on stale targets.
+    verdict = str(critic_result.get("verdict") or "").strip()
+    if not verdict:
+        return True
+    return False
+
+
 def _extract_target_beat_ids(
     story_critic_targets: Optional[List[dict]],
 ) -> List[str]:
@@ -229,6 +295,41 @@ def decide_escalation_scope(
             target_beat_ids=_extract_target_beat_ids(
                 story_critic_targets,
             ),
+        )
+
+    # BUG-LOCAL-287 (2026-05-27): when the Stage 7 critic CALL failed
+    # (the shadow stamped a `{'ok': False, ...}` or
+    # `{'shadow_setup_failed': True, ...}` marker on meta because
+    # CriticCallFailedError fired or the adapter could not build),
+    # we have NO signal about the episode's quality. Falling back to
+    # the legacy LINE reroll is wrong in this case: the legacy reroll
+    # is driven by the Sprint 5B story_critic's targets (a DIFFERENT
+    # critic from Stage 7) and on long episodes it consistently
+    # exhausts its 2-cycle budget chasing the same "flat lines"
+    # over and over, which stamps needs_full_rerun and halts Bark.
+    # Live evidence: pending_20260527_170250 (Gemma technical slot,
+    # 9-beat superconductivity episode) -- Stage 7 critic emitted
+    # empty output twice, shadow stamped marker, Agent C routed to
+    # LINE, legacy reroll exhausted 2 cycles on the same 6 targets,
+    # episode failed to ship.
+    # The correct behavior when Stage 7 is dark: SHIP. The episode
+    # passed Stage 3 line validators, the doctor's diagnosis ran,
+    # and the multiturn composer's best-of-N already picked the
+    # cleanest line per beat. Without an authoritative whole-episode
+    # signal we don't have grounds to keep regenerating.
+    if _critic_call_failed(critic_result):
+        return EscalationDecision(
+            scope=EscalationScope.NONE,
+            reason=(
+                "Stage 7 shadow critic FAILED to produce a verdict "
+                "(empty output / shadow setup failure) -- no signal "
+                "to escalate on; ship the composed episode rather "
+                "than burn legacy-reroll cycles on the Sprint 5B "
+                "story_critic's separate target list. See "
+                "BUG-LOCAL-287."
+            ),
+            target_beat_ids=[],
+            regeneration_hint="",
         )
 
     verdict = _coerce_verdict(critic_result)
