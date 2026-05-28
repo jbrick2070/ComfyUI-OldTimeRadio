@@ -16,11 +16,12 @@ from __future__ import annotations
 from nodes import _otr_editor_pass as _ep
 
 
-def test_editor_max_new_tokens_at_least_2048():
-    """The cap must be >= 2048 so a full EditorVerdict (8-10 axes
-    each with 1-3 sentence notes + 1200-char overall_note + JSON
-    overhead) fits without truncating mid-string."""
-    assert _ep._EDITOR_MAX_NEW_TOKENS >= 2048
+def test_editor_max_new_tokens_at_least_4096():
+    """BUG-296 (2026-05-27): the cap must be >= 4096. 2048 still
+    truncated attempt 1 at base temp 0.30 on live runs -- the
+    model produces verbose JSON at base temp and only fits at
+    lower retry temp. 4096 lets attempt 1 land first try."""
+    assert _ep._EDITOR_MAX_NEW_TOKENS >= 4096
 
 
 def test_editor_retry_temperature_strictly_below_base():

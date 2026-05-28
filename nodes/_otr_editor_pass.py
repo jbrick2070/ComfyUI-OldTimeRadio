@@ -66,7 +66,15 @@ _EDITOR_RETRY_TEMPERATURE: float = 0.15
 # Same shape as BUG-LOCAL-285 on story_brief. Schema-side caps
 # still bound the actual content; the bump gives the model room
 # to close its JSON.
-_EDITOR_MAX_NEW_TOKENS: int = 2048
+# BUG-LOCAL-296 (2026-05-27): bumped 2048 -> 4096. 2048 STILL
+# truncated Editor attempt 1 at base temp 0.30 on pending_*_223452
+# (operator's third post-restart writers'-room soak). Same shape
+# as BUG-285 / 291 / 293: the model produces verbose JSON at base
+# temp; lower temp on retry produces tighter JSON that fits, but
+# we burn ~30-60 sec on a doomed attempt 1 every cycle. 4096
+# gives Mistral-Nemo room to close its JSON on the first try at
+# the base temperature.
+_EDITOR_MAX_NEW_TOKENS: int = 4096
 _EDITOR_MAX_ATTEMPTS: int = 2
 
 
