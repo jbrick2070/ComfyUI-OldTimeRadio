@@ -2475,16 +2475,18 @@ class OTR_LedgerScriptWriter:
                     resolved["num_characters"],
                     resolved["target_words"],
                 )
-                # Sprint 4.5 (2026-05-28) -- diagnostic Stage 1
-                # fan-out audit. Runs BEFORE the legacy single-call
-                # shadow pass so the operator sees both side-by-
-                # side in meta. The fan-out re-uses the shadow
-                # pass's constrained generator (bound to Stage1Plan).
-                # On any failure (per-knob LLM raise, all-invalid
-                # validators) the helper returns ok=False without
-                # raising, the audit is stamped, and we fall
-                # through to the legacy shadow pass so the outline
-                # path stays intact.
+                # Sprint 4.5 + 4.6 (2026-05-28) -- Stage 1 fan-out.
+                # Sprint 4.5 added it as a DIAGNOSTIC pass running
+                # parallel to the legacy single-call shadow pass
+                # (4 LLM calls total: 3 fan-out + 1 shadow). Sprint
+                # 4.6 dedups: when the fan-out succeeds, its winner
+                # IS the shadow plan -- the legacy single-call is
+                # skipped (3 LLM calls total). On fan-out failure
+                # we fall through to the legacy path so the cast
+                # audit / continuity ledger / validators all still
+                # have a Stage 1 plan to consume (Prime Directive 1).
+                _fanout_plan = None
+                _fanout_winner_attempt = None
                 if resolved.get("use_stage1_fanout"):
                     try:
                         from . import _otr_stage1_fanout as _OTRFAN
@@ -2530,13 +2532,29 @@ class OTR_LedgerScriptWriter:
                                 else None
                             ),
                             "error": _fan_res.no_valid_error_msg,
+                            # Sprint 4.6: did the fan-out winner
+                            # actually become the shadow plan, or
+                            # did we fall through?
+                            "used_as_shadow_plan": False,  # patched below
                         }
+                        if _fan_res.ok:
+                            _fanout_plan = _fan_res.winner_plan
+                            _fan_audit["used_as_shadow_plan"] = True
+                            log.info(
+                                "[Stage1FanOut] Sprint 4.6: winner "
+                                "(knob=%s) IS the shadow plan; "
+                                "skipping legacy single-call "
+                                "generate_stage1_plan.",
+                                _fan_audit["winner_knob"],
+                            )
+                        else:
+                            log.warning(
+                                "[Stage1FanOut] Sprint 4.6: fan-out "
+                                "failed (%s); falling through to "
+                                "legacy single-call shadow pass.",
+                                _fan_res.no_valid_error_msg[:200],
+                            )
                         meta["stage1_fanout"] = _fan_audit
-                        log.info(
-                            "[Stage1FanOut] diagnostic pass: ok=%s "
-                            "winner_knob=%s",
-                            _fan_res.ok, _fan_audit["winner_knob"],
-                        )
                     except Exception as _fan_exc:  # noqa: BLE001
                         # Never break the writer for a diagnostic
                         # pass; stamp + continue (Prime Directive 1).
@@ -2551,19 +2569,27 @@ class OTR_LedgerScriptWriter:
                                 f"{type(_fan_exc).__name__}: "
                                 f"{_fan_exc}"
                             )[:400],
+                            "used_as_shadow_plan": False,
                         }
 
-                _shadow_plan, _shadow_attempts = (
-                    _OTRS1.generate_stage1_plan(
-                        _shadow_gen_fn,
-                        news_seed=resolved["news_seed"],
-                        num_characters=resolved["num_characters"],
-                        target_words=resolved["target_words"],
-                        episode_title_hint=(
-                            resolved.get("episode_title") or ""
-                        ),
+                # Sprint 4.6: when the fan-out winner is available,
+                # use it as the shadow plan (no extra LLM call).
+                # Otherwise run the legacy single-call generator.
+                if _fanout_plan is not None:
+                    _shadow_plan = _fanout_plan
+                    _shadow_attempts = []
+                else:
+                    _shadow_plan, _shadow_attempts = (
+                        _OTRS1.generate_stage1_plan(
+                            _shadow_gen_fn,
+                            news_seed=resolved["news_seed"],
+                            num_characters=resolved["num_characters"],
+                            target_words=resolved["target_words"],
+                            episode_title_hint=(
+                                resolved.get("episode_title") or ""
+                            ),
+                        )
                     )
-                )
                 meta["stage1_shadow_attempts"] = [
                     {
                         "attempt": a.attempt,
