@@ -326,6 +326,16 @@ _NODE_MODULES = {
     # operator A/B confirms use_story_room ships on by default. PD6:
     # technical_model arrives over a STRING forceInput socket.
     "OTR_StoryRoomExtract": (".nodes.OTR_StoryRoomExtract", "OTR_StoryRoomExtract", " OTR Story Room Extract (dormant)"),
+    # Wave 3 bridge (2026-05-27): commit the Story Room extraction into
+    # the in-flight ledger so the freeze cascade + Bark see Story Room
+    # dialogue instead of the legacy compose_line output. Defaults
+    # commit=False (no-op pass-through, PD1 byte-identity holds). When
+    # commit=True AND extraction.status='ok', walks extraction.dialogue
+    # and overwrites ledger.lines[*].text per beat_id. Place between
+    # OTR_LedgerScriptWriter.script_json and OTR_LedgerFreezeCascade
+    # input. script_json passes through verbatim; the actual ledger
+    # write is a side-effect on the in-flight singleton.
+    "OTR_StoryRoomCommit": (".nodes.OTR_StoryRoomCommit", "OTR_StoryRoomCommit", " OTR Story Room Commit (Wave 3 bridge, dormant)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

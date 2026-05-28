@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 76,
-  "last_link_id": 224,
+  "last_node_id": 77,
+  "last_link_id": 226,
   "nodes": [
     {
       "id": 63,
@@ -1780,7 +1780,7 @@
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 107
+          "link": 225
         },
         {
           "name": "news_used",
@@ -2288,7 +2288,9 @@
         {
           "name": "story_room_extraction",
           "type": "STRING",
-          "links": null,
+          "links": [
+            226
+          ],
           "slot_index": 0
         }
       ],
@@ -2298,6 +2300,60 @@
       },
       "widgets_values": [
         ""
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 77,
+      "type": "OTR_StoryRoomCommit",
+      "pos": [
+        500,
+        900
+      ],
+      "size": [
+        440,
+        200
+      ],
+      "title": "Story Room Commit (Wave 3 bridge, DORMANT)",
+      "flags": {},
+      "order": 102,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 107
+        },
+        {
+          "name": "story_room_extraction",
+          "type": "STRING",
+          "link": 226
+        },
+        {
+          "name": "commit",
+          "type": "BOOLEAN",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            225
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_StoryRoomCommit",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2652,8 +2708,8 @@
       107,
       1,
       1,
-      62,
-      1,
+      77,
+      0,
       "STRING"
     ],
     [
@@ -2910,6 +2966,22 @@
       5,
       76,
       3,
+      "STRING"
+    ],
+    [
+      225,
+      77,
+      0,
+      62,
+      1,
+      "STRING"
+    ],
+    [
+      226,
+      76,
+      0,
+      77,
+      1,
       "STRING"
     ]
   ],
