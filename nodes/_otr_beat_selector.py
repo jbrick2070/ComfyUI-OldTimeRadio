@@ -157,9 +157,13 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
 
 
 def _voiced_beats(plan: Any) -> List[Any]:
+    # A fix (2026-05-28): read via _attr so a parsed-from-JSON plan
+    # (dict) and its dict-shaped beats resolve correctly. The old
+    # getattr path returned no beats for a dict plan, scoring it as a
+    # zero-beat plan and distorting the selector audit.
     return [
-        b for b in (getattr(plan, "beats", None) or [])
-        if str(getattr(b, "speaker", "") or "").strip() != "MUSIC"
+        b for b in (_attr(plan, "beats", None) or [])
+        if str(_attr(b, "speaker", "") or "").strip() != "MUSIC"
     ]
 
 
@@ -169,7 +173,7 @@ def _carries_alarm_pattern(plan: Any) -> bool:
     haystack_parts: list[str] = []
     for b in _voiced_beats(plan):
         for attr in ("intent", "objective", "turn"):
-            v = getattr(b, attr, None)
+            v = _attr(b, attr, None)
             if v:
                 haystack_parts.append(str(v).lower())
     haystack = "\n".join(haystack_parts)
@@ -183,7 +187,7 @@ def score_beat_sheet(plan: Any) -> BeatSelectorScores:
     selector is judging visible structure, never taste. Small local
     models can score this; humans handle the listen test.
     """
-    ds = getattr(plan, "dramatic_state", None)
+    ds = _attr(plan, "dramatic_state", None)
     voiced = _voiced_beats(plan)
 
     # 1. clear_opposed_desires -- DramaticState present and the two
@@ -203,14 +207,14 @@ def score_beat_sheet(plan: Any) -> BeatSelectorScores:
         slot = str(_attr(ds,"costly_choice_beat", "") or "").strip()
         if slot:
             by_slot = {
-                str(getattr(b, "dialogue_slot_id", "") or "").strip(): b
+                str(_attr(b, "dialogue_slot_id", "") or "").strip(): b
                 for b in voiced
             }
             by_slot.pop("", None)
             pivot = by_slot.get(slot)
             if pivot is not None:
-                sb = _norm(getattr(pivot, "state_before", ""))
-                sa = _norm(getattr(pivot, "state_after", ""))
+                sb = _norm(_attr(pivot, "state_before", ""))
+                sa = _norm(_attr(pivot, "state_after", ""))
                 if sb and sa and sb != sa:
                     costly_choice_present = 1
 
@@ -229,7 +233,7 @@ def score_beat_sheet(plan: Any) -> BeatSelectorScores:
     ending_changed_from_beginning = 0
     if ds is not None and voiced:
         ec = _norm(_attr(ds,"ending_change", ""))
-        opening = _norm(getattr(voiced[0], "state_before", ""))
+        opening = _norm(_attr(voiced[0], "state_before", ""))
         if ec and opening and ec != opening:
             ending_changed_from_beginning = 1
 
