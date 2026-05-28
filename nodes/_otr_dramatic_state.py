@@ -2,9 +2,9 @@
 
 The DramaticState object replaces the 350-char `script_brief`
 postage-stamp arc as the episode's reproducibility anchor. The
-news_interpreter and Director write it; the Writer reads it; the
-structural validators in `_otr_beat_validators` judge whether a beat
-sheet honors it.
+news_interpreter and the brief-builder write it; the Writer reads it;
+the structural validators in `_otr_beat_validators` judge whether a
+beat sheet honors it.
 
 Why the postage-stamp arc had to go (round-robin consensus):
   - 350 chars is too small to specify the dramatic question, both

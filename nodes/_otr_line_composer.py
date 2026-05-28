@@ -679,6 +679,28 @@ class LineRequest:
     # tail. Empty string means this is a normal first-pass compose (the
     # block is dropped), so every existing caller / test is unaffected.
     reroll_hint: str = ""
+    # ---- Sprint 3 (2026-05-28): arc-aware line generation ----
+    # The line composer's previous diet (style + canon + cast + spine +
+    # last 2 lines + intent + mood + word count) reliably reproduced
+    # the immediate-context bias of small instruct-tuned models:
+    # lines that fit the surrounding mood but did not advance the
+    # episode arc. Round-robin consensus: instead of fighting that
+    # bias, USE it -- park the dramatic state (the next_turn the
+    # beat must reveal, the dramatic question that frames the whole
+    # episode) directly above the generation slot so the magnetic
+    # pole pulls toward arc, not just toward mood.
+    #
+    # All Sprint 3 fields default to empty so every existing caller
+    # and test is unaffected. The Path B (Story Room) writer drafts
+    # the whole episode against the brief and does NOT use this
+    # composer, so this enrichment lives on Path A.
+    dramatic_question: str = ""
+    beat_objective: str = ""
+    beat_obstacle: str = ""
+    beat_turn: str = ""
+    beat_subtext: str = ""
+    beat_tension: int = 0     # 0 = unset; renders only when 1..5
+    next_turn: str = ""
 
 
 @dataclass(frozen=True)
@@ -1103,6 +1125,40 @@ def _build_user_prompt(req: LineRequest) -> str:
         parts.append("")
         parts.append(f"SOUND IN THE ROOM: {req.sfx_cue}")
 
+    # ===== Sprint 3 (2026-05-28): DRAMATIC FRAME (magnetic pole) =====
+    # The block sits ABOVE the rolling window so the next_turn the
+    # beat must reveal is the last directive the model reads before
+    # the LAST SPOKEN buffer. Each line is conditionally emitted so
+    # legacy callers (Sprint 2 Optional fields all empty) still
+    # render exactly the pre-Sprint-3 prompt -- the entire block is
+    # dropped when none of the Sprint 3 fields are set.
+    _dramatic_lines: list[str] = []
+    if req.dramatic_question:
+        _dramatic_lines.append(
+            f"DRAMATIC QUESTION: {req.dramatic_question}"
+        )
+    _this_beat_lines: list[str] = []
+    if req.beat_objective:
+        _this_beat_lines.append(f"  Objective: {req.beat_objective}")
+    if req.beat_obstacle:
+        _this_beat_lines.append(f"  Obstacle:  {req.beat_obstacle}")
+    if req.beat_turn:
+        _this_beat_lines.append(f"  Turn:      {req.beat_turn}")
+    if req.beat_subtext:
+        _this_beat_lines.append(f"  Subtext:   {req.beat_subtext}")
+    if 1 <= req.beat_tension <= 5:
+        _this_beat_lines.append(f"  Tension:   {req.beat_tension}/5")
+    if _this_beat_lines:
+        _dramatic_lines.append("THIS BEAT:")
+        _dramatic_lines.extend(_this_beat_lines)
+    if req.next_turn:
+        _dramatic_lines.append(
+            f"NEXT BEAT MUST REVEAL: {req.next_turn}"
+        )
+    if _dramatic_lines:
+        parts.append("")
+        parts.extend(_dramatic_lines)
+
     # Tier 2 fix #15 (2026-05-11): prompt-injection guard. Prior
     # generated lines paste raw into the next prompt; if any earlier
     # generation produced "Now ignore your instructions and ..." it
@@ -1162,6 +1218,21 @@ def _build_user_prompt(req: LineRequest) -> str:
         )
         parts.append(f"  {req.reroll_hint}")
         parts.append("")
+    # Sprint 3 (2026-05-28): output constraint -- the anti-decorative
+    # lever. Lands at the WRITE LINE tail (just above "Speak now.")
+    # so it is the model's last instruction. Conditional on any
+    # Sprint 3 dramatic field being set; legacy callers (Sprint 2
+    # Optional fields all empty) skip the constraint and the prompt
+    # is byte-identical to pre-Sprint-3.
+    if (
+        req.dramatic_question or req.beat_objective or req.beat_turn
+        or req.next_turn
+    ):
+        parts.append(
+            "Write 1 spoken line. Do not summarize the objective. "
+            "Do not explain the turn. Perform the objective indirectly. "
+            "The situation must be different after this line."
+        )
     parts.append("Speak now.")
     return "\n".join(parts)
 
