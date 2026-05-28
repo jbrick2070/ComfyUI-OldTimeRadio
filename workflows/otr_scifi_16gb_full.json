@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 78,
-  "last_link_id": 226,
+  "last_node_id": 79,
+  "last_link_id": 229,
   "nodes": [
     {
       "id": 63,
@@ -2377,17 +2377,17 @@
         {
           "name": "candidate_a_json",
           "type": "STRING",
-          "link": null
+          "link": 227
         },
         {
           "name": "candidate_b_json",
           "type": "STRING",
-          "link": null
+          "link": 228
         },
         {
           "name": "candidate_c_json",
           "type": "STRING",
-          "link": null
+          "link": 229
         }
       ],
       "outputs": [
@@ -2411,6 +2411,99 @@
       "widgets_values": [
         "",
         "",
+        ""
+      ],
+      "color": "#3A5A3C",
+      "bgcolor": "#23341F"
+    },
+    {
+      "id": 79,
+      "type": "OTR_Stage1FanOut",
+      "pos": [
+        500,
+        1200
+      ],
+      "size": [
+        440,
+        280
+      ],
+      "title": "Stage 1 Fan-Out (Sprint 4 diversity knobs, detached)",
+      "flags": {},
+      "order": 109,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "news_seed",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "num_characters",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "target_words",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "episode_title_hint",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "candidate_a_json",
+          "type": "STRING",
+          "links": [
+            227
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "candidate_b_json",
+          "type": "STRING",
+          "links": [
+            228
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "candidate_c_json",
+          "type": "STRING",
+          "links": [
+            229
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "winning_plan_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "fanout_audit_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_Stage1FanOut",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        2,
+        350,
         ""
       ],
       "color": "#3A5A3C",
@@ -3040,6 +3133,30 @@
       0,
       77,
       1,
+      "STRING"
+    ],
+    [
+      227,
+      79,
+      0,
+      78,
+      0,
+      "STRING"
+    ],
+    [
+      228,
+      79,
+      1,
+      78,
+      1,
+      "STRING"
+    ],
+    [
+      229,
+      79,
+      2,
+      78,
+      2,
       "STRING"
     ]
   ],

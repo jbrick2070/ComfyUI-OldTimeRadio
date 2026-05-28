@@ -40,20 +40,26 @@ def test_beat_selector_node_present():
     assert len(matches) == 1
 
 
-def test_beat_selector_is_detached():
-    """Sprint 4.2 invariant: the node is registered but NOT wired
-    to any upstream / downstream. Operator wires it manually once
-    Sprint 4.3 (Stage 1 fan-out) lands."""
+def test_beat_selector_inputs_wired_to_stage1_fanout():
+    """Sprint 4.7 (2026-05-28) -- the BeatSelector's three
+    candidate inputs are now wired to OTR_Stage1FanOut's three
+    candidate outputs. Outputs remain detached so the operator
+    decides where the winner / audit go.
+
+    (Sprint 4.2 originally shipped the node detached; Sprint 4.7
+    upgraded the wiring once Sprint 4.8's OTR_Stage1FanOut node
+    landed.)
+    """
     d = _load()
     bs = next(n for n in d["nodes"] if n.get("type") == "OTR_BeatSelector")
-    for inp in bs.get("inputs", []):
-        assert inp.get("link") is None, (
-            f"OTR_BeatSelector input {inp.get('name')!r} should be "
-            "detached (link == None); got "
-            f"{inp.get('link')!r}"
+    bs_inputs_by_name = {inp["name"]: inp for inp in bs.get("inputs", [])}
+    for cand in ("candidate_a_json", "candidate_b_json", "candidate_c_json"):
+        assert bs_inputs_by_name[cand]["link"] is not None, (
+            f"Sprint 4.7: OTR_BeatSelector input {cand!r} should "
+            f"carry a link from OTR_Stage1FanOut; got "
+            f"{bs_inputs_by_name[cand]['link']!r}"
         )
     for out in bs.get("outputs", []):
-        # Empty list OR null is acceptable for detached outputs.
         links = out.get("links") or []
         assert links == [], (
             f"OTR_BeatSelector output {out.get('name')!r} should be "
