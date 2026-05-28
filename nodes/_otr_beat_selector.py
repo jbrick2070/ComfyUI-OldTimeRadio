@@ -146,6 +146,16 @@ def _norm(s: Any) -> str:
     return " ".join((str(s or "").strip()).lower().split())
 
 
+def _attr(obj: Any, name: str, default: Any = None) -> Any:
+    """Dict-or-attribute read (Sprint 4.1 wire-up). Stage1Plan
+    .dramatic_state is Optional[Any] so a parsed-from-JSON plan
+    carries the dramatic state as a dict, not a DramaticState
+    object; the scorer must read both."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
 def _voiced_beats(plan: Any) -> List[Any]:
     return [
         b for b in (getattr(plan, "beats", None) or [])
@@ -182,15 +192,15 @@ def score_beat_sheet(plan: Any) -> BeatSelectorScores:
     #    so we only need to confirm both fields are populated).
     clear_opposed_desires = int(bool(
         ds is not None
-        and getattr(ds, "character_a_wants", "")
-        and getattr(ds, "character_b_wants", "")
+        and _attr(ds,"character_a_wants", "")
+        and _attr(ds,"character_b_wants", "")
     ))
 
     # 2. costly_choice_present -- the named slot exists AND its
     #    state pivots (state_before != state_after).
     costly_choice_present = 0
     if ds is not None:
-        slot = str(getattr(ds, "costly_choice_beat", "") or "").strip()
+        slot = str(_attr(ds,"costly_choice_beat", "") or "").strip()
         if slot:
             by_slot = {
                 str(getattr(b, "dialogue_slot_id", "") or "").strip(): b
@@ -218,7 +228,7 @@ def score_beat_sheet(plan: Any) -> BeatSelectorScores:
     #    side is empty the axis fails (cannot prove change).
     ending_changed_from_beginning = 0
     if ds is not None and voiced:
-        ec = _norm(getattr(ds, "ending_change", ""))
+        ec = _norm(_attr(ds,"ending_change", ""))
         opening = _norm(getattr(voiced[0], "state_before", ""))
         if ec and opening and ec != opening:
             ending_changed_from_beginning = 1

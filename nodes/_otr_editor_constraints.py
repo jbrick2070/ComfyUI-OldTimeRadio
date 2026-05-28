@@ -153,6 +153,13 @@ def _norm(s: Any) -> str:
     return " ".join((str(s or "").strip()).lower().split())
 
 
+def _attr(obj: Any, name: str, default: Any = None) -> Any:
+    """Dict-or-attribute read (Sprint 4.1 wire-up)."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
 def _voiced_beats(plan: Any) -> List[Any]:
     return [
         b for b in (getattr(plan, "beats", None) or [])
@@ -273,7 +280,7 @@ def check_constraints(
     # ---- MISSING_COSTLY_CHOICE ----------------------------------------
     ds = getattr(plan, "dramatic_state", None)
     if ds is not None:
-        slot = str(getattr(ds, "costly_choice_beat", "") or "").strip()
+        slot = str(_attr(ds,"costly_choice_beat", "") or "").strip()
         if not slot:
             failing.append(EditorConstraint.MISSING_COSTLY_CHOICE)
             notes.append(

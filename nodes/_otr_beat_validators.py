@@ -55,6 +55,17 @@ def _norm(s: Any) -> str:
     return " ".join((str(s or "").strip()).lower().split())
 
 
+def _attr(obj: Any, name: str, default: Any = None) -> Any:
+    """Read `name` off `obj` whether it's a pydantic model, a
+    dataclass, or a plain dict (Sprint 4.1: Stage1Plan.dramatic_state
+    is Optional[Any] so the round-trip through JSON yields a dict,
+    not a DramaticState. Both shapes need to work in the validator
+    + scorer)."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
 def is_dead_beat(beat: Any) -> bool:
     """A beat is dead if it carries typed state and state_before
     normalizes-equal to state_after. Untyped beats (legacy Sprint 1
@@ -114,7 +125,7 @@ def validate_beat_sheet(plan: Any) -> List[str]:
         return defects  # legacy plan; rest of validators have nothing to claim
 
     # ---- Validator 2: costly-choice beat exists ------------------
-    target_slot = str(getattr(ds, "costly_choice_beat", "") or "").strip()
+    target_slot = str(_attr(ds,"costly_choice_beat", "") or "").strip()
     if not target_slot:
         defects.append(
             f"{DefectKind.NO_COSTLY_CHOICE}: dramatic_state.costly_"
@@ -153,7 +164,7 @@ def validate_beat_sheet(plan: Any) -> List[str]:
         )
 
     # ---- Validator 4: ending change --------------------------------
-    ending_change = _norm(getattr(ds, "ending_change", ""))
+    ending_change = _norm(_attr(ds,"ending_change", ""))
     opening_state = ""
     if voiced:
         opening_state = _norm(
