@@ -43,6 +43,14 @@ CODE_SPEAKER_LEAK: str = "speaker_leak"
 CODE_BANNED_PHRASE: str = "banned_phrase"
 CODE_CONTINUITY_BREAK: str = "continuity_break"
 CODE_OFF_BEAT: str = "off_beat"
+# BUG-LOCAL-288 (2026-05-27): SFW post-validator. PD4 says "Safe
+# for work. No profanity. Non-violent. Good narrative arc." The
+# writer occasionally emits mild profanity ("Damn it",
+# "What the hell") that BUG_BIBLE-261 already caught at the
+# whole-episode level but that slipped through compose_line. This
+# code lets the Stage 3 line-level gate flag the same patterns
+# so the operator sees the violation before Bark ever renders.
+CODE_SFW_VIOLATION: str = "sfw_violation"
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +120,47 @@ DEFAULT_BANNED_PHRASES: List[str] = [
     "absolutely",
     "literally",
     "utterly",
+]
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-288: SFW profanity terms (PD4)
+# ---------------------------------------------------------------------------
+# PD4 ships a hard rule: "Safe for work. No profanity. Non-violent.
+# Good narrative arc." validate_sfw catches the family of mild
+# profanity Mistral-Nemo and Gemma occasionally emit on dialogue.
+# Each entry is matched as a whole word (word-boundary regex) so
+# 'hell' fires on "go to hell" but NOT on "hello". Case-insensitive.
+# Operator-extensible per-call; this constant is the starting set.
+#
+# Sourced from live runs (pending_20260527_153942 "Space Force /
+# SpaceX targeting" shipped a 'damn it' first-line that violated
+# PD4 and still made it through to ledger persistence).
+
+DEFAULT_PROFANITY_TERMS: List[str] = [
+    # Mild profanity that the writer occasionally emits on tense
+    # beats.
+    "damn",
+    "damnit",
+    "dammit",
+    "hell",
+    "goddamn",
+    "godammit",
+    "goddammit",
+    "shit",
+    "bullshit",
+    "bitch",
+    "bastard",
+    "ass",
+    "asshole",
+    "fuck",
+    "fucking",
+    "fucker",
+    "piss",
+    # Common substitutions
+    "screw you",
+    "screw this",
+    "screw that",
 ]
 
 
@@ -385,6 +434,81 @@ def validate_banned_phrases(
     return None
 
 
+def validate_sfw(
+    beat: Stage1Beat,
+    line_text: str,
+    speaker_name: str,
+    terms: Optional[List[str]] = None,
+) -> Optional[ValidationFinding]:
+    """BUG-LOCAL-288 (2026-05-27): SFW profanity validator.
+
+    Word-boundary regex check against the configurable profanity
+    list. First match fires an `sfw_violation` ERROR so compose_line's
+    single-repair branch fires (Wave 1 Agent B contract). The
+    distinction from `validate_banned_phrases` is intentional --
+    profanity is a HARD PD4 ship-stop ("Safe for work. No
+    profanity."), purple-prose is taste. Codes stay separate so the
+    operator can filter the meta.stage3_findings_per_beat trail by
+    cause without grepping prose.
+
+    Match shape: case-insensitive, whole-word ONLY. "hell" fires on
+    "go to hell" but NOT on "hello" / "hellish" / "shellfish".
+    Multi-word entries ("screw you") match exact phrases as
+    substrings (still bounded -- the writer is unlikely to slip
+    "screw you" inside another word).
+
+    Reserved speakers (ANNOUNCER, MUSIC) are subject to the same
+    rule -- the announcer's bookends are part of the shippable
+    transcript and PD4 applies uniformly.
+    """
+    if not isinstance(line_text, str):
+        return None
+    terms = terms if terms is not None else DEFAULT_PROFANITY_TERMS
+    low = line_text.lower()
+    for term in terms:
+        t = (term or "").strip().lower()
+        if not t:
+            continue
+        if " " in t:
+            # Multi-word phrase -- substring match.
+            if t in low:
+                return ValidationFinding(
+                    severity=_SEVERITY_ERROR,
+                    code=CODE_SFW_VIOLATION,
+                    beat_id=beat.beat_id,
+                    speaker=speaker_name,
+                    message=(
+                        f"SFW violation (PD4): profanity phrase "
+                        f"{term!r} detected in line. PD4 ships as "
+                        f"a hard rule -- rewrite without the term."
+                    ),
+                    expected="no profanity",
+                    got=term,
+                )
+        else:
+            # Single word -- word-boundary regex so 'hell' does
+            # NOT match 'hello'.
+            pattern = re.compile(
+                rf"\b{re.escape(t)}\b",
+                re.IGNORECASE,
+            )
+            if pattern.search(line_text):
+                return ValidationFinding(
+                    severity=_SEVERITY_ERROR,
+                    code=CODE_SFW_VIOLATION,
+                    beat_id=beat.beat_id,
+                    speaker=speaker_name,
+                    message=(
+                        f"SFW violation (PD4): profanity word "
+                        f"{term!r} detected in line. PD4 ships as "
+                        f"a hard rule -- rewrite without the word."
+                    ),
+                    expected="no profanity",
+                    got=term,
+                )
+    return None
+
+
 def validate_continuity(
     beat: Stage1Beat,
     line_text: str,
@@ -522,6 +646,15 @@ def validate_line(
 
     # Speaker-leak applies to all beats too.
     finding = validate_speaker_leak(beat, line_text, speaker_name)
+    if finding is not None:
+        result.findings.append(finding)
+
+    # BUG-LOCAL-288: SFW profanity (PD4 hard rule). Runs BEFORE
+    # banned phrases so an SFW-violating line that ALSO contains a
+    # banned phrase surfaces the SFW finding first -- profanity is
+    # the more serious ship-stop. The compose_line repair branch
+    # treats both shapes the same way (one regenerate attempt).
+    finding = validate_sfw(beat, line_text, speaker_name)
     if finding is not None:
         result.findings.append(finding)
 
