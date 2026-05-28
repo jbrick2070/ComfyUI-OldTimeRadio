@@ -311,6 +311,39 @@ def _format_editor_notes_block(verdict: EditorVerdict) -> str:
     return "\n".join(lines)
 
 
+def _format_constraint_repair_block(verdict: EditorVerdict) -> str:
+    """Sprint 5.5 (2026-05-28) -- render the Writer's revision
+    directive from a constraint-editor verdict.
+
+    Sprint 5.4 stores the constraint editor's output in an
+    EditorVerdict-shape adapter where:
+      verdict.failing_axes   == EditorConstraintVerdict.failing_constraints
+      verdict.overall_note   == EditorConstraintVerdict.repair_note
+
+    The Sprint 5.2 `derive_repair_prompt` helper produces a richer
+    block than `_format_editor_notes_block` -- it labels each
+    constraint code with a concrete per-code repair header so the
+    Writer doesn't have to guess what "WRONG_SPEAKER" means.
+    Sprint 5.5 splices that block in directly when the
+    constraint-editor path is on.
+
+    Pass-decision verdicts return an empty block (Writer has
+    nothing to revise) -- callers can splice unconditionally.
+    """
+    from ._otr_editor_constraints import (
+        EditorConstraintVerdict,
+        derive_repair_prompt,
+    )
+
+    constraint_verdict = EditorConstraintVerdict(
+        pass_decision=bool(verdict.pass_decision),
+        failing_constraints=list(verdict.failing_axes or []),
+        repair_note=str(verdict.overall_note or ""),
+        cycle=int(getattr(verdict, "cycle", 0) or 0),
+    )
+    return derive_repair_prompt(constraint_verdict)
+
+
 def build_writer_system_prompt() -> str:
     """Return the Writer's system prompt verbatim.
 
@@ -329,6 +362,8 @@ def build_writer_user_prompt(
     last_editor_verdict: Optional[EditorVerdict] = None,
     last_draft: Optional[str] = None,
     cycle: int = 0,
+    *,
+    use_constraint_editor: bool = False,
 ) -> str:
     """Build the user-message body for one Writer turn.
 
@@ -359,6 +394,35 @@ def build_writer_user_prompt(
 
     if last_editor_verdict is not None and last_draft is not None:
         draft_clean = (last_draft or "").strip() or "(empty draft)"
+        # Sprint 5.5 (2026-05-28): when the constraint editor is on,
+        # render the per-code repair block via derive_repair_prompt
+        # (labelled headers, no taste-rubric framing). Legacy path
+        # keeps the unchanged _format_editor_notes_block.
+        if use_constraint_editor:
+            repair_block = _format_constraint_repair_block(
+                last_editor_verdict,
+            )
+            # When derive_repair_prompt returns empty (the verdict
+            # passed -- shouldn't happen in a revision cycle, but
+            # defensive) fall through to a minimal block so the
+            # Writer still has signal.
+            if not repair_block:
+                repair_block = (
+                    "EDITOR NOTES:\n  (the constraint editor "
+                    "passed; revise only for clarity)"
+                )
+            revision_directive = (
+                "Revise the draft addressing each named constraint "
+                "above. Do NOT rewrite passing passages. Output the "
+                "FULL revised episode as prose now."
+            )
+        else:
+            repair_block = _format_editor_notes_block(last_editor_verdict)
+            revision_directive = (
+                "Revise the draft addressing every failing axis named "
+                "above. Output the FULL revised episode as prose now, "
+                "not a diff or a change list."
+            )
         parts.extend([
             "",
             "YOUR LAST DRAFT (the editor's notes are about THIS):",
@@ -366,11 +430,9 @@ def build_writer_user_prompt(
             draft_clean,
             "--- end last draft ---",
             "",
-            _format_editor_notes_block(last_editor_verdict),
+            repair_block,
             "",
-            "Revise the draft addressing every failing axis named "
-            "above. Output the FULL revised episode as prose now, not "
-            "a diff or a change list.",
+            revision_directive,
         ])
     else:
         parts.extend([
@@ -397,12 +459,18 @@ def _call_writer(
     last_draft: Optional[str],
     cycle: int,
     is_first_pass_in_cycle: bool,
+    use_constraint_editor: bool = False,
 ) -> str:
     """Run one Writer turn and return the raw draft text.
 
     The Writer is a free-form prose pass -- creative slot, no
     constrained-decode schema. The caller decides whether the result
     is a usable draft (non-empty after stripping).
+
+    Sprint 5.5 (2026-05-28): `use_constraint_editor` propagates into
+    `build_writer_user_prompt` so revision turns under the
+    constraint-editor path render `derive_repair_prompt`-style
+    per-code repair blocks instead of the taste-rubric notes block.
     """
     user = build_writer_user_prompt(
         brief=brief,
@@ -411,6 +479,7 @@ def _call_writer(
         last_editor_verdict=last_editor_verdict,
         last_draft=last_draft,
         cycle=cycle,
+        use_constraint_editor=use_constraint_editor,
     )
     messages = [
         {"role": "system", "content": build_writer_system_prompt()},
@@ -743,6 +812,7 @@ def run_story_room(
                 last_draft=None,
                 cycle=0,
                 is_first_pass_in_cycle=True,
+                use_constraint_editor=use_constraint_editor,
             )
         except Exception as exc:  # noqa: BLE001 -- writer LLM call
             log.warning(
@@ -852,6 +922,7 @@ def run_story_room(
                 last_draft=current_draft,
                 cycle=cycle_idx + 1,
                 is_first_pass_in_cycle=True,
+                use_constraint_editor=use_constraint_editor,
             )
         except Exception as exc:  # noqa: BLE001 -- writer LLM call
             log.warning(
