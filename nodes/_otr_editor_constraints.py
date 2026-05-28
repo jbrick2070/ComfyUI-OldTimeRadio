@@ -591,3 +591,302 @@ def derive_repair_prompt(verdict: EditorConstraintVerdict) -> str:
         lines.append("")
         lines.append(f"Editor's note: {note}")
     return "\n".join(lines)
+
+
+
+# ---------------------------------------------------------------------------
+# Sprint 5.3 (2026-05-28) -- LLM-side constraint editor surface
+# ---------------------------------------------------------------------------
+#
+# Mirror of `_otr_editor_pass.run_editor` for the Sprint 5 constraint
+# editor: same call shape (prompt builder + run() entry that consumes
+# a constrained-decode generate_fn), narrower schema (no taste
+# rubric, no per-axis-notes), single repair turn (Sprint 5 cap).
+#
+# The Sprint 5.4 follow-up swaps `_otr_story_room._call_editor` for
+# `_call_constraint_editor` (a thin wrapper around run_constraint_
+# editor) when the operator flips use_constraint_editor=True on the
+# OTR_StoryRoom widget. That swap also forces max_editor_cycles=1.
+# This sprint lands the pure LLM-side surface + tests; the loop swap
+# is a separate sprint because it touches OTR_StoryRoom's
+# constrained-decode binding layer.
+
+import json as _json_for_constraint_editor
+
+from pydantic import BaseModel as _BaseModel
+from pydantic import Field as _Field
+from typing import Literal as _Literal
+
+
+__all__.extend([
+    "EditorConstraintVerdictSchema",
+    "ConstraintEditorCallFailedError",
+    "build_constraint_editor_prompt",
+    "run_constraint_editor",
+])
+
+
+_CONSTRAINT_EDITOR_BASE_TEMPERATURE: float = 0.20
+_CONSTRAINT_EDITOR_RETRY_TEMPERATURE: float = 0.10
+# Sprint 5.3: the constraint verdict carries at most 5 enum codes +
+# a one-sentence repair_note. ~600 chars of JSON + overhead fits
+# comfortably in 1024 tokens at the base temperature; tighter than
+# the taste editor's 4096 cap.
+_CONSTRAINT_EDITOR_MAX_NEW_TOKENS: int = 1024
+_CONSTRAINT_EDITOR_MAX_ATTEMPTS: int = 2
+
+
+_ConstraintCodeLiteral = _Literal[
+    "WRONG_SPEAKER",
+    "PHANTOM_CHARACTER",
+    "MISSING_COSTLY_CHOICE",
+    "NO_FINAL_THIRD_TURN",
+    "FORMAT_FAILURE",
+]
+
+
+class EditorConstraintVerdictSchema(_BaseModel):
+    """Constrained-decode binding for the LLM-side constraint editor.
+
+    Mirrors EditorConstraintVerdict one for one; the Literal union on
+    `failing_constraints` keeps the sampler inside the 5 canonical
+    codes so the constraint check can never invent a sixth axis. The
+    consumer json.loads + Pydantic-validates the raw output (belt and
+    braces vs the constrained sampler).
+    """
+
+    pass_decision: bool = _Field(
+        ...,
+        description=(
+            "True iff failing_constraints is empty. The loop ships "
+            "on True; on False it runs ONE targeted Writer revision "
+            "turn (Sprint 5 cap)."
+        ),
+    )
+    failing_constraints: List[_ConstraintCodeLiteral] = _Field(
+        default_factory=list,
+        description=(
+            "Subset of the five EditorConstraint codes the draft "
+            "currently fails. Empty when pass_decision is True."
+        ),
+    )
+    repair_note: str = _Field(
+        default="",
+        max_length=400,
+        description=(
+            "One-sentence concrete repair instruction for the "
+            "Writer's next revision turn. Required when "
+            "pass_decision is False; ignored when True."
+        ),
+    )
+
+
+class ConstraintEditorCallFailedError(RuntimeError):
+    """Raised when the LLM-side constraint editor exhausts its retry
+    budget. The run_story_room caller decides whether to soft-pass
+    the Writer's last draft (per Section 4 Wave 2 risk row) or hard-
+    fail the room; this module surfaces the failure loud."""
+
+    def __init__(
+        self,
+        *,
+        attempts: int,
+        last_raw_output: str,
+        last_error: Exception,
+    ) -> None:
+        self.attempts = attempts
+        self.last_raw_output = last_raw_output
+        self.last_error = last_error
+        super().__init__(
+            f"Constraint editor exhausted retry budget after "
+            f"{attempts} attempt(s); last error: "
+            f"{type(last_error).__name__}: {last_error}"
+        )
+
+
+def _coerce_director_brief_dict(brief: Any) -> dict:
+    """Local copy of _otr_editor_pass._coerce_director_brief's logic
+    so this module stays decoupled from the taste editor's prompt
+    builder."""
+    if isinstance(brief, str):
+        try:
+            brief = _json_for_constraint_editor.loads(brief)
+        except _json_for_constraint_editor.JSONDecodeError as exc:
+            raise ConstraintEditorCallFailedError(
+                attempts=0,
+                last_raw_output=brief[:200],
+                last_error=exc,
+            )
+    if isinstance(brief, dict):
+        d = brief
+    else:
+        d = {
+            "news_premise": getattr(brief, "news_premise", ""),
+            "dramatic_question": getattr(brief, "dramatic_question", ""),
+            "opposed_desires": getattr(brief, "opposed_desires", ""),
+            "arc_shape": getattr(brief, "arc_shape", ""),
+            "audience_feel": getattr(brief, "audience_feel", ""),
+            "forbidden_drift": list(getattr(brief, "forbidden_drift", []) or []),
+            "raw_brief": getattr(brief, "raw_brief", ""),
+        }
+    return {
+        "news_premise": str(d.get("news_premise", "") or ""),
+        "dramatic_question": str(d.get("dramatic_question", "") or ""),
+        "opposed_desires": str(d.get("opposed_desires", "") or ""),
+        "arc_shape": str(d.get("arc_shape", "") or ""),
+        "audience_feel": str(d.get("audience_feel", "") or ""),
+        "forbidden_drift": [
+            str(x) for x in (d.get("forbidden_drift", []) or [])
+        ],
+        "raw_brief": str(d.get("raw_brief", "") or ""),
+    }
+
+
+def build_constraint_editor_prompt(
+    director_brief: Any,
+    writer_draft: str,
+    *,
+    cast_names: Optional[List[str]] = None,
+    cycle: int = 0,
+) -> List[dict]:
+    """Build [system, user] messages for the constraint editor call.
+
+    Args:
+        director_brief: DirectorBriefLike OR dict OR serialized JSON.
+        writer_draft: the current Writer draft as one prose string.
+        cast_names: optional locked cast roster; rendered into the
+            prompt so the LLM has a concrete reference when scoring
+            WRONG_SPEAKER / PHANTOM_CHARACTER.
+        cycle: 0-indexed editor pass number. Stamped on the verdict.
+
+    Returns a two-message list ready for generate_fn.
+    """
+    brief = _coerce_director_brief_dict(director_brief)
+    draft = (writer_draft or "").strip() or "(empty draft)"
+    cast_block = ""
+    if cast_names:
+        rows = [str(n).strip() for n in cast_names if str(n).strip()]
+        if rows:
+            cast_block = (
+                "LOCKED CAST (use these names verbatim; any other "
+                "proper noun fails PHANTOM_CHARACTER):\n  - "
+                + "\n  - ".join(rows)
+                + "\n\n"
+            )
+
+    user = (
+        f"This is constraint-editor cycle {int(cycle)} for this "
+        "episode.\n\n"
+        f"{cast_block}"
+        f"DIRECTOR'S BRIEF:\n"
+        f"  News premise: {brief['news_premise']}\n"
+        f"  Dramatic question: {brief['dramatic_question']}\n"
+        f"  Opposed desires: {brief['opposed_desires']}\n"
+        f"  Arc shape: {brief['arc_shape']}\n"
+        f"  Audience feel: {brief['audience_feel']}\n"
+        f"\n"
+        f"WRITER'S CURRENT DRAFT:\n"
+        f"--- begin draft ---\n"
+        f"{draft}\n"
+        f"--- end draft ---\n\n"
+        "EDITOR INSTRUCTIONS:\n"
+        "  1. Decide pass_decision (True iff failing_constraints is "
+        "empty).\n"
+        "  2. List EVERY constraint that fails. Use only these enum "
+        "codes verbatim: WRONG_SPEAKER, PHANTOM_CHARACTER, "
+        "MISSING_COSTLY_CHOICE, NO_FINAL_THIRD_TURN, FORMAT_FAILURE.\n"
+        "  3. When pass_decision is False, write ONE concrete "
+        "sentence in repair_note naming what the Writer should fix.\n"
+        "  4. Do NOT rewrite the draft. Do NOT add taste notes.\n\n"
+        "Output a single JSON object matching:\n"
+        '{"pass_decision": <true|false>, "failing_constraints": '
+        '[<codes>], "repair_note": "<one sentence>"}'
+    )
+    return [
+        {"role": "system", "content": EDITOR_CONSTRAINTS_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+
+
+def run_constraint_editor(
+    director_brief: Any,
+    writer_draft: str,
+    *,
+    generate_fn: Callable[..., str],
+    cast_names: Optional[List[str]] = None,
+    cycle: int = 0,
+    max_attempts: int = _CONSTRAINT_EDITOR_MAX_ATTEMPTS,
+) -> EditorConstraintVerdict:
+    """Run one constraint-editor pass against the current Writer
+    draft. Returns an EditorConstraintVerdict.
+
+    Args:
+        director_brief: DirectorBriefLike OR dict OR JSON string.
+        writer_draft: the current draft prose.
+        generate_fn: a constrained-decode closure bound to
+            EditorConstraintVerdictSchema via
+            _otr_constrained_generate.make_constrained_generate_fn.
+            Signature: (messages, *, temperature, max_new_tokens) -> str.
+        cast_names: optional locked cast roster.
+        cycle: 0-indexed pass number; stamped on the returned verdict.
+        max_attempts: retry budget (default 2 -- one base attempt +
+            one structural retry at lower temperature).
+
+    Raises:
+        ConstraintEditorCallFailedError on retry exhaustion.
+
+    # LLM slot: technical
+    # Reason: structured constrained-decode verdict per project
+    # rule 6. Constraint-editor turns route to the writer's
+    # technical_model slot.
+    """
+    messages = build_constraint_editor_prompt(
+        director_brief,
+        writer_draft,
+        cast_names=cast_names,
+        cycle=cycle,
+    )
+    last_raw_output = ""
+    last_error: Optional[Exception] = None
+    for attempt_idx in range(1, max_attempts + 1):
+        temperature = (
+            _CONSTRAINT_EDITOR_BASE_TEMPERATURE
+            if attempt_idx == 1
+            else _CONSTRAINT_EDITOR_RETRY_TEMPERATURE
+        )
+        try:
+            # LLM slot: technical
+            # Reason: constrained-decode against
+            # EditorConstraintVerdictSchema; rule 6.
+            raw = generate_fn(
+                messages,
+                temperature=temperature,
+                max_new_tokens=_CONSTRAINT_EDITOR_MAX_NEW_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            last_raw_output = ""
+            continue
+        last_raw_output = raw or ""
+        try:
+            payload = _json_for_constraint_editor.loads(raw or "")
+            parsed = EditorConstraintVerdictSchema.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001 -- pydantic + JSONDecodeError
+            last_error = exc
+            continue
+        return EditorConstraintVerdict(
+            pass_decision=bool(parsed.pass_decision),
+            failing_constraints=list(parsed.failing_constraints),
+            repair_note=str(parsed.repair_note or ""),
+            cycle=int(cycle),
+        )
+
+    raise ConstraintEditorCallFailedError(
+        attempts=max_attempts,
+        last_raw_output=last_raw_output,
+        last_error=(
+            last_error
+            if last_error is not None
+            else RuntimeError("no error captured")
+        ),
+    )
