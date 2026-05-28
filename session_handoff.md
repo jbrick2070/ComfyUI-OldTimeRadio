@@ -1,12 +1,9 @@
-# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-28 (full cascade + follow-ups)
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-28 (QA-READY)
 
-All five build-plan sprints, all four wire-up sprints, all four
-follow-up sprints, AND the four extension sprints (5.3 / 5.4 / 5.5
-+ 4.4 / 4.5) shipped end-to-end on v2.0-alpha. HEAD ==
-origin/v2.0-alpha at `1044734`. Ready for the operator's 5-episode
-live soak.
+All sprints shipped. HEAD == origin/v2.0-alpha at `b2a9ac6`. Ready
+for Jeffrey's synthetic QA review pass.
 
-## Commits shipped (21 total)
+## Full commit chain (28 commits)
 
 | Sprint | Commit | Title |
 |---|---|---|
@@ -16,152 +13,167 @@ live soak.
 | 3 | e59f32b | arc-aware line composer prompt (Path A) |
 | 4 | 79c8014 | best-of-N beat-sheet selector |
 | 5 | ed833d8 | editor downgrade to constraint checker |
-| docs | eb8fdcd | session_handoff refresh after Sprint 1-5 cascade |
+| docs | eb8fdcd | handoff refresh after Sprint 1-5 cascade |
 | 2.1 | a0a175d | stamp DramaticState on meta after Stage 1 keystone |
 | 3.1 | e6a433f | thread DRAMATIC FRAME fields into LineRequest from writer |
 | 4.1 | ca0f860 | OTR_BeatSelector ComfyUI node + dict/object polymorphism |
 | 5.1 | da4079d | constraint-editor diagnostic stamp on meta |
-| docs | 42af9c6 | session_handoff refresh after wire-up cascade |
-| 2.2 | 99fa77f | writer halts on news-brief exhaustion (Jeffrey directive) |
+| docs | 42af9c6 | handoff refresh after wire-up cascade |
+| 2.2 | 99fa77f | writer halts on news-brief exhaustion |
 | 4.2 | d693bb2 | insert OTR_BeatSelector into canonical workflow JSON |
-| 4.3 | 7f7464a | Stage 1 fan-out helper + three diversity-knob prompts |
-| 5.2 | 54394ac | derive_repair_prompt -- verdict -> Writer revision block |
-| docs | 8eb61d1 | session_handoff refresh after full cascade |
-| 5.3 | bf86ab8 | LLM-side constraint editor surface (schema + prompt + run) |
+| 4.3 | 7f7464a | Stage 1 fan-out helper + 3 diversity-knob prompts |
+| 5.2 | 54394ac | derive_repair_prompt verdict -> Writer revision block |
+| docs | 8eb61d1 | handoff refresh after full cascade |
+| 5.3 | bf86ab8 | LLM-side constraint editor (schema + prompt + run) |
 | 5.4 | 4c6b0b1 | flip use_constraint_editor live in run_story_room + node |
 | 5.5 | 74eec12 | splice derive_repair_prompt into Writer revision turn |
 | 4.4 | 2d9557a | fan_out_and_select_stage1_plan composition helper |
 | 4.5 | 1044734 | wire diagnostic Stage 1 fan-out into OTR_LedgerScriptWriter |
+| docs | 6c78ba7 | handoff refresh after 5.3-5.5 + 4.4-4.5 |
+| 4.6 | ac2af53 | fan-out winner becomes shadow plan (dedup LLM calls) |
+| 4.8 | 3719b08 | OTR_Stage1FanOut ComfyUI node wrapper |
+| 4.7 | df4e38d | workflow JSON wires OTR_Stage1FanOut -> OTR_BeatSelector |
+| 5.6 | ab910f1 | soak audit template doc (5 episodes x 4 runs) |
+| 2.3 | b2a9ac6 | end-to-end smoke script for fan-out + constraint editor |
 
-HEAD: 1044734 on v2.0-alpha (origin matches).
-
-## Test counts
+## Final test counts (HEAD: b2a9ac6)
 
 | Gate                 | Baseline | Now       |
 |----------------------|----------|-----------|
-| pytest tests/        | 3597     | **3751**  |
+| pytest tests/        | 3597     | **3763**  |
 | Bug Bible regression | 23/1/2x  | 23/1/2x   |
 | Forbidden sweep      | runtime 0| runtime 0 |
-| Workflow JSON parse  | ok       | ok        |
+| Workflow JSON parse  | ok       | ok (38 nodes; last_node_id 79) |
+| Module imports       | ok       | ok        |
+| Smoke script         | (n/a)    | exit 0 (5/5 wires) |
 
-154 new pytest cases added across the cascade. Audio byte-identity
-preserved on the legacy compose path.
+**166 new pytest cases** added across the full cascade. Audio
+byte-identity preserved on the legacy compose path.
 
-## Operator opt-in matrix
+## Ready for QA — what the synthetic review should examine
 
-Every new capability ships behind a default-False flag (except
-Sprint 2.2 which defaults True per Jeffrey's directive). All can
-be flipped independently from the canonical workflow:
+The full pipeline is shipped behind operator flags. Every new
+capability defaults OFF (except Sprint 2.2 `news_briefs_required`
+which defaults True per Jeffrey's directive). The QA review's
+job: catch wiring drift, schema-name drift, prompt-text issues,
+and back-compat hazards before any live test.
 
-| Widget on OTR_LedgerScriptWriter | Default | Effect when ON |
-|---|---|---|
-| `news_briefs_required` (2.2) | **True** | NewsInterpreterError halts the writer (red graph) |
-| `enable_stage1_shadow_pass` | False | Parallel Stage 1 audit (existing) |
-| `use_stage1_fanout` (4.5) | False | Parallel 3-candidate fan-out audit; requires shadow pass ON |
-| `use_multiturn_dialogue` | False | Wave 0 multi-turn dialogue dispatch |
-| `enable_production_stage3_validators` | False | Stage 3 validators in legacy composer |
+### Files to review per sprint cluster
 
-| Widget on OTR_StoryRoom | Default | Effect when ON |
-|---|---|---|
-| `use_story_room` | False | Story Room writers' room loop runs |
-| `use_constraint_editor` (5.4) | False | Constraint editor + 1-cycle cap + per-code Writer repair block |
+**Sprint 1 (dialogue_slot_id keystone)**
+- `nodes/_otr_outline.py` — Beat.dialogue_slot_id field +
+  stamp_dialogue_slot_ids helper, called inside _assemble_outline.
+- `nodes/_otr_stage1_plan.py` — Stage1Beat.dialogue_slot_id +
+  stamp_dialogue_slot_ids called from parse_and_validate_plan.
+- `nodes/production_ledger.py` — init_lines_from_outline +
+  set_lines preserve dialogue_slot_id on every line row.
+- `nodes/_otr_story_room_extract.py` — narrow DialogueOnlySchema +
+  extract_dialogue_only function.
+- `nodes/OTR_StoryRoomExtract.py` — opt-in narrow path; reads
+  voice_slot_ids from the in-flight ledger.
+- `nodes/OTR_StoryRoomCommit.py` — _commit_dialogue joins by
+  dialogue_slot_id; raises StoryRoomCommitError on mismatch.
 
-| Widget on OTR_StoryRoomCommit | Default | Effect when ON |
-|---|---|---|
-| `commit` (1.0) | False | Story Room dialogue commits to ledger (red graph on slot mismatch) |
+**Sprint 2 + 2.1 + 2.2 + 2.3 (DramaticState + validators + halt)**
+- `nodes/_otr_dramatic_state.py` — DramaticState pydantic +
+  derive_dramatic_state_from_meta helper.
+- `nodes/_otr_beat_validators.py` — validate_beat_sheet + 4
+  defect kinds + _attr dict/object polymorphism.
+- `nodes/OTR_LedgerScriptWriter.py` — stamps meta.dramatic_state
+  + halts on NewsInterpreterError when required=True.
+- `scripts/smoke_fanout_constraint.py` — end-to-end smoke
+  (Sprint 2.3).
 
-## What episode generation stamps now
+**Sprint 3 + 3.1 (arc-aware line composer)**
+- `nodes/_otr_line_composer.py` — LineRequest +7 Sprint 3 fields;
+  _build_user_prompt renders DRAMATIC FRAME block + no-restate
+  constraint.
+- `nodes/OTR_LedgerScriptWriter.py` — _build_line_request threads
+  dramatic_question + next_turn into LineRequest.
 
-Per ledger, depending on flags:
+**Sprint 4 + 4.1 through 4.8 (best-of-N + fan-out)**
+- `nodes/_otr_beat_selector.py` — 5-axis scorer +
+  select_winning_beat_sheet + NoValidBeatSheetError +
+  BeatSelectorAudit.to_dict.
+- `nodes/_otr_stage1_fanout.py` — fan_out_stage1_plans + 3
+  diversity-knob prompts + fan_out_and_select_stage1_plan
+  composition helper.
+- `nodes/OTR_BeatSelector.py` — ComfyUI wrapper (Sprint 4.1).
+- `nodes/OTR_Stage1FanOut.py` — ComfyUI wrapper (Sprint 4.8).
+- `nodes/OTR_LedgerScriptWriter.py` — use_stage1_fanout widget +
+  diagnostic stamp on meta.stage1_fanout +
+  used_as_shadow_plan dedup field (Sprint 4.6).
+- `workflows/otr_scifi_16gb_full.json` — OTR_Stage1FanOut at
+  node id 79 wired to OTR_BeatSelector at node id 78 (Sprint
+  4.2 + 4.7).
 
-- `meta.story_room_commit` (Sprint 1; when commit=True): proof
-  block with commit_mode / draft_rows / voice_slots /
-  rows_committed / rows_skipped / fallback_to_legacy /
-  committed_slot_ids.
-- `meta.dramatic_state` (Sprint 2.1): the four required
-  DramaticState fields keyed off news_interpreter brief + cast.
-- `meta.editor_constraints` (Sprint 5.1): pass_decision +
-  failing_constraints + repair_note + cycle (diagnostic).
-- `meta.news_briefs_halt_reason` (Sprint 2.2, on halt): the
-  exception summary if news_briefs_required halted the run.
-- `meta.stage1_fanout` (Sprint 4.5; when use_stage1_fanout +
-  shadow pass ON): {ok, winner_knob, per_knob_ok,
-  selector_audit, error} from the 3-candidate diversity-knob
-  fan-out pass.
+**Sprint 5 + 5.1 through 5.6 (constraint editor)**
+- `nodes/_otr_editor_constraints.py` — EditorConstraint codes +
+  EditorConstraintVerdict dataclass +
+  EDITOR_CONSTRAINTS_SYSTEM_PROMPT (no taste verbs) +
+  check_constraints (Python) + check_constraints_from_ledger +
+  derive_repair_prompt + EditorConstraintVerdictSchema (LLM
+  surface) + build_constraint_editor_prompt +
+  run_constraint_editor.
+- `nodes/_otr_story_room.py` — _call_constraint_editor adapter +
+  use_constraint_editor kwarg routes the editor cycle +
+  build_writer_user_prompt splices derive_repair_prompt block.
+- `nodes/OTR_StoryRoom.py` — use_constraint_editor widget +
+  binds editor_generate_fn to EditorConstraintVerdictSchema.
+- `nodes/OTR_LedgerScriptWriter.py` — Sprint 5.1 diagnostic stamp
+  via check_constraints_from_ledger on meta.editor_constraints.
 
-## The structural-quality toolchain end-to-end
+### QA pass invariants to spot-check
 
-**Ceiling (Sprint 4 line):**
-`fan_out_and_select_stage1_plan` runs 3 candidate Stage 1 calls
-with moral-dilemma / bureaucratic-absurd / intimate-personal-cost
-system-prompt prefixes, validates each via Sprint 2 structural
-validators, scores on five visible-structure axes
-(clear_opposed_desires / costly_choice_present /
-each_beat_changes_situation / ending_changed / no_alarm_pattern),
-picks the highest-total eligible candidate (lowest-index tie
-break). Diagnostic pass lives on
-`meta.stage1_fanout` until the operator validates the knobs.
+- **PD1 (audio):** no audio-path change anywhere; the legacy
+  compose path stays byte-identical when all new flags OFF.
+- **PD3 (workflow JSON):** every node-side surface change has a
+  matching workflow JSON edit (Sprint 4.2 + 4.7 cover the new
+  nodes; existing slot-position pin tests catch widget drift).
+- **PD5 ("dummy" ban):** no occurrence of the word "dummy" in
+  code, comments, fixtures, or commit messages.
+- **PD6 (no model_id widget on consumers):** the forbidden-
+  pattern sweep enforces. New nodes:
+  - OTR_BeatSelector: pure Python, no LLM slot — no model_id.
+  - OTR_Stage1FanOut: technical_model is forceInput only.
+- **Adapter polymorphism (Sprint 4.1):** every site that reads
+  `dramatic_state` from a parsed plan uses `_attr(obj, name)`
+  instead of `getattr` so dict-from-JSON works.
 
-**Floor (Sprint 5 line):**
-OTR_StoryRoom's `use_constraint_editor=True` rebinds the editor
-LLM to `EditorConstraintVerdictSchema` (Literal[5 codes]), forces
-`max_editor_cycles=1`, and the Writer revision turn renders
-`derive_repair_prompt`'s per-code repair instructions instead of
-taste-rubric notes. The OFF path is byte-identical to pre-Sprint-5
-taste editor.
+## Smoke command for the QA run
 
-## Operator next steps
+```cmd
+cd /d C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+git pull origin v2.0-alpha
+git rev-parse HEAD
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest tests/ -q --no-header
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -q --no-header
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe docs\_s28_forbidden_sweep.py
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\smoke_fanout_constraint.py
+```
 
-1. **5-episode soak** with `use_story_room=true` + `commit=true`
-   (Sprint 1) + `news_briefs_required=true` (Sprint 2.2, default).
-2. For each ledger, capture:
-   - `meta.story_room_commit.rows_skipped == 0` AND
-     `fallback_to_legacy == false`
-   - `meta.dramatic_state` populated with all four fields
-   - `meta.editor_constraints.failing_constraints` (diagnostic)
-3. **Constraint editor A/B:** rerun two of the five episodes with
-   `use_constraint_editor=true`; compare:
-   - Editor wall-clock (taste editor 60-90 sec per cycle vs
-     constraint editor <30 sec; cap 1 cycle vs 3)
-   - Listen test: does the constraint editor's per-code Writer
-     repair (Sprint 5.5) produce a tighter revision than the
-     taste editor's overall_note?
-4. **Diversity-knob A/B:** rerun two episodes with
-   `enable_stage1_shadow_pass=true` + `use_stage1_fanout=true`.
-   Inspect `meta.stage1_fanout.per_knob_ok` -- did all three knobs
-   produce a valid Stage1Plan? Inspect
-   `meta.stage1_fanout.selector_audit.scores_per_candidate`
-   side-by-side -- do the three knobs produce structurally
-   different candidates, or do they all look the same?
-5. **Human A/B listen test** between legacy + new beat-engine +
-   constraint-editor path. Ship the new path as default only when
-   it wins.
+Expected output:
+- HEAD: b2a9ac6 or later
+- pytest: 3763 passed / 21 skipped / 0 failed
+- Bug Bible: 23 passed / 1 skipped / 2 xfailed
+- Forbidden sweep: HITS=410 / forensic=410 / runtime=0
+- Smoke: 5/5 wires intact; exit 0
 
-## Remaining queued sprints
+## Soak audit template
 
-- **Sprint 4.6 -- fan-out swap into outline path.** Once the
-  operator validates the diversity knobs produce structurally
-  different candidates (Sprint 4.5 stamps), swap the WINNER of
-  the fan-out into the live outline path (replaces
-  `generate_outline` or feeds its winner). Touches
-  OTR_LedgerScriptWriter's outline call surface. Operator-soak-
-  driven.
-- **Sprint 4.7 -- OTR_BeatSelector node fully wired.** Once the
-  fan-out drives the outline, the detached OTR_BeatSelector
-  workflow node (Sprint 4.2) becomes the canonical drag-and-drop
-  for the fan-out path.
-
-The pure-Python + LLM-side surfaces for these are all shipped;
-each follow-up sprint becomes a thin integration job once the
-operator's soak data informs the right defaults.
+When Jeffrey is ready to test, follow `docs/2026-05-28-soak-audit-
+template.md`. Capture the four audit fields × 5 episodes × 4 flag
+combinations. Bring the filled-in template back so the next
+session can identify what stayed in spec and what needs a fix
+sprint.
 
 ---
 ## Resume instructions
 Open a fresh window with the OTR-OldTimeRadio folder selected,
 attach `session_handoff.md`, and say:
 
-"Read the handoff. Confirm pytest baseline 3751 + Bug Bible green
-+ workflow JSON parses. Then guide the operator's 5-episode soak +
-the Sprint 5.4 constraint-editor A/B + the Sprint 4.5 diversity-
-knob A/B. Report the four audit fields (story_room_commit /
-dramatic_state / editor_constraints / stage1_fanout) per episode."
+"QA review the cascade. Read every file in the 'Files to review
+per sprint cluster' section. Run the smoke command. Report any
+schema-name drift, wiring drift, prompt issues, or back-compat
+hazards. Group findings by severity (must-fix / should-fix / nit)
+so I can decide which fix sprints to run."
