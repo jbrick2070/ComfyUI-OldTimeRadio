@@ -1203,6 +1203,9 @@ def _resolve_inputs(
     # Sprint 2.2 (2026-05-28): when True, news_interpreter exhaustion
     # halts the run rather than graceful-degrading to meta["news"]=None.
     news_briefs_required: bool = True,
+    # Sprint 4.5 (2026-05-28): when True AND the shadow pass is on,
+    # run a parallel fan-out audit and stamp meta.stage1_fanout.
+    use_stage1_fanout: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1372,6 +1375,8 @@ def _resolve_inputs(
             bool(enable_production_stage3_validators),
         # Sprint 2.2 (2026-05-28): news-brief hard-halt toggle.
         "news_briefs_required": bool(news_briefs_required),
+        # Sprint 4.5 (2026-05-28): diagnostic Stage 1 fan-out toggle.
+        "use_stage1_fanout": bool(use_stage1_fanout),
     }
 
 
@@ -1910,6 +1915,34 @@ class OTR_LedgerScriptWriter:
                         "Production should ship ON."
                     ),
                 }),
+                # Sprint 4.5 (2026-05-28) -- diagnostic Stage 1
+                # fan-out audit. When ON the writer runs
+                # fan_out_and_select_stage1_plan (3 candidates with
+                # diversity knobs MORAL_DILEMMA / BUREAUCRATIC_
+                # ABSURD / INTIMATE_PERSONAL_COST) as a PARALLEL
+                # pass alongside the existing Stage 1 path, then
+                # stamps meta.stage1_fanout with the winner +
+                # selector audit + per-knob results. The main
+                # outline flow is unchanged. The operator soaks
+                # this pass to verify the diversity knobs produce
+                # structurally distinct candidates BEFORE the
+                # future Sprint 4.6 swaps the fan-out winner into
+                # the live outline path. Requires
+                # enable_stage1_shadow_pass=True so the technical-
+                # slot constrained generator is already built.
+                "use_stage1_fanout": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 4.5 (2026-05-28). OFF (default) "
+                        "-> no diagnostic fan-out. ON -> run a "
+                        "PARALLEL 3-candidate Stage 1 fan-out "
+                        "with diversity knobs and stamp meta."
+                        "stage1_fanout. Outline + audio path "
+                        "unchanged. Requires "
+                        "enable_stage1_shadow_pass=ON (re-uses "
+                        "the shadow pass's constrained generator)."
+                    ),
+                }),
             },
         }
 
@@ -1988,6 +2021,12 @@ class OTR_LedgerScriptWriter:
         # whole workflow needs to stop and re-roll news"). Set False
         # for back-compat graceful-degrade.
         news_briefs_required=True,
+        # Sprint 4.5 (2026-05-28): diagnostic Stage 1 fan-out
+        # parallel pass. Default False = no fan-out. When True AND
+        # enable_stage1_shadow_pass is also True, the writer runs
+        # fan_out_and_select_stage1_plan and stamps the result on
+        # meta.stage1_fanout for operator soak inspection.
+        use_stage1_fanout=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -2019,6 +2058,8 @@ class OTR_LedgerScriptWriter:
             enable_production_stage3_validators=enable_production_stage3_validators,
             # Sprint 2.2 (2026-05-28): hard-halt toggle.
             news_briefs_required=news_briefs_required,
+            # Sprint 4.5 (2026-05-28): diagnostic fan-out toggle.
+            use_stage1_fanout=use_stage1_fanout,
         )
 
         log.info(
@@ -2434,6 +2475,84 @@ class OTR_LedgerScriptWriter:
                     resolved["num_characters"],
                     resolved["target_words"],
                 )
+                # Sprint 4.5 (2026-05-28) -- diagnostic Stage 1
+                # fan-out audit. Runs BEFORE the legacy single-call
+                # shadow pass so the operator sees both side-by-
+                # side in meta. The fan-out re-uses the shadow
+                # pass's constrained generator (bound to Stage1Plan).
+                # On any failure (per-knob LLM raise, all-invalid
+                # validators) the helper returns ok=False without
+                # raising, the audit is stamped, and we fall
+                # through to the legacy shadow pass so the outline
+                # path stays intact.
+                if resolved.get("use_stage1_fanout"):
+                    try:
+                        from . import _otr_stage1_fanout as _OTRFAN
+                        # Build the same user-prompt the legacy
+                        # single-call shadow pass uses so the
+                        # candidates and the shadow pass differ
+                        # only by the diversity-knob prefix.
+                        _fan_user_prompt = _OTRS1.build_stage1_user_prompt(
+                            news_seed=resolved["news_seed"],
+                            num_characters=resolved["num_characters"],
+                            target_words=resolved["target_words"],
+                            episode_title_hint=(
+                                resolved.get("episode_title") or ""
+                            ),
+                        )
+                        _fan_res = _OTRFAN.fan_out_and_select_stage1_plan(
+                            generate_fn=_shadow_gen_fn,
+                            parse_fn=lambda raw: (
+                                _OTRS1P.parse_and_validate_plan(
+                                    __import__("json").loads(raw)
+                                )
+                            ),
+                            base_system_prompt=_OTRS1._STAGE1_SYSTEM_PROMPT,
+                            user_prompt=_fan_user_prompt,
+                        )
+                        _fan_audit = {
+                            "ok": _fan_res.ok,
+                            "winner_knob": (
+                                _fan_res.fan_out_results[
+                                    _fan_res.selector_audit.winner_index
+                                ].knob
+                                if _fan_res.ok and _fan_res.selector_audit is not None
+                                else None
+                            ),
+                            "per_knob_ok": [
+                                {"knob": r.knob, "ok": r.ok,
+                                 "error": (r.error or "")[:200]}
+                                for r in _fan_res.fan_out_results
+                            ],
+                            "selector_audit": (
+                                _fan_res.selector_audit.to_dict()
+                                if _fan_res.selector_audit is not None
+                                else None
+                            ),
+                            "error": _fan_res.no_valid_error_msg,
+                        }
+                        meta["stage1_fanout"] = _fan_audit
+                        log.info(
+                            "[Stage1FanOut] diagnostic pass: ok=%s "
+                            "winner_knob=%s",
+                            _fan_res.ok, _fan_audit["winner_knob"],
+                        )
+                    except Exception as _fan_exc:  # noqa: BLE001
+                        # Never break the writer for a diagnostic
+                        # pass; stamp + continue (Prime Directive 1).
+                        log.warning(
+                            "[Stage1FanOut] diagnostic pass raised "
+                            "%s: %s -- main flow unaffected.",
+                            type(_fan_exc).__name__, str(_fan_exc)[:200],
+                        )
+                        meta["stage1_fanout"] = {
+                            "ok": False,
+                            "error": (
+                                f"{type(_fan_exc).__name__}: "
+                                f"{_fan_exc}"
+                            )[:400],
+                        }
+
                 _shadow_plan, _shadow_attempts = (
                     _OTRS1.generate_stage1_plan(
                         _shadow_gen_fn,
