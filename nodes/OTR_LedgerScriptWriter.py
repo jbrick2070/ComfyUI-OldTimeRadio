@@ -2100,6 +2100,33 @@ class OTR_LedgerScriptWriter:
             _skeleton_path,
         )
 
+        # BUG-LOCAL-290 (2026-05-27): sweep stale `pending_*` dirs.
+        # Every writer error before line composition leaves a
+        # 0-line pending_* dir on disk forever (17 accumulated on
+        # 2026-05-27 alone). Run a sweep here -- AFTER the current
+        # run's own skeleton is stamped (so it self-excludes via
+        # the 2-hour age threshold) and BEFORE any expensive work
+        # starts. PD1: the sweep helper never raises; a
+        # filesystem failure logs a warning and the writer
+        # proceeds.
+        try:
+            from . import _otr_paths as _OTRP
+            from ._otr_pending_cleanup import sweep_empty_pending_dirs
+            _episodes_root = _OTRP.otr_episodes_root()
+            _sweep_report = sweep_empty_pending_dirs(_episodes_root)
+            if _sweep_report.deleted:
+                log.info(
+                    "[OTR_LedgerScriptWriter] BUG-LOCAL-290 pending "
+                    "sweep: deleted %d stale dir(s) before run start.",
+                    len(_sweep_report.deleted),
+                )
+        except Exception as _sweep_exc:  # noqa: BLE001 -- non-fatal
+            log.warning(
+                "[OTR_LedgerScriptWriter] BUG-LOCAL-290 pending sweep "
+                "raised %s: %s -- continuing without sweep.",
+                type(_sweep_exc).__name__, str(_sweep_exc)[:200],
+            )
+
         # D.2 Two-pass style picker (when "let the story decide" is
         # selected or combo is blank AND no style_custom override).
         # Pass 1 inventor produces 5 distinct snake_case style
