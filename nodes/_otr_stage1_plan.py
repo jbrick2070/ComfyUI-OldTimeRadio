@@ -208,6 +208,70 @@ class Stage1Beat(BaseModel):
             "rather than by raw beat_id."
         ),
     )
+    # ---- Sprint 2 (2026-05-28): per-beat dramatic state ----
+    # All Sprint 2 fields are Optional during this sprint so existing
+    # producers (legacy Stage 1 calls, tests, Wave 0 in-loop plan
+    # builder) keep parsing without modification. The validator suite
+    # in _otr_beat_validators treats absent fields as "untyped legacy
+    # beat" and skips the structural check; the typed validators only
+    # fire when state_before / state_after / next_turn are present.
+    # Sprint 2.1 will lift the Optionals once the producers wire in.
+    objective: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Sprint 2: speaker's concrete in-beat goal.",
+    )
+    obstacle: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Sprint 2: what blocks the objective in this beat.",
+    )
+    turn: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Sprint 2: how the beat pivots (the state change verb).",
+    )
+    tactics_used: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Sprint 2: verb phrase naming the speaker's tactic.",
+    )
+    state_before: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description=(
+            "Sprint 2: world/character state at beat start. The "
+            "dead-beat validator rejects state_before == state_after."
+        ),
+    )
+    state_after: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description=(
+            "Sprint 2: world/character state at beat end. Must differ "
+            "from state_before (every beat must change the situation)."
+        ),
+    )
+    subtext: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Sprint 2: unspoken layer beneath the line.",
+    )
+    tension: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Sprint 2: 1..5 tension level. Strictly monotonic NOT required.",
+    )
+    next_turn: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description=(
+            "Sprint 2: forward signal -- what the NEXT beat must "
+            "reveal. Sprint 3 line composer reads this as the "
+            "magnetic pole above the generation slot."
+        ),
+    )
 
     @field_validator("callback_to", mode="before")
     @classmethod
@@ -310,6 +374,23 @@ class Stage1Plan(BaseModel):
         default_factory=list,
         max_length=RUNNING_FACTS_MAX,
         description=f"Established facts the dialogue must respect. Each item is a short factual statement. Stage 2 Turn 3 prompt embeds these verbatim; Stage 3 continuity validator (step 5) checks no rendered line contradicts any of them. Max {RUNNING_FACTS_MAX} entries.",
+    )
+    # ---- Sprint 2 (2026-05-28): episode-level dramatic state ----
+    # Optional during this sprint -- legacy plans pass through, only
+    # plans whose producer wired in news_interpreter's Sprint 2 lift
+    # carry a populated DramaticState. The structural validators in
+    # _otr_beat_validators only fire on plans where it is present.
+    # Stored as Any (resolved by duck-typing in the validator) to
+    # keep this module's imports stdlib + pydantic only.
+    dramatic_state: Optional[Any] = Field(
+        default=None,
+        description=(
+            "Sprint 2: episode-level DramaticState "
+            "(_otr_dramatic_state.DramaticState). Optional this "
+            "sprint; producers wire it as part of the news_interpreter "
+            "lift. Validators in _otr_beat_validators skip cleanly "
+            "when this is None."
+        ),
     )
 
     @field_validator("running_facts")
