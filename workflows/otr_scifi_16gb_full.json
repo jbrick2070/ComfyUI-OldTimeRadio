@@ -69,11 +69,13 @@
         0.05,
         1.03,
         200,
-        false,
+        true,
         "roll (~11% chance)",
-        false,
-        false,
-        false
+        true,
+        true,
+        true,
+        true,
+        true
       ],
       "inputs": [],
       "outputs": [
@@ -2238,10 +2240,11 @@
         "",
         "",
         "",
-        false,
+        true,
         4,
         3,
-        18
+        18,
+        true
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2353,7 +2356,7 @@
       "widgets_values": [
         "",
         "",
-        false
+        true
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"

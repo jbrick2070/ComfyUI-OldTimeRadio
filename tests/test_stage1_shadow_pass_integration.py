@@ -253,10 +253,22 @@ class TestSourceLevelPins:
 
 
 class TestWorkflowJsonPin:
-    def test_workflow_writer_widget_vector_is_20(self):
-        """Sprint 10B Wave 1 Agent B (2026-05-27) bumped the vector
-        from 19 to 20 -- slot 19 is `enable_production_stage3_validators`
-        (default False). Slots 17/18 unchanged."""
+    def test_workflow_writer_widget_vector_is_22_all_on(self):
+        """2026-05-28 (Jeffrey directive): otr_scifi_16gb_full.json is
+        baked to the one-click ALL-ON optimal-run state. The writer
+        vector is the full 22-widget surface (3 required + 19 optional)
+        with every render-quality + diagnostic flag ON.
+
+        NOTE: this intentionally overrides the prior 'ships legacy-safe
+        by default' invariant for THIS file -- Jeffrey runs the soak
+        himself and wanted no widget fiddling. PD1 byte-identity is
+        still guarded by test_audio_byte_identical (hermetic; pins its
+        own seeds), which is unaffected by the shipped workflow default.
+
+        Slots (0-indexed): 15 enable_polish_pass,
+        17 enable_stage1_shadow_pass, 18 use_multiturn_dialogue,
+        19 enable_production_stage3_validators, 20 news_briefs_required,
+        21 use_stage1_fanout."""
         import json
         wf_path = (
             WRITER_SRC.parent.parent / "workflows" / "otr_scifi_16gb_full.json"
@@ -265,22 +277,13 @@ class TestWorkflowJsonPin:
         writer = next(n for n in wf["nodes"] if n.get("id") == 1)
         assert writer["type"] == "OTR_LedgerScriptWriter"
         wv = writer["widgets_values"]
-        assert len(wv) == 20, (
-            f"workflow JSON writer widgets_values length must be 20 "
-            f"post-Sprint-10B-Wave-1-Agent-B; got {len(wv)}"
+        assert len(wv) == 22, (
+            f"workflow JSON writer widgets_values length must be 22 "
+            f"(full INPUT_TYPES surface, all-on bake); got {len(wv)}"
         )
-        assert wv[17] is False, (
-            f"workflow JSON writer slot 17 (enable_stage1_shadow_pass) "
-            f"must default False; got {wv[17]!r}"
-        )
-        assert wv[18] is False, (
-            f"workflow JSON writer slot 18 (use_multiturn_dialogue) "
-            f"must default False so the legacy byte-identity contract "
-            f"holds out-of-the-box; got {wv[18]!r}"
-        )
-        assert wv[19] is False, (
-            f"workflow JSON writer slot 19 "
-            f"(enable_production_stage3_validators) must default False "
-            f"so PD1 byte-identity holds on the legacy path; got "
-            f"{wv[19]!r}"
-        )
+        assert wv[15] is True, f"slot 15 enable_polish_pass; got {wv[15]!r}"
+        assert wv[17] is True, f"slot 17 enable_stage1_shadow_pass; got {wv[17]!r}"
+        assert wv[18] is True, f"slot 18 use_multiturn_dialogue; got {wv[18]!r}"
+        assert wv[19] is True, f"slot 19 enable_production_stage3_validators; got {wv[19]!r}"
+        assert wv[20] is True, f"slot 20 news_briefs_required; got {wv[20]!r}"
+        assert wv[21] is True, f"slot 21 use_stage1_fanout; got {wv[21]!r}"
