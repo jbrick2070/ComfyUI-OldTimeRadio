@@ -251,12 +251,20 @@ class OTR_StoryRoomExtract:
             cache_entry, StoryRoomExtractionSchema,
         )
 
+        # Auto-resolve cast + news_seed from in-flight ledger when
+        # the widgets are empty (2026-05-27).
+        from ._otr_writers_room_resolver import (
+            resolve_cast_names as _resolve_cast,
+            resolve_news_seed as _resolve_seed,
+        )
+        resolved_cast = _resolve_cast(cast_names) or self._parse_cast(cast_names)
+        resolved_seed = _resolve_seed(news_seed)
         try:
             extraction = extract_from_transcript(
                 transcript_payload,
                 generate_fn=generate_fn,
-                cast_names=self._parse_cast(cast_names),
-                news_seed=news_seed or "",
+                cast_names=resolved_cast,
+                news_seed=resolved_seed,
             )
         except ExtractionCallFailedError as exc:
             log.warning(

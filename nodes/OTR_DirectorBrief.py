@@ -142,12 +142,17 @@ class OTR_DirectorBrief:
             run_director,
         )
 
-        # Normalize the cast list: comma-separated, trimmed, drop empties.
-        cast_list = [
-            piece.strip()
-            for piece in (cast_names or "").split(",")
-            if piece.strip()
-        ]
+        # Cast names + news seed auto-resolve (2026-05-27): when the
+        # operator leaves the widgets empty, pull from the in-flight
+        # ledger the writer just stamped (its locked cast + the news
+        # fetcher's selected seed). Lets the writers' room run pure
+        # from scratch with no typed inputs.
+        from ._otr_writers_room_resolver import (
+            resolve_cast_names as _resolve_cast,
+            resolve_news_seed as _resolve_seed,
+        )
+        cast_list = _resolve_cast(cast_names)
+        news_seed = _resolve_seed(news_seed)
 
         log.info(
             "[OTR_DirectorBrief] news_seed=%d chars, %d cast name(s); "

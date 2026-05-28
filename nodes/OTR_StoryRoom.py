@@ -312,7 +312,15 @@ class OTR_StoryRoom:
                 "no usable DirectorBrief on the director_brief input"
             ),)
 
-        cast = self._parse_cast(cast_names)
+        # Auto-resolve cast + news_seed from in-flight ledger when
+        # the widgets are empty (2026-05-27). Lets the writers' room
+        # run pure from scratch with no typed inputs.
+        from ._otr_writers_room_resolver import (
+            resolve_cast_names as _resolve_cast,
+            resolve_news_seed as _resolve_seed,
+        )
+        cast = _resolve_cast(cast_names) or self._parse_cast(cast_names)
+        news_seed = _resolve_seed(news_seed)
 
         # Lazy imports so node-load is cheap and pytest collect does
         # not drag in torch / lm-format-enforcer for unrelated suites.
