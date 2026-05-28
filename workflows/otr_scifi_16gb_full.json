@@ -1,7 +1,7 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 77,
+  "last_node_id": 78,
   "last_link_id": 226,
   "nodes": [
     {
@@ -2357,6 +2357,64 @@
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
+    },
+    {
+      "id": 78,
+      "type": "OTR_BeatSelector",
+      "pos": [
+        1000,
+        900
+      ],
+      "size": [
+        440,
+        220
+      ],
+      "title": "Beat Selector (Sprint 4 best-of-N, detached)",
+      "flags": {},
+      "order": 110,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "candidate_a_json",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "candidate_b_json",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "candidate_c_json",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "winning_plan_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "selector_audit",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BeatSelector",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        "",
+        ""
+      ],
+      "color": "#3A5A3C",
+      "bgcolor": "#23341F"
     }
   ],
   "links": [
