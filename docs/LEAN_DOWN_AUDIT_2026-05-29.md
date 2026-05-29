@@ -207,3 +207,88 @@ SUPERSEDES the v1 "Removal protocol" + "Sequencing" above.
 6. **Commit 6 -- widget cleanup confirm + stale `__main__` assert fix + Two-Model dangling-
    output decision.** Final JSON re-save; full regression; your restart.
 7. T1 (untracked git-status cruft) + T3/T4 after a repo-wide reference scan.
+
+---
+
+# v3 EXECUTION PLAN (round-2 QA + re-verified, 2026-05-29) -- THE LIVE PLAN
+
+Round-2 reviewer QA, reconciled against the actual JSON + node code. This SUPERSEDES the
+v2 sequencing. Two reviewer finds were real (Node 42 dead, the output-slot trap); one was
+correctly cautious and verification CONFIRMED it must stay (Node 21).
+
+## Already DONE -- verified on the real file (via Desktop Commander, not the sandbox)
+Commit 1 (987742b) migrated the graph. Current state CONFIRMED: 31 nodes, 69 links,
+last_link_id=230==max, 0 duplicate ids, 0 orphan links; Story Room nodes 73-79 absent;
+writer.script_json -> link 230 -> FreezeCascade(62).script_json. So there is NOTHING left
+to do for the Story Room *graph*; the v1/v2 "delete nodes 73-79 + add link 230" steps are
+a NO-OP now. Any future JSON script MUST be idempotent (remove_if_present) and MUST run
+through Desktop Commander -- the Linux/bash mount serves a CORRUPTED copy of this JSON
+(trailing NUL/space padding; known stale-VM-mount issue). Edit/validate the real file only.
+
+## Verified corrections to the round-2 QA
+- **Node 42 `PathchSageAttentionKJ` -- DEAD, delete (NEW, verified).** Title "Patch Sage
+  Attention (FLUX) -- DISABLED, BUG-LOCAL-070", widget="disabled" => pure MODEL
+  pass-through; it's a KJNodes EXTERNAL node (removing it also drops that dep; it is not
+  OTR_-prefixed so the validator never required it). Exact edits (link ids verified on the
+  real file): delete link 203 `[203,71,0,42,0,"MODEL"]`; mutate link 69
+  `[69,42,0,23,0,"MODEL"]` -> `[69,71,0,23,0,"MODEL"]`; node 71 outputs[0].links
+  `[203,204]` -> `[69,204]`; node 23 inputs[0].link stays 69; delete the node-42 object;
+  last_link_id stays 230 (max unchanged). Validator-safe.
+- **Node 21 `OTR_FixedShotDurationStub` -- KEEP, do NOT delete (verified REQUIRED).** Despite
+  "Stub" in the name, `otr_shot_duration_calculator.py` does a real transform
+  (`expand_plan_with_durations`: clips-per-shot, global frame renumber + FLF boundary
+  sharing, token regen) that `OTR_BatchFluxRender` consumes via link 41. Bypassing feeds
+  FLUX an un-expanded plan = visual regression, and `tests/test_fixed_shot_duration_stub_rename.py`
+  hard-pins node 21's type + links 40/41. ACTION: keep. OPTIONAL later: rename away from
+  "Stub" (e.g. OTR_ShotDurationExpander) -- but that's a PD3 lockstep change (class +
+  __init__ + JSON type + S&R name + that test), not a deletion. Not dead weight.
+- **Prune writer `creative_writing_model` output -- exact, with the slot trap.** Verified:
+  writer outputs slot 4=creative_writing_model (links []), slot 5=technical_model
+  (links [115]); the ONLY link off slot 5 is 115=`[115,1,5,62,4,"STRING"]`, ZERO off slot 4.
+  Edits: RETURN_TYPES drop one "STRING" (6->5); RETURN_NAMES drop creative_writing_model;
+  run() return tuple drop resolved["creative_writing_model"]; JSON remove the slot-4 output
+  object, renumber technical_model slot_index 5->4; **mutate link 115 src_slot 5->4 ->
+  `[115,1,4,62,4,"STRING"]`** (THE trap); last_link_id unaffected. MUST update in lockstep:
+  the writer `__main__` self-test (asserts the 6-tuple), and
+  `tests/test_workflow_json_guardrails.py` TestWriterB2aSurface::test_writer_output_slot_indexes_stable
+  + TestCascadeB3Surface::test_cascade_technical_socket_wired_in_canonical_json (assert
+  outputs[4/5] names + src_slot==5 + len>=6). The widget-surface tests stay green (output
+  prune != widget change).
+- **Widget removal -- assert-guarded, highest-index-first.** For the 4 optional flags at
+  widgets_values [15,17,18,22] (all currently False), the migration script MUST
+  `assert len(widgets)==23 and widgets[15] is False and widgets[17] is False and
+  widgets[18] is False and widgets[22] is False`, then pop indices in order 22,18,17,15 --
+  in the SAME commit as the matching INPUT_TYPES / run() / _resolve_inputs edits. Never pop
+  blind.
+
+## THE TWO CRASH POINTS (everything else is manageable)
+1. **Writer widget index drift** (removing optional widgets from INPUT_TYPES without
+   migrating widgets_values, or wrong index/order).
+2. **Output slot-index drift** (removing the creative_writing_model output without
+   decrementing technical_model AND fixing link 115 src_slot 5->4).
+After EVERY JSON change: re-assert no orphan links, no dup ids, last_link_id==max.
+
+## v3 commit order (one concern each; regression + your restart per commit)
+- **A. Graph validation (already satisfied):** no-op -- the migration landed; just confirm
+  the invariants above before starting B. Done.
+- **B. Delete Node 42** (disabled Sage patch) + bridge link 69 node71->node23; regression
+  the FLUX render path.
+- **C. Story Room CODE removal:** the graph no longer references it, so delete the 6
+  module/wrapper files + the 5 `_NODE_MODULES` entries + Story-Room tests; EDIT the
+  constraint-editor tests to drop director/editor fixture imports; keep `_otr_craft_floor`
+  + `_otr_editor_constraints` (writer-owned).
+- **D. Multiturn removal:** 3 Wave-0 modules + dispatch block + widget (pop index 18) +
+  kwargs + resolved-dict key + tests.
+- **E. Shadow + fan-out removal (together):** writer blocks + OTR_Stage1FanOut/OTR_BeatSelector
+  + helpers + 2 `_NODE_MODULES` entries + widgets (pop 22 then 17) + tests; verify
+  `_otr_name_gender` has no other caller.
+- **F. Polish removal (last, riskiest -- hot-path):** excise from `_otr_line_composer` +
+  `_otr_model_loader` + `_otr_reroll` + widget (pop 15) + polish tests; FULL audio
+  byte-identity regression.
+- **G. Prune writer creative_writing_model output:** the exact edits above (incl. link 115
+  src_slot 5->4) + update the 3 pinning tests + the writer self-test.
+- **Node 21:** KEEP. Separately, optionally rename (PD3 lockstep) -- not a deletion.
+- **T1/T3/T4 cruft:** after a repo-wide reference scan (every workflow JSON + test fixture).
+
+Net (beyond Commit 1): -1 more graph node (42), ~12-16 modules + the writer output socket
+removed, widgets_values 23->19, one fewer external dep (KJNodes Sage patch).
