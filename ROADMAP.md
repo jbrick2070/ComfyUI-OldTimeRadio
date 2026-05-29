@@ -2634,6 +2634,56 @@ Both upscale options run on the WHOLE episode (every clip), exposed as a workflo
 
 ---
 
+### B5 — Burn-in captions (v2 ship requirement, DECIDED 2026-05-25)
+
+**Status:** decided 2026-05-25. **Ship-blocker for v2.** Accessibility-first framing — captions for hearing-impaired viewers are part of the v2 deliverable, not a v2.x polish.
+
+**Why burn-in specifically (not embedded soft subs or sidecar SRT):** distribution path is OBS Studio → live broadcast / RTMP out (per the `output/episodes_for_obs/<ep>/<ep>.mp4` ship-folder convention). OBS Media Source ignores `mov_text` embedded subtitle tracks AND paired `.srt` sidecar files — neither survives the OBS broadcast layer. Pixels are the only caption surface that reaches the audience reliably. Burn-in or nothing.
+
+**Architecture:** new node `OTR_BurnInCaptions` inserted between `OTR_RTXUpscale` and the final mp4 emit. Burn-in goes on the highest-resolution frame (post-upscale) for text crispness — burning on 1472×832 then upscaling would blur the type. Per-frame ffmpeg subtitle filter pass using ASS styling.
+
+```
+... -> [VideoComposite] -> [RTXUpscale] -> [OTR_BurnInCaptions] -> final.mp4
+```
+
+**Source data:** reads from in-memory ledger (`led` socket input), NOT from disk — every dialogue line in `lines[]` already carries `text` + `start_s` + `dur_s`, which is exactly the data an SRT row needs. Writes a temp SRT to the OS temp dir, runs `ffmpeg ... -vf "subtitles=<temp_srt>:force_style='...'" ...`, optionally preserves the SRT as a sidecar (see below) before deleting the temp copy. Avoids the disk-ledger read path (cross-reference BUG-LOCAL: ledger lock + WinError 5 atomic-rename failures observed 2026-05-25 on episode `signal_lost_bioluminescent_trench_descent_20260525_182002`).
+
+**Tier placement:** Green (always-on baseline) in the Green/Yellow/Red workflow UI architecture proposal (see `docs/2026-05-25-simplest-8gb-workflow-problem-statement.md` §10). NOT bypassable in default state. Both 8GB and 16GB tiers get burn-in.
+
+**Style spec (locked here, not a separate doc):**
+
+- **Font:** Atkinson Hyperlegible (open-source, designed by Braille Institute for low-vision readers) as primary; Inter as fallback if Atkinson is missing on the user's system. Sans-serif at all costs — serifs blur at small caption sizes.
+- **Color:** white text with 2-3px black outline. NOT drop-shadow alone (drop-shadow fails on bright backgrounds). Outline is universal-readable on any FLUX still background.
+- **Position:** bottom-third, with 5% safe-area padding from frame edge.
+- **Speaker prefix:** italicized character name + colon. Example: *STANLEY:* "The pressure hull integrity is holding..." — distinguishes who's speaking when voice presets sound similar; standard radio-drama caption convention.
+- **Non-dialogue cues:** square-bracketed accessibility-standard format. `[♪ tense musical interlude]` for music_inter beats, `[radio static]` / `[explosion]` / `[footsteps approaching]` for SFX beats. Required for hearing-impaired use case — they need the audible-narrative not just the dialogue.
+- **Timing:** show caption 200ms BEFORE line `start_s`, hold 200ms AFTER `start_s + dur_s`. Perceptual breathing room; prevents flash-cuts that strain readers.
+- **Font size:** 28-32px at 1080p. Tunable via a single node widget for festival vs social-clip scaling.
+
+**Sidecar SRT also always-on (backup, not deliverable):** `OTR_BurnInCaptions` emits the SRT to `output/otr/episodes/<ep>/<ep>.srt` next to the mp4 before deleting its temp copy. Reasons: accessibility tools that DO parse sidecars (VLC, archival systems), future YouTube/Vimeo direct-upload path where SRT overrides auto-captions, text-searchable catalog of every episode's dialogue, translation pipeline target (`<ep>.es.srt`, `<ep>.ja.srt` for platforms that support paired sidecars). Costs <100ms — same data already written for ffmpeg, just kept instead of deleted.
+
+**Acceptance for v2 ship:**
+
+- `OTR_BurnInCaptions` node registered + wired into both 8GB and 16GB workflow JSONs.
+- Final upscaled mp4 has captions burned into the pixels, visible on any player.
+- Sidecar `.srt` exists at the canonical episode path.
+- Style matches the spec above (Atkinson Hyperlegible OR Inter fallback, white-on-outline, bottom-third with safe-area padding, italicized speaker prefix, bracketed non-dialogue cues).
+- Burn-in pass adds <60s to total render time on a representative episode (measured target).
+- Bug Bible regression + full OTR suite green; new `tests/test_burn_in_captions.py` covers ledger→SRT conversion, ffmpeg-flag generation, speaker-prefix injection, music_inter/sfx bracketing, timing offsets, and the sidecar-preserve path.
+- README hardware-tier table (S24.1) updated to call out captions as a baseline accessibility feature, not an opt-in.
+- Operator confirms via OBS playback test that captions render correctly when the mp4 is broadcast through OBS Media Source.
+
+**Out of scope for v2 (defer to v2.x):**
+
+- Per-character styling (different fonts/colors per speaker — STANLEY in blue, REGINALD in green, etc.) — flourish, not accessibility.
+- Multi-language translation pipeline (`<ep>.es.srt` generation via API LLM translation) — depends on v2.x API-LLM decision.
+- Embedded `mov_text` soft subs in the mp4 container — OBS ignores them, adds ffmpeg complexity for zero broadcast benefit. Skip entirely until a non-OBS distribution path opens.
+- Custom OBS Lua/Python script for toggleable on-air captions — fragile, sync-prone, defeats the "burn-in is reliable" rationale.
+
+**Why this matters:** v2 ships when the artifact is accessible. The OTR pipeline writes radio drama; without captions, a hearing-impaired viewer experiences a silent film. Burning captions in is the smallest, most reliable change that makes every shipped episode accessible to every viewer, on every distribution path including the OBS broadcast layer that's the actual production target.
+
+---
+
 ## v2.0-beta candidates
 
 ### Animated backgrounds (3-layer composite, 16 GB only)

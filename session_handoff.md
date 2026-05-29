@@ -1,99 +1,102 @@
-# Session Handoff -- OTR Lean-Down -- 2026-05-29
+# Session Handoff -- OTR Lean-Down COMPLETE, Phase 2 (live render) next -- 2026-05-29
 
 ## Core goal
-Execute the OTR pipeline lean-down: remove dead/dormant story machinery (multiturn,
-Story Room, shadow/fan-out, polish surface, an unused writer output, a disabled graph
-node) so the shipped path is just writer (use_exchange) -> freeze cascade -> audio ->
-video. Run it one sprint at a time (REVIEW -> CODE -> WIRE -> REGRESS -> COMMIT), then a
-Phase-2 headless ComfyUI API test loop until a full episode renders clean. Do it all
-autonomously via Desktop Commander + Windows MCP -- no input needed from Jeffrey.
+The pipeline lean-down (remove dormant story machinery so the shipped path is
+writer(use_exchange) -> freeze cascade -> audio -> video) is **DONE and pushed**:
+steps 5-12 of `docs/LEAN_DOWN_AUDIT_2026-05-29.md` are complete. The ONLY remaining
+work is **Phase 2: drive a full episode through ComfyUI's HTTP API headless and
+iterate to a clean render** (the live end-to-end validation the static gates can't
+do). Do it autonomously via Desktop Commander + Windows MCP -- no input needed.
 
-## THE SPEC LIVES IN ONE FILE
-`docs/LEAN_DOWN_AUDIT_2026-05-29.md` (committed, HEAD 4020923) is the complete, verified
-go-forward plan: preconditions, keep-list, deletion inventory, the 12-step execution order,
-the widget-removal method, and the Phase-2 headless plan. READ IT FIRST. This handoff only
-adds the live session state + operational gotchas that file does not capture. Do not
-re-derive the plan; follow it.
+## State of the art (verify first)
+- HEAD `v2.0-alpha` == origin == **`00c0880`**. Confirm before starting.
+- Six lean-down commits shipped: `608eb88` (5 multiturn), `6c0943a` (6 Story Room),
+  `b0db85b` (7 shadow+fanout), `5e238ce` (9 polish), `46bfa77` (10 output prune),
+  `00c0880` (12 bisect cruft). Step 8 = verified no-op; step 11 = VRAM guardians KEPT.
+- ~19K lines of dormant machinery removed. Writer surface is now **19 widgets**
+  (was 23) and **5 outputs** (script_text, script_json, news_used, estimated_minutes,
+  technical_model -- the creative_writing_model output was removed, zero consumers).
+- `workflows/otr_scifi_16gb_full.json`: 30 nodes, 68 links, last_link_id 230; writer
+  node id=1 widgets_values len 19; technical_model output now slot 4, link 115 =
+  `[115,1,4,62,4,"STRING"]`. It is the ONLY workflow with the writer node.
+- Working tree: only pre-existing `ROADMAP.md` + `docs/s28_diff_tmp.txt` mods +
+  untracked planning docs (not from the lean-down). No in-flight code edits.
 
-## Tech stack & constraints
-Windows, RTX 5080 16GB (14.5GB ceiling), ComfyUI Desktop @ localhost:8000, branch
-`v2.0-alpha` only (never `main`). venv python: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`.
-CLAUDE.md rules are in force (auto-loaded): UTF-8 no BOM; never the word "dummy" (use
-placeholder/stub); audio byte-identity is sacred; wire every node change into the workflow
-JSON; every LLM call tagged creative/technical. Git only via Desktop Commander cmd shell.
+## Verification toolkit (ALL GREEN at HEAD -- run these every Phase-2 code change)
+Run from repo root with the venv python + BACKSLASH paths (forward-slash/quoted
+paths get mangled by the shell layer -- retry with backslash + cmd.exe if "not found"):
+- `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py -q`  -> 23 passed (the Bug Bible repo IS present on this machine via Desktop Commander; the handoff's old "absent in sandbox" note was only about the bash/VM mount).
+- `...python.exe -m pytest tests\test_core.py -q`  -> 59 passed
+- `...python.exe -m pytest tests\test_audio_byte_identical.py -q`  -> 9 passed / 1 skipped (Prime Directive 1: audio byte-identity held at EVERY lean-down step).
+- Full suite `pytest tests/ -q` -> **only 2 failures, both PRE-EXISTING + unrelated to
+  the lean-down** (confirmed identical at the pre-work commit 608eb88):
+  `test_bark_freeze_halt_bypass.py::TestWorkflowJsonNode11::test_node_11_widgets_values_includes_bypass_default`
+  and `test_llm_slot_sweep.py::test_every_llm_call_site_has_slot_tag`. Treat these as
+  the known baseline; a 3rd failure is a real Phase-2 regression. (Worth a separate fix.)
 
-## What's done & decided (this session)
-- Sprints/steps 1-4 of the plan are DONE. Step 4 (Node 42 cut) shipped: commit `7b67503`.
-  Graph now 30 nodes / 68 links, last_link_id 230. `tests/test_core.py` 59 passed.
-- Node 42 was `mode:0` (active) but its `sage_attention` widget == `'disabled'` (title:
-  "...DISABLED, BUG-LOCAL-070") -> a true MODEL passthrough. Cut via the link-203 bridge
-  (delete master link 69, retarget link 203 -> node 23, node 23 model input 69->203, node 71
-  output list untouched). LESSON: verify a node's EFFECT (widget state), not just mode/presence.
-- Verified and locked as KEEP (do NOT delete -- these are the landmines):
-  `_otr_stage1_plan` (live outline; easily confused with shadow-only `_otr_stage1_call`);
-  `make_polish_generate_fn` (shared conservative-sampling factory called by the live freeze
-  cascade + writer base + line composer, test-pinned -- NOT polish-only despite the name);
-  `OTR_VRAMGuardian` / `OTR_VRAMContextTest` (manual 16GB VRAM tools, test_core-pinned).
-- Widget order in writer `widgets_values` verified via ast: [15]=enable_polish_pass,
-  [17]=enable_stage1_shadow_pass, [18]=use_multiturn_dialogue, [19]=use_exchange(KEEP),
-  [22]=use_stage1_fanout. They are INTERLEAVED with keepers -> remove via value-asserted
-  name-keyed regen (method in the doc), never index-popping.
-- Registry `_NODE_MODULES` in `__init__.py` is explicit + `importlib.import_module` per entry
-  -> a deleted module's entry MUST go in the same commit or startup throws ImportError.
-- All 10 workflow JSONs have zero refs to the to-be-deleted node types -> tombstoning safe.
+## Decisions made this session (don't reopen)
+- Step 5: `_otr_wave0_multiturn.py` could NOT be deleted wholesale -- the KEPT Stage-3
+  validators path uses `build_inloop_stage1_plan` + `line_request_to_stage1_beat`.
+  Those (+ `_coerce_beat_id`, `_build_synthetic_led_data`) were migrated into the kept
+  `nodes/_otr_legacy_to_stage1_adapter.py`; the writer imports them as `_OTRL2S1`.
+- Step 9: full polish removal, BUT `OTR_LedgerScriptWriter` slot scheduler's
+  `for_polish()` was RETAINED as a creative-slot conservative-sampling primitive (it
+  wraps the KEPT `_otr_model_loader.make_polish_generate_fn`; the slot-routing tests
+  pin it). It has no production caller now -- intentional, not a bug.
+- The freeze cascade's `_otr_freeze_cascade.py:790  if "stage1_shadow_attempts" in meta:`
+  Stage-7 shadow-critic block is now DORMANT (the writer never stamps that key post
+  step 7). Left in place -- audio-path-adjacent, harmless, out of scope. Candidate for
+  a future cleanup, NOT a Phase-2 blocker.
+- Step 12 kept (not proven zero-ref): OTR_Visual* sidecar, OTR_CheckpointLoaderGated,
+  OTR_VideoConcat, OTR_BatchProceduralSFX, OTR_ProjectStateLoader, OTR_SaveCopy,
+  `_otr_lfc_context` (test-covered). Don't tombstone these without a fresh zero-ref proof.
+- Downstream audit done: no consumer reads a removed meta-key (only the dormant cascade
+  gate above) and zero consumers of the removed creative_writing_model output.
 
-## State of the art
-- HEAD `v2.0-alpha` == origin == `4020923`. Working tree: pre-existing untracked plan docs +
-  ROADMAP.md / session_handoff.md modifications only; no in-flight half-edits.
-- The only graph touched so far is `workflows/otr_scifi_16gb_full.json` (Node 42 removed).
-- No writer code has been edited yet -- sprints 5-10 are untouched.
+## Immediate next steps (Phase 2 -- per docs/LEAN_DOWN_AUDIT_2026-05-29.md "Phase 2")
+1. Confirm HEAD == 00c0880. Launch ComfyUI headless under Desktop Commander so its
+   stdout/stderr is AI-readable:
+   `cd /d C:\Users\jeffr\Documents\ComfyUI && .venv\Scripts\python.exe main.py --port 8000`
+   (DC start_process, shell:"cmd.exe"). Keep the PID; read_process_output tails
+   PARSE_FATAL / tracebacks / VRAM spikes / FFmpeg. Wait for full node load + the
+   "OK - All N nodes loaded" line (folder_paths-dependent nodes load fine inside ComfyUI;
+   they only fail in the standalone import smoke).
+2. Export an **API-format** copy of `otr_scifi_16gb_full.json` (the UI nodes/links JSON
+   is NOT what /prompt accepts -- it wants the api-prompt dict keyed by node id with
+   class_type + inputs). Use ComfyUI "Save (API Format)" via Windows MCP/Chrome, or
+   convert programmatically; keep it beside the UI json.
+3. POST `http://127.0.0.1:8000/prompt` with `{"prompt": <api_graph>, "client_id": <uuid>}`;
+   capture prompt_id. A 400 here is a node/input contract error -- the body names the node
+   (likely surfaces any leftover lean-down wiring gap).
+4. Poll `http://127.0.0.1:8000/history/<prompt_id>` until done AND tail the launched
+   process log. (Optional: ws://127.0.0.1:8000/ws?clientId=<uuid> for execution_error events.)
+5. On error: read the traceback from the process log, fix autonomously (code / JSON /
+   widget), re-run the relevant pytest + the 3 gates above, re-queue. Iterate.
+6. **Success gate:** /history shows completed; audio output file exists + non-empty; no
+   PARSE_FATAL; dialogue line count > 0; VRAM peak <= 14.5 GB; FFmpeg returned 0; audio
+   byte-identity vs the pre-lean baseline still holds.
+7. Record the proven API JSON + prompt_id + runtime in `BUG_LOG.md`.
 
-## Operational gotchas (cost real time this session -- do these the proven way)
-- COMMIT MESSAGES: write the message to `.git\COMMIT_EDITMSG` with the FILE TOOL (DC
-  write_file), then `git add <path> && git commit -F .git\COMMIT_EDITMSG`. Do NOT use
-  `echo msg> .git\COMMIT_EDITMSG` inside a chained cmd -- the redirect-in-chain silently
-  no-ops through this shell layer (commit skipped, exit 0). Confirmed twice.
-- DC start_process: pass `shell:"cmd.exe"` (default is powershell, which fails `cmd`/`&&`).
-  Output capture on chained cmd is flaky -- after a commit/push, verify with a separate
-  `git rev-parse HEAD` + `git rev-parse origin/<branch>` rather than trusting captured stdout.
-- Inspect JSON/code by writing a probe `.py` via DC write_file and running it with the venv
-  python; inline `python -c "..."` gets quote-mangled by the shell layer. Delete probes after.
-- JSON surgery pattern that worked: an assert-preconditions -> mutate -> run the 7-check
-  link-table validation -> write (`json.dumps(indent=2, ensure_ascii=False)`, no trailing
-  newline to match the canonical file) script. Then review `git --no-pager diff` before commit.
-- REGRESSION TESTS -- all present + green this session; DO NOT ask where they are, just run
-  them (venv python, BACKSLASH paths):
-  * Bug Bible: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py` (23 passed on the Node 42 commit)
-  * Core: repo `tests\test_core.py` (59 passed)   * Audio: repo `tests\test_audio_byte_identical.py`
-  Run: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest <backslash-path> -q`
-  An earlier "Bug Bible missing" reading was a FALSE NEGATIVE -- this shell layer mangles
-  forward-slash quoted paths and parenthesized `if exist`. Use backslash paths + simple quoting.
-- The bash/VM mount serves CORRUPTED file copies -- always operate on the real Windows path
-  through Desktop Commander, never the sandbox mount.
-
-## Immediate next steps
-1. Re-read `docs/LEAN_DOWN_AUDIT_2026-05-29.md` (the spec). Confirm HEAD == 4020923.
-2. Execute step 5 -- Multiturn: delete `_otr_wave0_multiturn.py`, `_otr_stage2_call.py`,
-   `_otr_stage2_prompt.py` + their tests; remove the writer dispatch block + the
-   `use_multiturn_dialogue` widget via value-asserted name-keyed regen; remove its kwarg +
-   resolved-dict key. Run `test_core.py` (+ Bug Bible on the full machine); cache-safe ComfyUI
-   restart; commit + push.
-3. Continue steps 6 (Story Room), 7 (Shadow+fan-out), 8 (loader cleanup), 9 (Polish -- LAST,
-   per-symbol, keep make_polish_generate_fn), 10 (prune creative_writing_model output). Step 11
-   is KEEP (VRAM guardians); step 12 is scan-gated cruft.
-4. Then Phase 2 -- headless API testing per the doc: launch ComfyUI under Desktop Commander so
-   its log is AI-readable, export the workflow to API format, POST /prompt, poll /history +
-   tail the process log, iterate to a clean episode (success gate in the doc).
+## Operational gotchas (proven this session)
+- Git only via Desktop Commander **cmd** shell (never PowerShell). Commit messages:
+  write to `.git\COMMIT_EDITMSG` with the file tool, then `git commit -F .git\COMMIT_EDITMSG`
+  (do NOT use `echo msg> file` in a chained cmd -- the redirect silently no-ops).
+- For code/JSON surgery: write an assertion-guarded probe `.py` (atomic: write only if all
+  asserts + ast.parse pass), run with the venv python, delete after. Inline `python -c "..."`
+  gets quote-mangled.
+- Operate on the REAL Windows path via Desktop Commander, never the bash/VM mount (it
+  serves stale/corrupt copies). The venv python is the full Windows interpreter.
+- Cache-safe ComfyUI restart before loading a mutated JSON (clear `__pycache__`, hard-refresh
+  browser) -- the frontend can force a stale node definition over the new JSON.
 
 ## Open questions
-- None blocking. Two verify-at-execution items, both flagged in the doc: in step 6 the two
-  shared constraint-editor tests must be EDITED (not deleted) and `test_dialogue_slot_id`
-  confirmed non-live; in step 9 each polish symbol (needs_polish / polish_line /
-  is_polish_refusal / _POLISH_*) must be proven enable_polish_pass-exclusive before removal.
+- None blocking Phase 2. Two pre-existing full-suite failures (node-11 bypass + llm_slot_sweep)
+  are unrelated baseline reds. The dormant freeze-cascade shadow gate + the uncalled
+  `for_polish()` primitive are intentional retentions, optional future cleanups.
 
 ---
 ## Resume instructions
 Open a fresh window, attach this file, and say:
-"Read this handoff file and prepare to execute the immediate next steps. Acknowledge when
-you're ready to start." Desktop Commander + Windows MCP can perform every step (code edits,
-git, tests, headless ComfyUI launch + log tail) without Jeffrey present.
+"Read this handoff file and prepare to execute the immediate next steps (Phase 2 live
+render). Acknowledge when you're ready to start." Desktop Commander + Windows MCP can do
+every step (launch ComfyUI, tail its log, POST /prompt, fix + re-run, git) without Jeffrey.
