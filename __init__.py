@@ -280,14 +280,6 @@ _NODE_MODULES = {
     # filename. Pure side-effect; passes the upstream path through
     # unchanged so production wiring is not affected.
     "OTR_SaveCopy": (".nodes.otr_save_copy", "SaveCopy", " Save Copy (per-stage QA tee)"),
-    # BUG-LOCAL-231 Step 6 bisect (2026-05-19): minimal STRING-emit node
-    # used to feed `gate_signal` (forceInput=True) on
-    # OTR_DeferredCheckpointLoader / OTR_FluxBranchGate variants without
-    # bringing the full ledger flow into the bisect graph. TEMPORARY --
-    # delete this registration + nodes/_bisect_string_source.py + every
-    # workflows/_bisect_*.json after BUG-LOCAL-231 closes (Step 9
-    # cleanup of the 9-step plan).
-    "OTR_BisectStringSource": (".nodes._bisect_string_source", "BisectStringSource", " Bisect String Source (BUG-LOCAL-231 -- delete at close)"),
 
 
 }

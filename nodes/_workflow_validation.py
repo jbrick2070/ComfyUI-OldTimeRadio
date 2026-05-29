@@ -80,6 +80,9 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_StoryRoomCommit",
     "OTR_DirectorBrief",
     "OTR_EditorPass",
+    # Lean-down 2026-05-29 (step 12): temporary BUG-LOCAL-231 bisect
+    # STRING-emit node; deleted with its _bisect_flux_*.json graphs.
+    "OTR_BisectStringSource",
     # Lean-down 2026-05-29 (step 7): the shadow-pass Stage 1 fan-out +
     # best-of-N beat-selector diagnostic nodes were deleted with the
     # shadow/fan-out cluster.
