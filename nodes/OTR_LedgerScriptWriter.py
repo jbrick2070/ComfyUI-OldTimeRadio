@@ -3105,10 +3105,18 @@ class OTR_LedgerScriptWriter:
             # resident technical cache_entry. request_slot reuses the
             # entry build_continuity_ledger just used -- no reload, no new
             # VRAM beyond resident (Prime Directives 1 + 2).
-            _sdc_cache = _OTRML.request_slot(
+            #
+            # BUG-LOCAL-294 (caught live 2026-05-28): run() binds _OTRML /
+            # _OTRCG as function-LOCALS inside the gated shadow-pass block,
+            # so referencing those bare names here raises UnboundLocalError
+            # whenever the shadow pass is OFF. Import the modules under
+            # fresh local aliases right before use to sidestep the scope.
+            from . import _otr_model_loader as _OTRML_SDC
+            from . import _otr_constrained_generate as _OTRCG_SDC
+            _sdc_cache = _OTRML_SDC.request_slot(
                 "technical", resolved["technical_model"],
             )
-            _sdc_gen_fn = _OTRCG.make_constrained_generate_fn(
+            _sdc_gen_fn = _OTRCG_SDC.make_constrained_generate_fn(
                 _sdc_cache, _SlotJobFields, heartbeat_label="SlotContract",
             )
             _sdc_active_props = list(
