@@ -12,9 +12,10 @@ shared symbol that only LOOKS dormant, and deleting VRAM-survival logic. Each ha
 - Sprint 1 / step 4 (Node 42 cut) DONE -- commit 7b67503, pushed to v2.0-alpha. Graph now
   30 nodes / 68 links, last_link_id 230. Link-table validation (7 checks) + tests/test_core.py
   (59 passed) green. NEXT: step 5 (Multiturn).
-- Bug Bible regression was NOT runnable in the Cowork sandbox (survival-guide repo absent at
-  C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide). On the full machine,
-  run it every commit per CLAUDE.md alongside core + audio.
+- Regression suites verified present + green this session (use venv python + BACKSLASH paths):
+  Bug Bible `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py`
+  (23 passed), core `tests\test_core.py` (59 passed), audio `tests\test_audio_byte_identical.py`.
+  An earlier "Bible missing" note was a shell-quoting false negative -- the file is there.
 
 ## Current state (verified)
 otr_scifi_16gb_full.json: 30 nodes, 68 links, last_link_id 230 (== max, no orphan/dup),
@@ -171,7 +172,7 @@ Prove that first, every widget commit:
 11. VRAM guardians -- KEEP (see above).
 12. Cruft (scan-gated) -- per-candidate zero-reference proof, then tombstone each.
 
-Per commit: core + audio + affected suites green (+ Bug Bible on the full machine); cache-safe
+Per commit: Bug Bible + core + audio + affected suites green; cache-safe
 ComfyUI restart to confirm node 1 loads and the run reaches audio; re-run the link-table
 validator after any JSON edit.
 

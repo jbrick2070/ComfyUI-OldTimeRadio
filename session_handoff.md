@@ -61,8 +61,13 @@ JSON; every LLM call tagged creative/technical. Git only via Desktop Commander c
 - JSON surgery pattern that worked: an assert-preconditions -> mutate -> run the 7-check
   link-table validation -> write (`json.dumps(indent=2, ensure_ascii=False)`, no trailing
   newline to match the canonical file) script. Then review `git --no-pager diff` before commit.
-- Bug Bible repo is ABSENT in this Cowork sandbox (`...\comfyui-custom-node-survival-guide`
-  missing) -- run `tests/test_core.py` + audio here; run the Bug Bible on the full machine.
+- REGRESSION TESTS -- all present + green this session; DO NOT ask where they are, just run
+  them (venv python, BACKSLASH paths):
+  * Bug Bible: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py` (23 passed on the Node 42 commit)
+  * Core: repo `tests\test_core.py` (59 passed)   * Audio: repo `tests\test_audio_byte_identical.py`
+  Run: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest <backslash-path> -q`
+  An earlier "Bug Bible missing" reading was a FALSE NEGATIVE -- this shell layer mangles
+  forward-slash quoted paths and parenthesized `if exist`. Use backslash paths + simple quoting.
 - The bash/VM mount serves CORRUPTED file copies -- always operate on the real Windows path
   through Desktop Commander, never the sandbox mount.
 
