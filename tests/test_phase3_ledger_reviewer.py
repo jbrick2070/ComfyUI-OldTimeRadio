@@ -1238,3 +1238,49 @@ class TestScriptDoctorOrchestrator:
         fn = _mk_generate_fn("not json at all")
         report = run_script_doctor(fn, led.data, led.data["cast"], 8)
         assert report.overall_verdict == "needs_full_rerun"
+
+
+class TestBugLocal276RefuseAnnouncerOnCharacterLine:
+    """BUG-LOCAL-276 family (2026-05-29): the deterministic wrong_char_id
+    repair must NEVER remap a speaker_role='character' line onto the
+    announcer's cast row (a Kokoro / non-v2 voice). Honoring such an
+    auditor suggestion stamps an unrenderable voice on a Bark line and
+    hard-crashes BatchBarkGenerator at render. The row is left for the
+    Script Doctor instead, so the locked character speaker stays constant
+    and announcer lines are never managed onto a character.
+
+    _build_ledger cast: c01=ALICE, c02=BOB, c03=ANNOUNCER (no voice_preset).
+    """
+
+    def test_character_line_not_remapped_onto_announcer(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "Hello there.", role="character"),
+        ])
+        # Auditor wrongly suggests the ANNOUNCER's char_id (c03) for a
+        # character-role line.
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c01", expected="c03",
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(led.data, report, led.data["cast"])
+        # Refused: char_id unchanged (NOT the announcer's c03), not counted.
+        assert led.data["lines"][0]["char_id"] == "c01"
+        assert n == 0
+
+    def test_character_to_character_remap_still_works(self, tmp_path):
+        # Positive control: a legitimate character->character remap is
+        # unaffected by the announcer guard.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c99", "Hello there.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c99", expected="c02",
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(led.data, report, led.data["cast"])
+        assert led.data["lines"][0]["char_id"] == "c02"
+        assert n == 1

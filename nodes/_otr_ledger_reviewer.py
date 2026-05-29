@@ -808,6 +808,14 @@ def apply_deterministic_cast_repairs(
             valid_char_ids[cid.casefold()] = cid
     char_id_by_name.setdefault("ANNOUNCER", "announcer")
     valid_char_ids.setdefault("announcer", "announcer")
+    # BUG-LOCAL-276 family (2026-05-29): char_id -> cast row, so the
+    # wrong_char_id repair can refuse to remap a character-role line
+    # onto the announcer's row (a Kokoro bm_fable / non-v2 voice).
+    cast_row_by_id: dict[str, dict] = {}
+    for row in cast_rows or []:
+        _cid = (row.get("char_id") or "").casefold()
+        if _cid:
+            cast_row_by_id[_cid] = row
     repaired = 0
     lines_by_id: dict[str, dict] = {
         ln.get("line_id", ""): ln
@@ -868,11 +876,42 @@ def apply_deterministic_cast_repairs(
                     if cid is None:
                         cid = char_id_by_name.get(target_name.upper())
             if cid:
+                # Gate 2 (BUG-LOCAL-276 family, 2026-05-29): NEVER remap a
+                # speaker_role='character' line onto the announcer's cast
+                # row. The pre-audit LLM sometimes suggests the announcer's
+                # char_id (c01) for a character beat; honoring it stamps a
+                # Kokoro bm_fable / non-v2 voice on a Bark line and
+                # BatchBarkGenerator Gate 3 hard-rejects it at render
+                # (the original BUG-276 crash). Refuse + leave the row for
+                # the Script Doctor so the locked character speaker stays
+                # constant and announcer lines are never managed onto a
+                # character. Operator design steer (Jeffrey 2026-05-29).
+                _line_role = (line.get("speaker_role") or "").strip().lower()
+                _target_row = cast_row_by_id.get(cid.casefold())
+                _target_voice = str((_target_row or {}).get("voice_preset") or "")
+                # The announcer is identified by NAME (id-scheme independent);
+                # a present-but-non-v2 voice is a secondary signal. An EMPTY
+                # voice_preset must NOT trigger the refusal -- it is unknown,
+                # not necessarily the announcer (the deterministic-repair unit
+                # fixtures carry no voice_preset).
+                _target_is_announcer = bool(_target_row) and (
+                    (_target_row.get("name") or "").strip().upper() == "ANNOUNCER"
+                    or (_target_voice != "" and not _target_voice.startswith("v2/"))
+                )
+                if _line_role == "character" and _target_is_announcer:
+                    log.warning(
+                        "[OTR_LedgerReviewer] wrong_char_id violation on "
+                        "line_id=%s suggested expected=%r -> char_id=%r, "
+                        "which is the announcer / a non-Bark (non-v2/*) "
+                        "voice. Refusing to remap a character line onto it "
+                        "(BUG-276 family); leaving row for the Script Doctor.",
+                        v.line_id, v.expected, cid,
+                    )
                 # Over-flagging guard (BUG-LOCAL-271): if the line
                 # already carries the correct char_id, the auditor
                 # over-flagged it -- nothing to repair, nothing to
                 # escalate. Count it as resolved and move on.
-                if (line.get("char_id") or "").casefold() == cid.casefold():
+                elif (line.get("char_id") or "").casefold() == cid.casefold():
                     repaired += 1
                 else:
                     line["char_id"] = cid
