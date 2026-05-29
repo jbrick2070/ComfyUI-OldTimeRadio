@@ -17,7 +17,8 @@ Coverage map:
   - pick_style happy path: inventor produces 5, chooser picks one
   - pick_style inventor retry recovery
   - pick_style inventor all-fail -> StyleGenerationFailedError
-  - pick_style chooser mismatch -> StyleGenerationFailedError
+  - pick_style chooser mismatch -> fallback to first candidate (BUG-LOCAL-295)
+  - pick_style chooser model raise -> fallback to first candidate (BUG-LOCAL-295)
   - pick_style empty article precondition -> raise
   - pick_style seed pool too small -> raise
 
@@ -403,38 +404,42 @@ class TestPickStyle:
             )
         assert "after 3 attempts" in str(exc_info.value)
 
-    def test_chooser_mismatch_raises(self):
+    def test_chooser_mismatch_falls_back(self):
+        # BUG-LOCAL-295: a chooser pick outside the candidate pool must
+        # NOT halt the episode. After exhausting its retry budget the
+        # picker falls back to the first candidate rather than raising.
         inventor_response = "\n".join(_five_valid_distinct())
-        chooser_response = "rogue_descriptor_outside_pool"
-        gen = _make_canned_generate_fn([inventor_response, chooser_response])
-        with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(creative_fn=gen, technical_fn=gen,
-                article_text="Article whose chooser goes rogue.",
-                seed_pool=_TEN_PRESETS,
-                rng=random.Random("chooser-rogue"),
-                model_id="test-model",
-            )
-        assert "chooser output validation failed" in str(exc_info.value)
+        rogue = "rogue_descriptor_outside_pool"
+        gen = _make_canned_generate_fn(
+            [inventor_response, rogue, rogue, rogue]
+        )
+        pick = _SP.pick_style(creative_fn=gen, technical_fn=gen,
+            article_text="Article whose chooser goes rogue.",
+            seed_pool=_TEN_PRESETS,
+            rng=random.Random("chooser-rogue"),
+            model_id="test-model",
+        )
+        assert pick.chosen == _five_valid_distinct()[0]
+        assert pick.candidates == _five_valid_distinct()
 
-    def test_chooser_llm_raise_propagates(self):
+    def test_chooser_llm_raise_falls_back(self):
+        # BUG-LOCAL-295: if the chooser model raises on every attempt,
+        # fall back to the first candidate rather than crashing the run.
         inventor_response = "\n".join(_five_valid_distinct())
 
         def _gen(messages, *, temperature, max_new_tokens):
-            # First call (inventor) returns valid; second call
-            # (chooser) raises.
-            if temperature >= 0.5:  # inventor temperatures
+            # inventor temperatures are high; chooser temp is low.
+            if temperature >= 0.5:
                 return inventor_response
             raise RuntimeError("chooser model offline")
 
-        with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(creative_fn=_gen, technical_fn=_gen,
-                article_text="Article whose chooser model dies.",
-                seed_pool=_TEN_PRESETS,
-                rng=random.Random("chooser-offline"),
-                model_id="test-model",
-            )
-        assert "chooser LLM call failed" in str(exc_info.value)
-        assert exc_info.value.__cause__ is not None
+        pick = _SP.pick_style(creative_fn=_gen, technical_fn=_gen,
+            article_text="Article whose chooser model dies.",
+            seed_pool=_TEN_PRESETS,
+            rng=random.Random("chooser-offline"),
+            model_id="test-model",
+        )
+        assert pick.chosen == _five_valid_distinct()[0]
 
     def test_empty_article_raises_precondition(self):
         gen = _make_canned_generate_fn([])

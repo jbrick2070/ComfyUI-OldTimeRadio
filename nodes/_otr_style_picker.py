@@ -404,8 +404,9 @@ def _validate_chooser_output(raw: str, candidates: list[str]) -> str:
       - Lowercase normalize.
       - Match against candidate set (exact equality, post-strip).
 
-    Raises ValueError on any mismatch (caller wraps in
-    StyleGenerationFailedError; no retry per fail-loud policy).
+    Raises ValueError on any mismatch. The caller (_run_chooser) retries
+    on a ValueError and, after its retry budget, falls back to the first
+    candidate (BUG-LOCAL-295) -- a style-slug pick never halts the run.
     """
     text = (raw or "").strip()
     if not text:
@@ -502,10 +503,18 @@ def _run_chooser(
     *,
     article_excerpt: str,
     candidates: list[str],
+    max_attempts: int = 3,
 ) -> str:
-    """Run Pass 2 (single attempt). Returns the chosen candidate.
-    Raises StyleGenerationFailedError on any failure -- generate_fn
-    raise, mismatch, empty output. No retry per fail-loud policy.
+    """Run Pass 2 with a small retry budget, then a deterministic
+    fallback. ALWAYS returns a candidate from `candidates`.
+
+    BUG-LOCAL-295 (caught live 2026-05-28): the small local chooser model
+    occasionally ignores "pick from this list" and hallucinates a new
+    slug (e.g. 'spine_tingling_recovery' not in the 5 candidates). A
+    cosmetic style-slug pick must NEVER halt the whole episode, so on a
+    bad LLM call or an invalid pick we retry, and after `max_attempts`
+    fall back to the first candidate instead of raising. Validation still
+    rejects the hallucinated slug -- we recover rather than crash.
     """
     user_prompt = _build_chooser_user_prompt(article_excerpt, candidates)
     messages = [
@@ -513,38 +522,51 @@ def _run_chooser(
         {"role": "user",   "content": user_prompt},
     ]
 
-    log.info("[OTR_StylePicker] chooser (temp=%.2f)", _CHOOSER_TEMPERATURE)
-    try:
-        # LLM slot: technical -- chooser pass (single-index pick)
-        raw = generate_fn(
-            messages,
-            temperature=float(_CHOOSER_TEMPERATURE),
-            max_new_tokens=_CHOOSER_MAX_TOKENS,
+    last_err = ""
+    for attempt_idx in range(max_attempts):
+        log.info(
+            "[OTR_StylePicker] chooser attempt %d/%d (temp=%.2f)",
+            attempt_idx + 1, max_attempts, _CHOOSER_TEMPERATURE,
         )
-    except Exception as exc:  # noqa: BLE001
-        log.error(
-            "[OTR_StylePicker] chooser LLM call FAILED: %s; halting "
-            "workflow per fail-loud policy",
-            exc,
-        )
-        raise StyleGenerationFailedError(
-            f"chooser LLM call failed: {type(exc).__name__}: {exc}"
-        ) from exc
+        try:
+            # LLM slot: technical -- chooser pass (single-index pick)
+            raw = generate_fn(
+                messages,
+                temperature=float(_CHOOSER_TEMPERATURE),
+                max_new_tokens=_CHOOSER_MAX_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_err = f"generate_fn raised: {type(exc).__name__}: {exc}"
+            log.warning(
+                "[OTR_StylePicker] chooser attempt %d/%d: %s",
+                attempt_idx + 1, max_attempts, last_err,
+            )
+            continue
 
-    try:
-        chosen = _validate_chooser_output(raw, candidates)
-    except ValueError as exc:
-        log.error(
-            "[OTR_StylePicker] chooser output rejected: %s; halting "
-            "workflow per fail-loud policy",
-            exc,
-        )
-        raise StyleGenerationFailedError(
-            f"chooser output validation failed: {exc}"
-        ) from exc
+        try:
+            chosen = _validate_chooser_output(raw, candidates)
+        except ValueError as exc:
+            last_err = str(exc)
+            log.warning(
+                "[OTR_StylePicker] chooser attempt %d/%d rejected: %s",
+                attempt_idx + 1, max_attempts, last_err,
+            )
+            continue
 
-    log.info("[OTR_StylePicker] chooser picked %r", chosen)
-    return chosen
+        log.info(
+            "[OTR_StylePicker] chooser picked %r (attempt %d/%d)",
+            chosen, attempt_idx + 1, max_attempts,
+        )
+        return chosen
+
+    fallback = candidates[0]
+    log.warning(
+        "[OTR_StylePicker] chooser failed %d attempt(s) (last: %s); "
+        "falling back to first candidate %r rather than halting the "
+        "episode over a style-slug pick.",
+        max_attempts, last_err, fallback,
+    )
+    return fallback
 
 
 # ---------------------------------------------------------------------------
