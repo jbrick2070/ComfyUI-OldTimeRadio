@@ -458,3 +458,99 @@ def test_tier_a_adapter_flags_below_word_floor_against_live_build2():
     res = adapter(parsed, slots)
     assert res.ok is False
     assert "d001" in res.failing_slot_ids
+
+
+# ---------------------------------------------------------------------------
+# run_exchange_prepass: grouping + compose + prior-line threading
+# ---------------------------------------------------------------------------
+
+import re as _re
+from types import SimpleNamespace
+
+
+def _beat(bid, sid, spk, intent="advance the scene"):
+    return SimpleNamespace(
+        beat_id=bid, dialogue_slot_id=sid, speaker=spk,
+        intent=intent, target_words=20,
+    )
+
+
+def _fake_gen_valid(messages, *, temperature=0.0, max_new_tokens=0):
+    # Emit exactly the expected group ids: match the format-block template
+    # `  dNNN|SPEAKER: <line>` so prior-block lines (real speaker/text) do
+    # not get echoed back and inflate the parsed set.
+    text = "\n".join(m["content"] for m in messages)
+    ids = _re.findall(r"(d\d{3})\|SPEAKER: <line>", text)
+    return "\n".join(
+        f"{sid}|SPK: a long enough line of dialogue here now" for sid in ids
+    )
+
+
+def _tier_ok(parsed, slots):
+    return ce.TierAResult(ok=True)
+
+
+def _tier_fail(parsed, slots):
+    return ce.TierAResult(
+        ok=False, reasons=["forced fail"],
+        failing_slot_ids=[s.dialogue_slot_id for s in slots],
+    )
+
+
+def test_prepass_composes_a_voiced_group():
+    beats = [
+        _beat("b001", "d001", "REN"),
+        _beat("b002", "d002", "MAEVE"),
+        _beat("b003", "d003", "REN"),
+    ]
+    out = ce.run_exchange_prepass(
+        beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+    )
+    assert set(out) == {"b001", "b002", "b003"}
+    assert all(out.values())
+
+
+def test_prepass_announcer_breaks_group_and_is_excluded():
+    beats = [
+        _beat("b001", "d001", "ANNOUNCER"),
+        _beat("b002", "d002", "REN"),
+        _beat("b003", "d003", "MAEVE"),
+        _beat("b004", "d004", "ANNOUNCER"),
+    ]
+    out = ce.run_exchange_prepass(
+        beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+    )
+    assert set(out) == {"b002", "b003"}
+
+
+def test_prepass_single_voiced_beat_is_not_composed():
+    beats = [
+        _beat("b001", "d001", "ANNOUNCER"),
+        _beat("b002", "d002", "REN"),
+    ]
+    out = ce.run_exchange_prepass(
+        beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+    )
+    assert out == {}
+
+
+def test_prepass_failed_group_is_excluded():
+    beats = [
+        _beat("b001", "d001", "REN"),
+        _beat("b002", "d002", "MAEVE"),
+    ]
+    out = ce.run_exchange_prepass(
+        beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_fail,
+    )
+    assert out == {}
+
+
+def test_prepass_multi_group_threads_prior_without_parse_drift():
+    # 5 voiced beats -> groups [3, 2]; the second group's prompt carries
+    # the first group's composed lines as prior context. All 5 must
+    # compose (proves prior-line ids are not echoed into the parsed set).
+    beats = [_beat(f"b00{i}", f"d00{i}", "REN") for i in range(1, 6)]
+    out = ce.run_exchange_prepass(
+        beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+    )
+    assert set(out) == {"b001", "b002", "b003", "b004", "b005"}

@@ -73,6 +73,7 @@
         "roll (~11% chance)",
         true,
         true,
+        false,
         true,
         true,
         true

@@ -1206,6 +1206,9 @@ def _resolve_inputs(
     # Sprint 4.5 (2026-05-28): when True AND the shadow pass is on,
     # run a parallel fan-out audit and stamp meta.stage1_fanout.
     use_stage1_fanout: bool = False,
+    # Build 4 (2026-05-28): grouped-exchange dialogue path. When True the
+    # render loop pre-passes voiced beat groups through compose_exchange.
+    use_exchange: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1377,6 +1380,8 @@ def _resolve_inputs(
         "news_briefs_required": bool(news_briefs_required),
         # Sprint 4.5 (2026-05-28): diagnostic Stage 1 fan-out toggle.
         "use_stage1_fanout": bool(use_stage1_fanout),
+        # Build 4 (2026-05-28): grouped-exchange dialogue path toggle.
+        "use_exchange": bool(use_exchange),
     }
 
 
@@ -1856,6 +1861,33 @@ class OTR_LedgerScriptWriter:
                         "beat carries the path taken."
                     ),
                 }),
+                # Build 4 (2026-05-28, GO_FORWARD_PLAN_v10): grouped
+                # exchange dialogue path. OFF (default) keeps the per-beat
+                # composer; PD1 byte-identity holds. ON runs a pre-pass
+                # that groups 2-3 consecutive voiced beats and renders
+                # each group as one exchange (compose_exchange) using the
+                # Build 3 slot_drama_contracts + the Build 2 Tier-A
+                # integrity check (one block per slot, repair-by-group
+                # once, then legacy fallback). ANNOUNCER/MUSIC beats and
+                # trailing singletons keep their existing pass; any
+                # failure falls back to the legacy composer per beat so
+                # audio is never blocked.
+                "use_exchange": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Build 4 grouped-exchange dialogue. OFF (default) "
+                        "keeps the per-beat composer; PD1 byte-identity "
+                        "holds. ON groups 2-3 consecutive voiced beats and "
+                        "renders each as one exchange (compose_exchange) "
+                        "with the Build 3 contracts + Build 2 Tier-A "
+                        "check; one block per slot, one repair-by-group, "
+                        "then legacy fallback. ANNOUNCER/MUSIC + trailing "
+                        "singletons keep their pass. Any failure falls "
+                        "back to legacy per beat -- audio is never "
+                        "blocked. Validate VRAM <= 14.5 GB + zero slot "
+                        "drift on a live N=3 run."
+                    ),
+                }),
                 # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
                 # Stage 3 validators on the legacy dialogue composer.
                 # Catches speaker leaks, banned phrases, length drift,
@@ -2027,6 +2059,8 @@ class OTR_LedgerScriptWriter:
         # fan_out_and_select_stage1_plan and stamps the result on
         # meta.stage1_fanout for operator soak inspection.
         use_stage1_fanout=False,
+        # Build 4 (2026-05-28): grouped-exchange dialogue path (default OFF).
+        use_exchange=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -2060,6 +2094,8 @@ class OTR_LedgerScriptWriter:
             news_briefs_required=news_briefs_required,
             # Sprint 4.5 (2026-05-28): diagnostic fan-out toggle.
             use_stage1_fanout=use_stage1_fanout,
+            # Build 4 (2026-05-28): grouped-exchange dialogue path toggle.
+            use_exchange=use_exchange,
         )
 
         log.info(
@@ -3505,6 +3541,58 @@ class OTR_LedgerScriptWriter:
         # 'fallback_reason'?} dicts. Empty in legacy mode.
         _w0_per_beat_paths: list[dict] = []
 
+        # --- Build 4 (2026-05-28): grouped-exchange pre-pass -----------
+        # When use_exchange is ON, render consecutive voiced beat groups
+        # as exchanges BEFORE the per-beat loop; the loop then short-
+        # circuits each composed beat to the returned text. OFF (default)
+        # leaves _ex_lines_by_beat_id empty so the loop is byte-identical
+        # to the legacy / multiturn path (PD1). The whole block is
+        # defensive: any failure leaves the map empty and every beat
+        # renders via its existing path (never break audio). Runs inside
+        # the compose_line helper context so the creative model is
+        # resident (same slot the per-beat composer uses).
+        # LLM slot: creative -- compose_exchange renders dialogue
+        # (subtext / refusal / reversal) via creative_generate_fn (rule 6).
+        _ex_use: bool = bool(resolved.get("use_exchange", False))
+        _ex_lines_by_beat_id: dict[str, str] = {}
+        if _ex_use:
+            try:
+                from ._otr_compose_exchange import (
+                    run_exchange_prepass as _run_ex_prepass,
+                    make_tier_a_adapter as _make_tier_a,
+                )
+                from ._otr_craft_floor import (
+                    evaluate_tier_a as _eval_tier_a,
+                    normalize_slot_line as _norm_slot_line,
+                )
+                _ex_tier_a = _make_tier_a(_eval_tier_a, _norm_slot_line)
+                _ex_cast = getattr(outline, "cast", None) or cast_rows or []
+                with slot_scheduler.helper_context("compose_line"):
+                    _ex_lines_by_beat_id = _run_ex_prepass(
+                        list(outline.beats),
+                        meta.get("slot_drama_contracts") or {},
+                        list(_ex_cast),
+                        generate_fn=creative_generate_fn,
+                        tier_a_check=_ex_tier_a,
+                    )
+                meta["exchange_prepass_audit"] = {
+                    "beats_composed": len(_ex_lines_by_beat_id),
+                    "beat_ids": sorted(_ex_lines_by_beat_id.keys()),
+                }
+                log.info(
+                    "[OTR_LedgerScriptWriter] Build 4 use_exchange: %d "
+                    "beat(s) composed via grouped exchange.",
+                    len(_ex_lines_by_beat_id),
+                )
+            except Exception as _ex_exc:  # noqa: BLE001 -- never break audio
+                log.warning(
+                    "[OTR_LedgerScriptWriter] Build 4 exchange pre-pass "
+                    "failed (%s: %s); all beats use the legacy / multiturn "
+                    "path.",
+                    type(_ex_exc).__name__, str(_ex_exc)[:200],
+                )
+                _ex_lines_by_beat_id = {}
+
         for beat in outline.beats:
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
@@ -3528,8 +3616,14 @@ class OTR_LedgerScriptWriter:
                 # LLM slot: creative -- multiturn dispatch forwards
                 # the creative_generate_fn into Stage 2 (tagged
                 # creative inside _otr_stage2_call.compose_line).
+                # Build 4: a beat composed by the exchange pre-pass
+                # short-circuits the multiturn + legacy paths below.
+                _ex_text = (
+                    _ex_lines_by_beat_id.get(beat.beat_id)
+                    if _ex_use else None
+                )
                 _w0_result = None
-                if _w0_use_multiturn:
+                if _w0_use_multiturn and _ex_text is None:
                     _w0_beat = _OTRW0MT.line_request_to_stage1_beat(
                         beat,
                         fallback_index=beat_index_by_id.get(
@@ -3556,7 +3650,10 @@ class OTR_LedgerScriptWriter:
                         "path": _w0_result.path,
                         "fallback_reason": _w0_result.fallback_reason,
                     })
-                if _w0_result is not None and _w0_result.path == "multiturn":
+                if _ex_text is not None:
+                    cleaned = _ex_text
+                    beat_compose_flags = ()
+                elif _w0_result is not None and _w0_result.path == "multiturn":
                     cleaned = _w0_result.text
                     beat_compose_flags = ()
                 else:

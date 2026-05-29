@@ -839,3 +839,159 @@ def make_tier_a_adapter(
         )
 
     return _adapter
+
+
+# ===========================================================================
+# run_exchange_prepass -- the writer-loop orchestration (testable)
+# ===========================================================================
+#
+# The writer integration calls this ONCE before its per-beat render loop.
+# It groups consecutive voiced beats, composes each group as an exchange,
+# and returns {beat_id: text} for the beats that composed cleanly. The
+# per-beat loop then short-circuits those beats to the returned text and
+# leaves every other beat (singletons, ANNOUNCER / MUSIC, failed groups)
+# on its existing path -- so audio is never blocked (Prime Directive 1).
+# Pure given the injected generate_fn + tier_a_check (no torch, no I/O),
+# so the whole orchestration unit-tests with fakes.
+
+
+class _CastShim:
+    """Adapter so dict cast rows expose .name / .persona to the prompt."""
+
+    __slots__ = ("name", "persona")
+
+    def __init__(self, name: str, persona: str) -> None:
+        self.name = name
+        self.persona = persona
+
+
+def _normalize_cast(cast: Sequence[Any]) -> List[Any]:
+    out: List[Any] = []
+    for c in (cast or ()):
+        if isinstance(c, dict):
+            out.append(
+                _CastShim(
+                    str(c.get("name") or ""),
+                    str(c.get("persona") or c.get("voice") or ""),
+                )
+            )
+        else:
+            out.append(c)
+    return out
+
+
+def run_exchange_prepass(
+    beats: Sequence[Any],
+    contracts: Mapping[str, Any],
+    cast: Sequence[Any],
+    *,
+    generate_fn: GenerateFn,
+    tier_a_check: TierACheckFn,
+    prior_window: int = 4,
+    min_size: int = 2,
+    max_size: int = 3,
+    reserved_speakers: Sequence[str] = ("ANNOUNCER",),
+    temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
+    max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
+) -> Dict[str, str]:
+    """Compose voiced beat groups as exchanges; return {beat_id: text}.
+
+    Walks `beats` in order, accumulating runs of consecutive voiced
+    (non-reserved, non-empty-speaker, valid d### slot id) beats. Each run
+    is chunked by group_voiced_beats; every group of >= min_size is
+    rendered with compose_exchange. Only "ok" / "ok_repaired" results
+    contribute lines; a "fail" group or a singleton contributes nothing,
+    so the caller renders those beats via its existing path.
+
+    `beats` items are duck-typed: .dialogue_slot_id, .speaker, .beat_id,
+    .intent, and optionally .target_words / .length_target_words.
+
+    prior_window: how many already-composed display lines to feed the
+    next group as scene context. Composed lines accumulate as the prepass
+    advances so later groups see earlier dialogue.
+
+    Returns {beat_id: text} for beats whose group composed cleanly. Pure
+    given the injected generate_fn + tier_a_check.
+    """
+    reserved_lower = {
+        str(s or "").strip().lower() for s in reserved_speakers
+    }
+    cast_norm = _normalize_cast(cast)
+
+    def _slot_id(b: Any) -> str:
+        return str(getattr(b, "dialogue_slot_id", "") or "").strip()
+
+    def _speaker(b: Any) -> str:
+        return str(getattr(b, "speaker", "") or "").strip()
+
+    def _groupable(b: Any) -> bool:
+        spk = _speaker(b)
+        return (
+            bool(_SLOT_ID_RE.match(_slot_id(b)))
+            and bool(spk)
+            and spk.lower() not in reserved_lower
+        )
+
+    def _target_words(b: Any) -> int:
+        for attr in ("target_words", "length_target_words"):
+            v = getattr(b, attr, None)
+            if isinstance(v, int) and v > 0:
+                return v
+        return 20
+
+    out: Dict[str, str] = {}
+    prior: List[str] = []
+
+    def _compose_run(run_beats: List[Any]) -> None:
+        if not run_beats:
+            return
+        slot_to_beat = {_slot_id(b): b for b in run_beats}
+        voiced_slots = [
+            VoicedSlot(
+                dialogue_slot_id=_slot_id(b),
+                speaker=_speaker(b),
+                intent=str(getattr(b, "intent", "") or ""),
+                length_target_words=_target_words(b),
+            )
+            for b in run_beats
+        ]
+        for grp in group_voiced_beats(
+            voiced_slots,
+            min_size=min_size,
+            max_size=max_size,
+            reserved_speakers=reserved_speakers,
+        ):
+            if len(grp) < min_size:
+                continue
+            res = compose_exchange(
+                grp,
+                contracts,
+                prior[-prior_window:] if prior_window > 0 else [],
+                cast_norm,
+                generate_fn=generate_fn,
+                tier_a_check=tier_a_check,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+            if res.status not in ("ok", "ok_repaired"):
+                continue
+            for vs in grp:
+                sid = vs.dialogue_slot_id
+                text = res.lines.get(sid, "")
+                b = slot_to_beat.get(sid)
+                if not text or b is None:
+                    continue
+                bid = str(getattr(b, "beat_id", "") or "").strip()
+                if bid:
+                    out[bid] = text
+                prior.append(f"{sid}|{vs.speaker}: {text}")
+
+    run: List[Any] = []
+    for b in beats or ():
+        if _groupable(b):
+            run.append(b)
+        else:
+            _compose_run(run)
+            run = []
+    _compose_run(run)
+    return out
