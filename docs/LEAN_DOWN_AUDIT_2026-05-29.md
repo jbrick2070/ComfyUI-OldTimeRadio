@@ -128,3 +128,82 @@ T0/T1 anytime (disk + git-status). Then T2 in order: multiturn -> Story Room -> 
 shadow+fanout, each its own commit + regression + JSON re-save + your restart. T3/T4 last,
 after confirming no alt-workflow dependence. Net effect: ~12-16 node modules + ~6 dormant
 helper modules + ~20 tests removed, one workflow graph simplified to writer -> freeze direct.
+
+---
+
+# v2 EXECUTION PLAN (QA-revised + code-verified, 2026-05-29)
+
+A reviewer QA'd the v1 plan against the JSON. Most points were right; two were
+speculative (reviewer hadn't seen the node code) and I verified them. This v2 section
+SUPERSEDES the v1 "Removal protocol" + "Sequencing" above.
+
+## QA reconciliation (verified against the code, not just the JSON)
+- **Validator (QA risk #5) -- mostly UNFOUNDED, verified.** `OTR_WorkflowValidator`
+  (node 63) -> `nodes/_workflow_validation.py` checks NO node counts / required types /
+  topology. Only Check 6 (link table) bites: no orphan links, no dup link ids,
+  `last_link_id == max(link_id)`, no reserved ids {111,112}. So keep the link table
+  consistent and NO validator edit is needed. Do NOT add the removed types to
+  `DELETED_NODE_TYPES` (that deny-list is only for tombstoning types other workflows
+  might still reference).
+- **Story Room "dormant" wording (QA #2) -- CORRECTED.** The nodes DO execute at runtime
+  (live logs showed DirectorBrief -> StoryRoom -> Extract running every episode);
+  `commit=False` only skips Commit's WRITE. So the ledger/audio is byte-identical (Commit
+  pass-through, confirmed in code), but removal also reclaims ~2 min/run and kills the
+  Extract under-produce crash surface. "Out of the output," not "inert."
+- **Widget-shift (QA #1) -- real but bounded.** The 4 removable writer widgets are all
+  OPTIONAL (indices 15/17/18/22); the validator's widget-drift check walks only the 3
+  REQUIRED widgets, so it won't catch a bad optional array -- but ComfyUI still maps
+  `widgets_values` positionally at load. So widget removal MUST migrate the array
+  (remove highest index first: 22 -> 18 -> 17 -> 15) in lockstep with the INPUT_TYPES /
+  run() / _resolve_inputs edits. `test_workflow_canonical_baseline.py` only checks
+  widgets[0..4], so it stays green.
+- **Link bookkeeping (QA #3/#4) -- adopted exactly.** Deleting a link must scrub it from
+  the global `links` array AND every surviving node's `outputs[].links` / `inputs[].link`,
+  and a new link needs a fresh id + `last_link_id` bump. Do this PROGRAMMATICALLY (a
+  migration script), not by hand.
+- **Tier 0 (QA #4 traps) -- re-labelled** "zero GIT risk, NOT zero operational risk":
+  preserve the most recent `io/` + `outputs/` run evidence for regression compare; only
+  blanket-delete the old `_*.txt`/`__pycache__` scratch.
+- **Polish (QA #3) -- re-framed** as hot-path refactor of the live `_otr_line_composer`,
+  not cleanup. Highest regression exposure of the four; do it on its own with full audio
+  regression.
+- **Tier 3 (QA #5) -- hard gate:** scan EVERY workflow JSON + test fixture for a node type
+  before deleting it (esp. visual/*). No delete on single-workflow absence alone.
+
+## Verified surgery facts (from otr_scifi_16gb_full.json)
+- `last_link_id=229`, `last_node_id=79`. Writer (1) `script_json`=output slot 1, links=[107].
+- Story Room links = {107,218,219,220,221,222,223,224,225,226} (confirmed). Island links =
+  {227,228,229} (nodes 79->78 only; node 79 inputs all null).
+- Rewire = new link **[230, 1, 1, 62, 1, "STRING"]** (writer script_json out1 ->
+  FreezeCascade in slot 1, replacing the old 225 from Commit).
+- Node-array deltas: writer out[1].links [107]->[230]; out[4].links [221]->[] ; out[5].links
+  [115,218,219,222,224]->[115]. FreezeCascade in[1].link 225->230. `last_link_id`->230.
+  Result: 81->69 links, 38->31 nodes, max link id 230 == last_link_id (validator-clean).
+- FLAG (not a blocker): after removal the writer's `creative_writing_model` broadcast
+  output (slot 4) has zero consumers (Story Room was its only one); the writer still uses
+  the creative model internally. Decide whether to leave the dangling output or prune it.
+- MINOR: the writer's `if __name__=="__main__"` self-test has a stale `assert n_optional==15`
+  (already 20 today; not in the pytest gate). If we drop 4 optional widgets, update it.
+
+## SAFE SEQUENCE (do in this order; each its own commit + your restart to validate)
+1. **Commit 1 -- JSON-ONLY graph migration** (no code touched): programmatically remove
+   nodes 73,74,75,76,77,78,79; remove links {107,218..226,227,228,229}; add link 230
+   (writer->FreezeCascade); scrub node arrays; set last_link_id=230. Validate
+   programmatically: JSON parses, no orphan links, no dup ids, last_link_id==max, 31 nodes.
+   YOU restart ComfyUI + confirm node 1 (writer) loads and the graph runs writer->freeze.
+   The node classes stay registered (harmless, just unused) until step 3.
+2. **Commit 2 -- multiturn removal** (lowest-risk code): delete the 3 Wave-0 modules + the
+   dispatch block + the widget (array-migrate index 18) + tests. Regression.
+3. **Commit 3 -- Story Room code removal:** now that the JSON no longer references them,
+   delete the 6 Story-Room module/wrapper files + the 5 `_NODE_MODULES` entries + tests
+   (delete the story-room tests; EDIT the constraint-editor tests to drop director/editor
+   fixture imports -- the constraint-editor feature survives in the writer). Regression.
+4. **Commit 4 -- shadow + fan-out removal** (together): strip both writer blocks + 2 nodes +
+   helper modules + the 2 `_NODE_MODULES` entries; widgets array-migrate indices 22 then 17.
+   Regression.
+5. **Commit 5 -- polish removal** (hot-path; do last + carefully): excise the polish path
+   from `_otr_line_composer` + `_otr_model_loader` + `_otr_reroll` + the widget (index 15).
+   Full audio byte-identity regression.
+6. **Commit 6 -- widget cleanup confirm + stale `__main__` assert fix + Two-Model dangling-
+   output decision.** Final JSON re-save; full regression; your restart.
+7. T1 (untracked git-status cruft) + T3/T4 after a repo-wide reference scan.
