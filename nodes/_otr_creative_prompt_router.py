@@ -41,12 +41,6 @@ from typing import Literal
 
 from . import _otr_model_catalog
 from ._otr_line_composer import (
-    _POLISH_SYSTEM_PROMPT_ANNOUNCER as _MODERN_POLISH_ANNOUNCER,
-)
-from ._otr_line_composer import (
-    _POLISH_SYSTEM_PROMPT_CHARACTER as _MODERN_POLISH_CHARACTER,
-)
-from ._otr_line_composer import (
     _SYSTEM_PROMPT as _MODERN_LINE_COMPOSER_SYSTEM,
 )
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
@@ -56,8 +50,6 @@ from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
 Phase = Literal[
     "outline",
     "line_composer_system",
-    "polish_character",
-    "polish_announcer",
 ]
 
 
@@ -69,8 +61,6 @@ Phase = Literal[
 _MODERN_BY_PHASE: dict[str, str] = {
     "outline":              _MODERN_OUTLINE_SYSTEM,
     "line_composer_system": _MODERN_LINE_COMPOSER_SYSTEM,
-    "polish_character":     _MODERN_POLISH_CHARACTER,
-    "polish_announcer":     _MODERN_POLISH_ANNOUNCER,
 }
 
 

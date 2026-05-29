@@ -40,8 +40,6 @@ MISTRAL_NEMO = "mistralai/Mistral-Nemo-Instruct-2407"
 PHASES: tuple[str, ...] = (
     "outline",
     "line_composer_system",
-    "polish_character",
-    "polish_announcer",
 )
 
 
@@ -58,8 +56,6 @@ def test_router_returns_modern_for_default_mistral_nemo() -> None:
     expected_modern_by_phase = {
         "outline":              _otr_outline._SYSTEM_PROMPT,
         "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
-        "polish_character":     _otr_line_composer._POLISH_SYSTEM_PROMPT_CHARACTER,
-        "polish_announcer":     _otr_line_composer._POLISH_SYSTEM_PROMPT_ANNOUNCER,
     }
     for phase in PHASES:
         out = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)
@@ -158,17 +154,15 @@ def test_router_has_exactly_4_production_callers_at_d2b_boundary() -> None:
     D2a shipped with 0 callers. D2b wired:
       _otr_outline.generate_outline      (phase="outline")
       _otr_line_composer.compose_line    (phase="line_composer_system")
-      _otr_line_composer.polish_line     (phase="polish_announcer")
-      _otr_line_composer.polish_line     (phase="polish_character")
 
     The router module's own definition file is excluded -- this
     test counts CALL sites, not definitions or imports.
     """
     router_src = REPO_ROOT / "nodes" / "_otr_creative_prompt_router.py"
     count, hits = _count_callers("resolve_creative_system_prompt", router_src)
-    assert count == 4, (
+    assert count == 2, (
         f"resolve_creative_system_prompt has {count} production "
-        f"caller(s) at the D2b boundary; expected exactly 4. Hits:\n  "
+        f"caller(s) at the D2b boundary; expected exactly 2. Hits:\n  "
         + "\n  ".join(hits)
     )
 

@@ -395,7 +395,6 @@ def test_compose_line_reroll_hint_param_reaches_prompt():
     compose_line(
         creative_fn=fn, req=req,
         reroll_hint="land the betrayal harder",
-        enable_polish_pass=False,
     )
     assert captured, "generate_fn was never called"
     user_msg = captured[0][1]["content"]

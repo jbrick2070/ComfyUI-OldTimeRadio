@@ -30,8 +30,6 @@ from nodes._otr_line_composer import (  # noqa: E402
     _build_user_prompt,
     build_voice_card,
     compose_line,
-    needs_polish,
-    polish_line,
     render_outline_spine,
 )
 
@@ -504,150 +502,10 @@ class TestBuildUserPrompt:
 # ---------------------------------------------------------------------------
 
 
-class TestNeedsPolish:
-    """needs_polish() regex gate for the v4 polish pass."""
-
-    def test_clean_line_returns_false(self):
-        assert needs_polish("Then we should go now.") is False
-        assert needs_polish("I never said anything like that.") is False
-
-    def test_he_said_pattern_caught(self):
-        assert needs_polish('Then we should go," she said.') is True
-        assert needs_polish("He whispered the answer.") is True
-        assert needs_polish("They paused before responding.") is True
-
-    def test_opens_with_quote_caught(self):
-        assert needs_polish('"Then we should go now."') is True
-        assert needs_polish("“Then we should go now.”") is True
-
-    def test_asterisk_action_caught(self):
-        assert needs_polish("*sighs* Then we should go now.") is True
-        assert needs_polish("Then we should go *now*.") is True
-
-    def test_bracket_direction_caught(self):
-        assert needs_polish("[pauses] Then we should go now.") is True
-        assert needs_polish("Then we should go now [looks away].") is True
-
-    def test_parenthesized_cue_verbs_caught(self):
-        assert needs_polish("(sighs) Then we should go now.") is True
-        assert needs_polish("Then we should go now (laughs).") is True
-        assert needs_polish("Then we should go now (long pause).") is True
-
-    def test_empty_input_returns_false(self):
-        assert needs_polish("") is False
-        assert needs_polish(None) is False  # type: ignore[arg-type]
 
 
-class TestPolishLine:
-    """polish_line targeted-edit LLM call."""
-
-    def test_returns_cleaned_line_on_success(self):
-        def mock_polish(messages, *, temperature, max_new_tokens, stop=None):
-            assert temperature < 0.6, "polish should use low temperature"
-            return "Then we should go now."
-        result = polish_line(
-            mock_polish,
-            'Then we should go," she said.',
-            "ALICE (female, weary)", polish_generate_fn=mock_polish,
-        )
-        assert result == "Then we should go now."
-
-    def test_falls_back_to_original_on_generate_raise(self):
-        def mock_raise(messages, *, temperature, max_new_tokens, stop=None):
-            raise RuntimeError("simulated LLM crash")
-        original = 'Then we should go," she said.'
-        result = polish_line(mock_raise, original, "ALICE", polish_generate_fn=mock_raise)
-        assert result == original
-
-    def test_falls_back_to_original_on_empty_output(self):
-        def mock_empty(messages, *, temperature, max_new_tokens, stop=None):
-            return ""
-        original = '"Then we should go."'
-        result = polish_line(mock_empty, original, "ALICE", polish_generate_fn=mock_empty)
-        assert result == original
-
-    def test_handles_stop_unsupported_via_typeerror(self):
-        # Generate_fn signatures that don't accept stop= must still
-        # work (the polish call retries without the kwarg).
-        def mock_no_stop(messages, *, temperature, max_new_tokens):
-            return "Cleaned line."
-        result = polish_line(mock_no_stop, '"Leaked."', "ALICE", polish_generate_fn=mock_no_stop)
-        assert result == "Cleaned line."
 
 
-class TestComposeLinePolishGating:
-    """compose_line + enable_polish_pass interaction."""
-
-    def _req(self, **overrides):
-        # target_words=6 chosen so the 5-6 word mock outputs in these
-        # tests pass the two-sided length band (BUG-LOCAL-279 2026-05-26:
-        # 0.3x..1.7x of target -> target=6 -> [3..10], same band shape
-        # as before the floor relaxation since the 3-word absolute
-        # floor binds first). Larger targets would force the band
-        # to reject the mocks as too-short and retry, masking the
-        # polish-pass interaction the tests are really exercising.
-        kwargs = {
-            "speaker": "ALICE",
-            "intent": "reveal",
-            "mood": "tense",
-            "target_words": 6,
-            "canon_header": "x",
-            "last_lines": [],
-        }
-        kwargs.update(overrides)
-        return LineRequest(**kwargs)
-
-    def test_polish_off_keeps_leaked_line_as_is(self):
-        # Default: enable_polish_pass=False. Even a leaky compose
-        # output is committed without polish.
-        def mock_leak(messages, *, temperature, max_new_tokens, stop=None):
-            return 'Then we should go," she said.'
-        res = compose_line(creative_fn=mock_leak, req=self._req())
-        assert res.text == 'Then we should go," she said.'
-
-    def test_polish_on_replaces_leaked_line(self):
-        # enable_polish_pass=True + leaky compose output -> ONE extra
-        # generate call, polished line replaces the leak.
-        calls = []
-        def mock(messages, *, temperature, max_new_tokens, stop=None):
-            calls.append(messages)
-            if len(calls) == 1:
-                return 'Then we should go," she said.'
-            # Polish pass: low temp, system prompt is the polish editor.
-            assert temperature < 0.6
-            assert "script editor" in messages[0]["content"].lower()
-            return "Then we should go now."
-        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
-        assert res.text == "Then we should go now."
-        assert len(calls) == 2
-
-    def test_polish_on_skips_clean_line(self):
-        # enable_polish_pass=True + clean compose output -> polish
-        # call NOT fired (regex gate skips it).
-        calls = []
-        def mock(messages, *, temperature, max_new_tokens, stop=None):
-            calls.append(messages)
-            return "Then we should go now."
-        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
-        assert res.text == "Then we should go now."
-        assert len(calls) == 1  # composer only, no polish
-
-    def test_polish_falls_back_when_polish_call_raises(self):
-        # Need a compose output that survives strip_line_formatting
-        # AND trips the narration-leak regex so polish actually fires.
-        # 'X," she said.' is not a wrapping-quotes pattern (asymmetric),
-        # so strip leaves it largely intact; the "she said" regex fires.
-        calls = []
-        def mock(messages, *, temperature, max_new_tokens, stop=None):
-            calls.append(messages)
-            if len(calls) == 1:
-                return 'Then we should go," she said.'
-            raise RuntimeError("polish failed")
-        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
-        # polish_line catches the raise and returns the original (the
-        # cleaned compose output) so the leaky line still ships.
-        assert "Then we should go" in res.text
-        assert len(calls) == 2
 
 
 class TestTier1Regressions:
@@ -871,21 +729,6 @@ class TestStopStringSlice:
         ) == "Hello there."
 
 
-class TestTier2NarrationLeak:
-    """Tier 2 fix #13 — bare present-tense action verbs caught."""
-
-    def test_he_pauses_caught(self):
-        assert needs_polish("He pauses before answering.") is True
-    def test_she_smiles_caught(self):
-        assert needs_polish("She smiles at the camera.") is True
-    def test_he_looks_away_caught(self):
-        assert needs_polish("He looks away from the screen.") is True
-    def test_she_nods_caught(self):
-        assert needs_polish("She nods in agreement.") is True
-    def test_they_shrug_legacy_form_passes(self):
-        # "They shrug" (bare imperative form, no -s) is NOT a leak;
-        # could be legitimate plural-agreement dialogue.
-        assert needs_polish("Look at them, they shrug at everything.") is False
 
 
 class TestTier2LengthEnforcement:
@@ -1216,45 +1059,6 @@ class TestPositionForRaise:
             _position_for("b001", "totally_made_up")
 
 
-class TestPolishBeforePhantom:
-    """Tier 3 fix #20 — polish MUST run before the phantom-name
-    gate. If polish runs second any proper noun it introduces
-    silently bypasses the gate. This test pins the order."""
-
-    def test_polished_phantom_still_flagged(self):
-        # Mock returns a leaky line on call 1, then a polish output
-        # that contains a NEW proper noun ("DELTA") not in the
-        # roster. The phantom gate must STILL flag DELTA on the
-        # final LineResult.compose_flags.
-        calls = []
-        def mock(messages, *, temperature, max_new_tokens, stop=None):
-            calls.append(temperature)
-            if len(calls) == 1:
-                # Leaky output (trips needs_polish via "she said").
-                return 'I think we should go now," she said.'
-            # Polish output: clean of narration tells but
-            # introduces a NEW ALL-CAPS phantom name. Within band:
-            # 6 words for target_words=6 -> [3..10].
-            return "DELTA, hold the line we still have time."
-        roster = frozenset({"ALICE", "BOB", "ANNOUNCER"})
-        req = LineRequest(
-            speaker="ALICE", intent="reveal", mood="tense",
-            target_words=6, canon_header="x", last_lines=[],
-            allowed_roster=roster,
-        )
-        res = compose_line(creative_fn=mock, req=req, enable_polish_pass=True, polish_generate_fn=mock)
-        # Polish ran: 2 calls.
-        assert len(calls) == 2
-        # Polish output was used.
-        assert "DELTA" in res.text
-        # Phantom gate STILL flagged the new name on the polished
-        # output — proves polish ran BEFORE phantom detection.
-        assert any(
-            "phantom_name:DELTA" in f for f in res.compose_flags
-        ), (
-            f"phantom flag missing on polished output; "
-            f"compose_flags={res.compose_flags!r}"
-        )
 
 
 class TestSlidingWindowConstant:

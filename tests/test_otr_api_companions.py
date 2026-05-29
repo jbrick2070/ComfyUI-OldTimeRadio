@@ -109,7 +109,6 @@ def _writer_schemas() -> dict:
                     "min_p": ("FLOAT", {"default": 0.05}),
                     "repetition_penalty": ("FLOAT", {"default": 1.03}),
                     "max_new_tokens_cap": ("INT", {"default": 200}),
-                    "enable_polish_pass": ("BOOLEAN", {"default": False}),
                     "lemmy_cameo": (
                         ["roll (~11% chance)", "always include",
                          "never include"],
@@ -170,11 +169,10 @@ def _writer_node_fixture() -> dict:
                     0.05,                                     # 12 min_p
                     1.03,                                     # 13 repetition_penalty
                     200,                                      # 14 max_new_tokens_cap
-                    False,                                    # 15 enable_polish_pass
-                    "roll (~11% chance)",                     # 16 lemmy_cameo
-                    False,                                    # 17 use_exchange
-                    False,                                    # 18 enable_production_stage3_validators
-                    True,                                     # 19 news_briefs_required
+                    "roll (~11% chance)",                     # 15 lemmy_cameo
+                    False,                                    # 16 use_exchange
+                    False,                                    # 17 enable_production_stage3_validators
+                    True,                                     # 18 news_briefs_required
                 ],
             }
         ],
@@ -417,7 +415,7 @@ def test_round_trip_canonical_node1_inputs_correct():
     vector length to 20.
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 20, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

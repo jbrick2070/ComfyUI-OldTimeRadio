@@ -560,8 +560,12 @@ class _SlotScheduler:
         return generate_fn
 
     def for_polish(self):
-        """Return a polish_generate_fn closure. Polish always routes
-        through the creative slot per the S30 routing table."""
+        """Return a conservative-sampling generate_fn on the creative
+        slot. Retained as a scheduler primitive (wraps the kept
+        make_polish_generate_fn) after the 2026-05-29 lean-down removed
+        the polish *feature* (widget + compose_line pass + symbols);
+        no production caller remains, but the slot-routing contract +
+        its tests keep this creative-slot conservative-sampling helper."""
         scheduler = self
 
         def polish_fn(messages, *, temperature, max_new_tokens):
@@ -576,6 +580,7 @@ class _SlotScheduler:
             )
 
         return polish_fn
+
 
 
 def _build_truncating_generate_fn(
@@ -1191,7 +1196,6 @@ def _resolve_inputs(
     min_p: float = 0.05,
     repetition_penalty: float = 1.03,
     max_new_tokens_cap: int = 200,
-    enable_polish_pass: bool = False,
     # Sprint 10B Wave 1 Agent B: Stage 3 validators flag.
     enable_production_stage3_validators: bool = False,
     # Sprint 2.2 (2026-05-28): when True, news_interpreter exhaustion
@@ -1359,7 +1363,6 @@ def _resolve_inputs(
         "max_new_tokens_cap":   max(40, min(400, int(
             max_new_tokens_cap or 200,
         ))),
-        "enable_polish_pass":   bool(enable_polish_pass),
         # Sprint 10B Wave 1 Agent B Stage 3 validators flag.
         "enable_production_stage3_validators":
             bool(enable_production_stage3_validators),
@@ -1725,26 +1728,6 @@ class OTR_LedgerScriptWriter:
                         "drift; attempt-2 retry uses the full cap."
                     ),
                 }),
-                "enable_polish_pass": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "After the composer's retry ladder closes, "
-                        "optionally check each generated line against a "
-                        "small narration-leak regex (he said / "
-                        "*asterisk action* / [bracket direction] / "
-                        "opens-with-quote-mark / parenthesized cue "
-                        "verbs). If the line trips the regex, fire ONE "
-                        "polish LLM call with a targeted cleanup prompt "
-                        "and replace the line.\n\n"
-                        "OFF (default) preserves the 1-call-per-voiced-"
-                        "beat composer hot-path. ON typically adds 1-2 "
-                        "extra calls per 15-line episode (~30s); not "
-                        "the full +15 calls (~3-5 min). Backstops the "
-                        "Script Doctor's end-of-episode pass for users "
-                        "who want clean lines in the ledger as they "
-                        "are written."
-                    ),
-                }),
                 # BUG-LOCAL-260: operator control for the LEMMY cameo.
                 # The natural roll is OS-entropy (~11%, decoupled from
                 # the seed); this widget lets the operator force it.
@@ -1911,7 +1894,6 @@ class OTR_LedgerScriptWriter:
         min_p=0.05,
         repetition_penalty=1.03,
         max_new_tokens_cap=200,
-        enable_polish_pass=False,
         # BUG-LOCAL-260: operator control for the LEMMY cameo. Maps to
         # force_lemmy (None = natural ~11% OS-entropy roll).
         lemmy_cameo="roll (~11% chance)",
@@ -1949,7 +1931,6 @@ class OTR_LedgerScriptWriter:
             min_p=min_p,
             repetition_penalty=repetition_penalty,
             max_new_tokens_cap=max_new_tokens_cap,
-            enable_polish_pass=enable_polish_pass,
             # Sprint 10B Wave 1 Agent B: propagate Stage 3 flag.
             enable_production_stage3_validators=enable_production_stage3_validators,
             # Sprint 2.2 (2026-05-28): hard-halt toggle.
@@ -2038,10 +2019,6 @@ class OTR_LedgerScriptWriter:
         # LLM slot: technical -- structured passes (news_interpreter
         # in B2b; B4b adds RSS news rerank).
         technical_generate_fn = slot_scheduler.for_slot("technical")
-        # LLM slot: creative -- polish always routes here per the
-        # S30 routing table (W4 fix sampling distinct from composer
-        # but model identity is creative).
-        polish_generate_fn = slot_scheduler.for_polish()
 
         # --- D. Cast contract -- LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER
         #
@@ -3223,8 +3200,6 @@ class OTR_LedgerScriptWriter:
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                            enable_polish_pass=resolved["enable_polish_pass"],
-                            polish_generate_fn=polish_generate_fn,
                             creative_repo_id=resolved["creative_writing_model"],
                             **_w1b_s3_kwargs,
                         )
@@ -3303,10 +3278,6 @@ class OTR_LedgerScriptWriter:
                             max_new_tokens_cap=resolved[
                                 "max_new_tokens_cap"
                             ],
-                            enable_polish_pass=resolved[
-                                "enable_polish_pass"
-                            ],
-                            polish_generate_fn=polish_generate_fn,
                             creative_repo_id=resolved[
                                 "creative_writing_model"
                             ],
@@ -3644,11 +3615,6 @@ class OTR_LedgerScriptWriter:
             "slot":  "creative",
             "model": resolved["creative_writing_model"],
         }
-        if resolved["enable_polish_pass"]:
-            gen_params_by_phase["polish"] = {
-                "slot":  "creative",
-                "model": resolved["creative_writing_model"],
-            }
         if title_source == "llm_post_composition":
             gen_params_by_phase["title_regen"] = {
                 "slot":  "creative",

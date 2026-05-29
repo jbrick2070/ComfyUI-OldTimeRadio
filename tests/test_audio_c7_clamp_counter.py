@@ -34,8 +34,6 @@ MISTRAL_NEMO = "mistralai/Mistral-Nemo-Instruct-2407"
 PHASES = (
     "outline",
     "line_composer_system",
-    "polish_character",
-    "polish_announcer",
 )
 
 
@@ -48,8 +46,6 @@ def test_default_config_both_slots_mistral_nemo_returns_modern_prompts_byte_stab
     expected = {
         "outline":              _otr_outline._SYSTEM_PROMPT,
         "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
-        "polish_character":     _otr_line_composer._POLISH_SYSTEM_PROMPT_CHARACTER,
-        "polish_announcer":     _otr_line_composer._POLISH_SYSTEM_PROMPT_ANNOUNCER,
     }
     for phase in PHASES:
         actual = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)

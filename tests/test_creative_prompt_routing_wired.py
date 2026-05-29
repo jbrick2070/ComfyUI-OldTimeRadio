@@ -88,13 +88,11 @@ def _count_phase_literal_in_router_calls(phase: str) -> tuple[int, list[str]]:
 @pytest.mark.parametrize("phase", [
     "outline",
     "line_composer_system",
-    "polish_character",
-    "polish_announcer",
 ])
 def test_each_creative_phase_has_exactly_one_production_callsite(
     phase: str,
 ) -> None:
-    """Phase-name inventory: each of the 4 creative phases is wired
+    """Phase-name inventory: each of the 2 creative phases is wired
     at exactly one production call site at D2b.
     """
     count, hits = _count_phase_literal_in_router_calls(phase)

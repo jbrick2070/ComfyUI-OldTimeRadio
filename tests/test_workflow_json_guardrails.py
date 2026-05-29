@@ -654,36 +654,36 @@ class TestWriterB2aSurface:
         #  12  min_p                      0.05
         #  13  repetition_penalty         1.03
         #  14  max_new_tokens_cap         200
-        #  15  enable_polish_pass         False
-        #  16  lemmy_cameo                "roll (~11% chance)"
-        #  17  use_exchange                       True      (Build 4)
-        #  18  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
-        #  19  news_briefs_required               True      (Sprint 2.2)
+        #  15  lemmy_cameo                "roll (~11% chance)"
+        #  16  use_exchange                       True      (Build 4)
+        #  17  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
+        #  18  news_briefs_required               True      (Sprint 2.2)
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270)
         # -- vector 19 -> 17; the 2026-05-29 lean-down removed
-        # use_multiturn_dialogue (step 5), then enable_stage1_shadow_pass +
-        # use_stage1_fanout (step 7) -- vector 23 -> 20. use_exchange /
-        # Stage 3 validators / news briefs are the surviving optional flags.
-        assert len(wv) == 20, (
-            f"writer widgets_values length drift: {len(wv)} (expected 20 "
+        # use_multiturn_dialogue (step 5), enable_stage1_shadow_pass +
+        # use_stage1_fanout (step 7), and enable_polish_pass (step 9) --
+        # vector 23 -> 19. use_exchange / Stage 3 validators / news briefs
+        # are the surviving optional flags.
+        assert len(wv) == 19, (
+            f"writer widgets_values length drift: {len(wv)} (expected 19 "
             f"after the 2026-05-29 lean-down removed use_multiturn_dialogue "
-            f"(step 5) + enable_stage1_shadow_pass + use_stage1_fanout "
-            f"(step 7) -- 23 -> 20)"
+            f"(step 5), enable_stage1_shadow_pass + use_stage1_fanout "
+            f"(step 7), and enable_polish_pass (step 9) -- 23 -> 19)"
         )
-        # Slot 17: use_exchange -- the live grouped-exchange dialogue path
+        # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
-        assert wv[17] is True, (
-            f"use_exchange (slot 17) must be ON in the shipped bake; "
-            f"got {wv[17]!r}"
+        assert wv[16] is True, (
+            f"use_exchange (slot 16) must be ON in the shipped bake; "
+            f"got {wv[16]!r}"
         )
-        # Slot 18: enable_production_stage3_validators (ON in the shipped
+        # Slot 17: enable_production_stage3_validators (ON in the shipped
         # bake).
-        assert wv[18] is True, (
-            f"enable_production_stage3_validators (slot 18); got {wv[18]!r}"
+        assert wv[17] is True, (
+            f"enable_production_stage3_validators (slot 17); got {wv[17]!r}"
         )
-        # Slot 19: news_briefs_required (ON in the shipped bake).
-        assert wv[19] is True, (
-            f"news_briefs_required (slot 19); got {wv[19]!r}"
+        # Slot 18: news_briefs_required (ON in the shipped bake).
+        assert wv[18] is True, (
+            f"news_briefs_required (slot 18); got {wv[18]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

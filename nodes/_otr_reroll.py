@@ -570,7 +570,6 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
                     creative_fn=generate_fn,
                     req=req,
                     reroll_hint=hint,
-                    enable_polish_pass=False,
                 )
             except LineCompositionFailedError as exc:
                 history.append({
