@@ -657,40 +657,36 @@ class TestWriterB2aSurface:
         #  15  enable_polish_pass         False
         #  16  lemmy_cameo                "roll (~11% chance)"
         #  17  enable_stage1_shadow_pass          False     (Sprint 10A step 3-C)
-        #  18  use_multiturn_dialogue             False     (Sprint 10B Wave 0)
-        #  19  enable_production_stage3_validators False    (Sprint 10B Wave 1 Agent B)
-        # History: optimization_profile removed 2026-05-23; lemmy_cameo
-        # appended 2026-05-23 (BUG-LOCAL-260); `seed` + its companion
-        # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17;
-        # enable_stage1_shadow_pass appended 2026-05-26 (Sprint 10A step
-        # 3-C) -- vector 17 -> 18; use_multiturn_dialogue appended
-        # 2026-05-27 (Sprint 10B Wave 0) -- vector 18 -> 19;
-        # enable_production_stage3_validators appended 2026-05-27
-        # (Sprint 10B Wave 1 Agent B) -- vector 19 -> 20.
-        assert len(wv) == 20, (
-            f"writer widgets_values length drift: {len(wv)} (expected 20 "
-            f"after the Sprint 10B Wave 1 Agent B Stage 3 validators "
-            f"widget addition)"
+        #  18  use_exchange                       True      (Build 4; replaced multiturn 2026-05-29)
+        #  19  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
+        #  20  news_briefs_required               True      (Sprint 2.2)
+        #  21  use_stage1_fanout                  False     (Sprint 4.5)
+        # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270)
+        # -- vector 19 -> 17; enable_stage1_shadow_pass appended 2026-05-26;
+        # use_multiturn_dialogue appended 2026-05-27 then REMOVED in the
+        # 2026-05-29 lean-down (vector 23 -> 22); use_exchange / Stage 3
+        # validators / news briefs / fan-out are the surviving optional flags.
+        assert len(wv) == 22, (
+            f"writer widgets_values length drift: {len(wv)} (expected 22 "
+            f"after the 2026-05-29 lean-down removed use_multiturn_dialogue "
+            f"-- 23 -> 22)"
         )
-        # Slot 17: enable_stage1_shadow_pass must default to False so
-        # the existing pipeline keeps its bit-identical behaviour.
+        # Slot 17: enable_stage1_shadow_pass (shadow pass OFF in the
+        # shipped bake).
         assert wv[17] is False, (
-            f"enable_stage1_shadow_pass widget must default to False "
-            f"(slot 17); got {wv[17]!r}"
+            f"enable_stage1_shadow_pass (slot 17); got {wv[17]!r}"
         )
-        # Slot 18: use_multiturn_dialogue must default to False so the
-        # legacy one-shot dialogue composer runs out-of-the-box and the
-        # PD1 byte-identity contract holds.
-        assert wv[18] is False, (
-            f"use_multiturn_dialogue widget must default to False "
-            f"(slot 18); got {wv[18]!r}"
+        # Slot 18: use_exchange -- the live grouped-exchange dialogue
+        # path (ON in the shipped bake; it replaced use_multiturn_dialogue
+        # at this slot in the lean-down).
+        assert wv[18] is True, (
+            f"use_exchange (slot 18) must be ON in the shipped bake; "
+            f"got {wv[18]!r}"
         )
-        # Slot 19: enable_production_stage3_validators must default to
-        # False so the legacy compose_line path does not run Stage 3
-        # validators and PD1 byte-identity holds out-of-the-box.
-        assert wv[19] is False, (
-            f"enable_production_stage3_validators widget must default "
-            f"to False (slot 19); got {wv[19]!r}"
+        # Slot 19: enable_production_stage3_validators (ON in the shipped
+        # bake).
+        assert wv[19] is True, (
+            f"enable_production_stage3_validators (slot 19); got {wv[19]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

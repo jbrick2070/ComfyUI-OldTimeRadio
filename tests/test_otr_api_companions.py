@@ -121,15 +121,23 @@ def _writer_schemas() -> dict:
                     "enable_stage1_shadow_pass": (
                         "BOOLEAN", {"default": False},
                     ),
-                    # Sprint 10B Wave 0 (2026-05-27): multiturn-dispatch
-                    # widget appended at slot 18 -- vector 18 -> 19.
-                    "use_multiturn_dialogue": (
+                    # Build 4 (2026-05-28): grouped-exchange widget at
+                    # slot 18 (replaced use_multiturn_dialogue in the
+                    # 2026-05-29 lean-down). Mirrors INPUT_TYPES order.
+                    "use_exchange": (
                         "BOOLEAN", {"default": False},
                     ),
                     # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
-                    # Stage 3 validators widget appended at slot 19 --
-                    # vector 19 -> 20.
+                    # Stage 3 validators widget at slot 19.
                     "enable_production_stage3_validators": (
+                        "BOOLEAN", {"default": False},
+                    ),
+                    # Sprint 2.2 (2026-05-28): news-brief hard-halt, slot 20.
+                    "news_briefs_required": (
+                        "BOOLEAN", {"default": True},
+                    ),
+                    # Sprint 4.5 (2026-05-28): Stage 1 fan-out diagnostic, slot 21.
+                    "use_stage1_fanout": (
                         "BOOLEAN", {"default": False},
                     ),
                 },
@@ -175,8 +183,10 @@ def _writer_node_fixture() -> dict:
                     False,                                    # 15 enable_polish_pass
                     "roll (~11% chance)",                     # 16 lemmy_cameo
                     False,                                    # 17 enable_stage1_shadow_pass
-                    False,                                    # 18 use_multiturn_dialogue
+                    False,                                    # 18 use_exchange
                     False,                                    # 19 enable_production_stage3_validators
+                    True,                                     # 20 news_briefs_required
+                    False,                                    # 21 use_stage1_fanout
                 ],
             }
         ],
@@ -419,7 +429,7 @@ def test_round_trip_canonical_node1_inputs_correct():
     vector length to 20.
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 20, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 22, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 
