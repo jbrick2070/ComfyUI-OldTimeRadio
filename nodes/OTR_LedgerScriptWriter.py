@@ -3044,34 +3044,37 @@ class OTR_LedgerScriptWriter:
         # path reads it yet, so this build only produces + validates +
         # stamps.
         #
-        # generate_fn=None this commit => deterministic minimal contracts
-        # (build_slot_drama_contract's fallback, always schema-valid for a
-        # well-formed slot row). Satisfies the Build 3 gate (no garbage
-        # contract reaches the writer) with ZERO new LLM passes, ZERO
-        # model load, ZERO VRAM beyond what is already resident (Prime
-        # Directives 1 + 2). To ACTIVATE the technical-slot LLM (the
-        # line_job + hidden_pressure quality lift) replace the `None`
-        # below with a SlotJobFields-bound technical fn and validate VRAM
-        # + quality on a live N=3 run:
-        #     from . import _otr_model_loader as _ML
-        #     from . import _otr_constrained_generate as _CG
-        #     from ._otr_slot_drama_contract import SlotJobFields
-        #     _sdc_cache = _ML.request_slot(
-        #         "technical", resolved["technical_model"])
-        #     _sdc_gen_fn = _CG.make_constrained_generate_fn(
-        #         _sdc_cache, SlotJobFields, heartbeat_label="SlotContract")
-        # (# LLM slot: technical -- structured SlotJobFields constrained
-        # decode; routes to the technical model per project rule 6; no
-        # model_id widget, id from resolved["technical_model"].)
-        # The whole block is defensive: any failure leaves the contracts
-        # absent and the render path untouched (never break audio).
+        # The technical-slot LLM writes ONLY line_job + hidden_pressure
+        # (SlotJobFields, constrained decode); the other six fields are
+        # derived deterministically. The generator is built from the
+        # resident technical cache_entry below. A failed/invalid LLM pass
+        # regenerates once then falls back to a deterministic minimal
+        # contract (build_slot_drama_contract), so no garbage contract
+        # reaches the writer (Build 3 gate). The whole block is defensive:
+        # any failure leaves the contracts absent and the render path
+        # untouched (never break audio). Operator: confirm VRAM <= 14.5 GB
+        # and the source distribution (llm/llm_regenerate/minimal) in the
+        # slot_drama_contracts_audit log on the next live N=3 run.
+        # LLM slot: technical -- structured SlotJobFields constrained
+        # decode (rule 6); id from resolved["technical_model"], no
+        # model_id widget.
         try:
             from ._otr_slot_drama_contract import (
                 build_slot_drama_contract as _build_sdc,
                 validate_episode_contracts as _validate_sdc_episode,
+                SlotJobFields as _SlotJobFields,
             )
 
-            _sdc_gen_fn = None  # deterministic this commit (see note above)
+            # Build the technical-slot SlotJobFields generator from the
+            # resident technical cache_entry. request_slot reuses the
+            # entry build_continuity_ledger just used -- no reload, no new
+            # VRAM beyond resident (Prime Directives 1 + 2).
+            _sdc_cache = _OTRML.request_slot(
+                "technical", resolved["technical_model"],
+            )
+            _sdc_gen_fn = _OTRCG.make_constrained_generate_fn(
+                _sdc_cache, _SlotJobFields, heartbeat_label="SlotContract",
+            )
             _sdc_active_props = list(
                 getattr(continuity_state, "active_props", []) or []
             )
