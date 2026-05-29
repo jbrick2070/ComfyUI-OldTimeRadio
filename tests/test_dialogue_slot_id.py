@@ -1,11 +1,10 @@
 """Sprint 1 keystone (2026-05-28) -- dialogue_slot_id integrity tests.
 
-Covers the four touch surfaces:
+Covers the three live touch surfaces (Story Room extract/commit removed
+in the 2026-05-29 lean-down):
   1. _otr_outline.Beat + stamp_dialogue_slot_ids
   2. _otr_stage1_plan.Stage1Beat + stamp_dialogue_slot_ids
   3. production_ledger.init_lines_from_outline + set_lines
-  4. _otr_story_room_extract.DialogueOnlySchema
-  5. OTR_StoryRoomCommit._commit_dialogue (slot-id join + fail-loud)
 
 The 5/5 episode soak gate post-commit verifies live integrity; this
 file pins the deterministic invariants subagents can run before push.
@@ -30,14 +29,6 @@ from nodes._otr_stage1_plan import (
     Stage1Plan,
     parse_and_validate_plan,
     stamp_dialogue_slot_ids as stamp_stage1_slot_ids,
-)
-from nodes._otr_story_room_extract import (
-    DialogueOnlySchema,
-    DialogueOnlyRow,
-)
-from nodes.OTR_StoryRoomCommit import (
-    OTR_StoryRoomCommit,
-    StoryRoomCommitError,
 )
 from nodes.production_ledger import Ledger
 
@@ -293,122 +284,3 @@ def test_set_lines_preserves_dialogue_slot_id(tmp_path):
     ])
     lines = led.data["lines"]
     assert [ln["dialogue_slot_id"] for ln in lines] == ["d001", "d002"]
-
-
-# ---------------------------------------------------------------------------
-# 4. DialogueOnlySchema validation
-# ---------------------------------------------------------------------------
-
-
-def test_dialogue_only_schema_happy_path():
-    s = DialogueOnlySchema(dialogue=[
-        DialogueOnlyRow(dialogue_slot_id="d001", speaker="ALICE", text="hi"),
-        DialogueOnlyRow(dialogue_slot_id="d002", speaker="BOB", text="hey"),
-    ])
-    assert len(s.dialogue) == 2
-
-
-def test_dialogue_only_schema_rejects_empty():
-    with pytest.raises(ValidationError):
-        DialogueOnlySchema(dialogue=[])
-
-
-def test_dialogue_only_row_rejects_malformed_slot_id():
-    with pytest.raises(ValidationError):
-        DialogueOnlyRow(dialogue_slot_id="b001", speaker="ALICE", text="hi")
-
-
-# ---------------------------------------------------------------------------
-# 5. OTR_StoryRoomCommit._commit_dialogue -- fail-loud slot join
-# ---------------------------------------------------------------------------
-
-
-def _ledger_with_slot_ids(slot_ids: List[str]) -> Dict[str, Any]:
-    """Build a minimal ledger dict whose voiced lines carry slot ids."""
-    return {
-        "lines": [
-            {"beat_id": f"b{i+1:03d}", "text": "",
-             "char_count": 0, "word_count": 0,
-             "dialogue_slot_id": sid}
-            for i, sid in enumerate(slot_ids)
-        ],
-    }
-
-
-def _draft_rows(slot_ids: List[str], texts: List[str]) -> List[Dict[str, Any]]:
-    return [
-        {"dialogue_slot_id": sid, "speaker": "ALICE", "text": t}
-        for sid, t in zip(slot_ids, texts)
-    ]
-
-
-def test_commit_dialogue_happy_path():
-    node = OTR_StoryRoomCommit()
-    ledger = _ledger_with_slot_ids(["d001", "d002", "d003"])
-    draft = _draft_rows(
-        ["d001", "d002", "d003"],
-        ["First spoken line.", "Second spoken line.", "Third spoken line."],
-    )
-    audit = node._commit_dialogue(ledger, draft)
-    assert audit["commit_mode"] == "dialogue_slot_order"
-    assert audit["draft_rows"] == 3
-    assert audit["voice_slots"] == 3
-    assert audit["rows_committed"] == 3
-    assert audit["rows_skipped"] == 0
-    assert audit["fallback_to_legacy"] is False
-    assert audit["committed_slot_ids"] == ["d001", "d002", "d003"]
-    texts = [ln["text"] for ln in ledger["lines"]]
-    assert texts == [
-        "First spoken line.", "Second spoken line.", "Third spoken line.",
-    ]
-
-
-def test_commit_dialogue_raises_on_count_mismatch():
-    node = OTR_StoryRoomCommit()
-    ledger = _ledger_with_slot_ids(["d001", "d002", "d003"])
-    draft = _draft_rows(["d001", "d002"], ["a", "b"])
-    with pytest.raises(StoryRoomCommitError) as ctx:
-        node._commit_dialogue(ledger, draft)
-    assert "slot count mismatch" in str(ctx.value)
-
-
-def test_commit_dialogue_raises_on_order_mismatch():
-    node = OTR_StoryRoomCommit()
-    ledger = _ledger_with_slot_ids(["d001", "d002", "d003"])
-    draft = _draft_rows(["d001", "d003", "d002"], ["a", "b", "c"])
-    with pytest.raises(StoryRoomCommitError) as ctx:
-        node._commit_dialogue(ledger, draft)
-    assert "slot order mismatch" in str(ctx.value)
-
-
-def test_commit_dialogue_raises_on_missing_slot_id_on_row():
-    node = OTR_StoryRoomCommit()
-    ledger = _ledger_with_slot_ids(["d001"])
-    draft = [{"speaker": "ALICE", "text": "x"}]  # no slot id
-    with pytest.raises(StoryRoomCommitError) as ctx:
-        node._commit_dialogue(ledger, draft)
-    assert "missing dialogue_slot_id" in str(ctx.value)
-
-
-def test_commit_dialogue_raises_on_empty_text():
-    node = OTR_StoryRoomCommit()
-    ledger = _ledger_with_slot_ids(["d001", "d002"])
-    draft = _draft_rows(["d001", "d002"], ["ok line", ""])
-    with pytest.raises(StoryRoomCommitError) as ctx:
-        node._commit_dialogue(ledger, draft)
-    assert "empty text" in str(ctx.value)
-
-
-def test_commit_dialogue_raises_when_ledger_lacks_slot_ids():
-    """Pre-Sprint-1 ledger shape -- no dialogue_slot_id anywhere."""
-    node = OTR_StoryRoomCommit()
-    ledger = {
-        "lines": [
-            {"beat_id": "b001", "text": "", "char_count": 0, "word_count": 0},
-            {"beat_id": "b002", "text": "", "char_count": 0, "word_count": 0},
-        ],
-    }
-    draft = _draft_rows(["d001", "d002"], ["a", "b"])
-    with pytest.raises(StoryRoomCommitError) as ctx:
-        node._commit_dialogue(ledger, draft)
-    assert "pre-dates Sprint 1 keystone" in str(ctx.value)

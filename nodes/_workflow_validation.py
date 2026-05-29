@@ -71,6 +71,15 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_VoiceRender",            # legacy aggregator
     "OTR_BatchKokoroGenerator",   # replaced by OTR_KokoroAnnouncer
     "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + OTR_VideoComposite
+    # Lean-down 2026-05-29 (step 6): the dormant Story Room writers'-room
+    # cluster (Director / Editor / Story Room / Extract / Commit) was
+    # deleted. Tombstoned so a stale workflow JSON referencing one of
+    # them fails loudly at validation instead of at runtime.
+    "OTR_StoryRoom",
+    "OTR_StoryRoomExtract",
+    "OTR_StoryRoomCommit",
+    "OTR_DirectorBrief",
+    "OTR_EditorPass",
 })
 
 

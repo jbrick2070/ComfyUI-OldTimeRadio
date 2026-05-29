@@ -280,14 +280,6 @@ _NODE_MODULES = {
     # filename. Pure side-effect; passes the upstream path through
     # unchanged so production wiring is not affected.
     "OTR_SaveCopy": (".nodes.otr_save_copy", "SaveCopy", " Save Copy (per-stage QA tee)"),
-    # Sprint 10B Wave 1 Agent D (2026-05-27): Director agent. Reads a
-    # news seed + locked cast and emits a structured DirectorBrief
-    # (design Section 3.1). DORMANT in Wave 1: workflow JSON entry
-    # lands with the output socket disconnected; Wave 2 Agent F's
-    # Story Room loop wires the brief into the Writer's loop. PD6
-    # contract: no model_id widget, technical_model flows over a
-    # STRING input socket from the writer's broadcast output.
-    "OTR_DirectorBrief": (".nodes.OTR_DirectorBrief", "OTR_DirectorBrief", " OTR Director Brief (dormant)"),
     # BUG-LOCAL-231 Step 6 bisect (2026-05-19): minimal STRING-emit node
     # used to feed `gate_signal` (forceInput=True) on
     # OTR_DeferredCheckpointLoader / OTR_FluxBranchGate variants without
@@ -296,46 +288,6 @@ _NODE_MODULES = {
     # workflows/_bisect_*.json after BUG-LOCAL-231 closes (Step 9
     # cleanup of the 9-step plan).
     "OTR_BisectStringSource": (".nodes._bisect_string_source", "BisectStringSource", " Bisect String Source (BUG-LOCAL-231 -- delete at close)"),
-    # Sprint 10B Wave 1 Agent E (2026-05-27): Editor agent (DORMANT).
-    # Consumes a DirectorBrief (Section 3.1) + Writer draft and emits a
-    # typed EditorVerdict (Section 3.2) scoring against the existing
-    # rubric axes via constrained decode against EditorVerdictSchema.
-    # Wave 1 registers the node; Wave 2 Agent F (Story Room loop) wires
-    # it into the Writer's revision cycles. Today's pipeline is
-    # unchanged (sockets ship disconnected in the workflow JSON). PD6
-    # contract: no model_id widget; technical_model flows over a STRING
-    # input socket from the writer's broadcast output.
-    "OTR_EditorPass": (".nodes.OTR_EditorPass", "OTR_EditorPass", " OTR Editor Pass (dormant)"),
-    # Sprint 10B Wave 2 Agent F (2026-05-27): Story Room loop. Wires the
-    # Director (Wave 1 Agent D), the Writer (creative slot, free-form
-    # prose), and the Editor (Wave 1 Agent E, technical slot) into a
-    # bounded conversation that converges on a publishable Writer draft.
-    # Emits a StoryRoomTranscript (design Section 3.3) for Wave 2 Agent G
-    # to extract structured artifacts from. Ships behind use_story_room:
-    # bool = False so PD1 byte-identity holds; Wave 3 operator A/B flips
-    # it on. PD6: both slot ids arrive over STRING forceInput sockets.
-    "OTR_StoryRoom": (".nodes.OTR_StoryRoom", "OTR_StoryRoom", " OTR Story Room (dormant)"),
-    # Sprint 10B Wave 2 Agent G (2026-05-27): Story Room transcript-to-
-    # structured extraction. Consumes the Wave 2 Agent F transcript and
-    # emits a typed StoryRoomExtraction (design Section 3.4) whose
-    # dict-shaped fields match the keys the announcer / continuity
-    # ledger / music+SFX cue builder / bark generator already consume.
-    # DORMANT in Wave 2: when the upstream payload is empty / dormant /
-    # malformed the node returns a sentinel without an LLM call. Wave 3's
-    # bridge wires the structured output into the legacy ledger when the
-    # operator A/B confirms use_story_room ships on by default. PD6:
-    # technical_model arrives over a STRING forceInput socket.
-    "OTR_StoryRoomExtract": (".nodes.OTR_StoryRoomExtract", "OTR_StoryRoomExtract", " OTR Story Room Extract (dormant)"),
-    # Wave 3 bridge (2026-05-27): commit the Story Room extraction into
-    # the in-flight ledger so the freeze cascade + Bark see Story Room
-    # dialogue instead of the legacy compose_line output. Defaults
-    # commit=False (no-op pass-through, PD1 byte-identity holds). When
-    # commit=True AND extraction.status='ok', walks extraction.dialogue
-    # and overwrites ledger.lines[*].text per beat_id. Place between
-    # OTR_LedgerScriptWriter.script_json and OTR_LedgerFreezeCascade
-    # input. script_json passes through verbatim; the actual ledger
-    # write is a side-effect on the in-flight singleton.
-    "OTR_StoryRoomCommit": (".nodes.OTR_StoryRoomCommit", "OTR_StoryRoomCommit", " OTR Story Room Commit (Wave 3 bridge, dormant)"),
 
     # Sprint 4.1 wire-up (2026-05-28): best-of-N beat sheet selector.
     # Pure-Python mechanical scorer; no LLM call. Accepts up to 3
