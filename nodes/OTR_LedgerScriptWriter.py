@@ -3032,6 +3032,132 @@ class OTR_LedgerScriptWriter:
             b.beat_id: i for i, b in enumerate(outline.beats)
         }
 
+        # --- H.6. Build 3 (2026-05-28): per-slot drama contracts -------
+        # GO_FORWARD_PLAN_v10 Build 3. For each voiced slot, derive the
+        # six deterministic contract fields (speaker / concrete details /
+        # state_before / state_after / must_turn) from DramaticState +
+        # continuity active_props + news key_terms, attach the two
+        # free-text fields (line_job, hidden_pressure), validate per-slot
+        # + episode-level (exactly one must_turn), and stamp on
+        # meta["slot_drama_contracts"] keyed by slot id. Build 4
+        # (compose_exchange) is the sole consumer; nothing in the render
+        # path reads it yet, so this build only produces + validates +
+        # stamps.
+        #
+        # generate_fn=None this commit => deterministic minimal contracts
+        # (build_slot_drama_contract's fallback, always schema-valid for a
+        # well-formed slot row). Satisfies the Build 3 gate (no garbage
+        # contract reaches the writer) with ZERO new LLM passes, ZERO
+        # model load, ZERO VRAM beyond what is already resident (Prime
+        # Directives 1 + 2). To ACTIVATE the technical-slot LLM (the
+        # line_job + hidden_pressure quality lift) replace the `None`
+        # below with a SlotJobFields-bound technical fn and validate VRAM
+        # + quality on a live N=3 run:
+        #     from . import _otr_model_loader as _ML
+        #     from . import _otr_constrained_generate as _CG
+        #     from ._otr_slot_drama_contract import SlotJobFields
+        #     _sdc_cache = _ML.request_slot(
+        #         "technical", resolved["technical_model"])
+        #     _sdc_gen_fn = _CG.make_constrained_generate_fn(
+        #         _sdc_cache, SlotJobFields, heartbeat_label="SlotContract")
+        # (# LLM slot: technical -- structured SlotJobFields constrained
+        # decode; routes to the technical model per project rule 6; no
+        # model_id widget, id from resolved["technical_model"].)
+        # The whole block is defensive: any failure leaves the contracts
+        # absent and the render path untouched (never break audio).
+        try:
+            from ._otr_slot_drama_contract import (
+                build_slot_drama_contract as _build_sdc,
+                validate_episode_contracts as _validate_sdc_episode,
+            )
+
+            _sdc_gen_fn = None  # deterministic this commit (see note above)
+            _sdc_active_props = list(
+                getattr(continuity_state, "active_props", []) or []
+            )
+            _sdc_key_terms = list(
+                (meta.get("news") or {}).get("key_terms") or []
+            )
+            _sdc_dramatic = meta.get("dramatic_state") or {}
+            _sdc_voiced_beats = [
+                b for b in outline.beats
+                if str(getattr(b, "dialogue_slot_id", "") or "").strip()
+            ]
+
+            _sdc_objs = []
+            _sdc_contracts: dict = {}
+            _sdc_sources: dict = {}
+            for _sdc_i, _sdc_beat in enumerate(_sdc_voiced_beats):
+                _sdc_sid = str(
+                    getattr(_sdc_beat, "dialogue_slot_id", "") or ""
+                ).strip()
+                _sdc_speaker = str(
+                    getattr(_sdc_beat, "speaker", "") or ""
+                ).strip()
+                if not _sdc_speaker and str(
+                    getattr(_sdc_beat, "speaker_role", "") or ""
+                ).strip().lower() == "announcer":
+                    _sdc_speaker = "ANNOUNCER"
+                if not _sdc_sid or not _sdc_speaker:
+                    # Voiced slot without a usable id/speaker -- skip; a
+                    # single missing contract is handled downstream.
+                    continue
+                _sdc_row = {
+                    "dialogue_slot_id": _sdc_sid,
+                    "speaker": _sdc_speaker,
+                }
+                try:
+                    _sdc_contract, _sdc_source = _build_sdc(
+                        _sdc_gen_fn,
+                        slot_row=_sdc_row,
+                        slot_index=_sdc_i,
+                        dramatic_state=_sdc_dramatic,
+                        beat_intent=str(
+                            getattr(_sdc_beat, "intent", "") or ""
+                        ),
+                        active_props=_sdc_active_props,
+                        key_terms=_sdc_key_terms,
+                    )
+                except Exception as _sdc_exc:  # noqa: BLE001
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] Build 3 contract build "
+                        "failed for slot %s (%s); skipping that slot.",
+                        _sdc_sid, type(_sdc_exc).__name__,
+                    )
+                    continue
+                _sdc_objs.append(_sdc_contract)
+                _sdc_contracts[_sdc_sid] = _sdc_contract.model_dump()
+                _sdc_sources[_sdc_source] = (
+                    _sdc_sources.get(_sdc_source, 0) + 1
+                )
+
+            _sdc_ok, _sdc_reasons = _validate_sdc_episode(
+                _sdc_objs, _sdc_active_props, _sdc_key_terms,
+            )
+            meta["slot_drama_contracts"] = _sdc_contracts
+            meta["slot_drama_contracts_audit"] = {
+                "count": len(_sdc_contracts),
+                "sources": _sdc_sources,
+                "episode_valid": bool(_sdc_ok),
+                "reasons": list(_sdc_reasons[:20]),
+            }
+            led.save()
+            log.info(
+                "[OTR_LedgerScriptWriter] Build 3 slot drama contracts: "
+                "%d slot(s), sources=%s, episode_valid=%s%s",
+                len(_sdc_contracts), _sdc_sources, _sdc_ok,
+                "" if _sdc_ok else (
+                    " reasons=" + "; ".join(_sdc_reasons[:5])
+                ),
+            )
+        except Exception as _exc:  # noqa: BLE001 -- never break audio
+            log.warning(
+                "[OTR_LedgerScriptWriter] Build 3 slot drama contract "
+                "pass failed (%s: %s); meta['slot_drama_contracts'] left "
+                "absent. Build 4 compose_exchange degrades to no-contract.",
+                type(_exc).__name__, str(_exc)[:200],
+            )
+
         # --- I. Per-beat loop ------------------------------------------
         script_text_parts: list = []
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
