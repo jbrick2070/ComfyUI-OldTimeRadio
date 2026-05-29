@@ -333,6 +333,72 @@ class OTR_StoryRoomExtract:
             }
             return (json.dumps(payload, ensure_ascii=False, indent=2),)
 
+        # ---- Build 2 (2026-05-28): deterministic Tier-A craft floor ----
+        # Run the format/integrity gate on the SAME rows Commit will join,
+        # BEFORE the ledger is touched. On any Tier-A failure emit the
+        # node's existing status="failed" sentinel so OTR_StoryRoomCommit
+        # hard-fails under commit=True (integrity over recovery -- no
+        # silent fallback to legacy lines). Deterministic; no LLM; no new
+        # node/widget -> no workflow JSON change (build2/WIRING_SPEC.md
+        # Option A + Placement 1).
+        from ._otr_craft_floor import evaluate_tier_a, normalize_slot_line
+
+        craft_raw = "\n".join(
+            normalize_slot_line(
+                r.get("dialogue_slot_id"), r.get("speaker"), r.get("text")
+            )
+            for r in dialogue_rows
+        )
+        # Manifest slot-id sequence is the ledger's voiced order -- the
+        # exact sequence OTR_StoryRoomCommit validates position-by-position
+        # (_commit_dialogue raises on draft_slot_ids != voice_slot_ids), so
+        # the count / order / empty checks mirror Commit and yield zero
+        # false-reds on a known-good draft. Speaker is paired from the
+        # draft row per slot, making SPEAKER_MISMATCH inert: the in-flight
+        # ledger LINE persists char_id + speaker_role, NOT the speaker
+        # NAME, and the live Commit join does not validate speaker either.
+        # Promoting speaker to a live check needs a slot->name resolver
+        # confirmed against a live extract (operator N=3 follow-up). The
+        # one genuinely new hard-fail here is BELOW_WORD_FLOOR (floor 4);
+        # beats target 16-24 words so it only catches degenerate output.
+        _draft_speaker_by_sid = {
+            str(r.get("dialogue_slot_id") or "").strip(): str(
+                r.get("speaker") or ""
+            ).strip()
+            for r in dialogue_rows
+            if str(r.get("dialogue_slot_id") or "").strip()
+        }
+        craft_manifest = [
+            {"slot_id": sid, "speaker": _draft_speaker_by_sid.get(sid, "")}
+            for sid in voice_slot_ids
+        ]
+        craft_verdict = evaluate_tier_a(craft_raw, craft_manifest)
+        if not craft_verdict.passed:
+            log.warning(
+                "[OTR_StoryRoomExtract] Tier-A craft floor REJECTED the "
+                "extract (%d failure(s): %s); emitting failure sentinel "
+                "so Commit fails loud rather than writing degraded lines.",
+                len(craft_verdict.failures),
+                ", ".join(craft_verdict.failure_codes),
+            )
+            payload = {
+                "status": "failed",
+                "reason": (
+                    "Tier-A craft floor: "
+                    + ", ".join(craft_verdict.failure_codes)
+                ),
+                "tier_a": craft_verdict.to_dict(),
+                "cast": [],
+                "beats": [],
+                "dialogue": [],
+                "audio_cues": [],
+                "running_facts": [],
+                "arc": None,
+                "premise": "",
+            }
+            return (json.dumps(payload, ensure_ascii=False, indent=2),)
+        # ---- end Build 2 craft floor ----
+
         # Reassemble the StoryRoomExtraction-shaped payload from the
         # in-flight ledger (cast / beats / running_facts / premise)
         # plus the LLM-extracted dialogue rows. Downstream consumers
