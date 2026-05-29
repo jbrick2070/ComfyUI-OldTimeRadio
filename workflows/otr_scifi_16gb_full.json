@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 79,
-  "last_link_id": 229,
+  "last_link_id": 230,
   "nodes": [
     {
       "id": 63,
@@ -92,7 +92,7 @@
           "name": "script_json",
           "type": "STRING",
           "links": [
-            107
+            230
           ],
           "slot_index": 1
         },
@@ -115,20 +115,14 @@
         {
           "name": "creative_writing_model",
           "type": "STRING",
-          "links": [
-            221
-          ],
+          "links": [],
           "slot_index": 4
         },
         {
           "name": "technical_model",
           "type": "STRING",
           "links": [
-            115,
-            218,
-            219,
-            222,
-            224
+            115
           ],
           "slot_index": 5
         }
@@ -1783,7 +1777,7 @@
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 225
+          "link": 230
         },
         {
           "name": "news_used",
@@ -2077,441 +2071,6 @@
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
-    },
-    {
-      "id": 73,
-      "type": "OTR_EditorPass",
-      "pos": [
-        1800,
-        -260
-      ],
-      "size": [
-        380,
-        200
-      ],
-      "title": "Editor Pass (Sprint 10B Wave 1, DORMANT)",
-      "properties": {
-        "Node name for S&R": "OTR_EditorPass"
-      },
-      "widgets_values": [
-        "",
-        "",
-        0
-      ],
-      "inputs": [
-        {
-          "name": "director_brief",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "writer_draft",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "cycle",
-          "type": "INT",
-          "link": null
-        },
-        {
-          "name": "technical_model",
-          "type": "STRING",
-          "link": 218
-        }
-      ],
-      "outputs": [
-        {
-          "name": "editor_verdict",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 0
-        }
-      ],
-      "flags": {},
-      "order": 99,
-      "mode": 0,
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
-    },
-    {
-      "id": 74,
-      "type": "OTR_DirectorBrief",
-      "pos": [
-        500,
-        200
-      ],
-      "size": [
-        400,
-        220
-      ],
-      "flags": {},
-      "order": 99,
-      "mode": 0,
-      "title": "Director Brief (dormant, Wave 1 Agent D)",
-      "inputs": [
-        {
-          "name": "technical_model",
-          "type": "STRING",
-          "link": 219,
-          "shape": 7,
-          "label": "technical_model"
-        }
-      ],
-      "outputs": [
-        {
-          "name": "director_brief",
-          "type": "STRING",
-          "links": [
-            220
-          ],
-          "shape": 3,
-          "slot_index": 0,
-          "label": "director_brief"
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_DirectorBrief",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        "",
-        ""
-      ]
-    },
-    {
-      "id": 75,
-      "type": "OTR_StoryRoom",
-      "pos": [
-        500,
-        520
-      ],
-      "size": [
-        440,
-        260
-      ],
-      "title": "Story Room (Sprint 10B Wave 2 Agent F, DORMANT)",
-      "flags": {},
-      "order": 100,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "director_brief",
-          "type": "STRING",
-          "link": 220
-        },
-        {
-          "name": "news_seed",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "cast_names",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "creative_writing_model",
-          "type": "STRING",
-          "link": 221,
-          "shape": 7
-        },
-        {
-          "name": "technical_model",
-          "type": "STRING",
-          "link": 222,
-          "shape": 7
-        }
-      ],
-      "outputs": [
-        {
-          "name": "story_room_transcript",
-          "type": "STRING",
-          "links": [
-            223
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_StoryRoom",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        "",
-        "",
-        "",
-        true,
-        4,
-        3,
-        18,
-        true
-      ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
-    },
-    {
-      "id": 76,
-      "type": "OTR_StoryRoomExtract",
-      "pos": [
-        1100,
-        520
-      ],
-      "size": [
-        440,
-        220
-      ],
-      "title": "Story Room Extract (Sprint 10B Wave 2 Agent G, DORMANT)",
-      "flags": {},
-      "order": 101,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "story_room_transcript",
-          "type": "STRING",
-          "link": 223
-        },
-        {
-          "name": "cast_names",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "news_seed",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "technical_model",
-          "type": "STRING",
-          "link": 224,
-          "shape": 7
-        }
-      ],
-      "outputs": [
-        {
-          "name": "story_room_extraction",
-          "type": "STRING",
-          "links": [
-            226
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_StoryRoomExtract",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        ""
-      ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
-    },
-    {
-      "id": 77,
-      "type": "OTR_StoryRoomCommit",
-      "pos": [
-        500,
-        900
-      ],
-      "size": [
-        440,
-        200
-      ],
-      "title": "Story Room Commit (Wave 3 bridge, DORMANT)",
-      "flags": {},
-      "order": 102,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "script_json",
-          "type": "STRING",
-          "link": 107
-        },
-        {
-          "name": "story_room_extraction",
-          "type": "STRING",
-          "link": 226
-        },
-        {
-          "name": "commit",
-          "type": "BOOLEAN",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "script_json",
-          "type": "STRING",
-          "links": [
-            225
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_StoryRoomCommit",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        "",
-        "",
-        false
-      ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
-    },
-    {
-      "id": 78,
-      "type": "OTR_BeatSelector",
-      "pos": [
-        1000,
-        900
-      ],
-      "size": [
-        440,
-        220
-      ],
-      "title": "Beat Selector (Sprint 4 best-of-N, detached)",
-      "flags": {},
-      "order": 110,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "candidate_a_json",
-          "type": "STRING",
-          "link": 227
-        },
-        {
-          "name": "candidate_b_json",
-          "type": "STRING",
-          "link": 228
-        },
-        {
-          "name": "candidate_c_json",
-          "type": "STRING",
-          "link": 229
-        }
-      ],
-      "outputs": [
-        {
-          "name": "winning_plan_json",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 0
-        },
-        {
-          "name": "selector_audit",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_BeatSelector",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        "",
-        "",
-        ""
-      ],
-      "color": "#3A5A3C",
-      "bgcolor": "#23341F"
-    },
-    {
-      "id": 79,
-      "type": "OTR_Stage1FanOut",
-      "pos": [
-        500,
-        1200
-      ],
-      "size": [
-        440,
-        280
-      ],
-      "title": "Stage 1 Fan-Out (Sprint 4 diversity knobs, detached)",
-      "flags": {},
-      "order": 109,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "news_seed",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "num_characters",
-          "type": "INT",
-          "link": null
-        },
-        {
-          "name": "target_words",
-          "type": "INT",
-          "link": null
-        },
-        {
-          "name": "episode_title_hint",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "technical_model",
-          "type": "STRING",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "candidate_a_json",
-          "type": "STRING",
-          "links": [
-            227
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "candidate_b_json",
-          "type": "STRING",
-          "links": [
-            228
-          ],
-          "slot_index": 1
-        },
-        {
-          "name": "candidate_c_json",
-          "type": "STRING",
-          "links": [
-            229
-          ],
-          "slot_index": 2
-        },
-        {
-          "name": "winning_plan_json",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 3
-        },
-        {
-          "name": "fanout_audit_json",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 4
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_Stage1FanOut",
-        "cnr_id": "OldTimeRadio"
-      },
-      "widgets_values": [
-        "",
-        2,
-        350,
-        ""
-      ],
-      "color": "#3A5A3C",
-      "bgcolor": "#23341F"
     }
   ],
   "links": [
@@ -2860,14 +2419,6 @@
       "STRING"
     ],
     [
-      107,
-      1,
-      1,
-      77,
-      0,
-      "STRING"
-    ],
-    [
       108,
       1,
       2,
@@ -3068,99 +2619,11 @@
       "STRING"
     ],
     [
-      218,
+      230,
       1,
-      5,
-      73,
-      3,
-      "STRING"
-    ],
-    [
-      219,
       1,
-      5,
-      74,
-      0,
-      "STRING"
-    ],
-    [
-      220,
-      74,
-      0,
-      75,
-      0,
-      "STRING"
-    ],
-    [
-      221,
-      1,
-      4,
-      75,
-      3,
-      "STRING"
-    ],
-    [
-      222,
-      1,
-      5,
-      75,
-      4,
-      "STRING"
-    ],
-    [
-      223,
-      75,
-      0,
-      76,
-      0,
-      "STRING"
-    ],
-    [
-      224,
-      1,
-      5,
-      76,
-      3,
-      "STRING"
-    ],
-    [
-      225,
-      77,
-      0,
       62,
       1,
-      "STRING"
-    ],
-    [
-      226,
-      76,
-      0,
-      77,
-      1,
-      "STRING"
-    ],
-    [
-      227,
-      79,
-      0,
-      78,
-      0,
-      "STRING"
-    ],
-    [
-      228,
-      79,
-      1,
-      78,
-      1,
-      "STRING"
-    ],
-    [
-      229,
-      79,
-      2,
-      78,
-      2,
       "STRING"
     ]
   ],
