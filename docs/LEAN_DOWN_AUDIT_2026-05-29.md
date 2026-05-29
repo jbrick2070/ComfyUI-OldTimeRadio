@@ -8,8 +8,16 @@ scan, VRAM-primitive definition sites, all workflow JSONs). The big traps: maste
 desync, writer widget transposition, the slot 4/5 race, frontend-cache poisoning, deleting a
 shared symbol that only LOOKS dormant, and deleting VRAM-survival logic. Each has a guard.
 
+## Progress
+- Sprint 1 / step 4 (Node 42 cut) DONE -- commit 7b67503, pushed to v2.0-alpha. Graph now
+  30 nodes / 68 links, last_link_id 230. Link-table validation (7 checks) + tests/test_core.py
+  (59 passed) green. NEXT: step 5 (Multiturn).
+- Bug Bible regression was NOT runnable in the Cowork sandbox (survival-guide repo absent at
+  C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide). On the full machine,
+  run it every commit per CLAUDE.md alongside core + audio.
+
 ## Current state (verified)
-otr_scifi_16gb_full.json: 31 nodes, 69 links, last_link_id 230 (== max, no orphan/dup),
+otr_scifi_16gb_full.json: 30 nodes, 68 links, last_link_id 230 (== max, no orphan/dup),
 writer.script_json -> link 230 -> FreezeCascade. use_exchange ON; multiturn / shadow / fan-out
 / polish all OFF. All 10 workflow JSONs scanned: zero references to any node type slated for
 deletion -- tombstoning deleted types is safe.
@@ -40,19 +48,17 @@ mount serves a corrupted copy). Link-table validator, every edit:
 - last_link_id == max(link id)
 - no reserved link ids (111, 112)
 - no stale output-link ids left on surviving nodes
+(The Sprint-1 apply script implements all 7 inline; reuse that pattern as the JSON gate.)
 
 ## Operator discipline -- backend + frontend cache (every writer-surface change)
 ComfyUI caches node definitions in the running backend AND the browser. Any change to the
-writer's INPUT_TYPES, RETURN_TYPES, or widgets (steps 4, 5, 6, 8, 9) must follow this order or
+writer's INPUT_TYPES, RETURN_TYPES, or widgets (steps 5, 6, 7, 9, 10) must follow this order or
 the frontend forces a stale node definition over the new JSON and corrupts widgets_values on
 save:
-1. Edit Python first.
-2. Stop ComfyUI.
-3. Clear Python __pycache__.
-4. Restart the backend.
+1. Edit Python first. 2. Stop ComfyUI. 3. Clear Python __pycache__. 4. Restart the backend.
 5. Hard-refresh the browser (Ctrl+F5); clear ComfyUI local storage for the tab if needed.
 6. THEN load the mutated JSON. 7. THEN save. 8. THEN run the link-table validator.
-Slot 4/5 race (step 9): never open the mutated JSON while the backend still believes output
+Slot 4/5 race (step 10): never open the mutated JSON while the backend still believes output
 slot 4 is creative_writing_model. Restart before loading.
 
 ## Keep -- load-bearing, never remove
@@ -105,7 +111,8 @@ test_stage1_cast_audit; writer shadow block (~2467-2750) + widgets enable_stage1
 (wv[17]) + use_stage1_fanout (wv[22]) + kwargs/resolved keys; leave _otr_stage1_plan untouched;
 tombstone OTR_Stage1FanOut, OTR_BeatSelector.
 
-GRAPH-ONLY: Node 42 PathchSageAttentionKJ (external, DISABLED) -- delete from JSON.
+GRAPH-ONLY: Node 42 PathchSageAttentionKJ (sage_attention='disabled' passthrough, BUG-LOCAL-070)
+-- DONE (commit 7b67503).
 
 POLISH (in-file; per-symbol audit, NOT bulk): remove ONLY the enable_polish_pass-exclusive
 surface (the enable_polish_pass branch + widget wv[15] + reroll polish flag + polish tests).
@@ -140,15 +147,10 @@ Prove that first, every widget commit:
 6. Cache-safe restart, confirm node 1 loads and the run reaches audio.
 
 ## Execution order (one concern per commit; regression + cache-safe reload each)
-1. Add/run the link-table validator.
-2. Pre-deletion reference scan (DONE above; re-run if the tree changed).
-3. Node 63 topology verify (DONE above).
-4. Node 42 -- JSON only, via the link-203 bridge (fewer brittle list edits): delete master
-   link 69 [69,42,0,23,0,"MODEL"]; change link 203 [203,71,0,42,0,"MODEL"] ->
-   [203,71,0,23,0,"MODEL"]; node 71 outputs[0].links STAYS [203,204] (no edit); node 23 model
-   input link 69 -> 203 (a single scalar edit); delete node 42; last_link_id stays 230.
-   Rationale: re-targeting 203 + a scalar input edit avoids removing an element from node 71's
-   output list, which is the edit most likely to leave a ghost id. Validate.
+1. Add/run the link-table validator. (DONE -- Sprint-1 apply script.)
+2. Pre-deletion reference scan. (DONE; re-run if the tree changed.)
+3. Node 63 topology verify. (DONE.)
+4. Node 42 -- JSON-only link-203 bridge. (DONE -- commit 7b67503.)
 5. Multiturn -- delete files + _NODE_MODULES entry + tests; writer dispatch block + widget
    (value-asserted name-keyed regen).
 6. Story Room -- delete cluster files + 5 _NODE_MODULES entries + dedicated tests; EDIT the two
@@ -169,9 +171,37 @@ Prove that first, every widget commit:
 11. VRAM guardians -- KEEP (see above).
 12. Cruft (scan-gated) -- per-candidate zero-reference proof, then tombstone each.
 
-Per commit: Bug Bible + core + audio + affected suites green; cache-safe ComfyUI restart to
-confirm node 1 loads and the run reaches audio; re-run the link-table validator after any JSON
-edit.
+Per commit: core + audio + affected suites green (+ Bug Bible on the full machine); cache-safe
+ComfyUI restart to confirm node 1 loads and the run reaches audio; re-run the link-table
+validator after any JSON edit.
+
+## Phase 2 -- Headless API testing (after sprints 5-12 land)
+Goal: drive a full episode through ComfyUI's HTTP API with nobody watching the desktop, and
+iterate to a clean render. This closes the "AI cannot see the ComfyUI Desktop console" gap:
+launch ComfyUI ourselves so its stdout/stderr is captured in a Desktop Commander process the
+AI can read.
+1. Launch headless under Desktop Commander (its log becomes AI-readable):
+   cd C:\Users\jeffr\Documents\ComfyUI && .venv\Scripts\python.exe main.py --port 8000
+   Keep the PID; read_process_output tails PARSE_FATAL / tracebacks / VRAM spikes / FFmpeg.
+   (Windows MCP can launch/focus the Desktop app instead if a GUI run is preferred.)
+2. Export an API-format copy of the lean workflow. The UI JSON (nodes/links) is NOT what
+   /prompt accepts -- /prompt wants the API-prompt dict keyed by node id with class_type +
+   inputs. Use ComfyUI "Save (API Format)" or convert programmatically; keep it beside
+   otr_scifi_16gb_full.json.
+3. Queue: POST http://127.0.0.1:8000/prompt with {"prompt": <api_graph>, "client_id": <uuid>};
+   capture prompt_id. A 400 here is a node/input contract error -- the body names the node.
+4. Watch: poll http://127.0.0.1:8000/history/<prompt_id> until it appears (done) AND tail the
+   launched process stdout. Optional: ws://127.0.0.1:8000/ws?clientId=<uuid> for progress +
+   execution_error events.
+5. On error: read the traceback from our own process log, fix autonomously (code / JSON /
+   widget), re-run the relevant pytest, re-queue. Iterate.
+6. Success gate (a working workflow): /history shows completed; the audio output file exists
+   and is non-empty; no PARSE_FATAL; dialogue line count > 0; VRAM peak <= 14.5 GB; FFmpeg
+   returned 0; audio byte-identity vs the pre-lean baseline still holds.
+7. Record the proven API JSON + prompt_id + runtime in BUG_LOG.md.
+Tooling note: Desktop Commander does the headless launch + log tail + git; Windows MCP can
+drive the Desktop GUI (start, Queue, screenshot) if a desktop run is wanted. Neither needs
+input from Jeffrey.
 
 ## Hard blockers before execution
 - No widget migration without the value/type assertion gate.
