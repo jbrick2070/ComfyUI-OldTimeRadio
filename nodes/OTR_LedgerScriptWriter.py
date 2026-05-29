@@ -53,10 +53,10 @@ Pipeline (unchanged from v2.0 LPL):
        perfect_run_spacesaver, creativity, optimization_profile).
    10. Save ledger.
 
-Output contract (UNCHANGED from prior v2.0):
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
+Output contract:
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING")
     RETURN_NAMES = ("script_text", "script_json", "news_used",
-                    "estimated_minutes")
+                    "estimated_minutes", "technical_model")
 
 Widget surface (current as of 2026-05-23):
     required:
@@ -1848,10 +1848,10 @@ class OTR_LedgerScriptWriter:
     # for downstream consumers. B2a wires the widget surface only --
     # the cascade consumer is wired in B3, the writer's internal slot
     # routing comes in B2b.
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING", "STRING")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING")
     RETURN_NAMES = (
         "script_text", "script_json", "news_used", "estimated_minutes",
-        "creative_writing_model", "technical_model",
+        "technical_model",
     )
 
     @classmethod
@@ -3777,7 +3777,6 @@ class OTR_LedgerScriptWriter:
             script_json,
             news_json,
             est_minutes,
-            resolved["creative_writing_model"],
             resolved["technical_model"],
         )
 
@@ -3911,16 +3910,16 @@ if __name__ == "__main__":
         print("[2/9] FAIL: INPUT_TYPES schema")
 
     # 3. Locked output contract.
-    #     S30 B2a: two new STRING outputs broadcast the resolved model
-    #     ids (creative_writing_model, technical_model). RETURN_TYPES
-    #     grows from 4 to 6.
+    #     S30 B2a broadcast both resolved model ids; the 2026-05-29
+    #     lean-down removed the zero-consumer creative_writing_model
+    #     output. Only technical_model remains; RETURN_TYPES is 5.
     try:
         assert cls.RETURN_TYPES == (
-            "STRING", "STRING", "STRING", "INT", "STRING", "STRING",
+            "STRING", "STRING", "STRING", "INT", "STRING",
         ), f"RETURN_TYPES drift: {cls.RETURN_TYPES}"
         assert cls.RETURN_NAMES == (
             "script_text", "script_json", "news_used", "estimated_minutes",
-            "creative_writing_model", "technical_model",
+            "technical_model",
         ), f"RETURN_NAMES drift: {cls.RETURN_NAMES}"
         assert cls.FUNCTION == "run"
         assert cls.CATEGORY == "OldTimeRadio"

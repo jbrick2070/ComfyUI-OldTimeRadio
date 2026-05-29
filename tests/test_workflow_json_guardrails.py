@@ -600,8 +600,7 @@ class TestWriterB2aSurface:
             1: "script_json",
             2: "news_used",
             3: "estimated_minutes",
-            4: "creative_writing_model",
-            5: "technical_model",
+            4: "technical_model",
         }
         outputs = writer.get("outputs", [])
         for slot, expected_name in expected.items():
@@ -930,7 +929,7 @@ class TestCascadeB3Surface:
 
     def test_cascade_technical_socket_wired_in_canonical_json(self):
         """Canonical workflow JSON must have exactly one link from
-        the writer's `technical_model` output (slot 5) to the
+        the writer's `technical_model` output (slot 4) to the
         cascade's `technical_model` input. last_link_id reflects the
         new link.
         """
@@ -948,8 +947,8 @@ class TestCascadeB3Surface:
 
         # writer.outputs[5] must broadcast at least one link.
         writer_outputs = writer.get("outputs", [])
-        assert len(writer_outputs) >= 6
-        tm_output = writer_outputs[5]
+        assert len(writer_outputs) >= 5
+        tm_output = writer_outputs[4]
         assert tm_output["name"] == "technical_model"
         assert tm_output.get("links"), (
             f"writer.technical_model output must have at least one "
@@ -983,9 +982,9 @@ class TestCascadeB3Surface:
             f"cascade.technical_model wired from node id={src_id}; "
             f"expected writer id={writer['id']}"
         )
-        assert src_slot == 5, (
+        assert src_slot == 4, (
             f"cascade.technical_model wired from writer output slot "
-            f"{src_slot}; expected slot 5 (writer's technical_model)"
+            f"{src_slot}; expected slot 4 (writer's technical_model)"
         )
         assert dst_id == cascade["id"], (
             f"link {link_id} dst={dst_id}; expected cascade id "
