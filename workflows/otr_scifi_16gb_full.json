@@ -861,7 +861,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 69
+          "link": 203
         },
         {
           "name": "clip",
@@ -1010,46 +1010,6 @@
         "stills",
         "full_env"
       ]
-    },
-    {
-      "id": 42,
-      "type": "PathchSageAttentionKJ",
-      "pos": [
-        1270,
-        1420
-      ],
-      "size": [
-        380,
-        78
-      ],
-      "title": "Patch Sage Attention (FLUX) -- DISABLED, BUG-LOCAL-070",
-      "properties": {
-        "Node name for S&R": "PathchSageAttentionKJ"
-      },
-      "widgets_values": [
-        "disabled",
-        false
-      ],
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 203
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
-            69
-          ],
-          "slot_index": 0
-        }
-      ],
-      "flags": {},
-      "order": 14,
-      "mode": 0
     },
     {
       "id": 51,
@@ -2243,14 +2203,6 @@
       "STRING"
     ],
     [
-      69,
-      42,
-      0,
-      23,
-      0,
-      "MODEL"
-    ],
-    [
       78,
       7,
       0,
@@ -2502,7 +2454,7 @@
       203,
       71,
       0,
-      42,
+      23,
       0,
       "MODEL"
     ],
