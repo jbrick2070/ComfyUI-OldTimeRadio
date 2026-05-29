@@ -71,12 +71,12 @@
         200,
         true,
         "roll (~11% chance)",
-        true,
-        true,
+        false,
         false,
         true,
         true,
-        true
+        true,
+        false
       ],
       "inputs": [],
       "outputs": [
