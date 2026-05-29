@@ -1,21 +1,24 @@
 # OTR Lean-Down -- Go-Forward Plan
 
 Goal: strip the pipeline to one clean path -- writer (use_exchange) -> freeze cascade ->
-audio -> video -- removing dead/dormant machinery that does not serve the story. Story
-quality is paramount; nothing load-bearing is touched.
+audio -> video -- removing dead/dormant machinery that does not serve the story. Audio is
+king; nothing load-bearing is touched. Every call below is grounded in a verification pass
+over the real files (link table, writer INPUT_TYPES via ast, importer graph, all workflow
+JSONs). Findings that overturned earlier assumptions are folded in as decisions.
 
-## Current state
-otr_scifi_16gb_full.json is graph-lean: 31 nodes, 69 links, last_link_id 230 (== max, no
-orphan/dup links), writer.script_json -> link 230 -> FreezeCascade. use_exchange ON;
-multiturn / shadow-pass / fan-out / polish all OFF. Remaining work: code removal + two small
-graph cuts + a model-loader audit.
+## Current state (verified)
+otr_scifi_16gb_full.json: 31 nodes, 69 links, last_link_id 230 (== max, no orphan/dup),
+writer.script_json -> link 230 -> FreezeCascade. use_exchange ON; multiturn / shadow / fan-out
+/ polish all OFF. All 10 workflow JSONs scanned: zero references to any node type slated for
+deletion -- so tombstoning deleted types is safe. Remaining work: code removal + two graph
+cuts + a conservative model-loader audit.
 
 ## JSON surgery rules (read before any graph edit)
-The workflow JSON is TWO synchronized systems: the master `links` array at the bottom, and
-each node's local `inputs[].link` / `outputs[].links`. EVERY link change must mutate BOTH --
-node-local edits alone leave the file corrupt even when the visual graph looks right. All
-edits go through Desktop Commander on the real file; the bash/VM mount serves a corrupted
-copy. After every JSON edit run the link-table validation (keep it as a reusable script):
+The workflow JSON is TWO synchronized systems: the master `links` array, and each node's
+local `inputs[].link` / `outputs[].links`. EVERY link change must mutate BOTH -- node-local
+edits alone leave the file corrupt even when the visual graph looks right. All edits go
+through Desktop Commander on the real file; the bash/VM mount serves a corrupted copy. After
+every JSON edit run the link-table validation:
 - JSON parses
 - every node-local link id exists in the master `links` array
 - every master link has a real source node and a real target node (no orphans)
@@ -24,102 +27,135 @@ copy. After every JSON edit run the link-table validation (keep it as a reusable
 - no reserved link ids (111, 112)
 - no stale output-link ids left on surviving nodes
 
+The most dangerous failure is silent corruption, not a crash: a bad widget migration or a
+stale master link can still load and run the WRONG settings or ghost routes. The two methods
+below (name-keyed widget regen; full link mutation) exist to make that class of failure
+impossible rather than merely unlikely.
+
 ## Keep -- load-bearing, never remove
 - nodes/_otr_compose_exchange.py (dialogue engine), _otr_craft_floor.py (Tier-A gate),
-  _otr_slot_drama_contract.py (contracts), _otr_editor_constraints.py + _otr_beat_validators.py.
-- Shared libs: _otr_stage1_plan, _otr_constrained_generate, _otr_legacy_to_stage1_adapter,
-  _otr_whole_episode_critic, news_interpreter, production_ledger, story_orchestrator,
-  _otr_model_loader, _otr_line_composer (polish carved out, file stays), _otr_reroll.
+  _otr_slot_drama_contract.py, _otr_editor_constraints.py + _otr_beat_validators.py.
+- Shared libs: _otr_stage1_plan (the LIVE outline generator -- see warning below),
+  _otr_constrained_generate, _otr_legacy_to_stage1_adapter, _otr_whole_episode_critic,
+  news_interpreter, production_ledger, story_orchestrator, _otr_model_loader,
+  _otr_line_composer (polish carved out, file stays), _otr_reroll.
 - Node 21 OTR_FixedShotDurationStub / otr_shot_duration_calculator.py -- REQUIRED (real
-  per-shot frame expansion BatchFluxRender consumes; test-pinned). Optional later: rename
-  off "Stub" (lockstep: class + __init__ + JSON type + S&R name + its test). Do NOT delete.
-- Node 63 OTR_WorkflowValidator + _workflow_validation.py -- KEEP the module. The node is
-  graph-detached (no inputs/consumers); optional later: move its link-table checks to CI and
-  drop the node from the production graph. Low priority -- it is a useful pre-run net.
+  per-shot frame expansion BatchFluxRender consumes; test-pinned). Do NOT delete. Optional
+  later: rename off "Stub" in lockstep (class + __init__ + JSON type + S&R name + its test).
+- Node 63 OTR_WorkflowValidator + _workflow_validation.py -- KEEP the module. Verified: it
+  introspects each node's INPUT_TYPES() dynamically and NEVER inspects node outputs, so the
+  creative_writing_model prune cannot false-fail it, and it pins no writer output count. Its
+  widget-drift check catches a TRUNCATED or None widget slot but NOT a same-length
+  transposition -- so it is not a safety net for widget removal; the name-keyed regen below
+  is. The node is graph-detached; optional later: move its checks to CI.
+- use_exchange writer widget (widgets_values[19]) -- the LIVE feature. KEEP.
 
-## Complete deletion inventory (modules suspect for deletion)
+## WARNING -- two near-identical names, opposite fates
+- _otr_stage1_plan  (alias _OTRS1P) -- LIVE outline path. KEEP.
+- _otr_stage1_call  (alias _OTRS1)  -- shadow-pass only (writer import + all call sites sit
+  inside `if resolved.get("enable_stage1_shadow_pass")`, ~line 2487-2750). DELETE with the
+  shadow cluster. Do not confuse the two.
+
+## Complete deletion inventory (verified)
 
 MULTITURN -- Wave-0 dialogue, superseded by use_exchange -- DELETE
-- nodes/_otr_wave0_multiturn.py
-- nodes/_otr_stage2_call.py
-- nodes/_otr_stage2_prompt.py
+- nodes/_otr_wave0_multiturn.py, _otr_stage2_call.py, _otr_stage2_prompt.py
+- tests/test_wave0_multiturn_dispatch.py, test_stage2_multiturn.py
+- writer: dispatch block + use_multiturn_dialogue widget (wv[18]) + kwarg + resolved key
 
 STORY ROOM -- dormant writers-room, replaced by use_exchange -- DELETE
-- nodes/OTR_StoryRoom.py
-- nodes/_otr_story_room.py
-- nodes/OTR_StoryRoomExtract.py
-- nodes/_otr_story_room_extract.py
-- nodes/OTR_StoryRoomCommit.py
-- nodes/OTR_DirectorBrief.py
-- nodes/_otr_director_brief.py
-- nodes/OTR_EditorPass.py
-- nodes/_otr_editor_pass.py
-- nodes/_otr_writers_room_resolver.py
+- nodes/OTR_StoryRoom.py, _otr_story_room.py, OTR_StoryRoomExtract.py,
+  _otr_story_room_extract.py, OTR_StoryRoomCommit.py, OTR_DirectorBrief.py,
+  _otr_director_brief.py, OTR_EditorPass.py, _otr_editor_pass.py,
+  _otr_writers_room_resolver.py  (+ their 5 _NODE_MODULES entries)
+- tests dedicated to the cluster: test_otr_story_room, test_otr_story_room_extract,
+  test_otr_director_brief, test_otr_editor_pass, test_writers_room_resolver,
+  test_bug_local_293_extract_token_budget, test_bug_local_291_editor_token_budget
+- EDIT, do not delete: test_constraint_editor_live_swap.py and
+  test_writer_constraint_repair_splice.py import BOTH the cluster AND the live constraint
+  editor -- drop only the Story-Room/Director/Editor fixtures, keep the live-editor coverage.
+  test_dialogue_slot_id.py: confirm it is not asserting live slot-id behavior before cutting.
+- scripts/smoke_fanout_constraint.py -- delete (imports story_room + director_brief +
+  editor_pass + stage1_fanout; pure dormant-feature smoke).
+- Tombstone in DELETED_NODE_TYPES: OTR_StoryRoom, OTR_StoryRoomExtract, OTR_StoryRoomCommit,
+  OTR_DirectorBrief, OTR_EditorPass (verified zero JSON refs -> safe).
 
-STAGE-1 SHADOW + FAN-OUT -- diagnostics for a swap that never landed -- DELETE
-- nodes/OTR_Stage1FanOut.py
-- nodes/OTR_BeatSelector.py
-- nodes/_otr_stage1_fanout.py
-- nodes/_otr_beat_selector.py
-- nodes/_otr_stage1_call.py
-- nodes/_otr_stage1_cast_audit.py
-- nodes/_otr_name_gender.py            [VERIFY-FIRST: confirm no other caller]
+SHADOW + FAN-OUT (+ cast audit + name-gender) -- diagnostics for a swap that never landed.
+All reachable ONLY through enable_stage1_shadow_pass (verified) -- DELETE
+- nodes/_otr_stage1_fanout.py, _otr_beat_selector.py, _otr_stage1_call.py,
+  _otr_stage1_cast_audit.py, _otr_name_gender.py  (name_gender's only non-test caller is
+  cast_audit, which is shadow-gated -> the whole sub-tree goes together)
+- nodes/OTR_Stage1FanOut.py, OTR_BeatSelector.py  (+ their _NODE_MODULES entries)
+- tests: test_stage1_fanout, test_stage1_fanout_and_select, test_beat_selector,
+  test_beat_selector_dict_plan_a, test_stage1_call, test_stage1_prompt_bounds,
+  test_stage1_shadow_pass_integration, test_stage1_cast_audit
+- writer: shadow-pass block (~2467-2750) incl. the fan-out sub-block + the Build-3 local-alias
+  import note; widgets enable_stage1_shadow_pass (wv[17]) + use_stage1_fanout (wv[22]) +
+  kwargs + resolved keys
+- Tombstone in DELETED_NODE_TYPES: OTR_Stage1FanOut, OTR_BeatSelector (zero JSON refs -> safe)
 
 GRAPH-ONLY (no repo module)
 - Node 42 PathchSageAttentionKJ (external KJNodes node, DISABLED) -- delete from JSON + bridge.
 
 IN-FILE, NOT A MODULE (files stay; logic carved out)
-- Polish: _otr_line_composer.py + _otr_model_loader.py + _otr_reroll.py
+- Polish: _otr_line_composer.py + _otr_model_loader.py + _otr_reroll.py; writer widget
+  enable_polish_pass (wv[15]).
 
-REGISTERED-BUT-UNUSED NODES -- [VERIFY-FIRST: scan every workflow JSON + test fixture + import + doc before delete]
-- nodes/OTR_BisectStringSource.py        (temporary, BUG-231)
-- nodes/OTR_VisualBridge.py, OTR_VisualPoll.py, OTR_VisualRenderer.py,
-  OTR_VisualPromptCoercion.py, OTR_VisualExtractFluxPrompt.py   (visual sidecar; may be another workflow)
-- nodes/OTR_CheckpointLoaderGated.py     (superseded by DeferredCheckpointLoader)
-- nodes/OTR_VideoConcat.py               (superseded by VideoComposite)
-- nodes/OTR_BatchProceduralSFX.py        (check _otr_sfx_lib coupling)
-- nodes/OTR_ProjectStateLoader.py, OTR_VRAMGuardian.py, OTR_VRAMContextTest.py, OTR_SaveCopy.py
-- nodes/_otr_lfc_context.py              (orphan candidate -- only a test references it)
+WRITER OUTPUT (graph + surface)
+- creative_writing_model output (slot 4) -- verified ZERO consumers; safe to prune. Link 115
+  is the ONLY slot-5 link, so the 5->4 renumber is complete.
 
-## Execution order (one concern per commit; regression + restart each)
-1. Node 42 -- JSON only (mutate master links AND node-local): delete master link
-   [203,71,0,42,0,"MODEL"]; mutate master link 69 [69,42,0,23,0,"MODEL"] ->
-   [69,71,0,23,0,"MODEL"]; node 71 outputs[0].links [203,204] -> [69,204]; node 23 input
-   link stays 69; delete node 42; last_link_id stays 230. Run link-table validation.
-2. Story Room code -- delete the 10 files + the 5 _NODE_MODULES entries + Story-Room tests;
-   edit constraint-editor tests to drop DirectorBrief/EditorPass fixture imports only.
-3. Multiturn -- delete the 3 files + writer dispatch block + widget [18] + kwargs +
-   resolved-dict key + tests.
-4. Shadow + fan-out -- delete the 7 files (verify _otr_name_gender) + 2 _NODE_MODULES
-   entries + writer shadow/fan-out blocks + widgets ([22] then [17]) + tests.
-5. Model-loader audit -- audit _otr_model_loader.py for prep tied ONLY to deleted features:
-   make_polish_generate_fn, any shadow / fan-out / multiturn / diagnostic-only cache warming
-   or VRAM reservation, unused multimodal/Gemini staging, large diagnostic-only model
-   families, orphaned slot warmups. Remove orphaned loader paths -- dead VRAM prep silently
-   burns VRAM. (Audit, then remove only what is confirmed orphaned.)
-6. Polish (LAST; hot-path surgery) -- remove needs_polish / polish_line / is_polish_refusal
-   / _POLISH_* constants / the enable_polish_pass branch / make_polish_generate_fn / reroll
-   polish flag / writer widget [15] / polish tests. FULL audio byte-identity regression.
-7. Prune writer creative_writing_model output -- RETURN_TYPES/NAMES drop it; run() return
-   tuple drop it; JSON delete output slot 4, renumber technical_model slot 5->4, mutate
-   master link 115 [115,1,5,62,4,"STRING"] -> [115,1,4,62,4,"STRING"]; update the 3
-   writer-surface guardrail tests + the writer self-test.
-8. Cruft (scan-gated) -- registered-but-unused nodes (scan every workflow JSON + fixture +
-   import + doc first); untracked superseded plan docs; gitignored scratch + __pycache__.
+REGISTERED-BUT-UNUSED NODES -- scan-gated, LAST. The registry list is noisy (it still names
+already-tombstoned types and nodes used only by other workflows: humo_smoke_*.json,
+_bisect_*.json). Do NOT bulk-delete. For each candidate, prove zero references across ALL 10
+workflow JSONs + every test + every import before deleting, then tombstone. Candidates:
+OTR_BisectStringSource; the OTR_Visual* sidecar; OTR_CheckpointLoaderGated; OTR_VideoConcat;
+OTR_BatchProceduralSFX; OTR_ProjectStateLoader; OTR_VRAMGuardian; OTR_VRAMContextTest;
+OTR_SaveCopy; _otr_lfc_context.
 
-## The two crash points
-1. WRITER WIDGET-INDEX DRIFT (removing optional widgets). Two safe methods:
-   - Phased (safest): replace each removed widget with an inert placeholder widget in
-     Python -> load ComfyUI -> confirm node 1 loads -> save a clean workflow -> remove the
-     placeholders + migrate the JSON array in the same commit.
-   - Scripted: pop widgets_values highest index first (22 -> 18 -> 17 -> 15) in the SAME
-     commit as the INPUT_TYPES / run() / _resolve_inputs edits, asserting FIRST
-     len==23 and widgets_values[15]/[17]/[18]/[22] all False. No assert, no pop.
-   Index map: [15]=enable_polish_pass [17]=enable_stage1_shadow_pass
-   [18]=use_multiturn_dialogue [22]=use_stage1_fanout.
-2. OUTPUT SLOT-INDEX DRIFT (pruning creative_writing_model) -- must decrement
-   technical_model slot 5->4 AND mutate master link 115 src_slot 5->4. If 115 still points
-   to source slot 5, the graph lies.
+## Widget removal method (the safe one) -- name-keyed regeneration
+The writer's widgets_values is positional: required(3) then optional(20), in declared order.
+Verified 0-based map of the relevant slots:
+  [15]=enable_polish_pass  [16]=lemmy_cameo  [17]=enable_stage1_shadow_pass
+  [18]=use_multiturn_dialogue  [19]=use_exchange(KEEP)
+  [20]=enable_production_stage3_validators  [21]=news_briefs_required  [22]=use_stage1_fanout
+The widgets to remove are INTERLEAVED with keepers, so tail-lopping or blind index-popping is
+wrong. Instead, for each commit that removes a widget:
+1. Build `old_map = dict(zip(OLD_ORDERED_NAMES, widgets_values))` from the node's current
+   INPUT_TYPES order.
+2. Edit INPUT_TYPES / run() / _resolve_inputs to drop the widget.
+3. Regenerate `widgets_values = [old_map[name] for name in NEW_ORDERED_NAMES]`.
+4. Assert: every removed name absent from NEW order; every surviving name present in old_map;
+   len(new) == new INPUT_TYPES count.
+5. Load ComfyUI once, confirm node 1 loads and the run reaches audio.
+This is name-based, so it cannot transpose values into the wrong field -- the one failure the
+validator does NOT catch.
 
-Per commit: Bug Bible + core + audio + affected suites green; restart ComfyUI to confirm
-node 1 loads and the run reaches audio; re-run the link-table validation after any JSON edit.
+## Execution order (one concern per commit; regression + ComfyUI reload each)
+1. Node 42 -- JSON only (mutate master AND node-local): delete master link
+   [203,71,0,42,0,"MODEL"]; change link 69 [69,42,0,23,0,"MODEL"] -> [69,71,0,23,0,"MODEL"];
+   node 71 outputs[0].links [203,204] -> [69,204]; node 23 input link stays 69; delete node
+   42; last_link_id stays 230. Run link-table validation.
+2. Multiturn -- delete files + tests; writer dispatch block + widget (name-keyed regen).
+3. Story Room -- delete the cluster files + _NODE_MODULES entries + dedicated tests; EDIT the
+   two shared constraint-editor tests; delete the smoke script; tombstone the 5 types.
+4. Shadow + fan-out -- delete the 5 modules + 2 node classes + 8 tests; writer shadow block +
+   2 widgets (name-keyed regen); tombstone the 2 types. Leave _otr_stage1_plan untouched.
+5. Model-loader audit -- conservative. Find loader prep tied ONLY to deleted features
+   (make_polish_generate_fn; shadow/fan-out/multiturn cache warming or VRAM reservation;
+   orphaned slot warmups). Remove a path only if it has zero remaining callers after steps
+   2-4. Do not delete branches on suspicion alone (e.g. multimodal/Gemini staging may not
+   exist). The loader is shared hot-path code; re-run a FULL live episode, not just pytest --
+   a VRAM regression will not show in unit tests.
+6. Polish (LAST; hot-path) -- remove needs_polish / polish_line / is_polish_refusal /
+   _POLISH_* / the enable_polish_pass branch / make_polish_generate_fn / the reroll polish
+   flag / widget (name-keyed regen) / polish tests. FULL audio byte-identity regression.
+7. Prune writer creative_writing_model output -- RETURN_TYPES/NAMES drop it; run() tuple drop
+   it; JSON delete output slot 4, renumber technical_model 5->4, change link 115
+   [115,1,5,62,4,"STRING"] -> [115,1,4,62,4,"STRING"]; update the 3 writer-surface guardrail
+   tests + the writer self-test.
+8. Cruft (scan-gated) -- only after the per-candidate zero-reference proof above; tombstone
+   each as it goes. Then untracked superseded plan docs + gitignored scratch/__pycache__.
+
+Per commit: Bug Bible + core + audio + affected suites green; restart ComfyUI to confirm node
+1 loads and the run reaches audio; re-run the link-table validation after any JSON edit.
