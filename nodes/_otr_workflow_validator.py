@@ -79,6 +79,83 @@ def _load_workflow(path: str) -> dict[str, Any]:
         ) from e
 
 
+# ---------------------------------------------------------------------------
+# S14.3 widget-vector contract check (BUG-LOCAL-293)
+# ---------------------------------------------------------------------------
+# Mirrors scripts/otr_api.py::_serialized_slot_names so the validator agrees
+# with the UI->API converter on how many widgets_values slots a node SHOULD
+# carry. Two ComfyUI client-side serialization rules /object_info doesn't
+# encode visibly: (1) forceInput=True widget inputs occupy NO slot;
+# (2) an INT seed/noise_seed widget gains a hidden control_after_generate
+# companion slot. Drift between this count and the saved widgets_values length
+# is the BUG-210 (stale-slot shift) / BUG-253 (short-by-one) class.
+_WIDGET_TYPE_NAMES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
+_COMPANION_INT_WIDGETS = ("seed", "noise_seed")
+
+
+def _wv_type_of(spec: Any):
+    if isinstance(spec, (list, tuple)) and len(spec) > 0:
+        return spec[0]
+    return spec
+
+
+def _wv_is_widget_backed(spec: Any) -> bool:
+    t = _wv_type_of(spec)
+    if isinstance(t, list):  # COMBO (inline choices) is a widget
+        return True
+    return isinstance(t, str) and t.upper() in _WIDGET_TYPE_NAMES
+
+
+def _wv_has_force_input(spec: Any) -> bool:
+    if not isinstance(spec, (list, tuple)) or len(spec) < 2:
+        return False
+    opts = spec[1]
+    return isinstance(opts, dict) and bool(opts.get("forceInput"))
+
+
+def _expected_slot_count(input_types: dict) -> int:
+    """How many widgets_values slots a clean save should carry, per the
+    otr_api serialized-slot rules (forceInput dropped, seed companion added)."""
+    required = (input_types.get("required") or {})
+    optional = (input_types.get("optional") or {})
+    n = 0
+    for name, spec in list(required.items()) + list(optional.items()):
+        if not _wv_is_widget_backed(spec):
+            continue
+        if _wv_has_force_input(spec):
+            continue
+        n += 1
+        t = _wv_type_of(spec)
+        if isinstance(t, str) and t.upper() == "INT" and name in _COMPANION_INT_WIDGETS:
+            n += 1  # hidden control_after_generate companion slot
+    return n
+
+
+def widget_vector_drift(workflow: dict, ncm: dict) -> list[str]:
+    """Return human-readable drift findings for OTR nodes whose saved
+    widgets_values length != expected serialized-slot count. OTR nodes only
+    (others lack a loadable INPUT_TYPES here). Pure; never raises."""
+    findings: list[str] = []
+    for node in (workflow.get("nodes") or []):
+        ntype = node.get("type")
+        cls = ncm.get(ntype) if isinstance(ncm, dict) else None
+        if cls is None or not hasattr(cls, "INPUT_TYPES"):
+            continue
+        wv = node.get("widgets_values")
+        if not isinstance(wv, list):
+            continue
+        try:
+            expected = _expected_slot_count(cls.INPUT_TYPES() or {})
+        except Exception:
+            continue
+        if len(wv) != expected:
+            findings.append(
+                f"node {node.get('id')} {ntype}: widgets_values="
+                f"{len(wv)} != expected {expected}"
+            )
+    return findings
+
+
 class WorkflowValidator:
     """OTR workflow contract validator node.
 
@@ -154,12 +231,30 @@ class WorkflowValidator:
             _NCM,
             strict_unknown_types=strict_unknown_types,
         )
+        # S14.3 (BUG-LOCAL-293): widget-vector contract check. Advisory --
+        # warns on the BUG-210/253 realignment-drift class (a node's saved
+        # widgets_values length no longer matches its INPUT_TYPES serialized
+        # slot count, which makes ComfyUI map later widgets to wrong slots).
+        # Does NOT raise yet: the forceInput slot-count convention is still
+        # being reconciled (otr_api drops forceInput slots; the node-14
+        # MusicGenTheme + the audio-widget-vector tests currently disagree --
+        # this is the live BUG-281 question). validate_anyway already gates
+        # the whole node; once the convention is locked this is promoted to a
+        # hard raise.
+        drift = widget_vector_drift(workflow, _NCM)
+        for d in drift:
+            log.warning("OTR_WorkflowValidator: WIDGET-VECTOR DRIFT -- %s", d)
         n_nodes = len(workflow.get("nodes") or [])
         n_links = len(workflow.get("links") or [])
+        drift_str = (
+            f", widget_vector_drift={len(drift)} ({'; '.join(drift)})"
+            if drift else ", widget_vector_drift=0"
+        )
         msg = (
             f"OTR_WorkflowValidator: OK -- {n_nodes} nodes, {n_links} links, "
             f"strict_unknown_types={strict_unknown_types}, "
             f"path={workflow_json_path or str(_DEFAULT_WORKFLOW_PATH)!r}"
+            f"{drift_str}"
         )
         log.info(msg)
         return (msg,)
