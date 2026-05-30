@@ -1,13 +1,13 @@
-"""Sprint 10A step 7 wiring helper -- legacy ledger -> Stage1Plan adapter.
+"""Legacy ledger -> Stage1Plan adapter.
 
-The whole-episode shadow critic (_otr_whole_episode_critic) needs a
-Stage1Plan + rendered_lines list to evaluate. The legacy writer
-pipeline produces a different shape: cast rows in led.data['cast'],
-beat/outline rows in led.data['lines'], premise/arc text in
-meta.episode_canon, etc. This module builds a best-effort Stage1Plan
-from the legacy ledger so the critic can still score the LEGACY
-episode being produced (the most operationally useful target while
-Sprint 10A coexists with the legacy path).
+Builds a best-effort Stage1Plan + rendered_lines list from a legacy
+writer ledger: cast rows in led.data['cast'], beat/outline rows in
+led.data['lines'], premise/arc text in meta.episode_canon, etc.
+
+Retained because the writer's Stage 3 path reuses this adapter
+(OTR_LedgerScriptWriter imports legacy_ledger_to_stage1_plan). The
+Sprint 10A whole-episode shadow critic that originally consumed it
+was removed in the 2026-05-29 lean-down.
 
 Adapter philosophy: loss-tolerant + non-fatal. If the legacy ledger
 is missing a field the Stage 1 schema requires, we fill with a

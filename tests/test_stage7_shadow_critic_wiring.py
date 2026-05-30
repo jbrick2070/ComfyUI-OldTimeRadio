@@ -1,4 +1,4 @@
-"""Sprint 10A step 7 wiring regression -- adapter + cascade integration.
+"""Adapter + escalation-gate wiring regression.
 
 Covers:
   * nodes/_otr_legacy_to_stage1_adapter:
@@ -12,16 +12,14 @@ Covers:
       - Running_facts extracted from continuity_ledger if present
       - extract_rendered_lines pulls (beat_id, speaker, text)
   * nodes/_otr_freeze_cascade:
-      - Source-level pin: Stage 7 shadow block lives AFTER the
-        legacy story_critic stamp and BEFORE the reroll loop.
-      - Source-level pin: shadow block gated on
-        meta['stage1_shadow_attempts'].
-      - Source-level pin: catch-all Exception arm present + stamps
-        shadow_setup_failed marker.
+      - Source-level pins on the Sprint 10B Wave 1 Agent C escalation
+        gate (BUG-LOCAL-281): the cascade dispatches on
+        decide_escalation_scope / EscalationScope and builds a no-op
+        RerollDisposition on the ship path.
 
-Tests do NOT exercise the runtime cascade (would need a full
-ledger fixture + LLM mock); the wiring is a thin diagnostic
-addition that we pin via source-level inspection.
+The Stage 7 whole-episode shadow critic was removed in the 2026-05-29
+lean-down; only the live legacy->Stage1 adapter and the escalation
+gate remain pinned here.
 """
 
 from __future__ import annotations
@@ -329,88 +327,6 @@ class TestExtractRenderedLines:
         assert extract_rendered_lines(None) == []  # type: ignore[arg-type]
 
 
-# ---------------------------------------------------------------------------
-# Cascade wiring -- source-level pins
-# ---------------------------------------------------------------------------
-
-
-class TestCascadeWiringSource:
-    def _src(self) -> str:
-        return CASCADE_SRC.read_text(encoding="utf-8")
-
-    def test_step7_shadow_block_marker_present(self):
-        src = self._src()
-        assert "Sprint 10A step 7: whole-episode shadow critic" in src
-
-    def test_block_runs_after_legacy_critic_stamp(self):
-        """Critical placement: the Stage 7 shadow block must live
-        AFTER meta['story_critic_report'] = ... and BEFORE the
-        Sprint 5C reroll loop. Otherwise the critic sees a stale or
-        missing legacy critic report."""
-        src = self._src()
-        legacy_stamp_idx = src.index(
-            'meta["story_critic_report"] = story_critic_report.model_dump()'
-        )
-        shadow_idx = src.index("Sprint 10A step 7: whole-episode shadow critic")
-        reroll_idx = src.index("Sprint 5C: targeted reroll loop")
-        assert legacy_stamp_idx < shadow_idx < reroll_idx, (
-            "Stage 7 shadow block must be sandwiched between the "
-            "legacy critic stamp and the Sprint 5C reroll loop"
-        )
-
-    def test_block_gated_on_stage1_shadow_attempts(self):
-        """The shadow critic must only run when the operator opted
-        into shadow diagnostics (writer stamped
-        meta.stage1_shadow_attempts). This is the 'same widget,
-        same opt-in' semantics carried across nodes."""
-        src = self._src()
-        shadow_idx = src.index("Sprint 10A step 7: whole-episode shadow critic")
-        # Block extends from the marker through to the reroll loop;
-        # search the whole region so we don't miss the gate behind
-        # the long comment header.
-        reroll_idx = src.index("Sprint 5C: targeted reroll loop")
-        block = src[shadow_idx:reroll_idx]
-        assert '"stage1_shadow_attempts" in meta' in block, (
-            "Stage 7 shadow block must gate on meta['stage1_shadow_attempts']"
-        )
-
-    def test_block_imports_are_local(self):
-        """Imports must be local to the branch so workflows with the
-        flag off don't pay the import cost."""
-        src = self._src()
-        shadow_idx = src.index("Sprint 10A step 7: whole-episode shadow critic")
-        reroll_idx = src.index("Sprint 5C: targeted reroll loop")
-        block = src[shadow_idx:reroll_idx]
-        assert "from . import _otr_legacy_to_stage1_adapter" in block
-        assert "from . import _otr_whole_episode_critic" in block
-
-    def test_block_has_catch_all_exception_arm(self):
-        """A bug in the shadow critic must NEVER halt the cascade.
-        Pin via source check: catch-all 'except Exception' present
-        in the shadow block."""
-        src = self._src()
-        shadow_idx = src.index("Sprint 10A step 7: whole-episode shadow critic")
-        # The block ends at the next major marker (the reroll loop).
-        reroll_idx = src.index("Sprint 5C: targeted reroll loop")
-        block = src[shadow_idx:reroll_idx]
-        assert "except Exception" in block, (
-            "Stage 7 shadow block must carry a catch-all Exception arm "
-            "so a bug here never halts the cascade"
-        )
-
-    def test_block_stamps_meta_keys(self):
-        """The shadow block must stamp meta['stage7_shadow_critic'] in
-        every reachable code path so the soak ledger always carries
-        a forensic record."""
-        src = self._src()
-        shadow_idx = src.index("Sprint 10A step 7: whole-episode shadow critic")
-        reroll_idx = src.index("Sprint 5C: targeted reroll loop")
-        block = src[shadow_idx:reroll_idx]
-        assert 'meta["stage7_shadow_critic"]' in block
-        # And the failure path stamps shadow_setup_failed.
-        assert "shadow_setup_failed" in block
-
-
 class TestBugLocal281Stage7ShipSkipsReroll:
     """BUG-LOCAL-281 (Sprint 10B Wave 0 follow-on, 2026-05-27):
     when the Stage 7 whole-episode critic returns verdict='ship',
@@ -437,21 +353,16 @@ class TestBugLocal281Stage7ShipSkipsReroll:
             "source documenting the Stage 7 ship-verdict gate"
         )
 
-    def test_gate_reads_stage7_verdict_before_reroll(self):
-        """The gate must read meta['stage7_shadow_critic']['verdict']
-        BEFORE the reroll dispatch so a 'ship' verdict short-circuits
-        the legacy loop entirely (not after the fact)."""
+    def test_gate_decides_escalation_before_reroll(self):
+        """The escalation decision must be computed BEFORE the reroll
+        dispatch so a ship/structural verdict short-circuits the legacy
+        loop entirely (not after the fact)."""
         src = self._src()
-        # Anchor: the gate must mention reading the Stage 7 verdict.
-        gate_idx = src.index('stage7_shadow_critic')
-        # The reroll dispatch site -- gate must be BEFORE this OR
-        # contained inside the same if/else block that wraps it.
+        decide_idx = src.index("decide_escalation_scope(")
         reroll_call_idx = src.index("_OTRRR.run_targeted_reroll")
-        # Both indices exist; gate must appear in the cascade body
-        # before OR sandwiching the reroll call. Search for the
-        # gate-read pattern in the cascade body.
-        assert "stage7_shadow_critic" in src
-        assert "_OTRRR.run_targeted_reroll" in src
+        assert decide_idx < reroll_call_idx, (
+            "escalation decision must be computed before the reroll dispatch"
+        )
 
     def test_gate_uses_escalation_module(self):
         """Sprint 10B Wave 1 Agent C (2026-05-27, commits 73bfed7..)
