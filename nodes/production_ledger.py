@@ -86,10 +86,15 @@ def _default_out_dir(episode_id: Optional[str] = None) -> str:
         ``Ledger.rename_episode`` once the title is finalized.
     """
     ep = episode_id or ("pending_" + time.strftime("%Y%m%d_%H%M%S"))
-    return os.path.join(
-        os.path.expanduser("~"),
-        "Documents", "ComfyUI", "output", "otr", "episodes", ep, "audio",
-    )
+    # BUG-LOCAL-292: route through the shared resolver instead of a hardcoded
+    # ~/Documents path. comfy_output_dir() resolves OTR_OUTPUT_DIR env, else
+    # ComfyUI folder_paths, else a node-relative walk-up -- so the ledger lands
+    # under the SAME output/otr/episodes/<ep>/audio tree as portraits, the
+    # latest_ledger route, and every other _otr_paths consumer (no more
+    # Documents-vs-AppData split). Lazy import: _otr_paths is pure (no back-dep
+    # on this module), and importing at call time avoids any load-order risk.
+    from ._otr_paths import otr_audio_dir
+    return str(otr_audio_dir(ep))
 
 
 def _slugify(s: str, limit: int = 60) -> str:
