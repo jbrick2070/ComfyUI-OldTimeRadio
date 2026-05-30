@@ -80,6 +80,27 @@ try:
 except Exception as _hf_err:
     log.debug("[OldTimeRadio] HF_TOKEN bake-in skipped: %s", _hf_err)
 
+# 5. OTR output base pin (BUG-LOCAL-292) — resolve ONE canonical output root
+#    from ComfyUI's own folder_paths so every OTR writer lands under the same
+#    relative ``output/otr`` tree. Without this, a dual-install (Documents +
+#    AppData copies) made some nodes fall through to the install-specific
+#    ``__file__`` walk-up fallback in _otr_paths.comfy_output_dir(), splitting
+#    portraits/stills (AppData) from the video/obs output (Documents). Setting
+#    OTR_OUTPUT_DIR (tier 1) once here makes every comfy_output_dir() call —
+#    in either install copy — return the same ComfyUI output dir. Skipped when
+#    already set (honors explicit overrides + pytest monkeypatch) and when
+#    folder_paths is unavailable (CLI / pytest), so it is a no-op outside the
+#    ComfyUI process. Relative output/otr for everyone.
+if not os.environ.get("OTR_OUTPUT_DIR"):
+    try:
+        import folder_paths  # ComfyUI canonical output API (ready at node-load)
+        _otr_out = folder_paths.get_output_directory()
+        if _otr_out:
+            os.environ["OTR_OUTPUT_DIR"] = str(_otr_out)
+            log.info("[OldTimeRadio] OTR_OUTPUT_DIR pinned to ComfyUI output: %s", _otr_out)
+    except Exception as _out_err:
+        log.debug("[OldTimeRadio] OTR_OUTPUT_DIR pin skipped: %s", _out_err)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ISOLATED PER-NODE LOADING
 # If one node fails to import (e.g. missing transformers, parler_tts lib),
