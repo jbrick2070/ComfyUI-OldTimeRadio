@@ -53,7 +53,7 @@ def _serialized_slot_names(input_types: dict) -> list[str]:
     for bucket in ("required", "optional"):
         for name, spec in (input_types.get(bucket) or {}).items():
             t = spec[0] if isinstance(spec, (list, tuple)) and spec else spec
-            is_widget = isinstance(t, list) or (
+            is_widget = isinstance(t, (list, tuple)) or (
                 isinstance(t, str) and t.upper() in _WIDGET_TYPES
             )
             opts = (
@@ -190,7 +190,7 @@ def test_no_stale_dict_residue_in_widget_vector(
     for bucket in ("required", "optional"):
         for name, spec in (it.get(bucket) or {}).items():
             t = spec[0] if isinstance(spec, (list, tuple)) and spec else spec
-            is_widget = isinstance(t, list) or (
+            is_widget = isinstance(t, (list, tuple)) or (
                 isinstance(t, str) and t.upper() in _WIDGET_TYPES
             )
             opts = (

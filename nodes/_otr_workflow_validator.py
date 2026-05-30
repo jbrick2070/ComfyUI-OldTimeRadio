@@ -101,7 +101,7 @@ def _wv_type_of(spec: Any):
 
 def _wv_is_widget_backed(spec: Any) -> bool:
     t = _wv_type_of(spec)
-    if isinstance(t, list):  # COMBO (inline choices) is a widget
+    if isinstance(t, (list, tuple)):  # COMBO choices (list OR tuple form) is a widget
         return True
     return isinstance(t, str) and t.upper() in _WIDGET_TYPE_NAMES
 
@@ -231,30 +231,36 @@ class WorkflowValidator:
             _NCM,
             strict_unknown_types=strict_unknown_types,
         )
-        # S14.3 (BUG-LOCAL-293): widget-vector contract check. Advisory --
-        # warns on the BUG-210/253 realignment-drift class (a node's saved
-        # widgets_values length no longer matches its INPUT_TYPES serialized
-        # slot count, which makes ComfyUI map later widgets to wrong slots).
-        # Does NOT raise yet: the forceInput slot-count convention is still
-        # being reconciled (otr_api drops forceInput slots; the node-14
-        # MusicGenTheme + the audio-widget-vector tests currently disagree --
-        # this is the live BUG-281 question). validate_anyway already gates
-        # the whole node; once the convention is locked this is promoted to a
-        # hard raise.
+        # S14.3 (BUG-LOCAL-293): widget-vector contract check -- HARD GATE.
+        # Each OTR node's saved widgets_values length must equal its INPUT_TYPES
+        # serialized-slot count (forceInput slots dropped; INT seed/noise_seed
+        # control_after_generate companion added; sockets + COMBO list/tuple
+        # handled, per scripts/otr_api._serialized_slot_names). A mismatch is the
+        # BUG-210 (stale-slot shift) / BUG-253 (short-by-one) / BUG-281 (stale
+        # forceInput slot) realignment class -- ComfyUI maps later widgets to the
+        # WRONG slots, silently shipping a mis-configured render. We RAISE here so
+        # the run halts at queue time, before any model loads, naming the node.
+        # validate_anyway=False bypasses the whole node if an operator needs to
+        # run a deliberately-drifted workflow for diagnostics.
         drift = widget_vector_drift(workflow, _NCM)
-        for d in drift:
-            log.warning("OTR_WorkflowValidator: WIDGET-VECTOR DRIFT -- %s", d)
+        if drift:
+            for d in drift:
+                log.error("OTR_WorkflowValidator: WIDGET-VECTOR DRIFT -- %s", d)
+            raise ValueError(
+                "OTR_WorkflowValidator: widget-vector contract drift on "
+                f"{len(drift)} node(s) -- " + "; ".join(drift) + ". A node's "
+                "saved widgets_values length no longer matches its INPUT_TYPES "
+                "serialized-slot count; ComfyUI would positionally map later "
+                "widgets to the wrong slots. Fix the workflow JSON's node "
+                "widgets_values (or set validate_anyway=False to bypass)."
+            )
         n_nodes = len(workflow.get("nodes") or [])
         n_links = len(workflow.get("links") or [])
-        drift_str = (
-            f", widget_vector_drift={len(drift)} ({'; '.join(drift)})"
-            if drift else ", widget_vector_drift=0"
-        )
         msg = (
             f"OTR_WorkflowValidator: OK -- {n_nodes} nodes, {n_links} links, "
             f"strict_unknown_types={strict_unknown_types}, "
             f"path={workflow_json_path or str(_DEFAULT_WORKFLOW_PATH)!r}"
-            f"{drift_str}"
+            f", widget_vector_drift=0"
         )
         log.info(msg)
         return (msg,)
