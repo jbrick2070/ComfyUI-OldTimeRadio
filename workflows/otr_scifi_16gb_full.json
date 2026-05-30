@@ -1295,50 +1295,6 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            102
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoraLoaderModelOnly",
-        "cnr_id": "comfy-core"
-      },
-      "title": "LTX 2.3 distilled LoRA @ 0.5",
-      "widgets_values": [
-        "ltxv\\ltx2\\ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
-        0.5
-      ],
-      "color": "#1E3A5F",
-      "bgcolor": "#13253F"
-    },
-    {
-      "id": 61,
-      "type": "LoraLoaderModelOnly",
-      "pos": [
-        3700,
-        1810
-      ],
-      "size": [
-        400,
-        82
-      ],
-      "flags": {},
-      "order": 28,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 102
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
             103
           ],
           "shape": 3,
@@ -1349,10 +1305,10 @@
         "Node name for S&R": "LoraLoaderModelOnly",
         "cnr_id": "comfy-core"
       },
-      "title": "LTX 2.3 distilled LoRA @ 0.2",
+      "title": "LTX 2.3 distilled LoRA @ 0.7",
       "widgets_values": [
         "ltxv\\ltx2\\ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
-        0.2
+        0.7
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
@@ -2248,16 +2204,8 @@
       "MODEL"
     ],
     [
-      102,
-      60,
-      0,
-      61,
-      0,
-      "MODEL"
-    ],
-    [
       103,
-      61,
+      60,
       0,
       55,
       0,
@@ -2581,8 +2529,8 @@
     "info": {
       "name": "Old-Time Radio Sci-Fi Anthology",
       "author": "Jeffrey Brick",
-      "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine placeholders included.",
-      "version": "1.5.0"
+      "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine (FLUX -> HuMo -> LTX cascade).",
+      "version": "2.0-alpha"
     }
   },
   "version": 0.4
