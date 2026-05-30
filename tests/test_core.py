@@ -494,10 +494,9 @@ class TestAudioContract:
         assert 8000 <= audio["sample_rate"] <= 96000
 
     # Voice-path-cleanbreak 2026-05-12 (P3): test_sfx_generator and
-    # test_sfx_all_types were deleted. The legacy OTR_SFXGenerator node
-    # class is gone; the procedural SFX_GENERATORS dict survives as a
-    # library and feeds BatchProceduralSFX (exercised by
-    # tests/test_procsfx_ledger.py).
+    # test_sfx_all_types were deleted with the legacy OTR_SFXGenerator
+    # node class. The procedural SFX node + library were removed in the
+    # 2026-05-29 lean-down.
 
     def test_episode_assembler(self):
         from nodes.scene_sequencer import EpisodeAssembler

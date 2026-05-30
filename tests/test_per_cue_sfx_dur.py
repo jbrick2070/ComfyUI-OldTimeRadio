@@ -109,15 +109,12 @@ def test_g7_bounds_match_consumer_intersection():
     still exposes the canonical numeric values."""
     from nodes._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
     import nodes.batch_audiogen_generator as ag
-    import nodes.batch_procedural_sfx as proc
 
-    # The consumers' module-level constants MUST be the same objects
+    # The consumer's module-level constants MUST be the same objects
     # as the freeze module's. (Identity, not equality -- catches a
     # local-shadow refactor that would silently diverge.)
     assert ag.SFX_DUR_MIN_S is SFX_DUR_MIN_S
     assert ag.SFX_DUR_MAX_S is SFX_DUR_MAX_S
-    assert proc.SFX_DUR_MIN_S is SFX_DUR_MIN_S
-    assert proc.SFX_DUR_MAX_S is SFX_DUR_MAX_S
 
     # The numeric values themselves -- pinned for the canonical
     # cleanbreak intersection.
