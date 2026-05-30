@@ -191,8 +191,6 @@ _NODE_MODULES = {
     # portrait lookup hits instead of falling through to the env-still
     # tier 4 stopgap.
     "OTR_BatchFluxPortraitRender": (".visual.batch_flux_portrait_render", "BatchFluxPortraitRender", " Batch FLUX Portrait Render (per-cast)"),
-    # v2.0 MIT-original video-chain nodes (replace VideoHelperSuite-GPL deps)
-    "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
     # v2.0 read-only ledger/script adapter for multi-pass FLUX rendering
     # (legacy "Director" naming retired in voice-path-cleanbreak S23.9).
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
