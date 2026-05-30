@@ -109,9 +109,9 @@ def _resolve_captions_ass(source_mp4: Path) -> tuple[Optional[str], str]:
             return (None, f"ledger not found for {episode_id}")
     style = str(os.environ.get("OTR_CAPTION_STYLE", "sdh_standard")).strip() or "sdh_standard"
     try:
-        margin_v = int(os.environ.get("OTR_CAPTION_MARGIN_V", "70") or 70)
+        margin_v = int(os.environ.get("OTR_CAPTION_MARGIN_V", "90") or 90)
     except ValueError:
-        margin_v = 70
+        margin_v = 90
     out_path, report = build_ass_from_ledger(ledger, style=style, margin_v=margin_v)
     return (out_path, report)
 

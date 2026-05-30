@@ -71,7 +71,7 @@ STYLES = {
         "border_style": 3,         # opaque box (uses BackColour)
         "outline": 5,              # box padding -- MUST be >0 or libass draws no box
         "shadow": 0,
-        "margin_v": 70,
+        "margin_v": 90,            # P2 QA: clears bottom overscan + procgen waveform HUD
         "announcer_color": _ANNOUNCER_COLOR_BBGGRR,
     },
     # Themed variant for QA comparison only. Green CRT, thin outline (no box).

@@ -12,7 +12,8 @@ color-blind-safe and constantly legible. Audio never touched (`-c:a copy`).
   (same encode, no extra pass). ffmpeg build has `--enable-libass` (verified).
 - **Style `sdh_standard` (default):** Arial 52 px, **white** dialogue, opaque black box
   (`BorderStyle=3`, **Outline=5** -- must be >0 or libass draws no box; BackColour ~75%),
-  bottom-center, `MarginV=70`, max 2 lines.
+  bottom-center, `MarginV=90` (P2 QA: clears bottom overscan + procgen waveform HUD;
+  runtime-tunable via `OTR_CAPTION_MARGIN_V`), max 2 lines.
 - **Speaker label = color-blind-safe:** bold **white** `NAME:` (the label text + weight IS
   the cue). Color is a **subtle pastel outline only** (`\b1\bord1\3c<pastel>`), never the fill,
   never the differentiator. Dialogue + name fill stay white on the box at all times.
