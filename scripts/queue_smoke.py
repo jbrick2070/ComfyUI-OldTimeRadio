@@ -55,7 +55,7 @@ def main() -> int:
     # Patch by NAME -- robust against future widget reorders.
     patch_widget_by_name(wf, 1, "target_words", 30, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "act_count", 1, schemas)
+    patch_widget_by_name(wf, 1, "act_count", "1", schemas)
 
     api = workflow_to_api_prompt(wf, schemas)
     prompt_id = submit_prompt(api)
