@@ -118,6 +118,31 @@ def test_ass_filter_arg_returns_basename_and_parent():
     assert cwd.endswith("audio")
 
 
+# -- P4: caption widgets + node<->JSON widget-vector contract --------------
+
+def test_caption_widgets_present(node):
+    opt = node.INPUT_TYPES()["optional"]
+    assert "burn_captions" in opt and "caption_style" in opt
+    assert opt["burn_captions"][1]["default"] is False  # clean master default
+    assert "sdh_standard" in opt["caption_style"][0]
+
+
+def test_widget_vector_matches_workflow_json():
+    """Node 58 INPUT_TYPES slot count must equal its widgets_values length in
+    the canonical workflow JSON (the BUG-293 contract the validator enforces)."""
+    import json
+
+    from nodes.otr_post_upscale_procgen_blend import PostUpscaleProcgenBlend
+    from nodes._otr_workflow_validator import _expected_slot_count
+
+    expected = _expected_slot_count(PostUpscaleProcgenBlend.INPUT_TYPES())
+    wf = json.loads((_REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json")
+                    .read_text(encoding="utf-8"))
+    n58 = next(n for n in wf["nodes"] if n["id"] == 58)
+    assert n58["type"] == "OTR_PostUpscaleProcgenBlend"
+    assert len(n58["widgets_values"]) == expected == 11
+
+
 def test_default_blend_opacity_is_full_strength(node):
     """BUG-LOCAL-096 (2026-05-04 EVENING): default opacity bumped from
     0.5 to 1.0 so the procgen overlay shows at full intensity by

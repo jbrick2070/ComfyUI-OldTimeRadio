@@ -83,15 +83,15 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     return (p.name, str(p.parent))
 
 
-def _resolve_captions_ass(source_mp4: Path) -> tuple[Optional[str], str]:
+def _resolve_captions_ass(source_mp4: Path, style: str = "") -> tuple[Optional[str], str]:
     """Build the SDH .ass for this episode. Returns (ass_path, message).
 
     Best-effort: any failure returns (None, reason) and the caller proceeds
     with an un-captioned blend -- captions never block the deliverable.
-    Style/margin come from env: OTR_CAPTION_STYLE (default sdh_standard),
-    OTR_CAPTION_MARGIN_V (default 70). The episode id is the source stem;
-    the ledger is resolved via otr_audio_dir(), falling back to the in-flight
-    ledger singleton.
+    ``style`` is the caller-resolved preset (widget value, env-overridden);
+    empty falls back to sdh_standard. Margin comes from OTR_CAPTION_MARGIN_V
+    (default 90). The episode id is the source stem; the ledger is resolved
+    via otr_audio_dir(), falling back to the in-flight ledger singleton.
     """
     if build_ass_from_ledger is None:
         return (None, "caption builder unavailable (_otr_captions import failed)")
@@ -107,7 +107,7 @@ def _resolve_captions_ass(source_mp4: Path) -> tuple[Optional[str], str]:
             ledger = Path(alt)
         else:
             return (None, f"ledger not found for {episode_id}")
-    style = str(os.environ.get("OTR_CAPTION_STYLE", "sdh_standard")).strip() or "sdh_standard"
+    style = (style or "").strip() or "sdh_standard"
     try:
         margin_v = int(os.environ.get("OTR_CAPTION_MARGIN_V", "90") or 90)
     except ValueError:
@@ -140,6 +140,9 @@ def _resolve_captions_ass(source_mp4: Path) -> tuple[Optional[str], str]:
 _DEFAULT_BLEND_MODE = "screen"
 _DEFAULT_BLEND_OPACITY = 1.0
 _DEFAULT_GREEN_ONLY = True
+# SDH open-caption widgets (P4). Clean master is the default -> captions OFF.
+_CAPTION_STYLE_CHOICES = ["sdh_standard", "otr_crt"]
+_DEFAULT_CAPTION_STYLE = "sdh_standard"
 # BUG-LOCAL-103 (2026-05-04 LATE EVENING): pre-blend shadow crush.
 # Pixel inspection of a procgen mp4 dark region (signal_lost_echo_in_stasis
 # 0:22, 99% of frame is luminance < 32) showed the "black" background is
@@ -523,6 +526,30 @@ class PostUpscaleProcgenBlend:
                         "(0,255,0) collapses to (255,255,255)."
                     ),
                 }),
+                # SDH open captions (P4). APPENDED AT THE END per BUG-LOCAL-097
+                # (widgets_values is positional -- only ever append). These two
+                # are now the tail; do not insert anything after them without
+                # also extending the workflow JSON widgets_values + validator.
+                "burn_captions": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Burn SDH open captions into the final 1080p output. "
+                        "Default OFF = clean master. ON = accessible delivery: "
+                        "white dialogue on an opaque box, bold-white speaker "
+                        "labels with a subtle pastel outline (color is never the "
+                        "speaker cue -- color-blind safe), synced from the ledger "
+                        "line timing. Audio stays -c:a copy (byte-identical). "
+                        "Env OTR_BURN_CAPTIONS=1 also forces this on."
+                    ),
+                }),
+                "caption_style": (_CAPTION_STYLE_CHOICES, {
+                    "default": _DEFAULT_CAPTION_STYLE,
+                    "tooltip": (
+                        "Caption style preset. 'sdh_standard' (default): Arial, "
+                        "white-on-black-box, accessibility master. 'otr_crt': "
+                        "green-CRT themed variant. Env OTR_CAPTION_STYLE overrides."
+                    ),
+                }),
             },
         }
 
@@ -543,6 +570,8 @@ class PostUpscaleProcgenBlend:
         out_suffix: str = "_procgen_blended",
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
         green_only_overlay: bool = _DEFAULT_GREEN_ONLY,
+        burn_captions: bool = False,
+        caption_style: str = _DEFAULT_CAPTION_STYLE,
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
@@ -622,12 +651,15 @@ class PostUpscaleProcgenBlend:
                 "unavailable (%s); proceeding", _exc,
             )
 
-        # SDH open captions (P1): opt-in via OTR_BURN_CAPTIONS. Clean master is
-        # the default (captions OFF); delivery sets the env to burn captions.
-        # Best-effort -- a caption failure NEVER blocks the blend.
+        # SDH open captions (P4): enabled by the burn_captions widget OR the
+        # OTR_BURN_CAPTIONS env (env forces on for headless delivery). Clean
+        # master is the default (OFF). Style precedence: OTR_CAPTION_STYLE env
+        # overrides the caption_style widget. Best-effort -- a caption failure
+        # NEVER blocks the blend.
         captions_ass_path = None
-        if _env_truthy("OTR_BURN_CAPTIONS"):
-            captions_ass_path, cap_msg = _resolve_captions_ass(src)
+        if bool(burn_captions) or _env_truthy("OTR_BURN_CAPTIONS"):
+            style = str(os.environ.get("OTR_CAPTION_STYLE", "") or caption_style).strip()
+            captions_ass_path, cap_msg = _resolve_captions_ass(src, style=style)
             log.info("[PostUpscaleProcgenBlend] captions: %s", cap_msg)
             report_lines.append(f"captions: {cap_msg}")
 

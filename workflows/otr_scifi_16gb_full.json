@@ -1555,7 +1555,9 @@
         false,
         "_procgen_blended",
         18,
-        true
+        true,
+        false,
+        "sdh_standard"
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
