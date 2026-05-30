@@ -160,7 +160,6 @@ _NODE_MODULES = {
     # in the same commit (Prime Directive 2: never double-load
     # Mistral-Nemo on the 16 GB card).
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
-    "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
     "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
     # Sprint H §3.7 topology gate (Jeffrey 2026-05-17): forces
     # LTXAVTextEncoderLoader's downstream consumer to wait for

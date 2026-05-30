@@ -30,8 +30,7 @@ Design notes:
       when the downstream SaveImage asks for the IMAGE.
     - Accepts an optional "also_unload_llm_polish" flag so the
       visual-prompt polish LLM (Mistral-Nemo) is released in the
-      same pass, matching checkpoint_loader_gated.py's pattern in
-      reverse.
+      same pass (the gated visual-loader acquire pattern, in reverse).
     - Never raises: a failed empty_cache should NOT kill the graph
       (the image is already decoded and on its way to disk).
 
