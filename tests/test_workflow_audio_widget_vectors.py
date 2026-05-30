@@ -34,6 +34,42 @@ def _find_node(wf: dict, node_type: str) -> dict | None:
     return None
 
 
+_WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
+_COMPANION_INT_WIDGETS = ("seed", "noise_seed")
+
+
+def _serialized_slot_names(input_types: dict) -> list[str]:
+    """Ordered names of the widget slots that actually occupy widgets_values,
+    matching ComfyUI's serialization (and scripts/otr_api._serialized_slot_names
+    + nodes/_otr_workflow_validator): socket (non-widget) inputs excluded,
+    forceInput widgets dropped (they become socket-only, no slot), and an INT
+    seed/noise_seed widget gains a hidden control_after_generate companion slot.
+
+    Pre-S14.3 these tests used a naive ``required + optional`` key count, which
+    overcounts a forceInput widget (e.g. node 14 OTR_MusicGenTheme's
+    ``script_json``) -- the BUG-281 drift. This helper is the correct count.
+    """
+    names: list[str] = []
+    for bucket in ("required", "optional"):
+        for name, spec in (input_types.get(bucket) or {}).items():
+            t = spec[0] if isinstance(spec, (list, tuple)) and spec else spec
+            is_widget = isinstance(t, list) or (
+                isinstance(t, str) and t.upper() in _WIDGET_TYPES
+            )
+            opts = (
+                spec[1]
+                if isinstance(spec, (list, tuple)) and len(spec) > 1
+                and isinstance(spec[1], dict)
+                else {}
+            )
+            if not is_widget or opts.get("forceInput"):
+                continue
+            names.append(name)
+            if isinstance(t, str) and t.upper() == "INT" and name in _COMPANION_INT_WIDGETS:
+                names.append(f"{name}__control_after_generate")
+    return names
+
+
 # -------------------------------------------------------------------
 # AudioGen
 # -------------------------------------------------------------------
@@ -46,10 +82,7 @@ def test_audiogen_widget_vector_length_matches_input_types():
     production_plan_json input; this test catches that drift."""
     from nodes.batch_audiogen_generator import BatchAudioGenGenerator
     it = BatchAudioGenGenerator.INPUT_TYPES()
-    expected_slots = (
-        list((it.get("required") or {}).keys())
-        + list((it.get("optional") or {}).keys())
-    )
+    expected_slots = _serialized_slot_names(it)
     wf = _load_workflow()
     node = _find_node(wf, "OTR_BatchAudioGenGenerator")
     assert node is not None, (
@@ -71,10 +104,7 @@ def test_audiogen_allow_silence_fallback_pinned_false():
     ImportError (S17.2 strict-default contract)."""
     from nodes.batch_audiogen_generator import BatchAudioGenGenerator
     it = BatchAudioGenGenerator.INPUT_TYPES()
-    expected_slots = (
-        list((it.get("required") or {}).keys())
-        + list((it.get("optional") or {}).keys())
-    )
+    expected_slots = _serialized_slot_names(it)
     idx = expected_slots.index("allow_silence_fallback")
     wf = _load_workflow()
     node = _find_node(wf, "OTR_BatchAudioGenGenerator")
@@ -97,10 +127,7 @@ def test_musicgen_widget_vector_length_matches_input_types():
     declared widget slot count."""
     from nodes.musicgen_theme import MusicGenTheme
     it = MusicGenTheme.INPUT_TYPES()
-    expected_slots = (
-        list((it.get("required") or {}).keys())
-        + list((it.get("optional") or {}).keys())
-    )
+    expected_slots = _serialized_slot_names(it)
     wf = _load_workflow()
     node = _find_node(wf, "OTR_MusicGenTheme")
     assert node is not None, (
@@ -118,10 +145,7 @@ def test_musicgen_allow_silence_fallback_pinned_false():
     """Same strict-default pin for MusicGen (C3 / S24)."""
     from nodes.musicgen_theme import MusicGenTheme
     it = MusicGenTheme.INPUT_TYPES()
-    expected_slots = (
-        list((it.get("required") or {}).keys())
-        + list((it.get("optional") or {}).keys())
-    )
+    expected_slots = _serialized_slot_names(it)
     idx = expected_slots.index("allow_silence_fallback")
     wf = _load_workflow()
     node = _find_node(wf, "OTR_MusicGenTheme")
@@ -165,7 +189,21 @@ def test_no_stale_dict_residue_in_widget_vector(
     decl = []
     for bucket in ("required", "optional"):
         for name, spec in (it.get(bucket) or {}).items():
+            t = spec[0] if isinstance(spec, (list, tuple)) and spec else spec
+            is_widget = isinstance(t, list) or (
+                isinstance(t, str) and t.upper() in _WIDGET_TYPES
+            )
+            opts = (
+                spec[1]
+                if isinstance(spec, (list, tuple)) and len(spec) > 1
+                and isinstance(spec[1], dict)
+                else {}
+            )
+            if not is_widget or opts.get("forceInput"):
+                continue  # socket-only / forceInput inputs occupy no slot
             decl.append((name, spec))
+            if isinstance(t, str) and t.upper() == "INT" and name in _COMPANION_INT_WIDGETS:
+                decl.append((f"{name}__control_after_generate", ("STRING", {})))
     wf = _load_workflow()
     node = _find_node(wf, node_type)
     wv = node.get("widgets_values") or []
@@ -230,10 +268,7 @@ def test_pre_cleanbreak_widget_vector_with_stale_empty_dict_fails():
     """
     from nodes.batch_audiogen_generator import BatchAudioGenGenerator
     it = BatchAudioGenGenerator.INPUT_TYPES()
-    expected_slots = (
-        list((it.get("required") or {}).keys())
-        + list((it.get("optional") or {}).keys())
-    )
+    expected_slots = _serialized_slot_names(it)
 
     # The exact pre-C3 vector that shipped BUG-LOCAL-210. Length 7.
     pre_cleanbreak_vector = [
