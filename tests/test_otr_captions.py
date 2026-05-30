@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_CAP = _REPO_ROOT / "scripts" / "otr_captions.py"
+_CAP = _REPO_ROOT / "nodes" / "_otr_captions.py"
 
 spec = importlib.util.spec_from_file_location("otr_captions", _CAP)
 cap = importlib.util.module_from_spec(spec)

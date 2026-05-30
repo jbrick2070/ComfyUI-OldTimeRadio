@@ -55,9 +55,65 @@ _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
 
-from _otr_paths import otr_obs_dir  # noqa: E402
+from _otr_paths import otr_audio_dir, otr_obs_dir  # noqa: E402
+
+try:
+    from _otr_captions import build_ass_from_ledger  # noqa: E402
+except Exception:  # pragma: no cover -- captions optional; never block a render
+    build_ass_from_ledger = None  # type: ignore
 
 log = logging.getLogger(__name__)
+
+
+def _env_truthy(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
+    """Return (filter_basename, cwd) for the ffmpeg ``ass=`` filter.
+
+    Windows drive-letter colons cannot be reliably escaped inside an ffmpeg
+    filtergraph (``ass=C\\:/...`` fails to parse). The robust cross-platform
+    trick is to reference the subtitle file by BASENAME only and run ffmpeg
+    with its working directory set to the file's folder -- no colon, no
+    separators, nothing the filtergraph parser can choke on. Input/output mp4
+    paths stay absolute (they are command args, not filtergraph tokens).
+    """
+    p = Path(ass_path)
+    return (p.name, str(p.parent))
+
+
+def _resolve_captions_ass(source_mp4: Path) -> tuple[Optional[str], str]:
+    """Build the SDH .ass for this episode. Returns (ass_path, message).
+
+    Best-effort: any failure returns (None, reason) and the caller proceeds
+    with an un-captioned blend -- captions never block the deliverable.
+    Style/margin come from env: OTR_CAPTION_STYLE (default sdh_standard),
+    OTR_CAPTION_MARGIN_V (default 70). The episode id is the source stem;
+    the ledger is resolved via otr_audio_dir(), falling back to the in-flight
+    ledger singleton.
+    """
+    if build_ass_from_ledger is None:
+        return (None, "caption builder unavailable (_otr_captions import failed)")
+    episode_id = source_mp4.stem
+    ledger = otr_audio_dir(episode_id) / f"{episode_id}_ledger.json"
+    if not ledger.is_file():
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+        except ImportError:  # pragma: no cover
+            import _otr_ledger as _OTRL  # type: ignore
+        alt = _OTRL.in_flight_ledger_path()
+        if alt is not None and Path(alt).is_file():
+            ledger = Path(alt)
+        else:
+            return (None, f"ledger not found for {episode_id}")
+    style = str(os.environ.get("OTR_CAPTION_STYLE", "sdh_standard")).strip() or "sdh_standard"
+    try:
+        margin_v = int(os.environ.get("OTR_CAPTION_MARGIN_V", "70") or 70)
+    except ValueError:
+        margin_v = 70
+    out_path, report = build_ass_from_ledger(ledger, style=style, margin_v=margin_v)
+    return (out_path, report)
 
 # BUG-LOCAL-096 (2026-05-04 EVENING): default bumped from "lighten"
 # at 0.5 to "screen" at 1.0 to bring procgen colors at full intensity.
@@ -213,6 +269,7 @@ def _build_blend_cmd(
     ffmpeg: str,
     shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
     green_only_overlay: bool = False,
+    captions_ass_path: Optional[str] = None,
 ) -> list[str]:
     """Build the ffmpeg command for procgen-over-source blend.
 
@@ -300,13 +357,21 @@ def _build_blend_cmd(
         main_format_step = ""
         main_input_label = "[0:v]"
         post_blend_format = ""
+    # SDH open-caption burn (P1): when an .ass path is provided, route the
+    # blend output through an intermediate label and burn captions with the
+    # libass ``ass`` filter at native 1080p. Pure video op -- audio is still
+    # mapped via ``-c:a copy`` below, so C7 byte-identity is untouched.
+    blend_label = "[vpre]" if captions_ass_path else "[v]"
     filter_complex = (
         f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
         f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}{green_only_step}[pgn];"
         f"{main_format_step}"
         f"{main_input_label}[pgn]blend=all_mode={blend_mode}:"
-        f"all_opacity={blend_opacity:.3f}:shortest=1{post_blend_format}[v]"
+        f"all_opacity={blend_opacity:.3f}:shortest=1{post_blend_format}{blend_label}"
     )
+    if captions_ass_path:
+        ass_name, _ass_cwd = _ass_filter_arg(captions_ass_path)
+        filter_complex += f";[vpre]ass={ass_name}[v]"
     # BUG-LOCAL-030 C7 hardening (2026-05-03 EVENING, post-round-robin
     # Gemini catch): NO ``-shortest`` flag here. ffmpeg ``-shortest`` on
     # an A/V mux stops writing the audio stream as soon as the SHORTEST
@@ -557,15 +622,30 @@ class PostUpscaleProcgenBlend:
                 "unavailable (%s); proceeding", _exc,
             )
 
+        # SDH open captions (P1): opt-in via OTR_BURN_CAPTIONS. Clean master is
+        # the default (captions OFF); delivery sets the env to burn captions.
+        # Best-effort -- a caption failure NEVER blocks the blend.
+        captions_ass_path = None
+        if _env_truthy("OTR_BURN_CAPTIONS"):
+            captions_ass_path, cap_msg = _resolve_captions_ass(src)
+            log.info("[PostUpscaleProcgenBlend] captions: %s", cap_msg)
+            report_lines.append(f"captions: {cap_msg}")
+
         cmd = _build_blend_cmd(
             source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,
             blend_mode=blend_mode, blend_opacity=float(blend_opacity),
             ffmpeg=ffmpeg,
             shadow_crush_threshold=int(shadow_crush_threshold),
             green_only_overlay=bool(green_only_overlay),
+            captions_ass_path=captions_ass_path,
         )
+        # Run with cwd = the .ass folder so the libass filter resolves the
+        # subtitle by basename (sidesteps Windows drive-colon filtergraph
+        # escaping). All input/output paths in cmd are absolute.
+        run_cwd = str(Path(captions_ass_path).parent) if captions_ass_path else None
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           cwd=run_cwd)
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
             msg = (

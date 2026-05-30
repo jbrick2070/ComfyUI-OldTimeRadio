@@ -76,6 +76,48 @@ def test_returns_two_strings(node):
     assert node.OUTPUT_NODE is True
 
 
+# -- P1: SDH caption burn wiring -------------------------------------------
+
+def test_build_cmd_no_captions_is_unchanged():
+    from nodes.otr_post_upscale_procgen_blend import _build_blend_cmd
+
+    cmd = _build_blend_cmd(
+        source_mp4=Path("s.mp4"), procgen_mp4=Path("p.mp4"),
+        out_mp4=Path("o.mp4"), blend_mode="screen", blend_opacity=1.0,
+        ffmpeg="ffmpeg",
+    )
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    assert fc.endswith("[v]")
+    assert "ass=" not in fc            # no caption step when not requested
+    assert "-c:a" in cmd and cmd[cmd.index("-c:a") + 1] == "copy"
+
+
+def test_build_cmd_with_captions_appends_ass_by_basename():
+    from nodes.otr_post_upscale_procgen_blend import _build_blend_cmd
+
+    cmd = _build_blend_cmd(
+        source_mp4=Path("s.mp4"), procgen_mp4=Path("p.mp4"),
+        out_mp4=Path("o.mp4"), blend_mode="screen", blend_opacity=1.0,
+        ffmpeg="ffmpeg",
+        captions_ass_path=r"C:\Users\x\ep\audio\ep_captions.ass",
+    )
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    # blend routes through [vpre]; ass burns by BASENAME (no drive colon, no path)
+    assert "[vpre]" in fc
+    assert ";[vpre]ass=ep_captions.ass[v]" in fc
+    assert "C:" not in fc and "/" not in fc.split("ass=")[1]
+    # audio still copied -- C7 untouched
+    assert cmd[cmd.index("-c:a") + 1] == "copy"
+
+
+def test_ass_filter_arg_returns_basename_and_parent():
+    from nodes.otr_post_upscale_procgen_blend import _ass_filter_arg
+
+    name, cwd = _ass_filter_arg(r"C:\Users\x\ep\audio\ep_captions.ass")
+    assert name == "ep_captions.ass"
+    assert cwd.endswith("audio")
+
+
 def test_default_blend_opacity_is_full_strength(node):
     """BUG-LOCAL-096 (2026-05-04 EVENING): default opacity bumped from
     0.5 to 1.0 so the procgen overlay shows at full intensity by
