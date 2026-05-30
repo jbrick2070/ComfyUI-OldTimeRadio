@@ -158,3 +158,9 @@ config/news_history.json
 outputs_scratch/
 outputs_scratch_*/
 
+# --- 2026-05-30 temp git-diff dump hygiene ---
+# Raw `git diff` captures (e.g. docs/s28_diff_tmp.txt, 3.9 MB) were committed
+# by accident. Ignore the pattern so sprint diff dumps never re-enter.
+*_diff_tmp.txt
+docs/*_tmp.txt
+
