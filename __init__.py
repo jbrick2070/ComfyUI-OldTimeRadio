@@ -274,12 +274,6 @@ _NODE_MODULES = {
     # with the SIGNAL LOST CRT signature (audio-reactive scanlines +
     # flicker over the otherwise-static black surround).
     "OTR_PostUpscaleProcgenBlend": (".nodes.otr_post_upscale_procgen_blend", "PostUpscaleProcgenBlend", " Post-Upscale Procgen Blend (1080p)"),
-    # BUG-LOCAL-031 QA tee (2026-05-03 EVENING). Per-stage video copy
-    # so smoke workflows can preserve the output of every pipeline
-    # node before the next node potentially clobbers the canonical
-    # filename. Pure side-effect; passes the upstream path through
-    # unchanged so production wiring is not affected.
-    "OTR_SaveCopy": (".nodes.otr_save_copy", "SaveCopy", " Save Copy (per-stage QA tee)"),
 
 
 }
