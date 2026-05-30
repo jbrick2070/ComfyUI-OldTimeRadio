@@ -155,6 +155,51 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
         steps_failed.append(f"import comfy.model_management ({exc})")
         mm = None
     if mm is not None:
+        # 3a: BUG-LOCAL-291 -- detach still-tracked patchers BEFORE the
+        # registry clear. ``unload_all_models()`` clears the model-
+        # management registry but, on its own, does not guarantee the
+        # underlying ModelPatcher weights leave the GPU when another
+        # strong reference survives (e.g. the ComfyUI executor's cached
+        # node outputs). Walking ``current_loaded_models`` and calling
+        # ``detach(unpatch_all=True)`` mutates the SHARED patcher object,
+        # which moves its weights to the offload device even though the
+        # Python wrapper stays alive elsewhere. This is the same
+        # mechanism the FLUX portrait node's EXIT eviction uses; doing
+        # it here too means the HuMoTierLoader call site (and any smoke
+        # workflow without the portrait node) gets the same reclaim.
+        # Best-effort per-patcher; a failure on one never blocks the
+        # rest or the unload_all_models() below.
+        try:
+            _tracked = list(getattr(mm, "current_loaded_models", None) or [])
+        except Exception:  # noqa: BLE001
+            _tracked = []
+        _detached = 0
+        for _lm in _tracked:
+            # current_loaded_models holds LoadedModel wrappers; the
+            # ModelPatcher is on .model (fall back to the entry itself).
+            _patcher = getattr(_lm, "model", _lm)
+            try:
+                _detach = getattr(_patcher, "detach", None)
+                if callable(_detach):
+                    try:
+                        _detach(unpatch_all=True)
+                    except TypeError:
+                        _detach()  # older signature: no kwargs
+                    _detached += 1
+                    continue
+            except Exception:  # noqa: BLE001
+                pass
+            # Fallback: move the underlying nn.Module weights to CPU.
+            try:
+                _inner = getattr(_patcher, "model", None)
+                if _inner is not None and hasattr(_inner, "to"):
+                    _inner.to("cpu")
+                    _detached += 1
+            except Exception:  # noqa: BLE001
+                pass
+        if _detached:
+            steps_run.append(f"detach_patchers({_detached})")
+
         try:
             mm.unload_all_models()
             steps_run.append("unload_all_models")

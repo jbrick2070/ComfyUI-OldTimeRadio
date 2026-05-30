@@ -672,8 +672,155 @@ class BatchFluxPortraitRender:
         else:
             out_batch = torch.zeros((1, height, width, 3), dtype=torch.float32)
 
+        # Capture the rendered count BEFORE the EXIT eviction clears the
+        # list (the eviction drops rendered_imgs to free GPU refs, so the
+        # done-report line below must read a snapshot, not len() after).
+        _rendered_count = len(rendered_imgs)
+
+        # ---- BUG-LOCAL-291 fix (2026-05-30): EXIT eviction of FLUX ----
+        # Root cause of the HuMo Phase C thrash: this node pinned the
+        # FLUX MODEL via load_models_gpu([model]) on ENTRY (BUG-LOCAL-231
+        # Option B) but never released it on EXIT. The FLUX->HuMo path
+        # is FLUX-portrait -> OTR_UnloadAll -> OTR_BatchHumoRender. The
+        # downstream UnloadAll runs mm.unload_all_models(), which clears
+        # ComfyUI's model-management REGISTRY (so the Phase-C probe logs
+        # "comfy-tracked models=0") but does NOT drop the strong Python
+        # references the ComfyUI executor keeps to the FLUX checkpoint
+        # loader's cached (model, clip, vae) outputs. Because those
+        # ModelPatcher objects stay referenced, gc.collect() cannot
+        # collect them and torch.cuda.empty_cache() cannot reclaim their
+        # weight tensors -- so ~14.7 GB of FLUX weights stayed allocated
+        # into HuMo Phase C (allocated=14689 MB, free=0 MB), starving
+        # HuMo-1.7B + WanVAE + WanTE + Whisper and forcing the sampler
+        # to thrash shared memory (~193 s/it vs ~12-14 s/it healthy).
+        #
+        # The FLUX->HuMo transition is NOT an LLM phase boundary, so a
+        # full model eviction here is correct and desired (CLAUDE.md
+        # Prime Directive 2 forbids force_vram_offload only BETWEEN LLM
+        # phases; FLUX-portrait is the LAST consumer of the FLUX
+        # checkpoint before the video branch). This node touches only
+        # FLUX MODEL/CLIP/VAE weights -- no audio data -- so the audio
+        # path stays byte-identical (Prime Directive 1).
+        #
+        # The fix mutates the SHARED ModelPatcher objects this node was
+        # handed (model / clip / vae). Those are the exact objects the
+        # executor still caches, so detaching them / moving their
+        # weights to the offload device frees the CUDA allocation even
+        # though the Python wrappers stay alive in the cache. This is
+        # the source fix UnloadAll's own telemetry comment predicted
+        # (visual/unload_all.py "FLUX survived as a user-managed
+        # CheckpointLoaderSimple patcher ... needs explicit MODEL/CLIP/
+        # VAE patcher dereference before this chain").
+        try:
+            import comfy.model_management as _mm  # type: ignore
+            import gc as _gc
+
+            _before_alloc_mb = float("nan")
+            _after_alloc_mb = float("nan")
+            try:
+                if torch.cuda.is_available():
+                    _before_alloc_mb = torch.cuda.memory_allocated() / (1024 ** 2)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # 1. Move the returned IMAGE batch to CPU so the tensor that
+            #    flows out the socket (and through UnloadAll into HuMo's
+            #    flux_done_gate) does not itself pin GPU bytes.
+            try:
+                if hasattr(out_batch, "detach") and getattr(
+                    out_batch, "is_cuda", False
+                ):
+                    out_batch = out_batch.detach().to("cpu", copy=False)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # 2. Clear the model-management registry first (mirrors the
+            #    ENTRY nuclear eviction; pairs with gc + empty_cache per
+            #    the BUG-07.03 invariant).
+            try:
+                _mm.unload_all_models()
+            except Exception:  # noqa: BLE001
+                pass
+
+            # 3. Explicitly dereference the FLUX patchers we were handed.
+            #    detach(unpatch_all=True) is the canonical ModelPatcher
+            #    teardown (unpatches LoRAs and moves weights to the
+            #    offload/CPU device). Guarded by hasattr so an older or
+            #    newer Comfy that renames the method falls through to a
+            #    raw weights-to-CPU move. We do this on the SHARED
+            #    objects, which is why it reaches the executor-cached
+            #    references that unload_all_models alone cannot.
+            def _evict_patcher(_p):
+                if _p is None:
+                    return
+                try:
+                    _detach = getattr(_p, "detach", None)
+                    if callable(_detach):
+                        try:
+                            _detach(unpatch_all=True)
+                        except TypeError:
+                            # Older signature: detach() with no kwargs.
+                            _detach()
+                        return
+                except Exception:  # noqa: BLE001
+                    pass
+                # Fallback: move the underlying nn.Module weights to CPU.
+                try:
+                    _inner = getattr(_p, "model", None)
+                    if _inner is not None and hasattr(_inner, "to"):
+                        _inner.to("cpu")
+                except Exception:  # noqa: BLE001
+                    pass
+
+            for _p in (model, clip, vae):
+                _evict_patcher(_p)
+
+            # 4. Drop this node's own local strong refs to the rendered
+            #    GPU tensors before the collect so the allocator coalesce
+            #    sees freed pages.
+            try:
+                rendered_imgs.clear()
+            except Exception:  # noqa: BLE001
+                pass
+
+            # 5. gc + full CUDA allocator flush so the freed weight pages
+            #    actually return to the driver and the Phase-C probe
+            #    inside HuMo reflects the drop.
+            try:
+                _gc.collect()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                _mm.soft_empty_cache(force=True)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()  # no-op on Windows; harmless
+                    _after_alloc_mb = torch.cuda.memory_allocated() / (1024 ** 2)
+            except Exception:  # noqa: BLE001
+                pass
+
+            log.info(
+                "[OTR_BatchFluxPortraitRender] EXIT eviction (BUG-LOCAL-291): "
+                "FLUX MODEL/CLIP/VAE detached + cache flushed; "
+                "allocated %.0f -> %.0f MB",
+                _before_alloc_mb, _after_alloc_mb,
+            )
+            report_lines.append(
+                f"OTR_BatchFluxPortraitRender: EXIT eviction (BUG-LOCAL-291) "
+                f"allocated {_before_alloc_mb:.0f} -> {_after_alloc_mb:.0f} MB"
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[OTR_BatchFluxPortraitRender] EXIT eviction failed "
+                "(non-fatal): %s", exc,
+            )
+
         report_lines.append(
-            f"OTR_BatchFluxPortraitRender done | rendered={len(rendered_imgs)}/"
+            f"OTR_BatchFluxPortraitRender done | rendered={_rendered_count}/"
             f"{len(cast)} | out_dir={portraits_dir}"
         )
         return (out_batch, "\n".join(report_lines), str(portraits_dir))
