@@ -51,6 +51,19 @@ committed on `v2.0-alpha`.** Only operator-gated validation remains.
 4. Decide `OTR_NAME_CROSS_GENDER_RATE` lane (default strict 0.0 in place).
 5. Decide the untracked `docs/2026-05-30-cast-*` consult docs (commit or drop).
 
+## Live log monitoring (during operator runs)
+`scripts/otr_tail_logs.py` tails both logs + queries the ComfyUI history/queue API.
+Run with the venv python (NOT type/tail — the logs sit under OneDrive-virtualized
+paths cmd can't read, and `tail` doesn't exist on Windows):
+
+    C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_tail_logs.py --lines 40
+
+Logs: `C:\Users\jeffr\AppData\Roaming\ComfyUI\logs\comfyui.log` (s/it, VRAM, FFmpeg)
+and `…\ComfyUI-OldTimeRadio\otr_runtime.log` (OTR phases). The script forces UTF-8
+on BOTH the read AND stdout (the logs carry box/emoji chars that crash cp1252). An
+`[error]` on an advancing `NN%|…| s/it` line is ComfyUI's stderr progress bar —
+NORMAL, not a failure. Re-run every ~2 min until `/history` shows `completed`.
+
 ## Open questions
 - `OTR_NAME_CROSS_GENDER_RATE`: strict (0.0, in place) vs LLM-owns-intent (>0).
 - Bug Bible regression RAN against the OTR pack (operator-uploaded
