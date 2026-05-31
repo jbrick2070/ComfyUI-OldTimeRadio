@@ -8,8 +8,8 @@
       "id": 63,
       "type": "OTR_WorkflowValidator",
       "pos": [
-        50,
-        2100
+        80.0,
+        470.0
       ],
       "size": [
         400,
@@ -42,8 +42,8 @@
       "id": 1,
       "type": "OTR_LedgerScriptWriter",
       "pos": [
-        50,
-        200
+        80.0,
+        80.0
       ],
       "size": [
         400,
@@ -127,8 +127,8 @@
       "id": 3,
       "type": "OTR_SceneSequencer",
       "pos": [
-        950,
-        200
+        1740.0,
+        80.0
       ],
       "size": [
         400,
@@ -199,8 +199,8 @@
       "id": 4,
       "type": "OTR_AudioEnhance",
       "pos": [
-        1950,
-        200
+        2280.0,
+        80.0
       ],
       "size": [
         380,
@@ -246,8 +246,8 @@
       "id": 7,
       "type": "OTR_EpisodeAssembler",
       "pos": [
-        1450,
-        200
+        2800.0,
+        80.0
       ],
       "size": [
         420,
@@ -322,8 +322,8 @@
       "id": 11,
       "type": "OTR_BatchBarkGenerator",
       "pos": [
-        480,
-        600
+        1140.0,
+        80.0
       ],
       "size": [
         400,
@@ -374,8 +374,8 @@
       "id": 12,
       "type": "OTR_SignalLostVideo",
       "pos": [
-        2450,
-        200
+        3360.0,
+        80.0
       ],
       "size": [
         400,
@@ -441,8 +441,8 @@
       "id": 13,
       "type": "OTR_KokoroAnnouncer",
       "pos": [
-        480,
-        950
+        1140.0,
+        810.0
       ],
       "size": [
         360,
@@ -500,8 +500,8 @@
       "id": 14,
       "type": "OTR_MusicGenTheme",
       "pos": [
-        950,
-        600
+        1140.0,
+        350.0
       ],
       "size": [
         380,
@@ -568,8 +568,8 @@
       "id": 15,
       "type": "OTR_BatchAudioGenGenerator",
       "pos": [
-        480,
-        800
+        1140.0,
+        580.0
       ],
       "size": [
         400,
@@ -623,8 +623,8 @@
       "id": 20,
       "type": "OTR_VideoPlan",
       "pos": [
-        100,
-        1200
+        1140.0,
+        1010.0
       ],
       "size": [
         460,
@@ -708,8 +708,8 @@
       "id": 21,
       "type": "OTR_FixedShotDurationStub",
       "pos": [
-        600,
-        1200
+        1740.0,
+        450.0
       ],
       "size": [
         380,
@@ -777,8 +777,8 @@
       "id": 22,
       "type": "OTR_DeferredCheckpointLoader",
       "pos": [
-        1020,
-        1200
+        3360.0,
+        430.0
       ],
       "size": [
         340,
@@ -835,8 +835,8 @@
       "id": 23,
       "type": "OTR_BatchFluxRender",
       "pos": [
-        1400,
-        1200
+        4380.0,
+        80.0
       ],
       "size": [
         420,
@@ -920,8 +920,8 @@
       "id": 24,
       "type": "OTR_UnloadAll",
       "pos": [
-        1860,
-        1200
+        5480.0,
+        80.0
       ],
       "size": [
         280,
@@ -973,8 +973,8 @@
       "id": 25,
       "type": "OTR_SaveToEpisodeWorkspace",
       "pos": [
-        2180,
-        1200
+        4940.0,
+        80.0
       ],
       "size": [
         320,
@@ -1004,8 +1004,8 @@
       "id": 51,
       "type": "OTR_BatchHumoRender",
       "pos": [
-        2660,
-        200
+        6480.0,
+        80.0
       ],
       "size": [
         480,
@@ -1137,8 +1137,8 @@
       "id": 52,
       "type": "OTR_VideoComposite",
       "pos": [
-        3160,
-        200
+        8720.0,
+        80.0
       ],
       "size": [
         480,
@@ -1219,8 +1219,8 @@
       "id": 54,
       "type": "LowVRAMCheckpointLoader",
       "pos": [
-        3500,
-        1700
+        7100.0,
+        80.0
       ],
       "size": [
         380,
@@ -1273,8 +1273,8 @@
       "id": 60,
       "type": "LoraLoaderModelOnly",
       "pos": [
-        3700,
-        1700
+        7620.0,
+        80.0
       ],
       "size": [
         400,
@@ -1317,8 +1317,8 @@
       "id": 55,
       "type": "OTR_BatchLTXRender",
       "pos": [
-        3920,
-        1700
+        8160.0,
+        80.0
       ],
       "size": [
         420,
@@ -1400,8 +1400,8 @@
       "id": 56,
       "type": "OTR_RTXUpscale",
       "pos": [
-        4400,
-        1100
+        9340.0,
+        80.0
       ],
       "size": [
         380,
@@ -1456,8 +1456,8 @@
       "id": 57,
       "type": "OTR_DeferredLtxTextEncoderLoader",
       "pos": [
-        3500,
-        1850
+        5900.0,
+        510.0
       ],
       "size": [
         400,
@@ -1498,8 +1498,8 @@
       "id": 58,
       "type": "OTR_PostUpscaleProcgenBlend",
       "pos": [
-        4900,
-        1100
+        9860.0,
+        80.0
       ],
       "size": [
         420,
@@ -1566,8 +1566,8 @@
       "id": 59,
       "type": "OTR_BatchFluxPortraitRender",
       "pos": [
-        1700,
-        1500
+        4940.0,
+        430.0
       ],
       "size": [
         400,
@@ -1655,8 +1655,8 @@
       "id": 62,
       "type": "OTR_LedgerFreezeCascade",
       "pos": [
-        50,
-        -180
+        620.0,
+        80.0
       ],
       "size": [
         380,
@@ -1760,8 +1760,8 @@
       "id": 70,
       "type": "OTR_LtxBranchGate",
       "pos": [
-        3710,
-        1715
+        6480.0,
+        610.0
       ],
       "size": [
         320,
@@ -1803,8 +1803,8 @@
       "id": 71,
       "type": "OTR_FluxBranchGate",
       "pos": [
-        1145,
-        1000
+        3900.0,
+        80.0
       ],
       "size": [
         340,
@@ -1880,8 +1880,8 @@
       "id": 72,
       "type": "OTR_HuMoTierLoader",
       "pos": [
-        2180,
-        200
+        5900.0,
+        80.0
       ],
       "size": [
         440,
