@@ -94,7 +94,7 @@ _DEFAULT_AUDIO_ENCODER = "whisper_large_v3_fp16.safetensors"
 _DEFAULT_DISTILL_LORA = "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"
 
 # ModelSamplingSD3 shift -- 8 for the Wan 2.1 HuMo stack on every tier
-# (matches workflows/humo_smoke_1p7b.json node 48 and the 14B/GGUF chain).
+# (1.7B / 14B / GGUF all use the same shift).
 _MODEL_SAMPLING_SHIFT = 8.0
 
 # Per-tier render config. Pure data -- no I/O. _tier_config returns a
