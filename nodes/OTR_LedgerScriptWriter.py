@@ -614,6 +614,14 @@ def _build_truncating_generate_fn(
     Truncation is left-side (drops oldest tokens, preserves most
     recent context).
     """
+    # [OpenRouter S3] Remote branch (FC2 seam 2). A provider-tagged remote
+    # entry has no model/tokenizer/context_cap to close over; return the
+    # remote generate_fn before capturing local handles below. The remote
+    # model does its own prompt budgeting server-side and honours the
+    # caller's per-call temperature + stop. Zero local VRAM.
+    if cache_entry.get("provider") == "openrouter":
+        from . import _otr_openrouter_backend as _orb
+        return _orb.make_openrouter_generate_fn(cache_entry)
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)

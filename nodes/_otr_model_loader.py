@@ -747,6 +747,31 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # Step 1: normalize.
     normalized = _otr_catalog.validate_model_id(model_id)
 
+    # [OpenRouter S3] Remote branch (FC2 seam 1) -- the dispatch table is
+    # otherwise dormant. A virtual catalog row carries
+    # loader_backend="openrouter_http"; route it to the remote backend's
+    # load(), which returns a provider-tagged cache_entry using ZERO local
+    # VRAM. SKIP steps 3-8 (resolve_context_cap, check_vram_fit,
+    # auto_download_if_missing, the resident-model teardown, load_llm) and
+    # -- critically -- LEAVE any resident local model in LLM_CACHE
+    # UNTOUCHED (C2 no-evict). Placed before the Step 2 cache-hit read so
+    # a remote request never reads or mutates LLM_CACHE: the common config
+    # (creative=remote, technical=local) must not evict + reload the local
+    # model across slot transitions. Remote makes zero CUDA / snapshot /
+    # download calls.
+    _remote_row = _otr_catalog._by_repo_id().get(normalized)
+    if (
+        _remote_row is not None
+        and getattr(_remote_row, "loader_backend", None) == "openrouter_http"
+    ):
+        from ._otr_model_runtime import get_backend_for_row
+        log.info(
+            "[Selector] slot=%s remote backend for %s (no local VRAM; "
+            "resident local model left in place, C2 no-evict)",
+            slot, normalized,
+        )
+        return get_backend_for_row(_remote_row).load(normalized, _remote_row)
+
     # Step 2: cache hit on the same model id (regardless of slot).
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
         log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
@@ -881,6 +906,12 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     Raises ModelLoaderError if the cache_entry is missing required
     keys or if torch is not importable at first call time.
     """
+    # [OpenRouter S3] Remote branch (FC2 seam 2). A provider-tagged
+    # remote entry has no model/tokenizer; return the remote generate_fn
+    # before the local-key check below. Uses zero local VRAM.
+    if cache_entry.get("provider") == "openrouter":
+        from ._otr_openrouter_backend import make_openrouter_generate_fn
+        return make_openrouter_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -961,6 +992,13 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     Returns a callable with the same signature as `make_generate_fn`:
         (messages, *, temperature, max_new_tokens) -> str
     """
+    # [OpenRouter S3] Remote branch (FC2 seam 2). A provider-tagged
+    # remote entry has no model/tokenizer; the remote generate_fn applies
+    # the same sampling the caller passes (polish callers pass their own
+    # temperature), so one closure covers both factories.
+    if cache_entry.get("provider") == "openrouter":
+        from ._otr_openrouter_backend import make_openrouter_generate_fn
+        return make_openrouter_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

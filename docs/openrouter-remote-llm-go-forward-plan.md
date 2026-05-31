@@ -105,7 +105,7 @@ A `- [ ]` item flips to `- [x]` only when: done **and** the regression suite is 
 | S0 — Baseline lock + freeze contracts | DONE (2026-05-31) | BUG-LOCAL-293 | baseline was RED (5 known pre-existing fails) — fixed to green per Jeffrey; full OTR 3204 pass / 12 skip / 0 fail; Bug Bible 23/1skip/2xfail; FC1–FC5 frozen; checkpoint commit |
 | S1 — OpenRouter backend (mocked) | DONE (2026-05-31) | — | `_otr_openrouter_backend.py` + registered in `BACKENDS_BY_KEY`; 22 mocked-HTTP tests incl. cost-abort via mocked counter (no request sent) |
 | S2 — Catalog rows (enabled-gated) | DONE (2026-05-31) | — | virtual rows join curated set only when enabled; `provider` field + `openrouter_http` literal; 12 toggle tests; no validator surgery |
-| S3 — Wire remote branch into live path | NOT STARTED | — | `request_slot` + generate-fn branches; no-evict (C2) |
+| S3 — Wire remote branch into live path | DONE (2026-05-31) | — | `request_slot` remote branch (skips local steps, C2 no-evict) + all 3 generate-fn factories branch on `provider`; 8 wiring tests incl. no-evict object-identity |
 | S4 — Technical JSON fail-closed gate | NOT STARTED | — | schema → validate → bounded repair → fail-closed (C4) |
 | S5 — Metadata stamp | NOT STARTED | — | provider + slot + resolved slug + params + schema-mode |
 | S6 — Smoke proofs (disabled + enabled) | NOT STARTED | — | byte-identical (off); end-to-end + abort proofs (on) |

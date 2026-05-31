@@ -450,8 +450,57 @@ class OpenRouterBackend:
         return str(text)[:200]
 
 
+def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | None = None):
+    """Return a generate_fn closure for a provider-tagged remote
+    cache_entry (FC2 seam 2).
+
+    The closure matches the signature every OTR generate_fn uses --
+    ``(messages, *, temperature, max_new_tokens, stop=None) -> str`` --
+    so the loader factories (`make_generate_fn`,
+    `make_polish_generate_fn`) and the writer's
+    `_build_truncating_generate_fn` can all return it unchanged when
+    ``cache_entry["provider"] == "openrouter"``.
+
+    `response_format` is None for free-form creative + the plain
+    structured_call path; S4 passes an OpenRouter json_schema
+    response_format for the grammar-constrained technical path so remote
+    technical output is schema-enforced (fail-closed via structured_call's
+    validate + bounded-repair ladder)."""
+    backend = OpenRouterBackend()
+
+    def generate_fn(messages, *, temperature=None, max_new_tokens=None, stop=None):
+        return backend.generate(
+            cache_entry,
+            messages,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            stop=stop,
+            response_format=response_format,
+        )
+
+    return generate_fn
+
+
+def schema_to_response_format(schema_model: Any, *, name: str = "otr_schema") -> dict:
+    """Map a Pydantic model class to an OpenRouter
+    ``response_format={type: json_schema, ...}`` payload (S4). Kept here
+    so the remote constrained-generate path mirrors the local
+    `make_constrained_generate_fn(cache_entry, schema_model)` entry."""
+    schema_dict = schema_model.model_json_schema()
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": name,
+            "strict": True,
+            "schema": schema_dict,
+        },
+    }
+
+
 __all__ = [
     "OpenRouterBackend",
+    "make_openrouter_generate_fn",
+    "schema_to_response_format",
     "OpenRouterError",
     "OpenRouterConfigError",
     "OpenRouterCostCeilingError",
