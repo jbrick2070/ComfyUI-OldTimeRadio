@@ -576,6 +576,18 @@ def validate_model_id(
     if _HF_REPO_ID_RE.match(normalized) and (auto_download_enabled or allow_remote):
         return normalized
 
+    # [OpenRouter S6] In-app hint: an OpenRouter handle that reached here
+    # means remote is not enabled (the virtual rows are absent from the
+    # curated set, so Path 1 missed). Give a clear, actionable error that
+    # names the env vars + the setup guide, instead of the generic hint.
+    if normalized.startswith("openrouter:"):
+        raise UnknownModelError(
+            f"{normalized!r} is an OpenRouter remote model, but remote is "
+            f"not enabled. Set OPENROUTER_API_KEY and OTR_ENABLE_OPENROUTER=1 "
+            f"(plus OPENROUTER_MODEL_A / OPENROUTER_MODEL_B), then restart "
+            f"ComfyUI in a fresh terminal. See docs/openrouter-setup.md."
+        )
+
     raise UnknownModelError(
         _unknown_recovery_hint(
             normalized,

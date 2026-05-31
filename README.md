@@ -27,9 +27,17 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** adds in-graph HuMo lip-sync per dialogue line, layered over the v1.7 proc gen base — full-episode mp4 with talking-head video on top of the audio-reactive CRT visualization. Shipping on the `v2.0-alpha` git branch; `main` stays at v1.7.
 
-### Optional (experimental): remote LLM via OpenRouter
+### Optional: remote LLM via OpenRouter (opt-in, default-off)
 
-The default pipeline is still **100% local, zero API keys** — that doesn't change. v2.0-alpha is adding an *opt-in* option to run the writer's creative and/or technical model on a hosted frontier model through [OpenRouter](https://openrouter.ai), for users who want to experiment with story quality. It stays **off** unless you set an API key and an enable flag, and whether it actually produces a better episode than the local default is still being evaluated. Full walkthrough (account → key → enable): [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
+The default pipeline is **100% local, zero API keys** — that never changes. v2.0-alpha **ships** an opt-in path to run the writer's creative and/or technical slot on a hosted frontier model (Claude, GPT, etc.) through [OpenRouter](https://openrouter.ai).
+
+- **Off unless you turn it on.** Nothing remote runs unless you set both `OPENROUTER_API_KEY` and `OTR_ENABLE_OPENROUTER=1`. With them unset, the offline pipeline is byte-for-byte unchanged.
+- **Pick it in the writer.** When enabled, two named slots — **OpenRouter A** and **OpenRouter B** — appear in *both* model dropdowns, each bound to a model slug of your choice via `OPENROUTER_MODEL_A` / `OPENROUTER_MODEL_B` (the real slug stays in your environment, never in the workflow).
+- **Cost-guarded.** A hard per-run token ceiling aborts before runaway spend; you only spend while remote is enabled and selected.
+- **Fail-closed JSON.** Remote *technical* (structured) output that can't be validated aborts the run rather than writing bad data — so the creative slot is the best place to try remote, and the technical slot is safest left local.
+- **Better story? You decide.** The local default (Mistral-Nemo) is the soak-tested baseline; whether a hosted model writes a better episode is yours to A/B test.
+
+Full walkthrough (account → key → enable → use): [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
 
 ### What's in the v2.0-alpha FULL workflow (`workflows/otr_scifi_16gb_full.json`)
 

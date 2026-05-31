@@ -1547,7 +1547,10 @@ class OTR_LedgerScriptWriter:
                             "style picker invention). Mistral-Nemo is "
                             "the C7 byte-identical audio baseline. "
                             "Suffix tags like [NOT DOWNLOADED] are "
-                            "stripped before HF lookup."
+                            "stripped before HF lookup. To use a remote "
+                            "OpenRouter model, set OPENROUTER_API_KEY + "
+                            "OTR_ENABLE_OPENROUTER=1 and pick OpenRouter A/B "
+                            "(see docs/openrouter-setup.md)."
                         ),
                     },
                 ),
@@ -1563,7 +1566,10 @@ class OTR_LedgerScriptWriter:
                             "Default matches creative_writing_model so "
                             "the single-model audio baseline holds; "
                             "pick a smaller model here when you want "
-                            "Slot 1 != Slot 2 routing for VRAM headroom."
+                            "Slot 1 != Slot 2 routing for VRAM headroom. "
+                            "To use a remote OpenRouter model, set "
+                            "OPENROUTER_API_KEY + OTR_ENABLE_OPENROUTER=1 and "
+                            "pick OpenRouter A/B (see docs/openrouter-setup.md)."
                         ),
                     },
                 ),
