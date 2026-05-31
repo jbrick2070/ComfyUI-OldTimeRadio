@@ -1,7 +1,0 @@
-OK  workflows\ltx_2_3_downstream_smoke.json
-OK  workflows\otr_humo_4x_smoke.json
-OK  workflows\otr_humo_only_smoke.json
-OK  workflows\otr_humo_smoke.json
-OK  workflows\otr_scifi_16gb_full.json
-
-TOTAL violations: 0
