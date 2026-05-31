@@ -3709,6 +3709,18 @@ class OTR_LedgerScriptWriter:
             )
         meta.update(_brief_delta)
 
+        # S3 (VRAM): the writer is done with the LLM after story_brief_reflection
+        # (the last LLM phase) -- evict it here, after the script and BEFORE the
+        # downstream TTS / render phase, so it is not co-resident with
+        # Bark / Kokoro / HuMo / FLUX. Never raises (PD1, audio is king); gated
+        # by OTR_WRITER_UNLOAD_AFTER_SCRIPT (default on). VRAM-envelope benefit
+        # needs an operator GPU smoke to confirm.
+        try:
+            from . import _otr_writer_vram as _OTRVRAM
+        except ImportError:  # pragma: no cover - standalone / test load
+            import _otr_writer_vram as _OTRVRAM  # type: ignore
+        meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
+
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json
         # plumb. Sprint C gotcha #4 -- writer was the source of
