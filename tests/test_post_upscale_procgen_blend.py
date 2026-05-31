@@ -123,7 +123,7 @@ def test_ass_filter_arg_returns_basename_and_parent():
 def test_caption_widgets_present(node):
     opt = node.INPUT_TYPES()["optional"]
     assert "burn_captions" in opt and "caption_style" in opt
-    assert opt["burn_captions"][1]["default"] is False  # clean master default
+    assert opt["burn_captions"][1]["default"] is True  # accessible-by-default
     assert "sdh_standard" in opt["caption_style"][0]
 
 

@@ -24,8 +24,9 @@ color-blind-safe and constantly legible. Audio never touched (`-c:a copy`).
 
 ## Master vs delivery
 
-- **Clean master: captions OFF** (default). **Accessible delivery: `sdh_standard` ON.**
-- Toggle is opt-in; the clean render is always preserved.
+- **Accessible delivery is the default: captions ON** (`burn_captions` default True,
+  `sdh_standard`). Turn `burn_captions` OFF for a **clean master** (festival/archival).
+- Per-render control via the Node 58 widget or `OTR_BURN_CAPTIONS` env.
 
 ## Sprints (review -> wired -> regress -> commit, one per commit)
 

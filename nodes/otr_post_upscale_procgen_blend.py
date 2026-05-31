@@ -531,10 +531,11 @@ class PostUpscaleProcgenBlend:
                 # are now the tail; do not insert anything after them without
                 # also extending the workflow JSON widgets_values + validator.
                 "burn_captions": ("BOOLEAN", {
-                    "default": False,
+                    "default": True,
                     "tooltip": (
                         "Burn SDH open captions into the final 1080p output. "
-                        "Default OFF = clean master. ON = accessible delivery: "
+                        "Default ON = accessible delivery. Turn OFF for a clean "
+                        "master (festival/archival). When ON: "
                         "white dialogue on an opaque box, bold-white speaker "
                         "labels with a subtle pastel outline (color is never the "
                         "speaker cue -- color-blind safe), synced from the ledger "
@@ -570,7 +571,7 @@ class PostUpscaleProcgenBlend:
         out_suffix: str = "_procgen_blended",
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
         green_only_overlay: bool = _DEFAULT_GREEN_ONLY,
-        burn_captions: bool = False,
+        burn_captions: bool = True,
         caption_style: str = _DEFAULT_CAPTION_STYLE,
     ):
         report_lines: list[str] = []
