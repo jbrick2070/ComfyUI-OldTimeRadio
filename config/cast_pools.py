@@ -100,6 +100,134 @@ LAST_NAMES = [
     "Steiner",
 ]
 
+# -----------------------------------------------------------------------------
+# Name -> gender classification (S1, cast name<->gender<->voice coherence fix).
+#
+# FIRST_NAMES above is a flat, gender-blind pool: pick_first_last() rolls a
+# name from it with no regard for the slot gender Python later binds, so a
+# male-coded name (MALIK) can land on a female slot/voice and vice versa. The
+# voice always followed gender correctly; only the NAME was wrong.
+#
+# FIRST_NAMES_BY_GENDER partitions the SAME names by gender so the repair pass
+# (nodes/_otr_casting.py) can swap a mismatched first name for a same-gender one
+# without ever touching the cast RNG. FIRST_NAMES stays byte-identical (its
+# order is load-bearing for C7 -- pick_first_last draws rng.choice(FIRST_NAMES)),
+# so these buckets are ADDITIVE: a partition view, never a replacement.
+#
+# Classification policy: only clearly male- or female-coded names are tagged
+# male/female. Genuinely cross-cultural or ambiguous names (Quinn, Ren, Charlie,
+# Dao, ...) are "unisex" -- unisex is coherent with EITHER binary slot gender,
+# so it never triggers a (false) repair. This deliberately minimizes repairs to
+# the unambiguous mismatches that motivated the fix.
+# -----------------------------------------------------------------------------
+FIRST_NAMES_BY_GENDER: dict[str, list[str]] = {
+    "male": [
+        "Vance", "Sully", "Mac", "Cole", "Drake", "Kane", "Malik", "Kael",
+        "Tariq", "Kenji", "Jiro", "Hiro", "Lev", "Dmitri", "Sergei", "Volkov",
+        "Yuri", "Nelson", "Martin", "Carl", "Lenny", "Montgomery", "Seymour",
+        "Ned", "Barney", "Moe", "Kent", "Rod", "Todd", "Jimbo", "Dolph",
+        "Kearney", "Tommy", "Allan", "Cavor", "Dracula", "Edward", "Griffin",
+        "Gulliver", "Henry", "James", "John", "Karnacki", "Nemo", "Phileas",
+        "Quasimodo", "Robinson", "Sherlock", "Smee", "Victor", "Watson",
+        "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan", "Truman",
+        "Fletcher", "Joel", "Stanley", "Walter", "Ace", "Lloyd", "Bruce",
+        "Mork", "Sean", "Andrew", "Parry", "Malcolm", "Daniel", "Michael",
+        "Ryan", "Kevin", "Toby", "Darryl", "Creed", "Oscar", "Steve", "Ed",
+        "Doug", "Travis", "Will", "Faber", "Rick", "Glen", "Isidore", "Bob",
+        "Manfred", "Leo", "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip",
+        "Grover", "Peter",
+    ],
+    "female": [
+        "Margot", "Nora", "Zuri", "Oya", "Nia", "Mali", "Anya", "Mira", "Edna",
+        "Alice", "Ayesha", "Mina", "Wendy", "Pam", "Meredith", "Erin",
+        "Phyllis", "Jenna", "Mindy", "Ellie", "Rashida", "Clarisse", "Donna",
+        "Juliana",
+    ],
+    "unisex": [
+        "Stone", "Hayes", "Quinn", "Reese", "Carter", "Blake", "Chidi", "Ayo",
+        "Ren", "Akira", "Yuki", "Sora", "Rei", "Krit", "Niran", "Sunan", "Dao",
+        "Pim", "Som", "Dale", "Pinky", "Leviathan", "Tarkon", "Adrian", "Chris",
+        "Kelly", "Rainn", "Charlie", "Palmer", "Sailor", "Djinn",
+    ],
+}
+
+# Reverse index UPPER(first name) -> "male"|"female"|"unisex". Names are stored
+# title-case in the buckets but the cast carries them upper-cased
+# ("MALIK HIBBERT"), so the lookup key is upper-cased on both sides.
+_FIRST_NAME_GENDER_INDEX: dict[str, str] = {}
+for _bucket_gender, _bucket_names in FIRST_NAMES_BY_GENDER.items():
+    for _bucket_name in _bucket_names:
+        _FIRST_NAME_GENDER_INDEX[_bucket_name.upper()] = _bucket_gender
+
+
+def _verify_name_buckets() -> None:
+    """Fail fast at import if the gender buckets drift out of sync with
+    FIRST_NAMES. A real RuntimeError (not assert) so ``python -O`` can't
+    strip the guard -- a silent drift would let a mis-tagged name slip a
+    bad repair into production.
+    """
+    union: set[str] = set()
+    seen = 0
+    for _g, _names in FIRST_NAMES_BY_GENDER.items():
+        union |= set(_names)
+        seen += len(_names)
+    canonical = set(FIRST_NAMES)
+    if union != canonical:
+        missing = sorted(canonical - union)
+        extra = sorted(union - canonical)
+        raise RuntimeError(
+            "FIRST_NAMES_BY_GENDER drift vs FIRST_NAMES: "
+            f"missing={missing} extra={extra}"
+        )
+    if seen != len(union):
+        raise RuntimeError(
+            "FIRST_NAMES_BY_GENDER buckets must be disjoint "
+            f"(total tagged {seen} != unique {len(union)})"
+        )
+
+
+_verify_name_buckets()
+
+
+# Genre-biased name views (S1). OTR_CAST_GENRE selects a flavor subset; the
+# default "auto" reproduces today's behavior exactly (the full FIRST_NAMES pool
+# in its original order). Each non-auto genre is derived by intersecting a
+# pillar name-set with the gender buckets, so every genre name is guaranteed
+# already gender-classified -- no separate hand-curation to keep in sync.
+_GENRE_NAME_SETS: dict[str, set[str]] = {
+    # Hard-boiled 1950s Americana + public-domain classics + sitcom Americana.
+    "scifi_1950s": {
+        "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes", "Cole",
+        "Drake", "Quinn", "Reese", "Kane", "Carter", "Blake", "Nelson",
+        "Martin", "Carl", "Edna", "Ned", "Kent", "Alice", "Edward", "Henry",
+        "James", "John", "Victor", "Wendy", "Walter", "Michael", "Pam",
+        "Donna", "Bob", "Leo", "Peter",
+    },
+    "noir": {
+        "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes", "Cole",
+        "Drake", "Quinn", "Reese", "Kane", "Carter", "Blake", "Sherlock",
+        "Watson", "Karnacki", "Victor", "Fletcher", "Rick", "Bob",
+        "Travis", "Palmer", "Glen", "Manfred",
+    },
+    # Afrofuturism + Neo-Tokyo + Russian Dieselpunk + Thai density pillars.
+    "space_opera": {
+        "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia", "Ren",
+        "Akira", "Kenji", "Yuki", "Sora", "Jiro", "Rei", "Hiro", "Krit",
+        "Mali", "Niran", "Sunan", "Dao", "Pim", "Som", "Lev", "Anya", "Dmitri",
+        "Sergei", "Volkov", "Mira", "Yuri", "Tarkon", "Leviathan", "Djinn",
+    },
+}
+
+FIRST_NAMES_BY_GENRE: dict[str, dict[str, list[str]]] = {
+    "auto": FIRST_NAMES_BY_GENDER,
+}
+for _genre, _nameset in _GENRE_NAME_SETS.items():
+    FIRST_NAMES_BY_GENRE[_genre] = {
+        _g: [_n for _n in FIRST_NAMES_BY_GENDER[_g] if _n in _nameset]
+        for _g in ("male", "female", "unisex")
+    }
+
+
 # Trait pools for procedural character profiles
 GENDERS = ["male", "female"]
 AGE_BRACKETS = ["20s", "30s", "40s", "50s", "60s"]
@@ -375,19 +503,75 @@ def open_voice_pool(taken: set[str]) -> list[tuple[str, str]]:
     return out
 
 
-def pick_first_last(rng: random.Random, taken_names: set[str]) -> str:
+def pick_first_last(
+    rng: random.Random,
+    taken_names: set[str],
+    genre: str = "auto",
+) -> str:
     """Roll a 'FIRSTNAME LASTNAME' from the curated pool, uppercase,
     avoiding any name already in `taken_names`.
 
     Falls back to retry up to 50 times before giving up and returning
-    a raw roll (which the caller should accept). On a 110/50 pool, 50
+    a raw roll (which the caller should accept). On a 154/54 pool, 50
     retries handles any plausible num_characters request.
+
+    genre: "auto" (default) draws from the full FIRST_NAMES pool in its
+    original order -- byte-identical to the pre-S1 behavior, so a fixed
+    OTR_CAST_SEED reproduces the exact same rolls (C7). A non-auto genre
+    (see FIRST_NAMES_BY_GENRE) draws from that genre's flavor subset; this
+    only takes effect when OTR_CAST_GENRE is explicitly set, so default
+    runs are byte-identical.
     """
+    genre_norm = (genre or "auto").strip().lower()
+    # C7: the auto path MUST draw rng.choice(FIRST_NAMES) on the original
+    # list object so the sequence is unchanged for a fixed seed.
+    if genre_norm == "auto" or genre_norm not in FIRST_NAMES_BY_GENRE:
+        first_pool = FIRST_NAMES
+    else:
+        first_pool = names_for_genre(genre_norm) or FIRST_NAMES
     for _ in range(50):
-        first = rng.choice(FIRST_NAMES)
+        first = rng.choice(first_pool)
         last = rng.choice(LAST_NAMES)
         name = f"{first} {last}".upper()
         if name not in taken_names:
             return name
     # Cosmic-collision fallback -- accept whatever the last roll gave.
-    return f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}".upper()
+    return f"{rng.choice(first_pool)} {rng.choice(LAST_NAMES)}".upper()
+
+
+def gender_of_first_name(name: str) -> str:
+    """Classify a first name as "male" | "female" | "unisex" | "unknown".
+
+    Case-insensitive. Accepts either a bare first name ("Malik") or a full
+    "FIRST LAST" cast name ("MALIK HIBBERT") -- only the first whitespace
+    token is classified. "unknown" means the name is not in the curated
+    pool; callers treat unknown like unisex (never force a repair on a name
+    we cannot confidently gender).
+    """
+    if not name:
+        return "unknown"
+    head = name.strip().split()
+    if not head:
+        return "unknown"
+    return _FIRST_NAME_GENDER_INDEX.get(head[0].upper(), "unknown")
+
+
+def names_for_genre(genre: str, gender: str | None = None) -> list[str]:
+    """Return the first-name list for a genre, optionally filtered to one
+    gender bucket.
+
+    "auto" (or any unknown genre) returns the full pool: FIRST_NAMES in its
+    original order when unfiltered (byte-identical roll source), or the
+    gender bucket when a gender is given. A known non-auto genre returns
+    that genre's curated subset.
+    """
+    genre_norm = (genre or "auto").strip().lower()
+    gender_norm = (gender or "").strip().lower() or None
+    if genre_norm == "auto" or genre_norm not in FIRST_NAMES_BY_GENRE:
+        if gender_norm in ("male", "female", "unisex"):
+            return list(FIRST_NAMES_BY_GENDER[gender_norm])
+        return list(FIRST_NAMES)
+    buckets = FIRST_NAMES_BY_GENRE[genre_norm]
+    if gender_norm in ("male", "female", "unisex"):
+        return list(buckets[gender_norm])
+    return [n for g in ("male", "female", "unisex") for n in buckets[g]]
