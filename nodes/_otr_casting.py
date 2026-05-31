@@ -114,6 +114,15 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_cast_env  # type: ignore
 
+# CastPlanner (S4) + Pass-1 validator (S7). Only consulted on the llm_slot_fill
+# path; pool mode never imports-uses them at runtime.
+try:
+    from . import _otr_castplanner as _CASTPLAN
+    from . import _otr_cast_validator as _CASTVAL
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_castplanner as _CASTPLAN  # type: ignore
+    import _otr_cast_validator as _CASTVAL  # type: ignore
+
 log = logging.getLogger(__name__)
 
 
@@ -800,6 +809,7 @@ def python_assign_voice_preset(
     *,
     available_voices: List[tuple[str, str]],
     rng: Optional[random.Random] = None,
+    age_band: Optional[str] = None,
 ) -> str:
     """Stage 3: pick the voice preset for one slot. PURE PYTHON.
 
@@ -855,6 +865,24 @@ def python_assign_voice_preset(
     ]
     pick_from = timbre_matched or candidates
 
+    # 2b. Age-matched subset (S5, voice x age). ONLY when an age_band is
+    #     supplied -- the CastPlanner / llm_slot_fill path. Pool mode passes
+    #     age_band=None, so this is a no-op and pool-mode voice picks stay
+    #     byte-identical (C7). Still exactly ONE rng.choice below (R6): age is
+    #     a filter, never a draw.
+    if age_band:
+        try:
+            from ._otr_castplanner import AGE_BAND_VOICE_TAGS
+        except ImportError:  # pragma: no cover - standalone / test load
+            from _otr_castplanner import AGE_BAND_VOICE_TAGS  # type: ignore
+        age_tags = AGE_BAND_VOICE_TAGS.get(age_band, frozenset())
+        if age_tags:
+            age_matched = [
+                (p, s) for p, s in pick_from
+                if any(t in (s or "").strip().lower() for t in age_tags)
+            ]
+            pick_from = age_matched or pick_from
+
     # 3. Deterministic tie-break. Sort by preset id first so the rng
     #    draws from a stable ordering (C7: dict / set iteration order
     #    is hash-randomized; a sorted list is byte-stable).
@@ -882,6 +910,7 @@ def cast_one_character(
     casting_brief: str = "",
     ensemble_slot: Optional[EnsembleSlot] = None,
     rng: Optional[random.Random] = None,
+    age_band: Optional[str] = None,
 ) -> CastingResponse:
     """Cast one open character. Returns an assembled CastingResponse.
 
@@ -954,6 +983,7 @@ def cast_one_character(
         slot,
         available_voices=available_voices,
         rng=rng,
+        age_band=age_band,
     )
 
     response = CastingResponse(
@@ -1072,6 +1102,132 @@ def assemble_pre_locked_rows(
 
 
 # ---------------------------------------------------------------------------
+# llm_slot_fill Pass-1 (S6) -- optional LLM naming overlay on the finished
+# deterministic cast. Gated by OTR_NAME_MODE=llm_slot_fill; pool mode skips it
+# entirely (byte-identical, C7).
+# ---------------------------------------------------------------------------
+
+
+def _extract_json_list(raw):
+    """Tolerantly pull a JSON array out of an LLM response (handles code fences
+    + surrounding prose). Returns a list, or None if none parses."""
+    import json
+    s = (raw or "").strip()
+    if s.startswith("```"):
+        parts = s.split("```")
+        if len(parts) >= 2:
+            s = parts[1]
+        if s.lstrip().lower().startswith("json"):
+            s = s.lstrip()[4:]
+    try:
+        v = json.loads(s)
+        if isinstance(v, list):
+            return v
+    except Exception:
+        pass
+    a, b = s.find("["), s.rfind("]")
+    if a != -1 and b > a:
+        try:
+            v = json.loads(s[a:b + 1])
+            if isinstance(v, list):
+                return v
+        except Exception:
+            return None
+    return None
+
+
+def _build_pass1_prompt(plan, news_seed, style):
+    """Compact, schema-locked Pass-1 naming prompt: a name + two texture notes
+    per slot. Gender / voice / age / role are Python-fixed facts the LLM writes
+    into, never chooses."""
+    story = (news_seed or "").strip()[:_NEWS_SEED_CAP]
+    style_str = (style or "").strip() or "open"
+    lines = [
+        "Name the cast of a radio drama. For EACH slot, return a name that fits "
+        "the stated gender plus two short texture notes. Do NOT change gender, "
+        "voice, age, or role.",
+        f"Story: {story}",
+        f"Style: {style_str}",
+        "",
+        "Slots:",
+    ]
+    for s in plan:
+        lines.append(f"- {s.char_id}: {s.gender}, {s.age_band}, {s.dramatic_role}")
+    lines += [
+        "",
+        "Return ONLY a JSON array, one object per slot, with EXACTLY these keys:",
+        '[{"char_id":"c02","name":"First Last",'
+        '"one_line_presence":"<6-10 words>","dialogue_style":"<6-10 words>"}]',
+        "Names must fit the stated gender. No duplicate names. No extra keys.",
+    ]
+    return "\n".join(lines)
+
+
+def _apply_llm_slot_fill(
+    cast, ensemble_slots, voice_by_char_id, age_by_char_id,
+    *, generate_fn, news_seed, style, cast_seed, meta,
+):
+    """Overlay LLM names + texture onto the finished deterministic cast. ONE
+    creative-slot call, NO retry (per the sprint plan); on ANY failure the
+    deterministic (S2-coherent) names stand -- they are the guaranteed-coherent
+    backstop. A successful LLM name still passes the same gender-coherence repair
+    as S2 (isolated rng), so the result is always coherent in strict mode.
+    """
+    meta["name_mode"] = "llm_slot_fill"
+    plan = _CASTPLAN.build_cast_plan(
+        ensemble_slots, voice_by_char_id, age_band_by_char_id=age_by_char_id)
+    prompt = _build_pass1_prompt(plan, news_seed, style)
+    # LLM slot: creative -- cast naming + texture is a creative-writing pass; it
+    # reuses the writer's creative_fn (no new model_id widget, PD6).
+    try:
+        raw = generate_fn(
+            [{"role": "user", "content": prompt}],
+            temperature=0.7, max_new_tokens=400,
+        )
+    except Exception as exc:  # noqa: BLE001 -- loader/LLM varies; fall back
+        meta["llm_naming_applied"] = False
+        meta["llm_naming_fallback_reason"] = (
+            f"generate_fn raised: {type(exc).__name__}")
+        return cast
+    items = _extract_json_list(raw)
+    result = _CASTVAL.validate_pass1(items if items is not None else raw, plan)
+    if not result.ok:
+        meta["llm_naming_applied"] = False
+        meta["llm_naming_fallback_reason"] = result.reason
+        return cast
+    # Gender-coherence repair on the LLM names (the LLM may not honour gender).
+    rate = _otr_cast_env.cross_gender_rate()
+    gender_by_id = {s.char_id: s.gender for s in plan}
+    plan_ids = {s.char_id for s in plan}
+    taken = {row.get("name") for row in cast if row.get("char_id") not in plan_ids}
+    final_names: dict = {}
+    for cid, name in result.names_by_char_id.items():
+        final = name
+        g = gender_by_id.get(cid, "")
+        if g in ("male", "female"):
+            tag = _POOLS.gender_of_first_name(name)
+            if tag in ("male", "female") and tag != g:
+                iso = random.Random(f"{cast_seed}:{cid}:llm")
+                keep_cross = rate > 0.0 and iso.random() < rate
+                if not keep_cross:
+                    swapped = _pick_same_gender_first_name(name, g, iso, taken)
+                    if swapped:
+                        final = swapped
+        final_names[cid] = final
+        taken.add(final)
+    texture = result.texture_by_char_id
+    for row in cast:
+        cid = row.get("char_id")
+        if cid in final_names:
+            row["name"] = final_names[cid]
+            if cid in texture:
+                row["cast_texture"] = texture[cid]
+    meta["llm_naming_applied"] = True
+    meta["cast_texture"] = texture
+    return cast
+
+
+# ---------------------------------------------------------------------------
 # Top-level: lock_cast -- runs the LLM call per open slot, returns
 # the full locked cast.
 # ---------------------------------------------------------------------------
@@ -1117,6 +1273,14 @@ def lock_cast(
     # creative plane. (S32 B3's technical-slot repair routing was
     # retired in the Sprint 2A/2D structured_call conversion.)
     generate_fn = creative_fn
+
+    # llm_slot_fill (S6): name_mode decides whether an LLM Pass-1 renames the
+    # cast AFTER the deterministic build. Pool mode (default) never enters that
+    # path, so pool behavior is byte-identical (C7). The voice/age maps feed the
+    # CastPlanner (S4) when the llm path runs.
+    name_mode = _otr_cast_env.name_mode()
+    voice_by_char_id: dict = {}
+    age_by_char_id: dict = {}
 
     # Voice assignment (Stage 3) needs a seeded rng for its deterministic
     # tie-break; reuse the cast rng so a fixed seed stays byte-identical
@@ -1180,7 +1344,11 @@ def lock_cast(
     )
 
     casting_attempts: list[int] = []
-    for slot, ens in zip(open_slots, ensemble_slots):
+    for i, (slot, ens) in enumerate(zip(open_slots, ensemble_slots)):
+        # Age axis (S5) is active ONLY in llm_slot_fill mode; pool mode passes
+        # None so voice picks stay byte-identical (C7).
+        age_band = (_CASTPLAN.age_band_for_index(i)
+                    if name_mode == "llm_slot_fill" else None)
         available_voices = _POOLS.open_voice_pool(taken_voices)
         if not available_voices:
             # Belt-and-braces: should never fire because of the
@@ -1203,6 +1371,7 @@ def lock_cast(
                 casting_brief=casting_brief,
                 ensemble_slot=ens,
                 rng=cast_rng,
+                age_band=age_band,
             )
         except CastingFailedError as exc:
             # S32 B3 (D2): if the failure came from the repair-attempt
@@ -1245,11 +1414,25 @@ def lock_cast(
         cast.append(new_row)
         taken_voices.add(response.voice_preset)
         prior_cast_for_llm.append(new_row)
+        voice_by_char_id[ens.char_id] = response.voice_preset
+        age_by_char_id[ens.char_id] = age_band
         # Telemetry: how many attempts did this slot need? We can't
         # see it from the response object; the caller can wrap
         # cast_one_character if granular telemetry is needed. For now
         # just stamp 1 -- a successful call returned without raising.
         casting_attempts.append(1)
+
+    meta: dict = {}
+    # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the finished,
+    # already-coherent deterministic cast. Runs BEFORE the structural-token
+    # guard so a bad LLM name is still rejected; on any failure the
+    # deterministic (S2-repaired) names stand.
+    if name_mode == "llm_slot_fill":
+        cast = _apply_llm_slot_fill(
+            cast, ensemble_slots, voice_by_char_id, age_by_char_id,
+            generate_fn=generate_fn, news_seed=news_seed, style=style,
+            cast_seed=cast_seed, meta=meta,
+        )
 
     # Post-cast voice-uniqueness invariant. Belt-and-braces guard
     # against a future refactor breaking the pre-filter / validator /
@@ -1271,12 +1454,12 @@ def lock_cast(
     # TITLE / NOTE / TARGET / STYLE.
     _assert_no_structural_tokens_in_cast(cast)
 
-    meta = {
+    meta.update({
         "lemmy_hit":              lemmy_hit,
         "casting_attempts":       casting_attempts,
         "num_characters_request": num_characters,
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
-    }
+    })
     return cast, meta
 
 
