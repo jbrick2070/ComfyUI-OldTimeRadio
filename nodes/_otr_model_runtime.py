@@ -35,6 +35,7 @@ from typing import Any
 from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
+from . import _otr_openrouter_backend
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +154,12 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     "transformers_safetensors":          TransformersSafetensorsBackend(),
     "transformers_multimodal_text_only": TransformersMultimodalTextOnlyBackend(),
     "transformers_gptq_int4":            TransformersGPTQInt4Backend(),
+    # Remote, opt-in, default-off (S1). Registered here so the dormant
+    # dispatch table knows the adapter; S3 wires the LIVE call into
+    # request_slot + the generate-fn factory. A remote call uses zero
+    # local VRAM and must never evict the resident local model (C2).
+    _otr_openrouter_backend.OPENROUTER_BACKEND_KEY:
+        _otr_openrouter_backend.OpenRouterBackend(),
 }
 
 

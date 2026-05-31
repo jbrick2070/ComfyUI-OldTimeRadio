@@ -72,6 +72,7 @@ class CuratedModel:
         "transformers_safetensors",
         "transformers_multimodal_text_only",
         "transformers_gptq_int4",
+        "openrouter_http",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -91,6 +92,12 @@ class CuratedModel:
     license_audit_status: Literal[
         "mit_equivalent", "research_lane", "pending",
     ] = "pending"
+    # OpenRouter remote-LLM (S2). "local" = the transformers/HF weight
+    # path every existing row uses; "openrouter" = a virtual row whose
+    # weights live behind the OpenRouter API (zero local VRAM). Default
+    # "local" so every pre-existing row and any older fixture that omits
+    # the field still constructs unchanged.
+    provider: Literal["local", "openrouter"] = "local"
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -192,8 +199,67 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
 )
 
 
+def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
+    """The two virtual OpenRouter rows (S2) -- present ONLY when remote
+    is enabled (OPENROUTER_API_KEY set AND OTR_ENABLE_OPENROUTER=1). When
+    disabled the tuple is empty, so _by_repo_id / dropdowns / Path-1
+    validation never see them and the offline baseline is untouched (C3,
+    C8). Per FC4 these carry loader_backend='openrouter_http',
+    vram_fit_tier='PASS', approx_safetensors_gb=0.0, context_window=8192,
+    provider='openrouter'. The real model slug lives in env
+    (OPENROUTER_MODEL_A/B); only the named handle appears here, never the
+    slug. The rows join the curated set so validate_model_id Path 1
+    admits 'openrouter:slot-a|b' with NO validator surgery."""
+    try:
+        from . import _otr_openrouter_backend as _orb
+    except Exception:  # noqa: BLE001 -- a backend import hiccup must never break the catalog
+        return ()
+    if not _orb.openrouter_enabled():
+        return ()
+    common = dict(
+        requires_auth=False,
+        loader_backend="openrouter_http",
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=0.0,
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=_orb.DEFAULT_CONTEXT_WINDOW,
+        license="gated_terms",
+        license_audit_status="research_lane",
+        provider="openrouter",
+    )
+    return (
+        CuratedModel(
+            repo_id=_orb.SLOT_A_ID,
+            notes="OpenRouter remote model A (opt-in, default-off). Binds "
+            "to OPENROUTER_MODEL_A; zero local VRAM. See "
+            "docs/openrouter-setup.md.",
+            **common,
+        ),
+        CuratedModel(
+            repo_id=_orb.SLOT_B_ID,
+            notes="OpenRouter remote model B (opt-in, default-off). Binds "
+            "to OPENROUTER_MODEL_B; zero local VRAM. See "
+            "docs/openrouter-setup.md.",
+            **common,
+        ),
+    )
+
+
+def _active_curated_models() -> tuple[CuratedModel, ...]:
+    """CURATED_LLM_MODELS plus the enabled-only OpenRouter virtual rows.
+
+    Consumers that should surface remote when enabled (the dropdown
+    builder + validate_model_id Path 1 via _by_repo_id) read THIS.
+    Static license/audit tests iterate CURATED_LLM_MODELS directly, so
+    the virtual rows never reach them, and GATED_CURATED_MODELS stays
+    keyed off the real gated set."""
+    return CURATED_LLM_MODELS + _openrouter_virtual_rows()
+
+
 def _by_repo_id() -> dict[str, CuratedModel]:
-    return {m.repo_id: m for m in CURATED_LLM_MODELS}
+    return {m.repo_id: m for m in _active_curated_models()}
 
 
 GATED_CURATED_MODELS: frozenset[str] = frozenset(
@@ -366,11 +432,19 @@ def build_dropdown_choices(
     """
     scan = {r.repo_id: r for r in scan_local_llm_cache(hub_root=hub_root)}
     entries: list[DropdownEntry] = []
-    for m in CURATED_LLM_MODELS:
+    active = _active_curated_models()
+    for m in active:
+        if getattr(m, "provider", "local") == "openrouter":
+            # Remote (S2): no local weights, so the [NOT DOWNLOADED]
+            # suffix would be misleading. Show the clean named handle and
+            # treat it as available (selectable) whenever it is present
+            # -- it is present only when remote is enabled (C3).
+            entries.append(DropdownEntry(m.repo_id, m.repo_id, True, curated=True))
+            continue
         on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
         label = m.repo_id if on_disk else m.repo_id + NOT_DOWNLOADED_SUFFIX
         entries.append(DropdownEntry(label, m.repo_id, on_disk, curated=True))
-    curated_ids = {m.repo_id for m in CURATED_LLM_MODELS}
+    curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():
         if repo_id in curated_ids:
             continue
