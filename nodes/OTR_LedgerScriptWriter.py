@@ -2284,6 +2284,7 @@ class OTR_LedgerScriptWriter:
                 casting_brief=casting_brief,
                 style=resolved["style"],
                 rng=cast_rng,
+                cast_seed=cast_seed,
                 force_lemmy=lemmy_force,
             )
         led.set_cast(cast_rows)

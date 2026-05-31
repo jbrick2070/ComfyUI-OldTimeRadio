@@ -59,7 +59,7 @@ from __future__ import annotations
 import logging
 import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -106,6 +106,13 @@ except (ImportError, ValueError):
     if str(_REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(_REPO_ROOT))
     from config import cast_pools as _POOLS  # type: ignore[no-redef]
+
+# Frozen cast env-var contract (S0). Package import in production; flat import
+# when loaded standalone / under test.
+try:
+    from . import _otr_cast_env
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_cast_env  # type: ignore
 
 log = logging.getLogger(__name__)
 
@@ -562,11 +569,77 @@ def _plan_gender_distribution(
     return genders
 
 
+def _pick_same_gender_first_name(
+    current_name: str,
+    gender: str,
+    iso: random.Random,
+    taken_names: set,
+) -> Optional[str]:
+    """Swap the FIRST token of a 'FIRST LAST' cast name for a same-gender first
+    name (keeping the last name), avoiding collisions with names already in the
+    ensemble. Draws ONLY from the isolated rng `iso`, never the cast rng.
+    Returns the new UPPER name, or None if the gender bucket is empty.
+    """
+    parts = current_name.split(" ", 1)
+    last = parts[1] if len(parts) > 1 else ""
+    pool = list(_POOLS.FIRST_NAMES_BY_GENDER.get(gender, ()))
+    if not pool:
+        return None
+    iso.shuffle(pool)
+    for first in pool:
+        cand = (first + " " + last).strip().upper()
+        if cand not in taken_names:
+            return cand
+    # Saturated (every same-gender first collides on this last name) -- accept
+    # the first shuffled candidate anyway; a same-gender near-duplicate still
+    # beats leaving a cross-gender mismatch.
+    return (pool[0] + " " + last).strip().upper()
+
+
+def _repair_ensemble_names(
+    ensemble: List[EnsembleSlot],
+    *,
+    cast_seed: Optional[int],
+) -> List[EnsembleSlot]:
+    """C7-safe name<->gender repair (the core of the cast coherence fix).
+
+    For each binary-gender slot whose rolled first name is tagged the OTHER
+    binary gender, swap the first name for a same-gender one. The swap draws
+    from a per-character ISOLATED rng -- random.Random(f"{cast_seed}:{char_id}")
+    -- so the main cast rng sequence is NEVER perturbed: a no-op (byte-identical)
+    for an already-coherent seed, full coherence otherwise. 'unisex'/'unknown'
+    names and 'other'-gender slots are left untouched (coherent with either /
+    any gender). OTR_NAME_CROSS_GENDER_RATE > 0 lets a deterministic fraction of
+    mismatches stand as deliberate cross-gender names.
+    """
+    rate = _otr_cast_env.cross_gender_rate()
+    taken_names = {e.name for e in ensemble}
+    out: List[EnsembleSlot] = []
+    for ens in ensemble:
+        repaired = ens
+        if ens.gender in ("male", "female"):
+            tag = _POOLS.gender_of_first_name(ens.name)
+            if tag in ("male", "female") and tag != ens.gender:
+                iso = random.Random(f"{cast_seed}:{ens.char_id}")
+                keep_cross = rate > 0.0 and iso.random() < rate
+                if not keep_cross:
+                    new_name = _pick_same_gender_first_name(
+                        ens.name, ens.gender, iso, taken_names)
+                    if new_name is not None and new_name != ens.name:
+                        taken_names.discard(ens.name)
+                        taken_names.add(new_name)
+                        repaired = replace(ens, name=new_name)
+        out.append(repaired)
+    return out
+
+
 def precompute_ensemble_slots(
     open_slots: List["CastSlot"],
     *,
     prior_cast: Optional[List[dict]] = None,
     rng: Optional[random.Random] = None,
+    cast_seed: Optional[int] = None,
+    repair_names: bool = True,
 ) -> List[EnsembleSlot]:
     """Stage 1: decide the whole ensemble's gender / timbre / role
     distribution up front. PURE PYTHON -- no LLM.
@@ -606,6 +679,10 @@ def precompute_ensemble_slots(
             timbre=_TIMBRE_VOCAB[i % len(_TIMBRE_VOCAB)],
             role=_ROLE_VOCAB[i % len(_ROLE_VOCAB)],
         ))
+    # Cast name<->gender coherence repair (isolated rng; byte-identical for an
+    # already-coherent seed). See _repair_ensemble_names.
+    if repair_names:
+        ensemble = _repair_ensemble_names(ensemble, cast_seed=cast_seed)
     return ensemble
 
 
@@ -845,10 +922,16 @@ def cast_one_character(
     # once and hands each slot down; a standalone call plans just this
     # one slot so the function keeps working on its own.
     if ensemble_slot is None:
+        # Standalone single-character call: the caller passed an EXPLICIT name,
+        # so honour it verbatim -- the name<->gender repair is an ensemble
+        # (lock_cast) concern for the gender-blind POOL roll, not for a name a
+        # caller chose on purpose. repair_names=False keeps this path
+        # byte-identical to its pre-repair behavior.
         slot = precompute_ensemble_slots(
             [CastSlot(char_id="", name=name)],
             prior_cast=prior_cast,
             rng=rng,
+            repair_names=False,
         )[0]
     else:
         slot = ensemble_slot
@@ -1001,6 +1084,7 @@ def lock_cast(
     news_seed: str,
     style: str,
     rng: Optional[random.Random] = None,
+    cast_seed: Optional[int] = None,
     force_lemmy: Optional[bool] = None,
     max_attempts_per_call: int = 3,
     casting_brief: str = "",
@@ -1092,6 +1176,7 @@ def lock_cast(
         open_slots,
         prior_cast=prior_cast_for_llm,
         rng=cast_rng,
+        cast_seed=cast_seed,
     )
 
     casting_attempts: list[int] = []
@@ -1109,7 +1194,7 @@ def lock_cast(
         try:
             response = cast_one_character(
                 generate_fn,
-                name=slot.name,
+                name=ens.name,
                 news_seed=news_seed,
                 style=style,
                 prior_cast=prior_cast_for_llm,
@@ -1141,7 +1226,7 @@ def lock_cast(
             raise
         new_row = {
             "char_id":               slot.char_id,
-            "name":                  slot.name,
+            "name":                  ens.name,
             "gender":                response.gender,
             # Open-character voices are always drawn from the Bark
             # pool (VOICE_PROFILES in config/cast_pools.py), so the

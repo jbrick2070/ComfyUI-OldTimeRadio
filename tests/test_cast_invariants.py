@@ -59,10 +59,23 @@ def _lock(seed, *, num=4, force_lemmy=False):
         news_seed="Scientists report a quiet anomaly in the upper atmosphere "
                   "over the test range.",
         style="1950s science fiction radio drama",
-        rng=random.Random(seed), force_lemmy=force_lemmy,
+        rng=random.Random(seed), cast_seed=seed, force_lemmy=force_lemmy,
         max_attempts_per_call=1,
     )
     return cast
+
+
+def _binary_mismatches(cast):
+    """Open rows whose binary slot gender disagrees with the name's gender."""
+    out = []
+    for r in cast:
+        if r["name"] in ("ANNOUNCER", "LEMMY"):
+            continue
+        if r["gender"] in ("male", "female"):
+            tag = _POOLS.gender_of_first_name(r["name"])
+            if tag in ("male", "female") and tag != r["gender"]:
+                out.append((r["char_id"], r["name"], r["gender"], tag))
+    return out
 
 
 class _CountingRandom(random.Random):
@@ -152,5 +165,52 @@ def test_r6_one_rng_choice_per_slot():
 
 
 # ---------------------------------------------------------------------------
-# R3 / R7 / R8 / R9 are appended by S2 / S6 / S7 / S8 as their behavior lands.
+# R3 -- coherence (S2): every binary-gender slot's name gender matches the slot
+# gender in strict mode. This is the bug the sprint exists to fix.
+# ---------------------------------------------------------------------------
+def test_r3_coherence_no_binary_mismatch():
+    g = _golden()
+    seeds = {g["known_incoherent_seed"], g["seed"]} | set(range(0, 60))
+    for seed in sorted(seeds):
+        for num in (3, 4, 5):
+            cast = _lock(seed, num=num)
+            bad = _binary_mismatches(cast)
+            assert not bad, f"seed {seed} num {num}: name/gender mismatch {bad}"
+
+
+def test_r3_known_bug_seed_repaired():
+    """The golden's known-incoherent seed had a male name on a female slot
+    (NEMO on a female slot). After repair the slot carries a same-gender name;
+    the slot gender is unchanged (only the NAME was ever wrong)."""
+    g = _golden()
+    seed = g["known_incoherent_seed"]
+    cast = _lock(seed, num=g["num_characters"])
+    assert g["known_incoherent_detail"], "golden must record the bug case"
+    for det in g["known_incoherent_detail"]:
+        row = next(r for r in cast if r["char_id"] == det["char_id"])
+        assert row["gender"] == det["slot_gender"], "slot gender must not change"
+        assert row["name"] != det["name"], "the mismatched name was not repaired"
+        assert _POOLS.gender_of_first_name(row["name"]) == det["slot_gender"]
+
+
+def test_r3_repair_is_byte_identical_for_coherent_seed():
+    """Belt-and-braces on R2: the repair must be a pure no-op at the coherent
+    golden seed -- the whole point of the isolated-rng design."""
+    g = _golden()
+    assert _structural(_lock(g["seed"], num=g["num_characters"])) == g["cast"]
+
+
+def test_cross_gender_rate_controls_repair(monkeypatch):
+    """OTR_NAME_CROSS_GENDER_RATE: 0.0 (default) repairs every mismatch; 1.0
+    lets the deliberate-cross path leave the original mismatch standing."""
+    g = _golden()
+    seed = g["known_incoherent_seed"]
+    assert not _binary_mismatches(_lock(seed, num=g["num_characters"]))  # strict
+    monkeypatch.setenv("OTR_NAME_CROSS_GENDER_RATE", "1.0")
+    assert _binary_mismatches(_lock(seed, num=g["num_characters"])), (
+        "rate=1.0 should leave the deliberate cross-gender name in place")
+
+
+# ---------------------------------------------------------------------------
+# R7 / R8 / R9 are appended by S6 / S7 / S8 as their behavior lands.
 # ---------------------------------------------------------------------------
