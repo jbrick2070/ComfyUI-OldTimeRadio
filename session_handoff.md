@@ -1,120 +1,90 @@
-# Session Handoff -- OTR v2.0-alpha stable baseline; next = LoRA (P1) + gender (P2) -- 2026-05-30
+# Session Handoff — OTR Cast-System fix (name↔gender↔voice) — 2026-05-30 (Phase 1 SHIPPED)
 
 ## Core goal
-OTR Visual Drama Engine, v2.0-alpha. This session landed the first fully clean
-end-to-end headless baseline (episode "Elusive Dance") under NORMAL_VRAM --
-fixing the FLUX/HuMo VRAM thrash that had blocked every prior run -- verified the
-output contract, and tagged it stable. Next work is two phases, in order:
-**Phase 1** optimize the LTX LoRA structure (consolidate a duplicate distill
-loader); **Phase 2** fix cast name/gender incoherence surfaced by the baseline.
+Fix cast incoherence: characters got a name from a gender-blind pool while gender was
+drawn separately, so male-coded names landed on female slots/voices (`MALIK HIBBERT`→female,
+`PHYLLIS OKAFOR`→male). The voice always followed gender correctly — **only the NAME was wrong.**
+**Phase 1 (deterministic name-repair) is DONE, verified, and committed.** Phase 2 (the optional
+schema-locked LLM naming layer) and S3 (a VRAM-timing change) remain.
 
-## Tech stack & constraints (live state; CLAUDE.md rules still apply, not repeated)
-- **Launch at NORMAL_VRAM.** `C:\Users\jeffr\Documents\ComfyUI\_otr_launch.bat` is now
-  `--port 8000 --cuda-malloc` (the `--highvram` flag was REMOVED). `--normalvram`
-  is an INVALID flag; "normal" = no vram flag at all. This single change fixed
-  BUG-291. Do NOT re-add `--highvram`.
-- **Stable tag:** `v2.0-alpha-stable-20260530` -> commit `f4d05b9` (annotated,
-  additive, pushed). The plain `v2.0-alpha-stable` was deliberately LEFT at the
-  old 2026-05-19 commit `e104056` (Jeffrey's call: dated tag only, no force-push).
-- **Output contract (hard):** exactly two valid locations -- final deliverable
-  `output/otr/obs/<id>_procgen_blended.mp4`, working tree
-  `output/otr/episodes/<id>/`. Base pinned via `OTR_OUTPUT_DIR` set in
-  `__init__.py` (node-relative -> `Documents\ComfyUI\output`).
-- **`Documents\ComfyUI\output` is invisible to Desktop Commander's directory
-  lister AND the Linux sandbox mount** (OneDrive path virtualization). But the
-  venv python CAN stat/read it. To inspect outputs, run a python script via DC
-  (pattern: `scripts/_otr_check_elusive_dance.py`). The ComfyUI history API
-  (`GET http://127.0.0.1:8000/history/<prompt_id>`) gives authoritative
-  status + output paths.
-- **DC monitoring gotchas:** a running ComfyUI's in-place progress bar trips a
-  false "waiting for input" in `read_process_output` -- read with a small
-  negative `offset` (tail). Inline `python -c "..."` through cmd MANGLES quotes
-  (confirmed again this session) -- always write a script file.
-- **Validator gate:** `OTR_WorkflowValidator` (node 63) HARD-RAISES on
-  widget-vector drift at queue time. Run a validator-only POST after every
-  workflow JSON edit: `scripts/_otr_post_validator.py`.
+## THE execution doc
+`docs/2026-05-30-cast-system__go-forward-sprint-plan.md` — full sprint grid S0–S9, frozen S0
+contracts, R1–R9 bar, waves. Phase 1 = S1+S0+S2 (shipped). Phase 2 = S4–S9. S3 = VRAM.
+Round-robin reasoning: `docs/2026-05-30-cast-name-gender-voice-coherence__*` (still untracked).
 
-## What's done & decided this session
-- **BUG-291 FIXED** (NORMAL_VRAM / DynamicVRAM streaming): FLUX 1.1-1.3 s/it,
-  HuMo 14-18 s/it (was ~193 / ~107 pinned). Lever-1 `free_otr_pipeline_residue`
-  reclaims reserved 1760->160 MB between phases; PHASE-C-VRAM-PROBE shows ~14.8
-  GB free before HuMo loads.
-- **BUG-292 FIXED**: output unified under one `Documents\ComfyUI\output\otr` tree.
-- **Baseline "Elusive Dance"** (`signal_lost_elusive_dance_20260530_114408`):
-  ComfyUI history `status=success`; 77 words / 5 lines; 63.96 s; 1920x1080 @
-  24fps; final blend 54.9 MB in `otr/obs`; full episode tree present
-  (audio/composited/upscaled/stills/videos b001-b005). Audio C7 preserved
-  (BUG-084 was video 0.44 s longer than audio; `-shortest` trims trailing video).
-  Story graded B/B+ (intact arc, SFW, on-theme; thin middle at min word count).
-- **LoRA finding (git history, all branches):** workflow nodes 60 & 61 have
-  ONLY EVER held the same file `ltxv\ltx2\ltx-2.3-22b-distilled-lora-384-1.1.safetensors`
-  (60 @ 0.5, 61 @ 0.2 == 0.7 additive). True duplicate, never a different
-  adapter -> consolidate branch (Path A), NOT "restore an intended 2nd LoRA".
-- **Cast finding (Phase 2):** name/gender incoherence -- MALIK HIBBERT (male-coded
-  name) char_gender=female -> female voice; PHYLLIS OKAFOR (female-coded name)
-  char_gender=male -> male voice. Voices correctly follow the assigned gender;
-  the NAMES don't. Likely independent randomization of name vs gender.
-- Wrote `docs/GO_FORWARD_PLAN_2026-05-30.md` (9-item hardening + LoRA decision
-  tree + execution rule) and `docs/ARCH_AUDIT_2026-05-30.md` (keep-list +
-  serialization warnings). DECISION: stabilize / document / lightly harden, do
-  NOT redesign; keep all fallback/provider/sidecar/VRAM-lever/mirror surfaces.
+## Tech stack & constraints (live; CLAUDE.md prime directives still apply, not repeated)
+- **Execution reality this session:** file edits via the harness hit the real Windows FS; **all
+  python/pytest/git run through Desktop Commander (cmd) on the Windows venv**
+  `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (Python 3.12.11). The Linux sandbox
+  was NOT used (stale-mount risk). DC stdout isn't captured reliably → scratch scripts write
+  results to `C:\Users\jeffr\AppData\Local\Temp\otr_s0\*_out.txt`, read back with DC read_file.
+- Tests run green via the venv; full `tests/` walk exits 2 by design (the conftest known-fail
+  guard) — parse the output file, don't trust the exit code. **Baseline failure set = 5 known
+  pre-existing:** test_b7_forbidden_sweep (x2), test_llm_slot_sweep, test_bark_freeze_halt_bypass,
+  test_workflow_validator_empty_path_fallback. Green bar = "these 5, no more."
+- No GPU / no Bark here — audio + LLM end-to-end + VRAM smoke are operator-only.
+- Branch `v2.0-alpha`. **Tagging is Jeffrey's (CLAUDE.md): do NOT `git tag v2.0` — recommend it.**
+
+## What's done & decided (this session)
+- **Phase 1 shipped — 3 commits on `v2.0-alpha`:**
+  - **S1 `acc091a`** `config/cast_pools.py`: `FIRST_NAMES_BY_GENDER` (98 M / 24 F / 31 unisex —
+    partitions the SAME names; `FIRST_NAMES` left byte-identical, order is load-bearing for C7),
+    `gender_of_first_name()` (case-insensitive; bare or "FIRST LAST"; cross-cultural→unisex so it
+    never forces a false repair), `FIRST_NAMES_BY_GENRE`+`names_for_genre()`, `pick_first_last`
+    gains `genre="auto"` (auto = unchanged draw), import-time `_verify_name_buckets()` drift guard.
+  - **S0 `a0bd03b`** `nodes/_otr_cast_env.py` (frozen env contract), `tests/golden/` capture script +
+    `cast_pool_baseline.json` (coherent seed=1, known-incoherent seed=0 = NEMO-on-female),
+    `tests/test_cast_invariants.py` (R1/R2/R4/R5/R6), `test_cast.sh`.
+  - **S2 `30c666d`** `nodes/_otr_casting.py`: `_repair_ensemble_names` + `_pick_same_gender_first_name`
+    — swaps ONLY a mismatched first name for a same-gender one via ISOLATED rng
+    `random.Random(f"{cast_seed}:{char_id}")` (main cast_rng never perturbed → byte-identical for
+    coherent seeds, coherent otherwise). `cast_seed` threaded writer→`lock_cast`→`precompute_ensemble_slots`;
+    `lock_cast` now carries repaired `ens.name` downstream. Standalone `cast_one_character` passes
+    `repair_names=False`. R3 + cross-gender-rate tests added.
+- **Key decisions:** repair is a gender-blind-POOL concern → only in lock_cast's ensemble, NOT the
+  standalone explicit-name path. Pool mode (default) stays byte-identical (PD1). Every knob is an
+  env var → no workflow-JSON change. `OTR_NAME_CROSS_GENDER_RATE` default 0.0 = strict repair.
+- **NOT done (deliberate):** S3 + Phase 2 — see Immediate next steps. Bug Bible regression couldn't
+  run (`comfyui-custom-node-survival-guide/tests/bug_bible_regression.py` absent in this checkout).
 
 ## State of the art
-- HEAD `f4d05b9` on `v2.0-alpha` (origin synced; this session added the tag +
-  a docs commit). Working tree otherwise clean except untracked planning docs.
-- **LTX LoRA chain** in `workflows/otr_scifi_16gb_full.json`:
-  node 54 `LowVRAMCheckpointLoader` -> 60 `LoraLoaderModelOnly` (@0.5; model in =
-  link 87, MODEL out = link 102) -> 61 `LoraLoaderModelOnly` (@0.2; model in =
-  link 102, MODEL out = link 103) -> 55 `OTR_BatchLTXRender` (model via link 103).
-  Both loaders load the identical distilled lora.
-- **Cast gen** assigns char_gender independent of the chosen name. Ledger of the
-  baseline: c01 ANNOUNCER gender=female / kokoro bf_lily; c02 MALIK HIBBERT
-  gender=female / bark v2/en_speaker_4; c03 PHYLLIS OKAFOR gender=male / bark
-  v2/en_speaker_3.
-- **Machine-local helpers created** (gitignored `scripts/_*.py`):
-  `_otr_check_elusive_dance.py` (output-contract verify + history API),
-  `_otr_show_elusive_story.py` (treatment + ledger story dump),
-  `_otr_cast_check.py` (cast gender vs voice). Reusable for the next baseline.
+- HEAD `30c666d` on `v2.0-alpha`. Chain: 30c666d (S2) → a0bd03b (S0) → acc091a (S1) → e04c80b.
+- Verified: full `tests/` walk = only the 5 known failures, 0 new. R1–R6 + R3 green
+  (177-item cast bar: 171→ green). BOM/AST/0-byte sweep clean on all 8 touched files.
+- **Untracked, intentionally left for Jeffrey to decide:** the consult docs + sprint plan in
+  `docs/2026-05-30-cast-*`. (Handoff open question — Jeffrey's lean is "don't hoard docs".)
+- The cast pipeline ground truth (still accurate): `OTR_LedgerScriptWriter.execute` →
+  `lock_cast` (`_otr_casting.py:997`) → `assemble_pre_locked_rows` (names via
+  `cast_pools.pick_first_last`) → `precompute_ensemble_slots` (gender + **now repair**) →
+  `python_assign_voice_preset` (one `rng.choice` per slot at `:785`).
 
 ## Immediate next steps
-**PHASE 1 -- LoRA update (Path A consolidation; code warrants it):**
-1. Edit `workflows/otr_scifi_16gb_full.json`: set node 60 `widgets_values[1]`
-   0.5 -> 0.7; DELETE node 61; repoint link 103's source from node 61 to node 60
-   (node 60 `outputs[0].links` -> `[103]`); remove link 102 from the top-level
-   `links` array. Resulting chain: 54 -> 60 (@0.7) -> 55.
-2. Validator POST (`scripts/_otr_post_validator.py`) -> expect
-   `widget_vector_drift=0`, no raise (LoraLoaderModelOnly = 2 widgets, no
-   forceInput/seed -> count unchanged).
-3. Fixed-seed A/B smoke vs the Elusive Dance baseline (pin `OTR_CAST_SEED` /
-   `OTR_STYLE_SEED` env per the true-randomization memory, or re-use the same
-   news seed). Compare LTX frames for parity.
-4. If parity holds -> commit (one change; the validator is the re-wire check).
-   If LTX instead shows a specific weakness -> **Path B**: keep distill @0.7 on
-   node 60 and repurpose node 61 to a DIFFERENT adapter (motion / CRT-period /
-   character) @0.15-0.3, additive on top of full distillation (do NOT rob the
-   distill budget); A/B vs the consolidated version.
-5. Per Jeffrey's plan: if the short LoRA smoke works, run a **110-word baseline**.
-
-**PHASE 2 -- cast name/gender review (AFTER Phase 1):**
-6. Locate cast-gen (name + gender draw) -- start in `nodes/OTR_LedgerScriptWriter.py`
-   (cast/contract passes) and any cast helper; trace how `gender` is set vs how
-   the character name is chosen.
-7. Choose the fix: (a) gender-aware naming (draw gender, then pick a fitting
-   name) or (b) derive gender from the chosen name. Log `BUG-LOCAL-NNN`.
-8. Implement + regress (Bug Bible + core + audio byte-identical) + a smoke;
-   confirm a male-named character gets a male voice, etc.
-
-**Also pending (low priority, from GO_FORWARD_PLAN):** items 3/6/7/8/9 --
-HuMo->LTX edge naming (`wait_for_humo_clips_dir`), `closing_audio` double-mix
-check, `LowVRAMCheckpointLoader` unused-CLIP check, route
-`scene_sequencer.py:152 DEFAULT_OUT` through `_otr_paths`, refresh stale workflow
-metadata. Plus operator action: retire the duplicate AppData install.
+1. **S3 (VRAM) — needs the GPU, do WITH an operator smoke.** Move the writer-LLM unload to after
+   the script, before the TTS phase (not order 17). Use `_flush_vram_keep_llm()` semantics; never
+   `force_vram_offload()` between LLM phases (CLAUDE.md). **Reconcile with Phase 2 first** — S6/S8
+   add a *second* writer LLM pass, so "unload after script" must not strand Pass-2. Validate by a
+   VRAM-envelope episode run (operator pastes console). Do not blind-commit.
+2. **Phase 2 (S4–S9) — optional `OTR_NAME_MODE=llm_slot_fill`.** Build behind the default-off flag
+   so pool mode stays byte-identical (C7). S4 `nodes/_otr_castplanner.py` (immutable slot schema,
+   frozen-contract jsonc in the sprint plan), S7 `nodes/_otr_cast_validator.py` (rejects
+   out-of-contract keys / dup names / wrong count / gender-carryback; fallback → the S2 repair, no
+   LLM retry), S6 writer Pass-1 (name+texture, schema-locked, model id via STRING socket — NO new
+   model_id widget, PD6), S5 voice (gender×age) keeping ONE `rng.choice`/slot (`:785`, R6) and NOT
+   changing pool-mode picks, S8 writer Pass-2 vs frozen cast (R9), S9 mode-matrix regress. All
+   unit-testable headless with stub generate_fns (mirror `tests/test_otr_casting.py`); real-LLM
+   validation is an operator run.
+3. Run `./test_cast.sh` (or the equivalent venv pytest selection) after every change; then the full
+   `tests/` walk — green bar = the 5 known failures only.
+4. **Phase 1 ship:** recommend Jeffrey run `git tag v2.0` (tagging is his per CLAUDE.md). Push is
+   done if origin accepted; otherwise the cmd block is in the final report.
 
 ## Open questions
-- Path A vs Path B is gated on Jeffrey's visual review of the baseline `otr/obs`
-  file: does LTX motion/style look good (-> Path A) or weak (-> Path B)?
-- Cast-gen fix direction (gender-from-name vs name-from-gender) -- Jeffrey may
-  prefer some non-stereotypical pairings, so confirm intent before enforcing.
+- **Jeffrey owns, set before S6:** `OTR_NAME_CROSS_GENDER_RATE` lane — strict (0.0, ships clean,
+  recommended default, already the default) vs LLM-owns-intent (>0, heavier validator contract).
+  Phase 1 ships strict; flip later without structural change.
+- Commit the untracked `docs/2026-05-30-cast-*` consult/sprint docs, or treat as ephemeral?
+- S3 vs Phase 2 ordering: Phase 2 changes the writer LLM lifecycle, so do S3 AFTER S8 (or design
+  S3 against the final two-pass lifecycle) to avoid reworking it.
 
 ---
 ## Resume instructions
