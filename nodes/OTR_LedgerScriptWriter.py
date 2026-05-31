@@ -3748,6 +3748,21 @@ class OTR_LedgerScriptWriter:
         except Exception:  # noqa: BLE001
             meta["creative_prompt_profile"] = "modern"
 
+        # [OpenRouter S5] Remote-LLM provenance. For any slot bound to an
+        # OpenRouter handle, stamp provider + virtual handle + resolved
+        # slug + basic params + schema-mode so the env-side binding is
+        # recorded in the run (the slug is a public model id, not a
+        # secret; the API key is never stamped). Empty for local runs, so
+        # the offline baseline is byte-identical (C1). Never raises (PD1).
+        try:
+            from . import _otr_openrouter_backend as _orb
+            meta.update(_orb.openrouter_meta_for(
+                resolved["creative_writing_model"],
+                resolved["technical_model"],
+            ))
+        except Exception:  # noqa: BLE001 -- provenance must never break a run
+            pass
+
         # NOTE: meta.episode_title is stamped once, by the J.5
         # post-composition title pass (meta["episode_title"] = final_title
         # above). A Sprint-E "K.5.7" block used to re-stamp it here from

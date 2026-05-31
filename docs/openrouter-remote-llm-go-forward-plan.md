@@ -106,8 +106,8 @@ A `- [ ]` item flips to `- [x]` only when: done **and** the regression suite is 
 | S1 — OpenRouter backend (mocked) | DONE (2026-05-31) | — | `_otr_openrouter_backend.py` + registered in `BACKENDS_BY_KEY`; 22 mocked-HTTP tests incl. cost-abort via mocked counter (no request sent) |
 | S2 — Catalog rows (enabled-gated) | DONE (2026-05-31) | — | virtual rows join curated set only when enabled; `provider` field + `openrouter_http` literal; 12 toggle tests; no validator surgery |
 | S3 — Wire remote branch into live path | DONE (2026-05-31) | — | `request_slot` remote branch (skips local steps, C2 no-evict) + all 3 generate-fn factories branch on `provider`; 8 wiring tests incl. no-evict object-identity |
-| S4 — Technical JSON fail-closed gate | NOT STARTED | — | schema → validate → bounded repair → fail-closed (C4) |
-| S5 — Metadata stamp | NOT STARTED | — | provider + slot + resolved slug + params + schema-mode |
+| S4 — Technical JSON fail-closed gate | DONE (2026-05-31) | — | `make_constrained_generate_fn` remote branch → schema→response_format → existing structured_call ladder (fail-closed C4); 6 tests incl. malformed/no-schema |
+| S5 — Metadata stamp | DONE (2026-05-31) | — | `openrouter_meta_for` + writer stamp; provider+handle+resolved slug+params+schema-mode; empty for local; no key leak; 8 tests |
 | S6 — Smoke proofs (disabled + enabled) | NOT STARTED | — | byte-identical (off); end-to-end + abort proofs (on) |
 
 ---

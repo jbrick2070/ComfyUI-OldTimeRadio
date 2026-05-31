@@ -497,10 +497,52 @@ def schema_to_response_format(schema_model: Any, *, name: str = "otr_schema") ->
     }
 
 
+def openrouter_meta_for(creative_id: str, technical_id: str) -> dict[str, Any]:
+    """Build run-meta remote-LLM provenance (S5).
+
+    For each slot bound to an OpenRouter virtual handle, records the
+    provider, the virtual handle, the RESOLVED slug, and basic params
+    (per-slot max-tokens cap + optional temperature override). Adds a
+    run-level `llm_remote_provider` and `llm_remote_schema_mode` (schema
+    mode = the json_schema response_format path, used when the TECHNICAL
+    slot is remote). Returns ``{}`` when neither slot is remote, so a
+    local run gets no extra meta keys and stays byte-identical (C1).
+
+    The resolved slug is a PUBLIC model id (e.g. "openai/gpt-4o"), not a
+    secret -- recording it makes the env-side binding auditable in the
+    run. The API key is never read here and never stamped (C9). Never
+    raises (PD1: provenance must not break a run); an unresolved slug is
+    stamped as "<unresolved>" rather than blowing up."""
+    meta: dict[str, Any] = {}
+    for slot_name, model_id in (("creative", creative_id), ("technical", technical_id)):
+        if not is_openrouter_row_id(model_id):
+            continue
+        try:
+            letter = _slot_letter(model_id)
+            slug = resolve_slug(model_id)
+        except OpenRouterError:
+            letter = "?"
+            slug = "<unresolved>"
+        meta[f"llm_{slot_name}_provider"] = PROVIDER
+        meta[f"llm_{slot_name}_handle"] = model_id
+        meta[f"llm_{slot_name}_slug"] = slug
+        meta[f"llm_{slot_name}_max_tokens_cap"] = _int_env(
+            f"OPENROUTER_{letter}_MAXTOK", DEFAULT_MAX_TOKENS_PER_CALL
+        ) if letter != "?" else DEFAULT_MAX_TOKENS_PER_CALL
+        meta[f"llm_{slot_name}_temperature_override"] = (
+            _float_env(f"OPENROUTER_{letter}_TEMP") if letter != "?" else None
+        )
+    if meta:
+        meta["llm_remote_provider"] = PROVIDER
+        meta["llm_remote_schema_mode"] = is_openrouter_row_id(technical_id)
+    return meta
+
+
 __all__ = [
     "OpenRouterBackend",
     "make_openrouter_generate_fn",
     "schema_to_response_format",
+    "openrouter_meta_for",
     "OpenRouterError",
     "OpenRouterConfigError",
     "OpenRouterCostCeilingError",

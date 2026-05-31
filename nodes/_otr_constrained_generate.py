@@ -193,6 +193,25 @@ def make_constrained_generate_fn(
     the whole-episode critic (step 7) each bind their own schema and
     get their own closure.
     """
+    # [OpenRouter S4] Remote branch: a provider-tagged remote entry has
+    # no tokenizer to bind a grammar parser to. Map the call's Pydantic
+    # schema -> OpenRouter response_format (json_schema, strict) and
+    # return the remote generate_fn. Integrity is enforced FAIL-CLOSED
+    # (C4) by the SAME downstream the local path uses -- either the
+    # structured_call validate + bounded-repair ladder (raises
+    # StructuredCallFailedError on exhaustion) or the call site's direct
+    # _parse_and_validate -- so malformed remote output can never reach
+    # the ledger. A model that lacks json_schema support returns a 4xx,
+    # which the backend surfaces as OpenRouterCallFailedError (also
+    # fail-closed). Zero NEW validation logic; reuses the existing path.
+    if cache_entry.get("provider") == "openrouter":
+        from . import _otr_openrouter_backend as _orb
+        response_format = _orb.schema_to_response_format(
+            schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
+        )
+        return _orb.make_openrouter_generate_fn(
+            cache_entry, response_format=response_format,
+        )
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
