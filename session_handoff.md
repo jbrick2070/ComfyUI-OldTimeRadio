@@ -53,8 +53,13 @@ committed on `v2.0-alpha`.** Only operator-gated validation remains.
 
 ## Open questions
 - `OTR_NAME_CROSS_GENDER_RATE`: strict (0.0, in place) vs LLM-owns-intent (>0).
-- Bug Bible regression could not run — `comfyui-custom-node-survival-guide/tests/`
-  is empty in this checkout; re-sync that repo to run it.
+- Bug Bible regression RAN against the OTR pack (operator-uploaded
+  `bug_bible_regression.py`): **23/23 applicable static checks pass**, incl. all
+  new cast files. Only the guide's internal Three-File Contract fails (its own
+  `BUG_BIBLE.yaml`/`README.md` aren't reachable here). The
+  `comfyui-custom-node-survival-guide` dir is an inaccessible reparse point in
+  this environment (cmd → "syntax incorrect"); a session that can reach it
+  should do the Three-File promotion if this fix earns a Bible entry.
 
 ---
 ## Resume instructions
