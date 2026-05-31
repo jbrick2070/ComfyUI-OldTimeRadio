@@ -1,0 +1,50 @@
+{
+  "schema": "otr-cast-golden-v1",
+  "mode": "pool",
+  "num_characters": 4,
+  "force_lemmy": false,
+  "news_seed": "Scientists report a quiet anomaly in the upper atmosphere over the test range.",
+  "style": "1950s science fiction radio drama",
+  "seed": 1,
+  "cast": [
+    {
+      "char_id": "c01",
+      "name": "ANNOUNCER",
+      "gender": "male",
+      "voice_preset": "bm_fable"
+    },
+    {
+      "char_id": "c02",
+      "name": "MONTY ECKELS",
+      "gender": "male",
+      "voice_preset": "v2/en_speaker_5"
+    },
+    {
+      "char_id": "c03",
+      "name": "CHIDI VOLKOV",
+      "gender": "female",
+      "voice_preset": "v2/en_speaker_2"
+    },
+    {
+      "char_id": "c04",
+      "name": "KRIT GORDON",
+      "gender": "male",
+      "voice_preset": "v2/en_speaker_0"
+    },
+    {
+      "char_id": "c05",
+      "name": "STANLEY SIMPSON",
+      "gender": "other",
+      "voice_preset": "v2/en_speaker_6"
+    }
+  ],
+  "known_incoherent_seed": 0,
+  "known_incoherent_detail": [
+    {
+      "char_id": "c05",
+      "name": "NEMO SIMPSON",
+      "slot_gender": "female",
+      "name_gender": "male"
+    }
+  ]
+}
