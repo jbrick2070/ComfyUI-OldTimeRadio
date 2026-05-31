@@ -27,6 +27,10 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** adds in-graph HuMo lip-sync per dialogue line, layered over the v1.7 proc gen base — full-episode mp4 with talking-head video on top of the audio-reactive CRT visualization. Shipping on the `v2.0-alpha` git branch; `main` stays at v1.7.
 
+### Optional (experimental): remote LLM via OpenRouter
+
+The default pipeline is still **100% local, zero API keys** — that doesn't change. v2.0-alpha is adding an *opt-in* option to run the writer's creative and/or technical model on a hosted frontier model through [OpenRouter](https://openrouter.ai), for users who want to experiment with story quality. It stays **off** unless you set an API key and an enable flag, and whether it actually produces a better episode than the local default is still being evaluated. Full walkthrough (account → key → enable): [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
+
 ### What's in the v2.0-alpha FULL workflow (`workflows/otr_scifi_16gb_full.json`)
 
 ```

@@ -1,110 +1,49 @@
-# Session Handoff — OTR Dual-Route LLM (local-OR-API model router) — 2026-05-31
+# Session Handoff -- OldTimeRadio: OpenRouter Remote LLM -- 2026-05-31
 
 ## Core goal
-Start DESIGNING (not yet building) the "dual-route LLM": each of the writer's two LLM slots
-— `creative_writing_model` and `technical_model` — can be a LOCAL model OR an API model, with
-the SAME workflow wiring and the SAME ledger commit path. This is **CARD 1 of
-`workflows/GO_FORWARD_PLAN_v11_model_router_then_cleanup_2026-05-28.md`** ("prove the model
-router — architecture risk only"). Operator wants to evaluate **OpenRouter** as the API backend.
-This is a research/design session: map OpenRouter onto the existing slot machinery, surface the
-decisions, produce a sprint plan. Do NOT mix in any story redesign (that's Card 3, back-pocket).
+Add OpenRouter as an **optional, non-local** LLM provider selectable on **both** writer slots (creative + technical). A go-forward plan is **locked and verified against live code**; this session produced the plan, not the code. The next session's job is to **execute that plan**: `docs/openrouter-remote-llm-go-forward-plan.md` is the single source of truth — read it first. (Supersedes the earlier "dual-route LLM" design handoff.)
 
 ## Tech stack & constraints
-- ComfyUI custom node; Python 3.12 venv `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`;
-  branch `v2.0-alpha` only; Windows. git via Desktop Commander cmd; tests via venv pytest (full
-  `tests/` walk green = the 5 known pre-existing failures only). CLAUDE.md + ROADMAP + BUG_LOG
-  auto-load — don't re-derive them; this handoff is the live add-on.
-- **THE decision to get from Jeffrey (everything waits on it):** CLAUDE.md says "100% local, open
-  source, offline-first; no cloud services, no API keys, no paid services." OpenRouter is cloud +
-  paid + API-key. v11 Card 1 explicitly flags this and only allows it as "API as an *option* with
-  local as default/fallback." Operator's stance this session: out-of-the-box behavior must be
-  zero-config — so **local stays the zero-config default; API is opt-in.** Keys live in ENV, never
-  in the workflow JSON ("no secret keys in JSON").
-- Card 1 hard rules: API JSON retries fail LOUD (never silently route back to local mid-call);
-  if a slot's API path is unset/unreachable → fall back to local; episode `meta` records
-  backend/model/slot; no node may assume Hugging Face / local-only model IDs.
+Existing repo (Python, ComfyUI custom node, RTX 5080 / 16 GB, Windows, `v2.0-alpha` branch). CLAUDE.md auto-loads — its git flow (Desktop Commander cmd, `.git\COMMIT_EDITMSG` + `-F`, one push attempt), VRAM ceiling, audio-king, "no dummy", and Bug-Bible-after-every-change rules are in force and are **not** repeated here. Work-specific hard rules (full detail in the plan): remote is **default-off, env-gated** (`OPENROUTER_API_KEY` + `OTR_ENABLE_OPENROUTER=1`); remote technical JSON is **fail-closed**; **no half-remote episodes** (abort, never mid-run fall-back); the remote branch **must not evict the resident local model** (C2); no new nodes, no new writer widgets, no `model_id` widget anywhere.
 
-## What's done & decided (this session — the cast sprint, now CLOSED)
-- Cast name↔gender↔voice coherence sprint (S0–S9 + S3) **shipped + validated live** on
-  `v2.0-alpha`, HEAD `5adda65` (+ tools `7530c52`). Commits: S1 `acc091a` / S0 `a0bd03b` /
-  S2 `30c666d` / S4–S8 `7e04dc4` / S3 `31ea332` / S9 `e37df79`. Live proof — episode "Cooling
-  Race" cast fully coherent (ANYA→female→female voice, NED→male→male voice, 0 mismatches);
-  `meta.writer_llm_unload=unloaded` confirmed S3 active; Bug Bible static checks 23/23 on the pack.
-  Full record in BUG_LOG.md sprint marker. **Don't reopen the cast work.**
-- Defaults are correct out-of-the-box: coherence repair on in default pool mode (no env var, no
-  workflow edit); `OTR_NAME_CROSS_GENDER_RATE=0.0` strict; `OTR_NAME_MODE=llm_slot_fill` + genre
-  are opt-in flavor only.
-- **Voice age-axis: DROPPED** — operator said "I don't care about ages." S5's `age_band` stays
-  inert in pool mode (gated to llm_slot_fill); do NOT make it default. Closed.
-- New committed tool: `scripts/otr_tail_logs.py` (live log tailer — venv python, forced UTF-8 on
-  read AND stdout, filters fake `%|` progress-bar `[error]` lines, hits `/queue`+`/history`).
-  CLAUDE.md is **gitignored** here — edits land on disk (govern the AI) but don't push.
+## Operator activation (Windows env vars)
+`OPENROUTER_API_KEY` is **already set** in the User environment (2026-05-31); its value is not stored in any file. To enable remote and choose the A/B models, run via `setx`, then restart ComfyUI in a fresh terminal:
 
-## State of the art (the seam the router plugs into)
-- **The two-model selector already exists** and is the ONLY model-id surface (CLAUDE.md PD6 — no
-  other node carries a model_id widget; consumers get the id via a STRING socket). Widgets:
-  `creative_writing_model` + `technical_model` on `OTR_LedgerScriptWriter`.
-- **`_SlotScheduler` is the single injection point** (`nodes/OTR_LedgerScriptWriter.py:430`):
-  `for_slot("creative"|"technical")` returns `generate_fn(messages, *, temperature, max_new_tokens,
-  stop=None)`; `_account_and_get_entry` calls `nodes/_otr_model_loader.request_slot(slot,
-  resolved_id)` to make a model resident. An API backend is injected here — when the resolved slot
-  id is an API id, hand back an OpenRouter-backed `generate_fn` with the identical signature, and
-  `_SlotScheduler` + the ledger commit path stay untouched.
-- Local loader stack to mirror: `_otr_model_loader.py` (`request_slot`/`load_llm`/`unload_llm`,
-  4-bit NF4, 1-token warmup), `_otr_loader_backends.py` (`make_generate_fn`,
-  `normalize_messages_for_tokenizer` system-role fold), `_otr_model_catalog.py` (dropdown choices,
-  license audit, `_snapshot_is_causal_lm`).
-- Existing API-call pattern to copy: `scripts/_consult_openai.py` + the Round-Robin keys read via
-  `winreg` from User-scope env (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN`). Add
-  `OPENROUTER_API_KEY` the same way.
-- The `generate_fn` contract an API slot must honor: take `messages` (list of {role,content}),
-  `temperature`, `max_new_tokens`, optional `stop`; return raw text. The JSON-constrained passes
-  (cast validator, critic, GBNF-grammar locally) need an equivalent on a hosted model —
-  OpenRouter `response_format`/structured outputs, NOT local grammar.
+```
+setx OTR_ENABLE_OPENROUTER 1
+setx OPENROUTER_MODEL_A "anthropic/claude-3.5-sonnet"
+setx OPENROUTER_MODEL_B "openai/gpt-4o"
+```
 
-## Immediate next steps (research/design — NO code yet)
-1. Read CARD 1 of `workflows/GO_FORWARD_PLAN_v11_model_router_then_cleanup_2026-05-28.md` in full
-   (scope, the 4-combo matrix, pass/fail gates). Skim Card 2 (cleanup) for ordering.
-2. **ComfyUI ships an OFFICIAL OpenRouter LLM partner node** (this is the "ad" Jeffrey saw —
-   `https://docs.comfy.org/tutorials/partner-nodes/openrouter/llm`): one node, curated models
-   (Claude, GPT, Gemini, Grok, DeepSeek, Qwen, Mistral, GLM, Kimi, Perplexity), `temperature` +
-   `reasoning_effort`, and OpenRouter routing suffixes `:floor` (cheapest, default-on) / `:nitro`
-   (fastest) = built-in cost control. Community nodes also exist (gabe-init/ComfyUI-Openrouter_node,
-   EnragedAntelope/ComfyUI-EACloudNodes). **Critical nuance for OTR:** that partner node is a
-   STANDALONE node = one output per graph execution, but `OTR_LedgerScriptWriter` makes MANY
-   internal LLM calls per episode through `_SlotScheduler`/`request_slot`, so the node almost
-   certainly can NOT be wired into the writer's internal slot calls. Likely answer: build an
-   INTERNAL OpenRouter-backed `generate_fn` at the slot seam, using the partner node as the
-   Comfy-blessed reference + the same `OPENROUTER_API_KEY` env + the `vendor/model` namespace +
-   the `:floor`/`:nitro` cost flags. Verify the API shape (`/api/v1/chat/completions`,
-   OpenAI-compatible), per-model `response_format`/structured-output support, and a pricing cap.
-3. Draft the backend abstraction: a `request_slot`-level branch (or a `make_api_generate_fn`
-   sibling of `make_generate_fn`) that returns an OpenRouter-backed `generate_fn`, selected when a
-   slot's resolved id is an API id (e.g. `openrouter:vendor/model`). `_SlotScheduler` and the
-   ledger path unchanged.
-4. Spec: env keys (never in JSON), LOUD-fail retry, local fallback when unset/unreachable, `meta`
-   stamps (backend/model/slot), and the JSON-constrained-output story per slot.
-5. Take the directive sign-off + model-pick questions to Jeffrey BEFORE any build.
-6. Produce a short ADR / sprint plan for Card 1 (mirror the cast `go-forward-sprint-plan` shape)
-   with the 4-combo matrix as the exit gate. Stop for operator sign-off.
+Unset `OTR_ENABLE_OPENROUTER` (or set it to `0`) to disable remote entirely. Slugs are the operator's choice and swappable; verify current ids at openrouter.ai/models. None of S0–S3 or the mocked tests require these — only the enabled smoke run (S6 / W4) does.
+
+## What's done & decided
+- **Architecture locked: Option A.** Two virtual catalog rows `openrouter:slot-a` / `openrouter:slot-b` (`loader_backend="openrouter_http"`, new `provider` field), bound to real slugs by env (`OPENROUTER_MODEL_A/B`). They appear in both dropdowns only when enabled. No graph surgery.
+- **Technical JSON: controlled T1, fail-closed.** Remote technical calls reuse the **existing** `structured_call` validate + bounded-repair ladder — zero new validation logic.
+- **Three code-review refinements baked in** (marked `[code-review refinement]` in the plan): (1) the `LoaderBackend`/`BACKENDS_BY_KEY` dispatch table is **dormant** — remote must be wired into two live seams (`request_slot` + the generate-fn factory), not just "registered"; (2) **no `validate_model_id` surgery** — virtual rows join the curated set when enabled, so Path 1 admits them; (3) **no-evict rule** for the single-resident model cache.
+- **Verified against live code this session** (2 subagents, all-PASS): dormant dispatch, skippable-for-remote steps, clean curated-set injection, generate-fn seam signatures, safe `provider` field, and the full S4 `structured_call` / `_parse_and_validate` / `make_constrained_generate_fn` surface.
+- **Rejected:** Option B (writer config widgets — deferred; clean future upgrade, needs *no* B6 change), Option C (profile nodes — violates PD6 intent), Option D (raw slugs in dropdown), default-on cloud, mid-episode local fall-back, streaming.
+- **No code written yet.** Nothing committed for this feature.
+
+## State of the art
+- `docs/openrouter-remote-llm-go-forward-plan.md` — **the plan to execute.** Decision, hard constraints C1–C9, frozen contracts FC1–FC5, the autonomous wave map (W0–W4), sprints S0–S6 with checkbox acceptance criteria, and a verified file:line anchor appendix.
+- `docs/2026-05-31-openrouter-remote-llm__round-robin-locked.md` — raw round-robin output (provenance).
+- `docs/2026-05-31-openrouter-remote-llm-architecture-options.md` — options analysis (superseded; background only).
+- `docs/openrouter-setup.md` — **end-user** guide (account → key → `setx` → enable → use) with honest "unproven quality" framing. README carries an experimental pointer to it; promoting that pointer + adding an in-app hint (error + dropdown tooltip pointing users to the guide) is an **S6 deliverable** in the plan. **Also tracked in S6:** the README is stale overall and needs a full newbie-oriented refresh — audience is **ComfyUI beginners using AI coding assistants**, so low-jargon and copy-paste-first. The OpenRouter section is only one part of that refresh.
+- Key live-code seams (verified; full list in plan appendix): `request_slot` `nodes/_otr_model_loader.py:712` (calls `load_llm` directly at `:812`); generate-fn factory `OTR_LedgerScriptWriter.py:586` + `_otr_model_loader.py:864`/`:939`; catalog `nodes/_otr_model_catalog.py` (`CuratedModel:53`, `CURATED_LLM_MODELS:96`, `_by_repo_id:195`, `validate_model_id:452`); structured calls `nodes/_otr_structured_call.py:293`; meta stamp `OTR_LedgerScriptWriter.py:3732`.
+
+## Immediate next steps
+1. Read `docs/openrouter-remote-llm-go-forward-plan.md` end to end; treat FC1–FC5 + C1–C9 as fixed.
+2. Execute **W0 / S0 — baseline lock**: run the full regression set (`bug_bible_regression.py`, core tests, `test_audio_byte_identical.py`) + workflow JSON audits, confirm all green, freeze contracts, and make a clean checkpoint commit as the rollback point. Do **not** write feature code until the baseline is green.
+3. **W1 (2 parallel subagents):** S1 `nodes/_otr_openrouter_backend.py` (mocked HTTP; prove the cost-ceiling abort with a mocked token counter) ∥ S2 catalog rows + `provider` field (enabled-gated). Merge → full regress → gate.
+4. **W2 (solo):** S3 wire the remote branch into `request_slot` + generate-fn factory; enforce C2 no-evict. **W3 (parallel):** S4 fail-closed JSON ∥ S5 meta stamp. **W4 (solo):** S6 smoke proofs + final regress + Bug Bible.
+5. **Run autonomously — no operator-approval gates.** Drive W0 → W3, plus S5 and the S6 *disabled* byte-identical proof, plus every mocked/unit test and the mocked cost-abort proof, committing per wave via the CLAUDE.md git flow (Desktop Commander cmd, `.git\COMMIT_EDITMSG` + `-F`, verify after each push). Halt only on a red regression you can't fix, a real ambiguity, or a C1–C9 breach.
+6. **One human gate — leave for Jeffrey:** the S6 *enabled* live smoke (a real OpenRouter call) needs env vars not yet set (`OPENROUTER_API_KEY` is set; `OTR_ENABLE_OPENROUTER=1` + `OPENROUTER_MODEL_A/B` are not) and spends credits on a GPU episode run. Do everything up to it, then stop and report what's green; Jeffrey runs the enabled smoke when awake.
 
 ## Open questions
-- **Directive sign-off (Jeffrey owns; gates everything):** confirm OpenRouter is an intentional
-  opt-in *option* with local as the zero-config default + fallback.
-- Which OpenRouter models for creative vs technical? Cost ceiling / budget guardrail?
-- JSON-constrained passes (validators/critic): use OpenRouter `response_format=json_object` /
-  structured outputs, or keep those passes local-only and route only free-form creative to the API?
-  (Decides which of the 4 matrix combos are even meaningful.)
-- Surface API ids through the existing `creative_writing_model`/`technical_model` dropdowns (add to
-  the catalog) vs a separate `*_backend` env/socket — PD6 says NO new model_id widget either way.
-- **Official partner node vs internal client:** use ComfyUI's official OpenRouter node directly, or
-  build an internal OpenRouter `generate_fn` at the `_SlotScheduler` seam? The node is standalone
-  (one call per execution) and can't serve the writer's many mid-pipeline passes — so the answer is
-  probably "internal client; the partner node is the blessing + reference + key/config + cost-flag
-  source." Reference docs: `https://docs.comfy.org/tutorials/partner-nodes/openrouter/llm`.
+None blocking. The actual slugs `OPENROUTER_MODEL_A/B` point to are the operator's runtime choice and do not block any sprint. Option B remains an explicitly deferred future upgrade.
 
 ---
 ## Resume instructions
 Open a fresh window, attach this file, and say:
-"Read this handoff file and prepare to execute the immediate next steps.
-Acknowledge when you're ready to start."
+"Read this handoff and `docs/openrouter-remote-llm-go-forward-plan.md`, then execute W0–W3 (plus S5, the S6 *disabled* proof, and all regressions) autonomously, committing per wave. Do not wait for my approval between sprints — only stop on a red regression you can't fix, a real ambiguity, a C1–C9 breach, or the S6 *enabled* live smoke (which needs me). Post progress as you go and start now."

@@ -1,0 +1,88 @@
+# Using OpenRouter (optional, experimental) — get a key & turn it on
+
+OldTimeRadio runs **100% local with zero API keys by default**, and that never changes. This page is only for users who want to *experiment* with running the writer on a hosted frontier model (Claude, GPT, etc.) through [OpenRouter](https://openrouter.ai) to see if it makes a better episode.
+
+> **Status:** opt-in feature on the `v2.0-alpha` branch. It is **off** unless you set an API key *and* an enable flag (below). With them unset, nothing remote ever runs and the local pipeline is byte-for-byte unchanged.
+
+## Will it make a better story?
+
+**Unknown — that's the point of trying it.** The local default (Mistral-Nemo) is the soak-tested baseline. A bigger hosted model *may* write a stronger script, but it also costs money and sends your prompt to a third party. Treat this as an A/B experiment: generate one episode local, one with OpenRouter on the **creative** slot, and compare. Don't assume remote is better until you've heard both.
+
+## What it costs
+
+- **Free to try:** new accounts get a small free allowance, and OpenRouter has many **free models** (append `:free` to the slug, e.g. a `...:free` model). Free models are rate-limited (~20 requests/min; 50/day until you've purchased ≥10 credits, then 1000/day) and aren't guaranteed to support structured output (see the technical-slot note).
+- **Paid models:** frontier models bill against prepaid **credits** at pass-through provider pricing (no markup). OpenRouter adds a 5.5% fee — $0.80 minimum — when you *buy* credits. You only spend while remote is enabled and selected.
+- **Built-in guard:** OTR enforces a hard per-run spend/token ceiling and aborts before exceeding it, so a runaway loop can't quietly burn credits.
+
+## Step 1 — Create an OpenRouter account
+
+1. Go to [openrouter.ai](https://openrouter.ai) and click **Sign In**.
+2. Sign up with Google or email. **No credit card needed** for the free tier.
+
+## Step 2 — Create an API key
+
+1. Click your **profile icon** (top right) → **Keys** (or go straight to [openrouter.ai/keys](https://openrouter.ai/keys)).
+2. Click **Create Key**, give it a name like `OldTimeRadio`, and copy it. It looks like `sk-or-v1-…`.
+3. Copy it now — OpenRouter only shows the full key once.
+
+*(Optional, only for paid models: add a few dollars of credits on the [Credits page](https://openrouter.ai/settings/credits). Skip this if you'll use `:free` models.)*
+
+## Step 3 — Save the key on your PC (Windows)
+
+Open **Command Prompt** (not PowerShell — its console history is written to disk; cmd's isn't) and run, with your real key in place of the placeholder:
+
+```
+setx OPENROUTER_API_KEY "sk-or-v1-PASTE-YOUR-REAL-KEY-HERE"
+```
+
+No quotes are required (the key has no spaces), but they're safe — `setx` strips them, so the stored value stays clean. This saves to your User environment permanently. **Never paste your real key into a chat, a commit, or a screenshot.**
+
+## Step 4 — Turn it on and pick your models
+
+Two named remote slots, **A** and **B**, each point at a real model slug of your choice. Set them once:
+
+```
+setx OTR_ENABLE_OPENROUTER 1
+setx OPENROUTER_MODEL_A "anthropic/claude-3.5-sonnet"
+setx OPENROUTER_MODEL_B "openai/gpt-4o"
+```
+
+Browse and confirm exact, current slugs at [openrouter.ai/models](https://openrouter.ai/models) — they version over time. To go fully free, point A/B at a `:free` model slug.
+
+**Then restart ComfyUI in a fresh terminal** so it reads the new variables.
+
+## Step 5 — Use it in ComfyUI
+
+In the `OTR_LedgerScriptWriter` node you'll now see **OpenRouter A** and **OpenRouter B** in *both* model dropdowns:
+
+- **`creative_writing_model`** — the narrative passes (outline, cast, dialogue, polish). This is the best slot to try remote: it's where a strong model buys the most quality, and any model works here.
+- **`technical_model`** — the structured/JSON passes. See the note below before using remote here.
+
+Pick OpenRouter A (or B) on the slot you want, leave the other on the local default, and queue as usual.
+
+## Technical slot — read before using remote there
+
+The technical passes must emit strictly valid JSON. Locally that's guaranteed by grammar-constrained decoding. A remote model can only approximate it via "structured outputs," which **not every model (especially free ones) supports**. OTR is **fail-closed**: if a remote technical reply can't be validated, the run aborts with a clear error rather than writing bad data.
+
+**Recommendation:** keep `technical_model` on the **local default** and only put OpenRouter on `creative_writing_model`. If you do want remote technical, choose a model that explicitly supports structured outputs.
+
+## Privacy
+
+OpenRouter does not log prompts/completions by default, and routes around providers that do unless you opt in. Your script prompts (news summaries, character/dialogue text) will leave your machine when remote is enabled. If that matters to you, keep it off — the local pipeline never sends anything anywhere.
+
+## Turn it off
+
+Set the gate to `0` (or clear it) and restart ComfyUI:
+
+```
+setx OTR_ENABLE_OPENROUTER 0
+```
+
+The OpenRouter A/B options disappear from the dropdowns and the pipeline is back to 100% local. Your saved key stays put for next time; to remove it entirely, delete the `OPENROUTER_API_KEY` user variable.
+
+## Troubleshooting
+
+- **No OpenRouter A/B in the dropdown** → `OPENROUTER_API_KEY` or `OTR_ENABLE_OPENROUTER=1` isn't set, or ComfyUI wasn't restarted in a new terminal after `setx`.
+- **Run aborts on a technical pass** → the remote model didn't return valid JSON (fail-closed). Switch that slot to local or to a structured-output-capable model.
+- **"Insufficient credits" / rate-limit errors** → you're on a paid or rate-limited model; add credits or switch to a `:free` slug.
+- **Cost ceiling abort** → expected guard; raise the limit deliberately or use a cheaper/free model.
