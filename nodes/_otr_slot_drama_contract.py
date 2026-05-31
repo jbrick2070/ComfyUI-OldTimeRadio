@@ -381,6 +381,9 @@ def generate_slot_job_fields(
             ),
         },
     ]
+    # LLM slot: technical -- structured SlotJobFields JSON pass; the
+    # injected generate_fn is the constrained-decode closure built from
+    # the technical slot (see make_constrained_generate_fn call site).
     raw = generate_fn(
         messages,
         temperature=temperature,

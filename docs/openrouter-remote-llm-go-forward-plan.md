@@ -102,7 +102,7 @@ A `- [ ]` item flips to `- [x]` only when: done **and** the regression suite is 
 
 | Sprint | Status | Bug pointers | Notes |
 |--------|--------|--------------|-------|
-| S0 — Baseline lock + freeze contracts | NOT STARTED | — | full regress green, FC1–FC5 frozen, clean checkpoint commit |
+| S0 — Baseline lock + freeze contracts | DONE (2026-05-31) | BUG-LOCAL-293 | baseline was RED (5 known pre-existing fails) — fixed to green per Jeffrey; full OTR 3204 pass / 12 skip / 0 fail; Bug Bible 23/1skip/2xfail; FC1–FC5 frozen; checkpoint commit |
 | S1 — OpenRouter backend (mocked) | NOT STARTED | — | `_otr_openrouter_backend.py`; cost-abort proven with mocked counter |
 | S2 — Catalog rows (enabled-gated) | NOT STARTED | — | rows join curated set when enabled; no validator surgery |
 | S3 — Wire remote branch into live path | NOT STARTED | — | `request_slot` + generate-fn branches; no-evict (C2) |
@@ -244,3 +244,9 @@ Two operator runs, then close out.
 - Live-code accuracy review (2 subagents): all structural claims **PASS**. S4 re-grounded on the real `structured_call`/`_parse_and_validate` ladder (no new validation logic; reuses existing Pydantic schemas).
 - Restructured for autonomous Cowork execution: subagent waves W0–W4, no operator-approval gates.
 - Status: verified and ready. Awaiting go to start W0/S0.
+
+### 2026-05-31 · Session 1 (W0 / S0 — baseline lock)
+- Reviewed every live seam named in the appendix — all anchors confirmed accurate (the writer file is `nodes/OTR_LedgerScriptWriter.py`; line numbers match: `_build_truncating_generate_fn:586`, resolved ids `:1348`, dropdowns `:1546`, creative meta stamp `:3732`; `request_slot:712`, generate-fn factories `make_generate_fn:864`/`make_polish_generate_fn:939`; catalog dataclass/literal/curated/`validate_model_id`; `structured_call:293`/`_parse_and_validate:259`; `make_constrained_generate_fn:161`; dispatch table dormant in `_otr_model_runtime.py`). FC1–FC5 confirmed unchanged.
+- **S0 surfaced a RED baseline at HEAD `688263b`**: the full `tests/` walk failed on the 5 long-carried "known pre-existing failures" — none related to OpenRouter. Per S0 ("no feature code until baseline green") I halted and reported; Jeffrey chose **fix-to-green-first**. Logged + fixed as **BUG-LOCAL-293** (test/tooling/JSON-widget only): stale 29-node floor; node-11 `bypass_freeze_halt` restored to safe `false`; missing `# LLM slot: technical` tag at `_otr_slot_drama_contract.py:384`; forbidden-sweep `OSError(22)` from a OneDrive-locked multi-MB temp diff → tooling now writes to the OS temp dir.
+- **Baseline now GREEN:** full OTR `tests/` 3204 passed / 12 skipped / 0 failed; Bug Bible 23 passed / 1 skipped / 2 xfailed; `tools/audit_workflow_schema.py` OK. (`scripts/_audit_workflow_json.py` `unregistered_types` is a known environmental artifact — needs the ComfyUI runtime to register all node + built-in types; identical pre/post and not a wiring break.)
+- Checkpoint commit on `v2.0-alpha` is the rollback point. Next: W1 (S1 backend ∥ S2 catalog rows).

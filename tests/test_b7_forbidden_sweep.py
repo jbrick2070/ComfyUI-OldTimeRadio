@@ -19,9 +19,11 @@ Four tests:
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import tokenize
 from pathlib import Path
 
@@ -35,8 +37,18 @@ SWEEP_PATH = PACK_ROOT / "docs" / "_s28_forbidden_sweep.py"
 def _run_sweep_subprocess() -> tuple[int, str]:
     """Regenerate the diff input + invoke the sweep as a subprocess.
     Returns (return_code, stdout).
+
+    The diff + out files go to the OS temp dir (not the OneDrive-synced
+    docs/ tree) and are passed to the sweep via OTR_S28_DIFF_PATH /
+    OTR_S28_OUT_PATH. Writing the multi-MB diff into the synced tree let
+    OneDrive hold it open mid-sync, so the next truncating re-open
+    failed with OSError(22) -- the 2026-05-31 forbidden-sweep red
+    baseline. The OS temp dir is not synced, so the sweep is
+    deterministic.
     """
-    diff_path = PACK_ROOT / "docs" / "s28_diff_tmp.txt"
+    tmpdir = Path(tempfile.gettempdir())
+    diff_path = tmpdir / "otr_s28_diff_tmp.txt"
+    out_path = tmpdir / "otr_s28_forbidden_hits.txt"
     # Use git directly to write the diff with UTF-8 encoding.
     diff = subprocess.check_output(
         ["git", "-C", str(PACK_ROOT), "diff",
@@ -44,10 +56,15 @@ def _run_sweep_subprocess() -> tuple[int, str]:
         text=True, encoding="utf-8",
     )
     diff_path.write_text(diff, encoding="utf-8")
+    env = {
+        **os.environ,
+        "OTR_S28_DIFF_PATH": str(diff_path),
+        "OTR_S28_OUT_PATH": str(out_path),
+    }
     proc = subprocess.run(
         [sys.executable, str(SWEEP_PATH)],
         capture_output=True, text=True, encoding="utf-8",
-        cwd=str(PACK_ROOT),
+        cwd=str(PACK_ROOT), env=env,
     )
     return proc.returncode, proc.stdout
 
