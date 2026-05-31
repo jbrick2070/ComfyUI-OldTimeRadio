@@ -163,4 +163,7 @@ outputs_scratch_*/
 # by accident. Ignore the pattern so sprint diff dumps never re-enter.
 *_diff_tmp.txt
 docs/*_tmp.txt
+# Untracked sprint QA-dump leftover that is OneDrive-locked on disk (removed
+# from git in the docs prune; ignore so it stays out of `git status`).
+docs/2026-05-13-S28-new-forbidden-hits.txt
 
