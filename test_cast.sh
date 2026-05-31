@@ -19,6 +19,7 @@ PY="${OTR_PY:-C:/Users/jeffr/Documents/ComfyUI/.venv/Scripts/python.exe}"
 
 exec "$PY" -m pytest \
   tests/test_cast_invariants.py \
+  tests/test_cast_llm_naming.py \
   tests/test_otr_casting.py \
   tests/test_lock_cast_routing.py \
   tests/test_writer_cast_lock_voice_preset.py \
