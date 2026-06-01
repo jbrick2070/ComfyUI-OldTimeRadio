@@ -3741,15 +3741,17 @@ class OTR_LedgerScriptWriter:
             )
         meta.update(_brief_delta)
 
-        # --- Story-spine Wave 2: Stage 3 (critic) / 3.5 (single editor
-        # repair) / unload / Stage 4 (scrub), in-process + env-gated,
-        # DEFAULT ON (opt-out). The orchestrator runs the four post-script
-        # passes out of the box; OTR_ENABLE_STORY_SPINE=0 restores the
-        # writer's byte-identical default path (the unload block in the
-        # else branch). When on, the orchestrator performs the writer-LLM
-        # unload itself, after the LLM passes (D8). Never raises (PD1). No
-        # node surface, no workflow-JSON change (D4/D5); model ids come
-        # from resolved[...] (critic -> technical slot, editor -> creative).
+        # --- Story-spine Wave 2: the post-script passes (Stage 2.5 length
+        # pass / Stage 3 QA router / Stage 3.5 micro-repair / unload /
+        # Stage 4 scrub), in-process + env-gated, DEFAULT ON (opt-out). The
+        # orchestrator runs them out of the box; OTR_ENABLE_STORY_SPINE=0
+        # restores the writer's byte-identical default path (the unload
+        # block in the else branch). When on, the orchestrator performs the
+        # writer-LLM unload itself, after the LLM passes (D8). The spine
+        # NEVER raises (PD1); the only fail-loud signal is the REJECT gate
+        # checked right after this block. No node surface, no workflow-JSON
+        # change (D4/D5); model ids come from resolved[...] (QA -> technical
+        # slot, length pass + micro-repair -> creative slot).
         try:
             from . import _otr_story_spine as _OTRSPINE
         except ImportError:  # pragma: no cover - standalone / test load
@@ -3775,6 +3777,22 @@ class OTR_LedgerScriptWriter:
             except ImportError:  # pragma: no cover - standalone / test load
                 import _otr_writer_vram as _OTRVRAM  # type: ignore
             meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
+
+        # REJECT gate (go-forward Sprint 3): the story-spine QA router can
+        # mark an episode structurally unshippable (a dead ending, a broken
+        # turn, an unclear premise -- defects a one-line edit cannot fix).
+        # The spine itself NEVER raises (PD1 -- it sets story_verdict=REJECT,
+        # unloads the writer LLM, and skips the scrub); the WRITER raises
+        # here at its boundary, matching the fail-loud cast-lock pattern
+        # above. An aborted run produces no node output, so the graph stops
+        # BEFORE the FLUX -> HuMo -> LTX -> Bark render -- no audio is ever
+        # produced for a rejected story. A QA crash fails open to PASS and
+        # never reaches here, so it stays fail-soft.
+        if meta.get("story_verdict") == "REJECT":
+            raise RuntimeError(
+                f"OTR reject gate: "
+                f"{meta.get('story_reject_reason') or 'story rejected'}"
+            )
 
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json
