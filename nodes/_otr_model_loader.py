@@ -759,10 +759,18 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # (creative=remote, technical=local) must not evict + reload the local
     # model across slot transitions. Remote makes zero CUDA / snapshot /
     # download calls.
+    # BUG-LOCAL-299: this remote-routing gate shipped recognizing ONLY
+    # "openrouter_http". A Comfy Credits row (loader_backend="comfy_credits_http")
+    # fell through to the LOCAL path below, so ComfyUI tried to HF-download the
+    # virtual handle (e.g. "comfy:slot-a") -> HFValidationError, aborting the run
+    # before the lane was ever exercised. Route BOTH remote loader_backends; the
+    # _otr_model_runtime dispatch table already maps each key to its backend, so
+    # a future remote lane only adds its key to this tuple.
+    _REMOTE_LOADER_BACKENDS = ("openrouter_http", "comfy_credits_http")
     _remote_row = _otr_catalog._by_repo_id().get(normalized)
     if (
         _remote_row is not None
-        and getattr(_remote_row, "loader_backend", None) == "openrouter_http"
+        and getattr(_remote_row, "loader_backend", None) in _REMOTE_LOADER_BACKENDS
     ):
         from ._otr_model_runtime import get_backend_for_row
         log.info(
@@ -912,6 +920,10 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "openrouter":
         from ._otr_openrouter_backend import make_openrouter_generate_fn
         return make_openrouter_generate_fn(cache_entry)
+    # BUG-LOCAL-299: Comfy Credits sibling -- same zero-VRAM remote seam.
+    if cache_entry.get("provider") == "comfy_credits":
+        from ._otr_comfy_backend import make_comfy_credits_generate_fn
+        return make_comfy_credits_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -999,6 +1011,10 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "openrouter":
         from ._otr_openrouter_backend import make_openrouter_generate_fn
         return make_openrouter_generate_fn(cache_entry)
+    # BUG-LOCAL-299: Comfy Credits sibling -- same zero-VRAM remote seam.
+    if cache_entry.get("provider") == "comfy_credits":
+        from ._otr_comfy_backend import make_comfy_credits_generate_fn
+        return make_comfy_credits_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

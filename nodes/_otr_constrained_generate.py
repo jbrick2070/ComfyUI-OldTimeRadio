@@ -212,6 +212,19 @@ def make_constrained_generate_fn(
         return _orb.make_openrouter_generate_fn(
             cache_entry, response_format=response_format,
         )
+    # BUG-LOCAL-299: Comfy Credits sibling. The Comfy lane is "OpenRouter over
+    # Comfy's proxy", so the json_schema response_format is byte-identical --
+    # reuse the OpenRouter schema mapper, then hand it to the Comfy generate_fn.
+    # Same fail-closed downstream (structured_call validate + repair ladder).
+    if cache_entry.get("provider") == "comfy_credits":
+        from . import _otr_openrouter_backend as _orb
+        from . import _otr_comfy_backend as _occ
+        response_format = _orb.schema_to_response_format(
+            schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
+        )
+        return _occ.make_comfy_credits_generate_fn(
+            cache_entry, response_format=response_format,
+        )
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

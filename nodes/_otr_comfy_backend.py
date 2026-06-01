@@ -57,11 +57,16 @@ COMFY_ROW_IDS = frozenset({SLOT_A_ID, SLOT_B_ID})
 
 DEFAULT_CONTEXT_WINDOW = 8192
 
-# The Comfy API proxy surface. Env-overridable so the operator can pin the
-# exact, version-correct endpoint at the first live credit-billed run
-# without a code change. Defaults are a best-effort starting point.
+# The Comfy API proxy surface. Verified 2026-06-01 against the bundled
+# partner-node source: path from `comfy_api_nodes/nodes_openrouter.py`
+# (OPENROUTER_CHAT_ENDPOINT) and base from `comfy_api_nodes/util/_helpers.py`
+# (default_base_url -> args.comfy_api_base or https://api.comfy.org). The
+# proxy path carries an `/api/` segment that the pre-verification best-guess
+# omitted (BUG-LOCAL-297). Still env-overridable (OTR_COMFY_API_BASE /
+# OTR_COMFY_CHAT_PATH) so a future proxy move needs no code change; a
+# mismatch fails closed with a named error (never crashes Node 1).
 DEFAULT_BASE_URL = "https://api.comfy.org"
-DEFAULT_CHAT_PATH = "/proxy/openrouter/v1/chat/completions"
+DEFAULT_CHAT_PATH = "/proxy/openrouter/api/v1/chat/completions"
 
 # Recommended slugs (the dropdown lead + the resolution fallback). Both are
 # present in the Comfy partner-node catalog below. Anthropic tops out at

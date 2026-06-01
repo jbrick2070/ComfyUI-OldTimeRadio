@@ -68,11 +68,12 @@ fall-back to a local model and no silent remote→remote swap.
 
 ## First-run endpoint check (operator)
 
-The Comfy proxy surface is env-overridable so you can confirm the exact,
-version-correct endpoint at your first credit-billed run without a code change:
+The Comfy proxy surface is env-overridable so you can repoint it without a code
+change. The defaults were verified 2026-06-01 against the bundled partner-node
+source (`comfy_api_nodes/nodes_openrouter.py` + `util/_helpers.py`):
 
 - `OTR_COMFY_API_BASE` (default `https://api.comfy.org`)
-- `OTR_COMFY_CHAT_PATH` (default `/proxy/openrouter/v1/chat/completions`)
+- `OTR_COMFY_CHAT_PATH` (default `/proxy/openrouter/api/v1/chat/completions`)
 
 If the first live run fails with a clear "confirm OTR_COMFY_API_BASE /
 OTR_COMFY_CHAT_PATH" error, point these at the live Comfy proxy and re-run. The

@@ -221,20 +221,50 @@ _AUDIOGEN_CORRECT_INPUTS = {
     "default_duration": 3.0,
 }
 
+# Known-correct widget values for OTR_MusicGenTheme.
+# BUG-LOCAL-298: node 14's script_json is a forceInput, but the workflow JSON
+# still tags that input with a "widget" flag. _workflow_to_api_prompt counts a
+# linked-with-widget-flag input as a KEPT widgets_values slot, so it overcounts
+# by one and the 4-value vector ["", "facebook/musicgen-medium", 3.0, false]
+# shifts: episode_seed<-model, model_id<-guidance, guidance_scale<-False (0.0).
+# 0.0 < the node's min=1.0, so ComfyUI rejects node 14; since EpisodeAssembler
+# reads node 14's opening/closing theme outputs, the ENTIRE audio output is
+# invalidated and the prompt no-ops (0 lines). The production ComfyUI frontend
+# and tests/test_workflow_audio_widget_vectors.py both correctly EXCLUDE the
+# forceInput slot (the length-4 vector is correct and that test passes); only
+# this headless replica converter overcounts. Hardcode the intended values,
+# mirroring the BUG-LOCAL-008 AudioGen correction above.
+_MUSICGEN_CORRECT_INPUTS = {
+    "episode_seed": "",
+    "model_id": "facebook/musicgen-medium",
+    "guidance_scale": 3.0,
+    "allow_silence_fallback": False,
+}
+
 
 def _fix_known_widget_drift(prompt):
     """Apply hardcoded corrections for nodes with known widget drift.
 
     BUG-LOCAL-008: OTR_BatchAudioGenGenerator gets episode_seed and
     model_id from the wrong wv slots due to schema ordering mismatch.
-    This correction overwrites with the workflow's intended values.
+    BUG-LOCAL-298: OTR_MusicGenTheme shifts by one because its forceInput
+    script_json carries a "widget" flag in the workflow JSON (see the
+    _MUSICGEN_CORRECT_INPUTS note). Both corrections overwrite with the
+    workflow's intended values; linked inputs (e.g. script_json) are left
+    untouched because .update() only sets the listed widget keys.
     """
     for nid, node_data in prompt.items():
-        if node_data.get("class_type") == "OTR_BatchAudioGenGenerator":
+        ct = node_data.get("class_type")
+        if ct == "OTR_BatchAudioGenGenerator":
             before = {k: node_data["inputs"].get(k) for k in _AUDIOGEN_CORRECT_INPUTS}
             node_data["inputs"].update(_AUDIOGEN_CORRECT_INPUTS)
             print(f"  Fixed node #{nid} OTR_BatchAudioGenGenerator widget drift")
             log.info("BUG-LOCAL-008 fix applied: was %s, now correct", before)
+        elif ct == "OTR_MusicGenTheme":
+            before = {k: node_data["inputs"].get(k) for k in _MUSICGEN_CORRECT_INPUTS}
+            node_data["inputs"].update(_MUSICGEN_CORRECT_INPUTS)
+            print(f"  Fixed node #{nid} OTR_MusicGenTheme widget drift")
+            log.info("BUG-LOCAL-298 fix applied: was %s, now correct", before)
     return prompt
 
 

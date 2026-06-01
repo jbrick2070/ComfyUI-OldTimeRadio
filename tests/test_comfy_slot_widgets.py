@@ -186,6 +186,23 @@ def test_generate_fn_factory_marks_remote(comfy_on):
     assert getattr(fn, "_otr_comfy_credits", False) is True
 
 
+# --- request_slot routing (BUG-LOCAL-299) -----------------------------------
+
+
+def test_request_slot_routes_comfy_handle_to_backend(comfy_on):
+    """BUG-LOCAL-299: request_slot must route a comfy_credits_http row to the
+    REMOTE backend (provider-tagged, zero local VRAM) -- not fall through to
+    the local HF loader, which tried to download the literal 'comfy:slot-a'
+    and raised HFValidationError. Pins the parity gate that shipped openrouter-
+    only. No network/auth: load() only resolves the slug."""
+    from nodes import _otr_model_loader as ml
+    entry = ml.request_slot("creative", occ.SLOT_A_ID)
+    assert entry["provider"] == "comfy_credits"
+    assert entry["slug"] == occ.resolve_slug(occ.SLOT_A_ID)
+    # Remote => zero local handles (never touched the local download/load path).
+    assert "model" not in entry and "tokenizer" not in entry
+
+
 # --- writer surface + _resolve_inputs threading -----------------------------
 
 
