@@ -1231,6 +1231,23 @@ def _build_user_prompt(req: LineRequest) -> str:
             "Do not explain the turn. Perform the objective indirectly. "
             "The situation must be different after this line."
         )
+    # Story-spine Stream B1 (2026-05-31): universal news-grounding +
+    # one-breath length rider. Lands at the WRITE LINE tail (just above
+    # "Speak now.") so it is the model's last instruction, and applies
+    # to every model on every voiced beat -- premise grounding and
+    # spoken-length pacing are model-agnostic (no per-model branch, per
+    # spine invariant 6). `theme` / allowed_people / allowed_things on
+    # the request carry the news material; the phantom + cast gates
+    # still enforce entity discipline post-hoc, so this is a salience
+    # nudge, not the only guard. The ~20-30 word "one breath" clause is
+    # the source-side length lever -- Stream D owns the hard total-length
+    # ceiling; this does NOT touch _word_bands or the max_new_tokens cap.
+    parts.append(
+        "Ground this line in the news facts and this scene's premise; "
+        "do not invent people, places, or objects the news does not "
+        "imply. Keep it spoken-length -- one breath, about 20-30 words, "
+        "concrete, no nested clauses."
+    )
     parts.append("Speak now.")
     return "\n".join(parts)
 
