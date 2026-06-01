@@ -169,8 +169,28 @@ class Beat(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Outline schema
+# Arc references (story-spine Stream A) + Outline schema
 # ---------------------------------------------------------------------------
+
+
+class TurnRef(BaseModel):
+    """Story-spine Stream A: pointer to the beat where the situation
+    irreversibly changes. ``beat_index`` is a 0-based index into
+    ``Outline.beats``. Stamped deterministically by the Path-C combiner
+    (``_derive_arc_refs``), never emitted by an LLM -- the index cannot
+    exist until Python has assembled the beat list."""
+
+    beat_index: int = Field(..., ge=0, description="0-based index into Outline.beats")
+    what_changes: str = Field(..., min_length=3, max_length=200)
+
+
+class ButtonRef(BaseModel):
+    """Story-spine Stream A: pointer to the closing beat that lands the
+    payoff. ``beat_index`` is a 0-based index into ``Outline.beats``.
+    Stamped by the combiner, same rationale as ``TurnRef``."""
+
+    beat_index: int = Field(..., ge=0, description="0-based index into Outline.beats")
+    payoff: str = Field(..., min_length=3, max_length=200)
 
 
 class Outline(BaseModel):
@@ -196,6 +216,20 @@ class Outline(BaseModel):
     # within the schema cap with music_inter beats.
     beats: list[Beat] = Field(..., min_length=4, max_length=32)
 
+    # Story-spine Stream A (2026-05-31): arc gate. central_tension rides
+    # the Stage-1 _MacroShape LLM call; turning_point + button are
+    # stamped by the Path-C combiner (_derive_arc_refs) because their
+    # beat_index cannot exist until the beat list is assembled. All
+    # three are Optional-with-default so legacy Outline(...) construction
+    # and serialized round-trips stay valid; the production combiner
+    # always populates them (acceptance: every shipped outline carries a
+    # turn + a payoff). The _arc_refs_coherent validator below only
+    # checks coherence WHEN present, so it never fail-closes a back-compat
+    # outline.
+    central_tension: str = Field(default="", max_length=300)
+    turning_point: Optional[TurnRef] = Field(default=None)
+    button: Optional[ButtonRef] = Field(default=None)
+
     @model_validator(mode="after")
     def _no_duplicate_beat_ids(self) -> "Outline":
         """Schema-internal sanity check. Cast-membership cross-check
@@ -204,6 +238,39 @@ class Outline(BaseModel):
         ids = [b.beat_id for b in self.beats]
         if len(ids) != len(set(ids)):
             raise ValueError(f"duplicate beat_ids in outline: {ids}")
+        return self
+
+    @model_validator(mode="after")
+    def _arc_refs_coherent(self) -> "Outline":
+        """Story-spine Stream A structural guard. Only fires when the arc
+        refs are present (the combiner always sets them; legacy outlines
+        leave them None and pass). Indices must be in range, the turn
+        must precede the button, and the button must land in the back
+        half of the episode. The combiner stamps valid refs by
+        construction, so a raise here means a regression -- caught by the
+        outline regression, not a recoverable runtime state."""
+        n = len(self.beats)
+        tp = self.turning_point
+        bt = self.button
+        if tp is not None and not (0 <= tp.beat_index < n):
+            raise ValueError(
+                f"turning_point.beat_index {tp.beat_index} out of range [0,{n})"
+            )
+        if bt is not None and not (0 <= bt.beat_index < n):
+            raise ValueError(
+                f"button.beat_index {bt.beat_index} out of range [0,{n})"
+            )
+        if tp is not None and bt is not None:
+            if not (tp.beat_index < bt.beat_index):
+                raise ValueError(
+                    f"turning_point ({tp.beat_index}) must precede button "
+                    f"({bt.beat_index})"
+                )
+            if bt.beat_index < n // 2:
+                raise ValueError(
+                    f"button.beat_index {bt.beat_index} must land in the back "
+                    f"half of {n} beats (at/near the final beat)"
+                )
         return self
 
 
@@ -938,6 +1005,12 @@ class _MacroShape(BaseModel):
     premise: str = Field(..., min_length=10, max_length=400)
     setting: str = Field(..., min_length=4, max_length=120)
     time_of_day: str = Field(..., min_length=3, max_length=40)
+    # Story-spine Stream A: the dramatic question. Required-with-default
+    # (like Beat.arc_phase) -- a small local model frequently omits an
+    # Optional field, so default="" guarantees the macro parses even when
+    # omitted; the combiner then falls back to the premise. Capable
+    # models emit it from the _MACRO_SYSTEM_PROMPT schema below.
+    central_tension: str = Field(default="", max_length=300)
 
 
 # Stage 2 schema -- per-phase speaker assignments only. Each beat is
@@ -983,10 +1056,11 @@ You plan short science-fiction audio dramas. Return one JSON object only -- no p
 
 Schema:
 {
-  "title":       3-80 chars,
-  "premise":     10-400 chars; one sentence that extrapolates dramatically from the story,
-  "setting":     4-120 chars; concrete place,
-  "time_of_day": 3-40 chars; e.g. "midnight", "pre-dawn", "after first contact".
+  "title":           3-80 chars,
+  "premise":         10-400 chars; one sentence that extrapolates dramatically from the story,
+  "setting":         4-120 chars; concrete place,
+  "time_of_day":     3-40 chars; e.g. "midnight", "pre-dawn", "after first contact",
+  "central_tension": 10-300 chars; the single dramatic question the episode answers, one sentence.
 }
 """
 
@@ -1297,6 +1371,62 @@ def _structured_attempt_entry(
     )
 
 
+def _climactic_phase(arc_phases: tuple[str, ...]) -> Optional[str]:
+    """Story-spine Stream A: pick the phase that holds the turn. Prefer an
+    explicit 'climax' phase; else the penultimate phase; else the last.
+    Pure; never raises."""
+    if not arc_phases:
+        return None
+    lowered = [p.lower() for p in arc_phases]
+    if "climax" in lowered:
+        return arc_phases[lowered.index("climax")]
+    if len(arc_phases) >= 2:
+        return arc_phases[-2]
+    return arc_phases[-1]
+
+
+def _derive_arc_refs(
+    beats: list[Beat], macro: "_MacroShape", arc_phases: tuple[str, ...],
+) -> tuple[str, Optional[TurnRef], Optional[ButtonRef]]:
+    """Story-spine Stream A: deterministically locate the turning-point
+    and button beats and build the arc refs (Path C -- the beat_index
+    cannot exist until the combiner has assembled the beat list).
+
+    button = the last CHARACTER beat (the dramatic payoff). turn = the
+    first character beat of the climactic phase, falling back to ~two-
+    thirds through the character beats, always kept strictly < button.
+    central_tension comes from the macro, falling back to the premise.
+
+    Pure; never raises; always returns coherent refs (turn < button, both
+    valid indices) for any outline with >= 2 character beats. For a
+    degenerate outline (< 2 character beats) returns (central, None, None)
+    so the Optional arc fields simply stay unset and the validator skips."""
+    char_idxs = [i for i, b in enumerate(beats) if b.speaker_role == "character"]
+    central = (getattr(macro, "central_tension", "") or "").strip()
+    if not central:
+        central = (macro.premise or "").strip()[:300]
+    if len(char_idxs) < 2:
+        return central, None, None
+    button_idx = char_idxs[-1]
+    turn_idx: Optional[int] = None
+    climax_phase = _climactic_phase(arc_phases)
+    if climax_phase is not None:
+        for i in char_idxs:
+            if beats[i].arc_phase == climax_phase and i < button_idx:
+                turn_idx = i
+                break
+    if turn_idx is None:
+        cand = char_idxs[min(len(char_idxs) - 1, (len(char_idxs) * 2) // 3)]
+        turn_idx = cand if cand < button_idx else char_idxs[-2]
+    if turn_idx >= button_idx:
+        turn_idx = char_idxs[-2]
+    return (
+        central,
+        TurnRef(beat_index=turn_idx, what_changes=beats[turn_idx].intent),
+        ButtonRef(beat_index=button_idx, payoff=beats[button_idx].intent),
+    )
+
+
 def _assemble_outline(
     macro: _MacroShape,
     phase_skeletons: list[_PhaseSkeleton],
@@ -1400,12 +1530,22 @@ def _assemble_outline(
         arc_phase=arc_phases[-1],
     ))
 
+    # Story-spine Stream A: stamp the arc refs from the assembled beats
+    # (Path C -- beat_index cannot exist until now). Deterministic; the
+    # combiner is the only production path, so every shipped outline
+    # carries a turn + a payoff by construction.
+    central_tension, turning_point, button = _derive_arc_refs(
+        beats, macro, arc_phases,
+    )
     outline = Outline(
         title=macro.title,
         premise=macro.premise,
         setting=macro.setting,
         time_of_day=macro.time_of_day,
         beats=beats,
+        central_tension=central_tension,
+        turning_point=turning_point,
+        button=button,
     )
     stamp_dialogue_slot_ids(outline)
     return outline
