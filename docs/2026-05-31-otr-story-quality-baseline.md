@@ -43,6 +43,7 @@ SFW / non-violent compliance is pass/fail, tracked separately (all runs must pas
 | T2 | **local** parity | local mistral-nemo / local mistral-nemo | 60 | 11/11 | X-Labs: First Light | 4.0 | 3.5 | 3.5 | 3.5 | 4.0 | 3.0 | 3.5 | **25.0 / 35** (71%) | pass |
 | T3 | **local** prod-len | local mistral-nemo / local mistral-nemo | 350 | 11/11 | Doorway to Anomaly | 3.0 | 4.5 | 4.5 | 4.0 | 4.0 | 3.5 | 3.5 | **27.0 / 35** (77%) | pass |
 | T4 | **remote** prod-len | OR mistral-nemo / OR mistral-nemo | 350 | 11/11 | Muddy Canaries | 4.0 | 4.0 | 3.5 | 3.0 | 3.0 | 3.5 | 2.5 | **23.5 / 35** (67%) | pass |
+| T6 | **local** prod-len (consistency) | local mistral-nemo / local mistral-nemo | 350 | 11/11 | Dancing Plague | 4.0 | 4.0 | 4.0 | 3.5 | 3.5 | 3.5 | 3.0 | **25.5 / 35** (73%) | pass |
 
 Wall-clock: T1 remote ~270s, T2 local ~281s (near-identical; remote saves the local
 LLM load/unload, local saves the network round-trips). T3 local 350w ~11m20s (18 lines,
@@ -229,6 +230,54 @@ ambiguous twist (the capuchins have *tripled*, "could cause a whole new set of p
 generation quirks the local run didn't trigger -- *not* a wiring problem. Every structured
 call still returned valid JSON; the run completed clean end-to-end.
 
+### T6 -- local Mistral-Nemo (both slots), 350w consistency check -- "Dancing Plague"
+
+episode `pending_20260531_183850`, 18 lines, ~11m24s. A second local 350w run (different
+live news story) to test whether T3's strong result repeats.
+
+> **c01:** Ladies and gentlemen, gather 'round your radios as we step into UCLA's lab tonight, where Dr. Hosein Mohimani is dancing on the edge of precision and prediction.
+> **c02:** You know, Creed, these bacterial cultures... they're like nothing we've seen before. They're practically dancing on our lab tables.
+> **c03:** (pauses, adjusts his glasses) Yes, well, bacteria have been known to surprise us, haven't they? I've been staring at these sequences all morning, and they're... quite the puzzle.
+> **c02:** (rolling up her sleeves) I'll have my keyboard and I'll have fun until this code yields its secrets.
+> **c03:** (tapping a pen nervously) Do remember, Erin, these secrets could be the difference between a pandemic and a headline. We're racing against something that doesn't keep office hours.
+> _[music interlude]_
+> **c02:** (sighs, rubbing her temples) This is like trying to untangle a knot with a pair of tweezers, Creed. I'm losing track of where we are in the sequence.
+> **c03:** (leaning in, voice firm) I need you to stay on this, Erin. We can't afford to lose momentum. I'll have some coffee sent over to keep you going.
+> **c02:** (freezes, then looks up at Creed, grimacing) Wait, Creed. I think... I think I just found another anomaly. This one's bigger than we thought.
+> **c03:** (clenching his fist) I expected more from you, Erin. Time is literally lives here.
+> **c02:** (staring at her screen, fingers trembling) These numbers... they're not adding up. It's like someone's taken a sledgehammer to our patterns.
+> **c03:** (slamming a fist on the table) We don't have time for 'like'. We need results. Now.
+> _[music interlude]_
+> **c02:** (whispering, eyes widening) Creed, it's... it's not just the data. The anomaly's eating into our power grid. Look, the lights are flickering.
+> **c03:** (leaning in, voice tight) How long until it crashes? We're running on borrowed time here, Erin. Literally.
+> **c02:** (calmly, pointing at the screen) It's not random, Creed. It's a pattern, cycling every 37 minutes. Like clockwork.
+> **c03:** (tapping out a code on his old manual alarm clock) Damn it. Sound the global alarm. We've got 36 minutes left before it hits again.
+> **announcer:** Tonight, UCLA's Hosein Mohimani has shown us the future of medicine, where molecules meet machines. Goodnight.
+
+**Read:** Well-grounded -- UCLA + Dr. Hosein Mohimani (a real bioinformatics researcher) +
+"molecules meet machines" anchor a sequence-analysis premise (grounding 4.0). Strong
+ticking-clock arc: mysterious cultures -> race-against-a-pandemic pressure -> escalating
+anomaly -> a 37-minute-cycle cliffhanger ("sound the global alarm", 36 minutes left)
+(arc 4.0). **Attribution is clean across all 16 speech lines** -- Erin (c02, the coder)
+and Creed (c03, the anxious taskmaster) stay distinct and consistent (voice 4.0,
+coherence 3.5; the data-anomaly-hits-the-power-grid beat is a sci-fi stretch). Good stage
+business (adjusts glasses, trembling fingers, fist on the table). Mild tells: melodrama +
+"literally" used twice (tells 3.0). One mild content note: "Damn it" is the kind of word
+the SFW guard usually trims -- borderline, not profanity, flagged for the operator's taste.
+
+## Local consistency (T3 vs T6) -- repeatable at production length
+
+Two local 350w runs on different live news stories: **T3 27/35 (77%) and T6 25.5/35 (73%)
+-- both mid-70s, both with clean speaker attribution, both completed end-to-end with no
+Bark crash.** Local at production length is repeatable and reliable. Contrast the two
+remote 350w runs: T4 finished but lower (67%, with the F3 name-leak) and T5 *crashed* at
+Bark (BUG-276 family). So on this small sample, **local 350w is both higher-scoring and
+more reliable than remote 350w** (2/2 clean vs 1 lower-quality completion + 1 crash). The
+crash is a known-open cast-routing defect that can in principle hit either path; it landed
+on remote here. This reinforces the steer: keep local as the dependable default (it earned
+its B/B+), treat remote as a working, proven-wired option, and spend the next effort on the
+content/cast-routing surface (F3 + BUG-276 family), not on transport.
+
 ## Parity verdict -- CLOSED at production length
 
 **Wiring is proven identical on both transports, at both lengths.** Same model
@@ -278,8 +327,10 @@ highest-value targets with code anchors (below).
 | T3 local 350w | `2a49e952` | success ~11m20s | Doorway to Anomaly |
 | T4 remote 350w | `851229da` | success ~9m15s | Muddy Canaries |
 | T5 remote 350w (F3 repro) | `da741d15` | **CRASH @ Bark ~317s** | -- (BUG-276 family) |
+| T6 local 350w (consistency) | `dd225b38` | success ~11m24s | Dancing Plague |
 
-T1-T4: real RSS, `news_interpreter` ON, **no baked premise**, audio-only, SFW pass.
+T1-T4 + T6: real RSS, `news_interpreter` ON, **no baked premise**, audio-only, SFW pass
+(T6 "Damn it" flagged for operator taste). T5 crashed before producing a script.
 
 ## Bugs the soak surfaced (beyond the F1-F3 content findings)
 
