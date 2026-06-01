@@ -44,6 +44,8 @@ SFW / non-violent compliance is pass/fail, tracked separately (all runs must pas
 | T3 | **local** prod-len | local mistral-nemo / local mistral-nemo | 350 | 11/11 | Doorway to Anomaly | 3.0 | 4.5 | 4.5 | 4.0 | 4.0 | 3.5 | 3.5 | **27.0 / 35** (77%) | pass |
 | T4 | **remote** prod-len | OR mistral-nemo / OR mistral-nemo | 350 | 11/11 | Muddy Canaries | 4.0 | 4.0 | 3.5 | 3.0 | 3.0 | 3.5 | 2.5 | **23.5 / 35** (67%) | pass |
 | T6 | **local** prod-len (consistency) | local mistral-nemo / local mistral-nemo | 350 | 11/11 | Dancing Plague | 4.0 | 4.0 | 4.0 | 3.5 | 3.5 | 3.5 | 3.0 | **25.5 / 35** (73%) | pass |
+| T7 | **local** short (curve) | local mistral-nemo / local mistral-nemo | 150 | 11/11 | _(writer abort)_ | -- | -- | -- | -- | -- | -- | -- | **FAILED** (inventor parse, fail-closed) | n/a |
+| T8 | **local** long (curve) | local mistral-nemo / local mistral-nemo | 500 | 11/11 | Dust of Uncertainty | 3.5 | 3.5 | 4.0 | 3.5 | 3.0 | 3.5 | 3.0 | **24.0 / 35** (69%) | pass* |
 
 Wall-clock: T1 remote ~270s, T2 local ~281s (near-identical; remote saves the local
 LLM load/unload, local saves the network round-trips). T3 local 350w ~11m20s (18 lines,
@@ -278,6 +280,47 @@ on remote here. This reinforces the steer: keep local as the dependable default 
 its B/B+), treat remote as a working, proven-wired option, and spend the next effort on the
 content/cast-routing surface (F3 + BUG-276 family), not on transport.
 
+## Length curve (local) -- quality peaks ~350w; 500w is not better
+
+Extending the local length sweep (all local mistral-nemo, seeds 11/11):
+
+| Words | Run | Score | Lines | Note |
+|-------|-----|-------|-------|------|
+| 60 | T2 | 71% | 5 | too short for a full arc |
+| 150 | T7 | **FAILED** | -- | writer "inventor" pass parse-failed 3x, fail-closed (no script) |
+| 350 | T3 / T6 | 77% / 73% | 18 / 18 | sweet spot -- full arc, clean attribution, reliable |
+| 500 | T8 | 69% | 18 (334 words) | undershot to 18 lines / 334 words; critic flagged needs_full_rerun |
+
+**Quality peaks around 350w.** 60w is too cramped for an arc; 500w did NOT improve on 350w
+-- the writer's beat structure caps near 18 lines, so a 500w target just stretched
+per-line length, undershot to 334 words, and introduced an emotional-arc gap the critic
+caught (`needs_full_rerun`). Recommendation: **keep production around 350 target words.**
+
+### T7 -- local 150w -- writer abort (fail-closed)
+
+prompt_id `c6b2a82d`. The writer's "inventor" pass failed schema/parse validation on all 3
+attempts (`inventor failed after 3 attempts; parse failed: inventor lines
+'city_lab_expansion_notice' and 'initiative_expansion_notice'...`) and the writer aborted
+**fail-closed** -- no malformed script shipped. This is a content-generation robustness gap
+(local mistral-nemo produced un-parseable inventor output, likely near-duplicate keys),
+not a transport or wiring issue, and the fail-closed behaviour is correct (better an abort
+than a broken episode). Finding **F4** -- the inventor pass can exhaust its repair ladder on
+some local outputs; a candidate for the prompt/structure pass (e.g. a dedup/normalize step
+or a more forgiving inventor grammar). Stochastic; did not recur on the other local runs.
+
+### T8 -- local 500w -- "Dust of Uncertainty" (24/35)
+
+episode `pending_20260531_185404`, 18 lines, ~9m31s. A NASA-return-to-the-moon premise:
+a lunar-base crew (Lemmy = c02, Nia = c03; the Lemmy cameo rolled in) fighting a rogue AI
+that has seized the rovers and power grid. Well-built tension and stage business, clean
+attribution. **But the critic flagged `needs_full_rerun`** (bypassed by the soak halt) for
+a real reason: an abrupt emotional flip -- Nia grabs Lemmy's wrist to STOP him (line 11),
+he ignores her and types (line 12), then she is suddenly "relieved" and thanking him
+(line 13) with no bridging beat (coherence 3.0). Two "damn"s ("damn AI glitches", "Damn
+it") slipped the SFW guard -- mild, but against Jeffrey's strict no-profanity standard
+(finding **F5**, `pass*` in the table). 24/35 -- slightly below the 350w runs, consistent
+with the curve: more budget did not help.
+
 ## Parity verdict -- CLOSED at production length
 
 **Wiring is proven identical on both transports, at both lengths.** Same model
@@ -317,6 +360,16 @@ highest-value targets with code anchors (below).
   inside an asterisk `*...*` group or as a bare mid-sentence token, and retry (the loop
   already supports retry-on-reject). Scope it to multi-word ALL-CAPS to avoid touching
   legitimate single-name drama. Must pass Bug Bible + audio byte-identical before ship.
+- **F4 -- writer "inventor" pass can fail-closed (local).** T7 (local 150w) aborted: the
+  inventor pass parse-failed 3x on near-duplicate keys (`city_lab_expansion_notice` /
+  `initiative_expansion_notice`) and the writer fail-closed (correct -- no broken episode
+  shipped). A robustness gap, not a crash: a dedup/normalize step or a more forgiving
+  inventor grammar would let it recover. Stochastic; did not recur on other local runs.
+  Medium priority.
+- **F5 -- "damn" slips the SFW guard.** T6 and T8 both used "damn"/"Damn it" -- mild, but
+  against the strict no-profanity standard (CLAUDE.md / Jeffrey's prefs). Add "damn(ed)" to
+  the SFW validator wordlist if a hard no is wanted, else leave as an allowed mild
+  interjection -- an operator taste call. Low priority, trivial.
 
 ## Test log
 
@@ -328,9 +381,14 @@ highest-value targets with code anchors (below).
 | T4 remote 350w | `851229da` | success ~9m15s | Muddy Canaries |
 | T5 remote 350w (F3 repro) | `da741d15` | **CRASH @ Bark ~317s** | -- (BUG-276 family) |
 | T6 local 350w (consistency) | `dd225b38` | success ~11m24s | Dancing Plague |
+| T7 local 150w (curve) | `c6b2a82d` | **error @ writer ~?s** | -- (inventor parse, fail-closed) |
+| T8 local 500w (curve) | `7ba361af` | success ~9m31s | Dust of Uncertainty |
 
-T1-T4 + T6: real RSS, `news_interpreter` ON, **no baked premise**, audio-only, SFW pass
-(T6 "Damn it" flagged for operator taste). T5 crashed before producing a script.
+All scored runs: real RSS, `news_interpreter` ON, **no baked premise**, audio-only. SFW
+mostly clean -- T6/T8 used "damn" (mild, flagged F5). T5 crashed (BUG-276 family) and T7
+aborted (inventor parse, F4) before producing a script. **8 runs total: 6 scored, 2 failed
+(1 remote Bark crash, 1 local writer abort) -- both fail-closed/safe, no broken episode
+shipped.**
 
 ## Bugs the soak surfaced (beyond the F1-F3 content findings)
 
