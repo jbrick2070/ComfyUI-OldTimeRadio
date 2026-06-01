@@ -167,3 +167,10 @@ docs/*_tmp.txt
 # from git in the docs prune; ignore so it stays out of `git status`).
 docs/2026-05-13-S28-new-forbidden-hits.txt
 
+# --- 2026-06-01 OpenRouter catalog cache ---
+# The four-dropdown router caches the OpenRouter /models list at
+# models/openrouter_models.json (per-machine discovery data, refreshed via
+# scripts/otr_openrouter_refresh.py). Already covered by the models/ rule
+# above; pinned explicitly so the cache file is unmistakably non-versioned.
+models/openrouter_models.json
+

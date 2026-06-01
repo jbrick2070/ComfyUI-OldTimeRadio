@@ -49,6 +49,8 @@ setx OPENROUTER_MODEL_B "openai/gpt-4o"
 
 Browse and confirm exact, current slugs at [openrouter.ai/models](https://openrouter.ai/models) — they version over time. To go fully free, point A/B at a `:free` model slug.
 
+> **Since the 2026-06-01 four-dropdown router, `OPENROUTER_MODEL_A`/`_B` are a *fallback*, not the primary control.** In the ComfyUI UI you now pick the actual slug per-workflow from the **slot-model dropdowns** (Step 5). The env vars are used when a slot's picker is left unset (headless runs, or a workflow saved while remote was off). Resolution order per slot: the slot-picker widget value → `OTR_OPENROUTER_SLOT_A_DEFAULT`/`_B_DEFAULT` → `OPENROUTER_MODEL_A`/`_B` → the built-in recommended default.
+
 **Then restart ComfyUI in a fresh terminal** so it reads the new variables.
 
 ## Step 4b — (Optional) Route for speed or cost
@@ -75,14 +77,52 @@ setx OPENROUTER_SORT throughput   :: both slots, unless a slot/slug overrides it
 
 Precedence is most-specific-first: a `:nitro`/`:floor` on the slug wins, then `OPENROUTER_A_ROUTE`/`OPENROUTER_B_ROUTE`, then `OPENROUTER_SORT`. The hard cost ceiling still applies either way — a faster provider is never an uncapped one. The route you used is recorded in the episode's run meta so a run is reproducible.
 
-## Step 5 — Use it in ComfyUI
+## Step 5 — Use it in ComfyUI (the four-dropdown router)
 
-In the `OTR_LedgerScriptWriter` node you'll now see **OpenRouter A** and **OpenRouter B** in *both* model dropdowns:
+Since 2026-06-01 the `OTR_LedgerScriptWriter` node has **four** model dropdowns in two layers:
 
-- **`creative_writing_model`** — the narrative passes (outline, cast, dialogue, polish). This is the best slot to try remote: it's where a strong model buys the most quality, and any model works here.
-- **`technical_model`** — the structured/JSON passes. See the note below before using remote here.
+**Layer 1 — where each pass runs (the routing selectors):**
 
-Pick OpenRouter A (or B) on the slot you want, leave the other on the local default, and queue as usual.
+- **`creative_writing_model`** — the narrative passes (outline, cast, dialogue, polish). Choices are your **local** models plus **`openrouter:slot-a`** and **`openrouter:slot-b`**. This is the best slot to try remote.
+- **`technical_model`** — the structured/JSON passes. Same choices. See the technical-slot note below before sending it remote.
+
+**Layer 2 — which real OpenRouter model each slot is (the slug pickers):**
+
+- **`openrouter_slot_a_model`** — the actual slug behind `openrouter:slot-a`.
+- **`openrouter_slot_b_model`** — the actual slug behind `openrouter:slot-b`.
+
+So to run the creative passes on a hosted model: set **`creative_writing_model` → `openrouter:slot-a`**, then pick the model you want in **`openrouter_slot_a_model`** (e.g. `anthropic/claude-3.5-sonnet`). Leave `technical_model` on the local default. Queue as usual.
+
+The slug pickers are **passive**: choosing a slug in `openrouter_slot_a_model` does nothing on its own — it only takes effect when a selector points at `openrouter:slot-a`. So you can pre-set both slots and flip between local and remote just by changing the selector.
+
+**Conditional default (fresh node only):** when remote is enabled, a freshly-dropped writer node defaults `creative_writing_model` to `openrouter:slot-a` (so the feature is one click away); `technical_model` stays local and is never auto-flipped. A **saved** workflow always keeps its own values — defaults apply only to new nodes.
+
+## Refresh the model list (populating the slug pickers)
+
+The slug dropdowns are built from an on-disk cache, never a live network call (so opening the node menu is always instant and offline-safe). Until you refresh it, the pickers show only a recommended default plus an `(enable OpenRouter)` / `(no OpenRouter models cached …)` sentinel. Populate it with the refresh script:
+
+```
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_openrouter_refresh.py
+```
+
+It fetches the live [openrouter.ai/models](https://openrouter.ai/models) list and writes `models/openrouter_models.json` (per-machine, git-ignored). Re-run it whenever you want to see newly added models. A failed/offline run keeps your existing cache and never crashes. Reload the node (or restart ComfyUI) to see the refreshed list.
+
+## Narrowing the slug list (optional filters)
+
+The slug pickers can get long. These env vars trim them (filters only — they never hide your local models or the slot handles):
+
+```
+setx OTR_OPENROUTER_PROVIDER_FILTER "anthropic,openai"   :: only these providers
+setx OTR_OPENROUTER_MODEL_ALLOWLIST "anthropic/claude-3.5-sonnet,openai/gpt-4o"  :: only these slugs
+setx OTR_OPENROUTER_MODEL_DENYLIST "some/model"          :: hide these slugs
+setx OTR_OPENROUTER_SLOT_B_REQUIRE_JSON 1                :: slot B: only structured-output models
+```
+
+`REQUIRE_JSON` is **per slot** (default off). It's meant for slot B when you route the technical slot remote — it never narrows slot A, so a creative-only model is never hidden from A because B needs JSON. You can also pin each slot's default with `OTR_OPENROUTER_SLOT_A_DEFAULT` / `OTR_OPENROUTER_SLOT_B_DEFAULT`.
+
+## Your saved model is never silently swapped
+
+A workflow saved with a specific slug keeps it. If you reload that workflow and your local cache is stale or cold (so the slug isn't in the current dropdown list), OTR **preserves your saved slug, logs a warning, and still uses it** — a stale cache is not a missing model, and OTR never quietly substitutes a different one. If a remote call genuinely fails, the run aborts with a clear error (fail-loud) rather than swapping to another model mid-episode. Re-run the refresh script to bring the slug back into the visible list.
 
 ## Technical slot — read before using remote there
 
@@ -107,6 +147,7 @@ The OpenRouter A/B options disappear from the dropdowns and the pipeline is back
 ## Troubleshooting
 
 - **No OpenRouter A/B in the dropdown** → `OPENROUTER_API_KEY` or `OTR_ENABLE_OPENROUTER=1` isn't set, or ComfyUI wasn't restarted in a new terminal after `setx`.
+- **The slug picker (`openrouter_slot_a/b_model`) only shows a recommended default + `(no OpenRouter models cached …)`** → the catalog cache is empty. Run `scripts\otr_openrouter_refresh.py`, then reload the node. (You can still type/keep any valid slug — a saved one is preserved even when out of the visible list.)
 - **Run aborts on a technical pass** → the remote model didn't return valid JSON (fail-closed). Switch that slot to local or to a structured-output-capable model.
 - **"Insufficient credits" / rate-limit errors** → you're on a paid or rate-limited model; add credits or switch to a `:free` slug.
 - **Cost ceiling abort** → expected guard; raise the limit deliberately or use a cheaper/free model.
