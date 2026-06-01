@@ -117,6 +117,27 @@ def _spec_for(node_type: str, widget_name: str, schemas: dict) -> Any:
     )
 
 
+# [OpenRouter S3] Slot-picker widget names whose out-of-list COMBO value the
+# validator must ADMIT (preserve) rather than reject. See the admit-path in
+# _validate_widget_value below.
+_OPENROUTER_SLOT_WIDGETS = frozenset({
+    "openrouter_slot_a_model", "openrouter_slot_b_model",
+})
+
+
+def _is_openrouter_admissible(widget_name: str, value: Any) -> bool:
+    """True when an out-of-list COMBO value is a legitimate OpenRouter binding
+    to preserve: a non-empty value on a slot-picker widget (a real slug chosen
+    from a cache that is now stale/cold), or any 'openrouter:'-prefixed handle
+    (the slot handles are absent from creative/technical choices when remote is
+    disabled). Mirrors catalog.validate_model_id's openrouter admit-path."""
+    if not isinstance(value, str) or not value:
+        return False
+    if widget_name in _OPENROUTER_SLOT_WIDGETS:
+        return True
+    return value.startswith("openrouter:")
+
+
 def _validate_widget_value(
     node_type: str,
     widget_name: str,
@@ -149,6 +170,15 @@ def _validate_widget_value(
     # Dropdown / COMBO -- type_def is the list of choices.
     if isinstance(type_def, list):
         if value not in type_def:
+            # [OpenRouter S3] Admit-path past the static choice-list check.
+            # A saved OpenRouter slot slug can be legitimately out-of-list
+            # (the cache it was picked from is now stale/cold) and the slot
+            # handles are absent from creative/technical choices when remote
+            # is disabled. Preserve such a value (BUG-LOCAL-280 + the
+            # 2026-06-01 preservation rule) instead of rejecting it at patch
+            # time -- enablement/resolution is enforced downstream.
+            if _is_openrouter_admissible(widget_name, value):
+                return
             raise ValueError(
                 f"widget {widget_name!r} on node_type {node_type!r} is a "
                 f"COMBO with choices {type_def!r}; got {value!r} which is "

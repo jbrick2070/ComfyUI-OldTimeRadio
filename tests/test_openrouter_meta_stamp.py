@@ -19,6 +19,16 @@ A = "openrouter:slot-a"
 B = "openrouter:slot-b"
 
 
+@pytest.fixture(autouse=True)
+def _clear_slot_bindings():
+    """S3: clear the process-global slot bindings around every test so meta
+    resolution always exercises the env-fallback path here (a binding set by
+    another module must never contaminate these env-driven assertions)."""
+    orb.clear_slot_bindings()
+    yield
+    orb.clear_slot_bindings()
+
+
 @pytest.fixture
 def enabled(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-SECRET-DO-NOT-LEAK")
@@ -73,12 +83,16 @@ def test_no_api_key_in_any_meta_value(enabled):
         assert "sk-SECRET-DO-NOT-LEAK" not in str(v)
 
 
-def test_unresolved_slug_does_not_raise(monkeypatch):
+def test_unbound_slug_falls_back_to_recommended(monkeypatch):
+    """S3: the env is now a FALLBACK, not the primary source. An unbound slot
+    with no OPENROUTER_MODEL_A no longer stamps '<unresolved>' -- it resolves
+    to the recommended creative default. The stamp still never raises (PD1)."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.delenv("OPENROUTER_MODEL_A", raising=False)
+    monkeypatch.delenv("OTR_OPENROUTER_SLOT_A_DEFAULT", raising=False)
     meta = orb.openrouter_meta_for(A, LOCAL)
-    assert meta["llm_creative_slug"] == "<unresolved>"
+    assert meta["llm_creative_slug"] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
 
 
 def test_writer_wires_the_stamp():

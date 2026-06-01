@@ -2022,7 +2022,18 @@ class OTR_LedgerScriptWriter:
         try:
             from . import _otr_openrouter_backend as _orb_budget
             _orb_budget.reset_run_budget()
-        except Exception:  # noqa: BLE001 -- budget reset is best-effort
+            # S3 (2026-06-01): record the slot-picker widget values so the
+            # backend resolves a handle (openrouter:slot-a/b) to the OPERATOR'S
+            # chosen slug, demoting the env (OPENROUTER_MODEL_A/B) to a
+            # fallback. Set from the RAW widget args BEFORE _resolve_inputs so
+            # the binding is live even for the RSS rerank's technical-slot load
+            # inside _resolve_inputs. Best-effort: on any failure resolution
+            # falls back to env, so a binding hiccup never blocks the run.
+            _orb_budget.set_slot_bindings(
+                slot_a=openrouter_slot_a_model,
+                slot_b=openrouter_slot_b_model,
+            )
+        except Exception:  # noqa: BLE001 -- budget/binding setup is best-effort
             pass
 
         # --- A. Resolve all widget inputs (RSS fetch happens here) -----
@@ -3909,6 +3920,11 @@ class OTR_LedgerScriptWriter:
                 resolved["creative_writing_model"],
                 resolved["technical_model"],
             ))
+            # S3 (2026-06-01): also stamp the slug each slot RESOLVES to (on
+            # the live bindings/fallback chain) + catalog staleness, so the
+            # run records which remote model would serve each slot and how
+            # fresh discovery was. {} when remote is disabled (C1 byte-ident).
+            meta.update(_orb.openrouter_run_meta())
         except Exception:  # noqa: BLE001 -- provenance must never break a run
             pass
 

@@ -24,11 +24,14 @@ from nodes import _otr_model_runtime as runtime
 
 @pytest.fixture(autouse=True)
 def _reset_and_silence(monkeypatch):
-    """Zero the per-run budget and make backoff instant for every test."""
+    """Zero the per-run budget, clear S3 slot bindings (so env-fallback
+    resolution is the default), and make backoff instant for every test."""
     orb.reset_run_budget()
+    orb.clear_slot_bindings()
     monkeypatch.setattr(orb.time, "sleep", lambda *_a, **_k: None)
     yield
     orb.reset_run_budget()
+    orb.clear_slot_bindings()
 
 
 @pytest.fixture
@@ -112,10 +115,42 @@ def test_load_raises_when_disabled(monkeypatch):
         orb.OpenRouterBackend().load(orb.SLOT_A_ID, _row())
 
 
-def test_resolve_slug_raises_when_unbound(monkeypatch):
+def test_resolve_slug_falls_back_to_recommended_when_unbound(monkeypatch):
+    """S3: env is DEMOTED to a fallback. With no binding, no SLOT_DEFAULT and
+    no OPENROUTER_MODEL_A, resolve_slug returns the recommended creative
+    default (the plan §5 case-1 chain ends at the recommended constant before
+    the config error) rather than raising."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.delenv("OPENROUTER_MODEL_A", raising=False)
+    monkeypatch.delenv("OTR_OPENROUTER_SLOT_A_DEFAULT", raising=False)
+    assert orb.resolve_slug(orb.SLOT_A_ID) == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+
+
+def test_resolve_slug_chain_priority(monkeypatch):
+    """A bound slug > OTR_OPENROUTER_SLOT_x_DEFAULT > OPENROUTER_MODEL_x env."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
+    monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "vendor/env-model")
+    monkeypatch.delenv("OTR_OPENROUTER_SLOT_A_DEFAULT", raising=False)
+    # env only
+    assert orb.resolve_slug(orb.SLOT_A_ID) == "vendor/env-model"
+    # SLOT_A_DEFAULT beats env
+    monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "vendor/slot-default")
+    assert orb.resolve_slug(orb.SLOT_A_ID) == "vendor/slot-default"
+    # a bound slug (the widget pick) beats everything
+    orb.set_slot_bindings(slot_a="vendor/bound-model", slot_b=None)
+    assert orb.resolve_slug(orb.SLOT_A_ID) == "vendor/bound-model"
+
+
+def test_resolve_slug_raises_when_nothing_resolvable(monkeypatch):
+    """The config error is still reachable: no binding, no env, no
+    SLOT_DEFAULT, and the recommended constant forced empty -> raise."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
+    monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
+    monkeypatch.delenv("OPENROUTER_MODEL_A", raising=False)
+    monkeypatch.delenv("OTR_OPENROUTER_SLOT_A_DEFAULT", raising=False)
+    monkeypatch.setattr(orb, "OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT", "")
     with pytest.raises(orb.OpenRouterConfigError):
         orb.resolve_slug(orb.SLOT_A_ID)
 

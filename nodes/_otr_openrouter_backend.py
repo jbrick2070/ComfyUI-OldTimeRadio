@@ -166,20 +166,52 @@ def _slot_letter(repo_id: str) -> str:
 
 
 def resolve_slug(repo_id: str) -> str:
-    """Map a virtual handle to the real model slug bound in the env
-    (`OPENROUTER_MODEL_A` / `OPENROUTER_MODEL_B`). Raises
-    OpenRouterConfigError when the slug env var is unset -- the handle
-    has no meaning without it. The slug is the operator's runtime choice
-    and is recorded in run meta (S5), never hard-coded here."""
+    """Map a virtual handle (openrouter:slot-a/b) to the real model slug,
+    resolving on the STORED slot-picker widget value (S3 / plan §5). Three
+    cases:
+
+      (2) A slug is bound for the slot (the operator's slot-picker pick) ->
+          USE IT VERBATIM. If it is absent from the (possibly stale/cold)
+          local cache, WARN but still attempt it -- a stale cache is not a
+          gone model, and we never silently swap a saved slug.
+      (1) No binding (empty / unset / placeholder sentinel) -> fallback
+          chain: OTR_OPENROUTER_SLOT_x_DEFAULT -> OPENROUTER_MODEL_x (env,
+          now DEMOTED to a fallback) -> recommended default -> config error.
+
+    (Case 3 -- a selected call FAILS -- is handled at generate time by the
+    retry ladder raising OpenRouterCallFailedError; there is no remote->remote
+    swap.) The resolved slug is a public model id, recorded in run meta (S3),
+    never hard-coded for a live pick and never a secret."""
     letter = _slot_letter(repo_id)
-    slug = _env(f"OPENROUTER_MODEL_{letter}")
-    if not slug:
-        raise OpenRouterConfigError(
-            f"{repo_id} selected but OPENROUTER_MODEL_{letter} is not set. "
-            f"Bind it via setx (see docs/openrouter-setup.md), then restart "
-            f"ComfyUI in a fresh terminal."
-        )
-    return slug
+
+    # Case 2: explicit saved slug from the slot-picker widget -> verbatim.
+    bound = _slot_bindings.get(letter)
+    if bound:
+        if not _slug_in_cache(bound):
+            log.warning(
+                "[OpenRouter] slot-%s slug %r is not in the local catalog "
+                "cache (stale or cold cache?). Using it as saved and "
+                "attempting the call -- run the refresh script to update "
+                "discovery. No substitution.",
+                letter, bound,
+            )
+        return bound
+
+    # Case 1: unbound -> fallback chain (env is now a fallback, not primary).
+    slot_default = _env(f"OTR_OPENROUTER_SLOT_{letter}_DEFAULT")
+    if slot_default:
+        return slot_default
+    env_slug = _env(f"OPENROUTER_MODEL_{letter}")
+    if env_slug:
+        return env_slug
+    recommended = recommended_slug_for_slot(letter)
+    if recommended:
+        return recommended
+    raise OpenRouterConfigError(
+        f"{repo_id} selected but no slug is bound: set the "
+        f"openrouter_slot_{letter.lower()}_model widget, OPENROUTER_MODEL_{letter}, "
+        f"or OTR_OPENROUTER_SLOT_{letter}_DEFAULT. See docs/openrouter-setup.md."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +317,75 @@ def reset_run_budget() -> None:
 
 
 _run_token_total = 0
+
+
+# ---------------------------------------------------------------------------
+# S3 per-run slot bindings -- the slot-picker widget values, demoting env
+# ---------------------------------------------------------------------------
+#
+# The writer records the openrouter_slot_a/b_model widget values here at the
+# start of run() (the same single per-episode entry that resets the budget),
+# so resolve_slug can map a handle to the OPERATOR'S chosen slug instead of the
+# env. Process-global because the loader->backend call chain does not thread
+# widget values. A None / empty / placeholder-sentinel binding means "unset"
+# -> resolve_slug falls through to the env / recommended chain (so headless
+# runs and old workflows keep working). The plan's preservation rule lives in
+# resolve_slug: a bound slug is used verbatim and never silently swapped.
+
+_slot_bindings: dict[str, str | None] = {"A": None, "B": None}
+
+
+def _clean_slot_value(v: Any) -> str | None:
+    """Normalize a slot-picker widget value to a real slug or None. Empty,
+    whitespace, or a parenthesized UI placeholder sentinel (e.g.
+    '(enable OpenRouter)') is treated as 'unset' (-> None)."""
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    if not s or (s.startswith("(") and s.endswith(")")):
+        return None
+    return s
+
+
+def set_slot_bindings(*, slot_a: Any = None, slot_b: Any = None) -> None:
+    """Record the per-run slot->slug bindings from the writer's slot-picker
+    widgets. Normalized via _clean_slot_value; the env (OPENROUTER_MODEL_A/B)
+    is demoted to a fallback used only when a slot is unbound."""
+    _slot_bindings["A"] = _clean_slot_value(slot_a)
+    _slot_bindings["B"] = _clean_slot_value(slot_b)
+
+
+def clear_slot_bindings() -> None:
+    """Drop both bindings (back to env / recommended fallback). Called by
+    tests; the writer overwrites via set_slot_bindings each run()."""
+    _slot_bindings["A"] = None
+    _slot_bindings["B"] = None
+
+
+def recommended_slug_for_slot(letter: str) -> str:
+    """The recommended default slug for slot 'A'/'B': the per-slot env
+    override OTR_OPENROUTER_SLOT_x_DEFAULT if set, else the built-in
+    OPENROUTER_RECOMMENDED_*_DEFAULT constant. This is the last rung of the
+    resolve_slug fallback chain (§5 case 1) before the config error."""
+    L = (letter or "").strip().upper()
+    if L == "A":
+        return (_env("OTR_OPENROUTER_SLOT_A_DEFAULT")
+                or OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT)
+    if L == "B":
+        return (_env("OTR_OPENROUTER_SLOT_B_DEFAULT")
+                or OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
+                or OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT)
+    raise OpenRouterConfigError(f"slot letter must be 'A' or 'B', got {letter!r}")
+
+
+def _slug_in_cache(slug: str) -> bool:
+    """True if `slug` is an id in the S0 disk cache. Used only to decide
+    whether to WARN about a saved slug absent from a stale/cold cache --
+    never to reject or swap it (cache staleness != a gone model)."""
+    try:
+        return any(m.get("id") == slug for m in cached_models())
+    except Exception:  # noqa: BLE001 -- a cache read must never break resolution
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -908,6 +1009,27 @@ def openrouter_meta_for(creative_id: str, technical_id: str) -> dict[str, Any]:
     return meta
 
 
+def openrouter_run_meta() -> dict[str, Any]:
+    """S3 run-meta: the slug each slot RESOLVES to (on the current bindings /
+    fallback chain) plus catalog staleness, so a run records exactly which
+    remote model would serve each slot and how fresh discovery was. Returns
+    {} when remote is disabled, keeping a local run byte-identical (C1).
+    Never raises (PD1): an unresolvable slot stamps '<unresolved>'."""
+    if not openrouter_enabled():
+        return {}
+    out: dict[str, Any] = {}
+    for letter, handle in (("a", SLOT_A_ID), ("b", SLOT_B_ID)):
+        try:
+            out[f"slot_{letter}_resolved_slug"] = resolve_slug(handle)
+        except OpenRouterError:
+            out[f"slot_{letter}_resolved_slug"] = "<unresolved>"
+    cm = catalog_meta()
+    out["openrouter_catalog_source"] = cm.get("source")
+    out["openrouter_catalog_fetched_at"] = cm.get("fetched_at")
+    out["openrouter_catalog_staleness"] = cm.get("staleness")
+    return out
+
+
 __all__ = [
     "OpenRouterBackend",
     "make_openrouter_generate_fn",
@@ -929,6 +1051,10 @@ __all__ = [
     "resolve_slug",
     "resolve_route",
     "reset_run_budget",
+    "set_slot_bindings",
+    "clear_slot_bindings",
+    "recommended_slug_for_slot",
+    "openrouter_run_meta",
     # catalog cache (S0)
     "CATALOG_SCHEMA_VERSION",
     "load_catalog_cache",
