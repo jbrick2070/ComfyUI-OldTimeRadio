@@ -59,6 +59,17 @@ DEFAULT_MAX_TOKENS_PER_RUN = 200_000
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2  # total attempts = retries + 1
 
+# Minimum output budget for a remote call. The writer's per-call
+# max_new_tokens are sized for the LOCAL grammar-constrained path, where
+# lm-format-enforcer forces a compact bare JSON object that fits in
+# ~150-200 tokens. A free-form remote model (no token grammar) writes a
+# fuller object + a ```json fence and needs more room; at the local
+# budget it truncates mid-object (finish_reason=length) -> unparseable
+# JSON -> fail-closed abort. This floor (max_tokens is a CEILING -- the
+# model still stops at finish_reason=stop and bills only actual tokens)
+# lets the remote model finish. Overridable via OPENROUTER_MIN_OUTPUT_TOKENS.
+DEFAULT_MIN_OUTPUT_TOKENS = 1024
+
 
 # ---------------------------------------------------------------------------
 # Errors -- all abort the run (C4 fail-closed / C5 no half-remote)
@@ -302,9 +313,15 @@ class OpenRouterBackend:
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
         base_url = cache_entry.get("base_url") or DEFAULT_BASE_URL
 
-        # Resolve the output budget, clamped to the per-slot cap.
+        # Resolve the output budget. The remote model has NO token grammar,
+        # so it must not inherit the local grammar-era per-call budget (which
+        # truncates a free-form object mid-JSON). Floor at
+        # DEFAULT_MIN_OUTPUT_TOKENS, then clamp to the per-slot cap. max_tokens
+        # is a ceiling only -- the model stops at finish_reason=stop and bills
+        # actual tokens, so a generous floor costs nothing on short replies.
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_MAX_TOKENS_PER_CALL)
-        out_tokens = int(max_new_tokens or cap)
+        floor = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
+        out_tokens = max(int(max_new_tokens or 0), floor)
         if out_tokens > cap:
             out_tokens = cap
         temp = (
@@ -430,6 +447,13 @@ class OpenRouterBackend:
             raise OpenRouterCallFailedError(
                 f"OpenRouter {slug} returned no choices: "
                 f"{str(body)[:300]}"
+            )
+        if choices[0].get("finish_reason") == "length":
+            log.warning(
+                "[OpenRouter] %s hit finish_reason=length -- output truncated "
+                "at the token ceiling; a downstream JSON parse may fail. Raise "
+                "OPENROUTER_MIN_OUTPUT_TOKENS or the slot max-tokens cap.",
+                slug,
             )
         message = choices[0].get("message") or {}
         content = message.get("content")

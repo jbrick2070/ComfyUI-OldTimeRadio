@@ -176,7 +176,9 @@ def test_generate_happy_path(enabled_env, monkeypatch):
     )
     assert out == "hello from sonnet"
     assert seen["payload"]["model"] == "anthropic/claude-3.5-sonnet"
-    assert seen["payload"]["max_tokens"] == 128
+    # 128 is below the remote min-output floor (1024) and is bumped up so a
+    # free-form remote reply isn't truncated mid-JSON. max_tokens is a ceiling.
+    assert seen["payload"]["max_tokens"] == 1024
     assert seen["payload"]["temperature"] == 0.6
     assert seen["api_key_present"] is True
 
@@ -196,6 +198,37 @@ def test_generate_passes_response_format_when_given(enabled_env, monkeypatch):
     )
     assert seen["payload"]["response_format"] == rf
     assert seen["payload"]["model"] == "openai/gpt-4o"  # slot B slug
+
+
+def test_small_max_new_tokens_is_floored(enabled_env, monkeypatch):
+    """The writer's local grammar-era per-call budget (~200) must be floored
+    for the remote path so a free-form model isn't truncated mid-JSON
+    (the cast-JSON truncation bug, 2026-05-31). max_tokens is a ceiling, so
+    flooring it costs nothing on short replies."""
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=50)
+    assert seen["payload"]["max_tokens"] >= 1024
+
+
+def test_floor_overridable_via_env(enabled_env, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS", "1500")
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=50)
+    assert seen["payload"]["max_tokens"] == 1500
 
 
 def test_max_tokens_clamped_to_cap(enabled_env, monkeypatch):
