@@ -1926,6 +1926,24 @@ class OTR_LedgerScriptWriter:
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
+        # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-RUN cost
+        # budget at the top of every episode. The budget is a module-level
+        # accumulator in _otr_openrouter_backend; reset_run_budget() was
+        # defined + exported but NEVER wired into the live path, so in a
+        # persistent headless server (the Scheduled Task launcher) the
+        # "per-run" ceiling actually accumulated across EVERY remote episode
+        # and would spuriously fail-closed after a few runs. The writer is
+        # the single per-episode entry that precedes all remote LLM calls
+        # (its own passes + the downstream cascade share the process global),
+        # so ONE reset here scopes the ceiling to one episode. PD1: a budget
+        # reset must never be load-bearing for the writer -- any import/attr
+        # failure is swallowed.
+        try:
+            from . import _otr_openrouter_backend as _orb_budget
+            _orb_budget.reset_run_budget()
+        except Exception:  # noqa: BLE001 -- budget reset is best-effort
+            pass
+
         # --- A. Resolve all widget inputs (RSS fetch happens here) -----
         resolved = _resolve_inputs(
             target_words=target_words,

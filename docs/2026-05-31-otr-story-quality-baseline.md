@@ -277,5 +277,26 @@ highest-value targets with code anchors (below).
 | T2 local 60w | `fa4162dc` | success ~281s | X-Labs: First Light |
 | T3 local 350w | `2a49e952` | success ~11m20s | Doorway to Anomaly |
 | T4 remote 350w | `851229da` | success ~9m15s | Muddy Canaries |
+| T5 remote 350w (F3 repro) | `da741d15` | **CRASH @ Bark ~317s** | -- (BUG-276 family) |
 
-All four: real RSS, `news_interpreter` ON, **no baked premise**, audio-only, SFW pass.
+T1-T4: real RSS, `news_interpreter` ON, **no baked premise**, audio-only, SFW pass.
+
+## Bugs the soak surfaced (beyond the F1-F3 content findings)
+
+- **BUG-LOCAL-296 [FIXED this session] -- OpenRouter per-RUN cost ceiling never reset.**
+  `_run_token_total` is a module global; `reset_run_budget()` existed + was exported but
+  was never called in the live path, so in the persistent Scheduled-Task server the
+  "per-run" 300k ceiling accumulated across every remote episode (T5 was already at ~200k
+  *at the outline*, carrying T1+T4's spend). Unfixed, remote episodes would start
+  failing-closed after ~2-3 runs. Fixed by wiring `reset_run_budget()` into
+  `OTR_LedgerScriptWriter.run()` (the single per-episode entry before any remote call),
+  defensively. +3 tests; full suite 3306 passed / 0 failed. Live re-verify pending the
+  headless restart that loads it.
+- **BUG-LOCAL-276/271 family RECURRENCE [logged, not fixed -- known-open] -- T5 crashed
+  at Bark Gate 3:** `voice_preset missing or non-v2/* for character 'UNKNOWN'
+  (line_id=b018, char_id='announcer', got None)`. A character line resolved to the
+  announcer with no Bark preset; the `bypass_freeze_halt=True` soak escape hatch let it
+  reach Bark, and the BUG-276 Gate-2 reviewer guard didn't catch it on this run. Remote
+  mistral-nemo at 350w triggered it; local (T3) did not. This is the deeper cast-routing
+  defect already parked for operator review -- the new datum is that it reproduces on the
+  remote path at production length. (This is why T5 produced no F3-repro script.)
