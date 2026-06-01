@@ -51,6 +51,30 @@ Browse and confirm exact, current slugs at [openrouter.ai/models](https://openro
 
 **Then restart ComfyUI in a fresh terminal** so it reads the new variables.
 
+## Step 4b — (Optional) Route for speed or cost
+
+One model slug is usually served by several providers, and OpenRouter picks one per call. Because the writer makes **many** LLM calls per episode (news, cast, outline, each dialogue line, critic, title), biasing that choice can make a real difference to wall-clock time or spend. Two ways to set it, simplest first:
+
+**On the slug** — append `:nitro` (fastest provider) or `:floor` (cheapest provider) right on the model id:
+
+```
+setx OPENROUTER_MODEL_A "anthropic/claude-3.5-sonnet:nitro"
+```
+
+**Or with an env knob** — per slot, or globally for both:
+
+```
+setx OPENROUTER_A_ROUTE nitro     :: just slot A   (nitro | floor | throughput | price | latency)
+setx OPENROUTER_SORT throughput   :: both slots, unless a slot/slug overrides it
+```
+
+- **`nitro` / `throughput`** — route to the fastest provider. Best when you want each episode generated as quickly as possible.
+- **`floor` / `price`** — route to the cheapest provider. Best for keeping spend down on long runs.
+- **`latency`** — lowest time-to-first-token.
+- **Unset (default)** — OpenRouter's normal load-balancing; a good neutral choice.
+
+Precedence is most-specific-first: a `:nitro`/`:floor` on the slug wins, then `OPENROUTER_A_ROUTE`/`OPENROUTER_B_ROUTE`, then `OPENROUTER_SORT`. The hard cost ceiling still applies either way — a faster provider is never an uncapped one. The route you used is recorded in the episode's run meta so a run is reproducible.
+
 ## Step 5 — Use it in ComfyUI
 
 In the `OTR_LedgerScriptWriter` node you'll now see **OpenRouter A** and **OpenRouter B** in *both* model dropdowns:
@@ -86,3 +110,4 @@ The OpenRouter A/B options disappear from the dropdowns and the pipeline is back
 - **Run aborts on a technical pass** → the remote model didn't return valid JSON (fail-closed). Switch that slot to local or to a structured-output-capable model.
 - **"Insufficient credits" / rate-limit errors** → you're on a paid or rate-limited model; add credits or switch to a `:free` slug.
 - **Cost ceiling abort** → expected guard; raise the limit deliberately or use a cheaper/free model.
+- **Episodes feel slow** → try `OPENROUTER_SORT throughput` (or `:nitro` on the slug) to route every call to the fastest provider; use `:floor` / `price` if you'd rather cut cost than time.

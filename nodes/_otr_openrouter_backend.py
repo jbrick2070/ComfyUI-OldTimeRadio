@@ -171,6 +171,100 @@ def resolve_slug(repo_id: str) -> str:
     return slug
 
 
+# ---------------------------------------------------------------------------
+# Provider routing -- speed / cost control (":nitro" fastest / ":floor" cheapest)
+# ---------------------------------------------------------------------------
+#
+# A single slug (e.g. "anthropic/claude-3.5-sonnet") is served by several
+# upstream providers; OpenRouter picks one per call. `provider.sort` biases
+# that choice: "throughput" routes to the fastest provider (so the writer's
+# many internal LLM calls return as quickly as possible), "price" routes to
+# the cheapest, "latency" to the lowest time-to-first-token. OpenRouter also
+# accepts ":nitro" (== throughput) and ":floor" (== price) as slug shortcuts.
+#
+# We normalize BOTH the slug shortcut and the env knobs to one `provider.sort`
+# value so there is a single code path and the resolved choice is recorded in
+# run meta (S5). Default (no knob, no suffix) is OpenRouter's normal
+# load-balanced routing -- no `sort` is sent.
+
+_SORT_BY_ALIAS = {
+    # fastest provider (highest throughput) -- ":nitro"
+    "nitro": "throughput",
+    "fast": "throughput",
+    "fastest": "throughput",
+    "throughput": "throughput",
+    "speed": "throughput",
+    # cheapest provider -- ":floor"
+    "floor": "price",
+    "cheap": "price",
+    "cheapest": "price",
+    "price": "price",
+    "cost": "price",
+    # lowest time-to-first-token
+    "latency": "latency",
+}
+
+
+def _normalize_sort(token: str | None) -> str | None:
+    """Map a friendly route token (nitro / floor / fast / cheap / ...) or a
+    raw OpenRouter sort (throughput / price / latency) to a `provider.sort`
+    value. An empty or unrecognized token resolves to None (OpenRouter's
+    default load-balanced routing)."""
+    if not token:
+        return None
+    return _SORT_BY_ALIAS.get(token.strip().lower())
+
+
+def _sort_from_env(name: str) -> str | None:
+    """Read a routing env var and normalize it, warning (never raising) when
+    a non-empty value is not a recognized route so a typo is visible."""
+    raw = _env(name)
+    if not raw:
+        return None
+    sort = _normalize_sort(raw)
+    if sort is None:
+        log.warning(
+            "[OpenRouter] %s=%r is not a recognized route "
+            "(use nitro/floor or throughput/price/latency); using default routing.",
+            name, raw,
+        )
+    return sort
+
+
+def _split_slug_suffix(slug: str) -> tuple[str, str | None]:
+    """Honour OpenRouter's native ':nitro' / ':floor' slug shortcuts. Returns
+    (clean_slug, sort): the suffix is stripped so it is sent as an explicit
+    `provider.sort` (one code path) instead of relying on the wire shortcut,
+    and the clean slug is what gets stamped into run meta."""
+    if not isinstance(slug, str):
+        return slug, None
+    base, sep, suffix = slug.rpartition(":")
+    if sep and base and suffix.lower() in ("nitro", "floor"):
+        return base, _normalize_sort(suffix)
+    return slug, None
+
+
+def resolve_route(letter: str, slug: str) -> tuple[str, str | None]:
+    """Resolve the provider-routing sort for a slot, most-specific first:
+
+      1. a ':nitro' / ':floor' suffix on the slug (the operator typed it onto
+         the model id -- the most explicit signal), else
+      2. the per-slot env ``OPENROUTER_<L>_ROUTE``, else
+      3. the global env ``OPENROUTER_SORT``, else
+      4. None -- OpenRouter's default load-balanced routing.
+
+    Returns ``(clean_slug_without_suffix, sort_or_None)``. The slug suffix is
+    always stripped from the returned slug regardless of which rule wins, so
+    the wire payload and run meta never carry the shortcut."""
+    clean_slug, suffix_sort = _split_slug_suffix(slug)
+    if suffix_sort is not None:
+        return clean_slug, suffix_sort
+    per_slot = _sort_from_env(f"OPENROUTER_{letter}_ROUTE")
+    if per_slot is not None:
+        return clean_slug, per_slot
+    return clean_slug, _sort_from_env("OPENROUTER_SORT")
+
+
 def reset_run_budget() -> None:
     """Zero the per-run token accumulator. Called at the start of an
     episode so the per-run cost ceiling (C6) measures one run, not the
@@ -263,7 +357,10 @@ class OpenRouterBackend:
                 f"(see docs/openrouter-setup.md)."
             )
         letter = _slot_letter(repo_id)
-        slug = resolve_slug(repo_id)
+        # Resolve the slug AND its provider-routing sort together: a ':nitro'/
+        # ':floor' suffix on the bound slug is stripped here and carried as an
+        # explicit sort, so the wire payload + run meta hold the clean slug.
+        slug, provider_sort = resolve_route(letter, resolve_slug(repo_id))
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
             or DEFAULT_CONTEXT_WINDOW
@@ -273,6 +370,7 @@ class OpenRouterBackend:
             "model_id": repo_id,          # the virtual handle
             "slot_letter": letter,        # "A" / "B"
             "slug": slug,                 # the resolved real model id
+            "provider_sort": provider_sort,  # throughput|price|latency|None
             "context_cap": context_window,
             "context_window": context_window,
             # optional per-slot overrides (FC3) -- None ⇒ caller controls
@@ -285,8 +383,9 @@ class OpenRouterBackend:
             # branches on provider BEFORE requiring them (S3).
         }
         log.info(
-            "[OpenRouter] load slot=%s handle=%s slug=%s ctx=%d (remote, 0 VRAM)",
-            letter, repo_id, slug, context_window,
+            "[OpenRouter] load slot=%s handle=%s slug=%s route=%s ctx=%d "
+            "(remote, 0 VRAM)",
+            letter, repo_id, slug, provider_sort or "default", context_window,
         )
         return cache_entry
 
@@ -316,6 +415,7 @@ class OpenRouterBackend:
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
         base_url = cache_entry.get("base_url") or DEFAULT_BASE_URL
+        provider_sort = cache_entry.get("provider_sort")
 
         # Resolve the output budget. The remote model has NO token grammar,
         # so it must not inherit the local grammar-era per-call budget (which
@@ -347,12 +447,23 @@ class OpenRouterBackend:
             payload["temperature"] = float(temp)
         if stop:
             payload["stop"] = [s for s in stop if s]
+        # Build ONE provider-routing object so the speed/cost sort and the
+        # require_parameters guard coexist (a second `payload["provider"]`
+        # assignment would clobber the first).
+        provider_opts: dict[str, Any] = {}
+        if provider_sort:
+            # ":nitro"/throughput = fastest provider, ":floor"/price =
+            # cheapest, latency = lowest time-to-first-token (C6: the cost
+            # guard still applies; a faster upstream is not an uncapped one).
+            provider_opts["sort"] = provider_sort
         if response_format is not None:
             payload["response_format"] = response_format
             # Defect A: only route to upstreams that actually honour the
             # requested parameters, so response_format can't be silently
             # dropped on the wire (which would make the enforcement a no-op).
-            payload["provider"] = {"require_parameters": True}
+            provider_opts["require_parameters"] = True
+        if provider_opts:
+            payload["provider"] = provider_opts
 
         text = self._post_with_retries(
             base_url=base_url, api_key=api_key, payload=payload, slug=slug,
@@ -576,13 +687,15 @@ def openrouter_meta_for(creative_id: str, technical_id: str) -> dict[str, Any]:
             continue
         try:
             letter = _slot_letter(model_id)
-            slug = resolve_slug(model_id)
+            slug, sort = resolve_route(letter, resolve_slug(model_id))
         except OpenRouterError:
             letter = "?"
             slug = "<unresolved>"
+            sort = None
         meta[f"llm_{slot_name}_provider"] = PROVIDER
         meta[f"llm_{slot_name}_handle"] = model_id
         meta[f"llm_{slot_name}_slug"] = slug
+        meta[f"llm_{slot_name}_route"] = sort or "default"
         meta[f"llm_{slot_name}_max_tokens_cap"] = _int_env(
             f"OPENROUTER_{letter}_MAXTOK", DEFAULT_MAX_TOKENS_PER_CALL
         ) if letter != "?" else DEFAULT_MAX_TOKENS_PER_CALL
@@ -612,5 +725,6 @@ __all__ = [
     "openrouter_enabled",
     "is_openrouter_row_id",
     "resolve_slug",
+    "resolve_route",
     "reset_run_budget",
 ]
