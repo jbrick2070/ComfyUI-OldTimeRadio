@@ -1,49 +1,112 @@
-# Session Handoff -- OldTimeRadio: OpenRouter Remote LLM -- 2026-05-31
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-31 (story-quality + Opus)
 
 ## Core goal
-Add OpenRouter as an **optional, non-local** LLM provider selectable on **both** writer slots (creative + technical). A go-forward plan is **locked and verified against live code**; this session produced the plan, not the code. The next session's job is to **execute that plan**: `docs/openrouter-remote-llm-go-forward-plan.md` is the single source of truth — read it first. (Supersedes the earlier "dual-route LLM" design handoff.)
+Establish a story-quality baseline for the OTR writer across local vs OpenRouter models,
+fix any bugs the testing surfaces, and hand the next sprint a single consolidated plan
+(story-quality + bugs) that can be round-robined across parallel sessions. This session
+proved the OpenRouter wiring, scored 6 + Opus runs, fixed one real bug, and wrote the
+sprint-feed docs. **All work is committed to `v2.0-alpha`; HEAD = `e85db02`.** (Supersedes
+the prior "OpenRouter Remote LLM" handoff -- that feature shipped; this went further.)
 
 ## Tech stack & constraints
-Existing repo (Python, ComfyUI custom node, RTX 5080 / 16 GB, Windows, `v2.0-alpha` branch). CLAUDE.md auto-loads — its git flow (Desktop Commander cmd, `.git\COMMIT_EDITMSG` + `-F`, one push attempt), VRAM ceiling, audio-king, "no dummy", and Bug-Bible-after-every-change rules are in force and are **not** repeated here. Work-specific hard rules (full detail in the plan): remote is **default-off, env-gated** (`OPENROUTER_API_KEY` + `OTR_ENABLE_OPENROUTER=1`); remote technical JSON is **fail-closed**; **no half-remote episodes** (abort, never mid-run fall-back); the remote branch **must not evict the resident local model** (C2); no new nodes, no new writer widgets, no `model_id` widget anywhere.
-
-## Operator activation (Windows env vars)
-`OPENROUTER_API_KEY` is **already set** in the User environment (2026-05-31); its value is not stored in any file. To enable remote and choose the A/B models, run via `setx`, then restart ComfyUI in a fresh terminal:
-
-```
-setx OTR_ENABLE_OPENROUTER 1
-setx OPENROUTER_MODEL_A "anthropic/claude-3.5-sonnet"
-setx OPENROUTER_MODEL_B "openai/gpt-4o"
-```
-
-Unset `OTR_ENABLE_OPENROUTER` (or set it to `0`) to disable remote entirely. Slugs are the operator's choice and swappable; verify current ids at openrouter.ai/models. None of S0–S3 or the mocked tests require these — only the enabled smoke run (S6 / W4) does.
+Windows, RTX 5080 16GB, ComfyUI Desktop on `localhost:8000`. Venv python:
+`C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. Branch `v2.0-alpha` only.
+Hard rules in CLAUDE.md (auto-loaded, not repeated): audio byte-identical (PD1), 14.5GB
+VRAM ceiling, wire every change into the workflow JSON, SFW/non-violent, never "dummy",
+every LLM call tagged creative/technical + routed via the writer's model widgets (a new
+editor/critic model = a new *broadcast output*, not a per-node widget), Bug Bible regression
+after every code change. **Git: Desktop Commander `cmd` only, `.git\COMMIT_EDITMSG` + `-F`,
+one push attempt, verify `local HEAD == origin HEAD`.**
 
 ## What's done & decided
-- **Architecture locked: Option A.** Two virtual catalog rows `openrouter:slot-a` / `openrouter:slot-b` (`loader_backend="openrouter_http"`, new `provider` field), bound to real slugs by env (`OPENROUTER_MODEL_A/B`). They appear in both dropdowns only when enabled. No graph surgery.
-- **Technical JSON: controlled T1, fail-closed.** Remote technical calls reuse the **existing** `structured_call` validate + bounded-repair ladder — zero new validation logic.
-- **Three code-review refinements baked in** (marked `[code-review refinement]` in the plan): (1) the `LoaderBackend`/`BACKENDS_BY_KEY` dispatch table is **dormant** — remote must be wired into two live seams (`request_slot` + the generate-fn factory), not just "registered"; (2) **no `validate_model_id` surgery** — virtual rows join the curated set when enabled, so Path 1 admits them; (3) **no-evict rule** for the single-resident model cache.
-- **Verified against live code this session** (2 subagents, all-PASS): dormant dispatch, skippable-for-remote steps, clean curated-set injection, generate-fn seam signatures, safe `provider` field, and the full S4 `structured_call` / `_parse_and_validate` / `make_constrained_generate_fn` surface.
-- **Rejected:** Option B (writer config widgets — deferred; clean future upgrade, needs *no* B6 change), Option C (profile nodes — violates PD6 intent), Option D (raw slugs in dropdown), default-on cloud, mid-episode local fall-back, streaming.
-- **No code written yet.** Nothing committed for this feature.
+- **OpenRouter local<->remote parity is CLOSED.** Same model completes the whole pipeline on
+  both transports; the quality gap is *content*, not transport.
+- **Opus is materially the best writer: 31/35 (89%)** vs best local mistral 27/35 (77%),
+  remote mistral 67%. ~$0.47/episode. Wins on news-grounding (+2) and payoff (+1).
+  **Recommended as default creative slot but NOT auto-flipped -- operator's call** (paid
+  default + real "too dense for radio" caveat: Opus overshot 350->829 words).
+- **Length sweet spot ~350 words** (60w too cramped, 500w no better/undershot).
+- **Three-pass architecture is the agreed go-forward:** Pass 1 Opus writes -> Pass 2 tactical
+  editor (radio length/cadence; = old C1) -> Pass 3 creative-QA critic (re-aim the existing
+  `run_story_critic`, premium non-Opus model, rides the existing reroll loop).
+- **BUG-LOCAL-296 FIXED + committed** (`d982821`): OpenRouter per-run cost budget never reset
+  (`reset_run_budget()` defined+exported, never called) -> accumulated per-process. Wired into
+  `OTR_LedgerScriptWriter.run()` top, defensively. +3 tests; full suite **3306 passed / 0
+  failed**; live-confirmed (~43k tok one-episode budget).
+- **Rejected:** overhauling the local writer (solid B+); shipping the F3 name-leak fix blind
+  (operator review / maybe obsoleted by Pass 3); restart without verifying it came back up.
+- Logged-not-fixed: **F3/BUG-295** (remote cast-name leak into stage directions), **F4**
+  (inventor fail-closed), **F5** ("damn" slips SFW), **BUG-276/271** (cast-routing -> Bark
+  crash on one remote run). All fail-closed/safe.
 
 ## State of the art
-- `docs/openrouter-remote-llm-go-forward-plan.md` — **the plan to execute.** Decision, hard constraints C1–C9, frozen contracts FC1–FC5, the autonomous wave map (W0–W4), sprints S0–S6 with checkbox acceptance criteria, and a verified file:line anchor appendix.
-- `docs/2026-05-31-openrouter-remote-llm__round-robin-locked.md` — raw round-robin output (provenance).
-- `docs/2026-05-31-openrouter-remote-llm-architecture-options.md` — options analysis (superseded; background only).
-- `docs/openrouter-setup.md` — **end-user** guide (account → key → `setx` → enable → use) with honest "unproven quality" framing. README carries an experimental pointer to it; promoting that pointer + adding an in-app hint (error + dropdown tooltip pointing users to the guide) is an **S6 deliverable** in the plan. **Also tracked in S6:** the README is stale overall and needs a full newbie-oriented refresh — audience is **ComfyUI beginners using AI coding assistants**, so low-jargon and copy-paste-first. The OpenRouter section is only one part of that refresh.
-- Key live-code seams (verified; full list in plan appendix): `request_slot` `nodes/_otr_model_loader.py:712` (calls `load_llm` directly at `:812`); generate-fn factory `OTR_LedgerScriptWriter.py:586` + `_otr_model_loader.py:864`/`:939`; catalog `nodes/_otr_model_catalog.py` (`CuratedModel:53`, `CURATED_LLM_MODELS:96`, `_by_repo_id:195`, `validate_model_id:452`); structured calls `nodes/_otr_structured_call.py:293`; meta stamp `OTR_LedgerScriptWriter.py:3732`.
+**All committed (`v2.0-alpha`, HEAD `e85db02`).** Session commits: `c2c1955` baseline ->
+`d982821` BUG-296 -> `0224821` T6 -> `7526b2d` length sweep -> `3696627` Opus comparison +
+plan -> `670636a` three-pass -> `e85db02` consolidated problem statement.
+
+Read these docs, not the transcript:
+- `docs/2026-05-31-otr-consolidated-problem-statement.md` -- **THE SPRINT FEED.** P0-P10
+  (story+bugs), dependency table, 4 round-robin streams (A creative core / B robustness /
+  C hygiene+safety / D stability+cleanup), open questions.
+- `docs/2026-05-31-otr-story-quality-comparison.md` -- all-runs scorecard + the Opus 89%
+  "The Green Book of Nights" full script + routing audit + cost.
+- `docs/2026-05-31-otr-story-quality-baseline.md` -- 6 scored runs, F1-F5, length curve.
+- `docs/openrouter-llm-call-improvement-plan.md` -- C1-C6 + three-pass architecture (model
+  table w/ live pricing, control flow, effort, open questions).
+
+Source changed this session (only this): `nodes/OTR_LedgerScriptWriter.py` `run()` calls
+`_otr_openrouter_backend.reset_run_budget()` at the top (BUG-296);
+`tests/test_openrouter_budget_reset.py` is the new regression.
+
+**Live machine state (NOT in any tracked file):**
+- ComfyUI server **PID 57540** up + idle, **still Opus-on-slot-A** from the Opus test. The
+  launcher bat is reverted to mistral-nemo, so the **11:59 PM daily `OTR_API` task trigger
+  relaunches on mistral-nemo** (cheap default). No queued runs.
+- Headless launcher (OUTSIDE repo): `C:\Users\jeffr\Documents\ComfyUI\_otr_headless_launch.bat`
+  -- `OTR_ENABLE_OPENROUTER=1`, `OPENROUTER_MODEL_A=mistralai/mistral-nemo` (reverted), seeds
+  11/11, cost caps. Backup `..._launch.bat.premopus`. Opus run = edit slot A to
+  `anthropic/claude-opus-4.8:nitro`, restart task, revert after.
+- Scratch harness in repo ROOT (untracked; relocate to `tools/` under P10): `_otr_soak2.py`
+  (submit/poll/full), `_otr_dump_scripts.py`, `_otr_show_episode.py`, `_otr_routing_audit.py`,
+  `_otr_interrupt.py`, `_otr_or_anthropic.py`, `_otr_or_price*.py`, `_otr_or_mistral.py`,
+  older `_otr_or_diag*.py`, `_otr_soak_ids.json`, `_otr_last_prompt.json`.
+
+**Operational gotchas (save rework):**
+- ComfyUI runs via Scheduled Task `OTR_API` -> `_otr_headless_launch.bat`. Console -> 
+  `_otr_headless_soak.log` (NOT `%APPDATA%\ComfyUI\logs\comfyui.log`). OTR phase log:
+  `otr_runtime.log`.
+- Restart: `taskkill /F /T` the python whose cmdline has `main.py --port 8000`, then
+  `schtasks /End /TN OTR_API` + `/Run /TN OTR_API`. **`/End` orphans the python** -- kill it
+  first; confirm `netstat -ano | findstr 8000` empty before relaunch; poll
+  `_otr_soak2.py poll --pid none` until `/queue` answers.
+- `wmic` gone (Win11) -> PowerShell `Get-CimInstance Win32_Process`. cmd mangles inline
+  `python -c "..."` -> use a script file. OpenRouter key in `HKCU\Environment` (winreg); never log it.
+- Score from the writer/cascade **ledger** (`output\otr\episodes\<id>\...\*_ledger.json`);
+  7 axes x 0-5; audio irrelevant to the score.
 
 ## Immediate next steps
-1. Read `docs/openrouter-remote-llm-go-forward-plan.md` end to end; treat FC1–FC5 + C1–C9 as fixed.
-2. Execute **W0 / S0 — baseline lock**: run the full regression set (`bug_bible_regression.py`, core tests, `test_audio_byte_identical.py`) + workflow JSON audits, confirm all green, freeze contracts, and make a clean checkpoint commit as the rollback point. Do **not** write feature code until the baseline is green.
-3. **W1 (2 parallel subagents):** S1 `nodes/_otr_openrouter_backend.py` (mocked HTTP; prove the cost-ceiling abort with a mocked token counter) ∥ S2 catalog rows + `provider` field (enabled-gated). Merge → full regress → gate.
-4. **W2 (solo):** S3 wire the remote branch into `request_slot` + generate-fn factory; enforce C2 no-evict. **W3 (parallel):** S4 fail-closed JSON ∥ S5 meta stamp. **W4 (solo):** S6 smoke proofs + final regress + Bug Bible.
-5. **Run autonomously — no operator-approval gates.** Drive W0 → W3, plus S5 and the S6 *disabled* byte-identical proof, plus every mocked/unit test and the mocked cost-abort proof, committing per wave via the CLAUDE.md git flow (Desktop Commander cmd, `.git\COMMIT_EDITMSG` + `-F`, verify after each push). Halt only on a red regression you can't fix, a real ambiguity, or a C1–C9 breach.
-6. **One human gate — leave for Jeffrey:** the S6 *enabled* live smoke (a real OpenRouter call) needs env vars not yet set (`OPENROUTER_API_KEY` is set; `OTR_ENABLE_OPENROUTER=1` + `OPENROUTER_MODEL_A/B` are not) and spends credits on a GPU episode run. Do everything up to it, then stop and report what's green; Jeffrey runs the enabled smoke when awake.
+1. **Dispatch Stream B first** (cheap, isolated, unblocks valid runs): P4 relax the
+   `news_interpreter` key-term gate (`news_interpreter.py:803` -- accept LLM-judge-supported
+   paraphrase, not just verbatim) + P5 harden the inventor pass (dedup keys + one repair).
+   Two valid runs died here (T7; the BUG-296 verify run).
+2. **Then Stream A** (headline): build the three-pass rig per the improvement-plan doc --
+   `editor_model`/`critic_model` broadcast outputs (PD6), Pass-2 editor prompt, Pass-3
+   creative-QA critic, per-model prompt riders + temps.
+3. **Streams C (F3/C5, F5 SFW, C6) and D (BUG-276 crash + dead-code cleanup)** in parallel;
+   re-check F3 after Stream A.
+4. Each stream exit gate: Bug Bible + core + audio byte-identical green **and** a scored A/B
+   vs the 2026-05-31 baseline.
+5. (If asked) draft the **round-robin kickoff-prompt template** Jeffrey requested.
 
 ## Open questions
-None blocking. The actual slugs `OPENROUTER_MODEL_A/B` point to are the operator's runtime choice and do not block any sprint. Option B remains an explicitly deferred future upgrade.
+- Pass 2 editor model (local / Haiku 4.5 / GPT-4o-mini)? Pass 3 critic model (Sonnet 4.6 rec /
+  Haiku / local; not Opus-self-judge)?
+- Flip production default to Opus? Per-episode budget cap for a paid default?
+- Dead-code pointer (P10): confirm whether a specific committed "dead-code synthesis" doc
+  exists, else P10 uses ROADMAP staleness audit + forbidden-sweep + BUG_LOG cleanbreak +
+  the scratch-file cleanup above.
 
 ---
 ## Resume instructions
 Open a fresh window, attach this file, and say:
-"Read this handoff and `docs/openrouter-remote-llm-go-forward-plan.md`, then execute W0–W3 (plus S5, the S6 *disabled* proof, and all regressions) autonomously, committing per wave. Do not wait for my approval between sprints — only stop on a red regression you can't fix, a real ambiguity, a C1–C9 breach, or the S6 *enabled* live smoke (which needs me). Post progress as you go and start now."
+"Read this handoff file and prepare to execute the immediate next steps. Acknowledge when you're ready to start."
