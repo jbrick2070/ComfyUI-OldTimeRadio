@@ -54,6 +54,15 @@ OPENROUTER_ROW_IDS = (SLOT_A_ID, SLOT_B_ID)
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_CONTEXT_WINDOW = 8192
 
+# Recommended OpenRouter default slugs (the drift-prone constants flagged in
+# the 2026-06-01 go-forward plan, open-question 2). A fresh node offers these
+# as the leading slot picks when the operator has set no per-slot
+# OTR_OPENROUTER_SLOT_x_DEFAULT override. They are recommended STARTING points,
+# never a cage -- any cached slug can be chosen. Creative favours a strong
+# narrative model; technical favours a reliably structured-output model.
+OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "anthropic/claude-opus-4.8"
+OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "deepseek/deepseek-v4-pro"
+
 # Conservative cost ceilings. Deliberately low so an unconfigured
 # operator cannot accidentally spend a fortune; raise via env when ready.
 # Defect C fix: the COST per-call ceiling must sit ABOVE the OUTPUT cap, or a
@@ -913,6 +922,8 @@ __all__ = [
     "SLOT_A_ID",
     "SLOT_B_ID",
     "OPENROUTER_ROW_IDS",
+    "OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT",
+    "OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT",
     "openrouter_enabled",
     "is_openrouter_row_id",
     "resolve_slug",

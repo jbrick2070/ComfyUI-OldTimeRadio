@@ -469,6 +469,145 @@ def dropdown_choices(hub_root: Path | None = None) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter slot-slug picker dropdowns (S1)
+# ---------------------------------------------------------------------------
+#
+# The 2026-06-01 four-dropdown router: creative_writing_model and
+# technical_model stay LOCAL + slot-a/b selectors (build_dropdown_choices
+# above -- the OpenRouter catalog NEVER appears there). The two NEW pickers
+# openrouter_slot_a_model / openrouter_slot_b_model choose the real OpenRouter
+# slug from the S0 disk cache (nodes/_otr_openrouter_backend.cached_models()).
+# INPUT_TYPES-safe: every tier reads the on-disk cache only, never the network.
+
+OPENROUTER_ENABLE_SENTINEL = "(enable OpenRouter)"
+"""Sole choice in a slot picker when remote is disabled. UI-only -- S3
+rejects it before backend resolution; it can never resolve as a slug."""
+
+OPENROUTER_EMPTY_CACHE_SENTINEL = "(no OpenRouter models cached -- run refresh_catalog_cache)"
+"""Shown when remote is enabled but the catalog cache is missing/empty. The
+recommended default is offered alongside so the slot still has a valid pick."""
+
+# Top-N newest-by-`created` models that lead the "recent" tier.
+_OPENROUTER_RECENT_COUNT = 8
+
+
+def _csv_env(name: str) -> list[str]:
+    """Parse a comma-separated env var into a stripped, non-empty list.
+    Unset / empty -> []."""
+    raw = os.environ.get(name)
+    if not raw:
+        return []
+    return [tok.strip() for tok in raw.split(",") if tok.strip()]
+
+
+def _slot_requires_json(slot: str) -> bool:
+    """Per-slot structured-output filter. NEVER global: defaults off, so a
+    creative model is never hidden from slot A just because slot B needs
+    JSON. Reads OTR_OPENROUTER_SLOT_<A|B>_REQUIRE_JSON."""
+    var = f"OTR_OPENROUTER_SLOT_{slot.strip().upper()}_REQUIRE_JSON"
+    return os.environ.get(var, "0") == "1"
+
+
+def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
+    """Apply the slot-A/B catalog filters (filters, never a cage). Each is
+    independent and unset == no-op:
+      * OTR_OPENROUTER_PROVIDER_FILTER -- provider-prefix allowlist (id before '/')
+      * OTR_OPENROUTER_MODEL_ALLOWLIST -- exact-id allowlist
+      * OTR_OPENROUTER_MODEL_DENYLIST  -- exact-id removal
+      * per-slot REQUIRE_JSON          -- keep only supports_json models
+    """
+    providers = set(_csv_env("OTR_OPENROUTER_PROVIDER_FILTER"))
+    allow = set(_csv_env("OTR_OPENROUTER_MODEL_ALLOWLIST"))
+    deny = set(_csv_env("OTR_OPENROUTER_MODEL_DENYLIST"))
+    require_json = _slot_requires_json(slot)
+    out: list[dict] = []
+    for m in models:
+        mid = m.get("id")
+        if not isinstance(mid, str) or not mid:
+            continue
+        provider = m.get("provider") or (mid.split("/", 1)[0] if "/" in mid else "")
+        if providers and provider not in providers:
+            continue
+        if allow and mid not in allow:
+            continue
+        if mid in deny:
+            continue
+        if require_json and not m.get("supports_json"):
+            continue
+        out.append(m)
+    return out
+
+
+def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
+    """Slug-picker choices for openrouter_slot_<slot>_model (slot 'a' / 'b').
+
+    Remote disabled -> [OPENROUTER_ENABLE_SENTINEL].
+    Remote enabled  -> an ordered, de-duplicated slug list drawn from the S0
+    disk cache, filtered by _filter_catalog_models:
+        1. recommended default for the slot -- the per-slot
+           OTR_OPENROUTER_SLOT_x_DEFAULT override when set AND present in the
+           filtered cache, else the OPENROUTER_RECOMMENDED_*_DEFAULT constant.
+           Always offered first so the slot's default value is selectable even
+           if a cold cache or a filter would otherwise hide it.
+        2. favorites -- OTR_OPENROUTER_FAVORITES, in operator order
+        3. recent    -- top-N newest by `created`
+        4. the rest  -- alphabetical by id
+    Enabled but empty/cold cache -> [recommended_default, EMPTY_CACHE_SENTINEL].
+    INPUT_TYPES-safe: reads the disk cache only, never the network.
+    """
+    s = slot.strip().lower()
+    if s not in ("a", "b"):
+        raise ValueError(f"slot must be 'a' or 'b', got {slot!r}")
+    try:
+        from . import _otr_openrouter_backend as _orb
+    except Exception:  # noqa: BLE001 -- a backend import hiccup must never break INPUT_TYPES
+        return [OPENROUTER_ENABLE_SENTINEL]
+    if not _orb.openrouter_enabled():
+        return [OPENROUTER_ENABLE_SENTINEL]
+
+    models = _filter_catalog_models(_orb.cached_models(), slot=s)
+    by_id = {m["id"]: m for m in models}
+
+    # Tier 1 lead: the per-slot env override iff present in the filtered cache,
+    # else the recommended constant ("if set + present, else recommended").
+    configured = (os.environ.get(f"OTR_OPENROUTER_SLOT_{s.upper()}_DEFAULT") or "").strip()
+    constant = (
+        _orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT if s == "a"
+        else _orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
+    )
+    lead = configured if (configured and configured in by_id) else constant
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(mid: str) -> None:
+        if mid and mid not in seen:
+            seen.add(mid)
+            ordered.append(mid)
+
+    _add(lead)  # always offered -> default value stays selectable
+
+    for fav in _csv_env("OTR_OPENROUTER_FAVORITES"):
+        if fav in by_id:
+            _add(fav)
+
+    def _created(m: dict) -> float:
+        c = m.get("created")
+        return float(c) if isinstance(c, (int, float)) else 0.0
+
+    for m in sorted(models, key=_created, reverse=True)[:_OPENROUTER_RECENT_COUNT]:
+        _add(m["id"])
+    for m in sorted(models, key=lambda m: m["id"]):
+        _add(m["id"])
+
+    if not models:
+        # Cold / fully-filtered cache: keep the recommended default selectable
+        # and flag that discovery is empty so the operator runs a refresh.
+        return [lead, OPENROUTER_EMPTY_CACHE_SENTINEL]
+    return ordered
+
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 
@@ -1105,6 +1244,9 @@ __all__ = [
     "scan_local_llm_cache",
     "build_dropdown_choices",
     "dropdown_choices",
+    "openrouter_catalog_dropdown_choices",
+    "OPENROUTER_ENABLE_SENTINEL",
+    "OPENROUTER_EMPTY_CACHE_SENTINEL",
     "validate_model_id",
     "estimate_model_size_gb",
     "auto_download_if_missing",

@@ -9,9 +9,14 @@ handle, never the real model slug.
 """
 from __future__ import annotations
 
+import datetime
+import json
+from pathlib import Path
+
 import pytest
 
 from nodes import _otr_model_catalog as cat
+from nodes import _otr_openrouter_backend as orb
 from nodes._otr_model_inputs import UnknownModelError
 
 
@@ -129,3 +134,208 @@ def test_gated_set_unaffected_by_virtual_rows(enabled):
     requires_auth=False virtual rows must never appear there."""
     assert SLOT_A not in cat.GATED_CURATED_MODELS
     assert SLOT_B not in cat.GATED_CURATED_MODELS
+
+
+# ===========================================================================
+# S1 -- openrouter_catalog_dropdown_choices (the slot-A/B slug pickers)
+# ===========================================================================
+#
+# Contract (2026-06-01 plan SS4 + SS7): the catalog feeds ONLY the two slot
+# pickers, never creative/technical; disabled -> sentinel; enabled -> tiered,
+# filtered slug list led by the recommended default; per-slot filters narrow
+# only their slot. INPUT_TYPES-safe (cache reads only, no network).
+
+# Recommended defaults must match the backend constants; include both so each
+# slot's lead is a real cache hit. One non-JSON model proves REQUIRE_JSON.
+_CATALOG_MODELS = [
+    {"id": "anthropic/claude-opus-4.8", "name": "Claude Opus 4.8",
+     "provider": "anthropic", "created": 400, "context_length": 200000,
+     "pricing": {"prompt": "0.000005", "completion": "0.000025"},
+     "supported_parameters": ["response_format", "structured_outputs"],
+     "supports_json": True},
+    {"id": "deepseek/deepseek-v4-pro", "name": "DeepSeek V4 Pro",
+     "provider": "deepseek", "created": 300, "context_length": 128000,
+     "pricing": {"prompt": "0.00000043", "completion": "0.00000087"},
+     "supported_parameters": ["response_format"], "supports_json": True},
+    {"id": "openai/gpt-4o", "name": "GPT-4o",
+     "provider": "openai", "created": 200, "context_length": 128000,
+     "pricing": {"prompt": "0.0000025", "completion": "0.00001"},
+     "supported_parameters": ["response_format", "structured_outputs"],
+     "supports_json": True},
+    {"id": "x-ai/grok-2-mini", "name": "Grok 2 Mini",
+     "provider": "x-ai", "created": 100, "context_length": 32768,
+     "pricing": {"prompt": "0.000001", "completion": "0.000002"},
+     "supported_parameters": ["tools"], "supports_json": False},
+]
+
+_FILTER_ENV = (
+    "OTR_OPENROUTER_MODEL_ALLOWLIST", "OTR_OPENROUTER_MODEL_DENYLIST",
+    "OTR_OPENROUTER_PROVIDER_FILTER", "OTR_OPENROUTER_SLOT_A_REQUIRE_JSON",
+    "OTR_OPENROUTER_SLOT_B_REQUIRE_JSON", "OTR_OPENROUTER_FAVORITES",
+    "OTR_OPENROUTER_SLOT_A_DEFAULT", "OTR_OPENROUTER_SLOT_B_DEFAULT",
+)
+
+
+def _write_cache(cache_dir, models, *, source="live"):
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": orb.CATALOG_SCHEMA_VERSION,
+        "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": source, "count": len(models), "models": models,
+    }
+    (cache_dir / "openrouter_models.json").write_text(
+        json.dumps(payload), encoding="utf-8")
+
+
+@pytest.fixture
+def enabled_cached(monkeypatch, tmp_path):
+    """Remote enabled + a populated catalog cache in tmp_path. Clears any
+    filter env that might leak from the live host (remote is enabled there)."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "anthropic/claude-opus-4.8")
+    monkeypatch.setenv("OPENROUTER_MODEL_B", "deepseek/deepseek-v4-pro")
+    monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))
+    for k in _FILTER_ENV:
+        monkeypatch.delenv(k, raising=False)
+    _write_cache(tmp_path, _CATALOG_MODELS)
+    return tmp_path
+
+
+# --- disabled -> sentinel --------------------------------------------------
+
+
+def test_slot_picker_sentinel_when_disabled(disabled):
+    assert cat.openrouter_catalog_dropdown_choices("a") == [cat.OPENROUTER_ENABLE_SENTINEL]
+    assert cat.openrouter_catalog_dropdown_choices("b") == [cat.OPENROUTER_ENABLE_SENTINEL]
+
+
+def test_slot_picker_invalid_slot_raises():
+    with pytest.raises(ValueError):
+        cat.openrouter_catalog_dropdown_choices("c")
+
+
+# --- enabled -> catalog, led by the recommended default --------------------
+
+
+def test_slot_picker_shows_catalog_when_enabled(enabled_cached):
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    for mid in ("anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
+                "openai/gpt-4o", "x-ai/grok-2-mini"):
+        assert mid in a
+    assert cat.OPENROUTER_ENABLE_SENTINEL not in a
+
+
+def test_slot_a_lead_is_recommended_creative(enabled_cached):
+    assert cat.openrouter_catalog_dropdown_choices("a")[0] == \
+        orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+
+
+def test_slot_b_lead_is_recommended_technical(enabled_cached):
+    assert cat.openrouter_catalog_dropdown_choices("b")[0] == \
+        orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
+
+
+def test_per_slot_default_override_leads_when_present(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "openai/gpt-4o")
+    assert cat.openrouter_catalog_dropdown_choices("a")[0] == "openai/gpt-4o"
+
+
+def test_per_slot_default_override_ignored_when_absent(enabled_cached, monkeypatch):
+    """Override set but not in the cache -> fall back to the recommended
+    constant for the dropdown lead (discovery can't show what isn't cached;
+    S3 still honours an explicit saved slug at resolution)."""
+    monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "ghost/not-in-cache")
+    assert cat.openrouter_catalog_dropdown_choices("a")[0] == \
+        orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+
+
+# --- the catalog NEVER appears in creative/technical -----------------------
+
+
+def test_catalog_absent_from_creative_technical(enabled_cached):
+    choices = cat.dropdown_choices(hub_root=enabled_cached)
+    joined = " ".join(choices)
+    for mid in ("anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
+                "openai/gpt-4o", "x-ai/grok-2-mini"):
+        assert mid not in joined
+    # the routing handles are still present (they are not catalog slugs)
+    assert SLOT_A in choices and SLOT_B in choices
+
+
+# --- per-slot REQUIRE_JSON narrows ONLY its slot ---------------------------
+
+
+def test_require_json_narrows_only_that_slot(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_SLOT_B_REQUIRE_JSON", "1")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    b = cat.openrouter_catalog_dropdown_choices("b")
+    # grok-2-mini has supports_json False: present in A (no filter), gone in B.
+    assert "x-ai/grok-2-mini" in a
+    assert "x-ai/grok-2-mini" not in b
+    # JSON-capable models remain in both.
+    assert "openai/gpt-4o" in a and "openai/gpt-4o" in b
+
+
+# --- allow / deny / provider filters ---------------------------------------
+
+
+def test_allowlist_narrows(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_MODEL_ALLOWLIST",
+                       "anthropic/claude-opus-4.8,openai/gpt-4o")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert set(a) == {"anthropic/claude-opus-4.8", "openai/gpt-4o"}
+
+
+def test_denylist_removes(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_MODEL_DENYLIST", "openai/gpt-4o")
+    assert "openai/gpt-4o" not in cat.openrouter_catalog_dropdown_choices("a")
+
+
+def test_provider_filter_narrows(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_PROVIDER_FILTER", "anthropic")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a == ["anthropic/claude-opus-4.8"]
+
+
+def test_favorites_float_after_lead(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_FAVORITES", "openai/gpt-4o")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    # lead is the recommended creative default; favorite comes right after.
+    assert a[0] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+    assert a[1] == "openai/gpt-4o"
+
+
+def test_recent_tier_orders_by_created_desc(enabled_cached, monkeypatch):
+    """After the lead (opus, created 400 -> also newest), the remaining
+    models follow newest-first: deepseek(300), gpt-4o(200), grok(100)."""
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a == ["anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
+                 "openai/gpt-4o", "x-ai/grok-2-mini"]
+
+
+# --- enabled but cold/empty cache ------------------------------------------
+
+
+def test_empty_cache_when_enabled_shows_recommended_plus_sentinel(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
+    monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))  # no cache file
+    for k in _FILTER_ENV:
+        monkeypatch.delenv(k, raising=False)
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a == [orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+                 cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
+
+
+# --- INPUT_TYPES safety: the builder never touches the network -------------
+
+
+def test_slot_picker_is_network_free(enabled_cached, monkeypatch):
+    def _boom(**kw):
+        raise AssertionError("network fetch fired from a dropdown build")
+    monkeypatch.setattr(orb, "_fetch_models_json", _boom)
+    # Must build purely from the disk cache -- no fetch, no raise.
+    out = cat.openrouter_catalog_dropdown_choices("a")
+    assert "anthropic/claude-opus-4.8" in out
