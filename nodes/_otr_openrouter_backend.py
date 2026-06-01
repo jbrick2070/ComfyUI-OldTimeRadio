@@ -27,10 +27,12 @@ builds + registers it and proves it under mocked HTTP.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -274,6 +276,195 @@ def reset_run_budget() -> None:
 
 
 _run_token_total = 0
+
+
+# ---------------------------------------------------------------------------
+# Catalog cache (S0) -- disk-cached OpenRouter model list for the dropdowns
+# ---------------------------------------------------------------------------
+#
+# INPUT_TYPES() must NEVER touch the network (hard rule): the four model
+# dropdowns build from THIS on-disk cache only. The cache is refreshed
+# EXPLICITLY (an operator / refresh-script call to refresh_catalog_cache),
+# never at import and never inside INPUT_TYPES. A missing / corrupt / empty
+# cache degrades safely to an empty model list -- discovery is empty, but a
+# saved slug is still preserved + attempted (S3). The cache governs
+# DISCOVERY only; it must never mutate a saved slot slug value.
+
+CATALOG_SCHEMA_VERSION = 1
+_CATALOG_FILENAME = "openrouter_models.json"
+_CATALOG_STALE_AFTER_S = 7 * 24 * 3600  # older than a week -> "stale" (still usable)
+
+
+def _catalog_cache_path() -> Path:
+    """``<repo>/models/openrouter_models.json`` (in-repo, git-ignored). This
+    module lives in ``nodes/``, so the repo root is two parents up. Override
+    the directory via ``OTR_OPENROUTER_CACHE_DIR`` (tests / relocation)."""
+    override = _env("OTR_OPENROUTER_CACHE_DIR")
+    base = Path(override) if override else Path(__file__).resolve().parent.parent / "models"
+    return base / _CATALOG_FILENAME
+
+
+def _empty_catalog(source: str) -> dict:
+    """A safe, well-formed empty catalog. ``source`` records WHY it is empty
+    (missing / corrupt) for the staleness log + run meta."""
+    return {
+        "schema_version": CATALOG_SCHEMA_VERSION,
+        "fetched_at": None,
+        "source": source,
+        "count": 0,
+        "models": [],
+    }
+
+
+def load_catalog_cache() -> dict:
+    """Read the on-disk catalog. NEVER raises, NEVER blocks, NEVER touches the
+    network. Missing file -> empty(source='missing'); unreadable / corrupt /
+    wrong-shape -> empty(source='corrupt'). On success: schema_version,
+    fetched_at, source, count, models[]."""
+    path = _catalog_cache_path()
+    try:
+        if not path.is_file():
+            return _empty_catalog("missing")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("models"), list):
+            log.warning("[OpenRouter] catalog cache %s malformed; treating as empty.", path)
+            return _empty_catalog("corrupt")
+        data.setdefault("schema_version", CATALOG_SCHEMA_VERSION)
+        data.setdefault("fetched_at", None)
+        data.setdefault("source", "cache")
+        data["count"] = len(data["models"])
+        return data
+    except Exception as exc:  # noqa: BLE001 -- a cache read must never break a dropdown build
+        log.warning("[OpenRouter] catalog cache read failed (%s); treating as empty.", exc)
+        return _empty_catalog("corrupt")
+
+
+def cached_models() -> list[dict]:
+    """The model dicts from the cache (or [] when missing/corrupt). Each entry
+    carries at least ``id``; S1 derives provider / supports_json / recency
+    from the stored fields."""
+    models = load_catalog_cache().get("models") or []
+    return [m for m in models if isinstance(m, dict) and m.get("id")]
+
+
+def _parse_iso(ts: Any) -> datetime.datetime | None:
+    if not ts or not isinstance(ts, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def catalog_meta() -> dict:
+    """Compact staleness view for the dropdown-build log + run meta:
+    ``{source, fetched_at, count, staleness}``. staleness is one of
+    live | cache | stale | empty. Never raises."""
+    try:
+        data = load_catalog_cache()
+        count = int(data.get("count") or 0)
+        fetched_at = data.get("fetched_at")
+        source = data.get("source") or "cache"
+        if count == 0:
+            staleness = "empty"
+        elif source == "live":
+            staleness = "live"
+        else:
+            staleness = "cache"
+            ts = _parse_iso(fetched_at)
+            if ts is not None:
+                age = (datetime.datetime.now(datetime.timezone.utc) - ts).total_seconds()
+                if age > _CATALOG_STALE_AFTER_S:
+                    staleness = "stale"
+        return {"source": source, "fetched_at": fetched_at,
+                "count": count, "staleness": staleness}
+    except Exception:  # noqa: BLE001
+        return {"source": "corrupt", "fetched_at": None, "count": 0, "staleness": "empty"}
+
+
+def _slim_model(raw: dict) -> dict | None:
+    """Keep only the fields the dropdowns + filters need; None for a row with
+    no usable id. ``supports_json`` is derived from OpenRouter's
+    ``supported_parameters`` (a model that lists ``structured_outputs`` or
+    ``response_format`` can be schema-constrained -- the REQUIRE_JSON filter,
+    S1)."""
+    if not isinstance(raw, dict):
+        return None
+    mid = raw.get("id")
+    if not isinstance(mid, str) or not mid:
+        return None
+    sp = raw.get("supported_parameters")
+    sp = [str(x) for x in sp] if isinstance(sp, list) else []
+    pricing = raw.get("pricing") if isinstance(raw.get("pricing"), dict) else {}
+    return {
+        "id": mid,
+        "name": str(raw.get("name") or mid),
+        "provider": mid.split("/", 1)[0] if "/" in mid else "",
+        "created": raw.get("created"),
+        "context_length": raw.get("context_length"),
+        "pricing": {"prompt": pricing.get("prompt"),
+                    "completion": pricing.get("completion")},
+        "supported_parameters": sp,
+        "supports_json": ("structured_outputs" in sp) or ("response_format" in sp),
+    }
+
+
+def _fetch_models_json(*, base_url: str, api_key: str | None, timeout_s: int) -> list[dict]:
+    """Mockable network seam (tests patch this): GET ``/models`` and return the
+    raw ``data`` list. ``requests`` is imported lazily so the module stays
+    import-safe + network-free. ONLY ``refresh_catalog_cache`` calls this --
+    never INPUT_TYPES, never at import."""
+    import requests  # lazy: keep module import-safe + network-free
+    url = f"{base_url.rstrip('/')}/models"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    resp = requests.get(url, headers=headers, timeout=timeout_s)
+    resp.raise_for_status()
+    body = resp.json()
+    data = body.get("data") if isinstance(body, dict) else body
+    return data if isinstance(data, list) else []
+
+
+def _atomic_write_catalog(catalog: dict) -> None:
+    """Write the cache atomically (temp file + ``os.replace``) so a crash
+    mid-write never leaves a half-written / corrupt cache. Creates ``models/``
+    if absent. Never raises into the caller."""
+    try:
+        path = _catalog_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(catalog, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[OpenRouter] catalog atomic write failed (%s).", exc)
+
+
+def refresh_catalog_cache(*, force: bool = False) -> dict:  # noqa: ARG001 -- force reserved
+    """Fetch the live OpenRouter model list and atomically write the cache.
+    EXPLICIT call only (operator / refresh script) -- never import, never
+    INPUT_TYPES. A fetch failure NEVER destroys a good cache and never raises:
+    it logs and returns the existing cache. Returns the catalog dict in
+    effect after the call."""
+    base_url = _env("OPENROUTER_BASE_URL") or DEFAULT_BASE_URL
+    api_key = _env("OPENROUTER_API_KEY")
+    timeout_s = _int_env("OPENROUTER_TIMEOUT_S", DEFAULT_TIMEOUT_S)
+    try:
+        raw_models = _fetch_models_json(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
+    except Exception as exc:  # noqa: BLE001 -- a failed refresh keeps the old cache
+        log.warning("[OpenRouter] catalog refresh failed (%s); keeping existing cache.", exc)
+        return load_catalog_cache()
+    models = [m for m in (_slim_model(r) for r in raw_models) if m is not None]
+    catalog = {
+        "schema_version": CATALOG_SCHEMA_VERSION,
+        "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "live",
+        "count": len(models),
+        "models": models,
+    }
+    _atomic_write_catalog(catalog)
+    log.info("[OpenRouter] catalog refreshed: %d models, source=live", len(models))
+    return catalog
 
 
 # ---------------------------------------------------------------------------
@@ -727,4 +918,100 @@ __all__ = [
     "resolve_slug",
     "resolve_route",
     "reset_run_budget",
+    # catalog cache (S0)
+    "CATALOG_SCHEMA_VERSION",
+    "load_catalog_cache",
+    "cached_models",
+    "catalog_meta",
+    "refresh_catalog_cache",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Self-test (S0 cache) -- no network, no GPU. Drives the cache through
+# missing / live / corrupt / offline and proves it never raises or blocks,
+# and that load_catalog_cache stays network-free (INPUT_TYPES-safe).
+# Prints "SELF-TEST PASS: N/N". Run: python nodes\_otr_openrouter_backend.py
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import sys
+    import tempfile
+
+    _passed = 0
+    _total = 0
+
+    def _check(name: str, cond: bool) -> None:
+        global _passed, _total
+        _total += 1
+        if cond:
+            _passed += 1
+            print(f"  ok   {name}")
+        else:
+            print(f"  FAIL {name}")
+
+    _mod = sys.modules[__name__]
+    os.environ["OTR_OPENROUTER_CACHE_DIR"] = tempfile.mkdtemp(prefix="otr_orcat_")
+
+    # 1. Missing cache -> safe empty, never raises.
+    c0 = load_catalog_cache()
+    _check("missing -> source=missing, empty",
+           c0["source"] == "missing" and c0["models"] == [] and cached_models() == [])
+    _check("catalog_meta(missing) -> staleness=empty",
+           catalog_meta()["staleness"] == "empty")
+
+    # 2. Refresh with a mocked fetch -> live cache; slimmed; supports_json derived.
+    _fake_models = [
+        {"id": "anthropic/claude-opus-4.8", "name": "Claude Opus 4.8",
+         "created": 1, "context_length": 200000,
+         "pricing": {"prompt": "0.000005", "completion": "0.000025"},
+         "supported_parameters": ["tools", "response_format", "structured_outputs"]},
+        {"id": "deepseek/deepseek-v4-pro", "name": "DeepSeek V4 Pro",
+         "created": 2, "context_length": 128000,
+         "pricing": {"prompt": "0.00000043", "completion": "0.00000087"},
+         "supported_parameters": ["tools"]},
+        {"no_id": True},  # malformed row -> dropped by _slim_model
+    ]
+    _mod._fetch_models_json = lambda **kw: _fake_models
+    cat = refresh_catalog_cache()
+    _check("refresh -> source=live, count=2 (malformed row dropped)",
+           cat["source"] == "live" and cat["count"] == 2)
+    _by_id = {m["id"]: m for m in cached_models()}
+    _check("supports_json True when structured_outputs/response_format present",
+           _by_id["anthropic/claude-opus-4.8"]["supports_json"] is True)
+    _check("supports_json False when absent",
+           _by_id["deepseek/deepseek-v4-pro"]["supports_json"] is False)
+    _check("provider derived from slug prefix",
+           _by_id["anthropic/claude-opus-4.8"]["provider"] == "anthropic")
+    _check("catalog_meta(live) -> staleness=live, count=2",
+           catalog_meta()["staleness"] == "live" and catalog_meta()["count"] == 2)
+
+    # 3. Corrupt cache file -> safe empty, never raises.
+    _catalog_cache_path().write_text("{ this is not valid json", encoding="utf-8")
+    c3 = load_catalog_cache()
+    _check("corrupt -> source=corrupt, empty",
+           c3["source"] == "corrupt" and c3["models"] == [])
+
+    # 4. Offline / failed fetch -> keeps the existing good cache, never raises.
+    _mod._fetch_models_json = lambda **kw: _fake_models
+    refresh_catalog_cache()  # lay down a good cache again
+
+    def _boom(**kw):
+        raise RuntimeError("simulated network failure")
+
+    _mod._fetch_models_json = _boom
+    try:
+        cat4 = refresh_catalog_cache()
+        _check("offline refresh -> kept existing cache (count 2), no raise",
+               cat4["count"] == 2)
+    except Exception as exc:  # noqa: BLE001 -- must NOT raise
+        _check(f"offline refresh raised: {exc!r}", False)
+
+    # 5. load_catalog_cache stays network-free even with the fetch seam broken
+    #    (INPUT_TYPES safety -- the dropdowns read this, never the network).
+    _check("load_catalog_cache works with fetch seam broken (no network)",
+           isinstance(load_catalog_cache(), dict))
+
+    os.environ.pop("OTR_OPENROUTER_CACHE_DIR", None)
+    print(f"SELF-TEST PASS: {_passed}/{_total}")
+    sys.exit(0 if _passed == _total else 1)
