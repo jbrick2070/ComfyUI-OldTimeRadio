@@ -233,6 +233,45 @@ def run_post_script_spine(
     meta["story_spine_enabled"] = True
     repair_used = False
 
+    # --- Stage 2.5: conditional length normalization (creative slot) ---
+    # The Radio Editor's length pass runs FIRST and ONLY when the draft is
+    # out of spec (over the word band OR any line over the spoken cap); a
+    # clean draft skips it with no LLM call (go-forward Sprint 2). It owns
+    # episode length / pacing via render-safe per-beat edits (Tier-1 tighten
+    # + Tier-2 count change with needs_render_realign). NEVER RAISES (PD1).
+    # LLM slot: creative -- narrative length / pacing pass.
+    try:
+        from . import _otr_radio_editor as _ED
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_radio_editor as _ED  # type: ignore
+    try:
+        led_data = getattr(led, "data", led)
+        if _ED.needs_length_normalization(led_data):
+            _turn_idx, _button_idx = _map_arc_indices(outline, led)
+            _recompose = _make_recompose_fn(led, creative_generate_fn)
+            ctx = (
+                slot_scheduler.helper_context("radio_editor")
+                if slot_scheduler is not None
+                else _nullcontext()
+            )
+            with ctx:
+                _length_plan, length_report = _ED.normalize_length(
+                    led_data,
+                    editor_model=resolved["creative_writing_model"],
+                    slot_fn=creative_generate_fn,
+                    recompose_fn=_recompose,
+                    turn_beat_index=_turn_idx,
+                    button_beat_index=_button_idx,
+                    apply=True,
+                )
+            meta["length_pass_report"] = _editor_summary(length_report)
+        else:
+            meta["length_pass_report"] = {"status": "SKIPPED_IN_SPEC"}
+    except Exception as exc:  # noqa: BLE001 -- length pass must never break a run
+        meta["length_pass_report"] = {"status": "ERROR",
+                                      "error": type(exc).__name__}
+        log.warning("[OTR_StorySpine] length normalization failed: %r", exc)
+
     # --- Stage 3: Creative QA critic (read-only, technical slot) -------
     # LLM slot: technical -- structured categorical verdict.
     verdict = None
@@ -409,6 +448,14 @@ def _selftest() -> int:
         "cast_name_leak_indices": [], "sfw_ok": True, "verdict": "PASS",
     })
 
+    # A no-op KEEP RadioEditPlan, in band -- the creative slot returns this
+    # when the Stage 2.5 length pass runs on the short _min_ledger (which is
+    # under band, so the pass fires); it validates + applies as a no-op.
+    keep_plan_json = _json.dumps({
+        "edits": [{"beat_index": 0, "action": "KEEP"}],
+        "projected_word_total": 350,
+    })
+
     resolved = {"technical_model": "test/tech", "creative_writing_model": "test/creative"}
 
     # Test 1: flag UNSET -> default ON (out-of-the-box best run).
@@ -445,13 +492,14 @@ def _selftest() -> int:
         meta = led.data["meta"]
         run_post_script_spine(
             led, meta, outline=None,
-            creative_generate_fn=_stub_generate(pass_verdict),
+            creative_generate_fn=_stub_generate(keep_plan_json),
             technical_generate_fn=_stub_generate(pass_verdict),
             resolved=resolved, slot_scheduler=None,
         )
         ok = (
             meta.get("story_spine_status") == "ok"
             and meta.get("story_spine_enabled") is True
+            and "length_pass_report" in meta
             and "creative_qa_verdict" in meta
             and "ledger_scrub_status" in meta
             and "writer_llm_unload" in meta
@@ -545,6 +593,47 @@ def _selftest() -> int:
             print(f"  [FAIL] recompose bad={out_bad!r} raise={out_raise!r}")
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] recompose raised: {exc!r}")
+
+    # Test 8: Stage 2.5 wiring -- an in-spec draft SKIPS the length pass
+    # with NO creative-slot LLM call (the conditional wiring), and the run
+    # still completes and stamps meta.
+    total += 1
+    try:
+        os.environ[_ENV_FLAG] = "1"
+        _filler = " ".join(["word"] * 28)
+        _in_spec_lines = [
+            {"line_id": "L%02d" % k, "beat_id": "b%02d" % k, "char_id": "c02",
+             "speaker_role": "character", "text": _filler, "word_count": 28}
+            for k in range(12)
+        ]
+        led8 = _Ledger({
+            "cast": [{"char_id": "c02", "name": "ALICE",
+                      "voice_preset": "v2/en_speaker_1",
+                      "speaker_role": "character"}],
+            "lines": _in_spec_lines, "meta": {},
+        })
+        meta8 = led8.data["meta"]
+
+        def _boom_creative(messages, *, temperature, max_new_tokens, stop=None):
+            raise AssertionError(
+                "length pass must not call the creative LLM on an in-spec draft")
+
+        run_post_script_spine(
+            led8, meta8, outline=None,
+            creative_generate_fn=_boom_creative,
+            technical_generate_fn=_stub_generate(pass_verdict),
+            resolved=resolved, slot_scheduler=None,
+        )
+        if (meta8.get("story_spine_status") == "ok"
+                and meta8.get("length_pass_report", {}).get("status")
+                == "SKIPPED_IN_SPEC"):
+            passed += 1
+            print("  [PASS] in-spec draft skips the length pass (no LLM call)")
+        else:
+            print(f"  [FAIL] skip-path length_pass_report = "
+                  f"{meta8.get('length_pass_report')}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] skip-path test raised: {exc!r}")
 
     os.environ.pop(_ENV_FLAG, None)
     print(f"SELF-TEST PASS: {passed}/{total}")
