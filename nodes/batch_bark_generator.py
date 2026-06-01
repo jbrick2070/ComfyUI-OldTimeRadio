@@ -23,6 +23,7 @@ v1.0  2026-04-04  Jeffrey Brick
 
 import json
 import logging
+import os
 import gc
 import time
 import warnings
@@ -440,8 +441,25 @@ class BatchBarkGenerator:
         #
         # Missing meta.freeze_verdict (legacy graphs, tests) -> proceed as
         # before. Only an explicit 'needs_full_rerun' verdict halts.
+        #
+        # BUG-LOCAL-300 (2026-06-01) safety/quality split: not every
+        # needs_full_rerun means "unrenderable". meta.freeze_block_class
+        # records WHY. "structural" (reviewer cast terminal / Phase 10 gap
+        # audit) is genuinely unrenderable and still HALTS. "quality" (a
+        # subjective story-critic verdict -- weak arc, flat lines, reroll
+        # exhaustion -- reached only AFTER the cast audit passed, so the cast
+        # is sound and the ledger is renderable) renders with a loud warning
+        # instead of blocking audio on a taste call. The Gate 3 voice-preset
+        # check below stays the hard renderability net, so a misclassified
+        # ledger still cannot render garbage. Missing/unknown class -> treated
+        # as structural (halt). OTR_BARK_HALT_ON_QUALITY_BLOCK=1 restores the
+        # strict halt-on-any-needs_full_rerun behaviour.
         _verdict = _meta.get("freeze_verdict")
         if _verdict == "needs_full_rerun":
+            _block_class = _meta.get("freeze_block_class")
+            _strict_quality_halt = (
+                os.environ.get("OTR_BARK_HALT_ON_QUALITY_BLOCK", "0") == "1"
+            )
             if bypass_freeze_halt:
                 # Operator-opted bypass for sprint-time iteration.
                 # Loud WARNING so the soak log shows the halt was
@@ -455,6 +473,16 @@ class BatchBarkGenerator:
                     "intended for fast-iteration smoke runs only. "
                     "Flip the widget OFF for any broadcast-ready "
                     "episode. See BUG-LOCAL-276."
+                )
+            elif _block_class == "quality" and not _strict_quality_halt:
+                log.warning(
+                    "[BatchBark] freeze_verdict='needs_full_rerun' with "
+                    "freeze_block_class='quality' -- a subjective story-critic "
+                    "verdict on a cast-clean, renderable ledger, NOT a "
+                    "renderability failure. Rendering anyway (the Gate 3 "
+                    "voice-preset check still applies). Set "
+                    "OTR_BARK_HALT_ON_QUALITY_BLOCK=1 to halt on quality "
+                    "blocks too. See BUG-LOCAL-300."
                 )
             else:
                 raise ValueError(

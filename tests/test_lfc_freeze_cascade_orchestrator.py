@@ -232,6 +232,86 @@ class TestPhase10HardFailDownstream:
 
 
 # ---------------------------------------------------------------------------
+# BUG-LOCAL-300 safety/quality split -- meta.freeze_block_class
+# ---------------------------------------------------------------------------
+
+
+class TestFreezeBlockClassSplit:
+    """The cascade stamps meta.freeze_block_class alongside a
+    needs_full_rerun verdict so BatchBarkGenerator can tell a genuinely
+    unrenderable ledger ("structural" -> halt) from a renderable-but-
+    low-quality one ("quality" -> render with a warning)."""
+
+    def test_reviewer_terminal_is_structural(self):
+        """Reviewer needs_full_rerun = cast/contract failure -> structural."""
+        led = _ledger_obj(_clean_ledger_data())
+
+        def fake_review(_fn, _led):
+            return _stub_reviewer_disposition("needs_full_rerun")
+
+        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                          side_effect=fake_review):
+            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
+        assert led.data["meta"]["freeze_block_class"] == "structural"
+
+    def test_phase10_reject_is_structural(self):
+        """Phase 10 gap-audit rejection = critical structural gap ->
+        structural (genuinely unrenderable)."""
+        data = _clean_ledger_data()
+        led = _ledger_obj(data)
+
+        def fake_review(_fn, _led):
+            # Empty a voiced line so Phase 10 finds a critical gap.
+            _led.data["lines"][1]["text"] = ""
+            _led.data["lines"][1]["word_count"] = 0
+            _led.data["lines"][1]["char_count"] = 0
+            return _stub_reviewer_disposition("clean_no_edits")
+
+        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                          side_effect=fake_review):
+            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
+        assert led.data["meta"]["freeze_block_class"] == "structural"
+
+    def test_reroll_exhaustion_is_quality(self):
+        """A critic-driven terminal (reroll exhaustion / arc escalation) is
+        reached only AFTER the reviewer cast audit passed, so the ledger is
+        renderable -> quality, not structural."""
+        led = _ledger_obj(_clean_ledger_data())
+
+        critic_stub = SimpleNamespace(
+            model_dump=lambda: {"arc_verdict": "uneven"},
+            arc_verdict="uneven",
+            reroll_targets=["b002"],   # non-empty -> escalation is not NONE
+            flat_lines=[],
+            continuity_issues=[],
+            render_priority=[],
+        )
+        reroll_stub = _LFC_ORCH._OTRRR.RerollDisposition(
+            verdict="needs_full_rerun",
+            cycles_run=2,
+            lines_rerolled=0,
+            final_report=critic_stub,
+        )
+
+        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                          side_effect=lambda *a, **k:
+                          _stub_reviewer_disposition("clean_no_edits")), \
+             patch.object(_LFC_ORCH._OTRSC, "run_story_critic",
+                          side_effect=lambda *a, **k: critic_stub), \
+             patch.object(_LFC_ORCH._OTRRR, "run_targeted_reroll",
+                          side_effect=lambda *a, **k: reroll_stub):
+            disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert disp.verdict == "needs_full_rerun"
+        assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
+        assert led.data["meta"]["freeze_block_class"] == "quality"
+
+
+# ---------------------------------------------------------------------------
 # meta.cleanup_passes ledger
 # ---------------------------------------------------------------------------
 

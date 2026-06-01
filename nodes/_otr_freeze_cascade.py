@@ -508,6 +508,7 @@ def _build_terminal_skip_disposition(
     verdict: str,
     reviewer_disp: Optional[_OTRLR.ReviewerDisposition],
     pre_report: _LFC.GapAuditReport,
+    block_class: str = "structural",
 ) -> FreezeDisposition:
     """Stamp the terminal-skip state and build the FreezeDisposition.
 
@@ -522,6 +523,10 @@ def _build_terminal_skip_disposition(
     """
     meta = ledger_data.setdefault("meta", {})
     meta["freeze_verdict"] = verdict
+    # BUG-LOCAL-300 safety/quality split: record WHY this terminal verdict
+    # fired so BatchBarkGenerator can tell a genuinely unrenderable ledger
+    # ("structural") from a renderable-but-low-quality one ("quality").
+    meta["freeze_block_class"] = block_class
     # B5: stamp the remaining phases as terminal_skipped so
     # meta.cleanup_passes / readiness_passes stay contiguous. S30 B4:
     # phase 4 / 4.5 / 5 / 6 names removed -- those phases no longer exist.
@@ -704,6 +709,9 @@ def run_freeze_cascade(
             verdict=interim_verdict,
             reviewer_disp=reviewer_disp,
             pre_report=pre_report,
+            # Reviewer cast/contract terminal -> the ledger is structurally
+            # unrenderable; Bark must halt (BUG-LOCAL-300).
+            block_class="structural",
         )
         log.info(
             "[LFC] terminal reviewer verdict %r -- skipping Phase 4..10 "
@@ -877,6 +885,12 @@ def run_freeze_cascade(
             verdict="needs_full_rerun",
             reviewer_disp=reviewer_disp,
             pre_report=pre_report,
+            # Reached only after the reviewer cast audit PASSED (this is the
+            # non-terminal path), so the cast is sound and the ledger is
+            # renderable. needs_full_rerun here is a SUBJECTIVE story-critic
+            # call (reroll exhaustion / arc escalation) -> "quality", not a
+            # renderability failure (BUG-LOCAL-300).
+            block_class="quality",
         )
         log.warning(
             "[LFC] reroll loop exhausted %d cycle(s) with the critic "
@@ -1010,6 +1024,10 @@ def run_freeze_cascade(
         # when it raised (when meta was stampable).
         if not meta.get("freeze_verdict"):
             meta["freeze_verdict"] = "needs_full_rerun"
+        # BUG-LOCAL-300: Phase 10 gap-audit rejection = critical structural
+        # gaps -> the ledger is genuinely unrenderable. Mark structural so the
+        # Bark halt always blocks (never downgraded to a quality warn-through).
+        meta["freeze_block_class"] = "structural"
         disp = FreezeDisposition(
             verdict="needs_full_rerun",
             reviewer_disposition=reviewer_disp,

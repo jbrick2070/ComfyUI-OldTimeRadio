@@ -117,7 +117,10 @@ class TestHaltBlockSource:
         right BUG_LOG entry."""
         src = self._src()
         verdict_block_start = src.index('if _verdict == "needs_full_rerun":')
-        block = src[verdict_block_start:verdict_block_start + 2000]
+        # Window widened (2000 -> 3000) for the BUG-LOCAL-300 quality branch
+        # that now sits between the bypass warning and the structural
+        # ValueError. The assertion (both reference BUG-LOCAL-276) is unchanged.
+        block = src[verdict_block_start:verdict_block_start + 3000]
         # Both the raise ValueError(...) string AND the bypass log
         # message reference BUG-LOCAL-276.
         assert block.count("BUG-LOCAL-276") >= 2, (
@@ -137,6 +140,38 @@ class TestHaltBlockSource:
         assert "bypass_freeze_halt" in block, (
             "ValueError message should name the bypass widget so the "
             "operator can find the escape hatch from the error alone"
+        )
+
+    def test_quality_block_branch_renders_not_raises(self):
+        """BUG-LOCAL-300 safety/quality split: a freeze_block_class=='quality'
+        block must RENDER (log.warning + proceed), never raise -- so a
+        renderable story is not blocked on a subjective arc verdict. Only the
+        structural else-branch raises."""
+        src = self._src()
+        verdict_idx = src.index('if _verdict == "needs_full_rerun":')
+        q_idx = src.index('_block_class == "quality"', verdict_idx)
+        assert q_idx > verdict_idx, (
+            "the quality branch must live inside the needs_full_rerun check"
+        )
+        # The quality branch runs from its elif to the structural else.
+        branch = src[q_idx:src.index("else:", q_idx)]
+        assert "log.warning" in branch, "quality branch must log.warning"
+        assert "raise" not in branch, (
+            "quality branch must NOT raise -- it renders the (renderable) "
+            "ledger; only the structural else-branch halts"
+        )
+        assert "BUG-LOCAL-300" in branch, (
+            "quality branch must reference BUG-LOCAL-300 for soak greps"
+        )
+
+    def test_quality_block_env_override_present(self):
+        """The strict-halt escape hatch is an env var (OTR project convention:
+        every knob is an env var) so an operator can restore the old
+        halt-on-any behaviour without a workflow JSON change."""
+        src = self._src()
+        assert "OTR_BARK_HALT_ON_QUALITY_BLOCK" in src, (
+            "the quality split must expose OTR_BARK_HALT_ON_QUALITY_BLOCK to "
+            "restore strict halting"
         )
 
 
