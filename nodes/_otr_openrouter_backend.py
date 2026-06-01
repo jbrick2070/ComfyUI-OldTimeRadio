@@ -54,8 +54,12 @@ DEFAULT_CONTEXT_WINDOW = 8192
 
 # Conservative cost ceilings. Deliberately low so an unconfigured
 # operator cannot accidentally spend a fortune; raise via env when ready.
-DEFAULT_MAX_TOKENS_PER_CALL = 8192
-DEFAULT_MAX_TOKENS_PER_RUN = 200_000
+# Defect C fix: the COST per-call ceiling must sit ABOVE the OUTPUT cap, or a
+# reply near the output cap (+ the prompt added by the estimate) spuriously
+# trips OpenRouterCostCeilingError. So they are two separate numbers.
+DEFAULT_OUTPUT_TOKENS_CAP = 8192      # ceiling on OUTPUT tokens (max_tokens) per call
+DEFAULT_MAX_TOKENS_PER_CALL = 32768   # COST per-call ceiling (prompt+output estimate)
+DEFAULT_MAX_TOKENS_PER_RUN = 300_000
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2  # total attempts = retries + 1
 
@@ -274,7 +278,7 @@ class OpenRouterBackend:
             # optional per-slot overrides (FC3) -- None ⇒ caller controls
             "temperature_override": _float_env(f"OPENROUTER_{letter}_TEMP"),
             "max_tokens_cap": _int_env(
-                f"OPENROUTER_{letter}_MAXTOK", DEFAULT_MAX_TOKENS_PER_CALL
+                f"OPENROUTER_{letter}_MAXTOK", DEFAULT_OUTPUT_TOKENS_CAP
             ),
             "base_url": _env("OPENROUTER_BASE_URL") or DEFAULT_BASE_URL,
             # no "model" / "tokenizer" keys: the generate-fn factory
@@ -319,7 +323,7 @@ class OpenRouterBackend:
         # DEFAULT_MIN_OUTPUT_TOKENS, then clamp to the per-slot cap. max_tokens
         # is a ceiling only -- the model stops at finish_reason=stop and bills
         # actual tokens, so a generous floor costs nothing on short replies.
-        cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_MAX_TOKENS_PER_CALL)
+        cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
         floor = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
         out_tokens = max(int(max_new_tokens or 0), floor)
         if out_tokens > cap:
@@ -345,6 +349,10 @@ class OpenRouterBackend:
             payload["stop"] = [s for s in stop if s]
         if response_format is not None:
             payload["response_format"] = response_format
+            # Defect A: only route to upstreams that actually honour the
+            # requested parameters, so response_format can't be silently
+            # dropped on the wire (which would make the enforcement a no-op).
+            payload["provider"] = {"require_parameters": True}
 
         text = self._post_with_retries(
             base_url=base_url, api_key=api_key, payload=payload, slug=slug,
@@ -442,6 +450,8 @@ class OpenRouterBackend:
     @staticmethod
     def _extract_text(result: dict, *, slug: str) -> str:
         body = result.get("json") or {}
+        if os.environ.get("OPENROUTER_DEBUG_RAW") == "1":
+            log.info("[OpenRouter] raw %s response: %s", slug, json.dumps(body)[:1500])
         choices = body.get("choices") or []
         if not choices:
             raise OpenRouterCallFailedError(
@@ -457,9 +467,21 @@ class OpenRouterBackend:
             )
         message = choices[0].get("message") or {}
         content = message.get("content")
+        # Defect D: content may be a list of typed parts (Anthropic-style
+        # content blocks); join their text. Some reasoning models also put
+        # the answer only in `reasoning` when `content` is empty -- fall
+        # back to that rather than aborting silently.
+        if isinstance(content, list):
+            content = "".join(
+                p.get("text", "") for p in content
+                if isinstance(p, dict) and p.get("type") in (None, "text")
+            )
+        if (not isinstance(content, str) or not content) and message.get("reasoning"):
+            content = str(message.get("reasoning"))
         if not isinstance(content, str) or not content:
             raise OpenRouterCallFailedError(
-                f"OpenRouter {slug} returned empty message content."
+                f"OpenRouter {slug} returned empty message content "
+                f"(finish_reason={choices[0].get('finish_reason')!r})."
             )
         return content
 
@@ -491,17 +513,28 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
     technical output is schema-enforced (fail-closed via structured_call's
     validate + bounded-repair ladder)."""
     backend = OpenRouterBackend()
+    bound_rf = response_format
 
-    def generate_fn(messages, *, temperature=None, max_new_tokens=None, stop=None):
+    def generate_fn(messages, *, temperature=None, max_new_tokens=None,
+                    stop=None, response_format=None):
+        # A per-call response_format (e.g. structured_call passing
+        # json_object on an un-schema'd creative call) overrides the bound
+        # one; otherwise the closure's bound response_format (S4 json_schema)
+        # is used. Free-form calls pass neither and get plain generation.
+        rf = response_format if response_format is not None else bound_rf
         return backend.generate(
             cache_entry,
             messages,
             temperature=temperature,
             max_new_tokens=max_new_tokens,
             stop=stop,
-            response_format=response_format,
+            response_format=rf,
         )
 
+    # Markers so structured_call can detect a remote fn and whether it
+    # already carries a schema-bound response_format (don't override that).
+    generate_fn._otr_openrouter = True  # type: ignore[attr-defined]
+    generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
     return generate_fn
 
 

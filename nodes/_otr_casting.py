@@ -154,14 +154,14 @@ class DescriptionResponse(BaseModel):
     full surface the LLM is now asked to produce.
     """
 
-    # BUG-LOCAL-263 (2026-05-24): max_length 200 -> 750. The casting
-    # prompt only ever showed the model the placeholder "<short>" --
-    # it never stated a character count -- so a normal 1-2 sentence
-    # description routinely overran the old 200 cap and aborted the
-    # run. 750 is a generous runaway guard, not a content target;
-    # _format_prior_entry already trims the echoed description to
-    # 60 chars, so the stored length never touches prompt budget.
-    character_description: str = Field(..., min_length=10, max_length=750)
+    # BUG-LOCAL-263 (2026-05-24): max_length 200 -> 750. 2026-05-31: 750 ->
+    # 1500 -- a verbose frontier remote model (claude-opus-4.8) writes
+    # richer descriptions that overran 750 and burned repair-ladder calls
+    # recovering. The cap is a runaway guard, not a content target;
+    # _format_prior_entry already trims the echoed description to 60 chars,
+    # so the stored length never touches prompt budget. Local Mistral's
+    # short descriptions are unaffected.
+    character_description: str = Field(..., min_length=10, max_length=1500)
 
     @field_validator("character_description")
     @classmethod
@@ -186,7 +186,7 @@ class CastingResponse(BaseModel):
     construction.
     """
 
-    character_description: str = Field(..., min_length=10, max_length=750)
+    character_description: str = Field(..., min_length=10, max_length=1500)
     gender: str = Field(..., min_length=3, max_length=12)
     voice_preset: str = Field(..., min_length=3, max_length=80)
 

@@ -248,7 +248,25 @@ def _invoke_slot(
 
     Every slot fn in this codebase has the signature
     `slot_fn(messages, *, temperature, max_new_tokens) -> str`.
+
+    [OpenRouter] A remote OpenRouter slot fn with NO schema-bound
+    response_format is asked for json_object mode, so a free-form frontier
+    model (e.g. Opus, whose default is prose) returns a parseable JSON
+    object for the parse+validate ladder below. A remote fn that already
+    carries a json_schema keeps it; local fns take neither kwarg. This is a
+    wiring change only -- the prompt, schema, and fail-closed ladder are
+    unchanged, and the local path is byte-identical.
     """
+    if (
+        getattr(slot_fn, "_otr_openrouter", False)
+        and getattr(slot_fn, "_otr_response_format", None) is None
+    ):
+        return slot_fn(
+            messages,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            response_format={"type": "json_object"},
+        )
     return slot_fn(
         messages,
         temperature=temperature,

@@ -170,3 +170,41 @@ def test_local_entry_without_tokenizer_still_errors():
     from nodes._otr_model_loader import ModelLoaderError
     with pytest.raises(ModelLoaderError):
         cg.make_constrained_generate_fn({"provider": "local"}, Tiny)
+
+
+# ---------------------------------------------------------------------------
+# Lean hardening: remote creative structured_call gets json_object mode
+# ---------------------------------------------------------------------------
+
+
+def test_remote_creative_structured_call_forces_json_object(enabled, monkeypatch):
+    """A remote fn with NO bound schema, driven through structured_call,
+    must request response_format=json_object (+ provider.require_parameters)
+    so a free-form frontier model returns parseable JSON."""
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _post_returning('{"name":"Ada","score":1}'),
+    )
+    slot_fn = orb.make_openrouter_generate_fn(_entry(enabled))  # no schema bound
+    assert getattr(slot_fn, "_otr_openrouter", False) is True
+    assert getattr(slot_fn, "_otr_response_format", "x") is None
+    structured_call(prompt="x", schema=Tiny, slot_fn=slot_fn,
+                    base_temperature=0.3, structural_retry_temperature=0.1)
+    assert seen["payload"]["response_format"] == {"type": "json_object"}
+    assert seen["payload"]["provider"] == {"require_parameters": True}
+
+
+def test_remote_bound_schema_not_overridden_by_json_object(enabled, monkeypatch):
+    """A remote fn that already carries a json_schema (S4 grammar path) keeps
+    it -- _invoke_slot must not clobber it with json_object."""
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _post_returning('{"name":"A","score":2}'),
+    )
+    rf = orb.schema_to_response_format(Tiny)
+    slot_fn = orb.make_openrouter_generate_fn(_entry(enabled), response_format=rf)
+    structured_call(prompt="x", schema=Tiny, slot_fn=slot_fn,
+                    base_temperature=0.3, structural_retry_temperature=0.1)
+    assert seen["payload"]["response_format"]["type"] == "json_schema"
