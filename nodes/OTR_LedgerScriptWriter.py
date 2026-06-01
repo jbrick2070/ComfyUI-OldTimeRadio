@@ -3743,13 +3743,13 @@ class OTR_LedgerScriptWriter:
 
         # --- Story-spine Wave 2: Stage 3 (critic) / 3.5 (single editor
         # repair) / unload / Stage 4 (scrub), in-process + env-gated,
-        # DEFAULT OFF. When OTR_ENABLE_STORY_SPINE != "1" the writer takes
-        # its byte-identical default path (the unload block in the else
-        # branch). When on, the orchestrator runs the four post-script
-        # passes AND performs the writer-LLM unload itself, after the LLM
-        # passes (D8). Never raises (PD1). No node surface, no workflow-
-        # JSON change (D4/D5); model ids come from resolved[...] (critic ->
-        # technical slot, editor -> creative slot).
+        # DEFAULT ON (opt-out). The orchestrator runs the four post-script
+        # passes out of the box; OTR_ENABLE_STORY_SPINE=0 restores the
+        # writer's byte-identical default path (the unload block in the
+        # else branch). When on, the orchestrator performs the writer-LLM
+        # unload itself, after the LLM passes (D8). Never raises (PD1). No
+        # node surface, no workflow-JSON change (D4/D5); model ids come
+        # from resolved[...] (critic -> technical slot, editor -> creative).
         try:
             from . import _otr_story_spine as _OTRSPINE
         except ImportError:  # pragma: no cover - standalone / test load

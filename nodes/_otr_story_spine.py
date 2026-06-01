@@ -6,13 +6,14 @@ Editor repair), the writer-LLM unload, and Stage 4 (deterministic
 Ledger Scrub) -- inside OTR_LedgerScriptWriter.run(), mirroring how
 run_story_brief_reflection is called (`_otr_story_brief.py:861`).
 
-GATED, DEFAULT OFF. `enabled()` reads `OTR_ENABLE_STORY_SPINE` and is
-False unless it is exactly "1". When the flag is off the writer takes
-its existing path (the unload block at the original call site), so the
-default pipeline is byte-identical and every headless regression stays
-green. When the flag is on -- an operator's deliberate GPU validation
-run -- the four passes run here. This is the same opt-in/default-off
-pattern the OpenRouter remote-LLM feature shipped with.
+GATED, DEFAULT ON (opt-out). `enabled()` reads `OTR_ENABLE_STORY_SPINE`
+and is True unless it is exactly "0". Out of the box the four passes run
+-- a fresh install gets the critic + editor + scrub with no env setup,
+which is the point of building them. Setting the flag to "0" is the
+operator escape hatch: it restores the writer's byte-identical baseline
+path (the unload block at the original call site), e.g. for a baseline
+A/B or a fast bare-writer smoke. The headless suite stays green on either
+setting (every pass is fail-soft and never raises).
 
 In-process, not a node (D4/D5): no INPUT_TYPES, no widget, no broadcast
 output, no workflow-JSON change. The model ids arrive as the writer's
@@ -25,21 +26,18 @@ script it already had. The single shared repair (spine invariant 5) is
 tracked here: a REPAIR_ONCE verdict spends it on the editor; the scrub
 is then told `repair_available=False`.
 
-Two refinements are deliberately deferred to the GPU-validation
-follow-up and are SAFE no-ops until then (both contained by the
-default-off flag):
-  * recompose_fn is a no-op (returns the original line). The editor's
-    seven other actions (KEEP / SHORTEN_LINE / CLEAN_PUNCTUATION /
-    CUT_LINE / REMOVE_REDUNDANT_BEAT / SPLIT_LINE / MERGE_SHORT_LINES)
-    all run; only RECOMPOSE_BEAT_SAME_INTENT degrades to KEEP rather
-    than risk a mis-built LineRequest -- a flat beat stays as-is, never
-    corrupted. Production recompose wraps `_otr_line_composer.compose_line`.
-  * turn_beat_index / button_beat_index are passed None (the editor's
-    structural + length + visual-noun guards still prevent any render-
-    contract corruption; only the "Tier-2 removals never drop the arc
-    beat" check is relaxed). The Stream A outline already carries
-    `turning_point` / `button`; mapping their all-beats index into the
-    editor's voiced-view index space is the follow-up.
+Full power, fail-soft by construction:
+  * recompose_fn wraps `_otr_line_composer.compose_line` on the creative
+    slot (`_make_recompose_fn`), so RECOMPOSE_BEAT_SAME_INTENT actually
+    regenerates a flat beat (same speaker + intent, under the editor's
+    fence). Any error returns the original line, so a beat is never
+    corrupted -- RECOMPOSE just degrades to KEEP on failure.
+  * turn_beat_index / button_beat_index are mapped from the Stream A
+    outline's `turning_point` / `button` into the editor's voiced-view
+    index space by beat_id (`_map_arc_indices`), so Tier-2 removals never
+    drop the arc beats. A mismatch yields None, which only relaxes that
+    one protection (the structural + length + visual-noun guards still
+    prevent any render-contract corruption).
 
 UTF-8 no BOM. No em-dashes. 4-space indentation.
 """
@@ -58,24 +56,141 @@ _ENV_FLAG = "OTR_ENABLE_STORY_SPINE"
 def enabled() -> bool:
     """True iff the story-spine post-script passes are switched on.
 
-    Default OFF: only an exact "1" enables it. Any other value (unset,
-    "0", "", "true", "yes") leaves the writer on its byte-identical
-    default path. Cheap, pure, never raises.
+    Default ON (opt-out): the story spine is the out-of-the-box pipeline,
+    so a fresh install gets the critic + editor + scrub with no env setup.
+    Only an explicit "0" disables it -- the operator escape hatch for a
+    byte-identical-baseline run or a fast bare-writer smoke. Cheap, pure,
+    never raises.
     """
     try:
-        return os.environ.get(_ENV_FLAG, "0").strip() == "1"
+        return os.environ.get(_ENV_FLAG, "1").strip() != "0"
     except Exception:  # noqa: BLE001 -- env read must never break a run
-        return False
+        return True
 
 
-def _noop_recompose(beat_index: int, original_text: str, hint: str) -> str:
-    """SAFE placeholder recompose seam (see module docstring).
+_VOICED_ROLES = ("character", "announcer")
 
-    Returns the original line unchanged, so RECOMPOSE_BEAT_SAME_INTENT
-    degrades to KEEP -- the beat is never corrupted. Production wiring
-    replaces this with a `_otr_line_composer.compose_line` wrapper.
+
+def _voiced_lines(led: Any) -> list:
+    """The editor's voiced view: character + announcer ledger lines, in
+    order. Mirrors _otr_radio_editor.VOICED_ROLES so beat_index maps
+    1:1 between this module and the editor. Never raises."""
+    try:
+        data = getattr(led, "data", led)
+        lines = data.get("lines") or []
+        return [l for l in lines
+                if isinstance(l, dict) and l.get("speaker_role") in _VOICED_ROLES]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _cast_name(cast: list, char_id: Any) -> Optional[str]:
+    for row in cast or ():
+        if isinstance(row, dict) and row.get("char_id") == char_id:
+            return row.get("name")
+    return None
+
+
+def _make_recompose_fn(led: Any, creative_generate_fn: Callable[..., str]):
+    """Build the editor's recompose seam: regenerate one flat beat via
+    `_otr_line_composer.compose_line` on the creative slot, same speaker
+    and intent, under the editor's RECOMPOSE fence.
+
+    Signature handed to the editor: ``recompose_fn(beat_index,
+    original_text, hint) -> str``. FAIL-SOFT BY CONSTRUCTION: any error
+    (bad index, LineRequest mismatch, a raising slot fn) returns the
+    ORIGINAL line, so RECOMPOSE degrades to KEEP and the beat is never
+    corrupted. `beat_index` is the editor's voiced-view index.
     """
-    return original_text
+    def _recompose(beat_index: int, original_text: str, hint: str) -> str:
+        try:
+            try:
+                from . import _otr_line_composer as _LC
+            except ImportError:  # pragma: no cover - standalone / test load
+                import _otr_line_composer as _LC  # type: ignore
+            data = getattr(led, "data", led)
+            cast = data.get("cast") or []
+            voiced = _voiced_lines(led)
+            if not (0 <= beat_index < len(voiced)):
+                return original_text
+            line = voiced[beat_index]
+            speaker = (
+                (_cast_name(cast, line.get("char_id")) or line.get("char_id") or "")
+                .strip().upper()
+            )
+            if not speaker:
+                return original_text
+            intent = (line.get("beat_intent") or "continue the scene").strip()
+            mood = (line.get("mood") or "neutral")
+            try:
+                target_words = int(line.get("target_words") or 20)
+            except Exception:  # noqa: BLE001
+                target_words = 20
+            # preceding voiced lines (most-recent-last) as scene context.
+            last_lines = []
+            for prev in voiced[max(0, beat_index - 3):beat_index]:
+                pname = (_cast_name(cast, prev.get("char_id"))
+                         or prev.get("char_id") or "").upper()
+                last_lines.append((pname, prev.get("text") or ""))
+            try:
+                roster = _LC.build_allowed_roster(cast)
+            except Exception:  # noqa: BLE001
+                roster = frozenset()
+            req = _LC.LineRequest(
+                speaker=speaker,
+                intent=intent,
+                mood=mood,
+                target_words=target_words,
+                canon_header="",
+                last_lines=last_lines,
+                allowed_roster=roster,
+                speaker_role=(line.get("speaker_role") or "character"),
+            )
+            res = _LC.compose_line(
+                creative_fn=creative_generate_fn,
+                req=req,
+                reroll_hint=(hint or None),
+            )
+            text = getattr(res, "text", None)
+            return text if (text and str(text).strip()) else original_text
+        except Exception:  # noqa: BLE001 -- recompose must never corrupt a beat
+            return original_text
+
+    return _recompose
+
+
+def _map_arc_indices(outline: Any, led: Any):
+    """Map the Stream A outline turning_point/button (indices into ALL
+    outline beats) into the editor's voiced-view index space (by
+    beat_id). Returns ``(turn_idx, button_idx)``; either is None on any
+    mismatch, which simply relaxes the editor's arc-protection without
+    risking a wrong-beat lock. Never raises."""
+    try:
+        voiced = _voiced_lines(led)
+        bid_to_idx: dict = {}
+        for i, l in enumerate(voiced):
+            bid = l.get("beat_id")
+            if bid is not None and bid not in bid_to_idx:
+                bid_to_idx[bid] = i
+
+        def _idx(ref: Any) -> Optional[int]:
+            if ref is None:
+                return None
+            try:
+                beats = outline.beats
+                bidx = ref.beat_index
+                if not (0 <= bidx < len(beats)):
+                    return None
+                return bid_to_idx.get(beats[bidx].beat_id)
+            except Exception:  # noqa: BLE001
+                return None
+
+        return (
+            _idx(getattr(outline, "turning_point", None)),
+            _idx(getattr(outline, "button", None)),
+        )
+    except Exception:  # noqa: BLE001
+        return None, None
 
 
 def _unload_writer_llm(meta: dict) -> None:
@@ -158,14 +273,16 @@ def run_post_script_spine(
                 if slot_scheduler is not None
                 else _nullcontext()
             )
+            _turn_idx, _button_idx = _map_arc_indices(outline, led)
+            _recompose = _make_recompose_fn(led, creative_generate_fn)
             with ctx:
                 _plan, report = _ED.run_radio_editor(
                     led_data,
                     editor_model=resolved["creative_writing_model"],
                     slot_fn=creative_generate_fn,
-                    recompose_fn=_noop_recompose,
-                    turn_beat_index=None,
-                    button_beat_index=None,
+                    recompose_fn=_recompose,
+                    turn_beat_index=_turn_idx,
+                    button_beat_index=_button_idx,
                     apply=True,
                 )
             repair_used = True
@@ -294,21 +411,21 @@ def _selftest() -> int:
 
     resolved = {"technical_model": "test/tech", "creative_writing_model": "test/creative"}
 
-    # Test 1: flag OFF -> enabled() False.
+    # Test 1: flag UNSET -> default ON (out-of-the-box best run).
     total += 1
     os.environ.pop(_ENV_FLAG, None)
-    if not enabled():
+    if enabled():
         passed += 1
-        print("  [PASS] flag unset -> enabled() False")
+        print("  [PASS] flag unset -> enabled() True (default on)")
     else:
-        print("  [FAIL] flag unset should be disabled")
+        print("  [FAIL] flag unset should be enabled (default on)")
 
-    # Test 2: flag "0" -> still off.
+    # Test 2: flag "0" -> the explicit opt-out escape hatch.
     total += 1
     os.environ[_ENV_FLAG] = "0"
     if not enabled():
         passed += 1
-        print("  [PASS] flag '0' -> enabled() False")
+        print("  [PASS] flag '0' -> enabled() False (opt-out)")
     else:
         print("  [FAIL] flag '0' should be disabled")
 
@@ -381,6 +498,53 @@ def _selftest() -> int:
             print(f"  [FAIL] raising-critic meta = {meta}")
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] raising critic propagated: {exc!r}")
+
+    # Test 6: _map_arc_indices maps the outline arc refs by beat_id into
+    # the voiced view, and is None-safe.
+    total += 1
+    try:
+        class _Ref:
+            def __init__(self, bi):
+                self.beat_index = bi
+
+        class _B:
+            def __init__(self, bid):
+                self.beat_id = bid
+
+        class _OL:
+            beats = [_B("b001"), _B("b002"), _B("b003"), _B("b004")]
+            turning_point = _Ref(2)   # b003
+            button = _Ref(3)          # b004
+
+        led6 = _min_ledger()
+        t, b = _map_arc_indices(_OL(), led6)
+        if t == 2 and b == 3 and _map_arc_indices(None, led6) == (None, None):
+            passed += 1
+            print("  [PASS] _map_arc_indices maps by beat_id; None-safe")
+        else:
+            print(f"  [FAIL] arc map -> t={t} b={b}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] arc map raised: {exc!r}")
+
+    # Test 7: _make_recompose_fn is fail-soft -- a bad index or a raising
+    # creative fn returns the ORIGINAL line, never raises, never corrupts.
+    total += 1
+    try:
+        led7 = _min_ledger()
+
+        def _raise_fn(messages, *, temperature, max_new_tokens, stop=None):
+            raise RuntimeError("no model")
+
+        rc = _make_recompose_fn(led7, _raise_fn)
+        out_bad = rc(999, "ORIGINAL", "tighten")
+        out_raise = rc(1, "ORIGINAL", "tighten")
+        if out_bad == "ORIGINAL" and out_raise == "ORIGINAL":
+            passed += 1
+            print("  [PASS] recompose fail-soft: bad index + raising fn -> original")
+        else:
+            print(f"  [FAIL] recompose bad={out_bad!r} raise={out_raise!r}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] recompose raised: {exc!r}")
 
     os.environ.pop(_ENV_FLAG, None)
     print(f"SELF-TEST PASS: {passed}/{total}")
