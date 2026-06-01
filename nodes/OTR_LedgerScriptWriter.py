@@ -3741,17 +3741,40 @@ class OTR_LedgerScriptWriter:
             )
         meta.update(_brief_delta)
 
-        # S3 (VRAM): the writer is done with the LLM after story_brief_reflection
-        # (the last LLM phase) -- evict it here, after the script and BEFORE the
-        # downstream TTS / render phase, so it is not co-resident with
-        # Bark / Kokoro / HuMo / FLUX. Never raises (PD1, audio is king); gated
-        # by OTR_WRITER_UNLOAD_AFTER_SCRIPT (default on). VRAM-envelope benefit
-        # needs an operator GPU smoke to confirm.
+        # --- Story-spine Wave 2: Stage 3 (critic) / 3.5 (single editor
+        # repair) / unload / Stage 4 (scrub), in-process + env-gated,
+        # DEFAULT OFF. When OTR_ENABLE_STORY_SPINE != "1" the writer takes
+        # its byte-identical default path (the unload block in the else
+        # branch). When on, the orchestrator runs the four post-script
+        # passes AND performs the writer-LLM unload itself, after the LLM
+        # passes (D8). Never raises (PD1). No node surface, no workflow-
+        # JSON change (D4/D5); model ids come from resolved[...] (critic ->
+        # technical slot, editor -> creative slot).
         try:
-            from . import _otr_writer_vram as _OTRVRAM
+            from . import _otr_story_spine as _OTRSPINE
         except ImportError:  # pragma: no cover - standalone / test load
-            import _otr_writer_vram as _OTRVRAM  # type: ignore
-        meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
+            import _otr_story_spine as _OTRSPINE  # type: ignore
+        if _OTRSPINE.enabled():
+            _OTRSPINE.run_post_script_spine(
+                led, meta, outline,
+                creative_generate_fn=creative_generate_fn,
+                technical_generate_fn=technical_generate_fn,
+                resolved=resolved,
+                slot_scheduler=slot_scheduler,
+            )
+        else:
+            # S3 (VRAM): the writer is done with the LLM after
+            # story_brief_reflection (the last LLM phase) -- evict it here,
+            # after the script and BEFORE the downstream TTS / render phase,
+            # so it is not co-resident with Bark / Kokoro / HuMo / FLUX.
+            # Never raises (PD1, audio is king); gated by
+            # OTR_WRITER_UNLOAD_AFTER_SCRIPT (default on). VRAM-envelope
+            # benefit needs an operator GPU smoke to confirm.
+            try:
+                from . import _otr_writer_vram as _OTRVRAM
+            except ImportError:  # pragma: no cover - standalone / test load
+                import _otr_writer_vram as _OTRVRAM  # type: ignore
+            meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
 
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json
