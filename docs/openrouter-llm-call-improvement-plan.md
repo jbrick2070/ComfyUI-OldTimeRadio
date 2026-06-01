@@ -22,10 +22,122 @@ mistral-nemo runs) + `docs/2026-05-31-otr-story-quality-comparison.md` (Opus 89%
 
 The gaps are per-slot. Below, each change names the slot, the call site, and the gate.
 
-## C1 -- Creative length + radio-legibility control (HIGHEST value)
+## Three-pass story architecture (operator direction, 2026-05-31)
 
-**Slot:** creative (dialogue composer + line composer). **Problem:** Opus writes 2.5x the
-target and sprawls; a listener can't track it aurally.
+Jeffrey's direction after seeing the Opus run: a **three-pass** generate -> edit -> judge
+pipeline. "Opus writes it, a more tactical pass cleans it to the right word count and makes
+the dialogue fit, and a final pass checks the dialogue is actually creative/interesting."
+(Decoding note: "31" = Opus, the model that scored 31/35.) This section is the spine; C1-C6
+below are the component changes it composes.
+
+### The three passes
+
+| Pass | Role | What it does | Maps to OTR | Model role |
+|------|------|--------------|-------------|------------|
+| **1 -- Writer** | creative generation | outline + cast + dialogue from organic news | the existing **creative slot** (Slot A) in `OTR_LedgerScriptWriter` | **Opus 4.8** |
+| **2 -- Tactical editor** | editorial cleanup | trim the overshoot to the radio word target; break comma-splice density into spoken cadence; confirm each beat's dialogue is complete + fits | a **new editorial call** after the dialogue stage (kin to, but distinct from, the existing structural Script Doctor) | a cheap, strong instruction-follower |
+| **3 -- Creative QA** | taste judgment | is the dialogue actually creative + interesting (not merely structurally valid)? verdict + targets; can send work back | **upgrade of the existing `run_story_critic`** + its reroll/escalation loop | a premium, non-Opus model |
+
+Pass 2 is **C1 made concrete as its own LLM call.** Pass 3 is the existing Sprint-5B story
+critic, re-aimed from "arc/flat-line structural check" to "is this *good*," with authority
+to trigger a re-edit or re-write (it already can set `needs_full_rerun`).
+
+### Model candidates + cost (per-pass, measured OpenRouter pricing 2026-05-31)
+
+Passes 2+3 are tiny next to Opus Pass 1, so pick them for **fit, not price**:
+
+| Pass | Candidate | $/Mtok in / out | Est. tokens/ep | Est. $/ep | Note |
+|------|-----------|-----------------|----------------|-----------|------|
+| 1 | **anthropic/claude-opus-4.8** | 5 / 25 | ~43k | **~$0.47** | measured; dominant cost. Could drop if prompted tighter (C2) |
+| 2 | openai/gpt-4o-mini | 0.15 / 0.60 | ~4k | ~$0.002 | cheapest capable editor |
+| 2 | mistralai/mistral-small-3.2-24b | 0.075 / 0.20 | ~4k | ~$0.001 | cheapest overall |
+| 2 | anthropic/claude-haiku-4.5 | 1 / 5 | ~4k | ~$0.008 | same family as Opus -> stylistic consistency (recommended) |
+| 2 | local mistral-nemo | 0 (local) | ~4k | $0 | free; the cascade already edits decently, but adds local VRAM/time |
+| 3 | **anthropic/claude-sonnet-4.6** | 3 / 15 | ~4k | **~$0.02** | strong literary taste, distinct from Opus (recommended) |
+| 3 | anthropic/claude-haiku-4.5 | 1 / 5 | ~4k | ~$0.008 | cheaper QA if Sonnet is overkill |
+| 3 | anthropic/claude-opus-4.8 | 5 / 25 | ~4k | ~$0.04 | **discouraged** -- model judging itself |
+
+**Full 3-pass episode cost:** ~**$0.50** with no retry (Pass 1 ~$0.47 + Pass 2 ~$0.005 +
+Pass 3 Sonnet ~$0.02). Worst case with **one** Opus re-write on a Pass-3 fail: ~**$1.00**.
+Passes 2+3 are rounding error; the cost lever is "how many times does Pass 1 (Opus) run."
+
+### Control flow
+
+Synchronous **1 -> 2 -> 3**, with a **bounded, escalation-scoped** loop on Pass-3 failure
+(reuse the existing `_otr_reroll_escalation.py` `EscalationScope` LINE/BEAT/EPISODE):
+
+```
+Pass 1 (Opus writes)  ->  Pass 2 (editor trims/fits)  ->  Pass 3 (creative QA verdict)
+                                                              |
+                          pass -> ship                        | fail
+                                                              v
+                              EscalationScope decides:
+                              LINE/BEAT  -> back to Pass 2 (cheap re-edit; no new Opus tokens)
+                              EPISODE    -> back to Pass 1 (Opus re-write; capped at 1 retry for cost)
+                              exhausted  -> ship best draft + WARN (today's bypass behavior)
+```
+
+Prefer routing Pass-3 failures to **Pass 2 re-edit** first (free/cheap) and only escalate to
+a Pass-1 Opus re-write for true structural misses -- this keeps the expected cost at one
+Opus pass. Hard cap Opus re-writes at 1 (cost guard already enforces the per-run ceiling).
+
+### Reconciliation with the existing creative/technical (Slot A / Slot B) split
+
+Today: Slot A = creative writer, Slot B = technical (local JSON/structured: cast contract,
+script doctor, critic). The 3-pass design **extends, not replaces** this -- it adds a third
+*model role*:
+
+- **Slot A (creative writer)** = Pass 1 = Opus. Unchanged in concept.
+- **Slot B (technical)** = the structured validators (cast contract, JSON normalization)
+  stay local + fail-closed. Unchanged.
+- **NEW: editor + critic model roles.** Per PD6 ("only the writer exposes a model_id; every
+  other node receives it via a STRING input from the writer's broadcast outputs"), this
+  means adding **`editor_model` and `critic_model` broadcast outputs** on
+  `OTR_LedgerScriptWriter`, wired to the Pass-2 node and the Pass-3 critic. That is the
+  PD6-compliant shape; it is the main new surface.
+- Open question (below): is "editor" a third creative-family slot, or just the technical
+  slot with a different model? Is "critic" worth a premium slot, or does it stay local?
+
+### Implementation effort (estimate -- PLAN ONLY)
+
+- **Slot plumbing (moderate):** 2 new writer widgets/broadcast outputs (`editor_model`,
+  `critic_model`) defaulting to the technical model (so the default path is byte-identical
+  until opted in); wire them through `_SlotScheduler.request_slot` to the editor + critic
+  call sites; update the workflow JSON (PD3 re-wire) + the two-model-selector routing table.
+- **Pass 2 (moderate):** author the editorial prompt (length target + spoken-cadence rules +
+  beat-completeness check); add the call site after the dialogue stage (a new node, or a new
+  mode on the Script Doctor). Tag `# LLM slot: creative` or a new editorial tag per PD6.
+- **Pass 3 (light):** re-aim the existing `run_story_critic` prompt from structural to
+  creative-interest judgment; point it at `critic_model`; the reroll/escalation loop already
+  exists. Define the **pass/fail gate** (what verdict ships vs loops -- the new design
+  question Pass 3 introduces).
+- **Gates (every step):** Bug Bible + core + audio byte-identical green, plus a scored A/B
+  vs the 2026-05-31 baseline; the 3-pass output must beat single-pass Opus (89%) on the
+  rubric AND read cleanly aloud, or the pass isn't worth its tokens.
+
+### Open design questions for Jeffrey (decide before any code)
+
+1. **Slot count:** stay 2 model-slots (editor+critic reuse technical/local) or go to **4
+   roles** (writer / editor / critic / technical-JSON)? More slots = more control + more cost
+   + more wiring.
+2. **Pass 2 model:** local mistral-nemo (free, decent, +VRAM) vs Haiku 4.5 (~$0.008, stronger
+   editor, Anthropic-consistent) vs GPT-4o-mini (~$0.002)?
+3. **Pass 3 model:** Sonnet 4.6 (~$0.02, recommended) vs Haiku (~$0.008) vs local? (Opus
+   self-judging is discouraged.)
+4. **Loop policy:** cap Opus re-writes at 1? Prefer Pass-2 re-edit over Pass-1 re-write on
+   failure? What's the ship-anyway fallback after exhaustion (keep today's bypass behavior)?
+5. **Pass 2 vs Script Doctor:** new dedicated editor node, or extend the existing Script
+   Doctor (which already edits, but structurally)? Risk of two passes fighting over the text.
+6. **Radio word target:** what is it? (Baseline sweet spot ~350. Pass 2 trims Opus's ~829 to
+   this.) Per-line spoken ceiling (~35 words / one breath)?
+7. **Is single-pass Opus already good enough?** 89% single-pass is strong. The 3-pass design
+   buys *radio legibility* + a *taste gate*, at +~$0.03 and real wiring. Worth it now, or ship
+   single-pass Opus + the C1 prompt nudge first and measure?
+
+## C1 -- Creative length + radio-legibility control (= Pass 2 editor)
+
+**This is Pass 2 above, made concrete.** **Slot:** creative/editor. **Problem:** Opus writes
+2.5x the target and sprawls; a listener can't track it aurally.
 **Changes (prompt-side, no schema change):**
 1. Add an explicit **per-line spoken ceiling** to the dialogue/line-composer user prompt:
    e.g. "Each line is spoken aloud on radio -- at most ~2 sentences / ~35 words, one breath.
