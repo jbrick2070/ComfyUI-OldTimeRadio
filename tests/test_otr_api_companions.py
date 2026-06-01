@@ -129,6 +129,11 @@ def _writer_schemas() -> dict:
                     "news_briefs_required": (
                         "BOOLEAN", {"default": True},
                     ),
+                    # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
+                    # appended at the END (indices 19/20) to mirror the live
+                    # INPUT_TYPES + the canonical workflow node-1 vector.
+                    "openrouter_slot_a_model": ("STRING", {"default": ""}),
+                    "openrouter_slot_b_model": ("STRING", {"default": ""}),
                 },
                 "optional": {},
             }
@@ -173,6 +178,8 @@ def _writer_node_fixture() -> dict:
                     False,                                    # 16 use_exchange
                     False,                                    # 17 enable_production_stage3_validators
                     True,                                     # 18 news_briefs_required
+                    "anthropic/claude-opus-4.8",              # 19 openrouter_slot_a_model
+                    "deepseek/deepseek-v4-pro",               # 20 openrouter_slot_b_model
                 ],
             }
         ],
@@ -413,9 +420,14 @@ def test_round_trip_canonical_node1_inputs_correct():
     Sprint 10B Wave 1 Agent B (2026-05-27) appended
     enable_production_stage3_validators at slot 19, bringing the
     vector length to 20.
+
+    S2 (2026-06-01) appended openrouter_slot_a_model +
+    openrouter_slot_b_model at slots 19/20, bringing the vector length
+    to 21. The new slots are appended at the END so creative/technical
+    stay at wv[3]/wv[4].
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 21, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

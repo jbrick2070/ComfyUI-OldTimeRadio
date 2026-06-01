@@ -1212,6 +1212,12 @@ def _resolve_inputs(
     # Build 4 (2026-05-28): grouped-exchange dialogue path. When True the
     # render loop pre-passes voiced beat groups through compose_exchange.
     use_exchange: bool = False,
+    # OpenRouter 4-dropdown router (2026-06-01, S2): the two slot-slug
+    # pickers. PASSIVE bindings -- threaded into the resolved dict here and
+    # consumed by slot resolution in S3. Default "" so an old workflow with
+    # no slot widgets resolves them as unset -> the S3 fallback chain.
+    openrouter_slot_a_model: str = "",
+    openrouter_slot_b_model: str = "",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1378,6 +1384,11 @@ def _resolve_inputs(
         "news_briefs_required": bool(news_briefs_required),
         # Build 4 (2026-05-28): grouped-exchange dialogue path toggle.
         "use_exchange": bool(use_exchange),
+        # S2 (2026-06-01): slot-slug picker values, threaded through for the
+        # S3 resolver. Stored raw (the placeholder sentinel / empty value is
+        # interpreted as "unset" at resolution time, not here).
+        "openrouter_slot_a_model": str(openrouter_slot_a_model or ""),
+        "openrouter_slot_b_model": str(openrouter_slot_b_model or ""),
     }
 
 
@@ -1497,6 +1508,27 @@ class OTR_LedgerScriptWriter:
         # Jeffrey 2026-05-10. Order is load-bearing — saved workflows
         # bind by widget index, and the user's mental model maps the
         # field labels to positions on the node.
+        #
+        # 2026-06-01 four-dropdown router (S2): two slot-slug pickers are
+        # APPENDED at the END of optional (never inserted) so existing
+        # widget indices [0..18] stay put -- saved workflows bind by index.
+        # The creative slot's DEFAULT is conditional: a freshly-dropped node
+        # defaults to openrouter:slot-a when remote is enabled, else local
+        # Mistral-Nemo. (Saved widgets_values always win; defaults apply to
+        # fresh nodes only.) technical stays local -- never auto-flipped.
+        # All dropdown builders are network-free (S0 disk cache only).
+        try:
+            from . import _otr_openrouter_backend as _orb
+            _remote_on = _orb.openrouter_enabled()
+            _slot_a_id = _orb.SLOT_A_ID
+        except Exception:  # noqa: BLE001 -- INPUT_TYPES must never raise
+            _remote_on = False
+            _slot_a_id = "openrouter:slot-a"
+        _creative_default = (
+            _slot_a_id if _remote_on else _otr_model_catalog.DEFAULT_LLM
+        )
+        _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
+        _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
         return {
             "required": {
                 "episode_title": ("STRING", {
@@ -1540,7 +1572,7 @@ class OTR_LedgerScriptWriter:
                 "creative_writing_model": (
                     _otr_model_catalog.dropdown_choices(),
                     {
-                        "default": _otr_model_catalog.DEFAULT_LLM,
+                        "default": _creative_default,
                         "tooltip": (
                             "LLM for the creative/narrative passes "
                             "(outline, cast, dialogue composer, polish, "
@@ -1853,6 +1885,49 @@ class OTR_LedgerScriptWriter:
                         "Production should ship ON."
                     ),
                 }),
+                # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
+                # APPENDED at the END of optional (indices [19]/[20]) so the
+                # existing [0..18] widget order is untouched. PASSIVE: a pick
+                # here binds a real slug to openrouter:slot-a/b but does NOT
+                # activate remote -- it is used only when creative_writing_model
+                # / technical_model selects that handle. Choices come from the
+                # S0 disk cache (network-free); remote-disabled shows the
+                # "(enable OpenRouter)" sentinel. Resolution + preservation
+                # land in S3.
+                "openrouter_slot_a_model": (
+                    _slot_a_choices,
+                    {
+                        "default": _slot_a_choices[0],
+                        "tooltip": (
+                            "OpenRouter model slug bound to the "
+                            "'openrouter:slot-a' handle (the creative slot). "
+                            "Passive: only used when creative_writing_model "
+                            "is set to 'openrouter:slot-a'. Choices are the "
+                            "cached OpenRouter catalog (run the refresh "
+                            "script); shows '(enable OpenRouter)' until "
+                            "OPENROUTER_API_KEY + OTR_ENABLE_OPENROUTER=1 are "
+                            "set. A saved slug is preserved even if absent "
+                            "from a stale cache. See docs/openrouter-setup.md."
+                        ),
+                    },
+                ),
+                "openrouter_slot_b_model": (
+                    _slot_b_choices,
+                    {
+                        "default": _slot_b_choices[0],
+                        "tooltip": (
+                            "OpenRouter model slug bound to the "
+                            "'openrouter:slot-b' handle (the technical slot). "
+                            "Passive: only used when technical_model is set "
+                            "to 'openrouter:slot-b'. Choices are the cached "
+                            "OpenRouter catalog; shows '(enable OpenRouter)' "
+                            "until remote is enabled. Set "
+                            "OTR_OPENROUTER_SLOT_B_REQUIRE_JSON=1 to limit "
+                            "this slot to structured-output models. See "
+                            "docs/openrouter-setup.md."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -1923,6 +1998,12 @@ class OTR_LedgerScriptWriter:
         news_briefs_required=True,
         # Build 4 (2026-05-28): grouped-exchange dialogue path (default OFF).
         use_exchange=False,
+        # S2 (2026-06-01): the two OpenRouter slot-slug picker widgets.
+        # Default "" so an old workflow without these widgets resolves them
+        # as unset (-> S3 fallback chain). ComfyUI passes the live widget
+        # value (a slug or the "(enable OpenRouter)" sentinel) by keyword.
+        openrouter_slot_a_model="",
+        openrouter_slot_b_model="",
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1969,6 +2050,9 @@ class OTR_LedgerScriptWriter:
             news_briefs_required=news_briefs_required,
             # Build 4 (2026-05-28): grouped-exchange dialogue path toggle.
             use_exchange=use_exchange,
+            # S2 (2026-06-01): thread the slot-slug picker values through.
+            openrouter_slot_a_model=openrouter_slot_a_model,
+            openrouter_slot_b_model=openrouter_slot_b_model,
         )
 
         log.info(

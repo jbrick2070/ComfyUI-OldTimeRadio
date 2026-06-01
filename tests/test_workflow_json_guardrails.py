@@ -662,12 +662,13 @@ class TestWriterB2aSurface:
         # use_multiturn_dialogue (step 5), enable_stage1_shadow_pass +
         # use_stage1_fanout (step 7), and enable_polish_pass (step 9) --
         # vector 23 -> 19. use_exchange / Stage 3 validators / news briefs
-        # are the surviving optional flags.
-        assert len(wv) == 19, (
-            f"writer widgets_values length drift: {len(wv)} (expected 19 "
-            f"after the 2026-05-29 lean-down removed use_multiturn_dialogue "
-            f"(step 5), enable_stage1_shadow_pass + use_stage1_fanout "
-            f"(step 7), and enable_polish_pass (step 9) -- 23 -> 19)"
+        # are the surviving optional flags. S2 (2026-06-01) appended
+        # openrouter_slot_a_model + openrouter_slot_b_model at slots 19/20
+        # (END of optional), so the vector is now 21 with [0..18] intact.
+        assert len(wv) == 21, (
+            f"writer widgets_values length drift: {len(wv)} (expected 21: "
+            f"the 2026-05-29 lean-down brought it to 19, then S2 appended "
+            f"openrouter_slot_a_model + openrouter_slot_b_model -> 21)"
         )
         # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -683,6 +684,16 @@ class TestWriterB2aSurface:
         # Slot 18: news_briefs_required (ON in the shipped bake).
         assert wv[18] is True, (
             f"news_briefs_required (slot 18); got {wv[18]!r}"
+        )
+        # Slots 19/20: the S2 OpenRouter slot-slug pickers, appended at the
+        # END. The shipped bake pins the recommended slugs; creative/technical
+        # stay LOCAL at wv[3]/wv[4], so these slots are inert unless a handle
+        # is selected. A saved slug is preserved verbatim (preservation rule).
+        assert wv[19] == "anthropic/claude-opus-4.8", (
+            f"openrouter_slot_a_model (slot 19) drifted: {wv[19]!r}"
+        )
+        assert wv[20] == "deepseek/deepseek-v4-pro", (
+            f"openrouter_slot_b_model (slot 20) drifted: {wv[20]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (
