@@ -664,11 +664,14 @@ class TestWriterB2aSurface:
         # vector 23 -> 19. use_exchange / Stage 3 validators / news briefs
         # are the surviving optional flags. S2 (2026-06-01) appended
         # openrouter_slot_a_model + openrouter_slot_b_model at slots 19/20
-        # (END of optional), so the vector is now 21 with [0..18] intact.
-        assert len(wv) == 21, (
-            f"writer widgets_values length drift: {len(wv)} (expected 21: "
-            f"the 2026-05-29 lean-down brought it to 19, then S2 appended "
-            f"openrouter_slot_a_model + openrouter_slot_b_model -> 21)"
+        # (END of optional). 2026-06-01 (Comfy Credits) appended the sibling
+        # pair comfy_slot_a_model + comfy_slot_b_model at slots 21/22, so the
+        # vector is now 23 with [0..20] intact.
+        assert len(wv) == 23, (
+            f"writer widgets_values length drift: {len(wv)} (expected 23: "
+            f"the 2026-05-29 lean-down brought it to 19, S2 appended the "
+            f"OpenRouter pair -> 21, then Comfy Credits appended "
+            f"comfy_slot_a_model + comfy_slot_b_model -> 23)"
         )
         # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -694,6 +697,18 @@ class TestWriterB2aSurface:
         )
         assert wv[20] == "deepseek/deepseek-v4-pro", (
             f"openrouter_slot_b_model (slot 20) drifted: {wv[20]!r}"
+        )
+        # Slots 21/22: the Comfy Credits slot-slug pickers, appended at the
+        # END. The shipped bake pins the recommended Comfy-lane slugs
+        # (Anthropic tops out at claude-opus-4.7 on Comfy's curated catalog);
+        # creative/technical stay LOCAL at wv[3]/wv[4], so these slots are
+        # inert unless a comfy:slot handle is selected. A saved slug is
+        # preserved verbatim (preservation rule).
+        assert wv[21] == "anthropic/claude-opus-4.7", (
+            f"comfy_slot_a_model (slot 21) drifted: {wv[21]!r}"
+        )
+        assert wv[22] == "deepseek/deepseek-v4-pro", (
+            f"comfy_slot_b_model (slot 22) drifted: {wv[22]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

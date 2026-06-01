@@ -73,6 +73,7 @@ class CuratedModel:
         "transformers_multimodal_text_only",
         "transformers_gptq_int4",
         "openrouter_http",
+        "comfy_credits_http",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -92,12 +93,13 @@ class CuratedModel:
     license_audit_status: Literal[
         "mit_equivalent", "research_lane", "pending",
     ] = "pending"
-    # OpenRouter remote-LLM (S2). "local" = the transformers/HF weight
-    # path every existing row uses; "openrouter" = a virtual row whose
-    # weights live behind the OpenRouter API (zero local VRAM). Default
-    # "local" so every pre-existing row and any older fixture that omits
-    # the field still constructs unchanged.
-    provider: Literal["local", "openrouter"] = "local"
+    # Remote-LLM provider tag. "local" = the transformers/HF weight path
+    # every existing row uses; "openrouter" = a virtual row behind the
+    # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
+    # ComfyUI's credit-billed partner-node proxy (2026-06-01). Remote rows
+    # carry zero local VRAM. Default "local" so every pre-existing row and
+    # any older fixture that omits the field still constructs unchanged.
+    provider: Literal["local", "openrouter", "comfy_credits"] = "local"
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -247,15 +249,67 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
+def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
+    """The two virtual Comfy Credits rows -- present ONLY when the lane is
+    enabled (OTR_ENABLE_COMFY_CREDITS=1). When disabled the tuple is empty,
+    so _by_repo_id / dropdowns / Path-1 validation never see them and the
+    offline baseline is untouched (mirrors the OpenRouter gate). These carry
+    loader_backend='comfy_credits_http', provider='comfy_credits',
+    approx_safetensors_gb=0.0; the real catalog slug resolves behind the
+    scenes (the comfy slot pickers / recommended default). The rows join the
+    curated set so validate_model_id Path 1 admits 'comfy:slot-a|b' with NO
+    validator surgery."""
+    try:
+        from . import _otr_comfy_backend as _occ
+    except Exception:  # noqa: BLE001 -- a backend import hiccup must never break the catalog
+        return ()
+    if not _occ.comfy_credits_enabled():
+        return ()
+    common = dict(
+        requires_auth=False,
+        loader_backend="comfy_credits_http",
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=0.0,
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=_occ.DEFAULT_CONTEXT_WINDOW,
+        license="gated_terms",
+        license_audit_status="research_lane",
+        provider="comfy_credits",
+    )
+    return (
+        CuratedModel(
+            repo_id=_occ.SLOT_A_ID,
+            notes="Comfy Credits remote model A (opt-in, default-off). "
+            "Credit-billed via ComfyUI's partner-node proxy; zero local "
+            "VRAM. See docs/comfy-credits-setup.md.",
+            **common,
+        ),
+        CuratedModel(
+            repo_id=_occ.SLOT_B_ID,
+            notes="Comfy Credits remote model B (opt-in, default-off). "
+            "Credit-billed via ComfyUI's partner-node proxy; zero local "
+            "VRAM. See docs/comfy-credits-setup.md.",
+            **common,
+        ),
+    )
+
+
 def _active_curated_models() -> tuple[CuratedModel, ...]:
-    """CURATED_LLM_MODELS plus the enabled-only OpenRouter virtual rows.
+    """CURATED_LLM_MODELS plus the enabled-only remote virtual rows
+    (OpenRouter + Comfy Credits).
 
     Consumers that should surface remote when enabled (the dropdown
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
     Static license/audit tests iterate CURATED_LLM_MODELS directly, so
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
     keyed off the real gated set."""
-    return CURATED_LLM_MODELS + _openrouter_virtual_rows()
+    return (
+        CURATED_LLM_MODELS
+        + _openrouter_virtual_rows()
+        + _comfy_virtual_rows()
+    )
 
 
 def _by_repo_id() -> dict[str, CuratedModel]:
@@ -434,11 +488,12 @@ def build_dropdown_choices(
     entries: list[DropdownEntry] = []
     active = _active_curated_models()
     for m in active:
-        if getattr(m, "provider", "local") == "openrouter":
-            # Remote (S2): no local weights, so the [NOT DOWNLOADED]
-            # suffix would be misleading. Show the clean named handle and
-            # treat it as available (selectable) whenever it is present
-            # -- it is present only when remote is enabled (C3).
+        if getattr(m, "provider", "local") != "local":
+            # Remote (OpenRouter / Comfy Credits): no local weights, so the
+            # [NOT DOWNLOADED] suffix would be misleading. Show the clean
+            # named handle and treat it as available (selectable) whenever
+            # it is present -- a remote row is present only when its lane is
+            # enabled (C3).
             entries.append(DropdownEntry(m.repo_id, m.repo_id, True, curated=True))
             continue
         on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
@@ -608,6 +663,58 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Comfy Credits slot-slug picker dropdowns (2026-06-01, four-dropdown router)
+# ---------------------------------------------------------------------------
+#
+# comfy_slot_a_model / comfy_slot_b_model choose the real credit-billed slug
+# from the PINNED partner-node catalog (nodes/_otr_comfy_backend.COMFY_LLM_MODELS)
+# -- no disk cache / refresh script (the catalog is a constant, not fetched).
+# INPUT_TYPES-safe: reads the constant only, never the network.
+
+COMFY_ENABLE_SENTINEL = "(enable Comfy Credits)"
+"""Sole choice in a Comfy slot picker when the lane is disabled. UI-only --
+rejected before backend resolution; it can never resolve as a slug."""
+
+
+def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
+    """Slug-picker choices for comfy_slot_<slot>_model (slot 'a' / 'b').
+
+    Lane disabled -> [COMFY_ENABLE_SENTINEL].
+    Lane enabled  -> the recommended default for the slot FIRST (so the
+    widget's default value is always selectable), then OTR_COMFY_FAVORITES
+    (operator order), then the full pinned catalog alphabetically. Deduped.
+    INPUT_TYPES-safe: reads the pinned constant only, never the network.
+    """
+    s = slot.strip().lower()
+    if s not in ("a", "b"):
+        raise ValueError(f"slot must be 'a' or 'b', got {slot!r}")
+    try:
+        from . import _otr_comfy_backend as _occ
+    except Exception:  # noqa: BLE001 -- a backend import hiccup must never break INPUT_TYPES
+        return [COMFY_ENABLE_SENTINEL]
+    if not _occ.comfy_credits_enabled():
+        return [COMFY_ENABLE_SENTINEL]
+
+    catalog = list(_occ.COMFY_LLM_MODELS)
+    lead = _occ.recommended_slug_for_slot(s)
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(mid: str) -> None:
+        if mid and mid not in seen:
+            seen.add(mid)
+            ordered.append(mid)
+
+    _add(lead)  # always offered -> default value stays selectable
+    for fav in _csv_env("OTR_COMFY_FAVORITES"):
+        if fav in catalog:
+            _add(fav)
+    for mid in sorted(catalog):
+        _add(mid)
+    return ordered
+
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 
@@ -725,6 +832,17 @@ def validate_model_id(
             f"not enabled. Set OPENROUTER_API_KEY and OTR_ENABLE_OPENROUTER=1 "
             f"(plus OPENROUTER_MODEL_A / OPENROUTER_MODEL_B), then restart "
             f"ComfyUI in a fresh terminal. See docs/openrouter-setup.md."
+        )
+
+    # In-app hint: a Comfy Credits handle that reached here means the lane
+    # is not enabled (the virtual rows are absent from the curated set, so
+    # Path 1 missed). Name the env var + setup guide.
+    if normalized.startswith("comfy:"):
+        raise UnknownModelError(
+            f"{normalized!r} is a Comfy Credits remote model, but the lane "
+            f"is not enabled. Set OTR_ENABLE_COMFY_CREDITS=1 and log in to a "
+            f"Comfy account with credits, then restart ComfyUI in a fresh "
+            f"terminal. See docs/comfy-credits-setup.md."
         )
 
     raise UnknownModelError(
@@ -1247,6 +1365,8 @@ __all__ = [
     "openrouter_catalog_dropdown_choices",
     "OPENROUTER_ENABLE_SENTINEL",
     "OPENROUTER_EMPTY_CACHE_SENTINEL",
+    "comfy_catalog_dropdown_choices",
+    "COMFY_ENABLE_SENTINEL",
     "validate_model_id",
     "estimate_model_size_gb",
     "auto_download_if_missing",

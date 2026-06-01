@@ -49,13 +49,16 @@ def remote_on(monkeypatch):
 
 
 def test_widget_order_appends_slots_at_end():
-    """The widget KEYS are env-independent: [0..18] frozen, slots at 19/20."""
+    """The widget KEYS are env-independent: [0..18] frozen, OpenRouter slots
+    at 19/20, Comfy Credits slots appended at 21/22 (2026-06-01)."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order[:19] == _EXPECTED_0_18, f"index drift in [0..18]: {order[:19]}"
     assert order[19] == "openrouter_slot_a_model"
     assert order[20] == "openrouter_slot_b_model"
-    assert len(order) == 21
+    assert order[21] == "comfy_slot_a_model"
+    assert order[22] == "comfy_slot_b_model"
+    assert len(order) == 23
 
 
 # --- conditional creative default; technical never flips --------------------

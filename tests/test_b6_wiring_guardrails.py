@@ -43,16 +43,21 @@ WRITER_PATH = PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
 #
 # S4 (2026-06-01): the four-dropdown router added two slug-picker widgets to
 # the writer -- openrouter_slot_a_model / openrouter_slot_b_model. They are
-# writer-only model picks too, so they join the guarded set (the writer's
-# active model-pick widgets go 2 -> 4: creative_writing_model, technical_model,
-# openrouter_slot_a_model, openrouter_slot_b_model). `model_id` stays as the
-# retired legacy name that must never reappear as a widget anywhere.
+# writer-only model picks too, so they join the guarded set.
+# 2026-06-01 (Comfy Credits): the sibling credit-billed lane appends a second
+# pair -- comfy_slot_a_model / comfy_slot_b_model -- so the writer's active
+# model-pick widgets go 4 -> 6: creative_writing_model, technical_model,
+# openrouter_slot_a_model, openrouter_slot_b_model, comfy_slot_a_model,
+# comfy_slot_b_model. `model_id` stays as the retired legacy name that must
+# never reappear as a widget anywhere.
 _MODEL_WIDGET_KEYS = frozenset({
     "model_id",
     "creative_writing_model",
     "technical_model",
     "openrouter_slot_a_model",
     "openrouter_slot_b_model",
+    "comfy_slot_a_model",
+    "comfy_slot_b_model",
 })
 
 

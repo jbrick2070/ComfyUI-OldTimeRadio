@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import _otr_comfy_backend
 from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
@@ -160,6 +161,12 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     # local VRAM and must never evict the resident local model (C2).
     _otr_openrouter_backend.OPENROUTER_BACKEND_KEY:
         _otr_openrouter_backend.OpenRouterBackend(),
+    # Comfy Credits remote, opt-in, default-off (2026-06-01). The credit-
+    # billed sibling of the OpenRouter lane: ComfyUI proxies the call and
+    # bills prepaid account credits. Zero local VRAM; never evicts the
+    # resident local model (C2).
+    _otr_comfy_backend.COMFY_BACKEND_KEY:
+        _otr_comfy_backend.ComfyCreditsBackend(),
 }
 
 

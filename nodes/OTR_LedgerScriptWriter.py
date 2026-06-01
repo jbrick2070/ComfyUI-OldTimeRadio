@@ -622,6 +622,13 @@ def _build_truncating_generate_fn(
     if cache_entry.get("provider") == "openrouter":
         from . import _otr_openrouter_backend as _orb
         return _orb.make_openrouter_generate_fn(cache_entry)
+    # [Comfy Credits] sibling remote seam (2026-06-01). Same provider-tag
+    # dispatch as OpenRouter: a credit-billed entry has no model/tokenizer/
+    # context_cap to close over; return the remote generate_fn before
+    # capturing local handles below. Server-side budgeting; zero local VRAM.
+    if cache_entry.get("provider") == "comfy_credits":
+        from . import _otr_comfy_backend as _occ
+        return _occ.make_comfy_credits_generate_fn(cache_entry)
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)
@@ -1218,6 +1225,8 @@ def _resolve_inputs(
     # no slot widgets resolves them as unset -> the S3 fallback chain.
     openrouter_slot_a_model: str = "",
     openrouter_slot_b_model: str = "",
+    comfy_slot_a_model: str = "",
+    comfy_slot_b_model: str = "",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1389,6 +1398,8 @@ def _resolve_inputs(
         # interpreted as "unset" at resolution time, not here).
         "openrouter_slot_a_model": str(openrouter_slot_a_model or ""),
         "openrouter_slot_b_model": str(openrouter_slot_b_model or ""),
+        "comfy_slot_a_model": str(comfy_slot_a_model or ""),
+        "comfy_slot_b_model": str(comfy_slot_b_model or ""),
     }
 
 
@@ -1529,6 +1540,11 @@ class OTR_LedgerScriptWriter:
         )
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
+        # Comfy Credits slot pickers (2026-06-01). Choices come from the
+        # PINNED partner-node catalog (network-free); the lane shows the
+        # "(enable Comfy Credits)" sentinel until OTR_ENABLE_COMFY_CREDITS=1.
+        _comfy_slot_a_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("a")
+        _comfy_slot_b_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("b")
         return {
             "required": {
                 "episode_title": ("STRING", {
@@ -1928,6 +1944,54 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Comfy Credits slot-slug pickers (2026-06-01), APPENDED at the
+                # END of optional (indices [21]/[22]) so the existing [0..20]
+                # widget order is untouched. PASSIVE: a pick binds a real slug
+                # to comfy:slot-a/b but does NOT activate the lane -- it is used
+                # only when creative_writing_model / technical_model selects
+                # that handle. Choices come from the pinned partner-node catalog
+                # (network-free); shows "(enable Comfy Credits)" until
+                # OTR_ENABLE_COMFY_CREDITS=1.
+                "comfy_slot_a_model": (
+                    _comfy_slot_a_choices,
+                    {
+                        "default": _comfy_slot_a_choices[0],
+                        "tooltip": (
+                            "Comfy Credits model slug bound to the "
+                            "'comfy:slot-a' handle (the creative slot). "
+                            "Passive: only used when creative_writing_model "
+                            "is set to 'comfy:slot-a'. Choices are the pinned "
+                            "ComfyUI partner-node catalog; shows '(enable "
+                            "Comfy Credits)' until OTR_ENABLE_COMFY_CREDITS=1 "
+                            "and a Comfy account with credits is logged in. "
+                            "Credit-billed. See docs/comfy-credits-setup.md."
+                        ),
+                    },
+                ),
+                "comfy_slot_b_model": (
+                    _comfy_slot_b_choices,
+                    {
+                        "default": _comfy_slot_b_choices[0],
+                        "tooltip": (
+                            "Comfy Credits model slug bound to the "
+                            "'comfy:slot-b' handle (the technical slot). "
+                            "Passive: only used when technical_model is set "
+                            "to 'comfy:slot-b'. Choices are the pinned "
+                            "ComfyUI partner-node catalog; shows '(enable "
+                            "Comfy Credits)' until the lane is enabled. "
+                            "Credit-billed. See docs/comfy-credits-setup.md."
+                        ),
+                    },
+                ),
+            },
+            # ComfyUI injects the logged-in account's credentials into these
+            # hidden inputs at execution time (the API-nodes auth convention).
+            # The writer threads them to _otr_comfy_backend.set_auth() so the
+            # Comfy Credits lane can make the credit-billed call. They are NOT
+            # widgets (absent from widgets_values) and are never logged.
+            "hidden": {
+                "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+                "api_key_comfy_org": "API_KEY_COMFY_ORG",
             },
         }
 
@@ -2004,6 +2068,14 @@ class OTR_LedgerScriptWriter:
         # value (a slug or the "(enable OpenRouter)" sentinel) by keyword.
         openrouter_slot_a_model="",
         openrouter_slot_b_model="",
+        # Comfy Credits slot pickers (2026-06-01), appended after the
+        # OpenRouter pair. Default "" => unset (resolves to recommended).
+        comfy_slot_a_model="",
+        comfy_slot_b_model="",
+        # ComfyUI-injected hidden auth (API-nodes convention). None when the
+        # operator is not logged in / the Comfy Credits lane is unused.
+        auth_token_comfy_org=None,
+        api_key_comfy_org=None,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -2032,6 +2104,21 @@ class OTR_LedgerScriptWriter:
             _orb_budget.set_slot_bindings(
                 slot_a=openrouter_slot_a_model,
                 slot_b=openrouter_slot_b_model,
+            )
+            # Comfy Credits sibling (2026-06-01): reset its per-run budget,
+            # bind the slot pickers, and capture the ComfyUI-injected hidden
+            # auth so the credit-billed call has a credential. Best-effort:
+            # any hiccup leaves the lane to fail closed at call time, never
+            # blocking the run (PD1).
+            from . import _otr_comfy_backend as _occ_budget
+            _occ_budget.reset_run_budget()
+            _occ_budget.set_slot_bindings(
+                slot_a=comfy_slot_a_model,
+                slot_b=comfy_slot_b_model,
+            )
+            _occ_budget.set_auth(
+                auth_token=auth_token_comfy_org,
+                api_key=api_key_comfy_org,
             )
         except Exception:  # noqa: BLE001 -- budget/binding setup is best-effort
             pass
@@ -2064,6 +2151,8 @@ class OTR_LedgerScriptWriter:
             # S2 (2026-06-01): thread the slot-slug picker values through.
             openrouter_slot_a_model=openrouter_slot_a_model,
             openrouter_slot_b_model=openrouter_slot_b_model,
+            comfy_slot_a_model=comfy_slot_a_model,
+            comfy_slot_b_model=comfy_slot_b_model,
         )
 
         log.info(

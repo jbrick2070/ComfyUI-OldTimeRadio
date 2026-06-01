@@ -138,6 +138,25 @@ def _is_openrouter_admissible(widget_name: str, value: Any) -> bool:
     return value.startswith("openrouter:")
 
 
+# [Comfy Credits 2026-06-01] Sibling admit-path. The pinned comfy slot slug is
+# out-of-list when the lane is disabled (the slot picker shows only the enable
+# sentinel), and the comfy:slot handles are absent from creative/technical
+# choices when the lane is off -- both must be PRESERVED, not rejected.
+_COMFY_SLOT_WIDGETS = frozenset({
+    "comfy_slot_a_model", "comfy_slot_b_model",
+})
+
+
+def _is_comfy_admissible(widget_name: str, value: Any) -> bool:
+    """True when an out-of-list COMBO value is a legitimate Comfy Credits
+    binding to preserve. Mirrors catalog.validate_model_id's comfy admit-path."""
+    if not isinstance(value, str) or not value:
+        return False
+    if widget_name in _COMFY_SLOT_WIDGETS:
+        return True
+    return value.startswith("comfy:")
+
+
 def _validate_widget_value(
     node_type: str,
     widget_name: str,
@@ -178,6 +197,8 @@ def _validate_widget_value(
             # 2026-06-01 preservation rule) instead of rejecting it at patch
             # time -- enablement/resolution is enforced downstream.
             if _is_openrouter_admissible(widget_name, value):
+                return
+            if _is_comfy_admissible(widget_name, value):
                 return
             raise ValueError(
                 f"widget {widget_name!r} on node_type {node_type!r} is a "

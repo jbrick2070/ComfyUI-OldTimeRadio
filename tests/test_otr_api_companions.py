@@ -134,6 +134,11 @@ def _writer_schemas() -> dict:
                     # INPUT_TYPES + the canonical workflow node-1 vector.
                     "openrouter_slot_a_model": ("STRING", {"default": ""}),
                     "openrouter_slot_b_model": ("STRING", {"default": ""}),
+                    # Comfy Credits (2026-06-01): the sibling slot-slug pickers,
+                    # appended at indices 21/22 to mirror the live INPUT_TYPES +
+                    # the canonical workflow node-1 vector.
+                    "comfy_slot_a_model": ("STRING", {"default": ""}),
+                    "comfy_slot_b_model": ("STRING", {"default": ""}),
                 },
                 "optional": {},
             }
@@ -180,6 +185,8 @@ def _writer_node_fixture() -> dict:
                     True,                                     # 18 news_briefs_required
                     "anthropic/claude-opus-4.8",              # 19 openrouter_slot_a_model
                     "deepseek/deepseek-v4-pro",               # 20 openrouter_slot_b_model
+                    "anthropic/claude-opus-4.7",              # 21 comfy_slot_a_model
+                    "deepseek/deepseek-v4-pro",               # 22 comfy_slot_b_model
                 ],
             }
         ],
@@ -423,11 +430,12 @@ def test_round_trip_canonical_node1_inputs_correct():
 
     S2 (2026-06-01) appended openrouter_slot_a_model +
     openrouter_slot_b_model at slots 19/20, bringing the vector length
-    to 21. The new slots are appended at the END so creative/technical
-    stay at wv[3]/wv[4].
+    to 21. Comfy Credits (2026-06-01) appended comfy_slot_a_model +
+    comfy_slot_b_model at slots 21/22, bringing it to 23. The new slots
+    are appended at the END so creative/technical stay at wv[3]/wv[4].
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 21, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 23, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 
