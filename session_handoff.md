@@ -1,103 +1,96 @@
-# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-31 (story spine LIVE -> go-forward refactor)
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-06-01 (go-forward refactor SHIPPED)
 
 ## Core goal
-The story spine shipped and is ON by default. The NEXT work is
-`docs/otr-go-forward-final.md` -- it REFACTORS the spine into a refined
-architecture (defect-router QA, conditional length pass + fenced
-micro-repair, REJECT abort). Execute its Sprints 0-4 with the loop
-`REVIEW -> CODE -> WIRE -> REGRESS -> COMMIT`, parallel subagents for the
-disjoint module authoring, serial wiring into the spine + writer.
+The `docs/otr-go-forward-final.md` refactor is **DONE and pushed** -- all of
+Sprints 0-4 shipped in 4 atomic commits on `v2.0-alpha`. The post-script story
+spine now runs: conditional length pass -> 3-verdict QA defect router ->
+beat-local micro-repair -> REJECT abort at the writer -> mechanical scrub. Every
+headless gate is green. **The only work left is the operator's GPU validation**
+(no AI session can run it). HEAD = `05ee2a2`, local == origin.
 
-**All work committed to `v2.0-alpha`; HEAD = `0d16620`.**
+## Tech stack & constraints
+Windows, RTX 5080 16GB. Venv python (full path): `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`.
+Standard rules live in CLAUDE.md (branch policy, git-via-DC, VRAM ceiling, no-BOM,
+no "dummy", LLM-slot tagging, run-regression-after-every-change) -- not repeated here.
 
-## What shipped this session (8 commits, all headless-green + pushed)
-`4bb382a` spine doc rewritten to live tree (Part 0 = 9 drift corrections) ->
-`9a04cfe` Stream B1 news-grounding rider -> `c9fe300` Stream A outline arc
-gate (+13 tests) -> `46270ed`/`f829d58`/`3343de7` Streams C/D/E modules ->
-`b73f57a` Wave 2 wiring (in-process, was env-gated) -> `0d16620` spine
-DEFAULT-ON + full-power editor seam.
+Cowork-environment facts learned this session (NOT in CLAUDE.md):
+- **Bug Bible repo is NOT checked out here** (`comfyui-custom-node-survival-guide`
+  absent). Its regression can only run on the host. Headless gate here = full
+  `tests/` + module self-tests + forbidden sweep.
+- **File tools (Read/Write/Edit) DO reach the real Windows FS** (same view git/DC
+  see) -- edits land, verified. **Glob has a path-param quirk (returns nothing);
+  use Grep instead.** Subagent sandboxes were the stale-mount ones -- author on the
+  main thread via file tools + Desktop Commander, not subagents.
+- Full `tests/` runs in ~30s headless; **baseline now 3327 passed / 12 skipped /
+  0 failed**. cmd mangles inline `python -c "..."` (quoting) -- write a script file
+  or use `findstr`; `tail` is not a Windows command (read pytest tails via the
+  Read tool on a redirected file, or DC `read_process_output -offset`).
 
-The live pipeline now (env `OTR_ENABLE_STORY_SPINE`, DEFAULT ON, =0 to
-opt out): writer -> Stage 3 critic -> Stage 3.5 editor repair (on
-REPAIR_ONCE) -> writer-LLM unload -> Stage 4 scrub. Orchestrated in
-`nodes/_otr_story_spine.py` (`run_post_script_spine`), called from
-`OTR_LedgerScriptWriter.run()` right after the reflection (the gated
-if/else that replaced the L3754 unload block). Never raises (PD1).
+## What's done & decided (this session)
+- **4 commits, b1abbc9 -> 05ee2a2, all headless-green + pushed:**
+  - `36cbb6b` Sprint 2: editor two-entry. Added `SMOOTH_DIALOGUE`/`CLARIFY_TURN`
+    Tier-1 actions (+ `_FRESH_PROSE_ACTIONS`; Guard 3 now fences ALL fresh prose),
+    `needs_length_normalization()`, `normalize_length()`, `micro_repair()`,
+    `_make_scoped_validator` (action-whitelist + flagged-beat fence). Wired
+    `normalize_length` as spine Stage 2.5.
+  - `3267531` Sprint 1: QA grader -> router. `CreativeQAVerdict`/`run_creative_qa`
+    REPLACED by `StoryQAVerdict`/`run_story_qa` (PASS/MICRO_REPAIR_NEEDED/REJECT +
+    flagged_beats + reason + 6 evidence flags). Full spine reorchestration.
+  - `e524c64` Sprint 3: writer raises `RuntimeError` on `meta["story_verdict"]=="REJECT"`
+    right after the spine call. New `tests/test_reject_gate_sprint3.py`.
+  - `05ee2a2` Sprint 4: scrub verified (already mechanical/fail-closed/never-rewrites);
+    new `tests/test_scrub_handoff_sprint4.py`.
+- **Key decisions:**
+  - QA fails **OPEN to PASS** on any crash (never falsely REJECT/abort; audio is king).
+  - QA judges the **VOICED view (character + announcer)** to match
+    `_otr_radio_editor.voiced_beats`, so `flagged_beats` map 1:1 to `micro_repair`.
+    (This was a real bug avoided -- the old grader was character-only.)
+  - REJECT: **spine sets meta + unloads + skips scrub + returns, NEVER raises (PD1);
+    the WRITER raises.** A QA crash (fail-open PASS) never reaches the raise.
+  - Scrub always called `repair_available=False` (micro-repair runs upstream).
+  - The **B-cap correction holds**: do NOT add a `target_words*2` per-line word cap
+    (that `*4` is a token budget); real ceiling is `_MAX_OVERSIZE_RATIO=3.0`.
+  - Executed serially on the main thread via Desktop Commander (NOT parallel
+    subagents -- their mounts were stale); collapsed author+wire into 4 atomic
+    per-sprint commits.
 
-## Current module state (what the go-forward refactors)
-- `nodes/_otr_creative_qa.py` -- `CreativeQAVerdict` GRADER (PASS/
-  REPAIR_ONCE/FAIL + leak/SFW fields), `run_creative_qa(led, fn, *,
-  critic_model_id)`. Sprint 1 -> convert to `StoryQAVerdict` ROUTER
-  (PASS/MICRO_REPAIR_NEEDED/REJECT + evidence flags dead_ending/
-  broken_turn/flat_contrast/unclear_grounding/chopped_dialogue/
-  pacing_failure); DROP the leak/SFW/JSON checks (scrub owns them).
-- `nodes/_otr_radio_editor.py` -- single `run_radio_editor(ledger, *,
-  editor_model, slot_fn, recompose_fn, turn/button_beat_index, apply)`,
-  Guards 1/2/3, apply_plan. Sprint 2 -> two entries: `normalize_length(led)`
-  (runs only when total>350+/-20% OR any line over spoken cap) +
-  `micro_repair(led, flagged_beats)` (beat-local, flagged only, 1 cycle);
-  add actions SMOOTH_DIALOGUE / CLARIFY_TURN; keep the 3 guards.
-- `nodes/_otr_ledger_scrub.py` -- `scrub_ledger(led, *, repair_available)`.
-  Sprint 4 -> wire with `repair_available=False` (micro-repair runs
-  upstream now); confirm mechanical-only, fail-closed, LAST.
-- `nodes/_otr_story_spine.py` -- orchestrator. Rework for: conditional
-  `normalize_length`, the 3-verdict router, `micro_repair` on flagged
-  beats, and the REJECT signal (Sprint 3: set meta["story_verdict"]=
-  "REJECT" + meta["story_reject_reason"], skip scrub, return normally).
-  Full-power seams already here: `_make_recompose_fn` (wraps compose_line),
-  `_map_arc_indices` (outline turn/button -> voiced-view index by beat_id).
-- `OTR_LedgerScriptWriter.run()` -- Sprint 3: after the spine call, before
-  the `meta["creative_model"]` stamp (~L3764) and the return, add
-  `if meta.get("story_verdict")=="REJECT": raise RuntimeError(...)` --
-  matches the existing fail-loud pattern; only new raise.
+## State of the art
+- `nodes/_otr_radio_editor.py` -- entries: `run_radio_editor` (general, now UNUSED
+  by the spine), `normalize_length`, `micro_repair`, `needs_length_normalization`.
+  Self-test 58/58.
+- `nodes/_otr_creative_qa.py` -- `StoryQAVerdict` + `run_story_qa` (router; cold
+  context, skeptical, high REJECT bar, fail-open). Old grader symbols GONE.
+  Self-test 7/7.
+- `nodes/_otr_story_spine.py` -- `run_post_script_spine` is the live flow above;
+  helpers `_make_recompose_fn`, `_map_arc_indices`, `_verdict_summary` (router fields).
+  meta key is now `story_qa_verdict` (was `creative_qa_verdict`). Self-test 10/10.
+- `nodes/_otr_ledger_scrub.py` -- unchanged (already correct). Self-test 8/8.
+- `nodes/OTR_LedgerScriptWriter.py` -- REJECT raise added after the spine call
+  (~L3779), before the `meta["creative_model"]` stamp.
+- New tests: `tests/test_reject_gate_sprint3.py` (4), `tests/test_scrub_handoff_sprint4.py` (4).
+- No node-surface or workflow-JSON change anywhere (in-process helpers, D4/D5).
 
-## REVIEW findings vs the go-forward doc (carry these in)
-1. **Sprint 0 B is the recurring D1/D2 drift.** The doc's
-   `min(cap, target_words*2)` per-line cap is WRONG: that `*4` in
-   `_otr_line_composer.compose_line_draft` (~L1606) is a `max_new_tokens`
-   TOKEN budget, not a word cap. Pulling it to x2 truncates lines ->
-   audio hazard. The real word ceiling is `_word_bands` `word_cap =
-   target_words * _MAX_OVERSIZE_RATIO` (3.0). DO NOT add a x2 word cap.
-   The B rider is already shipped (9a04cfe) -- that is the right B lever.
-2. A (turning_point/button on Outline) + E (scrub) are shipped and pass.
-3. The QA "always runs, model-agnostic" rule already holds -- the critic
-   routes to `resolved["technical_model"]`, no model-class skip.
+## Immediate next steps
+1. **Operator GPU gate (host, not headless):** render an episode with the spine
+   default-on, confirm **audio byte-identical** to the 2026-05-31 baseline on a
+   clean (non-reject) run, and run a **scored A/B** vs that baseline. Tail logs
+   with `scripts/otr_tail_logs.py`.
+2. **Run the Bug Bible regression on the host** (repo absent in cowork):
+   `python -m pytest C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py -q`
+3. Once a 2nd technical model is bound, **measure micro-repair / reject / dud
+   rates** (go-forward Sec 7) to confirm QA earns its per-run call and tune the
+   REJECT bar.
+4. Decide: **remove `run_radio_editor`?** It is now unused by the spine (a general
+   editor entry kept after the two-entry split). Cleanbreak would delete it +
+   its self-test Test 4; harmless to keep as a general API.
 
-## Tech stack & how to run (verified this session)
-Windows, RTX 5080 16GB. Venv python (full path, no spaces, no quotes
-needed in cmd): `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`.
-- Headless gates (any session, fast, no GPU): Bug Bible
-  `python -m pytest C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py -q`
-  + full `pytest tests/` (3342 passed / 0 failed baseline) + each module's
-  `python nodes\_otr_*.py` self-test + `python docs/_s28_forbidden_sweep.py`.
-- GPU-only gates (operator): audio byte-identical render + scored A/B vs
-  the 2026-05-31 baseline. Streams change the writer, not the audio path.
-- Git: Desktop Commander **cmd** shell only. `del .git\index.lock 2>nul`
-  first (subagent git leaves stale locks). `git add <files> && git commit
-  -F .git\COMMIT_EDITMSG` (write the message via the file tool first) &&
-  `git push origin v2.0-alpha` && verify `git rev-parse HEAD` ==
-  `git rev-parse origin/v2.0-alpha`. cmd mangles inline `python -c "..."`
-  and quoted paths -> use script files / py_compile on bare filenames.
-- Stale-mount caution: subagent sandboxes showed phantom file/git state
-  this session; the venv-python self-tests on the real FS (via DC) are
-  authoritative. Verify any "broken file" claim with py_compile, not a
-  subagent's mount view.
+## Open questions
+- Does the default-on spine hold byte-identical audio on the real render? (Only
+  the GPU A/B can answer; all headless gates pass.)
+- Keep or delete the now-unused `run_radio_editor` (see step 4).
 
-## Immediate next steps (go-forward §7 wave plan)
-1. Sprint 0: confirm A/B/E (above) -- no code; reaffirm the B-cap
-   correction. No commit.
-2. Wave 1 (3 parallel subagents, rework dormant + `__main__` self-test,
-   report diff, no commit, no wiring): Sprint 1 `_otr_creative_qa.py`
-   router; Sprint 2 `_otr_radio_editor.py` two-entry; Sprint 4
-   `_otr_ledger_scrub.py` verify/adjust. Brief each with the go-forward
-   §2 rules + §9 constraints + their sprint section.
-3. Wave 2 (one thread, regress + commit each, flow order): editor length
-   pass -> QA router -> micro-repair -> REJECT abort (Sprint 3) -> scrub
-   repair_available=False. Re-run full `tests/` + Bug Bible after each.
-4. Each module self-test green + full suite 0-fail before commit. GPU
-   audio/A-B is the operator's final gate (spine is default-on now).
-
+---
 ## Resume instructions
-Open a fresh window, attach this file + `docs/otr-go-forward-final.md`,
-and say: "Read this handoff + the go-forward doc, run Sprint 0 verify,
-then dispatch the Wave-1 subagents. Acknowledge when ready."
+Open a fresh window, attach this file, and say:
+"Read this handoff file and prepare to execute the immediate next steps.
+Acknowledge when you're ready to start."
