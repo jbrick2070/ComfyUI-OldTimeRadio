@@ -1,10 +1,14 @@
 """nodes/_otr_story_spine.py -- Wave 2 post-script orchestrator (env-gated).
 
 This is the in-process WIRING that runs the story-spine post-script
-passes -- Stage 3 (Creative QA critic), Stage 3.5 (the single Radio
-Editor repair), the writer-LLM unload, and Stage 4 (deterministic
-Ledger Scrub) -- inside OTR_LedgerScriptWriter.run(), mirroring how
-run_story_brief_reflection is called (`_otr_story_brief.py:861`).
+passes inside OTR_LedgerScriptWriter.run(), mirroring how
+run_story_brief_reflection is called (`_otr_story_brief.py:861`):
+Stage 2.5 (conditional Radio Editor length pass), Stage 3 (Targeted
+Story QA defect router), Stage 3.5 (beat-local micro-repair on the
+flagged beats), the writer-LLM unload, and Stage 4 (deterministic
+Ledger Scrub). A REJECT verdict aborts at the writer boundary: the spine
+sets meta["story_verdict"]="REJECT", unloads, skips the scrub, and
+returns -- the writer raises (the spine never does).
 
 GATED, DEFAULT ON (opt-out). `enabled()` reads `OTR_ENABLE_STORY_SPINE`
 and is True unless it is exactly "0". Out of the box the four passes run
@@ -22,9 +26,10 @@ editor -> creative slot). PD3 (workflow JSON): N/A; adds no node surface.
 
 NEVER RAISES (Prime Directive 1, audio is king). Every pass is wrapped;
 a failure stamps a status on `meta` and the run continues with the
-script it already had. The single shared repair (spine invariant 5) is
-tracked here: a REPAIR_ONCE verdict spends it on the editor; the scrub
-is then told `repair_available=False`.
+script it already had. At most ONE beat-local micro-repair cycle runs
+(spine invariant 5), and the deterministic scrub is always told
+`repair_available=False` -- it is mechanical and last, never a repair
+trigger.
 
 Full power, fail-soft by construction:
   * recompose_fn wraps `_otr_line_composer.compose_line` on the creative
@@ -219,8 +224,10 @@ def run_post_script_spine(
     resolved: dict,
     slot_scheduler: Any = None,
 ) -> None:
-    """Run Stage 3 (critic) -> 3.5 (single editor repair) -> unload ->
-    Stage 4 (scrub) in process, in that order.
+    """Run the post-script spine in process, in flow order: Stage 2.5
+    (conditional length pass) -> Stage 3 (Story QA router) -> [REJECT
+    abort] / Stage 3.5 (micro-repair on flagged beats) -> writer-LLM
+    unload -> Stage 4 (deterministic scrub).
 
     Called ONLY when `enabled()` is True. Mutates `led` (the editor
     applies its plan; the scrub normalizes in place) and stamps status
@@ -228,10 +235,14 @@ def run_post_script_spine(
     error on `meta` and continues, and it always performs the writer-LLM
     unload so VRAM is released before the cascade.
 
-    Slot routing (D6): critic -> technical slot; editor -> creative slot.
+    On a REJECT verdict it sets meta["story_verdict"]="REJECT" +
+    meta["story_reject_reason"], unloads, SKIPS the scrub, and returns
+    normally -- the writer raises at its boundary; the spine never does.
+
+    Slot routing (D6): QA router -> technical slot; length pass +
+    micro-repair -> creative slot.
     """
     meta["story_spine_enabled"] = True
-    repair_used = False
 
     # --- Stage 2.5: conditional length normalization (creative slot) ---
     # The Radio Editor's length pass runs FIRST and ONLY when the draft is
@@ -272,8 +283,11 @@ def run_post_script_spine(
                                       "error": type(exc).__name__}
         log.warning("[OTR_StorySpine] length normalization failed: %r", exc)
 
-    # --- Stage 3: Creative QA critic (read-only, technical slot) -------
-    # LLM slot: technical -- structured categorical verdict.
+    # --- Stage 3: Targeted Story QA router (read-only, technical slot) --
+    # Always runs, model-agnostic: cold context (final script only),
+    # skeptical framing, high REJECT bar. Fail-OPEN to PASS inside
+    # run_story_qa, so a QA crash ships the episode as-is rather than
+    # aborting it. LLM slot: technical -- structured categorical verdict.
     verdict = None
     try:
         from . import _otr_creative_qa as _QA
@@ -286,37 +300,62 @@ def run_post_script_spine(
             else _nullcontext()
         )
         with ctx:
-            verdict = _QA.run_creative_qa(
+            verdict = _QA.run_story_qa(
                 led,
                 technical_generate_fn,
                 critic_model_id=resolved["technical_model"],
             )
-        meta["creative_qa_verdict"] = _verdict_summary(verdict)
-    except Exception as exc:  # noqa: BLE001 -- critic must never break a run
-        meta["creative_qa_verdict"] = {"verdict": "ERROR",
-                                       "error": type(exc).__name__}
-        log.warning("[OTR_StorySpine] creative QA failed: %r", exc)
+        meta["story_qa_verdict"] = _verdict_summary(verdict)
+    except Exception as exc:  # noqa: BLE001 -- QA must never break a run
+        meta["story_qa_verdict"] = {"verdict": "ERROR",
+                                    "error": type(exc).__name__}
+        log.warning("[OTR_StorySpine] story QA failed: %r", exc)
 
-    # --- Stage 3.5: the single Radio Editor repair (creative slot) -----
-    # Only on a recoverable REPAIR_ONCE verdict; one cycle, then stop
-    # (spine invariant 5). LLM slot: creative -- narrative editing.
-    if verdict is not None and getattr(verdict, "verdict", None) == "REPAIR_ONCE":
+    _verdict_value = getattr(verdict, "verdict", None)
+
+    # --- REJECT abort (go-forward Sprint 3, spine side) ----------------
+    # A structural defect a one-line edit cannot fix. Set the signal on
+    # meta, unload the writer LLM, SKIP the scrub, and return NORMALLY --
+    # NEVER raise (PD1, the spine's never-raises contract). The writer
+    # raises at its boundary on this signal. A QA crash (verdict None or a
+    # fail-open PASS) does NOT reach here, so a crash stays fail-soft.
+    if _verdict_value == "REJECT":
+        meta["story_verdict"] = "REJECT"
+        meta["story_reject_reason"] = (
+            getattr(verdict, "reason", "") or "story rejected"
+        )
+        log.warning("[OTR_StorySpine] story QA REJECT: %s",
+                    meta["story_reject_reason"])
+        _unload_writer_llm(meta)
+        meta["story_spine_status"] = "ok_reject"
+        return
+
+    # --- Stage 3.5: beat-local micro-repair (creative slot) ------------
+    # Only on MICRO_REPAIR_NEEDED with flagged beats; ONE cycle, flagged
+    # beats only (spine invariant 5; the editor's scoped validator fences
+    # it). flagged_beats are voiced-view indices, the SAME space the editor
+    # uses (the QA router judges the voiced view). Arc indices + recompose
+    # are recomputed here because the Stage 2.5 length pass may have
+    # re-indexed beats. LLM slot: creative -- narrative editing.
+    flagged = list(getattr(verdict, "flagged_beats", None) or [])
+    if _verdict_value == "MICRO_REPAIR_NEEDED" and flagged:
         try:
             from . import _otr_radio_editor as _ED
         except ImportError:  # pragma: no cover - standalone / test load
             import _otr_radio_editor as _ED  # type: ignore
         try:
             led_data = getattr(led, "data", led)
+            _turn_idx, _button_idx = _map_arc_indices(outline, led)
+            _recompose = _make_recompose_fn(led, creative_generate_fn)
             ctx = (
                 slot_scheduler.helper_context("radio_editor")
                 if slot_scheduler is not None
                 else _nullcontext()
             )
-            _turn_idx, _button_idx = _map_arc_indices(outline, led)
-            _recompose = _make_recompose_fn(led, creative_generate_fn)
             with ctx:
-                _plan, report = _ED.run_radio_editor(
+                _mr_plan, mr_report = _ED.micro_repair(
                     led_data,
+                    flagged,
                     editor_model=resolved["creative_writing_model"],
                     slot_fn=creative_generate_fn,
                     recompose_fn=_recompose,
@@ -324,24 +363,26 @@ def run_post_script_spine(
                     button_beat_index=_button_idx,
                     apply=True,
                 )
-            repair_used = True
-            meta["radio_editor_report"] = _editor_summary(report)
-        except Exception as exc:  # noqa: BLE001 -- editor must never break a run
-            meta["radio_editor_report"] = {"status": "ERROR",
+            meta["micro_repair_report"] = _editor_summary(mr_report)
+        except Exception as exc:  # noqa: BLE001 -- micro-repair must never break a run
+            meta["micro_repair_report"] = {"status": "ERROR",
                                            "error": type(exc).__name__}
-            log.warning("[OTR_StorySpine] radio editor repair failed: %r", exc)
+            log.warning("[OTR_StorySpine] micro-repair failed: %r", exc)
 
     # --- Writer-LLM unload (D8): after the LLM passes, before scrub -----
     _unload_writer_llm(meta)
 
-    # --- Stage 4: deterministic Ledger Scrub (no LLM) ------------------
+    # --- Stage 4: deterministic Ledger Scrub (no LLM, LAST) ------------
+    # repair_available=False: any beat-local micro-repair already ran
+    # upstream, so the scrub never triggers a repair -- it is mechanical,
+    # fail-closed, and the last word on the ledger (go-forward Sprint 4).
     try:
         from . import _otr_ledger_scrub as _SCRUB
     except ImportError:  # pragma: no cover - standalone / test load
         import _otr_ledger_scrub as _SCRUB  # type: ignore
     try:
         led_data = getattr(led, "data", led)
-        result = _SCRUB.scrub_ledger(led_data, repair_available=not repair_used)
+        result = _SCRUB.scrub_ledger(led_data, repair_available=False)
         meta["ledger_scrub_status"] = getattr(result, "status", "UNKNOWN")
         if getattr(result, "repair_consumed", False):
             meta["ledger_scrub_repair_consumed"] = True
@@ -353,11 +394,11 @@ def run_post_script_spine(
 
 
 def _verdict_summary(verdict: Any) -> dict:
-    """Compact, JSON-safe view of the critic verdict for meta."""
+    """Compact, JSON-safe view of the story QA router verdict for meta."""
     keys = (
-        "verdict", "has_turn", "ending_earned", "grounded_in_premise",
-        "voices_distinct", "weakest_beat_index", "sfw_ok",
-        "overlong_line_indices", "cast_name_leak_indices",
+        "verdict", "flagged_beats", "reason", "dead_ending", "broken_turn",
+        "flat_contrast", "unclear_grounding", "chopped_dialogue",
+        "pacing_failure",
     )
     out: dict = {}
     for k in keys:
@@ -441,11 +482,10 @@ def _selftest() -> int:
         return _fn
 
     pass_verdict = _json.dumps({
-        "has_turn": True, "turn_beat_index": 0, "ending_earned": True,
-        "ending_note": "lands", "grounded_in_premise": True,
-        "voices_distinct": True, "weakest_beat_index": None,
-        "weakest_problem": "", "overlong_line_indices": [],
-        "cast_name_leak_indices": [], "sfw_ok": True, "verdict": "PASS",
+        "verdict": "PASS", "flagged_beats": [], "reason": "clean",
+        "dead_ending": False, "broken_turn": False, "flat_contrast": False,
+        "unclear_grounding": False, "chopped_dialogue": False,
+        "pacing_failure": False,
     })
 
     # A no-op KEEP RadioEditPlan, in band -- the creative slot returns this
@@ -500,7 +540,7 @@ def _selftest() -> int:
             meta.get("story_spine_status") == "ok"
             and meta.get("story_spine_enabled") is True
             and "length_pass_report" in meta
-            and "creative_qa_verdict" in meta
+            and "story_qa_verdict" in meta
             and "ledger_scrub_status" in meta
             and "writer_llm_unload" in meta
             and isinstance(led.data["lines"], list)
@@ -531,17 +571,19 @@ def _selftest() -> int:
             creative_generate_fn=_boom, technical_generate_fn=_boom,
             resolved=resolved, slot_scheduler=None,
         )
-        # The critic is itself fail-closed: a raising slot fn is caught
-        # inside run_creative_qa and returned as verdict="FAIL", so the
-        # orchestrator sees FAIL (editor must NOT run), not "ERROR".
+        # The router is fail-OPEN: a raising slot fn is caught inside
+        # run_story_qa and returned as verdict="PASS", so the spine ships
+        # the episode as-is (no micro-repair, no abort), the scrub still
+        # runs, and the run stays intact (PD1 -- a QA crash never breaks it).
         if (meta.get("story_spine_status") == "ok"
-                and meta.get("creative_qa_verdict", {}).get("verdict")
-                in ("FAIL", "ERROR")
+                and meta.get("story_qa_verdict", {}).get("verdict")
+                in ("PASS", "ERROR")
                 and "ledger_scrub_status" in meta
-                and "radio_editor_report" not in meta):
+                and "micro_repair_report" not in meta
+                and "story_verdict" not in meta):
             passed += 1
-            print("  [PASS] raising critic -> fail-closed (no editor), "
-                  "scrub still ran, run intact")
+            print("  [PASS] raising critic -> fail-open PASS (no repair, no "
+                  "abort), scrub still ran, run intact")
         else:
             print(f"  [FAIL] raising-critic meta = {meta}")
     except Exception as exc:  # noqa: BLE001
@@ -634,6 +676,83 @@ def _selftest() -> int:
                   f"{meta8.get('length_pass_report')}")
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] skip-path test raised: {exc!r}")
+
+    # Test 9: MICRO_REPAIR_NEEDED verdict -> beat-local micro-repair runs
+    # on the flagged beats, the scrub still runs, no REJECT signal.
+    total += 1
+    try:
+        os.environ[_ENV_FLAG] = "1"
+        led9 = _min_ledger()
+        meta9 = led9.data["meta"]
+        qa_micro_json = _json.dumps({
+            "verdict": "MICRO_REPAIR_NEEDED", "flagged_beats": [1],
+            "reason": "beat 1 reads chopped", "dead_ending": False,
+            "broken_turn": False, "flat_contrast": False,
+            "unclear_grounding": False, "chopped_dialogue": True,
+            "pacing_failure": False,
+        })
+        # A KEEP on the flagged beat 1 -- valid for BOTH the Stage 2.5
+        # length pass (any beat) AND the scoped micro-repair (flagged only).
+        keep_beat1_json = _json.dumps({
+            "edits": [{"beat_index": 1, "action": "KEEP"}],
+            "projected_word_total": 350,
+        })
+        run_post_script_spine(
+            led9, meta9, outline=None,
+            creative_generate_fn=_stub_generate(keep_beat1_json),
+            technical_generate_fn=_stub_generate(qa_micro_json),
+            resolved=resolved, slot_scheduler=None,
+        )
+        if (meta9.get("story_spine_status") == "ok"
+                and meta9.get("story_qa_verdict", {}).get("verdict")
+                == "MICRO_REPAIR_NEEDED"
+                and "micro_repair_report" in meta9
+                and "ledger_scrub_status" in meta9
+                and "story_verdict" not in meta9):
+            passed += 1
+            print("  [PASS] MICRO_REPAIR_NEEDED -> micro-repair ran, scrub ran, "
+                  "no abort")
+        else:
+            print(f"  [FAIL] micro-repair path meta = {meta9}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] micro-repair path raised: {exc!r}")
+
+    # Test 10: REJECT verdict -> abort at the writer boundary. The spine
+    # sets the signal, unloads, SKIPS the scrub, returns ok_reject (never
+    # raises). The writer is what raises on this signal.
+    total += 1
+    try:
+        os.environ[_ENV_FLAG] = "1"
+        led10 = _min_ledger()
+        meta10 = led10.data["meta"]
+        qa_reject_json = _json.dumps({
+            "verdict": "REJECT", "flagged_beats": [], "reason": "dead ending",
+            "dead_ending": True, "broken_turn": False, "flat_contrast": False,
+            "unclear_grounding": False, "chopped_dialogue": False,
+            "pacing_failure": False,
+        })
+        keep_beat1_json = _json.dumps({
+            "edits": [{"beat_index": 1, "action": "KEEP"}],
+            "projected_word_total": 350,
+        })
+        run_post_script_spine(
+            led10, meta10, outline=None,
+            creative_generate_fn=_stub_generate(keep_beat1_json),
+            technical_generate_fn=_stub_generate(qa_reject_json),
+            resolved=resolved, slot_scheduler=None,
+        )
+        if (meta10.get("story_verdict") == "REJECT"
+                and meta10.get("story_reject_reason")
+                and meta10.get("story_spine_status") == "ok_reject"
+                and "ledger_scrub_status" not in meta10
+                and "writer_llm_unload" in meta10):
+            passed += 1
+            print("  [PASS] REJECT -> signal set, unloaded, scrub skipped, "
+                  "returned (no raise)")
+        else:
+            print(f"  [FAIL] reject path meta = {meta10}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] reject path raised: {exc!r}")
 
     os.environ.pop(_ENV_FLAG, None)
     print(f"SELF-TEST PASS: {passed}/{total}")
