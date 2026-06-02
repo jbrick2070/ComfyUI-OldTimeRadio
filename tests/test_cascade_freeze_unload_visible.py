@@ -148,7 +148,7 @@ class TestFreezeUnloadStampVisible:
                 )
 
         # Output slot 1 is updated_script_json per cascade RETURN_NAMES.
-        assert isinstance(result, tuple) and len(result) == 5
+        assert isinstance(result, tuple) and len(result) == 7
         returned_json = result[1]
         parsed = json.loads(returned_json)
         meta = parsed.get("meta", {})
@@ -179,10 +179,10 @@ class TestFreezeUnloadStampVisible:
                     technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                 )
 
-        # Cascade still returns its 5-tuple (the unload failure is
+        # Cascade still returns its 7-tuple (the unload failure is
         # logged, stamped, and the cascade carries on; only downstream
         # video nodes might decide to bail).
-        assert isinstance(result, tuple) and len(result) == 5
+        assert isinstance(result, tuple) and len(result) == 7
         returned_json = result[1]
         parsed = json.loads(returned_json)
         meta = parsed.get("meta", {})

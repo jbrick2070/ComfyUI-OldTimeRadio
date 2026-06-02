@@ -12,7 +12,7 @@ orchestrator. Tests verify that:
   * Improved reviewer verdict + Phase 10 clean -> frozen_with_doctor_edits
   * meta.cleanup_passes records each phase
   * meta.skip_reviewer bypass still works (Phase 0/10 still run)
-  * Output contract preserved: 5 slots, freeze_verdict last
+  * Output contract: 7 slots; freeze_verdict at 4, episode_seed + v2_ledger_json appended at 5,6
 """
 from __future__ import annotations
 
@@ -432,9 +432,10 @@ class TestNodeOutputContract:
         assert OTR_LedgerFreezeCascade.RETURN_NAMES == (
             "script_text", "script_json", "news_used",
             "estimated_minutes", "freeze_verdict",
+            "episode_seed", "v2_ledger_json",
         )
         assert OTR_LedgerFreezeCascade.RETURN_TYPES == (
-            "STRING", "STRING", "STRING", "INT", "STRING",
+            "STRING", "STRING", "STRING", "INT", "STRING", "INT", "STRING",
         )
 
     def test_legacy_class_name_is_dead(self):

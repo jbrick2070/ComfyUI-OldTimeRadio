@@ -189,9 +189,10 @@ class TestB1UnloadInFinally:
         assert ctx.unload_mock.call_count == 1
         # Meta stamp reflects the failure.
         assert ctx.led.data["meta"].get("freeze_unload_ok") is False
-        # Cascade still returns its verdict.
+        # Cascade still returns its verdict (7-tuple since R0a appended
+        # episode_seed + v2_ledger_json at indices 5,6).
         assert isinstance(result, tuple)
-        assert len(result) == 5
+        assert len(result) == 7
 
     def test_unload_runs_when_serialize_raises(self):
         """A failure inside assemble_script_text_from_ledger must

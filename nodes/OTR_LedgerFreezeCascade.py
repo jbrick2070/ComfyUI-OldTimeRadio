@@ -4,8 +4,15 @@ Wires AFTER OTR_LedgerScriptWriter and BEFORE SceneSequencer. Touches
 the production ledger only; emits no audio, no video, no LLM weights
 beyond what the writer already loaded.
 
-Output contract (5 slots):
-    script_text, script_json, news_used, estimated_minutes, freeze_verdict
+Output contract (7 slots):
+    script_text, script_json, news_used, estimated_minutes, freeze_verdict,
+    episode_seed, v2_ledger_json
+
+R0a (2026-06-02): episode_seed + v2_ledger_json appended at output indices
+5,6 -- never inserted, so outputs 0-4 (and the 13-consumer fan-out on out[1]
+script_json) keep byte-identical raw-delegation behavior. episode_seed is
+derived read-only from the frozen ledger (never stamped back), so out[1] stays
+unchanged; v2_ledger_json carries the frozen ledger for OTR_CastLock (Wave 2a).
 
 `freeze_verdict` literal set (S33 B2 trim 2026-05-15):
 
@@ -74,6 +81,17 @@ def _no_ledger_error_json(incoming_script_json: str) -> str:
     }, indent=2, ensure_ascii=False)
 
 
+def _episode_seed_from_ledger(ledger_json: str) -> int:
+    """Derive a stable, read-only ``episode_seed`` from the FROZEN ledger JSON.
+
+    Pure function of the locked ledger content -- NEVER stamped back into the
+    ledger, so out[1] (script_json) stays byte-identical (R0a / I-2). The
+    ``episode_seed_v1`` domain tag namespaces the reduction.
+    """
+    from ._otr_resolved_request import _seed_to_int64
+    return _seed_to_int64("episode_seed_v1", ledger_json or "{}")
+
+
 class OTR_LedgerFreezeCascade:
     """Ledger Freeze Cascade -- multi-phase post-writer cleanup.
 
@@ -104,10 +122,12 @@ class OTR_LedgerFreezeCascade:
 
     CATEGORY = "OldTimeRadio/v2"
     FUNCTION = "run"
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING", "INT", "STRING")
     RETURN_NAMES = (
         "script_text", "script_json", "news_used",
         "estimated_minutes", "freeze_verdict",
+        # R0a: appended at indices 5,6 -- never inserted (outputs 0-4 frozen).
+        "episode_seed", "v2_ledger_json",
     )
 
     @classmethod
@@ -308,6 +328,8 @@ class OTR_LedgerFreezeCascade:
                 news_used or "",
                 int(estimated_minutes or 0),
                 "needs_full_rerun",
+                0,
+                _no_ledger_error_json(script_json),
             )
         led = (peek() if callable(peek) else _PL.get_ledger())
         if led is None:
@@ -321,6 +343,8 @@ class OTR_LedgerFreezeCascade:
                 news_used or "",
                 int(estimated_minutes or 0),
                 "needs_full_rerun",
+                0,
+                _no_ledger_error_json(script_json),
             )
 
         # S30 B3: resolve the technical_model id via the shared
@@ -492,4 +516,6 @@ class OTR_LedgerFreezeCascade:
             news_used or "",
             int(estimated_minutes or 0),
             disp.verdict,
+            _episode_seed_from_ledger(updated_script_json),
+            updated_script_json,
         )

@@ -239,9 +239,13 @@ def load_llm(
         elif any(tag in _stripped_model_id.lower() for tag in ("9b", "12b", "e4b", "4b-it")):
             max_memory = {0: "6.8GiB", "cpu": "32GiB"}
 
-        # Enable TF32 for faster matmuls on Ampere/Ada/Blackwell GPUs
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
+        # TF32 OFF by default for byte-identical determinism (I-2 / C-1). The
+        # run_comfy_otr launcher additionally exports NVIDIA_TF32_OVERRIDE=0 so
+        # TF32 is disabled globally BEFORE torch imports. matmul precision stays
+        # 'high' for LLM throughput -- the env override gates TF32 when a
+        # determinism run is engaged. See nodes/_otr_determinism.py.
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
         if torch.cuda.get_device_capability()[0] >= 8:
             torch.set_float32_matmul_precision('high')
 

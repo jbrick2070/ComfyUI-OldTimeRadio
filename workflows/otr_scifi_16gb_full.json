@@ -1752,6 +1752,18 @@
           "type": "STRING",
           "links": [],
           "slot_index": 4
+        },
+        {
+          "name": "episode_seed",
+          "type": "INT",
+          "links": [],
+          "slot_index": 5
+        },
+        {
+          "name": "v2_ledger_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 6
         }
       ],
       "flags": {},
