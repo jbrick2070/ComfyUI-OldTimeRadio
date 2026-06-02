@@ -178,6 +178,28 @@ def test_backend_generate_requires_auth(comfy_on, monkeypatch):
         backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=8)
 
 
+def test_min_output_tokens_floored_bug301(comfy_on, monkeypatch):
+    """BUG-LOCAL-301: a small per-call max_new_tokens must be floored to at
+    least DEFAULT_MIN_OUTPUT_TOKENS (1024, parity with the OpenRouter lane) so
+    a verbose / reasoning technical model (deepseek-v4-pro) is not truncated
+    mid-JSON (finish_reason=length -> JSONDecodeError)."""
+    captured = {}
+
+    def _fake_post(*, url, bearer, payload, timeout_s):
+        captured["payload"] = payload
+        return {"status_code": 200,
+                "json": {"choices": [{"message": {"content": "{}"}}]},
+                "text": ""}
+
+    monkeypatch.setattr(occ, "_post_comfy_chat_completion", _fake_post)
+    occ.set_auth(auth_token="tok-abc")
+    backend = occ.ComfyCreditsBackend()
+    entry = backend.load(occ.SLOT_B_ID, types.SimpleNamespace(context_window=8192))
+    backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=64)
+    assert occ.DEFAULT_MIN_OUTPUT_TOKENS >= 1024
+    assert captured["payload"]["max_tokens"] >= 1024
+
+
 def test_generate_fn_factory_marks_remote(comfy_on):
     row = types.SimpleNamespace(context_window=8192)
     entry = occ.ComfyCreditsBackend().load(occ.SLOT_B_ID, row)

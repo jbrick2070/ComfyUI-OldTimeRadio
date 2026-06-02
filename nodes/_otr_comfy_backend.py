@@ -108,7 +108,17 @@ COMFY_LLM_MODELS: tuple[str, ...] = (
 DEFAULT_MAX_TOKENS_PER_CALL = 32768
 DEFAULT_MAX_TOKENS_PER_RUN = 300000
 DEFAULT_OUTPUT_TOKENS_CAP = 8192
-DEFAULT_MIN_OUTPUT_TOKENS = 512
+# BUG-LOCAL-301: 1024 (was 512). Parity with the OpenRouter lane's BUG-294
+# output-token floor. max_tokens is a CEILING -- a higher floor costs nothing
+# on short replies (the model stops at finish_reason=stop and bills only actual
+# tokens) but stops a verbose / reasoning technical model from being cut off
+# mid-object. The recommended technical default deepseek-v4-pro is a reasoning
+# model: it emits chain-of-thought before the JSON, so a 512 floor truncated
+# build_news_briefs (finish_reason=length -> JSONDecodeError -> the writer
+# halted at news_interpreter). Reasoning-heavy models can still need more --
+# bump OTR_COMFY_MIN_OUTPUT_TOKENS, or use a non-reasoning / local technical
+# model for the structured-JSON passes.
+DEFAULT_MIN_OUTPUT_TOKENS = 1024
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2
 
