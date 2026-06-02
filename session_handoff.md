@@ -20,9 +20,16 @@ detail. (CLAUDE.md prime directives, git flow, and testing auto-load -- not repe
 Sprints committed on `v2.0-alpha`: **A** `9b76d78` (audio engine registry + `_otr_audio_utils`),
 **B** `1b5a39b` (delivery vector), **C** `c79cc51` (engine adapters: bark/kokoro/musicgen batch +
 chatterbox/indextts2/stable_audio per-line), **C.1** `f49d4f9` (`_otr_script_prep.clean_spoken_text`),
-**graph guards** `d06560a` (`tests/test_workflow_graph_integrity_guards.py`). Full `tests/` was green
-at last run (3444 passed, 12 skipped). The `eng_indextts2.py` adapter exists but is now **dormant**
-for v2 (see cuts).
+**graph guards** `d06560a` (`tests/test_workflow_graph_integrity_guards.py`).
+**R0a (a-e) DONE 2026-06-02** on `v2.0-alpha`: `3ebf9f4` (a-c -- `_otr_resolved_request` shell
+[`_seed_to_int64`, IN_KEY/IGNORED, cache_key, AUDIO asserts]; `_otr_determinism` + scoped
+`deterministic_inference` + `scripts/run_comfy_otr.{bat,ps1}` + tf32-off at `_otr_model_loader.py:243-244`;
+FreezeCascade node 62 gains `episode_seed`+`v2_ledger_json` at out indices 5,6, wired into
+`workflows/otr_scifi_16gb_full.json`) and `892c280` (d-e -- legacy Bark/Kokoro/MusicGen/AudioGen seed
+py+np+torch+cuda from the frozen `script_json` via `seed_all_rngs`; `_otr_legacy_manifest` +
+`config/legacy_invocation_manifest.json` drift guard). Full `tests/` now **3495 passed, 12 skipped,
+0 failed** (~32s). Only R0a **(f)** (operator-GPU render-twice bit-identity baseline) remains -- deferred.
+The `eng_indextts2.py` adapter (under `nodes/_otr_audio_engines/`) exists but is now **dormant** for v2 (see cuts).
 
 ## Decided this session (don't reopen)
 - **Build runs in waves** (orchestration section of the plan): **R0a** (serial, first, ends on the
@@ -65,27 +72,46 @@ for v2 (see cuts).
   `OTR_AudioTeardownJoin` node (the `finally`-teardown + existing `audio_done` gate already serialize);
   `OTR_CastLock` does NOT replace node 62 and cannot merge char_ids (char_id is stable identity, I-9).
 
-## Immediate next steps (start Wave R0a -- all headless except (f))
-1. `nodes/_otr_resolved_request.py` -- `_seed_to_int64(*parts)->int`, the `ResolvedVoiceRequest`
-   shell (IN_KEY/IGNORED fields per the plan), and the AUDIO-batch contract asserts
-   (`{waveform:[B,1,T], sample_rate}`, empty `[1,1,0]`). Full `tests/`, commit.
-2. `nodes/_otr_determinism.py` (post-`import torch` flags, scoped `deterministic_inference(seed)` CM,
-   SDPA MATH pin) + `scripts/run_comfy_otr.bat`/`.ps1` (env BEFORE python) + flip `allow_tf32`->False
-   at `nodes/_otr_model_loader.py:243-244`. Commit.
-3. Node 62 FreezeCascade: append dedicated `episode_seed` + v2-ledger output ports at indices 5,6;
-   derive `episode_seed` internally; assert out[1] bytes unchanged for raw delegation. Wire into the
-   workflow JSON. Commit.
-4. Legacy seeding in the 4 legacy audio nodes (Bark/Kokoro/MusicGen/AudioGen): seed py+np+torch+cuda+
-   Generator before forward, seed = `_seed_to_int64(sha256(frozen script_json bytes))`, no parse. Commit.
-5. `config/legacy_invocation_manifest.json` -- frozen widget vectors + `widgets_sha256` for the 4 legacy
-   nodes; add the contract test. Commit.
-6. **Operator/GPU gate (needs Jeffrey + the RTX 5080):** render-twice legacy for bit-identity, capture
-   `baseline_v2_audio_legacy_{sha,ledger_sha,audio_metadata_sha}` (audio only). Then Wave 0 opens.
+## Immediate next steps -- R0a (a-e) DONE; start Wave 0
+R0a (a-e) is committed + green (see "Already shipped"); step (f) is operator-GPU (deferred).
+**Begin Wave 0 (shared contracts; serial register + full `tests/` + commit).** Plan SSOT table has
+file->imports->tests. The 8 Wave-0 pieces:
+1. `nodes/_otr_resolved_request.py` -- ADD `build_resolved_request(...)` + integer-tick `quantize_params(...)`
+   on top of the shipped shell (the shell -- `_seed_to_int64`, IN_KEY/IGNORED, `cache_key`, AUDIO asserts --
+   is already in place; do NOT redo it).
+2. `nodes/_otr_script_prep.py` -- ADD `prepare_text` (+`PREPARE_TEXT_VERSION`) on top of the shipped
+   `clean_spoken_text`: strip asterisks/`♪`/delivery-tags, collapse ellipsis->one pause, KEEP `. , ?`.
+   Golden examples test. Pure+deterministic (C7).
+3. `nodes/_otr_audio_engines/registry.py` -- `assert_usable(engine,role)` + 6-class enum
+   (`gated_by_flag|missing_model|missing_hf_token|incompatible_profile|noncommercial_blocked|malformed_config`),
+   FAIL CLOSED.
+4. `nodes/_otr_audio_engines/base.py` -- adapter base + `pack_audio_batch` + `supports_external_generator`.
+5. `nodes/_otr_audio_cache.py` -- cache PROTOCOL only (interface; impl is Wave 1f).
+6. `nodes/_otr_class_registry.py` -- mapping keys + display names + categories for the new nodes.
+7. `config/*_schema.json` -- bank-entry + cache-sidecar schemas.
+8. `config/audio_engine_profiles.yaml` + `nodes/_otr_engine_profiles.py` -- 0d resolver, lazy-load
+   (module-cached, exception-wrapped), INPUT_TYPES legacy-first, NO module-scope IO (C-5).
+Then Wave 1 (8 files), Wave 2a (CastLock + writer refactor), Wave 2b (opt-in JSON + 2 link tables).
 
-After R0a: Wave 0 contracts (request builder+quantizer, `prepare_text`+version, `assert_usable`+6-class
-enum, adapter base+`pack_audio_batch`+`supports_external_generator`, cache PROTOCOL, `_otr_class_registry`,
-bank+sidecar schemas, `0d` profiles resolver), then the 8 Wave-1 files. See the plan's SSOT table for
-file->wave->imports->tests.
+## Operational notes (this session, 2026-06-02) -- read before resuming
+- **Tests + git run via Desktop Commander on the Windows venv, NOT the sandbox** (sandbox has no torch;
+  the bug-bible repo is not mounted there). Full suite:
+  `cd /d C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio &
+  C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider`
+  (~32s, currently 3495 pass / 12 skip). conftest has a **KNOWN-FAIL-GUARD**: ANY new failing test is
+  flagged a regression against a 0-fail baseline -- fix it, do not register it. To save context, redirect
+  to a file and read only the tail summary.
+- **Bug Bible repo NOT locatable** at the CLAUDE.md path (`...\comfyui-custom-node-survival-guide\`);
+  `Documents\ComfyUI` looks OneDrive-virtualized (`dir` returns empty). Gated on in-repo `tests/` instead.
+  Flag to Jeffrey / re-confirm the path.
+- **Commit flow:** write `.git\COMMIT_EDITMSG` via the file tool, then in DC **cmd**:
+  `git add <explicit paths>` (NEVER `-A` -- ~20 untracked planning docs + `custom_nodes.lnk` must stay
+  unstaged) then `git commit -F .git\COMMIT_EDITMSG`. The CRLF->LF warning on JSON/`config` commits is the
+  repo's existing eol policy (harmless). For workflow-JSON edits use a one-shot byte-replace py script
+  (CRLF-preserving) that validates `json.loads` before writing -- do NOT reflow the whole file.
+- **Deferred operator/GPU (batch to the very end, needs Jeffrey + RTX 5080):** R0a (f) render-twice
+  bit-identity baseline, R0b box-fresh smoke, Wave 3 F/G1/I. Directive: no live testing until ALL headless
+  sprints are built; the per-sprint pytest regression stays in every commit gate.
 
 ## Open questions (flag to Jeffrey before they bite)
 1. RESOLVED -- IndexTTS2 = shipped default voice, Stable Audio 3 = shipped default music (Jeffrey,
