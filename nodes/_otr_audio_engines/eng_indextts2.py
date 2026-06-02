@@ -1,0 +1,66 @@
+"""IndexTTS2 voice adapter -- expressive zero-shot cloning, opt-in.
+
+NON-commercial: IndexTTS2 weights carry the Bilibili license (written auth
+required for commercial use), so this engine is opt-in behind
+OTR_ENABLE_INDEXTTS2 and never a default. ``interface == "per_line"``. The
+library import is deferred to ``load``; the actual inference call is wired and
+verified in the GPU dependency pilot (it must not drag xformers onto cu130).
+"""
+from __future__ import annotations
+
+from .registry import register
+
+
+@register
+class IndexTTS2Engine:
+    name = "indextts2"
+    roles = ("char_voice",)
+    default_roles = ()
+    commercial_clean = False  # Bilibili license -- non-commercial
+    requires_flag = "OTR_ENABLE_INDEXTTS2"
+    interface = "per_line"
+    sample_rate = 22050
+
+    def __init__(self):
+        self._model = None
+
+    def load(self):
+        if self._model is not None:
+            return
+        try:
+            import indextts  # noqa: F401
+        except ImportError as exc:
+            raise RuntimeError(
+                "indextts is not installed -- run the isolated dependency "
+                "pilot and install it before enabling OTR_ENABLE_INDEXTTS2"
+            ) from exc
+        # VERIFY in the pilot: construct IndexTTS2 from its config + model dir
+        # and cache the inference handle on self._model.
+        self._model = indextts
+
+    def unload(self):
+        self._model = None
+        try:
+            import torch
+
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+    def emo_list(self, delivery_vector):
+        """8-dim delivery vector -> IndexTTS2 Emo-Vector order list."""
+        from .._otr_delivery_vector import EMOTIONS
+
+        dv = delivery_vector or {}
+        return [round(float(dv.get(e, 0.0)), 3) for e in EMOTIONS]
+
+    def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
+        """One dialogue line -> mono AUDIO. Inference wired in the pilot."""
+        self.load()
+        emo = self.emo_list(delivery_vector)
+        # VERIFY in the pilot: call IndexTTS2 infer(spk_audio_prompt=ref_clip_path,
+        # text=text, emo_vector=emo, seed=seed, ...) and wrap via mono_safe.
+        raise RuntimeError(
+            "IndexTTS2 inference is wired and verified in the GPU pilot; "
+            f"engine registered and selectable (emo dims={len(emo)})"
+        )
