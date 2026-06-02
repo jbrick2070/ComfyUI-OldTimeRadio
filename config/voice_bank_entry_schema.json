@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "otr:voice_bank_entry/v1",
+  "title": "OTR voice reference bank entry",
+  "description": "One castable voice reference (plan E.1). The deterministic caster scores entries by gender/timbre/role/age and picks exactly one per slot from a seeded RNG. Identity is voice_ref_id (I-9 keys on this, never the character name).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "voice_ref_id",
+    "engine",
+    "gender",
+    "timbre",
+    "roles",
+    "age_band",
+    "ref_path",
+    "ref_sha256",
+    "commercial_clean"
+  ],
+  "properties": {
+    "voice_ref_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identity of this voice reference. The cast lock stamps this onto a slot; downstream selects, never re-casts (I-4/I-9)."
+    },
+    "engine": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Audio engine name this reference is for (must be a registered engine in the audio-engine registry)."
+    },
+    "gender": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Caster gender match field (highest weight, 100)."
+    },
+    "timbre": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Caster timbre tags (weight 40). May be empty."
+    },
+    "roles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Audio roles this voice can serve, e.g. char_voice / announcer_voice."
+    },
+    "age_band": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Caster age-band match field (weight 10), e.g. child / young_adult / adult / elder."
+    },
+    "ref_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to the reference audio clip on local disk (VALIDATE_INPUTS checks local-disk presence)."
+    },
+    "ref_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "description": "sha256 of the reference clip for integrity + re-baseline tracking (voice_bank_id+sha is a re-baseline trigger)."
+    },
+    "commercial_clean": {
+      "type": "boolean",
+      "description": "I-8 three-state input at the bank layer: true = clean, false = known-gated (non-blocking warning). A missing value is fail-closed at the release gate, not here."
+    }
+  }
+}

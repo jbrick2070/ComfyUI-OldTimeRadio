@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "otr:audio_cache_sidecar/v1",
+  "title": "OTR audio cache sidecar",
+  "description": "Metadata sidecar persisted beside each cached audio buffer (plan G0). Mirrors nodes/_otr_audio_cache.AudioCacheRecord field-for-field; the cache key is cache_key == ResolvedVoiceRequest.cache_key (I-6). Only cache_key is required so a partially-populated record still round-trips; the release gate enforces allowed_for_release + a present commercial_clean boolean (I-8).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["cache_key"],
+  "properties": {
+    "cache_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "sha256 over the ResolvedVoiceRequest IN_KEY fields (I-6)."
+    },
+    "request_schema_version": {
+      "type": "string",
+      "description": "ResolvedVoiceRequest schema version; a record whose version != the build target is re-rendered (slim migration)."
+    },
+    "cache_schema_version": { "type": "string" },
+    "role": { "type": "string" },
+    "engine_name": { "type": "string" },
+    "engine_impl_version": { "type": "string" },
+    "voice_ref_id": { "type": ["string", "null"] },
+    "sample_rate": { "type": "integer", "minimum": 0 },
+    "channels": { "type": "integer", "minimum": 1 },
+    "commercial_clean": {
+      "type": ["boolean", "null"],
+      "description": "I-8; a null here is fail-closed at the release gate."
+    },
+    "allowed_for_release": {
+      "type": "boolean",
+      "description": "G0: the release manifest refuses any record not allowed_for_release."
+    },
+    "audio_path": { "type": "string" },
+    "audio_sha256": { "type": "string" },
+    "prepare_text_version": { "type": "string" },
+    "delivery_projection_version": { "type": "string" },
+    "engine_prompt_template_version": { "type": "string" }
+  }
+}
