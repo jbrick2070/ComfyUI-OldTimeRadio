@@ -45,6 +45,13 @@ class ChatterboxEngine:
         except Exception:
             pass
 
+    def prepare_text(self, text, delivery_vector=None):
+        """Engine-neutral clean spoken text. Audio direction lives in the
+        delivery vector / exaggeration, not in the words."""
+        from .._otr_script_prep import clean_spoken_text
+
+        return clean_spoken_text(text)
+
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
         """One dialogue line -> mono AUDIO. Deterministic under fixed seed."""
         import torch

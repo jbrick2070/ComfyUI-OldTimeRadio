@@ -54,6 +54,13 @@ class IndexTTS2Engine:
         dv = delivery_vector or {}
         return [round(float(dv.get(e, 0.0)), 3) for e in EMOTIONS]
 
+    def prepare_text(self, text, delivery_vector=None):
+        """Engine-neutral clean spoken text; the audio direction is routed
+        into the emo-vector (see emo_list), not the words."""
+        from .._otr_script_prep import clean_spoken_text
+
+        return clean_spoken_text(text)
+
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
         """One dialogue line -> mono AUDIO. Inference wired in the pilot."""
         self.load()
