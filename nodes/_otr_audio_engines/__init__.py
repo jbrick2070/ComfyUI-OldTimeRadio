@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from .registry import (
     AudioEngine,
+    EngineUnusable,
+    EngineUsabilityReason,
     assert_usable,
     default_engine_for_role,
     engines_for_role,
@@ -24,6 +26,8 @@ from . import eng_chatterbox, eng_indextts2, eng_stable_audio  # noqa: E402,F401
 
 __all__ = [
     "AudioEngine",
+    "EngineUnusable",
+    "EngineUsabilityReason",
     "assert_usable",
     "default_engine_for_role",
     "engines_for_role",

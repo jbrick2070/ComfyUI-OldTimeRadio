@@ -10,9 +10,19 @@ byte-identical.
 Adding a new model later is a one-file adapter plus one import line -- no node
 surgery. This mirrors the writer's multi-slot LLM design: independent slots,
 one shared extensible pool.
+
+Usability is **fail-closed** (plan C-6, "names the missing piece -- never
+crash, never silent swap"). ``assert_usable`` validates that the requested
+engine can actually run for the role and either returns the validated engine
+name or raises :class:`EngineUnusable` carrying one of the six
+:class:`EngineUsabilityReason` codes. It NEVER silently swaps an opt-in engine
+for the role default -- the byte-identical safety property is provided by the
+shipped workflow defaulting its engine widget to the legacy engine until
+promotion, not by a hidden substitution at dispatch time.
 """
 from __future__ import annotations
 
+import enum
 import os
 from typing import Optional, Protocol, runtime_checkable
 
@@ -37,6 +47,50 @@ class AudioEngine(Protocol):
 
     def load(self) -> None: ...
     def unload(self) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Fail-closed usability taxonomy (plan piece 3 + dispatch D)
+# ---------------------------------------------------------------------------
+
+
+class EngineUsabilityReason(str, enum.Enum):
+    """The six reasons an engine may be refused for a role (fail-closed).
+
+    ``assert_usable`` (registry level, no IO) raises ``GATED_BY_FLAG``,
+    ``MALFORMED_CONFIG`` and ``INCOMPATIBLE_PROFILE``. The disk/token/commercial
+    reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``, ``NONCOMMERCIAL_BLOCKED``)
+    are raised by the profile resolver and the release gate, which reuse this
+    same enum + :class:`EngineUnusable` so the taxonomy is single-sourced.
+    """
+
+    GATED_BY_FLAG = "gated_by_flag"
+    MISSING_MODEL = "missing_model"
+    MISSING_HF_TOKEN = "missing_hf_token"
+    INCOMPATIBLE_PROFILE = "incompatible_profile"
+    NONCOMMERCIAL_BLOCKED = "noncommercial_blocked"
+    MALFORMED_CONFIG = "malformed_config"
+
+
+class EngineUnusable(RuntimeError):
+    """Raised when an engine cannot serve a role. Carries the classified
+    ``reason`` (an :class:`EngineUsabilityReason`) plus the engine + role so a
+    node can surface a clear, named queue-time error (C-7) instead of crashing
+    or silently substituting another engine.
+    """
+
+    def __init__(self, engine: str, role: str, reason, detail: str = ""):
+        self.engine = engine
+        self.role = role
+        self.reason = EngineUsabilityReason(reason)
+        self.detail = detail
+        msg = (
+            f"audio engine '{engine}' is not usable for role '{role}': "
+            f"{self.reason.value}"
+        )
+        if detail:
+            msg += f" -- {detail}"
+        super().__init__(msg)
 
 
 _REGISTRY: dict = {}
@@ -85,18 +139,40 @@ def default_engine_for_role(role: str) -> Optional[str]:
 
 
 def assert_usable(name: str, role: str) -> str:
-    """Resolve the engine that may actually run for ``role``.
+    """Validate that ``name`` may actually run for ``role``; FAIL CLOSED.
 
-    A default-for-role engine always runs. A non-default engine runs only when
-    its ``requires_flag`` env var is set to ``"1"``; otherwise this returns the
-    role's default engine, so an un-flagged opt-in lane never changes the
-    rendered audio (the safety property behind the whole v2 lane).
+    Returns the validated engine name on success. Raises :class:`EngineUnusable`
+    with a classified reason otherwise -- never silently resolves to another
+    engine (C-6):
+
+    * ``MALFORMED_CONFIG`` -- no engine named ``name`` is registered.
+    * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role`` in ``roles``.
+    * ``GATED_BY_FLAG`` -- a non-default opt-in engine whose ``requires_flag``
+      env var is not set to ``"1"``.
+
+    A default-for-role engine is always usable. Disk/token/commercial checks
+    (the other three reason codes) require IO and are enforced downstream by the
+    profile resolver and release gate, not here (C-5: the registry does no IO).
     """
-    eng = get_engine(name)
+    if not is_registered(name):
+        raise EngineUnusable(
+            name, role, EngineUsabilityReason.MALFORMED_CONFIG,
+            f"no audio engine named '{name}' is registered",
+        )
+    eng = _REGISTRY[name]
+    if role not in getattr(eng, "roles", ()):
+        raise EngineUnusable(
+            name, role, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+            f"engine '{name}' serves roles {tuple(getattr(eng, 'roles', ()))}, "
+            f"not '{role}'",
+        )
     if role in getattr(eng, "default_roles", ()):
         return name
     flag = getattr(eng, "requires_flag", None)
     if flag and os.getenv(flag, "0") != "1":
-        resolved = default_engine_for_role(role)
-        return resolved if resolved is not None else name
+        raise EngineUnusable(
+            name, role, EngineUsabilityReason.GATED_BY_FLAG,
+            f"engine '{name}' is opt-in for role '{role}'; set {flag}=1 to "
+            f"enable it",
+        )
     return name

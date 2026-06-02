@@ -3,6 +3,8 @@
 Scope: music + announcer + character voices. SFX is intentionally out of the
 v2 audio-engine infrastructure.
 """
+import pytest
+
 from nodes import _otr_audio_engines as AE
 
 
@@ -49,11 +51,15 @@ def test_optin_flags_and_licensing():
     assert sa.commercial_clean is True
 
 
-def test_assert_usable_optin_off_resolves_to_default(monkeypatch):
+def test_assert_usable_optin_off_fails_closed(monkeypatch):
+    # Fail closed (C-6): opt-in char-voice engines raise GATED_BY_FLAG when
+    # their flag is off -- they are never silently swapped for bark.
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
     monkeypatch.delenv("OTR_ENABLE_INDEXTTS2", raising=False)
-    assert AE.assert_usable("chatterbox", "char_voice") == "bark"
-    assert AE.assert_usable("indextts2", "char_voice") == "bark"
+    for name in ("chatterbox", "indextts2"):
+        with pytest.raises(AE.EngineUnusable) as ei:
+            AE.assert_usable(name, "char_voice")
+        assert ei.value.reason is AE.EngineUsabilityReason.GATED_BY_FLAG
 
 
 def test_assert_usable_optin_on_runs(monkeypatch):
