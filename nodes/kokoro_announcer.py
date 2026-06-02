@@ -174,6 +174,13 @@ class KokoroAnnouncer:
         # audio.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
+        # R0a: seed all RNGs from the FROZEN script_json so legacy Kokoro audio
+        # is reproducible (I-2). No parse -- hash the raw wire string. (The voice
+        # pick uses its own seeded random.Random, unaffected.) Operator render-
+        # twice baseline (R0a step f) locks this in.
+        from ._otr_resolved_request import _seed_to_int64
+        from ._otr_determinism import seed_all_rngs
+        seed_all_rngs(_seed_to_int64("kokoro_legacy_v1", script_json))
         announcer_items = _extract_announcer_lines(led)
 
         if not announcer_items:

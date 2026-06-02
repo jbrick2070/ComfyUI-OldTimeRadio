@@ -427,6 +427,13 @@ class BatchBarkGenerator:
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
 
+        # R0a: seed all RNGs from the FROZEN script_json so legacy Bark audio is
+        # reproducible (I-2). No parse -- hash the raw wire string. The operator
+        # render-twice baseline (R0a step f) locks this seeding in.
+        from ._otr_resolved_request import _seed_to_int64
+        from ._otr_determinism import seed_all_rngs
+        seed_all_rngs(_seed_to_int64("bark_legacy_v1", script_json))
+
         _meta = led.get("meta") or {}
 
         # BUG-LOCAL-276 (run-3 crash 2026-05-26): halt before any Bark work

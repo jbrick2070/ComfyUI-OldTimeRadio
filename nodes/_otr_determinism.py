@@ -63,6 +63,27 @@ def assert_determinism_env_ready(strict: bool = True) -> bool:
     return not bad
 
 
+def seed_all_rngs(seed: int) -> None:
+    """Seed python / numpy / torch / cuda from one int (numpy masked to 32 bits).
+
+    Used by the legacy audio nodes to make their forwards reproducible (I-2):
+    legacy audio seeds nothing today, so a render-twice diverges. Seeding here
+    -- derived from the frozen script_json via ``_seed_to_int64`` -- is what the
+    R0a operator bit-identity baseline (step f) locks in. This seeds the GLOBAL
+    RNGs; the scoped per-forward strictness lives in ``deterministic_inference``.
+    """
+    seed = int(seed)
+    random.seed(seed)
+    try:
+        import numpy as _np
+        _np.random.seed(seed & 0xFFFFFFFF)
+    except Exception:
+        pass
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
 def apply_module_determinism_defaults() -> None:
     """Post-import-torch defaults safe for the whole process: TF32 off, cuDNN
     benchmark off, cuDNN deterministic on. Does NOT enable

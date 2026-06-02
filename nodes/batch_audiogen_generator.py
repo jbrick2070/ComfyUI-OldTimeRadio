@@ -279,6 +279,13 @@ class BatchAudioGenGenerator:
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
 
+        # R0a: seed all RNGs from the FROZEN script_json so legacy AudioGen audio
+        # is reproducible (I-2). No parse -- hash the raw wire string. Operator
+        # render-twice baseline (R0a step f) locks this in.
+        from ._otr_resolved_request import _seed_to_int64
+        from ._otr_determinism import seed_all_rngs
+        seed_all_rngs(_seed_to_int64("audiogen_legacy_v1", script_json))
+
         # Walk ledger sfx lines (Pattern 2: roles={"sfx"}). The cue
         # text comes DIRECTLY from line["text"] -- no [SFX:] regex,
         # no legacy parser-list "description" field. line_id is carried

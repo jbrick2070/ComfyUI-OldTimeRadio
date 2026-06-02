@@ -1,0 +1,97 @@
+{
+  "manifest_schema_version": "1",
+  "nodes": {
+    "OTR_BatchBarkGenerator": {
+      "class": "BatchBarkGenerator",
+      "widgets": [
+        {
+          "name": "script_json",
+          "default": "[]"
+        },
+        {
+          "name": "temperature",
+          "default": 0.7
+        },
+        {
+          "name": "bypass_freeze_halt",
+          "default": false
+        }
+      ],
+      "widgets_sha256": "cdf98ae467bde480d8fdca89705ed425214aedff1333fe76380d3604c2b3f156"
+    },
+    "OTR_KokoroAnnouncer": {
+      "class": "KokoroAnnouncer",
+      "widgets": [
+        {
+          "name": "script_json",
+          "default": "[]"
+        },
+        {
+          "name": "episode_seed",
+          "default": ""
+        },
+        {
+          "name": "voice_override",
+          "default": "random"
+        },
+        {
+          "name": "speed",
+          "default": 0.95
+        }
+      ],
+      "widgets_sha256": "86e0ab3556903ba180d4a911ee739c4c3db1d9e950e5b9076cf0873032ee32e0"
+    },
+    "OTR_MusicGenTheme": {
+      "class": "MusicGenTheme",
+      "widgets": [
+        {
+          "name": "episode_seed",
+          "default": ""
+        },
+        {
+          "name": "model_id",
+          "default": "facebook/musicgen-medium"
+        },
+        {
+          "name": "guidance_scale",
+          "default": 3.0
+        },
+        {
+          "name": "allow_silence_fallback",
+          "default": false
+        }
+      ],
+      "widgets_sha256": "4e29272b2a96f051f243e13e374d9848a57cf0065fc505df2ccfbebe50d5e726"
+    },
+    "OTR_BatchAudioGenGenerator": {
+      "class": "BatchAudioGenGenerator",
+      "widgets": [
+        {
+          "name": "script_json",
+          "default": "{}"
+        },
+        {
+          "name": "episode_seed",
+          "default": ""
+        },
+        {
+          "name": "model_id",
+          "default": "facebook/audiogen-medium"
+        },
+        {
+          "name": "guidance_scale",
+          "default": 3.0
+        },
+        {
+          "name": "default_duration",
+          "default": 3.0
+        },
+        {
+          "name": "allow_silence_fallback",
+          "default": false
+        }
+      ],
+      "widgets_sha256": "69674b5fb2d3e2a4039fb6b9f7aff022a200972ae975da42a747bfd859eab97e"
+    }
+  }
+}

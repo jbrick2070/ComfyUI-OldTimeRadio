@@ -542,6 +542,13 @@ class MusicGenTheme:
         # ---- L3 ledger reads (single source of truth) ----
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
+        # R0a: seed all RNGs from the FROZEN script_json so legacy MusicGen audio
+        # is reproducible (I-2). No parse -- hash the raw wire string. episode_seed
+        # stays cache-key only. Operator render-twice baseline (R0a step f) locks
+        # this in.
+        from ._otr_resolved_request import _seed_to_int64
+        from ._otr_determinism import seed_all_rngs
+        seed_all_rngs(_seed_to_int64("musicgen_legacy_v1", script_json))
         meta = led.get("meta", {}) or {}
         gen_params = meta.get("gen_params_initial", {}) or {}
 
