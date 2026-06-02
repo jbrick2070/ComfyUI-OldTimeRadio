@@ -74,8 +74,10 @@ The `eng_indextts2.py` adapter (under `nodes/_otr_audio_engines/`) exists but is
 
 ## Immediate next steps -- R0a (a-e) DONE; start Wave 0
 R0a (a-e) is committed + green (see "Already shipped"); step (f) is operator-GPU (deferred).
-**Begin Wave 0 (shared contracts; serial register + full `tests/` + commit).** Plan SSOT table has
-file->imports->tests. The 8 Wave-0 pieces:
+**Wave 0 IN PROGRESS** (shared contracts; serial register + full `tests/` + commit). Pieces 1-2 DONE
+(commit `d0decf1`): `build_resolved_request` + integer-tick `quantize_params` in `_otr_resolved_request.py`,
+and `prepare_text` + `PREPARE_TEXT_VERSION` in `_otr_script_prep.py`. Full `tests/` 3525 pass / 12 skip.
+**Resume at piece 3.** Plan SSOT table has file->imports->tests. The 8 Wave-0 pieces (1-2 done):
 1. `nodes/_otr_resolved_request.py` -- ADD `build_resolved_request(...)` + integer-tick `quantize_params(...)`
    on top of the shipped shell (the shell -- `_seed_to_int64`, IN_KEY/IGNORED, `cache_key`, AUDIO asserts --
    is already in place; do NOT redo it).
