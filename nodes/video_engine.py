@@ -1000,7 +1000,7 @@ _PRESET_DESC = {
     "v2/en_speaker_4": "female * bright * energetic",
     "v2/en_speaker_5": "male * casual * warm",
     "v2/en_speaker_6": "male * deep * resonant",
-    "v2/en_speaker_7": "male * sharp * anxious",
+    "v2/en_speaker_7": "female * sharp * anxious",  # FIX-3 sync: en_speaker_7 reclassified female in story_orchestrator
     "v2/en_speaker_8": "male * clipped * precise",
     "v2/en_speaker_9": "female * mature * authoritative",
     "v2/de_speaker_0": "male * German accent * precise * clipped",

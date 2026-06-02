@@ -60,13 +60,13 @@ _ANNOUNCER_COLOR_BBGGRR = "&H80C8FF&"  # soft amber (#FFC880) -- announcer disti
 # Alignment, MarginL, MarginR, MarginV, Encoding.
 # Colors here are &HAABBGGRR (alpha 00 = opaque, FF = transparent).
 STYLES = {
-    # Accessibility master. White text, ~65%-opaque black box (BorderStyle=3).
+    # Accessibility master. White text, ~55%-opaque black box (BorderStyle=3).
     "sdh_standard": {
         "font": "Arial",
-        "size": 52,
+        "size": 26,
         "primary": "&H00FFFFFF",   # opaque white
         "outline_col": "&H00000000",
-        "back": "&H40000000",      # alpha 0x40 -> ~75% opaque black box
+        "back": "&H70000000",      # alpha 0x70 -> ~56% opaque black box (lighter)
         "bold": 0,
         "border_style": 3,         # opaque box (uses BackColour)
         "outline": 5,              # box padding -- MUST be >0 or libass draws no box
