@@ -56,6 +56,7 @@ from typing import Any, Callable, Optional
 log = logging.getLogger("OTR_StorySpine")
 
 _ENV_FLAG = "OTR_ENABLE_STORY_SPINE"
+_QA_ENV_FLAG = "OTR_ENABLE_STORY_QA"
 
 
 def enabled() -> bool:
@@ -71,6 +72,21 @@ def enabled() -> bool:
         return os.environ.get(_ENV_FLAG, "1").strip() != "0"
     except Exception:  # noqa: BLE001 -- env read must never break a run
         return True
+
+
+def qa_enabled() -> bool:
+    """True iff the post-script Story QA / reject pass may run.
+
+    DEFAULT OFF (opt-in). BUG-LOCAL-302 (operator directive 2026-06-01): the
+    Story QA pass is a credit-billed LLM call whose only power is to REJECT --
+    aborting a fully-written, renderable episode and discarding the tokens
+    already spent writing it. So the QA LLM does NOT run out of the box: it is
+    gated off entirely (no call, no tokens, no reject) unless a power user sets
+    OTR_ENABLE_STORY_QA=1. Cheap, pure, never raises."""
+    try:
+        return os.environ.get(_QA_ENV_FLAG, "0").strip() == "1"
+    except Exception:  # noqa: BLE001 -- env read must never break a run
+        return False
 
 
 _VOICED_ROLES = ("character", "announcer")
@@ -284,32 +300,44 @@ def run_post_script_spine(
         log.warning("[OTR_StorySpine] length normalization failed: %r", exc)
 
     # --- Stage 3: Targeted Story QA router (read-only, technical slot) --
-    # Always runs, model-agnostic: cold context (final script only),
-    # skeptical framing, high REJECT bar. Fail-OPEN to PASS inside
-    # run_story_qa, so a QA crash ships the episode as-is rather than
-    # aborting it. LLM slot: technical -- structured categorical verdict.
+    # BUG-LOCAL-302: OPT-IN, DEFAULT OFF (operator directive 2026-06-01). This
+    # is a credit-billed LLM call whose only action is to REJECT -- aborting a
+    # fully-written, renderable episode and wasting the tokens already spent
+    # composing it. So the QA LLM is GATED OFF and does NOT even run out of the
+    # box: no call, no tokens, no reject. A power user sets OTR_ENABLE_STORY_QA=1
+    # to turn the critic + reject gate back on. When on it is model-agnostic:
+    # cold context (final script only), skeptical framing, high REJECT bar, and
+    # fail-OPEN to PASS inside run_story_qa (a QA crash ships the episode as-is
+    # rather than aborting it). LLM slot: technical -- structured verdict.
     verdict = None
-    try:
-        from . import _otr_creative_qa as _QA
-    except ImportError:  # pragma: no cover - standalone / test load
-        import _otr_creative_qa as _QA  # type: ignore
-    try:
-        ctx = (
-            slot_scheduler.helper_context("creative_qa")
-            if slot_scheduler is not None
-            else _nullcontext()
-        )
-        with ctx:
-            verdict = _QA.run_story_qa(
-                led,
-                technical_generate_fn,
-                critic_model_id=resolved["technical_model"],
+    if not qa_enabled():
+        meta["story_qa_verdict"] = {
+            "verdict": "SKIPPED",
+            "reason": ("OTR_ENABLE_STORY_QA not set -- QA LLM gated off by "
+                       "default (BUG-LOCAL-302): no call, no tokens, no reject."),
+        }
+    else:
+        try:
+            from . import _otr_creative_qa as _QA
+        except ImportError:  # pragma: no cover - standalone / test load
+            import _otr_creative_qa as _QA  # type: ignore
+        try:
+            ctx = (
+                slot_scheduler.helper_context("creative_qa")
+                if slot_scheduler is not None
+                else _nullcontext()
             )
-        meta["story_qa_verdict"] = _verdict_summary(verdict)
-    except Exception as exc:  # noqa: BLE001 -- QA must never break a run
-        meta["story_qa_verdict"] = {"verdict": "ERROR",
-                                    "error": type(exc).__name__}
-        log.warning("[OTR_StorySpine] story QA failed: %r", exc)
+            with ctx:
+                verdict = _QA.run_story_qa(
+                    led,
+                    technical_generate_fn,
+                    critic_model_id=resolved["technical_model"],
+                )
+            meta["story_qa_verdict"] = _verdict_summary(verdict)
+        except Exception as exc:  # noqa: BLE001 -- QA must never break a run
+            meta["story_qa_verdict"] = {"verdict": "ERROR",
+                                        "error": type(exc).__name__}
+            log.warning("[OTR_StorySpine] story QA failed: %r", exc)
 
     _verdict_value = getattr(verdict, "verdict", None)
 
@@ -524,6 +552,10 @@ def _selftest() -> int:
         print("  [PASS] flag '1' -> enabled() True")
     else:
         print("  [FAIL] flag '1' should be enabled")
+
+    # BUG-LOCAL-302: the Story QA pass is opt-in (default off). Tests 4/5/9/10
+    # exercise it, so turn it on for them; Test 11 covers the default-off skip.
+    os.environ[_QA_ENV_FLAG] = "1"
 
     # Test 4: full PASS path runs, stamps meta, never raises, ledger valid.
     total += 1
@@ -754,7 +786,44 @@ def _selftest() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] reject path raised: {exc!r}")
 
+    # Test 11: QA gated OFF by default (BUG-LOCAL-302). The QA LLM must NOT be
+    # called (a raising technical fn proves it would have), the verdict is
+    # SKIPPED, there is no REJECT signal, and the run still completes + scrubs.
+    total += 1
+    try:
+        os.environ[_ENV_FLAG] = "1"
+        os.environ.pop(_QA_ENV_FLAG, None)  # default: QA off
+        led11 = _min_ledger()
+        meta11 = led11.data["meta"]
+
+        def _qa_must_not_run(messages, *, temperature, max_new_tokens, stop=None):
+            raise AssertionError(
+                "QA LLM must not be called when OTR_ENABLE_STORY_QA is unset")
+
+        keep_plan = _json.dumps({
+            "edits": [{"beat_index": 0, "action": "KEEP"}],
+            "projected_word_total": 350,
+        })
+        run_post_script_spine(
+            led11, meta11, outline=None,
+            creative_generate_fn=_stub_generate(keep_plan),
+            technical_generate_fn=_qa_must_not_run,
+            resolved=resolved, slot_scheduler=None,
+        )
+        if (meta11.get("story_spine_status") == "ok"
+                and meta11.get("story_qa_verdict", {}).get("verdict") == "SKIPPED"
+                and "story_verdict" not in meta11
+                and "ledger_scrub_status" in meta11):
+            passed += 1
+            print("  [PASS] QA gated off by default -> no QA call, SKIPPED, "
+                  "no reject, scrub ran")
+        else:
+            print(f"  [FAIL] QA-default-off meta = {meta11}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [FAIL] QA-default-off raised: {exc!r}")
+
     os.environ.pop(_ENV_FLAG, None)
+    os.environ.pop(_QA_ENV_FLAG, None)
     print(f"SELF-TEST PASS: {passed}/{total}")
     return 0 if passed == total else 1
 

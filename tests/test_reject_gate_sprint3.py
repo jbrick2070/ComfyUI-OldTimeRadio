@@ -119,3 +119,35 @@ def test_spine_calls_scrub_with_repair_available_false():
     assert "repair_available=not repair_used" not in _SPINE_SRC, (
         "the old repair_available=not repair_used wiring must be gone"
     )
+
+
+def test_qa_pass_is_opt_in_default_off():
+    """BUG-LOCAL-302: the Story QA / reject LLM must be GATED OFF by default --
+    no call, no tokens, no reject -- and run only when OTR_ENABLE_STORY_QA=1.
+    A credit-billed gate whose only action is to abort a finished, renderable
+    episode must never be default-on."""
+    import os as _os
+    from nodes import _otr_story_spine as _spine
+
+    _prev = _os.environ.pop("OTR_ENABLE_STORY_QA", None)
+    try:
+        assert _spine.qa_enabled() is False, "QA must default OFF"
+        _os.environ["OTR_ENABLE_STORY_QA"] = "1"
+        assert _spine.qa_enabled() is True, "OTR_ENABLE_STORY_QA=1 opts in"
+        _os.environ["OTR_ENABLE_STORY_QA"] = "0"
+        assert _spine.qa_enabled() is False
+    finally:
+        if _prev is None:
+            _os.environ.pop("OTR_ENABLE_STORY_QA", None)
+        else:
+            _os.environ["OTR_ENABLE_STORY_QA"] = _prev
+
+    # The run_story_qa LLM call must live behind the qa_enabled() gate.
+    assert "def qa_enabled" in _SPINE_SRC
+    assert "OTR_ENABLE_STORY_QA" in _SPINE_SRC
+    gate_idx = _SPINE_SRC.find("if not qa_enabled()")
+    qa_call_idx = _SPINE_SRC.find("run_story_qa(")
+    assert gate_idx != -1, "the QA pass must be gated by qa_enabled()"
+    assert qa_call_idx > gate_idx, (
+        "run_story_qa must be called only inside the qa_enabled() gate"
+    )
