@@ -143,6 +143,51 @@ Each item: **what's wrong · why it matters · evidence · candidate fix.** IDs 
   not find a single doc named "dead-code synthesis"; if you meant a specific committed critique,
   point me at it and I'll fold it in.
 
+### P11 — Caption text size reduction (−65%)
+- **What:** the burned-in SDH open-caption letters render too large on screen; cut the
+  caption font size by ~65%.
+- **Why:** render/output hygiene — the oversized lower-third dominates the frame, fights the
+  1940s-broadcast look, and crowds the HuMo/composite visual. A smaller caption sits cleaner.
+- **Evidence:** `nodes/_otr_captions.py:66` — the default `sdh_standard` ASS style is **Arial
+  52 px** (the A/B-only `otr_crt` style is **50 px**, `:80`); the `{size}` field is written
+  into the ASS `Style:` line at `:192-195` and burned in at the video composite/blend stage
+  (the SDH caption burn, ~Node 58). 52 px renders oversized at the output resolution.
+- **Fix:** reduce the `sdh_standard` `"size"` **52 → ~18** (52 × 0.35 = 18.2; the 65% cut) at
+  `_otr_captions.py:66`, and `otr_crt` `"size"` 50 → ~18 to match. One style-dict value each;
+  no node-surface / widget / workflow-JSON change; caption-only, so audio stays byte-identical.
+  **Side effects to validate:** (a) *legibility* — 18 px is small; confirm it still reads at the
+  procgen_blended output resolution, and (SDH captions are an accessibility feature) that the
+  ~65%-opaque box + outline keep contrast; (b) *line-wrapping* — smaller glyphs fit more
+  characters per line, so existing wraps/margins may change (re-check the ASS wrap + `margin_v`);
+  (c) *vertical layout* — a smaller caption block + box shifts the lower-third; confirm it stays
+  inside the title-safe area. **Stream D** (render/output hygiene). **Gate:** A/B one caption at
+  52 px vs 18 px on a real output frame — legible + correctly positioned; audio byte-identical.
+
+### P12 — TTS model evaluation: Bark alternatives (research / eval)
+- **What:** evaluate a different local TTS model that may beat Bark for OTR voices. Jeffrey
+  recalled it only as *"something like Express to…"* by *"some company like express to"* — best
+  decode is **XTTS-v2 (Coqui)** ("X-TTS" sounds like "express" dictated). **This is research /
+  eval, not implementation** — Jeffrey picks the winner before any swap-out work begins.
+- **Why:** Bark is today's TTS; a higher-quality / more controllable / faster local model could
+  lift voice quality, character distinctness, and the period-authentic 1940s feel. Any candidate
+  must be **100% local + open-source, no paid services** (CLAUDE.md).
+- **Evidence:** Jeffrey's recollection (above) + Bark's known limits (instability/artifacts,
+  speed). Open-source, consumer-GPU candidates:
+  - **XTTS-v2 (Coqui)** — *leading match for "Express"*; strong Bark alternative, multi-speaker
+    voice cloning, runs comfortably on 16 GB; mature + widely used.
+  - **StyleTTS2** — very high quality + fast; expressive style control.
+  - **F5-TTS** — recent, strong zero-shot quality.
+  - **VoiceCraft** — zero-shot + speech editing.
+  - **ChatTTS** — conversational TTS (less likely the "express" match).
+- **Fix (eval plan, no code):** score each candidate on voice quality, 3-voice character
+  distinctness, period-authentic 1940s broadcast feel, VRAM on RTX 5080 16 GB (under the 14.5 GB
+  ceiling, co-resident with the writer/video budget), **license = open-source (required)**, and
+  ComfyUI node availability vs implementation effort. **Acceptance gate:** render the SAME 1-line
+  script across 3 character voices with current Bark and each candidate; side-by-side listen test
+  vs the existing Bark baseline; Jeffrey selects the winner before any swap-out. **Stream D**
+  (output hygiene / stability — eval only). **Confirm:** was **XTTS-v2** the model you meant? If
+  yes, this tightens to XTTS-v2-vs-Bark and the rest drop to "also-considered."
+
 ---
 
 ## 4. Dependencies + ordering
@@ -160,10 +205,13 @@ Each item: **what's wrong · why it matters · evidence · candidate fix.** IDs 
 | P8 F5 SFW | independent; trivial | — |
 | **P9 BUG-276 crash** | independent; deep cast-routing fix | unblocks remote reliability at length |
 | P10 cleanup | independent | reduces drift; do continuously |
+| **P11 caption size** | independent; one caption-style value (`_otr_captions.py:66`) | render/output hygiene; no blocker |
+| **P12 TTS eval** | independent; research/eval only (no code until Jeffrey picks) | gates any future Bark swap-out |
 
 **Key arrows for round-robin:** P0 is the big rock and **supersedes P1, houses P2/P3, may
 obsolete P6**. P4+P5 are a cheap robustness pair that should land *first* (they decide whether
-a run produces a story at all). P9 is an isolated crash fix. P8/P10 are independent hygiene.
+a run produces a story at all). P9 is an isolated crash fix. P8/P10/P11 are independent hygiene;
+P12 is a research/eval bake-off (no code until Jeffrey picks the TTS).
 
 ---
 
@@ -189,11 +237,16 @@ content opinion alone).
   multi-char word-count floor. *Bounded, low-risk; re-check P6 need after Stream A lands.*
   Owner needs `_otr_line_composer.py` + the SFW validator. Gate: the T4 "ERIN SPENDER" case
   retries clean; SFW pass; byte-identical audio.
-- **Stream D — Stability + cleanup (P9 + P10).** Land the BUG-276/271 cast-routing fix
-  (announcer-exclusion in reroll + pre-Bark gate) and the dead-code/scratch cleanup. *Isolated
-  crash fix + continuous hygiene.* Owner needs the reviewer/reroll/cast-contract code + the
-  forbidden-sweep. Gate: force a `needs_full_rerun` and assert no character line reaches Bark
-  on an announcer voice; forbidden-sweep clean.
+- **Stream D — Stability + cleanup + render/output hygiene (P9 + P10 + P11 + P12).** Land the
+  BUG-276/271 cast-routing fix (announcer-exclusion in reroll + pre-Bark gate) and the
+  dead-code/scratch cleanup; **reduce the SDH caption size ~65% (P11, `_otr_captions.py:66`,
+  52 → ~18 px)**; and run the **Bark-alternative TTS evaluation (P12, XTTS-v2 lead) — research
+  only, Jeffrey picks the winner before any swap-out.** *Isolated crash fix + continuous hygiene
+  + output polish + a TTS bake-off.* Owner needs the reviewer/reroll/cast-contract code + the
+  forbidden-sweep (P9/P10), `nodes/_otr_captions.py` (P11), and a TTS eval harness (P12). Gate:
+  force a `needs_full_rerun` and assert no character line reaches Bark on an announcer voice;
+  forbidden-sweep clean; caption A/B legible at the reduced size; TTS listen-test comparison
+  delivered for Jeffrey's pick.
 
 Streams A and B/C/D are fully parallel. Within A, do P0 scaffolding before P2/P3 tuning.
 
