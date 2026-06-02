@@ -196,3 +196,96 @@ def assert_audio_batch_contract(audio, *, where: str = "") -> dict:
             f"AUDIO contract{ctx}: sample_rate must be a positive int, got {sr!r}"
         )
     return audio
+
+
+# ---------------------------------------------------------------------------
+# Wave 0: integer-tick quantizer + request builder (the engine never keys on a
+# raw widget float -- I-6)
+# ---------------------------------------------------------------------------
+
+DEFAULT_PARAM_QUANTUM = 1000  # 3 decimal places of tick resolution
+
+
+def quantize_params(params, *, quantum: int = DEFAULT_PARAM_QUANTUM) -> Tuple[Tuple[str, int], ...]:
+    """Map a ``{name: value}`` param dict to a sorted tuple of ``(name, int_tick)``.
+
+    Floats become integer ticks (``round(value * quantum)``) so float-repr noise
+    can never perturb the cache key; bools become 0/1; any non-numeric value is
+    reduced to a stable 31-bit int tick. Deterministic and order-independent
+    (sorted by name).
+    """
+    out = []
+    for name in sorted((params or {}).keys()):
+        v = params[name]
+        if isinstance(v, bool):
+            tick = 1 if v else 0
+        elif isinstance(v, (int, float)):
+            tick = int(round(float(v) * quantum))
+        else:
+            tick = _seed_to_int64("param", str(name), str(v)) % (1 << 31)
+        out.append((str(name), tick))
+    return tuple(out)
+
+
+def build_resolved_request(
+    *,
+    role: str,
+    engine_name: str,
+    engine_profile_id: str,
+    engine_impl_version: str,
+    char_id: str,
+    line_id: str,
+    occurrence: int = 0,
+    prepared_text: str = "",
+    voice_ref_id: Optional[str] = None,
+    voice_preset: Optional[str] = None,
+    delivery_profile_id: str = "neutral",
+    delivery_profile_version: str = "1",
+    episode_seed: int = 0,
+    cast_lock_revision: int = 0,
+    sample_rate: int = _DEFAULT_SR,
+    channels: int = 1,
+    params=None,
+    quantum: int = DEFAULT_PARAM_QUANTUM,
+    source_ref_sha256: str = "",
+    commercial_clean: Optional[bool] = None,
+) -> ResolvedVoiceRequest:
+    """Pack already-resolved pieces into the frozen ``ResolvedVoiceRequest``.
+
+    Computes the derived identity fields: ``prepared_text_sha256``, the quantized
+    params tuple, and ``stable_line_seed`` (``stable_line_seed_v1`` reduction of
+    episode_seed + cast_lock_revision + line_id + char_id + prepared_text_sha256 +
+    engine_profile_id + voice_ref_id + delivery_profile_version, per G1). The raw
+    ``prepared_text`` is carried only as the IGNORED debug field.
+    """
+    prepared_text = prepared_text or ""
+    prepared_text_sha256 = hashlib.sha256(prepared_text.encode("utf-8")).hexdigest()
+    quantized = quantize_params(params, quantum=quantum)
+    stable_line_seed = _seed_to_int64(
+        "stable_line_seed_v1", int(episode_seed), int(cast_lock_revision),
+        line_id, char_id, prepared_text_sha256, engine_profile_id,
+        voice_ref_id or "", delivery_profile_version,
+    )
+    return ResolvedVoiceRequest(
+        role=role,
+        engine_name=engine_name,
+        engine_profile_id=engine_profile_id,
+        engine_impl_version=engine_impl_version,
+        char_id=char_id,
+        line_id=line_id,
+        occurrence=int(occurrence),
+        prepared_text_sha256=prepared_text_sha256,
+        voice_ref_id=voice_ref_id,
+        voice_preset=voice_preset,
+        delivery_profile_id=delivery_profile_id,
+        delivery_profile_version=delivery_profile_version,
+        episode_seed=int(episode_seed),
+        cast_lock_revision=int(cast_lock_revision),
+        stable_line_seed=stable_line_seed,
+        sample_rate=int(sample_rate),
+        channels=int(channels),
+        quantized_params=quantized,
+        source_ref_sha256=source_ref_sha256,
+        commercial_clean=commercial_clean,
+        prepared_text=prepared_text,
+    )

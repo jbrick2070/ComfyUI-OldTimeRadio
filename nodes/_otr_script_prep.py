@@ -28,3 +28,30 @@ def clean_spoken_text(text: str) -> str:
     t = _BRACKET.sub(" ", t)
     t = _WS.sub(" ", t).strip()
     return t
+
+
+PREPARE_TEXT_VERSION = "1"
+
+_ASTERISK = re.compile(r"\*+")
+# ♩ ♪ ♫ ♬ + the two musical-note emoji, as ASCII-safe escapes.
+_MUSIC_NOTE = re.compile(r"[♩♪♫♬\U0001F3B5\U0001F3B6]+")
+_MULTIDOT = re.compile(r"\.{2,}")
+
+
+def prepare_text(text: str) -> str:
+    """Engine-neutral spoken text for a TTS forward (the per-engine hook default).
+
+    Builds on ``clean_spoken_text`` (which strips a leading speaker label,
+    parenthetical stage directions, and bracket tags), then additionally removes
+    emphasis asterisks and music-note glyphs, normalizes any unicode ellipsis or
+    run of dots to a single ``...`` pause, and KEEPS sentence punctuation
+    ``. , ?``. Pure + deterministic -> C7-safe; versioned by
+    ``PREPARE_TEXT_VERSION`` so it can participate in cache identity / IS_CHANGED.
+    """
+    t = clean_spoken_text(text)
+    t = _ASTERISK.sub(" ", t)
+    t = _MUSIC_NOTE.sub(" ", t)
+    t = t.replace("…", "...")   # unicode ellipsis -> three dots
+    t = _MULTIDOT.sub("...", t)      # any run of 2+ dots -> one pause
+    t = _WS.sub(" ", t).strip()
+    return t
