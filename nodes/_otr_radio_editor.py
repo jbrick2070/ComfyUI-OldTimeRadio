@@ -94,7 +94,7 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 log = logging.getLogger("OTR")
@@ -273,6 +273,23 @@ class BeatEdit(BaseModel):
         ge=0,
         description="MERGE_SHORT_LINES only: adjacent same-speaker beat to fold in",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_field_aliases(cls, data):
+        """BUG-LOCAL-303: LLMs (claude-opus included) routinely emit the
+        shortened field name ``index`` instead of the schema's ``beat_index``
+        (and ``merge_with`` for ``merge_with_index``). Accept those as aliases
+        so the length / micro-repair pass validates on attempt 1 instead of
+        burning 2-3 credit-billed structured-call retries on a pure field-name
+        mismatch. Best-effort: only a plain dict is remapped, and an explicit
+        ``beat_index`` always wins over ``index``."""
+        if isinstance(data, dict):
+            if "beat_index" not in data and "index" in data:
+                data = {**data, "beat_index": data["index"]}
+            if "merge_with_index" not in data and "merge_with" in data:
+                data = {**data, "merge_with_index": data["merge_with"]}
+        return data
 
     def is_tier1(self) -> bool:
         return self.action in TIER1_ACTIONS
