@@ -1,4 +1,22 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (post 1c COMPLETE)
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 part 1 shipped)
+
+## STATUS (HEAD 5a747f0) -- SPRINT 2 PART 1 SHIPPED
+Sprint 2 (a) de-risking core shipped (5a747f0): `cast_seed` persisted in
+`meta.cast_contract` + the pure byte-identical `_otr_casting.replay_voice_assignment`
++ the parity test (`replay == lock_cast` char-for-char, locked into regression).
+ADDITIVE -- the writer still assigns voices; the replay is proven but not yet wired.
+**PART 2 REMAINS** (the invasive gate-timing re-architecture): OTR_CastLock.lock()
+reads cast_seed+num_characters+lemmy_hit from the frozen `meta.cast_contract` and
+calls `replay_voice_assignment` for bark (stamps voice_preset per char_id,
+regardless of cast_voice_policy); remove the writer-side voice stamp; RELAX writer
+Gate 1 (`_assert_voice_preset_invariant`) + FreezeCascade Gate 2 (G6) so voice_preset
+may be absent at freeze and assigned by CastLock; convert test_otr_casting /
+test_freeze_cascade_g6 / test_writer_cast_lock_voice_preset / test_cast_contract /
+test_cast_lock / test_lock_cast_routing. Full spec in task 8. Suite 3655/12/0,
+Bug Bible green. local HEAD == origin == 5a747f0. **USE cast_seed, NOT stable_cast_seed.**
+
+---
+
 
 ## STATUS (HEAD 9259336) -- SPRINT 1c COMPLETE
 1a bark (673a2bc), 1b kokoro (89e90a7), 1c (ad0ac50 part1 music-prompt-via-Meta-brief
