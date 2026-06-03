@@ -1,0 +1,99 @@
+# OTR v2 audio-engine profiles (plan D5 / Wave 0 piece 8).
+#
+# One row per (role, engine). Curated per-engine default_params live HERE -- not
+# in the delivery layer. The resolver (nodes/_otr_engine_profiles.py) loads this
+# lazily (cached, exception-wrapped) and hashes the file text into the
+# engine_profile source sha (a re-baseline trigger). Engine names MUST match the
+# audio-engine registry. Box-fresh installs keep legacy engines as the internal
+# default; the model-backed defaults (IndexTTS2 voice, Stable Audio music) are
+# promoted to the shipped out-of-box default only at promotion (I), after the F
+# dependency pilots pass. model_path / model_sha256 stay empty until F pins them.
+profile_schema_version: "1"
+
+profiles:
+  # --- character voice ---
+  - profile_id: char_bark_v1
+    role: char_voice
+    engine: bark
+    commercial_clean: false        # Suno Bark terms not confirmed for commercial use
+    model_path: ""
+    model_sha256: ""
+    default_params: {text_temp: 0.7, waveform_temp: 0.7}
+    allowed_voice_banks: [bark_legacy]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+
+  - profile_id: char_chatterbox_v1
+    role: char_voice
+    engine: chatterbox
+    commercial_clean: true         # MIT
+    model_path: ""
+    model_sha256: ""
+    default_params: {exaggeration: 0.5, cfg_weight: 0.4, temperature: 0.6}
+    allowed_voice_banks: [default]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+
+  - profile_id: char_indextts2_v1
+    role: char_voice
+    engine: indextts2
+    commercial_clean: false        # Bilibili license -- non-commercial use gated
+    model_path: ""
+    model_sha256: ""
+    default_params: {temperature: 0.8, emo_alpha: 1.0}
+    allowed_voice_banks: [default]
+    engine_impl_version: "1"
+    sample_rate: 22050
+    requires_hf_token: false        # weights are downloadable; only commercial USE is gated
+
+  # --- announcer voice ---
+  - profile_id: announcer_kokoro_v1
+    role: announcer_voice
+    engine: kokoro
+    commercial_clean: true         # Apache-2.0
+    model_path: ""
+    model_sha256: ""
+    default_params: {speed: 1.0}
+    allowed_voice_banks: [kokoro_builtin]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+
+  - profile_id: announcer_chatterbox_v1
+    role: announcer_voice
+    engine: chatterbox
+    commercial_clean: true         # MIT
+    model_path: ""
+    model_sha256: ""
+    default_params: {exaggeration: 0.4, cfg_weight: 0.4, temperature: 0.6}
+    allowed_voice_banks: [default]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+
+  # --- music ---
+  - profile_id: music_musicgen_v1
+    role: music
+    engine: musicgen
+    commercial_clean: false        # CC-BY-NC-4.0 -- non-commercial
+    model_path: ""
+    model_sha256: ""
+    default_params: {guidance_scale: 3.0, temperature: 1.0}
+    allowed_voice_banks: []
+    engine_impl_version: "1"
+    sample_rate: 32000
+    requires_hf_token: false
+
+  - profile_id: music_stable_audio_v1
+    role: music
+    engine: stable_audio_music
+    commercial_clean: true         # Stability Community license (revenue-capped)
+    model_path: ""
+    model_sha256: ""
+    default_params: {steps: 100, cfg_scale: 7.0, seconds_total: 30}
+    allowed_voice_banks: []
+    engine_impl_version: "1"
+    sample_rate: 44100
+    requires_hf_token: true         # SA3 weights are HF-gated (accept license + HF_TOKEN)
