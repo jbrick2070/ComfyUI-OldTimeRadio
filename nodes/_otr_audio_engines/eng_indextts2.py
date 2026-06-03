@@ -62,11 +62,19 @@ class IndexTTS2Engine:
         return clean_spoken_text(text)
 
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
-        """One dialogue line -> mono AUDIO. Inference wired in the pilot."""
+        """One dialogue line -> mono AUDIO. Inference wired in the GPU pilot.
+
+        TODO-for-F: the assumed library call is
+            IndexTTS2(cfg, model_dir).infer(spk_audio_prompt=ref_clip_path,
+                text=text, emo_vector=<self.emo_list(delivery_vector)>,
+                seed=seed, generator=<bound torch.Generator>)
+        scripts/otr_audio_dep_pilot.py verifies the constructor + infer kwargs +
+        external-generator support on GPU before supports_external_generator is
+        flipped True and this body is filled. Until then indextts2 is a
+        flag-gated, default-off stub -- never run blind in production.
+        """
         self.load()
         emo = self.emo_list(delivery_vector)
-        # VERIFY in the pilot: call IndexTTS2 infer(spk_audio_prompt=ref_clip_path,
-        # text=text, emo_vector=emo, seed=seed, ...) and wrap via mono_safe.
         raise RuntimeError(
             "IndexTTS2 inference is wired and verified in the GPU pilot; "
             f"engine registered and selectable (emo dims={len(emo)})"

@@ -53,23 +53,24 @@ class ChatterboxEngine:
         return clean_spoken_text(text)
 
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
-        """One dialogue line -> mono AUDIO. Deterministic under fixed seed."""
-        import torch
+        """One dialogue line -> mono AUDIO. Inference wired in the GPU pilot.
 
-        from .._otr_audio_utils import mono_safe
-
+        TODO-for-F: the assumed library call is
+            ChatterboxTTS.generate(text, audio_prompt_path=ref_clip_path,
+                exaggeration=<self._project(delivery_vector)>, cfg=0.5,
+                temperature=0.6, generator=<bound torch.Generator>)
+        scripts/otr_audio_dep_pilot.py verifies on GPU that ``generate`` binds an
+        external ``torch.Generator`` (so render-twice is byte-identical) before
+        ``supports_external_generator`` is flipped True and this body is filled.
+        Until then chatterbox is a flag-gated, default-off stub -- never run
+        blind in production.
+        """
         self.load()
-        torch.manual_seed(int(seed))
         exaggeration = self._project(delivery_vector)
-        # VERIFY signature in the dependency pilot before promotion.
-        wav = self._model.generate(
-            text,
-            audio_prompt_path=ref_clip_path,
-            exaggeration=exaggeration,
-            cfg=0.5,
-            temperature=0.6,
+        raise RuntimeError(
+            "Chatterbox inference is wired and verified in the GPU pilot; "
+            f"engine registered and selectable (exaggeration={exaggeration})"
         )
-        return mono_safe({"waveform": wav, "sample_rate": self.sample_rate})
 
     @staticmethod
     def _project(delivery_vector):

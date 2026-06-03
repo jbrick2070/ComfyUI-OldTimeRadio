@@ -45,10 +45,19 @@ class StableAudioMusicEngine:
         self._model = None
 
     def generate_clip(self, prompt, duration_s, seed):
-        """Text prompt -> stereo AUDIO clip. Inference wired in the pilot."""
+        """Text prompt -> stereo AUDIO clip. Inference wired in the GPU pilot.
+
+        TODO-for-F: the assumed library call is the ComfyUI-native SA3 sampler /
+            generate_diffusion_cond(model, steps=<int>,
+                conditioning=[{"prompt": prompt, "seconds_total": duration_s}],
+                seed=seed, generator=<bound torch.Generator>)
+        preserving stereo via canonical_audio. scripts/otr_audio_dep_pilot.py
+        verifies on GPU that the native SA3 path binds a torch.Generator (so
+        render-twice is byte-identical) before supports_external_generator is
+        flipped True and this body is filled. Until then stable_audio_music is a
+        flag-gated, default-off stub -- never run blind in production.
+        """
         self.load()
-        # VERIFY in the pilot: run Stable Audio diffusion (fixed seed + steps),
-        # preserving stereo via canonical_audio.
         raise RuntimeError(
             "Stable Audio inference is wired and verified in the GPU pilot; "
             f"engine registered and selectable (prompt len={len(prompt or '')})"
