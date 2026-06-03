@@ -9,15 +9,22 @@ bark/kokoro/musicgen/audiogen nodes are all gone.** Suite green 3650/12/0, Bug B
 green. local HEAD == origin == 9259336.
 
 **Remaining headless work is essentially done.** The next sprints are gated:
-- **Sprint 2 (writer casting -> CastLock)** -- NEEDS A JEFFREY DECISION (named stop:
-  listener-audible casting change + handoff ambiguity). The handoff said "bark draws
-  from the bank", but bark uses discrete v2/* PRESETS, not the clip-based voice bank
-  (which excludes bark), and eng_bark reads cast.voice_preset (Gate 3 fails without it).
-  Removing the writer's python_assign_voice_preset leaves bark voiceless unless CastLock
-  takes over PRESET assignment -- a new casting model that determines which voice each
-  character gets. Decision: (a) move the seeded preset picker into CastLock auto_registry
-  (behavior-preserving, recommended); (b) add a bark preset bank (new assignment);
-  (c) keep the writer stamp for bark, move only clip-engine casting. Full spec in task 8.
+- **Sprint 2 (writer casting -> CastLock)** -- APPROVED as option (a) (move the seeded
+  bark preset picker into CastLock) WITH a byte-identical parity-test mandate. Feasibility
+  analyzed; one HARD PREREQUISITE found: all cast determinism (incl. bark voice picks)
+  flows from ONE `cast_seed` (OTR_LedgerScriptWriter:2477 `cast_rng=random.Random(cast_seed)`,
+  OS-entropy per episode; OTR_CAST_SEED = C7 override) and the writer does NOT persist it
+  (stamps only meta.cast_contract{lemmy_hit,casting_attempts,counts}). So CastLock cannot
+  reproduce the picks byte-identically until cast_seed is PERSISTED. cast_rng is also
+  shared/interleaved (assemble name-rolls + precompute gender-shuffle + per-slot voice
+  picks; the LLM description does NOT draw it), so (a) requires CastLock to REPLAY that rng
+  sequence, not just port the picker. PLAN (full in task 8): (1) writer persists cast_seed
+  in meta.cast_contract.cast_seed; (2) extract a PURE replay fn from lock_cast
+  (random.Random(cast_seed) -> assemble_pre_locked_rows -> precompute_ensemble_slots -> per
+  slot python_assign_voice_preset, no LLM); (3) CastLock calls it for bark; (4) parity test
+  (writer snapshot at seed S == CastLock replay, char-for-char); (5) remove the writer voice
+  stamp. Use cast_seed, NOT _otr_voice_bank.stable_cast_seed (the flagged trap). ~1c-sized;
+  needs fresh runway. Tree clean at 109c94d (no Sprint 2 code cut).
 - **Sprint 3** -- LARGELY SUBSUMED by 1c: the R0a legacy seeding lived in the now-deleted
   nodes; legacy_invocation_manifest.json + test_legacy_audio_seeding are already gone.
   Residual = capture baseline_v2 (Gate B, operator GPU).
