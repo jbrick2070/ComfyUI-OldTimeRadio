@@ -301,6 +301,30 @@ _NODE_MODULES = {
 
 }
 
+# ---------------------------------------------------------------------------
+# v2 audio/casting nodes (Wave 1a-c, 2a) -- registered from the single source
+# of truth in nodes/_otr_class_registry.new_node_modules_table(), and ONLY for
+# the nodes whose module file already exists on disk. Merging by table (not as
+# literal "OTR_..." keys) keeps the class-registry collision guard meaningful;
+# the file-existence check keeps a box-fresh load banner clean -- a node whose
+# module has not landed yet (e.g. OTR_CastLock before Wave 2a) is simply
+# skipped, so the loader never logs a phantom "Skipped" line (C-6).
+try:
+    from .nodes._otr_class_registry import (
+        new_node_modules_table as _otr_new_audio_table,
+    )
+
+    _otr_pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    for _otr_key, _otr_value in _otr_new_audio_table().items():
+        _otr_rel = _otr_value[0].lstrip(".").replace(".", os.sep) + ".py"
+        if os.path.exists(os.path.join(_otr_pkg_dir, _otr_rel)):
+            _NODE_MODULES[_otr_key] = _otr_value
+except Exception as _otr_audio_reg_exc:  # noqa: BLE001
+    log.warning(
+        "[OldTimeRadio] v2 audio node table merge skipped: %s",
+        _otr_audio_reg_exc,
+    )
+
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
     try:
         mod = importlib.import_module(module_path, package=__name__)
