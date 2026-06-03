@@ -1,5 +1,25 @@
 # Session Handoff -- OTR v2.0-alpha (audio/voice overhaul) -- 2026-06-02
 
+## DECISION (2026-06-02, operator): CLEAN-BREAK the legacy path -- supersedes every "permanent legacy fallback" line in THIS doc and in the EXECUTION-PLAN
+No permanent legacy fallback. The new engine registry is the ONE true audio path. Each
+session: continue the EXECUTION-PLAN build AND rip out legacy in lockstep -- do BOTH, every
+time. Rule per piece: (1) build the replacement + wire into `full.json`, (2) full suite
+green, (3) in the SAME change delete the legacy it replaced + every reference, (4) suite
+green again, zero orphan symbols. Never delete legacy before its replacement is proven
+green; never close a sprint with the replaced legacy still in the tree; a sprint's
+definition of done includes a guard test that FAILS if that legacy reappears. Do NOT defer
+legacy removal to an end-of-project cleanup -- deferred legacy rots and sidetracks every
+future change.
+Supersedes, specifically: I-1 "permanent fallback" (legacy is transitional, gone by
+promotion); the "Writer cast/stamp removal" note below -- the legacy bark `voice_preset`
+stamp in `_otr_casting.lock_cast` is now a REMOVAL TARGET (OTR_CastLock already owns v2
+casting), not something to preserve, and is no longer legacy-baseline-gated; R0a
+"render-twice LEGACY baseline" -> capture `baseline_v2` from the NEW engines instead (no
+v1.7 baseline to preserve); Promotion "legacy stays the fallback" -> legacy is retired.
+KEEP bark/kokoro/musicgen as NORMAL registry adapters (engine options, no "legacy" status).
+With no fallback, the F dep-pilot is a HARD prerequisite for a working render (missing
+model/dep -> C-7 named error, never a silent fallback).
+
 ## Core goal
 v2.0-alpha audio + voice-casting overhaul per
 `docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` (the SSOT). Model-
@@ -75,3 +95,49 @@ suite green at 3727, full.json wired 16/16). The remaining work is GPU/operator
 -- run the F dependency pilot (scripts/otr_audio_dep_pilot.py) to verify
 signatures + flip supports_external_generator, then promotion. Acknowledge when
 ready."
+
+## Clean-break progress + F results (2026-06-02, LATEST -- authoritative)
+HEAD == origin/v2.0-alpha at 574622d; suite green 3727. Clean-break directive
+(top of this doc + the EXECUTION-PLAN) ADOPTED: new engine registry is the ONE
+true audio path, no fallback/delegation, F dep-pilot is a HARD render prereq.
+
+F dep-pilot results (isolated venvs created via Desktop Commander under the
+Claude packaged-app AppData\Local\otr_pilot_venvs\<engine>):
+- chatterbox: PASS. torch 2.6.0+cpu, NO xformers / flash_attn. Real signature
+  ChatterboxTTS.generate(text, repetition_penalty, min_p, top_p,
+  audio_prompt_path, exaggeration, cfg_weight, temperature) + from_pretrained(device).
+  G1 body MATCHES -- supported_kwargs drops the non-existent cfg + generator;
+  generate binds NO external generator so supports_external_generator stays False
+  (determinism via the deterministic_inference global-seed wrap). Body validated.
+- indextts2 / stable_audio / bark / kokoro / musicgen: NOT yet probed.
+
+Engine landscape: nodes/_otr_audio_engines/ has eng_bark/eng_chatterbox/
+eng_indextts2/eng_kokoro/eng_musicgen/eng_stable_audio. bark/kokoro/musicgen
+currently delegate (interface="batch") to the standalone LEGACY nodes
+batch_bark_generator.py / kokoro_announcer.py / musicgen_theme.py /
+batch_audiogen_generator.py.
+
+Clean-break removal targets (each a lockstep sprint: build self-contained
+adapter -> wire full.json -> suite green -> DELETE the legacy + every ref in the
+SAME change -> green + a guard test that FAILS if the legacy reappears):
+1. Raw-delegation (I-3): make eng_bark/eng_kokoro/eng_musicgen self-contained
+   per_line/clip adapters, then delete batch_bark_generator.py /
+   kokoro_announcer.py / musicgen_theme.py / batch_audiogen_generator.py + the
+   "batch" dispatch in _otr_voice_node_common + stable_audio_theme. (_otr_bark_lib
+   may remain as the bark adapter's inference impl -- verify.)
+2. Writer bark voice_preset stamp in _otr_casting (python_assign_voice_preset +
+   _assert_voice_preset_invariant + uniqueness guard) -> REMOVE; OTR_CastLock
+   owns casting; bark draws its voice from the bank.
+3. R0a legacy seeding + config/legacy_invocation_manifest.json -> REMOVE; capture
+   baseline_v2 from the NEW engines.
+4. C-5/C-6 legacy-first defaults -> flip full.json defaults to the new engines
+   (promotion); retire OTR_ENABLE_* gating.
+5. Legacy byte-identity tests -> replace with baseline_v2 tests.
+
+NOTE: every removal is gated on first building + proving (suite green) the
+self-contained replacement; replacements for bark/kokoro/musicgen need their F
+probe (install lib in an isolated venv, confirm import clean + real signature).
+
+Next: continue F (install + probe indextts2/stable_audio/bark/kokoro/musicgen),
+then the first lockstep sprint -- eng_bark self-contained -> delete
+batch_bark_generator + the batch delegation + refs -> guard test.

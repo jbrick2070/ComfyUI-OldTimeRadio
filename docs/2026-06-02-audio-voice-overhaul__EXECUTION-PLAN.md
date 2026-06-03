@@ -5,6 +5,10 @@
 
 ---
 
+## CLEAN-BREAK directive (2026-06-02, operator) -- supersedes every "legacy permanent fallback" line below
+No permanent legacy fallback. The new engine registry is the ONE true audio path. Remove legacy IN LOCKSTEP with building its replacement: build -> full suite green -> delete the legacy + all references in the SAME change -> suite green again, zero orphan symbols. Never defer removal to an end-of-project cleanup (deferred legacy rots and sidetracks every future change). A sprint is not done until the legacy it replaced is gone AND a guard test fails if it reappears.
+This SUPERSEDES: **I-1** ("legacy is the permanent fallback"); **I-3** (raw-delegation hard fork -- removed entirely); **C-5/C-6** ("legacy-first" default and "default stays legacy until F"); **H/I** ("legacy permanent fallback"); **R0a** steps (d)/(e)/(f) (legacy seeding + `legacy_invocation_manifest` + the render-twice-LEGACY baseline -> instead capture `baseline_v2` from the NEW engines); and any opt-in/second workflow JSON (one json of record = `otr_scifi_16gb_full.json`). KEEP bark/kokoro/musicgen as NORMAL registry adapters (engine options, no special "legacy" status; self-contained, no delegation). With no fallback, the F dep-pilot is a HARD prerequisite for a render; a missing model/dep raises the **C-7** named error, never a silent fallback. `baseline_v2` (new engines) is the reference.
+
 ## Build orchestration -- waves
 Dependency-ordered. SHARED-FILE steps (`__init__.py`, the workflow JSON, every full-regression + commit) are SERIAL gates, never parallel. A `--no-parallel` serial path always exists -- parallelism is an optimization, never required to ship.
 
