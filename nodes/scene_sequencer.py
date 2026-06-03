@@ -107,29 +107,19 @@ def _normalize_clip(clip_np, target_peak=0.85):
 
 
 def _resample_audio(clip_np, src_rate, dst_rate):
-    """Resample a 1-D float32 numpy array.
+    """Resample a 1-D float32 numpy array (CPU-only).
 
-    Path selection (RTX 5080 optimized):
-      - CUDA available + clip > 5s - torchaudio.functional.resample on GPU
-        (8-12x faster than scipy for full scenes, sinc-interpolated)
-      - Otherwise - scipy.signal.resample_poly (high-quality CPU path)
+    Post-engine audio DSP runs on CPU (invariant I-11): resampling must not
+    touch CUDA, or the deterministic audio baseline varies under the
+    non-strict determinism default. Path selection:
+      - scipy.signal.resample_poly - high-quality, anti-aliased CPU path
       - No scipy - np.interp linear fallback
     """
     if src_rate == dst_rate:
         return clip_np.astype(np.float32)
 
-    # GPU fast path for anything longer than ~5 seconds
-    try:
-        import torch
-        import torchaudio
-        if torch.cuda.is_available() and len(clip_np) > int(src_rate * 5):
-            wav = torch.from_numpy(clip_np).unsqueeze(0).float().cuda()  # [1, T]
-            resampled = torchaudio.functional.resample(wav, src_rate, dst_rate)
-            log.info("[SceneSequencer] Resample %dHz-%dHz: GPU torchaudio (%d samples)",
-                     src_rate, dst_rate, len(clip_np))
-            return resampled.squeeze(0).cpu().numpy().astype(np.float32)
-    except ImportError:
-        pass  # fall through to CPU paths
+    # I-11: the prior GPU torchaudio fast path was removed so post-engine
+    # resampling stays on CPU and the audio baseline is determinism-stable.
 
     # CPU path: scipy polyphase (high quality, anti-aliased)
     g = math.gcd(int(dst_rate), int(src_rate))

@@ -357,13 +357,13 @@ class AudioEnhance:
         log.info("[OTR_AudioEnhance] Input: %dHz %dch %d samples (%.1fs)",
                  orig_sr, orig_channels, orig_samples, orig_duration)
 
-        # -- Move to GPU for DSP acceleration --
-        # All torchaudio DSP ops (resample, biquad, conv1d) run on CUDA when
-        # tensors are on GPU. VRAM impact is negligible (<50 MB for long clips).
-        _use_cuda = torch.cuda.is_available()
-        if _use_cuda:
-            waveform = waveform.to("cuda", non_blocking=True)
-            log.info("[OTR_AudioEnhance] DSP on GPU (CUDA)")
+        # -- DSP runs on CPU (invariant I-11) --
+        # Post-engine audio DSP must never touch CUDA: a GPU op after the
+        # engine forward makes the audio baseline vary under the non-strict
+        # determinism default, and it competes for the 14.5 GB budget the video
+        # branch needs. Keep the whole enhance chain on CPU regardless of the
+        # device the upstream node handed us.
+        waveform = waveform.cpu()
 
         # -- Step 1: Resample --
         waveform = _resample(waveform, orig_sr, target_sample_rate)
@@ -406,9 +406,8 @@ class AudioEnhance:
         # overlaps. Final -1.0 dBFS pass now runs post-crossfade in Assembler.
         log.info("[OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)")
 
-        # -- Move back to CPU for ComfyUI pipeline --
-        if _use_cuda:
-            waveform = waveform.cpu()
+        # -- Ensure CPU output for the ComfyUI pipeline (I-11) --
+        waveform = waveform.cpu()
 
         # -- Verify stereo output --
         assert waveform.shape[1] == 2, (
