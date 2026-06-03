@@ -1,4 +1,32 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 COMPLETE; Sprint 3 subsumed)
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 COMPLETE; Sprint 3 subsumed; headless soak plan ready)
+
+## NEXT ACTION -- headless API audio soak (plan committed, awaiting ComfyUI up)
+**Plan:** `docs/2026-06-03-audio-headless-api-soak__test-plan.md` (committed). Prove the
+*current* baked-in `otr_scifi_16gb_full.json` runs the audio path box-fresh via the ComfyUI
+HTTP API, 30-word episodes, **aborting each run at the audio->HuMo boundary** so each costs
+seconds of audio, never the video render.
+- **Operator decisions locked:** phased matrix (validated bark/kokoro/musicgen FIRST, then a
+  guarded IndexTTS2/Chatterbox/Stable-Audio probe = early F signal) · single pass then
+  repeat-green · 30-word first.
+- **Harness (reuse, NO new plumbing):** `scripts/otr_api.py` -- `load_workflow` +
+  `fetch_schemas` + `patch_widget_by_name` (set length/engine/knobs by NAME) +
+  `workflow_to_api_prompt` + `submit_prompt` (raises on node_errors) + `poll_history` +
+  **`cancel_queue()` = the abort**. Monitor via `scripts/smoke_watcher.py` (log tail +
+  /history + /queue + LHM VRAM @ localhost:8085).
+- **Phase 0 = the must-pass-first gate Jeffrey flagged:** the JSON is very different from
+  what the harness last translated, so re-validate the UI->API translation against LIVE
+  `/object_info` (it RAISES on widget drift, never misaligns) + confirm ComfyUI accepts the
+  unmodified graph (empty node_errors), then cancel. If it trips -> fix converter/JSON
+  BEFORE any render.
+- **Canonical node map:** 1 Writer · 80 CastLock(preserve_ledger) · 81 CharacterVoices=bark ·
+  82 Announcer=kokoro · 83 Theme=musicgen · 72+51 HuMo = the abort boundary.
+- **Run model:** Desktop Commander (cmd) + venv python on Jeffrey's box against live ComfyUI
+  `localhost:8000`. Never rewrite the canonical JSON (patch an in-memory deep copy).
+- **Blocked on:** ComfyUI Desktop up at localhost:8000. Then Phase 0 (read-only, renders
+  nothing) -> Phase 1 smoke (capture the audio-done log marker) -> Phase 2 soak (validated
+  OFAT, both CastLock policies + cast sizes 1/3) -> Phase 3 new-engine probe (VRAM-watched).
+
+---
 
 ## STATUS (HEAD 8915139) -- SPRINT 2 (a) COMPLETE + SPRINT 3 SUBSUMED
 **Sprint 2 (a) fully shipped.** Part 1 (5a747f0): cast_seed persisted + the pure
