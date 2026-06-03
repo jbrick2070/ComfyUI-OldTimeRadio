@@ -822,6 +822,53 @@ def _slice_audio_tensor(audio_dict: dict, start_s: float, dur_s: float) -> dict:
     return {"waveform": sliced.contiguous(), "sample_rate": sr}
 
 
+HUMO_ANALYSIS_SR = 16000
+
+
+def _resample_waveform_cpu(waveform, src_sr: int, dst_sr: int):
+    """Resample a CPU ``[B, C, T]`` float tensor src_sr -> dst_sr (I-11: CPU).
+
+    Prefers torchaudio's sinc resampler; falls back to linear interpolation so a
+    missing torchaudio never breaks the HuMo analysis path."""
+    if src_sr == dst_sr or int(waveform.shape[-1]) == 0:
+        return waveform
+    try:
+        import torchaudio.functional as _AF
+        return _AF.resample(waveform, src_sr, dst_sr)
+    except Exception:
+        import torch.nn.functional as _F
+        new_t = max(1, int(round(int(waveform.shape[-1]) * dst_sr / src_sr)))
+        return _F.interpolate(waveform, size=new_t, mode="linear", align_corners=False)
+
+
+def _humo_analysis_audio(audio_dict: dict) -> dict:
+    """HuMo ANALYSIS contract (plan S0.1): a CLONED 16 kHz mono copy of a
+    per-line audio slice, for AudioEncoderEncode (Whisper) ONLY.
+
+    The master ``episode_audio`` is fanned to HuMo (node 51) AND SignalLost
+    (node 12) and may be stereo at its native rate (I-5); HuMo must NOT pin it
+    to mono. This builds an independent analysis buffer: ``.clone()`` FIRST (so
+    the shared master tensor is never aliased or mutated), downmix to mono, then
+    resample to 16 kHz -- all on ``.cpu()`` tensors (I-11). Scoped to the
+    per-line slice; ``is_never_humo_role`` lines (music / announcer / sfx) never
+    reach here.
+    """
+    import torch
+    wf = audio_dict["waveform"]
+    sr = int(audio_dict.get("sample_rate", 0)) or HUMO_ANALYSIS_SR
+    # Clone onto CPU FIRST so the shared master buffer is never aliased (I-5).
+    w = wf.detach().to("cpu").clone().to(torch.float32)
+    if w.dim() == 1:
+        w = w.unsqueeze(0).unsqueeze(0)
+    elif w.dim() == 2:
+        w = w.unsqueeze(0)
+    # Downmix to mono across the channel dim (dim 1) -- analysis only.
+    if w.shape[1] > 1:
+        w = w.mean(dim=1, keepdim=True)
+    w = _resample_waveform_cpu(w, sr, HUMO_ANALYSIS_SR)
+    return {"waveform": w.contiguous(), "sample_rate": HUMO_ANALYSIS_SR}
+
+
 def _pad_audio_silence_lead(audio_dict: dict, pad_samples: int) -> dict:
     """BUG-LOCAL-102: prepend ``pad_samples`` of digital silence
     (zero samples) to a sliced AUDIO dict. Used to give HuMo's audio
@@ -2350,7 +2397,10 @@ class BatchHumoRender:
                     chunk["audio_emb"] = _call(
                         audio_enc_node,
                         audio_encoder=audio_encoder,
-                        audio=chunk["audio"],
+                        # S0.1: feed AudioEncoderEncode a CLONED 16 kHz mono
+                        # analysis copy; the master episode_audio (chunk["audio"]
+                        # is a slice of it) stays untouched and may be stereo.
+                        audio=_humo_analysis_audio(chunk["audio"]),
                     )[0]
                 except Exception as exc:
                     log.warning("[BatchHumoRender] %s: audio encode failed: %s",
