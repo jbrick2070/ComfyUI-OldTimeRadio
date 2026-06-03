@@ -1,0 +1,284 @@
+"""OTR_CastLock -- single v2 ledger authority (plan E.0-E.5, Wave 2a).
+
+Sits AFTER OTR_LedgerFreezeCascade and is the one place the v2 cast is locked:
+it validates the cast, optionally assigns voice references from the bank with the
+deterministic caster, stamps ``voice_ref_id`` / ``voice_preset`` /
+``cast_lock_revision`` onto the cast entries, and emits the single canonical
+``ledger_json`` the v2 audio nodes (and HuMo) consume.
+
+Byte-safety (I-1 / I-3): CastLock's ``ledger_json`` feeds the v2 nodes' per-line
+path ONLY. The legacy raw-delegation path keeps reading the untouched
+FreezeCascade ``script_json`` (the bark batch path delegates that verbatim), so
+the legacy audio stays byte-identical even though CastLock rewrites the ledger.
+
+Casting (I-4): the new caster runs on its own seeded RNG, disjoint from the
+legacy cast RNG. ``preserve_ledger`` (default) re-casts nothing; ``auto_registry``
+assigns references from the selected voice bank.
+
+E.4: the widgets are exactly ``voice_bank`` / ``cast_voice_policy`` /
+``delivery_profile`` / ``allow_voice_reuse`` -- no ``voice_engine_mode``,
+``deterministic_inference`` or ``model_id`` widget. Import-time is
+side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
+"""
+from __future__ import annotations
+
+import json
+import logging
+
+log = logging.getLogger("OTR")
+
+_VOICE_BANKS = ("default", "bark_legacy", "kokoro_builtin")
+_CAST_POLICIES = ("preserve_ledger", "auto_registry")
+_DEFAULT_ANNOUNCER_ENGINE = "kokoro"
+
+
+def _is_announcer_entry(entry: dict) -> bool:
+    name = str(entry.get("name") or "").strip().upper()
+    role = str(entry.get("speaker_role") or entry.get("role") or "").strip().lower()
+    return name == "ANNOUNCER" or role == "announcer"
+
+
+class CastLock:
+    """Registered as ``OTR_CastLock``. Single v2 ledger authority."""
+
+    CATEGORY = "OldTimeRadio/v2/audio"
+    FUNCTION = "lock"
+    RETURN_TYPES = ("STRING", "INT", "STRING", "STRING")
+    RETURN_NAMES = ("ledger_json", "cast_lock_revision", "cast_report", "done")
+    OUTPUT_NODE = False
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        # C-5: no IO. Delivery list is a tiny pure call; fall back hard-coded.
+        try:
+            from ._otr_delivery_profiles import available_delivery_profiles
+
+            delivery = available_delivery_profiles() or ["neutral"]
+        except Exception:  # noqa: BLE001
+            delivery = ["neutral"]
+        return {
+            "required": {
+                "script_json": ("STRING", {
+                    "multiline": True,
+                    "default": "{}",
+                    "forceInput": True,
+                    "tooltip": (
+                        "Frozen v2 ledger JSON from OTR_LedgerFreezeCascade "
+                        "(node 62 slot 1). CastLock rewrites it into the "
+                        "canonical ledger_json; the legacy raw path keeps "
+                        "reading this untouched string."
+                    ),
+                }),
+            },
+            "optional": {
+                "voice_bank": (list(_VOICE_BANKS), {
+                    "default": _VOICE_BANKS[0],
+                    "tooltip": (
+                        "Voice reference bank scope used by auto_registry. "
+                        "'default' casts from the chatterbox / indextts2 "
+                        "reference banks; bark_legacy / kokoro_builtin keep the "
+                        "preset-based engines."
+                    ),
+                }),
+                "cast_voice_policy": (list(_CAST_POLICIES), {
+                    "default": _CAST_POLICIES[0],
+                    "tooltip": (
+                        "preserve_ledger: keep the writer's voice assignments "
+                        "(byte-safe default). auto_registry: assign voice "
+                        "references from the bank with the deterministic caster."
+                    ),
+                }),
+                "delivery_profile": (delivery, {
+                    "default": delivery[0],
+                    "tooltip": "Delivery profile id (only 'neutral' ships in v2).",
+                }),
+                "allow_voice_reuse": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "When the bank runs out of unique references, allow "
+                        "reusing one already assigned (the gender floor still "
+                        "holds). Off -> casting fails closed instead."
+                    ),
+                }),
+                "gate_in": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "Optional ordering signal (wire an upstream done).",
+                }),
+            },
+        }
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, **kwargs):
+        # D: local-disk only; casting/bank checks are fail-closed on the lock()
+        # path, not here, so a box-fresh graph validates clean.
+        return True
+
+    # ------------------------------------------------------------------ #
+    def lock(self, script_json, voice_bank="default",
+             cast_voice_policy="preserve_ledger", delivery_profile="neutral",
+             allow_voice_reuse=False, gate_in=""):
+        from . import _otr_ledger_consumers as _OTRLC
+        from ._otr_delivery_profiles import (
+            DELIVERY_PROFILE_VERSION, get_delivery_profile,
+        )
+
+        led = _OTRLC.load_ledger(script_json)
+        get_delivery_profile(delivery_profile)  # fail-closed on unknown profile
+        cast = led.get("cast") or []
+        report: list = []
+
+        # Cheap char_id-subset validator (E.0): duplicate char_id fails before
+        # any casting / model load.
+        self._assert_unique_char_ids(cast)
+
+        meta = led.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+            led["meta"] = meta
+        revision = int(meta.get("cast_lock_revision") or 0) + 1
+
+        if cast_voice_policy == "auto_registry":
+            self._auto_registry(led, cast, voice_bank, allow_voice_reuse, report)
+        else:
+            report.append(
+                f"preserve_ledger: {len(cast)} cast entries preserved "
+                f"(no re-cast)"
+            )
+
+        # Stamp the lock identity onto meta (I-4: stamp once at cast lock).
+        meta["cast_lock_revision"] = revision
+        meta["cast_voice_policy"] = cast_voice_policy
+        meta["delivery_profile_id"] = delivery_profile
+        meta["delivery_profile_version"] = DELIVERY_PROFILE_VERSION
+        meta["voice_bank_id"] = voice_bank
+
+        report.insert(0, f"cast_lock_revision={revision} policy={cast_voice_policy}")
+        ledger_json = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
+        done = f"cast_lock:done:rev={revision}:policy={cast_voice_policy}"
+        return (ledger_json, int(revision), "\n".join(report), done)
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _assert_unique_char_ids(cast) -> None:
+        seen = set()
+        for entry in cast:
+            if not isinstance(entry, dict):
+                continue
+            cid = entry.get("char_id")
+            if not cid:
+                continue
+            if cid in seen:
+                raise ValueError(
+                    f"OTR_CastLock: duplicate char_id {cid!r} in cast -- the "
+                    f"writer cast contract is violated (fails before any cast)"
+                )
+            seen.add(cid)
+
+    # ------------------------------------------------------------------ #
+    def _auto_registry(self, led, cast, voice_bank, allow_voice_reuse, report):
+        from ._otr_voice_bank import (
+            CASTING_POLICY_VERSION, VoiceCastingError, announcer_voice_ref,
+            assign_voice_for_slot, load_voice_bank,
+        )
+        from ._otr_voice_node_common import coerce_int_seed
+
+        bank_entries, _bank_sha = load_voice_bank()
+        meta = led.get("meta") or {}
+        episode_seed = coerce_int_seed(meta.get("episode_seed"))
+        target_engine = self._resolve_char_engine(voice_bank, bank_entries)
+        announcer_engine = _DEFAULT_ANNOUNCER_ENGINE
+
+        if target_engine is None:
+            report.append(
+                f"auto_registry: voice_bank {voice_bank!r} has no character "
+                f"reference engine; character voices preserved"
+            )
+
+        used: set = set()
+        gated = 0
+        for entry in cast:
+            if not isinstance(entry, dict):
+                continue
+            char_id = str(entry.get("char_id") or "")
+
+            if _is_announcer_entry(entry):
+                try:
+                    ref = announcer_voice_ref(announcer_engine, bank=bank_entries)
+                    self._stamp(entry, ref)
+                    gated += 0 if ref.commercial_clean else 1
+                    report.append(
+                        f"  {char_id or 'ANNOUNCER'}: announcer {ref.voice_ref_id} "
+                        f"({ref.engine}, clean={ref.commercial_clean})"
+                    )
+                except VoiceCastingError as exc:
+                    report.append(f"  {char_id or 'ANNOUNCER'}: announcer NOT cast -- {exc}")
+                continue
+
+            if target_engine is None:
+                continue
+            gender = str(entry.get("gender") or "").strip().lower()
+            if not gender:
+                report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
+                continue
+            try:
+                ref = assign_voice_for_slot(
+                    role="char_voice",
+                    engine=target_engine,
+                    char_id=char_id,
+                    gender=gender,
+                    timbre=tuple(entry.get("timbre") or ()),
+                    age_band=str(entry.get("age_band") or ""),
+                    episode_seed=episode_seed,
+                    casting_policy_version=CASTING_POLICY_VERSION,
+                    allow_voice_reuse=allow_voice_reuse,
+                    used_voice_ref_ids=used,
+                    bank=bank_entries,
+                )
+            except VoiceCastingError as exc:
+                report.append(f"  {char_id}: NOT cast -- {exc}")
+                continue
+            self._stamp(entry, ref)
+            used.add(ref.voice_ref_id)
+            gated += 0 if ref.commercial_clean else 1
+            report.append(
+                f"  {char_id}: {ref.voice_ref_id} ({ref.engine}, "
+                f"clean={ref.commercial_clean})"
+            )
+
+        if gated:
+            report.append(
+                f"auto_registry: {gated} assigned voice(s) are known-gated "
+                f"(commercial_clean=false) -- non-blocking warning (I-8)"
+            )
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _stamp(entry, ref) -> None:
+        """Stamp the chosen reference onto a cast entry (I-4 / I-9)."""
+        entry["voice_ref_id"] = ref.voice_ref_id
+        entry["voice_engine"] = ref.engine
+        entry["commercial_clean"] = bool(ref.commercial_clean)
+
+    @staticmethod
+    def _resolve_char_engine(voice_bank, bank_entries):
+        """First legacy-first char_voice engine whose profile allows ``voice_bank``
+        AND that has reference entries in the bank. ``None`` if there is none
+        (e.g. bark_legacy / kokoro_builtin -> preset engines, no refs)."""
+        try:
+            from ._otr_engine_profiles import legacy_first_engines, load_resolver
+
+            resolver = load_resolver()
+            engines_with_refs = {e.engine for e in bank_entries}
+            for eng in legacy_first_engines("char_voice"):
+                if eng not in engines_with_refs:
+                    continue
+                if resolver is None:
+                    return eng
+                prof = resolver.profile_for("char_voice", eng)
+                if prof and voice_bank in prof.allowed_voice_banks:
+                    return eng
+        except Exception:  # noqa: BLE001
+            return None
+        return None
