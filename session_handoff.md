@@ -1,143 +1,121 @@
-# Session Handoff -- OTR v2.0-alpha (audio/voice overhaul) -- 2026-06-02
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-02
 
-## DECISION (2026-06-02, operator): CLEAN-BREAK the legacy path -- supersedes every "permanent legacy fallback" line in THIS doc and in the EXECUTION-PLAN
-No permanent legacy fallback. The new engine registry is the ONE true audio path. Each
-session: continue the EXECUTION-PLAN build AND rip out legacy in lockstep -- do BOTH, every
-time. Rule per piece: (1) build the replacement + wire into `full.json`, (2) full suite
-green, (3) in the SAME change delete the legacy it replaced + every reference, (4) suite
-green again, zero orphan symbols. Never delete legacy before its replacement is proven
-green; never close a sprint with the replaced legacy still in the tree; a sprint's
-definition of done includes a guard test that FAILS if that legacy reappears. Do NOT defer
-legacy removal to an end-of-project cleanup -- deferred legacy rots and sidetracks every
-future change.
-Supersedes, specifically: I-1 "permanent fallback" (legacy is transitional, gone by
-promotion); the "Writer cast/stamp removal" note below -- the legacy bark `voice_preset`
-stamp in `_otr_casting.lock_cast` is now a REMOVAL TARGET (OTR_CastLock already owns v2
-casting), not something to preserve, and is no longer legacy-baseline-gated; R0a
-"render-twice LEGACY baseline" -> capture `baseline_v2` from the NEW engines instead (no
-v1.7 baseline to preserve); Promotion "legacy stays the fallback" -> legacy is retired.
-KEEP bark/kokoro/musicgen as NORMAL registry adapters (engine options, no "legacy" status).
-With no fallback, the F dep-pilot is a HARD prerequisite for a working render (missing
-model/dep -> C-7 named error, never a silent fallback).
+## CLEAN-BREAK DIRECTIVE (operator, non-negotiable) -- READ FIRST
+The new engine registry is the ONE true audio path. NO permanent legacy
+fallback, no raw delegation, no v1.7 byte-identity crutch.
+REMOVE EACH LEGACY ITEM IN TANDEM WITH BUILDING ITS REPLACEMENT -- never defer
+legacy removal to a later cleanup. RATIONALE (operator): if legacy is not
+removed as each replacement lands, you will be SPRINTING INDEFINITELY chasing
+legacy removal later; deferred legacy rots and sidetracks every future change.
+LOCKSTEP RULE, per piece: (1) build the replacement + wire into full.json, (2)
+full suite green, (3) in the SAME change delete the legacy it replaced + every
+reference, (4) suite green again with zero orphan symbols, (5) add a guard test
+that FAILS if that legacy reappears. Never delete legacy before its replacement
+is proven green; never close a sprint with the replaced legacy still in the tree.
+Supersedes the EXECUTION-PLAN's I-1 / I-3 / C-5 / C-6 / H / I, plus R0a legacy
+seeding + legacy_invocation_manifest + the render-twice-LEGACY baseline (capture
+baseline_v2 from the NEW engines instead). Keep bark/kokoro/musicgen as NORMAL
+registry adapters (no "legacy" status, self-contained, no delegation). With no
+fallback, the F dep-pilot is a HARD render prerequisite; a missing model/dep
+raises the C-7 named error, never a silent fallback.
 
 ## Core goal
-v2.0-alpha audio + voice-casting overhaul per
-`docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` (the SSOT). Model-
-agnostic per-role engine registry + voice casting; the new path is the product,
-legacy is the PERMANENT byte-identical fallback (I-1). Everything wires into the
-ONE workflow of record, `workflows/otr_scifi_16gb_full.json` (no second json).
+Finish docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md (the SSOT) under
+the clean-break above: a model-agnostic per-role engine registry (character
+voice / announcer / music) as the SOLE audio path, wired into the ONE workflow
+workflows/otr_scifi_16gb_full.json. Every session: continue the build AND rip
+legacy in lockstep -- do BOTH.
 
 ## Tech stack & constraints (full set in CLAUDE.md + the EXECUTION-PLAN)
-- Python 3.12 + torch, Windows, RTX 5080 16 GB. Branch `v2.0-alpha`, never main.
-- ONE json of record = `workflows/otr_scifi_16gb_full.json` (29 nodes, 71 links).
-- Tests + git on the WINDOWS HOST via Desktop Commander `cmd`. venv:
-  `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`.
-- Full regression after every change: `python -m pytest -q -p no:cacheprovider`
-  (conftest `SystemExit(2)` on ANY new failure). Commit via `.git\COMMIT_EDITMSG`
-  + `git commit -F`; `git add` explicit paths, never `-A`. ASCII .py, no BOM.
-- Audio is king. I-11: post-engine DSP runs on CPU. `supports_external_generator`
-  flips True ONLY after the F GPU pilot verifies a bound `torch.Generator`.
+- Python 3.12 + torch, Windows, RTX 5080 16 GB. Branch v2.0-alpha, never main.
+- ONE workflow of record: workflows/otr_scifi_16gb_full.json (29 nodes, 71 links).
+- Tests + git on the WINDOWS HOST via Desktop Commander cmd (NOT PowerShell for
+  git; NOT the GitHub connector -- it is context-only). venv python:
+  C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe.
+- Full regression after EVERY change: python -m pytest -q -p no:cacheprovider
+  (conftest SystemExit(2) on ANY new failure -- must be fully green). Commit via
+  .git\COMMIT_EDITMSG + git commit -F; git add explicit paths, never -A.
+  ASCII-only .py, no BOM, never the word "dummy" (use placeholder/test).
+- VRAM 14.5 GB ceiling. I-11: post-engine audio DSP runs on CPU. baseline_v2
+  (new engines) is THE audio reference now (no v1.7 byte-identity).
 
-## What's done & decided (this session -- committed + pushed)
-- `7d8b758` **I-11 post-engine DSP on CPU.** `scene_sequencer._resample_audio`
-  dropped the GPU torchaudio fast path; `audio_enhance.AudioEnhance.enhance`
-  forces the whole enhance chain to CPU (removed the cuda move + `_use_cuda`).
-  No node surface change. Suite green.
-- `9b57e7a` **G1 engine inference bodies.** `eng_chatterbox` / `eng_indextts2` /
-  `eng_stable_audio` now implement their documented assumed_call: lazy-import the
-  lib inside `load()`/generate, seed locally on top of the `deterministic_inference`
-  wrap, bind a per-line `torch.Generator` when the signature accepts one, return
-  `{"waveform","sample_rate"}`. New `base.supported_kwargs` drops any kwarg the
-  real lib does not accept (an assumed_call name F later corrects cannot crash the
-  forward). STILL flag-gated + default-off; `supports_external_generator` stays
-  False (operator flips after F). Headless (libs absent) each body fails closed
-  with "not installed". +8 tests (`tests/test_audio_engine_bodies_g1.py`).
-- Suite GREEN: **3727 passed, 12 skipped, 0 failed**. Wiring guard
-  `test_full_workflow_v2_audio_wiring.py` green (16/16); full.json has all 4 v2
-  nodes (OTR_CastLock, OTR_BatchCharacterVoices, OTR_AnnouncerVoice,
-  OTR_StableAudioTheme).
+## What's done (committed + pushed; HEAD 4f1a853 == origin/v2.0-alpha; suite 3727/12/0)
+- 7d8b758 I-11: post-engine DSP forced to CPU (scene_sequencer._resample_audio
+  dropped the GPU torchaudio path; audio_enhance.AudioEnhance.enhance is CPU-only).
+- 9b57e7a G1: inference bodies for chatterbox / indextts2 / stable_audio written
+  to each documented assumed_call; new base.supported_kwargs guard drops any
+  kwarg the real lib does not accept; +8 tests (tests/test_audio_engine_bodies_g1).
+  Flag-gated, default-off, supports_external_generator False (set True per engine
+  after F). Headless (lib absent) each body fails closed with "not installed".
+- 4f1a853 clean-break directive adopted in both docs + chatterbox F result.
 
-## NOT safe headless -- needs the 5080 (do NOT do blind)
-- **Writer cast/stamp removal (Wave 2a tail).** `_otr_casting.lock_cast` stamps
-  the BARK `voice_preset` (`v2/en_speaker_X`) that the LEGACY bark path reads from
-  node 62 `out[1]`, guarded by `_assert_voice_preset_invariant`. Removing it
-  breaks the permanent legacy fallback (I-1). The v2 `voice_ref_id` casting is
-  ALREADY owned by `OTR_CastLock`. Full migration is a legacy-retirement step
-  and/or needs the R0a render-twice baseline to prove legacy bytes unchanged.
-- **Promotion (flip full.json defaults to the new engines)** must wait for F --
-  defaulting to unvalidated inference bodies would break box-fresh renders.
+## F dep-pilot results (HARD prerequisite under clean-break)
+Harness scripts/otr_audio_dep_pilot.py: offline, subprocess-isolated, --python
+<venv>; diffs torch + xformers/flash_attn before/after import; reads assumed_call.
+- chatterbox: PASS. Isolated venv created via Desktop Commander under the Claude
+  packaged-app AppData\Local\otr_pilot_venvs\chatterbox. torch 2.6.0+cpu, NO
+  xformers/flash_attn. Real ChatterboxTTS.generate(text, repetition_penalty,
+  min_p, top_p, audio_prompt_path, exaggeration, cfg_weight, temperature) +
+  from_pretrained(device). G1 body MATCHES (supported_kwargs drops the nonexistent
+  cfg + generator). generate binds NO external generator -> supports_external_
+  generator stays False; determinism comes from the deterministic_inference
+  global-seed wrap. Body validated against the real API.
+- indextts2, stable_audio: NOT yet probed -- need isolated-venv installs + signature
+  read; then reconcile the G1 bodies + flip supports_external_generator if they bind a generator.
+- bark, kokoro, musicgen: libs ALREADY in the MAIN ComfyUI venv (the legacy nodes
+  use them) -> NO isolated venv needed; their clean-break is a refactor of working code.
 
-## Immediate next steps (GPU / operator)
-1. **F dependency pilot (THE unblock):** install chatterbox / indextts2 /
-   stable-audio-tools each in its OWN venv, then
-   `...python.exe scripts\otr_audio_dep_pilot.py --json` (or `--python <venv>`).
-   Per engine confirm: import clean, torch unchanged, no xformers / flash_attn,
-   the real generate/infer/constructor signature, and a bound `torch.Generator`.
-   Reconcile the G1 bodies' `GPU-VALIDATE` markers, then flip
-   `supports_external_generator=True`.
-2. **R0a baseline:** render-twice legacy bit-identity; capture
-   `baseline_v2_audio_legacy_{sha,ledger_sha,audio_metadata_sha}`. Unblocks the
-   writer cast work + promotion.
-3. **Promotion (I):** after F, flip full.json defaults to the best engine per
-   role + retire `OTR_ENABLE_*`; legacy stays the fallback.
-4. **R0b box-fresh smoke:** launch via `scripts\run_comfy_otr.bat`, load
-   full.json, run stub engines, emit a minimal MP4.
+## Engine landscape (nodes/_otr_audio_engines/)
+base.py, registry.py, eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro,
+eng_musicgen, eng_stable_audio.
+- chatterbox / indextts2 / stable_audio already have self-contained G1 bodies.
+- bark / kokoro / musicgen are currently interface="batch" -> delegate verbatim
+  to the standalone LEGACY nodes: batch_bark_generator.py, kokoro_announcer.py,
+  musicgen_theme.py, batch_audiogen_generator.py. Batch dispatch is at
+  _otr_voice_node_common.py:217 (voice) and stable_audio_theme.py:172 (music).
+- full.json selects engines by widget value ("bark" L150/L1850, "kokoro" L1916,
+  "musicgen" L1982); the legacy nodes are NOT separate graph nodes -- reached
+  only via delegation. So converting an adapter to self-contained needs no
+  full.json node edit; only the engine-widget defaults change at promotion.
+
+## Clean-break sprints remaining (each LOCKSTEP: build replacement -> wire ->
+## suite green -> delete the legacy + every ref in the SAME change -> green +
+## guard test that fails if it reappears)
+1a. eng_bark -> self-contained per_line body (extract bark inference from
+    _otr_bark_lib / BatchBarkGenerator). Delete batch_bark_generator.py + the bark
+    "wrapper == legacy byte-identical" tests (convert to baseline_v2). Keep the
+    batch dispatch (kokoro/musicgen still use it). Guard test: BatchBarkGenerator gone.
+1b. eng_kokoro -> self-contained announcer body. Delete kokoro_announcer.py + refs.
+1c. eng_musicgen -> self-contained clip body. Delete musicgen_theme.py +
+    batch_audiogen_generator.py, then REMOVE the batch dispatch entirely
+    (_otr_voice_node_common:217 + stable_audio_theme:172) -- last batch user, I-3 gone.
+2.  Remove the writer bark voice_preset stamp in _otr_casting
+    (python_assign_voice_preset + _assert_voice_preset_invariant + uniqueness
+    guard); OTR_CastLock owns casting (bank voice_ref_id); bark draws from the bank.
+3.  Remove R0a legacy seeding + config/legacy_invocation_manifest.json; capture
+    baseline_v2 from the new engines (replace render-twice-LEGACY tests).
+4.  Promotion: flip full.json engine-widget defaults to the new engines per role;
+    retire OTR_ENABLE_* gating. Gated on F-validation of the chosen defaults.
+5.  F probes for indextts2 + stable_audio (isolated venvs); flip
+    supports_external_generator + reconcile bodies vs real signatures.
+
+## Immediate next step
+Run the bark lockstep (1a) end-to-end as ONE focused unit: read _otr_bark_lib +
+batch_bark_generator to extract the per-line bark inference; build eng_bark
+self-contained (interface per_line, real generate_voice, lazy import, AUDIO dict
+out); wire; suite green; in the SAME change delete batch_bark_generator.py + all
+refs + convert the bark byte-identity tests to baseline_v2; suite green; add a
+guard test that fails if batch_bark_generator / BatchBarkGenerator reappears.
 
 ## Open questions
-- Order of GPU sprints (F pilot vs R0a baseline). F is the G1/promotion unblock.
+- bark/kokoro/musicgen real per-line inference shapes (read _otr_bark_lib etc.).
+- indextts2 construction (cfg/model_dir) + stable_audio entry point -- F resolves.
 
 ---
 ## Resume instructions
 Open a fresh window with the project mounted, attach this file, and say:
-"Read this handoff and continue the v2.0-alpha audio/voice overhaul. Verify
-HEAD == origin/v2.0-alpha. Headless is complete (I-11 + G1 bodies committed,
-suite green at 3727, full.json wired 16/16). The remaining work is GPU/operator
--- run the F dependency pilot (scripts/otr_audio_dep_pilot.py) to verify
-signatures + flip supports_external_generator, then promotion. Acknowledge when
-ready."
-
-## Clean-break progress + F results (2026-06-02, LATEST -- authoritative)
-HEAD == origin/v2.0-alpha at 574622d; suite green 3727. Clean-break directive
-(top of this doc + the EXECUTION-PLAN) ADOPTED: new engine registry is the ONE
-true audio path, no fallback/delegation, F dep-pilot is a HARD render prereq.
-
-F dep-pilot results (isolated venvs created via Desktop Commander under the
-Claude packaged-app AppData\Local\otr_pilot_venvs\<engine>):
-- chatterbox: PASS. torch 2.6.0+cpu, NO xformers / flash_attn. Real signature
-  ChatterboxTTS.generate(text, repetition_penalty, min_p, top_p,
-  audio_prompt_path, exaggeration, cfg_weight, temperature) + from_pretrained(device).
-  G1 body MATCHES -- supported_kwargs drops the non-existent cfg + generator;
-  generate binds NO external generator so supports_external_generator stays False
-  (determinism via the deterministic_inference global-seed wrap). Body validated.
-- indextts2 / stable_audio / bark / kokoro / musicgen: NOT yet probed.
-
-Engine landscape: nodes/_otr_audio_engines/ has eng_bark/eng_chatterbox/
-eng_indextts2/eng_kokoro/eng_musicgen/eng_stable_audio. bark/kokoro/musicgen
-currently delegate (interface="batch") to the standalone LEGACY nodes
-batch_bark_generator.py / kokoro_announcer.py / musicgen_theme.py /
-batch_audiogen_generator.py.
-
-Clean-break removal targets (each a lockstep sprint: build self-contained
-adapter -> wire full.json -> suite green -> DELETE the legacy + every ref in the
-SAME change -> green + a guard test that FAILS if the legacy reappears):
-1. Raw-delegation (I-3): make eng_bark/eng_kokoro/eng_musicgen self-contained
-   per_line/clip adapters, then delete batch_bark_generator.py /
-   kokoro_announcer.py / musicgen_theme.py / batch_audiogen_generator.py + the
-   "batch" dispatch in _otr_voice_node_common + stable_audio_theme. (_otr_bark_lib
-   may remain as the bark adapter's inference impl -- verify.)
-2. Writer bark voice_preset stamp in _otr_casting (python_assign_voice_preset +
-   _assert_voice_preset_invariant + uniqueness guard) -> REMOVE; OTR_CastLock
-   owns casting; bark draws its voice from the bank.
-3. R0a legacy seeding + config/legacy_invocation_manifest.json -> REMOVE; capture
-   baseline_v2 from the NEW engines.
-4. C-5/C-6 legacy-first defaults -> flip full.json defaults to the new engines
-   (promotion); retire OTR_ENABLE_* gating.
-5. Legacy byte-identity tests -> replace with baseline_v2 tests.
-
-NOTE: every removal is gated on first building + proving (suite green) the
-self-contained replacement; replacements for bark/kokoro/musicgen need their F
-probe (install lib in an isolated venv, confirm import clean + real signature).
-
-Next: continue F (install + probe indextts2/stable_audio/bark/kokoro/musicgen),
-then the first lockstep sprint -- eng_bark self-contained -> delete
-batch_bark_generator + the batch delegation + refs -> guard test.
+"Read this handoff + docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md.
+Verify HEAD == origin/v2.0-alpha and the suite is green (3727). Then continue the
+EXECUTION-PLAN under the CLEAN-BREAK directive -- build each replacement AND
+delete the legacy it replaces in the SAME change (lockstep), starting with the
+bark sprint (1a). Acknowledge when ready."
