@@ -1,4 +1,27 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (post-1a+1b)
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (post 1c-part-1)
+
+## STATUS UPDATE (HEAD ad0ac50)
+1a (bark, 673a2bc) + 1b (kokoro, 89e90a7) SHIPPED. **1c PART 1 SHIPPED (ad0ac50):**
+the theme-music cue prompt now routes through the Meta brief protocol via the new
+single-source `nodes/_otr_music_prompt.py` (`compose_music_prompt` reads mood / setting /
+period through `_otr_brief_reader._read_brief_field`); `stable_audio_theme`'s clip path
+uses it; `tests/test_music_prompt_brief_protocol.py` pins it. No live audio change yet
+(musicgen still the batch default; stable_audio flag-off). Suite 3739/12/0, Bug Bible green.
+
+**1c PART 2 REMAINS -- the atomic legacy deletion.** Full step-by-step spec is in the
+TASK LIST (task 7). Summary: flip `eng_musicgen` batch->clip (self-contained
+`generate_clip` via transformers MusicGen; mirror `eng_stable_audio`; sr 32000,
+guidance_scale 3.0 pinned, do_sample=True, 50 tok/s, peak-normalize 0.89; routes through
+the theme node's `_render_clips` + `compose_music_prompt`, preserving musicgen output) ->
+delete `musicgen_theme.py` + `batch_audiogen_generator.py` -> retire the batch-delegation
+layer (theme-node `_delegate_batch` + shared `_otr_voice_node_common._delegate_batch` +
+`frozen_batch_widgets` + `_manifest_path` + the `OTRVoiceNodeBase` batch branch) -> delete
+`_otr_legacy_manifest.py` + `config/legacy_invocation_manifest.json` -> convert/delete the
+~15 test files in task 7 (incl. dropping the `_otr_legacy_manifest` imports from the
+bark+kokoro guards) -> add a batch-dispatch-retired guard. ONE atomic commit, push only
+when green. `full.json` verified CLEAN (v2 nodes are the instances -- NO graph surgery).
+Then sprint 2 -> 3. Operator mandate: continue autonomously; stop only on a red regression
+you cannot fix, real handoff ambiguity, a C1-C9 breach, or a GPU-gated step (Gate B).
 
 ## Core goal
 Finish `docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` (the SSOT) under
