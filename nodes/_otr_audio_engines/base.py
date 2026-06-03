@@ -69,6 +69,26 @@ def engine_supports_external_generator(engine) -> bool:
     return bool(getattr(engine, "supports_external_generator", False))
 
 
+def supported_kwargs(fn, **kwargs) -> dict:
+    """Subset of ``kwargs`` whose names appear in ``fn``'s signature.
+
+    Blind-call guard for engine forwards implemented to the documented
+    assumed_call: a kwarg the real library does not accept is dropped instead of
+    passed, so a name the F dependency pilot later corrects cannot crash the
+    forward. If the signature cannot be introspected (C builtins) or it accepts
+    ``**kwargs``, everything passes through unchanged.
+    """
+    import inspect
+
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return dict(kwargs)
+    if any(p.kind == p.VAR_KEYWORD for p in params.values()):
+        return dict(kwargs)
+    return {k: v for k, v in kwargs.items() if k in params}
+
+
 def pack_audio_batch(
     items: Iterable,
     *,

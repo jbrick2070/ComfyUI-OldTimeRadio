@@ -28,15 +28,20 @@ class IndexTTS2Engine:
         if self._model is not None:
             return
         try:
-            import indextts  # noqa: F401
+            from indextts.infer import IndexTTS2
         except ImportError as exc:
             raise RuntimeError(
                 "indextts is not installed -- run the isolated dependency "
                 "pilot and install it before enabling OTR_ENABLE_INDEXTTS2"
             ) from exc
-        # VERIFY in the pilot: construct IndexTTS2 from its config + model dir
-        # and cache the inference handle on self._model.
-        self._model = indextts
+        import os
+
+        # GPU-VALIDATE (F): confirm the IndexTTS2(cfg, model_dir) constructor +
+        # the weights-dir convention on the box. OTR_INDEXTTS2_DIR points at the
+        # downloaded weights; cfg is the config.yaml beside them.
+        model_dir = os.environ.get("OTR_INDEXTTS2_DIR", "")
+        cfg = os.path.join(model_dir, "config.yaml") if model_dir else ""
+        self._model = IndexTTS2(cfg, model_dir)
 
     def unload(self):
         self._model = None
@@ -62,20 +67,65 @@ class IndexTTS2Engine:
         return clean_spoken_text(text)
 
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
-        """One dialogue line -> mono AUDIO. Inference wired in the GPU pilot.
+        """One dialogue line -> mono AUDIO ``{"waveform", "sample_rate"}``.
 
-        TODO-for-F: the assumed library call is
+        Implemented to the documented assumed_call:
             IndexTTS2(cfg, model_dir).infer(spk_audio_prompt=ref_clip_path,
                 text=text, emo_vector=<self.emo_list(delivery_vector)>,
-                seed=seed, generator=<bound torch.Generator>)
-        scripts/otr_audio_dep_pilot.py verifies the constructor + infer kwargs +
-        external-generator support on GPU before supports_external_generator is
-        flipped True and this body is filled. Until then indextts2 is a
-        flag-gated, default-off stub -- never run blind in production.
+                seed=seed[, generator=<bound torch.Generator>])
+        Runs inside the call site's ``deterministic_inference`` wrap. GPU-VALIDATE
+        (F): scripts/otr_audio_dep_pilot pins the constructor, the ``infer``
+        kwargs + return type, and external-generator support on the box, then
+        flips ``supports_external_generator`` True. Flag-gated + default-off;
+        ``supported_kwargs`` keeps an unverified kwarg from crashing.
         """
+        import torch
+
+        from .base import supported_kwargs
+
         self.load()
-        emo = self.emo_list(delivery_vector)
-        raise RuntimeError(
-            "IndexTTS2 inference is wired and verified in the GPU pilot; "
-            f"engine registered and selectable (emo dims={len(emo)})"
+        seed = int(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+        infer = getattr(self._model, "infer", None) or getattr(
+            self._model, "generate", None
         )
+        if infer is None:
+            raise RuntimeError(
+                "IndexTTS2 handle exposes no infer()/generate() -- the GPU "
+                "pilot (F) wires the real inference entry point"
+            )
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        kwargs = supported_kwargs(
+            infer,
+            spk_audio_prompt=ref_clip_path,
+            text=text,
+            emo_vector=self.emo_list(delivery_vector),
+            seed=seed,
+            generator=torch.Generator(device=dev).manual_seed(seed),
+        )
+        return {
+            "waveform": self._as_waveform(infer(**kwargs)),
+            "sample_rate": self.sample_rate,
+        }
+
+    @staticmethod
+    def _as_waveform(out):
+        """Normalize an engine return (tensor / ``(sr, wav)`` / dict / WAV path)
+        to a waveform tensor. GPU-VALIDATE (F): pin IndexTTS2.infer's real return
+        type and drop this shim if it already returns a plain tensor.
+        """
+        import torch
+
+        if isinstance(out, tuple) and out:
+            out = out[-1]
+        if isinstance(out, dict):
+            out = out.get("waveform", out.get("wav"))
+        if isinstance(out, str):
+            import torchaudio
+
+            wav, _sr = torchaudio.load(out)
+            return wav
+        return torch.as_tensor(out)

@@ -31,34 +31,59 @@ class StableAudioMusicEngine:
         if self._model is not None:
             return
         try:
-            import stable_audio_tools  # noqa: F401
+            from stable_audio_tools import get_pretrained_model
         except ImportError as exc:
             raise RuntimeError(
                 "stable-audio-tools is not installed -- install Stable Audio "
                 "before enabling OTR_ENABLE_STABLE_AUDIO"
             ) from exc
-        # VERIFY in the pilot: load the Stable Audio pipeline (native ComfyUI
-        # nodes or stable_audio_tools) and cache it on self._model.
-        self._model = stable_audio_tools
+        import os
+
+        # GPU-VALIDATE (F): the plan's target is the ComfyUI-native SA3 loader;
+        # this loads the documented stable_audio_tools pretrained model. The env
+        # var points at the SA3 checkpoint / model id.
+        model_id = os.environ.get(
+            "OTR_STABLE_AUDIO_MODEL", "stabilityai/stable-audio-open-1.0"
+        )
+        model, _config = get_pretrained_model(model_id)
+        self._model = model
 
     def unload(self):
         self._model = None
 
     def generate_clip(self, prompt, duration_s, seed):
-        """Text prompt -> stereo AUDIO clip. Inference wired in the GPU pilot.
+        """Text prompt -> stereo AUDIO clip ``{"waveform", "sample_rate"}``.
 
-        TODO-for-F: the assumed library call is the ComfyUI-native SA3 sampler /
+        Implemented to the documented assumed_call:
             generate_diffusion_cond(model, steps=<int>,
                 conditioning=[{"prompt": prompt, "seconds_total": duration_s}],
-                seed=seed, generator=<bound torch.Generator>)
-        preserving stereo via canonical_audio. scripts/otr_audio_dep_pilot.py
-        verifies on GPU that the native SA3 path binds a torch.Generator (so
-        render-twice is byte-identical) before supports_external_generator is
-        flipped True and this body is filled. Until then stable_audio_music is a
-        flag-gated, default-off stub -- never run blind in production.
+                seed=seed[, generator=<bound torch.Generator>])
+        Stereo is preserved (pack_audio_batch downmixes only while the assembly
+        chain is still mono). GPU-VALIDATE (F): the plan's target is the
+        ComfyUI-native SA3 sampler; scripts/otr_audio_dep_pilot pins the real
+        entry point + that it binds a ``torch.Generator`` on the box, then flips
+        ``supports_external_generator`` True. Flag-gated + default-off until then.
         """
+        import torch
+
+        from .base import supported_kwargs
+
         self.load()
-        raise RuntimeError(
-            "Stable Audio inference is wired and verified in the GPU pilot; "
-            f"engine registered and selectable (prompt len={len(prompt or '')})"
+        seed = int(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+        from stable_audio_tools.inference.generation import generate_diffusion_cond
+
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        kwargs = supported_kwargs(
+            generate_diffusion_cond,
+            steps=100,
+            conditioning=[{"prompt": prompt, "seconds_total": float(duration_s)}],
+            seed=seed,
+            device=dev,
+            generator=torch.Generator(device=dev).manual_seed(seed),
         )
+        audio = generate_diffusion_cond(self._model, **kwargs)
+        return {"waveform": audio, "sample_rate": self.sample_rate}

@@ -53,24 +53,42 @@ class ChatterboxEngine:
         return clean_spoken_text(text)
 
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
-        """One dialogue line -> mono AUDIO. Inference wired in the GPU pilot.
+        """One dialogue line -> mono AUDIO ``{"waveform", "sample_rate"}``.
 
-        TODO-for-F: the assumed library call is
+        Implemented to the documented assumed_call:
             ChatterboxTTS.generate(text, audio_prompt_path=ref_clip_path,
-                exaggeration=<self._project(delivery_vector)>, cfg=0.5,
-                temperature=0.6, generator=<bound torch.Generator>)
-        scripts/otr_audio_dep_pilot.py verifies on GPU that ``generate`` binds an
-        external ``torch.Generator`` (so render-twice is byte-identical) before
-        ``supports_external_generator`` is flipped True and this body is filled.
-        Until then chatterbox is a flag-gated, default-off stub -- never run
-        blind in production.
+                exaggeration=<self._project(delivery_vector)>, cfg_weight=0.5,
+                temperature=0.6[, generator=<bound torch.Generator>])
+        Runs inside the call site's ``deterministic_inference`` wrap (global RNG
+        already seeded); we seed locally too and bind a per-line Generator when
+        ``generate`` accepts one. GPU-VALIDATE (F): scripts/otr_audio_dep_pilot
+        confirms the kwargs + that ``generate`` binds an external
+        ``torch.Generator`` on the box, then flips
+        ``supports_external_generator`` True. Flag-gated + default-off until
+        then; ``supported_kwargs`` keeps an unverified kwarg from crashing.
         """
+        import torch
+
+        from .base import supported_kwargs
+
         self.load()
-        exaggeration = self._project(delivery_vector)
-        raise RuntimeError(
-            "Chatterbox inference is wired and verified in the GPU pilot; "
-            f"engine registered and selectable (exaggeration={exaggeration})"
+        seed = int(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        kwargs = supported_kwargs(
+            self._model.generate,
+            audio_prompt_path=ref_clip_path,
+            exaggeration=self._project(delivery_vector),
+            cfg=0.5,
+            cfg_weight=0.5,
+            temperature=0.6,
+            generator=torch.Generator(device=dev).manual_seed(seed),
         )
+        wav = self._model.generate(text, **kwargs)
+        return {"waveform": wav, "sample_rate": self.sample_rate}
 
     @staticmethod
     def _project(delivery_vector):
