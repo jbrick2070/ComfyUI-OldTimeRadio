@@ -1,157 +1,202 @@
-# Session Handoff -- OTR Audio + Voice-Casting Overhaul -- 2026-06-02 (Wave 0 complete)
+# Session Handoff -- OTR Audio + Voice-Casting Overhaul -- 2026-06-02 (Wave 1 + Wave 2a-node COMPLETE)
 
 ## Core goal
-Build the model-agnostic, per-role audio engine registry + voice-casting subsystem for the
-OldTimeRadio ComfyUI pipeline on `v2.0-alpha`. Character voice / announcer / music each selectable
-per role; deterministic voice bank + caster; a post-freeze cast-lock node; a frozen
-`ResolvedVoiceRequest` identity/cache contract. Legacy path stays a permanent **byte-identical**
-fallback. **R0a complete; Wave 0 COMPLETE (8/8); resume at Wave 1 piece 1a.**
+Model-agnostic, per-role audio engine registry + voice-casting subsystem for the
+OldTimeRadio ComfyUI pipeline on `v2.0-alpha`. Character voice / announcer / music
+each selectable per role; deterministic voice bank + caster; a post-freeze
+cast-lock node; a frozen `ResolvedVoiceRequest` identity/cache contract. Legacy
+path stays a permanent **byte-identical** fallback.
+
+**STATUS: Wave 0 done. Wave 1 (1a-1g) done. Wave 2a CastLock NODE done. All
+headless code is shipped + pushed behind a green gate. The remainder
+(writer cast/stamp removal, Wave 2b opt-in workflow JSON, and all GPU gates) is
+operator/GPU-gated -- see "Remaining (operator / GPU)".**
 
 ## Canonical spec (read first, don't re-derive)
-`docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` is the single source of truth -- invariants
-I-1..I-11, ComfyUI first-run invariants C-1..C-7, wave/sprint build order, `ResolvedVoiceRequest v1`
-fields, per-sprint test names, re-baseline triggers, verify-at-build list. `CLAUDE.md` + `ROADMAP.md` /
-`BUG_LOG.md` auto-load.
+`docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` -- single source of truth
+(invariants I-1..I-11, ComfyUI C-1..C-7, wave order, ResolvedVoiceRequest fields,
+per-sprint tests, re-baseline triggers). `CLAUDE.md` + `ROADMAP.md` + `BUG_LOG.md`
+auto-load.
 
-## HOW TO RUN TESTS + GIT -- everything is OUTSIDE the sandbox (read before doing anything)
-The Linux sandbox (`mcp__workspace__bash`) has **no torch** and does NOT mount the venv or the Bug
-Bible repo. Use it ONLY for read-only repo exploration (grep/ls on the mount). **All tests + git run
-on the Windows host via Desktop Commander (DC) `cmd` shell.**
+## Git state
+- Branch `v2.0-alpha`. **HEAD = `4ea3fc2` == `origin/v2.0-alpha`** (pushed; verify
+  with `git rev-parse HEAD` vs `origin/v2.0-alpha` first).
+- Wave 0 code ended at `34bbbd2`. This session added, in order:
+  - `6b15e7c` 1a OTR_BatchCharacterVoices
+  - `dd11a2f` 1b OTR_AnnouncerVoice + shared voice-node base (`_otr_voice_node_common.py`)
+  - `8f77b0a` 1c OTR_StableAudioTheme
+  - `56ce95b` 1d voice reference bank + caster (`_otr_voice_bank.py` + `config/voice_reference_bank.json`)
+  - `83eeb52` 1e delivery profiles + release gate (`_otr_delivery_profiles.py` + `_otr_release_gate.py`)
+  - `1d45e78` 1f FileAudioCache impl + slim migration (added to `_otr_audio_cache.py`)
+  - `622bbff` 1g HuMo 16k-mono ANALYSIS clone (edit to `batch_humo_render.py`)
+  - `4ea3fc2` 2a OTR_CastLock (`nodes/cast_lock.py`)
+- **Full `tests/` baseline now: 3679 passed, 12 skipped, 0 failed (~36s).**
+  Wave-0 baseline was 3569; this session added 110 passing tests, zero regressions.
 
-- **venv python (full path; system `python` is not on PATH):**
-  `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`
-- **Full regression -- the gate. Run after EVERY change. DC `cmd`:**
-  `cd /d C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio & C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider`
-  **Current baseline: 3569 passed, 12 skipped, 0 failed (~34s).** Context-saver: redirect to a temp
-  file and read only the tail, e.g. append `> _otr_pytest_tail.txt 2>&1` then DC `read_file` offset
-  `-3`; **`del _otr_pytest_tail.txt` before committing** (it is untracked -- never stage it).
-- **conftest KNOWN-FAIL-GUARD:** `EXPECTED_FAILED_NODEIDS` is empty; ANY new failing test hard-exits
-  `SystemExit(2)`. Updating an existing test to a new contract is fine **as long as it passes green**.
-- **Targeted run** (fast iterate): `... -m pytest tests/test_X.py tests/test_Y.py -q -p no:cacheprovider`.
-- **`python -c "..."` is UNUSABLE through DC cmd** -- inner quotes / `&`-chaining get mangled
-  ("unterminated string literal"). For any Python probe, **write a tiny `.py` file and run
-  `python file.py`**, then `del` it. (Reinforces CLAUDE.md's no-heredoc rule.)
-- **Commit flow (DC `cmd` only -- never PowerShell for git):** write `.git\COMMIT_EDITMSG` with the
-  file tool, then `git add <explicit paths>` (**NEVER `-A`** -- ~20 untracked planning docs +
-  `custom_nodes.lnk` must stay unstaged), then `git commit -F .git\COMMIT_EDITMSG`. Verify:
-  `git log -1 --format=%H%n%s` + `git status --porcelain --untracked-files=no` (empty). `CRLF will be
-  replaced by LF` on `config/*` / `*.json` is the repo's existing eol policy -- harmless.
-- **Bug Bible repo still NOT locatable** at the CLAUDE.md path -- gate on the in-repo `tests/` suite;
-  ask Jeffrey before any Three-File-Contract bible push.
-- **Workflow-JSON edits** (`workflows/*.json` CRLF + litegraph): surgical CRLF-preserving byte-replace
-  via a one-shot py script that asserts `json.loads` parses before writing; never `json.load/dump` the
-  whole file. (Not needed yet -- first workflow edit is Wave 2b.)
-- File creation/edits: Claude file tools (Read/Write/Edit) write the real Windows FS DC + git see.
-- **Env confirmed this session:** `pydantic 2.12.5` (v2 API) + `PyYAML 6.0.3` are installed in the venv.
+## HOW TO RUN TESTS + GIT -- everything is OUTSIDE the sandbox
+The Linux sandbox (`mcp__workspace__bash`) has **no torch** and **cannot parse the
+CRLF litegraph workflow JSON** (stale-mount; `json.load` raises "Unterminated
+string"). Use the sandbox ONLY for read-only grep/ls on `.py`/`.md`. **All tests,
+git, and any workflow-JSON parsing run on the Windows host via Desktop Commander
+(DC) `cmd`.**
+- venv python: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (system
+  `python` not on PATH).
+- Full regression (the gate, run after EVERY change). DC `cmd`, redirect + read the
+  file (interactive capture hits a ~60s MCP timeout; the redirect always completes):
+  `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider > _otr_pytest_tail.txt 2>&1`
+  then read `_otr_pytest_tail.txt` with the file tool. **`del` every `_otr_*_tail.txt`
+  before committing** (untracked; never stage).
+- conftest KNOWN-FAIL-GUARD: `EXPECTED_FAILED_NODEIDS` is empty; ANY new failing test
+  hard-exits `SystemExit(2)` (fires on subset runs too).
+- **`python -c "..."` is UNUSABLE through DC cmd** (quote mangling). Write a tiny `.py`
+  file, run `python file.py`, `del` it.
+- Commit flow (DC `cmd` only, never PowerShell for git): write `.git\COMMIT_EDITMSG`
+  with the file tool, `git add <explicit paths>` (**NEVER `-A`** -- ~20 untracked
+  planning docs + `custom_nodes.lnk` must stay unstaged), `git commit -F
+  .git\COMMIT_EDITMSG`, verify `git log -1 --format=%H%n%s` + `git status --porcelain
+  --untracked-files=no` empty.
+- **ASCII-only `.py` source, no em-dash (`--` not the long dash)** -- a test in every new
+  suite enforces it; CLAUDE.md cp1252 subprocess-decode rule.
 
-## Shipped this session -- Wave 0 pieces 3-8 (committed + PUSHED on v2.0-alpha)
-Wave 0 CODE ends at `34bbbd2`; current branch HEAD = `073e4ca` (this handoff doc) sitting on top.
-Both pushed (`git rev-parse HEAD` == `origin/v2.0-alpha`; verified 41 files, no BOM, no 0-byte). The
-next session should `git rev-parse HEAD` first to confirm nothing landed after `073e4ca`. Commits:
-- `dd0f86a` **#3 fail-closed registry** -- `nodes/_otr_audio_engines/registry.py`: `assert_usable` now
-  FAILS CLOSED (C-6, **never silent-swap**). New `EngineUsabilityReason` enum (the 6 codes
-  `gated_by_flag|missing_model|missing_hf_token|incompatible_profile|noncommercial_blocked|malformed_config`)
-  + `EngineUnusable(engine, role, reason, detail)`. `assert_usable` raises GATED_BY_FLAG (opt-in flag
-  off), MALFORMED_CONFIG (unknown engine), INCOMPATIBLE_PROFILE (role mismatch); returns the validated
-  name on success. **The byte-identical safety property now comes from the shipped workflow defaulting
-  its engine widget to the legacy engine until promotion (I), NOT from a dispatch substitution.** The
-  two old silent-swap tests were rewritten to the fail-closed contract. Downstream (profile resolver,
-  release gate) reuse the same enum.
-- `5235055` **#4 base** -- `nodes/_otr_audio_engines/base.py`: `AudioEngineAdapter` (OPTIONAL base; the
-  registry duck-types, legacy adapters don't inherit) + `pack_audio_batch(items, *, sample_rate, mono)`
-  (the existing Bark `[B,1,T]` / empty `[1,1,0]` contract, mono-safe + right-pad, built on
-  `canonical_audio`/`mono_safe`/`empty_audio_batch`) + `engine_supports_external_generator` (default
-  False until the F pilot verifies an external `torch.Generator` -- G1).
-- `a5349cc` **#5 cache protocol** -- `nodes/_otr_audio_cache.py` (interface only; impl is 1f):
-  `cache_key_for(request)` == `ResolvedVoiceRequest.cache_key` (the single I-6 keying rule),
-  `AudioCacheRecord` frozen sidecar (mirrors the JSON schema), `record_from_request(...)`,
-  `AudioCache` runtime_checkable Protocol (key_for/has/get/put/iter_records).
-- `863fb13` **#6 class registry** -- `nodes/_otr_class_registry.py`: `NewNodeSpec` rows for
-  `OTR_BatchCharacterVoices` / `OTR_AnnouncerVoice` / `OTR_StableAudioTheme` / `OTR_CastLock`, all
-  CATEGORY `OldTimeRadio/v2/audio`, **bare class names** (BatchBarkGenerator-style),
-  `new_node_modules_table()` -> the `{key:(module,class,display)}` shape the top `__init__._NODE_MODULES`
-  consumes. **NOT yet wired into the top `__init__`** -- wire per node as each module lands so box-fresh
-  load stays clean (no phantom "Skipped", banner stays N/N).
-- `9efc292` **#7 schemas** -- `config/voice_bank_entry_schema.json` (E.1 fields) +
-  `config/audio_cache_sidecar_schema.json` (mirrors `AudioCacheRecord`, drift-guarded by test).
-- `34bbbd2` **#8 profiles + resolver** -- `config/audio_engine_profiles.yaml` (7 profiles) +
-  `nodes/_otr_engine_profiles.py`: `EngineProfileResolver v1`, lazy pydantic-v2 load cached by content
-  sha (`source_sha256` = re-baseline trigger), `resolve_casting_plan(role, engine, voice_bank)`
-  fail-closed ladder (reuses the registry enum; ref engines reject `bark_legacy` via
-  `allowed_voice_banks`), `legacy_first_engines(role)` HARDCODED for INPUT_TYPES (C-5 never-empty),
-  `assert_token_for_profile`/`assert_model_available` (generate-path only, never INPUT_TYPES).
-  - **profile_ids:** char_bark_v1, char_chatterbox_v1, char_indextts2_v1, announcer_kokoro_v1,
-    announcer_chatterbox_v1, music_musicgen_v1, music_stable_audio_v1.
-  - **voice-bank ids:** `bark_legacy` (bark presets), `kokoro_builtin` (kokoro), `default` (chatterbox +
-    indextts2 reference clips). Music profiles carry no bank. `music_stable_audio_v1.requires_hf_token=true`.
+## What shipped this session (do NOT redo)
+
+### The dispatch contract (1a/1b shared base `nodes/_otr_voice_node_common.py`)
+`OTRVoiceNodeBase` + `voice_input_types(role, fallback)` + helpers
+(`frozen_batch_widgets`, `coerce_int_seed`, `build_engine_combo`). Every voice node:
+- INPUT_TYPES is C-5 safe (no IO, never-empty, exception-wrapped engine combo from
+  `legacy_first_engines(role)`); forceInput sockets `script_json`/`ledger_json`/
+  `gate_in` carry no widget; serialized widgets are exactly `engine` + `stereo_policy`;
+  no `seed`/`model_id` widget.
+- Dispatch: `assert_usable(engine, role)` FAIL CLOSED (6-class); `batch` interface ->
+  **raw verbatim delegation** of the EXACT `script_json` string + the frozen
+  `config/legacy_invocation_manifest.json` widget tuple (byte-identical, I-3); `per_line`
+  -> `build_resolved_request` -> `prepare_text` -> adapter -> `pack_audio_batch` (C-4).
+- Teardown (`unload`+`gc`+`empty_cache`) in `finally` BEFORE the `done` sentinel (I-7).
+  `done` = `"<role>:done:engine=...:clips=N"`; zero workload still emits `done` + `[1,1,0]`.
+
+### Nodes (auto-registered via `__init__` table merge + file-existence guard)
+- **`batch_character_voices.py` / `BatchCharacterVoices` / OTR_BatchCharacterVoices**
+  -- role `char_voice`; engines bark(legacy default, batch)/chatterbox/indextts2.
+- **`announcer_voice.py` / `AnnouncerVoice` / OTR_AnnouncerVoice** -- role
+  `announcer_voice`; kokoro(legacy default, batch -> OTR_KokoroAnnouncer)/chatterbox;
+  routes only `speaker_role=announcer`.
+- **`stable_audio_theme.py` / `StableAudioTheme` / OTR_StableAudioTheme** -- role
+  `music`; musicgen(legacy default, batch -> OTR_MusicGenTheme, 3 cue AUDIO outputs)/
+  stable_audio_music(clip). Outputs: opening/closing/interstitial_theme_audio +
+  render_log + done. Self-contained (3 outputs, clip path) -- NOT on the voice base.
+- **`cast_lock.py` / `CastLock` / OTR_CastLock** -- single v2 ledger authority after
+  FreezeCascade. In `script_json`(forceInput) + widgets voice_bank /
+  cast_voice_policy(preserve_ledger|auto_registry) / delivery_profile / allow_voice_reuse
+  + gate_in(forceInput). Out ledger_json / cast_lock_revision(INT) / cast_report / done.
+  preserve_ledger (default) re-casts nothing (byte-safe); auto_registry runs the caster,
+  stamps voice_ref_id/voice_engine/commercial_clean, announcer takes the per-engine pin.
+  No voice_engine_mode/deterministic_inference/model_id widget (E.4).
+
+`__init__.py` merges `new_node_modules_table()` ONLY for keys whose module file exists
+(so OTR_CastLock appeared once `cast_lock.py` landed). All 4 v2 keys now live. The merge
+is by table, NOT literal `"OTR_..."` keys (the class-registry collision test enforces this).
+
+### Libraries
+- **`_otr_voice_bank.py`** -- `load_voice_bank` (validates each entry vs
+  `config/voice_bank_entry_schema.json`, dependency-free, rejects dup voice_ref_id, caches
+  by content sha); `get_all_registered_voices`; `assign_voice_for_slot` (own seeded RNG,
+  I-4; gender100/timbre40/role20/age10; ladder g+t+r+age -> drop age -> drop role ->
+  gender-only -> raise unless allow_voice_reuse re-walks permitting reuse, gender floor
+  holds); `announcer_voice_ref(engine)` pin; `CASTING_POLICY_VERSION="1"`.
+- **`config/voice_reference_bank.json`** -- 8 starter entries (chatterbox + indextts2 char
+  refs, kokoro `bm_george` + chatterbox `cc_announcer_male` announcer pins). `ref_sha256`
+  is `"pending"` until F pins real clip hashes; `ref_path` is the intended on-disk location.
+- **`_otr_delivery_profiles.py`** -- `neutral`-only identity profile;
+  DELIVERY_PROFILE_VERSION / DELIVERY_PROJECTION_VERSION; get/apply/available.
+- **`_otr_release_gate.py`** -- `assert_release_clean(items, *, strict_commercial,
+  require_allowed_for_release)` three-state scan (true=clean / false=warn / missing|null=
+  FAIL CLOSED), reuses EngineUsabilityReason (MALFORMED_CONFIG / NONCOMMERCIAL_BLOCKED);
+  `ReleaseReport`; `mangle_release_filename` (hashes a gated stem).
+- **`_otr_audio_cache.py`** (impl added) -- `FileAudioCache` (sidecar `<key>.json` + buffer
+  `<key>.npy`, key = `cache_key_for` = ResolvedVoiceRequest.cache_key, all IO in methods);
+  slim migration `needs_rerender` (schema drift -> miss) + read-only
+  `assert_registry_ledger_has_voice_ref_id` (cast-locked ledger missing voice_ref_id ->
+  CacheMigrationError; legacy/no-cast_lock ledger left alone) + `detect_ledger_schema_version`.
+- **`batch_humo_render.py`** (edit) -- `_humo_analysis_audio` = CLONED 16k-mono copy for
+  `AudioEncoderEncode` (Whisper) ONLY; `.clone()` first so the shared master `episode_audio`
+  is never aliased/mutated (may stay stereo, I-5); CPU-only DSP (I-11). Wired at the Phase-B
+  encode call only. `is_never_humo_role` skip was already present (line ~2160).
 
 ## Decisions locked this session (do not re-litigate)
-- assert_usable fail-closed (above) supersedes the Sprint A/C silent-swap. This was the one real
-  contract change; everything else is additive.
-- New nodes' class names are bare; CATEGORY is `OldTimeRadio/v2/audio`; mapping keys carry the `OTR_`
-  prefix. Source of truth = `_otr_class_registry.py`.
-- Engine matrix license/`commercial_clean` values were NOT churned (kept as the shipped adapters set):
-  bark False, kokoro True, musicgen False, chatterbox True, indextts2 False, stable_audio_music True.
+- Extracted a shared voice-node base (1a refactored to a thin subclass; public surface
+  unchanged so its tests stayed green). The theme node is self-contained (3 outputs).
+- Voice nodes take BOTH `script_json` (raw FreezeCascade, for byte-identical bark/kokoro/
+  musicgen batch delegation) AND `ledger_json` (CastLock, for the per-line/cast-aware path).
+  CastLock rewriting the ledger is therefore byte-safe: the legacy batch path uses the raw
+  string, the new per-line path uses CastLock's ledger.
+- CastLock auto_registry resolves the character engine from the bank via the engine profiles
+  (`voice_bank="default"` -> chatterbox; bark_legacy/kokoro_builtin -> preset engines -> chars
+  preserved). Announcer engine defaults to kokoro.
 
-## Deferred -- needs Jeffrey + the RTX 5080 (batch to the very end)
-- **I-11 `_resample_audio` `.cuda()` at `nodes/scene_sequencer.py:126` is NOT changed.** It is on the
-  LEGACY byte path; flipping it to CPU before the R0a-f baseline is captured could silently shift the
-  not-yet-captured baseline. Do the CPU flip **deliberately, then capture the baseline on the CPU
-  path.** All NEW v2-node post-engine DSP must be authored on `.cpu()` tensors per I-11.
-- R0a (f) render-twice legacy bit-identity baseline; R0b box-fresh live smoke; Wave 3 F/G1/I.
-- Directive in force: **no live/GPU testing until ALL headless sprints are built; the pytest
-  regression stays in every commit gate.**
+## Remaining (operator / GPU) -- NOT done; gated by design
 
-## Immediate next steps -- Wave 1 (resume at piece 1a)
-Per piece: read the existing surface -> build -> wire JSON if a node -> full `tests/` via DC -> commit
-explicit paths. Plan D / D5 / E / S0.1 / G0 have the field lists + test names.
-- **1a `nodes/batch_character_voices.py`, 1b `nodes/announcer_voice.py`, 1c `nodes/stable_audio_theme.py`.**
-  Gate sockets + dispatch; **lazy-import engine libs INSIDE `generate()`**; INPUT_TYPES legacy-first via
-  `legacy_first_engines(role)` + exception-safe + never-empty (C-5); forceInput keys (`script_json`,
-  `ledger_json`, `gate_in`) carry NO `widget`; output adds `done` (STRING); `gate_in->done`; teardown
-  in `finally` BEFORE `done` (I-7); **batch path = raw delegation** to the legacy node (I-3, byte-
-  identical), **per-line path** = `build_resolved_request` -> `prepare_text` -> `generate_voice/clip` ->
-  `pack_audio_batch` (C-4). Wire `new_node_modules_table()` into the top `__init__._NODE_MODULES` as
-  these land; each class `CATEGORY == expected_category(key)`.
-- 1d `_otr_voice_bank.py` validator + `assign_voice_for_slot` caster + `config/voice_reference_bank.json`
-  (codes to `voice_bank_entry_schema.json`; E.2 scoring gender100/timbre40/role20/age10 -> stable sort
-  -> one seeded `rng.choice` from `stable_cast_seed`).
-- 1e `_otr_delivery_profiles.py` (neutral-only) + `_otr_release_gate.py` `assert_release_clean`
-  (codes to `audio_cache_sidecar_schema.json`; fail-closed on missing `commercial_clean`, reuse enum).
-- 1f `_otr_audio_cache.py` IMPL against the piece-5 protocol (read/write keyed on `cache_key_for` +
-  slim migration: `detect_ledger_schema_version`, reject old ledger missing `voice_ref_id`,
-  `request_schema_version != target -> re-render`).
-- 1g S0.1 HuMo 16k-mono ANALYSIS-clone contract -- **existing-file edit to `nodes/batch_humo_render.py`**
-  (own worktree if parallel); do NOT pin master mono.
-Then **Wave 2a** (`nodes/cast_lock.py` `OTR_CastLock` + move cast/stamp OUT of the writer -- the writer
-is heavily tested, refactor carefully) and **Wave 2b** (build `workflows/otr_scifi_16gb_audio_v2_optin.json`
-via the headless litegraph builder + the TWO explicit link tables + drop node 15 + link-integrity tests;
-R0b live smoke is operator).
+### Wave 2a tail -- writer cast/stamp removal [SERIAL, operator GPU]
+Move the cast/stamp OUT of `OTR_LedgerScriptWriter`, keep only the cheap char_id-subset
+validator. **Deferred deliberately:** its only real verification is the R0a render-twice
+legacy bit-identity diff vs the (not-yet-captured) baseline -- removing it blind risks
+silently shifting the legacy audio. INDEPENDENT of Wave 2b (CastLock stamps regardless;
+the writer can keep stamping for the legacy workflow). Do this WITH the R0a baseline in hand.
+
+### Wave 2b -- opt-in workflow JSON + link tests [SERIAL]
+**There is NO headless litegraph builder in the repo yet** (only patch/audit scripts:
+`scripts/normalize_workflow_widgets.py`, `_audit_workflow_json.py`, `_inspect_workflow.py`,
+`_build_videoplan_test_workflow.py`). Wave 2b = build that builder + emit
+`workflows/otr_scifi_16gb_audio_v2_optin.json` + link tests, then **R0b live smoke is the
+operator gate** (it must load in ComfyUI Desktop -- litegraph socket/widget fidelity + the
+`d06560a` graph/widget guards are exactly what R0b catches; do not ship this without a load).
+
+**Exact migration spec (derived from `otr_scifi_16gb_full.json`, 29 nodes, last_node_id=79,
+last_link_id=230):**
+- Node **62 OTR_LedgerFreezeCascade has 7 outputs** (R0a-c ports already present):
+  out[0]=script_text, out[1]=script_json, out[2]=news_used, out[3]=estimated_minutes,
+  out[4]=freeze_verdict, **out[5]=episode_seed (INT, unwired)**, **out[6]=v2_ledger_json
+  (STRING, unwired)**.
+- 62.out[1] currently fans to 13 consumers: links L2->3.in0, L12->11.in0(bark), L16->12.in1,
+  L19->13.in0(kokoro), L21->14.in0(musicgen), L24->15.in0(SFX), L47->20.in1, L113->20.in0,
+  L114->59.in3, L79->51.in5(HuMo), L82->52.in2, L90->55.in3, L202->71.in0.
+- **Partition for the opt-in copy:** raw out[1] STAYS for 3,12,20,52,55,59,71. The 3 NEW
+  audio nodes REPLACE legacy 11/13/14 (rebuild instances, not type-swap): their `script_json`
+  <- 62.out[1] (raw, for delegation), their `ledger_json` <- CastLock.ledger_json. **HuMo
+  51.in[5] <- CastLock.ledger_json** (was raw out[1], L79). **CastLock.script_json <-
+  62.out[6] v2_ledger_json** (the dedicated port).
+- **Theme slot map BY NAME** (14 MusicGenTheme -> StableAudioTheme): 14.out[0](opening) ->
+  7.in[1] (L22) becomes opening_theme_audio -> 7.in[1]; 14.out[1](closing) -> 7.in[2] (L23)
+  AND 12.in[3] (L105) becomes closing_theme_audio -> 7.in[2] + 12.in[3]; interstitial unwired.
+- **Drop node 15 (OTR_BatchAudioGenGenerator)** + L24 + L25 (15.out0 -> 3.in3). SceneSequencer
+  in[3] (sfx) becomes None -- E.5 says make it optional/None-safe (pure prepend).
+- **done->gate chain:** CharacterVoices.done -> AnnouncerVoice.gate_in -> StableAudioTheme.gate_in;
+  plus the post-unload `gate_signal` into the first video loader (I-7).
+- STILL TO PROBE for the builder: outputs of 11(bark)/13(kokoro) -> their consumers, and the
+  full input socket names of 3 SceneSequencer / 7 EpisodeAssembler. Parse on the HOST (venv
+  python), never the sandbox.
+- Tests: per-consumer landing, per-theme-slot landing, `no_orphan_links_after_drop_node15`,
+  widget-vector-exact for the 4 new instances, no-legacy-node-instances-on-active-path,
+  CastLock ledger source. Run `validate_workflow_contract` (`nodes/_workflow_validation.py`)
+  on the new file as a headless gate, but treat R0b as the real acceptance.
+
+### R0a-f / R0b / Wave 3 [operator, RTX 5080]
+- R0a (f): render-twice legacy bit-identity baseline (audio only); the I-11 `_resample_audio`
+  `.cuda()` at `scene_sequencer.py:126` CPU flip should be done deliberately THEN baselined.
+- R0b: box-fresh live smoke of the opt-in workflow (stub engines, no weights).
+- Wave 3: F dep-isolation pilots (IndexTTS2 + Stable Audio 3 are the promotion gate) -> G1 live
+  inference + capture -> I promotion (flip shipped defaults, retire OTR_ENABLE_* flags).
 
 ## Surfaces already read this session (save a re-read)
-- `nodes/_otr_audio_engines/` adapters: `interface` is `"batch"` (bark/kokoro/musicgen -> legacy default,
-  `make_batch_node()`), `"per_line"` (chatterbox/indextts2 -> `generate_voice(text, ref_clip_path,
-  delivery_vector, seed)`), `"clip"` (stable_audio_music -> `generate_clip(prompt, duration_s, seed)`).
-- `nodes/_otr_resolved_request.py`: `build_resolved_request(...)`, `quantize_params`, `_seed_to_int64`,
-  `empty_audio_batch`, `assert_audio_batch_contract`. `nodes/_otr_script_prep.py`: `prepare_text` +
-  `PREPARE_TEXT_VERSION`. `nodes/_otr_audio_utils.py`: `canonical_audio`/`mono_safe`/`audio_sha16`.
-- `nodes/kokoro_announcer.py` = the announcer-node analog: INPUT_TYPES(required `script_json` STRING,
-  optional widgets), `RETURN_TYPES=("AUDIO","STRING","STRING")`, `FUNCTION="render"`, reads the ledger via
-  `_otr_ledger_consumers.load_ledger(script_json)` + `iter_lines(led, roles={"announcer"})`, seeds RNGs
-  from the frozen `script_json` (`seed_all_rngs(_seed_to_int64("<engine>_legacy_v1", script_json))`),
-  builds `[B,1,T]`, tears down (`gc.collect()` + `empty_cache()`).
-- `nodes/batch_bark_generator.py`: empty batch `{waveform: zeros(1,1,2400), sr:24000}`; pads to longest
-  in batch. `nodes/scene_sequencer.py` ~L518-538 unbinds `waveform[b]` per line (dim 0 = lines). `.cuda()`
-  resample at L126 (the I-11 deferral above).
-- Registration: top-level `__init__.py` `_NODE_MODULES = {"OTR_<Name>": (module, class, display)}` loop
-  (isolated try/except per node; banner counts loaded==total). Display names lead with a space; node-file
-  local `NODE_DISPLAY_NAME_MAPPINGS` is NOT what the package exports (the `_NODE_MODULES` value is).
-  `tests/test_naming_conventions.py` only constrains `_otr_*_lib.py` files + package display names (no
-  `[EMOJI]/[TODO]/[PLACEHOLDER]/[FIXME]`). STILL TO READ for 1a-c: a gate node
-  (`visual/flux_branch_gate.py`) for the `gate_in` STRING forceInput -> passthrough pattern, and
-  `tests/test_workflow_audio_widget_vectors.py` for the widget-vector contract.
+Registry/base/profiles/resolved_request/script_prep/audio_utils/ledger_consumers/manifest/
+all 6 engine adapters/kokoro_announcer/batch_bark_generator/musicgen_theme/top `__init__`/
+conftest/class_registry/`_otr_speaker_role` -- all current. The bark/kokoro/musicgen legacy
+nodes are the batch-delegation targets; their manifest widget vectors are in
+`config/legacy_invocation_manifest.json` (script_json dropped; bark=[temp,bypass],
+kokoro=["",random,0.95], musicgen=["",model_id,3.0,False]).
 
 ---
 ## Resume instructions
-Open a fresh window, attach this file, and say:
-"Read this handoff file and continue the audio overhaul at Wave 1 piece 1a. Acknowledge when ready."
+Open a fresh window with ComfyUI Desktop reachable, attach this file, and say:
+"Read this handoff and continue at Wave 2b (build the litegraph builder + the opt-in workflow
+JSON per the migration spec), then run R0b. Acknowledge when ready."
+For the writer cast/stamp removal, do it only with the R0a baseline captured first.
