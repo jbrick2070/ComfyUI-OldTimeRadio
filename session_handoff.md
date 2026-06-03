@@ -1,4 +1,31 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (post 1c-part-1)
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (post 1c COMPLETE)
+
+## STATUS (HEAD 9259336) -- SPRINT 1c COMPLETE
+1a bark (673a2bc), 1b kokoro (89e90a7), 1c (ad0ac50 part1 music-prompt-via-Meta-brief
++ 9259336 part2 musicgen->clip + delete the whole legacy batch infra). **Every audio
+engine is now self-contained per_line / clip; the batch-delegation layer,
+_otr_legacy_manifest, the legacy invocation manifest, and the legacy
+bark/kokoro/musicgen/audiogen nodes are all gone.** Suite green 3650/12/0, Bug Bible
+green. local HEAD == origin == 9259336.
+
+**Remaining headless work is essentially done.** The next sprints are gated:
+- **Sprint 2 (writer casting -> CastLock)** -- NEEDS A JEFFREY DECISION (named stop:
+  listener-audible casting change + handoff ambiguity). The handoff said "bark draws
+  from the bank", but bark uses discrete v2/* PRESETS, not the clip-based voice bank
+  (which excludes bark), and eng_bark reads cast.voice_preset (Gate 3 fails without it).
+  Removing the writer's python_assign_voice_preset leaves bark voiceless unless CastLock
+  takes over PRESET assignment -- a new casting model that determines which voice each
+  character gets. Decision: (a) move the seeded preset picker into CastLock auto_registry
+  (behavior-preserving, recommended); (b) add a bark preset bank (new assignment);
+  (c) keep the writer stamp for bark, move only clip-engine casting. Full spec in task 8.
+- **Sprint 3** -- LARGELY SUBSUMED by 1c: the R0a legacy seeding lived in the now-deleted
+  nodes; legacy_invocation_manifest.json + test_legacy_audio_seeding are already gone.
+  Residual = capture baseline_v2 (Gate B, operator GPU).
+- **Sprints 4 (promotion) + 5 (F pilots)** -- operator / GPU-gated.
+- **Gate B (operator GPU):** render-twice baseline_v2 capture for bark + kokoro + musicgen.
+
+---
+
 
 ## STATUS UPDATE (HEAD ad0ac50)
 1a (bark, 673a2bc) + 1b (kokoro, 89e90a7) SHIPPED. **1c PART 1 SHIPPED (ad0ac50):**
