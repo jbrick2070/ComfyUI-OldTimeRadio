@@ -489,10 +489,13 @@ def _check_per_cast_invariants(
         else:
             voice_preset = row.get("voice_preset")
             if not voice_preset:
-                errors.append(
-                    f"G6: cast[{idx}] (char_id={char_id!r}) has empty/"
-                    f"missing voice_preset (writer cast-lock contract "
-                    f"violation)"
+                # Sprint 2 (a): bark voice_preset is assigned by OTR_CastLock
+                # AFTER this freeze (the writer no longer stamps it), so an empty
+                # preset here is EXPECTED, not a contract violation. WARN only --
+                # CastLock's exit invariant is the hard gate now.
+                warnings.append(
+                    f"cast[{idx}] (char_id={char_id!r}) has no voice_preset yet "
+                    f"(assigned by OTR_CastLock post-freeze)"
                 )
             elif not str(voice_preset).startswith("v2/"):
                 errors.append(

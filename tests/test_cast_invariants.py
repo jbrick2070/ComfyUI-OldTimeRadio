@@ -62,6 +62,15 @@ def _lock(seed, *, num=4, force_lemmy=False):
         rng=random.Random(seed), cast_seed=seed, force_lemmy=force_lemmy,
         max_attempts_per_call=1,
     )
+    # Sprint 2 (a): the writer no longer stamps bark voice_preset -- OTR_CastLock
+    # replays it post-freeze (byte-identical, pinned by
+    # test_cast_voice_replay_parity). These coherence invariants assert on the
+    # fully-cast ledger, so apply the same replay the CastLock node applies.
+    _voices = _OTRC.replay_voice_assignment(
+        cast_seed=seed, num_characters=num, lemmy_hit=_meta["lemmy_hit"])
+    for _r in cast:
+        if _r.get("char_id") in _voices:
+            _r["voice_preset"] = _voices[_r["char_id"]]
     return cast
 
 

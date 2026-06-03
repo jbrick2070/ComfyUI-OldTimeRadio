@@ -145,6 +145,14 @@ class CastLock:
             led["meta"] = meta
         revision = int(meta.get("cast_lock_revision") or 0) + 1
 
+        # Sprint 2 (a): CastLock OWNS bark voice casting. The writer no longer
+        # stamps voice_preset -- it persists cast_seed in meta.cast_contract and
+        # CastLock replays the deterministic picker (byte-identical) and stamps
+        # the bark voices here, then runs the relocated voice invariants (Gate 1,
+        # formerly in lock_cast). Runs regardless of cast_voice_policy (the policy
+        # governs the clip-engine voice bank, not bark casting).
+        self._assign_bark_voices(cast, meta, report)
+
         if cast_voice_policy == "auto_registry":
             self._auto_registry(led, cast, voice_bank, allow_voice_reuse, report)
         else:
@@ -231,6 +239,57 @@ class CastLock:
                 log.warning(
                     "[CastLock] defensive unload_llm raised %r; proceeding", exc
                 )
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _assign_bark_voices(cast, meta, report) -> None:
+        """Sprint 2 (a): stamp bark voice_preset onto the cast by REPLAYING the
+        writer's deterministic picker.
+
+        The writer persists ``cast_seed`` (OS-entropy per episode) in
+        ``meta.cast_contract`` and no longer stamps voice_preset itself.
+        ``replay_voice_assignment`` reconstructs the exact picker sequence keyed
+        on that cast_seed -- byte-identical to what the writer used to assign
+        (pinned by tests/test_cast_voice_replay_parity.py) -- and we stamp it
+        onto the bark (non-ANNOUNCER) rows by char_id. The relocated Gate 1 voice
+        invariants then run HERE, after assignment.
+
+        A ledger with no persisted cast_seed (legacy graph / minimal test
+        fixture) cannot be replayed; its voice_preset is preserved untouched and
+        the post-assignment invariant is skipped (nothing was assigned).
+        """
+        from . import _otr_casting as _OTRCAST
+
+        contract = (meta or {}).get("cast_contract") or {}
+        cast_seed = contract.get("cast_seed")
+        if cast_seed is None:
+            report.append(
+                "bark voices: no cast_seed in meta.cast_contract -- "
+                "voice_preset preserved (no replay)"
+            )
+            return
+        num_characters = int(contract.get("num_characters_request") or 0)
+        lemmy_hit = bool(contract.get("lemmy_hit"))
+        voices = _OTRCAST.replay_voice_assignment(
+            cast_seed=int(cast_seed), num_characters=num_characters,
+            lemmy_hit=lemmy_hit,
+        )
+        stamped = 0
+        for row in cast:
+            if not isinstance(row, dict):
+                continue
+            cid = row.get("char_id")
+            if cid in voices:
+                row["voice_preset"] = voices[cid]
+                stamped += 1
+        report.append(
+            f"bark voices: replayed cast_seed -> {stamped} voice_preset(s) "
+            f"stamped (CastLock owns bark casting)"
+        )
+        # Gate 1 (relocated from the writer's lock_cast): every non-ANNOUNCER row
+        # now carries a v2/* voice_preset, and no two bark rows share a voice.
+        _OTRCAST._assert_unique_bark_voices(cast)
+        _OTRCAST._assert_voice_preset_invariant(cast)
 
     # ------------------------------------------------------------------ #
     @staticmethod

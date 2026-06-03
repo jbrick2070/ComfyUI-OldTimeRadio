@@ -188,7 +188,11 @@ class CastingResponse(BaseModel):
 
     character_description: str = Field(..., min_length=10, max_length=1500)
     gender: str = Field(..., min_length=3, max_length=12)
-    voice_preset: str = Field(..., min_length=3, max_length=80)
+    # Sprint 2 (a): voice_preset is no longer assigned by the writer -- OTR_CastLock
+    # replays the picker and stamps it after the freeze. cast_one_character leaves
+    # it EMPTY, so the field allows "" (was min_length=3). A non-empty value still
+    # caps at 80 chars.
+    voice_preset: str = Field(default="", max_length=80)
 
     @field_validator("gender")
     @classmethod
@@ -1028,13 +1032,11 @@ def cast_one_character(
         casting_brief=casting_brief,
     )
 
-    # Stage 3 -- Python picks the voice from the pre-filtered pool.
-    voice_preset = python_assign_voice_preset(
-        slot,
-        available_voices=available_voices,
-        rng=rng,
-        age_band=age_band,
-    )
+    # Sprint 2 (a): bark voice_preset is assigned by OTR_CastLock AFTER the
+    # freeze (replay_voice_assignment -- byte-identical to this picker), NOT
+    # here. The writer no longer stamps it; it stays empty through the writer +
+    # the freeze and is filled at cast-lock.
+    voice_preset = ""
 
     response = CastingResponse(
         character_description=description.character_description,
@@ -1484,21 +1486,11 @@ def lock_cast(
             cast_seed=cast_seed, meta=meta,
         )
 
-    # Post-cast voice-uniqueness invariant. Belt-and-braces guard
-    # against a future refactor breaking the pre-filter / validator /
-    # reroll chain that today already guarantees uniqueness by
-    # construction. Cheap, deterministic, fast-fails at the right
-    # spot. Per Jeffrey 2026-05-10: "ensure no two characters have
-    # the same voice model including LEMMY a hard decision."
-    #
-    # ANNOUNCER is intentionally excluded -- it's Kokoro-namespaced
-    # (bm_/bf_) and cannot collide with the Bark pool by construction.
-    # The check covers LEMMY (Bark) + all open-character Bark voices.
-    _assert_unique_bark_voices(cast)
-    # Gate 1 (voice-path-cleanbreak): every non-ANNOUNCER row carries a
-    # non-empty v2/* voice_preset. Earliest of three gates; Gate 2 lives
-    # in FreezeCascade Phase 0 G6, Gate 3 in BatchBarkGenerator.
-    _assert_voice_preset_invariant(cast)
+    # Sprint 2 (a): the bark voice_preset + uniqueness invariants relocated to
+    # OTR_CastLock's exit. The writer no longer assigns voice_preset (CastLock
+    # replays it byte-identically after the freeze), so asserting v2/* here would
+    # fail on the now-empty rows. _assert_unique_bark_voices +
+    # _assert_voice_preset_invariant run in OTR_CastLock after it stamps voices.
     # S13.1: structural-token guard. Reject cast rows whose name is a
     # SFX cue / screenplay meta-direction / parser artefact / one of
     # TITLE / NOTE / TARGET / STYLE.

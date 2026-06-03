@@ -1,14 +1,15 @@
 """tests/test_freeze_cascade_g6.py
 
-P2 Gate 2 — FreezeCascade Phase 0 / Phase 10 G6 voice_preset invariant.
-Every non-ANNOUNCER cast row must carry a non-empty ``voice_preset``
-starting with ``v2/``. Phase 0 logs the gap; Phase 10 hard-fails via
-FreezeAssertionError.
+FreezeCascade Phase 0 / Phase 10 G6 voice_preset invariant.
 
-This is the middle gate in the voice-path-cleanbreak's three-gate
-defense in depth. Gate 1 lives at the writer's lock_cast exit
-(``_otr_casting._assert_voice_preset_invariant``); Gate 3 lives in
-BatchBarkGenerator.
+Sprint 2 (a) re-timed this gate. Bark ``voice_preset`` is now assigned by
+OTR_CastLock AFTER the freeze (the writer no longer stamps it), so an EMPTY
+preset at freeze time is expected and G6 only WARNs on it. A PRESENT but
+non-``v2/`` preset on a Bark row is still a hard error (a real malformed value).
+The hard voice gate -- every non-ANNOUNCER row carries a ``v2/`` preset, no two
+collide -- moved to OTR_CastLock's exit
+(``_otr_casting._assert_voice_preset_invariant`` + ``_assert_unique_bark_voices``,
+invoked by ``OTR_CastLock._assign_bark_voices``). Gate 3 lives in the Bark engine.
 """
 from __future__ import annotations
 
@@ -46,26 +47,38 @@ def test_g6_passes_on_valid_cast():
 
 
 def test_g6_errors_on_empty_preset():
-    """Empty / missing voice_preset on a Bark row is a Phase 10 hard error."""
+    """Sprint 2 (a): empty/missing voice_preset on a Bark row is now a WARNING,
+    not a hard error -- OTR_CastLock assigns the bark voice AFTER the freeze (the
+    writer no longer stamps it), so an empty preset at freeze time is expected.
+    The hard voice gate moved to CastLock's exit invariant. (Name kept for
+    nodeid stability.)"""
     led = _make_ledger([
         {"char_id": "c01", "name": "LEMMY", "voice_preset": "", "traits": "gruff"},
     ])
     report = _LFC.run_gap_audit(led, label="test")
     g6_errors = [e for e in report.errors if "voice_preset" in e.lower()]
-    assert g6_errors, "G6 should error on empty voice_preset"
-    assert any("c01" in e or "LEMMY" in e for e in g6_errors), (
-        f"G6 error should identify the offending row: {g6_errors!r}"
+    assert not g6_errors, \
+        f"empty voice_preset must not hard-error at freeze now: {g6_errors!r}"
+    g6_warnings = [w for w in report.warnings if "voice_preset" in w.lower()]
+    assert g6_warnings, \
+        "G6 should WARN on empty voice_preset (CastLock assigns it post-freeze)"
+    assert any("c01" in w or "LEMMY" in w for w in g6_warnings), (
+        f"G6 warning should identify the offending row: {g6_warnings!r}"
     )
 
 
 def test_g6_errors_on_none_preset():
+    """Sprint 2 (a): None voice_preset is a WARNING now (see empty-preset)."""
     led = _make_ledger([
         {"char_id": "c01", "name": "LEMMY",
          "voice_preset": None, "traits": "gruff"},
     ])
     report = _LFC.run_gap_audit(led, label="test")
     g6_errors = [e for e in report.errors if "voice_preset" in e.lower()]
-    assert g6_errors, "G6 should error on None voice_preset"
+    assert not g6_errors, \
+        f"None voice_preset must not hard-error at freeze now: {g6_errors!r}"
+    g6_warnings = [w for w in report.warnings if "voice_preset" in w.lower()]
+    assert g6_warnings, "G6 should WARN on None voice_preset"
 
 
 def test_g6_errors_on_non_v2_preset():

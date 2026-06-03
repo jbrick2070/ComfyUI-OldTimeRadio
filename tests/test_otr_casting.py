@@ -715,16 +715,19 @@ def test_cast_one_character_first_attempt_success():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c1"),
     )
-    # gender comes from Python's ensemble plan; voice from the pool.
+    # gender comes from Python's ensemble plan; voice_preset is now empty here
+    # (OTR_CastLock stamps the bark voice after the freeze).
     assert r.gender in _OTRC._VALID_GENDERS
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
     assert r.character_description
 
 
 def test_cast_one_character_voice_always_in_pool():
-    """Sprint 3D: Python assigns the voice from the pre-filtered pool,
-    so the assembled CastingResponse always carries an in-pool voice
-    regardless of what the LLM emits."""
+    """Sprint 2 (a): the writer no longer assigns the bark voice --
+    cast_one_character leaves voice_preset EMPTY and OTR_CastLock stamps it
+    (from the same pre-filtered pool) after the freeze. Test name kept for
+    nodeid stability; the in-pool guarantee now lives in the CastLock parity +
+    replay tests."""
     gen = _make_canned_generate_fn([_desc_response()])
     r = _OTRC.cast_one_character(
         gen,
@@ -732,7 +735,7 @@ def test_cast_one_character_voice_always_in_pool():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-pool"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
 
 
 def test_cast_one_character_honours_precomputed_ensemble_slot():
@@ -772,7 +775,7 @@ def test_cast_one_character_max_attempts_one_single_shot_no_repair():
         prior_cast=[], available_voices=_three_voices(),
         max_attempts=1, rng=random.Random("c-single"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
 
 
 def test_cast_one_character_repair_truncates_huge_raw():
@@ -799,7 +802,7 @@ def test_cast_one_character_repair_truncates_huge_raw():
         prior_cast=[], available_voices=_three_voices(),
         max_attempts=3, rng=random.Random("c-huge"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
     repair_text = "".join(m["content"] for m in captured_messages[-1])
     assert huge_garbage not in repair_text, (
         "repair prompt embedded the full 4000-char garbage -- the "
@@ -851,7 +854,7 @@ def test_cast_one_character_rerolls_on_invalid_description_json():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-reroll"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
 
 
 def test_cast_one_character_survives_trailing_object_after_json():
@@ -924,7 +927,7 @@ def test_cast_one_character_strips_markdown_fences():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-fence"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
 
 
 def test_cast_one_character_handles_prose_preamble():
@@ -937,7 +940,7 @@ def test_cast_one_character_handles_prose_preamble():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-preamble"),
     )
-    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
 
 
 def test_cast_one_character_empty_voice_pool_raises_immediately():
@@ -1084,9 +1087,10 @@ def test_lock_cast_no_lemmy_end_to_end():
     assert cast[0]["name"] == "ANNOUNCER"
     assert cast[0]["char_id"] == "c01"
     assert [r["char_id"] for r in cast[1:]] == ["c02", "c03", "c04"]
-    # All voices distinct (Python pre-filter + uniqueness invariant)
-    voices = [r["voice_preset"] for r in cast]
-    assert len(set(voices)) == len(voices)
+    # Sprint 2 (a): the writer no longer assigns open-character voices --
+    # OTR_CastLock stamps them post-freeze, so the open rows carry empty
+    # voice_preset here. Uniqueness is asserted in the CastLock + parity tests.
+    assert all(r["voice_preset"] == "" for r in cast[1:])
     assert meta["lemmy_hit"] is False
     assert meta["num_characters_locked"] == 3
 
@@ -1111,9 +1115,9 @@ def test_lock_cast_with_lemmy_end_to_end():
     assert [r["char_id"] for r in cast[2:]] == ["c03", "c04"]
     assert meta["lemmy_hit"] is True
     assert meta["num_characters_locked"] == 3
-    # LEMMY's voice must not collide with the open-character voices.
-    voices = [r["voice_preset"] for r in cast]
-    assert len(set(voices)) == len(voices)
+    # Sprint 2 (a): open-character voices are stamped by OTR_CastLock post-freeze
+    # (empty here); LEMMY (pre-locked) keeps v2/en_speaker_8.
+    assert all(r["voice_preset"] == "" for r in cast[2:])
 
 
 def test_lock_cast_python_owns_distribution_not_the_llm():
@@ -1135,12 +1139,11 @@ def test_lock_cast_python_owns_distribution_not_the_llm():
     for row in open_rows:
         assert row["gender"] in _OTRC._VALID_GENDERS, \
             f"Python must stamp a valid gender: {row!r}"
-        assert row["voice_preset"].startswith("v2/"), \
-            f"Python must stamp a Bark voice: {row!r}"
-    # Voice uniqueness across the whole cast still holds.
-    voices = [r["voice_preset"] for r in open_rows]
-    assert len(set(voices)) == len(voices), \
-        f"Python voice assignment produced a collision: {voices!r}"
+        # Sprint 2 (a): the bark voice is no longer stamped by the writer -- it's
+        # empty here; OTR_CastLock (also pure Python, never the LLM) assigns it
+        # post-freeze. The LLM still never decides the voice.
+        assert row["voice_preset"] == "", \
+            f"writer must NOT stamp a voice (CastLock owns it now): {row!r}"
 
 
 def test_lock_cast_one_llm_call_per_open_slot():
@@ -1253,43 +1256,23 @@ def test_assert_unique_bark_voices_ignores_announcer():
     _OTRC._assert_unique_bark_voices(cast)
 
 
-def test_lock_cast_invariant_fires_at_end_if_voices_collide(
-    monkeypatch,
-):
-    """End-to-end fail-safe: simulate a future refactor where the
-    pre-filter no longer excludes already-taken voices AND voice
-    assignment no longer rejects duplicates. Two open characters get
-    the SAME Bark voice; the final invariant in lock_cast must raise.
+def test_lock_cast_invariant_fires_at_end_if_voices_collide():
+    """Fail-safe: the Bark voice-uniqueness invariant -- relocated to OTR_CastLock
+    in Sprint 2 (a) (formerly the post-cast guard inside lock_cast) -- must raise
+    if two non-ANNOUNCER rows ever carry the SAME Bark voice. lock_cast no longer
+    assigns voices, so the invariant function is exercised directly here; it's
+    exactly what OTR_CastLock._assign_bark_voices calls after it stamps. (Test
+    name kept for nodeid stability.)
     """
-    monkeypatch.setattr(
-        _POOLS, "open_voice_pool",
-        lambda taken: [
-            ("v2/en_speaker_4", "female bright 30s"),
-            ("v2/en_speaker_6", "female throaty 40s"),
-        ],
-    )
-
-    # Stub cast_one_character to always return the SAME voice -- a
-    # refactor that broke distribution. Returns a valid CastingResponse.
-    def stub_cast_one_character(generate_fn, **kwargs):  # noqa: ARG001
-        return _OTRC.CastingResponse(
-            character_description="stub character description text",
-            gender="female",
-            voice_preset="v2/en_speaker_4",
-        )
-
-    monkeypatch.setattr(_OTRC, "cast_one_character", stub_cast_one_character)
-
-    rng = random.Random("invariant-fires")
+    colliding = [
+        {"char_id": "c01", "name": "ANNOUNCER", "voice_preset": "bm_george"},
+        {"char_id": "c02", "name": "ALICE", "voice_preset": "v2/en_speaker_4"},
+        {"char_id": "c03", "name": "BOB", "voice_preset": "v2/en_speaker_4"},
+    ]
     with pytest.raises(_OTRC.CastingFailedError) as exc_info:
-        _OTRC.lock_cast(creative_fn=(lambda *_a, **_kw: ""),
-            num_characters=2,
-            news_seed="story", style="noir",
-            rng=rng,
-            force_lemmy=False,
-        )
+        _OTRC._assert_unique_bark_voices(colliding)
     assert "POST-CAST INVARIANT" in str(exc_info.value), \
-        f"final invariant must fire, got: {exc_info.value!r}"
+        f"relocated invariant must fire, got: {exc_info.value!r}"
 
 
 def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
@@ -1301,13 +1284,19 @@ def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
     All 6 assigned voices must be distinct Bark presets."""
     rng = random.Random("kokoro-bark-separation")
     gen = _make_canned_generate_fn([_desc_response()] * 6)
-    cast, _ = _OTRC.lock_cast(creative_fn=gen,
+    cast, meta = _OTRC.lock_cast(creative_fn=gen,
         num_characters=6,
         news_seed="story", style="noir",
-        rng=rng,
+        rng=rng, cast_seed=777001,
         force_lemmy=False,
     )
-    open_voices = [r["voice_preset"] for r in cast[1:]]
+    # Sprint 2 (a): the writer leaves open voices empty; OTR_CastLock stamps them
+    # via the byte-identical replay. The announcer's Kokoro voice never reduces
+    # the Bark pool (separate namespaces), so all 6 open characters resolve to
+    # distinct Bark presets after the CastLock replay.
+    voices = _OTRC.replay_voice_assignment(
+        cast_seed=777001, num_characters=6, lemmy_hit=meta["lemmy_hit"])
+    open_voices = [voices[r["char_id"]] for r in cast[1:]]
     all_bark_presets = {p for p, _, _, _ in _POOLS.VOICE_PROFILES}
     assert len(open_voices) == 6
     assert len(set(open_voices)) == 6, \
