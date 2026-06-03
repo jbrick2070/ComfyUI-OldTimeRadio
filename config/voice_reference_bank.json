@@ -1,0 +1,95 @@
+{
+  "voice_bank_id": "otr_voice_reference_bank_v1",
+  "schema_version": "1",
+  "notes": "Starter v2 voice reference bank (plan E.1). Each entry codes to config/voice_bank_entry_schema.json. ref_sha256 is 'pending' until the F GPU pilot pins the real clip hashes; ref_path is the intended on-disk location (VALIDATE_INPUTS checks local-disk presence at queue time). Bark uses presets (bark_legacy bank), not reference clips, so it is not represented here. The whole-file sha is the voice_bank_id+sha re-baseline trigger.",
+  "voices": [
+    {
+      "voice_ref_id": "cc_male_warm",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": ["warm", "baritone"],
+      "roles": ["char_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/chatterbox/cc_male_warm.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cc_male_gravel",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": ["gravel", "deep"],
+      "roles": ["char_voice"],
+      "age_band": "elder",
+      "ref_path": "models/TTS/refs/chatterbox/cc_male_gravel.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cc_female_warm",
+      "engine": "chatterbox",
+      "gender": "female",
+      "timbre": ["warm", "alto"],
+      "roles": ["char_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/chatterbox/cc_female_warm.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cc_female_bright",
+      "engine": "chatterbox",
+      "gender": "female",
+      "timbre": ["bright", "soprano"],
+      "roles": ["char_voice"],
+      "age_band": "young_adult",
+      "ref_path": "models/TTS/refs/chatterbox/cc_female_bright.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "ix_male_neutral",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": ["neutral", "clear"],
+      "roles": ["char_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/ix_male_neutral.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": false
+    },
+    {
+      "voice_ref_id": "ix_female_neutral",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": ["neutral", "clear"],
+      "roles": ["char_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/ix_female_neutral.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": false
+    },
+    {
+      "voice_ref_id": "bm_george",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": ["authoritative", "bbc"],
+      "roles": ["announcer_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bm_george.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cc_announcer_male",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": ["authoritative", "resonant"],
+      "roles": ["announcer_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/chatterbox/cc_announcer_male.wav",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    }
+  ]
+}
