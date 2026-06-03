@@ -7,10 +7,12 @@ each selectable per role; deterministic voice bank + caster; a post-freeze
 cast-lock node; a frozen `ResolvedVoiceRequest` identity/cache contract. Legacy
 path stays a permanent **byte-identical** fallback.
 
-**STATUS: Wave 0 done. Wave 1 (1a-1g) done. Wave 2a CastLock NODE done. All
-headless code is shipped + pushed behind a green gate. The remainder
-(writer cast/stamp removal, Wave 2b opt-in workflow JSON, and all GPU gates) is
-operator/GPU-gated -- see "Remaining (operator / GPU)".**
+**STATUS: Wave 0 done. Wave 1 (1a-1g) done. Wave 2a CastLock NODE done. Wave 2b
+HEADLESS done (opt-in workflow JSON + headless litegraph builder + 16 link
+tests, commit 8e3d5c2). All headless code is shipped + pushed behind a green
+gate (full tests/ 3711 passed, 13 skipped, 0 failed). The remainder (R0b live
+load, Wave 2a writer cast/stamp removal, and all GPU gates) is operator/GPU-
+gated -- see "Remaining (operator / GPU)".**
 
 ## Canonical spec (read first, don't re-derive)
 `docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` -- single source of truth
@@ -19,8 +21,11 @@ per-sprint tests, re-baseline triggers). `CLAUDE.md` + `ROADMAP.md` + `BUG_LOG.m
 auto-load.
 
 ## Git state
-- Branch `v2.0-alpha`. **HEAD = `4ea3fc2` == `origin/v2.0-alpha`** (pushed; verify
-  with `git rev-parse HEAD` vs `origin/v2.0-alpha` first).
+- Branch `v2.0-alpha`. **HEAD = `8e3d5c2` == `origin/v2.0-alpha`** (pushed; verify
+  with `git rev-parse HEAD` vs `origin/v2.0-alpha` first). `8e3d5c2` = Wave 2b
+  headless (opt-in workflow JSON + `scripts/build_optin_audio_v2_workflow.py` +
+  `tests/test_optin_audio_v2_workflow.py`), on top of `8d1c99f` (handoff doc)
+  and `4ea3fc2` (2a CastLock).
 - Wave 0 code ended at `34bbbd2`. This session added, in order:
   - `6b15e7c` 1a OTR_BatchCharacterVoices
   - `dd11a2f` 1b OTR_AnnouncerVoice + shared voice-node base (`_otr_voice_node_common.py`)
@@ -196,7 +201,13 @@ kokoro=["",random,0.95], musicgen=["",model_id,3.0,False]).
 
 ---
 ## Resume instructions
+Wave 2b headless is DONE (`8e3d5c2`): `workflows/otr_scifi_16gb_audio_v2_optin.json`
+is built + green (16 dedicated tests + the repo workflow guardrails cover it).
 Open a fresh window with ComfyUI Desktop reachable, attach this file, and say:
-"Read this handoff and continue at Wave 2b (build the litegraph builder + the opt-in workflow
-JSON per the migration spec), then run R0b. Acknowledge when ready."
-For the writer cast/stamp removal, do it only with the R0a baseline captured first.
+"Read this handoff and continue at R0b: launch via the real .bat, load
+`workflows/otr_scifi_16gb_audio_v2_optin.json` in ComfyUI Desktop, run the stub
+engines, and confirm the 3 new audio nodes run with NO legacy node INSTANCE on
+the active path (registry nodes MAY select legacy engines via raw delegation).
+Acknowledge when ready."
+For the Wave 2a writer cast/stamp removal, do it only with the R0a baseline
+captured first (removing it blind risks shifting the legacy audio).
