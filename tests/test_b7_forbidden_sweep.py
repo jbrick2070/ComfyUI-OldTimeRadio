@@ -184,15 +184,14 @@ def test_forbidden_sweep_non_llm_marker_works():
     NON_LLM_MODEL_WIDGET_OK = True is exempt from the model-widget
     guard. This is the B6 test's responsibility (validated there);
     the sweep itself doesn't enforce the structural rule -- it
-    enforces the symbol-name extinction list. Cross-check: the three
-    audio nodes (BatchAudioGenGenerator, MusicGenTheme,
-    VRAMContextTest) flagged with the marker do NOT trigger the
-    runtime sweep (they keep their `model_id` widget legitimately).
+    enforces the symbol-name extinction list. Cross-check: VRAMContextTest
+    (flagged with the marker) does NOT trigger the runtime sweep (it keeps its
+    `model_id` widget legitimately). BatchAudioGenGenerator + MusicGenTheme were
+    retired in the audio clean-break (1c), so the exempt set is now just the one.
     """
     rc, stdout = _run_sweep_subprocess()
-    # The sweep output must not mention any of the three exempt
-    # classes as a runtime offender.
-    for cls_name in ("BatchAudioGenGenerator", "MusicGenTheme", "VRAMContextTest"):
+    # The sweep output must not mention the exempt class as a runtime offender.
+    for cls_name in ("VRAMContextTest",):
         # A runtime hit would appear under the "--- runtime (in
         # output file) ---" header; if the section exists but the
         # class name appears as an offender line, fail.

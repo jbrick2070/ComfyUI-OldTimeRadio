@@ -105,29 +105,15 @@ class TestMusicGenC7Baseline:
             "added, or removed. Capture new C7 baseline before merging."
         )
 
-    def test_musicgen_consumes_mood_prefix_helper(self):
-        """Path F (2026-05-18): MusicGen now composes prompts directly
-        from meta brief fields (atmosphere + setting + period overlay)
-        via _compose_music_prompt. The old C5g `_apply_story_brief_mood_prefix`
-        helper was retired -- mood terms are now integrated into the
-        prompt body, not prepended as a prefix. The
-        get_story_brief_music_mood helper is still called for the
-        diagnostic log line (story_brief_status + mood_terms), so the
-        consumer-helper wire stays pinned here.
+    def test_music_prompt_routes_through_brief_protocol(self):
+        """Audio clean-break (1c): the music cue prompt is composed in the
+        single-source nodes/_otr_music_prompt.py, which reads the Meta brief via
+        the brief-reader protocol (_read_brief_field) -- not a local template.
+        Replaces the retired musicgen_theme._compose_music_prompt source pin.
         """
-        src = _read_src("nodes/musicgen_theme.py")
-        # The diagnostic log still uses the helper.
-        assert "get_story_brief_music_mood" in src
-        # The composer function pulls atmosphere terms directly:
-        assert "_compose_music_prompt" in src
-
-    def test_musicgen_logs_status_for_observability(self):
-        """The mood-prefix application path must log story_brief_status
-        + mood_terms exactly once per render so soak diagnostics
-        surface which path fired."""
-        src = _read_src("nodes/musicgen_theme.py")
-        assert "story_brief_status" in src
-        assert "mood_terms" in src
+        src = _read_src("nodes/_otr_music_prompt.py")
+        assert "_read_brief_field" in src
+        assert "def compose_music_prompt" in src
 
     def test_writer_default_mistral_nemo_pinned(self):
         """The C7 baseline holds ONLY when both writer slots resolve

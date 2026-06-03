@@ -609,33 +609,8 @@ class TestVRAMGuardianNode:
 # 15. AUDIOGEN CANONICAL SFX CONSUMPTION (v1.5 Phase 1)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestAudioGenCanonicalSFX:
-    """Verify BatchAudioGenGenerator consumes canonical parser SFX items."""
-
-    def test_audiogen_no_regex_import(self):
-        """AudioGen should NOT use its own SFX regex anymore."""
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
-        with open(path, encoding="utf-8") as f:
-            src = f.read()
-        # The old duplicate regex pattern should be gone
-        assert "re.findall(r'\\[SFX:" not in src, (
-            "AudioGen still contains duplicate SFX regex. "
-            "It should consume canonical parser output instead."
-        )
-
-    # Voice-path-cleanbreak 2026-05-12 (P3): test_audiogen_reads_type_sfx
-    # was deleted. The new L3-native AudioGen iterates ledger lines via
-    # iter_lines(roles={"sfx"}) rather than the legacy parser-list
-    # `item["type"] == "sfx"` field check. Coverage moved to
-    # tests/test_audiogen_ledger.py (4 cases).
-
-    def test_audiogen_reads_description_field(self):
-        """AudioGen source should read the 'description' field from SFX items."""
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
-        with open(path, encoding="utf-8") as f:
-            src = f.read()
-        assert '"description"' in src, (
-            "AudioGen should read the 'description' field from canonical SFX items"
-        )
+# Audio clean-break 1c: TestAudioGenCanonicalSFX deleted -- the AudioGen / SFX
+# node (batch_audiogen_generator.py) was retired (SFX is out of the v2 audio
+# infrastructure), so its source-pattern tests no longer apply.
 
 

@@ -48,11 +48,10 @@ FIXED_SEEDS = {
     # the OTR_CAST_SEED / OTR_STYLE_SEED env vars as the C7 override.
     # OTR_LLMDirector seed entry deleted in voice-path-cleanbreak Sprint 2
     # (2026-05-12). Director class + workflow node are gone; no seed to set.
-    # OTR_BatchBarkGenerator (1a) + OTR_KokoroAnnouncer (1b) removed in the audio
-    # clean-break: bark + kokoro are now per_line registry engines seeded per line
-    # via deterministic_inference, not batch nodes with a single seed entry.
-    "OTR_BatchAudioGenGenerator": 42,
-    "OTR_MusicGenTheme": 42,
+    # All legacy batch audio nodes removed in the audio clean-break (1a bark,
+    # 1b kokoro, 1c musicgen + audiogen): every audio engine is now a
+    # self-contained per_line / clip registry engine seeded per line via
+    # deterministic_inference, not a batch node with a single seed entry.
 }
 
 # BUG-LOCAL-269 / 270: the writer's CAST (character names + announcer

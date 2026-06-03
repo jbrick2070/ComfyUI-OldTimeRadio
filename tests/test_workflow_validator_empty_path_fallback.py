@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_workflow_validator as wv
-from nodes import musicgen_theme
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -94,21 +93,6 @@ class TestValidatorEmptyPathFallback:
         assert "widget empty" in src
 
 
-class TestMusicgenImportErrorMessage:
-    """R-7 companion / M9: MusicGen ImportError message names the
-    install command explicitly."""
-
-    def test_musicgen_source_has_explicit_install_hint(self):
-        """The error message body must name the pip install command
-        so a fresh operator can resolve without guessing which extras
-        package is missing."""
-        src = open(musicgen_theme.__file__, encoding="utf-8").read()
-        # The exact message string lives in the ImportError branch at
-        # the transformers / MusicGen import site. We don't try to
-        # trigger the ImportError live (transformers is installed in
-        # the test env); we check the source contains the install hint.
-        assert "pip install transformers audiocraft" in src, (
-            "MusicGen ImportError branch must name explicit install "
-            "command; operator should not have to guess which extras "
-            "package is missing"
-        )
+# TestMusicgenImportErrorMessage deleted in the audio clean-break (1c): the
+# legacy musicgen_theme node was retired. The musicgen engine's "not installed"
+# fail-closed RuntimeError now lives in nodes/_otr_audio_engines/eng_musicgen.py.

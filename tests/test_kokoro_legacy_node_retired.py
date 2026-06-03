@@ -28,16 +28,10 @@ def test_kokoro_announcer_module_not_importable():
         importlib.import_module("nodes.kokoro_announcer")
 
 
-def test_kokoro_announcer_not_in_legacy_audio_nodes():
-    from nodes._otr_legacy_manifest import LEGACY_AUDIO_NODES
-
-    assert "OTR_KokoroAnnouncer" not in LEGACY_AUDIO_NODES
-
-
-def test_kokoro_announcer_not_in_committed_manifest():
-    from nodes._otr_legacy_manifest import load_committed_manifest
-
-    assert "OTR_KokoroAnnouncer" not in load_committed_manifest()["nodes"]
+# The LEGACY_AUDIO_NODES + committed-manifest assertions were dropped in the
+# audio clean-break (1c): nodes/_otr_legacy_manifest.py + the manifest JSON were
+# deleted when the last batch engine (musicgen) flipped to clip. The module-file
+# / import / registration / per_line guards below still pin kokoro's retirement.
 
 
 def test_init_has_no_kokoro_announcer_registration():

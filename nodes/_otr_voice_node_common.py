@@ -1,11 +1,12 @@
 """Shared dispatch core for the v2 voice nodes (Wave 1 / 1a + 1b).
 
 OTR_BatchCharacterVoices (1a) and OTR_AnnouncerVoice (1b) share ONE dispatch
-contract: pick an engine from the registry, FAIL CLOSED, and either delegate
-verbatim to a legacy batch node (byte-identical) or render per line into the
-existing Bark AUDIO-batch contract -- with engine teardown in ``finally`` BEFORE
-the ``done`` signal (I-7). This module holds that core so each node file declares
-only its role, its INPUT_TYPES, and its output names.
+contract: pick an engine from the registry, FAIL CLOSED, and render per line into
+the existing Bark AUDIO-batch contract -- with engine teardown in ``finally``
+BEFORE the ``done`` signal (I-7). The legacy batch-delegation path was retired in
+the audio clean-break (1c); every audio engine is now self-contained per_line /
+clip. This module holds that core so each node file declares only its role, its
+INPUT_TYPES, and its output names.
 
 The theme node (1c) is NOT built on this base: it has three AUDIO outputs and a
 ``clip`` interface, so it is self-contained.
@@ -16,17 +17,13 @@ Import-time is side-effect-free; engine libraries are lazy-imported INSIDE
 from __future__ import annotations
 
 import gc
-import json
 import logging
-import os
 
 log = logging.getLogger("OTR")
 
-_MANIFEST_FILENAME = "legacy_invocation_manifest.json"
-
 
 # --------------------------------------------------------------------------- #
-# Pure helpers (no IO at import; the manifest read happens on the dispatch path)
+# Pure helpers (no IO at import; engines are self-contained per_line / clip)
 # --------------------------------------------------------------------------- #
 def coerce_int_seed(val) -> int:
     """Reduce a ledger ``episode_seed`` (often a string) to a stable int.
@@ -47,43 +44,6 @@ def coerce_int_seed(val) -> int:
         except ValueError:
             pass
     return _seed_to_int64("episode_seed", s)
-
-
-def _manifest_path() -> str:
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(os.path.dirname(here), "config", _MANIFEST_FILENAME)
-
-
-def frozen_batch_widgets(node, role) -> list:
-    """Frozen non-``script_json`` widget defaults for a legacy batch node.
-
-    Reads ``config/legacy_invocation_manifest.json`` (generate-path IO -- never
-    INPUT_TYPES) and returns the serialized widget defaults in declaration
-    order, dropping any ``script_json`` widget (passed explicitly first). These
-    frozen values are what the R0a render-twice baseline was captured against,
-    so passing them verbatim keeps raw delegation byte-identical (re-baseline
-    trigger: ``legacy_manifest_sha``).
-    """
-    from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason
-
-    cls_name = type(node).__name__
-    with open(_manifest_path(), "r", encoding="utf-8") as fh:
-        manifest = json.load(fh)
-    entry = None
-    for spec in (manifest.get("nodes") or {}).values():
-        if spec.get("class") == cls_name:
-            entry = spec
-            break
-    if entry is None:
-        raise EngineUnusable(
-            cls_name, role, EngineUsabilityReason.MALFORMED_CONFIG,
-            f"no legacy invocation manifest entry for class {cls_name!r}",
-        )
-    return [
-        w.get("default")
-        for w in (entry.get("widgets") or [])
-        if w.get("name") != "script_json"
-    ]
 
 
 def build_engine_combo(role, fallback) -> list:
@@ -214,12 +174,7 @@ class OTRVoiceNodeBase:
             interface = getattr(adapter, "interface", "per_line")
             sr_hint = int(getattr(adapter, "sample_rate", 24000) or 24000)
 
-            if interface == "batch":
-                audio_out, line, n_clips = self._delegate_batch(
-                    adapter, engine, script_json,
-                )
-                render_log.append(line)
-            elif interface == "per_line":
+            if interface == "per_line":
                 audio_out, lines, n_clips = self._render_per_line(
                     adapter, engine, script_json, ledger_json, stereo_policy,
                 )
@@ -240,41 +195,6 @@ class OTRVoiceNodeBase:
             audio_out = empty_audio_batch(sr_hint)
         done = self._done_signal(engine, n_clips)
         return (audio_out, "\n".join(render_log), done)
-
-    # ------------------------------------------------------------------ #
-    def _delegate_batch(self, adapter, engine, script_json):
-        """Raw, byte-identical delegation to the legacy batch node (I-3).
-
-        The legacy node is handed the EXACT ``script_json`` string object and
-        the frozen manifest widget tuple -- zero transform. Returns the legacy
-        AUDIO output (slot 0) unchanged, asserted against the AUDIO-batch
-        contract, plus a log line and the batch size.
-        """
-        from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason
-        from ._otr_resolved_request import assert_audio_batch_contract
-
-        node = adapter.make_batch_node()
-        func_name = getattr(node, "FUNCTION", None)
-        fn = getattr(node, func_name, None) if func_name else None
-        if not callable(fn):
-            raise EngineUnusable(
-                engine, self.ROLE, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"legacy batch node {type(node).__name__!r} has no callable "
-                f"FUNCTION {func_name!r}",
-            )
-        widgets = frozen_batch_widgets(node, self.ROLE)
-        # Verbatim: exact upstream string first, then the frozen widget tuple.
-        result = fn(script_json, *widgets)
-        audio = result[0] if isinstance(result, tuple) else result
-        audio = assert_audio_batch_contract(
-            audio, where=f"{type(self).__name__}.delegate",
-        )
-        n = int(audio["waveform"].shape[0]) if audio["waveform"].numel() else 0
-        line = (
-            f"{self.ROLE}: delegated to legacy '{engine}' (batch, verbatim "
-            f"script_json + {len(widgets)} frozen widgets)"
-        )
-        return audio, line, n
 
     # ------------------------------------------------------------------ #
     def _render_per_line(self, adapter, engine, script_json, ledger_json,

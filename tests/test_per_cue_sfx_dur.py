@@ -101,23 +101,12 @@ def test_g7_dur_s_at_old_upper_bound_now_raises():
     )
 
 
-def test_g7_bounds_match_consumer_intersection():
-    """Sprint 10.1 (post-S6.4) drift guard. The G7 bounds MUST equal
-    the consumer-intersection of AudioGen + ProcSFX. Post-S10.1 both
-    consumers import these constants directly, so the intersection is
-    enforced structurally -- this test verifies the freeze module
-    still exposes the canonical numeric values."""
+def test_g7_bounds_canonical_values():
+    """The G7 SFX duration bounds are the canonical cleanbreak intersection.
+    AudioGen was retired in 1c; ProcSFX + the freeze cascade still consume these
+    constants from nodes/_otr_ledger_freeze.py (the single source of truth)."""
     from nodes._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
-    import nodes.batch_audiogen_generator as ag
 
-    # The consumer's module-level constants MUST be the same objects
-    # as the freeze module's. (Identity, not equality -- catches a
-    # local-shadow refactor that would silently diverge.)
-    assert ag.SFX_DUR_MIN_S is SFX_DUR_MIN_S
-    assert ag.SFX_DUR_MAX_S is SFX_DUR_MAX_S
-
-    # The numeric values themselves -- pinned for the canonical
-    # cleanbreak intersection.
     assert SFX_DUR_MIN_S == 0.5
     assert SFX_DUR_MAX_S == 10.0
 
@@ -217,34 +206,9 @@ def _l3_sfx_ledger(dur_s_list):
     }
 
 
-def test_audiogen_honors_per_cue_dur_s():
-    """AudioGen's render_queue picks up dur_s from sfx_items."""
-    from nodes.batch_audiogen_generator import BatchAudioGenGenerator
-    # We intercept just the iter+queue build path; bypass real model.
-    node = BatchAudioGenGenerator()
-    script_json = json.dumps(_l3_sfx_ledger([0.5, 4.0, None]))
-
-    captured_durations = []
-
-    def _fake_generate_audio(*a, **kw):
-        # Capture the duration arg that would've been passed.
-        captured_durations.append(kw.get("duration", a[1] if len(a) > 1 else None))
-        return np.zeros(int(32000 * 0.1), dtype=np.float32)
-
-    # Quick path: assert the sfx_items list construction picks dur_s.
-    from nodes import _otr_ledger_consumers as _OTRLC
-    led = _OTRLC.load_ledger(script_json)
-    sfx_items = []
-    for line in _OTRLC.iter_lines(led, roles={"sfx"}):
-        sfx_items.append({
-            "line_id": line.get("line_id"),
-            "text":    line.get("text"),
-            "dur_s":   line.get("dur_s"),
-        })
-    assert [it["dur_s"] for it in sfx_items] == [0.5, 4.0, None], (
-        f"sfx_items dur_s extraction broke; got "
-        f"{[it['dur_s'] for it in sfx_items]!r}"
-    )
+# test_audiogen_honors_per_cue_dur_s deleted in the audio clean-break (1c): the
+# AudioGen node was retired. The ledger-side dur_s extraction it exercised is
+# covered by the iter_lines + ProcSFX tests below + the freeze G7 tests above.
 
 
 def test_audiogen_falls_back_to_default_when_dur_s_absent():

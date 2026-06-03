@@ -4,28 +4,30 @@ The generic theme-music surface for the opt-in v2 audio lane. It emits the three
 fixed cues (opening / closing / interstitial) the EpisodeAssembler consumes, and
 picks its engine from the shared audio-engine registry, dispatching FAIL-CLOSED:
 
-  * ``musicgen`` (byte-identical legacy default, ``batch`` interface) -> RAW
-    verbatim delegation to OTR_MusicGenTheme with the exact upstream
-    ``script_json`` string plus the frozen widget tuple from
-    ``config/legacy_invocation_manifest.json`` (zero transform; I-1, I-3). The
-    legacy node returns the three cue AUDIO tensors, passed through unchanged.
-  * ``stable_audio_music`` (opt-in, flag-gated + HF-token-gated, ``clip``
-    interface) -> a music-only prompt per cue, a per-cue external seed
+Every music engine is a self-contained ``clip`` engine (the legacy
+batch-delegation path was retired in the audio clean-break, 1c):
+
+  * ``musicgen`` (default, ``clip``) -> a per-cue prompt from the Meta brief
+    (``_otr_music_prompt.compose_music_prompt``), a per-cue external seed
     (``_seed_to_int64(music_rng_seed, slot)``, G1), the adapter ``generate_clip``
     call, and ``pack_audio_batch`` into the AUDIO-batch contract (C-4).
+  * ``stable_audio_music`` (opt-in, flag-gated + HF-token-gated, ``clip``) -> the
+    same clip path; native stereo downmixed to mono while the assembly chain is
+    mono.
 
-Unlike the voice nodes this node has THREE AUDIO outputs and a ``clip`` path, so
-it is self-contained rather than built on the voice-node base; it reuses the
-shared ``frozen_batch_widgets`` / ``coerce_int_seed`` / ``build_engine_combo``
-helpers. Engine libraries are lazy-imported inside ``generate``. Teardown runs in
-``finally`` BEFORE the ``done`` signal (I-7). UTF-8, no BOM, ASCII-only source.
+Unlike the voice nodes this node has THREE AUDIO outputs, so it is self-contained
+rather than built on the voice-node base; it reuses the shared
+``coerce_int_seed`` / ``build_engine_combo`` helpers plus the
+``compose_music_prompt`` composer. Engine libraries are lazy-imported inside
+``generate``. Teardown runs in ``finally`` BEFORE the ``done`` signal (I-7).
+UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
 import gc
 import logging
 
-from ._otr_voice_node_common import build_engine_combo, coerce_int_seed, frozen_batch_widgets
+from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
 from ._otr_music_prompt import compose_music_prompt
 
 log = logging.getLogger("OTR")
@@ -147,10 +149,7 @@ class StableAudioTheme:
             adapter = get_engine(engine)
             interface = getattr(adapter, "interface", "clip")
 
-            if interface == "batch":
-                cues, line = self._delegate_batch(adapter, engine, script_json)
-                render_log.append(line)
-            elif interface == "clip":
+            if interface == "clip":
                 cues, lines = self._render_clips(
                     adapter, engine, script_json, ledger_json, stereo_policy,
                 )
@@ -176,45 +175,6 @@ class StableAudioTheme:
             cues["opening"], cues["closing"], cues["interstitial"],
             "\n".join(render_log), done,
         )
-
-    # ------------------------------------------------------------------ #
-    def _delegate_batch(self, adapter, engine, script_json):
-        """Raw, byte-identical delegation to the legacy MusicGen theme (I-3).
-
-        The legacy node is handed the exact ``script_json`` string + the frozen
-        manifest widget tuple. It returns the three cue AUDIO tensors (slots
-        0/1/2), passed through unchanged after a contract assert.
-        """
-        from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason
-        from ._otr_resolved_request import assert_audio_batch_contract
-
-        node = adapter.make_batch_node()
-        func_name = getattr(node, "FUNCTION", None)
-        fn = getattr(node, func_name, None) if func_name else None
-        if not callable(fn):
-            raise EngineUnusable(
-                engine, ROLE, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"legacy theme node {type(node).__name__!r} has no callable "
-                f"FUNCTION {func_name!r}",
-            )
-        widgets = frozen_batch_widgets(node, ROLE)
-        result = fn(script_json, *widgets)
-        if not isinstance(result, tuple) or len(result) < 3:
-            raise EngineUnusable(
-                engine, ROLE, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"legacy theme node returned {type(result).__name__} with "
-                f"fewer than 3 AUDIO outputs",
-            )
-        cues = {}
-        for i, slot in enumerate(_CUE_SLOTS):
-            cues[slot] = assert_audio_batch_contract(
-                result[i], where=f"StableAudioTheme.delegate.{slot}",
-            )
-        line = (
-            f"music: delegated to legacy '{engine}' (batch, verbatim "
-            f"script_json + {len(widgets)} frozen widgets, 3 cues)"
-        )
-        return cues, line
 
     # ------------------------------------------------------------------ #
     def _render_clips(self, adapter, engine, script_json, ledger_json,

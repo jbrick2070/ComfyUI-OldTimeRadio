@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.musicgen_theme import _compose_music_prompt, CUE_DURATIONS
+from nodes._otr_music_prompt import compose_music_prompt as _compose_music_prompt, CUE_DURATIONS
 
 
 # ---------------------------------------------------------------------------

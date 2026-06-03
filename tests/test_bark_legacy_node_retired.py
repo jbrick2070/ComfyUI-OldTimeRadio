@@ -33,16 +33,10 @@ def test_batch_bark_module_not_importable():
         importlib.import_module("nodes.batch_bark_generator")
 
 
-def test_batch_bark_not_in_legacy_audio_nodes():
-    from nodes._otr_legacy_manifest import LEGACY_AUDIO_NODES
-
-    assert "OTR_BatchBarkGenerator" not in LEGACY_AUDIO_NODES
-
-
-def test_batch_bark_not_in_committed_manifest():
-    from nodes._otr_legacy_manifest import load_committed_manifest
-
-    assert "OTR_BatchBarkGenerator" not in load_committed_manifest()["nodes"]
+# The LEGACY_AUDIO_NODES + committed-manifest assertions were dropped in the
+# audio clean-break (1c): nodes/_otr_legacy_manifest.py + the manifest JSON were
+# deleted when the last batch engine (musicgen) flipped to clip. The module-file
+# / import / registration / per_line guards below still pin bark's retirement.
 
 
 def test_init_has_no_batch_bark_registration():

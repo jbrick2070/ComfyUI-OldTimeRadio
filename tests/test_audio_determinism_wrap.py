@@ -170,14 +170,9 @@ def test_theme_dispatch_wraps_forward_in_cm():
     assert 0 <= i_with < i_call, "generate_clip must sit inside the CM"
 
 
-def test_legacy_batch_path_is_not_wrapped():
-    # The byte-identical batch delegation must NOT be inside a determinism CM
-    # (I-3: zero transform). The wrap lives only on the per-line/clip paths.
-    src = (REPO_ROOT / "nodes" / "_otr_voice_node_common.py").read_text(encoding="utf-8")
-    delegate = src[src.find("def _delegate_batch"):src.find("def _render_per_line")]
-    assert "deterministic_inference" not in delegate, (
-        "legacy batch delegation must stay outside any determinism CM (I-3)"
-    )
+# test_legacy_batch_path_is_not_wrapped deleted in the audio clean-break (1c):
+# the batch-delegation path (_delegate_batch) was retired entirely -- every audio
+# engine is now self-contained per_line / clip, each wrapped in the determinism CM.
 
 
 if __name__ == "__main__":

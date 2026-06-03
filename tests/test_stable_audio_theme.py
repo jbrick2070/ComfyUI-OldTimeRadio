@@ -8,7 +8,6 @@ HF-token gate for the opt-in Stable Audio engine.
 """
 from __future__ import annotations
 
-import hashlib
 import pathlib
 import re
 
@@ -22,38 +21,29 @@ NODE_SRC = REPO_ROOT / "nodes" / "stable_audio_theme.py"
 _WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
 
 
-def _wav(seed_str):
-    h = hashlib.sha256(seed_str.encode("utf-8")).digest()
-    wf = torch.tensor([b / 255.0 for b in h[:8]], dtype=torch.float32).reshape(1, 1, 8)
-    return {"waveform": wf, "sample_rate": 32000}
-
-
-class MusicGenTheme:  # noqa: N801 -- intentional name-mirror for the manifest lookup
-    FUNCTION = "render"
-
-    def __init__(self):
-        self.calls = []
-
-    def render(self, script_json, episode_seed="", model_id="facebook/musicgen-medium",
-               guidance_scale=3.0, allow_silence_fallback=False):
-        self.calls.append(
-            (script_json, episode_seed, model_id, guidance_scale, allow_silence_fallback)
-        )
-        return (
-            _wav(f"{script_json}|opening"),
-            _wav(f"{script_json}|closing"),
-            _wav(f"{script_json}|interstitial"),
-            "stub theme log",
-        )
-
-
-def _install_stub_musicgen(monkeypatch):
+def _stub_musicgen_generate_clip(monkeypatch, recorder):
+    """Stub the per-cue clip generate_clip so the theme dispatch runs without
+    transformers / GPU. Audio clean-break 1c: musicgen is a clip engine."""
     from nodes._otr_audio_engines import get_engine
 
     musicgen = get_engine("musicgen")
-    stub = MusicGenTheme()
-    monkeypatch.setattr(musicgen, "make_batch_node", lambda: stub)
-    return stub
+
+    def _gen(prompt, duration_s, seed):
+        recorder.append({"prompt": prompt, "duration_s": duration_s, "seed": seed})
+        return {"waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+                "sample_rate": 32000}
+
+    monkeypatch.setattr(musicgen, "generate_clip", _gen)
+    return musicgen
+
+
+def _ledger(meta=None):
+    import json
+
+    return json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [], "lines": [], "meta": meta or {},
+    })
 
 
 def _serialized_slots(input_types: dict) -> list:
@@ -117,45 +107,36 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     assert engines
 
 
-def test_no_mutation_exact_string_and_frozen_widgets(monkeypatch):
-    from nodes.stable_audio_theme import StableAudioTheme
-
-    stub = _install_stub_musicgen(monkeypatch)
-    script = '{"meta": {"music_mood_terms": ["tense"]}}'
-    StableAudioTheme().generate(script_json=script, engine="musicgen")
-    assert len(stub.calls) == 1
-    passed_json, episode_seed, model_id, guidance, allow_fb = stub.calls[0]
-    assert passed_json is script, "script_json must pass through verbatim (I-3)"
-    # Frozen manifest widget tuple for OTR_MusicGenTheme (no script_json widget).
-    assert (episode_seed, model_id, guidance, allow_fb) == (
-        "", "facebook/musicgen-medium", 3.0, False,
-    )
-
-
-def test_golden_three_cue_passthrough_sha(monkeypatch):
-    from nodes._otr_audio_utils import audio_sha16
-    from nodes.stable_audio_theme import StableAudioTheme
-
-    stub = _install_stub_musicgen(monkeypatch)
-    script = '{"meta": {}}'
-    op, cl, inter, _log = stub.render(script, "", "facebook/musicgen-medium", 3.0, False)
-    out = StableAudioTheme().generate(script_json=script, engine="musicgen")
-    assert audio_sha16(out[0]) == audio_sha16(op)
-    assert audio_sha16(out[1]) == audio_sha16(cl)
-    assert audio_sha16(out[2]) == audio_sha16(inter)
-
-
-def test_execute_returns_five_outputs_contract(monkeypatch):
+def test_musicgen_clip_renders_three_cues(monkeypatch):
     from nodes._otr_resolved_request import assert_audio_batch_contract
     from nodes.stable_audio_theme import StableAudioTheme
 
-    _install_stub_musicgen(monkeypatch)
-    out = StableAudioTheme().generate(script_json='{"meta": {}}', engine="musicgen")
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    out = StableAudioTheme().generate(script_json=_ledger(), engine="musicgen")
     assert isinstance(out, tuple) and len(out) == 5
+    assert len(calls) == 3  # opening / closing / interstitial via _render_clips
     for i in range(3):
         assert_audio_batch_contract(out[i], where=f"test.cue{i}")
     assert isinstance(out[3], str)
     assert out[4].startswith("music:done")
+
+
+def test_musicgen_clip_prompt_from_meta_brief(monkeypatch):
+    """The cue prompt is composed from the Meta brief (clean-break 1c)."""
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    meta = {
+        "story_brief_status": "ok",
+        "story_brief_terms": {"setting": ["dim room"], "atmosphere": ["tense"]},
+        "music_mood_terms": ["sombre", "uneasy"],
+    }
+    StableAudioTheme().generate(script_json=_ledger(meta), engine="musicgen")
+    opening = calls[0]["prompt"]
+    assert "sombre" in opening
+    assert opening.endswith("instrumental only, no dialogue, no vocals")
 
 
 def test_dispatch_fails_closed_with_taxonomy(monkeypatch):

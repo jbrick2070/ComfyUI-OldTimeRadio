@@ -79,10 +79,18 @@ def test_kokoro_is_per_line_after_cleanbreak_1b():
     assert AE.get_engine("kokoro").interface == "per_line"
 
 
-def test_remaining_legacy_engines_are_batch_interface():
-    # MusicGen still delegates to its legacy batch node until the 1c clean-break.
-    for n in ("musicgen",):
-        assert AE.get_engine(n).interface == "batch"
+def test_musicgen_is_clip_after_cleanbreak_1c():
+    # Audio clean-break (1c): musicgen flipped from batch delegation to a
+    # self-contained clip engine (eng_musicgen.py).
+    assert AE.get_engine("musicgen").interface == "clip"
+
+
+def test_no_batch_interface_engines_remain():
+    # Clean-break complete (1a/1b/1c): every registered audio engine is
+    # self-contained per_line / clip; the batch-delegation layer is retired.
+    for n in ("bark", "chatterbox", "indextts2", "kokoro", "musicgen",
+              "stable_audio_music"):
+        assert AE.get_engine(n).interface in ("per_line", "clip"), n
 
 
 if __name__ == "__main__":
