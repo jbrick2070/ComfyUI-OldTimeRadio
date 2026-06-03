@@ -3,10 +3,10 @@
 The generic announcer-voice surface for the opt-in v2 audio lane. Shares the
 voice-node dispatch core with OTR_BatchCharacterVoices:
 
-  * ``kokoro`` (byte-identical legacy default, ``batch`` interface) -> RAW
-    verbatim delegation to OTR_KokoroAnnouncer with the exact upstream
-    ``script_json`` string plus the frozen widget tuple from
-    ``config/legacy_invocation_manifest.json`` (zero transform; I-1, I-3).
+  * ``kokoro`` (default, ``per_line``) -> one announcer line per call via the
+    self-contained Kokoro engine (audio clean-break 1b). One British voice is
+    chosen per episode (seeded from episode_seed); the voice .pt is verified on
+    local disk in a C-7 preflight (never fetched during execute).
   * ``chatterbox`` (opt-in, flag-gated, ``per_line``) -> one frozen
     ``ResolvedVoiceRequest`` per announcer line, prepared text, the adapter
     call, then ``pack_audio_batch`` into the Bark AUDIO-batch contract (C-4).

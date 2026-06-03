@@ -55,7 +55,7 @@ profiles:
     commercial_clean: true         # Apache-2.0
     model_path: ""
     model_sha256: ""
-    default_params: {speed: 1.0}
+    default_params: {speed: 0.95}   # matches the shipped announcer cadence (was 1.0; aligned to live behavior, clean-break 1b)
     allowed_voice_banks: [kokoro_builtin]
     engine_impl_version: "1"
     sample_rate: 24000

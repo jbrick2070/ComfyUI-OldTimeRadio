@@ -297,10 +297,10 @@ VOICE_PROFILES = [
 # Pool composition (2 male + 2 female) drives the natural 50/50 announcer
 # gender split per episode that Jeffrey called out 2026-05-10.
 #
-# Source of truth: this list duplicates `ANNOUNCER_VOICE_POOL` in
-# nodes/kokoro_announcer.py:37 verbatim. Keep them in sync; a P2 follow-up
-# is to import the pool here from kokoro_announcer.py so there's one
-# canonical list (see project_cast_contract_p2_followups.md).
+# Source of truth: this list mirrors `ANNOUNCER_VOICE_POOL` in
+# nodes/_otr_audio_engines/eng_kokoro.py (the per_line kokoro engine, audio
+# clean-break 1b). Keep them in sync; a follow-up is to import the pool from
+# there so there is one canonical list.
 ANNOUNCER_PRESETS = [
     ("bm_george", "BBC authoritative male"),
     ("bm_fable",  "documentary relaxed male"),

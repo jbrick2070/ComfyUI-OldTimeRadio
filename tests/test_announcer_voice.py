@@ -1,14 +1,14 @@
 """Wave 1 / 1b -- OTR_AnnouncerVoice generic announcer-voice node.
 
-Headless (CUDA masked by tests/conftest.py). The byte-identical batch path is
-exercised by stubbing the legacy delegate with a node whose class NAME matches
-the legacy ``KokoroAnnouncer`` so the frozen-manifest widget lookup resolves,
-then asserting verbatim delegation + passthrough sha equality. Fail-closed and
-zero-line paths run with no engine library installed.
+Headless (CUDA masked by tests/conftest.py). After the audio clean-break 1b,
+kokoro is a per_line engine, so the dispatch is exercised by stubbing the
+per-line ``generate_voice`` (and the C-7 voice-file check) and asserting the
+announcer per-line contract: episode-seeded voice pick, packing, gate, teardown.
+Fail-closed and zero-line paths run with no engine library installed.
 """
 from __future__ import annotations
 
-import hashlib
+import json
 import pathlib
 import re
 
@@ -23,28 +23,34 @@ COMMON_SRC = REPO_ROOT / "nodes" / "_otr_voice_node_common.py"
 _WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
 
 
-class KokoroAnnouncer:  # noqa: N801 -- intentional name-mirror for the manifest lookup
-    FUNCTION = "render"
+def _stub_kokoro_generate_voice(monkeypatch, recorder):
+    """Stub the per-line kokoro generate_voice and make begin_episode's C-7
+    voice-file check pass, so the dispatch contract runs without kokoro / GPU."""
+    from nodes._otr_audio_engines import eng_kokoro, get_engine
 
-    def __init__(self):
-        self.calls = []
-
-    def render(self, script_json, episode_seed="", voice_override="random", speed=0.95):
-        self.calls.append((script_json, episode_seed, voice_override, speed))
-        h = hashlib.sha256(
-            f"{script_json}|{episode_seed}|{voice_override}|{speed}".encode("utf-8")
-        ).digest()
-        wf = torch.tensor([b / 255.0 for b in h[:8]], dtype=torch.float32).reshape(1, 1, 8)
-        return ({"waveform": wf, "sample_rate": 24000}, "stub render log", "bm_george")
-
-
-def _install_stub_kokoro(monkeypatch):
-    from nodes._otr_audio_engines import get_engine
-
+    # __file__ exists, so begin_episode's os.path.exists preflight passes.
+    monkeypatch.setattr(eng_kokoro, "_kokoro_voice_path", lambda v: __file__)
     kokoro = get_engine("kokoro")
-    stub = KokoroAnnouncer()
-    monkeypatch.setattr(kokoro, "make_batch_node", lambda: stub)
-    return stub
+
+    def _gen(text, voice_ref, delivery_vector, seed):
+        recorder.append({"text": text, "voice_ref": voice_ref, "seed": seed})
+        return {"waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+                "sample_rate": 24000}
+
+    monkeypatch.setattr(kokoro, "generate_voice", _gen)
+    return kokoro
+
+
+def _one_announcer_line_ledger(episode_seed="seed-1"):
+    """Minimal L3 ledger: one announcer line + an announcer cast row."""
+    return json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [{"char_id": "ann", "name": "ANNOUNCER",
+                  "speaker_role": "announcer"}],
+        "lines": [{"line_id": "a1", "char_id": "ann",
+                   "speaker_role": "announcer", "text": "Tonight, on the air."}],
+        "meta": {"episode_seed": episode_seed},
+    })
 
 
 def _serialized_slots(input_types: dict) -> list:
@@ -106,39 +112,63 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     assert engines
 
 
-def test_no_mutation_exact_string_and_frozen_widgets(monkeypatch):
-    from nodes.announcer_voice import AnnouncerVoice
-
-    stub = _install_stub_kokoro(monkeypatch)
-    script = '{"lines": [{"line_id": "a1", "speaker_role": "announcer"}], "meta": {}}'
-    AnnouncerVoice().generate(script_json=script, engine="kokoro")
-    assert len(stub.calls) == 1
-    passed_json, episode_seed, voice_override, speed = stub.calls[0]
-    assert passed_json is script, "script_json must pass through verbatim (I-3)"
-    # Frozen manifest widget tuple for OTR_KokoroAnnouncer (sans script_json).
-    assert (episode_seed, voice_override, speed) == ("", "random", 0.95)
-
-
-def test_golden_legacy_direct_vs_wrapper_sha(monkeypatch):
-    from nodes._otr_audio_utils import audio_sha16
-    from nodes.announcer_voice import AnnouncerVoice
-
-    stub = _install_stub_kokoro(monkeypatch)
-    script = '{"lines": [], "cast": [], "meta": {}}'
-    direct_audio, _log, _voice = stub.render(script, "", "random", 0.95)
-    out = AnnouncerVoice().generate(script_json=script, engine="kokoro")
-    assert audio_sha16(out[0]) == audio_sha16(direct_audio)
-
-
-def test_execute_stub_returns_audio_contract(monkeypatch):
+def test_kokoro_per_line_picks_episode_voice_and_packs(monkeypatch):
     from nodes._otr_resolved_request import assert_audio_batch_contract
     from nodes.announcer_voice import AnnouncerVoice
 
-    _install_stub_kokoro(monkeypatch)
-    out = AnnouncerVoice().generate(script_json='{"x": 1}', engine="kokoro")
-    assert isinstance(out, tuple) and len(out) == 3
+    calls = []
+    _stub_kokoro_generate_voice(monkeypatch, calls)
+    out = AnnouncerVoice().generate(
+        script_json=_one_announcer_line_ledger("seed-1"), engine="kokoro",
+    )
+    assert len(calls) == 1
+    # begin_episode picks one pool voice (seeded); the cast has no voice_ref_id,
+    # so the ref slot is None and eng_kokoro uses the episode pick internally.
+    assert calls[0]["voice_ref"] is None
     assert_audio_batch_contract(out[0], where="test")
     assert out[2].startswith("announcer:done")
+
+
+def test_kokoro_per_line_returns_audio_contract(monkeypatch):
+    from nodes._otr_resolved_request import assert_audio_batch_contract
+    from nodes.announcer_voice import AnnouncerVoice
+
+    _stub_kokoro_generate_voice(monkeypatch, [])
+    out = AnnouncerVoice().generate(
+        script_json=_one_announcer_line_ledger(), engine="kokoro",
+    )
+    assert isinstance(out, tuple) and len(out) == 3
+    audio = assert_audio_batch_contract(out[0], where="test")
+    assert int(audio["waveform"].shape[0]) == 1
+    assert isinstance(out[1], str)
+    assert out[2].startswith("announcer:done")
+
+
+def test_kokoro_announcer_voice_pick_is_episode_seeded():
+    """Deterministic per-episode pick from the curated pool -- preserves what
+    listeners heard from the legacy node (same pool, same seed derivation)."""
+    from nodes._otr_audio_engines.eng_kokoro import (
+        ANNOUNCER_VOICE_POOL, _pick_announcer_voice,
+    )
+
+    a = _pick_announcer_voice("seed-1")
+    b = _pick_announcer_voice("seed-1")
+    assert a == b and a in ANNOUNCER_VOICE_POOL
+
+
+def test_kokoro_begin_episode_c7_named_error_when_voice_absent(monkeypatch):
+    """C-7: a missing voice file is a NAMED error at preflight, never a download."""
+    from nodes._otr_audio_engines import eng_kokoro
+    from nodes._otr_audio_engines.registry import (
+        EngineUnusable, EngineUsabilityReason,
+    )
+
+    monkeypatch.setattr(eng_kokoro, "_kokoro_voice_path",
+                        lambda v: "/otr/does/not/exist.pt")
+    eng = eng_kokoro.KokoroEngine()
+    with pytest.raises(EngineUnusable) as exc:
+        eng.begin_episode({"episode_seed": "seed-1"})
+    assert exc.value.reason is EngineUsabilityReason.MISSING_MODEL
 
 
 def test_dispatch_fails_closed_with_taxonomy(monkeypatch):

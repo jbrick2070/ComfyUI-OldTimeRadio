@@ -24,7 +24,6 @@ MANIFEST_PATH = _REPO / "config" / "legacy_invocation_manifest.json"
 
 # node_key -> (module suffix under nodes/, class name)
 LEGACY_AUDIO_NODES = {
-    "OTR_KokoroAnnouncer": ("kokoro_announcer", "KokoroAnnouncer"),
     "OTR_MusicGenTheme": ("musicgen_theme", "MusicGenTheme"),
     "OTR_BatchAudioGenGenerator": ("batch_audiogen_generator", "BatchAudioGenGenerator"),
 }

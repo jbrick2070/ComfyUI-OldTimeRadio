@@ -1,28 +1,6 @@
 {
   "manifest_schema_version": "1",
   "nodes": {
-    "OTR_KokoroAnnouncer": {
-      "class": "KokoroAnnouncer",
-      "widgets": [
-        {
-          "name": "script_json",
-          "default": "[]"
-        },
-        {
-          "name": "episode_seed",
-          "default": ""
-        },
-        {
-          "name": "voice_override",
-          "default": "random"
-        },
-        {
-          "name": "speed",
-          "default": 0.95
-        }
-      ],
-      "widgets_sha256": "86e0ab3556903ba180d4a911ee739c4c3db1d9e950e5b9076cf0873032ee32e0"
-    },
     "OTR_MusicGenTheme": {
       "class": "MusicGenTheme",
       "widgets": [

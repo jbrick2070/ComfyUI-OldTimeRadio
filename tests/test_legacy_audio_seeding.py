@@ -1,9 +1,10 @@
-"""R0a (d): the legacy batch audio nodes (Kokoro / MusicGen / AudioGen) seed
-every RNG from the FROZEN script_json (no parse) before their forward, so a
-render-twice is reproducible (I-2). Bark dropped here in the audio clean-break
-(1a) -- it is now a per_line registry engine seeded via deterministic_inference,
-not a batch node. Source-proxy guard (the real bit-identity check is operator
-GPU, step f), plus a functional check that seed_all_rngs is deterministic."""
+"""R0a (d): the legacy batch audio nodes (MusicGen / AudioGen) seed every RNG
+from the FROZEN script_json (no parse) before their forward, so a render-twice
+is reproducible (I-2). Bark (1a) and Kokoro (1b) dropped here in the audio
+clean-break -- they are now per_line registry engines seeded via
+deterministic_inference, not batch nodes. Source-proxy guard (the real
+bit-identity check is operator GPU, step f), plus a functional check that
+seed_all_rngs is deterministic."""
 import random
 from pathlib import Path
 
@@ -15,7 +16,6 @@ from nodes._otr_determinism import seed_all_rngs
 REPO = Path(__file__).resolve().parent.parent
 
 CASES = {
-    "kokoro_announcer.py": "kokoro_legacy_v1",
     "musicgen_theme.py": "musicgen_legacy_v1",
     "batch_audiogen_generator.py": "audiogen_legacy_v1",
 }

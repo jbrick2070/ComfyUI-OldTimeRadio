@@ -15,9 +15,10 @@ def test_committed_manifest_matches_live_surface():
 
 
 def test_all_legacy_audio_nodes_present():
-    # Bark retired from the manifest in the audio clean-break (1a) -- it is now a
-    # per_line registry engine, not a batch-delegated legacy node. The remaining
-    # legacy audio nodes (Kokoro / MusicGen / AudioGen) stay frozen here.
+    # Bark (1a) and Kokoro (1b) retired from the manifest in the audio
+    # clean-break -- they are per_line registry engines now, not batch-delegated
+    # legacy nodes. The remaining legacy audio nodes (MusicGen / AudioGen) stay
+    # frozen here.
     m = load_committed_manifest()
     assert set(m["nodes"]) == set(LEGACY_AUDIO_NODES)
 

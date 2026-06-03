@@ -163,7 +163,6 @@ _NODE_MODULES = {
     "OTR_BatchAudioGenGenerator":(".nodes.batch_audiogen_generator", "BatchAudioGenGenerator"," Batch AudioGen (Foley)"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
     "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      " Project State Loader"),
-    "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         " Kokoro Announcer"),
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           " MusicGen Theme"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            " VRAM Guardian"),
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),

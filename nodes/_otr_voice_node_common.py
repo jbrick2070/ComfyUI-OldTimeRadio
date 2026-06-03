@@ -326,6 +326,14 @@ class OTRVoiceNodeBase:
         # slot via voice_ref_field (default "voice_ref_path"); non-bark engines
         # omit the attr and keep the clip-path behavior unchanged.
         ref_field = getattr(adapter, "voice_ref_field", "voice_ref_path")
+        # Per-episode engine context (additive, engine-agnostic): an engine that
+        # needs episode-level state -- e.g. kokoro picks ONE announcer voice per
+        # episode seeded from episode_seed and runs its C-7 voice-file preflight
+        # -- does it here, once, before the per-line loop. Engines without the
+        # hook (bark / chatterbox / indextts2) are unaffected.
+        begin = getattr(adapter, "begin_episode", None)
+        if callable(begin):
+            begin(meta)
         clips: list = []
         log_lines: list = [
             f"{self.ROLE}: rendering {len(lines)} lines on '{engine}' "

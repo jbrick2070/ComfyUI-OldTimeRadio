@@ -73,10 +73,15 @@ def test_bark_is_per_line_after_cleanbreak_1a():
     assert AE.get_engine("bark").interface == "per_line"
 
 
+def test_kokoro_is_per_line_after_cleanbreak_1b():
+    # Audio clean-break (1b): kokoro flipped from batch delegation to a
+    # self-contained per_line announcer engine (eng_kokoro.py).
+    assert AE.get_engine("kokoro").interface == "per_line"
+
+
 def test_remaining_legacy_engines_are_batch_interface():
-    # Kokoro + MusicGen still delegate to their legacy batch nodes until the
-    # 1b / 1c clean-break sprints flip them too.
-    for n in ("kokoro", "musicgen"):
+    # MusicGen still delegates to its legacy batch node until the 1c clean-break.
+    for n in ("musicgen",):
         assert AE.get_engine(n).interface == "batch"
 
 
