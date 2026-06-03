@@ -20,8 +20,11 @@ Why a protocol now (before the impl):
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 from dataclasses import asdict, dataclass, fields as _dc_fields
-from typing import Iterable, Optional, Protocol, runtime_checkable
+from typing import Iterable, List, Optional, Protocol, runtime_checkable
 
 CACHE_SCHEMA_VERSION = "1"
 
@@ -152,3 +155,170 @@ class AudioCache(Protocol):
     def iter_records(self) -> Iterable[AudioCacheRecord]:
         """Iterate every persisted record (the release-gate manifest scan)."""
         ...
+
+
+# ===========================================================================
+# Wave 1f -- implementation + slim migration
+# ===========================================================================
+from ._otr_resolved_request import REQUEST_SCHEMA_VERSION  # noqa: E402
+
+# The registry-path (cast-locked) ledger schema. A pre-cast-lock ledger replayed
+# through the registry path predates voice_ref_id and must be re-rendered.
+LEDGER_SCHEMA_VERSION_TARGET = "2"
+
+
+class CacheMigrationError(RuntimeError):
+    """Raised when a stale ledger cannot be replayed through the registry path."""
+
+
+def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEMA_VERSION) -> bool:
+    """True iff a cached record's request schema differs from the build target.
+
+    The slim-migration rule (G0): a record whose ``request_schema_version`` is not
+    the current target is treated as a cache MISS so the audio is re-rendered.
+    """
+    return str(getattr(record, "request_schema_version", "")) != str(target_request_schema_version)
+
+
+def detect_ledger_schema_version(ledger: dict) -> str:
+    """Read a ledger's schema version (read-only; never mutates the ledger)."""
+    meta = (ledger or {}).get("meta") or {}
+    return str(
+        meta.get("ledger_schema_version")
+        or meta.get("schema_version")
+        or "1"
+    )
+
+
+def assert_registry_ledger_has_voice_ref_id(ledger: dict) -> None:
+    """Reject a cast-locked (registry-path) ledger whose cast lacks voice_ref_id.
+
+    A ledger that has been through CastLock carries ``meta.cast_lock_revision``;
+    every cast entry on that path must carry a ``voice_ref_id`` (I-9). An OLD
+    registry ledger that predates the field is rejected so it is re-cast rather
+    than rendered with a missing identity. A LEGACY-path ledger (no
+    cast_lock_revision) is left alone -- it keys on ``voice_preset``, not on a
+    reference id. READ-ONLY: never rewrites the ledger (the legacy raw-delegation
+    script is untouched).
+    """
+    meta = (ledger or {}).get("meta") or {}
+    if not meta.get("cast_lock_revision"):
+        return  # legacy / pre-cast-lock path: nothing to enforce
+    for entry in (ledger.get("cast") or []):
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("voice_ref_id"):
+            raise CacheMigrationError(
+                f"cast-locked ledger missing voice_ref_id for char_id "
+                f"{entry.get('char_id')!r}; re-cast required (old registry ledger)"
+            )
+
+
+class FileAudioCache:
+    """File-backed :class:`AudioCache` implementation (G0).
+
+    One sidecar JSON (``<cache_key>.json``) plus one audio buffer
+    (``<cache_key>.npy``) per entry, both named by the I-6 cache key, so a gated
+    model identifier can never leak into a cache filename (the sha key is already
+    opaque). All disk IO happens in the methods -- constructing the cache does no
+    IO (C-5). ``get`` applies the slim migration: a version-drifted record reads
+    as a miss so the audio is re-rendered.
+    """
+
+    def __init__(self, cache_dir, *, request_schema_version: str = REQUEST_SCHEMA_VERSION):
+        self.cache_dir = str(cache_dir)
+        self.request_schema_version = str(request_schema_version)
+
+    # -- key / paths --
+    def key_for(self, request) -> str:
+        return cache_key_for(request)
+
+    def _sidecar_path(self, key: str) -> str:
+        return os.path.join(self.cache_dir, f"{key}.json")
+
+    def _audio_path(self, key: str) -> str:
+        return os.path.join(self.cache_dir, f"{key}.npy")
+
+    # -- read --
+    def has(self, request) -> bool:
+        return os.path.exists(self._sidecar_path(self.key_for(request)))
+
+    def get(self, request) -> Optional[AudioCacheRecord]:
+        path = self._sidecar_path(self.key_for(request))
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                record = AudioCacheRecord.from_dict(json.load(fh))
+        except Exception:  # noqa: BLE001 -- an unreadable sidecar is a miss
+            return None
+        if needs_rerender(record, target_request_schema_version=self.request_schema_version):
+            return None  # slim migration: schema drift -> re-render
+        return record
+
+    # -- write --
+    def put(self, request, audio, *, allowed_for_release: bool = False) -> AudioCacheRecord:
+        key = self.key_for(request)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        audio_path = self._audio_path(key)
+        audio_sha = self._write_audio(audio, audio_path)
+        record = record_from_request(
+            request,
+            audio_path=audio_path,
+            audio_sha256=audio_sha,
+            allowed_for_release=allowed_for_release,
+            prepare_text_version=_prepare_text_version(),
+            delivery_projection_version=_delivery_projection_version(),
+            engine_prompt_template_version="1",
+        )
+        with open(self._sidecar_path(key), "w", encoding="utf-8") as fh:
+            json.dump(record.to_dict(), fh, sort_keys=True, separators=(",", ":"))
+        return record
+
+    # -- scan --
+    def iter_records(self) -> Iterable[AudioCacheRecord]:
+        if not os.path.isdir(self.cache_dir):
+            return
+        for name in sorted(os.listdir(self.cache_dir)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(self.cache_dir, name), "r", encoding="utf-8") as fh:
+                    yield AudioCacheRecord.from_dict(json.load(fh))
+            except Exception:  # noqa: BLE001 -- skip an unreadable sidecar
+                continue
+
+    def releasable_records(self) -> List[AudioCacheRecord]:
+        """Records marked ``allowed_for_release`` (the release manifest, G0)."""
+        return [r for r in self.iter_records() if r.allowed_for_release]
+
+    @staticmethod
+    def _write_audio(audio, path: str) -> str:
+        """Persist an AUDIO buffer to ``path`` (npy) and return its sha256."""
+        import numpy as np
+
+        wf = audio["waveform"] if isinstance(audio, dict) else audio
+        if hasattr(wf, "detach"):
+            arr = wf.detach().to("cpu").contiguous().numpy()
+        else:
+            arr = np.asarray(wf)
+        np.save(path, arr)
+        return hashlib.sha256(np.ascontiguousarray(arr).tobytes()).hexdigest()
+
+
+def _prepare_text_version() -> str:
+    try:
+        from ._otr_script_prep import PREPARE_TEXT_VERSION
+
+        return PREPARE_TEXT_VERSION
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _delivery_projection_version() -> str:
+    try:
+        from ._otr_delivery_profiles import DELIVERY_PROJECTION_VERSION
+
+        return DELIVERY_PROJECTION_VERSION
+    except Exception:  # noqa: BLE001
+        return ""
