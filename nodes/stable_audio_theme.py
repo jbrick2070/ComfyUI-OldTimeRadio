@@ -248,6 +248,7 @@ class StableAudioTheme:
         from ._otr_engine_profiles import (
             assert_model_available, assert_token_for_profile, require_resolver,
         )
+        from ._otr_determinism import deterministic_inference
         from ._otr_resolved_request import _seed_to_int64
 
         resolver = require_resolver()
@@ -270,7 +271,10 @@ class StableAudioTheme:
             prompt = _music_prompt(meta, slot)
             duration_s = _CUE_DURATIONS[slot]
             engine_seed = _seed_to_int64(music_seed_base, slot)  # G1 theme seed
-            clip = adapter.generate_clip(prompt, duration_s, engine_seed)
+            # G1: scope determinism + seed/restore around the single forward
+            # (non-strict; bit_exact is gated on the F pilot -- see voice path).
+            with deterministic_inference(engine_seed, warn_only=True):
+                clip = adapter.generate_clip(prompt, duration_s, engine_seed)
             cues[slot] = pack_audio_batch([clip], sample_rate=sr, mono=mono)
             log_lines.append(f"  [{slot}] {duration_s:.0f}s at {sr} Hz")
         return cues, log_lines

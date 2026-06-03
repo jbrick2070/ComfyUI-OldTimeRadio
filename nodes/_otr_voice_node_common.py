@@ -294,6 +294,7 @@ class OTRVoiceNodeBase:
         from ._otr_resolved_request import (
             _seed_to_int64, build_resolved_request, empty_audio_batch,
         )
+        from ._otr_determinism import deterministic_inference
         from ._otr_script_prep import prepare_text as _neutral_prepare_text
 
         sr = int(getattr(adapter, "sample_rate", 24000) or 24000)
@@ -353,7 +354,15 @@ class OTRVoiceNodeBase:
             )
             # G1: per-engine external seed reduced from the stable line seed.
             engine_seed = _seed_to_int64(engine, request.stable_line_seed)
-            audio = adapter.generate_voice(prepared, ref_clip_path, None, engine_seed)
+            # G1: scope strict-determinism + seed/restore every RNG around the
+            # single forward (I-2/C-2). warn_only=True keeps the process default
+            # non-strict so a nondeterministic CUDA op cannot crash the opt-in
+            # render on sm_120; bit_exact (warn_only=False) is gated on the F
+            # pilot verifying each engine binds an external torch.Generator.
+            with deterministic_inference(engine_seed, warn_only=True):
+                audio = adapter.generate_voice(
+                    prepared, ref_clip_path, None, engine_seed,
+                )
             clips.append(audio)
         packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
         n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
