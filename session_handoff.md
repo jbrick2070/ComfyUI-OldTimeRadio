@@ -1,19 +1,32 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 part 1 shipped)
+# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 COMPLETE; Sprint 3 subsumed)
 
-## STATUS (HEAD 5a747f0) -- SPRINT 2 PART 1 SHIPPED
-Sprint 2 (a) de-risking core shipped (5a747f0): `cast_seed` persisted in
-`meta.cast_contract` + the pure byte-identical `_otr_casting.replay_voice_assignment`
-+ the parity test (`replay == lock_cast` char-for-char, locked into regression).
-ADDITIVE -- the writer still assigns voices; the replay is proven but not yet wired.
-**PART 2 REMAINS** (the invasive gate-timing re-architecture): OTR_CastLock.lock()
-reads cast_seed+num_characters+lemmy_hit from the frozen `meta.cast_contract` and
-calls `replay_voice_assignment` for bark (stamps voice_preset per char_id,
-regardless of cast_voice_policy); remove the writer-side voice stamp; RELAX writer
-Gate 1 (`_assert_voice_preset_invariant`) + FreezeCascade Gate 2 (G6) so voice_preset
-may be absent at freeze and assigned by CastLock; convert test_otr_casting /
-test_freeze_cascade_g6 / test_writer_cast_lock_voice_preset / test_cast_contract /
-test_cast_lock / test_lock_cast_routing. Full spec in task 8. Suite 3655/12/0,
-Bug Bible green. local HEAD == origin == 5a747f0. **USE cast_seed, NOT stable_cast_seed.**
+## STATUS (HEAD 8915139) -- SPRINT 2 (a) COMPLETE + SPRINT 3 SUBSUMED
+**Sprint 2 (a) fully shipped.** Part 1 (5a747f0): cast_seed persisted + the pure
+byte-identical `replay_voice_assignment` + the parity test. Part 2 (8915139):
+OTR_CastLock OWNS bark casting -- `cast_one_character` leaves voice_preset EMPTY;
+`CastLock._assign_bark_voices` reads cast_seed+num_characters+lemmy_hit from the
+frozen `meta.cast_contract`, replays the picker (byte-identical) and stamps
+voice_preset per char_id (any cast_voice_policy), then runs the relocated Gate 1
+invariants (unique + v2/*). FreezeCascade **G6** now WARNs on an empty non-ANNOUNCER
+voice_preset (CastLock assigns post-freeze); a present-but-non-v2/ preset still
+errors. `CastingResponse.voice_preset` allows "". 5 test files converted; the parity
+test is now **load-bearing** (writer-empty -> the REAL CastLock node stamps ==
+replay == committed golden snapshot). No name drift (golden byte-identity proven),
+no audio change. No node surface changed -> no workflow JSON re-wire.
+
+**Sprint 3 (legacy audio seeding removal) = SUBSUMED by 1c** -- the per-clip legacy
+seeding lived in the retired batch nodes. Confirmed gone: test_legacy_audio_seeding +
+_otr_legacy_manifest don't exist, registry has no batch interface, the 3 retired-node
+guard tests pass. No implementable code residual.
+
+**Only residual for the whole audio overhaul = operator-GPU, deferred to Jeffrey:**
+**Gate B** = render-twice `baseline_v2` byte-identity capture for bark + kokoro +
+musicgen on the RTX 5080 (per-engine seed determinism, the new-path baseline). Then
+Sprints 4 (promotion: retire `OTR_ENABLE_*` build flags once Gate B is green) + 5
+(F probes). All GPU-gated -- nothing further implementable headless.
+
+Suite 3655/12/0, Bug Bible green, audio byte-identical green. local HEAD == origin
+== 8915139. **USE cast_seed, NOT stable_cast_seed.**
 
 ---
 
