@@ -39,7 +39,7 @@ legacy in lockstep -- do BOTH.
 - VRAM 14.5 GB ceiling. I-11: post-engine audio DSP runs on CPU. baseline_v2
   (new engines) is THE audio reference now (no v1.7 byte-identity).
 
-## What's done (committed + pushed; HEAD 4f1a853 == origin/v2.0-alpha; suite 3727/12/0)
+## What's done (committed + pushed; HEAD bf10ef7 == origin/v2.0-alpha; suite 3727/12/0)
 - 7d8b758 I-11: post-engine DSP forced to CPU (scene_sequencer._resample_audio
   dropped the GPU torchaudio path; audio_enhance.AudioEnhance.enhance is CPU-only).
 - 9b57e7a G1: inference bodies for chatterbox / indextts2 / stable_audio written
@@ -48,6 +48,12 @@ legacy in lockstep -- do BOTH.
   Flag-gated, default-off, supports_external_generator False (set True per engine
   after F). Headless (lib absent) each body fails closed with "not installed".
 - 4f1a853 clean-break directive adopted in both docs + chatterbox F result.
+- bf10ef7 1a-PREP (safe half): relocated the pure Bark per-line helpers
+  (_clean_text_for_bark / _chunk_text_for_bark / _generate_single_line) byte-exactly
+  into _otr_bark_lib.py; batch_bark_generator.py re-exports them (all import/patch
+  targets still resolve); story_orchestrator sources _generate_single_line from the
+  lib. Zero behavior change. This is the delegation-free foundation for eng_bark.
+  The flip+delete half is GATED -- see below + docs/2026-06-03-bark-cleanbreak-1a__decision-brief.md.
 
 ## F dep-pilot results (HARD prerequisite under clean-break)
 Harness scripts/otr_audio_dep_pilot.py: offline, subprocess-isolated, --python
@@ -100,12 +106,24 @@ eng_musicgen, eng_stable_audio.
     supports_external_generator + reconcile bodies vs real signatures.
 
 ## Immediate next step
-Run the bark lockstep (1a) end-to-end as ONE focused unit: read _otr_bark_lib +
-batch_bark_generator to extract the per-line bark inference; build eng_bark
-self-contained (interface per_line, real generate_voice, lazy import, AUDIO dict
-out); wire; suite green; in the SAME change delete batch_bark_generator.py + all
-refs + convert the bark byte-identity tests to baseline_v2; suite green; add a
-guard test that fails if batch_bark_generator / BatchBarkGenerator reappears.
+1a-PREP is DONE (bf10ef7): bark inference is relocated + delegation-free. The
+remaining half (flip bark to per_line + delete batch_bark_generator.py) is BLOCKED
+on two operator gates + one settled design, ALL written up with ready-to-apply
+code in docs/2026-06-03-bark-cleanbreak-1a__decision-brief.md:
+  - GATE A (decide): where the freeze-halt safety gate (BUG-276/300) re-homes.
+    It lives ONLY in batch_bark_generator today; no v2 node re-homes it; deleting
+    the node drops it. Recommend OTR_CastLock + OTR_BYPASS_FREEZE_HALT env (the
+    bypass widget cannot survive -- v2 nodes forbid extra widgets). Appendix C.
+  - GATE B (operator GPU): capture render-twice baseline_v2 for bark. The per_line
+    path is NOT byte-identical to the batch path, so baseline_v2 is the new
+    reference (clean-break directive) and I cannot capture it headless.
+  - SETTLED: voice_preset routing via a voice_ref_field adapter attr (appendix A,
+    non-breaking for chatterbox/indextts2); eng_bark per_line body (appendix B);
+    BUG-096 ledger writeback is REDUNDANT (scene_sequencer.py:768-903 already
+    writes authoritative start_s/dur_s) -> safe to drop with the node.
+Then: apply A+B+C, delete the node + bark refs (manifest/init/legacy-manifest),
+convert the 6 bark test files (list in the brief), add the reappearance guard
+test, suite green, capture baseline_v2, commit + push.
 
 ## Open questions
 - bark/kokoro/musicgen real per-line inference shapes (read _otr_bark_lib etc.).
