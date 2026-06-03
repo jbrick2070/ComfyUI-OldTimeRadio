@@ -465,7 +465,9 @@ class TestWorkflowJSONFull:
         types = {n["type"] for n in wf["nodes"]}
         required = {
             "OTR_LedgerScriptWriter",
-            "OTR_BatchBarkGenerator", "OTR_SceneSequencer",
+            # Wave 2b: OTR_BatchCharacterVoices (v2) replaced the legacy
+            # OTR_BatchBarkGenerator instance; it delegates to bark by default.
+            "OTR_BatchCharacterVoices", "OTR_SceneSequencer",
             "OTR_EpisodeAssembler",
         }
         assert not (required - types), f"Missing: {required - types}"

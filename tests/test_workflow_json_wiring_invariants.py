@@ -164,15 +164,26 @@ def test_no_ledger_json_input_sources_from_signal_lost_video_path_output(
     )
 
 
-def test_all_ledger_json_inputs_source_from_freeze_cascade_script_json(
+def test_all_ledger_json_inputs_source_from_freeze_cascade_or_castlock(
     workflow: dict, nodes_by_id: dict, links_by_id: dict,
 ) -> None:
-    """Every node with a ledger_json input must source from
-    FreezeCascade.script_json. Catches missed rewires.
+    """Every node with a ledger_json input must source from either
+    OTR_LedgerFreezeCascade.script_json (the raw frozen ledger) or
+    OTR_CastLock.ledger_json (the cast-locked ledger emitted by the v2
+    audio lane). CastLock itself must read the FreezeCascade v2 ledger
+    port, so the cast-locked ledger still traces back to the freeze
+    authority. Catches missed rewires.
     """
+    allowed = {
+        ("OTR_LedgerFreezeCascade", "script_json"),
+        ("OTR_CastLock", "ledger_json"),
+    }
     failures: list[str] = []
     seen_ledger_json_inputs = 0
+    castlock_ids: list[int] = []
     for n in workflow["nodes"]:
+        if n.get("type") == "OTR_CastLock":
+            castlock_ids.append(n["id"])
         for inp in n.get("inputs") or []:
             if inp.get("name") != "ledger_json":
                 continue
@@ -184,23 +195,32 @@ def test_all_ledger_json_inputs_source_from_freeze_cascade_script_json(
                     f"ledger_json is unlinked"
                 )
                 continue
-            src_type, src_out = _resolve_link_source(
-                link_id, links_by_id, nodes_by_id,
-            )
-            if not (
-                src_type == "OTR_LedgerFreezeCascade"
-                and src_out == "script_json"
-            ):
+            src = _resolve_link_source(link_id, links_by_id, nodes_by_id)
+            if src not in allowed:
                 failures.append(
                     f"node id={n['id']} type={n.get('type')} "
                     f"ledger_json link#{link_id} sources from "
-                    f"{src_type}.{src_out}; expected "
-                    f"OTR_LedgerFreezeCascade.script_json"
+                    f"{src[0]}.{src[1]}; expected "
+                    f"OTR_LedgerFreezeCascade.script_json or "
+                    f"OTR_CastLock.ledger_json"
                 )
     assert seen_ledger_json_inputs >= 4, (
         f"expected >=4 ledger_json inputs in default workflow; "
         f"found {seen_ledger_json_inputs}"
     )
+    # The cast-locked ledger must trace back to the FreezeCascade v2 port.
+    for cid in castlock_ids:
+        link_id = _find_input_link_id(nodes_by_id[cid], "script_json")
+        assert link_id is not None, (
+            f"OTR_CastLock id={cid} script_json is unlinked"
+        )
+        src_type, _src_out = _resolve_link_source(
+            link_id, links_by_id, nodes_by_id,
+        )
+        assert src_type == "OTR_LedgerFreezeCascade", (
+            f"OTR_CastLock id={cid} script_json sources from {src_type}; "
+            f"expected OTR_LedgerFreezeCascade (v2 ledger port)"
+        )
     assert not failures, (
         "ledger_json wiring violations:\n  " + "\n  ".join(failures)
     )

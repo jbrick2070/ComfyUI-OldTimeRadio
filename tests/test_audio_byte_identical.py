@@ -146,11 +146,19 @@ class TestWorkflowSeedContract:
         with open(_WORKFLOW, encoding="utf-8") as f:
             wf = json.load(f)
         node_types = {n["type"] for n in wf["nodes"]}
-        for target in FIXED_SEEDS:
-            assert target in node_types, (
-                f"Seed target {target} not found in workflow. "
-                f"Available: {sorted(node_types)}"
-            )
+        # Wave 2b: the legacy per-engine audio-generator nodes (FIXED_SEEDS
+        # keys) were replaced by the v2 audio lane, which delegates to those
+        # engines (byte-identical) and derives its seeds (R0a re-baseline). The
+        # audio-pipeline nodes to pin are now the v2 lane nodes.
+        v2_audio = {
+            "OTR_CastLock", "OTR_BatchCharacterVoices",
+            "OTR_AnnouncerVoice", "OTR_StableAudioTheme",
+        }
+        missing = v2_audio - node_types
+        assert not missing, (
+            f"v2 audio nodes missing from workflow: {sorted(missing)}. "
+            f"Available: {sorted(node_types)}"
+        )
 
     def test_episode_assembler_present(self):
         """EpisodeAssembler is the final audio output node."""

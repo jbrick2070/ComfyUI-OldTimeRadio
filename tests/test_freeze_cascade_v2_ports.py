@@ -73,17 +73,29 @@ def test_workflow_node62_has_seven_outputs():
     assert outs[5]["type"] == "INT" and outs[6]["type"] == "STRING"
 
 
-def test_workflow_new_ports_have_no_links():
+def test_workflow_new_ports_episode_seed_unwired_v2ledger_to_castlock():
+    # R0a appended out[5]=episode_seed + out[6]=v2_ledger_json, both unwired.
+    # Wave 2b wired out[6] -> OTR_CastLock.script_json (the cast-lock ledger
+    # authority); out[5] episode_seed stays unwired.
     outs = _node62()["outputs"]
-    assert outs[5]["links"] == [] and outs[6]["links"] == []
+    assert outs[5]["name"] == "episode_seed" and outs[5]["links"] == []
+    assert outs[6]["name"] == "v2_ledger_json"
+    v2_links = outs[6]["links"] or []
+    assert len(v2_links) == 1
+    by_id = {n["id"]: n for n in WF["nodes"]}
+    links_by_id = {lk[0]: lk for lk in WF["links"]}
+    dst = by_id[links_by_id[v2_links[0]][3]]
+    assert dst["type"] == "OTR_CastLock"
 
 
-def test_workflow_out1_fanout_preserved():
-    # out[1] script_json keeps its 13-consumer raw-delegation fan-out (link 110
-    # on out[2] news_used is unrelated; appending 5,6 shifts nothing).
+def test_workflow_out1_fanout_after_v2_audio_rewire():
+    # Wave 2b rewired the audio consumers of out[1]: the legacy 11/13/14
+    # instances + the SFX node (15) were dropped and HuMo's ledger moved to
+    # CastLock; the 3 v2 audio nodes now take the raw script_json for
+    # byte-identical batch delegation. Net 11 raw consumers remain.
     outs = _node62()["outputs"]
     assert outs[1]["name"] == "script_json"
-    assert len(outs[1]["links"]) == 13
+    assert len(outs[1]["links"]) == 11
 
 
 if __name__ == "__main__":

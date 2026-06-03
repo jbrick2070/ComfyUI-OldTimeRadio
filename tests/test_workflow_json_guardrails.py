@@ -512,16 +512,19 @@ class TestVoicePathCleanbreakWiring:
         doc = self._doc()
         nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
         # Find the single MusicGen and FreezeCascade nodes.
+        # Wave 2b: OTR_StableAudioTheme (v2) replaced the legacy
+        # OTR_MusicGenTheme instance and reads the raw FreezeCascade script_json
+        # for byte-identical batch delegation + cue mood.
         musicgens = [
             n for n in doc.get("nodes", [])
-            if n.get("type") == "OTR_MusicGenTheme"
+            if n.get("type") == "OTR_StableAudioTheme"
         ]
         cascades = [
             n for n in doc.get("nodes", [])
             if n.get("type") == "OTR_LedgerFreezeCascade"
         ]
         assert len(musicgens) == 1, (
-            f"expected exactly one OTR_MusicGenTheme; got {len(musicgens)}"
+            f"expected exactly one OTR_StableAudioTheme; got {len(musicgens)}"
         )
         assert len(cascades) == 1, (
             f"expected exactly one OTR_LedgerFreezeCascade; got {len(cascades)}"

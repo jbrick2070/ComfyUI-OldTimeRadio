@@ -42,28 +42,37 @@ def test_expected_slot_count_rules():
     assert _expected_slot_count(it) == 4
 
 
+def _manifest_vector(node_type: str) -> list:
+    """The FROZEN delegation widget vector for a legacy engine, from
+    config/legacy_invocation_manifest.json. Wave 2b replaced the legacy node
+    INSTANCES in full.json with the v2 audio lane, which delegates using these
+    vectors -- so the drift guard reads the manifest, not the workflow JSON."""
+    manifest = json.loads(
+        (REPO / "config" / "legacy_invocation_manifest.json")
+        .read_text(encoding="utf-8")
+    )
+    return [w["default"] for w in manifest["nodes"][node_type]["widgets"]]
+
+
 def test_audiogen_no_drift():
-    """AudioGen has no forceInput/seed quirk and its vector is C6-pinned;
-    expected slot count must equal the canonical workflow's saved length."""
-    node = _node(WF, "OTR_BatchAudioGenGenerator")
-    assert node is not None
+    """The AudioGen frozen delegation vector must match the class INPUT_TYPES
+    slot count (the drift that would break delegation)."""
+    wv = _manifest_vector("OTR_BatchAudioGenGenerator")
     expected = _expected_slot_count(BatchAudioGenGenerator.INPUT_TYPES())
-    actual = len(node.get("widgets_values") or [])
-    print(f"\n[AUDIOGEN] expected={expected} actual={actual}")
+    actual = len(wv)
+    print(f"\n[AUDIOGEN manifest] expected={expected} actual={actual}")
     assert actual == expected, (
-        f"AudioGen widget-vector drift: saved {actual} vs expected {expected}"
+        f"AudioGen manifest widget-vector drift: {actual} vs expected {expected}"
     )
 
 
-def test_musicgen_node14_documents_bug281():
-    """Documents the live forceInput slot-count question on node 14.
-    Prints expected (otr_api convention: script_json forceInput dropped) vs
-    the saved length. Non-asserting on equality -- this IS the open BUG-281."""
-    node = _node(WF, "OTR_MusicGenTheme")
-    assert node is not None
+def test_musicgen_manifest_documents_bug281():
+    """Documents the forceInput slot-count question on the MusicGen frozen
+    delegation vector (BUG-281). Non-asserting on equality."""
+    wv = _manifest_vector("OTR_MusicGenTheme")
     expected = _expected_slot_count(MusicGenTheme.INPUT_TYPES())
-    actual = len(node.get("widgets_values") or [])
-    print(f"\n[MUSICGEN node14] expected={expected} actual={actual} "
+    actual = len(wv)
+    print(f"\n[MUSICGEN manifest] expected={expected} actual={actual} "
           f"(drift={'YES' if expected != actual else 'no'})")
     assert isinstance(expected, int) and isinstance(actual, int)
 

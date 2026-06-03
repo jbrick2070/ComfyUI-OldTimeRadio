@@ -180,20 +180,27 @@ class TestHaltBlockSource:
 # ---------------------------------------------------------------------------
 
 
-class TestWorkflowJsonNode11:
-    def test_node_11_widgets_values_includes_bypass_default(self):
-        wf = json.loads(WORKFLOW_JSON.read_text(encoding="utf-8"))
-        node = next(n for n in wf["nodes"] if n.get("id") == 11)
-        assert node["type"] == "OTR_BatchBarkGenerator"
-        wv = node["widgets_values"]
-        # Pre-widget layout: ["[]", 0.7]. Post-widget: ["[]", 0.7, False].
+class TestBarkDelegationManifest:
+    def test_bark_manifest_widget_vector_includes_bypass_default(self):
+        # Wave 2b replaced the OTR_BatchBarkGenerator INSTANCE in full.json with
+        # the v2 OTR_BatchCharacterVoices node, which delegates to bark using the
+        # FROZEN widget vector in legacy_invocation_manifest.json. The
+        # bypass_freeze_halt=False pin now lives there (it is what the v2 lane
+        # passes to bark), so this guard reads the manifest.
+        manifest = json.loads(
+            (WORKFLOW_JSON.parent.parent / "config"
+             / "legacy_invocation_manifest.json").read_text(encoding="utf-8")
+        )
+        widgets = manifest["nodes"]["OTR_BatchBarkGenerator"]["widgets"]
+        wv = [w["default"] for w in widgets]
+        # Frozen layout: ["[]", 0.7, False] (script_json, temperature, bypass).
         assert len(wv) == 3, (
-            f"OTR_BatchBarkGenerator widgets_values length must be 3 "
-            f"after the bypass_freeze_halt widget addition; got {len(wv)}"
+            f"OTR_BatchBarkGenerator frozen widget vector must be 3 "
+            f"(script_json, temperature, bypass_freeze_halt); got {len(wv)}"
         )
         assert wv[0] == "[]"        # script_json default
         assert wv[1] == 0.7         # temperature default
         assert wv[2] is False, (
-            f"bypass_freeze_halt widget must default to False in the "
-            f"canonical workflow; got {wv[2]!r}"
+            f"bypass_freeze_halt must default to False in the delegation "
+            f"manifest; got {wv[2]!r}"
         )

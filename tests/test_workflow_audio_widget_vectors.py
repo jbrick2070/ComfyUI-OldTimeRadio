@@ -24,7 +24,26 @@ CANONICAL_WORKFLOW = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
 
 
 def _load_workflow() -> dict:
-    return json.loads(CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
+    """Node-shaped view of the legacy audio engines' FROZEN widget vectors,
+    read from config/legacy_invocation_manifest.json.
+
+    Wave 2b replaced the legacy per-engine audio-generator INSTANCES in
+    full.json with the v2 audio lane; the lane delegates to those engines using
+    the manifest's frozen widget vectors. So the drift these tests guard -- the
+    production widget vector vs the class INPUT_TYPES -- now lives in the
+    manifest, not the workflow JSON. Each manifest entry is surfaced as a
+    ``{type, widgets_values}`` node so the per-node assertions below are
+    unchanged (and now pin the exact vector the v2 lane delegates with)."""
+    manifest = json.loads(
+        (REPO_ROOT / "config" / "legacy_invocation_manifest.json")
+        .read_text(encoding="utf-8")
+    )
+    nodes = [
+        {"type": ntype,
+         "widgets_values": [w.get("default") for w in entry.get("widgets") or []]}
+        for ntype, entry in (manifest.get("nodes") or {}).items()
+    ]
+    return {"nodes": nodes}
 
 
 def _find_node(wf: dict, node_type: str) -> dict | None:

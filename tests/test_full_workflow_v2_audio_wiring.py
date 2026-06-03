@@ -28,7 +28,7 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-_WF_PATH = _REPO / "workflows" / "otr_scifi_16gb_audio_v2_optin.json"
+_WF_PATH = _REPO / "workflows" / "otr_scifi_16gb_full.json"
 
 # Registry key -> the node id the builder assigns (build order, ids 80-83).
 NEW_NODE_IDS = {
