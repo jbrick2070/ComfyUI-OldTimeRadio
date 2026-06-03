@@ -26,42 +26,18 @@ import gc
 import logging
 
 from ._otr_voice_node_common import build_engine_combo, coerce_int_seed, frozen_batch_widgets
+from ._otr_music_prompt import compose_music_prompt
 
 log = logging.getLogger("OTR")
 
 ROLE = "music"
 _LEGACY_FIRST_FALLBACK = ("musicgen", "stable_audio_music")
 
-# The three fixed theme cues + their durations (seconds). Durations are part of
-# cue identity; keep stable (mirrors the legacy MusicGen cue durations).
+# The three fixed theme cues. Durations + the per-cue prompt are composed by the
+# single-source Meta-brief composer (nodes/_otr_music_prompt.compose_music_prompt),
+# so music pulls period/setting/mood from the same propagating creative brief as
+# every other downstream creative call -- not a local template.
 _CUE_SLOTS = ("opening", "closing", "interstitial")
-_CUE_DURATIONS = {"opening": 12.0, "closing": 8.0, "interstitial": 4.0}
-_CUE_CHARACTER = {
-    "opening": "slow atmospheric build, sustained instrumental intro",
-    "closing": "resolving cadence, gentle decay into silence, instrumental outro",
-    "interstitial": "brief textural bridge, short instrumental transition",
-}
-_MUSIC_TAIL = ", instrumental only, no vocals, no dialogue"
-
-
-def _music_prompt(meta, slot) -> str:
-    """A deterministic music-only cue prompt (<500 chars, no dialogue/names).
-
-    Mines optional mood terms from the ledger meta (``music_mood_terms`` first,
-    then ``story_brief_terms.atmosphere``); falls back to a neutral seed.
-    """
-    mood = []
-    if isinstance(meta, dict):
-        mm = meta.get("music_mood_terms")
-        if isinstance(mm, list):
-            mood = [str(t).strip() for t in mm if str(t).strip()][:3]
-        if not mood:
-            terms = meta.get("story_brief_terms")
-            atmo = terms.get("atmosphere") if isinstance(terms, dict) else None
-            if isinstance(atmo, list):
-                mood = [str(t).strip() for t in atmo if str(t).strip()][:3]
-    head = ", ".join(mood) if mood else "atmospheric"
-    return f"{head}, {_CUE_CHARACTER[slot]}{_MUSIC_TAIL}"[:480]
 
 
 def _load_meta(*sources) -> dict:
@@ -268,8 +244,7 @@ class StableAudioTheme:
             f"music: rendering 3 cues on '{engine}' (profile {profile.profile_id})"
         ]
         for slot in _CUE_SLOTS:
-            prompt = _music_prompt(meta, slot)
-            duration_s = _CUE_DURATIONS[slot]
+            prompt, duration_s = compose_music_prompt(meta, slot)
             engine_seed = _seed_to_int64(music_seed_base, slot)  # G1 theme seed
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
