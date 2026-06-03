@@ -38,8 +38,8 @@ log = logging.getLogger("OTR")
 #   3. Python's warnings system (FutureWarning/UserWarning from transformers
 #      internals and Bark's hardcoded max_length=20 kwarg) → filterwarnings
 #
-# Individual node files (bark_tts.py, batch_bark_generator.py) also have
-# targeted filterwarnings calls as a belt-and-suspenders fallback.
+# The Bark library module (_otr_bark_lib.py) also has targeted
+# filterwarnings calls as a belt-and-suspenders fallback.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +160,6 @@ _NODE_MODULES = {
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       " Scene Sequencer"),
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
-    "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   " Batch Bark Generator"),
     "OTR_BatchAudioGenGenerator":(".nodes.batch_audiogen_generator", "BatchAudioGenGenerator"," Batch AudioGen (Foley)"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
     "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      " Project State Loader"),

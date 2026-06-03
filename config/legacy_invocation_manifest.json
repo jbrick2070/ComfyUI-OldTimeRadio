@@ -1,24 +1,6 @@
 {
   "manifest_schema_version": "1",
   "nodes": {
-    "OTR_BatchBarkGenerator": {
-      "class": "BatchBarkGenerator",
-      "widgets": [
-        {
-          "name": "script_json",
-          "default": "[]"
-        },
-        {
-          "name": "temperature",
-          "default": 0.7
-        },
-        {
-          "name": "bypass_freeze_halt",
-          "default": false
-        }
-      ],
-      "widgets_sha256": "cdf98ae467bde480d8fdca89705ed425214aedff1333fe76380d3604c2b3f156"
-    },
     "OTR_KokoroAnnouncer": {
       "class": "KokoroAnnouncer",
       "widgets": [

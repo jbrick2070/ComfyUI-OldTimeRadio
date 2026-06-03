@@ -224,7 +224,8 @@ def test_no_external_caller_of_legacy_symbols():
 
 
 _IMPORTER_PATHS = (
-    "nodes/batch_bark_generator.py",
+    # nodes/batch_bark_generator.py retired in the audio clean-break (1a); the
+    # bark inference lib (_otr_bark_lib.py) carries the unload_llm handoff now.
     "nodes/_otr_bark_lib.py",
     "nodes/scene_sequencer.py",
 )

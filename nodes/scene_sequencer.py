@@ -299,7 +299,7 @@ def _clean_text_for_bark(text):
 
     # -- Step 2: Drop ALL parenthetical stage directions ----------------------
     # BUG-LOCAL-101 (2026-04-28 PM): mirrors the change in
-    # batch_bark_generator._clean_text_for_bark. The two functions must stay
+    # _otr_bark_lib._clean_text_for_bark. The two functions must stay
     # behaviorally identical (test_scene_sequencer_clean_matches_batcher).
     # Parens get dropped wholesale rather than translated to Bark non-verbal
     # tokens, because rendered tokens add unwanted breath/throat audio

@@ -320,6 +320,12 @@ class OTRVoiceNodeBase:
         mono = (stereo_policy == "mono_safe")
 
         prep = getattr(adapter, "prepare_text", None)
+        # voice_ref routing (clean-break 1a): most engines clone from a reference
+        # clip path; bark routes its discrete v2/* voice_preset through the SAME
+        # positional ref slot. The adapter declares which cast field feeds the
+        # slot via voice_ref_field (default "voice_ref_path"); non-bark engines
+        # omit the attr and keep the clip-path behavior unchanged.
+        ref_field = getattr(adapter, "voice_ref_field", "voice_ref_path")
         clips: list = []
         log_lines: list = [
             f"{self.ROLE}: rendering {len(lines)} lines on '{engine}' "
@@ -332,7 +338,10 @@ class OTRVoiceNodeBase:
             cast = _OTRLC.cast_lookup(led, char_id)
             voice_ref_id = cast.get("voice_ref_id")
             voice_preset = cast.get("voice_preset")
-            ref_clip_path = cast.get("voice_ref_path") or cast.get("ref_path")
+            if ref_field == "voice_ref_path":
+                voice_ref = cast.get("voice_ref_path") or cast.get("ref_path")
+            else:
+                voice_ref = cast.get(ref_field)
             prepared = prep(text, None) if callable(prep) else _neutral_prepare_text(text)
             request = build_resolved_request(
                 role=self.ROLE,
@@ -361,7 +370,7 @@ class OTRVoiceNodeBase:
             # pilot verifying each engine binds an external torch.Generator.
             with deterministic_inference(engine_seed, warn_only=True):
                 audio = adapter.generate_voice(
-                    prepared, ref_clip_path, None, engine_seed,
+                    prepared, voice_ref, None, engine_seed,
                 )
             clips.append(audio)
         packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)

@@ -48,7 +48,9 @@ FIXED_SEEDS = {
     # the OTR_CAST_SEED / OTR_STYLE_SEED env vars as the C7 override.
     # OTR_LLMDirector seed entry deleted in voice-path-cleanbreak Sprint 2
     # (2026-05-12). Director class + workflow node are gone; no seed to set.
-    "OTR_BatchBarkGenerator": 42,
+    # OTR_BatchBarkGenerator removed in the audio clean-break (1a): bark is now a
+    # per_line registry engine seeded per line via deterministic_inference, not a
+    # batch node with a single seed entry.
     "OTR_KokoroAnnouncer": 42,
     "OTR_BatchAudioGenGenerator": 42,
     "OTR_MusicGenTheme": 42,

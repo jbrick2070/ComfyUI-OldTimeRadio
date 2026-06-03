@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 log = logging.getLogger("OTR")
 
@@ -125,6 +126,11 @@ class CastLock:
         )
 
         led = _OTRLC.load_ledger(script_json)
+        # Freeze-halt + VRAM-recovery gate, re-homed here from the legacy audio
+        # nodes (audio clean-break). CastLock runs first in the v2 audio chain
+        # (CastLock -> CharacterVoices -> Announcer -> Theme), so one gate covers
+        # every downstream audio engine instead of one copy per legacy node.
+        self._enforce_freeze_gate(led.get("meta") or {})
         get_delivery_profile(delivery_profile)  # fail-closed on unknown profile
         cast = led.get("cast") or []
         report: list = []
@@ -158,6 +164,73 @@ class CastLock:
         ledger_json = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         done = f"cast_lock:done:rev={revision}:policy={cast_voice_policy}"
         return (ledger_json, int(revision), "\n".join(report), done)
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _enforce_freeze_gate(meta) -> None:
+        """Freeze-halt + VRAM-recovery gate, re-homed from the legacy audio
+        nodes in the audio clean-break (BUG-LOCAL-276 / BUG-LOCAL-300 / E9).
+
+        freeze_verdict=='needs_full_rerun' refuses to cast/render UNLESS the
+        block is a subjective 'quality' verdict (renders with a warning -- the
+        cast is clean, only the story-critic arc is weak) or the operator sets
+        OTR_BYPASS_FREEZE_HALT=1 for sprint-time smoke iteration. A missing or
+        unknown block class is treated as structural (halt);
+        OTR_BARK_HALT_ON_QUALITY_BLOCK=1 restores strict halt-on-any. A missing
+        verdict (legacy graphs / tests) proceeds unchanged.
+
+        Then, if the cascade teardown reported an unload failure
+        (freeze_unload_ok is False), attempt one defensive unload_llm before the
+        audio chain claims VRAM -- CastLock runs before any audio engine loads,
+        so this protects the 14.5 GB ceiling (I-7).
+        """
+        verdict = (meta or {}).get("freeze_verdict")
+        if verdict == "needs_full_rerun":
+            block_class = (meta or {}).get("freeze_block_class")
+            bypass = os.environ.get("OTR_BYPASS_FREEZE_HALT", "0") == "1"
+            strict_quality = (
+                os.environ.get("OTR_BARK_HALT_ON_QUALITY_BLOCK", "0") == "1"
+            )
+            if bypass:
+                log.warning(
+                    "[CastLock] FREEZE HALT BYPASSED (OTR_BYPASS_FREEZE_HALT=1); "
+                    "casting a flagged ledger. Intended for sprint-time smoke "
+                    "iteration only; downstream gates may still surface issues. "
+                    "See BUG-LOCAL-276."
+                )
+            elif block_class == "quality" and not strict_quality:
+                log.warning(
+                    "[CastLock] freeze_verdict='needs_full_rerun' with "
+                    "freeze_block_class='quality' -- a subjective story-critic "
+                    "verdict on a cast-clean, renderable ledger, not a "
+                    "renderability failure. Proceeding. Set "
+                    "OTR_BARK_HALT_ON_QUALITY_BLOCK=1 to halt on quality blocks "
+                    "too. See BUG-LOCAL-300."
+                )
+            else:
+                raise ValueError(
+                    "OTR_CastLock: freeze cascade stamped "
+                    "freeze_verdict='needs_full_rerun' (structural -- the writer "
+                    "left the ledger in an unrenderable state). Refusing to "
+                    "cast/render. Re-run the writer phase. Set "
+                    "OTR_BYPASS_FREEZE_HALT=1 only for sprint-time smoke "
+                    "iteration. See BUG-LOCAL-276."
+                )
+
+        if (meta or {}).get("freeze_unload_ok") is False:
+            log.warning(
+                "[CastLock] meta.freeze_unload_ok=False -- cascade teardown "
+                "reported unload_llm failure; attempting one defensive unload "
+                "before the audio chain claims VRAM"
+            )
+            try:
+                from ._otr_model_loader import unload_llm
+
+                unload_llm()
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[CastLock] defensive unload_llm raised %r; proceeding", exc
+                )
 
     # ------------------------------------------------------------------ #
     @staticmethod

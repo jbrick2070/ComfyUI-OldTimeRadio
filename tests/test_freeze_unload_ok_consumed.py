@@ -2,9 +2,10 @@
 
 Pre-E9 the cascade stamped meta.freeze_unload_ok=False on its
 finally-block unload_llm failure, but no downstream consumer read the
-stamp. A leaked Mistral-Nemo cache passed silently into Bark / FLUX
-VRAM and OOM'd. Post-E9 Bark and BatchFluxRender each consult the
-flag and attempt one defensive unload before claiming VRAM.
+stamp. A leaked Mistral-Nemo cache passed silently into the audio /
+FLUX VRAM and OOM'd. Post-E9 the audio chain (re-homed to OTR_CastLock
+in the 1a clean-break) and BatchFluxRender each consult the flag and
+attempt one defensive unload before claiming VRAM.
 
 This test AST-walks the two source files for the read pattern. It
 does not exercise the defensive-unload path at runtime (that would
@@ -26,7 +27,10 @@ def _read_source(rel_path: str) -> str:
 
 
 CONSUMER_FILES = (
-    "nodes/batch_bark_generator.py",
+    # Audio clean-break (1a): the freeze_unload_ok defensive unload re-homed from
+    # the retired BatchBark node into OTR_CastLock, which runs first in the v2
+    # audio chain (before any audio engine claims VRAM).
+    "nodes/cast_lock.py",
     "visual/batch_flux_render.py",
 )
 

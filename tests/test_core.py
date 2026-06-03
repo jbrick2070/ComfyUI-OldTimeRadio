@@ -72,7 +72,7 @@ class TestCleanTextForBark:
 
     @pytest.fixture
     def clean_fn(self):
-        from nodes.batch_bark_generator import _clean_text_for_bark
+        from nodes._otr_bark_lib import _clean_text_for_bark
         return _clean_text_for_bark
 
     def test_strips_voice_tag(self, clean_fn):
@@ -121,15 +121,16 @@ class TestCleanTextForBark:
         assert clean_fn("").strip() == ""
 
     def test_scene_sequencer_clean_matches_batcher(self):
-        """Both nodes must produce identical output for the same input."""
-        from nodes.batch_bark_generator import _clean_text_for_bark as bb_clean
+        """The canonical _otr_bark_lib cleaner and the SceneSequencer copy must
+        produce identical output for the same input (regex parity)."""
+        from nodes._otr_bark_lib import _clean_text_for_bark as lib_clean
         from nodes.scene_sequencer import _clean_text_for_bark as ss_clean
         probe = "[VOICE: X, male, 40s, calm, low] [whispers] Hello [laughs] world [shouts] stop."
-        bb = bb_clean(probe)
+        lib = lib_clean(probe)
         ss = ss_clean(probe)
-        assert bb == ss, (
-            f"_clean_text_for_bark output differs between nodes:\n"
-            f"  BatchBark:     {bb!r}\n"
+        assert lib == ss, (
+            f"_clean_text_for_bark output differs between modules:\n"
+            f"  _otr_bark_lib: {lib!r}\n"
             f"  SceneSequencer:{ss!r}"
         )
 
@@ -277,9 +278,10 @@ class TestCitationGuard:
 
 # Voice-path-cleanbreak 2026-05-12 (P3): TestBarkTTSCodePatterns deleted.
 # nodes/bark_tts.py (the legacy single-line OTR_BarkTTS node) was deleted
-# in lockstep. The production Bark surface is BatchBarkGenerator
-# (batch_bark_generator.py), exercised by tests/test_bark_ledger.py +
-# tests/test_bark_cast_contract.py.
+# in lockstep. Audio clean-break (1a): the batch OTR_BatchBarkGenerator node
+# was retired too -- bark is now a per_line registry engine
+# (nodes/_otr_audio_engines/eng_bark.py), its inference in nodes/_otr_bark_lib.py,
+# exercised by tests/test_bark_cast_contract.py + tests/test_batch_character_voices.py.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

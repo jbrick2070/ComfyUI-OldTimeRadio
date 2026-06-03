@@ -9,7 +9,7 @@ without any engine library installed.
 """
 from __future__ import annotations
 
-import hashlib
+import json
 import pathlib
 import re
 
@@ -24,35 +24,36 @@ _WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
 
 
 # ----------------------------------------------------------------------------
-# Stub legacy delegate. Class NAME mirrors the real legacy node so the
-# config/legacy_invocation_manifest.json lookup in _frozen_batch_widgets
-# resolves and returns the frozen [temperature, bypass_freeze_halt] tuple.
+# Per-line bark stub. The audio clean-break (1a) flipped bark to a per_line
+# registry engine, so OTR_BatchCharacterVoices no longer delegates to a batch
+# node -- it calls adapter.generate_voice per dialogue line. We stub that one
+# method so the dispatch contract (voice_ref routing, packing, gate, teardown)
+# runs without loading Bark (CUDA masked by conftest).
 # ----------------------------------------------------------------------------
-class BatchBarkGenerator:  # noqa: N801 -- intentional name-mirror for the manifest lookup
-    FUNCTION = "generate_batch"
-
-    def __init__(self):
-        self.calls = []
-
-    def generate_batch(self, script_json, temperature=0.7, bypass_freeze_halt=False):
-        self.calls.append((script_json, temperature, bypass_freeze_halt))
-        # Deterministic waveform derived from the EXACT args, so any mutation of
-        # script_json or a different widget tuple would change the sha.
-        h = hashlib.sha256(
-            f"{script_json}|{temperature}|{bypass_freeze_halt}".encode("utf-8")
-        ).digest()
-        wf = torch.tensor([b / 255.0 for b in h[:8]], dtype=torch.float32).reshape(1, 1, 8)
-        return ({"waveform": wf, "sample_rate": 24000}, "stub batch log")
-
-
-def _install_stub_bark(monkeypatch):
-    """Point the singleton bark adapter's make_batch_node at the stub above."""
+def _stub_bark_generate_voice(monkeypatch, recorder):
+    """Point the singleton bark adapter's per-line generate_voice at a stub."""
     from nodes._otr_audio_engines import get_engine
 
     bark = get_engine("bark")
-    stub = BatchBarkGenerator()
-    monkeypatch.setattr(bark, "make_batch_node", lambda: stub)
-    return stub
+
+    def _gen(text, voice_ref, delivery_vector, seed):
+        recorder.append({"text": text, "voice_ref": voice_ref, "seed": seed})
+        return {"waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+                "sample_rate": 24000}
+
+    monkeypatch.setattr(bark, "generate_voice", _gen)
+    return bark
+
+
+def _one_char_line_ledger(preset="v2/en_speaker_3"):
+    """Minimal L3 ledger: one character line whose cast row carries the preset."""
+    return json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [{"char_id": "c01", "name": "LEMMY", "voice_preset": preset}],
+        "lines": [{"line_id": "l1", "char_id": "c01",
+                   "speaker_role": "character", "text": "Hello there."}],
+        "meta": {"episode_seed": "seed-1"},
+    })
 
 
 def _serialized_slots(input_types: dict) -> list:
@@ -123,41 +124,38 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
 
 
 # ----------------------------------------------------------------------------
-# Byte-identical batch delegation (I-3)
+# Per-line bark dispatch (audio clean-break 1a: bark is per_line, not batch)
 # ----------------------------------------------------------------------------
-def test_no_mutation_exact_string_and_frozen_widgets(monkeypatch):
-    from nodes.batch_character_voices import BatchCharacterVoices
-
-    stub = _install_stub_bark(monkeypatch)
-    script = '{"lines": [{"line_id": "l1"}], "cast": [], "meta": {}}'
-    BatchCharacterVoices().generate(script_json=script, engine="bark")
-    assert len(stub.calls) == 1
-    passed_json, temperature, bypass = stub.calls[0]
-    assert passed_json is script, "script_json must pass through verbatim (I-3)"
-    assert (temperature, bypass) == (0.7, False), "frozen manifest widget tuple"
-
-
-def test_golden_legacy_direct_vs_wrapper_sha(monkeypatch):
-    from nodes._otr_audio_utils import audio_sha16
-    from nodes.batch_character_voices import BatchCharacterVoices
-
-    stub = _install_stub_bark(monkeypatch)
-    script = '{"lines": [], "cast": [], "meta": {}}'
-    direct_audio, _ = stub.generate_batch(script, 0.7, False)
-    out = BatchCharacterVoices().generate(script_json=script, engine="bark")
-    assert audio_sha16(out[0]) == audio_sha16(direct_audio)
-
-
-def test_execute_stub_returns_audio_contract(monkeypatch):
+def test_bark_per_line_routes_voice_preset_into_ref_slot(monkeypatch):
     from nodes._otr_resolved_request import assert_audio_batch_contract
     from nodes.batch_character_voices import BatchCharacterVoices
 
-    _install_stub_bark(monkeypatch)
-    out = BatchCharacterVoices().generate(script_json='{"x": 1}', engine="bark")
-    assert isinstance(out, tuple) and len(out) == 3
+    calls = []
+    _stub_bark_generate_voice(monkeypatch, calls)
+    out = BatchCharacterVoices().generate(
+        script_json=_one_char_line_ledger("v2/en_speaker_3"), engine="bark",
+    )
+    assert len(calls) == 1
+    # appendix A: bark declares voice_ref_field="voice_preset", so the dispatch
+    # routes cast.voice_preset (NOT a clip path) into the positional ref slot.
+    assert calls[0]["voice_ref"] == "v2/en_speaker_3"
     assert_audio_batch_contract(out[0], where="test")
-    assert isinstance(out[1], str)
     assert out[2].startswith("char_voice:done")
+
+
+def test_bark_per_line_packs_audio_contract(monkeypatch):
+    from nodes._otr_resolved_request import assert_audio_batch_contract
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    _stub_bark_generate_voice(monkeypatch, [])
+    out = BatchCharacterVoices().generate(
+        script_json=_one_char_line_ledger(), engine="bark",
+    )
+    audio = assert_audio_batch_contract(out[0], where="test")
+    assert int(audio["waveform"].shape[0]) == 1  # one packed clip
+    assert int(audio["sample_rate"]) == 24000
+    assert isinstance(out, tuple) and len(out) == 3
+    assert isinstance(out[1], str)
 
 
 # ----------------------------------------------------------------------------
@@ -203,9 +201,9 @@ def test_zero_line_role_still_emits_gate_and_empty_batch(monkeypatch):
 def test_gate_in_consumed_without_crashing(monkeypatch):
     from nodes.batch_character_voices import BatchCharacterVoices
 
-    _install_stub_bark(monkeypatch)
+    _stub_bark_generate_voice(monkeypatch, [])
     out = BatchCharacterVoices().generate(
-        script_json='{"x": 1}', engine="bark",
+        script_json=_one_char_line_ledger(), engine="bark",
         gate_in="upstream:done:engine=x:clips=3",
     )
     # gate_in creates the ordering edge only; done is this node's own sentinel.

@@ -67,8 +67,16 @@ def test_assert_usable_optin_on_runs(monkeypatch):
     assert AE.assert_usable("chatterbox", "char_voice") == "chatterbox"
 
 
-def test_legacy_engines_are_batch_interface():
-    for n in ("bark", "kokoro", "musicgen"):
+def test_bark_is_per_line_after_cleanbreak_1a():
+    # Audio clean-break (1a): bark flipped from batch delegation to a
+    # self-contained per_line registry engine (nodes/_otr_audio_engines/eng_bark.py).
+    assert AE.get_engine("bark").interface == "per_line"
+
+
+def test_remaining_legacy_engines_are_batch_interface():
+    # Kokoro + MusicGen still delegate to their legacy batch nodes until the
+    # 1b / 1c clean-break sprints flip them too.
+    for n in ("kokoro", "musicgen"):
         assert AE.get_engine(n).interface == "batch"
 
 
