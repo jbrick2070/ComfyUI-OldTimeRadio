@@ -892,6 +892,56 @@ def python_assign_voice_preset(
 
 
 # ---------------------------------------------------------------------------
+# Sprint 2 (a) -- pure voice-assignment REPLAY for OTR_CastLock
+# ---------------------------------------------------------------------------
+def replay_voice_assignment(
+    *,
+    cast_seed: int,
+    num_characters: int,
+    lemmy_hit: bool,
+) -> dict:
+    """Reproduce lock_cast's deterministic bark voice_preset assignment WITHOUT
+    the LLM. Returns ``{char_id: voice_preset}`` for every non-ANNOUNCER row
+    (LEMMY, when present, plus the open slots).
+
+    Sprint 2 (a): this is the pure replay OTR_CastLock runs to OWN bark casting,
+    byte-identical to what the writer's ``lock_cast`` assigned for the same
+    (cast_seed, num_characters, lemmy_hit). It replays the EXACT seeded-rng
+    sequence the writer used -- ``random.Random(cast_seed)`` drives the announcer
+    pick + the open-slot name rolls (assemble_pre_locked_rows) + the gender
+    shuffle (precompute_ensemble_slots) + the per-slot voice pick
+    (python_assign_voice_preset). The LLM description step in lock_cast draws NO
+    cast rng, so skipping it does not perturb the sequence. The LEMMY cameo roll
+    uses OS entropy (never the seeded rng), so passing ``force_lemmy=lemmy_hit``
+    (the writer's persisted outcome) reproduces the cast structure + draw count
+    exactly. Keys on the writer's ``cast_seed`` -- NOT
+    ``_otr_voice_bank.stable_cast_seed`` (a different per-character clip seed).
+    The parity test pins ``replay == lock_cast`` char-for-char.
+    """
+    rng = random.Random(cast_seed)
+    pre_locked, open_slots, _hit = assemble_pre_locked_rows(
+        num_characters=num_characters, rng=rng, force_lemmy=bool(lemmy_hit),
+    )
+    prior_cast = [r for r in pre_locked if r["name"] != "ANNOUNCER"]
+    taken_voices = {r["voice_preset"] for r in prior_cast}
+    ensemble_slots = precompute_ensemble_slots(
+        open_slots, prior_cast=prior_cast, rng=rng, cast_seed=cast_seed,
+    )
+    name_mode = _otr_cast_env.name_mode()
+    out: dict = {r["char_id"]: r["voice_preset"] for r in prior_cast}
+    for i, (slot, ens) in enumerate(zip(open_slots, ensemble_slots)):
+        age_band = (_CASTPLAN.age_band_for_index(i)
+                    if name_mode == "llm_slot_fill" else None)
+        available_voices = _POOLS.open_voice_pool(taken_voices)
+        voice = python_assign_voice_preset(
+            ens, available_voices=available_voices, rng=rng, age_band=age_band,
+        )
+        taken_voices.add(voice)
+        out[slot.char_id] = voice
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Per-character caller -- composes the three Sprint 3D stages
 # ---------------------------------------------------------------------------
 
@@ -1668,6 +1718,7 @@ __all__ = [
     "precompute_ensemble_slots",
     "llm_write_description",
     "python_assign_voice_preset",
+    "replay_voice_assignment",
     "cast_one_character",
     "lock_cast",
 ]

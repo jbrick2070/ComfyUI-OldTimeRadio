@@ -2512,6 +2512,12 @@ class OTR_LedgerScriptWriter:
             "casting_attempts":       cast_meta["casting_attempts"],
             "num_characters_request": cast_meta["num_characters_request"],
             "num_characters_locked":  cast_meta["num_characters_locked"],
+            # Sprint 2 (a): persist the cast RNG seed so OTR_CastLock can REPLAY
+            # the deterministic bark voice assignment byte-identically. It drives
+            # the whole cast rng and is OS-entropy per episode, so it cannot be
+            # reconstructed downstream -- it must travel in the frozen ledger.
+            "cast_seed":              int(cast_seed),
+            "cast_seed_source":       str(cast_seed_source),
         }
         log.info(
             "[OTR_LedgerScriptWriter] cast locked: %d rows "
