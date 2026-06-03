@@ -45,7 +45,9 @@ on the Windows host via Desktop Commander (DC) `cmd` shell.**
 - **Env confirmed this session:** `pydantic 2.12.5` (v2 API) + `PyYAML 6.0.3` are installed in the venv.
 
 ## Shipped this session -- Wave 0 pieces 3-8 (committed + PUSHED on v2.0-alpha)
-HEAD = `34bbbd2` (== origin/v2.0-alpha; pushed + verified, 41 files, no BOM, no 0-byte). Commits:
+Wave 0 CODE ends at `34bbbd2`; current branch HEAD = `073e4ca` (this handoff doc) sitting on top.
+Both pushed (`git rev-parse HEAD` == `origin/v2.0-alpha`; verified 41 files, no BOM, no 0-byte). The
+next session should `git rev-parse HEAD` first to confirm nothing landed after `073e4ca`. Commits:
 - `dd0f86a` **#3 fail-closed registry** -- `nodes/_otr_audio_engines/registry.py`: `assert_usable` now
   FAILS CLOSED (C-6, **never silent-swap**). New `EngineUsabilityReason` enum (the 6 codes
   `gated_by_flag|missing_model|missing_hf_token|incompatible_profile|noncommercial_blocked|malformed_config`)
