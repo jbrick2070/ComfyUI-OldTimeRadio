@@ -608,7 +608,7 @@ def _bark_test_presets(presets_to_test):
     try:
         import numpy as np
         from ._otr_bark_lib import _load_bark
-        from .batch_bark_generator import _generate_single_line
+        from ._otr_bark_lib import _generate_single_line
     except ImportError as e:
         log.info("[VoiceHealth] Bark not importable (%s) - skipping health check", e)
         _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
