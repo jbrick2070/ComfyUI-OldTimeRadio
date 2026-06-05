@@ -82,7 +82,7 @@ def test_load_without_tag_fails_closed():
 
 
 # --------------------------------------------------------------------------- #
-# generate(): local POST, payload shape, reasoning_effort/grammar carried
+# generate(): local POST, payload shape, reasoning_effort carried, raw grammar rejected
 # --------------------------------------------------------------------------- #
 def test_generate_posts_local_and_returns_content(monkeypatch):
     captured = {}
@@ -108,7 +108,7 @@ def test_generate_posts_local_and_returns_content(monkeypatch):
     assert "reasoning_effort" not in captured["payload"]
 
 
-def test_generate_carries_reasoning_effort_and_grammar(monkeypatch):
+def test_generate_carries_reasoning_effort(monkeypatch):
     captured = {}
 
     def fake_post(*, base_url, payload, timeout_s):
@@ -119,10 +119,27 @@ def test_generate_carries_reasoning_effort_and_grammar(monkeypatch):
     monkeypatch.setenv("OLLAMA_REASONING_EFFORT", "none")
     ce = OLL.OllamaBackend().load("g", _row())
     OLL.OllamaBackend().generate(
-        ce, [{"role": "user", "content": "x"}], grammar='root ::= "a"',
+        ce, [{"role": "user", "content": "x"}],
     )
     assert captured["payload"]["reasoning_effort"] == "none"
-    assert captured["payload"]["grammar"] == 'root ::= "a"'
+
+
+def test_generate_rejects_raw_grammar(monkeypatch):
+    # Ollama /v1 does not accept a raw GBNF grammar; the lane fails loud rather
+    # than POST an unsupported field or silently drop it.
+    posted = {"called": False}
+
+    def fake_post(*, base_url, payload, timeout_s):
+        posted["called"] = True
+        return _ok()
+
+    monkeypatch.setattr(OLL, "_post_chat_completion", fake_post)
+    ce = OLL.OllamaBackend().load("g", _row())
+    with pytest.raises(OLL.OllamaConfigError):
+        OLL.OllamaBackend().generate(
+            ce, [{"role": "user", "content": "x"}], grammar='root ::= "a"',
+        )
+    assert posted["called"] is False
 
 
 def test_generate_fail_closed_on_non_200(monkeypatch):
@@ -155,7 +172,29 @@ def test_make_generate_fn_markers():
     ce = OLL.OllamaBackend().load("g", _row())
     fn = OLL.make_ollama_generate_fn(ce)
     assert getattr(fn, "_otr_ollama", False) is True
-    assert getattr(fn, "_otr_supports_grammar", False) is True
+    # Ollama /v1 cannot honour raw GBNF, so the lane must NOT advertise grammar
+    # support -- the style-picker inventor gates on this marker's absence.
+    assert getattr(fn, "_otr_supports_grammar", False) is False
+
+
+def test_inventor_flag_on_does_not_leak_grammar_to_ollama(monkeypatch):
+    # Even with the inventor GBNF flag ON, the Ollama lane must not advertise
+    # grammar support, so _run_inventor's gate keeps the raw grammar away from
+    # Ollama; the ordinary (no-grammar) call still works.
+    monkeypatch.setenv("OTR_ENABLE_INVENTOR_GBNF", "1")
+    captured = {}
+
+    def fake_post(*, base_url, payload, timeout_s):
+        captured["payload"] = payload
+        return _ok("ok")
+
+    monkeypatch.setattr(OLL, "_post_chat_completion", fake_post)
+    ce = OLL.OllamaBackend().load("g", _row())
+    fn = OLL.make_ollama_generate_fn(ce)
+    assert getattr(fn, "_otr_supports_grammar", False) is False
+    out = fn([{"role": "user", "content": "x"}], temperature=0.6, max_new_tokens=64)
+    assert out == "ok"
+    assert "grammar" not in captured["payload"]
 
 
 # --------------------------------------------------------------------------- #

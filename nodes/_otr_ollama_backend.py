@@ -17,12 +17,15 @@ This module is self-contained on purpose (its own HTTP POST, its own
 ``OLLAMA_*`` env, no import from ``_otr_openrouter_backend``) so the local
 lane can never be coupled to or confused with the cloud lane.
 
-It carries two levers the local llama backends honour over ``/v1``:
+It carries one lever the local Ollama daemon honours over ``/v1``:
 ``reasoning_effort`` (``OLLAMA_REASONING_EFFORT=none`` disables a thinking
-model's ``<think>`` preamble so it does not burn the output budget) and
-``grammar`` (a GBNF string the style-picker inventor passes to hard-cap output
-at exactly N descriptors, fixing an overgenerating model's 63-vs-5 break of
-the exact-count gate). UTF-8, no BOM, ASCII-only source.
+model's ``<think>`` preamble so it does not burn the output budget). Ollama's
+OpenAI-compatible ``/v1`` does NOT accept a raw top-level ``grammar`` (GBNF)
+field: structured output is expressed as a JSON-schema ``response_format`` that
+Ollama converts to GBNF internally. This lane therefore REJECTS a raw
+``grammar`` fail-loud -- the style-picker inventor never sends one here (its
+always-on parser net handles overgeneration), and a genuine llama.cpp
+``server`` would be a separate future lane. UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -210,10 +213,15 @@ class OllamaBackend:
         if response_format is not None:
             payload["response_format"] = response_format
         if grammar:
-            # GBNF decode constraint: llama.cpp / Ollama accept a top-level
-            # `grammar` over /v1. The style-picker inventor passes its exactly-N
-            # grammar so an overgenerating model cannot break the exact-count gate.
-            payload["grammar"] = grammar
+            # Ollama's OpenAI-compatible /v1 does NOT accept a raw top-level
+            # `grammar` (GBNF) field -- only a real llama.cpp `server` does.
+            # Structured output is a JSON-schema `response_format` Ollama converts
+            # to GBNF internally. Fail loud rather than POST an unsupported field
+            # or silently drop it: a lane flag must never mislead the operator.
+            raise OllamaConfigError(
+                "Ollama /v1 does not accept a raw GBNF `grammar`; express the "
+                "constraint as a JSON-schema `response_format` instead."
+            )
 
         return self._post_with_retries(base_url=base_url, payload=payload, slug=slug)
 
@@ -282,7 +290,6 @@ class OllamaBackend:
 # --------------------------------------------------------------------------- #
 def make_ollama_generate_fn(
     cache_entry: dict, *, response_format: dict | None = None,
-    grammar: str | None = None,
 ):
     """Return a generate_fn closure for a provider-tagged Ollama cache_entry.
 
@@ -292,18 +299,19 @@ def make_ollama_generate_fn(
     ``_build_truncating_generate_fn``, and the constrained-generate seam return
     it unchanged when ``cache_entry["provider"] == "ollama"``.
 
-    The ``_otr_supports_grammar`` marker lets the style-picker inventor pass its
-    exactly-N GBNF grammar ONLY to backends that honour it (this local
-    llama-server lane); local transformers backends lack the marker and stay
-    byte-identical."""
+    This lane deliberately does NOT advertise ``_otr_supports_grammar``: Ollama's
+    /v1 cannot honour a raw top-level GBNF ``grammar`` (only a JSON-schema
+    ``response_format``). The style-picker inventor gates on
+    ``getattr(fn, "_otr_supports_grammar", False)``, so the marker's absence
+    keeps its exactly-N grammar away from this lane (the inventor's always-on
+    parser net handles overgeneration). A ``grammar`` forced in anyway is
+    rejected fail-loud by ``OllamaBackend.generate``."""
     backend = OllamaBackend()
     bound_rf = response_format
-    bound_grammar = grammar
 
     def generate_fn(messages, *, temperature=None, max_new_tokens=None,
                     stop=None, response_format=None, grammar=None):
         rf = response_format if response_format is not None else bound_rf
-        g = grammar if grammar is not None else bound_grammar
         return backend.generate(
             cache_entry,
             messages,
@@ -311,12 +319,11 @@ def make_ollama_generate_fn(
             max_new_tokens=max_new_tokens,
             stop=stop,
             response_format=rf,
-            grammar=g,
+            grammar=grammar,
         )
 
     generate_fn._otr_ollama = True  # type: ignore[attr-defined]
     generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
-    generate_fn._otr_supports_grammar = True  # type: ignore[attr-defined]
     return generate_fn
 
 
