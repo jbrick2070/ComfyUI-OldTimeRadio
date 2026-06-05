@@ -12,6 +12,11 @@ Here's the whole recipe.
 Get it from https://ollama.com and make sure it's running (`ollama serve`, or the tray
 app). It exposes an OpenAI-compatible API at `http://localhost:11434/v1` — no API key.
 
+**Use a recent Ollama.** `reasoning_effort` is only honoured on newer builds — tested on
+**0.30.5** (check with `ollama --version`). If gemma-4 still comes back empty *with a full
+hidden "reasoning" field*, your build is ignoring the flag → update Ollama. That's the #1
+cause of "it just returns nothing."
+
 ## 2) Pull Gemma-4
 ```
 ollama pull hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M
