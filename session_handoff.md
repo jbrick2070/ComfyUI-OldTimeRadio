@@ -1,4 +1,4 @@
-# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-04 (late)
+# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- CURRENT (written 2026-06-05, overnight session 06-04 -> 06-05)
 
 ## Core goal
 Three things shipped on `v2.0-alpha` this session; the LAST remaining work is
