@@ -213,6 +213,22 @@ def _float_env(name: str) -> float | None:
         return None
 
 
+def _reasoning_effort_from_env() -> str | None:
+    """Read OPENROUTER_REASONING_EFFORT, the OpenAI-standard reasoning control
+    (high|medium|low|none). Ollama's OpenAI-compatible /v1 honours it to bound
+    or DISABLE a thinking model's <think> preamble: the gemma-4 lane sets
+    'none' so the model emits the structured answer directly instead of
+    spending the output budget on reasoning (-> finish_reason=length -> an
+    empty/truncated body the JSON passes cannot parse). Native `think:false`
+    and `chat_template_kwargs` are NOT honoured on /v1 (ollama#14820 / #16240),
+    so reasoning_effort is the portable lever. Unset/empty -> None (the field
+    is omitted, so non-thinking models and OpenRouter-proper are unaffected)."""
+    raw = _env("OPENROUTER_REASONING_EFFORT")
+    if not raw:
+        return None
+    return raw.strip().lower() or None
+
+
 def openrouter_enabled() -> bool:
     """C3 gate: remote is reachable ONLY when the key is present AND the
     explicit enable flag is set. Either missing ⇒ remote is off and the
@@ -822,6 +838,18 @@ class OpenRouterBackend:
             payload["temperature"] = float(temp)
         if stop:
             payload["stop"] = [s for s in stop if s]
+        # Reasoning control (gemma-4 / thinking-model lane). The OpenAI-standard
+        # `reasoning_effort` (high|medium|low|none) is the portable lever Ollama's
+        # /v1 honours to bound or disable the <think> preamble; set
+        # OPENROUTER_REASONING_EFFORT=none so a reasoning model emits the
+        # structured answer directly instead of burning the output budget on
+        # reasoning (-> finish_reason=length -> unparseable JSON). Unset -> the
+        # field is omitted, so non-thinking models / OpenRouter-proper are
+        # byte-identical. Not require_parameters-gated: a backend that ignores it
+        # simply reasons as before -- the output-token floor is the safety net.
+        reasoning_effort = _reasoning_effort_from_env()
+        if reasoning_effort:
+            payload["reasoning_effort"] = reasoning_effort
         # Build ONE provider-routing object so the speed/cost sort and the
         # require_parameters guard coexist (a second `payload["provider"]`
         # assignment would clobber the first).

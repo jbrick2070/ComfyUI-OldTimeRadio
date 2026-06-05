@@ -176,6 +176,8 @@ def test_dispatch_table_routes_loader_backend_literal_to_correct_adapter() -> No
         "transformers_safetensors":          runtime.TransformersSafetensorsBackend,
         "transformers_multimodal_text_only": runtime.TransformersMultimodalTextOnlyBackend,
         "transformers_gptq_int4":            runtime.TransformersGPTQInt4Backend,
+        # LOCAL llama.cpp/Ollama lane (2026-06-04): the gemma-4-12b curated row.
+        "ollama_local_http":                 runtime._otr_ollama_backend.OllamaBackend,
     }
     failures: list[str] = []
     for row in catalog.CURATED_LLM_MODELS:

@@ -107,8 +107,16 @@ def test_curated_set_is_a_tuple_of_curated_model():
             "transformers_safetensors",
             "transformers_multimodal_text_only",
             "transformers_gptq_int4",
+            # ollama_local_http: a curated row served by the LOCAL llama.cpp/
+            # Ollama daemon over /v1 (gemma-4-12b, PROMOTED 2026-06-04). No HF
+            # safetensors download, so approx_safetensors_gb is 0.
+            "ollama_local_http",
         )
-        assert entry.approx_safetensors_gb > 0
+        if entry.provider == "local":
+            assert entry.approx_safetensors_gb > 0
+        else:
+            # HTTP-dispatched (local Ollama): no local HF weights on disk.
+            assert entry.approx_safetensors_gb == 0
 
 
 def test_default_llm_constant_is_in_curated_set():
@@ -180,17 +188,31 @@ def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
     entries = catalog.build_dropdown_choices(hub_root=empty_hub_root)
     curated_ids = {m.repo_id for m in catalog.CURATED_LLM_MODELS}
     assert {e.repo_id for e in entries} == curated_ids
+    # HTTP-dispatched curated rows (provider != "local", e.g. the local Ollama
+    # gemma-4-12b) have no HF weights to download, so the dropdown shows them as
+    # available rather than [NOT DOWNLOADED]; every transformers-local row with
+    # an empty cache is marked not-downloaded.
+    by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
     for e in entries:
-        assert e.on_disk is False
-        assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
+        if by_id[e.repo_id].provider != "local":
+            assert e.on_disk is True
+            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
+        else:
+            assert e.on_disk is False
+            assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
 
 
 def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistral_nemo):
     entries = catalog.build_dropdown_choices(hub_root=hub_root_with_mistral_nemo)
+    by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
     for e in entries:
         if e.repo_id == catalog.DEFAULT_LLM:
             assert e.on_disk is True
             assert e.label == catalog.DEFAULT_LLM
+            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
+        elif by_id.get(e.repo_id) and by_id[e.repo_id].provider != "local":
+            # HTTP-dispatched (local Ollama gemma): always available, no suffix.
+            assert e.on_disk is True
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         else:
             assert e.on_disk is False

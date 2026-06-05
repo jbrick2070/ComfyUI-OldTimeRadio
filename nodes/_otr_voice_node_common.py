@@ -21,6 +21,15 @@ import logging
 
 log = logging.getLogger("OTR")
 
+# Voice-CLONING char engines that REQUIRE a per-character reference WAV. When one
+# of these is selected but a line has no usable voice_ref_path (preserve_ledger did
+# not assign a clip ref, or no reference clips are installed on disk), the per-line
+# path falls back to bark (preset voices) so the episode always renders -- audio is
+# king (PD1). Restricted to the named cloning engines so a test stub or a non-clone
+# engine never trips it. Add a new cloning engine here when its reference-bank
+# pipeline lands (e.g. xtts / cosyvoice).
+_OTR_CLONE_ENGINES = ("indextts2", "chatterbox")
+
 
 # --------------------------------------------------------------------------- #
 # Pure helpers (no IO at import; engines are self-contained per_line / clip)
@@ -255,6 +264,10 @@ class OTRVoiceNodeBase:
         if callable(begin):
             begin(meta)
         clips: list = []
+        # Lazy bark fallback adapter (2026-06-04): loaded only if a voice-cloning
+        # char engine (indextts2 / chatterbox) hits a line with no usable
+        # reference clip. Torn down after the loop.
+        _bark_fb = None
         log_lines: list = [
             f"{self.ROLE}: rendering {len(lines)} lines on '{engine}' "
             f"(profile {profile.profile_id})"
@@ -291,6 +304,33 @@ class OTRVoiceNodeBase:
             )
             # G1: per-engine external seed reduced from the stable line seed.
             engine_seed = _seed_to_int64(engine, request.stable_line_seed)
+            # Graceful ref-clip fallback (2026-06-04): a voice-CLONING char engine
+            # (voice_ref_field == "voice_ref_path", e.g. indextts2 / chatterbox)
+            # cannot synthesize without a per-character reference WAV. If this cast
+            # row carries none (preserve_ledger does not assign clip refs, and/or
+            # no reference clips are installed on disk), render THIS line with bark
+            # (preset voices, no ref clip) using the cast's replayed voice_preset,
+            # so the episode never hard-fails on a missing voice reference -- audio
+            # is king (PD1). The clone engine engages automatically once a usable
+            # voice_ref_path is present. Bark is loaded once, lazily.
+            if self.ROLE == "char_voice" and engine in _OTR_CLONE_ENGINES and not voice_ref:
+                if _bark_fb is None:
+                    from ._otr_audio_engines import get_engine as _get_engine
+                    _bark_fb = _get_engine("bark")
+                    _bark_fb.load()
+                    log_lines.append(
+                        f"{self.ROLE}: WARNING engine '{engine}' has no reference "
+                        f"clip for one or more lines; rendering those with bark "
+                        f"(preset voices). Install {engine} reference WAVs (or set "
+                        f"cast_voice_policy=auto_registry) to enable it."
+                    )
+                bark_seed = _seed_to_int64("bark", request.stable_line_seed)
+                with deterministic_inference(bark_seed, warn_only=True):
+                    audio = _bark_fb.generate_voice(
+                        prepared, voice_preset or "v2/en_speaker_6", None, bark_seed,
+                    )
+                clips.append(audio)
+                continue
             # G1: scope strict-determinism + seed/restore every RNG around the
             # single forward (I-2/C-2). warn_only=True keeps the process default
             # non-strict so a nondeterministic CUDA op cannot crash the opt-in
@@ -301,6 +341,11 @@ class OTRVoiceNodeBase:
                     prepared, voice_ref, None, engine_seed,
                 )
             clips.append(audio)
+        if _bark_fb is not None:
+            try:
+                _bark_fb.unload()
+            except Exception:  # noqa: BLE001 -- teardown must not mask the render
+                pass
         packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
         n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
         log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")

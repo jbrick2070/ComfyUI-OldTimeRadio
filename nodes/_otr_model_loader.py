@@ -770,19 +770,28 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # before the lane was ever exercised. Route BOTH remote loader_backends; the
     # _otr_model_runtime dispatch table already maps each key to its backend, so
     # a future remote lane only adds its key to this tuple.
-    _REMOTE_LOADER_BACKENDS = ("openrouter_http", "comfy_credits_http")
-    _remote_row = _otr_catalog._by_repo_id().get(normalized)
+    # Backends reached over an HTTP /v1 call (dispatched via _otr_model_runtime),
+    # NOT the in-process transformers loader: the cloud lanes (openrouter_http,
+    # comfy_credits_http) AND the LOCAL llama.cpp/Ollama lane (ollama_local_http,
+    # a local daemon on 127.0.0.1 -- local, but HTTP-dispatched, so it shares
+    # this zero-process-VRAM, no-HF-download, no-evict seam). A new HTTP lane
+    # only adds its key here. (BUG-LOCAL-299: routing ALL of them here keeps a
+    # virtual/HTTP handle from falling through to the local HF-download path.)
+    _HTTP_DISPATCH_BACKENDS = (
+        "openrouter_http", "comfy_credits_http", "ollama_local_http",
+    )
+    _http_row = _otr_catalog._by_repo_id().get(normalized)
     if (
-        _remote_row is not None
-        and getattr(_remote_row, "loader_backend", None) in _REMOTE_LOADER_BACKENDS
+        _http_row is not None
+        and getattr(_http_row, "loader_backend", None) in _HTTP_DISPATCH_BACKENDS
     ):
         from ._otr_model_runtime import get_backend_for_row
         log.info(
-            "[Selector] slot=%s remote backend for %s (no local VRAM; "
-            "resident local model left in place, C2 no-evict)",
+            "[Selector] slot=%s HTTP-dispatched backend for %s (no local VRAM; "
+            "resident local model left in place, no-evict)",
             slot, normalized,
         )
-        return get_backend_for_row(_remote_row).load(normalized, _remote_row)
+        return get_backend_for_row(_http_row).load(normalized, _http_row)
 
     # Step 2: cache hit on the same model id (regardless of slot).
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
@@ -928,6 +937,11 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
+    # LOCAL llama.cpp/Ollama lane (2026-06-04) -- same zero-process-VRAM seam,
+    # but the endpoint is a local daemon on 127.0.0.1, not a cloud service.
+    if cache_entry.get("provider") == "ollama":
+        from ._otr_ollama_backend import make_ollama_generate_fn
+        return make_ollama_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -1019,6 +1033,11 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
+    # LOCAL llama.cpp/Ollama lane (2026-06-04) -- same zero-process-VRAM seam,
+    # but the endpoint is a local daemon on 127.0.0.1, not a cloud service.
+    if cache_entry.get("provider") == "ollama":
+        from ._otr_ollama_backend import make_ollama_generate_fn
+        return make_ollama_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

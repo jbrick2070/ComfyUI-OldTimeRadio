@@ -629,6 +629,13 @@ def _build_truncating_generate_fn(
     if cache_entry.get("provider") == "comfy_credits":
         from . import _otr_comfy_backend as _occ
         return _occ.make_comfy_credits_generate_fn(cache_entry)
+    # [Ollama] LOCAL llama.cpp/Ollama lane (2026-06-04). Same provider-tag
+    # dispatch, but the endpoint is a local daemon on 127.0.0.1 -- no model/
+    # tokenizer/context_cap to close over; zero ComfyUI-process VRAM. Fail-closed
+    # local-only (never cloud), no API key, no credit cost.
+    if cache_entry.get("provider") == "ollama":
+        from . import _otr_ollama_backend as _oll
+        return _oll.make_ollama_generate_fn(cache_entry)
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)

@@ -74,6 +74,7 @@ class CuratedModel:
         "transformers_gptq_int4",
         "openrouter_http",
         "comfy_credits_http",
+        "ollama_local_http",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -99,7 +100,13 @@ class CuratedModel:
     # ComfyUI's credit-billed partner-node proxy (2026-06-01). Remote rows
     # carry zero local VRAM. Default "local" so every pre-existing row and
     # any older fixture that omits the field still constructs unchanged.
-    provider: Literal["local", "openrouter", "comfy_credits"] = "local"
+    provider: Literal["local", "openrouter", "comfy_credits", "ollama"] = "local"
+    # The Ollama model tag for a provider="ollama" row (loader_backend=
+    # "ollama_local_http"): the LOCAL llama.cpp/Ollama model name the lane sends
+    # to 127.0.0.1:11434/v1 (e.g. "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M").
+    # Empty for every other row. The curated repo_id stays the dropdown label;
+    # this is the on-the-wire tag, resolved by nodes/_otr_ollama_backend.py.
+    ollama_model_tag: str = ""
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -148,21 +155,26 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     ),
     CuratedModel(
         repo_id="google/gemma-4-12b-it",
-        requires_auth=True,
-        loader_backend="transformers_multimodal_text_only",
+        requires_auth=False,  # served by the LOCAL Ollama daemon (GGUF), not an HF download
+        loader_backend="ollama_local_http",
         vram_fit_tier="PASS",
-        approx_safetensors_gb=23.9,
-        notes="Gemma 4 12B (2026-06-03) -- 12B class, the same size tier as the "
-        "Mistral-Nemo default and the first Gemma capable enough to soak-test as "
-        "a real writer (E2B/E4B are too small for the structured passes). "
-        "Encoder-free multimodal, used text-only; NF4 ~8 GB on the 5080. "
-        "Apache-2.0 (Gemma 4), ungated download.",
+        approx_safetensors_gb=0.0,  # no HF safetensors: the GGUF lives in Ollama's store
+        notes="Gemma 4 12B via the LOCAL llama.cpp/Ollama lane (2026-06-04). "
+        "transformers cannot load the gemma4_unified architecture (it needs "
+        "transformers-from-source, which would destabilize the Blackwell "
+        "torch-2.10/cu130 venv), so this row runs through Ollama's LOCAL "
+        "OpenAI-/v1 endpoint (127.0.0.1:11434) against the GGUF -- NOT "
+        "OpenRouter, NOT Comfy Credits, fail-closed local-only. Pull it once "
+        "with: ollama pull hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M. "
+        "Apache-2.0 (Gemma 4).",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
         context_window=8192,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
+        provider="ollama",
+        ollama_model_tag="hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M",
     ),
     CuratedModel(
         repo_id="google/gemma-2-2b-it",

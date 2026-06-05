@@ -225,6 +225,20 @@ def make_constrained_generate_fn(
         return _occ.make_comfy_credits_generate_fn(
             cache_entry, response_format=response_format,
         )
+    # [Ollama] LOCAL llama.cpp/Ollama lane (2026-06-04). The local llama-server
+    # speaks the same OpenAI-/v1 json_schema response_format, so reuse the
+    # schema mapper (a transport-level OpenAI-spec map, not a cloud dependency),
+    # then hand it to the Ollama generate_fn. Same fail-closed downstream
+    # (structured_call validate + bounded-repair ladder).
+    if cache_entry.get("provider") == "ollama":
+        from . import _otr_openrouter_backend as _orb
+        from . import _otr_ollama_backend as _oll
+        response_format = _orb.schema_to_response_format(
+            schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
+        )
+        return _oll.make_ollama_generate_fn(
+            cache_entry, response_format=response_format,
+        )
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

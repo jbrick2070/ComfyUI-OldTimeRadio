@@ -335,6 +335,40 @@ def test_max_tokens_clamped_to_cap(enabled_env, monkeypatch):
     assert seen["payload"]["max_tokens"] == 256
 
 
+def test_generate_sends_reasoning_effort_when_env_set(enabled_env, monkeypatch):
+    # gemma-4 lane (2026-06-04): OPENROUTER_REASONING_EFFORT=none tells Ollama's
+    # /v1 to suppress the <think> preamble so a reasoning model emits the
+    # structured answer directly instead of spending the output budget on
+    # reasoning (-> finish_reason=length -> unparseable JSON).
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=64)
+    assert seen["payload"]["reasoning_effort"] == "none"
+
+
+def test_generate_omits_reasoning_effort_when_env_unset(enabled_env, monkeypatch):
+    # Default: no reasoning-control field, so non-thinking models and
+    # OpenRouter-proper payloads stay byte-identical.
+    monkeypatch.delenv("OPENROUTER_REASONING_EFFORT", raising=False)
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=64)
+    assert "reasoning_effort" not in seen["payload"]
+
+
 # ---------------------------------------------------------------------------
 # C6 cost-ceiling abort -- proven with a mocked token counter
 # ---------------------------------------------------------------------------
