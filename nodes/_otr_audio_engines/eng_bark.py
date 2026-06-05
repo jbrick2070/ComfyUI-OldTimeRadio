@@ -23,7 +23,7 @@ from .registry import register
 class BarkEngine:
     name = "bark"
     roles = ("char_voice",)
-    default_roles = ("char_voice",)      # internal default until promotion (I)
+    default_roles = ()                   # DEMOTED 2026-06-04: indextts2 is now the char_voice default; bark stays selectable
     commercial_clean = False             # Suno Bark terms not confirmed commercial
     requires_flag = None
     interface = "per_line"

@@ -121,10 +121,10 @@ def test_auto_registry_stamps_voice_refs():
     )
     led = json.loads(out[0])
     cast = {e["char_id"]: e for e in led["cast"]}
-    # Characters get chatterbox references.
+    # Characters get indextts2 references (the promoted rank-1 char_voice default).
     for cid in ("c1", "c2"):
         assert cast[cid].get("voice_ref_id"), cid
-        assert cast[cid]["voice_engine"] == "chatterbox"
+        assert cast[cid]["voice_engine"] == "indextts2"
         assert isinstance(cast[cid]["commercial_clean"], bool)
     # Distinct references (no reuse across the two characters).
     assert cast["c1"]["voice_ref_id"] != cast["c2"]["voice_ref_id"]

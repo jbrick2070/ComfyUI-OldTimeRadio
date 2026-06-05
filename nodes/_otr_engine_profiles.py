@@ -35,11 +35,14 @@ _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 _VALID_RUNTIMES = {"in_graph", "oop_venv"}
 _VALID_LICENSE_STATES = {"", "clean", "gated", "unknown"}
 
-# Hardcoded, legacy-first engine order per role for INPUT_TYPES (C-5: never empty
-# combo, stable across flags, no IO). The internal build default is the first
-# (legacy) entry until promotion (I) flips the shipped default per role.
+# Hardcoded engine order per role for INPUT_TYPES (C-5: never empty combo, stable
+# across flags, no IO). Index 0 is the shipped default for the role: char_voice and
+# music are PROMOTED to their model-backed defaults (indextts2, stable_audio_3);
+# announcer stays kokoro.
 _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
-    "char_voice": ("bark", "chatterbox", "indextts2"),
+    # char_voice PROMOTED 2026-06-04: indextts2 (Path B oop_venv worker) is the
+    # shipped default; chatterbox + bark remain selectable.
+    "char_voice": ("indextts2", "chatterbox", "bark"),
     "announcer_voice": ("kokoro", "chatterbox"),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.

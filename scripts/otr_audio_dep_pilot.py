@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """OTR audio dependency-pilot harness (plan Wave 3 / F -- the G1 unblock).
 
-The opt-in audio engines (chatterbox / indextts2 / stable_audio_music) ship as
-flag-gated stubs: their real library forward calls are NOT written until this
-pilot verifies, on the operator's GPU box, that importing each library is SAFE
-on the Blackwell / cu130 stack and that its forward can bind an external
-``torch.Generator`` (the bit_exact precondition -- base.py
+The dep-pilot audio engines (chatterbox / indextts2 / stable_audio_music) need
+Blackwell / cu130 dependency validation before G1 wires their real library
+forward calls: chatterbox + stable_audio_music are flag-gated opt-ins; indextts2
+was PROMOTED 2026-06-04 to the shipped char_voice default but runs in an isolated
+oop_venv Path B worker, so it stays pilot-gated until this harness verifies, on
+the operator's GPU box, that importing each library is SAFE and that its forward
+can bind an external ``torch.Generator`` (the bit_exact precondition -- base.py
 ``supports_external_generator``).
 
 This module is the harness the operator runs to do that verification. It is
@@ -69,7 +71,10 @@ OPT_IN_ENGINES = {
         "lib_module": "indextts",
         "adapter_class": "IndexTTS2Engine",
         "forward": "generate_voice",
-        "flag": "OTR_ENABLE_INDEXTTS2",
+        # PROMOTED 2026-06-04: indextts2 is the shipped char_voice default (no
+        # flag); it stays dep-pilot-gated via its isolated oop_venv Path B worker
+        # until F validates the Blackwell deps.
+        "flag": None,
         "assumed_call": (
             "IndexTTS2(cfg, model_dir).infer(spk_audio_prompt=<ref>, "
             "text=<str>, emo_vector=<list>, seed=<int>, "

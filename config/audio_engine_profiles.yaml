@@ -4,10 +4,11 @@
 # in the delivery layer. The resolver (nodes/_otr_engine_profiles.py) loads this
 # lazily (cached, exception-wrapped) and hashes the file text into the
 # engine_profile source sha (a re-baseline trigger). Engine names MUST match the
-# audio-engine registry. Box-fresh installs keep legacy engines as the internal
-# default; the model-backed defaults (IndexTTS2 voice, Stable Audio music) are
-# promoted to the shipped out-of-box default only at promotion (I), after the F
-# dependency pilots pass. model_path / model_sha256 stay empty until F pins them.
+# audio-engine registry. The model-backed defaults are now the shipped out-of-box
+# default per role: IndexTTS2 voice (PROMOTED 2026-06-04) and Stable Audio 3 music
+# (PROMOTED 2026-06-03). With no permanent legacy fallback, a render fails closed
+# with a NAMED error until that engine's deps/weights are installed (C-7);
+# model_path / model_sha256 stay empty until F pins them.
 #
 # Sprint-1 declarative metadata (additive; never changes live byte-identical
 # dispatch): rank (fallback priority, lower = tried first), is_default (the
@@ -22,9 +23,9 @@ profile_schema_version: "1"
 
 profiles:
   # --- character voice ---
-  # Live byte-identical default is bark (engine default_roles) until S6; the
-  # scope default below is indextts2 (rank 1). The rank chain falls
-  # indextts2 -> chatterbox -> bark while the first two are gated off.
+  # Shipped default is indextts2 (engine default_roles + rank 1), PROMOTED
+  # 2026-06-04. The rank chain falls indextts2 -> chatterbox -> bark; bark stays
+  # selectable as a fully byte-identical in-graph fallback.
   - profile_id: char_bark_v1
     role: char_voice
     engine: bark

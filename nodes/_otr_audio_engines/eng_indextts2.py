@@ -4,9 +4,11 @@ IndexTTS2 hard-pins torch 2.8 / numpy 1.26 / transformers 4.52, which would bric
 the Blackwell (torch 2.10 / cu130) ComfyUI venv. So it runs in its OWN isolated
 venv (python 3.10 / torch 2.8 / cu128) as a supervised subprocess worker; this
 adapter, in ComfyUI's venv, drives it over line-delimited JSON and reads back the
-rendered WAV -- ZERO shared torch. NON-commercial: IndexTTS2 weights carry the
-bilibili Model Use License, so the engine is opt-in behind ``OTR_ENABLE_INDEXTTS2``
-and never a default. ``interface == "per_line"``.
+rendered WAV -- ZERO shared torch. PROMOTED 2026-06-04 to the shipped char_voice
+default: its weights carry the non-commercial bilibili Model Use License, so it
+emits a non-blocking commercial-use warning (I-8) and -- with no permanent legacy
+fallback -- a render fails closed with a NAMED error until the Path B worker +
+weights are installed (C-7). ``interface == "per_line"``.
 
 Config (env, with box defaults under ``ComfyUI/index-tts``):
   ``OTR_INDEXTTS2_VENV``   isolated venv python (``.venv/Scripts/python.exe``)
@@ -41,9 +43,9 @@ def _default(*parts):
 class IndexTTS2Engine:
     name = "indextts2"
     roles = ("char_voice",)
-    default_roles = ()
+    default_roles = ("char_voice",)  # PROMOTED 2026-06-04: shipped char_voice default
     commercial_clean = False  # bilibili Model Use License -- non-commercial
-    requires_flag = "OTR_ENABLE_INDEXTTS2"
+    requires_flag = None             # default engine -> always usable; venv/weights checked in load()
     interface = "per_line"
     sample_rate = 22050
 
@@ -78,7 +80,7 @@ class IndexTTS2Engine:
                 raise RuntimeError(
                     "IndexTTS2 Path B not installed: %s missing at %s -- run "
                     "scripts\\_otr_indextts2_install.ps1 (isolated venv + weights) "
-                    "before enabling OTR_ENABLE_INDEXTTS2" % (label, path))
+                    "before rendering with indextts2 (the default char voice)" % (label, path))
         cfg = os.path.join(model_dir, "config.yaml")
         if not os.path.exists(cfg):
             raise RuntimeError(

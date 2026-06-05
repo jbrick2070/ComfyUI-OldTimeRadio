@@ -9,7 +9,7 @@ from nodes import _otr_audio_engines as AE
 
 
 def test_char_voice_default_is_bark():
-    assert AE.engines_for_role("char_voice")[0] == "bark"
+    assert AE.engines_for_role("char_voice")[0] == "indextts2"  # PROMOTED 2026-06-04
 
 
 def test_announcer_default_is_kokoro():
@@ -46,22 +46,24 @@ def test_optin_flags_and_licensing():
     assert cb.requires_flag == "OTR_ENABLE_CHATTERBOX"
     assert cb.commercial_clean is True
     idx = AE.get_engine("indextts2")
-    assert idx.requires_flag == "OTR_ENABLE_INDEXTTS2"
-    assert idx.commercial_clean is False  # Bilibili non-commercial
+    assert idx.requires_flag is None  # PROMOTED 2026-06-04: shipped char_voice default
+    assert idx.commercial_clean is False  # Bilibili non-commercial (non-blocking warn)
     sa = AE.get_engine("stable_audio_music")
     assert sa.requires_flag == "OTR_ENABLE_STABLE_AUDIO"
     assert sa.commercial_clean is True
 
 
 def test_assert_usable_optin_off_fails_closed(monkeypatch):
-    # Fail closed (C-6): opt-in char-voice engines raise GATED_BY_FLAG when
-    # their flag is off -- they are never silently swapped for bark.
+    # Fail closed (C-6): a still-opt-in char-voice engine raises GATED_BY_FLAG
+    # when its flag is off. indextts2 was PROMOTED 2026-06-04 to the shipped
+    # char_voice default (always usable, no flag); chatterbox stays opt-in.
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
+    with pytest.raises(AE.EngineUnusable) as ei:
+        AE.assert_usable("chatterbox", "char_voice")
+    assert ei.value.reason is AE.EngineUsabilityReason.GATED_BY_FLAG
+    # indextts2 is the promoted default -> always usable even with its flag off.
     monkeypatch.delenv("OTR_ENABLE_INDEXTTS2", raising=False)
-    for name in ("chatterbox", "indextts2"):
-        with pytest.raises(AE.EngineUnusable) as ei:
-            AE.assert_usable(name, "char_voice")
-        assert ei.value.reason is AE.EngineUsabilityReason.GATED_BY_FLAG
+    assert AE.assert_usable("indextts2", "char_voice") == "indextts2"
 
 
 def test_assert_usable_optin_on_runs(monkeypatch):

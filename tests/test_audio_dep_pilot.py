@@ -125,19 +125,28 @@ def test_opt_in_engines_match_registry_adapters():
 
 def test_pilot_covers_exactly_the_optin_engines():
     from nodes import _otr_audio_engines as AE
+    from nodes import _otr_engine_profiles as EP
 
-    # Every flag-gated (non-default) engine with an EXTERNAL dependency library is
-    # covered, and the harness invents none. Legacy default engines
-    # (bark/kokoro/musicgen) are byte-identical defaults and excluded; ComfyUI-
-    # NATIVE engines (e.g. stable_audio_3) drive ComfyUI's own nodes and have no
-    # external lib to probe, so they are excluded from the dep pilot too.
-    gated = set()
+    # The dep pilot covers every non-native engine that needs Blackwell
+    # dependency validation: a flag-gated opt-in library (chatterbox,
+    # stable_audio_music) OR an isolated out-of-process worker (indextts2,
+    # runtime=oop_venv -- PROMOTED 2026-06-04 to the char_voice default but still
+    # pilot-gated until F validates its Path B venv). Byte-identical in-graph
+    # defaults (bark/kokoro/musicgen) and ComfyUI-native engines (stable_audio_3)
+    # have no external lib to probe and are excluded.
+    resolver = EP.load_resolver()
+    needs_pilot = set()
     for role in ("char_voice", "announcer_voice", "music"):
         for eng in AE.engines_for_role(role):
             adapter = AE.get_engine(eng)
-            if getattr(adapter, "requires_flag", None) and not getattr(adapter, "native", False):
-                gated.add(eng)
-    assert set(PILOT.OPT_IN_ENGINES) == gated
+            if getattr(adapter, "native", False):
+                continue
+            flag_gated = bool(getattr(adapter, "requires_flag", None))
+            prof = resolver.profile_for(role, eng) if resolver else None
+            oop_venv = bool(prof and prof.runtime == "oop_venv")
+            if flag_gated or oop_venv:
+                needs_pilot.add(eng)
+    assert set(PILOT.OPT_IN_ENGINES) == needs_pilot
 
 
 def test_source_is_ascii_no_em_dash():

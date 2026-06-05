@@ -94,7 +94,7 @@ def test_missing_token_raises_in_generate_not_input_types(monkeypatch):
 
 
 def test_legacy_first_engines_pure_and_legacy_first():
-    assert EP.legacy_first_engines("char_voice")[0] == "bark"
+    assert EP.legacy_first_engines("char_voice")[0] == "indextts2"  # PROMOTED 2026-06-04
     assert EP.legacy_first_engines("announcer_voice")[0] == "kokoro"
     assert EP.legacy_first_engines("music")[0] == "stable_audio_3"  # PROMOTED 2026-06-03
     assert EP.legacy_first_engines("nonexistent_role") == []

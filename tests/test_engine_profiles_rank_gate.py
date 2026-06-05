@@ -59,13 +59,15 @@ def test_role_default_is_rank1_flagged():
     assert r.role_default("music").engine == "stable_audio_3"
 
 
-def test_fallback_skips_gated_off_optins_to_bark(monkeypatch):
-    # indextts2 + chatterbox are opt-in; with their flags off the char chain
-    # falls through to bark (the live byte-identical default) -- never crashes.
+def test_fallback_returns_promoted_indextts2_default(monkeypatch):
+    # indextts2 was PROMOTED 2026-06-04 to the always-usable char_voice default
+    # (no flag); chatterbox stays opt-in. With every opt-in flag off the rank
+    # chain still resolves to indextts2 (rank 1, always usable) -- never crashes,
+    # never silently swaps. bark stays selectable as the rank-3 fallback.
     monkeypatch.delenv("OTR_ENABLE_INDEXTTS2", raising=False)
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
     r = _resolver()
-    assert r.resolve_role_fallback("char_voice").engine == "bark"
+    assert r.resolve_role_fallback("char_voice").engine == "indextts2"
 
 
 def test_fallback_picks_indextts2_when_enabled(monkeypatch):

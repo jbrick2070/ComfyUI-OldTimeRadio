@@ -1847,7 +1847,7 @@
         "Node name for S&R": "OTR_BatchCharacterVoices"
       },
       "widgets_values": [
-        "bark",
+        "indextts2",
         "mono_safe"
       ],
       "inputs": [

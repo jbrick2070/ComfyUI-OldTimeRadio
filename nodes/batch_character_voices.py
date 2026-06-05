@@ -26,13 +26,13 @@ from ._otr_voice_node_common import OTRVoiceNodeBase, voice_input_types
 class BatchCharacterVoices(OTRVoiceNodeBase):
     """Generic character-voice node. Registered as ``OTR_BatchCharacterVoices``.
 
-    Engine order: bark (legacy byte-identical default) > chatterbox > indextts2.
+    Engine order: indextts2 (promoted shipped default) > chatterbox > bark.
     """
 
     ROLE = "char_voice"
     LINE_ROLES = ("character",)
     DONE_PREFIX = "char_voice"
-    LEGACY_FIRST_FALLBACK = ("bark", "chatterbox", "indextts2")
+    LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "bark")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"
