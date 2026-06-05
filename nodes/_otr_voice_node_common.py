@@ -84,18 +84,31 @@ def _resolve_clone_ref_path(engine, cast, episode_seed):
         )
     if entry is None:
         gender = str(cast.get("gender") or "").strip().lower()
-        if not gender:
-            return None
-        try:
-            entry = assign_voice_for_slot(
-                role="char_voice", engine=engine,
-                char_id=str(cast.get("char_id") or ""), gender=gender,
-                timbre=tuple(cast.get("timbre") or ()),
-                age_band=str(cast.get("age_band") or ""),
-                episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+        if gender:
+            try:
+                entry = assign_voice_for_slot(
+                    role="char_voice", engine=engine,
+                    char_id=str(cast.get("char_id") or ""), gender=gender,
+                    timbre=tuple(cast.get("timbre") or ()),
+                    age_band=str(cast.get("age_band") or ""),
+                    episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+                )
+            except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
+                entry = None
+        if entry is None:
+            # Gender-agnostic last resort: an empty or out-of-bank gender (e.g.
+            # the writer emitting gender='other'/'unspecified') has no same-gender
+            # reference, but a clone engine must still get a REAL voice rather than
+            # silently dropping to bark (PD1 + the index-only goal). Pick any ref
+            # for this engine, deterministically keyed on char_id so C7 holds.
+            import random as _random
+            cands = sorted(
+                (e for e in bank if e.engine == engine),
+                key=lambda e: e.voice_ref_id,
             )
-        except Exception:  # noqa: BLE001 -- no castable ref -> bark
-            return None
+            if cands:
+                _seed = f"{episode_seed}_{cast.get('char_id', '')}_anyref"
+                entry = _random.Random(_seed).choice(cands)
     path = _resolve_ref_to_disk(getattr(entry, "ref_path", "") or "")
     return path if (path and os.path.exists(path)) else None
 

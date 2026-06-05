@@ -174,9 +174,20 @@ def test_node15_dropped_with_no_orphan_links(wf, by_id):
 
 def test_widget_vectors_exact(by_id):
     """Each new node's widgets_values equals its INPUT_TYPES-derived defaults
-    (the legacy engine per role + preserve_ledger -- the byte-safe defaults)."""
+    (the legacy engine per role -- the byte-safe defaults), EXCEPT CastLock (80).
+
+    The canonical workflow selects IndexTTS2 for character voices (node 81), so
+    it intentionally sets CastLock to auto_registry + allow_voice_reuse=True so
+    every character is voiced on IndexTTS2 instead of falling back to bark. The
+    byte-identical guarantee only applies to bark-SELECTED paths; this workflow
+    is not one, so the deviation from the preserve_ledger default is deliberate.
+    """
     mapping = _new_class_mapping()
+    # CastLock (80): intentional index-workflow override (see docstring).
+    assert by_id[80]["widgets_values"] == ["default", "auto_registry", "neutral", True]
     for key, nid in NEW_NODE_IDS.items():
+        if nid == 80:
+            continue
         assert by_id[nid]["widgets_values"] == _derive_widget_defaults(mapping[key])
 
 
