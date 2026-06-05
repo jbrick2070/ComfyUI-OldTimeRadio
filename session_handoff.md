@@ -1,82 +1,124 @@
-# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-05
+# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-05 (voice overhaul -> chatterbox)
 
 ## Core goal
-Made **gemma-4-12b viable as the OTR writer** and **recovered indextts2 as the default
-character voice**, then proved the whole pipeline end-to-end on a 30-word episode
-(script -> voice -> HuMo -> composite -> upscale -> procgen). The point of this pass was
-to confirm the writer/voice base is solid before Jeffrey's video-engine refactor.
+This session fixed and hardened the **character-voice subsystem** end-to-end:
+killed a render-crashing bug, made **IndexTTS2 the actual default voice for every
+character (no more silent bark fallback)**, and expanded the CC0 reference bank
+from 4 to 36 voices with dynamic gender->voice casting. It is DONE, committed, and
+live-validated. **The next mission is a CHATTERBOX engine via a dep-isolated
+sidecar venv** (roundtable it, wire it into the workflow, test it) -- with Dia
+(Apache-2.0, commercially clean) as the recommended alternative.
 
-## Tech stack & constraints (session-specific; CLAUDE.md/ROADMAP/BUG_LOG auto-load the rest)
-- ComfyUI Desktop 0.24.1 (Electron), Windows, RTX 5080 Laptop 16GB (Blackwell sm_120),
-  torch 2.10+cu130. Venv `C:\Users\jeffr\Documents\ComfyUI\.venv`; server on :8000.
-- **`.py` edits need a ComfyUI RESTART to load** (module cache).
-- Git via Desktop Commander (sandbox git is read-OK; use DC for writes). The DC/PowerShell
-  spawn often fails to capture external-exe stdout -> run git/pytest via the venv python's
-  `subprocess` or Start-Process `-RedirectStandardOutput` to a file, then read the file.
-- **`scripts/_*.py` is gitignored**; essential scripts are kept by `!` negation (the
-  indextts2 worker was lost to this -- see below).
-- Ollama 0.30.5 local at 127.0.0.1:11434 for the gemma lane.
-- **HEAD = d076898 on v2.0-alpha (== origin).** Repo default branch is `main`; all of this
-  session's work is on `v2.0-alpha`.
+## Tech stack & constraints (session-specific; CLAUDE.md + memory auto-load the rest)
+- ComfyUI Desktop on :8000, Windows, RTX 5080 16GB (Blackwell sm_120), venv
+  `C:\Users\jeffr\Documents\ComfyUI\.venv` (torch 2.10+cu130, numpy 2.4.4).
+- `.py` edits need a ComfyUI RESTART to load (module cache). The voice bank JSON
+  HOT-RELOADS (load_voice_bank caches by content sha) -- no restart for bank edits.
+- Git via Desktop Commander (`git -C <repo> ...` with Start-Process
+  `-RedirectStandardOutput` to a file; DC/PowerShell does not capture external-exe
+  stdout). **HEAD = 62792fd on v2.0-alpha, [ahead 7] of origin -- NOT PUSHED.**
+- `datasets` 5.0.0 was pip-installed this session (+ pyarrow/dill/multiprocess;
+  torch/numpy unchanged). HF audio must be read with `Audio(decode=False)` + soundfile
+  -- the `torchcodec` decode backend is NOT installed on purpose (it breaks this stack).
+- Refs live OUTSIDE git at `C:\ComfyUI-Models\TTS\refs\indextts2\*.wav` (model assets).
+- Reuse the existing scratch pattern: write a `scripts/_otr_*.py` that writes its OWN
+  result file, run via the venv python, read the file (DC stdout capture is flaky).
+  `scripts/_otr_*` is scratch/gitignored EXCEPT the tracked `_otr_indextts2_worker.py`.
 
-## What's done & decided (all pushed to origin/v2.0-alpha)
-- **`af75ab1`** -- Ollama lane no longer advertises raw-GBNF grammar support (Ollama /v1
-  doesn't accept a raw `grammar`); `OllamaBackend.generate` fails loud if one is passed.
-  Roundtable Option A (unanimous GPT+Gemini+Grok+DeepSeek; ~$0.20).
-- **`e4cb3ac`** -- Ollama lane now DEFAULTS `reasoning_effort=none`. THE gemma fix:
-  gemma-4-12b is a thinking model; unset, it spent its whole budget on `<think>`, returned
-  empty (finish_reason=length), and aborted the style inventor. `OLLAMA_REASONING_EFFORT=none`
-  also set as a User env var.
-- **`bb140a4` + `858a9b2`** -- committed `scripts/_otr_indextts2_worker.py` and UN-IGNORED it
-  from `scripts/_*.py` (root cause: the worker was scratch-only, went missing, silently broke
-  the default char voice -> node 81 failed closed). Doc: `docs/indextts2_pathb_setup.md`.
-- **`721ecf6`/`d892a54`/`d076898`** -- `docs/gemma4/` shareable Reddit guide + test JSON +
-  one-file tester + badges + Ollama-version note.
-- **gemma-4-12b PROVEN as writer** (cleared the style inventor that previously rejected it --
-  reverses the writer-bakeoff "rejected" verdict). **indextts2 PROVEN as voice** (rendered
-  in-pipeline). Full `tests/` 3744/13/0 + Bug Bible green after every change.
-- Rejected: sending raw GBNF to Ollama; leaving the worker as scratch.
+## What's done & decided (all on v2.0-alpha, suite 3758/0 throughout)
+- **eda8590** mixed-rate crash: `OTR_BatchCharacterVoices` died on
+  `pack_audio_batch: mixed sample rates [22050, 24000]` when a cast mixed
+  indextts2 (22050) + bark-fallback (24000). Fix: `resample_audio()` in
+  `nodes/_otr_audio_utils.py` (scipy.signal.resample_poly -- the I-11 resampler,
+  NOT torchaudio) downsamples the bark fallback clip to the primary `sr` in the
+  fallback branch of `_otr_voice_node_common._render_per_line`. Plus a
+  finally-unload: bark fallback adapter stashed on `self._bark_fallback_active`,
+  torn down in `generate()`'s finally.
+- **4dbbc3e** the canonical workflow `workflows/otr_scifi_16gb_full.json` node 80
+  (OTR_CastLock) flipped to `[default, auto_registry, neutral, true]` -- the old
+  `preserve_ledger` default never assigned index refs, forcing bark. (Schema
+  default stays `preserve_ledger` for the byte-safe legacy bark path;
+  `test_full_workflow_v2_audio_wiring.py::test_widget_vectors_exact` updated to
+  expect the node-80 override.)
+- **39f384a** gender-agnostic last resort in `_resolve_clone_ref_path`
+  (`_otr_voice_node_common.py`): when gender is empty/out-of-bank (writer emits
+  `gender='other'`), pick ANY index ref deterministically (seeded by char_id) so a
+  clone engine NEVER silently drops to bark. Male/female keep gender-correct picks.
+- **382ff86 / c9c8d8a / 8ae8fd6 / 62792fd** -- `scripts/otr_dl_indextts2_refs.py`
+  (the reusable downloader: `--source donations|lj-speech|rhasspy`, F0 gender
+  tagging, ~12s mono refs, sha, wires `config/voice_reference_bank.json`,
+  idempotent + `--dry-run`). Bank is now **36 indextts2 voices: 14 male / 22
+  female**, all CC0/PD (kyutai voice-donations CC0 + LJ Speech PD + Rhasspy
+  Kathleen/Kerstin CC0 via blob-less GitHub sparse-checkout).
+- Rejected: torchaudio resample (codebase uses scipy, I-11); torchcodec install;
+  Common Voice (every mirror is script-based/gated/torchcodec on datasets 5.0);
+  changing the schema default (only the workflow node was flipped).
 
 ## State of the art
-- indextts2 Path-B install is ON DISK and working: venv
-  `C:\Users\jeffr\Documents\ComfyUI\index-tts\.venv`, weights `...\index-tts\checkpoints`
-  (gpt.pth/s2mel.pth/qwen emo + facebook/w2v-bert-2.0 under `checkpoints\hf_cache`). Env
-  vars (User): `OTR_INDEXTTS2_VENV` / `_DIR` / `_WORKER`. Worker protocol = stdin/stdout JSON
-  (ready -> per-line {text,ref_clip,emo_vector[8],emo_alpha,seed,out_path} -> {ok,...,22050});
-  worker dups fd1->fd2 so model prints can't corrupt the channel.
-- Full 30-word smoke (gemma + indextts2) rendered SUCCESS:
-  `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\` + final
-  `output\otr\obs\..._procgen_blended.mp4`. `/history` status=success. No VRAM thrash through
-  HuMo/upscale/procgen.
-- KNOWN issue (NOT ours): Comfy Desktop's Electron window goes BLACK mid-render (GPU-process
-  crash under VRAM pressure) -- cosmetic; backend completes via API. Comfy-Org/desktop
-  #1643/#1046. For heavy renders use the browser tab at :8000 or disable HW accel; the
-  /prompt API needs no UI.
-- Harness: `scripts/queue_smoke.py` (30w/2char/1act) on `scripts/otr_api.py`; writer = node 1
-  `OTR_LedgerScriptWriter`, slots `creative_writing_model` + `technical_model`. Monitor via
-  `otr_runtime.log` + `/otr/latest_ledger` + `/history/<pid>`. (See memory: otr-full-smoke-harness.)
+- **Live out-of-the-box test PASSED** (ComfyUI restarted 15:52, after the fixes):
+  a 6-char cast (3F/3M) + 1 `gender='other'` (HAYES WELLS) + female announcer ->
+  every character voiced on IndexTTS2, **`Bark loaded` = 0**, full render to
+  `output\otr\episodes\signal_lost_toolwielding_tentacles_20260605_155914\...mp4`
+  (68.5s). Headless: a 9-char diverse cast maps 8/9 distinct gender-correct, 0 bark.
+- Engines + per-engine I/O contract (the seam for a NEW engine):
+  adapter `voice_ref_field` tells the dispatch which cast field feeds it --
+  indextts2/chatterbox=`voice_ref_path` (clip), kokoro=`voice_ref_id`,
+  bark=`voice_preset`. Rates: indextts2 22050, bark/chatterbox 24000, music 44100,
+  SceneSequencer standardizes batches to 48000. `_OTR_CLONE_ENGINES =
+  ("indextts2","chatterbox")` is a HARD-CODED tuple in `_otr_voice_node_common.py`.
+- **Chatterbox today:** wired (`nodes/_otr_audio_engines/eng_chatterbox.py`, 24000,
+  in the engine dropdown + 4 bank entries) but UNUSABLE -- its deps hard-pin
+  torch2.6/numpy1.26 which brick the torch2.10/cu130 venv, AND 0 chatterbox ref
+  WAVs are installed (bank has 4, disk has 0). Chatterbox license = MIT.
+- **Casting-architecture roundtable MUST-FIX backlog (staged, NOT applied)** in
+  `docs/2026-06-05-voice-casting-architecture/pass01_plan.md` -- directly relevant
+  to adding any new engine: (1) CastLock `_stamp` writes `voice_ref_id` not
+  `voice_ref_path`; (2) commercial_clean EFFECTIVE = engine AND ref
+  (`eng_indextts2.commercial_clean=False` -- bilibili NON-COMMERCIAL -- vs CC0
+  refs=true); (3) gender guaranteed on the cast row; (4) kokoro `ANNOUNCER_VOICE_POOL`
+  has 4 voices, only `bm_george` installed; (5) resample EVERY clip not just bark;
+  (6) replace `_OTR_CLONE_ENGINES` tuple with adapter metadata
+  (`requires_voice_ref` / `voice_ref_kind` / `missing_ref_fallback`).
 
-## Immediate next steps
-1. **Pre-refactor confirmation (cheap, headless, no video cost):** run the writer x voice
-   matrix pruned to `OTR_EpisodeAssembler` -- {mistral-nemo, gemma-4-12b} x {bark, indextts2}.
-   Confirms all 4 combos produce a script + voiced audio. Then ONE full baseline render
-   (mistral-nemo + bark = the byte-identical default) to confirm the full pre-refactor pipeline
-   is green. (Avoid full video for every combo -- HuMo is the long pole; the refactor replaces
-   the video stage anyway.)
-2. **Start the video-engine refactor** -- use the **otr-video-handoff** skill (NOT this general
-   one); it pins the video mission + anti-drift rules. Plan + artifacts live OUTSIDE the repo at
-   `C:\Users\jeffr\Documents\otr-video-roundtable\` (waves W0-W6).
-3. Housekeeping (non-blocking): 5 deleted `workflows/GO_FORWARD_PLAN_v7-v11_*.md` are unstaged
-   -- decide commit-deletion vs restore. Optionally mirror `docs/gemma4/` onto `main` for a
-   clean share link.
+## Immediate next steps (the chatterbox mission)
+1. **Roundtable the chatterbox-sidecar design** (use the `roundtable` skill;
+   dry-run estimate first, then live -- panel = GPT+Gemini+Grok+DeepSeek,
+   `--reasoning-effort none --max-tokens 12000`, Opus is the judge). Ground it
+   against `nodes/_otr_audio_engines/eng_chatterbox.py`, the existing IndexTTS2
+   sidecar (`scripts/_otr_indextts2_worker.py` + `docs/indextts2_pathb_setup.md`),
+   and the per-engine contract in `nodes/_otr_voice_node_common.py`. Core question:
+   isolate chatterbox's torch2.6/numpy1.26 deps in a SEPARATE venv reached by a
+   stdin/stdout JSON worker (exactly the IndexTTS2 Path-B pattern, env vars
+   `OTR_CHATTERBOX_VENV/_DIR/_WORKER`), so the main torch2.10 venv is never
+   touched. Decide worker protocol, ref-clip handling, and whether to first land
+   the `_OTR_CLONE_ENGINES`-tuple -> adapter-metadata refactor (casting roundtable
+   MUST-FIX #6) so chatterbox (and later Dia) slot in without per-engine `if`s.
+2. **Build it**: chatterbox sidecar venv + worker + adapter wiring; then INSTALL
+   chatterbox reference WAVs -- the bank already lists 4 chatterbox entries
+   (`cc_male_warm/cc_male_gravel/cc_female_warm/cc_female_bright`) but 0 are on
+   disk. Either source CC0 chatterbox refs (the kyutai voice-zero / donation WAVs
+   work for any clone engine -- re-tag `engine="chatterbox"` copies, or extend
+   `otr_dl_indextts2_refs.py` with an `--engine` arg) or generate them.
+3. **Wire + test**: set node 81 `engine=chatterbox` (and node 80
+   `voice_bank=default`), render a small cast, confirm it voices via the sidecar
+   and the main venv stays intact (the live `_otr_index_test.py`-style harness +
+   the `_otr_voicewatch.py` console grep are the pattern; recreate them as scratch).
+   Run the full suite (`pytest tests -q`) + Bug Bible after any `.py` change.
+4. **Strongly consider Dia instead/alongside** (`nari-labs/dia`, 1.6B, Apache-2.0
+   -> COMMERCIALLY CLEAN, fixes the IndexTTS2 non-commercial-license liability for
+   Jeffrey's films; zero-shot cloning so the 36-voice CC0 bank feeds it directly;
+   dialogue-native). Same sidecar + new `eng_dia.py` adapter. If the goal is a
+   shippable commercial voice, Dia > chatterbox.
 
 ## Open questions
-- Nothing from this session blocks anything. BUG_LOG's open items are the historical
-  BUG-LOCAL-231 FLUX VRAM-thrash family (out-of-band loaders) -- superseded by the NORMALVRAM
-  fix and dissolved by the coming video refactor; the full render this session showed no thrash.
-- gemma-4 is proven through the inventor; the rest of the writer (casting/compose/doctor) ran
-  clean once but hasn't been soaked across many episodes -- worth a soak before making gemma a
-  default.
+- **Chatterbox vs Dia**: chatterbox is already-wired (MIT) but bricks the venv and
+  has 0 refs; Dia is a new adapter but Apache-2.0 (commercial-clean) and reuses the
+  bank. Jeffrey asked for chatterbox this session -- confirm priority before the build.
+- Apply the casting MUST-FIX backlog (esp. `_OTR_CLONE_ENGINES` -> metadata, and
+  commercial_clean-effective) as part of the new-engine work, or separately?
+- Push the 7 unpushed commits to origin/v2.0-alpha (Jeffrey hadn't decided).
+- The 5 `workflows/GO_FORWARD_PLAN_v7-v11_*.md` deletions are still unstaged
+  (pre-existing, not from this session) -- commit-the-deletion vs restore.
 
 ---
 ## Resume instructions

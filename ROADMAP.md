@@ -8,6 +8,33 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
+## 2026-06-05 — SHIPPED: character-voice overhaul (IndexTTS2 default, no bark, 36-voice CC0 bank) | NEXT: chatterbox/Dia sidecar engine
+
+**Shipped (v2.0-alpha, `eda8590`..`62792fd`, suite 3758/0, live out-of-the-box render):**
+mixed-rate crash fixed (`resample_audio`, scipy.resample_poly per I-11); the
+canonical workflow's CastLock (node 80) flipped to `auto_registry`+reuse so
+IndexTTS2 voices EVERY character (the old `preserve_ledger` default forced bark);
+gender-agnostic last resort in `_resolve_clone_ref_path` (any cast gender, incl.
+the writer's `gender='other'`, lands on an index voice -- never a silent bark
+fallback); CC0 reference downloader `scripts/otr_dl_indextts2_refs.py`
+(`--source donations|lj-speech|rhasspy`) expanded the bank 4 -> **36 indextts2
+voices (14M / 22F)**. Verified live: a 6-char + `other` cast voiced 100% on index,
+`Bark loaded`=0, full mp4. Casting roundtable + plan in
+`docs/2026-06-05-voice-casting-architecture/`.
+
+**NEXT (the chatterbox mission):** roundtable + build + test a **CHATTERBOX engine
+via a dep-isolated SIDECAR venv** (the IndexTTS2 Path-B pattern -- chatterbox's
+torch2.6/numpy1.26 brick the main torch2.10 venv, and 0 chatterbox refs are
+installed). **Strongly consider Dia (`nari-labs/dia`, Apache-2.0 -> COMMERCIALLY
+CLEAN) instead/alongside:** IndexTTS2's model license is non-commercial (bilibili)
+so its output can't ship in the films; Dia fixes that and reuses the 36-voice CC0
+bank via zero-shot cloning. Full plan in `session_handoff.md`; the casting MUST-FIX
+backlog (replace the hard-coded `_OTR_CLONE_ENGINES` tuple with adapter metadata;
+commercial_clean-effective = engine AND ref; kokoro announcer pool; resample every
+clip) is in `docs/2026-06-05-voice-casting-architecture/pass01_plan.md`.
+
+---
+
 ## 2026-06-04 — QUEUED: REPO HYGIENE + "LEAN-AND-MEAN" CLEANUP SWEEP (after the video-engine update) (Jeffrey)
 
 **Sequencing:** runs AFTER the video-engine update ships (the round-table-converged plan + waves W0-W6; full plan + all artifacts live OUTSIDE the repo at `C:\Users\jeffr\Documents\otr-video-roundtable\`). Review the REAL final code, not a moving target. The video refactor is itself the big subtraction (it deletes the per-model batch nodes, branch gates, deferred loaders, `OTR_VideoPlan`, and the god-files `batch_humo_render.py` / `video_composite.py` / `batch_ltx_render.py`); this item finishes the job so the repo *reads* as lean as it now *is*. Cold-reviewer ballpark today ~B (process discipline A-, code-cleanliness C+); target A-.
