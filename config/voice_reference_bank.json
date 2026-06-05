@@ -7,8 +7,13 @@
       "voice_ref_id": "cc_male_warm",
       "engine": "chatterbox",
       "gender": "male",
-      "timbre": ["warm", "baritone"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "warm",
+        "baritone"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/chatterbox/cc_male_warm.wav",
       "ref_sha256": "pending",
@@ -18,8 +23,13 @@
       "voice_ref_id": "cc_male_gravel",
       "engine": "chatterbox",
       "gender": "male",
-      "timbre": ["gravel", "deep"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "gravel",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "elder",
       "ref_path": "models/TTS/refs/chatterbox/cc_male_gravel.wav",
       "ref_sha256": "pending",
@@ -29,8 +39,13 @@
       "voice_ref_id": "cc_female_warm",
       "engine": "chatterbox",
       "gender": "female",
-      "timbre": ["warm", "alto"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "warm",
+        "alto"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/chatterbox/cc_female_warm.wav",
       "ref_sha256": "pending",
@@ -40,8 +55,13 @@
       "voice_ref_id": "cc_female_bright",
       "engine": "chatterbox",
       "gender": "female",
-      "timbre": ["bright", "soprano"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "bright",
+        "soprano"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "young_adult",
       "ref_path": "models/TTS/refs/chatterbox/cc_female_bright.wav",
       "ref_sha256": "pending",
@@ -51,8 +71,13 @@
       "voice_ref_id": "vz_bill_boerst",
       "engine": "indextts2",
       "gender": "male",
-      "timbre": ["warm", "baritone"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "warm",
+        "baritone"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/vz_bill_boerst.wav",
       "ref_sha256": "be4815e4fb760ba1b78117545a260cce4a4c124c7657bc5c6127a0fef8ba661f",
@@ -62,8 +87,13 @@
       "voice_ref_id": "vz_peter_yearsley",
       "engine": "indextts2",
       "gender": "male",
-      "timbre": ["neutral", "clear"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "neutral",
+        "clear"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "elder",
       "ref_path": "models/TTS/refs/indextts2/vz_peter_yearsley.wav",
       "ref_sha256": "fbb3920fda7ae26a5a8b317ffcae1d55c0bd5d89d075205f5a52b1e924b83f51",
@@ -73,8 +103,13 @@
       "voice_ref_id": "vz_stuart_bell",
       "engine": "indextts2",
       "gender": "male",
-      "timbre": ["bright", "tenor"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "bright",
+        "tenor"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/vz_stuart_bell.wav",
       "ref_sha256": "00c7baeb2fb7a8c1c6198e045b5e853a7ccc04002a51a09b4be3dd7c96994f73",
@@ -84,8 +119,13 @@
       "voice_ref_id": "vz_caro_davy",
       "engine": "indextts2",
       "gender": "female",
-      "timbre": ["warm", "alto"],
-      "roles": ["char_voice"],
+      "timbre": [
+        "warm",
+        "alto"
+      ],
+      "roles": [
+        "char_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/vz_caro_davy.wav",
       "ref_sha256": "40c692c005a0268a7a5b6ebae348077d3dca6a86eb6b12bd36e343bbcd71b5f6",
@@ -95,8 +135,13 @@
       "voice_ref_id": "bm_george",
       "engine": "kokoro",
       "gender": "male",
-      "timbre": ["authoritative", "bbc"],
-      "roles": ["announcer_voice"],
+      "timbre": [
+        "authoritative",
+        "bbc"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bm_george.pt",
       "ref_sha256": "pending",
@@ -106,11 +151,112 @@
       "voice_ref_id": "cc_announcer_male",
       "engine": "chatterbox",
       "gender": "male",
-      "timbre": ["authoritative", "resonant"],
-      "roles": ["announcer_voice"],
+      "timbre": [
+        "authoritative",
+        "resonant"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/chatterbox/cc_announcer_male.wav",
       "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_c0a0",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_c0a0.wav",
+      "ref_sha256": "d366d5e0fc6526b71bbf71f01f0487e5994dce95765af1257b160bd827587826",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_kditz",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_kditz.wav",
+      "ref_sha256": "506dacad529e7471e74686a98a5b329bd675b58a3e004fcb87a42919d917abf3",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_blake",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_blake.wav",
+      "ref_sha256": "4fdbb44ecddf92bd53d45d9c8c51b84e72b57b4a50f615c878d2490ca9c2e916",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_andrea_spanish",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_andrea_spanish.wav",
+      "ref_sha256": "20ddc59300be8363a6b1ac0cdb9d21e98a4d4da57bf86aff1e21e1ce7380a648",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_bijay",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_bijay.wav",
+      "ref_sha256": "0ffb72dd127c61c4fe1a5a060591d785711f711eaf470fcc58e2baecbe1be5ac",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_haku",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_haku.wav",
+      "ref_sha256": "8cab88dc3ba79d30f3f2be73e3f95f272dd58fbeb4d8ba63f1cafd7b2c538d81",
       "commercial_clean": true
     }
   ]
