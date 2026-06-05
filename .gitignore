@@ -143,6 +143,12 @@ workflows/*.json.bak
 !scripts/_consult_nvidia.py
 !scripts/_consult_round_robin.py
 
+# --- 2026-06-05: the indextts2 Path-B worker is essential source, not a
+# per-task script. It was scratch-only under `scripts/_*.py`, went missing, and
+# silently broke the default char voice (node 81 failed closed). Keep it
+# versioned by exception so it can never disappear again. ---
+!scripts/_otr_indextts2_worker.py
+
 # --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
 # <output>/otr/state/ ---
 # The legacy <repo>/config/news_history.json is read-only-fallback for
