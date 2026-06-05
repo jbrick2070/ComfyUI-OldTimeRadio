@@ -338,6 +338,342 @@
       "ref_path": "models/TTS/refs/indextts2/vz_ljspeech.wav",
       "ref_sha256": "ac9a068dfa385afba72f39e6a9847a0ded6a5c71058502a56f743b8e4959f8dc",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_darya_khan",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_darya_khan.wav",
+      "ref_sha256": "bea01669fcddf598213761bb198d189b0d675578cc8b811a42ece33252378af4",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_sujan_daikoawaj",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_sujan_daikoawaj.wav",
+      "ref_sha256": "882187f4e4f174051756b807927807d6c1ae056fcd955717902f055134b2ec3e",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_hugo_the_frenchie",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_hugo_the_frenchie.wav",
+      "ref_sha256": "602494cea2b850ab9e284b9039adf971867fff6b98b1e2e79706ca9793995545",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_sirajo_x",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_sirajo_x.wav",
+      "ref_sha256": "1638e735c387ef1b8b51b8bca82bd9ca49cea3e5db58f7dccc70a7398a5e276a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_marshal_indian",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_marshal_indian.wav",
+      "ref_sha256": "8f573d3afd1ed39d0d13ee4490ee6c2b1beca458c5982c7e895101facaf4aa3f",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_1410",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_1410.wav",
+      "ref_sha256": "37a3fc121b3dd33a91e9c45e0f4b52f23bfe1020865b1b8aad9783934bedd2a1",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_andrea",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_andrea.wav",
+      "ref_sha256": "7b3f2ab699e2c0351c3b72e83188569b84dd24c6ba6162e54a0426b10167b147",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_hillbilly_jim",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_hillbilly_jim.wav",
+      "ref_sha256": "6b7996e3d5d244561c69f5da9ea3b3572a92d21ccbbf8c1d1badd9e30879cf03",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_erihppas",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_erihppas.wav",
+      "ref_sha256": "6b435a9b12389a0ad95e174e9491483d20cfc59a9c61c596122c5079a65d622a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_3973",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_3973.wav",
+      "ref_sha256": "435fb683dc7f209c1e08b979492d826b5ec503e3352e5bc9a887a3372e9514ba",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_9a66",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_9a66.wav",
+      "ref_sha256": "c0e8fbcaed15127dc795c169b7038e80856e928fb62f3bda9cc1bffb0ddc5152",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_bathri",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_bathri.wav",
+      "ref_sha256": "449d2c799df069f5751f3b7e311a57da2a9d1ac3d67b3d34223076340d27e621",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_hannah",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_hannah.wav",
+      "ref_sha256": "91e6422bfa3c747445ba7aea0fb3ec08dca7b2dcdcf1e956cf7d03bd78a5393c",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_awais_shah",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_awais_shah.wav",
+      "ref_sha256": "c3c1d5367adef21667c8fbaa0e2e2f72fa73b9886e5adeed20992b7d8b47ba19",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_rup",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_rup.wav",
+      "ref_sha256": "45c9be69d77610e13d0e9aad3a4483ef44c836dd427c8814f44505ab895ecea3",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_selfie",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_selfie.wav",
+      "ref_sha256": "f0fe51523f1aac0023050ae6ab1bfda19cc1f4997ef8314824550aee2f41615b",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_f179",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_f179.wav",
+      "ref_sha256": "f1b36e377fd338af1c10a5ca9934771f2e40198662fc3db4be619e86c2e61a0b",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_glenn",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_glenn.wav",
+      "ref_sha256": "c8679a09eff572aa9b564181b18e87525f5b18f290342032b014d30176ae946c",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_james",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_james.wav",
+      "ref_sha256": "2fafb2e9429d9e180da56ddf570e96f0ec6b826855a57180fcf0a2cb1d8db77a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_kathleen",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "clear",
+        "narration"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_kathleen.wav",
+      "ref_sha256": "10395fb6433365057b7ac51a9c53160f618a0ae4fc96b448bbd958223e550183",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_kerstin",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "clear",
+        "narration"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_kerstin.wav",
+      "ref_sha256": "1d87f3765290ffd02cba2daf901d5e5701abc52f97c4faf5245649494916464c",
+      "commercial_clean": true
     }
   ]
 }

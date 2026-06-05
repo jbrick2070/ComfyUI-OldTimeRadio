@@ -146,12 +146,15 @@ def main():
     ap.add_argument("--seg-seconds", type=float, default=12.0)
     ap.add_argument("--refs-dir", default=DEFAULT_REFS_DIR)
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--source", choices=["donations", "lj-speech"], default="donations",
-                    help="donations = kyutai CC0 voice-donations; lj-speech = LJ Speech (PD US female)")
+    ap.add_argument("--source", choices=["donations", "lj-speech", "rhasspy"], default="donations",
+                    help="donations = kyutai CC0 voice-donations; lj-speech = LJ Speech (PD US female); "
+                         "rhasspy = Rhasspy Kathleen + Kerstin (CC0, GitHub sparse-checkout)")
     args = ap.parse_args()
 
     if args.source == "lj-speech":
         return add_lj_speech(args)
+    if args.source == "rhasspy":
+        return add_rhasspy(args)
 
     from huggingface_hub import hf_hub_download
 
@@ -271,6 +274,94 @@ def add_lj_speech(args):
     print(f"ADD vz_ljspeech: female (LJ Speech, PD US narrator) "
           f"dur={len(wav)/OUT_RATE:.1f}s sha={sha[:8]}")
     print("RESTART ComfyUI to load the expanded bank.")
+    return 0
+
+
+# Rhasspy CC0 voice datasets (GitHub). Known gender, so no F0 tagging needed.
+RHASSPY_VOICES = [
+    ("kathleen", "female", "https://github.com/rhasspy/dataset-voice-kathleen.git"),
+    ("kerstin", "female", "https://github.com/rhasspy/dataset-voice-kerstin.git"),
+]
+
+
+def add_rhasspy(args):
+    """Add Rhasspy Kathleen (CC0 US female) + Kerstin (CC0 German female) by
+    sparse-checking out a handful of clips from each GitHub repo (no full clone),
+    concatenating to a ~seg-second reference. Idempotent."""
+    import subprocess
+    import numpy as np
+    import soundfile as sf
+    from scipy.signal import resample_poly
+
+    bank = load_bank()
+    existing = {v["voice_ref_id"] for v in bank["voices"]}
+    tmp_base = os.path.join(os.path.dirname(REPO), "_otr_voice_tmp")
+    os.makedirs(tmp_base, exist_ok=True)
+    os.makedirs(args.refs_dir, exist_ok=True)
+    added = []
+    for name, gender, url in RHASSPY_VOICES:
+        vid = "vz_" + name
+        if vid in existing:
+            print(f"{vid} already in bank; skip")
+            continue
+        d = os.path.join(tmp_base, name)
+        if not os.path.isdir(os.path.join(d, ".git")):
+            print(f"cloning {name} (blob-less)...")
+            subprocess.run(["git", "clone", "--no-checkout", "--depth", "1",
+                            "--filter=blob:none", url, d], check=True)
+        tree = subprocess.run(["git", "-C", d, "ls-tree", "-r", "--name-only", "HEAD"],
+                              capture_output=True, text=True).stdout.splitlines()
+        auds = [f for f in tree if f.lower().endswith((".wav", ".flac"))]
+        auds = [f for f in auds if f.lower().startswith("data/")] or auds
+        auds = sorted(auds)[:6]
+        if not auds:
+            print(f"{vid}: no audio files in repo; skip")
+            continue
+        subprocess.run(["git", "-C", d, "sparse-checkout", "init", "--no-cone"], check=False)
+        subprocess.run(["git", "-C", d, "sparse-checkout", "set", *auds], check=False)
+        subprocess.run(["git", "-C", d, "checkout"], check=False,
+                       capture_output=True, text=True)
+        chunks, sr0, total = [], None, 0.0
+        for rel in auds:
+            fp = os.path.join(d, rel.replace("/", os.sep))
+            if not os.path.exists(fp):
+                continue
+            data, sr0 = sf.read(fp, dtype="float32")
+            if getattr(data, "ndim", 1) == 2:
+                data = data.mean(axis=1)
+            chunks.append(np.asarray(data, dtype="float32"))
+            total += len(chunks[-1]) / int(sr0)
+            if total >= args.seg_seconds:
+                break
+        if not chunks:
+            print(f"{vid}: fetched no audio; skip")
+            continue
+        wav = np.concatenate(chunks)[: int(args.seg_seconds * sr0)]
+        if int(sr0) != OUT_RATE:
+            from math import gcd
+            g = gcd(int(sr0), OUT_RATE)
+            wav = resample_poly(wav, OUT_RATE // g, int(sr0) // g).astype("float32")
+        peak = float(np.max(np.abs(wav))) or 1.0
+        wav = (wav / peak * 0.97).astype("float32")
+        out_wav = os.path.join(args.refs_dir, vid + ".wav")
+        sf.write(out_wav, wav, OUT_RATE, subtype="PCM_16")
+        sha = _sha256_file(out_wav)
+        bank["voices"].append({
+            "voice_ref_id": vid, "engine": "indextts2", "gender": gender,
+            "timbre": ["clear", "narration"], "roles": ["char_voice"],
+            "age_band": "adult",
+            "ref_path": "models/TTS/refs/indextts2/" + vid + ".wav",
+            "ref_sha256": sha, "commercial_clean": True,
+        })
+        existing.add(vid)
+        added.append(vid)
+        print(f"ADD {vid}: {gender} (Rhasspy, CC0) dur={len(wav)/OUT_RATE:.1f}s sha={sha[:8]}")
+    if added:
+        save_bank(bank)
+        print(f"\nwrote {len(added)} Rhasspy CC0 ref(s): {added}")
+        print("RESTART ComfyUI to load the expanded bank.")
+    else:
+        print("\nnothing added.")
     return 0
 
 
