@@ -1778,9 +1778,9 @@
       },
       "widgets_values": [
         "default",
-        "preserve_ledger",
+        "auto_registry",
         "neutral",
-        false
+        true
       ],
       "inputs": [
         {
