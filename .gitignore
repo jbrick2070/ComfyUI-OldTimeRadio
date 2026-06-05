@@ -174,3 +174,15 @@ docs/2026-05-13-S28-new-forbidden-hits.txt
 # above; pinned explicitly so the cache file is unmistakably non-versioned.
 models/openrouter_models.json
 
+
+# --- 2026-06-04 root scratch hygiene (run/test/soak/bakeoff artifacts) ---
+# These land in the repo root from test/soak/install runs. None are tracked;
+# this just stops git from surfacing ~180 loose files in `git status`.
+# Root-anchored (leading /) so tracked nodes/_otr_*.py SOURCE is unaffected.
+# Real root files (requirements.txt, *.md docs, the workflow JSONs) are NOT matched.
+/_otr_*
+/*.DONE
+/*_STOP
+/*.err
+/*.out
+/*_results.jsonl

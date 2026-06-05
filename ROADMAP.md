@@ -8,6 +8,18 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
+## 2026-06-04 — QUEUED: REPO HYGIENE + "LEAN-AND-MEAN" CLEANUP SWEEP (after the video-engine update) (Jeffrey)
+
+**Sequencing:** runs AFTER the video-engine update ships (the round-table-converged plan + waves W0-W6; full plan + all artifacts live OUTSIDE the repo at `C:\Users\jeffr\Documents\otr-video-roundtable\`). Review the REAL final code, not a moving target. The video refactor is itself the big subtraction (it deletes the per-model batch nodes, branch gates, deferred loaders, `OTR_VideoPlan`, and the god-files `batch_humo_render.py` / `video_composite.py` / `batch_ltx_render.py`); this item finishes the job so the repo *reads* as lean as it now *is*. Cold-reviewer ballpark today ~B (process discipline A-, code-cleanliness C+); target A-.
+
+- **Root hygiene [.gitignore landed 2026-06-04].** Root carried ~185 loose `_otr_*` run/test/soak/bakeoff artifacts (133 `.txt` + logs + `.DONE`/`_STOP`/`_pid`/`.err` sentinels); none were git-tracked. `.gitignore` extended root-anchored (`/_otr_*`, `/*.DONE`, `/*_STOP`, `/*.err`, `/*.out`, `/*_results.jsonl`) so they stop polluting `git status`. STILL TODO: route script run-artifacts to `scratch/` (already ignored) so root stays clean permanently; one safe, list-first PHYSICAL sweep of the existing loose files (keep `BUG_LOG.md`, `session_handoff.md`, real docs/JSONs; never sweep while a soak/allnight run is live — respect `_pid`/`_STOP`/`.DONE`).
+- **De-vibe-code + optimization review.** Run BY AREA off the charter (`otr-video-roundtable\REPO_CLEANUP_REVIEW_CHARTER.md` + `prompts/repo_cleanup_review.md`): 17 AI-code-smell classes, deletion-biased, invariant-guarded; verify the refactor actually DELETED the retired surfaces (not commented-out / flag-gated).
+- **Doc accuracy.** Rewrite the stale README (v1.7 framing); fix the CLAUDE.md errors (the frozen-audio node list/count; the non-existent `gate_signal` — the broadcast is `OTR_LedgerFreezeCascade` out1 `script_json`).
+- **Metric scorecard, before/after.** LOC deleted, god-file count -> 0, main-env dependency count, cold-import ms, test runtime + coverage, s/it — the numbers that actually earn "lean and mean."
+- **Exit:** scorecard shows net LOC deletion + zero god-files (>800 lines); docs match reality; one senior human reviewer signs off. **Effort:** ~5 review passes by area + folds, ~$1-2 OpenRouter, bounded (one sweep per area, not an iterated loop). **Depends on:** video-engine update complete (+ the Wave 0.5 spike + W0-W6 green). LLM proposes; metrics + a human dispose.
+
+---
+
 ## 2026-05-24 SESSION — WRITER FIXES + HuMo TIERING LANDED (HEAD `e619ebb`)
 
 Two writer-path defects fixed and pushed to `v2.0-alpha` this session.
