@@ -41,12 +41,24 @@ def _resolve_ref_to_disk(ref_path):
         return None
     if os.path.isabs(ref_path):
         return ref_path
+    rp = ref_path.replace("\\", "/")
+    stripped = rp[len("models/"):] if rp.startswith("models/") else rp
+    candidates = []
     try:
         import folder_paths
 
-        return os.path.join(os.path.dirname(folder_paths.models_dir), ref_path)
+        md = folder_paths.models_dir
+        candidates.append(os.path.join(os.path.dirname(md), ref_path))  # <base>/models/...
+        candidates.append(os.path.join(md, stripped))                   # <models_dir>/TTS/...
     except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
-        return os.path.abspath(ref_path)
+        pass
+    # Known extra models root after the Comfy Desktop 1.0.4 model-path migration.
+    candidates.append(os.path.join("C:\\ComfyUI-Models", stripped))
+    candidates.append(os.path.abspath(ref_path))
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return candidates[0] if candidates else None
 
 
 def _resolve_clone_ref_path(engine, cast, episode_seed):
