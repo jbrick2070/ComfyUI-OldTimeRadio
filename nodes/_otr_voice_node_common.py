@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import gc
 import logging
+import os
 
 log = logging.getLogger("OTR")
 
@@ -29,6 +30,62 @@ log = logging.getLogger("OTR")
 # engine never trips it. Add a new cloning engine here when its reference-bank
 # pipeline lands (e.g. xtts / cosyvoice).
 _OTR_CLONE_ENGINES = ("indextts2", "chatterbox")
+
+
+def _resolve_ref_to_disk(ref_path):
+    """Resolve a voice-bank ref_path (usually relative to the ComfyUI root, e.g.
+    'models/TTS/refs/indextts2/ix_male_warm.wav') to an absolute path. Mirrors the
+    indextts2 adapter's own resolution so this existence check matches what the
+    worker will actually open."""
+    if not ref_path:
+        return None
+    if os.path.isabs(ref_path):
+        return ref_path
+    try:
+        import folder_paths
+
+        return os.path.join(os.path.dirname(folder_paths.models_dir), ref_path)
+    except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
+        return os.path.abspath(ref_path)
+
+
+def _resolve_clone_ref_path(engine, cast, episode_seed):
+    """Best-effort on-disk reference WAV for a cloning engine + cast row, or None.
+
+    preserve_ledger does not stamp a clip ref, and CastLock stamps only
+    voice_ref_id (not the path), so the per-line path can arrive with no
+    voice_ref_path even when a bank ref applies. Resolve it here: prefer the
+    cast's voice_ref_id, else assign one deterministically by gender. Returns an
+    absolute path ONLY if the file exists on disk; None -> the caller's bark
+    fallback renders the line. Never raises (a bad bank just means bark)."""
+    try:
+        from ._otr_voice_bank import assign_voice_for_slot, load_voice_bank
+
+        bank, _ = load_voice_bank()
+    except Exception:  # noqa: BLE001
+        return None
+    entry = None
+    vrid = cast.get("voice_ref_id")
+    if vrid:
+        entry = next(
+            (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None
+        )
+    if entry is None:
+        gender = str(cast.get("gender") or "").strip().lower()
+        if not gender:
+            return None
+        try:
+            entry = assign_voice_for_slot(
+                role="char_voice", engine=engine,
+                char_id=str(cast.get("char_id") or ""), gender=gender,
+                timbre=tuple(cast.get("timbre") or ()),
+                age_band=str(cast.get("age_band") or ""),
+                episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+            )
+        except Exception:  # noqa: BLE001 -- no castable ref -> bark
+            return None
+    path = _resolve_ref_to_disk(getattr(entry, "ref_path", "") or "")
+    return path if (path and os.path.exists(path)) else None
 
 
 # --------------------------------------------------------------------------- #
@@ -313,6 +370,11 @@ class OTRVoiceNodeBase:
             # so the episode never hard-fails on a missing voice reference -- audio
             # is king (PD1). The clone engine engages automatically once a usable
             # voice_ref_path is present. Bark is loaded once, lazily.
+            if engine in _OTR_CLONE_ENGINES and not voice_ref:
+                # preserve_ledger / CastLock-stamps-only-the-id: resolve an
+                # on-disk reference WAV from voice_ref_id or by gender so the
+                # clone engine clones a real voice. None -> bark fallback below.
+                voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed)
             if self.ROLE == "char_voice" and engine in _OTR_CLONE_ENGINES and not voice_ref:
                 if _bark_fb is None:
                     from ._otr_audio_engines import get_engine as _get_engine
