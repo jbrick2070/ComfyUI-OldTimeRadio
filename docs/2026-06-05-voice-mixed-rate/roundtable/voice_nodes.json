@@ -1,0 +1,91 @@
+{
+  "_note": "voice nodes excerpted from otr_scifi_16gb_full.json for the roundtable",
+  "nodes": [
+    {
+      "id": 80,
+      "type": "OTR_CastLock",
+      "widgets_values": [
+        "default",
+        "preserve_ledger",
+        "neutral",
+        false
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "link": 234
+        },
+        {
+          "name": "gate_in",
+          "link": null
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "type": "OTR_BatchCharacterVoices",
+      "widgets_values": [
+        "indextts2",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "link": 231
+        },
+        {
+          "name": "ledger_json",
+          "link": 235
+        },
+        {
+          "name": "gate_in",
+          "link": null
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "type": "OTR_AnnouncerVoice",
+      "widgets_values": [
+        "kokoro",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "link": 232
+        },
+        {
+          "name": "ledger_json",
+          "link": 236
+        },
+        {
+          "name": "gate_in",
+          "link": 244
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "type": "OTR_StableAudioTheme",
+      "widgets_values": [
+        "stable_audio_3",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "link": 233
+        },
+        {
+          "name": "ledger_json",
+          "link": 237
+        },
+        {
+          "name": "gate_in",
+          "link": 245
+        }
+      ]
+    }
+  ]
+}

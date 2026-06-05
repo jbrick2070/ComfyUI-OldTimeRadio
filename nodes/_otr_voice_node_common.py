@@ -246,6 +246,7 @@ class OTRVoiceNodeBase:
         adapter = None
         sr_hint = 24000
         n_clips = 0
+        self._bark_fallback_active = None
         try:
             engine = assert_usable(engine, self.ROLE)  # FAIL CLOSED (6-class)
             adapter = get_engine(engine)
@@ -266,6 +267,13 @@ class OTRVoiceNodeBase:
         finally:
             # I-7: free single-engine residency in finally, BEFORE 'done'.
             self._teardown(adapter)
+            # If _render_per_line loaded a bark fallback adapter and an exception
+            # skipped its normal post-loop unload, tear it down here so a failed
+            # render cannot leave Bark resident (GPT-5.5 roundtable, grounded).
+            _fb = getattr(self, "_bark_fallback_active", None)
+            if _fb is not None:
+                self._teardown(_fb)
+                self._bark_fallback_active = None
 
         if audio_out is None:
             from ._otr_resolved_request import empty_audio_batch
@@ -286,6 +294,7 @@ class OTRVoiceNodeBase:
         """
         from . import _otr_ledger_consumers as _OTRLC
         from ._otr_audio_engines import pack_audio_batch
+        from ._otr_audio_utils import resample_audio
         from ._otr_engine_profiles import (
             assert_model_available, assert_token_for_profile, require_resolver,
         )
@@ -392,6 +401,7 @@ class OTRVoiceNodeBase:
                     from ._otr_audio_engines import get_engine as _get_engine
                     _bark_fb = _get_engine("bark")
                     _bark_fb.load()
+                    self._bark_fallback_active = _bark_fb
                     log_lines.append(
                         f"{self.ROLE}: WARNING engine '{engine}' has no reference "
                         f"clip for one or more lines; rendering those with bark "
@@ -403,6 +413,16 @@ class OTRVoiceNodeBase:
                     audio = _bark_fb.generate_voice(
                         prepared, voice_preset or "v2/en_speaker_6", None, bark_seed,
                     )
+                # Mixed-rate fix (BUG-LOCAL voice): bark renders at its native
+                # rate (24000), but this batch packs at the primary engine's sr
+                # (e.g. indextts2 22050). Downsample the fallback clip to sr so
+                # pack_audio_batch's single-rate contract holds -- otherwise a
+                # cast that mixes ref'd (indextts2) and ref-less (bark fallback)
+                # characters crashes with "mixed sample rates [22050, 24000]".
+                # Primary-engine clips are never touched (C7 bit-exact);
+                # resample_audio is deterministic CPU (scipy.resample_poly, I-11).
+                if int(audio.get("sample_rate", sr)) != sr:
+                    audio = resample_audio(audio, sr)
                 clips.append(audio)
                 continue
             # G1: scope strict-determinism + seed/restore every RNG around the
@@ -420,6 +440,7 @@ class OTRVoiceNodeBase:
                 _bark_fb.unload()
             except Exception:  # noqa: BLE001 -- teardown must not mask the render
                 pass
+        self._bark_fallback_active = None
         packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
         n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
         log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")

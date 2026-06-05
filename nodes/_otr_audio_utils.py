@@ -56,6 +56,41 @@ def mono_safe(audio) -> dict:
     return {"waveform": wf, "sample_rate": a["sample_rate"]}
 
 
+def resample_audio(audio, target_sr) -> dict:
+    """Resample an AUDIO buffer to ``target_sr`` Hz. Deterministic, CPU-only.
+
+    Uses ``scipy.signal.resample_poly`` -- the same anti-aliased CPU resampler
+    SceneSequencer already uses (``scene_sequencer._resample_audio``), per
+    invariant I-11 which removed the GPU torchaudio path so post-engine
+    resampling stays deterministic. No-op when the buffer is already at
+    ``target_sr``. Returns a canonical AUDIO dict
+    ``{"waveform": tensor[B, C, T'], "sample_rate": target_sr}`` in float32.
+    scipy is lazy-imported so module import stays side-effect-free (C-5).
+    """
+    a = canonical_audio(audio)
+    src_sr = int(a["sample_rate"])
+    target_sr = int(target_sr)
+    if src_sr == target_sr:
+        return a
+    if src_sr <= 0 or target_sr <= 0:
+        raise ValueError(
+            f"resample_audio: rates must be positive "
+            f"(src={src_sr}, target={target_sr})"
+        )
+    wf = a["waveform"].detach().to("cpu").contiguous().to(torch.float32)
+    if wf.shape[-1] == 0:
+        # Empty buffer: nothing to resample; just restamp the rate.
+        return {"waveform": wf, "sample_rate": target_sr}
+    from math import gcd
+    from scipy.signal import resample_poly  # lazy import keeps C-5 (no import-time deps)
+
+    g = gcd(src_sr, target_sr)
+    up, down = target_sr // g, src_sr // g
+    res = resample_poly(wf.numpy(), up, down, axis=-1)  # [B, C, T']
+    out = torch.from_numpy(res.astype("float32")).contiguous()
+    return {"waveform": out, "sample_rate": target_sr}
+
+
 def audio_sha16(audio) -> str:
     """Deterministic 16-hex digest of an audio buffer (for render logs)."""
     a = canonical_audio(audio)
