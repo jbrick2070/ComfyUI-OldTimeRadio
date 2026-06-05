@@ -1446,6 +1446,65 @@ def _strip_named_prefix(cleaned: str, req: LineRequest) -> str:
     return cleaned
 
 
+_LEAK_NOUN_SLOT_WORDS = frozenset({
+    "the", "a", "an", "in", "of", "at", "on", "to", "with", "into", "onto",
+    "from", "near", "inside", "behind", "beside", "by", "for",
+})
+
+
+def _roster_leak_names(req) -> list[str]:
+    """BUG-LOCAL-295: OTHER characters' MULTI-word names (UPPERCASED) from the
+    episode's ACTUAL drawn roster (``req.allowed_people`` -- the dynamic
+    8316-combo cast, never a fixed list). A multi-word ALL-CAPS roster name in
+    body text is a generation leak, not dialogue. Single-word names are excluded
+    -- one-word cross-character drama ("Maeve.") is legitimate.
+    """
+    speaker = (getattr(req, "speaker", "") or "").strip().upper()
+    out: list[str] = []
+    for n in (getattr(req, "allowed_people", None) or ()):
+        nu = " ".join((n or "").split()).upper()
+        if nu and nu != speaker and len(nu.split()) >= 2:
+            out.append(nu)
+    out.sort(key=len, reverse=True)  # longest first
+    return out
+
+
+def _scrub_or_flag_roster_leak(cleaned: str, leak_names: list[str]):
+    """BUG-LOCAL-295: handle a leaked multi-word ALL-CAPS OTHER-roster name in
+    line body. Inside a ``*...*`` stage direction -> SCRUB it (deterministic,
+    cheap; stage-direction bleed, not spoken). In bare body -> flag for RETRY
+    only when the name sits in a grammatical NOUN SLOT (immediately preceded by
+    an article/preposition, e.g. "safe in the ERIN SPENDER"), which a scrub would
+    leave broken ("safe in the"); a vocative ("Get back here, ERIN SPENDER!") is
+    NOT flagged. Returns ``(possibly-scrubbed text, retry_name or None)``. Never
+    raises -- returns ``(cleaned, None)`` on any regex error.
+    """
+    if not leak_names or not cleaned:
+        return cleaned, None
+    try:
+        def _scrub_seg(m):
+            seg = m.group(0)
+            for n in leak_names:
+                seg = re.sub(rf"(?<![\w']){re.escape(n)}(?![\w'])", "", seg,
+                             flags=re.IGNORECASE)
+            seg = re.sub(r"\s{2,}", " ", seg)
+            return seg.replace("* ", "*").replace(" *", "*")
+        scrubbed = re.sub(r"\*[^*]+\*", _scrub_seg, cleaned)
+
+        bare = re.sub(r"\*[^*]+\*", " ", scrubbed)  # ignore stage directions
+        for n in leak_names:
+            for mobj in re.finditer(rf"(?<![\w']){re.escape(n)}(?![\w'])", bare,
+                                    flags=re.IGNORECASE):
+                prefix_words = bare[: mobj.start()].split()
+                if prefix_words:
+                    prev = prefix_words[-1].strip(".,;:!?\"'()").lower()
+                    if prev in _LEAK_NOUN_SLOT_WORDS:
+                        return scrubbed, n
+        return scrubbed, None
+    except re.error:
+        return cleaned, None
+
+
 def _replace_phantom_token(text: str, phantom: str, canonical: str) -> str:
     """Whole-word, case-insensitive replace of ``phantom`` with
     ``canonical`` in ``text``.
@@ -1707,6 +1766,31 @@ def compose_line_draft(
             )
             attempts.append((raw or "", err_msg))
             continue
+
+        # BUG-LOCAL-295 (2026-06-03): a multi-word ALL-CAPS OTHER-roster name
+        # (from the episode's dynamic roster) leaked into the body -- mid-phrase
+        # or inside a *...* stage direction, e.g. "*ERIN SPENDER the monkeys'
+        # enclosure*" or "safe in the ERIN SPENDER". The self-name filter above
+        # misses these. Scrub inside a *...* group; retry on a bare noun-slot
+        # leak (a scrub there would break grammar). Mirrors the drift retry
+        # below -- ship-with-warning on the last attempt (PD1: never discard).
+        cleaned, _leak_name = _scrub_or_flag_roster_leak(
+            cleaned, _roster_leak_names(req)
+        )
+        if _leak_name:
+            is_last_attempt = (attempt_idx + 1 >= max_attempts)
+            err_msg = f"roster-name leak in body: {_leak_name!r}"
+            if not is_last_attempt:
+                log.warning(
+                    "[OTR_LineComposer] attempt %d retry: %s",
+                    attempt_idx + 1, err_msg,
+                )
+                attempts.append((raw or "", err_msg))
+                continue
+            log.warning(
+                "[OTR_LineComposer] shipping line with roster-name leak on "
+                "final attempt %d: %s", attempt_idx + 1, err_msg,
+            )
 
         word_count = len(cleaned.split())
         if word_count > word_cap:

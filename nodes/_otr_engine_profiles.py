@@ -22,7 +22,7 @@ import os
 from typing import Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason, assert_usable
 
@@ -31,13 +31,19 @@ log = logging.getLogger("OTR")
 PROFILE_SCHEMA_VERSION = "1"
 _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 
+# Sprint 1: validated value sets for the new declarative profile metadata.
+_VALID_RUNTIMES = {"in_graph", "oop_venv"}
+_VALID_LICENSE_STATES = {"", "clean", "gated", "unknown"}
+
 # Hardcoded, legacy-first engine order per role for INPUT_TYPES (C-5: never empty
 # combo, stable across flags, no IO). The internal build default is the first
 # (legacy) entry until promotion (I) flips the shipped default per role.
 _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     "char_voice": ("bark", "chatterbox", "indextts2"),
     "announcer_voice": ("kokoro", "chatterbox"),
-    "music": ("musicgen", "stable_audio_music"),
+    # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
+    # render-proven) is index 0 = the shipped default; musicgen kept selectable.
+    "music": ("stable_audio_3", "musicgen", "stable_audio_music"),
 }
 
 
@@ -67,6 +73,83 @@ class EngineProfile(BaseModel):
     engine_impl_version: str = "1"
     sample_rate: int = 0
     requires_hf_token: bool = False
+
+    # --- Sprint 1: declarative engine metadata (additive). Defaults keep the
+    # existing rows valid; the YAML populates them explicitly. These describe
+    # selection intent + licensing; they do NOT change the live byte-identical
+    # dispatch (which stays on the engine-level default until promotion S6). ---
+    rank: int = 100                  # fallback priority; lower = tried first
+    is_default: bool = False         # scope/logical default for the role
+    runtime: str = "in_graph"        # in_graph | oop_venv (Path B worker)
+    needs_ref_clip: bool = False     # reference-clip identity engines
+    caps: dict = Field(default_factory=dict)
+    license_state: str = ""          # blank -> derive from commercial_clean
+    warn_text: str = ""              # non-blocking notice emitted when gated
+
+    @model_validator(mode="after")
+    def _validate_metadata(self):
+        if self.runtime not in _VALID_RUNTIMES:
+            raise ValueError(
+                f"profile '{self.profile_id}': runtime '{self.runtime}' not in "
+                f"{sorted(_VALID_RUNTIMES)}"
+            )
+        if self.license_state not in _VALID_LICENSE_STATES:
+            raise ValueError(
+                f"profile '{self.profile_id}': license_state "
+                f"'{self.license_state}' not in {sorted(_VALID_LICENSE_STATES)}"
+            )
+        return self
+
+
+def effective_license_state(profile: "EngineProfile") -> str:
+    """The profile's license state, deriving from ``commercial_clean`` when the
+    explicit ``license_state`` is blank: clean iff commercial_clean else gated.
+    """
+    if profile.license_state:
+        return profile.license_state
+    return "clean" if profile.commercial_clean else "gated"
+
+
+def gate_state(profile: "EngineProfile") -> str:
+    """Three-state commercial gate for a profile: 'clean' | 'warn' | 'stop'.
+
+    Mirrors :mod:`nodes._otr_release_gate`: clean ships silently, gated ('warn')
+    renders with a non-blocking notice, unknown ('stop') is fail-closed.
+    """
+    state = effective_license_state(profile)
+    if state == "clean":
+        return "clean"
+    if state == "gated":
+        return "warn"
+    return "stop"
+
+
+def engine_warning(profile: "EngineProfile") -> str:
+    """The non-blocking notice to surface for a gated profile at episode start,
+    or '' when the engine is clean. A 'stop'-state engine yields no warning --
+    it is refused by the resolver upstream, not warned-and-shipped.
+    """
+    if gate_state(profile) == "warn":
+        return profile.warn_text or (
+            f"{profile.engine}: known-gated (license_state=gated) -- "
+            f"non-blocking notice; verify before commercial release."
+        )
+    return ""
+
+
+def collect_engine_warnings(profiles) -> List[str]:
+    """Ordered, de-duplicated warn notices for the set of profiles selected for
+    an episode (episode-start emission). Clean engines contribute nothing; this
+    is what a node surfaces into render_log + console (I-8 non-blocking warn).
+    """
+    seen = set()
+    out: List[str] = []
+    for p in profiles or ():
+        w = engine_warning(p)
+        if w and w not in seen:
+            seen.add(w)
+            out.append(w)
+    return out
 
 
 class EngineProfileResolver:
@@ -124,6 +207,50 @@ class EngineProfileResolver:
                 f"'{profile.profile_id}' (allowed: {profile.allowed_voice_banks})",
             )
         return profile
+
+    def rank_chain(self, role: str) -> List["EngineProfile"]:
+        """Profiles serving ``role`` sorted by ``rank`` ascending (lowest rank =
+        highest priority), ``profile_id`` breaking ties for stability."""
+        return sorted(self.for_role(role), key=lambda p: (p.rank, p.profile_id))
+
+    def role_default(self, role: str) -> Optional["EngineProfile"]:
+        """The profile flagged ``is_default`` for ``role`` (lowest rank wins if
+        more than one is flagged), or ``None``."""
+        flagged = [p for p in self.rank_chain(role) if p.is_default]
+        return flagged[0] if flagged else None
+
+    def resolve_role_fallback(
+        self, role: str, *, voice_bank: Optional[str] = None,
+        require_bank: bool = False,
+    ) -> "EngineProfile":
+        """Walk the rank chain for ``role``; return the first profile whose
+        engine is registry-usable AND whose commercial gate is not 'stop' AND
+        (when constrained) whose voice bank fits. FAIL CLOSED if none qualify.
+
+        This is the auto-selection / fallback resolver. An opt-in engine gated
+        off (e.g. indextts2 before promotion) is skipped, so the chain naturally
+        falls through to the next usable rank (e.g. bark). It does NOT replace
+        the explicit per-node engine widget -- that stays the live,
+        byte-identical selection until promotion (S6).
+        """
+        for profile in self.rank_chain(role):
+            try:
+                assert_usable(profile.engine, role)
+            except EngineUnusable:
+                continue
+            if gate_state(profile) == "stop":
+                continue
+            banks = profile.allowed_voice_banks
+            if require_bank and not banks:
+                continue
+            if voice_bank is not None and voice_bank not in banks:
+                continue
+            return profile
+        raise EngineUnusable(
+            "", role, EngineUsabilityReason.MALFORMED_CONFIG,
+            f"no usable engine in the rank chain for role '{role}' "
+            f"(all gated-off, stop-gated, or bank-incompatible)",
+        )
 
 
 # ---------------------------------------------------------------------------

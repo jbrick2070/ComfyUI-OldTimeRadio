@@ -88,7 +88,14 @@ DEFAULT_DECODER_PROFILE = "default_v1"
 _MAX_CASTING_BRIEF_CHARS = 200
 _MAX_SCRIPT_BRIEF_CHARS = 350
 _MAX_NEWS_CLOSE_BRIEF_CHARS = 250
-_MAX_KEY_TERM_CHARS = 40
+# BUG-LOCAL-307 (2026-06-03): cap relaxed 40 -> 80. Real news entity names
+# routinely exceed 40 chars (e.g. "University Consortium for Atmospheric
+# Research" = 45); at 40 the key_terms validator RAISED, the structured-call
+# retry ladder exhausted -> NewsInterpreterError -> the whole episode HARD-
+# HALTED in NewsCurationDeep. The validator below now also COERCES (truncates)
+# an over-long term instead of raising, so even a pathological term can never
+# halt the run (cf. BUG-303 coerce-not-reject).
+_MAX_KEY_TERM_CHARS = 80
 _MIN_KEY_TERMS = 2
 # BUG-LOCAL-283 (2026-05-27): cap relaxed 6 -> 7. The LLM consistently
 # wants to emit one more term than the cap allows (NASA, FireSense,
@@ -179,16 +186,61 @@ class NewsBriefs(BaseModel):
 
     @field_validator("key_terms")
     @classmethod
-    def _check_term_lengths(cls, value: list[str]) -> list[str]:
+    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
+        # BUG-LOCAL-307 (2026-06-03): COERCE an over-long term (truncate at a
+        # word boundary), never raise. A real news entity routinely exceeds the
+        # cap (e.g. "University Consortium for Atmospheric Research" = 45); the
+        # old raise exhausted the structured-call retry ladder ->
+        # NewsInterpreterError -> hard HALT of the whole episode. Truncating
+        # keeps the schema always-valid; a clipped term that no longer matches
+        # the source is handled downstream by V1 (soft reroll / raw-seed
+        # fallback), which is recoverable -- never a hard halt. A non-string is
+        # still a genuine structural error and is raised. (cf. BUG-303.)
+        coerced: list[str] = []
         for t in value:
             if not isinstance(t, str):
                 raise ValueError(
                     f"key_term must be str, got {type(t).__name__}: {t!r}"
                 )
             if len(t) > _MAX_KEY_TERM_CHARS:
-                raise ValueError(
-                    f"key_term exceeds {_MAX_KEY_TERM_CHARS} chars: {t!r}"
-                )
+                clipped = t[:_MAX_KEY_TERM_CHARS]
+                # keep a clean word boundary when the kept span has a space
+                if " " in clipped:
+                    clipped = clipped.rsplit(" ", 1)[0]
+                t = clipped.rstrip()
+            coerced.append(t)
+        return coerced
+
+    @field_validator("key_terms", mode="before")
+    @classmethod
+    def _coerce_term_count(cls, value):
+        # BUG-LOCAL-264 (2026-06-03): trim an over-long key_terms LIST to the cap
+        # (keep the first _MAX_KEY_TERMS) instead of rejecting. Weak models return
+        # 9-10 terms; the schema cap-rejection lost the whole NewsBriefs object,
+        # so the announcer intro AND outro fell back to generic text. First-N is
+        # deterministic + offline. A non-list is left to normal validation; the
+        # per-term char-length coerce is _coerce_term_lengths (BUG-307). Silent
+        # coerce, matching that sibling validator.
+        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
+            return value[:_MAX_KEY_TERMS]
+        return value
+
+    @field_validator("script_brief", "news_close_brief", mode="before")
+    @classmethod
+    def _coerce_brief_length(cls, value, info):
+        # BUG-LOCAL-264: truncate an over-long brief at a word boundary instead of
+        # rejecting (a weak-model overrun otherwise drops BOTH distilled briefs ->
+        # generic announcer intro/outro). Non-str left to normal validation.
+        caps = {
+            "script_brief": _MAX_SCRIPT_BRIEF_CHARS,
+            "news_close_brief": _MAX_NEWS_CLOSE_BRIEF_CHARS,
+        }
+        cap = caps.get(info.field_name)
+        if cap and isinstance(value, str) and len(value) > cap:
+            clipped = value[:cap]
+            if " " in clipped:
+                clipped = clipped.rsplit(" ", 1)[0]
+            return clipped.rstrip()
         return value
 
 

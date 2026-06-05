@@ -27,7 +27,12 @@ from .registry import (
 from . import eng_bark, eng_kokoro, eng_musicgen  # noqa: E402,F401
 
 # Opt-in engines (flag-gated; never a default).
-from . import eng_chatterbox, eng_indextts2, eng_stable_audio  # noqa: E402,F401
+from . import (  # noqa: E402,F401
+    eng_chatterbox,
+    eng_indextts2,
+    eng_stable_audio,
+    eng_stable_audio_3,
+)
 
 __all__ = [
     "AudioEngine",

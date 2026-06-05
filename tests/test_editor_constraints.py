@@ -19,6 +19,7 @@ from nodes._otr_editor_constraints import (
     EDITOR_CONSTRAINTS_SYSTEM_PROMPT,
     EditorConstraint,
     EditorConstraintVerdict,
+    _cast_first_last_aliases,
     check_constraints,
 )
 from nodes._otr_stage1_plan import (
@@ -329,3 +330,92 @@ def test_verdict_to_dict_serializes():
     assert "failing_constraints" in blob
     assert "repair_note" in blob
     assert "cycle" in blob
+
+
+# ---------------------------------------------------------------------------
+# Weak-model name-abbreviation resolution (first/last-name aliases)
+# ---------------------------------------------------------------------------
+
+
+def test_cast_first_last_aliases_unambiguous():
+    aliases = _cast_first_last_aliases({"NIA HIBBERT", "DJINN SIMPSON"})
+    assert aliases == {"NIA", "HIBBERT", "DJINN", "SIMPSON"}
+
+
+def test_cast_first_last_aliases_excludes_ambiguous_first_name():
+    # Two characters share the first name NIA -> 'NIA' must NOT alias (ambiguous);
+    # the distinct surnames still do.
+    aliases = _cast_first_last_aliases({"NIA HIBBERT", "NIA SIMPSON"})
+    assert "NIA" not in aliases
+    assert {"HIBBERT", "SIMPSON"} <= aliases
+
+
+def test_cast_first_last_aliases_ignores_single_token_names():
+    assert _cast_first_last_aliases({"ALICE", "BOB"}) == set()
+
+
+def _plan_with_multiword_cast(speaker: str) -> Stage1Plan:
+    """A plan whose cast is two multi-word names; one voiced beat uses `speaker`."""
+    plan = Stage1Plan(
+        premise="A short test premise long enough to pass schema.",
+        arc=Stage1Arc(
+            setup="setup statement long enough to validate.",
+            complication="complication statement long enough to validate.",
+            resolution="resolution statement long enough to validate.",
+        ),
+        cast=[
+            Stage1CastMember(
+                name="NIA HIBBERT", gender="female", pronouns="she/her",
+                voice_id="v2/en_speaker_3",
+                persona="weary forensic engineer with dry humor.",
+                arc_role="reluctant insider",
+            ),
+            Stage1CastMember(
+                name="DJINN SIMPSON", gender="male", pronouns="he/him",
+                voice_id="v2/en_speaker_5",
+                persona="ambitious grant officer evasive about funding.",
+                arc_role="pressure source",
+            ),
+        ],
+        beats=[
+            Stage1Beat(
+                beat_id="b001", speaker="ANNOUNCER",
+                intent="open the episode",
+                length_target_words=15, emotional_register="welcoming",
+                state_before="audit has not begun", state_after="audit window open",
+                tension=2,
+            ),
+            Stage1Beat(
+                beat_id="b002", speaker=speaker,
+                intent="discover the missing ledger",
+                length_target_words=20, emotional_register="tight unease",
+                state_before="ledger somewhere", state_after="ledger missing",
+                tension=3,
+            ),
+            Stage1Beat(
+                beat_id="b003", speaker="DJINN SIMPSON",
+                intent="press for the signature tonight",
+                length_target_words=20, emotional_register="cold pressure",
+                state_before="signature unsigned", state_after="signature demanded",
+                tension=4,
+            ),
+        ],
+        running_facts=["the audit closes at midnight"],
+        dramatic_state=_ds(),
+    )
+    stamp_dialogue_slot_ids(plan)
+    return plan
+
+
+def test_abbreviated_speaker_is_not_wrong_speaker():
+    # A weak model writes 'NIA' for the locked 'NIA HIBBERT'; the first-name
+    # alias resolves it, so WRONG_SPEAKER must NOT fire.
+    verdict = check_constraints(_plan_with_multiword_cast("NIA"))
+    assert EditorConstraint.WRONG_SPEAKER not in verdict.failing_constraints
+
+
+def test_genuine_offcast_speaker_still_wrong_speaker():
+    # A name that is neither a cast member nor an unambiguous first/last name
+    # must still trip WRONG_SPEAKER (the resolver is conservative, not a bypass).
+    verdict = check_constraints(_plan_with_multiword_cast("ZORAK"))
+    assert EditorConstraint.WRONG_SPEAKER in verdict.failing_constraints

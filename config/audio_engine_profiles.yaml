@@ -8,10 +8,23 @@
 # default; the model-backed defaults (IndexTTS2 voice, Stable Audio music) are
 # promoted to the shipped out-of-box default only at promotion (I), after the F
 # dependency pilots pass. model_path / model_sha256 stay empty until F pins them.
+#
+# Sprint-1 declarative metadata (additive; never changes live byte-identical
+# dispatch): rank (fallback priority, lower = tried first), is_default (the
+# scope/logical default for the role -- distinct from the engine-level live
+# default, which stays on the legacy engine until promotion S6), runtime
+# (in_graph | oop_venv), needs_ref_clip, caps, license_state
+# (clean|gated|unknown; blank = derive from commercial_clean), warn_text
+# (non-blocking notice emitted when gated). license_state MIRRORS
+# commercial_clean here -- final license sign-off is Sprint 6, not an
+# unattended flip.
 profile_schema_version: "1"
 
 profiles:
   # --- character voice ---
+  # Live byte-identical default is bark (engine default_roles) until S6; the
+  # scope default below is indextts2 (rank 1). The rank chain falls
+  # indextts2 -> chatterbox -> bark while the first two are gated off.
   - profile_id: char_bark_v1
     role: char_voice
     engine: bark
@@ -23,6 +36,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
+    rank: 3                         # char fallback-only (never the scope default)
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: false           # bark uses speaker presets, not a ref clip
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: gated            # mirrors commercial_clean=false (verify S6)
+    warn_text: "Bark (Suno) weights: commercial terms unconfirmed. Local/personal use OK; verify Suno terms before commercial release."
 
   - profile_id: char_chatterbox_v1
     role: char_voice
@@ -35,6 +55,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
+    rank: 2                         # char rank-2 fallback (opt-in)
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: true
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
 
   - profile_id: char_indextts2_v1
     role: char_voice
@@ -47,6 +74,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 22050
     requires_hf_token: false        # weights are downloadable; only commercial USE is gated
+    rank: 1                         # char scope default (rank-1)
+    is_default: true
+    runtime: oop_venv               # Path B isolated worker on Blackwell
+    needs_ref_clip: true            # identity = reference clip only
+    caps: {emotion_vector: true, duration_control: true}
+    license_state: gated            # bilibili Model Use License (verify S6)
+    warn_text: "IndexTTS2 weights: bilibili Model Use License (not Apache-2.0). Local/personal use OK. Commercial use is conditioned + community-ambiguous -> verify with bilibili (indexspeech@bilibili.com) before commercial release. Do not use to train other commercial AI models."
 
   # --- announcer voice ---
   - profile_id: announcer_kokoro_v1
@@ -60,6 +94,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
+    rank: 1                         # announcer scope default
+    is_default: true
+    runtime: in_graph
+    needs_ref_clip: false
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
 
   - profile_id: announcer_chatterbox_v1
     role: announcer_voice
@@ -72,6 +113,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
+    rank: 2                         # announcer rank-2 (opt-in)
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: true
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
 
   # --- music ---
   - profile_id: music_musicgen_v1
@@ -85,6 +133,13 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 32000
     requires_hf_token: false
+    rank: 2                         # music rank-2 fallback
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: false
+    caps: {duration_control: true}
+    license_state: gated            # CC-BY-NC (non-commercial)
+    warn_text: "MusicGen weights are CC-BY-NC (non-commercial). Do not ship MusicGen output commercially."
 
   - profile_id: music_stable_audio_v1
     role: music
@@ -96,4 +151,30 @@ profiles:
     allowed_voice_banks: []
     engine_impl_version: "1"
     sample_rate: 44100
-    requires_hf_token: true         # SA3 weights are HF-gated (accept license + HF_TOKEN)
+    requires_hf_token: true         # stable-audio-open-1.0 weights are HF-gated
+    rank: 3                         # music rank-3 fallback (opt-in, HF-gated)
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: false
+    caps: {duration_control: true}
+    license_state: clean            # mirrors commercial_clean=true; plan flags revenue-cap review (S6)
+    warn_text: ""
+
+  - profile_id: music_stable_audio_3_v1
+    role: music
+    engine: stable_audio_3
+    commercial_clean: true         # SA3 community license -- commercial use OK
+    model_path: ""
+    model_sha256: ""
+    default_params: {steps: 100, cfg_scale: 6.0, seconds_total: 30, sampler: dpmpp_3m_sde_gpu, scheduler: exponential}
+    allowed_voice_banks: []
+    engine_impl_version: "1"
+    sample_rate: 44100
+    requires_hf_token: false        # Comfy-Org/stable-audio-3 is UNgated (free download)
+    rank: 1                         # music scope default
+    is_default: true
+    runtime: in_graph
+    needs_ref_clip: false
+    caps: {duration_control: true}
+    license_state: clean            # SA3 community license: commercial OK (verify exact model S6)
+    warn_text: ""

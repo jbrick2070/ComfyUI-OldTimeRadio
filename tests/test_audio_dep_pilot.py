@@ -126,14 +126,16 @@ def test_opt_in_engines_match_registry_adapters():
 def test_pilot_covers_exactly_the_optin_engines():
     from nodes import _otr_audio_engines as AE
 
-    # Every flag-gated (non-default) engine in the registry is covered, and the
-    # harness invents none. Legacy default engines (bark/kokoro/musicgen) are
-    # batch-interface byte-identical defaults and are intentionally excluded.
+    # Every flag-gated (non-default) engine with an EXTERNAL dependency library is
+    # covered, and the harness invents none. Legacy default engines
+    # (bark/kokoro/musicgen) are byte-identical defaults and excluded; ComfyUI-
+    # NATIVE engines (e.g. stable_audio_3) drive ComfyUI's own nodes and have no
+    # external lib to probe, so they are excluded from the dep pilot too.
     gated = set()
     for role in ("char_voice", "announcer_voice", "music"):
         for eng in AE.engines_for_role(role):
             adapter = AE.get_engine(eng)
-            if getattr(adapter, "requires_flag", None):
+            if getattr(adapter, "requires_flag", None) and not getattr(adapter, "native", False):
                 gated.add(eng)
     assert set(PILOT.OPT_IN_ENGINES) == gated
 

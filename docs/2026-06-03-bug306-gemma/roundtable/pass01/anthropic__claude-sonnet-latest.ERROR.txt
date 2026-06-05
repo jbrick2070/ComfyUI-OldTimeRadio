@@ -1,0 +1,1 @@
+empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort

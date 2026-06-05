@@ -12,7 +12,10 @@ Architecture (Jeffrey 2026-05-10 spec):
       - distinctness: no two descriptors may share more than one
         root word
       - up to 3 attempts; all fail -> raise
-      - exactly 5 valid distinct candidates required to advance
+      - exactly 5 valid distinct candidates required to advance;
+        overgeneration is tolerated -- the parser takes the first 5
+        distinct and skips malformed / duplicate / near-duplicate
+        lines rather than re-rolling (B, 2026-06-04)
 
   Pass 2 (Chooser): a strict editor LLM picks the SINGLE best
     descriptor for the article from the 5 candidates Pass 1
@@ -53,6 +56,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import random
 import re
 import time
@@ -103,6 +107,49 @@ _CHOOSER_MAX_TOKENS = 16
 _MAX_SHARED_ROOTS = 1
 
 
+def _build_inventor_gbnf() -> str:
+    """GBNF grammar constraining the inventor (Pass 1) to EXACTLY
+    _REQUIRED_CANDIDATE_COUNT lines, each a 2-5 word lowercase
+    snake_case descriptor (the DESCRIPTOR_RE shape).
+
+    A (2026-06-04): the decoder-level hard guarantee that backs up the B
+    parser net. A grammar-constrained model literally cannot overgenerate
+    (gemma's 63-vs-5 bug) -- the decode is forced to stop after exactly N
+    valid lines. Applied ONLY to backends that advertise grammar support
+    (the remote llama-server lane, via the generate_fn _otr_supports_grammar
+    marker); local mistral never sees it and stays byte-identical.
+    Live-validated under llama-server at gate F. llama.cpp accepts a top-
+    level `grammar` (GBNF) over its OpenAI-compatible /v1 endpoint.
+    """
+    # line = word ("_" word){1,4} -> 2..5 snake_case words, mirroring
+    # DESCRIPTOR_RE = ^[a-z]+(_[a-z]+){1,4}$ . The {1,4} bound is expanded
+    # into explicit optionals for portability across llama.cpp GBNF builds.
+    word_rule = "word ::= [a-z]+"
+    line_rule = 'line ::= word "_" word ("_" word)? ("_" word)? ("_" word)?'
+    root_seq = ' "\\n" '.join(["line"] * _REQUIRED_CANDIDATE_COUNT)
+    root_rule = f"root ::= {root_seq}"
+    return "\n".join([root_rule, line_rule, word_rule])
+
+
+# Computed once: the exactly-N inventor decode grammar (A). Threaded to the
+# inventor call only on grammar-capable backends AND when explicitly enabled
+# (see _run_inventor / _inventor_gbnf_enabled).
+_INVENTOR_GBNF = _build_inventor_gbnf()
+
+
+def _inventor_gbnf_enabled() -> bool:
+    """A is opt-in / default-off. The inventor GBNF grammar is attached ONLY
+    when OTR_ENABLE_INVENTOR_GBNF is set AND the backend advertises grammar
+    support (_otr_supports_grammar). Default-off so pointing the lane at a
+    non-grammar /v1 (Ollama, real OpenRouter) is never broken by an unknown
+    `grammar` field -- B (the parser net) stays the always-on safety net.
+    Mirrors OTR's opt-in/default-off lane conventions (OTR_ENABLE_OPENROUTER,
+    OTR_ENABLE_COMFY_CREDITS)."""
+    return os.environ.get("OTR_ENABLE_INVENTOR_GBNF", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
@@ -137,6 +184,21 @@ class StylePick(BaseModel):
     # deriving from the writer's slot scheduler.
     pass1_slot: str = Field(default="creative")
     pass2_slot: str = Field(default="technical")
+    # B telemetry (2026-06-04): per-draw inventor parse counts, so
+    # over/under-generation per model is visible in the ledger instead
+    # of surfacing only as a hard abort. Defaults keep older records and
+    # direct constructions valid. valid_count = grammar-valid lines;
+    # distinct_count = distinct survivors after the distinctness de-dupe
+    # (>= 5 on success); truncated_count = distinct survivors discarded
+    # beyond the required 5 (the overgeneration signal).
+    valid_count: int = Field(default=0, ge=0)
+    distinct_count: int = Field(default=0, ge=0)
+    truncated_count: int = Field(default=0, ge=0)
+    # Effective creative-slot model slug that produced the descriptors:
+    # the resolved remote slug when the slot is an OpenRouter handle, the
+    # local model id otherwise. Distinct from model_id (which may be a
+    # slot handle like 'openrouter:slot-a'). Forensic only.
+    model_slug: str = Field(default="")
 
     @field_validator("chosen")
     @classmethod
@@ -188,10 +250,11 @@ class StyleGenerationFailedError(RuntimeError):
     workflow as failed.
 
     Failure modes:
-      - Pass 1 inventor cannot produce 5 distinct grammar-valid
+      - Pass 1 inventor cannot recover 5 distinct grammar-valid
         candidates after 3 attempts (each attempt may fail for:
-        generate_fn raised, fewer than 5 lines returned, any line
-        fails the DESCRIPTOR_RE regex, distinctness rule violated).
+        generate_fn raised, or fewer than 5 distinct grammar-valid
+        descriptors remained after skipping malformed / duplicate /
+        near-duplicate lines).
       - Pass 2 chooser returns a string that doesn't exactly match
         one of the 5 candidates after whitespace strip.
       - news_seed precondition violated (empty article_text).
@@ -321,29 +384,66 @@ def _build_chooser_user_prompt(article_excerpt: str, candidates: list[str]) -> s
     )
 
 
-def _parse_inventor_output(raw: str) -> list[str]:
-    """Parse Pass 1 raw output into a list of candidates.
+@dataclass
+class _InventorParse:
+    """Result of parsing one inventor (Pass 1) raw output.
 
-    Strategy:
-      - Strip leading/trailing whitespace.
-      - Split on newlines; drop empty lines.
-      - Strip leading dashes / numbering / bullets per line.
-      - Lowercase + strip surrounding whitespace per line.
-      - Validate each line against DESCRIPTOR_RE.
-      - Validate exact count = 5 distinct.
-      - Validate distinctness rule (max 1 shared root word per pair).
+    Carries the 5 chosen candidates plus the per-draw counts that feed
+    style-pass telemetry (meta.style_pick): how many lines were
+    parseable (raw_count), grammar-valid (valid_count), distinct after
+    the distinctness de-dupe (distinct_count, >= 5 on success), and how
+    many distinct survivors were discarded beyond the required 5
+    (truncated_count -- the overgeneration signal).
+    """
 
-    Raises ValueError on any validation failure (caller wraps in
-    StyleGenerationFailedError after exhausting retries).
+    candidates: list[str]
+    raw_count: int
+    valid_count: int
+    distinct_count: int
+    truncated_count: int
+
+
+def _parse_inventor_descriptors(raw: str) -> _InventorParse:
+    """Parse Pass 1 raw output into exactly 5 distinct candidates plus
+    per-draw telemetry counts, tolerant of overgeneration.
+
+    Strategy (B, 2026-06-04 -- survive an overgenerating writer
+    without weakening the StylePick(min=max=5) contract):
+      - Strip whitespace; split on newlines; drop empty lines.
+      - Per line: strip list decorations / numbering / quotes, then
+        lowercase.
+      - Keep only lines matching DESCRIPTOR_RE. Malformed lines are
+        SKIPPED, not fatal -- an overgenerating model may interleave
+        prose, headings, or hyphenated tags.
+      - De-dupe deterministically in first-seen order: a descriptor
+        is accepted only if it shares at most _MAX_SHARED_ROOTS root
+        words with every already-accepted descriptor. This both drops
+        exact duplicates (they share all roots) and skips near-
+        duplicates (the distinctness rule, applied as a skip rather
+        than a hard re-roll).
+      - If >= _REQUIRED_CANDIDATE_COUNT distinct descriptors survive,
+        return the FIRST _REQUIRED_CANDIDATE_COUNT. Otherwise raise.
+
+    mistral-nemo emits ~5 clean distinct lines, so first-5 == all 5
+    and its output stays byte-identical to the prior strict parser.
+    An overgenerating writer (e.g. gemma returning 63 descriptors)
+    becomes survivable: the parser takes the first 5 distinct instead
+    of aborting the run. The 5 returned descriptors are grammar-valid
+    and pairwise within the distinctness rule by construction, so they
+    always satisfy the StylePick.candidates validator.
+
+    Raises ValueError when fewer than _REQUIRED_CANDIDATE_COUNT
+    distinct grammar-valid descriptors can be recovered (caller wraps
+    in StyleGenerationFailedError after exhausting retries).
     """
     text = (raw or "").strip()
     if not text:
         raise ValueError("inventor returned empty output")
 
-    lines: list[str] = []
+    # 1. Tokenize lines, stripping common list decorations.
+    parsed_lines: list[str] = []
     for raw_line in text.splitlines():
-        # Strip common list decorations: leading "- ", "* ", "1. ",
-        # "1) ", quotes, surrounding whitespace.
+        # Strip leading "- ", "* ", "1. ", "1) ", quotes, surrounding ws.
         stripped = raw_line.strip()
         if not stripped:
             continue
@@ -357,40 +457,51 @@ def _parse_inventor_output(raw: str) -> list[str]:
         # Strip surrounding quotes.
         stripped = stripped.strip("'\"`").strip()
         if stripped:
-            lines.append(stripped.lower())
+            parsed_lines.append(stripped.lower())
 
-    # Validate count.
-    if len(lines) != _REQUIRED_CANDIDATE_COUNT:
+    # 2. Keep only grammar-valid descriptors; skip malformed lines.
+    valid = [ln for ln in parsed_lines if DESCRIPTOR_RE.match(ln)]
+
+    # 3. De-dupe in first-seen order, enforcing distinctness as a skip.
+    #    A candidate sharing more than _MAX_SHARED_ROOTS roots with any
+    #    already-accepted descriptor (exact dup or near-dup) is skipped.
+    #    No early stop: the full distinct set sizes the overgeneration
+    #    telemetry; the first 5 are the result either way.
+    distinct: list[str] = []
+    for cand in valid:
+        roots = set(cand.split("_"))
+        if any(
+            len(roots & set(acc.split("_"))) > _MAX_SHARED_ROOTS
+            for acc in distinct
+        ):
+            continue
+        distinct.append(cand)
+
+    # 4. Require at least _REQUIRED_CANDIDATE_COUNT distinct survivors.
+    if len(distinct) < _REQUIRED_CANDIDATE_COUNT:
         raise ValueError(
-            f"inventor returned {len(lines)} parseable lines, need "
-            f"exactly {_REQUIRED_CANDIDATE_COUNT}: {lines!r}"
+            f"inventor recovered only {len(distinct)} distinct "
+            f"grammar-valid descriptor(s) (need {_REQUIRED_CANDIDATE_COUNT}) "
+            f"from {len(parsed_lines)} parseable line(s): {distinct!r}"
         )
 
-    # Validate grammar per line.
-    for line in lines:
-        if not DESCRIPTOR_RE.match(line):
-            raise ValueError(
-                f"inventor line {line!r} fails DESCRIPTOR_RE grammar "
-                f"(2-5 lowercase snake_case words)"
-            )
+    return _InventorParse(
+        candidates=distinct[:_REQUIRED_CANDIDATE_COUNT],
+        raw_count=len(parsed_lines),
+        valid_count=len(valid),
+        distinct_count=len(distinct),
+        truncated_count=max(0, len(distinct) - _REQUIRED_CANDIDATE_COUNT),
+    )
 
-    # Validate exact duplicates.
-    if len(set(lines)) != len(lines):
-        raise ValueError(f"inventor produced exact duplicate lines: {lines!r}")
 
-    # Validate distinctness rule.
-    for i, a in enumerate(lines):
-        roots_a = set(a.split("_"))
-        for b in lines[i + 1:]:
-            roots_b = set(b.split("_"))
-            shared = len(roots_a & roots_b)
-            if shared > _MAX_SHARED_ROOTS:
-                raise ValueError(
-                    f"inventor lines {a!r} and {b!r} share {shared} "
-                    f"root words (max {_MAX_SHARED_ROOTS} allowed)"
-                )
+def _parse_inventor_output(raw: str) -> list[str]:
+    """Back-compat thin wrapper returning only the 5 chosen candidates.
 
-    return lines
+    See _parse_inventor_descriptors for the full parse plus the
+    telemetry counts. Retained so callers/tests that only need the
+    descriptor list stay unchanged.
+    """
+    return _parse_inventor_descriptors(raw).candidates
 
 
 def _validate_chooser_output(raw: str, candidates: list[str]) -> str:
@@ -444,9 +555,10 @@ def _run_inventor(
     article_excerpt: str,
     seed_sample: list[str],
     max_attempts: int = len(_INVENTOR_TEMPERATURES),
-) -> tuple[list[str], int]:
-    """Run Pass 1 with retry budget. Returns (candidates,
-    attempts_used). Raises StyleGenerationFailedError on all-fail.
+) -> tuple["_InventorParse", int]:
+    """Run Pass 1 with retry budget. Returns (parse, attempts_used),
+    where `parse` carries the 5 candidates + per-draw telemetry counts.
+    Raises StyleGenerationFailedError on all-fail.
     """
     user_prompt = _build_inventor_user_prompt(article_excerpt, seed_sample)
     messages = [
@@ -464,12 +576,22 @@ def _run_inventor(
             attempt_idx + 1, max_attempts, temp,
         )
         try:
+            # A (2026-06-04): opt-in GBNF hard cap. Attach the exactly-N decode
+            # grammar ONLY when (a) the backend advertises grammar support
+            # (the remote llama-server lane, _otr_supports_grammar) AND (b) it
+            # is explicitly enabled (OTR_ENABLE_INVENTOR_GBNF). Default-off so
+            # a non-grammar /v1 (Ollama, real OpenRouter) and local / test
+            # backends never receive an unexpected `grammar` field -- B (the
+            # parser net) stays the always-on safety net, byte-identical.
+            inv_kwargs = {
+                "temperature": float(temp),
+                "max_new_tokens": _INVENTOR_MAX_TOKENS,
+            }
+            if (getattr(generate_fn, "_otr_supports_grammar", False)
+                    and _inventor_gbnf_enabled()):
+                inv_kwargs["grammar"] = _INVENTOR_GBNF
             # LLM slot: creative -- inventor pass (5-candidate generation)
-            raw = generate_fn(
-                messages,
-                temperature=float(temp),
-                max_new_tokens=_INVENTOR_MAX_TOKENS,
-            )
+            raw = generate_fn(messages, **inv_kwargs)
         except Exception as exc:  # noqa: BLE001
             err = f"generate_fn raised: {type(exc).__name__}: {exc}"
             log.warning("[OTR_StylePicker] inventor attempt %d: %s",
@@ -478,7 +600,7 @@ def _run_inventor(
             continue
 
         try:
-            candidates = _parse_inventor_output(raw)
+            parse = _parse_inventor_descriptors(raw)
         except ValueError as exc:
             err = f"parse failed: {exc}"
             log.warning("[OTR_StylePicker] inventor attempt %d: %s",
@@ -487,10 +609,12 @@ def _run_inventor(
             continue
 
         log.info(
-            "[OTR_StylePicker] inventor attempt %d/%d OK: %r",
-            attempt_idx + 1, max_attempts, candidates,
+            "[OTR_StylePicker] inventor attempt %d/%d OK: %r "
+            "(valid=%d distinct=%d truncated=%d)",
+            attempt_idx + 1, max_attempts, parse.candidates,
+            parse.valid_count, parse.distinct_count, parse.truncated_count,
         )
-        return candidates, attempt_idx + 1
+        return parse, attempt_idx + 1
 
     raise StyleGenerationFailedError(
         f"inventor failed after {max_attempts} attempts; errors: "
@@ -582,6 +706,7 @@ def pick_style(
     seed_pool: list[str],
     rng: random.Random,
     model_id: str = "",
+    model_slug: str = "",
 ) -> StylePick:
     """Top-level two-pass style picker.
 
@@ -607,6 +732,9 @@ def pick_style(
             same seed -> same sample -> same Pass 1 prompt -> same
             picks (C7 byte-identity guarantee).
         model_id: HF model ID stamped onto StylePick for forensics.
+        model_slug: effective creative-slot model slug (resolved remote
+            slug for an OpenRouter handle, else the local id). Forensic
+            only; lets style-pass telemetry attribute counts to a model.
 
     Returns:
         StylePick model with the chosen descriptor + full provenance.
@@ -633,11 +761,12 @@ def pick_style(
     #   technical_fn (S32 routing table flip from S31).
     # LLM slot: creative -- style inventor generates 5 descriptors
     pass1_t0 = time.perf_counter()
-    candidates, pass1_attempts = _run_inventor(
+    inv_parse, pass1_attempts = _run_inventor(
         creative_fn,
         article_excerpt=article_excerpt,
         seed_sample=seed_sample,
     )
+    candidates = inv_parse.candidates
     pass1_duration_ms = int((time.perf_counter() - pass1_t0) * 1000)
 
     # LLM slot: technical -- style chooser picks the best descriptor
@@ -662,4 +791,8 @@ def pick_style(
         pass1_attempts=pass1_attempts,
         pass1_duration_ms=pass1_duration_ms,
         pass2_duration_ms=pass2_duration_ms,
+        valid_count=inv_parse.valid_count,
+        distinct_count=inv_parse.distinct_count,
+        truncated_count=inv_parse.truncated_count,
+        model_slug=model_slug,
     )

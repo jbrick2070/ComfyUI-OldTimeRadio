@@ -44,13 +44,24 @@ def test_supported_kwargs_passes_through_var_keyword():
     "modname,clsname,libmod",
     [
         ("eng_chatterbox", "ChatterboxEngine", "chatterbox"),
-        ("eng_indextts2", "IndexTTS2Engine", "indextts"),
     ],
 )
 def test_voice_engine_fails_closed_without_lib(modname, clsname, libmod):
     if not _absent(libmod):
         pytest.skip(libmod + " present -- real inference needs the GPU pilot")
     eng = _engine(modname, clsname)
+    with pytest.raises(RuntimeError, match="not installed"):
+        eng.generate_voice("hello there", None, None, 7)
+
+
+def test_indextts2_pathb_fails_closed_without_worker(monkeypatch, tmp_path):
+    # IndexTTS2 is Path B (isolated subprocess worker), so "fail closed" means a
+    # missing isolated venv / worker / weights -- NOT an in-process import (it
+    # never imports the conflicting library in ComfyUI's process). Point the venv
+    # at a nonexistent path so load() fails fast with a named error and never
+    # spawns a real worker.
+    monkeypatch.setenv("OTR_INDEXTTS2_VENV", str(tmp_path / "nope" / "python.exe"))
+    eng = _engine("eng_indextts2", "IndexTTS2Engine")
     with pytest.raises(RuntimeError, match="not installed"):
         eng.generate_voice("hello there", None, None, 7)
 

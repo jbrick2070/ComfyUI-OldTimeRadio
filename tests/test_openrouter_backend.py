@@ -235,6 +235,59 @@ def test_generate_passes_response_format_when_given(enabled_env, monkeypatch):
     assert seen["payload"]["model"] == "openai/gpt-4o"  # slot B slug
 
 
+def test_generate_passes_grammar_when_given(enabled_env, monkeypatch):
+    # A (2026-06-04): a GBNF grammar threads into the payload (the local
+    # llama-server lane), with require_parameters set so a backend that
+    # ignores `grammar` is filtered out rather than left unconstrained.
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result("a_b\nc_d\ne_f\ng_h\ni_j"),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_B_ID, _row())
+    gbnf = 'root ::= line\nline ::= word "_" word\nword ::= [a-z]+'
+    backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.6, max_new_tokens=80, grammar=gbnf,
+    )
+    assert seen["payload"]["grammar"] == gbnf
+    assert seen["payload"]["provider"]["require_parameters"] is True
+
+
+def test_generate_omits_grammar_when_absent(enabled_env, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=50)
+    assert "grammar" not in seen["payload"]
+
+
+def test_make_generate_fn_threads_grammar_and_marker(enabled_env, monkeypatch):
+    # The closure threads a per-call grammar to backend.generate and
+    # advertises grammar support via the _otr_supports_grammar marker.
+    captured = {}
+
+    def fake_generate(self, model, messages, *, temperature=None,
+                      max_new_tokens=None, stop=None, response_format=None,
+                      grammar=None, **_):
+        captured["grammar"] = grammar
+        return "ok"
+
+    monkeypatch.setattr(orb.OpenRouterBackend, "generate", fake_generate)
+    entry = orb.OpenRouterBackend().load(orb.SLOT_A_ID, _row())
+    fn = orb.make_openrouter_generate_fn(entry)
+    assert getattr(fn, "_otr_supports_grammar", False) is True
+    fn([{"role": "user", "content": "x"}], temperature=0.6,
+       max_new_tokens=80, grammar="GBNF-HERE")
+    assert captured["grammar"] == "GBNF-HERE"
+
+
 def test_small_max_new_tokens_is_floored(enabled_env, monkeypatch):
     """The writer's local grammar-era per-call budget (~200) must be floored
     for the remote path so a free-form model isn't truncated mid-JSON
@@ -436,3 +489,76 @@ def test_key_not_in_call_failed_error(enabled_env, monkeypatch):
         assert "sk-SECRET-DO-NOT-LEAK" not in str(exc)
     else:
         pytest.fail("expected OpenRouterCallFailedError")
+
+
+# ---------------------------------------------------------------------------
+# Thinking-mode reasoning strip (BUG-306 / BUG-LOCAL-308 family)
+# ---------------------------------------------------------------------------
+
+
+def test_strip_reasoning_removes_balanced_think_block():
+    raw = '<think>plan the cast then the arc</think>\n{"ok": true}'
+    assert orb._strip_reasoning_tags(raw) == '{"ok": true}'
+
+
+def test_strip_reasoning_handles_dangling_close_from_ollama_prefill():
+    # Ollama pre-fills the opening <think> in the chat template, so the
+    # completion carries only the closing tag.
+    raw = 'reasoning about the news beat...</think>\n\n{"cast": []}'
+    assert orb._strip_reasoning_tags(raw) == '{"cast": []}'
+
+
+def test_strip_reasoning_removes_multiple_blocks():
+    raw = '<think>a</think>FOO<think>b</think>BAR'
+    assert orb._strip_reasoning_tags(raw) == 'FOOBAR'
+
+
+def test_strip_reasoning_is_case_insensitive_and_multiline():
+    raw = '<THINK>\nline1\nline2\n</Think>\nanswer'
+    assert orb._strip_reasoning_tags(raw) == 'answer'
+
+
+def test_strip_reasoning_noop_for_plain_text():
+    raw = '{"title": "The 3:10 to Yuma", "scene": "a dusty depot"}'
+    assert orb._strip_reasoning_tags(raw) == raw
+
+
+def test_strip_reasoning_preserves_unrelated_angle_brackets():
+    # A '<' that is not a think/channel marker must survive untouched.
+    raw = 'if x < 3 and y > 1 then go'
+    assert orb._strip_reasoning_tags(raw) == raw
+
+
+def test_strip_reasoning_keeps_final_harmony_channel():
+    raw = ('<|channel|>analysis<|message|>I should think first<|end|>'
+           '<|channel|>final<|message|>{"line": "Action!"}')
+    assert orb._strip_reasoning_tags(raw) == '{"line": "Action!"}'
+
+
+def test_strip_reasoning_handles_empty_and_none():
+    assert orb._strip_reasoning_tags("") == ""
+    assert orb._strip_reasoning_tags(None) is None
+
+
+def test_generate_strips_think_block_end_to_end(enabled_env, monkeypatch):
+    # The strip must apply on the live generate() path, not just the helper.
+    dirty = '<think>weigh the angles</think>{"verdict": "go"}'
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _ok_result(dirty))
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    out = backend.generate(entry, [{"role": "user", "content": "x"}],
+                           temperature=0.5, max_new_tokens=16)
+    assert out == '{"verdict": "go"}'
+
+
+def test_generate_aborts_when_only_reasoning_remains(enabled_env, monkeypatch):
+    # If the model emits ONLY a <think> block (no answer), stripping yields
+    # empty -> clean abort, not an empty string handed to the JSON parser.
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _ok_result("<think>just musing</think>"))
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    with pytest.raises(orb.OpenRouterCallFailedError):
+        backend.generate(entry, [{"role": "user", "content": "x"}],
+                         temperature=0.5, max_new_tokens=16)

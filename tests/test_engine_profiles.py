@@ -20,7 +20,7 @@ def test_load_resolver_and_source_hash():
     assert set(r.profile_ids()) == {
         "char_bark_v1", "char_chatterbox_v1", "char_indextts2_v1",
         "announcer_kokoro_v1", "announcer_chatterbox_v1",
-        "music_musicgen_v1", "music_stable_audio_v1",
+        "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
     }
 
 
@@ -96,7 +96,7 @@ def test_missing_token_raises_in_generate_not_input_types(monkeypatch):
 def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("char_voice")[0] == "bark"
     assert EP.legacy_first_engines("announcer_voice")[0] == "kokoro"
-    assert EP.legacy_first_engines("music")[0] == "musicgen"
+    assert EP.legacy_first_engines("music")[0] == "stable_audio_3"  # PROMOTED 2026-06-03
     assert EP.legacy_first_engines("nonexistent_role") == []
 
 

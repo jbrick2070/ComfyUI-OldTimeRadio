@@ -16,8 +16,10 @@ def test_announcer_default_is_kokoro():
     assert AE.engines_for_role("announcer_voice")[0] == "kokoro"
 
 
-def test_music_default_is_musicgen():
-    assert AE.engines_for_role("music")[0] == "musicgen"
+def test_music_default_is_stable_audio_3():
+    # PROMOTED 2026-06-03: SA3 is the shipped music default; musicgen still in the pool.
+    assert AE.engines_for_role("music")[0] == "stable_audio_3"
+    assert "musicgen" in AE.engines_for_role("music")
 
 
 def test_char_voice_pool_has_optins():

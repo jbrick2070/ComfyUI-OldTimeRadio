@@ -22,7 +22,7 @@ _MUSICGEN_TOKENS_PER_SEC = 50  # ~50 audio tokens per second at 32 kHz
 class MusicGenEngine:
     name = "musicgen"
     roles = ("music",)
-    default_roles = ("music",)           # internal default until promotion (I)
+    default_roles = ()                   # DEMOTED 2026-06-03: SA3 is now the music default; musicgen stays selectable
     commercial_clean = False             # Meta MusicGen CC-BY-NC-4.0 (non-commercial)
     requires_flag = None
     interface = "clip"

@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-06-03T22:43:27.264115+00:00",
+  "doc": "docs\\2026-06-03-audio-promotion-blocker\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 13779,
+  "models": [
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 13744,
+      "completion_tokens": 2099,
+      "cost_usd": 0.022427500000000003
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 15109,
+      "completion_tokens": 8000,
+      "cost_usd": 0.013532414999999999
+    }
+  ],
+  "total_cost_usd": 0.036
+}

@@ -227,5 +227,20 @@ def test_source_is_ascii_no_em_dash():
     src.encode("ascii")
 
 
+def test_shipped_bank_has_gendered_indextts2_voices():
+    # Sprint 3: indextts2 carries gender-mapped reference voices (kokoro-seeded)
+    # so a male slot gets a male voice and a female slot a female one.
+    entries, _ = load_voice_bank()
+    idx = [e for e in entries if e.engine == "indextts2"]
+    genders = {e.gender for e in idx}
+    assert "male" in genders and "female" in genders, "indextts2 needs male + female refs"
+    male = assign_voice_for_slot(role="char_voice", engine="indextts2", char_id="M",
+                                 gender="male", timbre=("warm",), age_band="adult", episode_seed=1)
+    female = assign_voice_for_slot(role="char_voice", engine="indextts2", char_id="F",
+                                   gender="female", timbre=("bright",), age_band="adult", episode_seed=1)
+    assert male.engine == "indextts2" and male.gender == "male"
+    assert female.engine == "indextts2" and female.gender == "female"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -1979,7 +1979,7 @@
         "Node name for S&R": "OTR_StableAudioTheme"
       },
       "widgets_values": [
-        "musicgen",
+        "stable_audio_3",
         "mono_safe"
       ],
       "inputs": [

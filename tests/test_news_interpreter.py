@@ -641,3 +641,132 @@ def test_byte_identical_with_mocked_generate_fn():
 # Case 13 (article with <2 extractable proper nouns -> graceful) --
 #           covered by post-assembly key_terms check (commit 4 wiring);
 #           test lands with that commit.
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-307 -- key_term length is COERCED (truncated), never a hard halt
+# ---------------------------------------------------------------------------
+#
+# The 40-char cap RAISED on a real >40-char news entity, exhausting the
+# structured-call retry ladder -> NewsInterpreterError -> the whole episode
+# HARD-HALTED in NewsCurationDeep (soak 2026-06-03, mn_musicgen_100, term
+# "University Consortium for Atmospheric Research" = 45 chars). The cap is now
+# 80 and the validator truncates an over-long term at a word boundary instead
+# of raising, so a long entity can never halt the run.
+
+
+def test_bug307_long_real_entity_key_term_accepted():
+    """A real >40-char news entity now fits under the relaxed 80-char cap and
+    constructs without raising (the old 40-char cap raised here)."""
+    long_term = "University Consortium for Atmospheric Research"  # 45 chars
+    assert len(long_term) > 40
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="An atmospheric scientist and a skeptical reporter.",
+        script_brief="A debate over a contested climate dataset.",
+        news_close_brief="A new atmospheric dataset was released tonight.",
+        key_terms=[long_term],
+    )
+    assert brief.key_terms == [long_term]  # <= 80 -> kept verbatim
+
+
+def test_bug307_overlong_key_term_truncated_not_raised():
+    """A pathological >80-char term is COERCED (truncated at a word boundary),
+    never raised -- so it can never exhaust the ladder / halt the episode."""
+    overlong = (
+        "International Intergovernmental Panel Consortium for Atmospheric "
+        "and Oceanic Research Coordination"
+    )
+    assert len(overlong) > 80
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A panel delegate and a wire-service stringer.",
+        script_brief="A procedural fight over a long-named committee.",
+        news_close_brief="The committee adjourned without a vote tonight.",
+        key_terms=[overlong],
+    )
+    (kept,) = brief.key_terms
+    assert len(kept) <= 80
+    assert overlong.startswith(kept)        # a clean prefix of the original
+    assert kept == kept.rstrip()            # word-boundary trim, no trailing space
+
+
+def test_bug307_normal_key_terms_pass_through_unchanged():
+    """Ordinary short terms are untouched (no coercion) -- byte-identical to
+    the pre-fix behavior for the common case."""
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A field biologist and a skeptical colleague.",
+        script_brief="A telescope picks up an unexplained signal.",
+        news_close_brief="Researchers reported an unexplained signal.",
+        key_terms=["telescope", "signal", "researchers"],
+    )
+    assert brief.key_terms == ["telescope", "signal", "researchers"]
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-264 -- over-cap news_briefs fields are COERCED, not rejected
+# ---------------------------------------------------------------------------
+# Weak writers (gemma-2-2b-it) return 9-10 key_terms (> cap) and over-long
+# briefs; the schema USED to reject -> the whole NewsBriefs object was lost ->
+# the announcer intro AND outro fell back to generic text. The fields now coerce.
+
+
+def test_bug264_overlong_key_terms_list_trimmed_to_cap():
+    terms = [f"term{i}" for i in range(10)]
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A scientist and a skeptic.",
+        script_brief="A debate over a dataset.",
+        news_close_brief="A dataset was released tonight.",
+        key_terms=terms,
+    )
+    assert brief.key_terms == terms[: news_interpreter._MAX_KEY_TERMS]
+    assert len(brief.key_terms) == news_interpreter._MAX_KEY_TERMS
+
+
+def test_bug264_overlong_script_brief_truncated_at_word_boundary():
+    cap = news_interpreter._MAX_SCRIPT_BRIEF_CHARS
+    long_brief = ("word " * ((cap // 5) + 20)).strip()
+    assert len(long_brief) > cap
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A scientist and a skeptic.",
+        script_brief=long_brief,
+        news_close_brief="A dataset was released tonight.",
+        key_terms=["dataset"],
+    )
+    assert len(brief.script_brief) <= cap
+    assert not brief.script_brief.endswith(" ")
+    assert long_brief.startswith(brief.script_brief)
+
+
+def test_bug264_overlong_news_close_brief_truncated():
+    cap = news_interpreter._MAX_NEWS_CLOSE_BRIEF_CHARS
+    long_close = ("alpha " * ((cap // 6) + 20)).strip()
+    assert len(long_close) > cap
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A scientist and a skeptic.",
+        script_brief="A debate over a dataset.",
+        news_close_brief=long_close,
+        key_terms=["dataset"],
+    )
+    assert len(brief.news_close_brief) <= cap
+
+
+def test_bug264_non_list_key_terms_still_rejected():
+    with pytest.raises(Exception):
+        news_interpreter.NewsBriefs(
+            casting_brief="A scientist and a skeptic.",
+            script_brief="A debate over a dataset.",
+            news_close_brief="A dataset was released tonight.",
+            key_terms=123,  # type: ignore[arg-type]
+        )
+
+
+def test_bug264_clean_payload_unchanged():
+    """In-cap inputs pass through untouched (clean-path inertness)."""
+    brief = news_interpreter.NewsBriefs(
+        casting_brief="A field biologist and a skeptical colleague.",
+        script_brief="A telescope picks up an unexplained signal.",
+        news_close_brief="Researchers reported an unexplained signal.",
+        key_terms=["telescope", "signal", "researchers"],
+    )
+    assert brief.script_brief == "A telescope picks up an unexplained signal."
+    assert brief.news_close_brief == "Researchers reported an unexplained signal."
+    assert brief.key_terms == ["telescope", "signal", "researchers"]

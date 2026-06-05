@@ -1,0 +1,26 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: build-ready as-is? no — the design has critical gaps that would cause loss of history, unsafe code changes without coordination, and relies on unverified guardrails, making unattended operation likely to break things.
+
+MUST-FIX BEFORE BUILD:
+1. [1] Soak log design is insufficient: the driver (`_otr_soak_matrix.py`) writes one results file per invocation (overwriting). The continuous loop has no mechanism to preserve history for the triage agent. Fix: wrap the driver in a loop that appends each episode’s result (including timestamp, combo label, seed if obtainable, phase, error tail) to a cumulative JSON-lines file, or at minimum rotate daily files with a monotonically growing key. Without this, the agent cannot detect NEW failures reliably.
+2. [1] `bypass_freeze_halt` not set: the matrix driver does not patch the workflow to set bypass_freeze_halt=OFF. To make BUG-276 halt gracefully as intended, the driver must add a widget patch for that parameter (node 7 or the assembler). Verify the exact node/widget name from the workflow; add `otr_api.patch_widget_by_name(...)`. Failing to do this may cause a hard crash instead of a clean halt.
+3. [2,4] No synchronization between auto-fix agent and soak/ComfyUI: the agent may modify code while the soak loop is running and ComfyUI is using old modules. A fix that passes regression may not take effect in the soak without a restart, causing the same bug to reoccur. The design must include a stop/resume protocol: agent signals the soak loop to pause, waits for current episode to finish, optionally restarts ComfyUI (if needed for module reload), applies fix, runs regression, then resumes soak. Without this, the system will be inconsistent.
+4. [4] Audio byte-identity guardrail unverified: the claim that regression-gated keep/revert protects audio relies on the test suite including an automated audio output comparison. The grounding excerpts do not show such a test; it may be a manual gate. Ensure that the full regression suite (run by the agent) includes a test that compares a rendered audio file to a known reference for at least one canonical episode. If that test does not exist or requires GPU/ComfyUI not available in the regression environment, this guardrail is false and auto-fix cannot be trusted to preserve audio quality.
+5. [2,3] Auto-fix classification must be deterministic and strictly scoped: the design says the agent classifies failures into a whitelist and applies “the smallest fix”, but does not specify concrete matching rules or safe fix templates. An open-ended LLM agent might apply an incorrect or dangerous change. Implement explicit pattern-based classifiers (e.g., look for Pydantic validation errors containing “field longer than max length”) and corresponding, pre‑approved fix transformations (e.g., truncate to max length). Never allow the agent to generate arbitrary code.
+6. [2] Auto-fix cap and one-at-a-time enforcement need persistent state: the design mentions a cap on fixes per night and one-at-a-time, but no mechanism is described. Implement a counter file (e.g., `_soak_auto_fix_count.txt`) that the agent increments after each successful fix, and an advisory lock file to prevent concurrent agent runs. The agent must refuse to act if the cap is reached.
+
+SHOULD-FIX:
+- [1] The soak log must capture the random seed(s) used per episode to enable reproduction. The driver could read the seed from the submitted API prompt (many ComfyUI nodes expose a seed widget). Without it, morning report cannot provide a repro.
+- [1] Define objective QUALITY flagging criteria (e.g., audio duration < 30 s, announcer line missing) and implement them in the soak driver, else only timeouts/crashes are logged.
+- [2] After a kept fix, run a focused re-run of the exact failing combo/seed before re-queuing the full soak, to quickly confirm the fix in the real context.
+- [2] The BUG_LOG entry must include the diff, branch, regression results, and a unique bug ID for traceability.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add a simple web dashboard to view overnight progress without remote shell.
+- Auto-generate a polished morning report email.
+
+CUT THESE (over-engineering):
+- The entire Triage + auto-fix agent (sections 2, 3, 4) for the initial deployment. Running only the continuous soak loop (with proper logging and a morning report) would surface intermittent bugs safely, without any unattended code changes. This eliminates all risks of mis‑classification, audio degradation, and coordination failures. Add auto‑fix later under human supervision after the soak pipeline is proven.
+
+[ASSUMPTION] The `bypass_freeze_halt` widget exists in the workflow and its name is known; verify in the actual JSON. If not, the halt strategy needs a different mechanism. [ASSUMPTION] The full regression suite can run without a ComfyUI server and without VRAM; if any test depends on the server, the agent’s gate would break or need a staging server.

@@ -185,6 +185,36 @@ _FORMAT_FAILURE_NEEDLES = (
 )
 
 
+def _cast_first_last_aliases(cast: set) -> set:
+    """Unambiguous first/last-name aliases of the locked cast.
+
+    A weaker writer model often abbreviates a locked character -- e.g. it
+    writes 'NIA' for the locked 'NIA HIBBERT' -- which the exact-membership
+    cast check then flags as WRONG_SPEAKER / PHANTOM_CHARACTER and halts the
+    freeze gate. This returns the first- and last-name tokens of multi-word
+    cast names that map to EXACTLY ONE cast member; a token shared by two
+    characters (ambiguous) is excluded, so a genuine off-cast name still
+    fails. Full-name writers are unaffected -- their exact names already
+    match -- so this only ADDS valid aliases (no previously-valid name
+    becomes invalid). In line with the phantom-ship policy, resolving an
+    unambiguous abbreviation is preferred over halting the render.
+    """
+    owner: dict = {}
+    ambiguous: set = set()
+    for full in cast or ():
+        toks = str(full).strip().upper().split()
+        if len(toks) < 2:
+            continue  # single-token names are already their own full form
+        for tok in (toks[0], toks[-1]):
+            if len(tok) < 3:
+                continue
+            if tok in owner and owner[tok] != full:
+                ambiguous.add(tok)
+            else:
+                owner[tok] = full
+    return {t for t in owner if t not in ambiguous}
+
+
 def check_constraints(
     plan: Any,
     *,
@@ -214,7 +244,10 @@ def check_constraints(
     cast = _cast_names(plan)
     extra = {str(n).strip().upper() for n in (cast_names_extra or [])}
     extra.update({"ANNOUNCER", "MUSIC"})
-    valid_speakers = cast | extra
+    # Accept unambiguous first/last-name abbreviations of locked cast members
+    # (e.g. 'NIA' for 'NIA HIBBERT') so a weak model's shorthand does not trip
+    # WRONG_SPEAKER / PHANTOM_CHARACTER and halt the freeze gate. Additive only.
+    valid_speakers = cast | extra | _cast_first_last_aliases(cast)
     allowed_pns = {
         str(n).strip().upper()
         for n in (allowed_proper_nouns or [])

@@ -608,6 +608,27 @@ class TestReviewLedgerDispositions:
         assert n == 0
         assert led.data["lines"][0]["char_id"] == "c99"  # unrepaired
 
+    def test_wrong_char_id_charid_shaped_expected_repairs(self, tmp_path):
+        """BUG-LOCAL-271: the cast auditor emits a CHAR_ID in `expected` (not a
+        name). The repair must validate it directly against the locked cast's
+        char_id set and write it. The prior code only resolved `expected` as a
+        NAME, so every char_id-shaped suggestion missed and the repair was dead
+        (all lines escalated to the Script Doctor, which flagged nothing)."""
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c99", "Hello.", role="character"),  # wrong cid
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c99", expected="c01",  # auditor emits a CHAR_ID, not a name
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["char_id"] == "c01"
+
     def test_role_mismatch_validates_against_enum(self, tmp_path):
         """Wiring-review #11: role_mismatch with valid enum value →
         written; invalid value → leave row alone."""

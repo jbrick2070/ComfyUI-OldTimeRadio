@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-04T21:53:23.988158+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-04-gemma4-writer\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 21722,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-4.8-opus-20260528",
+      "ok": true,
+      "prompt_tokens": 34783,
+      "completion_tokens": 11137,
+      "cost_usd": 1.35702
+    },
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-4.6-sonnet-20260217",
+      "ok": true,
+      "prompt_tokens": 25164,
+      "completion_tokens": 12000,
+      "cost_usd": 0.255492
+    },
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 20878,
+      "completion_tokens": 5600,
+      "cost_usd": 0.08209749999999999
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 22068,
+      "completion_tokens": 6183,
+      "cost_usd": 0.014978789999999999
+    }
+  ],
+  "total_cost_usd": 1.7096
+}

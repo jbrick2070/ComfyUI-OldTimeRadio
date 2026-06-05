@@ -2335,6 +2335,21 @@ class OTR_LedgerScriptWriter:
             # S32 B6: `helper_context` attributes all slot calls
             # inside the block to "pick_style" so per-helper /
             # per-phase meta tracking gets a clean phase label.
+            # Resolve the creative slot to its effective model slug for
+            # style-pass telemetry (over/under-generation per model). The
+            # inventor (pass 1) runs on the creative slot, so this is the
+            # model whose draw the counts describe. Only an OpenRouter
+            # handle needs resolving (-> its bound remote slug); a local
+            # model id is recorded verbatim. Telemetry label only -- never
+            # break the run over it.
+            _creative_model = str(resolved["creative_writing_model"])
+            _creative_slug = _creative_model
+            if _creative_model.startswith("openrouter:"):
+                try:
+                    from . import _otr_openrouter_backend as _orb_slug
+                    _creative_slug = _orb_slug.resolve_slug(_creative_model)
+                except Exception:  # noqa: BLE001 -- telemetry label only
+                    _creative_slug = _creative_model
             with slot_scheduler.helper_context("pick_style"):
                 style_pick = _OTRSP.pick_style(
                     creative_fn=creative_generate_fn,
@@ -2342,7 +2357,8 @@ class OTR_LedgerScriptWriter:
                     article_text=resolved["news_seed"],
                     seed_pool=list(_STYLE_PICKER_SEED_POOL),
                     rng=picker_rng,
-                    model_id=str(resolved["creative_writing_model"]),
+                    model_id=_creative_model,
+                    model_slug=_creative_slug,
                 )
             resolved["style"] = style_pick.chosen
             meta["style_pick"] = style_pick.model_dump()

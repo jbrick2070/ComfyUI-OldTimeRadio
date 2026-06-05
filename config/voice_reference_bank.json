@@ -55,7 +55,18 @@
       "roles": ["char_voice"],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/ix_male_neutral.wav",
-      "ref_sha256": "pending",
+      "ref_sha256": "a83b07db7428a2338600a1066141abcd4b5cb81bd285e3f4c387167682aeaa78",
+      "commercial_clean": false
+    },
+    {
+      "voice_ref_id": "ix_male_warm",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": ["warm", "baritone"],
+      "roles": ["char_voice"],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/ix_male_warm.wav",
+      "ref_sha256": "72d61ef2b9580609b31ec26940622a2965a4322863310c58384ff1bf155eb6b1",
       "commercial_clean": false
     },
     {
@@ -66,7 +77,18 @@
       "roles": ["char_voice"],
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/ix_female_neutral.wav",
-      "ref_sha256": "pending",
+      "ref_sha256": "1d25a4201c5cdf6f46839ca0901330c97ede57d2b8ba407e1bb89ef856066aba",
+      "commercial_clean": false
+    },
+    {
+      "voice_ref_id": "ix_female_bright",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": ["bright", "soprano"],
+      "roles": ["char_voice"],
+      "age_band": "young_adult",
+      "ref_path": "models/TTS/refs/indextts2/ix_female_bright.wav",
+      "ref_sha256": "3160dcb3975b481396c55a2ed890b1912962f93b8cb5b28fbe28f834ea40f9f2",
       "commercial_clean": false
     },
     {

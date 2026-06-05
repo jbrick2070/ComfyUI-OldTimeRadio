@@ -1,247 +1,91 @@
-# Session Handoff -- OTR v2.0-alpha audio/voice CLEAN-BREAK -- 2026-06-03 (Sprint 2 COMPLETE; Sprint 3 subsumed; headless soak plan ready)
-
-## NEXT ACTION -- headless API audio soak (plan committed, awaiting ComfyUI up)
-**Plan:** `docs/2026-06-03-audio-headless-api-soak__test-plan.md` (committed). Prove the
-*current* baked-in `otr_scifi_16gb_full.json` runs the audio path box-fresh via the ComfyUI
-HTTP API, 30-word episodes, **aborting each run at the audio->HuMo boundary** so each costs
-seconds of audio, never the video render.
-- **Operator decisions locked:** phased matrix (validated bark/kokoro/musicgen FIRST, then a
-  guarded IndexTTS2/Chatterbox/Stable-Audio probe = early F signal) · single pass then
-  repeat-green · 30-word first.
-- **Harness (reuse, NO new plumbing):** `scripts/otr_api.py` -- `load_workflow` +
-  `fetch_schemas` + `patch_widget_by_name` (set length/engine/knobs by NAME) +
-  `workflow_to_api_prompt` + `submit_prompt` (raises on node_errors) + `poll_history` +
-  **`cancel_queue()` = the abort**. Monitor via `scripts/smoke_watcher.py` (log tail +
-  /history + /queue + LHM VRAM @ localhost:8085).
-- **Phase 0 = the must-pass-first gate Jeffrey flagged:** the JSON is very different from
-  what the harness last translated, so re-validate the UI->API translation against LIVE
-  `/object_info` (it RAISES on widget drift, never misaligns) + confirm ComfyUI accepts the
-  unmodified graph (empty node_errors), then cancel. If it trips -> fix converter/JSON
-  BEFORE any render.
-- **Canonical node map:** 1 Writer · 80 CastLock(preserve_ledger) · 81 CharacterVoices=bark ·
-  82 Announcer=kokoro · 83 Theme=musicgen · 72+51 HuMo = the abort boundary.
-- **Run model:** Desktop Commander (cmd) + venv python on Jeffrey's box against live ComfyUI
-  `localhost:8000`. Never rewrite the canonical JSON (patch an in-memory deep copy).
-- **Blocked on:** ComfyUI Desktop up at localhost:8000. Then Phase 0 (read-only, renders
-  nothing) -> Phase 1 smoke (capture the audio-done log marker) -> Phase 2 soak (validated
-  OFAT, both CastLock policies + cast sizes 1/3) -> Phase 3 new-engine probe (VRAM-watched).
-
----
-
-## STATUS (HEAD 8915139) -- SPRINT 2 (a) COMPLETE + SPRINT 3 SUBSUMED
-**Sprint 2 (a) fully shipped.** Part 1 (5a747f0): cast_seed persisted + the pure
-byte-identical `replay_voice_assignment` + the parity test. Part 2 (8915139):
-OTR_CastLock OWNS bark casting -- `cast_one_character` leaves voice_preset EMPTY;
-`CastLock._assign_bark_voices` reads cast_seed+num_characters+lemmy_hit from the
-frozen `meta.cast_contract`, replays the picker (byte-identical) and stamps
-voice_preset per char_id (any cast_voice_policy), then runs the relocated Gate 1
-invariants (unique + v2/*). FreezeCascade **G6** now WARNs on an empty non-ANNOUNCER
-voice_preset (CastLock assigns post-freeze); a present-but-non-v2/ preset still
-errors. `CastingResponse.voice_preset` allows "". 5 test files converted; the parity
-test is now **load-bearing** (writer-empty -> the REAL CastLock node stamps ==
-replay == committed golden snapshot). No name drift (golden byte-identity proven),
-no audio change. No node surface changed -> no workflow JSON re-wire.
-
-**Sprint 3 (legacy audio seeding removal) = SUBSUMED by 1c** -- the per-clip legacy
-seeding lived in the retired batch nodes. Confirmed gone: test_legacy_audio_seeding +
-_otr_legacy_manifest don't exist, registry has no batch interface, the 3 retired-node
-guard tests pass. No implementable code residual.
-
-**Only residual for the whole audio overhaul = operator-GPU, deferred to Jeffrey:**
-**Gate B** = render-twice `baseline_v2` byte-identity capture for bark + kokoro +
-musicgen on the RTX 5080 (per-engine seed determinism, the new-path baseline). Then
-Sprints 4 (promotion: retire `OTR_ENABLE_*` build flags once Gate B is green) + 5
-(F probes). All GPU-gated -- nothing further implementable headless.
-
-Suite 3655/12/0, Bug Bible green, audio byte-identical green. local HEAD == origin
-== 8915139. **USE cast_seed, NOT stable_cast_seed.**
-
----
-
-
-## STATUS (HEAD 9259336) -- SPRINT 1c COMPLETE
-1a bark (673a2bc), 1b kokoro (89e90a7), 1c (ad0ac50 part1 music-prompt-via-Meta-brief
-+ 9259336 part2 musicgen->clip + delete the whole legacy batch infra). **Every audio
-engine is now self-contained per_line / clip; the batch-delegation layer,
-_otr_legacy_manifest, the legacy invocation manifest, and the legacy
-bark/kokoro/musicgen/audiogen nodes are all gone.** Suite green 3650/12/0, Bug Bible
-green. local HEAD == origin == 9259336.
-
-**Remaining headless work is essentially done.** The next sprints are gated:
-- **Sprint 2 (writer casting -> CastLock)** -- APPROVED as option (a) (move the seeded
-  bark preset picker into CastLock) WITH a byte-identical parity-test mandate. Feasibility
-  analyzed; one HARD PREREQUISITE found: all cast determinism (incl. bark voice picks)
-  flows from ONE `cast_seed` (OTR_LedgerScriptWriter:2477 `cast_rng=random.Random(cast_seed)`,
-  OS-entropy per episode; OTR_CAST_SEED = C7 override) and the writer does NOT persist it
-  (stamps only meta.cast_contract{lemmy_hit,casting_attempts,counts}). So CastLock cannot
-  reproduce the picks byte-identically until cast_seed is PERSISTED. cast_rng is also
-  shared/interleaved (assemble name-rolls + precompute gender-shuffle + per-slot voice
-  picks; the LLM description does NOT draw it), so (a) requires CastLock to REPLAY that rng
-  sequence, not just port the picker. PLAN (full in task 8): (1) writer persists cast_seed
-  in meta.cast_contract.cast_seed; (2) extract a PURE replay fn from lock_cast
-  (random.Random(cast_seed) -> assemble_pre_locked_rows -> precompute_ensemble_slots -> per
-  slot python_assign_voice_preset, no LLM); (3) CastLock calls it for bark; (4) parity test
-  (writer snapshot at seed S == CastLock replay, char-for-char); (5) remove the writer voice
-  stamp. Use cast_seed, NOT _otr_voice_bank.stable_cast_seed (the flagged trap). ~1c-sized;
-  needs fresh runway. Tree clean at 109c94d (no Sprint 2 code cut).
-- **Sprint 3** -- LARGELY SUBSUMED by 1c: the R0a legacy seeding lived in the now-deleted
-  nodes; legacy_invocation_manifest.json + test_legacy_audio_seeding are already gone.
-  Residual = capture baseline_v2 (Gate B, operator GPU).
-- **Sprints 4 (promotion) + 5 (F pilots)** -- operator / GPU-gated.
-- **Gate B (operator GPU):** render-twice baseline_v2 capture for bark + kokoro + musicgen.
-
----
-
-
-## STATUS UPDATE (HEAD ad0ac50)
-1a (bark, 673a2bc) + 1b (kokoro, 89e90a7) SHIPPED. **1c PART 1 SHIPPED (ad0ac50):**
-the theme-music cue prompt now routes through the Meta brief protocol via the new
-single-source `nodes/_otr_music_prompt.py` (`compose_music_prompt` reads mood / setting /
-period through `_otr_brief_reader._read_brief_field`); `stable_audio_theme`'s clip path
-uses it; `tests/test_music_prompt_brief_protocol.py` pins it. No live audio change yet
-(musicgen still the batch default; stable_audio flag-off). Suite 3739/12/0, Bug Bible green.
-
-**1c PART 2 REMAINS -- the atomic legacy deletion.** Full step-by-step spec is in the
-TASK LIST (task 7). Summary: flip `eng_musicgen` batch->clip (self-contained
-`generate_clip` via transformers MusicGen; mirror `eng_stable_audio`; sr 32000,
-guidance_scale 3.0 pinned, do_sample=True, 50 tok/s, peak-normalize 0.89; routes through
-the theme node's `_render_clips` + `compose_music_prompt`, preserving musicgen output) ->
-delete `musicgen_theme.py` + `batch_audiogen_generator.py` -> retire the batch-delegation
-layer (theme-node `_delegate_batch` + shared `_otr_voice_node_common._delegate_batch` +
-`frozen_batch_widgets` + `_manifest_path` + the `OTRVoiceNodeBase` batch branch) -> delete
-`_otr_legacy_manifest.py` + `config/legacy_invocation_manifest.json` -> convert/delete the
-~15 test files in task 7 (incl. dropping the `_otr_legacy_manifest` imports from the
-bark+kokoro guards) -> add a batch-dispatch-retired guard. ONE atomic commit, push only
-when green. `full.json` verified CLEAN (v2 nodes are the instances -- NO graph surgery).
-Then sprint 2 -> 3. Operator mandate: continue autonomously; stop only on a red regression
-you cannot fix, real handoff ambiguity, a C1-C9 breach, or a GPU-gated step (Gate B).
+# Session Handoff -- OTR v2.0-alpha -- 2026-06-04 (writer bake-off DONE; NEXT = code gemma-4-12b opt-in lane per pass02 plan)
 
 ## Core goal
-Finish `docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md` (the SSOT) under
-the CLEAN-BREAK directive: a model-agnostic per-role engine registry (character
-voice / announcer / music) as the SOLE audio path, wired into the ONE workflow
-`workflows/otr_scifi_16gb_full.json`. Remove each legacy item IN LOCKSTEP with
-building its replacement: build -> full suite green -> delete the legacy + all
-refs in the SAME change -> green again -> guard test that fails if it reappears.
+Make **gemma-4-12b** usable as an **opt-in** OTR writer lane without breaking the
+exact-count structured passes -- then decide (by quality) whether it's worth it.
+**mistral-nemo stays the shipping default either way.** The build plan is already
+converged and grounded: `docs/2026-06-04-gemma4-writer/roundtable/pass02_plan.md`.
+This session ran the bake-off (gemma aborts as-is), shipped a `<think>` strip, and
+roundtabled the fix. Next session = implement pass02 (code).
 
-## Tech stack & hard rules (cause rework if forgotten)
-Python 3.12 + torch, Windows, RTX 5080 16 GB. Branch `v2.0-alpha`, never `main`.
-- Tests + git on the WINDOWS HOST via **Desktop Commander cmd** (NOT PowerShell
-  for git; NOT the GitHub connector). venv python:
-  `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`.
-- Full regression after EVERY code change: `python -m pytest -q -p no:cacheprovider`
-  (~35 s; must stay fully green). Baseline now: **3731 passed, 12 skipped, 0 failed**.
-  Bug Bible regression also green.
-- Commit via `.git\COMMIT_EDITMSG` + `git commit -F` (cmd); `git add` explicit
-  paths, never `-A`. ASCII-only `.py`, no BOM, never the word "dummy".
-- After every push verify: local HEAD == origin HEAD, no 0-byte, no BOM, AST
-  parses, node classes registered. (A throwaway `_otr_verify_*.py` is handy.)
-- **DC `interact_with_process` TIMES OUT on long pytest even though pytest
-  finishes** -- run pytest with `> .log 2>&1` redirect, read the log tail (the
-  log completes regardless of the MCP timeout). `del` the .log before committing.
-- **Audio is king.** `baseline_v2` (render-twice from the NEW engines, operator
-  GPU) is THE reference -- no v1.7 byte-identity.
-- Operator mandate (2026-06-03): continue 1c -> 2 -> 3 WITHOUT pausing to ask;
-  only pause for genuinely operator/GPU-gated steps (Gate B baseline_v2 capture)
-  or another real change to what listeners hear.
+## Tech stack & constraints
+- Branch `v2.0-alpha`. CLAUDE.md + BUG_LOG.md + ROADMAP auto-load -- not repeated here.
+- **NOTHING IS COMMITTED. Jeffrey commits.** This session's edits are dirty in the tree.
+- VRAM ceiling 14.5 GB (RTX 5080, 16 GB, Blackwell, Windows). Offline-first / 100% local.
+- Writer two-slot model (creative_writing_model / technical_model); **no new model_id widgets** (rule 6); consumers get the id via STRING socket.
+- The OpenRouter lane is **provider-agnostic**: `OPENROUTER_BASE_URL` points it at ANY OpenAI `/v1` (this is how it reached Ollama). Enabled by `OTR_ENABLE_OPENROUTER=1` + `OPENROUTER_API_KEY` (any non-empty for a local server).
+- Run the full suite + Bug Bible after every code change: `"%VENV%" -m pytest -q -p no:cacheprovider` (venv = `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`). Baseline this session: **3705 passed / 12 skipped / 0 failed**; Bug Bible 0-fail.
+- **HF_HOME = `C:\ComfyUI-Models\huggingface`** -- a bare headless ComfyUI relaunch MUST set this or local writer models show "[NOT DOWNLOADED]" (the Desktop app sets it; ComfyUI is currently back on Jeffrey's Desktop app).
+- DC (Desktop Commander) gotchas this session: cmd mangles `"`/`$_` -> avoid quotes even on space-free paths, and use the subprocess+powershell-list-args pattern for `$_`; `ping`-wait > ~70s trips the MCP transport timeout; the file-tool mount LAGS Windows writes -> read repo files via DC `read_file`. cmd `mkdir` needs NO quotes to create nested dirs.
 
-## SHIPPED this session
-- **1a (bark) -- commit `673a2bc`.** eng_bark self-contained `per_line` (sources
-  `_otr_bark_lib`; voice_ref_field="voice_preset"; text_temp=0.7 pinned). Gate 3
-  preset contract fails closed in generate_voice. Deleted batch_bark_generator.py
-  + refs. Freeze-halt + freeze_unload_ok re-homed to `OTR_CastLock._enforce_freeze_gate`
-  (covers the whole chain). Guard: tests/test_bark_legacy_node_retired.py.
-- **1b (kokoro) -- commit `89e90a7`.** eng_kokoro self-contained `per_line`.
-  begin_episode picks ONE announcer voice per episode, seeded from episode_seed
-  over the curated pool (legacy parity -- no change to listeners); bank takes over
-  at promotion via cast voice_ref_id. prepare_text identity (legacy parity).
-  C-7: begin_episode verifies the voice .pt on local disk, NAMED MISSING_MODEL +
-  offline fetch cmd if absent, never networks in execute. Added an additive,
-  engine-agnostic **begin_episode(meta) hook** to `_otr_voice_node_common`
-  per-line dispatch (runs once before the loop; other engines ignore it).
-  announcer_kokoro_v1 profile speed 1.0 -> 0.95 (matches shipped cadence; pinned
-  by a drift guard). Deleted kokoro_announcer.py + refs. Guard:
-  tests/test_kokoro_legacy_node_retired.py.
+## What's done & decided
+- **Bake-off (docs/2026-06-04-writer-bakeoff.md):** gemma-4-12b (Ollama GGUF via the lane) **aborts at the style-picker "inventor" pass** -- returns **63** descriptors when exactly **5** are required; 3 attempts; fail-closed. mistral-nemo completes ("Serum's Gambit", ~21/35 this draw; best-local baseline 27/35). The `<think>` strip works (gemma cleared NewsCuration/NewsCurationDeep); failure is **instruction-compliance**, not transport.
+- **SHIPPED this session (uncommitted):** `_strip_reasoning_tags` in `nodes/_otr_openrouter_backend.py` (called in `_extract_text` before the empty-check) strips `<think>...</think>` (balanced + dangling-close) + harmony `<|channel|>` markers; no-op when absent. +10 tests in `tests/test_openrouter_backend.py`.
+- **`DEFAULT_LLM` is already `mistralai/Mistral-Nemo-Instruct-2407`** (`nodes/_otr_model_catalog.py:32`) -- no change; bake-off confirms keep it.
+- **Roundtable converged (Grok + ChatGPT + Gemini panel, Claude judge; ~$0.08 of a $5 budget):** the build path is **pass02_plan.md**. Key decisions:
+  - **B** = `_parse_inventor_output` takes first-5-distinct on overgeneration but **KEEP `StylePick.candidates Field(min=max=5)`** -- truncate in the parser, do NOT weaken the contract (corrects an earlier "relax to >=5" draft).
+  - **F** = serve `unsloth/gemma-4-12b-it-GGUF` (Apache-2.0, verified on HF) via **llama-server** through the existing `/v1` lane. NO in-Comfy transformers, NO new widget; run for writer passes only then UNLOAD before the FLUX/HuMo/LTX branch; one resident LLM at a time.
+  - **enable_thinking:false** via llama-server `--chat-template-kwargs '{"enable_thinking":false}'` for structured passes.
+  - **A** (GBNF "exactly 5" at the inventor call) only if B + thinking-off is insufficient. Prefer GBNF over JSON+schema (keeps the line-based contract).
+  - **GGUF fixes deployability, NOT the count bug.** A/B fix the bug.
+- **Rejected (do not reopen):** in-Comfy transformers gemma (BUG-306); gemma-as-default; relaxing `StylePick` to `>=5`; two resident local LLMs during video; prompt-only fix (failed 3x); a full Ollama-vs-llama.cpp-vs-LM-Studio bake-off (lane takes any `/v1`; only GBNF/json_schema-over-/v1 matters). Defer **C** (gemma-creative + mistral-technical slot routing): technical dispatch is staged, not wired, + VRAM trap.
 
-**HEAD now `89e90a7` == origin/v2.0-alpha.** (This handoff commit sits on top.)
+## State of the art (files + exact surfaces)
+- **`nodes/_otr_style_picker.py`** -- where B lands. `_REQUIRED_CANDIDATE_COUNT = 5`;
+  `DESCRIPTOR_RE` = 2-5 lowercase snake_case words; `_parse_inventor_output(raw)`
+  returns `list[str]` and currently RAISES `ValueError` when `len(lines) != 5`
+  (the count check ~line 363) -- change THIS to de-dupe + take first 5 (fail if <5).
+  `class StylePick` -> `candidates: Field(..., min_length=5, max_length=5)` (line 126)
+  -- KEEP. `pass1_slot` default `"creative"` (138), `pass2_slot` `"technical"` (139);
+  the paired contract routes BOTH passes through `creative_fn` today (technical
+  dispatch staged "B2") -> A must enforce at the inventor (creative) call, and C is
+  blocked on finishing this dispatch.
+- **`nodes/_otr_openrouter_backend.py`** -- `_strip_reasoning_tags` (shipped);
+  `resolve_slug` (bound slot value verbatim else `OTR_OPENROUTER_SLOT_A_DEFAULT`);
+  `schema_to_response_format` (json_schema seam, technical calls);
+  `_clean_slot_value` treats parenthesized `(...)` choices as unset.
+- **Roundtable artifacts:** `docs/2026-06-04-gemma4-writer/roundtable/` ->
+  `pass00_plan.md`, `pass01_plan.md`, `pass01_judgment.md`, **`pass02_plan.md` (the build plan)**,
+  `CHATGPT_PASTE.md`, `pass01/` (Grok + Gemini reviews + manifest). `pass01b/` recovery stalled (ignore).
+- **Bake-off scratch (gitignored `scripts/_*.py`, reusable):** `_otr_bakeoff_run.py`
+  (patch writer model + neutralize the 4 slot pickers to their `(...)` placeholder +
+  prune to node-7 closure + cancel on `freeze_verdict` before audio + dump ledger),
+  `_otr_bakeoff_launch_comfy.py` (headless ComfyUI with Ollama+seeds+HF_HOME env),
+  `_otr_bakeoff_wait.py`, `_otr_bakeoff_show.py`, `_otr_bakeoff_procs.py`. Captured
+  ledgers: `_otr_bakeoff_gemma4.json` (FAIL), `_otr_bakeoff_mistral.json` (STORY_READY).
+- **Ollama** has `unsloth/gemma-4-12b-it-GGUF:Q4_K_M`; pass02 recommends `UD-Q4_K_XL`.
+  The OTR canonical workflow `workflows/otr_scifi_16gb_full.json` carries STALE slot
+  values (`comfy_slot_b_model='deepseek/deepseek-v4-pro'`) that fail ComfyUI COMBO
+  validation when the lane is off -> the driver neutralizes all 4 pickers (pattern to reuse).
 
-## OUTSTANDING (operator-only; NOT blockers for 1c)
-- **Gate B (operator GPU):** capture render-twice `baseline_v2` for bark AND
-  kokoro on the RTX 5080 and wire them as the byte references. Until then the
-  bark/kokoro byte-tests are headless CONTRACT pins (shape/SR/fail-closed/preset/
-  seeded-pick), not byte pins. per_line is intentionally NOT byte-identical to the
-  old batch paths.
+## Immediate next steps (code, in order -- from pass02_plan.md)
+1. **B:** edit `_parse_inventor_output` (`nodes/_otr_style_picker.py`): collect valid
+   `DESCRIPTOR_RE` descriptors, de-dupe deterministically (respect distinctness), if
+   `>=5` take first 5, if `<5` raise; return exactly 5 so `StylePick(min=max=5)` holds.
+   Add a unit test (over-generation -> 5; <5 -> fail; dup-collapse). Run suite + Bug Bible.
+2. **Telemetry:** stamp `valid_count` / `distinct_count` / `truncated_count` / `model_slug`
+   on the style pass (ledger meta) so over/under-generation is visible, not just an abort.
+3. **F:** `llama-server -hf unsloth/gemma-4-12b-it-GGUF:UD-Q4_K_XL --port <p>` (confirm the
+   exact quant tag from the repo files). Point `OPENROUTER_BASE_URL=http://localhost:<p>/v1`;
+   verify the lane's OpenRouter headers don't trip llama-server. Reuse the bake-off driver to submit.
+4. **enable_thinking:false** for structured passes (llama-server `--chat-template-kwargs`,
+   PowerShell-escaping caveat). Re-test the exact-5 style-picker with gemma.
+5. **A (GBNF)** at the inventor call ONLY if B + thinking-off still over-generate.
+6. **Conformance harness (6 pt):** exact-5 ok / no 63 / dup caught / bad-grammar caught /
+   GBNF-or-json_schema works-or-marked-unsupported / **server unloads before video**; AND
+   **grep every other exact-count/shape gate** (chooser, cast contract, validators) for blast radius.
+7. Only then re-bake-off gemma narrative vs mistral on the 7-axis rubric. **If not clearly better, stop.**
 
-## State of the art
-`nodes/_otr_audio_engines/`: `bark`(per_line, self-contained), `kokoro`(per_line,
-self-contained), `chatterbox`/`indextts2`/`stable_audio`(per_line/clip G1 bodies,
-flag-gated default-off), `musicgen`(STILL `interface="batch"` -- delegates to
-musicgen_theme.py). `LEGACY_AUDIO_NODES` = {OTR_MusicGenTheme,
-OTR_BatchAudioGenGenerator} (2 left). The shared per-line dispatch
-`_otr_voice_node_common` has: build_engine_combo, coerce_int_seed,
-frozen_batch_widgets + _manifest_path (batch only -- DEAD after 1c), _delegate_batch
-(batch only -- DEAD after 1c), begin_episode hook, _render_per_line. CastLock owns
-the freeze-halt + freeze_unload_ok for the whole audio chain. The theme node
-`stable_audio_theme.py` (OTR_StableAudioTheme, self-contained, 3 AUDIO cue outputs)
-has BOTH a `_delegate_batch` (musicgen) and a `_render_clips` (stable_audio_music,
-clip interface: `generate_clip(prompt, duration_s, seed)`).
+## Open questions
+- Exact Unsloth quant tag (`UD-Q4_K_XL`) in the repo file list.
+- Does `enable_thinking:false` (+ GBNF if needed) actually yield exactly 5 from gemma?
+- Do the OpenRouter-lane headers work against a local llama-server?
+- Full list of other exact-count gates gemma would break (harness step 6).
+- Product call: is softening the strict 5-count gate (B) acceptable? (Jeffrey)
+- Housekeeping: a stalled roundtable `pass01b` python + an idle `ollama serve` may linger from this session (harmless; kill if tidying).
 
-## NEXT = 1c (musicgen + audiogen + retire batch dispatch) -- LARGEST sprint
-No new operator decision (musicgen per_line preserves music-gen behavior; SFX is
-already out of v2). Steps (one atomic lockstep change -- cannot sub-split cleanly
-because the manifest + batch dispatch serve musicgen until it is flipped):
-1. **eng_musicgen batch -> clip.** Give it a self-contained `interface="clip"` +
-   `generate_clip(self, prompt, duration_s, seed)` body. Relocate the MusicGen
-   inference out of `musicgen_theme.py` (model load + generate) -- mirror
-   `eng_stable_audio.py`'s clip body for structure (lazy import, fail-closed
-   "not installed" RuntimeError headless, peak-normalize as the legacy did).
-   The theme node's `_render_clips` ALREADY calls `generate_clip(prompt,
-   duration_s, engine_seed)` per cue, so once musicgen is `clip` it routes there.
-   Read `musicgen_theme.py` first for the cue durations / prompt / normalization
-   the legacy used, to preserve what listeners hear.
-2. **Delete `musicgen_theme.py` + `batch_audiogen_generator.py`** (audiogen =
-   dead legacy SFX, node 15 dropped). Remove both from `__init__.py`,
-   `_otr_legacy_manifest.LEGACY_AUDIO_NODES`, `legacy_invocation_manifest.json`.
-3. **Remove the theme node batch path**: `StableAudioTheme._delegate_batch` +
-   the `if interface == "batch"` branch in its `generate()`.
-4. **Retire the shared batch dispatch** in `_otr_voice_node_common`:
-   `_delegate_batch`, `frozen_batch_widgets`, `_manifest_path`, and the
-   `if interface == "batch"` branch in `OTRVoiceNodeBase.generate()`. KEEP
-   `build_engine_combo`, `coerce_int_seed`, the `begin_episode` hook,
-   `_render_per_line`. (I-3 raw-delegation retired -- the last batch user is gone.)
-5. **LEGACY_AUDIO_NODES is now empty** -> delete `nodes/_otr_legacy_manifest.py`
-   + `config/legacy_invocation_manifest.json` + tests
-   `test_legacy_invocation_manifest.py` + `test_legacy_audio_seeding.py`.
-6. **Tests**: convert `test_stable_audio_theme.py` (musicgen batch->clip),
-   `test_musicgen_*` (brief_rewire/cache_keys/parity/strict_failure),
-   `test_audiogen_*` (cache_keys/ledger/strict_failure/writeback_hardening),
-   `test_per_cue_sfx_dur.py`; drop musicgen+audiogen keys from
-   `test_audio_byte_identical.py` FIXED_SEEDS (likely empties it -- keep the dict
-   or delete the now-dead capture path). KEEP the workflow-JSON denylists in
-   `test_full_workflow_v2_audio_wiring.py` + `test_workflow_json_guardrails.py`
-   (they name the types as strings to assert NO instance -- still valid). Add a
-   `tests/test_batch_dispatch_retired.py` guard: musicgen+audiogen modules gone;
-   `_otr_voice_node_common` has no `_delegate_batch`/`frozen_batch_widgets`;
-   `OTRVoiceNodeBase.generate` has no batch branch; `_otr_legacy_manifest` gone.
-7. Full suite green; commit + push; verify.
-
-## Then 2 -> 3 (still headless), 4 -> 5 (operator/GPU)
-- **2**: remove the writer bark voice_preset stamp in `_otr_casting`
-  (`python_assign_voice_preset` + `_assert_voice_preset_invariant` + uniqueness
-  guard); OTR_CastLock owns casting (bank voice_ref_id); bark draws from the bank.
-- **3**: remove R0a legacy seeding (now only the deleted nodes had it -- mostly
-  done by 1c) + any remaining `legacy_invocation_manifest` refs; `baseline_v2`
-  replaces the render-twice-LEGACY tests (ties to Gate B operator GPU).
-- **4**: promotion -- flip full.json engine-widget defaults to the new engines
-  per role; retire `OTR_ENABLE_*`. GATED on Wave-3 F GPU pilots (operator).
-- **5**: F probes for indextts2 + stable_audio (isolated venvs); operator GPU.
-
+---
 ## Resume instructions
-Open a fresh window with the project mounted, attach this file, and say:
-"Read this handoff + docs/2026-06-02-audio-voice-overhaul__EXECUTION-PLAN.md.
-Verify HEAD == origin/v2.0-alpha and the suite is green (3731/12/0). Continue the
-EXECUTION-PLAN under the CLEAN-BREAK directive, removing legacy in lockstep --
-do sprint 1c (musicgen clip + audiogen delete + retire the batch dispatch +
-delete the legacy manifest), then 2 -> 3, without pausing to ask; only pause for
-operator/GPU-gated steps (Gate B) or a real change to what listeners hear.
-Acknowledge when ready."
+Open a fresh window, attach this file, and say:
+"Read this handoff file and prepare to execute the immediate next steps.
+Acknowledge when you're ready to start."

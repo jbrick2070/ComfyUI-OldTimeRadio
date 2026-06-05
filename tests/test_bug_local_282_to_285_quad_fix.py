@@ -157,19 +157,24 @@ class TestBugLocal283NewsBriefsCapBumpedTo7:
         )
         assert len(nb.key_terms) == 7
 
-    def test_eight_key_terms_rejected(self):
+    def test_eight_key_terms_coerced_to_7(self):
+        # BUG-LOCAL-264 (2026-06-03): 8 key_terms are now COERCED to the first 7,
+        # NOT rejected. A weak model overruns the cap; the old rejection lost the
+        # whole NewsBriefs object -> generic announcer intro/outro. (Supersedes the
+        # prior test_eight_key_terms_rejected.)
         eight = [
             "NASA", "FireSense", "Wildfire", "Thermal Sensor",
             "Fire Mission", "Fire Bulldozer", "Firefighter", "Pine Barrens",
         ]
-        with pytest.raises(ValidationError):
-            _ni.NewsBriefs(
-                scene_atmosphere="x" * 50,
-                casting_brief="y" * 50,
-                script_brief="z" * 80,
-                news_close_brief="w" * 50,
-                key_terms=eight,
-            )
+        nb = _ni.NewsBriefs(
+            scene_atmosphere="x" * 50,
+            casting_brief="y" * 50,
+            script_brief="z" * 80,
+            news_close_brief="w" * 50,
+            key_terms=eight,
+        )
+        assert nb.key_terms == eight[:7]
+        assert len(nb.key_terms) == 7
 
     def test_min_key_terms_constant_unchanged(self):
         # Lower-bound CONSTANT unchanged. The schema's min_length is

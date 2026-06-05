@@ -147,6 +147,24 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license_audit_status="mit_equivalent",
     ),
     CuratedModel(
+        repo_id="google/gemma-4-12b-it",
+        requires_auth=True,
+        loader_backend="transformers_multimodal_text_only",
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=23.9,
+        notes="Gemma 4 12B (2026-06-03) -- 12B class, the same size tier as the "
+        "Mistral-Nemo default and the first Gemma capable enough to soak-test as "
+        "a real writer (E2B/E4B are too small for the structured passes). "
+        "Encoder-free multimodal, used text-only; NF4 ~8 GB on the 5080. "
+        "Apache-2.0 (Gemma 4), ungated download.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+    ),
+    CuratedModel(
         repo_id="google/gemma-2-2b-it",
         requires_auth=True,
         loader_backend="transformers_safetensors",

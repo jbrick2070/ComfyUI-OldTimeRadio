@@ -31,11 +31,84 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Reasoning-wrapper strip (BUG-306 / BUG-LOCAL-308 family)
+# ---------------------------------------------------------------------------
+# Thinking-mode models (gemma-4, DeepSeek-R1, QwQ, ...) prepend their
+# chain-of-thought to the reply, wrapped in <think>...</think> -- and some
+# emit OpenAI-"harmony" <|channel|>analysis<|message|>...<|channel|>final
+# <|message|> markers. Through Ollama's OpenAI-compatible endpoint that
+# scaffolding lands inline in message.content, so the writer's structured
+# (JSON / GBNF) passes parse the reasoning preamble and abort the episode.
+# We strip it at the single response chokepoint (_extract_text) so every
+# downstream parser sees the clean answer. The strip is a strict no-op when
+# none of the markers are present, so non-thinking models (mistral-nemo,
+# claude, ...) are byte-for-byte unaffected.
+_THINK_PAIR_RE = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.DOTALL | re.IGNORECASE)
+_HARMONY_FINAL_RE = re.compile(
+    r"<\|channel\|>\s*final\s*<\|message\|>(.*?)(?:<\|(?:end|return|channel)\|>|\Z)",
+    re.DOTALL | re.IGNORECASE,
+)
+_HARMONY_HEADER_RE = re.compile(
+    r"<\|channel\|>.*?<\|message\|>", re.DOTALL | re.IGNORECASE
+)
+
+
+def _strip_reasoning_tags(text: str) -> str:
+    """Remove thinking-mode reasoning scaffolding from a model reply so the
+    writer's structured passes parse clean output (BUG-306/308 family).
+
+    Handles, in order:
+      1. OpenAI-"harmony" channels -- keep only the *final* channel's
+         message when present; otherwise drop analysis headers + sentinels.
+      2. Well-formed ``<think>...</think>`` blocks (removed entirely).
+      3. A dangling ``</think>`` with no open -- Ollama pre-fills the
+         opening ``<think>`` in the chat template, so the completion carries
+         only the close; keep everything after the LAST ``</think>``.
+      4. A leading dangling ``<think>`` with no close.
+
+    Returns the input unchanged when none of the markers appear.
+    """
+    if not isinstance(text, str) or not text:
+        return text
+    low = text.lower()
+    if "<think" not in low and "</think" not in low and "<|channel|>" not in low:
+        return text
+
+    out = text
+
+    # 1. Harmony channels: keep the final channel's message if present.
+    if "<|channel|>" in out.lower():
+        finals = _HARMONY_FINAL_RE.findall(out)
+        if finals:
+            out = finals[-1]
+        else:
+            out = _HARMONY_HEADER_RE.sub("", out)
+            for sentinel in ("<|end|>", "<|return|>", "<|start|>", "<|channel|>"):
+                out = out.replace(sentinel, "")
+
+    # 2. Balanced <think>...</think> blocks.
+    out = _THINK_PAIR_RE.sub("", out)
+
+    # 3. Dangling close (template pre-filled the open): keep text after it.
+    low2 = out.lower()
+    if "</think" in low2:
+        idx = low2.rfind("</think")
+        gt = out.find(">", idx)
+        out = out[gt + 1:] if gt != -1 else out
+
+    # 4. Leading dangling open with no close.
+    out = re.sub(r"^\s*<think\b[^>]*>", "", out, flags=re.IGNORECASE)
+
+    return out.strip()
+
 
 # ---------------------------------------------------------------------------
 # Identity constants (shared with the catalog rows in S2 + wiring in S3/S5)
@@ -701,6 +774,7 @@ class OpenRouterBackend:
         max_new_tokens: int | None = None,
         stop: Any = None,
         response_format: dict | None = None,
+        grammar: str | None = None,
         **_ignored: Any,
     ) -> str:
         """Run one remote chat completion and return the decoded string.
@@ -762,6 +836,17 @@ class OpenRouterBackend:
             # Defect A: only route to upstreams that actually honour the
             # requested parameters, so response_format can't be silently
             # dropped on the wire (which would make the enforcement a no-op).
+            provider_opts["require_parameters"] = True
+        if grammar:
+            # A (2026-06-04): GBNF decode constraint for the local
+            # llama-server lane -- llama.cpp accepts a top-level `grammar`
+            # over its OpenAI-compatible /v1 endpoint. Used by the style-
+            # picker inventor to hard-cap output at exactly N descriptors so
+            # an overgenerating model (gemma's 63-vs-5) cannot break the
+            # exact-count gate. require_parameters keeps it fail-closed: a
+            # backend that ignores `grammar` is filtered out rather than
+            # left silently unconstrained.
+            payload["grammar"] = grammar
             provider_opts["require_parameters"] = True
         if provider_opts:
             payload["provider"] = provider_opts
@@ -890,6 +975,11 @@ class OpenRouterBackend:
             )
         if (not isinstance(content, str) or not content) and message.get("reasoning"):
             content = str(message.get("reasoning"))
+        # Strip thinking-mode reasoning scaffolding (<think>...</think>,
+        # harmony channels) so the writer's structured passes parse clean
+        # output -- a no-op for non-thinking models (BUG-306/308 family).
+        if isinstance(content, str):
+            content = _strip_reasoning_tags(content)
         if not isinstance(content, str) or not content:
             raise OpenRouterCallFailedError(
                 f"OpenRouter {slug} returned empty message content "
@@ -908,12 +998,13 @@ class OpenRouterBackend:
         return str(text)[:200]
 
 
-def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | None = None):
+def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | None = None,
+                                grammar: str | None = None):
     """Return a generate_fn closure for a provider-tagged remote
     cache_entry (FC2 seam 2).
 
     The closure matches the signature every OTR generate_fn uses --
-    ``(messages, *, temperature, max_new_tokens, stop=None) -> str`` --
+    ``(messages, *, temperature, max_new_tokens, stop=None, ...) -> str`` --
     so the loader factories (`make_generate_fn`,
     `make_polish_generate_fn`) and the writer's
     `_build_truncating_generate_fn` can all return it unchanged when
@@ -923,17 +1014,28 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
     structured_call path; S4 passes an OpenRouter json_schema
     response_format for the grammar-constrained technical path so remote
     technical output is schema-enforced (fail-closed via structured_call's
-    validate + bounded-repair ladder)."""
+    validate + bounded-repair ladder).
+
+    `grammar` (A, 2026-06-04) is an optional GBNF string for the local
+    llama-server lane. It is None for every normal call; the style-picker
+    inventor passes its exactly-N grammar per-call so an overgenerating
+    model cannot break the exact-count gate. The `_otr_supports_grammar`
+    marker lets a caller pass a grammar ONLY to backends that honour it --
+    local backends lack the marker and stay byte-identical."""
     backend = OpenRouterBackend()
     bound_rf = response_format
+    bound_grammar = grammar
 
     def generate_fn(messages, *, temperature=None, max_new_tokens=None,
-                    stop=None, response_format=None):
+                    stop=None, response_format=None, grammar=None):
         # A per-call response_format (e.g. structured_call passing
         # json_object on an un-schema'd creative call) overrides the bound
         # one; otherwise the closure's bound response_format (S4 json_schema)
         # is used. Free-form calls pass neither and get plain generation.
         rf = response_format if response_format is not None else bound_rf
+        # A: a per-call GBNF grammar (the style-picker inventor passing its
+        # exactly-N grammar) overrides the bound one; both None = free-form.
+        g = grammar if grammar is not None else bound_grammar
         return backend.generate(
             cache_entry,
             messages,
@@ -941,12 +1043,17 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
             max_new_tokens=max_new_tokens,
             stop=stop,
             response_format=rf,
+            grammar=g,
         )
 
     # Markers so structured_call can detect a remote fn and whether it
     # already carries a schema-bound response_format (don't override that).
+    # _otr_supports_grammar (A) lets the style-picker inventor pass a per-
+    # call GBNF only to backends that honour it (the remote llama-server
+    # lane); local backends lack the marker and stay byte-identical.
     generate_fn._otr_openrouter = True  # type: ignore[attr-defined]
     generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
+    generate_fn._otr_supports_grammar = True  # type: ignore[attr-defined]
     return generate_fn
 
 

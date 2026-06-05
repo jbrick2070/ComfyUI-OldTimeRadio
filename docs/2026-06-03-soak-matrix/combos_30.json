@@ -1,0 +1,6 @@
+[
+  ["mn_sa3", "mistralai/Mistral-Nemo-Instruct-2407", "bark", "kokoro", "stable_audio_3"],
+  ["g4-12b_sa3", "google/gemma-4-12b-it", "bark", "kokoro", "stable_audio_3"],
+  ["mn_musicgen", "mistralai/Mistral-Nemo-Instruct-2407", "bark", "kokoro", "musicgen"],
+  ["g4-12b_musicgen", "google/gemma-4-12b-it", "bark", "kokoro", "musicgen"]
+]
