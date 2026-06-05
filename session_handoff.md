@@ -1,103 +1,82 @@
-# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- CURRENT (written 2026-06-05, overnight session 06-04 -> 06-05)
+# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-05
 
 ## Core goal
-Three things shipped on `v2.0-alpha` this session; the LAST remaining work is
-**live GPU verification of two of them** -- do NOT lose sight of LIVE-TESTING
-indextts2 AND gemma-4 (the user's explicit priority):
-1. **indextts2 is now the DEFAULT character voice** + has real public-domain
-   reference clips downloaded and wired. NOT yet proven by a live render.
-2. **gemma-4-12b has a dedicated LOCAL Ollama writer lane** (no more
-   `gemma4_unified` transformers crash). NOT yet proven by a live render as the
-   writer; the style-inventor 63-vs-5 overgeneration still needs its GBNF
-   constraint wired through this lane.
-3. A bark fallback so a cloning engine with no usable ref never breaks a render
-   (safety net; already done).
+Made **gemma-4-12b viable as the OTR writer** and **recovered indextts2 as the default
+character voice**, then proved the whole pipeline end-to-end on a 30-word episode
+(script -> voice -> HuMo -> composite -> upscale -> procgen). The point of this pass was
+to confirm the writer/voice base is solid before Jeffrey's video-engine refactor.
 
-## Tech stack & constraints (session-specific; CLAUDE.md auto-loads the rest)
-- **ComfyUI must be RESTARTED to load any .py edit** (Python module cache). User
-  restarted at end of session, so the latest code is now live for the next run.
-- **Cloud lanes are ALLOWED now** -- the "100% local" rule was LIFTED this
-  session (OpenRouter + Comfy Credits OK). The checked-in CLAUDE.md "100% local"
-  text is STALE pending the user's edit.
-- **Models live at `C:\ComfyUI-Models`** (Comfy Desktop 1.0.4 migration;
-  base-directory = `C:\Users\jeffr\Documents\ComfyUI`). `C:\ComfyUI-Models` is
-  OneDrive-virtualized: **cmd `dir` / `if exist` CANNOT see files there, but
-  Python `os.path.exists` CAN** -- always verify file presence with the venv
-  python, never `dir`.
-- Venv: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. GUI on :8000.
-  Use Desktop Commander (cmd) for git/pytest. indextts2 = Path B oop_venv
-  subprocess worker (env-pointed; it ran this session, so installed). gemma-4 =
-  local Ollama at 127.0.0.1:11434 (GGUF `hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M`
-  already pulled).
+## Tech stack & constraints (session-specific; CLAUDE.md/ROADMAP/BUG_LOG auto-load the rest)
+- ComfyUI Desktop 0.24.1 (Electron), Windows, RTX 5080 Laptop 16GB (Blackwell sm_120),
+  torch 2.10+cu130. Venv `C:\Users\jeffr\Documents\ComfyUI\.venv`; server on :8000.
+- **`.py` edits need a ComfyUI RESTART to load** (module cache).
+- Git via Desktop Commander (sandbox git is read-OK; use DC for writes). The DC/PowerShell
+  spawn often fails to capture external-exe stdout -> run git/pytest via the venv python's
+  `subprocess` or Start-Process `-RedirectStandardOutput` to a file, then read the file.
+- **`scripts/_*.py` is gitignored**; essential scripts are kept by `!` negation (the
+  indextts2 worker was lost to this -- see below).
+- Ollama 0.30.5 local at 127.0.0.1:11434 for the gemma lane.
+- **HEAD = d076898 on v2.0-alpha (== origin).** Repo default branch is `main`; all of this
+  session's work is on `v2.0-alpha`.
 
-## What's done & decided (HEAD = 2588974 on v2.0-alpha, == origin)
-- `0c50793` indextts2 -> shipped char_voice default (mirrors SA3 music promotion):
-  eng_indextts2 default_roles=("char_voice",)+requires_flag=None; bark demoted to
-  selectable fallback; `_LEGACY_FIRST_ENGINES["char_voice"]` =
-  ("indextts2","chatterbox","bark"); node 81 of otr_scifi_16gb_full.json =
-  indextts2; dep-pilot coverage decoupled (oop_venv, not flag).
-- `dd2b95f` LOCAL gemma Ollama lane + bark fallback (+ the prior gemma
-  reasoning_effort fix, NOW COMMITTED -- was the user's "don't lose it" worry):
-  - `nodes/_otr_ollama_backend.py` (NEW): self-contained LOCAL OpenAI-/v1 client,
-    hardwired 127.0.0.1:11434 (env `OLLAMA_BASE_URL`), fail-closed (never cloud),
-    no key, no cost guard. Carries reasoning_effort (`OLLAMA_REASONING_EFFORT`) +
-    grammar (GBNF). loader_backend "ollama_local_http", provider "ollama".
-  - `google/gemma-4-12b-it` catalog row routes here (ollama_model_tag = the GGUF).
-    Dispatch table + loader make_generate_fn/make_polish_generate_fn + writer +
-    constrained-generate seams all branch provider=="ollama".
-  - bark fallback in `_otr_voice_node_common._render_per_line`: a clone char
-    engine in `_OTR_CLONE_ENGINES = ("indextts2","chatterbox")` with no usable
-    ref renders that line on bark using the replayed voice_preset.
-- `d199515` per-line ref resolver: `_resolve_clone_ref_path` resolves a ref by
-  voice_ref_id else by gender via the bank caster; `_resolve_ref_to_disk` tries
-  multiple model-dir layouts incl. C:\ComfyUI-Models. No ref -> bark.
-- `2588974` REAL CC0 reference voices: `scripts/_otr_dl_indextts2_refs.py`
-  (gitignored scratch) downloaded 4 CC0 LibriVox clips from
-  kyutai/tts-voices `voice-zero/` -> C:\ComfyUI-Models\TTS\refs\indextts2\*.wav +
-  the base models dir (Python-verified present). Bank entries (engine indextts2):
-  vz_bill_boerst / vz_peter_yearsley / vz_stuart_bell (male), vz_caro_davy
-  (female), commercial_clean=true.
-- Rejected/decided: did NOT revert node 81 to bark (kept indextts2 default + bark
-  safety net); gemma lane kept SEPARATE from openrouter(cloud)/comfy(cloud);
-  voice-donations rejected as a source (un-genderable hex IDs) in favor of
-  voice-zero. Full tests/ green throughout (3755 collected, 0 failed).
+## What's done & decided (all pushed to origin/v2.0-alpha)
+- **`af75ab1`** -- Ollama lane no longer advertises raw-GBNF grammar support (Ollama /v1
+  doesn't accept a raw `grammar`); `OllamaBackend.generate` fails loud if one is passed.
+  Roundtable Option A (unanimous GPT+Gemini+Grok+DeepSeek; ~$0.20).
+- **`e4cb3ac`** -- Ollama lane now DEFAULTS `reasoning_effort=none`. THE gemma fix:
+  gemma-4-12b is a thinking model; unset, it spent its whole budget on `<think>`, returned
+  empty (finish_reason=length), and aborted the style inventor. `OLLAMA_REASONING_EFFORT=none`
+  also set as a User env var.
+- **`bb140a4` + `858a9b2`** -- committed `scripts/_otr_indextts2_worker.py` and UN-IGNORED it
+  from `scripts/_*.py` (root cause: the worker was scratch-only, went missing, silently broke
+  the default char voice -> node 81 failed closed). Doc: `docs/indextts2_pathb_setup.md`.
+- **`721ecf6`/`d892a54`/`d076898`** -- `docs/gemma4/` shareable Reddit guide + test JSON +
+  one-file tester + badges + Ollama-version note.
+- **gemma-4-12b PROVEN as writer** (cleared the style inventor that previously rejected it --
+  reverses the writer-bakeoff "rejected" verdict). **indextts2 PROVEN as voice** (rendered
+  in-pipeline). Full `tests/` 3744/13/0 + Bug Bible green after every change.
+- Rejected: sending raw GBNF to Ollama; leaving the worker as scratch.
 
 ## State of the art
-- HEAD 2588974 == origin/v2.0-alpha. Uncommitted: `session_handoff.md` (this),
-  `scripts/_otr_dl_indextts2_refs.py` (gitignored), `custom_nodes.lnk` (junk).
-- indextts2 refs ON DISK at C:\ComfyUI-Models\TTS\refs\indextts2\ : vz_bill_boerst,
-  vz_peter_yearsley, vz_stuart_bell, vz_caro_davy (.wav). ONLY 1 female -> 3F unmet.
-- NOTHING has been live-rendered yet this session (ComfyUI was being restarted).
+- indextts2 Path-B install is ON DISK and working: venv
+  `C:\Users\jeffr\Documents\ComfyUI\index-tts\.venv`, weights `...\index-tts\checkpoints`
+  (gpt.pth/s2mel.pth/qwen emo + facebook/w2v-bert-2.0 under `checkpoints\hf_cache`). Env
+  vars (User): `OTR_INDEXTTS2_VENV` / `_DIR` / `_WORKER`. Worker protocol = stdin/stdout JSON
+  (ready -> per-line {text,ref_clip,emo_vector[8],emo_alpha,seed,out_path} -> {ok,...,22050});
+  worker dups fd1->fd2 so model prints can't corrupt the channel.
+- Full 30-word smoke (gemma + indextts2) rendered SUCCESS:
+  `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\` + final
+  `output\otr\obs\..._procgen_blended.mp4`. `/history` status=success. No VRAM thrash through
+  HuMo/upscale/procgen.
+- KNOWN issue (NOT ours): Comfy Desktop's Electron window goes BLACK mid-render (GPU-process
+  crash under VRAM pressure) -- cosmetic; backend completes via API. Comfy-Org/desktop
+  #1643/#1046. For heavy renders use the browser tab at :8000 or disable HW accel; the
+  /prompt API needs no UI.
+- Harness: `scripts/queue_smoke.py` (30w/2char/1act) on `scripts/otr_api.py`; writer = node 1
+  `OTR_LedgerScriptWriter`, slots `creative_writing_model` + `technical_model`. Monitor via
+  `otr_runtime.log` + `/otr/latest_ledger` + `/history/<pid>`. (See memory: otr-full-smoke-harness.)
 
 ## Immediate next steps
-1. **LIVE-VERIFY indextts2 (priority).** Queue an episode (writer = mistral-nemo
-   is fine). Tail logs (`scripts/otr_tail_logs.py` or the console). CONFIRM:
-   - log `char_voice: rendering N lines on 'indextts2'` (NOT bark),
-   - NO warning `engine 'indextts2' has no reference clip ... falling back to bark`,
-   - episode completes with audio. If the indextts2 worker rejects the WAV
-     (format/sample-rate), resample the 4 refs to 24kHz mono with ffmpeg + re-run.
-2. **LIVE-VERIFY gemma-4-12b as writer.** Set node-1 creative_writing_model +
-   technical_model = `google/gemma-4-12b-it`; ensure `ollama serve` is up. Queue
-   an episode. CONFIRM it routes through Ollama (no `gemma4_unified` crash; log
-   `[Ollama] load google/gemma-4-12b-it -> ... base_url=http://localhost:11434/v1`).
-   Then the 63-vs-5 inventor: `make_ollama_generate_fn` already sets
-   `_otr_supports_grammar=True`; verify `nodes/_otr_style_picker._run_inventor`
-   passes its exactly-N GBNF grammar to grammar-capable backends. Set
-   `OLLAMA_REASONING_EFFORT=none` if gemma burns its budget on a `<think>` preamble.
-3. **Add more female indextts2 voices (3F target).** Edit VOICES in
-   scripts/_otr_dl_indextts2_refs.py (more female CC0 readers -- OwenTyme/voice-zero
-   LibriVox set or named female LibriVox readers), re-run, add bank entries.
-4. Run full tests/ after any code change (baseline 3755/0); commit + push.
+1. **Pre-refactor confirmation (cheap, headless, no video cost):** run the writer x voice
+   matrix pruned to `OTR_EpisodeAssembler` -- {mistral-nemo, gemma-4-12b} x {bark, indextts2}.
+   Confirms all 4 combos produce a script + voiced audio. Then ONE full baseline render
+   (mistral-nemo + bark = the byte-identical default) to confirm the full pre-refactor pipeline
+   is green. (Avoid full video for every combo -- HuMo is the long pole; the refactor replaces
+   the video stage anyway.)
+2. **Start the video-engine refactor** -- use the **otr-video-handoff** skill (NOT this general
+   one); it pins the video mission + anti-drift rules. Plan + artifacts live OUTSIDE the repo at
+   `C:\Users\jeffr\Documents\otr-video-roundtable\` (waves W0-W6).
+3. Housekeeping (non-blocking): 5 deleted `workflows/GO_FORWARD_PLAN_v7-v11_*.md` are unstaged
+   -- decide commit-deletion vs restore. Optionally mirror `docs/gemma4/` onto `main` for a
+   clean share link.
 
 ## Open questions
-- Does the indextts2 Path B worker accept the kyutai voice-zero WAVs as-is, or do
-  they need resampling to 24kHz mono? (live render answers).
-- Does the resolver hit the right on-disk ref in a LIVE render (live
-  folder_paths.models_dir vs the C:\ComfyUI-Models candidate)? (live render answers).
-- Is the gemma 63-vs-5 inventor break fully fixed by the GBNF pass, or does the
-  inventor-side wiring still need work? (grammar plumbing exists in
-  _otr_openrouter_backend + the ollama lane; the _otr_style_picker wiring is the
-  open piece).
+- Nothing from this session blocks anything. BUG_LOG's open items are the historical
+  BUG-LOCAL-231 FLUX VRAM-thrash family (out-of-band loaders) -- superseded by the NORMALVRAM
+  fix and dissolved by the coming video refactor; the full render this session showed no thrash.
+- gemma-4 is proven through the inventor; the rest of the writer (casting/compose/doctor) ran
+  clean once but hasn't been soaked across many episodes -- worth a soak before making gemma a
+  default.
 
 ---
 ## Resume instructions
