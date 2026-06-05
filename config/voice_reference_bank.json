@@ -258,6 +258,70 @@
       "ref_path": "models/TTS/refs/indextts2/vz_donor_haku.wav",
       "ref_sha256": "8cab88dc3ba79d30f3f2be73e3f95f272dd58fbeb4d8ba63f1cafd7b2c538d81",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_2181",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_2181.wav",
+      "ref_sha256": "d1ea3bb2ec07ea20eddf43a90a15139edcf68dc32d7294fb2f7b5eaf3f76afba",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_ss_1684",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_ss_1684.wav",
+      "ref_sha256": "2ca4a53a6945d91dde2e39e0aebf7ab4822d4381f88a2c6dc21fba6c874a656a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_gyroo",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "donated",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_gyroo.wav",
+      "ref_sha256": "7391a853d194c779c11cadb69af863fcf75f4ab1d5cd1f774a7dd575ebdac54b",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_donor_hkl",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "donated",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_donor_hkl.wav",
+      "ref_sha256": "60b645c78d50e241e4edeaa5d37fc502db7d747cc9385e4594f9ca0f7e52b332",
+      "commercial_clean": true
     }
   ]
 }
