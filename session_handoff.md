@@ -1,116 +1,103 @@
-# Session Handoff -- OTR v2.0-alpha -- 2026-06-04 (gemma writer: B/telemetry/A SHIPPED+COMMITTED; NEXT = make gemma a viable FULL writer)
+# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-04 (late)
 
 ## Core goal
-gemma-4-12b as an OPT-IN OTR writer lane. This session executed the prior
-handoff's pass02 plan: shipped + COMMITTED the style-picker hardening (B tolerant
-parser + telemetry + opt-in A/GBNF), and proved B+telemetry LIVE on real gemma.
-**mistral stays DEFAULT_LLM.** gemma now CLEARS the style picker but is NOT yet a
-viable FULL writer (halts downstream). Next session: get gemma to finish an
-episode (enable_thinking:false + token cap), then decide adoption by quality.
+Three things shipped on `v2.0-alpha` this session; the LAST remaining work is
+**live GPU verification of two of them** -- do NOT lose sight of LIVE-TESTING
+indextts2 AND gemma-4 (the user's explicit priority):
+1. **indextts2 is now the DEFAULT character voice** + has real public-domain
+   reference clips downloaded and wired. NOT yet proven by a live render.
+2. **gemma-4-12b has a dedicated LOCAL Ollama writer lane** (no more
+   `gemma4_unified` transformers crash). NOT yet proven by a live render as the
+   writer; the style-inventor 63-vs-5 overgeneration still needs its GBNF
+   constraint wired through this lane.
+3. A bark fallback so a cloning engine with no usable ref never breaks a render
+   (safety net; already done).
 
-## Tech stack & constraints
-(CLAUDE.md / ROADMAP / BUG_LOG auto-load -- not repeated.) NEW this session:
-- **Two commits on v2.0-alpha, NOT pushed:** `69de6dc` (docs hygiene: gitignore
-  root _otr_* + ROADMAP item) and `39d55c7` (snapshot: gemma hardening + ALL
-  accumulated session work, 129 files). Tree CLEAN except `custom_nodes.lnk`
-  (junk, intentionally untracked).
-- **A is opt-in/default-off:** the inventor GBNF is sent only when
-  `OTR_ENABLE_INVENTOR_GBNF` is set AND the backend advertises
-  `_otr_supports_grammar`. Default-off so Ollama / real-OpenRouter (no `grammar`
-  field) never regress; B is the always-on net.
-- **Lane is provider-agnostic** (`OPENROUTER_BASE_URL` -> any OpenAI /v1). gemma
-  reached via OLLAMA at localhost:11434/v1 (model
-  `hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M`, present). llama.cpp `llama-server`
-  NOT installed; LM Studio present (`C:\Users\jeffr\.lmstudio\bin\lms.exe`).
-- **Runs >70s MUST be DETACHED** -- the MCP call limit kills inline processes.
-  Use `scripts\_otr_bakeoff_detach.py`. ComfyUI is currently RUNNING headless on
-  :8000 (bake-off env).
-- Baseline: full suite **3726 passed / 12 skipped / 0**; Bug Bible **23 / 0**.
+## Tech stack & constraints (session-specific; CLAUDE.md auto-loads the rest)
+- **ComfyUI must be RESTARTED to load any .py edit** (Python module cache). User
+  restarted at end of session, so the latest code is now live for the next run.
+- **Cloud lanes are ALLOWED now** -- the "100% local" rule was LIFTED this
+  session (OpenRouter + Comfy Credits OK). The checked-in CLAUDE.md "100% local"
+  text is STALE pending the user's edit.
+- **Models live at `C:\ComfyUI-Models`** (Comfy Desktop 1.0.4 migration;
+  base-directory = `C:\Users\jeffr\Documents\ComfyUI`). `C:\ComfyUI-Models` is
+  OneDrive-virtualized: **cmd `dir` / `if exist` CANNOT see files there, but
+  Python `os.path.exists` CAN** -- always verify file presence with the venv
+  python, never `dir`.
+- Venv: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. GUI on :8000.
+  Use Desktop Commander (cmd) for git/pytest. indextts2 = Path B oop_venv
+  subprocess worker (env-pointed; it ran this session, so installed). gemma-4 =
+  local Ollama at 127.0.0.1:11434 (GGUF `hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M`
+  already pulled).
 
-## What's done & decided
-- **B (parser net) -- SHIPPED+COMMITTED+PROVEN LIVE.** `_parse_inventor_output`
-  skips malformed/dup/near-dup lines, takes first 5 distinct; `StylePick` stays
-  strict (min=max=5); mistral byte-identical. Live: gemma's style pass that
-  hard-aborted last session now succeeds (`valid=5 distinct=5 truncated=0`).
-- **Telemetry -- SHIPPED+COMMITTED+PROVEN LIVE.** `meta.style_pick` carries
-  valid_count/distinct_count/truncated_count/model_slug; model_slug resolves the
-  `openrouter:slot-a` handle to the gemma slug live.
-- **A (GBNF) -- SHIPPED+COMMITTED, opt-in, NOT live-proven.** grammar seam on the
-  lane, threaded to the inventor only when `_otr_supports_grammar` +
-  `OTR_ENABLE_INVENTOR_GBNF`. Live grammar-constraint proof needs a
-  grammar-capable /v1 (llama-server) -- not run this session.
-- **Exact-count gate audit -- DONE** (docs/2026-06-04-gemma4-writer/
-  exact_count_gate_audit.md). The style picker was the UNIQUE line-based
-  hard-fail-on-count gate; every other LLM-output gate is structured_call +
-  bounded-repair (tolerant), Python-generated, or non-LLM. Nothing else needs
-  B-style treatment.
-- **Bake-off -- DONE; gemma NOT viable yet** (docs/2026-06-04-gemma4-writer/
-  bakeoff_B_live_result.md). gemma clears the style picker but HALTS at
-  `build_news_briefs`: every gemma call hits `finish_reason=length`
-  (verbose/thinking burns the token budget before the JSON) -> JSONDecodeError
-  char 0 -> hard halt (news_briefs_required=True). NOT a B/A defect.
-- **Decided:** mistral stays DEFAULT_LLM. Rejected (do not reopen): in-Comfy
-  transformers gemma, relaxing StylePick, sending grammar unconditionally
-  (regresses Ollama).
+## What's done & decided (HEAD = 2588974 on v2.0-alpha, == origin)
+- `0c50793` indextts2 -> shipped char_voice default (mirrors SA3 music promotion):
+  eng_indextts2 default_roles=("char_voice",)+requires_flag=None; bark demoted to
+  selectable fallback; `_LEGACY_FIRST_ENGINES["char_voice"]` =
+  ("indextts2","chatterbox","bark"); node 81 of otr_scifi_16gb_full.json =
+  indextts2; dep-pilot coverage decoupled (oop_venv, not flag).
+- `dd2b95f` LOCAL gemma Ollama lane + bark fallback (+ the prior gemma
+  reasoning_effort fix, NOW COMMITTED -- was the user's "don't lose it" worry):
+  - `nodes/_otr_ollama_backend.py` (NEW): self-contained LOCAL OpenAI-/v1 client,
+    hardwired 127.0.0.1:11434 (env `OLLAMA_BASE_URL`), fail-closed (never cloud),
+    no key, no cost guard. Carries reasoning_effort (`OLLAMA_REASONING_EFFORT`) +
+    grammar (GBNF). loader_backend "ollama_local_http", provider "ollama".
+  - `google/gemma-4-12b-it` catalog row routes here (ollama_model_tag = the GGUF).
+    Dispatch table + loader make_generate_fn/make_polish_generate_fn + writer +
+    constrained-generate seams all branch provider=="ollama".
+  - bark fallback in `_otr_voice_node_common._render_per_line`: a clone char
+    engine in `_OTR_CLONE_ENGINES = ("indextts2","chatterbox")` with no usable
+    ref renders that line on bark using the replayed voice_preset.
+- `d199515` per-line ref resolver: `_resolve_clone_ref_path` resolves a ref by
+  voice_ref_id else by gender via the bank caster; `_resolve_ref_to_disk` tries
+  multiple model-dir layouts incl. C:\ComfyUI-Models. No ref -> bark.
+- `2588974` REAL CC0 reference voices: `scripts/_otr_dl_indextts2_refs.py`
+  (gitignored scratch) downloaded 4 CC0 LibriVox clips from
+  kyutai/tts-voices `voice-zero/` -> C:\ComfyUI-Models\TTS\refs\indextts2\*.wav +
+  the base models dir (Python-verified present). Bank entries (engine indextts2):
+  vz_bill_boerst / vz_peter_yearsley / vz_stuart_bell (male), vz_caro_davy
+  (female), commercial_clean=true.
+- Rejected/decided: did NOT revert node 81 to bark (kept indextts2 default + bark
+  safety net); gemma lane kept SEPARATE from openrouter(cloud)/comfy(cloud);
+  voice-donations rejected as a source (un-genderable hex IDs) in favor of
+  voice-zero. Full tests/ green throughout (3755 collected, 0 failed).
 
-## State of the art (files + surfaces)
-- **nodes/_otr_style_picker.py** -- `_InventorParse` dataclass;
-  `_parse_inventor_descriptors(raw)` (full distinct set + counts, no early stop)
-  + `_parse_inventor_output(raw)` thin wrapper; `StylePick` + 4 telemetry fields
-  (defaulted); `_build_inventor_gbnf()` + `_INVENTOR_GBNF` +
-  `_inventor_gbnf_enabled()` (reads OTR_ENABLE_INVENTOR_GBNF); `_run_inventor`
-  attaches grammar iff marker+enabled (the `# LLM slot: creative` tag sits
-  ADJACENT to the call -- rule-6 sweep, SEARCH_WINDOW=8); `pick_style(...,
-  model_slug="")`.
-- **nodes/_otr_openrouter_backend.py** -- `OpenRouterBackend.generate(...,
-  grammar=None)` -> `payload["grammar"]` + require_parameters;
-  `make_openrouter_generate_fn(..., grammar=None)` binds + per-call grammar +
-  sets `generate_fn._otr_supports_grammar = True`.
-- **nodes/OTR_LedgerScriptWriter.py** (~line 2338, D.2 style block) -- resolves
-  `_creative_slug` via `_otr_openrouter_backend.resolve_slug` ONLY for
-  `openrouter:` handles (defensive try/except), passes model_id + model_slug.
-- **Tests:** tests/test_otr_style_picker.py (B/telemetry/A/threading incl.
-  flag-off), tests/test_openrouter_backend.py (grammar payload + marker).
-- **Scratch tooling (gitignored scripts/_*.py):** `_otr_bakeoff_detach.py`
-  (DETACHED driver launch -- REQUIRED for >70s runs), `_otr_live_ledger.py
-  [cancel]` (read meta.style_pick from /otr/latest_ledger; cancel before audio),
-  `_otr_bakeoff_launch_comfy.py` (headless ComfyUI w/ Ollama lane env; the
-  file-handle leak was fixed this session), `_otr_bakeoff_run.py` (driver),
-  `_otr_bakeoff_show.py`. Captured: `_otr_bakeoff_gemma4live.json` (FAIL @
-  build_news_briefs), `_otr_bakeoff_gemma4live.run.log`, `_otr_comfy_headless.log`.
+## State of the art
+- HEAD 2588974 == origin/v2.0-alpha. Uncommitted: `session_handoff.md` (this),
+  `scripts/_otr_dl_indextts2_refs.py` (gitignored), `custom_nodes.lnk` (junk).
+- indextts2 refs ON DISK at C:\ComfyUI-Models\TTS\refs\indextts2\ : vz_bill_boerst,
+  vz_peter_yearsley, vz_stuart_bell, vz_caro_davy (.wav). ONLY 1 female -> 3F unmet.
+- NOTHING has been live-rendered yet this session (ComfyUI was being restarted).
 
 ## Immediate next steps
-1. **enable_thinking:false + token cap (THE gemma-viability blocker).** gemma
-   halts at build_news_briefs on finish_reason=length. Try: (a) raise the remote
-   output budget -- set `OPENROUTER_MIN_OUTPUT_TOKENS` (e.g. 4096) and/or the
-   slot max-tokens cap in the ComfyUI launch env (`_otr_bakeoff_launch_comfy.py`
-   uses dict(os.environ) as base, so exporting them before launch works); (b)
-   disable thinking -- test whether Ollama's /v1 honors a think-off (Ollama
-   `think:false` / `chat_template_kwargs`), else this needs llama-server
-   `--chat-template-kwargs '{"enable_thinking":false}'`. Re-run:
-   `python scripts\_otr_bakeoff_detach.py openrouter:slot-a gemma_thinkoff 320`,
-   poll `python scripts\_otr_live_ledger.py`. Goal: STORY_READY (lines>=4 +
-   freeze_verdict), or confirm thinking-off is mandatory.
-2. **A GBNF live-proof (if a grammar /v1 is available).** Install/serve
-   llama.cpp `llama-server` OR verify LM Studio honors the `grammar` field; set
-   `OTR_ENABLE_INVENTOR_GBNF=1` + point `OPENROUTER_BASE_URL` at it; confirm
-   gemma emits exactly 5 (truncated_count stays 0 even on a draw that would
-   otherwise overgenerate).
-3. **If gemma reaches STORY_READY:** grade narrative vs mistral on the 7-axis
-   rubric (`_otr_bakeoff_show.py _otr_bakeoff_<tag>.json`). If not clearly
-   better, STOP -- mistral stays.
-4. **Push** v2.0-alpha (commits `69de6dc` + `39d55c7`) -- not pushed this session
-   (`cd /d <repo> && git push origin v2.0-alpha` via Desktop Commander cmd).
-5. Housekeeping: ComfyUI headless still running on :8000 (kill if opening the
-   Desktop app); `custom_nodes.lnk` is an untracked junk shortcut (delete/ignore).
+1. **LIVE-VERIFY indextts2 (priority).** Queue an episode (writer = mistral-nemo
+   is fine). Tail logs (`scripts/otr_tail_logs.py` or the console). CONFIRM:
+   - log `char_voice: rendering N lines on 'indextts2'` (NOT bark),
+   - NO warning `engine 'indextts2' has no reference clip ... falling back to bark`,
+   - episode completes with audio. If the indextts2 worker rejects the WAV
+     (format/sample-rate), resample the 4 refs to 24kHz mono with ffmpeg + re-run.
+2. **LIVE-VERIFY gemma-4-12b as writer.** Set node-1 creative_writing_model +
+   technical_model = `google/gemma-4-12b-it`; ensure `ollama serve` is up. Queue
+   an episode. CONFIRM it routes through Ollama (no `gemma4_unified` crash; log
+   `[Ollama] load google/gemma-4-12b-it -> ... base_url=http://localhost:11434/v1`).
+   Then the 63-vs-5 inventor: `make_ollama_generate_fn` already sets
+   `_otr_supports_grammar=True`; verify `nodes/_otr_style_picker._run_inventor`
+   passes its exactly-N GBNF grammar to grammar-capable backends. Set
+   `OLLAMA_REASONING_EFFORT=none` if gemma burns its budget on a `<think>` preamble.
+3. **Add more female indextts2 voices (3F target).** Edit VOICES in
+   scripts/_otr_dl_indextts2_refs.py (more female CC0 readers -- OwenTyme/voice-zero
+   LibriVox set or named female LibriVox readers), re-run, add bank entries.
+4. Run full tests/ after any code change (baseline 3755/0); commit + push.
 
 ## Open questions
-- Does Ollama's OpenAI /v1 expose a thinking-disable (think / chat_template_kwargs)?
-  If not, gemma-viability needs llama-server.
-- Does LM Studio's /v1 honor the llama.cpp `grammar` field (needed for A's live proof)?
-- Is a higher token cap ALONE enough for build_news_briefs, or is
-  enable_thinking:false required?
-- Product (Jeffrey): is gemma worth the tuning, or stop at mistral as the proven default?
+- Does the indextts2 Path B worker accept the kyutai voice-zero WAVs as-is, or do
+  they need resampling to 24kHz mono? (live render answers).
+- Does the resolver hit the right on-disk ref in a LIVE render (live
+  folder_paths.models_dir vs the C:\ComfyUI-Models candidate)? (live render answers).
+- Is the gemma 63-vs-5 inventor break fully fixed by the GBNF pass, or does the
+  inventor-side wiring still need work? (grammar plumbing exists in
+  _otr_openrouter_backend + the ollama lane; the _otr_style_picker wiring is the
+  open piece).
 
 ---
 ## Resume instructions
