@@ -85,13 +85,17 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
-def _reasoning_effort_from_env() -> str | None:
-    """``OLLAMA_REASONING_EFFORT`` -> a validated effort string, or None.
+def _reasoning_effort_from_env() -> str:
+    """``OLLAMA_REASONING_EFFORT`` -> a validated effort string (default "none").
 
-    Unset / blank -> None -> the field is omitted (non-thinking models stay
-    byte-identical). ``none`` disables a thinking model's <think> preamble."""
+    This lane exists for gemma-4-12b, a *thinking* model: left to reason it
+    spends the whole output budget on a ``<think>`` preamble and returns empty
+    content (finish_reason='length'), which aborts the style inventor. So the
+    lane DEFAULTS to ``none`` (no thinking) when the env is unset or invalid;
+    set ``OLLAMA_REASONING_EFFORT=high|medium|low`` to re-enable reasoning.
+    Ollama ignores the field for non-thinking models, so the default is safe."""
     raw = (os.environ.get("OLLAMA_REASONING_EFFORT", "") or "").strip().lower()
-    return raw if raw in _VALID_REASONING_EFFORT else None
+    return raw if raw in _VALID_REASONING_EFFORT else "none"
 
 
 def ollama_enabled() -> bool:

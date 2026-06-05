@@ -104,8 +104,9 @@ def test_generate_posts_local_and_returns_content(monkeypatch):
     # LOCAL endpoint, never cloud.
     assert "localhost" in captured["base_url"] or "127.0.0.1" in captured["base_url"]
     assert captured["payload"]["model"] == "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M"
-    # reasoning_effort omitted when env unset (byte-identical for non-thinking).
-    assert "reasoning_effort" not in captured["payload"]
+    # The gemma thinking-model lane defaults reasoning_effort to "none" so the
+    # style inventor is never starved by a <think> preamble (env unset -> "none").
+    assert captured["payload"]["reasoning_effort"] == "none"
 
 
 def test_generate_carries_reasoning_effort(monkeypatch):
