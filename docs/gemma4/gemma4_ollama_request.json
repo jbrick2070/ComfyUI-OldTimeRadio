@@ -1,0 +1,9 @@
+{
+  "model": "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M",
+  "messages": [
+    { "role": "user", "content": "Write one vivid sentence about an old radio crackling to life." }
+  ],
+  "temperature": 0.6,
+  "max_tokens": 256,
+  "reasoning_effort": "none"
+}
