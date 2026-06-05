@@ -146,7 +146,12 @@ def main():
     ap.add_argument("--seg-seconds", type=float, default=12.0)
     ap.add_argument("--refs-dir", default=DEFAULT_REFS_DIR)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--source", choices=["donations", "lj-speech"], default="donations",
+                    help="donations = kyutai CC0 voice-donations; lj-speech = LJ Speech (PD US female)")
     args = ap.parse_args()
+
+    if args.source == "lj-speech":
+        return add_lj_speech(args)
 
     from huggingface_hub import hf_hub_download
 
@@ -212,6 +217,60 @@ def main():
         print("RESTART ComfyUI to load the expanded bank.")
     else:
         print("\nnothing added (quota already met or no new classifiable voices).")
+    return 0
+
+
+def add_lj_speech(args):
+    """Add one clean reference from LJ Speech (keithito/lj_speech, public domain,
+    single US female narrator). Streams a few consecutive clips into one ~seg-second
+    continuous span so the cloner has natural prosody. Idempotent."""
+    import numpy as np
+    import soundfile as sf
+    from datasets import load_dataset
+    from scipy.signal import resample_poly
+
+    bank = load_bank()
+    if any(v["voice_ref_id"] == "vz_ljspeech" for v in bank["voices"]):
+        print("vz_ljspeech already in bank; nothing to do.")
+        return 0
+    import io
+    from datasets import Audio
+    print("streaming MikhailT/lj-speech [full] (PD)...")
+    ds = load_dataset("MikhailT/lj-speech", split="full", streaming=True)
+    # decode=False -> raw WAV bytes, decoded with soundfile (avoids the torchcodec
+    # audio backend that this stack deliberately does not use).
+    ds = ds.cast_column("audio", Audio(decode=False))
+    chunks, sr0, total = [], None, 0.0
+    for s in ds:
+        raw = s["audio"]
+        data, sr0 = sf.read(io.BytesIO(raw["bytes"]), dtype="float32")
+        if getattr(data, "ndim", 1) == 2:
+            data = data.mean(axis=1)
+        chunks.append(np.asarray(data, dtype="float32"))
+        total += len(chunks[-1]) / int(sr0)
+        if total >= args.seg_seconds:
+            break
+    wav = np.concatenate(chunks)[: int(args.seg_seconds * sr0)]
+    if sr0 != OUT_RATE:
+        from math import gcd
+        g = gcd(int(sr0), OUT_RATE)
+        wav = resample_poly(wav, OUT_RATE // g, int(sr0) // g).astype("float32")
+    peak = float(np.max(np.abs(wav))) or 1.0
+    wav = (wav / peak * 0.97).astype("float32")
+    os.makedirs(args.refs_dir, exist_ok=True)
+    out_wav = os.path.join(args.refs_dir, "vz_ljspeech.wav")
+    sf.write(out_wav, wav, OUT_RATE, subtype="PCM_16")
+    sha = _sha256_file(out_wav)
+    bank["voices"].append({
+        "voice_ref_id": "vz_ljspeech", "engine": "indextts2", "gender": "female",
+        "timbre": ["clear", "narration"], "roles": ["char_voice"], "age_band": "adult",
+        "ref_path": "models/TTS/refs/indextts2/vz_ljspeech.wav",
+        "ref_sha256": sha, "commercial_clean": True,
+    })
+    save_bank(bank)
+    print(f"ADD vz_ljspeech: female (LJ Speech, PD US narrator) "
+          f"dur={len(wav)/OUT_RATE:.1f}s sha={sha[:8]}")
+    print("RESTART ComfyUI to load the expanded bank.")
     return 0
 
 

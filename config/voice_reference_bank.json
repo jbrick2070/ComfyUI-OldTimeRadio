@@ -322,6 +322,22 @@
       "ref_path": "models/TTS/refs/indextts2/vz_donor_hkl.wav",
       "ref_sha256": "60b645c78d50e241e4edeaa5d37fc502db7d747cc9385e4594f9ca0f7e52b332",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_ljspeech",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "clear",
+        "narration"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_ljspeech.wav",
+      "ref_sha256": "ac9a068dfa385afba72f39e6a9847a0ded6a5c71058502a56f743b8e4959f8dc",
+      "commercial_clean": true
     }
   ]
 }
