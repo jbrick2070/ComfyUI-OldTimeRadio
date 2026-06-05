@@ -1,5 +1,7 @@
 # Run Gemma-4 (12B) locally — and the ONE setting that makes it actually work
 
+[![test JSON](https://img.shields.io/badge/test-JSON-2ea44f)](./gemma4_ollama_request.json) [![raw JSON (copy-paste)](https://img.shields.io/badge/raw-copy--paste-1f6feb)](https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/docs/gemma4/gemma4_ollama_request.json) [![tester](https://img.shields.io/badge/run-gemma4__test.py-orange)](./gemma4_test.py)
+
 Gemma-4 runs great locally through **Ollama**, but it's a **thinking model**: out of
 the box it spends its whole output budget on a hidden reasoning pass and frequently
 returns **empty text** (`finish_reason: "length"`). That silently breaks anything that
