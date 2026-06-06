@@ -85,19 +85,38 @@ committed + pushed (HEAD **97c141e** on v2.0-alpha, even with origin).
   engine=chatterbox, node 80 voice_bank=default). Full detail:
   `docs/2026-06-05-tts-engine-sidecars/LIVE_TEST_RESULTS.md` + OPERATOR_HANDOFF.md.
 
-## Immediate next steps
-1. **Finish the in-graph chatterbox render** (needs Jeffrey to open Comfy Desktop
-   once, which loads the flag + new code): then run
-   `& "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe" "...\ComfyUI-OldTimeRadio\scripts\_otr_chatterbox_smoke.py"`
-   and confirm node 81 voices via chatterbox (Bark loaded=0), output under
-   `output\otr\episodes\`.
-2. **Install Dia live** (operator): `scripts\_otr_dia_install.ps1` (note: it uses
-   `py -3.11` which is absent here -> create the venv from the main 3.12 python via
-   `python -m venv`, like chatterbox; then torch 2.8+ cu128 + `pip install
-   git+https://github.com/nari-labs/dia.git` + soundfile). setx OTR_ENABLE_DIA 1
-   via `[Environment]::SetEnvironmentVariable`. Then smoke with node 81 engine=dia.
-3. Decide chatterbox/dia default-promotion (still opt-in/flag-gated; indextts2 is
-   the shipped char default).
+## Immediate next steps -- START HEADLESS TESTING (Jeffrey's call: do NOT kill/launch his ComfyUI uninvited)
+The engine is already proven (worker + full adapter path render a 3.8s 24kHz clip
+on the GPU; sample at docs/2026-06-05-tts-engine-sidecars/chatterbox_render_sample.wav,
+peak 0.47/rms 0.06). The ONE remaining validation is the in-ComfyUI-GRAPH render,
+driven HEADLESS via the API. Plan:
+1. **Get ComfyUI :8000 up WITH the flag + new code.** It must be a process whose
+   env has OTR_ENABLE_CHATTERBOX=1 (already in HKCU) AND that loaded the new .py.
+   - Easiest: Jeffrey opens Comfy Desktop himself (fresh launch reads HKCU env +
+     re-imports OTR). Confirm `Invoke-RestMethod http://127.0.0.1:8000/system_stats`.
+   - Headless server launch (if wanted): the Desktop server is
+     `<uv python ...\cpython-3.12.11...\python.exe> -s ComfyUI\main.py --port 8000
+     --enable-manager --base-directory C:\Users\jeffr\Documents\ComfyUI
+     --user-directory ...\user --database-url sqlite:///...\user\comfyui.db ...`.
+     BLOCKER: that `main.py` is bundled in the Electron asar -- it was NOT found in
+     app.asar.unpacked or Documents\ComfyUI. To launch headless, FIRST capture the
+     RUNNING server's working dir + exe via `Get-CimInstance Win32_Process` (do this
+     while Comfy Desktop is up), then relaunch that exact main.py with
+     OTR_ENABLE_CHATTERBOX=1 in env on a FREE port. Do NOT Start-Process the
+     Electron "Comfy Desktop.exe" from the DC shell -- it spawns ~7 procs but never
+     inits the server (no :8000, no log writes). See
+     [[reference_comfy_desktop_restart_gotchas]] / docs LIVE_TEST_RESULTS.md.
+2. **Run the smoke (fully headless API):**
+   `& "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
+   "...\ComfyUI-OldTimeRadio\scripts\_otr_chatterbox_smoke.py"` -> queues the
+   30-word workflow with node 81 engine=chatterbox, node 80 voice_bank=default.
+   Watch otr_runtime.log + /history/<pid>; expect chatterbox char voices,
+   Bark loaded=0, output under output\otr\episodes\.
+3. **Install Dia live** then repeat with node 81 engine=dia. `scripts\_otr_dia_install.ps1`
+   note: `py -3.11` is absent -> build the venv from the main 3.12 python (`python
+   -m venv`), torch 2.8+ cu128, `pip install git+https://github.com/nari-labs/dia.git`
+   + soundfile; set OTR_ENABLE_DIA=1 via `[Environment]::SetEnvironmentVariable`.
+4. Decide chatterbox/dia default-promotion (still opt-in; indextts2 is the default).
 
 ## Open questions
 - Dia clone quality with audio_prompt-only (no transcript) -- acceptable, or add
