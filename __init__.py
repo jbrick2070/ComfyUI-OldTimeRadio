@@ -213,9 +213,12 @@ _NODE_MODULES = {
     # portrait lookup hits instead of falling through to the env-still
     # tier 4 stopgap.
     "OTR_BatchFluxPortraitRender": (".visual.batch_flux_portrait_render", "BatchFluxPortraitRender", " Batch FLUX Portrait Render (per-cast)"),
-    # v2.0 read-only ledger/script adapter for multi-pass FLUX rendering
-    # (legacy "Director" naming retired in voice-path-cleanbreak S23.9).
-    "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
+    # OTR_VideoPlan -- DELETED in CW-1 (2026-06-06) of the OTR video platform
+    # build. Its prompt-generation + planning was absorbed by OTR_ShotLock
+    # (M4 per-beat creative derivation). The legacy FLUX/HuMo/LTX render chain
+    # it fed was unwired from otr_scifi_16gb_full.json in the same commit; the
+    # type is in the workflow validator's DELETED_NODE_TYPES sentinel so a
+    # stale workflow referencing it fails loudly (must be re-saved).
     # v2.0 multi-clip shot expansion (needs shot durations from audio
     # timeline). Sprint E E8 rename: was OTR_ShotDurationCalculator;
     # the new name surfaces the stub-nature of the current implementation

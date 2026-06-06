@@ -13,7 +13,7 @@ pydantic-free and only adapters / the lock node import these.
 
 The request-level ``required_inputs`` vocabulary is shared verbatim with
 ``nodes/_otr_shared/role_compat.py`` (tokens: ``text_prompt`` / ``init_image`` /
-``audio_ref`` / ``base_clip_ref``) so the Director's role filter and the
+``audio_ref`` / ``base_clip_ref``) so the director's role filter and the
 request's family validator agree on one vocabulary.
 """
 from __future__ import annotations

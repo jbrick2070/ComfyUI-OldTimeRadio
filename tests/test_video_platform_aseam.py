@@ -233,7 +233,7 @@ def test_schema_extra_forbid_and_family_rules():
 
 
 def test_widget_vector_exact():
-    """Golden pin on the Director's required widget order/names (drift guard)."""
+    """Golden pin on the director's required widget order/names (drift guard)."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "other_beats_video_model",

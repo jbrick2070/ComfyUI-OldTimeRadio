@@ -164,7 +164,33 @@ def pytest_sessionstart(session):
 # ---------------------------------------------------------------------------
 
 
-EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
+# CW-1 (2026-06-06) OTR video-platform teardown (operator-directed): the
+# legacy FLUX/HuMo/LTX render path was unwired from otr_scifi_16gb_full.json,
+# which is now an 11-node audio + radio-floor (SignalLostVideo) graph. The
+# tests below assert the REMOVED render-path nodes/wiring; they are
+# INTENTIONALLY RED until CW-4 rebuilds the render path (SilentComposite /
+# MasterAudioMux / Flux migration) and replaces them with new tests, at which
+# point they are deleted + removed from this set. See VIDEO_BUILD_HANDOFF.md.
+# The chatterbox entry is a PRE-EXISTING env failure (fails on the base commit
+# too: the chatterbox lib is installed, so fails-closed-without-lib cannot fail
+# closed) -- baselined here so the guard flags only NEW regressions, not this.
+EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset({
+    "tests/test_era_literals_c2a.py::TestWorkflowJsonStringBasedReplaceCompleted::test_post_replacement_strings_present_in_workflow",
+    "tests/test_fixed_shot_duration_stub_rename.py::TestWorkflowJsonRenamed::test_workflow_json_links_preserved",
+    "tests/test_fixed_shot_duration_stub_rename.py::TestWorkflowJsonRenamed::test_workflow_json_node_type_renamed",
+    "tests/test_freeze_cascade_v2_ports.py::test_workflow_out1_fanout_after_v2_audio_rewire",
+    "tests/test_full_workflow_v2_audio_wiring.py::test_audio_done_gate_to_first_video_loader_preserved",
+    "tests/test_full_workflow_v2_audio_wiring.py::test_freeze_script_json_partition",
+    "tests/test_full_workflow_v2_audio_wiring.py::test_humo_ledger_retargeted_to_castlock",
+    "tests/test_otr_api_companions.py::test_regression_node20_actual_workflow",
+    "tests/test_post_upscale_procgen_blend.py::test_widget_vector_matches_workflow_json",
+    "tests/test_workflow_canonical_baseline.py::TestHumoCanonicalSeed::test_humo_seed_control_is_fixed",
+    "tests/test_workflow_canonical_baseline.py::TestHumoCanonicalSeed::test_humo_seed_is_7",
+    "tests/test_workflow_canonical_baseline.py::TestSkipEnvStillsDefault::test_batchfluxrender_skip_env_stills_true_if_present",
+    "tests/test_workflow_json_wiring_invariants.py::test_all_ledger_json_inputs_source_from_freeze_cascade_or_castlock",
+    "tests/test_workflow_json_wiring_invariants.py::test_humo_portraits_dir_is_linked_to_portrait_render_output",
+    "tests/test_audio_engine_bodies_g1.py::test_voice_engine_fails_closed_without_lib[eng_chatterbox-ChatterboxEngine-chatterbox]",
+})
 # KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
 # (s26-downstream missed-regression sweep). The 5 BUG-108 + save
 # workspace entries went green when the test fixtures + the

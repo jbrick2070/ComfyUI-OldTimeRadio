@@ -8,7 +8,7 @@ video/image platform is built on (A-Seam deltas AS-1..AS-5):
   ``AudioEngine(Protocol)`` (AS-4). One pattern, three parallel namespaces
   (audio is frozen/independent; video + image reference this base).
 * :mod:`role_compat` -- the ONE shared role<->required-inputs engine filter
-  (AS-1), imported by the video Director, the image Director and the 3D
+  (AS-1), imported by the video director, the image director and the 3D
   availability check alike.
 * :mod:`resolver` -- execution-group DAG validation + the conditional-skip
   RESOLVER-PRUNE of orphaned background groups on fallback-restamp (AS-2).

@@ -48,12 +48,13 @@ class TestValidatorEmptyPathFallback:
         result = wv._load_workflow("")
         assert isinstance(result, dict)
         assert "nodes" in result
-        # Canonical workflow node count drifts as nodes are consolidated
-        # (e.g. the 2026-05-30 LTX distilled-LoRA merge 60/61 -> one
-        # loader dropped it to 29). This floor only confirms the empty
-        # path resolved to the real full workflow, not an empty/stub
-        # dict -- it is intentionally well below the live count.
-        assert len(result["nodes"]) >= 25
+        # Canonical workflow node count drifts as nodes are consolidated.
+        # CW-1 (2026-06-06) unwired the legacy FLUX/HuMo/LTX render path,
+        # dropping the canonical workflow to an 11-node audio + radio-floor
+        # (SignalLostVideo) graph. This floor only confirms the empty path
+        # resolved to the real full workflow, not an empty/stub dict -- it
+        # is intentionally below the live count.
+        assert len(result["nodes"]) >= 10
 
     def test_empty_path_logs_resolved_path(self, caplog):
         """The fallback must emit one INFO line naming the resolved

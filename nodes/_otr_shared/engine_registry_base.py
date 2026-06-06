@@ -158,7 +158,7 @@ class EngineRegistry:
     def all_engine_names(self) -> list:
         """Every registered engine name, sorted (the STATIC dropdown source).
 
-        The Director COMBO is built from the full registry (V-6: the enum stays
+        The director COMBO is built from the full registry (V-6: the enum stays
         the complete static list); role compatibility is filtered at
         execute/validate time, never by mutating the COMBO.
         """

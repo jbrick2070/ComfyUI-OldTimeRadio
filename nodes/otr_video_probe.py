@@ -5,7 +5,7 @@ registered video adapters, runs each one's registry-level ``assert_usable`` for
 the roles it claims, and emits (1) a ``host_caps`` JSON (ffmpeg / torch-cuda /
 NVML VRAM, all probed LAZILY + fail-soft), (2) a usable-engine list per role, and
 (3) a plain validator report. It runs BEFORE render and NEVER mutates a widget
-(V-6); the Director consumes its usable list as static data, not as a dynamic
+(V-6); the director consumes its usable list as static data, not as a dynamic
 COMBO rewrite.
 
 In CW-1 no concrete adapters are registered yet (they land CW-4+), so the probe

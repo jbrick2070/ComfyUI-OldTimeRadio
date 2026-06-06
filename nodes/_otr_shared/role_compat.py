@@ -8,12 +8,12 @@ that compatibility rule, imported identically by:
 
 * ``OTR_VideoDirector`` -- to validate / annotate the user's per-role pick,
 * ``OTR_ShotLock`` -- to fail closed on an incompatible locked pick,
-* the image Director (C1) and the 3D ``character_3d`` availability check (B),
+* the image director (C1) and the 3D ``character_3d`` availability check (B),
 
 so all three agree on one rule instead of drifting apart. Keeping it in ONE
 dep-free module is the whole point of AS-1.
 
-It runs at Director.execute / ShotLock.validate time -- NEVER at COMBO build
+It runs at OTR_VideoDirector.execute / ShotLock.validate time -- NEVER at COMBO build
 time (the enum stays the full static registry; filtering the COMBO itself would
 be dynamic-widget mutation, which V-6 forbids).
 
@@ -131,7 +131,7 @@ def filter_engines_for_role(role: str, engine_descriptors: Iterable) -> list:
 
     ``engine_descriptors`` is any iterable of :class:`EngineDescriptor`-shaped
     dicts (one per registered engine). Returns the subset of ``engine_id``s the
-    role can actually drive -- the list the Director annotates / ShotLock
+    role can actually drive -- the list the director annotates / ShotLock
     validates against. Raises :class:`RoleCompatError` only for an unknown role.
     """
     available = role_available_inputs(role)  # validate role up-front
