@@ -2,8 +2,8 @@
 
 Covers timecode formatting, word wrap, multi-line cue chunking, time
 distribution, SDH line rules (CPS lint), and ASS structure -- including the
-accessibility contract: dialogue + speaker-name fill are WHITE (color is a
-subtle outline only, never the speaker cue) and an opaque box is always drawn.
+accessibility contract: dialogue + speaker name are WHITE with the name BOLD
+(weight is the speaker cue, never color) on a single opaque box.
 """
 from __future__ import annotations
 
@@ -88,13 +88,16 @@ def test_build_ass_structure_and_accessibility(tmp_path):
     # PrimaryColour (fill) is opaque white.
     assert fields[3].strip().upper() == "&H00FFFFFF"
 
-    # Speaker label present and color applied only as an OUTLINE (\3c), with
-    # the fill reset to white (\r) -- never a \c fill-color recolor.
+    # Speaker label present, BOLD WHITE, sharing the SINGLE caption box --
+    # no per-name box/border/color (removed 2026-06-06: it drew an ugly
+    # highlighted block behind the name). Weight is the only speaker cue;
+    # \r resets the rest of the cue to the box style.
     assert "ANNOUNCER:" in text
     assert "ANTON BEATTY:" in text
-    assert "\\3c" in text          # outline-only color
     assert "\\b1" in text          # bold name (weight cue)
+    assert "\\3c" not in text      # no per-name outline color/border
     assert "\\c&H" not in text     # no fill recolor anywhere
+    assert "\\r" in text           # name resets to the box style
 
     # Long announcer line (>74 visible chars) splits into multiple cues.
     dlg = [l for l in text.splitlines() if l.startswith("Dialogue:")]

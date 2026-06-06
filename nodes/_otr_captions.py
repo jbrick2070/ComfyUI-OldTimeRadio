@@ -240,7 +240,6 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
 
     names = _cast_names(ledger)
     lines = ledger.get("lines") or []
-    order_map: dict = {}
     events: list[str] = []
     lint: list[str] = []
     prev_char = None
@@ -285,18 +284,18 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         elif cps > TARGET_CPS:
             lint.append(f"line[{li}] {nm or role}: {cps:.1f} CPS > target {TARGET_CPS}")
 
-        color = color_for(cid, role, st, order_map)
         for ci, (cue, (s, e)) in enumerate(zip(cues, spans)):
             if (e - s) < MIN_CUE_DUR_S:
                 lint.append(f"line[{li}] cue[{ci}] {nm or role}: on-screen {e - s:.2f}s < {MIN_CUE_DUR_S}s")
             disp = cue
-            # Speaker label = BOLD WHITE (color-blind-safe primary cue) with a
-            # SUBTLE colored OUTLINE only. Fill stays white; \r resets the rest
-            # of the cue to the white box style. Applied to the first cue only.
+            # Speaker label = BOLD WHITE (color-blind-safe primary cue). The
+            # name shares the SINGLE caption box -- no separate box/border or
+            # color around it (those drew the ugly highlighted block behind the
+            # name). Distinguished by weight only; \r resets to the box style.
             if ci == 0 and label:
                 lbl = label.strip()  # "NAME:"
                 disp = disp.replace(
-                    lbl, f"{{\\b1\\bord1\\3c{color}}}{lbl}{{\\r}}", 1)
+                    lbl, f"{{\\b1}}{lbl}{{\\r}}", 1)
             events.append(
                 f"Dialogue: 0,{ass_timecode(s)},{ass_timecode(e)},SDH,,0,0,0,,{disp}"
             )
