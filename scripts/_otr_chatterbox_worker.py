@@ -118,7 +118,11 @@ def main():
             # single-rate (pack_audio_batch contract); chatterbox base is 24000.
             if src_sr != _TARGET_SR:
                 wav = torchaudio.functional.resample(wav, src_sr, _TARGET_SR)
-            torchaudio.save(out_path, wav, _TARGET_SR)
+            # Save via soundfile, NOT torchaudio.save: torchaudio 2.x routes save
+            # through torchcodec (not installed in this isolated venv) -> the cu128
+            # Blackwell torch hits "TorchCodec is required". soundfile is direct.
+            import soundfile as sf
+            sf.write(out_path, wav.numpy().T, _TARGET_SR)  # [C, T] -> [T, C]
             if not os.path.exists(out_path):
                 emit({"ok": False, "error": "generate produced no file at %s" % out_path})
                 continue
