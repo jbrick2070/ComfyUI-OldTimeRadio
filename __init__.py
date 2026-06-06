@@ -294,6 +294,19 @@ _NODE_MODULES = {
     # flicker over the otherwise-static black surround).
     "OTR_PostUpscaleProcgenBlend": (".nodes.otr_post_upscale_procgen_blend", "PostUpscaleProcgenBlend", " Post-Upscale Procgen Blend (1080p)"),
 
+    # =========================================================================
+    # OTR Open Video Model Platform -- A-Seam core (CW-1, 2026-06-06).
+    # Model-agnostic, per-role video model selection; NO model is "primary".
+    # Additive shell: VideoProbe (usable engines + host caps) -> VideoDirector
+    # (per-role A/B/C model + image selectors, Other-Beats clip mode) ->
+    # ShotLock (audio-derived clip budget + DAG-validated execution_groups +
+    # M4 per-beat creative derivation; supersedes OTR_VideoPlan). Concrete
+    # engine adapters + the render path land in later windows.
+    # =========================================================================
+    "OTR_VideoProbe":              (".nodes.otr_video_probe",    "OTRVideoProbe",    " Video Probe (usable engines + host caps)"),
+    "OTR_VideoDirector":           (".nodes.otr_video_director", "OTRVideoDirector", " VideoDirector (per-role model select)"),
+    "OTR_ShotLock":                (".nodes.otr_shot_lock",      "OTRShotLock",      " Shot Lock (video plan authority)"),
+
 
 }
 
