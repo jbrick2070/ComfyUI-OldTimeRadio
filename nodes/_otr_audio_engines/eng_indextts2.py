@@ -142,10 +142,22 @@ class IndexTTS2Engine:
 
     # ---- emotion + text (adapter-side; sent to the worker) ----
     def emo_list(self, delivery_vector):
-        """8-dim delivery vector -> IndexTTS2 Emo-Vector order list."""
+        """8-dim delivery vector -> IndexTTS2 Emo-Vector order list. Robust to a
+        malformed (hand-editable) stamped vector: a non-dict or non-numeric value
+        -> 0.0, every value clamped to 0..1, so an out-of-contract ledger never
+        crashes the render or sends bad values to the worker (PD1)."""
         from .._otr_delivery_vector import EMOTIONS
-        dv = delivery_vector or {}
-        return [round(float(dv.get(e, 0.0)), 3) for e in EMOTIONS]
+        dv = delivery_vector if isinstance(delivery_vector, dict) else {}
+        out = []
+        for e in EMOTIONS:
+            try:
+                val = float(dv.get(e, 0.0))
+            except (TypeError, ValueError):
+                val = 0.0
+            if val != val:  # NaN
+                val = 0.0
+            out.append(round(min(1.0, max(0.0, val)), 3))
+        return out
 
     def prepare_text(self, text, delivery_vector=None):
         """Engine-neutral clean spoken text; audio direction rides the emo-vector,

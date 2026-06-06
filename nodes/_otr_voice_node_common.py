@@ -356,6 +356,13 @@ class OTRVoiceNodeBase:
         mono = (stereo_policy == "mono_safe")
 
         prep = getattr(adapter, "prepare_text", None)
+        # Per-line delivery (emotion) vector for expressive engines (indextts2
+        # emo-vector, chatterbox exaggeration). Prefer a stamped vector; else
+        # derive it deterministically (pure -> C7) from line text + scene tension.
+        # Engines that ignore delivery (bark / kokoro / dia) stay byte-identical;
+        # OTR_DELIVERY_VECTOR=0 reproduces pre-delivery (flat) renders -- and is a
+        # TRUE old path: the delivery module is imported lazily only when on.
+        _delivery_on = os.getenv("OTR_DELIVERY_VECTOR", "1") != "0"
         # voice_ref routing (clean-break 1a): most engines clone from a reference
         # clip path; bark routes its discrete v2/* voice_preset through the SAME
         # positional ref slot. The adapter declares which cast field feeds the
@@ -390,7 +397,21 @@ class OTRVoiceNodeBase:
                 voice_ref = cast.get("voice_ref_path") or cast.get("ref_path")
             else:
                 voice_ref = cast.get(ref_field)
-            prepared = prep(text, None) if callable(prep) else _neutral_prepare_text(text)
+            delivery_vector = None
+            if _delivery_on:
+                _dl = ln.get("delivery")
+                _stamped = _dl.get("emotion_vector") if isinstance(_dl, dict) else None
+                if isinstance(_stamped, dict) and _stamped:
+                    delivery_vector = _stamped
+                else:
+                    _tension = ln.get("scene_tension", ln.get("tension", 0.0)) or 0.0
+                    try:
+                        from ._otr_delivery_vector import deterministic_delivery_vector
+                        delivery_vector = deterministic_delivery_vector(text, float(_tension))
+                    except Exception as _e:  # noqa: BLE001 -- best-effort, never fatal
+                        log.debug("[OTR] delivery derive failed: %s", _e)
+                        delivery_vector = None
+            prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
             request = build_resolved_request(
                 role=self.ROLE,
                 engine_name=engine,
@@ -473,7 +494,7 @@ class OTRVoiceNodeBase:
             # pilot verifying each engine binds an external torch.Generator.
             with deterministic_inference(engine_seed, warn_only=True):
                 audio = adapter.generate_voice(
-                    prepared, voice_ref, None, engine_seed,
+                    prepared, voice_ref, delivery_vector, engine_seed,
                 )
             clips.append(audio)
         if _bark_fb is not None:

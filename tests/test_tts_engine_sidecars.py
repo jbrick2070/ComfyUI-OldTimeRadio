@@ -342,3 +342,34 @@ def test_announcer_clone_engine_can_fall_back():
     cbx = AE.get_engine("chatterbox")
     assert "announcer_voice" in cbx.roles
     assert cbx.requires_voice_ref is True and cbx.missing_ref_fallback == "bark"
+
+
+# --- delivery-vector wiring: robust projections (QA roundtable) ------------ #
+def test_emo_list_robust_to_malformed_vectors():
+    from nodes._otr_audio_engines import get_engine
+    idx = get_engine("indextts2")
+    assert idx.emo_list(None) == [0.0] * 8          # None -> flat
+    assert idx.emo_list("nope") == [0.0] * 8        # non-dict -> flat
+    # non-numeric + out-of-range + NaN-ish are coerced + clamped, never crash
+    out = idx.emo_list({"happy": "very", "angry": 99, "sad": -4, "calm": 0.5})
+    assert len(out) == 8 and all(0.0 <= v <= 1.0 for v in out)
+
+
+def test_chatterbox_project_robust_to_malformed_vectors():
+    from nodes._otr_audio_engines import get_engine
+    cbx = get_engine("chatterbox")
+    assert cbx._project(None) == 0.5                # kill-switch / no delivery
+    assert cbx._project(["bad"]) == 0.5             # non-dict
+    assert 0.0 <= cbx._project({"calm": "bad"}) <= 1.0  # non-numeric -> no crash
+    assert cbx._project({}) == 0.5                  # empty -> neutral (early return)
+    assert 0.0 <= cbx._project({"calm": 1.0}) <= 1.0
+    assert 0.0 <= cbx._project({"calm": 99}) <= 1.0  # out-of-range clamped
+
+
+def test_deterministic_delivery_vector_is_clean_and_complete():
+    from nodes._otr_delivery_vector import EMOTIONS, deterministic_delivery_vector
+    v = deterministic_delivery_vector("Help! Run! Danger!", 0.5)
+    assert set(v.keys()) == set(EMOTIONS)
+    assert all(0.0 <= float(x) <= 1.0 for x in v.values())
+    # pure / deterministic: same input -> same output
+    assert v == deterministic_delivery_vector("Help! Run! Danger!", 0.5)

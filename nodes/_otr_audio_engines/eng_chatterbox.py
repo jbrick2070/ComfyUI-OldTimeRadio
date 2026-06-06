@@ -141,10 +141,18 @@ class ChatterboxEngine:
 
     @staticmethod
     def _project(delivery_vector):
-        """Collapse the 8-dim delivery vector to Chatterbox's exaggeration."""
-        if not delivery_vector:
+        """Collapse the 8-dim delivery vector to Chatterbox's exaggeration. Robust
+        to a malformed stamped vector: a non-dict / non-numeric / missing 'calm'
+        -> neutral 0.5; calm clamped to 0..1 (never crashes the render, PD1)."""
+        if not isinstance(delivery_vector, dict) or not delivery_vector:
             return 0.5
-        calm = float(delivery_vector.get("calm", 0.5))
+        try:
+            calm = float(delivery_vector.get("calm", 0.5))
+        except (TypeError, ValueError):
+            calm = 0.5
+        if calm != calm:  # NaN
+            calm = 0.5
+        calm = min(1.0, max(0.0, calm))
         return round(min(1.0, 0.3 + 0.7 * max(0.0, 1.0 - calm)), 3)
 
     # ---- one dialogue line -> mono AUDIO {"waveform","sample_rate"} ----
