@@ -13,6 +13,7 @@ EXIT-checkpoint tests.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -70,6 +71,8 @@ def test_cold_import_no_heavy_libs():
         "import nodes._otr_shared.role_compat;"
         "import nodes._otr_shared.resolver;"
         "import nodes._otr_shared.engine_registry_base;"
+        "import nodes._otr_shared.gpu_residency;"
+        "import nodes._otr_shared.portrait_ledger;"
         "import nodes.otr_video_probe; import nodes.otr_video_director;"
         "import nodes.otr_shot_lock;"
         "heavy=[m for m in ('torch','transformers','diffusers') if m in sys.modules];"
@@ -540,3 +543,165 @@ def test_shotlock_end_to_end_stamps_video_section():
     }
     assert done == "shot_lock:done:rev=1"
     assert "shot_lock_revision=1" in report
+
+
+# ---------------------------------------------------------------------------
+# CW-2 -- AS-3 GPU-residency lease (cross-process single heavy engine)
+# ---------------------------------------------------------------------------
+def test_cross_subproject_single_lease(tmp_path):
+    """AS-3: ONE GPU-residency lease, cross-process. A second acquire on a
+    live-held lock fails closed (timeout); release frees it; a stale lock left
+    by a DEAD pid is reclaimed so a crashed sidecar never wedges the platform.
+    The lease is a SHARED module imported identically by C + B sidecars."""
+    from nodes._otr_shared import gpu_residency as gr
+
+    lockdir = tmp_path / "lease.lockdir"
+    lease = gr.acquire(timeout_s=2.0, lockdir=lockdir)
+    assert gr.is_held(lockdir)
+    assert gr.read_owner(lockdir)[0] == os.getpid()
+
+    # Held by a LIVE owner (this process) -> a second acquire fails closed.
+    with pytest.raises(gr.LeaseTimeout):
+        gr.acquire(timeout_s=0.3, poll_s=0.05, lockdir=lockdir)
+
+    # Release frees it for the next consumer; release is idempotent.
+    gr.release(lease)
+    assert not gr.is_held(lockdir)
+    gr.release(lease)  # no-op second release
+
+    lease2 = gr.acquire(timeout_s=2.0, lockdir=lockdir)
+    assert gr.is_held(lockdir)
+    gr.release(lease2)
+
+    # Stale lock from a DEAD pid is reclaimed, not waited on.
+    lockdir.mkdir(parents=True, exist_ok=True)
+    dead_pid = 2_000_000_000  # implausibly high -> pid_exists() is False
+    (lockdir / "owner").write_text(f"{dead_pid}\nstaletoken\n0\n", encoding="utf-8")
+    reclaimed = gr.acquire(timeout_s=2.0, lockdir=lockdir)
+    assert reclaimed.pid == os.getpid()
+    gr.release(reclaimed)
+    assert not gr.is_held(lockdir)
+
+
+def test_gpu_residency_probe_is_machine_wide_int():
+    """AS-3: probe_used_mb returns a machine-wide int (never get_free_memory);
+    cold-import clean (no torch pulled). 0 is a valid 'NVML unavailable' value
+    on a CPU box -- nvml_available distinguishes it for a fail-closed gate."""
+    from nodes._otr_shared import gpu_residency as gr
+    used = gr.probe_used_mb()
+    assert isinstance(used, int) and used >= 0
+    assert isinstance(gr.nvml_available(), bool)
+    # When NVML is unavailable, the bounded floor-wait fails closed.
+    if not gr.nvml_available():
+        assert gr.wait_until_below_mb(1, attempts=1, sleep_s=0.0) is False
+    import importlib
+    src = importlib.import_module("nodes._otr_shared.gpu_residency")
+    assert "torch" not in dir(src)
+
+
+# ---------------------------------------------------------------------------
+# CW-2 -- AS-5 content-addressed portrait-ledger resolution
+# ---------------------------------------------------------------------------
+def test_portrait_ledger_resolution(tmp_path):
+    """AS-5: char_id -> content-addressed portrait path; lookup is by char_id,
+    never the display name (BUG-098); unknown / unstamped both fail closed."""
+    from nodes._otr_shared import portrait_ledger as pl
+
+    h = "a" * 64
+    led = {"cast": [
+        {"char_id": "c1", "name": "BABA", "portrait_content_hash": h},
+        {"char_id": "c2", "name": "NOON"},  # no portrait stamped
+    ]}
+    p = pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path))
+    assert p == tmp_path / "otr" / "stills" / f"{h}.png"
+
+    # Lookup is by char_id ONLY -- the display name does not resolve.
+    with pytest.raises(pl.PortraitUnresolved):
+        pl.resolve_portrait_path(led, "BABA", output_dir=str(tmp_path))
+    # Unstamped char + unknown char both fail closed.
+    with pytest.raises(pl.PortraitUnresolved):
+        pl.resolve_portrait_path(led, "c2", output_dir=str(tmp_path))
+    with pytest.raises(pl.PortraitUnresolved):
+        pl.resolve_portrait_path(led, "missing", output_dir=str(tmp_path))
+
+    # Hash is over DECODED pixels: content-addressed + re-encoding-stable.
+    import numpy as np
+    px = np.zeros((4, 4, 3), dtype=np.uint8)
+    h1 = pl.compute_portrait_hash(px)
+    px2 = px.copy()
+    px2[0, 0, 0] = 1
+    assert h1 != pl.compute_portrait_hash(px2)        # diff pixels -> new hash
+    assert h1 == pl.compute_portrait_hash(px.copy())  # same pixels -> same hash
+
+
+def test_portrait_magic_byte(tmp_path):
+    """AS-5: stamp_portrait writes a REAL PNG (magic bytes) at the
+    content-addressed path, stamps the ledger by char_id, never overwrites
+    (idempotent for identical pixels), and a regen yields a NEW hash + path
+    while the old file stays intact (mesh-cache stays correct across regen)."""
+    from nodes._otr_shared import portrait_ledger as pl
+    import numpy as np
+
+    led = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    px = np.full((8, 8, 3), 127, dtype=np.uint8)
+    path = pl.stamp_portrait(led, "c1", px, output_dir=str(tmp_path))
+    assert path.exists()
+    with open(path, "rb") as fh:
+        assert fh.read(8) == b"\x89PNG\r\n\x1a\n"
+
+    # Ledger stamped by char_id; resolve round-trips to the same path.
+    h = led["cast"][0]["portrait_content_hash"]
+    assert path.name == f"{h}.png"
+    assert pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path)) == path
+
+    # Idempotent: identical pixels -> same path, no overwrite error.
+    again = pl.stamp_portrait(led, "c1", px.copy(), output_dir=str(tmp_path))
+    assert again == path
+
+    # Regen (different pixels) -> NEW hash + path; the prior file is intact.
+    px2 = np.full((8, 8, 3), 200, dtype=np.uint8)
+    path2 = pl.stamp_portrait(led, "c1", px2, output_dir=str(tmp_path))
+    assert path2 != path and path.exists() and path2.exists()
+    assert led["cast"][0]["portrait_content_hash"] == pl.compute_portrait_hash(px2)
+
+
+# ---------------------------------------------------------------------------
+# CW-2 -- clip-budget coverage: episode-duration bound + empty-script floor
+# (the CW-1 compute_clip_budget is the single source; these extend coverage)
+# ---------------------------------------------------------------------------
+def test_clip_budget_sum_equals_episode_duration():
+    """Clip-budget per-beat frames sum to EXACTLY the episode duration in
+    frames -- (total_samples*fps)//sample_rate -- so sum <= episode_duration
+    holds by construction (no double-count, no gap)."""
+    fps, sr = 25, 24000
+    beats = [
+        {"beat_id": "b1", "role": "character_video", "char_id": "c1", "text": "a",
+         "samples": 30000, "sample_rate": sr, "dur_s": None},
+        {"beat_id": "b2", "role": "scene_broll", "char_id": "", "text": "b",
+         "samples": 18000, "sample_rate": sr, "dur_s": None},
+        {"beat_id": "b3", "role": "background_abstract", "char_id": "", "text": "",
+         "samples": 6000, "sample_rate": sr, "dur_s": None},
+    ]
+    budget = sl.compute_clip_budget(beats, {}, fps)
+    total_samples = sum(b["samples"] for b in beats)
+    episode_frames = (total_samples * fps) // sr
+    assert budget["total_frames"] == episode_frames
+    assert budget["total_frames"] == sum(budget["per_beat"].values())
+
+
+def test_clip_budget_empty_script_radio_floor():
+    """Empty script -> radio-floor: zero frames, zero render count, NO abort.
+    OTR_ShotLock still stamps a video section for an episode with no lines."""
+    budget = sl.compute_clip_budget([], {}, 25)
+    assert budget["total_frames"] == 0
+    assert budget["other_beats_render_count"] == 0
+    assert budget["per_beat"] == {}
+
+    led = json.dumps({"cast": [], "lines": [], "meta": {}})
+    patched, rev, report, done = OTRShotLock().lock(
+        led, audio_done="audio:done", video_policy_json="{}",
+    )
+    out = json.loads(patched)
+    assert out["video"]["shots"] == []
+    assert out["video"]["clip_budget"]["total_frames"] == 0
+    assert done.startswith("shot_lock:done:")

@@ -12,6 +12,12 @@ video/image platform is built on (A-Seam deltas AS-1..AS-5):
   availability check alike.
 * :mod:`resolver` -- execution-group DAG validation + the conditional-skip
   RESOLVER-PRUNE of orphaned background groups on fallback-restamp (AS-2).
+* :mod:`gpu_residency` -- the cross-process single-heavy-engine lease (atomic
+  lock-dir + dead-PID reclaim) + machine-wide NVML probe (AS-3), taken by A and
+  by C's / B's cu128 sidecars so only ONE heavy engine is resident at a time.
+* :mod:`portrait_ledger` -- ledger-driven, content-addressed portrait
+  resolution (``{portrait_content_hash}.png``, decoded-pixel hash, never
+  overwrite) (AS-5), shared by the image director (C) and the 3D adapter (B).
 
 Every module here imports NOTHING heavy at module scope (no torch /
 transformers / diffusers / pydantic). Importing this package -- and any
