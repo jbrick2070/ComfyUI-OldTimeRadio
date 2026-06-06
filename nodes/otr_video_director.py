@@ -25,6 +25,7 @@ import logging
 log = logging.getLogger("OTR")
 
 from ._otr_video_engines import registry as _vreg
+from ._otr_image_engines import registry as _ireg
 from ._otr_shared import role_compat as _rc
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path. When a role
@@ -54,8 +55,12 @@ def _video_model_combo() -> list:
 
 
 def _image_model_combo() -> list:
-    """Static image-source list (C1 will source this from the image registry)."""
-    return list(IMAGE_DEFAULTS) + [ADD_CUSTOM]
+    """Image-source COMBO sourced from the C1 image registry (V-6: full static
+    list + the custom sentinel). 'Flux' is just gen 1 (engine ``flux_gen1``), no
+    longer a hardcoded string. Falls back to ``IMAGE_DEFAULTS`` only if the image
+    registry is somehow empty, so a box-fresh graph still validates."""
+    names = list(_ireg.all_engine_names()) or list(IMAGE_DEFAULTS)
+    return names + [ADD_CUSTOM]
 
 
 def _registry_descriptors() -> list:
