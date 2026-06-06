@@ -1,133 +1,125 @@
-# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-05 (TTS engines + delivery wiring + live chatterbox)
+# Session Handoff -- ComfyUI-OldTimeRadio (OTR) -- 2026-06-06 (episode-budget scaling fix + parked caption/audio ship)
 
 ## Core goal
-The project is becoming a collection of the greatest TTS engines (a TTS
-experiment). This session SHIPPED two new commercial-clean clone voices on the
-proven IndexTTS2 Path-B sidecar pattern -- **chatterbox** (MIT) and **Dia**
-(Apache-2.0) -- plus the foundation refactor (adapter metadata instead of a
-hard-coded engine tuple) and **wired the per-line delivery (emotion) vector**
-through dispatch so indextts2/chatterbox are expressive. Chatterbox was
-**live-validated rendering on the RTX 5080**; the one bug found was fixed. All
-committed + pushed (HEAD **97c141e** on v2.0-alpha, even with origin).
+Fix a live full-episode crash and make episode length scale cleanly. A 780-word
+run on `act_count=auto` crashed in outline generation with an
+`OutlineBudgetViolation` AFTER ~28 OpenRouter (Opus 4.8) calls. Root cause: the
+Phase-2A episode budget could allocate per-phase word targets that the fixed
+beat structure physically can't hold. Fixed in two commits (widen per-beat cap +
+fail-fast guard; then auto-scale the act count), and shipped the two parked
+output-polish fixes (caption name-border, louder master) from the prior session.
+THREAD NOTE: this is the engine / output-polish / budget thread, NOT the OTR
+video-engine platform build (that lives in VIDEO_BUILD_HANDOFF.md + the
+otr-video-handoff skill -- do not conflate).
 
 ## Tech stack & constraints (session-specific; CLAUDE.md + memory auto-load the rest)
-- ComfyUI Desktop (Electron, "Comfy Desktop.exe") on :8000, Windows, RTX 5080
-  16GB (Blackwell sm_120). Main venv `C:\Users\jeffr\Documents\ComfyUI\.venv`
-  (torch 2.10/cu130). `.py` edits need a ComfyUI RESTART (module cache); voice
-  bank JSON hot-reloads.
-- GOTCHAS discovered this session (durable):
-  - `setx` is NOT on the Desktop-Commander shell PATH -> it fails silently.
-    Set USER env via `[Environment]::SetEnvironmentVariable(name,val,'User')`.
-  - PowerShell `& $exe ... | Out-String` errors ("document in the middle of a
-    pipeline"); use `Start-Process -Wait -RedirectStandardOutput` (DC also does
-    not capture external-exe stdout -> always redirect to a file and read it).
-  - Comfy Desktop's python server canNOT be (re)started from the DC
-    non-interactive shell (the Electron app spawns 7 procs but never inits the
-    server / writes no logs). Manager has NO reboot endpoint (all /reboot 404).
-    Only a real app relaunch (Electron) reloads USER env + code. computer-use
-    needs an on-screen approval (unavailable when Jeffrey is away).
-  - The live server runs as the uv python `...\uv\python\cpython-3.12.11...
-    \python.exe -s ComfyUI\main.py --port 8000 --enable-manager`, parented by
-    "Comfy Desktop.exe" (PID chain: server <- .venv python <- Comfy Desktop.exe
-    <- explorer). main.py is bundled in the app (not in Documents\ComfyUI).
-- git: changes land via file tools on disk; commit/push via DC `git -C <repo>`
-  with Start-Process redirect. `scripts/_otr_*` is gitignored -> new worker /
-  install / smoke scripts must be `git add -f`'d (the recurring trap).
+- ComfyUI Desktop on :8000, Windows, RTX 5080 16GB. Main venv
+  `C:\Users\jeffr\Documents\ComfyUI\.venv`. `.py` edits need a ComfyUI RESTART
+  (module cache); JSON/voice-bank hot-reload.
+- **Verify on the real machine via Desktop Commander, NOT sandbox bash.** The
+  Cowork sandbox mount serves STALE/TORN reads of files just edited with the
+  file tools -> it reported a phantom `SyntaxError` on an untouched line this
+  session. Run py_compile / pytest through DC + venv python against the real
+  files. (Related: memory `feedback_cowork_sandbox_corruption`.)
+- DC pytest recipe: `shell:"cmd"`, `set HF_HOME=C:\ComfyUI-Models\huggingface`,
+  venv python `-m pytest -q ... > scripts\_otr_*.txt 2>&1 & type scripts\_otr_*.txt`
+  (DC won't reliably capture external-exe stdout; redirect + type). DC PowerShell
+  strips `$`. Bug Bible lives in the separate repo
+  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`, run with
+  a RELATIVE backslash path from its root (memory `reference_bug_bible_location`).
+- Git per CLAUDE.md + memory: stage/commit/push via Desktop Commander (cmd),
+  UTF-8 no BOM, one push attempt then verify HEAD-match + no-BOM + AST. Branch
+  `v2.0-alpha`, remote `https://github.com/jbrick2070/ComfyUI-OldTimeRadio.git`.
 
-## What's done & decided (all committed on v2.0-alpha, suite 3786/0 + Bug Bible green)
-- **Adapter-metadata refactor (casting MUST-FIX #6):** deleted the
-  `_OTR_CLONE_ENGINES` tuple in `nodes/_otr_voice_node_common.py`; dispatch now
-  branches on adapter metadata `requires_voice_ref` / `voice_ref_kind="wav_path"`
-  / `missing_ref_fallback="bark"` (defaults on `base.AudioEngineAdapter`; set on
-  indextts2/chatterbox/dia). `_resolve_clone_ref_path` is role-aware; a stale
-  (missing-on-disk) ref is nulled -> resolution + fallback (PD1); bark fallback
-  guard admits char_voice AND announcer_voice.
-- **chatterbox** (`eng_chatterbox.py` rewritten in-process->Popen sidecar +
-  `scripts/_otr_chatterbox_worker.py`): MIT, flag OTR_ENABLE_CHATTERBOX, sr 24000,
-  char+announcer. Worker saves via **soundfile** (NOT torchaudio.save -- torch
-  2.x routes save through torchcodec). LIVE-PROVEN on GPU.
-- **Dia** (`eng_dia.py` + `scripts/_otr_dia_worker.py`): Apache-2.0
-  (commercial-clean -> fixes indextts2's bilibili liability), flag OTR_ENABLE_DIA,
-  sr 44100, char_voice ONLY, `[S1]` tagged, audio_prompt-only clone (optional
-  `config/dia_ref_transcripts.json` keyed by WAV basename). NOT yet installed live.
-- **Shared `nodes/_otr_audio_engines/_otr_sidecar.py`:** bounded `read_protocol_line`
-  (reader thread; Windows pipes), idempotent `close_worker` (closes stdin/stdout
-  +stderr, kill+wait, tolerates double-close), `remove_quietly`. Env
-  OTR_SIDECAR_STARTUP_TIMEOUT(1800)/_REQUEST_TIMEOUT(600).
-- **Delivery wiring:** `_render_per_line` derives a per-line 8-dim vector via
-  `_otr_delivery_vector.deterministic_delivery_vector(text, scene_tension)` (pure,
-  C7) and passes it to prep + generate_voice. bark/kokoro/dia IGNORE it
-  (byte-identical); indextts2 `emo_list` + chatterbox `_project` consume it (both
-  hardened: non-numeric/out-of-range -> safe default + clamp). `OTR_DELIVERY_VECTOR=0`
-  = true no-import old path.
-- **Bank:** `scripts/_otr_mirror_clone_refs.py` mirrored the 36 CC0 indextts2 refs
-  to cb_*/dia_* (110 voices); dropped the 5 dangling placeholder chatterbox rows;
-  +1 chatterbox announcer ref. Profiles: added `char_dia_v1`, chatterbox profiles
-  runtime->oop_venv. dia added to dropdown + dep-pilot OPT_IN_ENGINES.
-- **5 roundtables** (1 design + 3 polish + 1 wiring QA, ~$1.5 OpenRouter, panel
-  GPT-5.5+Gemini-3.1+Grok-4.3+DeepSeek-v4, Opus judge) under
-  `docs/2026-06-05-tts-engine-sidecars/` + `docs/2026-06-05-delivery-wiring/`.
-- Rejected: torchaudio.save in the sidecar (torchcodec); chatterbox `--variant`;
-  mktemp->mkstemp (defeats the worker's no-file check); per-adapter request Lock
-  (ComfyUI is serial); restarting the proven indextts2 path.
+## What's done & decided (all committed + pushed to origin/v2.0-alpha)
+- **`9e7db41` fix(budget): per-beat ceiling widening + fail-fast guard.** In
+  `compute_episode_budget` (`nodes/_otr_episode_budget.py`): each phase now gets
+  `eff_hi = min(BEAT_WORD_HARD_MAX, max(base_hi, ceil(per_phase_words/n_beats)))`
+  so the fixed beat count can actually hold the requested length. `base_lo`
+  untouched; short episodes are byte-identical (350/3-act stays `(20,35)`).
+  `BEAT_WORD_HARD_MAX = 80` matches the Stage-3 `Beat.target_words` schema
+  (`ge=3, le=80`). A guard raises `InvalidEpisodeBudgetError` BEFORE any LLM call
+  if a phase still can't fit (saving the ~28-call burn). Old bug mechanism:
+  `_allocate_phase_target_words` hard-caps every beat at `hi`, so 3 acts x 14
+  beats x 35 = 490-word ceiling < 780. Default `target_words` is 350; 780 was
+  user-typed.
+- **`bbdb21a` fix(captions)** (parked, prior session): name label override
+  `{\b1\bord1\3c{color}}NAME` -> `{\b1}NAME` so the speaker name shares the one
+  caption box with no border/color. `nodes/_otr_captions.py` + test.
+- **`7758b4b` feat(audio)** (parked, prior session): louder final master via
+  `_master_loudness` (makeup gain + tanh soft-knee limiter + re-trim to -1 dBFS,
+  peak-safe, deterministic). Env `OTR_MASTER_MAKEUP_DB` default 4.0 (0 = legacy
+  pure peak-normalize). `nodes/scene_sequencer.py` (EpisodeAssembler).
+- **`4d77153` feat(budget): auto-scale act_count with length.** New
+  `auto_act_count(target_words)` in `_otr_episode_budget.py` (exported); the
+  writer's `act_count='auto'` path (`OTR_LedgerScriptWriter.py`) now calls it
+  instead of `default_act_count`. Picks the FEWEST acts >= the narrative
+  `default_act_count` floor whose widened budget fits (so beats stretch toward 80
+  within a low act count before adding an act); climbs only when forced; beyond
+  the ceiling returns the max-capacity act so `compute_episode_budget`'s guard
+  reports the true max. Feasibility is decided by a throwaway
+  `compute_episode_budget` build per candidate (one source of truth).
+- **Length envelope (both fixes live):** auto stays **3 acts <= ~1364 words**,
+  climbs to **5 acts ~1365-1502**, **6 acts ~1503-1820**; **> ~1820 = clean
+  fail-fast** (engine structural ceiling from the 80-words/beat x 32-beats
+  schema caps). Per-act feasible ranges: act3 238..1364, act4 273..1335, act5
+  417..1502, act6 481..1820, act7 580..1502. Manual act_count 1-7 still works and
+  stays strict (infeasible pick -> same clear guard error, not a crash).
+- **OpenRouter dropdowns refreshed** (not a crash cause; all 28 Opus calls had
+  succeeded). Ran `scripts/otr_openrouter_refresh.py` -> 344 models live;
+  `anthropic/claude-opus-4.8` now in `models/openrouter_models.json` (gitignored,
+  per-machine), so the "not in local catalog cache" warning clears next run.
+  Node never auto-fetches by design; user will refresh manually when new models
+  appear (declined scheduling).
+- **Regression GREEN:** 369 (core+budget+outline+writer+openrouter) + 239
+  (budget+auto-scale+core+writer+outline) + 117 targeted, plus the budget module
+  self-test, plus Bug Bible 16 passed / 7 skip / 3 xfail. All four commits
+  verified: HEAD local==origin `4d77153`, no BOM, AST-parse clean.
+- Rejected this session: "auto-add acts" as the primary lever (Option 1) and a
+  static per-beat cap bump -- chose dynamic widen-then-climb (Option A) per the
+  operator's "fewer acts, longer beats" preference.
 
-## State of the art (live, on the box)
-- chatterbox venv `C:\Users\jeffr\Documents\ComfyUI\chatterbox\.venv` INSTALLED:
-  chatterbox-tts 0.1.7 + **torch 2.11.0+cu128 / torchaudio 2.11.0+cu128** (the
-  Blackwell sm_120 override; PyPI torch was 2.6 CPU-only). GPU verified cap (12,0).
-- LIVE render proven: worker -> `RENDER_OK 3.80s @24kHz`; full adapter path ->
-  `ADAPTER_OK shape=(1,96000) @24kHz`. Bug fixed = soundfile save (commit e5d22a4).
-- USER env persisted (HKCU): `OTR_ENABLE_CHATTERBOX=1`,
-  `OTR_CHATTERBOX_VENV=...chatterbox\.venv\Scripts\python.exe`.
-- Comfy Desktop is CLOSED (0 procs, :8000 free) -- clean. Jeffrey reopens it to
-  load the flag + new code.
-- Ready driver: `scripts/_otr_chatterbox_smoke.py` (30-word workflow, node 81
-  engine=chatterbox, node 80 voice_bank=default). Full detail:
-  `docs/2026-06-05-tts-engine-sidecars/LIVE_TEST_RESULTS.md` + OPERATOR_HANDOFF.md.
+## State of the art
+- HEAD `4d77153` on `v2.0-alpha`, local == origin. Working tree clean except:
+  `M session_handoff.md` (this file), `?? docs/2026-06-05-video-planning__carryover-problem-statement.md`
+  (other thread), `?? scripts/_otr_matrix_out/` + `scripts/_otr_*.txt` (this
+  session's scratch test-capture files).
+- Files changed this session, all committed: `nodes/_otr_episode_budget.py`
+  (widening + guard + `auto_act_count` + `BEAT_WORD_HARD_MAX` +
+  `_max_target_words_for_act_count`), `nodes/OTR_LedgerScriptWriter.py` (auto
+  path -> `auto_act_count`), `tests/test_phase2a_episode_budget.py`
+  (`TestAutoActCount` + widening/guard cases), `nodes/_otr_captions.py`,
+  `tests/test_otr_captions.py`, `nodes/scene_sequencer.py`.
+- **Operator restarted Comfy Desktop** (all four fixes now loaded) and queued a
+  live 740-word episode on `act_count=auto` (-> 3 acts, feasible). Run in
+  progress at handoff time ("1. Story Writer (LPL v2.0): 0%"). This is the live
+  validation that the 780-class crash is fixed.
 
-## Immediate next steps -- START HEADLESS TESTING (Jeffrey's call: do NOT kill/launch his ComfyUI uninvited)
-The engine is already proven (worker + full adapter path render a 3.8s 24kHz clip
-on the GPU; sample at docs/2026-06-05-tts-engine-sidecars/chatterbox_render_sample.wav,
-peak 0.47/rms 0.06). The ONE remaining validation is the in-ComfyUI-GRAPH render,
-driven HEADLESS via the API. Plan:
-1. **Get ComfyUI :8000 up WITH the flag + new code.** It must be a process whose
-   env has OTR_ENABLE_CHATTERBOX=1 (already in HKCU) AND that loaded the new .py.
-   - Easiest: Jeffrey opens Comfy Desktop himself (fresh launch reads HKCU env +
-     re-imports OTR). Confirm `Invoke-RestMethod http://127.0.0.1:8000/system_stats`.
-   - Headless server launch (if wanted): the Desktop server is
-     `<uv python ...\cpython-3.12.11...\python.exe> -s ComfyUI\main.py --port 8000
-     --enable-manager --base-directory C:\Users\jeffr\Documents\ComfyUI
-     --user-directory ...\user --database-url sqlite:///...\user\comfyui.db ...`.
-     BLOCKER: that `main.py` is bundled in the Electron asar -- it was NOT found in
-     app.asar.unpacked or Documents\ComfyUI. To launch headless, FIRST capture the
-     RUNNING server's working dir + exe via `Get-CimInstance Win32_Process` (do this
-     while Comfy Desktop is up), then relaunch that exact main.py with
-     OTR_ENABLE_CHATTERBOX=1 in env on a FREE port. Do NOT Start-Process the
-     Electron "Comfy Desktop.exe" from the DC shell -- it spawns ~7 procs but never
-     inits the server (no :8000, no log writes). See
-     [[reference_comfy_desktop_restart_gotchas]] / docs LIVE_TEST_RESULTS.md.
-2. **Run the smoke (fully headless API):**
-   `& "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
-   "...\ComfyUI-OldTimeRadio\scripts\_otr_chatterbox_smoke.py"` -> queues the
-   30-word workflow with node 81 engine=chatterbox, node 80 voice_bank=default.
-   Watch otr_runtime.log + /history/<pid>; expect chatterbox char voices,
-   Bark loaded=0, output under output\otr\episodes\.
-3. **Install Dia live** then repeat with node 81 engine=dia. `scripts\_otr_dia_install.ps1`
-   note: `py -3.11` is absent -> build the venv from the main 3.12 python (`python
-   -m venv`), torch 2.8+ cu128, `pip install git+https://github.com/nari-labs/dia.git`
-   + soundfile; set OTR_ENABLE_DIA=1 via `[Environment]::SetEnvironmentVariable`.
-4. Decide chatterbox/dia default-promotion (still opt-in; indextts2 is the default).
+## Immediate next steps
+1. **Watch the running 740-word episode finish.** Confirm it clears outline
+   generation (no `OutlineBudgetViolation`) and renders to a fresh
+   `output/otr/obs/<ep>_procgen_blended.mp4`. Then eyeball the three shipped
+   fixes together: (a) captions have NO box/border behind the speaker name,
+   (b) final audio is audibly louder -- tune `OTR_MASTER_MAKEUP_DB` (6 = hotter,
+   0 = old) if +4 dB isn't right, (c) the 740-word script reads full-length.
+2. **Spot-check auto-scale on a long run** if desired: set `target_words` ~1500
+   on auto and confirm it auto-selects 5 acts and completes; ~1900 should
+   fail-fast instantly with the "lower target_words / raise act_count" message.
+3. **Stale baseline:** `tests/fixtures/baseline_v1.5.wav` is stale vs the louder
+   master. Re-capture (`python tests/test_audio_byte_identical.py
+   --capture-baseline`) or retire that GPU gate. Structural tests pass; the GPU
+   byte-identical test already skips headless.
+4. Optional docs: note the new length envelope (auto scales acts to ~1820) +
+   `OTR_MASTER_MAKEUP_DB` in README/openrouter-setup as part of the pending
+   newbie README refresh.
 
 ## Open questions
-- Dia clone quality with audio_prompt-only (no transcript) -- acceptable, or add
-  `config/dia_ref_transcripts.json` (faster-whisper)? Verify on GPU.
-- chatterbox external `torch.Generator` for bit_exact (G1) -- run
-  `scripts/otr_audio_dep_pilot.py --engines chatterbox,dia` on the box; keep
-  `supports_external_generator=False` until confirmed.
-- Dia 1.6B-0626 vs Dia2 (2025-11-19) -- targeted 0626; evaluate Dia2 later.
-- The other casting MUST-FIX items (#1 voice_ref_path stamping, #2
-  commercial_clean-effective, #3 gender guarantee, #4 kokoro announcer pool, #5
-  resample-every-clip) remain staged (see the casting roundtable plan).
+- Is +4 dB (`OTR_MASTER_MAKEUP_DB`) the master loudness the operator wants, after
+  hearing it live?
+- Re-capture the v1.5 audio byte-identical baseline, or retire that gate?
+- Pursue "Option B" true long-form (> ~1820 words) -- scale beat COUNT with
+  length + lift the 80-word/32-beat schema caps? That's a roundtable-worthy
+  architectural change, not yet scoped.
 
 ---
 ## Resume instructions
