@@ -34,6 +34,7 @@ log = logging.getLogger("OTR")
 __all__ = [
     "InvalidEpisodeBudgetError",
     "ACT_COUNT_CONFIG",
+    "BEAT_WORD_HARD_MAX",
     "ARC_PHASE_GUIDANCE",
     "EpisodeBudget",
     "default_act_count",
@@ -156,6 +157,13 @@ ACT_COUNT_CONFIG: dict[int, dict] = {
 }
 
 
+# The Stage-3 Beat pydantic schema (nodes/_otr_outline.Beat.target_words)
+# hard-caps a single voiced beat at 80 words (ge=3, le=80). The per-beat
+# ceiling widening in compute_episode_budget must never exceed this, or a
+# composed beat would fail schema validation downstream.
+BEAT_WORD_HARD_MAX: int = 80
+
+
 # Per-arc-phase composer guidance. The composer prompt (Phase 2A
 # Step 5) appends `ARC PHASE: <phase>\n  <guidance>` to every beat
 # so Mistral-Nemo gets a clear directional cue beyond `mood`.
@@ -203,6 +211,20 @@ class EpisodeBudget:
     target_words: int               # echoed for downstream convenience
 
 
+def _max_target_words_for_act_count(act_count: int) -> int:
+    """Largest target_words this act_count can hold without a per-phase
+    budget violation, given BEAT_WORD_HARD_MAX. Used only to make the
+    fail-fast guard message actionable; it is not itself a gate."""
+    cfg = ACT_COUNT_CONFIG[act_count]
+    limits = []
+    for frac, nb in zip(cfg["act_word_fractions"], cfg["voiced_beats_per_act"]):
+        if frac <= 0.0:
+            continue
+        # Floor feasibility per phase: nb * HARD_MAX >= 0.80 * frac * tw.
+        limits.append((nb * BEAT_WORD_HARD_MAX) / (0.80 * frac))
+    return int(min(limits)) if limits else 0
+
+
 def compute_episode_budget(
     target_words: int,
     act_count: int,
@@ -247,14 +269,57 @@ def compute_episode_budget(
         )
 
     cfg = ACT_COUNT_CONFIG[act_count]
+    per_phase_words = tuple(
+        round(target_words * f) for f in cfg["act_word_fractions"]
+    )
+    per_phase_beats = tuple(cfg["voiced_beats_per_act"])
+    base_lo, base_hi = cfg["words_per_beat_range"]
+
+    # --- Per-beat ceiling widening (BUG 2026-06-06) ---------------------
+    # A phase of P target words across N voiced beats needs a per-beat
+    # ceiling of at least ceil(P / N) to actually hold the words. The
+    # static ACT_COUNT_CONFIG ceilings were tuned for short episodes and
+    # silently capped long ones: e.g. target_words=780 at 3 acts could
+    # hold only 14 * 35 = 490 words, so the outline budget validator
+    # aborted the run AFTER ~24 LLM calls (OutlineBudgetViolation). Widen
+    # the ceiling just enough to deliver the requested length, bounded by
+    # the Stage-3 Beat schema hard cap. The floor (base_lo) is untouched,
+    # and short episodes (whose ceil(P/N) <= base_hi) are unchanged.
+    required_hi = max(
+        -(-pw // nb) for pw, nb in zip(per_phase_words, per_phase_beats)
+    )
+    eff_hi = min(BEAT_WORD_HARD_MAX, max(base_hi, required_hi))
+    words_per_beat_range = (base_lo, eff_hi)
+
+    # --- Fail-fast feasibility guard ------------------------------------
+    # Even at the schema ceiling, some (target_words, act_count) pairs
+    # cannot fit: a phase's max capacity (N * eff_hi) falls short of its
+    # allowed floor, or its min capacity (N * base_lo) overshoots its
+    # allowed ceiling. Raise NOW -- before a single LLM call -- with an
+    # actionable message, instead of crashing deep in outline generation.
+    for phase, pw, nb in zip(
+        cfg["arc_phases"], per_phase_words, per_phase_beats
+    ):
+        band_lo = round(0.80 * pw)
+        band_hi = round(1.20 * pw)
+        if nb * eff_hi < band_lo or nb * base_lo > band_hi:
+            max_tw = _max_target_words_for_act_count(act_count)
+            raise InvalidEpisodeBudgetError(
+                f"target_words={target_words} cannot fit act_count="
+                f"{act_count}: phase {phase!r} needs ~{pw} words across "
+                f"{nb} beats, but the per-beat range "
+                f"({base_lo}-{eff_hi}, capped at {BEAT_WORD_HARD_MAX}) "
+                f"bounds that phase to {nb * base_lo}-{nb * eff_hi} words. "
+                f"Lower target_words to <= ~{max_tw} at {act_count} acts, "
+                f"or raise act_count for more beats."
+            )
+
     return EpisodeBudget(
         act_count=act_count,
         arc_phases=cfg["arc_phases"],
-        per_phase_words=tuple(
-            round(target_words * f) for f in cfg["act_word_fractions"]
-        ),
-        per_phase_beats=tuple(cfg["voiced_beats_per_act"]),
-        words_per_beat_range=tuple(cfg["words_per_beat_range"]),
+        per_phase_words=per_phase_words,
+        per_phase_beats=per_phase_beats,
+        words_per_beat_range=words_per_beat_range,
         music_inter_count=(act_count - 1) if include_act_breaks else 0,
         announcer_beats=2,
         cast_size=num_characters,

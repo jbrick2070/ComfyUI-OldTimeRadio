@@ -142,6 +142,41 @@ class TestComputeEpisodeBudget:
         with pytest.raises(Exception):
             eb.act_count = 4  # type: ignore[misc]
 
+    # --- per-beat ceiling widening + fail-fast guard (BUG 2026-06-06) ---
+
+    def test_short_episode_beat_cap_unchanged_by_widening(self):
+        # ceil(P/N) <= base_hi for every phase, so widening is a no-op
+        # and a 350w/3-act episode is byte-identical to before the fix.
+        eb = compute_episode_budget(350, 3, True, 2)
+        assert eb.words_per_beat_range == (20, 35)
+
+    def test_long_episode_widens_beat_cap_to_fit_3_acts(self):
+        # target_words=780 at 3 acts: complication needs ceil(343/6)=58,
+        # which drives the per-beat ceiling up so the fixed 14-beat
+        # structure can actually hold the requested length.
+        eb = compute_episode_budget(780, 3, True, 2)
+        assert eb.words_per_beat_range[0] == 20
+        assert eb.words_per_beat_range[1] == 58
+        capacity = sum(
+            eb.words_per_beat_range[1] * nb for nb in eb.per_phase_beats
+        )
+        assert capacity >= 780
+
+    def test_beat_cap_never_exceeds_schema_hard_max(self):
+        from nodes._otr_episode_budget import BEAT_WORD_HARD_MAX
+        # A length demanding >80 words/beat is clamped to the schema cap.
+        eb = compute_episode_budget(1100, 3, True, 2)
+        assert eb.words_per_beat_range[1] == BEAT_WORD_HARD_MAX
+
+    def test_unfittable_length_raises_fast_with_guidance(self):
+        # Beyond what even 80-word beats can hold at this act count the
+        # guard raises immediately (no LLM calls), with an actionable hint.
+        with pytest.raises(InvalidEpisodeBudgetError) as exc:
+            compute_episode_budget(1400, 3, True, 2)
+        msg = str(exc.value)
+        assert "cannot fit" in msg
+        assert "raise act_count" in msg
+
 
 class TestActCountConfigSanity:
 
