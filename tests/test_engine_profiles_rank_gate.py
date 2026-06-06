@@ -47,7 +47,7 @@ def test_exactly_one_scope_default_per_role():
 def test_rank_chain_is_sorted_by_rank():
     r = _resolver()
     chain = [p.engine for p in r.rank_chain("char_voice")]
-    assert chain == ["indextts2", "chatterbox", "bark"]  # rank 1, 2, 3
+    assert chain == ["indextts2", "chatterbox", "dia", "bark"]  # rank 1, 2, 2, 3
     ranks = [p.rank for p in r.rank_chain("char_voice")]
     assert ranks == sorted(ranks)
 

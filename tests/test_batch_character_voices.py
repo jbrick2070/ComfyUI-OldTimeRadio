@@ -101,7 +101,7 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
 
     it = B.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
-    assert engines == ["indextts2", "chatterbox", "bark"]
+    assert engines == ["indextts2", "chatterbox", "dia", "bark"]
     assert it["required"]["engine"][1]["default"] == "indextts2"
     # Order is stable across opt-in flags.
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
@@ -119,7 +119,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
     it = B.INPUT_TYPES()  # must not raise (C-5)
     engines = list(it["required"]["engine"][0])
-    assert engines == ["indextts2", "chatterbox", "bark"]  # hardcoded fallback
+    assert engines == ["indextts2", "chatterbox", "dia", "bark"]  # hardcoded fallback
     assert engines, "engine combo must never be empty (C-5)"
 
 

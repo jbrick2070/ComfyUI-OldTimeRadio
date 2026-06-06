@@ -22,14 +22,26 @@ import os
 
 log = logging.getLogger("OTR")
 
-# Voice-CLONING char engines that REQUIRE a per-character reference WAV. When one
-# of these is selected but a line has no usable voice_ref_path (preserve_ledger did
-# not assign a clip ref, or no reference clips are installed on disk), the per-line
-# path falls back to bark (preset voices) so the episode always renders -- audio is
-# king (PD1). Restricted to the named cloning engines so a test stub or a non-clone
-# engine never trips it. Add a new cloning engine here when its reference-bank
-# pipeline lands (e.g. xtts / cosyvoice).
-_OTR_CLONE_ENGINES = ("indextts2", "chatterbox")
+# Voice-CLONING engines that REQUIRE a per-character reference WAV declare it via
+# adapter metadata (base.AudioEngineAdapter): requires_voice_ref=True plus
+# missing_ref_fallback="bark". When such an engine is selected but a char_voice
+# line has no usable voice_ref_path (preserve_ledger did not assign a clip ref, or
+# no reference clips are installed on disk), the per-line path renders that line on
+# the fallback engine (bark preset voices) so the episode always renders -- audio
+# is king (PD1). Branching on metadata (not a hard-coded engine-name tuple) means a
+# NEW cloning engine -- chatterbox / dia / xtts / cosyvoice -- slots in by setting
+# those attributes on its adapter, with ZERO changes here (casting MUST-FIX #6).
+def _engine_requires_voice_ref(adapter) -> bool:
+    """True iff ``adapter`` is a voice-cloning engine needing a reference WAV."""
+    return bool(getattr(adapter, "requires_voice_ref", False))
+
+
+def _engine_missing_ref_fallback(adapter):
+    """Name of the engine to render a line on when a cloning engine has no usable
+    reference (e.g. ``"bark"``), or None to render no fallback (let the forward
+    fail closed). Reads adapter metadata so the dispatch never hard-codes a name.
+    """
+    return getattr(adapter, "missing_ref_fallback", None) or None
 
 
 def _resolve_ref_to_disk(ref_path):
@@ -61,7 +73,7 @@ def _resolve_ref_to_disk(ref_path):
     return candidates[0] if candidates else None
 
 
-def _resolve_clone_ref_path(engine, cast, episode_seed):
+def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
     """Best-effort on-disk reference WAV for a cloning engine + cast row, or None.
 
     preserve_ledger does not stamp a clip ref, and CastLock stamps only
@@ -87,7 +99,7 @@ def _resolve_clone_ref_path(engine, cast, episode_seed):
         if gender:
             try:
                 entry = assign_voice_for_slot(
-                    role="char_voice", engine=engine,
+                    role=role, engine=engine,
                     char_id=str(cast.get("char_id") or ""), gender=gender,
                     timbre=tuple(cast.get("timbre") or ()),
                     age_band=str(cast.get("age_band") or ""),
@@ -102,8 +114,12 @@ def _resolve_clone_ref_path(engine, cast, episode_seed):
             # silently dropping to bark (PD1 + the index-only goal). Pick any ref
             # for this engine, deterministically keyed on char_id so C7 holds.
             import random as _random
+            # Prefer a ref whose roles include the active role (so an announcer
+            # render gets an announcer ref), then fall back to ANY ref for this
+            # engine so a clone engine still never silently drops to bark (PD1).
+            role_cands = [e for e in bank if e.engine == engine and role in e.roles]
             cands = sorted(
-                (e for e in bank if e.engine == engine),
+                role_cands or [e for e in bank if e.engine == engine],
                 key=lambda e: e.voice_ref_id,
             )
             if cands:
@@ -404,24 +420,36 @@ class OTRVoiceNodeBase:
             # so the episode never hard-fails on a missing voice reference -- audio
             # is king (PD1). The clone engine engages automatically once a usable
             # voice_ref_path is present. Bark is loaded once, lazily.
-            if engine in _OTR_CLONE_ENGINES and not voice_ref:
+            if _engine_requires_voice_ref(adapter) and voice_ref:
+                # A non-empty but STALE ref (the file is gone) must fall through
+                # to resolution + fallback, not be shipped to the worker (which
+                # would hard-fail "ref_clip missing") -- PD1. A valid ref is left
+                # untouched (the adapter resolves it) so shipped paths are
+                # byte-identical; only a missing-on-disk ref is nulled.
+                _disk = _resolve_ref_to_disk(voice_ref)
+                if not (_disk and os.path.exists(_disk)):
+                    voice_ref = None
+            if _engine_requires_voice_ref(adapter) and not voice_ref:
                 # preserve_ledger / CastLock-stamps-only-the-id: resolve an
                 # on-disk reference WAV from voice_ref_id or by gender so the
-                # clone engine clones a real voice. None -> bark fallback below.
-                voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed)
-            if self.ROLE == "char_voice" and engine in _OTR_CLONE_ENGINES and not voice_ref:
+                # clone engine clones a real voice. None -> fallback below.
+                voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
+            fb_name = _engine_missing_ref_fallback(adapter)
+            if (self.ROLE in ("char_voice", "announcer_voice")
+                    and _engine_requires_voice_ref(adapter)
+                    and not voice_ref and fb_name):
                 if _bark_fb is None:
                     from ._otr_audio_engines import get_engine as _get_engine
-                    _bark_fb = _get_engine("bark")
+                    _bark_fb = _get_engine(fb_name)
                     _bark_fb.load()
                     self._bark_fallback_active = _bark_fb
                     log_lines.append(
                         f"{self.ROLE}: WARNING engine '{engine}' has no reference "
-                        f"clip for one or more lines; rendering those with bark "
-                        f"(preset voices). Install {engine} reference WAVs (or set "
-                        f"cast_voice_policy=auto_registry) to enable it."
+                        f"clip for one or more lines; rendering those on "
+                        f"'{fb_name}' (preset voices). Install {engine} reference "
+                        f"WAVs (or set cast_voice_policy=auto_registry) to enable it."
                     )
-                bark_seed = _seed_to_int64("bark", request.stable_line_seed)
+                bark_seed = _seed_to_int64(fb_name, request.stable_line_seed)
                 with deterministic_inference(bark_seed, warn_only=True):
                     audio = _bark_fb.generate_voice(
                         prepared, voice_preset or "v2/en_speaker_6", None, bark_seed,

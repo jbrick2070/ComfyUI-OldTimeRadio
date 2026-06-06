@@ -209,7 +209,7 @@ def test_stable_cast_seed_null_safe():
 # ----------------------------------------------------------------------------
 def test_announcer_voice_ref_resolves_for_active_engine():
     assert announcer_voice_ref("kokoro").voice_ref_id == "bm_george"
-    assert announcer_voice_ref("chatterbox").voice_ref_id == "cc_announcer_male"
+    assert announcer_voice_ref("chatterbox").voice_ref_id == "cb_announcer_male"
 
 
 def test_announcer_voice_ref_raises_for_engine_without_ref():

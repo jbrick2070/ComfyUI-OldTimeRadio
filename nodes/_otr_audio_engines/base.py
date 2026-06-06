@@ -47,6 +47,17 @@ class AudioEngineAdapter:
     requires_flag: Optional[str] = None
     interface: str = "per_line"
     sample_rate: int = _DEFAULT_SR
+    # Voice-reference policy (model-agnostic dispatch -- replaces the old
+    # _OTR_CLONE_ENGINES name tuple). A voice-CLONING engine sets
+    # requires_voice_ref=True so the dispatch resolves a per-character reference
+    # WAV for it and, when none is available for a char_voice line, renders that
+    # line on missing_ref_fallback (PD1: the episode always renders).
+    # voice_ref_kind documents what the reference is ("wav_path" for clip-cloning
+    # engines). Non-clone engines keep these defaults and are never sent down the
+    # ref-resolution / fallback path.
+    requires_voice_ref: bool = False
+    voice_ref_kind: Optional[str] = None
+    missing_ref_fallback: Optional[str] = None
     # G1: bit_exact mode requires every forward to bind an external
     # torch.Generator. An adapter flips this True only once the F dependency
     # pilot has verified its forward accepts ``generator=``; until then it is

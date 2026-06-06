@@ -58,7 +58,7 @@ profiles:
     requires_hf_token: false
     rank: 2                         # char rank-2 fallback (opt-in)
     is_default: false
-    runtime: in_graph
+    runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
     needs_ref_clip: true
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
@@ -82,6 +82,25 @@ profiles:
     caps: {emotion_vector: true, duration_control: true}
     license_state: gated            # bilibili Model Use License (verify S6)
     warn_text: "IndexTTS2 weights: bilibili Model Use License (not Apache-2.0). Local/personal use OK. Commercial use is conditioned + community-ambiguous -> verify with bilibili (indexspeech@bilibili.com) before commercial release. Do not use to train other commercial AI models."
+
+  - profile_id: char_dia_v1
+    role: char_voice
+    engine: dia
+    commercial_clean: true         # Apache-2.0 -> commercial-clean engine (safe to ship)
+    model_path: ""
+    model_sha256: ""
+    default_params: {}
+    allowed_voice_banks: [default]
+    engine_impl_version: "1"
+    sample_rate: 44100             # Descript Audio Codec
+    requires_hf_token: false        # nari-labs/Dia-1.6B-0626 weights are ungated
+    rank: 2                         # char rank-2 (opt-in; peer of chatterbox)
+    is_default: false
+    runtime: oop_venv               # Path B isolated worker (torch 2.8 nightly on sm_120)
+    needs_ref_clip: true            # zero-shot clone from a reference clip
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
 
   # --- announcer voice ---
   - profile_id: announcer_kokoro_v1
@@ -116,7 +135,7 @@ profiles:
     requires_hf_token: false
     rank: 2                         # announcer rank-2 (opt-in)
     is_default: false
-    runtime: in_graph
+    runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
     needs_ref_clip: true
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean

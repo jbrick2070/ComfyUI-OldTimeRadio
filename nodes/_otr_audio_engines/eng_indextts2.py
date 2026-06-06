@@ -48,6 +48,12 @@ class IndexTTS2Engine:
     requires_flag = None             # default engine -> always usable; venv/weights checked in load()
     interface = "per_line"
     sample_rate = 22050
+    # Model-agnostic dispatch metadata (replaces the old _OTR_CLONE_ENGINES
+    # tuple): a clone engine needs a per-character reference WAV; a char_voice
+    # line with no usable ref renders on bark so the episode always renders (PD1).
+    requires_voice_ref = True
+    voice_ref_kind = "wav_path"
+    missing_ref_fallback = "bark"
 
     def __init__(self):
         self._proc = None

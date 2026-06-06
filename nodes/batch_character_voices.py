@@ -32,7 +32,7 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
     ROLE = "char_voice"
     LINE_ROLES = ("character",)
     DONE_PREFIX = "char_voice"
-    LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "bark")
+    LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "dia", "bark")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

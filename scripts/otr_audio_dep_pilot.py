@@ -82,6 +82,18 @@ OPT_IN_ENGINES = {
             "constructor + infer kwargs + generator support"
         ),
     },
+    "dia": {
+        "lib_module": "dia",
+        "adapter_class": "DiaEngine",
+        "forward": "generate_voice",
+        "flag": "OTR_ENABLE_DIA",
+        "assumed_call": (
+            "Dia.from_pretrained(<id>, compute_dtype=<str>).generate("
+            "'[S1] <text>', audio_prompt=<ref>)  # TODO-for-F: confirm the "
+            "generate() signature + that audio_prompt-only clone quality is "
+            "acceptable; no external generator (seed via global RNG)"
+        ),
+    },
     "stable_audio_music": {
         "lib_module": "stable_audio_tools",
         "adapter_class": "StableAudioMusicEngine",

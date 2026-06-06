@@ -18,7 +18,7 @@ def test_load_resolver_and_source_hash():
     text = PROFILES_YAML.read_text(encoding="utf-8")
     assert r.source_sha256 == hashlib.sha256(text.encode("utf-8")).hexdigest()
     assert set(r.profile_ids()) == {
-        "char_bark_v1", "char_chatterbox_v1", "char_indextts2_v1",
+        "char_bark_v1", "char_chatterbox_v1", "char_indextts2_v1", "char_dia_v1",
         "announcer_kokoro_v1", "announcer_chatterbox_v1",
         "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
     }
