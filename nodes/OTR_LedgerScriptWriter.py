@@ -1275,9 +1275,10 @@ def _resolve_inputs(
 
     # Phase 2A: act_count resolution. The widget is a combo --
     # "auto" (the default) means auto-derive via
-    # _otr_episode_budget.default_act_count; "1".."7" set it
-    # explicitly. An explicit pick is validated against the
-    # [default..max] band by compute_episode_budget in run().
+    # _otr_episode_budget.auto_act_count, which scales the act count up
+    # with target_words (fewest acts whose widened-beat budget fits the
+    # length); "1".."7" set it explicitly. An explicit pick is validated
+    # against the [default..max] band by compute_episode_budget in run().
     _act_count_raw = str(act_count).strip().lower()
     if _act_count_raw in ("", "auto"):
         act_count_int = 0
@@ -1289,11 +1290,12 @@ def _resolve_inputs(
     if act_count_int == 0:
         try:
             from . import _otr_episode_budget as _OTRB  # type: ignore
-            act_count_int = _OTRB.default_act_count(target_words)
+            act_count_int = _OTRB.auto_act_count(target_words)
         except Exception as exc:  # noqa: BLE001
-            # If target_words is below 30, default_act_count raises;
-            # fall through to act_count=1 and let compute_episode_budget
-            # surface the structured InvalidEpisodeBudgetError in run().
+            # If target_words is below 30, auto_act_count raises (via
+            # default_act_count); fall through to act_count=1 and let
+            # compute_episode_budget surface the structured
+            # InvalidEpisodeBudgetError in run().
             log.warning(
                 "[OTR_LedgerScriptWriter] act_count auto-derive failed "
                 "(target_words=%d): %s -- defaulting to 1",

@@ -27,6 +27,7 @@ from nodes._otr_episode_budget import (  # noqa: E402
     ARC_PHASE_GUIDANCE,
     EpisodeBudget,
     InvalidEpisodeBudgetError,
+    auto_act_count,
     compute_episode_budget,
     default_act_count,
     max_act_count,
@@ -81,6 +82,51 @@ class TestMaxActCount:
     ])
     def test_threshold_table(self, words, expected):
         assert max_act_count(words) == expected
+
+
+class TestAutoActCount:
+    """auto_act_count scales the act count up with length (option A,
+    2026-06-06): fewest acts whose widened-beat budget fits target_words,
+    at or above the narrative default floor."""
+
+    def test_default_length_stays_three_acts(self):
+        # 350 fits 3 acts, so auto must not over-subdivide it.
+        assert auto_act_count(350) == 3
+
+    def test_780_stays_three_acts_fewer_acts_preference(self):
+        # The whole point of "fewer acts, longer beats": 780 fits 3 acts
+        # (widened beats), so auto keeps 3 rather than adding acts.
+        assert auto_act_count(780) == 3
+
+    def test_never_below_narrative_default(self):
+        for tw in (30, 149, 150, 299, 300, 800, 1364):
+            assert auto_act_count(tw) >= default_act_count(tw)
+
+    def test_climbs_when_three_acts_cannot_fit(self):
+        # ~1600 words exceed the 3- and 4-act ceilings; auto climbs to the
+        # smallest act count that actually fits, and that budget is valid.
+        ac = auto_act_count(1600)
+        assert ac >= 5
+        compute_episode_budget(1600, ac, True, 2)  # must not raise
+
+    def test_chosen_act_count_always_valid_across_envelope(self):
+        # Across the whole supported envelope, the auto pick must build a
+        # budget without tripping the feasibility guard.
+        for tw in range(240, 1821, 20):
+            ac = auto_act_count(tw)
+            compute_episode_budget(tw, ac, True, 2)  # must not raise
+
+    def test_beyond_ceiling_picks_max_capacity_and_guard_still_fires(self):
+        # Past the engine's structural max, no act count fits; auto returns
+        # a real act count but compute_episode_budget still fail-fasts.
+        ac = auto_act_count(2500)
+        assert ac in range(1, 8)
+        with pytest.raises(InvalidEpisodeBudgetError):
+            compute_episode_budget(2500, ac, True, 2)
+
+    def test_below_minimum_raises(self):
+        with pytest.raises(InvalidEpisodeBudgetError):
+            auto_act_count(29)
 
 
 # ---------------------------------------------------------------------------

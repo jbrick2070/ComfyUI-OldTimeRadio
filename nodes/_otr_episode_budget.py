@@ -40,6 +40,7 @@ __all__ = [
     "default_act_count",
     "max_act_count",
     "compute_episode_budget",
+    "auto_act_count",
 ]
 
 
@@ -325,6 +326,42 @@ def compute_episode_budget(
         cast_size=num_characters,
         target_words=target_words,
     )
+
+
+def auto_act_count(target_words: int) -> int:
+    """Act count for the ``act_count='auto'`` path, scaled to length.
+
+    Honours the "fewer acts, longer beats" preference: returns the
+    FEWEST acts (at or above the narrative ``default_act_count`` floor)
+    whose per-beat-widened budget can actually hold ``target_words`` --
+    so beats stretch toward ``BEAT_WORD_HARD_MAX`` within a low act count
+    before a new act is added. It climbs only when even 80-word beats
+    cannot fit the length. Capped at ``max_act_count(target_words)`` / 7.
+
+    Feasibility is decided by ``compute_episode_budget`` itself (a
+    throwaway build per candidate) so there is exactly one source of
+    truth for what "fits"; ``include_act_breaks`` / ``num_characters`` do
+    not affect fit, so fixed valid placeholders are used.
+
+    If nothing in ``[floor, ceil]`` fits (``target_words`` beyond the
+    engine's structural ceiling), returns the highest-capacity act count
+    in range so the caller's ``compute_episode_budget`` raises a guard
+    error that reports the true maximum. Propagates
+    ``InvalidEpisodeBudgetError`` for ``target_words < 30``.
+    """
+    floor = default_act_count(target_words)          # raises if < 30
+    ceil = min(7, max_act_count(target_words))
+    candidates = range(floor, ceil + 1)
+    fits = []
+    for ac in candidates:
+        try:
+            compute_episode_budget(target_words, ac, True, 1)
+            fits.append(ac)
+        except InvalidEpisodeBudgetError:
+            continue
+    if fits:
+        return min(fits)
+    return max(candidates, key=_max_target_words_for_act_count)
 
 
 # ---------------------------------------------------------------------------
