@@ -106,6 +106,45 @@ def _normalize_clip(clip_np, target_peak=0.85):
     return (clip_np * (target_peak / peak)).astype(np.float32)
 
 
+def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None):
+    """Final episode loudness master: makeup gain + tanh soft limiter + peak.
+
+    The legacy master stage peak-normalized to -1.0 dBFS only. Speech has a
+    high crest factor, so peak-only leaves the episode perceptually quiet.
+    This lifts perceived loudness a touch above the streaming norm and is
+    peak-SAFE: a tanh soft-knee limiter rounds the gained peaks, then the true
+    peak is trimmed back to ``ceiling_dbfs``. Fully deterministic (no RNG).
+
+    ``makeup_db`` (default env OTR_MASTER_MAKEUP_DB, else 4.0; clamped 0..12)
+    sets the boost. 0 disables the limiter -> pure peak-normalize to the
+    ceiling (legacy behavior). Returns ``(waveform, makeup_db_used)``.
+    """
+    import os
+    ceiling = 10.0 ** (ceiling_dbfs / 20.0)
+    peak = waveform.abs().max()
+    if float(peak) < 1e-8:
+        return waveform, 0.0
+    # Normalize to the ceiling first so the limiter sees a known full scale.
+    waveform = waveform * (ceiling / peak)
+    if makeup_db is None:
+        try:
+            makeup_db = float(os.environ.get("OTR_MASTER_MAKEUP_DB", "4.0"))
+        except (TypeError, ValueError):
+            makeup_db = 4.0
+    makeup_db = max(0.0, min(12.0, float(makeup_db)))
+    if makeup_db > 0.0:
+        g = 10.0 ** (makeup_db / 20.0)
+        denom = float(torch.tanh(torch.tensor(g)))
+        if denom > 1e-8:
+            # tanh soft-knee: slope > 1 near zero lifts quiet/mid speech;
+            # smooth compression near full scale -> no hard clip. Unity at FS.
+            waveform = torch.tanh(waveform * g) / denom
+        peak2 = waveform.abs().max()
+        if float(peak2) > 1e-8:
+            waveform = waveform * (ceiling / peak2)
+    return waveform, makeup_db
+
+
 def _resample_audio(clip_np, src_rate, dst_rate):
     """Resample a 1-D float32 numpy array (CPU-only).
 
@@ -1074,13 +1113,15 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Assembled %d segments with %dms crossfades",
                  len(matched), crossfade_ms)
 
-        # Final peak normalize to -1.0 dBFS - runs AFTER crossfades so
-        # overlapping segments can't push the mix into clipping.
-        peak = episode_waveform.abs().max()
-        if peak > 1e-8:
-            target_linear = 10.0 ** (-1.0 / 20.0)  # -1.0 dBFS
-            episode_waveform = episode_waveform * (target_linear / peak)
-        log.info("[EpisodeAssembler] Final normalize: -1.0 dBFS (post-crossfade)")
+        # Final loudness master (post-crossfade): makeup gain + tanh soft
+        # limiter + -1.0 dBFS true-peak ceiling. Peak-normalizing alone left
+        # dialogue perceptually quiet (speech has a high crest factor), so we
+        # lift the episode a touch above the streaming norm WITHOUT ever
+        # hard-clipping. Deterministic; tune/disable via OTR_MASTER_MAKEUP_DB
+        # (0 = legacy peak-normalize to -1.0 dBFS). Jeffrey 2026-06-06.
+        episode_waveform, _makeup_db = _master_loudness(episode_waveform)
+        log.info("[EpisodeAssembler] Final loudness master: +%.1f dB makeup, "
+                 "-1.0 dBFS ceiling (post-crossfade)", _makeup_db)
 
         # Video-only pipeline - MP4 is written by OTR_SignalLostVideo.
         # No WAV or PNG files are saved here.
