@@ -38,3 +38,13 @@ try:  # pragma: no cover - trivial guard
     from . import z_image_turbo as _z_image_turbo  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# C3 (generic peer, default-OFF): the Qwen-Image (GGUF) adapter -- a 3rd image
+# engine carrying the layer to an OPEN set, via a DIFFERENT integration mode (the
+# in-stack ComfyUI-GGUF loader, no cu128 sidecar) behind the same protocol.
+# Cold-import clean; greyed until OTR_ENABLE_QWEN_IMAGE=1 + its GGUF weights exist.
+# Its own guard so a quirk in one adapter never blocks the others from registering.
+try:  # pragma: no cover - trivial guard
+    from . import qwen_image as _qwen_image  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
