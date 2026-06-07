@@ -10,5 +10,15 @@ Import-time is cold-import-clean (invariant V-12): importing this package +
 :mod:`registry` + any adapter descriptor pulls in NO heavy lib (torch /
 transformers / diffusers) -- a ``test_cold_import_no_heavy_libs`` asserts it.
 Adapters lazy-import their frameworks inside ``load`` / ``render_clip``, never at
-module scope. Keep this ``__init__`` free of eager adapter imports.
+module scope, so registering them here stays cold-import clean.
 """
+
+# CW-4: register the cheap radio-floor families on package import so the platform
+# is non-empty (selectable per role) before any heavy engine exists. They are
+# cold-import clean (lazy ffmpeg/PIL/torch inside render_clip), so this import
+# pulls in nothing heavy (invariant V-12, the cold-import test). Guarded so a
+# packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import cheap_families as _cheap_families  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

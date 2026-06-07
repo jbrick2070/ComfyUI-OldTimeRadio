@@ -321,6 +321,18 @@ _NODE_MODULES = {
     "OTR_MetaBriefImagePromptGen": (".nodes.otr_meta_brief_image_prompt", "OTRMetaBriefImagePromptGen", " Meta-Brief Image Prompt Gen"),
     "OTR_ImageGenDispatcher":      (".nodes.otr_image_gen_dispatcher",    "OTRImageGenDispatcher",      " Image Gen Dispatcher (cache + ledger + image_done)"),
 
+    # =========================================================================
+    # v2.0 Video render path (A-S3 / CW-4) -- M1 first watchable episode.
+    # The render output is composited into ONE always-silent canonical video
+    # (OTR_SilentComposite), then the FROZEN master audio is muxed on LAST
+    # (OTR_MasterAudioMux: -c:a copy, NO -shortest, byte-identical assert). Only
+    # MasterAudioMux may add audio (V-1). Cheap radio-floor families register in
+    # nodes/_otr_video_engines/cheap_families.py. The live episode render is an
+    # interactive ComfyUI smoke.
+    # =========================================================================
+    "OTR_SilentComposite":         (".nodes.otr_silent_composite",   "OTRSilentComposite",   " SilentComposite (render -> one always-silent video)"),
+    "OTR_MasterAudioMux":          (".nodes.otr_master_audio_mux",   "OTRMasterAudioMux",    " MasterAudioMux (terminal mux-LAST, -c:a copy)"),
+
 
 }
 
