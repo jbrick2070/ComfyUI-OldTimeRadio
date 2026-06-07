@@ -53,30 +53,14 @@ class TestHumoAudioPassthrough:
         # canonical form uses raw PCM input via -f f32le.
         assert "f32le" in src
 
-    def test_videocomposite_master_mix_uses_audio_copy(self):
-        """The downstream VideoComposite master_mix path MUST use
-        -c:a copy on the FINAL mux so the EpisodeAssembler audio
-        bytes reach the final mp4 unchanged. This is the
-        load-bearing surface for Prime Directive 1."""
-        src = _read_src("nodes/video_composite.py")
-        # The master_mix_per_clip_mux path must invoke -c:a copy on
-        # the final audio mux (the master mix audio comes from
-        # EpisodeAssembler and is the C7 byte-identity carrier).
-        assert "-c:a" in src
-        assert "-c copy" in src or "c:a copy" in src or "-c:a copy" in src
-
-    def test_videocomposite_strict_c7_widget_default_true(self):
-        """The strict_c7 widget gates fallback paths that would
-        introduce audio re-encoding. Default True means the run
-        FAILS LOUD instead of silently dropping into a path that
-        triple-AAC-encodes the audio."""
-        src = _read_src("nodes/video_composite.py")
-        # The strict_c7 widget must default True so Directive 1 is
-        # the default surface, not opt-in.
-        assert "strict_c7" in src
-        # The pattern is `"strict_c7": ("BOOLEAN", {"default": True})`
-        # which we lock loosely (default may be on a separate line).
-        assert '"default": True' in src or '"default":True' in src
+    # CW-4 legacy teardown (2026-06-07): the two VideoComposite C7 guards were
+    # DELETED -- nodes/video_composite.py was removed in the render-chain
+    # teardown (commits 691f2f0 / 0359403). The byte-identity carrier is now the
+    # terminal OTR_MasterAudioMux (-c:a copy, NO -shortest); its guarantee is
+    # asserted by tests/test_video_render_path_cw4.py
+    # (test_master_audio_mux_stream_hash_byte_identical) +
+    # tests/test_caption_burn_cw4.py, and the live audio spine by
+    # tests/test_audio_byte_identical.py. HuMo per-line passthrough above stays.
 
 
 class TestMusicGenC7Baseline:

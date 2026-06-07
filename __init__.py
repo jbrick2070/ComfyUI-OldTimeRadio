@@ -335,6 +335,7 @@ _NODE_MODULES = {
     # interactive ComfyUI smoke.
     # =========================================================================
     "OTR_SilentComposite":         (".nodes.otr_silent_composite",   "OTRSilentComposite",   " SilentComposite (render -> one always-silent video)"),
+    "OTR_CaptionBurn":             (".nodes.otr_caption_burn",       "OTRCaptionBurn",       " CaptionBurn (SDH open captions on the silent video; default-OFF)"),
     "OTR_MasterAudioMux":          (".nodes.otr_master_audio_mux",   "OTRMasterAudioMux",    " MasterAudioMux (terminal mux-LAST, -c:a copy)"),
 
 

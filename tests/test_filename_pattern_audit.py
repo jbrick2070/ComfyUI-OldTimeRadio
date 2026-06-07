@@ -80,10 +80,11 @@ ALLOWLIST = [
     # the same canonical path -- predictor, not writer. Single-source
     # contract still holds; allowlist entry covers the guard string.
     ("nodes/rtx_upscale.py", 'obs" / f"{ep_id}_procgen_blended.mp4"'),
-    # Composited mp4 -- VideoComposite writes otr/episodes/<ep>/composited/
-    # <episode_id>.mp4 by canonical convention. RTXUpscale picks it up
-    # via the src socket, not by reconstruction.
-    ("nodes/video_composite.py", 'out_dir / f"{episode_id}.mp4"'),
+    # CW-4 legacy teardown (2026-06-07): the nodes/video_composite.py allowlist
+    # entry was PRUNED -- VideoComposite was deleted in the render-chain teardown.
+    # The canonical composited mp4 is now produced by OTR_SilentComposite +
+    # OTR_MasterAudioMux (terminal, -c:a copy), neither of which reconstructs a
+    # disk path from an episode_id slug.
     # Procgen mp4 (signal_lost_<safe_title>_<ts>.mp4) -- write path
     # only. Treatment write below derives from this canonical name via
     # str.replace, not via slug reconstruction.
