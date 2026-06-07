@@ -352,6 +352,37 @@ def test_image_schema_extra_forbid():
         isc.CanonicalImage(image_id="i", role="r", object_id="o", path="p", nope=1)
 
 
+# --------------------------------------------------------------------------- #
+# disk-path handoff guard (PASS-PM C1): sidecar .png is read only once flushed
+def test_wait_for_file_ready_ok_and_timeout(tmp_path):
+    p = tmp_path / "ok.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 120)
+    assert disp.wait_for_file_ready(str(p), attempts=4, sleep_s=0.0) == str(p)
+    # missing file -> fail-closed timeout (never a silent bad image)
+    with pytest.raises(disp.ImageHandoffTimeout):
+        disp.wait_for_file_ready(str(tmp_path / "missing.png"), attempts=2, sleep_s=0.0)
+    # 0-byte / truncated handoff -> fail-closed timeout
+    z = tmp_path / "zero.png"
+    z.write_bytes(b"")
+    with pytest.raises(disp.ImageHandoffTimeout):
+        disp.wait_for_file_ready(str(z), attempts=2, sleep_s=0.0)
+
+
+def test_coerce_pixels_reads_png_path(tmp_path):
+    """The sidecar disk-path branch: a .png PATH is decoded to pixels (no IMAGE
+    tensor crosses the boundary) only after wait_for_file_ready confirms it."""
+    import numpy as np
+    from PIL import Image
+    px = np.full((6, 6, 3), 80, dtype=np.uint8)
+    p = tmp_path / "img.png"
+    Image.fromarray(px).save(p)
+    out = disp._coerce_pixels(str(p), wait_attempts=4, wait_sleep_s=0.0)
+    assert out.shape == (6, 6, 3)
+    # a never-ready path fails closed, never a wrong image
+    with pytest.raises(disp.ImageHandoffTimeout):
+        disp._coerce_pixels(str(tmp_path / "ghost.png"), wait_attempts=2, wait_sleep_s=0.0)
+
+
 @pytest.mark.requires_cuda
 def test_flux_gen1_passthrough_equality_gpu():
     """OPERATOR GPU SMOKE (skipped on CPU): the flux_gen1 adapter render must be
