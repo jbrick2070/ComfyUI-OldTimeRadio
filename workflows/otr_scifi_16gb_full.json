@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 85,
-  "last_link_id": 249,
+  "last_node_id": 86,
+  "last_link_id": 250,
   "nodes": [
     {
       "id": 63,
@@ -838,7 +838,7 @@
       "id": 85,
       "type": "OTR_MasterAudioMux",
       "pos": [
-        4320.0,
+        4800.0,
         80.0
       ],
       "size": [
@@ -858,7 +858,7 @@
         {
           "name": "silent_video_path",
           "type": "STRING",
-          "link": 247,
+          "link": 250,
           "widget": {
             "name": "silent_video_path"
           }
@@ -895,10 +895,70 @@
         }
       ],
       "flags": {},
-      "order": 12,
+      "order": 13,
       "mode": 0,
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
+    },
+    {
+      "id": 86,
+      "type": "OTR_CaptionBurn",
+      "pos": [
+        4320.0,
+        80.0
+      ],
+      "size": [
+        400,
+        220
+      ],
+      "title": "9b. Caption Burn (SDH open captions on the silent video; default-OFF)",
+      "properties": {
+        "Node name for S&R": "OTR_CaptionBurn"
+      },
+      "widgets_values": [
+        false,
+        "sdh_standard",
+        25,
+        "ffmpeg",
+        "",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "link": 247,
+          "widget": {
+            "name": "video_path"
+          }
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "links": [
+            250
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
     }
   ],
   "links": [
@@ -1114,7 +1174,7 @@
       247,
       84,
       0,
-      85,
+      86,
       0,
       "STRING"
     ],
@@ -1132,6 +1192,14 @@
       3,
       85,
       2,
+      "STRING"
+    ],
+    [
+      250,
+      86,
+      0,
+      85,
+      0,
       "STRING"
     ]
   ],
