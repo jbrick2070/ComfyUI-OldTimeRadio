@@ -28,12 +28,54 @@ import hashlib
 import json
 import logging
 import os
+import time
 
 log = logging.getLogger("OTR")
 
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_image_engines import registry as _ireg
+
+#: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
+#: smaller off the cross-process disk handoff is a 0-byte / truncated write,
+#: never a finished render.
+_MIN_PNG_BYTES = 67
+
+
+class ImageHandoffTimeout(RuntimeError):
+    """A sidecar-written image never became readable within the bounded retries.
+
+    A cu128 image sidecar writes its ``.png`` to disk and hands back the PATH; if
+    the main venv decodes it before the bytes are flushed it sees a 0-byte or
+    truncated file (PASS-PM C1 handoff race). The dispatcher treats this as a
+    fail-closed miss (warn + skip that object) -- never a silent bad image.
+    """
+
+
+def wait_for_file_ready(path, min_bytes: int = _MIN_PNG_BYTES,
+                        attempts: int = 40, sleep_s: float = 0.05) -> str:
+    """Block until ``path`` exists, is ``>= min_bytes``, and its size is STABLE
+    across two consecutive probes (the writer has stopped), then return it; raise
+    :class:`ImageHandoffTimeout` after the bounded retries.
+
+    Guards the cross-process disk-path handoff against a still-flushing or
+    0-byte ``.png``. Pure stdlib (os + time) -- cold-import clean (V-12).
+    """
+    last = -1
+    for _ in range(max(2, int(attempts))):
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            size = -1
+        if size >= int(min_bytes) and size == last:
+            return path
+        last = size
+        if sleep_s:
+            time.sleep(float(sleep_s))
+    raise ImageHandoffTimeout(
+        f"image handoff not ready: {path!r} (last size {last} bytes; "
+        f"need >= {min_bytes} and stable across two probes)"
+    )
 
 
 def _content_hash(obj) -> str:
@@ -66,14 +108,21 @@ def _assert_not_path(prompt: str) -> None:
         )
 
 
-def _coerce_pixels(result):
+def _coerce_pixels(result, *, min_bytes: int = _MIN_PNG_BYTES,
+                   wait_attempts: int = 40, wait_sleep_s: float = 0.05):
     """Decoded uint8 pixel array from a gen_fn result.
 
     A sidecar returns a ``.png`` PATH (disk-path handoff, never a tensor); an
     in-process gen returns a numpy uint8 array (a comfy IMAGE tensor must be
     ``.clone()``d + converted by the caller BEFORE here). Lazy PIL/numpy import.
+
+    On the PATH branch the file is read only AFTER :func:`wait_for_file_ready`
+    confirms it is fully flushed (PASS-PM C1 0-byte/truncated handoff race); a
+    never-ready file raises :class:`ImageHandoffTimeout`.
     """
     if isinstance(result, str):
+        wait_for_file_ready(result, min_bytes=min_bytes,
+                            attempts=wait_attempts, sleep_s=wait_sleep_s)
         from PIL import Image  # lazy (V-12)
         import numpy as np     # lazy
         return np.asarray(Image.open(result).convert("RGB"))
@@ -92,7 +141,9 @@ def apply_fresh_cap(n_requested: int, fresh_cap: int, beat_budget: int) -> int:
 
 
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
-                    gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0):
+                    gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
+                    handoff_min_bytes: int = _MIN_PNG_BYTES,
+                    handoff_wait_attempts: int = 40, handoff_wait_sleep_s: float = 0.05):
     """Generate (or cache-reuse) one portrait per character; stamp the ledger.
 
     ``gen_fn(request: dict) -> (numpy uint8 array | .png path)`` is the only GPU
@@ -149,11 +200,17 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         lease = None
         try:
             lease = _lease.acquire(timeout_s=lease_timeout_s, lockdir=lockdir)
-            pixels = _coerce_pixels(gen_fn(request))
+            pixels = _coerce_pixels(
+                gen_fn(request), min_bytes=handoff_min_bytes,
+                wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
+            )
             content_hash = _pl.compute_portrait_hash(pixels)
             path = _pl.stamp_portrait(ledger, cid, pixels, output_dir=output_dir)
         except _lease.LeaseTimeout as exc:
             warnings.append(f"{cid}: GPU lease timeout ({exc}); skipped")
+            continue
+        except ImageHandoffTimeout as exc:
+            warnings.append(f"{cid}: image handoff not ready ({exc}); skipped")
             continue
         finally:
             if lease is not None:

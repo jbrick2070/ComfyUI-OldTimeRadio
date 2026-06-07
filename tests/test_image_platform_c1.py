@@ -358,3 +358,85 @@ def test_flux_gen1_passthrough_equality_gpu():
     byte-equal to the legacy direct Flux output for the same request. Run on the
     5080; do NOT fake. Placeholder marker so the contract is visible + collected."""
     pytest.skip("operator GPU smoke -- run on the 5080 (passthrough-equality + golden-image)")
+
+
+# --------------------------------------------------------------------------- #
+# CW-IMG hardening -- cross-process disk-path handoff readiness (PASS-PM C1).
+# A cu128 image sidecar writes a .png and returns its PATH; the main venv must
+# not decode a 0-byte / still-flushing file. wait_for_file_ready guards that
+# race and the dispatcher treats a never-ready handoff as a fail-closed miss.
+# --------------------------------------------------------------------------- #
+def _write_png(path, val=123, size=8):
+    from PIL import Image
+    import numpy as np
+    Image.fromarray(np.full((size, size, 3), int(val), dtype=np.uint8)).save(path, format="PNG")
+    return str(path)
+
+
+def test_wait_for_file_ready_accepts_complete_png(tmp_path):
+    p = _write_png(tmp_path / "ready.png")
+    assert disp.wait_for_file_ready(p, attempts=5, sleep_s=0.0) == p
+
+
+def test_wait_for_file_ready_rejects_zero_byte(tmp_path):
+    z = tmp_path / "empty.png"
+    z.write_bytes(b"")                       # 0-byte handoff (the race)
+    with pytest.raises(disp.ImageHandoffTimeout):
+        disp.wait_for_file_ready(str(z), attempts=3, sleep_s=0.0)
+
+
+def test_wait_for_file_ready_rejects_missing(tmp_path):
+    with pytest.raises(disp.ImageHandoffTimeout):
+        disp.wait_for_file_ready(str(tmp_path / "nope.png"), attempts=3, sleep_s=0.0)
+
+
+def test_coerce_pixels_reads_sidecar_png_path(tmp_path):
+    """The disk-path handoff: a .png PATH decodes to a uint8 pixel array."""
+    p = _write_png(tmp_path / "side.png", val=200, size=8)
+    px = disp._coerce_pixels(p, wait_attempts=5, wait_sleep_s=0.0)
+    assert px.shape == (8, 8, 3) and int(px[0, 0, 0]) == 200
+
+
+def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path):
+    """End-to-end disk-path handoff: gen_fn returns a .png PATH (sidecar shape),
+    the dispatcher waits for it, content-addresses it + stamps the ledger."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}}
+    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    side = _write_png(tmp_path / "from_sidecar.png", val=77)
+
+    led, done, _r, warns = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=lambda _req: side,
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+        handoff_wait_attempts=5, handoff_wait_sleep_s=0.0,
+    )
+    assert warns == []
+    img = led["images"]["images"][0]
+    assert img["path"].replace("\\", "/").endswith(
+        f"otr/stills/{img['portrait_content_hash']}.png"
+    )
+    assert done.startswith("image:done:")
+
+
+def test_dispatcher_skips_truncated_handoff_fail_closed(clean_image_registry, tmp_path):
+    """A 0-byte sidecar handoff -> that object simply has no image (warned),
+    never a crash and never a silent bad render (PASS-PM C1, fail-closed)."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}}
+    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    empty = tmp_path / "truncated.png"
+    empty.write_bytes(b"")
+
+    led, _done, _r, warns = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=lambda _req: str(empty),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+        handoff_wait_attempts=2, handoff_wait_sleep_s=0.0,
+    )
+    assert led["images"]["images"] == []
+    assert any("handoff not ready" in w for w in warns)
