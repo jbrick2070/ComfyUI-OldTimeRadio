@@ -47,12 +47,16 @@ def _load_heavy():
     return ("proxy", t)
 
 
-def _teardown(handle):
+def _free_cuda():
+    """Release CUDA caching-allocator memory. The CALLER must drop its OWN
+    reference to the heavy handle FIRST (``= None`` / ``del``) -- deleting a
+    function parameter cannot free an object the caller still holds (the BUG-291
+    lesson: clear the holder's ref BEFORE empty_cache, or nothing is freed)."""
     import torch
-    del handle
     gc.collect()
     try:
         torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
         torch.cuda.synchronize()
     except Exception:  # noqa: BLE001
         pass
@@ -71,13 +75,14 @@ def main() -> int:
     base = gr.probe_used_mb()
     h1 = _load_heavy()
     load1 = gr.probe_used_mb()
-    _teardown(h1)
-    after = gr.probe_used_mb()
+    h1 = None                       # drop the holder's ref BEFORE empty_cache
+    _free_cuda()
     gr.wait_until_below_mb(base + TOL_MB, attempts=5, sleep_s=1.0)
     after = gr.probe_used_mb()
     h2 = _load_heavy()
     load2 = gr.probe_used_mb()
-    _teardown(h2)
+    h2 = None
+    _free_cuda()
 
     print(f"PROBE a: baseline={base} load1={load1} post_teardown={after} reload2={load2} MB")
     leaked = after - base

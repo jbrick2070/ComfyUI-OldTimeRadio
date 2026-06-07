@@ -25,7 +25,8 @@ SILENT = os.getenv("OTR_SILENT_CLIP", "").strip()
 
 
 def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
 
 
 def _pcm_sha(path):
