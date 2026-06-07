@@ -70,7 +70,12 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_SFXGenerator",           # legacy single-line node
     "OTR_VoiceRender",            # legacy aggregator
     "OTR_BatchKokoroGenerator",   # replaced by OTR_KokoroAnnouncer
-    "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + OTR_VideoComposite
+    "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + the (now also removed) legacy compositor
+    # CW-4 legacy render-path teardown (2026-06-07): the legacy in-graph
+    # compositor mixed audio with ffmpeg -shortest (forbidden by the
+    # frozen-audio spine). Replaced by SignalLostVideo -> OTR_SilentComposite
+    # -> OTR_MasterAudioMux (terminal mux, -c:a copy, no -shortest).
+    "OTR_VideoComposite",
     # Lean-down 2026-05-29 (step 6): the dormant Story Room writers'-room
     # cluster (Director / Editor / Story Room / Extract / Commit) was
     # deleted. Tombstoned so a stale workflow JSON referencing one of

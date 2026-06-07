@@ -270,11 +270,15 @@ _NODE_MODULES = {
     # cannot animate non-face references; LTX is the answer for
     # "the radio is the visual performer for non-dialogue."
     "OTR_BatchLTXRender":          (".nodes.batch_ltx_render", "BatchLTXRender", " Batch LTX Render (radio for music/sfx/announcer)"),
-    # v2.0 in-graph episode compositor. Pillarbox HuMo center 624x1080
-    # in 1920x1080 canvas + additive-blend SignalLostVideo proc gen at
-    # 50% opacity + audio mux from proc gen. Single ffmpeg invocation.
-    # Replaces scripts/render_episode_concat.py for production use.
-    "OTR_VideoComposite":          (".nodes.video_composite", "VideoComposite", " Video Composite (1080p)"),
+    # OTR_VideoComposite -- DELETED (CW-4 legacy render-path teardown,
+    # 2026-06-07). The legacy episode compositor mixed audio inside the
+    # graph (master_mix / per-clip-mux / humo_concat) and used
+    # ffmpeg `-shortest`, which the frozen-audio spine forbids. The new
+    # render path is SignalLostVideo -> OTR_SilentComposite (always
+    # silent, no audio) -> OTR_MasterAudioMux (terminal, -c:a copy, NO
+    # -shortest, byte-identical master). The type is tombstoned in the
+    # workflow validator's DELETED_NODE_TYPES so any stale workflow JSON
+    # naming it fails loudly at validation; such graphs must be re-saved.
     # v2.0 final-stage RTX VSR upscaler. Path-in / path-out wrapper around
     # NVIDIA's RTXVideoSuperResolution that preserves C7 audio identity:
     # decodes video frames in chunks via ffmpeg pipe, runs nvvfx HW-accel
