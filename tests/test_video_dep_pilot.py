@@ -1,0 +1,135 @@
+"""A-S4 -- the video dependency-pilot harness (scripts/otr_video_dep_pilot).
+
+Headless structure tests. The opt-in video engine libraries are absent in the
+pytest sandbox, so every probe must report ``lib_absent`` WITHOUT crashing and
+WITHOUT importing a banned dependency. Locks the pure helpers, the absent-lib
+behavior, and the no-drift contract with the real video registry.
+"""
+from __future__ import annotations
+
+import importlib.util
+import pathlib
+import sys
+
+import pytest
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+PILOT_SRC = REPO_ROOT / "scripts" / "otr_video_dep_pilot.py"
+
+
+def _load_pilot():
+    spec = importlib.util.spec_from_file_location("otr_video_dep_pilot", PILOT_SRC)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+PILOT = _load_pilot()
+
+
+# --------------------------------------------------------------------------- #
+# Pure helpers
+# --------------------------------------------------------------------------- #
+def test_snapshot_violations_flags_torch_change_and_banned_deps():
+    clean = {"torch": "2.10.0", "xformers": False, "flash_attn": False,
+             "sageattention": False}
+    assert PILOT.snapshot_violations(clean, clean) == []
+
+    swapped = dict(clean, torch="2.8.0")
+    assert any("torch version changed" in v
+               for v in PILOT.snapshot_violations(clean, swapped))
+
+    pulled = dict(clean, sageattention=True)
+    assert any("sageattention" in v
+               for v in PILOT.snapshot_violations(clean, pulled))
+
+
+def test_dep_snapshot_shape():
+    snap = PILOT.dep_snapshot()
+    assert set(snap) == {"torch", "xformers", "flash_attn", "sageattention"}
+    assert snap["torch"] is not None
+    for dep in ("xformers", "flash_attn", "sageattention"):
+        assert isinstance(snap[dep], bool)
+
+
+# --------------------------------------------------------------------------- #
+# Probe behavior (headless: libraries absent)
+# --------------------------------------------------------------------------- #
+def test_probe_one_absent_lib_is_clean_and_imports_no_banned_dep():
+    for name in PILOT.OPT_IN_ENGINES:
+        v = PILOT.probe_one(name, do_import=True)
+        assert v["engine"] == name
+        # Library absent in the sandbox -> a clean, non-crashing verdict.
+        assert v["status"] in {"lib_absent", "import_error"}, v
+        assert v["adapter_registered"] is True, "adapter must be registered"
+        assert "TODO-for-GPU-smoke" in v["assumed_call"]
+        assert v["import_clean_ready"] is False
+    # The probes must not have dragged a banned dep into this process.
+    for dep in ("xformers", "flash_attn", "sageattention"):
+        assert dep not in sys.modules
+
+
+def test_probe_one_unknown_engine():
+    assert PILOT.probe_one("not_a_real_engine")["status"] == "unknown_engine"
+
+
+def test_probe_one_no_import_reports_structure_only():
+    v = PILOT.probe_one("latentsync", do_import=False)
+    assert v["status"] == "not_imported"
+    assert v["adapter_registered"] is True
+    assert v["forward_present"] is True
+
+
+def test_run_pilot_in_process_headless_not_ready():
+    report = PILOT.run_pilot(isolated=False)
+    assert report["engine_count"] == len(PILOT.OPT_IN_ENGINES)
+    assert report["ready_count"] == 0          # libs absent -> nothing import-clean-ready
+    assert report["all_imports_clean"] is False
+    assert {v["engine"] for v in report["engines"]} == set(PILOT.OPT_IN_ENGINES)
+
+
+# --------------------------------------------------------------------------- #
+# No-drift contract with the real video registry
+# --------------------------------------------------------------------------- #
+def test_opt_in_engines_match_registry_adapters():
+    from nodes._otr_video_engines.registry import get_engine
+
+    for name, spec in PILOT.OPT_IN_ENGINES.items():
+        adapter = get_engine(name)             # raises if the name is unregistered
+        assert type(adapter).__name__ == spec["adapter_class"]
+        assert hasattr(adapter, spec["forward"]), (
+            f"{name} adapter is missing its forward {spec['forward']!r}"
+        )
+        assert adapter.requires_flag == spec["flag"]
+
+
+def test_pilot_covers_exactly_the_flag_gated_video_engines():
+    """The pilot covers every registered video engine that runs behind an opt-in
+    flag (the sidecar-isolated ones). Cheap radio-floor families + migration
+    peers have no flag and no external lib to probe, so they are excluded."""
+    from nodes._otr_video_engines import registry as vreg
+
+    gated = {n for n in vreg.all_engine_names()
+             if getattr(vreg.get_engine(n), "requires_flag", None)}
+    assert set(PILOT.OPT_IN_ENGINES) == gated
+
+
+def test_new_source_is_ascii_no_em_dash():
+    # The worker + install scripts (scripts/_*) are gitignored by repo
+    # convention (same as the chatterbox / dia sidecars) so they live only in
+    # the working tree; check them WHEN PRESENT but never fail a clean checkout.
+    for src_path in (
+        PILOT_SRC,
+        REPO_ROOT / "nodes" / "_otr_video_engines" / "eng_latentsync.py",
+        REPO_ROOT / "nodes" / "_otr_shared" / "sidecar.py",
+        REPO_ROOT / "scripts" / "_otr_latentsync_worker.py",
+    ):
+        if not src_path.exists():
+            continue
+        src = src_path.read_text(encoding="utf-8")
+        assert "—" not in src, f"em-dash forbidden in {src_path.name} (CLAUDE.md)"
+        src.encode("ascii")                    # ASCII-only source
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))
