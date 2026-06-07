@@ -1111,7 +1111,11 @@ def _save_clip_via_ffmpeg(
             "-preset", "medium",
         ]
         if have_audio:
-            cmd += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
+            # No -shortest (CW-4 frozen-audio spine): the per-line video
+            # frames and audio are equal-length by construction, and the
+            # terminal OTR_MasterAudioMux owns final audio. -shortest could
+            # only truncate the tail, never help -- so it is forbidden here.
+            cmd += ["-c:a", "aac", "-b:a", "192k"]
         cmd += [str(out_path)]
 
         proc = subprocess.run(cmd, capture_output=True, text=True)

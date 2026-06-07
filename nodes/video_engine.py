@@ -458,7 +458,12 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
-        "-shortest",
+        # No -shortest (CW-4 frozen-audio spine): the procedural video
+        # includes the Telemetry HUD credits post-roll, which intentionally
+        # runs LONGER than the episode audio. -shortest would truncate the
+        # end credits to the audio length -- never what we want. The exact
+        # frame count is piped from total_frames, so the output is bounded
+        # without it.
         "-movflags", "+faststart",
         output_path,
     ])

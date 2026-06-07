@@ -278,14 +278,18 @@ class VisualRenderer:
                 ]
                 _log("Video >= audio; capping output to exact audio length.")
         else:
+            # Probe failed: we cannot cap to an exact duration, but the
+            # CW-4 frozen-audio spine forbids -shortest (it could truncate
+            # the master audio when video < audio). Copy both streams with
+            # no length cap so the FULL audio always survives (C7); the
+            # container simply runs to the longer stream.
             cmd_mux += [
                 "-c:v", "copy",
                 "-c:a", "copy",
-                "-shortest",
             ]
             _log(
-                "Duration probe failed; falling back to -shortest "
-                "(C7 risk if video < audio)."
+                "Duration probe failed; muxing without -shortest so the "
+                "full master audio is never truncated (C7-safe)."
             )
 
         cmd_mux.append(str(out_path))
