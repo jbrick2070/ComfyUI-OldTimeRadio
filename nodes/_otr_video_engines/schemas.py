@@ -292,3 +292,9 @@ class VideoLedgerSection(_Forbid):
     execution_groups: list[ExecutionGroup] = Field(default_factory=list)
     roles: dict = Field(default_factory=dict)
     shots: list[ShotRow] = Field(default_factory=list)
+    #: A-S7 durable audit trail: one record per in-render LOUD fallback swap
+    #: (see nodes/_otr_shared/retry_taxonomy.build_fallback_decision). Appended
+    #: at the SAME video_revision -- a fallback restamp is a within-revision
+    #: degradation, never a re-lock. Loose dicts (like ``roles``), not a nested
+    #: model, so the render node can append without a schema round-trip.
+    runtime_fallback_decisions: list = Field(default_factory=list)
