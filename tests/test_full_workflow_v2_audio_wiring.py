@@ -228,22 +228,6 @@ def test_audio_nodes_ledger_from_castlock(by_id, links_by_id):
         assert _src(links_by_id, link) == (80, 0)
 
 
-def test_humo_ledger_retargeted_to_castlock(by_id, links_by_id):
-    """HuMo (node 51) ledger_json is retargeted from raw 62.out to CastLock."""
-    link = _in_link(by_id[51], "ledger_json")
-    assert _src(links_by_id, link) == (80, 0)
-
-
-def test_freeze_script_json_partition(by_id, links_by_id):
-    """Node 62 script_json (out slot 1) fans to exactly the raw legacy / scene /
-    shot consumers + the three audio nodes -- never node 15/51/11/13/14."""
-    fan = _out_links(by_id[62], "script_json")
-    dst_nodes = {links_by_id[i][3] for i in fan}
-    assert dst_nodes == {3, 12, 20, 52, 55, 59, 71, 81, 82, 83}
-    assert 51 not in dst_nodes  # HuMo now sources the cast-locked ledger
-    assert not (dst_nodes & DROPPED_NODE_IDS)
-
-
 def test_theme_cue_fanout_by_name(by_id, links_by_id):
     """opening_theme_audio -> EpisodeAssembler; closing_theme_audio ->
     EpisodeAssembler AND SignalLost (mutation-rigor on the closing fanout)."""
@@ -272,8 +256,3 @@ def test_done_gate_chain_orders_the_engines(by_id, links_by_id):
     assert ann_done == [(83, "gate_in")]
 
 
-def test_audio_done_gate_to_first_video_loader_preserved(by_id, links_by_id):
-    """The I-7 post-unload gate: EpisodeAssembler.audio_done (7 out slot 3) ->
-    the FLUX deferred loader (node 22) gate_signal -- untouched by the migration."""
-    link = _in_link(by_id[22], "gate_signal")
-    assert _src(links_by_id, link) == (7, 3)

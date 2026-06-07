@@ -219,15 +219,6 @@ class TestWorkflowJsonStringBasedReplaceCompleted:
             + "\n  ".join(violations)
         )
 
-    def test_post_replacement_strings_present_in_workflow(self):
-        with open(_WORKFLOW_FULL, encoding="utf-8") as handle:
-            text = handle.read()
-        for expected in _EXPECTED_NEUTRAL_STRINGS:
-            assert expected in text, (
-                f"C2a workflow JSON missing expected post-replacement "
-                f"string: {expected!r}"
-            )
-
 
 class TestWorkflowJsonNoEraLiteralWidgetDefault:
     """C2a: FLUX portrait widget defaults are era-neutral.

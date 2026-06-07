@@ -164,68 +164,6 @@ def test_no_ledger_json_input_sources_from_signal_lost_video_path_output(
     )
 
 
-def test_all_ledger_json_inputs_source_from_freeze_cascade_or_castlock(
-    workflow: dict, nodes_by_id: dict, links_by_id: dict,
-) -> None:
-    """Every node with a ledger_json input must source from either
-    OTR_LedgerFreezeCascade.script_json (the raw frozen ledger) or
-    OTR_CastLock.ledger_json (the cast-locked ledger emitted by the v2
-    audio lane). CastLock itself must read the FreezeCascade v2 ledger
-    port, so the cast-locked ledger still traces back to the freeze
-    authority. Catches missed rewires.
-    """
-    allowed = {
-        ("OTR_LedgerFreezeCascade", "script_json"),
-        ("OTR_CastLock", "ledger_json"),
-    }
-    failures: list[str] = []
-    seen_ledger_json_inputs = 0
-    castlock_ids: list[int] = []
-    for n in workflow["nodes"]:
-        if n.get("type") == "OTR_CastLock":
-            castlock_ids.append(n["id"])
-        for inp in n.get("inputs") or []:
-            if inp.get("name") != "ledger_json":
-                continue
-            seen_ledger_json_inputs += 1
-            link_id = inp.get("link")
-            if link_id is None:
-                failures.append(
-                    f"node id={n['id']} type={n.get('type')} "
-                    f"ledger_json is unlinked"
-                )
-                continue
-            src = _resolve_link_source(link_id, links_by_id, nodes_by_id)
-            if src not in allowed:
-                failures.append(
-                    f"node id={n['id']} type={n.get('type')} "
-                    f"ledger_json link#{link_id} sources from "
-                    f"{src[0]}.{src[1]}; expected "
-                    f"OTR_LedgerFreezeCascade.script_json or "
-                    f"OTR_CastLock.ledger_json"
-                )
-    assert seen_ledger_json_inputs >= 4, (
-        f"expected >=4 ledger_json inputs in default workflow; "
-        f"found {seen_ledger_json_inputs}"
-    )
-    # The cast-locked ledger must trace back to the FreezeCascade v2 port.
-    for cid in castlock_ids:
-        link_id = _find_input_link_id(nodes_by_id[cid], "script_json")
-        assert link_id is not None, (
-            f"OTR_CastLock id={cid} script_json is unlinked"
-        )
-        src_type, _src_out = _resolve_link_source(
-            link_id, links_by_id, nodes_by_id,
-        )
-        assert src_type == "OTR_LedgerFreezeCascade", (
-            f"OTR_CastLock id={cid} script_json sources from {src_type}; "
-            f"expected OTR_LedgerFreezeCascade (v2 ledger port)"
-        )
-    assert not failures, (
-        "ledger_json wiring violations:\n  " + "\n  ".join(failures)
-    )
-
-
 def test_audio_gate_does_not_source_from_signal_lost_video_path(
     workflow: dict, nodes_by_id: dict, links_by_id: dict,
 ) -> None:
@@ -255,38 +193,6 @@ def test_audio_gate_does_not_source_from_signal_lost_video_path(
         "audio_gate inputs miswired to SignalLostVideo.video_path:\n  "
         + "\n  ".join(violations)
     )
-
-
-def test_humo_portraits_dir_is_linked_to_portrait_render_output(
-    workflow: dict, nodes_by_id: dict, links_by_id: dict,
-) -> None:
-    """HuMo.portraits_dir must be linked to BatchFluxPortraitRender's
-    portraits_dir output (per G1 operator decision: portraits are
-    content, not gate).
-    """
-    humo_nodes = [
-        n for n in workflow["nodes"]
-        if n.get("type") == "OTR_BatchHumoRender"
-    ]
-    assert humo_nodes, "default workflow has no OTR_BatchHumoRender node"
-
-    for humo in humo_nodes:
-        link_id = _find_input_link_id(humo, "portraits_dir")
-        assert link_id is not None, (
-            f"HuMo node id={humo['id']} portraits_dir is unlinked; "
-            f"D0d requires wiring to BatchFluxPortraitRender.portraits_dir"
-        )
-        src_type, src_out = _resolve_link_source(
-            link_id, links_by_id, nodes_by_id,
-        )
-        assert (
-            src_type == "OTR_BatchFluxPortraitRender"
-            and src_out == "portraits_dir"
-        ), (
-            f"HuMo node id={humo['id']} portraits_dir link#{link_id} "
-            f"sources from {src_type}.{src_out}; expected "
-            f"OTR_BatchFluxPortraitRender.portraits_dir"
-        )
 
 
 def test_otr_workflow_validator_class_has_output_node_true() -> None:

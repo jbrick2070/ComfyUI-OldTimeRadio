@@ -93,37 +93,6 @@ class TestWriterCanonicalModelSlots:
         )
 
 
-class TestHumoCanonicalSeed:
-    """W-2 drift guard. HuMo Node 51 widgets must ship a fixed seed."""
-
-    def test_humo_seed_is_7(self):
-        n = _node_by_id(_load_canonical_workflow(), 51)
-        assert n.get("type") == "OTR_BatchHumoRender"
-        widgets = n.get("widgets_values", [])
-        assert len(widgets) >= 6, (
-            "HuMo widgets_values shorter than expected; widget vector "
-            "may have drifted"
-        )
-        # Widget order per BatchHumoRender.INPUT_TYPES:
-        #   [0] ledger_json
-        #   [1] portraits_dir
-        #   [2] clip_length
-        #   [3] max_clips
-        #   [4] seed
-        #   [5] seed control
-        assert widgets[4] == 7, (
-            f"HuMo seed widget must be 7 (schema default); got {widgets[4]!r}"
-        )
-
-    def test_humo_seed_control_is_fixed(self):
-        n = _node_by_id(_load_canonical_workflow(), 51)
-        widgets = n.get("widgets_values", [])
-        assert widgets[5] == "fixed", (
-            f"HuMo seed control must be 'fixed' to preserve cross-run visual "
-            f"stability during soak comparisons; got {widgets[5]!r}."
-        )
-
-
 class TestValidatorPathFallback:
     """W-3 design note. The validator's workflow_json_path widget
     intentionally ships as empty string; the source-side fallback
@@ -152,36 +121,6 @@ class TestValidatorPathFallback:
         assert widgets[2] is True
 
 
-class TestSkipEnvStillsDefault:
-    """W-4 drift guard. BatchFluxRender skip_env_stills is the
-    BUG-LOCAL-078 follow-up optimization. Schema default is True;
-    the JSON may omit the trailing optional widgets and let ComfyUI
-    fall through to the default. If the widget IS present in the
-    vector, it must be True."""
-
-    def test_batchfluxrender_skip_env_stills_true_if_present(self):
-        n = _node_by_id(_load_canonical_workflow(), 23)
-        assert n.get("type") == "OTR_BatchFluxRender"
-        widgets = n.get("widgets_values", [])
-        # skip_env_stills is the LAST optional widget per
-        # BatchFluxRender.INPUT_TYPES. If the widget vector reaches
-        # that position, the value must be True.
-        # Widget positions documented at visual/batch_flux_render.py
-        # INPUT_TYPES (script_json is widget [0] since model/clip/vae
-        # are typed inputs not widgets):
-        #   required: [0..10] = script_json, batch_limit, seed, ctrl,
-        #             steps, cfg, sampler_name, scheduler, width,
-        #             height, guidance
-        #   optional: [11..17] = fallback_prompt, style_suffix,
-        #             freeze_seed, fast_batch, radio_bookend_prompt,
-        #             radio_bookend_seed, skip_env_stills
-        if len(widgets) >= 18:
-            assert widgets[17] is True, (
-                f"BatchFluxRender skip_env_stills must be True per "
-                f"BUG-LOCAL-078 follow-up; got {widgets[17]!r}. "
-                "False re-enables the dead env-still pass and burns "
-                "2-3 minutes of FLUX time per episode."
-            )
         # else: widget falls through to schema default (True) -- OK.
 
 

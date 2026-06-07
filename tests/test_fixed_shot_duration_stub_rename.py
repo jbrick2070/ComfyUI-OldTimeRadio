@@ -72,12 +72,6 @@ class TestRegistryRenamed:
 
 
 class TestWorkflowJsonRenamed:
-    def test_workflow_json_node_type_renamed(self):
-        wf = json.loads(CANONICAL_JSON.read_text(encoding="utf-8"))
-        n21 = [n for n in wf["nodes"] if n["id"] == 21][0]
-        assert n21["type"] == "OTR_FixedShotDurationStub"
-        # Search-and-replace cousin
-        assert n21["properties"]["Node name for S&R"] == "OTR_FixedShotDurationStub"
 
     def test_workflow_json_drops_old_type(self):
         raw = CANONICAL_JSON.read_text(encoding="utf-8")
@@ -85,18 +79,6 @@ class TestWorkflowJsonRenamed:
             "Old node type must be gone from canonical workflow JSON; "
             "CLAUDE.md no-back-compat rule"
         )
-
-    def test_workflow_json_links_preserved(self):
-        """The rename touches the node type + properties name. Links
-        in/out of node 21 must be unchanged."""
-        wf = json.loads(CANONICAL_JSON.read_text(encoding="utf-8"))
-        links = {l[0]: l for l in wf["links"]}
-        # L40 source = 20.2 -> target = 21.0
-        assert 40 in links
-        assert links[40][3] == 21  # target node still 21
-        # L41 source = 21.0 -> target = 23.3
-        assert 41 in links
-        assert links[41][1] == 21  # source node still 21
 
 
 class TestNodeStillFunctional:

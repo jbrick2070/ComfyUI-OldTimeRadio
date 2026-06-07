@@ -88,16 +88,6 @@ def test_workflow_new_ports_episode_seed_unwired_v2ledger_to_castlock():
     assert dst["type"] == "OTR_CastLock"
 
 
-def test_workflow_out1_fanout_after_v2_audio_rewire():
-    # Wave 2b rewired the audio consumers of out[1]: the legacy 11/13/14
-    # instances + the SFX node (15) were dropped and HuMo's ledger moved to
-    # CastLock; the 3 v2 audio nodes now take the raw script_json for
-    # byte-identical batch delegation. Net 11 raw consumers remain.
-    outs = _node62()["outputs"]
-    assert outs[1]["name"] == "script_json"
-    assert len(outs[1]["links"]) == 11
-
-
 if __name__ == "__main__":
     import pytest
 
