@@ -131,5 +131,60 @@ def test_new_source_is_ascii_no_em_dash():
         src.encode("ascii")                    # ASCII-only source
 
 
+# --------------------------------------------------------------------------- #
+# Custom-node startup-contamination scan (KJNodes gate F + torch.hub ban)
+# --------------------------------------------------------------------------- #
+def test_scan_source_detects_module_scope_contaminant():
+    src = "import os\nimport sageattention\nfrom xformers import ops\n"
+    f = PILOT.scan_source_for_contaminants(src)
+    assert f["module_scope_imports"] == ["sageattention", "xformers"]
+    assert f["torch_hub_load"] is False and f["parse_error"] is False
+
+
+def test_scan_source_ignores_function_scope_import():
+    # A lazy import inside a function is NOT a startup contaminant.
+    src = "def f():\n    import sageattention\n    return sageattention\n"
+    f = PILOT.scan_source_for_contaminants(src)
+    assert f["module_scope_imports"] == []
+
+
+def test_scan_source_detects_torch_hub_load():
+    f = PILOT.scan_source_for_contaminants("import torch\nm = torch.hub.load('a/b', 'c')\n")
+    assert f["torch_hub_load"] is True
+
+
+def test_scan_source_parse_error_recorded_not_raised():
+    f = PILOT.scan_source_for_contaminants("def (:\n")
+    assert f["parse_error"] is True and f["module_scope_imports"] == []
+
+
+def test_scan_custom_nodes_flags_contaminated_node(tmp_path):
+    (tmp_path / "CleanNode").mkdir()
+    (tmp_path / "CleanNode" / "__init__.py").write_text("import os\n", encoding="utf-8")
+    (tmp_path / "BadNode").mkdir()
+    (tmp_path / "BadNode" / "__init__.py").write_text(
+        "import sageattention\n", encoding="utf-8")
+    report = PILOT.scan_custom_nodes(str(tmp_path))
+    assert report["scanned_dir_present"] is True
+    assert report["startup_audit_clean"] is False
+    assert {n["node"] for n in report["flagged_nodes"]} == {"BadNode"}
+
+
+def test_scan_custom_nodes_headless_missing_dir_is_clean(tmp_path):
+    report = PILOT.scan_custom_nodes(str(tmp_path / "does_not_exist"))
+    assert report["scanned_dir_present"] is False
+    assert report["startup_audit_clean"] is True and report["flagged_nodes"] == []
+
+
+def test_run_pilot_report_includes_custom_node_scan():
+    report = PILOT.run_pilot(isolated=False)
+    assert "custom_node_scan" in report
+    scan = report["custom_node_scan"]
+    assert set(scan) >= {"custom_nodes_dir", "scanned_dir_present",
+                         "flagged_nodes", "startup_audit_clean",
+                         "startup_contaminants"}
+    assert report["startup_audit_clean"] in (True, False)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -1,0 +1,288 @@
+"""Shared in-process motion-engine helpers (A-S5 / CW-6: LTX + Wan).
+
+The motion video engines -- ltx_video (text->video), wan_i2v (image->video), and
+humo (A-S6) -- run IN-PROCESS in the main ComfyUI cu130 / torch-2.10 venv: they
+call the installed ComfyUI wrapper node classes directly (no GraphBuilder),
+unlike the Path-B latentsync subprocess sidecar. This module factors the pieces
+those in-process motion adapters share, so each adapter file stays small and
+every guard is tested once:
+
+* MotionEngineBase -- the AS-3 single-heavy-engine GPU residency lease on
+  ``prepare`` plus a V-4 patcher-detach ``teardown`` that NEVER calls
+  ``unload_all_models``;
+* the BUG-070 SageAttention contamination gate -- int8-PV SageAttention
+  process-aborts LTX with NO traceback, so ``ltx_video`` fails CLOSED before its
+  first forward (``assert_sage_not_patched``) and ``wan_i2v`` is routed to a
+  sidecar when Sage is resident (``resolve_isolation``);
+* ``init_image`` aspect handling that maps a source image into the canvas with a
+  SINGLE uniform scale (``resolve_aspect_transform`` / ``assert_no_silent_stretch``)
+  so a portrait init never silently stretches into a landscape canvas
+  (pre-mortem N9).
+
+Cold-import clean (V-12): module scope imports only the stdlib + the dep-free
+shared GPU lease + the dep-free registry error types. torch / diffusers / the LTX
+/ Wan wrappers are imported LAZILY inside each adapter's ``load`` / ``render_clip``
+(the GPU-smoke render slice), never here. UTF-8, no BOM, ASCII-only source.
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+from .._otr_shared import gpu_residency as _GR
+from .registry import EngineUnusable, EngineUsabilityReason
+
+#: Machine-wide VRAM ceiling for the single resident heavy engine (A invariant).
+VRAM_CEILING_MB = 14500
+
+#: Aspect policies an init image may be fit into the canvas with (mirrors
+#: schemas.Canvas.aspect_policy). Each uses ONE uniform scale, so the aspect ratio
+#: is preserved; the forbidden behavior -- an implicit non-uniform stretch -- is
+#: never emitted.
+ASPECT_POLICIES = ("pad", "crop", "fit")
+DEFAULT_ASPECT_POLICY = "pad"
+
+#: Engine isolation tiers (schemas dependency_manifest.isolation).
+ISOLATION_IN_PROCESS = "in_process"
+ISOLATION_SIDECAR_REQUIRED = "sidecar_required"
+ISOLATION_SIDECAR_OPTIONAL = "sidecar_optional"
+
+
+# --------------------------------------------------------------------------- #
+# BUG-070 SageAttention contamination gate
+# --------------------------------------------------------------------------- #
+def sageattention_patched(modules=None, env=None):
+    """True if SageAttention is RESIDENT / forced on (not merely installed).
+
+    Detected WITHOUT importing anything heavy: a custom node that activates
+    SageAttention (e.g. KJNodes) leaves ``sageattention`` in ``sys.modules`` at
+    startup, and an explicit operator override ``OTR_SAGEATTENTION_PATCHED=1``
+    forces the gate closed for a wrapper that monkeypatched comfy attention
+    without leaving the module visible. Pure + side-effect free (reads
+    ``sys.modules`` / ``os.environ`` only; never imports sageattention).
+    """
+    mods = sys.modules if modules is None else modules
+    if "sageattention" in mods:
+        return True
+    environ = os.environ if env is None else env
+    return environ.get("OTR_SAGEATTENTION_PATCHED", "0") == "1"
+
+
+def assert_sage_not_patched(engine_name, family, *, modules=None, env=None):
+    """Fail CLOSED (BUG-070) if SageAttention is patched/resident.
+
+    int8-PV SageAttention process-aborts LTX-Video with NO traceback, so a motion
+    engine that cannot tolerate it must refuse to run BEFORE the first forward.
+    Raises :class:`EngineUnusable` (INCOMPATIBLE_PROFILE) when patched; returns
+    ``engine_name`` when clear.
+    """
+    if sageattention_patched(modules=modules, env=env):
+        raise EngineUnusable(
+            engine_name, family, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+            "SageAttention is patched/resident; %s refuses to run in-process "
+            "(BUG-070: int8-PV SageAttention process-aborts with no traceback). "
+            "Disable SageAttention (e.g. KJNodes) or run this engine in a cu128 "
+            "sidecar" % engine_name,
+            kind="video")
+    return engine_name
+
+
+def resolve_isolation(declared_isolation, sage_patched):
+    """Resolve an engine's runtime isolation tier (pure).
+
+    ``sidecar_optional`` (wan_i2v) escalates to ``sidecar_required`` when
+    SageAttention is resident -- running in-process next to a Sage-patched
+    attention is toxic (BUG-070). ``sidecar_required`` stays required; everything
+    else runs ``in_process``.
+    """
+    if declared_isolation == ISOLATION_SIDECAR_REQUIRED:
+        return ISOLATION_SIDECAR_REQUIRED
+    if declared_isolation == ISOLATION_SIDECAR_OPTIONAL and sage_patched:
+        return ISOLATION_SIDECAR_REQUIRED
+    return ISOLATION_IN_PROCESS
+
+
+# --------------------------------------------------------------------------- #
+# init_image aspect handling -- no silent stretch (pre-mortem N9)
+# --------------------------------------------------------------------------- #
+def assert_aspect_policy(policy):
+    """Validate an aspect policy; an unknown policy (which could imply an
+    implicit stretch) is rejected fail-closed."""
+    if policy not in ASPECT_POLICIES:
+        raise ValueError(
+            "aspect_policy %r not in %r (an implicit stretch is forbidden)"
+            % (policy, ASPECT_POLICIES))
+    return policy
+
+
+def _even(value):
+    """Round to the nearest even int (model-stride / yuv420p mod-2 safe)."""
+    n = int(round(value))
+    return n - (n % 2)
+
+
+def resolve_aspect_transform(src_w, src_h, dst_w, dst_h,
+                             policy=DEFAULT_ASPECT_POLICY):
+    """Map a source init image into the dst canvas with ONE uniform scale.
+
+    ``pad`` / ``fit`` scale to FIT inside the canvas (letterbox / pillarbox bars);
+    ``crop`` scales to COVER the canvas (center-crop the overflow). Either way a
+    single scalar ``scale`` is applied to both axes, so the aspect ratio is
+    preserved and the result is NEVER an implicit stretch. Returns a plan dict
+    (even ``scaled_w`` / ``scaled_h``, ``pad_x`` / ``pad_y`` or ``crop_x`` /
+    ``crop_y``, ``scale``, ``policy``). Raises on a non-positive dimension or an
+    unknown policy.
+    """
+    assert_aspect_policy(policy)
+    for label, value in (("src_w", src_w), ("src_h", src_h),
+                         ("dst_w", dst_w), ("dst_h", dst_h)):
+        if int(value) <= 0:
+            raise ValueError("%s must be positive, got %r" % (label, value))
+    sw, sh, dw, dh = int(src_w), int(src_h), int(dst_w), int(dst_h)
+    if policy == "crop":
+        scale = max(dw / sw, dh / sh)
+    else:                                   # pad | fit -> fit inside the canvas
+        scale = min(dw / sw, dh / sh)
+    scaled_w, scaled_h = _even(sw * scale), _even(sh * scale)
+    plan = {
+        "policy": policy, "scale": scale,
+        "src_w": sw, "src_h": sh, "dst_w": dw, "dst_h": dh,
+        "scaled_w": scaled_w, "scaled_h": scaled_h,
+        "pad_x": max(0, dw - scaled_w) // 2, "pad_y": max(0, dh - scaled_h) // 2,
+        "crop_x": max(0, scaled_w - dw) // 2, "crop_y": max(0, scaled_h - dh) // 2,
+    }
+    assert_no_silent_stretch(plan)
+    return plan
+
+
+def assert_no_silent_stretch(plan, tol=0.02):
+    """Guard: ``plan`` scaled both axes by the SAME factor (aspect preserved).
+
+    Recovers the effective per-axis scale from the plan; if they differ by more
+    than ``tol`` (a non-uniform / implicit stretch) it raises. Even-rounding
+    introduces a sub-pixel delta, hence the small tolerance.
+    """
+    sx = plan["scaled_w"] / plan["src_w"]
+    sy = plan["scaled_h"] / plan["src_h"]
+    if abs(sx - sy) > tol * max(sx, sy):
+        raise ValueError(
+            "aspect plan stretches (sx=%.4f sy=%.4f); a uniform scale is "
+            "required: %r" % (sx, sy, plan))
+    return True
+
+
+# --------------------------------------------------------------------------- #
+# Mid-sampling NVML ceiling probe (PASS-PM: peak during render, not just
+# pre/post -- an additively-resident LoRA delta can breach mid-sample)
+# --------------------------------------------------------------------------- #
+def vram_used_mb():
+    """Machine-wide VRAM used (MB) via the shared NVML probe, or ``None`` when
+    NVML is unavailable (e.g. the CPU box). Never ComfyUI ``get_free_memory()``
+    (this-process view only -- it cannot see a sidecar's allocation)."""
+    if not _GR.nvml_available():
+        return None
+    return _GR.probe_used_mb()
+
+
+def assert_vram_within_ceiling(label="render", ceiling_mb=VRAM_CEILING_MB):
+    """Mid-sampling NVML guard: assert machine-wide used VRAM has not breached the
+    single-heavy-engine ceiling DURING a render.
+
+    The GPU-smoke render loop calls this from inside the sampling callback (not
+    only at the pre/post boundary), because a LoRA delta is additively resident
+    and can push the peak past the ceiling mid-sample. A no-op when NVML is
+    unavailable (the CPU box -- the boundary settle-wait in ``teardown`` covers
+    that path). Raises ``RuntimeError`` on a breach; returns the used MB (or
+    ``None`` when NVML is absent).
+    """
+    used = vram_used_mb()
+    if used is None:
+        return None
+    if used > int(ceiling_mb):
+        raise RuntimeError(
+            "VRAM ceiling breached mid-%s: %d MB > %d MB (single resident heavy "
+            "engine)" % (label, used, int(ceiling_mb)))
+    return used
+
+
+# --------------------------------------------------------------------------- #
+# In-process motion-engine base (AS-3 lease + V-4 teardown)
+# --------------------------------------------------------------------------- #
+class MotionEngineBase:
+    """Shared lifecycle for an IN-PROCESS motion engine (LTX / Wan / HuMo).
+
+    Subclasses set the registry-core metadata (``name`` / ``family`` / ``roles``
+    / ...) and implement ``load`` / ``render_clip`` / ``canonicalize`` /
+    ``assert_usable``. This base provides the AS-3 single-heavy-engine lease on
+    ``prepare`` and the V-4 patcher-detach ``teardown`` (NEVER
+    ``unload_all_models``), so every motion adapter serialises behind one lease
+    and tears down without the global unload. ``__init__`` is cheap (no weights).
+    """
+
+    declared_isolation = ISOLATION_IN_PROCESS
+    binds_seed = True
+
+    def __init__(self):
+        self._loaded = False
+        self._patchers = []
+
+    # load / unload bracket residency; the heavy import + wrapper load is the
+    # CW-6 GPU-smoke slice, added per engine (lazy, never at module scope).
+    def load(self):  # pragma: no cover - overridden by each engine
+        raise NotImplementedError
+
+    def unload(self):
+        self._patchers = []
+        self._loaded = False
+
+    def prepare(self, host_caps, profile, session_ctx):
+        """Take the SHARED single-heavy-engine lease (AS-3) BEFORE loading
+        weights, then load. FAIL CLOSED: a held lease or a failed load raises and
+        the lease is never stranded."""
+        lease = _GR.acquire(
+            timeout_s=float(os.getenv("OTR_GPU_LEASE_TIMEOUT_S", "120")))
+        try:
+            self.load()
+        except BaseException:
+            _GR.release(lease)              # never strand the lease on a failure
+            raise
+        return {"engine_id": self.name, "lease": lease,
+                "patchers": self._patchers}
+
+    def teardown(self, prepared):
+        """Detach every tracked patcher (V-4), drop residency, RELEASE the lease,
+        then bounded-wait for machine-wide VRAM below the ceiling. Idempotent +
+        never raises out of teardown. NEVER ``unload_all_models`` (V-4 / V-5)."""
+        self._detach_patchers(prepared)
+        self.unload()
+        lease = (prepared or {}).get("lease")
+        had_lease = lease is not None
+        _GR.release(lease)
+        if had_lease:
+            _GR.wait_until_below_mb(VRAM_CEILING_MB, attempts=3, sleep_s=2.0)
+
+    @staticmethod
+    def _detach_patchers(prepared):
+        """V-4: detach EVERY tracked patcher (Wan experts + each LoRA) with
+        ``patcher.detach(unpatch_all=True)`` and clear strong refs. NEVER
+        ``unload_all_models()``. Guarded + idempotent; a no-op on the CPU box
+        where nothing was tracked."""
+        for patcher in list((prepared or {}).get("patchers") or []):
+            try:
+                detach = getattr(patcher, "detach", None)
+                if callable(detach):
+                    detach(unpatch_all=True)
+            except Exception:              # noqa: BLE001 - teardown must not raise
+                pass
+        if isinstance(prepared, dict):
+            prepared["patchers"] = []
+
+
+__all__ = [
+    "VRAM_CEILING_MB", "ASPECT_POLICIES", "DEFAULT_ASPECT_POLICY",
+    "ISOLATION_IN_PROCESS", "ISOLATION_SIDECAR_REQUIRED",
+    "ISOLATION_SIDECAR_OPTIONAL", "sageattention_patched",
+    "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
+    "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
+    "assert_vram_within_ceiling", "MotionEngineBase",
+]

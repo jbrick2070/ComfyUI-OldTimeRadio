@@ -27,6 +27,7 @@ UTF-8, no BOM, ASCII-only source.
 from __future__ import annotations
 
 import argparse
+import ast
 import importlib
 import importlib.util
 import json
@@ -39,7 +40,16 @@ import sys
 # (BUG-070). An engine whose import makes any appear is disqualified until fixed.
 BANNED_DEPS = ("xformers", "flash_attn", "sageattention")
 
-TOOL_VERSION = "1"
+# A custom node that imports any of these at MODULE SCOPE contaminates the
+# protected stack at ComfyUI STARTUP -- before the per-engine gate ever runs
+# (ComfyUI-KJNodes is the known offender: it can import sageattention at import
+# time, globally swapping attention and breaking render-twice determinism,
+# BUG-070). The startup scan greps every installed custom node __init__.py for
+# these module-scope imports + any ``torch.hub.load`` (a nondeterministic network
+# download banned on the determinism path).
+STARTUP_CONTAMINANTS = ("sageattention", "xformers", "flash_attn")
+
+TOOL_VERSION = "2"
 
 # The opt-in / sidecar-isolated video engines this pilot verifies. ``assumed_call``
 # is the render interface the live GPU wiring must confirm AFTER this pilot proves
@@ -57,6 +67,37 @@ OPT_IN_ENGINES = {
             "--audio_path <audio> --video_out_path <out> --seed <int>  "
             "# TODO-for-GPU-smoke: confirm the config/ckpt paths run headless on "
             "sm_120; optimize to a preloaded LipsyncPipeline reused per request"
+        ),
+    },
+    "ltx_video": {
+        "lib_module": "ltx_video",
+        "adapter_class": "LtxVideoEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_LTX_VIDEO",
+        "assumed_call": (
+            "in-process: drive the installed LTX-Video ComfyUI wrapper node "
+            "classes (MODEL+CLIP+VAE: ltx-video-2b ckpt + gemma text encoder + "
+            "LTX 2.3 distilled LoRA @0.7); ltx_video.assert_usable MUST assert "
+            "SageAttention is NOT patched (BUG-070) before the first forward.  "
+            "# TODO-for-GPU-smoke: confirm the installed wrapper INPUT_TYPES, that "
+            "the import does not swap torch or pull xformers/flash_attn/"
+            "sageattention, and render-twice determinism on sm_120"
+        ),
+    },
+    "wan_i2v": {
+        "lib_module": "wan",
+        "adapter_class": "WanI2VEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_WAN_I2V",
+        "assumed_call": (
+            "in-process by default (sidecar_optional -> sidecar when SageAttention "
+            "is resident): drive the installed Wan 2.2 i2v wrapper (two-expert "
+            "HIGH/LOW MoE + lightx2v/SVI_v2_PRO/distill LoRAs + ModelSamplingSD3 "
+            "sigma-split); the init_image is padded/cropped into the canvas, never "
+            "stretched.  # TODO-for-GPU-smoke: clear the KJNodes pin audit (gate F: "
+            "numpy<2 / transformers<=4.51.3), confirm the wrapper expert-pair / "
+            "LoRA-order / sigma-split via assert_usable, and render-twice "
+            "determinism on sm_120"
         ),
     },
 }
@@ -79,6 +120,103 @@ def _module_present(name):
         return importlib.util.find_spec(name) is not None
     except (ImportError, ValueError, ModuleNotFoundError):
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Custom-node startup-contamination scan (KJNodes gate F + torch.hub ban)
+# --------------------------------------------------------------------------- #
+def custom_nodes_dir():
+    """The ComfyUI ``custom_nodes`` directory (this repo's parent). The scan is
+    headless-safe when it is absent."""
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _iter_node_init_files(nodes_dir):
+    """Yield ``(node_name, init_py_path)`` for each installed custom node with a
+    top-level ``__init__.py``. Headless-safe: a missing dir yields nothing."""
+    try:
+        entries = sorted(os.listdir(nodes_dir))
+    except OSError:
+        return
+    for name in entries:
+        node_dir = os.path.join(nodes_dir, name)
+        if not os.path.isdir(node_dir):
+            continue
+        init_py = os.path.join(node_dir, "__init__.py")
+        if os.path.isfile(init_py):
+            yield name, init_py
+
+
+def _is_torch_hub_load(func):
+    """True iff an AST call target is the attribute chain ``torch.hub.load``."""
+    return (
+        isinstance(func, ast.Attribute) and func.attr == "load"
+        and isinstance(func.value, ast.Attribute) and func.value.attr == "hub"
+        and isinstance(func.value.value, ast.Name) and func.value.value.id == "torch"
+    )
+
+
+def scan_source_for_contaminants(src):
+    """Pure: parse one module source; return a finding dict.
+
+    ``module_scope_imports`` = sorted ``STARTUP_CONTAMINANTS`` imported at TOP
+    LEVEL (module scope -- these fire at ComfyUI startup, before any gate);
+    ``torch_hub_load`` = True if a ``torch.hub.load(...)`` call appears anywhere.
+    A source that will not parse is recorded (``parse_error``), never raised.
+    """
+    finding = {"module_scope_imports": [], "torch_hub_load": False,
+               "parse_error": False}
+    try:
+        tree = ast.parse(src)
+    except (SyntaxError, ValueError):
+        finding["parse_error"] = True
+        return finding
+    banned = set()
+    for node in tree.body:                       # module scope == top-level body
+        if isinstance(node, ast.Import):
+            for imp in node.names:                   # ast.alias node; name 'imp'
+                root = (imp.name or "").split(".")[0]
+                if root in STARTUP_CONTAMINANTS:
+                    banned.add(root)
+        elif isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if root in STARTUP_CONTAMINANTS:
+                banned.add(root)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _is_torch_hub_load(node.func):
+            finding["torch_hub_load"] = True
+            break
+    finding["module_scope_imports"] = sorted(banned)
+    return finding
+
+
+def scan_custom_nodes(nodes_dir=None):
+    """Scan every installed custom node ``__init__.py`` for startup contaminants
+    + ``torch.hub.load``. Headless-safe: a missing dir -> an empty, clean report;
+    an unreadable / unparseable file is skipped, never raised. Returns a report
+    dict with the FLAGGED nodes + a ``startup_audit_clean`` bool."""
+    d = nodes_dir if nodes_dir is not None else custom_nodes_dir()
+    flagged = []
+    for name, init_py in _iter_node_init_files(d):
+        try:
+            with open(init_py, "r", encoding="utf-8", errors="replace") as fh:
+                src = fh.read()
+        except OSError:
+            continue
+        f = scan_source_for_contaminants(src)
+        if f["module_scope_imports"] or f["torch_hub_load"]:
+            flagged.append({
+                "node": name, "init": init_py,
+                "module_scope_imports": f["module_scope_imports"],
+                "torch_hub_load": f["torch_hub_load"],
+            })
+    return {
+        "custom_nodes_dir": d,
+        "scanned_dir_present": bool(d) and os.path.isdir(d),
+        "startup_contaminants": list(STARTUP_CONTAMINANTS),
+        "flagged_nodes": flagged,
+        "startup_audit_clean": len(flagged) == 0,
+    }
 
 
 def dep_snapshot():
@@ -211,8 +349,13 @@ def probe_isolated(engine_name, *, python=None, timeout=600):
                     f"stderr tail: {(proc.stderr or '')[-200:]}"}
 
 
-def run_pilot(engines=None, *, isolated=True, python=None):
-    """Probe each engine; return the aggregate report. Never raises."""
+def run_pilot(engines=None, *, isolated=True, python=None, scan_nodes=True):
+    """Probe each engine; return the aggregate report. Never raises.
+
+    When ``scan_nodes`` (default), also runs the custom-node startup-contamination
+    audit (KJNodes gate F + torch.hub ban) and reports it under
+    ``custom_node_scan`` / ``startup_audit_clean``.
+    """
     names = list(engines) if engines else list(OPT_IN_ENGINES)
     verdicts = []
     for name in names:
@@ -221,6 +364,7 @@ def run_pilot(engines=None, *, isolated=True, python=None):
         else:
             verdicts.append(probe_one(name, do_import=True))
     ready = [v for v in verdicts if v.get("import_clean_ready")]
+    scan = scan_custom_nodes() if scan_nodes else None
     return {
         "tool_version": TOOL_VERSION,
         "banned_deps": list(BANNED_DEPS),
@@ -228,6 +372,8 @@ def run_pilot(engines=None, *, isolated=True, python=None):
         "ready_count": len(ready),
         "engine_count": len(verdicts),
         "all_imports_clean": bool(verdicts) and len(ready) == len(verdicts),
+        "custom_node_scan": scan,
+        "startup_audit_clean": (scan["startup_audit_clean"] if scan else None),
     }
 
 
@@ -247,6 +393,24 @@ def _print_human(report):
         for viol in v.get("violations") or []:
             print(f"    VIOLATION: {viol}")
         print(f"    assumed call (verify-at-build): {v.get('assumed_call')}")
+        print("")
+    scan = report.get("custom_node_scan")
+    if scan is not None:
+        print("custom-node startup audit (KJNodes gate F + torch.hub ban):")
+        if not scan["scanned_dir_present"]:
+            print(f"    custom_nodes dir not found: {scan['custom_nodes_dir']}")
+        elif scan["startup_audit_clean"]:
+            print("    clean -- no module-scope "
+                  f"{'/'.join(scan['startup_contaminants'])} or torch.hub.load")
+        else:
+            for n in scan["flagged_nodes"]:
+                bits = []
+                if n["module_scope_imports"]:
+                    bits.append("module-scope import: "
+                                + ", ".join(n["module_scope_imports"]))
+                if n["torch_hub_load"]:
+                    bits.append("torch.hub.load")
+                print(f"    FLAGGED {n['node']} -- {'; '.join(bits)}")
         print("")
     print(f"import-clean engines: {report['ready_count']}/{report['engine_count']}")
     print("next: install each lib in its isolated venv on the GPU box, verify the "
@@ -269,6 +433,10 @@ def main(argv=None):
                         help="emit JSON instead of a human report")
     parser.add_argument("--strict", action="store_true",
                         help="exit 1 unless every engine import is clean")
+    parser.add_argument("--scan-custom-nodes", action="store_true",
+                        help="scan every installed custom node __init__.py for "
+                             "module-scope sage/xformers/flash_attn + torch.hub.load "
+                             "(the KJNodes startup-contamination gate) and print it")
     args = parser.parse_args(argv)
 
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -276,6 +444,13 @@ def main(argv=None):
 
     if args.probe_one:
         print(json.dumps(probe_one(args.probe_one, do_import=True), sort_keys=True))
+        return 0
+
+    if args.scan_custom_nodes:
+        scan = scan_custom_nodes()
+        print(json.dumps(scan, sort_keys=True, indent=2))
+        if args.strict and not scan["startup_audit_clean"]:
+            return 1
         return 0
 
     engines = None

@@ -34,3 +34,23 @@ try:  # pragma: no cover - trivial guard
     from . import eng_latentsync as _eng_latentsync  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# M2 / A-S5: register the in-process motion engines -- ltx_video (text->video)
+# and wan_i2v (image->video). Both are DEFAULT-OFF / dark (empty default_roles +
+# gated behind OTR_ENABLE_LTX_VIDEO / OTR_ENABLE_WAN_I2V) so they show in the
+# static per-role dropdown (V-6) but are never a default and fail closed until
+# the operator enables them AND the wrapper + checkpoints are installed/verified
+# on the GPU box. Cold-import clean (lazy LTX/Wan wrapper + torch inside
+# load/render_clip, never here), so this import pulls in nothing heavy (invariant
+# V-12, the cold-import test). Guarded so a packaging quirk never breaks the
+# namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ltx_video as _eng_ltx_video  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+try:  # pragma: no cover - trivial guard
+    from . import eng_wan_i2v as _eng_wan_i2v  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
