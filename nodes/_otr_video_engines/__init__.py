@@ -54,3 +54,19 @@ try:  # pragma: no cover - trivial guard
     from . import eng_wan_i2v as _eng_wan_i2v  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# M2 / A-S6: register the in-process HuMo audio-driven-face engine -- the
+# heaviest motion engine (loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via
+# comfy.model_management). Like LTX/Wan it is DEFAULT-OFF / dark (empty
+# default_roles + gated behind OTR_ENABLE_HUMO) so it shows in the static
+# per-role dropdown (V-6) but is never a default and fails closed until the
+# operator enables it AND the wrapper + checkpoints are installed/verified on the
+# GPU box. Cold-import clean (lazy HuMo wrapper + torch inside load/render_clip,
+# never here), so this import pulls in nothing heavy (invariant V-12, the
+# cold-import test). Guarded so a packaging quirk never breaks the namespace
+# import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_humo as _eng_humo  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

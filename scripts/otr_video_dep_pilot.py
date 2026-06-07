@@ -100,6 +100,24 @@ OPT_IN_ENGINES = {
             "determinism on sm_120"
         ),
     },
+    "humo": {
+        "lib_module": "humo",
+        "adapter_class": "HuMoEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_HUMO",
+        "assumed_call": (
+            "in-process: drive the installed HuMo ComfyUI wrapper node classes "
+            "(loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via "
+            "comfy.model_management: umt5_xxl CLIP + wan_2.1 VAE + "
+            "whisper_large_v3 audio encoder + the HuMo diffusion model / LoRA "
+            "tier); audio-conditioned image-to-video, native 480x832 @25fps; the "
+            "portrait init is padded/cropped into the canvas, never stretched.  "
+            "# TODO-for-GPU-smoke: confirm the installed wrapper INPUT_TYPES + the "
+            "MODEL/CLIP/VAE/AUDIO_ENCODER handles, that the import does not swap "
+            "torch or pull xformers/flash_attn/sageattention, the VRAM<=14.5 GB "
+            "peak, and render-twice determinism on sm_120"
+        ),
+    },
 }
 
 

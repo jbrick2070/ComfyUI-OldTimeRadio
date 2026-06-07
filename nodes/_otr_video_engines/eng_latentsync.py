@@ -77,6 +77,9 @@ class LatentSyncEngine:
     #: is already 25 (its required input fps) so no fps re-time is needed.
     audio_sample_rate = 16_000
     target_fps = 25
+    #: Family-degradation next hop -> the zero-VRAM radio floor (A-S6 chain
+    #: humo -> latentsync -> still_kenburns; see nodes/_otr_shared/fallback.py).
+    fallback_engine = "still_kenburns"
 
     def __init__(self):
         self._proc = None
