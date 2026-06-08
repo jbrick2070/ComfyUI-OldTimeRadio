@@ -76,6 +76,17 @@ DELETED_NODE_TYPES = frozenset({
     # frozen-audio spine). Replaced by SignalLostVideo -> OTR_SilentComposite
     # -> OTR_MasterAudioMux (terminal mux, -c:a copy, no -shortest).
     "OTR_VideoComposite",
+    # CW cleanbreak (2026-06-08): the legacy in-graph BATCH render path is
+    # retired -- the FLUX/HuMo/LTX batch renderers + the VRAM-unload node +
+    # the LTX topology gate. Replaced by the model-agnostic video platform
+    # (OTR_VideoRenderBatch + the registry adapters). Tombstoned so a stale
+    # workflow JSON naming one of these fails loudly at validation.
+    "OTR_BatchHumoRender",
+    "OTR_BatchLTXRender",
+    "OTR_BatchFluxRender",
+    "OTR_BatchFluxPortraitRender",
+    "OTR_UnloadAll",
+    "OTR_LtxBranchGate",
     # Lean-down 2026-05-29 (step 6): the dormant Story Room writers'-room
     # cluster (Director / Editor / Story Room / Extract / Commit) was
     # deleted. Tombstoned so a stale workflow JSON referencing one of

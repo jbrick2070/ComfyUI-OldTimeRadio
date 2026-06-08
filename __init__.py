@@ -182,11 +182,6 @@ _NODE_MODULES = {
     # in the same commit (Prime Directive 2: never double-load
     # Mistral-Nemo on the 16 GB card).
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
-    "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
-    # Sprint H §3.7 topology gate (Jeffrey 2026-05-17): forces
-    # LTXAVTextEncoderLoader's downstream consumer to wait for
-    # OTR_UnloadAll completion. Passthrough, no logic.
-    "OTR_LtxBranchGate":           (".visual.ltx_branch_gate",         "LtxBranchGate",         " LTX Branch Gate (topology)"),
     # Sprint H §3.7 follow-up gate (Jeffrey 2026-05-17, mirror of
     # OTR_LtxBranchGate after b5c1441 proved the pattern): forces
     # every FLUX consumer to wait until OTR_LedgerFreezeCascade
@@ -205,14 +200,6 @@ _NODE_MODULES = {
     # them downstream of OTR_LedgerFreezeCascade.script_json.
     "OTR_DeferredCheckpointLoader": (".nodes._otr_deferred_loaders",   "DeferredCheckpointLoader", " Deferred Checkpoint Loader (gate-bound)"),
     "OTR_DeferredLtxTextEncoderLoader": (".nodes._otr_deferred_loaders", "DeferredLtxTextEncoderLoader", " Deferred LTX Text Encoder Loader (gate-bound)"),
-    "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
-    # BUG-LOCAL-078 fix (2026-05-03 EVENING). Per-cast portrait render.
-    # Generates one clean head-and-shoulders FLUX portrait for each
-    # cast member, saves to per-episode portraits/<char_id>_portrait.png,
-    # stamps cast[i].portrait_path into the ledger so HuMo's tier 1
-    # portrait lookup hits instead of falling through to the env-still
-    # tier 4 stopgap.
-    "OTR_BatchFluxPortraitRender": (".visual.batch_flux_portrait_render", "BatchFluxPortraitRender", " Batch FLUX Portrait Render (per-cast)"),
     # OTR_VideoPlan -- DELETED in CW-1 (2026-06-06) of the OTR video platform
     # build. Its prompt-generation + planning was absorbed by OTR_ShotLock
     # (M4 per-beat creative derivation). The legacy FLUX/HuMo/LTX render chain
@@ -253,23 +240,6 @@ _NODE_MODULES = {
     # here, upstream, so BatchHumoRender keeps its pre-loaded-inputs
     # surface.
     "OTR_HuMoTierLoader":          (".nodes._otr_humo_tier_loader", "HuMoTierLoader", " HuMo Tier Loader (1.7B default / 17B opt-in)"),
-    # v2.0 in-graph batch HuMo lip-sync renderer. Loads HuMo + Lora +
-    # CLIP + VAE + Whisper once, loops every ledger line internally,
-    # writes per-line clips at output/otr/videos/<ep_id>/<line_id>.mp4.
-    # Replaces scripts/render_humo_batch.py for production use; the
-    # CLI script stays as an ad-hoc smoke tool.
-    "OTR_BatchHumoRender":         (".nodes.batch_humo_render", "BatchHumoRender", " Batch HuMo Render"),
-    # v2.0 in-graph batch LTX-2 renderer for non-character ledger lines
-    # (announcer / music_open / music_close / music_inter / sfx).
-    # Loads LTX-Video 2B + T5 once, loops every non-character ledger
-    # line internally, feeds the radio_bookend.png as BOTH start and
-    # end keyframes via LTXVAddGuide for seamless loop, writes per-line
-    # clips alongside HuMo's output at
-    # output/otr/videos/<ep_id>/<line_id>.mp4. Architecture locked
-    # 2026-05-01 with Jeffrey after BUG-LOCAL-129 settled that HuMo
-    # cannot animate non-face references; LTX is the answer for
-    # "the radio is the visual performer for non-dialogue."
-    "OTR_BatchLTXRender":          (".nodes.batch_ltx_render", "BatchLTXRender", " Batch LTX Render (radio for music/sfx/announcer)"),
     # OTR_VideoComposite -- DELETED (CW-4 legacy render-path teardown,
     # 2026-06-07). The legacy episode compositor mixed audio inside the
     # graph (master_mix / per-clip-mux / humo_concat) and used
