@@ -30,6 +30,19 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+# A-ship in-process forward. The shared mechanics (node resolution, the declarative
+# graph executor, the silent bt709 encode, the VRAM guard) are proven in
+# wrapper_bridge; the GRAPH below is the ASSUMED native LTXV text->video topology
+# and is VERIFY-ON-GPU: the box runs the LTX 2.3 stack (gemma encoder + distilled
+# LoRA + audio nodes, see nodes/_otr_deferred_loaders.py), so the operator confirms
+# / replaces the node candidates + widgets against the installed wrapper INPUT_TYPES
+# (and the exact temporal length rule) before enabling. Filenames are env-overridable.
+_LTX_MIN_FRAMES = 9
+_LTX_DEFAULT_W = 768
+_LTX_DEFAULT_H = 512
+_LTX_DEFAULT_NEGATIVE = (
+    "low quality, worst quality, blurry, distorted, watermark, text, static")
+
 
 @register
 class LtxVideoEngine(_MC.MotionEngineBase):
@@ -77,30 +90,117 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 % self._ckpt_path(), kind="video")
         return self.name
 
-    # ---- residency (the heavy import + load is the CW-6 GPU-smoke slice) ----
+    #: Terminal node of the graph (its IMAGE output is encoded to the clip).
+    _TERMINAL = "vaedecode"
+
+    # ---- in-process graph spec (ASSUMED native LTXV; VERIFY-ON-GPU) ----
+    def _node_candidates(self):
+        """Ordered ComfyUI node-class candidates per graph node (the assumed
+        native LTXV text->video graph; confirm against the installed LTX stack)."""
+        return {
+            "checkpoint": ("CheckpointLoaderSimple",),
+            "pos": ("CLIPTextEncode",),
+            "neg": ("CLIPTextEncode",),
+            "latent": ("EmptyLTXVLatentVideo",),
+            "cond": ("LTXVConditioning",),
+            "ksampler": ("KSampler",),
+            "vaedecode": ("VAEDecode",),
+        }
+
+    def _ckpt_name(self):
+        return os.environ.get("OTR_LTX_VIDEO_CKPT_NAME") or os.path.basename(
+            self._ckpt_path())
+
+    def _dims(self, request):
+        """(width, height) from the request canvas with LTX landscape defaults."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        canvas = get("canvas") or {}
+        c_get = canvas.get if isinstance(canvas, dict) else (
+            lambda k, d=None: getattr(canvas, k, d))
+        w = int(c_get("w", 0) or 0) or _LTX_DEFAULT_W
+        h = int(c_get("h", 0) or 0) or _LTX_DEFAULT_H
+        return w, h
+
+    def _build_graph(self, plan, length, width, height):
+        """The declarative LTXV graph (wrapper_bridge.run_graph format). ASSUMED
+        native topology -- VERIFY/replace against the installed LTX stack."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        steps = int(os.environ.get("OTR_LTX_STEPS", "30"))
+        cfg = float(os.environ.get("OTR_LTX_CFG", "3.0"))
+        positive = plan.get("text_prompt") or "a cinematic scene"
+        negative = plan.get("negative_prompt") or os.environ.get(
+            "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        return {
+            "checkpoint": {"class": "checkpoint",
+                           "inputs": {"ckpt_name": self._ckpt_name()}},
+            "pos": {"class": "pos",
+                    "inputs": {"text": positive, "clip": W("checkpoint", 1)}},
+            "neg": {"class": "neg",
+                    "inputs": {"text": negative, "clip": W("checkpoint", 1)}},
+            "latent": {"class": "latent",
+                       "inputs": {"width": int(width), "height": int(height),
+                                  "length": int(length), "batch_size": 1}},
+            "cond": {"class": "cond",
+                     "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
+                                "frame_rate": float(self.target_fps)}},
+            "ksampler": {"class": "ksampler",
+                         "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
+                                    "cfg": cfg, "sampler_name": "euler",
+                                    "scheduler": "normal", "denoise": 1.0,
+                                    "model": W("checkpoint", 0),
+                                    "positive": W("cond", 0),
+                                    "negative": W("cond", 1),
+                                    "latent_image": W("latent", 0)}},
+            "vaedecode": {"class": "vaedecode",
+                          "inputs": {"samples": W("ksampler", 0),
+                                     "vae": W("checkpoint", 2)}},
+        }
+
+    # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
-        """Fail CLOSED until installed; the real wrapper import + model load is
-        the CW-6 GPU-smoke slice (lazy, never at module scope)."""
+        """Fail CLOSED until installed, then RESOLVE the installed LTX node classes
+        (fail-closed NAMED if absent). Weight load happens when the loader nodes
+        execute inside render_clip; the live VRAM<=14.5 GB peak + SageAttention-clean
+        determinism are the CW-6 GPU smoke (operator)."""
         if not self._installed():
             raise RuntimeError(
                 "ltx_video not installed: checkpoint missing at %s -- install the "
                 "LTX wrapper + ckpt, set OTR_ENABLE_LTX_VIDEO=1, and run the CW-6 "
                 "GPU smoke" % self._ckpt_path())
-        # GPU-smoke slice: lazily import the installed LTX wrapper, build the
-        # model handles (MODEL+CLIP+VAE: ltx-video-2b + gemma encoder + LTX 2.3
-        # distilled LoRA @0.7), track patchers for the V-4 teardown, set _loaded.
-        raise NotImplementedError(
-            "ltx_video in-process load is the CW-6 GPU-smoke render slice; "
-            "confirm the installed LTX wrapper INPUT_TYPES and SageAttention-clean "
-            "determinism on sm_120 before enabling")
+        from . import wrapper_bridge as _wb
+        self._classes = _wb.resolve_graph_classes(self._node_candidates())
+        self._loaded = True
 
     def render_clip(self, request, prepared):
-        """Drive ONE text->video clip via the in-process LTX wrapper. The pure
-        request build is CPU-tested; the wrapper forward is the GPU-smoke slice."""
+        """Drive ONE text->video clip via the in-process LTX wrapper graph, encode
+        the decoded IMAGE batch to a SILENT bt709 clip (V-1), retain the MODEL
+        patcher for V-4 teardown, and assert the mid-render NVML ceiling. Returns
+        the raw ``{out_path, frame_count}`` canonicalize() normalises. Fail-closed
+        NAMED if a wrapper node is missing."""
+        from . import wrapper_bridge as _wb
+        import tempfile
         plan = self._build_render_request(request)            # pure, CPU-tested
-        raise NotImplementedError(
-            "ltx_video.render_clip is the CW-6 GPU-smoke slice (in-process LTX "
-            "wrapper node-class forward); built request keys: %s" % sorted(plan))
+        classes = getattr(self, "_classes", None) \
+            or _wb.resolve_graph_classes(self._node_candidates())
+        width, height = self._dims(request)
+        length = max(_LTX_MIN_FRAMES,
+                     int(plan["target_frame_count"] or self.target_fps))
+        graph = self._build_graph(plan, length, width, height)
+        results = _wb.run_graph(graph, classes)
+        images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
+        bucket = prepared.setdefault("patchers", self._patchers) \
+            if isinstance(prepared, dict) else self._patchers
+        model = results.get("checkpoint", (None,))[0]
+        if model is not None and callable(getattr(model, "detach", None)) \
+                and id(model) not in {id(p) for p in bucket}:
+            bucket.append(model)
+        frames = _wb.images_to_uint8(images)
+        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_ltx_")
+        path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        _MC.assert_vram_within_ceiling("ltx_video-render")    # PASS-PM mid-render
+        return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p

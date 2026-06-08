@@ -30,6 +30,19 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+# A-ship in-process forward. Shared mechanics (resolution, declarative executor,
+# silent bt709 encode, VRAM guard) are proven in wrapper_bridge; the GRAPH below is
+# the ASSUMED native Wan image->video topology and is VERIFY-ON-GPU: the box runs
+# the KJ Wan 2.2 wrapper (two-expert HIGH/LOW MoE + ordered LoRAs + ModelSamplingSD3
+# sigma-split, see scripts/otr_video_dep_pilot.py assumed_call), so the operator
+# confirms / replaces the node candidates + widgets (and the wan_i2v sidecar route
+# under SageAttention) against the installed wrapper before enabling. Filenames are
+# env-overridable; the init_image is padded/cropped (never stretched, N9).
+_WAN_MIN_FRAMES = 33
+_WAN_MAX_FRAMES = 177
+_WAN_DEFAULT_NEGATIVE = (
+    "low quality, worst quality, blurry, distorted, watermark, text, static")
+
 
 @register
 class WanI2VEngine(_MC.MotionEngineBase):
@@ -84,26 +97,135 @@ class WanI2VEngine(_MC.MotionEngineBase):
                 % self._ckpt_path(), kind="video")
         return self.name
 
-    # ---- residency (the heavy import + load is the CW-6 GPU-smoke slice) ----
+    #: Terminal node of the graph (its IMAGE output is encoded to the clip).
+    _TERMINAL = "vaedecode"
+
+    # ---- in-process graph spec (ASSUMED native Wan i2v; VERIFY-ON-GPU) ----
+    def _node_candidates(self):
+        """Ordered ComfyUI node-class candidates per graph node (the assumed native
+        Wan image->video graph; confirm against the installed Wan 2.2 wrapper)."""
+        return {
+            "unet": ("UNETLoader",),
+            "clip": ("CLIPLoader",),
+            "pos": ("CLIPTextEncode",),
+            "neg": ("CLIPTextEncode",),
+            "vae": ("VAELoader",),
+            "loadimage": ("LoadImage",),
+            "wan": ("WanImageToVideo",),
+            "ksampler": ("KSampler",),
+            "vaedecode": ("VAEDecode",),
+        }
+
+    def _loader_names(self):
+        """Model FILENAMES the loader nodes consume (env-overridable; defaults are
+        placeholders the operator confirms against the installed Wan models)."""
+        return {
+            "unet": os.environ.get("OTR_WAN_I2V_UNET_NAME")
+            or os.path.basename(self._ckpt_path()),
+            "clip": os.environ.get(
+                "OTR_WAN_I2V_CLIP_NAME", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+            "vae": os.environ.get("OTR_WAN_I2V_VAE_NAME", "wan_2.1_vae.safetensors"),
+        }
+
+    def _dims(self, request):
+        """(width, height) from the request canvas (landscape default 832x480)."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        canvas = get("canvas") or {}
+        c_get = canvas.get if isinstance(canvas, dict) else (
+            lambda k, d=None: getattr(canvas, k, d))
+        return int(c_get("w", 0) or 0) or 832, int(c_get("h", 0) or 0) or 480
+
+    def _build_graph(self, request, image_name, plan, length, width, height):
+        """The declarative Wan i2v graph (wrapper_bridge.run_graph format). ASSUMED
+        native topology -- VERIFY/replace against the installed Wan wrapper."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        names = self._loader_names()
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        steps = int(os.environ.get("OTR_WAN_STEPS", "20"))
+        cfg = float(os.environ.get("OTR_WAN_CFG", "3.5"))
+        positive = get("text_prompt") or "subtle natural motion"
+        negative = os.environ.get("OTR_WAN_NEGATIVE", _WAN_DEFAULT_NEGATIVE)
+        return {
+            "unet": {"class": "unet",
+                     "inputs": {"unet_name": names["unet"], "weight_dtype": "default"}},
+            "clip": {"class": "clip",
+                     "inputs": {"clip_name": names["clip"], "type": "wan",
+                                "device": "default"}},
+            "pos": {"class": "pos",
+                    "inputs": {"text": positive, "clip": W("clip", 0)}},
+            "neg": {"class": "neg",
+                    "inputs": {"text": negative, "clip": W("clip", 0)}},
+            "vae": {"class": "vae", "inputs": {"vae_name": names["vae"]}},
+            "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
+            "wan": {"class": "wan",
+                    "inputs": {"width": int(width), "height": int(height),
+                               "length": int(length), "batch_size": 1,
+                               "positive": W("pos", 0), "negative": W("neg", 0),
+                               "vae": W("vae", 0), "start_image": W("loadimage", 0)}},
+            "ksampler": {"class": "ksampler",
+                         "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
+                                    "cfg": cfg, "sampler_name": "uni_pc",
+                                    "scheduler": "simple", "denoise": 1.0,
+                                    "model": W("unet", 0),
+                                    "positive": W("wan", 0),
+                                    "negative": W("wan", 1),
+                                    "latent_image": W("wan", 2)}},
+            "vaedecode": {"class": "vaedecode",
+                          "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}},
+        }
+
+    # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
+        """Fail CLOSED until installed, then RESOLVE the installed Wan node classes
+        (fail-closed NAMED if absent). Weight load happens when the loader nodes
+        execute inside render_clip; the live VRAM<=14.5 GB peak + the KJNodes pin
+        audit are the CW-6 GPU smoke (operator)."""
         if not self._installed():
             raise RuntimeError(
                 "wan_i2v not installed: checkpoint missing at %s -- install the "
                 "Wan wrapper + ckpt, set OTR_ENABLE_WAN_I2V=1, and run the CW-6 "
                 "GPU smoke" % self._ckpt_path())
-        # GPU-smoke slice: lazily import the installed Wan wrapper, build the
-        # two-expert MoE + ordered LoRA stack + ModelSamplingSD3 sigma split,
-        # track patchers for the V-4 teardown, set _loaded.
-        raise NotImplementedError(
-            "wan_i2v in-process load is the CW-6 GPU-smoke render slice; confirm "
-            "the installed Wan wrapper expert-pair / LoRA order / sigma split and "
-            "the KJNodes pin audit on sm_120 before enabling")
+        from . import wrapper_bridge as _wb
+        self._classes = _wb.resolve_graph_classes(self._node_candidates())
+        self._loaded = True
 
     def render_clip(self, request, prepared):
+        """Drive ONE image->video clip via the in-process Wan wrapper graph: stage
+        the init image into ComfyUI's input dir, execute the graph, encode the
+        decoded IMAGE batch to a SILENT bt709 clip (V-1), retain the MODEL patcher
+        for V-4 teardown, and assert the mid-render NVML ceiling. Returns the raw
+        ``{out_path, frame_count}`` canonicalize() normalises. Fail-closed NAMED if
+        a wrapper node or the init image is missing."""
+        from . import wrapper_bridge as _wb
+        import tempfile
         plan = self._build_render_request(request)            # pure, CPU-tested
-        raise NotImplementedError(
-            "wan_i2v.render_clip is the CW-6 GPU-smoke slice (in-process Wan "
-            "wrapper node-class forward); built request keys: %s" % sorted(plan))
+        if not plan["init_image"]:
+            raise _wb.GraphExecutionError(
+                "wan_i2v requires init_image (got %r)" % plan["init_image"])
+        classes = getattr(self, "_classes", None) \
+            or _wb.resolve_graph_classes(self._node_candidates())
+        image_name = _wb.stage_into_comfy_input(plan["init_image"])
+        width, height = self._dims(request)
+        length = _wb.quantize_frames_4n1(
+            plan["target_frame_count"] or self.target_fps,
+            min_frames=_WAN_MIN_FRAMES, max_frames=_WAN_MAX_FRAMES)
+        graph = self._build_graph(request, image_name, plan, length, width, height)
+        results = _wb.run_graph(graph, classes)
+        images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
+        bucket = prepared.setdefault("patchers", self._patchers) \
+            if isinstance(prepared, dict) else self._patchers
+        model = results.get("unet", (None,))[0]
+        if model is not None and callable(getattr(model, "detach", None)) \
+                and id(model) not in {id(p) for p in bucket}:
+            bucket.append(model)
+        frames = _wb.images_to_uint8(images)
+        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_wan_")
+        path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        _MC.assert_vram_within_ceiling("wan_i2v-render")      # PASS-PM mid-render
+        return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
