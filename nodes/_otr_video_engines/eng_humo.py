@@ -43,6 +43,23 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+# A-ship in-process forward (the native graph PROVEN in scripts/render_humo_batch.py
+# build_humo_prompt, verified on this RTX 5080 at 480x832 fp8). The graph TOPOLOGY +
+# widget values are legacy-proven; the exact checkpoint / encoder FILENAMES are
+# env-overridable (VERIFY-ON-GPU) so the operator confirms them against the
+# installed models without editing code. Native portrait 480x832 @ 25 fps; the Wan
+# 2.1 VAE 4n+1 length rule is enforced via wrapper_bridge.quantize_frames_4n1.
+_HUMO_MIN_FRAMES = 33          # below this has hung this hardware (legacy floor)
+_HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp8
+_HUMO_NATIVE_W = 480
+_HUMO_NATIVE_H = 832
+# An ASCII negative (CLAUDE.md: ASCII-only source). HuMo's best negative is the
+# ByteDance Chinese default; set OTR_HUMO_NEGATIVE to it on the box to match the
+# legacy template exactly.
+_HUMO_DEFAULT_NEGATIVE = (
+    "low quality, worst quality, blurry, jpeg artifacts, distorted, deformed, "
+    "extra fingers, bad hands, bad face, static, watermark, text")
+
 
 @register
 class HuMoEngine(_MC.MotionEngineBase):
@@ -99,34 +116,177 @@ class HuMoEngine(_MC.MotionEngineBase):
                 % self._ckpt_path(), kind="video")
         return self.name
 
-    # ---- residency (the heavy import + load is the A-S6 GPU-smoke slice) ----
+    #: Terminal node of the graph (its IMAGE output is encoded to the clip).
+    _TERMINAL = "vaedecode"
+
+    # ---- in-process graph spec (proven topology; filenames VERIFY-ON-GPU) ----
+    def _node_candidates(self):
+        """Ordered ComfyUI node-class candidates per graph node (all core /
+        comfy_extras classes used by the proven legacy HuMo graph)."""
+        return {
+            "unet": ("UNETLoader",),
+            "lora": ("LoraLoaderModelOnly",),
+            "modelsampling": ("ModelSamplingSD3",),
+            "clip": ("CLIPLoader",),
+            "pos": ("CLIPTextEncode",),
+            "neg": ("CLIPTextEncode",),
+            "vae": ("VAELoader",),
+            "loadaudio": ("LoadAudio",),
+            "audioenc_loader": ("AudioEncoderLoader",),
+            "audioenc": ("AudioEncoderEncode",),
+            "loadimage": ("LoadImage",),
+            "humo": ("WanHuMoImageToVideo",),
+            "ksampler": ("KSampler",),
+            "vaedecode": ("VAEDecode",),
+        }
+
+    def _loader_names(self):
+        """Model / encoder FILENAMES the loader nodes consume. Defaults are the
+        legacy-proven names; each is env-overridable so the operator points at the
+        installed files without editing code (VERIFY-ON-GPU)."""
+        return {
+            "unet": os.environ.get("OTR_HUMO_UNET_NAME")
+            or os.path.basename(self._ckpt_path()),
+            "lora": os.environ.get(
+                "OTR_HUMO_LORA_NAME",
+                "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"),
+            "clip": os.environ.get(
+                "OTR_HUMO_CLIP_NAME", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+            "vae": os.environ.get("OTR_HUMO_VAE_NAME", "wan_2.1_vae.safetensors"),
+            "whisper": os.environ.get(
+                "OTR_HUMO_AUDIO_ENCODER_NAME", "whisper_large_v3_fp16.safetensors"),
+        }
+
+    def _native_dims(self):
+        """HuMo's native render size (portrait 480x832; env-overridable). The
+        compositor pillarboxes the portrait into the 16:9 canvas (memory: keep
+        HuMo, accept the pillarbox) -- N9 no-stretch is preserved upstream."""
+        w = int(os.environ.get("OTR_HUMO_WIDTH", _HUMO_NATIVE_W))
+        h = int(os.environ.get("OTR_HUMO_HEIGHT", _HUMO_NATIVE_H))
+        return w, h
+
+    def _build_graph(self, image_name, audio_name, plan, length, width, height):
+        """The declarative HuMo graph (wrapper_bridge.run_graph format). Mirrors
+        the proven build_humo_prompt wiring node-for-node:
+        UNETLoader->LoRA->ModelSamplingSD3->KSampler (model); CLIPLoader->pos/neg;
+        VAELoader; LoadAudio->AudioEncoderEncode(+AudioEncoderLoader);
+        LoadImage->ref_image; WanHuMoImageToVideo->KSampler->VAEDecode."""
+        from . import wrapper_bridge as _wb
+        names = self._loader_names()
+        steps = int(os.environ.get("OTR_HUMO_STEPS", "6"))
+        cfg = float(os.environ.get("OTR_HUMO_CFG", "1.0"))
+        positive = plan.get("text_prompt") or "a person speaking, subtle facial motion"
+        negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
+        W = _wb.Wire
+        return {
+            "unet": {"class": "unet",
+                     "inputs": {"unet_name": names["unet"], "weight_dtype": "default"}},
+            "lora": {"class": "lora",
+                     "inputs": {"lora_name": names["lora"], "strength_model": 1.0,
+                                "model": W("unet", 0)}},
+            "modelsampling": {"class": "modelsampling",
+                              "inputs": {"shift": 8.0, "model": W("lora", 0)}},
+            "clip": {"class": "clip",
+                     "inputs": {"clip_name": names["clip"], "type": "wan",
+                                "device": "default"}},
+            "pos": {"class": "pos",
+                    "inputs": {"text": positive, "clip": W("clip", 0)}},
+            "neg": {"class": "neg",
+                    "inputs": {"text": negative, "clip": W("clip", 0)}},
+            "vae": {"class": "vae", "inputs": {"vae_name": names["vae"]}},
+            "loadaudio": {"class": "loadaudio", "inputs": {"audio": audio_name}},
+            "audioenc_loader": {"class": "audioenc_loader",
+                                "inputs": {"audio_encoder_name": names["whisper"]}},
+            "audioenc": {"class": "audioenc",
+                         "inputs": {"audio_encoder": W("audioenc_loader", 0),
+                                    "audio": W("loadaudio", 0)}},
+            "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
+            "humo": {"class": "humo",
+                     "inputs": {"width": int(width), "height": int(height),
+                                "length": int(length), "batch_size": 1,
+                                "positive": W("pos", 0), "negative": W("neg", 0),
+                                "vae": W("vae", 0),
+                                "audio_encoder_output": W("audioenc", 0),
+                                "ref_image": W("loadimage", 0)}},
+            "ksampler": {"class": "ksampler",
+                         "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
+                                    "cfg": cfg, "sampler_name": "uni_pc",
+                                    "scheduler": "simple", "denoise": 1.0,
+                                    "model": W("modelsampling", 0),
+                                    "positive": W("humo", 0),
+                                    "negative": W("humo", 1),
+                                    "latent_image": W("humo", 2)}},
+            "vaedecode": {"class": "vaedecode",
+                          "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}},
+        }
+
+    def _retain_model_patchers(self, results, prepared):
+        """Best-effort V-4: keep the MODEL ModelPatchers the graph produced so
+        teardown can detach(unpatch_all=True) them (the lease + VRAM settle-wait in
+        MotionEngineBase.teardown is the real residency guard)."""
+        bucket = prepared.setdefault("patchers", self._patchers) \
+            if isinstance(prepared, dict) else self._patchers
+        seen = {id(p) for p in bucket}
+        for nid in ("unet", "lora", "modelsampling"):
+            out = results.get(nid)
+            if not out:
+                continue
+            obj = out[0]
+            if id(obj) not in seen and callable(getattr(obj, "detach", None)):
+                bucket.append(obj)
+                seen.add(id(obj))
+
+    # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
-        """Fail CLOSED until installed; the real HuMo wrapper import + the
-        MODEL+CLIP+VAE+AUDIO_ENCODER load (umt5_xxl CLIP, wan_2.1 VAE,
-        whisper_large_v3 audio encoder + the HuMo diffusion model / LoRA tier) is
-        the A-S6 GPU-smoke slice (lazy via comfy.model_management, never at module
-        scope)."""
+        """Fail CLOSED until installed, then RESOLVE the installed ComfyUI wrapper
+        node classes (fail-closed NAMED if absent). The heavy weight load happens
+        when the loader nodes execute inside render_clip (ComfyUI's own model
+        management), so load() stays cheap and the AS-3 lease brackets the real
+        residency. The live VRAM<=14.5 GB peak + render-twice pixels are the A-S6
+        GPU smoke (operator)."""
         if not self._installed():
             raise RuntimeError(
                 "humo not installed: checkpoint missing at %s -- install the HuMo "
                 "wrapper + ckpt, set OTR_ENABLE_HUMO=1, and run the A-S6 GPU "
                 "smoke" % self._ckpt_path())
-        # GPU-smoke slice: lazily import the installed HuMo wrapper, build the
-        # MODEL+CLIP+VAE+AUDIO_ENCODER handles internally via comfy.model_
-        # management, track patchers for the V-4 teardown, set _loaded.
-        raise NotImplementedError(
-            "humo in-process load is the A-S6 GPU-smoke render slice; confirm the "
-            "installed HuMo wrapper INPUT_TYPES + the MODEL/CLIP/VAE/AUDIO_ENCODER "
-            "handles and the VRAM<=14.5 GB peak on sm_120 before enabling")
+        from . import wrapper_bridge as _wb
+        self._classes = _wb.resolve_graph_classes(self._node_candidates())
+        self._loaded = True
 
     def render_clip(self, request, prepared):
-        """Drive ONE audio-driven-face clip via the in-process HuMo wrapper. The
-        pure request build is CPU-tested; the wrapper forward is the GPU-smoke
-        slice."""
+        """Drive ONE audio-driven-face clip via the in-process HuMo wrapper graph.
+
+        Stages the portrait + speech into ComfyUI's input dir (the proven legacy
+        LoadImage / LoadAudio pattern), executes the proven node graph in
+        dependency order, encodes the decoded IMAGE batch to a SILENT bt709 clip
+        (V-1), retains the MODEL patchers for V-4 teardown, and asserts the
+        mid-render NVML ceiling. Returns the raw ``{out_path, frame_count}`` that
+        canonicalize() normalises. Fail-closed NAMED if a wrapper node is missing
+        or an input is absent."""
+        from . import wrapper_bridge as _wb
+        import tempfile
         plan = self._build_render_request(request)            # pure, CPU-tested
-        raise NotImplementedError(
-            "humo.render_clip is the A-S6 GPU-smoke slice (in-process HuMo wrapper "
-            "node-class forward); built request keys: %s" % sorted(plan))
+        if not plan["audio_path"] or not plan["init_image"]:
+            raise _wb.GraphExecutionError(
+                "humo requires both audio_ref and init_image (got audio=%r "
+                "init_image=%r)" % (plan["audio_path"], plan["init_image"]))
+        classes = getattr(self, "_classes", None) \
+            or _wb.resolve_graph_classes(self._node_candidates())
+        audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
+        image_name = _wb.stage_into_comfy_input(plan["init_image"])
+        length = _wb.quantize_frames_4n1(
+            plan["target_frame_count"] or self.target_fps,
+            min_frames=_HUMO_MIN_FRAMES, max_frames=_HUMO_MAX_FRAMES)
+        width, height = self._native_dims()
+        graph = self._build_graph(image_name, audio_name, plan, length, width, height)
+        results = _wb.run_graph(graph, classes)
+        images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
+        self._retain_model_patchers(results, prepared)
+        frames = _wb.images_to_uint8(images)
+        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_humo_")
+        path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        _MC.assert_vram_within_ceiling("humo-render")         # PASS-PM mid-render
+        return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
