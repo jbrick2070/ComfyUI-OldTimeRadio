@@ -23,9 +23,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ---
 
-## v2.0-alpha — Lip-synced video pipeline (active development on `v2.0-alpha` branch)
+## v2.0-alpha — Open Video Model Platform (model-agnostic; Subproject A shipped)
 
-v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** adds in-graph HuMo lip-sync per dialogue line, layered over the v1.7 proc gen base — full-episode mp4 with talking-head video on top of the audio-reactive CRT visualization. Shipping on the `v2.0-alpha` git branch; `main` stays at v1.7.
+v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** layers a **model-agnostic Open Video Model Platform** on top: you choose a video model **per role** (announcer / music / other-beats) from a registry of pluggable engine adapters — HuMo, LTX, Wan, lipsync, and the cheap "radio-floor" families (still / Ken-Burns / visualizer / station-card) — with **no model treated as "primary."** Each beat renders in-process; if an engine is unavailable or OOMs, the platform degrades **loudly down a fallback chain to a guaranteed radio-floor clip** and never aborts the episode or touches the frozen audio. The frozen 48 kHz master is the single source of truth for the timeline and clip budget, and is muxed in last byte-identical. Shipping on the `v2.0-alpha` git branch; `main` stays at v1.7.
 
 ### Optional: remote LLM via OpenRouter (opt-in, default-off)
 
@@ -39,51 +39,42 @@ The default pipeline is **100% local, zero API keys** — that never changes. v2
 
 Full walkthrough (account → key → enable → use): [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
 
-### What's in the v2.0-alpha FULL workflow (`workflows/otr_scifi_16gb_full.json`)
+### What's in the v2.0-alpha video platform
+
+The video layer is a **registry of pluggable engine adapters** chosen per role — not a fixed pipeline. The frozen 48 kHz audio master is produced first and is the single source of truth for the timeline and the clip budget; video renders to fit it and is muxed in last, byte-identical.
 
 ```
-Audio path (v2.0-alpha ledger-based):
-  LedgerScriptWriter (LLM) → FreezeCascade → BatchBarkGenerator → KokoroAnnouncer →
-  AudioGen + MusicGen + ProcSFX (parallel) → SceneSequencer → AudioEnhance →
-  EpisodeAssembler → SignalLostVideo
-  Output: signal_lost_<id>.mp4 — 1920x1080 audio-reactive CRT proc gen with 48 kHz audio embedded
-  (Legacy Director stage retired in voice-path-cleanbreak S2 / commit 249bc06.)
+Audio path (frozen master = source of truth for the timeline):
+  LedgerScriptWriter (LLM) -> FreezeCascade -> Bark + Kokoro + MusicGen + AudioGen + ProcSFX ->
+  SceneSequencer -> AudioEnhance -> EpisodeAssembler (emits audio_done) -> SignalLostVideo
+  Output: the 48 kHz master mix + the audio-reactive CRT proc-gen base.
 
-FLUX environment stills (v1.7 unchanged):
-  VideoPlan → ShotDurationCalculator → BatchFluxRender → UnloadAll → SaveImage
-  Output: full_env_*.png stills under output/otr/stills/
-
-NEW: HuMo loader chain
-  UNETLoader (HuMo 14B fp8 e4m3fn scaled) → LoraLoaderModelOnly (lightx2v) → ModelSamplingSD3 (shift=8)
-  CLIPLoader (umt5_xxl)
-  VAELoader (wan_2.1)
-  AudioEncoderLoader (whisper_large_v3_fp16)
-
-NEW: OTR_BatchHumoRender
-  Loads HuMo + Lora + CLIP + VAE + Whisper once per workflow execution. Loops every dialogue
-  line in the production ledger internally, renders per-line lip-sync clips at 480x832 portrait
-  via direct ComfyUI node calls. 7s default clip length, max_clips=0 for full episode.
-  Output: output/otr/videos/<ep_id>/<line_id>.mp4 (one mp4 per dialogue line)
-
-NEW: OTR_VideoComposite
-  Single ffmpeg invocation. Pillarboxes HuMo clips at 624x1080 center in 1920x1080 canvas,
-  additive-blends SignalLostVideo proc gen on top at 50% opacity, mux audio from proc gen.
-  Output: output/otr/episodes/<ep_id>.mp4 — final 1080p deliverable
+Video path (model-agnostic; audio-derived clip budget; no model is "primary"):
+  OTR_VideoDirector / OTR_ShotLock   per-role model selection + per-beat Meta-Brief prompts
+  OTR_VideoRenderBatch               in-process render of each beat through the SELECTED engine
+                                     adapter (HuMo / LTX / Wan / lipsync / the cheap radio-floor
+                                     families: still, Ken-Burns, visualizer, station-card);
+                                     single resident heavy engine, 14.5 GB ceiling, request-hash
+                                     deterministic; every chain terminates at a guaranteed
+                                     still / Ken-Burns floor; any fallback is LOUD (logged +
+                                     ledger-restamped at the same revision), never silent.
+  OTR_SilentComposite                assemble the silent video track.
+  OTR_MasterAudioMux (terminal)      mux the frozen master in LAST, -c:a copy (byte-identical),
+                                     no -shortest. Output: output/otr/episodes/<ep_id>.mp4
 ```
 
-### Why in-graph (not subprocess)?
+Adding a model is an adapter + a registry entry (the "+ Add Custom Model" contract) with no change to the video path; an engine whose dependencies aren't installed is simply absent from the selector. The image input (portraits / init-images) is itself a pluggable image-gen sub-adapter (Flux "gen 1" by default). Heavy in-process renders run on ComfyUI's executor thread, and VRAM is reclaimed between engines by detaching idle models (no global unload) to hold the single-resident-heavy ceiling.
 
-Earlier v2.0-alpha builds (BUG-LOCAL-076) tried a subprocess pattern: a trigger node fired a PowerShell wrapper that called Python orchestrators. It worked but kept HuMo's progress hidden from ComfyUI's UI (the subprocess submitted prompts to `/prompt` API, but the *decision logic* — which line, what timing, what portrait — ran in a separate process the user couldn't see). Pivoted 2026-04-27 to in-graph nodes (BUG-LOCAL-078) so progress is visible in ComfyUI's KSampler progress bars and the workflow JSON is a single self-contained source of truth.
+### Rendering model
 
-The CLI scripts (`scripts/render_humo_batch.py`, `scripts/render_episode_concat.py`, `scripts/test_humo_batch_concat.ps1`) remain in the repo as ad-hoc smoke tools — useful for testing HuMo on a single episode without queueing the full workflow — but the production path is in-graph.
+All rendering is in-process (in-graph) on ComfyUI's executor thread, so progress shows in the node UI and the workflow JSON stays the single self-contained source of truth. Per-engine heavy weights load through ComfyUI's own model management under the single-resident-heavy VRAM ceiling, and idle models are detached (not globally unloaded) between engines.
 
 ### v2.0-alpha quick test
 
-1. `git checkout v2.0-alpha` in your `custom_nodes/ComfyUI-OldTimeRadio/` directory
-2. Drag `workflows/otr_scifi_16gb_full.json` into ComfyUI
-3. Queue prompt
-4. Wait ~3-4 hours for a 5-min episode (audio + FLUX stills are minutes; HuMo per-line is ~265s × N lines)
-5. Final mp4 lands at `output/otr/episodes/<episode_id>.mp4`
+1. `git checkout v2.0-alpha` in your `custom_nodes/ComfyUI-OldTimeRadio/` directory.
+2. Drag the v2.0-alpha full workflow JSON into ComfyUI and Queue Prompt.
+3. Audio + the radio-floor video render in minutes; heavy engine adapters (HuMo, etc.) add time per beat and are opt-in via their `OTR_ENABLE_<ENGINE>` flags plus installed weights.
+4. Final mp4 lands at `output/otr/episodes/<episode_id>.mp4`.
 
 ### Launching ComfyUI Desktop on Windows (BUG-LOCAL-003 fix)
 
@@ -97,13 +88,11 @@ scripts\run_comfyui.cmd
 
 This sets `HF_HOME`, `HUGGINGFACE_HUB_CACHE`, `HF_HUB_OFFLINE`, and `TRANSFORMERS_OFFLINE` for the launched ComfyUI process. Edit the script to disable offline mode if you intentionally want HuggingFace to fetch updates.
 
-### v2.0-alpha known gaps (planned, not blocking)
+### v2.0-alpha status (2026-06-08)
 
-- **Real PASS1 character portraits not rendered** — HuMo currently uses FLUX environment stills as visual stand-ins because no node renders character portraits. Faces in the composite will be visually wrong per line; pipeline runs end-to-end. Real fix is wiring a second BatchFluxRender invocation to `VideoPlan.pass1_char_prompts_json`.
-- **Per-line audio-aligned timing** — HuMo overlays chain back-to-back from t=0 instead of matching real speech windows. Visual lip-sync is desynced from audio. Fix requires SceneSequencer to populate per-line `start_s` in the ledger.
-- **Optional 4K upscale** — `scripts/render_upscale_batch.py` (SeedVR2 3B fp16) ships but isn't yet wired as a Phase 2.5 / Phase 4 node in the v2.0-alpha workflow. CLI invocation works for ad-hoc per-clip or per-final upscale.
+Subproject A (the model-agnostic video platform) is **shipped + tagged `A-ship`**: the full render path passed a back-to-back full-episode GPU soak (single resident heavy engine under the 14.5 GB ceiling, deterministic, frozen audio byte-identical), degrading any unavailable engine loudly to the radio-floor clip. Pluggable and optional — they light up as their dependencies install: additional motion / lipsync engines, the 3D character renderer (Subproject B), and the opt-in image-gen peers (Subproject C). Optional 4K upscale (`scripts/render_upscale_batch.py`, SeedVR2) ships as an ad-hoc CLI tool.
 
-See `ROADMAP.md` for the full v2.0-alpha P1 build sequence and `docs/BUG_LOG.md` BUG-LOCAL-074 through BUG-LOCAL-078 for the architectural history.
+See `ROADMAP.md` for the build sequence and `docs/BUG_LOG.md` for the architectural history.
 
 ---
 
