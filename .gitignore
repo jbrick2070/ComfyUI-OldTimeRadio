@@ -192,3 +192,9 @@ models/openrouter_models.json
 /*.err
 /*.out
 /*_results.jsonl
+
+# --- 2026-06-06 matrix-run output hygiene ---
+# scripts/_otr_matrix_out/ is generated test-matrix exhaust (logs, pytest
+# captures, matrix_results.jsonl, MATRIX_DONE marker). Reproducible output,
+# not source -- keep it on disk but out of git history and `git status`.
+scripts/_otr_matrix_out/
