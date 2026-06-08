@@ -27,10 +27,13 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # (adapter_module, engine_name, enable_flag, model_env, expected_commercial_clean)
 # One row per matrix peer beyond C2/C3. Extend with new candidates here only.
+# Clean-license (MIT/Apache) -> True; conditional/unconfirmed license -> False.
 PEERS = [
     ("hidream_i1", "hidream_i1", "OTR_ENABLE_HIDREAM", "OTR_HIDREAM_GGUF", True),
     ("chroma_hd", "chroma_hd", "OTR_ENABLE_CHROMA", "OTR_CHROMA_CKPT", True),
     ("lumina_image", "lumina_image", "OTR_ENABLE_LUMINA", "OTR_LUMINA_CKPT", True),
+    ("sd35_large", "sd35_large", "OTR_ENABLE_SD35", "OTR_SD35_CKPT", False),
+    ("flux2_klein", "flux2_klein", "OTR_ENABLE_FLUX2_KLEIN", "OTR_FLUX2_KLEIN_CKPT", False),
 ]
 
 PEER_IDS = [p[1] for p in PEERS]

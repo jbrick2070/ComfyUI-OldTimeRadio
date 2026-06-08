@@ -68,3 +68,18 @@ try:  # pragma: no cover - trivial guard
     from . import lumina_image as _lumina_image  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# C7-C8 (generic peers, default-OFF, CONDITIONAL license -> commercial_clean=False):
+# matrix candidates whose license is conditional/unconfirmed, registered HONESTLY
+# so the layer holds mixed-license peers and the license gate surfaces each one's
+# real terms. SD 3.5 Large (Stability Community, free only below a revenue tier);
+# FLUX.2 Klein (FLUX-family, verify -- plus BUG-070 SageAttention at render time).
+# Each greyed until its own OTR_ENABLE_<X>=1 + weights exist; own guard each.
+try:  # pragma: no cover - trivial guard
+    from . import sd35_large as _sd35_large  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+try:  # pragma: no cover - trivial guard
+    from . import flux2_klein as _flux2_klein  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
