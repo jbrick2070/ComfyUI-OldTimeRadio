@@ -338,6 +338,16 @@ _NODE_MODULES = {
     "OTR_CaptionBurn":             (".nodes.otr_caption_burn",       "OTRCaptionBurn",       " CaptionBurn (SDH open captions on the silent video; default-OFF)"),
     "OTR_MasterAudioMux":          (".nodes.otr_master_audio_mux",   "OTRMasterAudioMux",    " MasterAudioMux (terminal mux-LAST, -c:a copy)"),
 
+    # =========================================================================
+    # v2.0 in-process render driver (A-S7.5) -- the model-agnostic render entry
+    # that walks the registry engines (prepare->render_clip->canonicalize->
+    # teardown) with the A-S7 retry taxonomy + fallback chain + LOUD restamp.
+    # "soak" mode is the A-ship full-episode gate; "single" validates one
+    # engine's in-process forward. No model is "primary". See
+    # nodes/_otr_video_engines/render_driver.py.
+    # =========================================================================
+    "OTR_VideoRenderBatch":        (".nodes.otr_video_render_batch", "OTRVideoRenderBatch", " Video Render Batch (A-S7.5 in-process render)"),
+
 
 }
 
@@ -470,6 +480,91 @@ try:
     print("[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)")
 except Exception as _otr_route_err:
     print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
+
+# =====================================================================
+# HTTP routes: POST /otr/video_render_single + POST /otr/video_render_soak
+# Trigger the in-process A-S7.5 render driver (nodes/_otr_video_engines/
+# render_driver.py) in a background thread so the request returns at once;
+# the worker writes a JSON report under output/otr/aship/ the operator polls.
+# In-process == NODE_CLASS_MAPPINGS is populated, so the heavy engine forwards
+# actually run on the GPU (the A-ship gate). Wrapped so a failure cannot break
+# node load.
+# =====================================================================
+try:
+    import json as _otr_rj
+    import os as _otr_ro
+    import threading as _otr_threading
+    from server import PromptServer as _otr_PS2  # type: ignore
+    from aiohttp import web as _otr_web2  # type: ignore
+
+    def _otr_render_report_dir():
+        base = _otr_ro.environ.get("OTR_OUTPUT_DIR") or _otr_ro.path.abspath(
+            _otr_ro.path.join(_otr_ro.path.dirname(_otr_ro.path.abspath(__file__)),
+                              "..", "..", "output"))
+        d = _otr_ro.path.join(base, "otr", "aship")
+        _otr_ro.makedirs(d, exist_ok=True)
+        return d
+
+    def _otr_run_render_async(report_name, fn):
+        path = _otr_ro.path.join(_otr_render_report_dir(), report_name)
+        with open(path, "w", encoding="utf-8") as f:
+            _otr_rj.dump({"ok": None, "status": "running"}, f)
+
+        def _worker():
+            try:
+                rep = fn()
+            except Exception as exc:  # noqa: BLE001 - report honestly
+                import traceback as _tb
+                rep = {"ok": False, "status": "crashed",
+                       "error": "%s: %s" % (type(exc).__name__, exc),
+                       "traceback": _tb.format_exc()[-2000:]}
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    _otr_rj.dump(rep, f, default=str)
+            except Exception:  # noqa: BLE001
+                pass
+
+        _otr_threading.Thread(target=_worker, daemon=True).start()
+        return path
+
+    async def _otr_body(request):
+        try:
+            return await request.json()
+        except Exception:  # noqa: BLE001
+            return {}
+
+    @_otr_PS2.instance.routes.post("/otr/video_render_single")
+    async def _otr_video_render_single(request):
+        body = await _otr_body(request)
+        from .nodes._otr_video_engines import render_driver as _rd
+        assets = {"init_image": body.get("portrait", ""),
+                  "audio_ref": body.get("audio", "")}
+        engine = str(body.get("engine", "humo"))
+        fc = int(body.get("frame_count", 33))
+        path = _otr_run_render_async(
+            "single_%s.json" % engine,
+            lambda: _rd.render_single(engine, assets=assets, frame_count=fc))
+        return _otr_web2.json_response({"started": True, "report_path": path})
+
+    @_otr_PS2.instance.routes.post("/otr/video_render_soak")
+    async def _otr_video_render_soak(request):
+        body = await _otr_body(request)
+        from .nodes._otr_video_engines import render_driver as _rd
+        assets = {"init_image": body.get("portrait", ""),
+                  "audio_ref": body.get("audio", "")}
+        beats = int(body.get("beats", 40))
+        oom = int(body.get("oom_index", 20))
+        fc = int(body.get("frame_count", 25))
+        path = _otr_run_render_async(
+            "soak_report.json",
+            lambda: _rd.run_gpu_soak(n_beats=beats, oom_index=oom,
+                                     frame_count=fc, assets=assets))
+        return _otr_web2.json_response({"started": True, "report_path": path})
+
+    print("[OldTimeRadio] HTTP routes registered: POST /otr/video_render_single,"
+          " POST /otr/video_render_soak")
+except Exception as _otr_render_route_err:
+    print(f"[OldTimeRadio] render route registration skipped: {_otr_render_route_err}")
 
 __all__ = [
     "NODE_CLASS_MAPPINGS",

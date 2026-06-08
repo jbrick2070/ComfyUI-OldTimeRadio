@@ -1,0 +1,484 @@
+"""In-process video render driver (A-S7.5) -- the model-agnostic render loop
+that ``OTR_VideoRenderBatch`` walks to ship Subproject A.
+
+For each shot the driver drives the registry engine lifecycle
+(``assert_usable -> prepare -> render_clip -> canonicalize -> teardown``) and, on
+a HARD failure, classifies it via the A-S7 retry taxonomy, walks the declared
+``fallback_engine`` chain (resolved by :mod:`nodes._otr_shared.fallback`), and
+restamps the ledger LOUDLY (log the swap + append a ``runtime_fallback_decisions``
+record at the SAME ``video_revision``) until a clip renders. Every chain is
+guaranteed to terminate at the registered radio floor (``still_kenburns``), so an
+episode NEVER aborts and a beat is NEVER dropped. The frozen ``ledger['audio']``
+section is read-only throughout (V-1 / the audio spine is frozen).
+
+In-process (V invariant: no HTTP server, no GraphBuilder): the heavy engines call
+ComfyUI wrapper node classes directly via :mod:`wrapper_bridge`, so this driver
+MUST run inside the ComfyUI process (``NODE_CLASS_MAPPINGS`` populated). The pure
+pieces (``make_fallback_of`` / ``classify_failure`` / the fixture builder /
+``assert_soak_ok``) are CPU-tested; the live render + the A-S7.5 GPU soak are the
+operator gate. UTF-8, no BOM, ASCII-only source.
+"""
+from __future__ import annotations
+
+import copy
+import logging
+import os
+import time
+
+from .._otr_shared import retry_taxonomy as _rt
+from .._otr_shared.fallback import resolve_fallback_chain
+from . import motion_common as _mc
+from . import registry as _vreg
+
+_LOG = logging.getLogger("OTR.video.render_driver")
+
+#: The cheap radio-floor engine names (terminal; a chain ends here).
+FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
+                         "visualizer", "flux_still"})
+#: The universal floor terminus appended to any engine whose declared chain
+#: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
+#: -- every chain terminates at a registered radio floor that always renders).
+UNIVERSAL_FLOOR = "still_kenburns"
+
+#: Subproject-B character_3d engine -> its A-side audio_driven_face fallback.
+#: hunyuan3d_talk ships with B (not registered yet), so the hop is overlaid here
+#: (mirrors scripts/otr_video_soak.make_fallback_of) to resolve the chain now.
+SYNTH_FALLBACKS = {"hunyuan3d_talk": "humo"}
+
+#: engine_id -> family, for restamping onto a fallback engine (covers the
+#: not-yet-registered B engine + the A/cheap engines).
+ENGINE_FAMILY = {
+    "hunyuan3d_talk": "character_3d", "humo": "audio_driven_face",
+    "latentsync": "lipsync_overlay", "still_kenburns": "static_motion",
+    "ltx_video": "text_to_video", "wan_i2v": "image_to_video",
+    "abstract": "abstract", "station_card": "static_image_gen",
+    "visualizer": "abstract", "flux_still": "static_image_gen",
+}
+
+#: The (role, engine, family) rotation covering all 5 roles + the 7 non-3D
+#: families (kept identical to scripts/otr_video_soak so the GPU soak walks the
+#: same shape the shipped CPU harness proves).
+_PROFILES = (
+    ("announcer_visual", "humo", "audio_driven_face"),
+    ("announcer_visual", "latentsync", "lipsync_overlay"),
+    ("music_visual", "ltx_video", "text_to_video"),
+    ("character_video", "wan_i2v", "image_to_video"),
+    ("scene_broll", "still_kenburns", "static_motion"),
+    ("background_abstract", "abstract", "abstract"),
+    ("announcer_visual", "station_card", "static_image_gen"),
+)
+#: The forced-OOM character_3d group (Subproject B family; degrades to humo).
+_CHAR3D = ("character_video", "hunyuan3d_talk", "character_3d")
+#: The heavy engines the soak forces to OOM on the character_3d shot so the chain
+#: walks all the way to the radio floor.
+OOM_ENGINES = frozenset({"hunyuan3d_talk", "humo", "latentsync"})
+#: The M1 frozen master-audio PCM marker the soak threads through + asserts is
+#: byte-identical after the run (the decision layer must never touch audio).
+FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+#: The expected character_3d degradation trail to the radio floor.
+EXPECTED_OOM_TRAIL = ["hunyuan3d_talk->humo (oom)", "humo->latentsync (oom)",
+                      "latentsync->still_kenburns (oom)"]
+
+
+class OomSignal(RuntimeError):
+    """Stand-in for a render-time CUDA OOM (a HARD failure) -- the soak forces it
+    on the mid-episode character_3d shot to walk the chain to the floor."""
+
+
+class RenderFloorError(RuntimeError):
+    """The radio floor itself failed to render -- a chain genuinely exhausted
+    (the soak's negative control; should never happen with a working ffmpeg)."""
+
+
+class SoakError(AssertionError):
+    """An A-S7.5 soak invariant was violated (the soak FAILED)."""
+
+
+# --------------------------------------------------------------------------- #
+# Pure helpers (CPU-tested)
+# --------------------------------------------------------------------------- #
+def make_fallback_of(synth=None):
+    """``fallback_of(name) -> next | None`` over the REAL registry + the synthetic
+    B overlay, guaranteeing termination at the radio floor (a dangling engine
+    with no declared fallback degrades to ``still_kenburns``)."""
+    overlay = dict(SYNTH_FALLBACKS)
+    if synth:
+        overlay.update(synth)
+
+    def fallback_of(name):
+        if name in overlay:
+            return overlay[name]
+        if _vreg.is_registered(name):
+            nxt = getattr(_vreg.get_engine(name), "fallback_engine", None)
+            if nxt:
+                return nxt
+        if name in FLOOR_NAMES:
+            return None
+        return UNIVERSAL_FLOOR
+
+    return fallback_of
+
+
+def classify_failure(exc):
+    """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
+    if isinstance(exc, OomSignal):
+        return _rt.FailureKind.OOM
+    name = type(exc).__name__
+    if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",
+                "KeyError", "FileNotFoundError"):
+        return _rt.FailureKind.DEPENDENCY_MISSING
+    if name == "GraphExecutionError":
+        return _rt.FailureKind.INVALID_DAG
+    return _rt.FailureKind.CRASH_BEFORE_LOAD
+
+
+def engine_family(name, default=None):
+    """The family for a (possibly unregistered) engine name."""
+    if name in ENGINE_FAMILY:
+        return ENGINE_FAMILY[name]
+    if _vreg.is_registered(name):
+        return getattr(_vreg.get_engine(name), "family", default) or default
+    return default or "abstract"
+
+
+def build_soak_fixture(n_beats=40, oom_index=20):
+    """Build a synthetic ``ledger['video']`` section + meta (pure; identical
+    shape to scripts/otr_video_soak.build_soak_fixture)."""
+    if not 0 <= oom_index < n_beats:
+        raise ValueError("oom_index %d out of range for %d beats"
+                         % (oom_index, n_beats))
+    shots = []
+    for i in range(n_beats):
+        role, engine, family = _CHAR3D if i == oom_index \
+            else _PROFILES[i % len(_PROFILES)]
+        shots.append({
+            "shot_id": "shot_%04d" % i, "beat_id": "b%04d" % i, "role": role,
+            "engine_id": engine, "family": family, "group_id": "grp_%04d" % i,
+            "target_frame_count": 25, "degradation_trail": [],
+        })
+    section = {"video_revision": 1, "fps": 25, "shots": shots}
+    meta = {"oom_shot_id": "shot_%04d" % oom_index, "oom_index": oom_index,
+            "n_beats": n_beats}
+    return section, meta
+
+
+def build_full_ledger(section):
+    """Wrap a video section in a full ledger with a FROZEN audio section."""
+    return {"audio": {"master_audio_sha256": FROZEN_AUDIO_SHA,
+                      "ledger_frozen": True},
+            "video": section}
+
+
+def build_request(shot, assets, frame_count, canvas=None):
+    """A VideoRequest-shaped dict per shot (deterministic: the seed is keyed to
+    the shot id so render-twice is identical -- V-7)."""
+    assets = assets or {}
+    portrait = assets.get("init_image", "")
+    audio = assets.get("audio_ref", "")
+    sid = shot["shot_id"]
+    try:
+        idx = int(sid.rsplit("_", 1)[-1])
+    except ValueError:
+        idx = 0
+    seed = (idx * 1009 + 7) & 0x7FFFFFFF
+    cw, ch = (canvas or (480, 832))
+    return {
+        "shot_id": sid, "request_id": sid,
+        "text_prompt": "a 1940s radio studio, warm tungsten light, on air",
+        "asset_refs": {"init_image": portrait} if portrait else {},
+        "audio_ref": {"path": audio} if audio else None,
+        "base_clip_ref": None,
+        "timing": {"target_frame_count": int(frame_count)},
+        "canvas": {"w": int(cw), "h": int(ch), "fps": 25, "aspect_policy": "pad"},
+        "seed_bundle": {"request_seed": seed},
+        "init_w": 480, "init_h": 832,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# The in-process render (the GPU slice)
+# --------------------------------------------------------------------------- #
+def _render_one(engine_name, request, *, force_oom):
+    """Attempt ONE candidate engine: assert_usable -> prepare -> render_clip ->
+    canonicalize, always teardown. ``force_oom`` raises BEFORE any work (the
+    soak's deterministic mid-episode OOM). Raises on failure; returns the
+    canonical clip dict on success."""
+    if force_oom:
+        raise OomSignal("forced soak OOM on %s" % engine_name)
+    if not _vreg.is_registered(engine_name):
+        raise LookupError("engine %r is not registered" % engine_name)
+    eng = _vreg.get_engine(engine_name)
+    prepared = None
+    try:
+        eng.assert_usable(host_caps={}, profile={})
+        prepared = eng.prepare(host_caps={}, profile={}, session_ctx={})
+        raw = eng.render_clip(request, prepared)
+        return eng.canonicalize(raw, request, {})
+    finally:
+        if prepared is not None:
+            try:
+                eng.teardown(prepared)
+            except Exception:            # noqa: BLE001 - teardown best-effort
+                pass
+
+
+def render_shot(shot, request, *, fallback_of, video_revision,
+                oom_engines=frozenset(), oom_shot_id=None):
+    """Render ONE shot through the fallback chain LOUDLY until a clip renders.
+
+    Returns ``(clip, restamped_shot, decisions, attempts, vram_used_mb)``. Each
+    HARD failure restamps the shot row + appends a runtime_fallback_decision at
+    the SAME revision and logs the LOUD swap. The floor always succeeds, so the
+    loop terminates with a clip (or raises RenderFloorError if the floor itself
+    cannot render -- the negative control)."""
+    sid = shot["shot_id"]
+    bid = shot.get("beat_id", sid)
+    chain = resolve_fallback_chain(shot["engine_id"], fallback_of)
+    decisions = []
+    attempts = []
+    out_shot = dict(shot)
+    used_mb = None
+    for cand in chain:
+        force = (sid == oom_shot_id and cand in oom_engines)
+        attempts.append(cand)
+        try:
+            clip = _render_one(cand, request, force_oom=force)
+            used_mb = _mc.vram_used_mb()
+            return clip, out_shot, decisions, attempts, used_mb
+        except Exception as exc:         # noqa: BLE001 - classified + LOUD swap
+            nxt = fallback_of(cand)
+            kind = _rt.FailureKind.OOM if force else classify_failure(exc)
+            if nxt is None:
+                raise RenderFloorError(
+                    "radio floor %r failed for shot %s: %s: %s"
+                    % (cand, sid, type(exc).__name__, exc))
+            _rt.classify(kind)           # validate the decision invariants
+            detail = ("forced soak OOM" if force
+                      else "%s: %s" % (type(exc).__name__,
+                                       str(exc).splitlines()[0]))[:200]
+            rec = _rt.build_fallback_decision(
+                shot_id=sid, beat_id=bid, from_engine=cand, to_engine=nxt,
+                kind=kind, video_revision=video_revision, detail=detail)
+            decisions.append(rec)
+            out_shot = _rt.restamp_shot_row(
+                out_shot, to_engine=nxt,
+                to_family=engine_family(nxt, out_shot.get("family")),
+                from_engine=cand, kind=kind)
+            _LOG.warning(_rt.format_swap_log(rec))
+    raise RenderFloorError("chain exhausted without a floor for shot %s" % sid)
+
+
+def run_episode(ledger, *, fallback_of, oom_shot_id=None,
+                oom_engines=frozenset(), assets=None, frame_count=25,
+                canvas=None):
+    """Drive one episode end-to-end on REAL engines (deep-copies the ledger; the
+    frozen ``audio`` section is never touched). Returns
+    ``{ledger, clips, trace, vram_peak_mb}``."""
+    ledger = copy.deepcopy(ledger)
+    section = ledger["video"]
+    rev = int(section["video_revision"])
+    clips, new_shots, trace = {}, [], []
+    vram_peak = 0
+    for shot in section["shots"]:
+        request = build_request(shot, assets, frame_count, canvas)
+        clip, out_shot, decisions, attempts, used = render_shot(
+            shot, request, fallback_of=fallback_of, video_revision=rev,
+            oom_engines=oom_engines, oom_shot_id=oom_shot_id)
+        for rec in decisions:
+            section = _rt.append_runtime_fallback_decision(section, rec)
+        clips[out_shot["shot_id"]] = clip
+        new_shots.append(out_shot)
+        trace.append({"shot_id": out_shot["shot_id"], "attempts": attempts,
+                      "final_engine": out_shot["engine_id"]})
+        if used:
+            vram_peak = max(vram_peak, int(used))
+    section["shots"] = new_shots
+    ledger["video"] = section
+    return {"ledger": ledger, "clips": clips, "trace": trace,
+            "vram_peak_mb": vram_peak}
+
+
+# --------------------------------------------------------------------------- #
+# A-S7.5 full-episode soak (two back-to-back episodes on REAL engines)
+# --------------------------------------------------------------------------- #
+def _clip_summary(clip):
+    """Compact, JSON-able view of a rendered clip + its on-disk reality."""
+    path = (clip or {}).get("path", "")
+    exists = bool(path) and os.path.exists(path)
+    size = os.path.getsize(path) if exists else 0
+    return {"engine_id": (clip or {}).get("engine_id"),
+            "family": (clip or {}).get("family"),
+            "frame_count": (clip or {}).get("frame_count"),
+            "path": path, "exists": exists, "size": size}
+
+
+def _norm_decisions(section):
+    """Structural (path-free) view of the runtime_fallback_decisions for the
+    determinism compare + the audit."""
+    return [{k: d.get(k) for k in ("shot_id", "from_engine", "to_engine",
+                                   "failure_kind", "block_class",
+                                   "video_revision")}
+            for d in section.get("runtime_fallback_decisions", [])]
+
+
+def _episode_facts(ep, meta):
+    led = ep["ledger"]
+    sec = led["video"]
+    shots = {s["shot_id"]: s for s in sec["shots"]}
+    oom = shots[meta["oom_shot_id"]]
+    clips = {sid: _clip_summary(c) for sid, c in ep["clips"].items()}
+    return {
+        "n_clips": len(ep["clips"]),
+        "all_clips_real": all(c["exists"] and c["size"] > 0
+                              for c in clips.values()),
+        "oom_final_engine": oom["engine_id"],
+        "oom_trail": oom["degradation_trail"],
+        "decisions": _norm_decisions(sec),
+        "video_revision": sec["video_revision"],
+        "audio_sha": led["audio"]["master_audio_sha256"],
+        "humo_rendered": sum(1 for c in clips.values()
+                             if c["engine_id"] == "humo" and c["exists"]),
+        "vram_peak_mb": ep["vram_peak_mb"],
+        "trace": ep["trace"],
+        "clips": clips,
+    }
+
+
+def assemble_report(meta, input_ledger, e1, e2, *, vram_ceiling_mb, elapsed_s):
+    return {
+        "meta": meta, "vram_ceiling_mb": int(vram_ceiling_mb),
+        "elapsed_s": round(float(elapsed_s), 1),
+        "episode_1": _episode_facts(e1, meta),
+        "episode_2": _episode_facts(e2, meta),
+        "input_oom_engine":
+            {s["shot_id"]: s for s in
+             input_ledger["video"]["shots"]}[meta["oom_shot_id"]]["engine_id"],
+        "input_oom_trail":
+            {s["shot_id"]: s for s in
+             input_ledger["video"]["shots"]}[meta["oom_shot_id"]]
+            ["degradation_trail"],
+    }
+
+
+def assert_soak_ok(report):
+    """Assert every A-S7.5 GPU-soak invariant; raise :class:`SoakError` on any
+    violation. Returns the list of passed-check descriptions for the report."""
+    meta = report["meta"]
+    n = meta["n_beats"]
+    ceiling = report["vram_ceiling_mb"]
+    checks = []
+    for tag in ("episode_1", "episode_2"):
+        f = report[tag]
+        if f["n_clips"] != n or not f["all_clips_real"]:
+            raise SoakError("%s: not every beat produced a real on-disk clip "
+                            "(%d/%d, all_real=%s)"
+                            % (tag, f["n_clips"], n, f["all_clips_real"]))
+        if f["oom_final_engine"] != "still_kenburns":
+            raise SoakError("%s: character_3d OOM did not converge to the radio "
+                            "floor (got %r)" % (tag, f["oom_final_engine"]))
+        if f["oom_trail"] != EXPECTED_OOM_TRAIL:
+            raise SoakError("%s: OOM degradation trail %r != %r"
+                            % (tag, f["oom_trail"], EXPECTED_OOM_TRAIL))
+        oom_decisions = [d for d in f["decisions"]
+                         if d["shot_id"] == meta["oom_shot_id"]]
+        if len(oom_decisions) != 3:
+            raise SoakError("%s: expected 3 LOUD OOM decisions on the "
+                            "character_3d shot, got %d"
+                            % (tag, len(oom_decisions)))
+        for d in oom_decisions:
+            if (d["failure_kind"] != "oom" or d["block_class"] != "hard"
+                    or d["video_revision"] != 1):
+                raise SoakError("%s: malformed OOM decision %r" % (tag, d))
+        if f["video_revision"] != 1:
+            raise SoakError("%s: video_revision bumped to %r (a restamp stays at "
+                            "the same revision)" % (tag, f["video_revision"]))
+        if f["audio_sha"] != FROZEN_AUDIO_SHA:
+            raise SoakError("%s: frozen audio sha changed (%r) -- the render "
+                            "driver must never touch audio" % (tag, f["audio_sha"]))
+        if f["humo_rendered"] < 1:
+            raise SoakError("%s: humo never rendered in-process (0 real humo "
+                            "clips) -- the heavy in-process forward did not run"
+                            % tag)
+        if f["vram_peak_mb"] and f["vram_peak_mb"] > ceiling:
+            raise SoakError("%s: VRAM peak %d MB > ceiling %d MB"
+                            % (tag, f["vram_peak_mb"], ceiling))
+        checks.append("%s: %d real clips; character_3d OOM->floor converged "
+                      "(%d LOUD restamps @rev1); %d humo in-process renders; "
+                      "VRAM peak %s MB <= %d; frozen audio untouched"
+                      % (tag, n, len(oom_decisions), f["humo_rendered"],
+                         f["vram_peak_mb"], ceiling))
+    if report["episode_1"]["trace"] != report["episode_2"]["trace"]:
+        raise SoakError("non-deterministic: the two episodes' render traces "
+                        "(per-shot attempts + final engine) differ")
+    if report["episode_1"]["decisions"] != report["episode_2"]["decisions"]:
+        raise SoakError("non-deterministic: the two episodes' fallback "
+                        "decisions differ")
+    if (report["input_oom_engine"] != "hunyuan3d_talk"
+            or report["input_oom_trail"]):
+        raise SoakError("carryover: the shared input fixture was mutated")
+    checks.append("determinism: two back-to-back episodes identical "
+                  "(traces + decisions); input fixture unmutated (no carryover)")
+    return checks
+
+
+def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None,
+                 vram_ceiling_mb=None):
+    """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back,
+    assert every invariant, and return the structured report. Raises
+    :class:`SoakError` on a violation (never a fake pass)."""
+    ceiling = int(vram_ceiling_mb or _mc.VRAM_CEILING_MB)
+    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=oom_index)
+    ledger = build_full_ledger(section)
+    fb = make_fallback_of()
+    t0 = time.time()
+    e1 = run_episode(ledger, fallback_of=fb, oom_shot_id=meta["oom_shot_id"],
+                     oom_engines=OOM_ENGINES, assets=assets,
+                     frame_count=frame_count)
+    e2 = run_episode(ledger, fallback_of=fb, oom_shot_id=meta["oom_shot_id"],
+                     oom_engines=OOM_ENGINES, assets=assets,
+                     frame_count=frame_count)
+    report = assemble_report(meta, ledger, e1, e2, vram_ceiling_mb=ceiling,
+                             elapsed_s=time.time() - t0)
+    try:
+        report["passed_checks"] = assert_soak_ok(report)
+        report["ok"] = True
+    except SoakError as exc:             # embed the failure -- never a fake pass
+        report["ok"] = False
+        report["error"] = str(exc)
+    return report
+
+
+def render_single(engine_name="humo", *, assets=None, frame_count=33,
+                  canvas=None):
+    """Render ONE shot via a SINGLE engine with NO fallback -- the focused
+    in-process validation (surfaces the real exception so the in-process forward
+    can be debugged in isolation before the full soak). Returns a result dict."""
+    shot = {"shot_id": "single_0000", "beat_id": "b0000",
+            "engine_id": engine_name,
+            "family": engine_family(engine_name, "audio_driven_face"),
+            "target_frame_count": int(frame_count), "degradation_trail": []}
+    request = build_request(shot, assets, frame_count, canvas)
+    t0 = time.time()
+    try:
+        clip = _render_one(engine_name, request, force_oom=False)
+        return {"ok": True, "engine": engine_name,
+                "elapsed_s": round(time.time() - t0, 1),
+                "clip": _clip_summary(clip),
+                "vram_used_mb": _mc.vram_used_mb()}
+    except Exception as exc:             # noqa: BLE001 - report honestly
+        import traceback
+        return {"ok": False, "engine": engine_name,
+                "elapsed_s": round(time.time() - t0, 1),
+                "error": "%s: %s" % (type(exc).__name__, exc),
+                "traceback": traceback.format_exc()[-1800:]}
+
+
+__all__ = [
+    "FLOOR_NAMES", "UNIVERSAL_FLOOR", "SYNTH_FALLBACKS", "ENGINE_FAMILY",
+    "OOM_ENGINES", "FROZEN_AUDIO_SHA", "EXPECTED_OOM_TRAIL",
+    "OomSignal", "RenderFloorError", "SoakError",
+    "make_fallback_of", "classify_failure", "engine_family",
+    "build_soak_fixture", "build_full_ledger", "build_request",
+    "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
+    "run_gpu_soak", "render_single",
+]
