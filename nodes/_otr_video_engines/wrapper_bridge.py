@@ -195,7 +195,52 @@ def _topo_order(graph):
     return order
 
 
-def run_graph(graph, classes=None, *, terminal=None):
+def _run_coroutine(coro):
+    """Run a coroutine to completion on a private event loop. ComfyUI's V3 node
+    API exposes an async node's FUNCTION as ``EXECUTE_NORMALIZED_ASYNC`` (a
+    coroutine); the in-process render driver runs in a worker thread with no
+    running loop, so a fresh loop drives it to completion."""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+def normalize_node_output(out):
+    """Normalize a node FUNCTION's return into a plain output tuple.
+
+    ComfyUI's V3 node API (``comfy_api``) makes a node's ``FUNCTION`` the
+    classmethod ``EXECUTE_NORMALIZED`` / ``EXECUTE_NORMALIZED_ASYNC``, which
+    returns a ``NodeOutput`` wrapper (its positional outputs live on ``.args``)
+    -- or, for an async ``execute``, a coroutine of one. The legacy V1 API
+    returns a plain tuple. This unwraps both to the raw output tuple
+    :func:`run_graph` wires by slot (duck-typed -- never imports comfy)."""
+    import inspect
+    if inspect.iscoroutine(out):
+        out = _run_coroutine(out)
+    if (out.__class__.__name__ == "NodeOutput"
+            and hasattr(out, "args") and hasattr(out, "block_execution")):
+        return tuple(out.args)
+    return out
+
+
+def _soft_free():
+    """Drop dead intermediate references' VRAM: GC, then ComfyUI's soft cache
+    empty so model_management can reclaim what is no longer referenced. A no-op
+    off the ComfyUI box (comfy import guarded)."""
+    import gc
+    gc.collect()
+    try:
+        import comfy.model_management as _mm
+        _mm.soft_empty_cache()
+    except Exception:  # noqa: BLE001 -- not inside ComfyUI / no torch -> skip
+        pass
+
+
+def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
+              keep=None):
     """Execute a declarative node graph in dependency order; return the results.
 
     ``graph`` maps ``node_id -> {"class": <class|name>, "inputs": {name: literal |
@@ -205,8 +250,29 @@ def run_graph(graph, classes=None, *, terminal=None):
     inputs, and its return normalised to a tuple. Returns ``{node_id: out_tuple}``;
     when ``terminal`` is given returns that node's tuple directly. Fail-closed: a
     missing class / cycle / a node raising becomes a NAMED GraphExecutionError
-    (never a silent partial render)."""
+    (never a silent partial render).
+
+    ``free_after_use`` mirrors ComfyUI's executor memory model: a node's outputs
+    are dropped (and a soft VRAM reclaim run) once every later consumer has run,
+    so a big intermediate (e.g. the umt5 CLIP / whisper encoder) is freed before
+    the sampler instead of pinning the whole graph resident (the A-S7.5
+    single-resident-engine VRAM ceiling). ``keep`` is the set of node ids never
+    freed (the terminal + the MODEL nodes an engine retains for V-4 teardown)."""
     classes = classes or {}
+    keep = set(keep or ())
+    if terminal is not None:
+        keep.add(terminal)
+    # Remaining-consumer count per source node (for free_after_use).
+    node_srcs = {}
+    remaining = {nid: 0 for nid in graph}
+    for nid in graph:
+        srcs = set()
+        for val in (graph[nid].get("inputs") or {}).values():
+            for w in _iter_wires(val):
+                srcs.add(w.src)
+        node_srcs[nid] = srcs
+        for s in srcs:
+            remaining[s] = remaining.get(s, 0) + 1
     results = {}
     for nid in _topo_order(graph):
         node = graph[nid]
@@ -230,12 +296,21 @@ def run_graph(graph, classes=None, *, terminal=None):
         kwargs = {k: _resolve_value(v, results)
                   for k, v in (node.get("inputs") or {}).items()}
         try:
-            out = fn(**kwargs)
+            out = normalize_node_output(fn(**kwargs))
         except Exception as exc:  # noqa: BLE001 -- surfaced NAMED, never silent
             raise GraphExecutionError(
                 "node %r (%s) raised %s: %s"
                 % (nid, fn_name, type(exc).__name__, exc))
         results[nid] = out if isinstance(out, tuple) else (out,)
+        if free_after_use:
+            did_free = False
+            for s in node_srcs.get(nid, ()):
+                remaining[s] -= 1
+                if remaining[s] <= 0 and s not in keep and s in results:
+                    del results[s]
+                    did_free = True
+            if did_free:
+                _soft_free()
     if terminal is not None:
         if terminal not in results:
             raise GraphExecutionError("terminal node %r not in graph" % terminal)

@@ -178,14 +178,17 @@ class HuMoEngine(_MC.MotionEngineBase):
         positive = plan.get("text_prompt") or "a person speaking, subtle facial motion"
         negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
         W = _wb.Wire
-        return {
+        # The lightx2v distill LoRA is a 14B-shaped adapter: it is INCOMPATIBLE
+        # with the 1.7B tier (shape-mismatch -> not merged + wasted VRAM). Make
+        # it optional so the 1.7B tier runs LoRA-free (set OTR_HUMO_LORA_NAME to
+        # none/skip and raise OTR_HUMO_STEPS, since the distill shortcut is gone).
+        lora_name = names["lora"]
+        skip_lora = (not lora_name) or str(lora_name).strip().lower() in (
+            "none", "skip", "off")
+        graph = {
             "unet": {"class": "unet",
-                     "inputs": {"unet_name": names["unet"], "weight_dtype": "default"}},
-            "lora": {"class": "lora",
-                     "inputs": {"lora_name": names["lora"], "strength_model": 1.0,
-                                "model": W("unet", 0)}},
-            "modelsampling": {"class": "modelsampling",
-                              "inputs": {"shift": 8.0, "model": W("lora", 0)}},
+                     "inputs": {"unet_name": names["unet"],
+                                "weight_dtype": "default"}},
             "clip": {"class": "clip",
                      "inputs": {"clip_name": names["clip"], "type": "wan",
                                 "device": "default"}},
@@ -208,17 +211,29 @@ class HuMoEngine(_MC.MotionEngineBase):
                                 "vae": W("vae", 0),
                                 "audio_encoder_output": W("audioenc", 0),
                                 "ref_image": W("loadimage", 0)}},
-            "ksampler": {"class": "ksampler",
-                         "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
-                                    "cfg": cfg, "sampler_name": "uni_pc",
-                                    "scheduler": "simple", "denoise": 1.0,
-                                    "model": W("modelsampling", 0),
-                                    "positive": W("humo", 0),
-                                    "negative": W("humo", 1),
-                                    "latent_image": W("humo", 2)}},
-            "vaedecode": {"class": "vaedecode",
-                          "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}},
         }
+        model_src = "unet"
+        if not skip_lora:
+            graph["lora"] = {"class": "lora",
+                             "inputs": {"lora_name": lora_name,
+                                        "strength_model": 1.0,
+                                        "model": W("unet", 0)}}
+            model_src = "lora"
+        graph["modelsampling"] = {
+            "class": "modelsampling",
+            "inputs": {"shift": 8.0, "model": W(model_src, 0)}}
+        graph["ksampler"] = {
+            "class": "ksampler",
+            "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
+                       "cfg": cfg, "sampler_name": "uni_pc",
+                       "scheduler": "simple", "denoise": 1.0,
+                       "model": W("modelsampling", 0),
+                       "positive": W("humo", 0), "negative": W("humo", 1),
+                       "latent_image": W("humo", 2)}}
+        graph["vaedecode"] = {
+            "class": "vaedecode",
+            "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}}
+        return graph
 
     def _retain_model_patchers(self, results, prepared):
         """Best-effort V-4: keep the MODEL ModelPatchers the graph produced so
@@ -279,7 +294,12 @@ class HuMoEngine(_MC.MotionEngineBase):
             min_frames=_HUMO_MIN_FRAMES, max_frames=_HUMO_MAX_FRAMES)
         width, height = self._native_dims()
         graph = self._build_graph(image_name, audio_name, plan, length, width, height)
-        results = _wb.run_graph(graph, classes)
+        # free_after_use frees the umt5 CLIP + whisper encoder once consumed so the
+        # sampler does not OOM behind a fully-resident graph; keep the terminal +
+        # the MODEL nodes (retained for the V-4 teardown detach).
+        results = _wb.run_graph(
+            graph, classes, free_after_use=True,
+            keep={self._TERMINAL, "unet", "lora", "modelsampling", "vae"})
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
