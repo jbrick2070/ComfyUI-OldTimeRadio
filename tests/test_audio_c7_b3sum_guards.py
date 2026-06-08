@@ -30,37 +30,11 @@ def _read_src(rel_path: str) -> str:
     return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
-class TestHumoAudioPassthrough:
-    """R-5: HuMo must not re-encode audio in the per-line mp4 mux."""
-
-    def test_humo_save_clip_uses_pcm_or_aac_with_input_match(self):
-        """The _save_clip_via_ffmpeg path writes per-line mp4s. The
-        audio encoder must be either AAC (the input is already AAC
-        and ffmpeg passes it through bit-perfect when the codec
-        matches) OR a documented passthrough. The HuMo native render
-        receives the input audio slot bytes and MUST emit them
-        unchanged to the on-disk mp4."""
-        src = _read_src("nodes/batch_humo_render.py")
-        # The ffmpeg invocation for the per-line clip mux is in
-        # _save_clip_via_ffmpeg (around L1050). The audio leg is
-        # -c:a aac -b:a 192k (HuMo intermediates) which preserves the
-        # source quality from the input PCM slice. The C7 byte-identity
-        # gate is downstream at VideoComposite (which is the load-bearing
-        # passthrough surface).
-        assert "-c:a" in src or "-c:a aac" in src
-        # Pin: the HuMo per-line clip mux MUST NOT use a codec that
-        # would re-transcode an already-encoded source. The
-        # canonical form uses raw PCM input via -f f32le.
-        assert "f32le" in src
-
-    # CW-4 legacy teardown (2026-06-07): the two VideoComposite C7 guards were
-    # DELETED -- nodes/video_composite.py was removed in the render-chain
-    # teardown (commits 691f2f0 / 0359403). The byte-identity carrier is now the
-    # terminal OTR_MasterAudioMux (-c:a copy, NO -shortest); its guarantee is
-    # asserted by tests/test_video_render_path_cw4.py
-    # (test_master_audio_mux_stream_hash_byte_identical) +
-    # tests/test_caption_burn_cw4.py, and the live audio spine by
-    # tests/test_audio_byte_identical.py. HuMo per-line passthrough above stays.
+# TestHumoAudioPassthrough (R-5) DELETED in the CW cleanbreak (2026-06-08): it
+# asserted on nodes/batch_humo_render.py's per-line mp4 mux, removed with the
+# legacy batch render path. The terminal OTR_MasterAudioMux (-c:a copy, no
+# -shortest) is the byte-identity carrier, covered by
+# tests/test_video_render_path_cw4.py + tests/test_audio_byte_identical.py.
 
 
 class TestMusicGenC7Baseline:

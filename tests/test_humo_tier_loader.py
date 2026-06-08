@@ -215,11 +215,10 @@ class TestRegistration:
         assert module_path == ".nodes._otr_humo_tier_loader"
         assert class_name == "HuMoTierLoader"
 
-    def test_batch_humo_render_still_registered(self):
-        # The tier loader feeds OTR_BatchHumoRender; the renderer must
-        # stay registered for the rewired workflow to load.
-        mods = self._node_modules()
-        assert "OTR_BatchHumoRender" in mods
+    # NOTE (CW cleanbreak 2026-06-08): the former
+    # test_batch_humo_render_still_registered assertion was removed -- the
+    # legacy OTR_BatchHumoRender node was deleted with the batch render path
+    # (tombstoned in DELETED_NODE_TYPES). The tier loader stays registered.
 
 
 # ---------------------------------------------------------------------------

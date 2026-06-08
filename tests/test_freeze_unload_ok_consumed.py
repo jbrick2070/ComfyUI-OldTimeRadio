@@ -31,7 +31,6 @@ CONSUMER_FILES = (
     # the retired BatchBark node into OTR_CastLock, which runs first in the v2
     # audio chain (before any audio engine claims VRAM).
     "nodes/cast_lock.py",
-    "visual/batch_flux_render.py",
 )
 
 

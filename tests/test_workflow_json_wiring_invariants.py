@@ -224,30 +224,9 @@ def test_otr_workflow_validator_class_has_output_node_true() -> None:
     )
 
 
-def test_batch_flux_portrait_render_emits_portraits_dir_output() -> None:
-    """The D0d wiring partner: BatchFluxPortraitRender must return a
-    third STRING value named `portraits_dir`. Without this output the
-    HuMo.portraits_dir link cannot land in the JSON.
-
-    AST-extract the class-level RETURN_TYPES + RETURN_NAMES to avoid
-    pulling in `folder_paths` (ComfyUI runtime module) at import time.
-    """
-    return_types = _ast_extract_class_attr_tuple(
-        PORTRAIT_SRC, "BatchFluxPortraitRender", "RETURN_TYPES",
-    )
-    return_names = _ast_extract_class_attr_tuple(
-        PORTRAIT_SRC, "BatchFluxPortraitRender", "RETURN_NAMES",
-    )
-    assert return_types == ("IMAGE", "STRING", "STRING"), (
-        f"BatchFluxPortraitRender.RETURN_TYPES is {return_types!r}; "
-        f"expected ('IMAGE', 'STRING', 'STRING'). Source: "
-        f"{PORTRAIT_SRC.relative_to(REPO_ROOT)}"
-    )
-    assert return_names == ("portrait_batch", "report", "portraits_dir"), (
-        f"BatchFluxPortraitRender.RETURN_NAMES is {return_names!r}; "
-        f"expected ('portrait_batch', 'report', 'portraits_dir'). Source: "
-        f"{PORTRAIT_SRC.relative_to(REPO_ROOT)}"
-    )
+# test_batch_flux_portrait_render_emits_portraits_dir_output DELETED in the CW
+# cleanbreak (2026-06-08): OTR_BatchFluxPortraitRender was removed with the
+# legacy batch render path, so there is no portraits_dir output to assert.
 
 
 def test_workflow_link_records_match_node_input_link_ids(
