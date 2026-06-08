@@ -305,6 +305,13 @@ class HuMoEngine(_MC.MotionEngineBase):
         frames = _wb.images_to_uint8(images)
         out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_humo_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        # Restore the proven HuMo VRAM discipline the refactor dropped: the frames
+        # are on disk, so evict the umt5 CLIP + whisper encoders (BUG-291 detach
+        # reclaim, the same the legacy free_otr_pipeline_residue used as
+        # inter-phase cleanup) so the resident stack drops back under the ceiling
+        # before the PASS-PM assert -- and so the next soak beat starts drained
+        # (no cross-beat accumulation). LOUD; no unload_all_models (V-4/V-5).
+        _wb.reclaim_idle_models(reason="humo post-decode")
         _MC.assert_vram_within_ceiling("humo-render")         # PASS-PM mid-render
         return {"out_path": path, "frame_count": n}
 

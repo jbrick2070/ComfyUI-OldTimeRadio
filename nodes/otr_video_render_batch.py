@@ -48,17 +48,33 @@ class OTRVideoRenderBatch:
 
     def render(self, mode, beats, oom_index, frame_count,
                engine="humo", portrait_path="", audio_path=""):
+        # NOTE: this MUST run inside ComfyUI's executor thread (i.e. submitted via
+        # /prompt, not a background HTTP-route thread): only there does ComfyUI's
+        # model_management evict the umt5/whisper encoders between encode and
+        # sample, keeping the heavy in-process forward under the VRAM ceiling.
+        import os
         from ._otr_video_engines import render_driver as _rd
         assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
         if mode == "single":
             report = _rd.render_single(engine, assets=assets,
                                        frame_count=int(frame_count))
+            name = "node_single_%s.json" % engine
         else:
             report = _rd.run_gpu_soak(n_beats=int(beats), oom_index=int(oom_index),
                                       frame_count=int(frame_count), assets=assets)
+            name = "node_soak.json"
         ok = bool(report.get("ok"))
-        log.warning("[OTR_VideoRenderBatch] mode=%s ok=%s", mode, ok)
-        return (json.dumps(report, ensure_ascii=True, default=str),)
+        payload = json.dumps(report, ensure_ascii=True, default=str)
+        try:                                  # durable report the operator polls
+            base = os.environ.get("OTR_OUTPUT_DIR") or "."
+            out_dir = os.path.join(base, "otr", "aship")
+            os.makedirs(out_dir, exist_ok=True)
+            with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
+                f.write(payload)
+        except Exception as exc:              # noqa: BLE001
+            log.warning("[OTR_VideoRenderBatch] report write failed: %s", exc)
+        log.warning("[OTR_VideoRenderBatch] mode=%s ok=%s -> %s", mode, ok, name)
+        return {"ui": {"text": [payload[:6000]]}, "result": (payload,)}
 
 
 __all__ = ["OTRVideoRenderBatch"]

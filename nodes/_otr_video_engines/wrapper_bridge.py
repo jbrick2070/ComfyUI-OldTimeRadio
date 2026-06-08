@@ -27,8 +27,11 @@ imported LAZILY inside the functions that need them. UTF-8, no BOM, ASCII-only.
 """
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
+
+_LOG = logging.getLogger("OTR.video.wrapper_bridge")
 
 #: Machine-wide VRAM ceiling for the single resident heavy engine (A invariant).
 VRAM_CEILING_MB = 14500
@@ -240,6 +243,62 @@ def _soft_free():
         _mm.soft_empty_cache()
     except Exception:  # noqa: BLE001 -- not inside ComfyUI / no torch -> skip
         pass
+
+
+def reclaim_idle_models(reason=""):
+    """Evict every currently-loaded ComfyUI model's weights off the GPU, the
+    proven HuMo VRAM discipline the in-process refactor dropped.
+
+    This is the BUG-291 reclaim ported from the legacy
+    ``_otr_vram_levers.free_otr_pipeline_residue`` step 3a: walk
+    ``comfy.model_management.current_loaded_models`` and ``detach(unpatch_all=
+    True)`` each patcher -- which moves its weights to the offload (CPU) device
+    even though a wrapper ref survives -- so the umt5 CLIP + whisper encoders'
+    VRAM is reclaimed after a render and the resident heavy stack drops back
+    under the single-resident-engine ceiling. It deliberately does NOT call
+    ``unload_all_models`` (forbidden by V-4/V-5); the detach is the actual VRAM
+    move, the registry clear is not needed. LOUD by contract. Returns the number
+    detached. A no-op off the ComfyUI box (comfy import guarded)."""
+    try:
+        import comfy.model_management as _mm
+    except Exception:  # noqa: BLE001 -- not inside ComfyUI -> nothing to reclaim
+        return 0
+    try:
+        loaded = list(getattr(_mm, "current_loaded_models", None) or [])
+    except Exception:  # noqa: BLE001
+        loaded = []
+    detached = 0
+    for lm in loaded:
+        patcher = getattr(lm, "model", lm)        # LoadedModel.model is the patcher
+        try:
+            det = getattr(patcher, "detach", None)
+            if callable(det):
+                try:
+                    det(unpatch_all=True)
+                except TypeError:
+                    det()                         # older signature: no kwargs
+                detached += 1
+                continue
+        except Exception:  # noqa: BLE001
+            pass
+        try:                                      # fallback: move weights to CPU
+            inner = getattr(patcher, "model", None)
+            if inner is not None and hasattr(inner, "to"):
+                inner.to("cpu")
+                detached += 1
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        import gc
+        gc.collect()
+        _mm.soft_empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+    _LOG.warning(
+        "[OTR video] LOUD VRAM reclaim%s: detached %d resident model(s) "
+        "(encoder eviction; no unload_all_models)",
+        (" (%s)" % reason) if reason else "", detached)
+    return detached
 
 
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
@@ -513,6 +572,7 @@ __all__ = [
     "WrapperNodeMissing", "GraphExecutionError",
     "node_class_mappings", "resolve_node_class", "resolve_graph_classes",
     "Wire", "run_graph",
+    "reclaim_idle_models",
     "quantize_frames_4n1", "even_dim", "images_to_uint8",
     "ffmpeg_silent_mp4_cmd", "ffmpeg_still_motion_cmd", "ffmpeg_lavfi_floor_cmd",
     "run_ffmpeg", "encode_frames_to_silent_mp4",
