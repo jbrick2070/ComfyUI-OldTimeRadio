@@ -294,12 +294,12 @@ class HuMoEngine(_MC.MotionEngineBase):
             min_frames=_HUMO_MIN_FRAMES, max_frames=_HUMO_MAX_FRAMES)
         width, height = self._native_dims()
         graph = self._build_graph(image_name, audio_name, plan, length, width, height)
-        # free_after_use frees the umt5 CLIP + whisper encoder once consumed so the
-        # sampler does not OOM behind a fully-resident graph; keep the terminal +
-        # the MODEL nodes (retained for the V-4 teardown detach).
-        results = _wb.run_graph(
-            graph, classes, free_after_use=True,
-            keep={self._TERMINAL, "unet", "lora", "modelsampling", "vae"})
+        # Render FULLY RESIDENT -- the proven BUG-265 low_vram_default path: the
+        # HuMo-1.7B stack (3.3 GB + umt5/whisper) stays resident with zero offload
+        # on a 16 GB card. (No free_after_use: forcing inter-node model eviction
+        # only fragmented the allocator into an OOM -- it is NOT what the working
+        # OTR_BatchHumoRender does.)
+        results = _wb.run_graph(graph, classes)
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)

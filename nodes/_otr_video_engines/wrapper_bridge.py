@@ -227,9 +227,12 @@ def normalize_node_output(out):
 
 
 def _soft_free():
-    """Drop dead intermediate references' VRAM: GC, then ComfyUI's soft cache
-    empty so model_management can reclaim what is no longer referenced. A no-op
-    off the ComfyUI box (comfy import guarded)."""
+    """Lightweight reclaim of dropped intermediates: GC + ComfyUI's soft cache
+    empty. Deliberately does NOT force-unload resident models: the proven HuMo
+    path (BUG-265 low_vram_default) keeps the 1.7B stack FULLY RESIDENT with zero
+    offload, and an aggressive ``free_memory`` here only fragments the 16 GB
+    allocator into the OOM/thrash it was meant to avoid. A no-op off the ComfyUI
+    box (comfy import guarded)."""
     import gc
     gc.collect()
     try:
