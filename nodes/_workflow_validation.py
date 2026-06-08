@@ -87,6 +87,9 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_BatchFluxPortraitRender",
     "OTR_UnloadAll",
     "OTR_LtxBranchGate",
+    # CW cleanbreak follow-up (2026-06-08): the HuMo tier loader only fed the
+    # deleted batch HuMo node; the in-process eng_humo adapter loads its own.
+    "OTR_HuMoTierLoader",
     # Lean-down 2026-05-29 (step 6): the dormant Story Room writers'-room
     # cluster (Director / Editor / Story Room / Extract / Commit) was
     # deleted. Tombstoned so a stale workflow JSON referencing one of
