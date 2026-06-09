@@ -60,6 +60,17 @@ _HUMO_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, jpeg artifacts, distorted, deformed, "
     "extra fingers, bad hands, bad face, static, watermark, text")
 
+# Production keystone tier baked in as the DEFAULT (the FAST pre-refactor config
+# that scored 37.5/45): the 14B Kijai fp8 UNET + the lightx2v 480p distill LoRA
+# at 6 steps / cfg 1.0 / ModelSamplingSD3 shift 8. The LoRA, steps, cfg and shift
+# defaults below already match this tier; only the UNET name differs from the
+# legacy 1.7B placeholder, so this is the single value that pins the tier. The
+# weight lives in diffusion_models and is resolved via ComfyUI folder_paths, so
+# it is found through extra_model_paths.yaml without a hardcoded box path. The
+# 1.7B tier (no-LoRA, ~20 steps) is far slower; override OTR_HUMO_UNET_NAME /
+# OTR_HUMO_CKPT + OTR_HUMO_LORA_NAME=none + OTR_HUMO_STEPS only to fall back to it.
+_HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
+
 
 @register
 class HuMoEngine(_MC.MotionEngineBase):
@@ -86,9 +97,21 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
-        return os.environ.get("OTR_HUMO_CKPT") or os.path.join(
-            _COMFY_ROOT, "models", "diffusion_models", "humo",
-            "humo_1.7B.safetensors")
+        # Explicit override wins; else resolve the default 14B UNET via ComfyUI
+        # folder_paths (honors extra_model_paths.yaml), else a best-effort join
+        # for the cheap existence check (headless / no folder_paths).
+        env = os.environ.get("OTR_HUMO_CKPT")
+        if env:
+            return env
+        name = os.environ.get("OTR_HUMO_UNET_NAME") or _HUMO_DEFAULT_UNET
+        try:
+            import folder_paths  # type: ignore
+            p = folder_paths.get_full_path("diffusion_models", name)
+            if p:
+                return p
+        except Exception:  # noqa: BLE001 - headless/CPU: fall back to a join
+            pass
+        return os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
 
     def _installed(self):
         """True iff the primary checkpoint exists on disk (no import -- cheap,
