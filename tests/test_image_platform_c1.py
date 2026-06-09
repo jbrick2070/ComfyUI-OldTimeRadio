@@ -471,3 +471,96 @@ def test_dispatcher_skips_truncated_handoff_fail_closed(clean_image_registry, tm
     )
     assert led["images"]["images"] == []
     assert any("handoff not ready" in w for w in warns)
+
+
+# --------------------------------------------------------------------------- #
+# C1 image GATE -- the in-process Flux gen_fn. The graph SPEC + the dispatcher
+# fail-closed degrade are CPU-pure; the live Flux forward is the operator GPU
+# smoke (test_flux_gen1_passthrough_equality_gpu, requires_cuda).
+# --------------------------------------------------------------------------- #
+def test_flux_gen1_graph_spec_is_proven_recipe():
+    """flux_gen1 builds the proven render_flux_batch recipe as a pure
+    wrapper_bridge graph (CheckpointLoaderSimple -> CLIPTextEncode x2 ->
+    EmptyLatentImage -> KSampler(euler/simple) -> VAEDecode), seed + prompt from
+    the request. Pure data -- no torch / comfy touched."""
+    from nodes._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
+    from nodes._otr_video_engines.wrapper_bridge import Wire
+    eng = FluxGen1ImageEngine()
+    params = eng._flux_params({"prompt": "a weathered spacer, station", "seed": 4242})
+    assert params["ckpt_name"] == "flux1-dev-fp8.safetensors"   # the box default
+    assert params["seed"] == 4242
+    assert params["sampler_name"] == "euler" and params["scheduler"] == "simple"
+    graph = eng._build_flux_graph(params, Wire)
+    assert set(graph) == {"ckpt", "pos", "neg", "latent", "ksampler", "decode"}
+    # CheckpointLoaderSimple out slots: 0=MODEL, 1=CLIP, 2=VAE (proven wiring)
+    assert graph["pos"]["inputs"]["clip"] == Wire("ckpt", 1)
+    assert graph["ksampler"]["inputs"]["model"] == Wire("ckpt", 0)
+    assert graph["ksampler"]["inputs"]["positive"] == Wire("pos", 0)
+    assert graph["ksampler"]["inputs"]["negative"] == Wire("neg", 0)
+    assert graph["ksampler"]["inputs"]["latent_image"] == Wire("latent", 0)
+    assert graph["decode"]["inputs"]["samples"] == Wire("ksampler", 0)
+    assert graph["decode"]["inputs"]["vae"] == Wire("ckpt", 2)
+    cands = eng._node_candidates()
+    assert cands["ckpt"] == ("CheckpointLoaderSimple",)
+    assert cands["decode"] == ("VAEDecode",)
+
+
+def test_flux_gen1_params_env_overridable(monkeypatch):
+    """Checkpoint + dims + sampler params are env-overridable so the operator
+    points at the installed model without a code edit; the request seed binds."""
+    monkeypatch.setenv("OTR_FLUX_CKPT", "my-flux.safetensors")
+    monkeypatch.setenv("OTR_FLUX_STEPS", "8")
+    monkeypatch.setenv("OTR_FLUX_WIDTH", "768")
+    monkeypatch.setenv("OTR_FLUX_HEIGHT", "1024")
+    from nodes._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
+    params = FluxGen1ImageEngine()._flux_params({"prompt": "p", "seed": 7})
+    assert params["ckpt_name"] == "my-flux.safetensors"
+    assert params["steps"] == 8
+    assert params["width"] == 768 and params["height"] == 1024
+    assert params["seed"] == 7
+
+
+def test_dispatcher_render_failure_degrades_to_floor(clean_image_registry, tmp_path):
+    """The image GATE never crashes the episode: a gen_fn that RAISES (no CUDA /
+    wrapper node missing / OOM) is fail-closed -> the object has no portrait
+    (warned LOUD) so HuMo degrades to the radio floor downstream."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}}
+    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+
+    def boom(_req):
+        raise RuntimeError("no CUDA / wrapper node missing on this box")
+
+    led, done, _r, warns = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=boom,
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+    )
+    assert led["images"]["images"] == []
+    assert any("render failed" in w for w in warns)
+    assert done.startswith("image:done:")
+
+
+def test_inprocess_gen_fn_resolves_engine_from_registry(clean_image_registry):
+    """The in-graph gen_fn resolves the request's engine from the registry and
+    returns its render_image pixels (model-agnostic; lazy -- no torch import)."""
+    import numpy as np
+    clean_image_registry._registry.clear()
+    captured = {}
+
+    def _render(request, prepared):
+        captured["req"] = request
+        captured["prepared"] = prepared
+        return np.full((4, 4, 3), 9, dtype=np.uint8)
+
+    stub = _img_stub(name="flux_gen1")
+    stub.prepare = lambda *a, **k: {"engine_id": "flux_gen1"}
+    stub.render_image = _render
+    stub.teardown = lambda *a, **k: None
+    ireg.register(stub)
+    px = disp._inprocess_gen_fn({"engine_id": "flux_gen1", "prompt": "p", "seed": 1})
+    assert px.shape == (4, 4, 3) and int(px[0, 0, 0]) == 9
+    assert captured["req"]["engine_id"] == "flux_gen1"
+    assert captured["prepared"] == {"engine_id": "flux_gen1"}

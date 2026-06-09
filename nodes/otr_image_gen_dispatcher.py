@@ -212,6 +212,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         except ImageHandoffTimeout as exc:
             warnings.append(f"{cid}: image handoff not ready ({exc}); skipped")
             continue
+        except Exception as exc:  # noqa: BLE001 -- any render failure -> floor
+            # The image GATE never crashes the episode: a wrapper-node-missing /
+            # CUDA-OOM / decode failure means this object simply has no portrait,
+            # so HuMo degrades to the radio floor LOUD downstream. Logged LOUD.
+            warnings.append(
+                f"{cid}: image render failed ({type(exc).__name__}: {exc}); "
+                "skipped (radio floor will be used)")
+            continue
         finally:
             if lease is not None:
                 _lease.release(lease)
@@ -249,6 +257,33 @@ def _safe_engine(engine_id):
         return _ireg.get_engine(engine_id)
     except Exception:  # noqa: BLE001
         return None
+
+
+def _inprocess_gen_fn(request):
+    """The in-graph image gen_fn: resolve the request's image engine from the
+    registry and run its in-process ``render_image`` (the real GPU step on the
+    live server). Model-agnostic -- any registered image engine plugs in with no
+    dispatcher edit. Cold-import clean (V-12): the registry is dep-free and the
+    engine lazy-imports torch / comfy only when it actually renders, so importing
+    this module never pulls a model framework. Returns a decoded uint8 (H,W,3)
+    pixel array (in-process) or a ``.png`` PATH (a future cu128 sidecar); the
+    dispatcher content-addresses + stamps it. A render failure RAISES -- the
+    dispatcher catches it fail-closed so the episode falls to the radio floor."""
+    eng = _ireg.get_engine(request.get("engine_id"))
+    eng = eng() if isinstance(eng, type) else eng
+    prepared = None
+    prep = getattr(eng, "prepare", None)
+    if callable(prep):
+        prepared = prep(None, None, None)
+    try:
+        return eng.render_image(request, prepared)
+    finally:
+        td = getattr(eng, "teardown", None)
+        if callable(td):
+            try:
+                td(prepared)
+            except Exception:  # noqa: BLE001 -- teardown is best-effort
+                pass
 
 
 class OTRImageGenDispatcher:
@@ -293,12 +328,14 @@ class OTRImageGenDispatcher:
         led = self._loads(script_json, {})
         policy = self._loads(image_policy_json, {})
         prompts = self._loads(image_prompts_json, {})
-        # gen_fn is None here -> the in-graph node defers actual pixels to the
-        # GPU/operator smoke (the in-process Flux gen-1 wiring lands with the
-        # render path); the CPU platform tests call dispatch_images() directly
-        # with an injected gen_fn. Cache reuse + ledger shape still resolve.
+        # The in-graph node mints REAL portraits via the request's image engine
+        # (in-process Flux gen-1) under the AS-3 GPU-residency lease. On a box
+        # without the GPU / wrapper nodes / checkpoint the render fails closed and
+        # the dispatcher degrades that object to the radio floor LOUD (never a
+        # crash). The CPU platform tests bypass this by calling dispatch_images()
+        # directly with an injected gen_fn.
         led, image_done, report, _warn = dispatch_images(
-            led, policy, prompts, gen_fn=None,
+            led, policy, prompts, gen_fn=_inprocess_gen_fn,
         )
         patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         return (patched, image_done, report)
