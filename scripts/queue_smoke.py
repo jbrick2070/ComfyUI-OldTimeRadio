@@ -52,6 +52,13 @@ def main() -> int:
     print("Loading + patching workflow...", flush=True)
     wf = load_workflow(WORKFLOW_PATH)
 
+    # Reset remote-LLM combo pickers to their sentinels so ComfyUI accepts
+    # the prompt when OpenRouter / Comfy Credits are not enabled in this env.
+    patch_widget_by_name(wf, 1, "openrouter_slot_a_model", "(enable OpenRouter)", schemas)
+    patch_widget_by_name(wf, 1, "openrouter_slot_b_model", "(enable OpenRouter)", schemas)
+    patch_widget_by_name(wf, 1, "comfy_slot_a_model", "(enable Comfy Credits)", schemas)
+    patch_widget_by_name(wf, 1, "comfy_slot_b_model", "(enable Comfy Credits)", schemas)
+
     # Patch by NAME -- robust against future widget reorders.
     patch_widget_by_name(wf, 1, "target_words", 30, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
