@@ -275,11 +275,15 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     w, h, fps = _even(w), _even(h), max(1, int(fps))
     floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
     floor_frames = count_video_frames(base_video_path) if floor_ok else 0
-    # the assembled silent video MUST equal the master length: the floor/procgen
-    # base IS the full master timeline (it carries the master mix), so position
-    # the beats by start_s + floor/black gap-fill the head/gaps/tail up to it.
-    target_total = None
-    if floor_ok:
+    # Derive target_total from the manifest's audio-derived frame budget first
+    # (the sum of target_frame_count across all shots, set by the render driver
+    # from the ledger's per-beat durations). This is the correct master length
+    # regardless of what the base video's container duration reports.
+    # Fall back to base video duration only when the manifest carries no budget
+    # (legacy / non-assemble path).
+    mft_total = int((manifest or {}).get("total_target_frames") or 0)
+    target_total = mft_total if mft_total > 0 else None
+    if target_total is None and floor_ok:
         master_dur = _probe_duration(base_video_path)
         if master_dur > 0:
             target_total = int(round(master_dur * fps))
