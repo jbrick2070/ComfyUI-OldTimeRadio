@@ -36,6 +36,7 @@ def _ltx_fakes(np, n=4):
     img = np.zeros((n, 24, 32, 3), dtype="float32")
     return {
         "checkpoint": _mk(lambda self, **k: (_FakeModel(), object(), object())),
+        "encoder": _mk(lambda self, **k: (object(),)),   # CLIPLoader -> clip
         "pos": _mk(lambda self, **k: (("c",),)),
         "neg": _mk(lambda self, **k: (("c",),)),
         "latent": _mk(lambda self, **k: (("latent",),)),
@@ -70,7 +71,12 @@ def test_ltx_graph_topology():
         {"text_prompt": "x", "negative_prompt": "y",
          "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 2}})
     g = eng._build_graph(plan, 49, 768, 512)
+    assert cand["encoder"] == ("CLIPLoader",)
     assert g["latent"]["inputs"]["length"] == 49
+    # T5-XXL CLIPLoader feeds pos + neg (GPU-verified probe_f3 2026-06-09)
+    assert g["pos"]["inputs"]["clip"] == wb.Wire("encoder", 0)
+    assert g["neg"]["inputs"]["clip"] == wb.Wire("encoder", 0)
+    assert g["encoder"]["inputs"]["type"] == "ltxv"
     ks = g["ksampler"]["inputs"]
     assert ks["model"] == wb.Wire("checkpoint", 0)
     assert ks["positive"] == wb.Wire("cond", 0)

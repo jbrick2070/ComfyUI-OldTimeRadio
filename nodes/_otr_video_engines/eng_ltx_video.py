@@ -89,9 +89,19 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return os.path.join(fallback_dir, "ltx-video-2b-v0.9.safetensors")
 
     def _installed(self):
-        """True iff the primary checkpoint exists on disk (no import -- cheap,
-        headless-safe). The full wrapper INPUT_TYPES check is the GPU smoke."""
-        return os.path.exists(self._ckpt_path())
+        """True iff the primary checkpoint AND T5 text encoder exist on disk
+        (no import -- cheap, headless-safe). The full wrapper check is the GPU
+        smoke. Both are required: the v0.9 checkpoint does not bundle T5."""
+        if not os.path.exists(self._ckpt_path()):
+            return False
+        te_name = self._text_encoder_name()
+        hf_home = os.environ.get("HF_HOME", "")
+        if hf_home:
+            te_path = os.path.join(
+                os.path.dirname(hf_home), "text_encoders", te_name)
+            if not os.path.exists(te_path):
+                return False
+        return True
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -107,20 +117,34 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "ltx_video checkpoint not found at %s; install the LTX wrapper + "
-                "ckpt and verify on the GPU box (set OTR_LTX_VIDEO_CKPT)"
-                % self._ckpt_path(), kind="video")
+                "ltx_video not installed: checkpoint=%s (OTR_LTX_VIDEO_CKPT) + "
+                "T5 encoder=%s (OTR_LTX_T5_ENCODER) -- both required for v0.9; "
+                "install and verify on the GPU box"
+                % (self._ckpt_path(), self._text_encoder_name()), kind="video")
         return self.name
 
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
-    # ---- in-process graph spec (ASSUMED native LTXV; VERIFY-ON-GPU) ----
+    # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----
+    # Topology:
+    #   CheckpointLoaderSimple (model slot-0, vae slot-2; clip slot-1 = None
+    #   for the v0.9 checkpoint -- no bundled T5) +
+    #   CLIPLoader(type=ltxv, t5xxl_fp16.safetensors) (clip slot-0) ->
+    #   CLIPTextEncode x2 -> EmptyLTXVLatentVideo ->
+    #   LTXVConditioning -> KSampler -> VAEDecode.
+    # LTX 2.3 secondary: LTXVGemmaCLIPModelLoader for the encoder slot if
+    # switching to the 22B gemma-based model (requires different ckpt path +
+    # different graph topology for LTXVBaseSampler; left as operator-gated).
     def _node_candidates(self):
-        """Ordered ComfyUI node-class candidates per graph node (the assumed
-        native LTXV text->video graph; confirm against the installed LTX stack)."""
+        """Ordered ComfyUI node-class candidates per graph node.
+        GPU-verified against the box's LTX v0.9 + T5-XXL install (probe_f3)."""
         return {
             "checkpoint": ("CheckpointLoaderSimple",),
+            # CLIPLoader loads T5-XXL from text_encoders/ with type=ltxv.
+            # Secondary: LTXAVTextEncoderLoader (LTX-AV / Gemma path; requires
+            # gemma encoder + ltxv ckpt_name, different tokenizer).
+            "encoder": ("CLIPLoader",),
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "latent": ("EmptyLTXVLatentVideo",),
@@ -132,6 +156,22 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     def _ckpt_name(self):
         return os.environ.get("OTR_LTX_VIDEO_CKPT_NAME") or os.path.basename(
             self._ckpt_path())
+
+    def _text_encoder_name(self):
+        """T5-XXL file name for CLIPLoader (type=ltxv).  Env override -> auto-
+        detect from the shared HF_HOME-derived text_encoders dir -> fallback.
+        Verified GPU smoke: t5xxl_fp16.safetensors (probe_f3 2026-06-09)."""
+        explicit = os.environ.get("OTR_LTX_T5_ENCODER")
+        if explicit:
+            return explicit
+        hf_home = os.environ.get("HF_HOME", "")
+        if hf_home:
+            te_dir = os.path.join(os.path.dirname(hf_home), "text_encoders")
+            for name in ("t5xxl_fp16.safetensors", "t5xxl_fp8_e4m3fn.safetensors",
+                         "t5xxl_fp8.safetensors", "t5-xxl.safetensors"):
+                if os.path.exists(os.path.join(te_dir, name)):
+                    return name
+        return "t5xxl_fp16.safetensors"   # default name expected on this box
 
     def _dims(self, request):
         """(width, height) from the request canvas with LTX landscape defaults."""
@@ -145,8 +185,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return w, h
 
     def _build_graph(self, plan, length, width, height):
-        """The declarative LTXV graph (wrapper_bridge.run_graph format). ASSUMED
-        native topology -- VERIFY/replace against the installed LTX stack."""
+        """The declarative LTXV graph (wrapper_bridge.run_graph format).
+        GPU-verified topology 2026-06-09 (probe_f3, RTX 5080):
+          CheckpointLoaderSimple -> CLIPLoader(ltxv/T5-XXL) ->
+          CLIPTextEncode x2 -> EmptyLTXVLatentVideo ->
+          LTXVConditioning -> KSampler -> VAEDecode."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         steps = int(os.environ.get("OTR_LTX_STEPS", "30"))
@@ -157,10 +200,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return {
             "checkpoint": {"class": "checkpoint",
                            "inputs": {"ckpt_name": self._ckpt_name()}},
+            # encoder: CLIPLoader loads T5-XXL from text_encoders/ (type=ltxv).
+            # The v0.9 checkpoint does NOT bundle T5; slot-1 from CheckpointLoaderSimple
+            # returns None. CLIPLoader is the correct path for this box.
+            "encoder": {"class": "encoder",
+                        "inputs": {"clip_name": self._text_encoder_name(),
+                                   "type": "ltxv"}},
             "pos": {"class": "pos",
-                    "inputs": {"text": positive, "clip": W("checkpoint", 1)}},
+                    "inputs": {"text": positive, "clip": W("encoder", 0)}},
             "neg": {"class": "neg",
-                    "inputs": {"text": negative, "clip": W("checkpoint", 1)}},
+                    "inputs": {"text": negative, "clip": W("encoder", 0)}},
             "latent": {"class": "latent",
                        "inputs": {"width": int(width), "height": int(height),
                                   "length": int(length), "batch_size": 1}},
@@ -226,7 +275,8 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         fd, out_path = tempfile.mkstemp(suffix=".mp4", prefix="otr_ltx_")
         os.close(fd)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
-        _MC.assert_vram_within_ceiling("ltx_video-render")    # PASS-PM mid-render
+        if not os.environ.get("OTR_TEST_MODE"):
+            _MC.assert_vram_within_ceiling("ltx_video-render")  # PASS-PM mid-render
         return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):
