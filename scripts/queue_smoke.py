@@ -52,12 +52,27 @@ def main() -> int:
     print("Loading + patching workflow...", flush=True)
     wf = load_workflow(WORKFLOW_PATH)
 
-    # Reset remote-LLM combo pickers to their sentinels so ComfyUI accepts
-    # the prompt when OpenRouter / Comfy Credits are not enabled in this env.
-    patch_widget_by_name(wf, 1, "openrouter_slot_a_model", "(enable OpenRouter)", schemas)
-    patch_widget_by_name(wf, 1, "openrouter_slot_b_model", "(enable OpenRouter)", schemas)
-    patch_widget_by_name(wf, 1, "comfy_slot_a_model", "(enable Comfy Credits)", schemas)
-    patch_widget_by_name(wf, 1, "comfy_slot_b_model", "(enable Comfy Credits)", schemas)
+    # Remote-LLM slot pickers: set to the first valid option from the live
+    # schema (which is either the sentinel when disabled, or the catalog default
+    # when OpenRouter / Comfy Credits are configured in this env).
+    def _first_choice(node_id: int, widget_name: str) -> str | None:
+        node_schema = (schemas or {}).get(str(node_id)) or {}
+        inp = node_schema.get("input", {})
+        for section in ("optional", "required"):
+            spec = inp.get(section, {}).get(widget_name)
+            if spec and isinstance(spec, (list, tuple)) and isinstance(spec[0], list):
+                return spec[0][0]
+        return None
+
+    for _slot in (
+        "openrouter_slot_a_model",
+        "openrouter_slot_b_model",
+        "comfy_slot_a_model",
+        "comfy_slot_b_model",
+    ):
+        _val = _first_choice(1, _slot)
+        if _val is not None:
+            patch_widget_by_name(wf, 1, _slot, _val, schemas)
 
     # Patch by NAME -- robust against future widget reorders.
     patch_widget_by_name(wf, 1, "target_words", 30, schemas)
