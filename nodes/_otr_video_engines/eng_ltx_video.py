@@ -54,6 +54,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # only required input is a text prompt. NOT a talking-head role (no lipsync).
     roles = ("scene_broll", "background_abstract", "music_visual")
     default_roles = ()
+    fallback_engine = "still_kenburns"
     required_inputs = ("text_prompt",)
     commercial_clean = False            # license is profile data; verify-at-build
     requires_flag = "OTR_ENABLE_LTX_VIDEO"
@@ -63,8 +64,29 @@ class LtxVideoEngine(_MC.MotionEngineBase):
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
-        return os.environ.get("OTR_LTX_VIDEO_CKPT") or os.path.join(
-            _COMFY_ROOT, "models", "checkpoints", "ltx-video-2b.safetensors")
+        explicit = os.environ.get("OTR_LTX_VIDEO_CKPT")
+        if explicit:
+            return explicit
+        # Build candidate dirs: the ComfyUI-relative default + the HF_HOME-derived
+        # shared-models root (C:\ComfyUI-Models\huggingface -> C:\ComfyUI-Models).
+        # HF_HOME is always set in the OTR launch bat; this is the reliable source
+        # on this box.  Fall back to _COMFY_ROOT for other setups.
+        candidate_dirs = [os.path.join(_COMFY_ROOT, "models", "checkpoints")]
+        hf_home = os.environ.get("HF_HOME", "")
+        if hf_home:
+            candidate_dirs.append(
+                os.path.join(os.path.dirname(hf_home), "checkpoints"))
+        # Prefer the versioned on-disk name (v0.9+) before the bare default.
+        for d in candidate_dirs:
+            for name in ("ltx-video-2b-v0.9.safetensors", "ltx-video-2b.safetensors"):
+                p = os.path.join(d, name)
+                if os.path.exists(p):
+                    return p
+        # Nothing found; return HF_HOME-derived v0.9 path (or _COMFY_ROOT) so the
+        # MISSING_MODEL error message names the expected file.
+        fallback_dir = (os.path.join(os.path.dirname(hf_home), "checkpoints")
+                        if hf_home else candidate_dirs[0])
+        return os.path.join(fallback_dir, "ltx-video-2b-v0.9.safetensors")
 
     def _installed(self):
         """True iff the primary checkpoint exists on disk (no import -- cheap,
@@ -185,8 +207,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
+        # LTX requires length == 8n+1 and dims multiple-of-32.
         length = max(_LTX_MIN_FRAMES,
                      int(plan["target_frame_count"] or self.target_fps))
+        length = ((length - 1) // 8) * 8 + 1               # snap to 8n+1
+        width = max(32, (width // 32) * 32)
+        height = max(32, (height // 32) * 32)
         graph = self._build_graph(plan, length, width, height)
         results = _wb.run_graph(graph, classes)
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
@@ -197,7 +223,8 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
-        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_ltx_")
+        fd, out_path = tempfile.mkstemp(suffix=".mp4", prefix="otr_ltx_")
+        os.close(fd)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         _MC.assert_vram_within_ceiling("ltx_video-render")    # PASS-PM mid-render
         return {"out_path": path, "frame_count": n}
