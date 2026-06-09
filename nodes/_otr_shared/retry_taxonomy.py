@@ -324,9 +324,12 @@ def format_swap_log(decision_record: dict) -> str:
     """Render the LOUD one-line swap log the render node emits on a fallback.
 
     LOUD by contract (never a silent swap): names the shot/beat, the engine
-    swap, the classified reason, and reaffirms the frozen audio is untouched.
+    swap, the classified reason, the captured failure detail (exception type +
+    first line, when present -- so a swallowed GraphExecutionError surfaces in
+    the log instead of only the reason code), and reaffirms the frozen audio is
+    untouched.
     """
-    return (
+    line = (
         "[OTR video] LOUD FALLBACK: shot=%s beat=%s engine '%s' -> '%s' "
         "reason=%s block_class=%s video_revision=%s (frozen audio untouched)"
         % (
@@ -339,6 +342,10 @@ def format_swap_log(decision_record: dict) -> str:
             decision_record.get("video_revision"),
         )
     )
+    detail = decision_record.get("detail")
+    if detail:
+        line += " detail=%r" % (str(detail),)
+    return line
 
 
 __all__ = [
