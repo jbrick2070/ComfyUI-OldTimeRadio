@@ -435,6 +435,8 @@ def build_clip_manifest(result, *, episode_id=""):
     shots = section.get("shots") or []
     clips = result.get("clips") or {}
     canvas = section.get("canonical_canvas") or {}
+    lines = {str(ln.get("line_id")): ln for ln in (led.get("lines") or [])
+             if isinstance(ln, dict) and ln.get("line_id")}
     rows = []
     total = 0
     hist = {}
@@ -447,14 +449,20 @@ def build_clip_manifest(result, *, episode_id=""):
         total += tfc
         eid = clip.get("engine_id") or shot.get("engine_id")
         sids = shot.get("source_line_ids")
+        bid = str(sids[0]) if isinstance(sids, list) and sids else str(sid or "")
+        sraw = lines.get(bid, {}).get("start_s")
+        try:
+            start_s = float(sraw) if sraw not in (None, "") else None
+        except (TypeError, ValueError):
+            start_s = None
         rows.append({
-            "order": order, "shot_id": sid,
-            "beat_id": str(sids[0]) if isinstance(sids, list) and sids else sid,
+            "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
             "family": clip.get("family") or shot.get("family") or "",
             "path": path,
             "frame_count": int(clip.get("frame_count") or 0),
             "target_frame_count": tfc,
+            "start_s": start_s,
             "exists": exists,
         })
         if exists:

@@ -225,7 +225,10 @@ def test_assemble_silent_timeline_frame_accurate_and_silent(tmp_path):
     out = tmp_path / "assembled.mp4"
     res, report = assemble_silent_timeline(manifest, str(floor), str(out),
                                            w=320, h=240, fps=25)
-    assert count_video_frames(str(out)) == 50        # 20 + 30, frame-accurate
+    # assembled length == the master/base length (the pre-mux A/V-sync guard);
+    # the 20+30 beat clips sit at the head, the floor tail-fills to the base.
+    assert abs(count_video_frames(str(out)) - count_video_frames(str(floor))) <= 2
+    assert count_video_frames(str(out)) >= 50        # the per-beat clips are included
     assert count_audio_streams(str(out)) == 0        # V-1: always silent
 
 
@@ -242,7 +245,7 @@ def test_assemble_gap_fills_missing_clip_from_floor(tmp_path):
     ]}
     out = tmp_path / "asm.mp4"
     assemble_silent_timeline(manifest, str(floor), str(out), w=320, h=240, fps=25)
-    assert count_video_frames(str(out)) == 75        # gap-filled beat still counted
+    assert abs(count_video_frames(str(out)) - count_video_frames(str(floor))) <= 2
     assert count_audio_streams(str(out)) == 0
 
 
@@ -262,5 +265,29 @@ def test_silent_composite_node_assemble_mode_via_manifest(tmp_path):
         str(floor), canvas_w=320, canvas_h=240, fps=25,
         output_path=str(out), clip_manifest_json=json.dumps(manifest))
     assert silent == str(out) and "assemble" in report
-    assert count_video_frames(silent) == 40          # 25 + 15
+    assert abs(count_video_frames(silent) - count_video_frames(str(floor))) <= 2
     assert count_audio_streams(silent) == 0
+
+
+def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
+    # POSITION mode: beats placed by start_s, floor gap-fills head/gap/tail so the
+    # assembled length == the master length (the +intro shift + closing theme).
+    manifest = {"fps": 25, "clips": [
+        {"shot_id": "s0", "target_frame_count": 50, "path": "/x/a.mp4",
+         "exists": True, "start_s": 9.6},      # after a 9.6s floor intro -> frame 240
+        {"shot_id": "s1", "target_frame_count": 40, "path": "/x/b.mp4",
+         "exists": True, "start_s": 12.0},     # 10-frame inter-beat floor gap
+    ]}
+    segs, total = plan_timeline_segments(
+        manifest, floor_available=True, floor_frames=2000,
+        target_total_frames=1543, fps=25)      # ~61.7s master
+    assert total == 1543                        # assembled == master length
+    assert [s["source"] for s in segs] == ["floor", "clip", "floor", "clip", "floor"]
+    assert segs[0]["n_frames"] == 240           # round(9.6*25) head intro
+    assert segs[2]["n_frames"] == 10            # round(12.0*25) - (240+50) inter-beat gap
+    assert segs[-1]["source"] == "floor"        # closing-theme tail
+    assert sum(s["n_frames"] for s in segs) == 1543
+    # no floor (black gap-fill) still reaches the master length
+    segs2, total2 = plan_timeline_segments(
+        manifest, floor_available=False, target_total_frames=1543, fps=25)
+    assert total2 == 1543 and segs2[0]["source"] == "black"

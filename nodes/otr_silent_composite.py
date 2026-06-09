@@ -142,38 +142,79 @@ def count_video_frames(path: str) -> int:
     return -1
 
 
-def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0):
+def _probe_duration(path):
+    """Container duration in seconds (the master length the assembled video must
+    match); 0.0 when unavailable."""
+    fp = _ffprobe_bin()
+    if not fp or not os.path.isfile(path):
+        return 0.0
+    p = _run([fp, "-v", "error", "-show_entries", "format=duration",
+              "-of", "default=noprint_wrappers=1:nokey=1", path])
+    out = (p.stdout or "").strip().splitlines()
+    try:
+        return float(out[0]) if out else 0.0
+    except (ValueError, IndexError):
+        return 0.0
+
+
+def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
+                           target_total_frames=None, fps=None):
     """Pure: the frame-accurate per-beat segment plan from a clip manifest.
 
-    Each beat becomes EXACTLY ``target_frame_count`` frames (the audio-derived
-    budget). A beat with a real on-disk clip uses it; a missing/short clip is
-    gap-filled from the procgen/still FLOOR, sliced at the beat's cumulative
-    start frame so the fill stays timeline-aligned; with no floor it degrades to
-    a generated black source so the episode ALWAYS assembles. Returns
-    ``(segments, total_frames)``; each segment is ``{order, shot_id, source,
-    path, src_start_frame, n_frames, engine_id}``. Frame counts only."""
-    clips = (manifest or {}).get("clips") or []
+    POSITION mode (every beat carries ``start_s`` AND a ``target_total_frames``
+    master length is given): place each beat at ``round(start_s*fps)`` and
+    floor/black gap-fill the head (the +intro shift), the inter-beat silences,
+    and the tail (the closing theme) so the assembled length == the master length
+    (the pre-mux A/V-sync guard). SEQUENTIAL mode (no start_s): concat the beats,
+    then tail-fill to ``target_total_frames`` when given. Each beat is EXACTLY
+    ``target_frame_count`` frames; a real on-disk clip is used, else the floor
+    (timeline-aligned slice in sequential mode) or black. Returns ``(segments,
+    total_frames)``; each segment is ``{order, shot_id, source, path,
+    src_start_frame, n_frames, engine_id}``. Frame counts only."""
+    rows = [r for r in ((manifest or {}).get("clips") or [])
+            if int((r or {}).get("target_frame_count") or 0) > 0]
+    fps = int(fps or (manifest or {}).get("fps") or 25)
+    ff = int(floor_frames or 0)
+    gap_src = "floor" if floor_available else "black"
     segments = []
     cursor = 0
-    ff = int(floor_frames or 0)
-    for row in clips:
-        n = int((row or {}).get("target_frame_count") or 0)
-        if n <= 0:
-            continue
-        if row.get("exists") and row.get("path"):
-            source, start = "clip", 0
-        elif floor_available:
-            source = "floor"
-            start = min(cursor, max(0, ff - n)) if ff else cursor
-        else:
-            source, start = "black", 0
+
+    def emit(source, path, n, src_start, shot_id=None, engine_id=None):
+        if int(n) <= 0:
+            return
         segments.append({
-            "order": len(segments), "shot_id": row.get("shot_id"),
-            "source": source, "path": row.get("path") or "",
-            "src_start_frame": int(start), "n_frames": n,
-            "engine_id": row.get("engine_id"),
-        })
-        cursor += n
+            "order": len(segments), "shot_id": shot_id, "source": source,
+            "path": path or "", "src_start_frame": int(src_start),
+            "n_frames": int(n), "engine_id": engine_id})
+
+    positioned = (target_total_frames is not None and rows
+                  and all(r.get("start_s") is not None for r in rows))
+    if positioned:
+        for r in sorted(rows, key=lambda x: float(x.get("start_s") or 0)):
+            n = int(r.get("target_frame_count") or 0)
+            start_frame = int(round(float(r.get("start_s") or 0) * fps))
+            if start_frame > cursor:                       # head / inter-beat gap
+                emit(gap_src, "", start_frame - cursor, 0)
+                cursor = start_frame
+            if r.get("exists") and r.get("path"):
+                emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
+            else:
+                emit(gap_src, "", n, 0, r.get("shot_id"), r.get("engine_id"))
+            cursor += n
+    else:                                                  # SEQUENTIAL (legacy)
+        for r in rows:
+            n = int(r.get("target_frame_count") or 0)
+            if r.get("exists") and r.get("path"):
+                emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
+            elif floor_available:
+                start = min(cursor, max(0, ff - n)) if ff else cursor
+                emit("floor", "", n, start, r.get("shot_id"), r.get("engine_id"))
+            else:
+                emit("black", "", n, 0, r.get("shot_id"), r.get("engine_id"))
+            cursor += n
+    if target_total_frames is not None and int(target_total_frames) > cursor:
+        emit(gap_src, "", int(target_total_frames) - cursor, 0)   # tail to master len
+        cursor = int(target_total_frames)
     return segments, cursor
 
 
@@ -234,8 +275,17 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     w, h, fps = _even(w), _even(h), max(1, int(fps))
     floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
     floor_frames = count_video_frames(base_video_path) if floor_ok else 0
+    # the assembled silent video MUST equal the master length: the floor/procgen
+    # base IS the full master timeline (it carries the master mix), so position
+    # the beats by start_s + floor/black gap-fill the head/gaps/tail up to it.
+    target_total = None
+    if floor_ok:
+        master_dur = _probe_duration(base_video_path)
+        if master_dur > 0:
+            target_total = int(round(master_dur * fps))
     segments, total = plan_timeline_segments(
-        manifest, floor_available=floor_ok, floor_frames=floor_frames)
+        manifest, floor_available=floor_ok, floor_frames=floor_frames,
+        target_total_frames=target_total, fps=fps)
     if not segments or total <= 0:
         raise ValueError("OTR_SilentComposite: manifest has no renderable beats")
     workdir = tempfile.mkdtemp(prefix="otr_assemble_")
