@@ -54,6 +54,18 @@ ALLOWED_DIRECTOR_SUBSTRINGS = (
     # the typed DirectorBrief dict is emitted on this slot. Wave 2
     # Agent F's Story Room loop wires consumers to this socket.
     "director_brief",
+    # justification: v2.0 model-agnostic video platform (Phase 1 wiring,
+    # 2026-06-08). OTR_VideoDirector is the per-role A/B/C VIDEO engine
+    # selector emitting video_policy_json -- NOT the retired legacy
+    # LLMDirector; it carries none of the forbidden production_plan_json /
+    # director_json sockets. S&R name + node title carry this class string.
+    "OTR_VideoDirector",
+    # justification: v2.0 model-agnostic image platform (Phase 1 wiring,
+    # 2026-06-08). OTR_ImageDirector is the per-role IMAGE engine + grain
+    # selector emitting image_policy_json -- NOT the retired legacy
+    # LLMDirector; it carries none of the forbidden production_plan_json /
+    # director_json sockets. S&R name + node title carry this class string.
+    "OTR_ImageDirector",
 )
 
 
