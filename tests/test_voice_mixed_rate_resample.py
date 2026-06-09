@@ -14,6 +14,10 @@ import sys
 import pytest
 import torch
 
+# scipy is a test dep for resample_audio; absent in base Python 3.11 (lives in
+# the ComfyUI venv). Skip the whole module cleanly rather than failing on import.
+pytest.importorskip("scipy")
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
 if _REPO_ROOT not in sys.path:

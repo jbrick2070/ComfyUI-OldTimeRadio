@@ -118,6 +118,43 @@ OPT_IN_ENGINES = {
             "peak, and render-twice determinism on sm_120"
         ),
     },
+    # Phase 3 / B opt-in: character_3d dark scaffold adapters. Both run in
+    # their own cu128 sidecar venv (NOT the ComfyUI cu130 venv); the venv
+    # python path is OTR_B_SIDECAR_PYTHON (hunyuan3d) /
+    # OTR_TRELLIS_SIDECAR_PYTHON (trellis). Asset-gated (Phase 5 keystone:
+    # real meshes + ARKit-52 template + probe_c <20% binding GO).
+    "hunyuan3d_talk": {
+        "lib_module": "hunyuanvideo",
+        "adapter_class": "Hunyuan3DTalkEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_CHARACTER_3D",
+        "assumed_call": (
+            "cu128 sidecar: drive HunyuanVideo-Talk mesh-to-talking-head pipeline "
+            "(OTR_B_SIDECAR_PYTHON venv); inputs: audio_ref WAV + init_image "
+            "portrait/mesh + ARKit-52 template NPZ; output: 480x832 @25fps mp4 "
+            "(pillarbox-padded to compositor canvas). VRAM sub-ceiling 14000 MB.  "
+            "# TODO-for-GPU-smoke: Phase 5 keystone -- confirm OTR_B_MESH_DIR "
+            "contains real meshes, OTR_B_ARKIT_TEMPLATE_NPZ exists, probe_c "
+            "<20%% binding, cu128 toolchain green, render-twice determinism on "
+            "sm_120. commercial_clean=False -- verify-at-build."
+        ),
+    },
+    "trellis_talk": {
+        "lib_module": "trellis",
+        "adapter_class": "TrellisTalkEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_TRELLIS_TALK",
+        "assumed_call": (
+            "cu128 sidecar: drive Microsoft TRELLIS image-to-3D pipeline "
+            "(OTR_TRELLIS_SIDECAR_PYTHON venv); MIT license (commercial_clean=True);"
+            " inputs: audio_ref WAV + init_image portrait; output: 480x832 @25fps "
+            "mp4. VRAM sub-ceiling 14000 MB. Chain A (trellis-first) deferred to "
+            "Phase 5.  "
+            "# TODO-for-GPU-smoke: Phase 5 keystone -- confirm OTR_B_MESH_DIR, "
+            "OTR_B_ARKIT_TEMPLATE_NPZ, probe_c <20%% binding, cu128 toolchain, "
+            "render-twice determinism on sm_120."
+        ),
+    },
 }
 
 

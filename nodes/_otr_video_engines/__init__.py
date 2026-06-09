@@ -70,3 +70,18 @@ try:  # pragma: no cover - trivial guard
     from . import eng_humo as _eng_humo  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# Phase 3 / B opt-in: register the character_3d dark scaffold adapters
+# (hunyuan3d_talk + trellis_talk). Both are DEFAULT-OFF / dark and FAIL CLOSED
+# until the Phase 5 GPU keystone is cleared (real meshes + ARKit-52 template +
+# cu128 toolchain + probe_c < 20% binding GO). Imported UNCONDITIONALLY here so
+# both engines appear in the static per-role dropdown (V-6: the COMBO always
+# shows the full registry; the usability gate is assert_usable, not the import).
+# Cold-import clean (V-12): eng_character_3d imports only stdlib + the dep-free
+# registry, no torch/diffusers/comfy at module scope. Guarded so a packaging
+# quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_character_3d as _eng_character_3d  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

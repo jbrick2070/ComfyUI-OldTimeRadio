@@ -33,8 +33,16 @@ where prebuilt wheels are scarce -- see project memory
 hyworld_2_pivot for context).
 """
 
-import transformers
-import transformers.tokenization_utils as _tu
+# Guard: transformers is an optional dep (lives in the ComfyUI venv; absent in
+# the bare pytest sandbox). The module-level import must not raise on import so
+# that _otr_constrained_generate (which imports this shim at module scope) stays
+# importable in test environments where transformers is not installed.
+try:
+    import transformers as _transformers  # noqa: F401 -- probed below
+    import transformers.tokenization_utils as _tu  # noqa: F401
+    _TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    _TRANSFORMERS_AVAILABLE = False
 
 
 def ensure_lmfe_transformers_compat() -> None:
@@ -49,18 +57,22 @@ def ensure_lmfe_transformers_compat() -> None:
     Call this function at every use site that imports
     lmformatenforcer (typically once at the top of a factory
     function). The check is cheap (single hasattr) and the alias
-    assignment is idempotent.
+    assignment is idempotent. No-op when transformers is absent.
     """
-    # Re-resolve transformers.tokenization_utils every call because
-    # an importlib.reload would have replaced the module object in
-    # sys.modules; our cached `_tu` would then point at the stale
-    # (but still in-memory) module.
-    import transformers as _t
-    import transformers.tokenization_utils as _live_tu
+    try:
+        # Re-resolve transformers.tokenization_utils every call because
+        # an importlib.reload would have replaced the module object in
+        # sys.modules; our cached `_tu` would then point at the stale
+        # (but still in-memory) module.
+        import transformers as _t
+        import transformers.tokenization_utils as _live_tu
+    except ImportError:
+        return  # transformers absent; nothing to shim
     if not hasattr(_live_tu, "PreTrainedTokenizerBase"):
         _live_tu.PreTrainedTokenizerBase = _t.PreTrainedTokenizerBase
 
 
 # Apply at module-import time as well so simple consumers that don't
 # call ensure_lmfe_transformers_compat() still see the alias.
+# No-op (returns immediately) when transformers is absent.
 ensure_lmfe_transformers_compat()

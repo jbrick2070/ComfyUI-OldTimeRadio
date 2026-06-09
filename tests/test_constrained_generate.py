@@ -55,6 +55,8 @@ class TestImport:
         # alias. The helper is idempotent and is called at every
         # factory use site -- this test exercises that contract
         # directly so it stays green regardless of test ordering.
+        # Skip when transformers is absent (base Python 3.11 sandbox).
+        pytest.importorskip("transformers")
         from nodes import _otr_lmfe_compat
 
         _otr_lmfe_compat.ensure_lmfe_transformers_compat()
@@ -110,6 +112,9 @@ class TestFactoryContract:
         return {"model": model, "tokenizer": tokenizer}
 
     def test_factory_returns_callable_with_schema_attributes(self):
+        # Requires lmformatenforcer to build the JsonSchemaParser; skip in
+        # the base Python 3.11 sandbox where it is not installed.
+        pytest.importorskip("lmformatenforcer")
         from nodes._otr_constrained_generate import make_constrained_generate_fn
 
         cache_entry = self._make_minimal_cache_entry()
@@ -129,6 +134,9 @@ class TestFactoryContract:
 
 class TestClosurePassesConstraint:
     def test_generate_invoked_with_prefix_fn(self):
+        # Requires lmformatenforcer + torch; skip in the base Python 3.11
+        # sandbox where lmformatenforcer is not installed.
+        pytest.importorskip("lmformatenforcer")
         from nodes._otr_constrained_generate import make_constrained_generate_fn
 
         # Build a fuller mock: tokenizer + model whose generate()

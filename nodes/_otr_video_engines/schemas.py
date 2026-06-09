@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Single-sourced vocabularies
 # ---------------------------------------------------------------------------
 
-#: The seven non-3D video families (the 8th, ``character_3d``, ships with B).
+#: The eight video families (seven non-3D + ``character_3d`` added in Phase 3).
 FAMILIES: tuple = (
     "audio_driven_face",
     "lipsync_overlay",
@@ -35,6 +35,7 @@ FAMILIES: tuple = (
     "static_image_gen",
     "static_motion",
     "abstract",
+    "character_3d",
 )
 
 #: Request-level required-input tokens (shared with role_compat).
@@ -48,6 +49,8 @@ REQUIRED_INPUT_TOKENS: tuple = (
 #: Hard request-level requirements per family. ``static_image_gen`` requires
 #: text_prompt OR init_image (handled specially); the no-input families
 #: (static_motion / abstract) accept optional asset_refs but require nothing.
+#: ``character_3d`` requires an audio_ref (speech) + init_image (portrait/mesh)
+#: so both the 3D pipeline and the audio-driven lip-sync chain can be built.
 FAMILY_REQUIRED_INPUTS: dict = {
     "audio_driven_face": ("audio_ref", "init_image"),
     "lipsync_overlay": ("base_clip_ref", "audio_ref"),
@@ -56,7 +59,14 @@ FAMILY_REQUIRED_INPUTS: dict = {
     "static_image_gen": (),   # special-cased: text_prompt OR init_image
     "static_motion": (),
     "abstract": (),
+    "character_3d": ("audio_ref", "init_image"),
 }
+
+# Guard: FAMILIES and FAMILY_REQUIRED_INPUTS must stay in sync (Phase 3 spec).
+assert set(FAMILIES) == set(FAMILY_REQUIRED_INPUTS), (
+    "schemas.py FAMILIES / FAMILY_REQUIRED_INPUTS out of sync: "
+    + str(set(FAMILIES) ^ set(FAMILY_REQUIRED_INPUTS))
+)
 
 
 class _Forbid(BaseModel):
@@ -150,7 +160,7 @@ class VideoRequest(_Forbid):
     @model_validator(mode="after")
     def _check_family_required_inputs(self) -> "VideoRequest":
         fam = self.family_hint
-        if fam not in FAMILY_REQUIRED_INPUTS:
+        if fam not in FAMILIES:
             raise ValueError(
                 f"VideoRequest.family_hint '{fam}' is not a known family "
                 f"{FAMILIES}"

@@ -29,11 +29,37 @@ def _req(**over):
 
 
 def test_families_and_tokens_are_single_sourced():
-    assert len(sc.FAMILIES) == 7
-    assert "character_3d" not in sc.FAMILIES          # 3D ships with B
+    # Phase 3 added character_3d: FAMILIES is now 8; FAMILY_REQUIRED_INPUTS in sync.
+    assert len(sc.FAMILIES) == 8
+    assert "character_3d" in sc.FAMILIES
     assert sc.REQUIRED_INPUT_TOKENS == (
         "text_prompt", "init_image", "audio_ref", "base_clip_ref")
     assert set(sc.FAMILY_REQUIRED_INPUTS) == set(sc.FAMILIES)
+
+
+def test_character_3d_requires_audio_and_init_image():
+    from pydantic import ValidationError
+    base = dict(
+        request_id="r1", shot_id="shot_3d", role="character_video",
+        family_hint="character_3d", profile_id="p3d",
+        timing=sc.Timing(), canvas=sc.Canvas(w=1280, h=720, fps=25),
+    )
+    # Missing both inputs
+    with pytest.raises(ValidationError):
+        sc.VideoRequest(**base)
+    # Missing init_image
+    with pytest.raises(ValidationError):
+        sc.VideoRequest(**{**base, "audio_ref": sc.AudioRef(path="a.wav")})
+    # Missing audio_ref
+    with pytest.raises(ValidationError):
+        sc.VideoRequest(**{**base, "asset_refs": {"init_image": "p.png"}})
+    # Both present -> valid
+    ok = sc.VideoRequest(**{
+        **base,
+        "audio_ref": sc.AudioRef(path="a.wav"),
+        "asset_refs": {"init_image": "p.png"},
+    })
+    assert ok.family_hint == "character_3d"
 
 
 def test_abstract_request_needs_no_inputs():
