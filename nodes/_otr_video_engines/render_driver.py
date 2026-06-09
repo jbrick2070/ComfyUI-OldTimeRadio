@@ -21,6 +21,7 @@ operator gate. UTF-8, no BOM, ASCII-only source.
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 import os
 import time
@@ -196,6 +197,110 @@ def build_request(shot, assets, frame_count, canvas=None):
 
 
 # --------------------------------------------------------------------------- #
+# Per-shot request builder (the REAL episode path). Resolves the character
+# portrait + the per-beat voice audio + the M4 creative prompt from the
+# ShotLock-planned ledger, keyed to ONE shot. Additive: the soak/global-assets
+# path (build_request) is untouched. Pure (reads the ledger, never writes; the
+# frozen audio section is only ever read) and CPU-tested.
+# --------------------------------------------------------------------------- #
+def _seed_from_hash(request_hash, shot_id):
+    """Deterministic 31-bit render seed from the shot's request_hash. Real
+    shot_ids are not numeric (``shot_b001``), so build_request's index trick
+    would collapse every per-shot seed to 0 -- V-7 keys the seed to the stable
+    request hash so render-twice is identical AND each beat differs."""
+    src = str(request_hash or shot_id or "")
+    return int(hashlib.sha256(src.encode("utf-8")).hexdigest()[:8], 16) & 0x7FFFFFFF
+
+
+def _portrait_index(ledger):
+    """``{char_id: portrait_path}`` from ``ledger['images']['images']`` (the
+    OTR_ImageGenDispatcher write-back; each entry is keyed by ``object_id``)."""
+    out = {}
+    imgs = ((ledger or {}).get("images") or {}).get("images") or []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        cid = str(im.get("object_id") or im.get("char_id") or "")
+        path = str(im.get("path") or "")
+        if cid and path:
+            out.setdefault(cid, path)
+    return out
+
+
+def _line_index(ledger):
+    """``{line_id: line}`` from the frozen ledger lines. ``line_id`` equals a
+    beat_id equals a shot's ``source_line_ids[0]``."""
+    out = {}
+    for ln in (ledger or {}).get("lines") or []:
+        if isinstance(ln, dict):
+            lid = str(ln.get("line_id") or "")
+            if lid:
+                out.setdefault(lid, ln)
+    return out
+
+
+def _voice_audio_for_line(line):
+    """The per-beat VOICE audio path for a line, robust to the per-engine field
+    name (``bark_wav_path`` / ``indextts2_wav_path`` / ...) plus the canonical
+    ``audio_wav_path``; a music clip is the fallback for a music beat. SFX is
+    never a face-driving voice. Returns "" when the ledger carries no per-line
+    audio (then audio_ref is None and HuMo falls back LOUD, or the render node
+    slices the frozen master mix by the beat timing)."""
+    if not isinstance(line, dict):
+        return ""
+    for k in ("audio_wav_path", "wav_path"):
+        if line.get(k):
+            return str(line[k])
+    for k, v in line.items():
+        if v and str(k).endswith("wav_path") and not str(k).startswith(("sfx", "music")):
+            return str(v)
+    for k in ("music_wav_path", "clip_path", "video_clip_path"):
+        if line.get(k):
+            return str(line[k])
+    return ""
+
+
+def _beat_id_for_shot(shot):
+    """The beat_id a shot renders: ``source_line_ids[0]`` (the ShotLock link),
+    else the ``shot_`` prefix stripped off the shot_id."""
+    sids = shot.get("source_line_ids")
+    if isinstance(sids, list) and sids:
+        return str(sids[0])
+    sid = str(shot.get("shot_id") or "")
+    return sid[len("shot_"):] if sid.startswith("shot_") else sid
+
+
+def build_request_from_shot(shot, ledger, *, canvas=None):
+    """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
+    episode path). Resolves the character portrait (``init_image``) + the
+    per-beat voice audio + the M4 ``text_prompt`` + the audio-derived
+    ``target_frame_count`` for THIS shot only. Reuses :func:`build_request` for
+    the canonical request shape + canvas, then overrides the prompt, the
+    request-hash seed, and the per-beat timing. Pure: it reads the ledger and
+    never writes; the frozen audio section is only ever read."""
+    line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
+    char_id = str(line.get("char_id") or "")
+    init_image = _portrait_index(ledger).get(char_id, "")
+    audio = _voice_audio_for_line(line)
+    frame_count = int(shot.get("target_frame_count") or 0)
+    req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
+                        frame_count, canvas)
+    creative = shot.get("creative") or {}
+    text_prompt = str(creative.get("text_prompt") or "")
+    if text_prompt:
+        req["text_prompt"] = text_prompt
+    req_hash = (shot.get("render_request_hash")
+                or (shot.get("cache_keys") or {}).get("request_hash"))
+    req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
+    # Carry the per-beat timing so the render node can slice the frozen master
+    # mix when the ledger has no per-line wav (audio_ref is None in that case).
+    req["timing"]["start_s"] = line.get("start_s")
+    req["timing"]["dur_s"] = line.get("dur_s")
+    req["char_id"] = char_id
+    return req
+
+
+# --------------------------------------------------------------------------- #
 # The in-process render (the GPU slice)
 # --------------------------------------------------------------------------- #
 def _render_one(engine_name, request, *, force_oom):
@@ -270,17 +375,26 @@ def render_shot(shot, request, *, fallback_of, video_revision,
 
 def run_episode(ledger, *, fallback_of, oom_shot_id=None,
                 oom_engines=frozenset(), assets=None, frame_count=25,
-                canvas=None):
+                canvas=None, request_builder=None):
     """Drive one episode end-to-end on REAL engines (deep-copies the ledger; the
     frozen ``audio`` section is never touched). Returns
-    ``{ledger, clips, trace, vram_peak_mb}``."""
+    ``{ledger, clips, trace, vram_peak_mb}``.
+
+    ``request_builder`` (default None) keeps the soak/global-assets path
+    (``build_request`` with the shared ``assets`` + ``frame_count``). The REAL
+    episode path passes ``build_request_from_shot``: ``request_builder(shot,
+    ledger, canvas=canvas)`` is called per shot for a per-beat portrait + audio
+    + prompt request (see :func:`run_real_episode`)."""
     ledger = copy.deepcopy(ledger)
     section = ledger["video"]
     rev = int(section["video_revision"])
     clips, new_shots, trace = {}, [], []
     vram_peak = 0
     for shot in section["shots"]:
-        request = build_request(shot, assets, frame_count, canvas)
+        if request_builder is not None:
+            request = request_builder(shot, ledger, canvas=canvas)
+        else:
+            request = build_request(shot, assets, frame_count, canvas)
         clip, out_shot, decisions, attempts, used = render_shot(
             shot, request, fallback_of=fallback_of, video_revision=rev,
             oom_engines=oom_engines, oom_shot_id=oom_shot_id)
@@ -296,6 +410,17 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
     ledger["video"] = section
     return {"ledger": ledger, "clips": clips, "trace": trace,
             "vram_peak_mb": vram_peak}
+
+
+def run_real_episode(ledger, *, fallback_of=None, canvas=None):
+    """Drive one REAL episode from a ShotLock-planned ledger: per-shot requests
+    (character portrait + per-beat voice audio + the M4 prompt) via
+    :func:`build_request_from_shot`, the full registry fallback chain (NO forced
+    OOM), real per-shot assets. Returns the :func:`run_episode` result; the
+    frozen audio section is untouched. The thin ``mode="episode"`` render node
+    calls this inside the ComfyUI executor thread."""
+    return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
+                       request_builder=build_request_from_shot, canvas=canvas)
 
 
 # --------------------------------------------------------------------------- #
@@ -479,6 +604,7 @@ __all__ = [
     "OomSignal", "RenderFloorError", "SoakError",
     "make_fallback_of", "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
+    "build_request_from_shot", "run_real_episode",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
     "run_gpu_soak", "render_single",
 ]
