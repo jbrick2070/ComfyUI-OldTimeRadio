@@ -168,13 +168,11 @@ def pytest_sessionstart(session):
 # (2026-06-07) rebuilt it as SignalLostVideo -> OTR_SilentComposite ->
 # OTR_MasterAudioMux and DELETED the 14 quarantined render-path tests that
 # asserted the old wiring (their coverage is replaced by the new-path tests
-# in tests/test_video_render_path_cw4.py). Only the chatterbox entry remains:
-# a PRE-EXISTING env failure (the chatterbox lib IS installed, so the
-# fails-closed-without-lib case cannot fail closed) -- baselined here so the
-# guard flags only NEW regressions, not this.
-EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset({
-    "tests/test_audio_engine_bodies_g1.py::test_voice_engine_fails_closed_without_lib[eng_chatterbox-ChatterboxEngine-chatterbox]",
-})
+# in tests/test_video_render_path_cw4.py).
+# CW-5 (2026-06-09) promoted the chatterbox entry: the test now skips when
+# the sidecar venv is present on disk (same pattern as indextts2), so it is
+# no longer an expected failure -- the guard would fire every run.
+EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
 # KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
 # (s26-downstream missed-regression sweep). The 5 BUG-108 + save
 # workspace entries went green when the test fixtures + the

@@ -9,6 +9,7 @@ engines remain disqualified from bit_exact mode until then.
 """
 import importlib
 import importlib.util
+import os
 
 import pytest
 
@@ -50,6 +51,13 @@ def test_voice_engine_fails_closed_without_lib(modname, clsname, libmod):
     if not _absent(libmod):
         pytest.skip(libmod + " present -- real inference needs the GPU pilot")
     eng = _engine(modname, clsname)
+    # Path-B sidecar engines have an isolated venv; if it exists on disk the
+    # worker spawns successfully instead of raising "not installed".  Skip when
+    # the sidecar is present -- real inference needs the GPU pilot.
+    if hasattr(eng, "_venv_python") and os.path.exists(eng._venv_python()):
+        pytest.skip(
+            modname + " sidecar venv present -- real sidecar needs the GPU pilot"
+        )
     with pytest.raises(RuntimeError, match="not installed"):
         eng.generate_voice("hello there", None, None, 7)
 
