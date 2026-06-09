@@ -400,3 +400,11 @@ def test_video_render_batch_episode_mode_bad_ledger_failsoft(monkeypatch, tmp_pa
     report_json, manifest_json = out["result"]
     assert manifest_json == ""                     # empty manifest, no crash
     assert _json.loads(report_json)["ok"] is False
+
+
+def test_video_render_batch_mode_combo_offers_episode():
+    # the mode PICKER must list "episode" (not just the render() branch) or the
+    # live ComfyUI /prompt validator rejects mode='episode' as value_not_in_list.
+    from nodes.otr_video_render_batch import OTRVideoRenderBatch
+    modes = OTRVideoRenderBatch.INPUT_TYPES()["required"]["mode"][0]
+    assert "episode" in modes and "soak" in modes and "single" in modes

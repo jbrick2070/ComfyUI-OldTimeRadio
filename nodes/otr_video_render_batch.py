@@ -37,7 +37,7 @@ class OTRVideoRenderBatch:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mode": (["soak", "single"], {"default": "soak"}),
+                "mode": (["soak", "single", "episode"], {"default": "soak"}),
                 "beats": ("INT", {"default": 40, "min": 1, "max": 400}),
                 "oom_index": ("INT", {"default": 20, "min": 0, "max": 399}),
                 "frame_count": ("INT", {"default": 25, "min": 1, "max": 240}),

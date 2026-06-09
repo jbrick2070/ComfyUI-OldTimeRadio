@@ -130,6 +130,61 @@ def _content_hash(obj) -> str:
 # ---------------------------------------------------------------------------
 
 
+def overlay_audio_timing(ledger: dict) -> dict:
+    """When the (pre-audio frozen) input ledger's lines carry NO audio timing,
+    overlay per-line ``dur_s``/``start_s``/``samples``/``sample_rate`` (+ any
+    ``*_wav_path``) from the NEWEST on-disk OTR ledger. The audio path persists
+    the real timing there while the ledger is still ``pending_*`` (the same disk
+    contract SceneSequencer/AudioEnhance/EpisodeAssembler use). ShotLock is gated
+    on ``audio_done`` so the timing exists by the time this runs. Fail-soft +
+    test-mode-skipped: no disk ledger -> the input ledger is returned unchanged.
+    Without this the audio-derived clip budget is all-zeros (the frozen
+    ``script_json`` from the freeze cascade is pre-audio)."""
+    import os
+    if os.environ.get("OTR_TEST_MODE") == "1":
+        return ledger                       # CPU tests never read disk state
+    lines = ledger.get("lines") or []
+    if not lines:
+        return ledger
+    if any(isinstance(ln, dict) and (ln.get("dur_s") or ln.get("duration_s")
+           or ln.get("samples") or ln.get("audio_samples")) for ln in lines):
+        return ledger                       # input already carries timing
+    try:
+        import json
+        from pathlib import Path
+        from . import _otr_ledger as _OL
+        roots = []
+        try:
+            from . import _otr_paths as _OP
+            roots.append(Path(_OP.otr_episodes_root()))
+        except Exception:                    # noqa: BLE001
+            base = os.environ.get("OTR_OUTPUT_DIR") or "."
+            roots.append(Path(base) / "otr" / "episodes")
+        p = _OL.find_most_recent_ledger(roots)
+        if not p:
+            return ledger
+        disk = json.loads(Path(p).read_text(encoding="utf-8"))
+        dmap = {str(dl.get("line_id")): dl for dl in (disk.get("lines") or [])
+                if isinstance(dl, dict) and dl.get("line_id")}
+        tkeys = ("dur_s", "duration_s", "start_s", "samples", "audio_samples", "sample_rate")
+        for ln in lines:
+            if not isinstance(ln, dict):
+                continue
+            d = dmap.get(str(ln.get("line_id") or ""))
+            if not d:
+                continue
+            for k in tkeys:
+                if ln.get(k) in (None, "") and d.get(k) not in (None, ""):
+                    ln[k] = d[k]
+            for k, v in d.items():
+                if str(k).endswith("wav_path") and v and not ln.get(k):
+                    ln[k] = v
+        log.info("[OTR_ShotLock] audio-timing overlay from %s", p.name)
+    except Exception as exc:                 # noqa: BLE001 - never block the lock
+        log.warning("[OTR_ShotLock] audio-timing overlay skipped: %s", exc)
+    return ledger
+
+
 def extract_beats(ledger: dict) -> list:
     """Ordered, non-skipped beats from the frozen ledger.
 
@@ -602,6 +657,7 @@ class OTRShotLock:
         from . import _otr_ledger_consumers as _OTRLC
 
         led = _OTRLC.load_ledger(script_json)
+        led = overlay_audio_timing(led)     # fill per-line timing from the post-audio disk ledger
         meta = led.get("meta")
         if not isinstance(meta, dict):
             meta = {}
