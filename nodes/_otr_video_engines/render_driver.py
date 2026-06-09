@@ -517,7 +517,20 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None,
     ``audio_ref`` filled by slicing ``[start_s, start_s+dur_s]`` from the
     master (read-only ffmpeg; master NEVER mutated).  Passed via
     ``functools.partial`` into ``build_request_from_shot`` so the call
-    signature of :func:`run_episode` stays unchanged."""
+    signature of :func:`run_episode` stays unchanged.
+
+    Rename-proofing: the episode dir is renamed ``pending_*`` -> final slug
+    mid-run, so the ``master_audio_path`` captured upstream can be stale (its
+    pending dir gone) by the time this renders -- which silently skipped the
+    per-beat slice and starved HuMo (audio_ref=''). Re-resolve to the SAME
+    master file under the renamed dir using the same contract the terminal mux
+    uses. Read-only; the audio bytes are never touched."""
+    if master_audio_path:
+        try:
+            from ..otr_master_audio_mux import _reresolve_master_audio
+            master_audio_path = _reresolve_master_audio(str(master_audio_path))
+        except Exception:  # noqa: BLE001 - never block the render on re-resolve
+            pass
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
     return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
