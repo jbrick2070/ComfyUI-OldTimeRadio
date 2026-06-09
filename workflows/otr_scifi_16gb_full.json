@@ -2,7 +2,7 @@
  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
  "revision": 0,
  "last_node_id": 92,
- "last_link_id": 261,
+ "last_link_id": 262,
  "nodes": [
   {
    "id": 63,
@@ -379,7 +379,8 @@
      "type": "STRING",
      "links": [
       246,
-      248
+      248,
+      262
      ],
      "slot_index": 0
     }
@@ -1279,6 +1280,14 @@
      "name": "patched_ledger_json",
      "type": "STRING",
      "link": 260
+    },
+    {
+     "name": "master_audio_path",
+     "type": "STRING",
+     "link": 262,
+     "widget": {
+      "name": "master_audio_path"
+     }
     }
    ],
    "outputs": [
@@ -1630,6 +1639,14 @@
    92,
    1,
    84,
+   1,
+   "STRING"
+  ],
+  [
+   262,
+   12,
+   0,
+   92,
    1,
    "STRING"
   ]

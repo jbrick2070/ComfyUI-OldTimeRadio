@@ -55,12 +55,24 @@ class OTRVideoRenderBatch:
                         "OTR_SilentComposite."
                     ),
                 }),
+                "master_audio_path": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": (
+                        "mode=episode: path to the FROZEN master mix (MP4 or WAV). "
+                        "Beats whose ledger line has no per-line *_wav_path get "
+                        "audio_ref filled by slicing [start_s, start_s+dur_s] from "
+                        "this file (read-only ffmpeg; master is NEVER mutated). "
+                        "Wire from OTR_SignalLostVideo.video_path (the procgen mp4 "
+                        "carries the frozen master audio). Leave unset to degrade "
+                        "LOUD on missing per-line wavs."
+                    ),
+                }),
             },
         }
 
     def render(self, mode, beats, oom_index, frame_count,
                engine="humo", portrait_path="", audio_path="",
-               patched_ledger_json="{}"):
+               patched_ledger_json="{}", master_audio_path=""):
         # NOTE: this MUST run inside ComfyUI's executor thread (i.e. submitted via
         # /prompt, not a background HTTP-route thread): only there does ComfyUI's
         # model_management evict the umt5/whisper encoders between encode and
@@ -73,7 +85,8 @@ class OTRVideoRenderBatch:
         manifest_payload = ""
         if mode == "episode":
             report, manifest_payload, name = self._render_episode(
-                _rd, patched_ledger_json)
+                _rd, patched_ledger_json,
+                master_audio_path=str(master_audio_path or ""))
         elif mode == "single":
             assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
             report = _rd.render_single(engine, assets=assets,
@@ -104,11 +117,14 @@ class OTRVideoRenderBatch:
                 "result": (payload, manifest_payload)}
 
     @staticmethod
-    def _render_episode(_rd, patched_ledger_json):
+    def _render_episode(_rd, patched_ledger_json, master_audio_path=""):
         """Render one REAL episode from a ShotLock-planned ledger ->
         ``(report, clip_manifest_json, report_name)``. Fail-soft: a bad or empty
         ledger yields an error report + an empty manifest so the graph never
-        crashes (the procgen floor still carries the visual elsewhere)."""
+        crashes (the procgen floor still carries the visual elsewhere).
+
+        ``master_audio_path``: path to the FROZEN master mix; forwarded to
+        :func:`run_real_episode` for per-beat audio slicing.  Read-only."""
         try:
             ledger = json.loads(patched_ledger_json or "{}")
         except (ValueError, TypeError) as exc:
@@ -121,7 +137,8 @@ class OTRVideoRenderBatch:
                     "", "node_episode_report.json")
         episode_id = str(ledger.get("episode_id")
                          or (ledger.get("meta") or {}).get("episode_id") or "")
-        ep = _rd.run_real_episode(ledger)
+        ep = _rd.run_real_episode(ledger,
+                                  master_audio_path=str(master_audio_path or ""))
         manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
         report = {
             "ok": manifest["clip_count"] > 0, "mode": "episode",

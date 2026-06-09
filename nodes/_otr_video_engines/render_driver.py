@@ -21,9 +21,12 @@ operator gate. UTF-8, no BOM, ASCII-only source.
 from __future__ import annotations
 
 import copy
+import functools
 import hashlib
 import logging
 import os
+import subprocess
+import tempfile
 import time
 
 from .._otr_shared import retry_taxonomy as _rt
@@ -197,6 +200,64 @@ def build_request(shot, assets, frame_count, canvas=None):
 
 
 # --------------------------------------------------------------------------- #
+# Per-beat audio slice from the frozen master mix (read-only).
+#
+# HuMo needs an ``audio_ref`` WAV per beat.  When the ledger carries no
+# per-line ``*_wav_path`` (the common case when individual TTS clips are not
+# re-exported as standalone files), we slice the FROZEN master mix by the
+# beat's ``[start_s, start_s+dur_s]`` timing that OTR_EpisodeAssembler
+# already stamped onto every ``lines[]`` entry.  The master file is opened
+# read-only by ffmpeg (``-i``); output goes to a dedicated temp directory so
+# the master is NEVER mutated (V-1 / audio spine frozen).  The slice is
+# deterministically keyed to the (path, start_s, dur_s) triple so a second
+# render of the same beat reuses the cached file without re-running ffmpeg.
+# --------------------------------------------------------------------------- #
+
+def _slice_master_audio(master_path, start_s, dur_s):
+    """ffmpeg-slice ``[start_s, start_s+dur_s]`` from the FROZEN master into a
+    temp WAV.  Read-only (``-i`` only, never ``-o`` on the master).  Returns
+    the temp path on success, ``""`` on failure (LOUD warning logged).
+
+    The output file is cached by a hash of ``(start_s, dur_s, master_path)``
+    so render-twice is deterministic without re-running ffmpeg."""
+    key = hashlib.sha256(
+        ("%.6f|%.6f|%s" % (float(start_s), float(dur_s), master_path)
+         ).encode("utf-8")
+    ).hexdigest()[:16]
+    tmp_dir = os.path.join(tempfile.gettempdir(), "otr_audio_slices")
+    try:
+        os.makedirs(tmp_dir, exist_ok=True)
+    except OSError as exc:
+        _LOG.warning("[OTR.render_driver] _slice_master_audio: cannot create "
+                     "tmp dir %s: %s", tmp_dir, exc)
+        return ""
+    out = os.path.join(tmp_dir, "slice_%s.wav" % key)
+    if os.path.exists(out) and os.path.getsize(out) > 0:
+        return out                       # deterministic cache hit
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", "%.6f" % float(start_s),
+        "-t",  "%.6f" % float(dur_s),
+        "-i",  master_path,
+        "-vn", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1",
+        out,
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=30)
+    except Exception as exc:             # noqa: BLE001 - LOUD, never crash
+        _LOG.warning("[OTR.render_driver] _slice_master_audio FAILED "
+                     "(%s@%.3f+%.3fs): %s",
+                     os.path.basename(master_path), start_s, dur_s, exc)
+        return ""
+    if not os.path.exists(out) or os.path.getsize(out) == 0:
+        _LOG.warning("[OTR.render_driver] _slice_master_audio: empty output "
+                     "(%s@%.3f+%.3fs)", os.path.basename(master_path),
+                     start_s, dur_s)
+        return ""
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Per-shot request builder (the REAL episode path). Resolves the character
 # portrait + the per-beat voice audio + the M4 creative prompt from the
 # ShotLock-planned ledger, keyed to ONE shot. Additive: the soak/global-assets
@@ -270,18 +331,48 @@ def _beat_id_for_shot(shot):
     return sid[len("shot_"):] if sid.startswith("shot_") else sid
 
 
-def build_request_from_shot(shot, ledger, *, canvas=None):
+def build_request_from_shot(shot, ledger, *, canvas=None,
+                            master_audio_path=""):
     """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
     episode path). Resolves the character portrait (``init_image``) + the
     per-beat voice audio + the M4 ``text_prompt`` + the audio-derived
     ``target_frame_count`` for THIS shot only. Reuses :func:`build_request` for
     the canonical request shape + canvas, then overrides the prompt, the
     request-hash seed, and the per-beat timing. Pure: it reads the ledger and
-    never writes; the frozen audio section is only ever read."""
+    never writes; the frozen audio section is only ever read.
+
+    ``master_audio_path`` (optional): path to the FROZEN master mix (MP4 or
+    WAV) from which per-beat audio is sliced when the ledger carries no
+    per-line ``*_wav_path``.  Passed in via :func:`run_real_episode` so the
+    file is never mutated (read-only ``ffmpeg -i``)."""
     line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
     char_id = str(line.get("char_id") or "")
     init_image = _portrait_index(ledger).get(char_id, "")
     audio = _voice_audio_for_line(line)
+    # Per-beat audio fallback: slice the FROZEN master when no per-line wav.
+    # The master is opened read-only by ffmpeg; the slice lands in a temp dir
+    # so the master is NEVER mutated (V-1 / audio spine frozen).
+    if not audio and master_audio_path and os.path.isfile(master_audio_path):
+        bid = _beat_id_for_shot(shot)
+        start_s = line.get("start_s")
+        dur_s = line.get("dur_s")
+        if (start_s is not None and dur_s is not None
+                and float(dur_s) > 0):
+            sliced = _slice_master_audio(master_audio_path,
+                                         float(start_s), float(dur_s))
+            if sliced:
+                _LOG.info("[OTR.render_driver] per-beat audio: sliced "
+                          "%s @%.3f+%.3fs -> %s (beat %s)",
+                          os.path.basename(master_audio_path),
+                          float(start_s), float(dur_s),
+                          os.path.basename(sliced), bid)
+                audio = sliced
+            else:
+                _LOG.warning("[OTR.render_driver] per-beat audio slice FAILED "
+                             "for beat %s -- HuMo will degrade LOUD", bid)
+        else:
+            _LOG.warning("[OTR.render_driver] per-beat audio: beat %s has no "
+                         "start_s/dur_s on line -- HuMo will degrade LOUD", bid)
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
@@ -412,15 +503,25 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             "vram_peak_mb": vram_peak}
 
 
-def run_real_episode(ledger, *, fallback_of=None, canvas=None):
+def run_real_episode(ledger, *, fallback_of=None, canvas=None,
+                     master_audio_path=""):
     """Drive one REAL episode from a ShotLock-planned ledger: per-shot requests
     (character portrait + per-beat voice audio + the M4 prompt) via
     :func:`build_request_from_shot`, the full registry fallback chain (NO forced
     OOM), real per-shot assets. Returns the :func:`run_episode` result; the
     frozen audio section is untouched. The thin ``mode="episode"`` render node
-    calls this inside the ComfyUI executor thread."""
+    calls this inside the ComfyUI executor thread.
+
+    ``master_audio_path``: path to the FROZEN master mix (MP4 or WAV).
+    When set, beats whose ledger line has no ``*_wav_path`` get their
+    ``audio_ref`` filled by slicing ``[start_s, start_s+dur_s]`` from the
+    master (read-only ffmpeg; master NEVER mutated).  Passed via
+    ``functools.partial`` into ``build_request_from_shot`` so the call
+    signature of :func:`run_episode` stays unchanged."""
+    rb = functools.partial(build_request_from_shot,
+                           master_audio_path=master_audio_path)
     return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
-                       request_builder=build_request_from_shot, canvas=canvas)
+                       request_builder=rb, canvas=canvas)
 
 
 def build_clip_manifest(result, *, episode_id=""):
@@ -661,7 +762,8 @@ __all__ = [
     "OomSignal", "RenderFloorError", "SoakError",
     "make_fallback_of", "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
-    "build_request_from_shot", "run_real_episode", "build_clip_manifest",
+    "build_request_from_shot", "_slice_master_audio",
+    "run_real_episode", "build_clip_manifest",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
     "run_gpu_soak", "render_single",
 ]
