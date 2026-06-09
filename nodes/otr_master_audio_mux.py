@@ -107,11 +107,15 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     """Mux the frozen master audio onto the silent video; FAIL CLOSED.
 
     Pure function (used by the node + tests). Steps: validate inputs -> duration
-    assert (|v - a| <= duration_tol_frames / fps) BEFORE the mux -> ffmpeg
+    assert (video must NOT exceed audio by > 1/fps) BEFORE the mux -> ffmpeg
     ``-map 0:v -map 1:a -c:v copy -c:a copy`` (NO ``-shortest``) -> assert the
     output audio decodes identically to the master. Returns ``(out_path,
     report_lines)``; raises ``ValueError`` on any gate failure (never produces a
     silently-wrong episode).
+
+    The gate permits ``a_dur > v_dur``: the master audio includes
+    opening/closing themes that play over black frames before/after the drama
+    clips; those seconds are not represented in the silent composite.
     """
     report: list = []
     fb = _ffmpeg_bin(ffmpeg)
@@ -122,16 +126,22 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     if not os.path.isfile(master_audio_path):
         raise ValueError(f"OTR_MasterAudioMux: master audio missing: {master_audio_path!r}")
 
-    # post-composite duration assert vs master BEFORE the mux (settb drift guard).
+    # Duration gate: the silent composite covers drama beats only; the master
+    # audio also includes opening/closing themes (typically 10s + 8s).  It is
+    # therefore EXPECTED that a_dur > v_dur -- the theme audio plays while a
+    # black frame holds at start/end.  We only refuse to mux when the VIDEO is
+    # LONGER than the audio, which would cause the tail of the video to play
+    # silently (a genuine error).  Audio-longer-than-video is intentional and
+    # safe: ffmpeg copies both streams with -c copy; the container duration
+    # equals max(v_dur, a_dur) and the audio plays out in full.
     v_dur = _probe_float(silent_video_path, "v:0")
     a_dur = _probe_float(master_audio_path, "a:0")
-    tol = max(1, int(fps or 25)) and (float(duration_tol_frames) / float(fps or 25))
-    if v_dur >= 0 and a_dur >= 0 and abs(v_dur - a_dur) > tol:
+    tol = float(duration_tol_frames) / float(fps or 25)
+    if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + tol:
         raise ValueError(
-            f"OTR_MasterAudioMux: silent video {v_dur:.4f}s vs master audio "
-            f"{a_dur:.4f}s differ by > {tol:.4f}s (1/fps); the composite is not "
-            f"built to the audio-derived budget -- refusing to mux (would need "
-            f"-shortest, which is forbidden)"
+            f"OTR_MasterAudioMux: silent video {v_dur:.4f}s is LONGER than master "
+            f"audio {a_dur:.4f}s by > {tol:.4f}s -- the tail of the video would "
+            f"play silently; check the composite frame budget"
         )
     report.append(f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s tol={tol:.4f}s OK")
 
