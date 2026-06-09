@@ -295,11 +295,16 @@ def test_expand_does_not_mutate_input():
 
 
 def test_node_registered():
+    # Chunk E cleanbreak (2026-06-08): OTRFixedShotDurationStub is retired.
+    # NODE_CLASS_MAPPINGS must be EMPTY (node not visible in ComfyUI picker).
+    # The class itself is retained as a pure-Python test helper only.
     from nodes.otr_shot_duration_calculator import (
-        NODE_CLASS_MAPPINGS, OTRFixedShotDurationStub,
+        NODE_CLASS_MAPPINGS,
     )
-    assert "OTR_FixedShotDurationStub" in NODE_CLASS_MAPPINGS
-    assert NODE_CLASS_MAPPINGS["OTR_FixedShotDurationStub"] is OTRFixedShotDurationStub
+    assert "OTR_FixedShotDurationStub" not in NODE_CLASS_MAPPINGS, (
+        "OTR_FixedShotDurationStub must be unregistered after Chunk E retire"
+    )
+    assert "OTR_ShotDurationCalculator" not in NODE_CLASS_MAPPINGS
 
 
 def test_input_types_schema():

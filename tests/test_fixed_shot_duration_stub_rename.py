@@ -1,89 +1,88 @@
-"""Sprint E E8: OTR_ShotDurationCalculator -> OTR_FixedShotDurationStub rename.
+"""Chunk E cleanbreak: OTR_ShotDurationCalculator + OTR_FixedShotDurationStub retired.
 
-Closes M10. The old name implied dynamic computation; the current
-implementation operates on a hand-crafted JSON array of durations
-(8s stub default) until the Bark audio-timeline wiring lands. The
-rename makes the stub-nature surface-visible.
+Sprint E E8 renamed OTR_ShotDurationCalculator -> OTR_FixedShotDurationStub.
+Chunk E (2026-06-08) fully retires both: OTR_ShotLock owns all per-episode
+budget / shot-duration logic, so neither node is needed on the wire.
 
-Per CLAUDE.md no-back-compat directive: NO alias entry for the old
-name. Workflow JSONs are rewritten clean; pre-Sprint-E saved
-workflow JSONs with the old type name will fail to load with a
-"missing OTR_ShotDurationCalculator" surface, which is the
-intentional greenfield behavior.
+Retirement contract:
+  - NODE_CLASS_MAPPINGS is empty (node not visible in ComfyUI picker)
+  - Both old and new type names are in DELETED_NODE_TYPES (stale workflow
+    JSONs fail validation loudly)
+  - The class + pure-Python helpers are kept for unit tests
+  - No workflow JSON contains either type name
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE = REPO_ROOT / "nodes" / "otr_shot_duration_calculator.py"
-INIT = REPO_ROOT / "__init__.py"
 CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+VALIDATION_MOD = REPO_ROOT / "nodes" / "_workflow_validation.py"
 
 
 def _src() -> str:
     return SOURCE.read_text(encoding="utf-8")
 
 
-class TestSourceClassRenamed:
-    def test_new_class_name_present(self):
-        src = _src()
-        assert "class OTRFixedShotDurationStub" in src
+class TestSourceClassRetained:
+    """Class must survive for unit-test helpers; registration is gone."""
+
+    def test_stub_class_still_present_for_tests(self):
+        assert "class OTRFixedShotDurationStub" in _src()
 
     def test_old_class_name_absent(self):
-        src = _src()
-        assert "class OTRShotDurationCalculator" not in src, (
-            "Old class name OTRShotDurationCalculator must be deleted; "
-            "CLAUDE.md no-back-compat rule"
-        )
+        assert "class OTRShotDurationCalculator" not in _src()
 
-    def test_module_class_mappings_use_new_id(self):
+
+class TestRegistrationCleared:
+    """Both names must be absent from NODE_CLASS_MAPPINGS (Chunk E retire)."""
+
+    def test_node_class_mappings_empty(self):
         from nodes.otr_shot_duration_calculator import (
             NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS,
-            OTRFixedShotDurationStub,
         )
-        assert "OTR_FixedShotDurationStub" in NODE_CLASS_MAPPINGS
-        assert NODE_CLASS_MAPPINGS["OTR_FixedShotDurationStub"] is OTRFixedShotDurationStub
+        assert "OTR_FixedShotDurationStub" not in NODE_CLASS_MAPPINGS, (
+            "OTR_FixedShotDurationStub must be unregistered (Chunk E retire)"
+        )
         assert "OTR_ShotDurationCalculator" not in NODE_CLASS_MAPPINGS
-        assert "OTR_FixedShotDurationStub" in NODE_DISPLAY_NAME_MAPPINGS
+        assert "OTR_FixedShotDurationStub" not in NODE_DISPLAY_NAME_MAPPINGS
         assert "OTR_ShotDurationCalculator" not in NODE_DISPLAY_NAME_MAPPINGS
 
-    def test_module_all_exports_new_name(self):
-        from nodes import otr_shot_duration_calculator as mod
-        assert "OTRFixedShotDurationStub" in mod.__all__
-        assert "OTRShotDurationCalculator" not in mod.__all__
+
+class TestTombstoned:
+    """Both type names must appear in DELETED_NODE_TYPES."""
+
+    def test_old_name_tombstoned(self):
+        from nodes._workflow_validation import DELETED_NODE_TYPES
+        assert "OTR_ShotDurationCalculator" in DELETED_NODE_TYPES
+
+    def test_stub_name_tombstoned(self):
+        from nodes._workflow_validation import DELETED_NODE_TYPES
+        assert "OTR_FixedShotDurationStub" in DELETED_NODE_TYPES
+
+    def test_videos_plan_tombstoned(self):
+        from nodes._workflow_validation import DELETED_NODE_TYPES
+        assert "OTR_VideoPlan" in DELETED_NODE_TYPES
+
+    def test_render_plan_tombstoned(self):
+        from nodes._workflow_validation import DELETED_NODE_TYPES
+        assert "OTR_RenderPlan" in DELETED_NODE_TYPES
 
 
-class TestRegistryRenamed:
-    def test_init_registry_uses_new_id(self):
-        src = INIT.read_text(encoding="utf-8")
-        assert '"OTR_FixedShotDurationStub"' in src
-        assert "OTRFixedShotDurationStub" in src
+class TestWorkflowJsonClean:
 
-    def test_init_registry_drops_old_id(self):
-        src = INIT.read_text(encoding="utf-8")
-        # The old key must not appear as a NODE_CLASS_MAPPINGS key.
-        # Forensic mentions in comments are allowed; the registry
-        # entry itself must use the new name.
-        # Check the registry tuple line is gone.
-        assert '"OTR_ShotDurationCalculator":  (' not in src
-
-
-class TestWorkflowJsonRenamed:
-
-    def test_workflow_json_drops_old_type(self):
+    def test_workflow_json_has_no_old_type(self):
         raw = CANONICAL_JSON.read_text(encoding="utf-8")
-        assert '"OTR_ShotDurationCalculator"' not in raw, (
-            "Old node type must be gone from canonical workflow JSON; "
-            "CLAUDE.md no-back-compat rule"
-        )
+        assert '"OTR_ShotDurationCalculator"' not in raw
+        assert '"OTR_FixedShotDurationStub"' not in raw
+        assert '"OTR_VideoPlan"' not in raw
+        assert '"OTR_RenderPlan"' not in raw
 
 
 class TestNodeStillFunctional:
-    """Defensive: the rename must not break the node's INPUT_TYPES
-    or its calculate() entrypoint."""
+    """Pure-Python helpers must survive the registration cleanup."""
 
     def test_input_types_intact(self):
         from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub

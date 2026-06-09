@@ -349,15 +349,25 @@ class TestVideoRenderBatchMasterAudioInput:
             "widgets_values must have exactly 7 entries (forceInput fields "
             "excluded); got %d: %r" % (len(wv), wv))
 
-    def test_workflow_link_262_wired(self):
-        """Link 262 (node12[0] -> node92.master_audio_path) must exist."""
+    def test_workflow_link_264_wired(self):
+        """Chunk E cleanbreak: link 264 (node7[1] -> node92.master_audio_path)
+        routes master audio from EpisodeAssembler.output_path, replacing the
+        legacy link 262 (procgen-mp4 -> render_batch). Link 262 must be gone."""
         import json, os
         wf_path = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
         with open(wf_path, encoding="utf-8") as f:
             wf = json.load(f)
-        lnk = next((l for l in wf["links"] if l[0] == 262), None)
-        assert lnk is not None, "link 262 missing from workflow"
-        assert lnk[1] == 12 and lnk[2] == 0, \
-            "link 262 must originate from node 12 slot 0"
-        assert lnk[3] == 92, "link 262 must target node 92"
-        assert wf["last_link_id"] == 262
+        # Legacy link 262 (procgen-mp4 source) must be cut
+        lnk262 = next((l for l in wf["links"] if l[0] == 262), None)
+        assert lnk262 is None, (
+            "link 262 (procgen-mp4 -> render_batch.master_audio_path) must be "
+            "cut in Chunk E cleanbreak"
+        )
+        # New link 264 (assembler.output_path -> render_batch) must be present
+        lnk = next((l for l in wf["links"] if l[0] == 264), None)
+        assert lnk is not None, "link 264 (assembler -> render_batch.master_audio_path) missing"
+        assert lnk[1] == 7,  f"link 264 src must be node 7 (EpisodeAssembler), got {lnk[1]}"
+        assert lnk[2] == 1,  f"link 264 src slot must be 1 (output_path), got {lnk[2]}"
+        assert lnk[3] == 92, f"link 264 dst must be node 92 (VideoRenderBatch), got {lnk[3]}"
+        assert lnk[4] == 1,  f"link 264 dst slot must be 1 (master_audio_path), got {lnk[4]}"
+        assert wf["last_link_id"] == 264

@@ -439,12 +439,14 @@ class OTRFixedShotDurationStub:
 # ---------------------------------------------------------------------------
 
 
-NODE_CLASS_MAPPINGS = {
-    "OTR_FixedShotDurationStub": OTRFixedShotDurationStub,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "OTR_FixedShotDurationStub": " OTR Fixed Shot Duration Stub",
-}
+# Chunk E cleanbreak (2026-06-08): OTR_ShotDurationCalculator /
+# OTR_FixedShotDurationStub fully superseded by OTR_ShotLock which owns
+# all per-episode budget and shot-duration logic.  Both type names are
+# tombstoned in _workflow_validation.DELETED_NODE_TYPES.  The class and
+# pure-Python helpers remain for unit tests; the ComfyUI registration is
+# cleared so the node does not appear in the picker or on the wire.
+NODE_CLASS_MAPPINGS: dict = {}
+NODE_DISPLAY_NAME_MAPPINGS: dict = {}
 
 __all__ = [
     "OTRFixedShotDurationStub",

@@ -1,1672 +1,1673 @@
 {
- "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
- "revision": 0,
- "last_node_id": 92,
- "last_link_id": 262,
- "nodes": [
-  {
-   "id": 63,
-   "type": "OTR_WorkflowValidator",
-   "pos": [
-    80.0,
-    470.0
-   ],
-   "size": [
-    400,
-    110
-   ],
-   "flags": {},
-   "order": 0,
-   "mode": 0,
-   "inputs": [],
-   "outputs": [
+  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
+  "revision": 0,
+  "last_node_id": 92,
+  "last_link_id": 264,
+  "nodes": [
     {
-     "name": "validation_report",
-     "type": "STRING",
-     "links": null,
-     "shape": 3,
-     "label": "validation_report"
+      "id": 63,
+      "type": "OTR_WorkflowValidator",
+      "pos": [
+        80.0,
+        470.0
+      ],
+      "size": [
+        400,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "validation_report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "label": "validation_report"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_WorkflowValidator",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        true,
+        true
+      ]
+    },
+    {
+      "id": 1,
+      "type": "OTR_LedgerScriptWriter",
+      "pos": [
+        80.0,
+        80.0
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "title": "1. Story Writer (LPL v2.0)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerScriptWriter"
+      },
+      "widgets_values": [
+        "",
+        350,
+        2,
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "",
+        true,
+        "auto",
+        "let the story decide",
+        "",
+        "balanced",
+        false,
+        0.05,
+        1.03,
+        200,
+        "roll (~11% chance)",
+        true,
+        true,
+        true,
+        "anthropic/claude-opus-4.8",
+        "deepseek/deepseek-v4-pro",
+        "anthropic/claude-opus-4.7",
+        "deepseek/deepseek-v4-pro"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [
+            106
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            230
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [
+            108
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [
+            109
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "links": [
+            115
+          ],
+          "slot_index": 4
+        }
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 3,
+      "type": "OTR_SceneSequencer",
+      "pos": [
+        1740.0,
+        80.0
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "title": "4. Scene Sequencer",
+      "properties": {
+        "Node name for S&R": "OTR_SceneSequencer"
+      },
+      "widgets_values": [
+        "[]",
+        0,
+        999,
+        "",
+        "bark",
+        0.0,
+        0.0
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 2,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "tts_audio_clips",
+          "type": "AUDIO",
+          "link": 239
+        },
+        {
+          "name": "announcer_audio_clips",
+          "type": "AUDIO",
+          "link": 240,
+          "shape": 7
+        },
+        {
+          "name": "sfx_audio_clips",
+          "type": "AUDIO",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 4,
+      "type": "OTR_AudioEnhance",
+      "pos": [
+        2280.0,
+        80.0
+      ],
+      "size": [
+        380,
+        340
+      ],
+      "title": "5. Audio Enhance",
+      "properties": {
+        "Node name for S&R": "OTR_AudioEnhance"
+      },
+      "widgets_values": [
+        48000,
+        0.3,
+        0.8,
+        0.15,
+        16000.0,
+        "subtle",
+        -1.0
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "enhanced_audio",
+          "type": "AUDIO",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 7,
+      "type": "OTR_EpisodeAssembler",
+      "pos": [
+        2800.0,
+        80.0
+      ],
+      "size": [
+        420,
+        350
+      ],
+      "title": "6. Episode Assembler",
+      "properties": {
+        "Node name for S&R": "OTR_EpisodeAssembler"
+      },
+      "widgets_values": [
+        "",
+        10.0,
+        8.0,
+        500
+      ],
+      "inputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "link": 6
+        },
+        {
+          "name": "opening_theme_audio",
+          "type": "AUDIO",
+          "link": 241
+        },
+        {
+          "name": "closing_theme_audio",
+          "type": "AUDIO",
+          "link": 242
+        }
+      ],
+      "outputs": [
+        {
+          "name": "episode_audio",
+          "type": "AUDIO",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "output_path",
+          "type": "STRING",
+          "links": [
+            263,
+            264
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "episode_info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "audio_done",
+          "type": "STRING",
+          "links": [
+            249,
+            253,
+            259
+          ],
+          "shape": 3,
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 12,
+      "type": "OTR_SignalLostVideo",
+      "pos": [
+        3360.0,
+        80.0
+      ],
+      "size": [
+        400,
+        280
+      ],
+      "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
+      "properties": {
+        "Node name for S&R": "OTR_SignalLostVideo"
+      },
+      "widgets_values": [
+        "[]",
+        "[]",
+        24,
+        "1920x1080",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 15
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 16,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 110,
+          "widget": {
+            "name": "news_used"
+          }
+        },
+        {
+          "name": "closing_audio",
+          "type": "AUDIO",
+          "link": 243
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "links": [
+            246
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
+    },
+    {
+      "id": 62,
+      "type": "OTR_LedgerFreezeCascade",
+      "pos": [
+        620.0,
+        80.0
+      ],
+      "size": [
+        380,
+        320
+      ],
+      "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerFreezeCascade"
+      },
+      "widgets_values": [
+        true,
+        true,
+        14.0,
+        "all",
+        6,
+        false,
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "link": 106
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 230
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 108
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "link": 109
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 115
+        }
+      ],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            2,
+            16,
+            231,
+            232,
+            233,
+            252,
+            255
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [
+            110
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "freeze_verdict",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        },
+        {
+          "name": "episode_seed",
+          "type": "INT",
+          "links": [],
+          "slot_index": 5
+        },
+        {
+          "name": "v2_ledger_json",
+          "type": "STRING",
+          "links": [
+            234
+          ],
+          "slot_index": 6
+        }
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 80,
+      "type": "OTR_CastLock",
+      "pos": [
+        1060,
+        470
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "1c. Cast Lock (v2 ledger authority)",
+      "properties": {
+        "Node name for S&R": "OTR_CastLock"
+      },
+      "widgets_values": [
+        "default",
+        "auto_registry",
+        "neutral",
+        true
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 234
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "links": [
+            235,
+            236,
+            237
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "cast_lock_revision",
+          "type": "INT",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "cast_report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 40,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 81,
+      "type": "OTR_BatchCharacterVoices",
+      "pos": [
+        1140,
+        80
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3a. Character Voices (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_BatchCharacterVoices"
+      },
+      "widgets_values": [
+        "indextts2",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 231
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 235
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "character_audio",
+          "type": "AUDIO",
+          "links": [
+            239
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [
+            244
+          ],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 41,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    },
+    {
+      "id": 82,
+      "type": "OTR_AnnouncerVoice",
+      "pos": [
+        1140,
+        330
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3b. Announcer Voice (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_AnnouncerVoice"
+      },
+      "widgets_values": [
+        "kokoro",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 232
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 236
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 244
+        }
+      ],
+      "outputs": [
+        {
+          "name": "announcer_audio",
+          "type": "AUDIO",
+          "links": [
+            240
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [
+            245
+          ],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 42,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    },
+    {
+      "id": 83,
+      "type": "OTR_StableAudioTheme",
+      "pos": [
+        1140,
+        580
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3c. Theme Music (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_StableAudioTheme"
+      },
+      "widgets_values": [
+        "stable_audio_3",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 233
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 237
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 245
+        }
+      ],
+      "outputs": [
+        {
+          "name": "opening_theme_audio",
+          "type": "AUDIO",
+          "links": [
+            241
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "closing_theme_audio",
+          "type": "AUDIO",
+          "links": [
+            242,
+            243
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "interstitial_theme_audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "flags": {},
+      "order": 43,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    },
+    {
+      "id": 84,
+      "type": "OTR_SilentComposite",
+      "pos": [
+        3840.0,
+        80.0
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "title": "9. Silent Composite (render -> one always-silent video)",
+      "properties": {
+        "Node name for S&R": "OTR_SilentComposite"
+      },
+      "widgets_values": [
+        1472,
+        832,
+        25,
+        "ffmpeg",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "base_video_path",
+          "type": "STRING",
+          "link": 246,
+          "widget": {
+            "name": "base_video_path"
+          }
+        },
+        {
+          "name": "clip_manifest_json",
+          "type": "STRING",
+          "link": 261
+        }
+      ],
+      "outputs": [
+        {
+          "name": "silent_video_path",
+          "type": "STRING",
+          "links": [
+            247
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
+    },
+    {
+      "id": 85,
+      "type": "OTR_MasterAudioMux",
+      "pos": [
+        4800.0,
+        80.0
+      ],
+      "size": [
+        400,
+        220
+      ],
+      "title": "10. Master Audio Mux (terminal mux-LAST)",
+      "properties": {
+        "Node name for S&R": "OTR_MasterAudioMux"
+      },
+      "widgets_values": [
+        25,
+        "ffmpeg",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "silent_video_path",
+          "type": "STRING",
+          "link": 250,
+          "widget": {
+            "name": "silent_video_path"
+          }
+        },
+        {
+          "name": "master_audio_path",
+          "type": "STRING",
+          "link": 263,
+          "widget": {
+            "name": "master_audio_path"
+          }
+        },
+        {
+          "name": "audio_done",
+          "type": "STRING",
+          "link": 249,
+          "widget": {
+            "name": "audio_done"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_video_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 86,
+      "type": "OTR_CaptionBurn",
+      "pos": [
+        4320.0,
+        80.0
+      ],
+      "size": [
+        400,
+        220
+      ],
+      "title": "9b. Caption Burn (SDH open captions on the silent video; default-OFF)",
+      "properties": {
+        "Node name for S&R": "OTR_CaptionBurn"
+      },
+      "widgets_values": [
+        false,
+        "sdh_standard",
+        25,
+        "ffmpeg",
+        "",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "link": 247,
+          "widget": {
+            "name": "video_path"
+          }
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "links": [
+            250
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
+    },
+    {
+      "id": 87,
+      "type": "OTR_VideoDirector",
+      "pos": [
+        620,
+        760
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_VideoDirector",
+      "properties": {
+        "Node name for S&R": "OTR_VideoDirector"
+      },
+      "widgets_values": [
+        "humo",
+        "visualizer",
+        "humo",
+        "flux_gen1",
+        "flux_gen1",
+        "flux_gen1",
+        "unique_per_beat",
+        8,
+        25,
+        832,
+        480,
+        "request_hash",
+        42,
+        true,
+        "auto",
+        "{}"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "video_policy_json",
+          "type": "STRING",
+          "links": [
+            251
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 187,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 88,
+      "type": "OTR_ImageDirector",
+      "pos": [
+        620,
+        1040
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_ImageDirector",
+      "properties": {
+        "Node name for S&R": "OTR_ImageDirector"
+      },
+      "widgets_values": [
+        "flux_gen1",
+        "flux_gen1",
+        "flux_gen1",
+        "per_object",
+        "per_object",
+        "per_object",
+        15,
+        "request_hash",
+        42,
+        "{}"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "image_policy_json",
+          "type": "STRING",
+          "links": [
+            254,
+            257
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 188,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 89,
+      "type": "OTR_MetaBriefImagePromptGen",
+      "pos": [
+        1080,
+        1040
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_MetaBriefImagePromptGen",
+      "properties": {
+        "Node name for S&R": "OTR_MetaBriefImagePromptGen"
+      },
+      "widgets_values": [
+        false
+      ],
+      "inputs": [
+        {
+          "name": "image_policy_json",
+          "type": "STRING",
+          "link": 254
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 255
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_prompts_json",
+          "type": "STRING",
+          "links": [
+            258
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 189,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 90,
+      "type": "OTR_ShotLock",
+      "pos": [
+        1080,
+        760
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_ShotLock",
+      "properties": {
+        "Node name for S&R": "OTR_ShotLock"
+      },
+      "widgets_values": [
+        false
+      ],
+      "inputs": [
+        {
+          "name": "video_policy_json",
+          "type": "STRING",
+          "link": 251
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 252
+        },
+        {
+          "name": "audio_done",
+          "type": "STRING",
+          "link": 253
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_ledger_json",
+          "type": "STRING",
+          "links": [
+            256
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "video_revision",
+          "type": "INT",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "shot_report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 190,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 91,
+      "type": "OTR_ImageGenDispatcher",
+      "pos": [
+        1560,
+        900
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_ImageGenDispatcher",
+      "properties": {
+        "Node name for S&R": "OTR_ImageGenDispatcher"
+      },
+      "widgets_values": [],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 256
+        },
+        {
+          "name": "image_policy_json",
+          "type": "STRING",
+          "link": 257
+        },
+        {
+          "name": "image_prompts_json",
+          "type": "STRING",
+          "link": 258
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 259
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_ledger_json",
+          "type": "STRING",
+          "links": [
+            260
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "image_done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 191,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 92,
+      "type": "OTR_VideoRenderBatch",
+      "pos": [
+        2040,
+        820
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "title": "OTR_VideoRenderBatch",
+      "properties": {
+        "Node name for S&R": "OTR_VideoRenderBatch"
+      },
+      "widgets_values": [
+        "episode",
+        40,
+        20,
+        25,
+        "humo",
+        "",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "patched_ledger_json",
+          "type": "STRING",
+          "link": 260
+        },
+        {
+          "name": "master_audio_path",
+          "type": "STRING",
+          "link": 264,
+          "widget": {
+            "name": "master_audio_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "render_report_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "clip_manifest_json",
+          "type": "STRING",
+          "links": [
+            261
+          ],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 192,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     }
-   ],
-   "properties": {
-    "Node name for S&R": "OTR_WorkflowValidator",
-    "cnr_id": "OldTimeRadio"
-   },
-   "widgets_values": [
-    "",
-    true,
-    true
-   ]
-  },
-  {
-   "id": 1,
-   "type": "OTR_LedgerScriptWriter",
-   "pos": [
-    80.0,
-    80.0
-   ],
-   "size": [
-    400,
-    320
-   ],
-   "title": "1. Story Writer (LPL v2.0)",
-   "properties": {
-    "Node name for S&R": "OTR_LedgerScriptWriter"
-   },
-   "widgets_values": [
-    "",
-    350,
-    2,
-    "mistralai/Mistral-Nemo-Instruct-2407",
-    "mistralai/Mistral-Nemo-Instruct-2407",
-    "",
-    true,
-    "auto",
-    "let the story decide",
-    "",
-    "balanced",
-    false,
-    0.05,
-    1.03,
-    200,
-    "roll (~11% chance)",
-    true,
-    true,
-    true,
-    "anthropic/claude-opus-4.8",
-    "deepseek/deepseek-v4-pro",
-    "anthropic/claude-opus-4.7",
-    "deepseek/deepseek-v4-pro"
-   ],
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "script_text",
-     "type": "STRING",
-     "links": [
-      106
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "links": [
-      230
-     ],
-     "slot_index": 1
-    },
-    {
-     "name": "news_used",
-     "type": "STRING",
-     "links": [
-      108
-     ],
-     "slot_index": 2
-    },
-    {
-     "name": "estimated_minutes",
-     "type": "INT",
-     "links": [
-      109
-     ],
-     "slot_index": 3
-    },
-    {
-     "name": "technical_model",
-     "type": "STRING",
-     "links": [
-      115
-     ],
-     "slot_index": 4
-    }
-   ],
-   "flags": {},
-   "order": 0,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 3,
-   "type": "OTR_SceneSequencer",
-   "pos": [
-    1740.0,
-    80.0
-   ],
-   "size": [
-    400,
-    300
-   ],
-   "title": "4. Scene Sequencer",
-   "properties": {
-    "Node name for S&R": "OTR_SceneSequencer"
-   },
-   "widgets_values": [
-    "[]",
-    0,
-    999,
-    "",
-    "bark",
-    0.0,
-    0.0
-   ],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 2,
-     "widget": {
-      "name": "script_json"
-     }
-    },
-    {
-     "name": "tts_audio_clips",
-     "type": "AUDIO",
-     "link": 239
-    },
-    {
-     "name": "announcer_audio_clips",
-     "type": "AUDIO",
-     "link": 240,
-     "shape": 7
-    },
-    {
-     "name": "sfx_audio_clips",
-     "type": "AUDIO",
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "name": "scene_audio",
-     "type": "AUDIO",
-     "links": [
-      5
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "render_log",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 6,
-   "mode": 0,
-   "color": "#4A2B4D",
-   "bgcolor": "#301C32"
-  },
-  {
-   "id": 4,
-   "type": "OTR_AudioEnhance",
-   "pos": [
-    2280.0,
-    80.0
-   ],
-   "size": [
-    380,
-    340
-   ],
-   "title": "5. Audio Enhance",
-   "properties": {
-    "Node name for S&R": "OTR_AudioEnhance"
-   },
-   "widgets_values": [
-    48000,
-    0.3,
-    0.8,
-    0.15,
-    16000.0,
-    "subtle",
-    -1.0
-   ],
-   "inputs": [
-    {
-     "name": "audio",
-     "type": "AUDIO",
-     "link": 5
-    }
-   ],
-   "outputs": [
-    {
-     "name": "enhanced_audio",
-     "type": "AUDIO",
-     "links": [
-      6
-     ],
-     "slot_index": 0
-    }
-   ],
-   "flags": {},
-   "order": 7,
-   "mode": 0,
-   "color": "#4A2B4D",
-   "bgcolor": "#301C32"
-  },
-  {
-   "id": 7,
-   "type": "OTR_EpisodeAssembler",
-   "pos": [
-    2800.0,
-    80.0
-   ],
-   "size": [
-    420,
-    350
-   ],
-   "title": "6. Episode Assembler",
-   "properties": {
-    "Node name for S&R": "OTR_EpisodeAssembler"
-   },
-   "widgets_values": [
-    "",
-    10.0,
-    8.0,
-    500
-   ],
-   "inputs": [
-    {
-     "name": "scene_audio",
-     "type": "AUDIO",
-     "link": 6
-    },
-    {
-     "name": "opening_theme_audio",
-     "type": "AUDIO",
-     "link": 241
-    },
-    {
-     "name": "closing_theme_audio",
-     "type": "AUDIO",
-     "link": 242
-    }
-   ],
-   "outputs": [
-    {
-     "name": "episode_audio",
-     "type": "AUDIO",
-     "links": [
-      15
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "output_path",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "episode_info",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 2
-    },
-    {
-     "name": "audio_done",
-     "type": "STRING",
-     "links": [
-      249,
-      253,
-      259
-     ],
-     "shape": 3,
-     "slot_index": 3
-    }
-   ],
-   "flags": {},
-   "order": 9,
-   "mode": 0,
-   "color": "#4A2B4D",
-   "bgcolor": "#301C32"
-  },
-  {
-   "id": 12,
-   "type": "OTR_SignalLostVideo",
-   "pos": [
-    3360.0,
-    80.0
-   ],
-   "size": [
-    400,
-    280
-   ],
-   "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
-   "properties": {
-    "Node name for S&R": "OTR_SignalLostVideo"
-   },
-   "widgets_values": [
-    "[]",
-    "[]",
-    24,
-    "1920x1080",
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "audio",
-     "type": "AUDIO",
-     "link": 15
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 16,
-     "widget": {
-      "name": "script_json"
-     }
-    },
-    {
-     "name": "news_used",
-     "type": "STRING",
-     "link": 110,
-     "widget": {
-      "name": "news_used"
-     }
-    },
-    {
-     "name": "closing_audio",
-     "type": "AUDIO",
-     "link": 243
-    }
-   ],
-   "outputs": [
-    {
-     "name": "video_path",
-     "type": "STRING",
-     "links": [
-      246,
-      248,
-      262
-     ],
-     "slot_index": 0
-    }
-   ],
-   "flags": {},
-   "order": 10,
-   "mode": 0,
-   "color": "#5B3A29",
-   "bgcolor": "#3C261B"
-  },
-  {
-   "id": 62,
-   "type": "OTR_LedgerFreezeCascade",
-   "pos": [
-    620.0,
-    80.0
-   ],
-   "size": [
-    380,
-    320
-   ],
-   "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
-   "properties": {
-    "Node name for S&R": "OTR_LedgerFreezeCascade"
-   },
-   "widgets_values": [
-    true,
-    true,
-    14.0,
-    "all",
-    6,
-    false,
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "script_text",
-     "type": "STRING",
-     "link": 106
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 230
-    },
-    {
-     "name": "news_used",
-     "type": "STRING",
-     "link": 108
-    },
-    {
-     "name": "estimated_minutes",
-     "type": "INT",
-     "link": 109
-    },
-    {
-     "name": "technical_model",
-     "type": "STRING",
-     "link": 115
-    }
-   ],
-   "outputs": [
-    {
-     "name": "script_text",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 0
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "links": [
+  ],
+  "links": [
+    [
       2,
+      62,
+      1,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ],
+    [
+      15,
+      7,
+      0,
+      12,
+      0,
+      "AUDIO"
+    ],
+    [
       16,
+      62,
+      1,
+      12,
+      1,
+      "STRING"
+    ],
+    [
+      106,
+      1,
+      0,
+      62,
+      0,
+      "STRING"
+    ],
+    [
+      108,
+      1,
+      2,
+      62,
+      2,
+      "STRING"
+    ],
+    [
+      109,
+      1,
+      3,
+      62,
+      3,
+      "INT"
+    ],
+    [
+      110,
+      62,
+      2,
+      12,
+      2,
+      "STRING"
+    ],
+    [
+      115,
+      1,
+      4,
+      62,
+      4,
+      "STRING"
+    ],
+    [
+      230,
+      1,
+      1,
+      62,
+      1,
+      "STRING"
+    ],
+    [
       231,
+      62,
+      1,
+      81,
+      0,
+      "STRING"
+    ],
+    [
       232,
+      62,
+      1,
+      82,
+      0,
+      "STRING"
+    ],
+    [
       233,
-      252,
-      255
-     ],
-     "slot_index": 1
-    },
-    {
-     "name": "news_used",
-     "type": "STRING",
-     "links": [
-      110
-     ],
-     "slot_index": 2
-    },
-    {
-     "name": "estimated_minutes",
-     "type": "INT",
-     "links": [],
-     "slot_index": 3
-    },
-    {
-     "name": "freeze_verdict",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 4
-    },
-    {
-     "name": "episode_seed",
-     "type": "INT",
-     "links": [],
-     "slot_index": 5
-    },
-    {
-     "name": "v2_ledger_json",
-     "type": "STRING",
-     "links": [
-      234
-     ],
-     "slot_index": 6
-    }
-   ],
-   "flags": {},
-   "order": 1,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 80,
-   "type": "OTR_CastLock",
-   "pos": [
-    1060,
-    470
-   ],
-   "size": [
-    400,
-    230
-   ],
-   "title": "1c. Cast Lock (v2 ledger authority)",
-   "properties": {
-    "Node name for S&R": "OTR_CastLock"
-   },
-   "widgets_values": [
-    "default",
-    "auto_registry",
-    "neutral",
-    true
-   ],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 234
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "name": "ledger_json",
-     "type": "STRING",
-     "links": [
+      62,
+      1,
+      83,
+      0,
+      "STRING"
+    ],
+    [
+      234,
+      62,
+      6,
+      80,
+      0,
+      "STRING"
+    ],
+    [
       235,
+      80,
+      0,
+      81,
+      1,
+      "STRING"
+    ],
+    [
       236,
-      237
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "cast_lock_revision",
-     "type": "INT",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "cast_report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 2
-    },
-    {
-     "name": "done",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 3
-    }
-   ],
-   "flags": {},
-   "order": 40,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 81,
-   "type": "OTR_BatchCharacterVoices",
-   "pos": [
-    1140,
-    80
-   ],
-   "size": [
-    400,
-    230
-   ],
-   "title": "3a. Character Voices (v2)",
-   "properties": {
-    "Node name for S&R": "OTR_BatchCharacterVoices"
-   },
-   "widgets_values": [
-    "indextts2",
-    "mono_safe"
-   ],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 231
-    },
-    {
-     "name": "ledger_json",
-     "type": "STRING",
-     "link": 235
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "name": "character_audio",
-     "type": "AUDIO",
-     "links": [
-      239
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "render_log",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "done",
-     "type": "STRING",
-     "links": [
-      244
-     ],
-     "slot_index": 2
-    }
-   ],
-   "flags": {},
-   "order": 41,
-   "mode": 0,
-   "color": "#234035",
-   "bgcolor": "#162821"
-  },
-  {
-   "id": 82,
-   "type": "OTR_AnnouncerVoice",
-   "pos": [
-    1140,
-    330
-   ],
-   "size": [
-    400,
-    230
-   ],
-   "title": "3b. Announcer Voice (v2)",
-   "properties": {
-    "Node name for S&R": "OTR_AnnouncerVoice"
-   },
-   "widgets_values": [
-    "kokoro",
-    "mono_safe"
-   ],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 232
-    },
-    {
-     "name": "ledger_json",
-     "type": "STRING",
-     "link": 236
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": 244
-    }
-   ],
-   "outputs": [
-    {
-     "name": "announcer_audio",
-     "type": "AUDIO",
-     "links": [
-      240
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "render_log",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "done",
-     "type": "STRING",
-     "links": [
-      245
-     ],
-     "slot_index": 2
-    }
-   ],
-   "flags": {},
-   "order": 42,
-   "mode": 0,
-   "color": "#234035",
-   "bgcolor": "#162821"
-  },
-  {
-   "id": 83,
-   "type": "OTR_StableAudioTheme",
-   "pos": [
-    1140,
-    580
-   ],
-   "size": [
-    400,
-    230
-   ],
-   "title": "3c. Theme Music (v2)",
-   "properties": {
-    "Node name for S&R": "OTR_StableAudioTheme"
-   },
-   "widgets_values": [
-    "stable_audio_3",
-    "mono_safe"
-   ],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 233
-    },
-    {
-     "name": "ledger_json",
-     "type": "STRING",
-     "link": 237
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": 245
-    }
-   ],
-   "outputs": [
-    {
-     "name": "opening_theme_audio",
-     "type": "AUDIO",
-     "links": [
-      241
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "closing_theme_audio",
-     "type": "AUDIO",
-     "links": [
+      80,
+      0,
+      82,
+      1,
+      "STRING"
+    ],
+    [
+      237,
+      80,
+      0,
+      83,
+      1,
+      "STRING"
+    ],
+    [
+      239,
+      81,
+      0,
+      3,
+      1,
+      "AUDIO"
+    ],
+    [
+      240,
+      82,
+      0,
+      3,
+      2,
+      "AUDIO"
+    ],
+    [
+      241,
+      83,
+      0,
+      7,
+      1,
+      "AUDIO"
+    ],
+    [
       242,
-      243
-     ],
-     "slot_index": 1
-    },
-    {
-     "name": "interstitial_theme_audio",
-     "type": "AUDIO",
-     "links": [],
-     "slot_index": 2
-    },
-    {
-     "name": "render_log",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 3
-    },
-    {
-     "name": "done",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 4
-    }
-   ],
-   "flags": {},
-   "order": 43,
-   "mode": 0,
-   "color": "#234035",
-   "bgcolor": "#162821"
-  },
-  {
-   "id": 84,
-   "type": "OTR_SilentComposite",
-   "pos": [
-    3840.0,
-    80.0
-   ],
-   "size": [
-    400,
-    200
-   ],
-   "title": "9. Silent Composite (render -> one always-silent video)",
-   "properties": {
-    "Node name for S&R": "OTR_SilentComposite"
-   },
-   "widgets_values": [
-    1472,
-    832,
-    25,
-    "ffmpeg",
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "base_video_path",
-     "type": "STRING",
-     "link": 246,
-     "widget": {
-      "name": "base_video_path"
-     }
-    },
-    {
-     "name": "clip_manifest_json",
-     "type": "STRING",
-     "link": 261
-    }
-   ],
-   "outputs": [
-    {
-     "name": "silent_video_path",
-     "type": "STRING",
-     "links": [
-      247
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 11,
-   "mode": 0,
-   "color": "#5B3A29",
-   "bgcolor": "#3C261B"
-  },
-  {
-   "id": 85,
-   "type": "OTR_MasterAudioMux",
-   "pos": [
-    4800.0,
-    80.0
-   ],
-   "size": [
-    400,
-    220
-   ],
-   "title": "10. Master Audio Mux (terminal mux-LAST)",
-   "properties": {
-    "Node name for S&R": "OTR_MasterAudioMux"
-   },
-   "widgets_values": [
-    25,
-    "ffmpeg",
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "silent_video_path",
-     "type": "STRING",
-     "link": 250,
-     "widget": {
-      "name": "silent_video_path"
-     }
-    },
-    {
-     "name": "master_audio_path",
-     "type": "STRING",
-     "link": 248,
-     "widget": {
-      "name": "master_audio_path"
-     }
-    },
-    {
-     "name": "audio_done",
-     "type": "STRING",
-     "link": 249,
-     "widget": {
-      "name": "audio_done"
-     }
-    }
-   ],
-   "outputs": [
-    {
-     "name": "final_video_path",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 0
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 13,
-   "mode": 0,
-   "color": "#4A2B4D",
-   "bgcolor": "#301C32"
-  },
-  {
-   "id": 86,
-   "type": "OTR_CaptionBurn",
-   "pos": [
-    4320.0,
-    80.0
-   ],
-   "size": [
-    400,
-    220
-   ],
-   "title": "9b. Caption Burn (SDH open captions on the silent video; default-OFF)",
-   "properties": {
-    "Node name for S&R": "OTR_CaptionBurn"
-   },
-   "widgets_values": [
-    false,
-    "sdh_standard",
-    25,
-    "ffmpeg",
-    "",
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "video_path",
-     "type": "STRING",
-     "link": 247,
-     "widget": {
-      "name": "video_path"
-     }
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "name": "video_path",
-     "type": "STRING",
-     "links": [
-      250
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 12,
-   "mode": 0,
-   "color": "#5B3A29",
-   "bgcolor": "#3C261B"
-  },
-  {
-   "id": 87,
-   "type": "OTR_VideoDirector",
-   "pos": [
-    620,
-    760
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_VideoDirector",
-   "properties": {
-    "Node name for S&R": "OTR_VideoDirector"
-   },
-   "widgets_values": [
-    "humo",
-    "visualizer",
-    "humo",
-    "flux_gen1",
-    "flux_gen1",
-    "flux_gen1",
-    "unique_per_beat",
-    8,
-    25,
-    832,
-    480,
-    "request_hash",
-    42,
-    true,
-    "auto",
-    "{}"
-   ],
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "video_policy_json",
-     "type": "STRING",
-     "links": [
-      251
-     ],
-     "slot_index": 0
-    }
-   ],
-   "flags": {},
-   "order": 187,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 88,
-   "type": "OTR_ImageDirector",
-   "pos": [
-    620,
-    1040
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_ImageDirector",
-   "properties": {
-    "Node name for S&R": "OTR_ImageDirector"
-   },
-   "widgets_values": [
-    "flux_gen1",
-    "flux_gen1",
-    "flux_gen1",
-    "per_object",
-    "per_object",
-    "per_object",
-    15,
-    "request_hash",
-    42,
-    "{}"
-   ],
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "image_policy_json",
-     "type": "STRING",
-     "links": [
+      83,
+      1,
+      7,
+      2,
+      "AUDIO"
+    ],
+    [
+      243,
+      83,
+      1,
+      12,
+      3,
+      "AUDIO"
+    ],
+    [
+      244,
+      81,
+      2,
+      82,
+      2,
+      "STRING"
+    ],
+    [
+      245,
+      82,
+      2,
+      83,
+      2,
+      "STRING"
+    ],
+    [
+      246,
+      12,
+      0,
+      84,
+      0,
+      "STRING"
+    ],
+    [
+      247,
+      84,
+      0,
+      86,
+      0,
+      "STRING"
+    ],
+    [
+      249,
+      7,
+      3,
+      85,
+      2,
+      "STRING"
+    ],
+    [
+      250,
+      86,
+      0,
+      85,
+      0,
+      "STRING"
+    ],
+    [
+      251,
+      87,
+      0,
+      90,
+      0,
+      "STRING"
+    ],
+    [
+      252,
+      62,
+      1,
+      90,
+      1,
+      "STRING"
+    ],
+    [
+      253,
+      7,
+      3,
+      90,
+      2,
+      "STRING"
+    ],
+    [
       254,
-      257
-     ],
-     "slot_index": 0
+      88,
+      0,
+      89,
+      0,
+      "STRING"
+    ],
+    [
+      255,
+      62,
+      1,
+      89,
+      1,
+      "STRING"
+    ],
+    [
+      256,
+      90,
+      0,
+      91,
+      0,
+      "STRING"
+    ],
+    [
+      257,
+      88,
+      0,
+      91,
+      1,
+      "STRING"
+    ],
+    [
+      258,
+      89,
+      0,
+      91,
+      2,
+      "STRING"
+    ],
+    [
+      259,
+      7,
+      3,
+      91,
+      3,
+      "STRING"
+    ],
+    [
+      260,
+      91,
+      0,
+      92,
+      0,
+      "STRING"
+    ],
+    [
+      261,
+      92,
+      1,
+      84,
+      1,
+      "STRING"
+    ],
+    [
+      263,
+      7,
+      1,
+      85,
+      1,
+      "STRING"
+    ],
+    [
+      264,
+      7,
+      1,
+      92,
+      1,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "info": {
+      "name": "Old-Time Radio Sci-Fi Anthology",
+      "author": "Jeffrey Brick",
+      "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine (FLUX -> HuMo -> LTX cascade).",
+      "version": "2.0-alpha"
     }
-   ],
-   "flags": {},
-   "order": 188,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
   },
-  {
-   "id": 89,
-   "type": "OTR_MetaBriefImagePromptGen",
-   "pos": [
-    1080,
-    1040
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_MetaBriefImagePromptGen",
-   "properties": {
-    "Node name for S&R": "OTR_MetaBriefImagePromptGen"
-   },
-   "widgets_values": [
-    false
-   ],
-   "inputs": [
-    {
-     "name": "image_policy_json",
-     "type": "STRING",
-     "link": 254
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 255
-    }
-   ],
-   "outputs": [
-    {
-     "name": "image_prompts_json",
-     "type": "STRING",
-     "links": [
-      258
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 189,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 90,
-   "type": "OTR_ShotLock",
-   "pos": [
-    1080,
-    760
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_ShotLock",
-   "properties": {
-    "Node name for S&R": "OTR_ShotLock"
-   },
-   "widgets_values": [
-    false
-   ],
-   "inputs": [
-    {
-     "name": "video_policy_json",
-     "type": "STRING",
-     "link": 251
-    },
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 252
-    },
-    {
-     "name": "audio_done",
-     "type": "STRING",
-     "link": 253
-    }
-   ],
-   "outputs": [
-    {
-     "name": "patched_ledger_json",
-     "type": "STRING",
-     "links": [
-      256
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "video_revision",
-     "type": "INT",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "shot_report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 2
-    },
-    {
-     "name": "done",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 3
-    }
-   ],
-   "flags": {},
-   "order": 190,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 91,
-   "type": "OTR_ImageGenDispatcher",
-   "pos": [
-    1560,
-    900
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_ImageGenDispatcher",
-   "properties": {
-    "Node name for S&R": "OTR_ImageGenDispatcher"
-   },
-   "widgets_values": [],
-   "inputs": [
-    {
-     "name": "script_json",
-     "type": "STRING",
-     "link": 256
-    },
-    {
-     "name": "image_policy_json",
-     "type": "STRING",
-     "link": 257
-    },
-    {
-     "name": "image_prompts_json",
-     "type": "STRING",
-     "link": 258
-    },
-    {
-     "name": "gate_in",
-     "type": "STRING",
-     "link": 259
-    }
-   ],
-   "outputs": [
-    {
-     "name": "patched_ledger_json",
-     "type": "STRING",
-     "links": [
-      260
-     ],
-     "slot_index": 0
-    },
-    {
-     "name": "image_done",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 1
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 2
-    }
-   ],
-   "flags": {},
-   "order": 191,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  },
-  {
-   "id": 92,
-   "type": "OTR_VideoRenderBatch",
-   "pos": [
-    2040,
-    820
-   ],
-   "size": [
-    380,
-    240
-   ],
-   "title": "OTR_VideoRenderBatch",
-   "properties": {
-    "Node name for S&R": "OTR_VideoRenderBatch"
-   },
-   "widgets_values": [
-    "episode",
-    40,
-    20,
-    25,
-    "humo",
-    "",
-    ""
-   ],
-   "inputs": [
-    {
-     "name": "patched_ledger_json",
-     "type": "STRING",
-     "link": 260
-    },
-    {
-     "name": "master_audio_path",
-     "type": "STRING",
-     "link": 262,
-     "widget": {
-      "name": "master_audio_path"
-     }
-    }
-   ],
-   "outputs": [
-    {
-     "name": "render_report_json",
-     "type": "STRING",
-     "links": [],
-     "slot_index": 0
-    },
-    {
-     "name": "clip_manifest_json",
-     "type": "STRING",
-     "links": [
-      261
-     ],
-     "slot_index": 1
-    }
-   ],
-   "flags": {},
-   "order": 192,
-   "mode": 0,
-   "color": "#2B3C5A",
-   "bgcolor": "#1C273C"
-  }
- ],
- "links": [
-  [
-   2,
-   62,
-   1,
-   3,
-   0,
-   "STRING"
-  ],
-  [
-   5,
-   3,
-   0,
-   4,
-   0,
-   "AUDIO"
-  ],
-  [
-   6,
-   4,
-   0,
-   7,
-   0,
-   "AUDIO"
-  ],
-  [
-   15,
-   7,
-   0,
-   12,
-   0,
-   "AUDIO"
-  ],
-  [
-   16,
-   62,
-   1,
-   12,
-   1,
-   "STRING"
-  ],
-  [
-   106,
-   1,
-   0,
-   62,
-   0,
-   "STRING"
-  ],
-  [
-   108,
-   1,
-   2,
-   62,
-   2,
-   "STRING"
-  ],
-  [
-   109,
-   1,
-   3,
-   62,
-   3,
-   "INT"
-  ],
-  [
-   110,
-   62,
-   2,
-   12,
-   2,
-   "STRING"
-  ],
-  [
-   115,
-   1,
-   4,
-   62,
-   4,
-   "STRING"
-  ],
-  [
-   230,
-   1,
-   1,
-   62,
-   1,
-   "STRING"
-  ],
-  [
-   231,
-   62,
-   1,
-   81,
-   0,
-   "STRING"
-  ],
-  [
-   232,
-   62,
-   1,
-   82,
-   0,
-   "STRING"
-  ],
-  [
-   233,
-   62,
-   1,
-   83,
-   0,
-   "STRING"
-  ],
-  [
-   234,
-   62,
-   6,
-   80,
-   0,
-   "STRING"
-  ],
-  [
-   235,
-   80,
-   0,
-   81,
-   1,
-   "STRING"
-  ],
-  [
-   236,
-   80,
-   0,
-   82,
-   1,
-   "STRING"
-  ],
-  [
-   237,
-   80,
-   0,
-   83,
-   1,
-   "STRING"
-  ],
-  [
-   239,
-   81,
-   0,
-   3,
-   1,
-   "AUDIO"
-  ],
-  [
-   240,
-   82,
-   0,
-   3,
-   2,
-   "AUDIO"
-  ],
-  [
-   241,
-   83,
-   0,
-   7,
-   1,
-   "AUDIO"
-  ],
-  [
-   242,
-   83,
-   1,
-   7,
-   2,
-   "AUDIO"
-  ],
-  [
-   243,
-   83,
-   1,
-   12,
-   3,
-   "AUDIO"
-  ],
-  [
-   244,
-   81,
-   2,
-   82,
-   2,
-   "STRING"
-  ],
-  [
-   245,
-   82,
-   2,
-   83,
-   2,
-   "STRING"
-  ],
-  [
-   246,
-   12,
-   0,
-   84,
-   0,
-   "STRING"
-  ],
-  [
-   247,
-   84,
-   0,
-   86,
-   0,
-   "STRING"
-  ],
-  [
-   248,
-   12,
-   0,
-   85,
-   1,
-   "STRING"
-  ],
-  [
-   249,
-   7,
-   3,
-   85,
-   2,
-   "STRING"
-  ],
-  [
-   250,
-   86,
-   0,
-   85,
-   0,
-   "STRING"
-  ],
-  [
-   251,
-   87,
-   0,
-   90,
-   0,
-   "STRING"
-  ],
-  [
-   252,
-   62,
-   1,
-   90,
-   1,
-   "STRING"
-  ],
-  [
-   253,
-   7,
-   3,
-   90,
-   2,
-   "STRING"
-  ],
-  [
-   254,
-   88,
-   0,
-   89,
-   0,
-   "STRING"
-  ],
-  [
-   255,
-   62,
-   1,
-   89,
-   1,
-   "STRING"
-  ],
-  [
-   256,
-   90,
-   0,
-   91,
-   0,
-   "STRING"
-  ],
-  [
-   257,
-   88,
-   0,
-   91,
-   1,
-   "STRING"
-  ],
-  [
-   258,
-   89,
-   0,
-   91,
-   2,
-   "STRING"
-  ],
-  [
-   259,
-   7,
-   3,
-   91,
-   3,
-   "STRING"
-  ],
-  [
-   260,
-   91,
-   0,
-   92,
-   0,
-   "STRING"
-  ],
-  [
-   261,
-   92,
-   1,
-   84,
-   1,
-   "STRING"
-  ],
-  [
-   262,
-   12,
-   0,
-   92,
-   1,
-   "STRING"
-  ]
- ],
- "groups": [],
- "config": {},
- "extra": {
-  "ds": {
-   "scale": 0.7,
-   "offset": [
-    0,
-    0
-   ]
-  },
-  "info": {
-   "name": "Old-Time Radio Sci-Fi Anthology",
-   "author": "Jeffrey Brick",
-   "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine (FLUX -> HuMo -> LTX cascade).",
-   "version": "2.0-alpha"
-  }
- },
- "version": 0.4
+  "version": 0.4
 }

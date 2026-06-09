@@ -107,6 +107,15 @@ DELETED_NODE_TYPES = frozenset({
     # shadow/fan-out cluster.
     "OTR_Stage1FanOut",
     "OTR_BeatSelector",
+    # Chunk E cleanbreak (2026-06-08): legacy video-plan nodes superseded
+    # by the model-agnostic platform (OTR_ShotLock owns all budget/plan
+    # logic; OTR_VideoRenderBatch replaces the per-model batch renderers).
+    # Tombstoned so a stale workflow JSON naming these fails at validation.
+    "OTR_VideoPlan",           # superseded by OTR_ShotLock
+    "OTR_RenderPlan",          # superseded by OTR_ShotLock
+    "OTR_ShotDurationCalculator",  # old name, renamed to OTR_FixedShotDurationStub
+                                   # then fully superseded by ShotLock budget
+    "OTR_FixedShotDurationStub",   # stub replacement, now superseded
 })
 
 

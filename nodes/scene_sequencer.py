@@ -1123,9 +1123,68 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Final loudness master: +%.1f dB makeup, "
                  "-1.0 dBFS ceiling (post-crossfade)", _makeup_db)
 
-        # Video-only pipeline - MP4 is written by OTR_SignalLostVideo.
-        # No WAV or PNG files are saved here.
-        output_path = "(video-only - MP4 written by OTR_SignalLostVideo)"
+        # Chunk-E GATE 1: write the frozen master mix to a standalone WAV
+        # so OTR_MasterAudioMux can source audio from the audio pipeline
+        # directly (decoupled from the procgen MP4 / OTR_SignalLostVideo).
+        # Uses Python stdlib `wave` (always available).  Best-effort:
+        # any failure keeps the placeholder path and the episode still
+        # renders (SignalLostVideo + procgen path act as fallback until
+        # the operator re-runs with a clean ledger).
+        output_path = "(video-only - master WAV save failed)"
+        try:
+            import wave as _wave_mod
+            import pathlib as _pathlib
+
+            # Derive audio dir from the in-flight ledger path.  The
+            # ledger lives at <ep_root>/audio/<id>_ledger.json so its
+            # parent IS the episode audio dir.
+            _wav_dir = None
+            _ep_id = ""
+            try:
+                from . import _otr_ledger as _OTRL_wav  # type: ignore
+                _lp = _OTRL_wav.in_flight_ledger_path()
+                if _lp is not None:
+                    _wav_dir = _pathlib.Path(_lp).parent
+                    # Ledger filename is <episode_id>_ledger.json
+                    _ep_id = _pathlib.Path(_lp).stem.replace("_ledger", "")
+            except Exception:  # noqa: BLE001
+                pass
+
+            if _wav_dir is None:
+                # Headless / no ledger: fall back to a stable temp location
+                import tempfile as _tempfile
+                _wav_dir = _pathlib.Path(_tempfile.gettempdir())
+                _ep_id = "otr_episode"
+
+            _wav_dir.mkdir(parents=True, exist_ok=True)
+            _master_wav = str(_wav_dir / f"{_ep_id}_master.wav")
+
+            # Save 16-bit PCM WAV (lossless; same format video_engine.py
+            # uses for the tmp audio muxed into the procgen MP4).
+            _ew_np = episode_waveform.detach().cpu() if hasattr(episode_waveform, "detach") else episode_waveform
+            import numpy as _np_wav
+            _pcm16 = (_ew_np.numpy() * 32767).clip(-32768, 32767).astype(_np_wav.int16)
+            # episode_waveform is (1, channels, samples) or (channels, samples)
+            if _pcm16.ndim == 3:
+                _pcm16 = _pcm16[0]          # drop batch dim -> (channels, samples)
+            _n_ch = int(_pcm16.shape[0])
+            _n_samp = int(_pcm16.shape[1])
+            # WAV wants interleaved (samples, channels) in C order
+            _pcm16_interleaved = _pcm16.T.copy(order="C")
+
+            with _wave_mod.open(_master_wav, "wb") as _wf:
+                _wf.setnchannels(_n_ch)
+                _wf.setsampwidth(2)          # 16-bit
+                _wf.setframerate(int(sample_rate))
+                _wf.writeframes(_pcm16_interleaved.tobytes())
+
+            output_path = _master_wav
+            log.info("[EpisodeAssembler] master WAV saved -> %s", _master_wav)
+        except Exception as _wav_exc:  # noqa: BLE001
+            log.warning(
+                "[EpisodeAssembler] master WAV save failed (non-fatal): %s", _wav_exc
+            )
+            output_path = "(video-only - master WAV save failed)"
 
         from datetime import datetime as _dt
         audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
