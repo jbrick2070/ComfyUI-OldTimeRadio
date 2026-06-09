@@ -55,8 +55,22 @@ def main() -> int:
     # Remote-LLM slot pickers: set to the first valid option from the live
     # schema (which is either the sentinel when disabled, or the catalog default
     # when OpenRouter / Comfy Credits are configured in this env).
+    #
+    # NOTE: /object_info schemas are keyed by node TYPE (e.g.
+    # "OTR_LedgerScriptWriter"), NOT by node id. Resolve the node's type from
+    # the workflow first, then index the schema by type -- mirroring what
+    # patch_widget_by_name already does. (Prior revision keyed by str(node_id),
+    # so the lookup always missed, _first_choice returned None, the patches
+    # were skipped, and stale saved slugs reached /prompt.)
+    def _node_type(node_id: int) -> str | None:
+        for node in wf.get("nodes", []):
+            if node.get("id") == node_id:
+                return node.get("type")
+        return None
+
     def _first_choice(node_id: int, widget_name: str) -> str | None:
-        node_schema = (schemas or {}).get(str(node_id)) or {}
+        node_type = _node_type(node_id)
+        node_schema = (schemas or {}).get(node_type) or {}
         inp = node_schema.get("input", {})
         for section in ("optional", "required"):
             spec = inp.get(section, {}).get(widget_name)

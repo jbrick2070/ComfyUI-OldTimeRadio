@@ -173,6 +173,55 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     return out_path, report
 
 
+def _reresolve_master_audio(master_audio_path: str) -> str:
+    """Rename-proof the master-audio path WITHOUT changing the audio source.
+
+    Upstream nodes capture ``master_audio_path`` while the episode dir is still
+    ``pending_<ts>``; the ledger then renames that dir to its final slug. The
+    captured absolute path becomes stale (its ``pending_<ts>`` directory no
+    longer exists) even though the FILE moved into the renamed dir keeping the
+    SAME basename. Re-resolve to that same file via the newest on-disk ledger
+    (the same durable-ledger contract OTR_ShotLock uses for audio timing).
+
+    Returns the original path unchanged when it already exists, when disk state
+    is disabled (``OTR_TEST_MODE``), or when no exact-basename match is found --
+    in which case the caller fails closed. It NEVER points at a different audio
+    source: only the byte-for-byte same basename under the renamed episode
+    ``audio`` dir is accepted, and ``mux_master_audio`` still asserts the output
+    is PCM-byte-identical to it.
+    """
+    if not master_audio_path or os.path.isfile(master_audio_path):
+        return master_audio_path
+    if os.environ.get("OTR_TEST_MODE") == "1":
+        return master_audio_path
+    want = os.path.basename(master_audio_path)
+    try:
+        from pathlib import Path
+        from . import _otr_ledger as _OL
+        roots = []
+        try:
+            from . import _otr_paths as _OP
+            roots.append(Path(_OP.otr_episodes_root()))
+        except Exception:  # noqa: BLE001
+            base = os.environ.get("OTR_OUTPUT_DIR") or "."
+            roots.append(Path(base) / "otr" / "episodes")
+        p = _OL.find_most_recent_ledger(roots)
+        if not p:
+            return master_audio_path
+        cand = Path(p).parent / want          # <episode>/audio/<same-basename>
+        if cand.is_file():
+            log.warning(
+                "[OTR_MasterAudioMux] LOUD re-resolve: master audio path stale "
+                "(episode dir renamed after capture); %r -> %r "
+                "(same file, post-rename dir)",
+                master_audio_path, str(cand),
+            )
+            return str(cand)
+    except Exception as exc:  # noqa: BLE001 - never mask the fail-closed path
+        log.warning("[OTR_MasterAudioMux] master audio re-resolve skipped: %s", exc)
+    return master_audio_path
+
+
 class OTRMasterAudioMux:
     """Registered as ``OTR_MasterAudioMux``. Terminal audio mux (V-1: the ONLY
     node that adds audio). ``-c:a copy``, NO ``-shortest``, byte-identical assert."""
@@ -227,6 +276,7 @@ class OTRMasterAudioMux:
 
     def mux(self, silent_video_path, master_audio_path, audio_done="", fps=25,
             ffmpeg="ffmpeg", output_path=""):
+        master_audio_path = _reresolve_master_audio(master_audio_path)
         out = output_path.strip() or self._default_out(silent_video_path)
         try:
             final, report = mux_master_audio(
@@ -242,4 +292,5 @@ class OTRMasterAudioMux:
         return (final, "OTR_MasterAudioMux OK -> " + final + "\n" + "\n".join(report))
 
 
-__all__ = ["OTRMasterAudioMux", "mux_master_audio", "audio_pcm_sha"]
+__all__ = ["OTRMasterAudioMux", "mux_master_audio", "audio_pcm_sha",
+           "_reresolve_master_audio"]
