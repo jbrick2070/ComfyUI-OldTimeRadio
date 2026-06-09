@@ -337,3 +337,66 @@ def test_run_episode_request_builder_overrides_default(record_registry):
 
     rd.run_episode(led, fallback_of=rd.make_fallback_of(), request_builder=rb)
     assert calls == ["shot_b001", "shot_b002"]   # the builder drove every shot
+
+
+# --------------------------------------------------------------------------- #
+# build_clip_manifest + the OTR_VideoRenderBatch mode="episode" entry (Chunk B).
+# The manifest is the beat-ordered STRING contract OTR_SilentComposite consumes;
+# the node episode path runs run_real_episode in-process (CPU here via stubs).
+# --------------------------------------------------------------------------- #
+def test_build_clip_manifest_beat_order_histogram_and_existence():
+    result = {
+        "ledger": {"video": {
+            "video_revision": 1, "fps": 25,
+            "canonical_canvas": {"w": 1472, "h": 832},
+            "shots": [
+                {"shot_id": "shot_b001", "source_line_ids": ["b001"],
+                 "engine_id": "humo", "family": "audio_driven_face",
+                 "target_frame_count": 50},
+                {"shot_id": "shot_b002", "source_line_ids": ["b002"],
+                 "engine_id": "abstract", "family": "abstract",
+                 "target_frame_count": 30},
+            ]}},
+        "clips": {
+            # a real on-disk path (this test file) proves the existence probe
+            "shot_b001": {"engine_id": "humo", "family": "audio_driven_face",
+                          "frame_count": 50, "path": __file__},
+            "shot_b002": {"engine_id": "abstract", "family": "abstract",
+                          "frame_count": 30, "path": ""},
+        },
+    }
+    m = rd.build_clip_manifest(result, episode_id="ep1")
+    assert [c["shot_id"] for c in m["clips"]] == ["shot_b001", "shot_b002"]
+    assert [c["order"] for c in m["clips"]] == [0, 1]
+    assert m["n_beats"] == 2 and m["total_target_frames"] == 80
+    assert m["canvas"] == {"w": 1472, "h": 832} and m["fps"] == 25
+    assert m["clip_count"] == 1                  # only the on-disk clip counts
+    assert m["engine_histogram"] == {"humo": 1}  # empty-path clip excluded
+    assert m["clips"][0]["exists"] is True and m["clips"][1]["exists"] is False
+
+
+def test_video_render_batch_episode_mode_emits_manifest(record_registry, tmp_path,
+                                                        monkeypatch):
+    import json as _json
+    from nodes.otr_video_render_batch import OTRVideoRenderBatch
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    out = OTRVideoRenderBatch().render(
+        mode="episode", beats=2, oom_index=0, frame_count=25,
+        patched_ledger_json=_json.dumps(_real_ledger()))
+    report_json, manifest_json = out["result"]    # 2-tuple: report + manifest
+    manifest = _json.loads(manifest_json)
+    assert [c["shot_id"] for c in manifest["clips"]] == ["shot_b001", "shot_b002"]
+    assert all(c["engine_id"] == "stub_record" for c in manifest["clips"])
+    assert manifest["n_beats"] == 2
+    assert _json.loads(report_json)["mode"] == "episode"
+
+
+def test_video_render_batch_episode_mode_bad_ledger_failsoft(monkeypatch, tmp_path):
+    import json as _json
+    from nodes.otr_video_render_batch import OTRVideoRenderBatch
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    out = OTRVideoRenderBatch().render(mode="episode", beats=2, oom_index=0,
+                                       frame_count=25, patched_ledger_json="{}")
+    report_json, manifest_json = out["result"]
+    assert manifest_json == ""                     # empty manifest, no crash
+    assert _json.loads(report_json)["ok"] is False

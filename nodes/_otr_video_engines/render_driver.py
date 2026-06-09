@@ -423,6 +423,55 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None):
                        request_builder=build_request_from_shot, canvas=canvas)
 
 
+def build_clip_manifest(result, *, episode_id=""):
+    """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
+    result -- the STRING contract OTR_SilentComposite assembles. Shot order is
+    the OUTPUT ledger's shots (already in beat order). Each row carries the clip
+    path + the audio-derived frame counts; ``engine_histogram`` counts the
+    on-disk clips per engine so the keystone can assert HuMo ran on the talking
+    beats and the episode is NOT all-procgen. The frozen audio is never read."""
+    led = result.get("ledger") or {}
+    section = led.get("video") or {}
+    shots = section.get("shots") or []
+    clips = result.get("clips") or {}
+    canvas = section.get("canonical_canvas") or {}
+    rows = []
+    total = 0
+    hist = {}
+    for order, shot in enumerate(shots):
+        sid = shot.get("shot_id")
+        clip = clips.get(sid) or {}
+        path = str(clip.get("path") or "")
+        exists = bool(path) and os.path.exists(path)
+        tfc = int(shot.get("target_frame_count") or 0)
+        total += tfc
+        eid = clip.get("engine_id") or shot.get("engine_id")
+        sids = shot.get("source_line_ids")
+        rows.append({
+            "order": order, "shot_id": sid,
+            "beat_id": str(sids[0]) if isinstance(sids, list) and sids else sid,
+            "engine_id": eid,
+            "family": clip.get("family") or shot.get("family") or "",
+            "path": path,
+            "frame_count": int(clip.get("frame_count") or 0),
+            "target_frame_count": tfc,
+            "exists": exists,
+        })
+        if exists:
+            hist[eid] = hist.get(eid, 0) + 1
+    return {
+        "episode_id": str(episode_id or ""),
+        "video_revision": int(section.get("video_revision") or 1),
+        "fps": int(section.get("fps") or 25),
+        "canvas": {"w": int(canvas.get("w") or 0), "h": int(canvas.get("h") or 0)},
+        "n_beats": len(rows),
+        "clip_count": sum(1 for r in rows if r["exists"]),
+        "total_target_frames": total,
+        "engine_histogram": hist,
+        "clips": rows,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # A-S7.5 full-episode soak (two back-to-back episodes on REAL engines)
 # --------------------------------------------------------------------------- #
@@ -604,7 +653,7 @@ __all__ = [
     "OomSignal", "RenderFloorError", "SoakError",
     "make_fallback_of", "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
-    "build_request_from_shot", "run_real_episode",
+    "build_request_from_shot", "run_real_episode", "build_clip_manifest",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
     "run_gpu_soak", "render_single",
 ]

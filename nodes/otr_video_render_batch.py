@@ -1,12 +1,15 @@
 """OTR_VideoRenderBatch -- the in-process render entry that walks the registry
 video engines via :mod:`nodes._otr_video_engines.render_driver` (A-S7.5).
 
-Two modes: ``soak`` runs the full-episode A-S7.5 soak (the A-ship gate -- 40
+Three modes: ``soak`` runs the full-episode A-S7.5 soak (the A-ship gate -- 40
 beats, all roles, a forced mid-episode character_3d OOM converging
 hunyuan3d_talk -> humo -> latentsync -> still_kenburns with LOUD restamps, run
 TWICE back-to-back for determinism, frozen audio untouched); ``single`` renders
-ONE shot via one engine (the focused in-process forward validation). Emits the
-structured render report as a JSON STRING. Model-agnostic: no model is "primary".
+ONE shot via one engine (the focused in-process forward validation); ``episode``
+renders one REAL per-beat clip per shot from a ShotLock-planned ledger
+(``run_real_episode``) and emits a beat-ordered clip manifest for the downstream
+OTR_SilentComposite. Emits the structured render report as a JSON STRING.
+Model-agnostic: no model is "primary".
 
 Cold-import clean (V-12): heavy work + the driver import are LAZY inside the
 FUNCTION; module scope imports only stdlib. UTF-8, no BOM, ASCII-only source.
@@ -26,8 +29,8 @@ class OTRVideoRenderBatch:
 
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "render"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("render_report_json",)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("render_report_json", "clip_manifest_json")
     OUTPUT_NODE = True
 
     @classmethod
@@ -43,38 +46,93 @@ class OTRVideoRenderBatch:
                 "engine": ("STRING", {"default": "humo"}),
                 "portrait_path": ("STRING", {"default": ""}),
                 "audio_path": ("STRING", {"default": ""}),
+                "patched_ledger_json": ("STRING", {
+                    "default": "{}", "multiline": True, "forceInput": True,
+                    "tooltip": (
+                        "mode=episode: the OTR_ShotLock-planned (and image-genned) "
+                        "ledger JSON. run_real_episode renders one REAL per-beat "
+                        "clip per shot; the emitted clip manifest feeds "
+                        "OTR_SilentComposite."
+                    ),
+                }),
             },
         }
 
     def render(self, mode, beats, oom_index, frame_count,
-               engine="humo", portrait_path="", audio_path=""):
+               engine="humo", portrait_path="", audio_path="",
+               patched_ledger_json="{}"):
         # NOTE: this MUST run inside ComfyUI's executor thread (i.e. submitted via
         # /prompt, not a background HTTP-route thread): only there does ComfyUI's
         # model_management evict the umt5/whisper encoders between encode and
         # sample, keeping the heavy in-process forward under the VRAM ceiling.
+        # Single resident heavy engine; the per-beat detach reclaim lives inside
+        # the engines (eng_humo: wrapper_bridge.reclaim_idle_models, NO
+        # unload_all_models). The frozen audio section is read-only throughout.
         import os
         from ._otr_video_engines import render_driver as _rd
-        assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
-        if mode == "single":
+        manifest_payload = ""
+        if mode == "episode":
+            report, manifest_payload, name = self._render_episode(
+                _rd, patched_ledger_json)
+        elif mode == "single":
+            assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
             report = _rd.render_single(engine, assets=assets,
                                        frame_count=int(frame_count))
             name = "node_single_%s.json" % engine
         else:
+            assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
             report = _rd.run_gpu_soak(n_beats=int(beats), oom_index=int(oom_index),
                                       frame_count=int(frame_count), assets=assets)
             name = "node_soak.json"
         ok = bool(report.get("ok"))
         payload = json.dumps(report, ensure_ascii=True, default=str)
-        try:                                  # durable report the operator polls
+        sub = "obs" if mode == "episode" else "aship"
+        try:                                  # durable artifacts the operator polls
             base = os.environ.get("OTR_OUTPUT_DIR") or "."
-            out_dir = os.path.join(base, "otr", "aship")
+            out_dir = os.path.join(base, "otr", sub)
             os.makedirs(out_dir, exist_ok=True)
             with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
                 f.write(payload)
+            if manifest_payload:
+                with open(os.path.join(out_dir, "node_episode_manifest.json"),
+                          "w", encoding="utf-8") as f:
+                    f.write(manifest_payload)
         except Exception as exc:              # noqa: BLE001
             log.warning("[OTR_VideoRenderBatch] report write failed: %s", exc)
         log.warning("[OTR_VideoRenderBatch] mode=%s ok=%s -> %s", mode, ok, name)
-        return {"ui": {"text": [payload[:6000]]}, "result": (payload,)}
+        return {"ui": {"text": [payload[:6000]]},
+                "result": (payload, manifest_payload)}
+
+    @staticmethod
+    def _render_episode(_rd, patched_ledger_json):
+        """Render one REAL episode from a ShotLock-planned ledger ->
+        ``(report, clip_manifest_json, report_name)``. Fail-soft: a bad or empty
+        ledger yields an error report + an empty manifest so the graph never
+        crashes (the procgen floor still carries the visual elsewhere)."""
+        try:
+            ledger = json.loads(patched_ledger_json or "{}")
+        except (ValueError, TypeError) as exc:
+            return ({"ok": False, "mode": "episode",
+                     "error": "patched_ledger_json is not valid JSON: %s" % exc},
+                    "", "node_episode_report.json")
+        if not isinstance(ledger, dict) or not (ledger.get("video") or {}).get("shots"):
+            return ({"ok": False, "mode": "episode",
+                     "error": "ledger has no video.shots (run OTR_ShotLock first)"},
+                    "", "node_episode_report.json")
+        episode_id = str(ledger.get("episode_id")
+                         or (ledger.get("meta") or {}).get("episode_id") or "")
+        ep = _rd.run_real_episode(ledger)
+        manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
+        report = {
+            "ok": manifest["clip_count"] > 0, "mode": "episode",
+            "episode_id": episode_id, "n_beats": manifest["n_beats"],
+            "clip_count": manifest["clip_count"],
+            "engine_histogram": manifest["engine_histogram"],
+            "video_revision": manifest["video_revision"],
+            "vram_peak_mb": ep.get("vram_peak_mb"), "trace": ep.get("trace"),
+        }
+        return (report, json.dumps(manifest, ensure_ascii=True, default=str),
+                "node_episode_report.json")
 
 
 __all__ = ["OTRVideoRenderBatch"]
