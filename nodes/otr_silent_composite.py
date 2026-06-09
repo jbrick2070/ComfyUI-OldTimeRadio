@@ -16,9 +16,11 @@ Pure ffmpeg, cold-import clean (stdlib only) -- no torch, no CUDA residency.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import tempfile
 import logging
 
 log = logging.getLogger("OTR")
@@ -120,6 +122,167 @@ def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
     return out_path, report
 
 
+# --------------------------------------------------------------------------- #
+# Per-beat assemble (Chunk C): a frame-accurate CFR timeline from a clip
+# manifest. Frame counts ONLY (never seconds) -- the assembled frame count is
+# asserted == the audio-derived budget (the pre-mux A/V sync guard). The frozen
+# audio is never touched (every segment is encoded with -an).
+# --------------------------------------------------------------------------- #
+def count_video_frames(path: str) -> int:
+    """Authoritative decoded frame count of v:0 (the assemble A/V-sync gate);
+    -1 when ffprobe or the file is missing."""
+    fp = _ffprobe_bin()
+    if not fp or not os.path.isfile(path):
+        return -1
+    p = _run([fp, "-v", "error", "-select_streams", "v:0", "-count_frames",
+              "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", path])
+    out = (p.stdout or "").strip().splitlines()
+    if out and out[0].strip().isdigit():
+        return int(out[0].strip())
+    return -1
+
+
+def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0):
+    """Pure: the frame-accurate per-beat segment plan from a clip manifest.
+
+    Each beat becomes EXACTLY ``target_frame_count`` frames (the audio-derived
+    budget). A beat with a real on-disk clip uses it; a missing/short clip is
+    gap-filled from the procgen/still FLOOR, sliced at the beat's cumulative
+    start frame so the fill stays timeline-aligned; with no floor it degrades to
+    a generated black source so the episode ALWAYS assembles. Returns
+    ``(segments, total_frames)``; each segment is ``{order, shot_id, source,
+    path, src_start_frame, n_frames, engine_id}``. Frame counts only."""
+    clips = (manifest or {}).get("clips") or []
+    segments = []
+    cursor = 0
+    ff = int(floor_frames or 0)
+    for row in clips:
+        n = int((row or {}).get("target_frame_count") or 0)
+        if n <= 0:
+            continue
+        if row.get("exists") and row.get("path"):
+            source, start = "clip", 0
+        elif floor_available:
+            source = "floor"
+            start = min(cursor, max(0, ff - n)) if ff else cursor
+        else:
+            source, start = "black", 0
+        segments.append({
+            "order": len(segments), "shot_id": row.get("shot_id"),
+            "source": source, "path": row.get("path") or "",
+            "src_start_frame": int(start), "n_frames": n,
+            "engine_id": row.get("engine_id"),
+        })
+        cursor += n
+    return segments, cursor
+
+
+def _seg_vf(w, h, fps, start_frame):
+    trim = ("trim=start_frame=%d,setpts=PTS-STARTPTS," % int(start_frame)) \
+        if int(start_frame) > 0 else ""
+    return (
+        "%sscale=%d:%d:force_original_aspect_ratio=decrease,"
+        "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d,"
+        "tpad=stop_mode=clone:stop_duration=3600" % (trim, w, h, w, h, fps)
+    )
+
+
+def _color_args(out_path):
+    # TAG bt709 identity (never matrix-convert) + canonical yuv420p H.264.
+    return ["-vsync", "cfr", "-pix_fmt", "yuv420p",
+            "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+            "-c:v", "libx264", "-crf", "18", "-preset", "fast", out_path]
+
+
+def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0):
+    """One canonical silent segment of EXACTLY ``n_frames`` from ``src`` (a clip,
+    or the floor sliced at ``start_frame``): truncates a long source, holds the
+    last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error."""
+    cmd = [fb, "-y", "-loglevel", "error", "-i", src, "-an",
+           "-vf", _seg_vf(w, h, fps, start_frame),
+           "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+    p = _run(cmd)
+    if p.returncode != 0:
+        raise ValueError("OTR_SilentComposite: segment encode failed (%s) :: %s"
+                         % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+
+
+def _encode_black(fb, n_frames, seg_path, *, w, h, fps):
+    """A generated black segment of EXACTLY ``n_frames`` (the ultimate gap-fill
+    so an episode with neither a clip nor a floor still assembles)."""
+    cmd = [fb, "-y", "-loglevel", "error",
+           "-f", "lavfi", "-i", "color=c=black:s=%dx%d:r=%d" % (w, h, fps),
+           "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+    p = _run(cmd)
+    if p.returncode != 0:
+        raise ValueError("OTR_SilentComposite: black segment failed (%s) :: %s"
+                         % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+
+
+def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
+                             h=832, fps=25, ffmpeg="ffmpeg"):
+    """Assemble a beat-ordered clip manifest into ONE always-silent canonical
+    CFR video; FAIL CLOSED. Each beat is conformed to EXACTLY its
+    ``target_frame_count`` (truncate if long, hold last frame if short); a
+    missing clip is gap-filled from the floor (``base_video_path``) or black. The
+    assembled frame count is asserted == the audio-derived budget total (the
+    pre-mux A/V sync guard). Returns ``(out_path, report)``."""
+    report: list = []
+    fb = _ffmpeg_bin(ffmpeg)
+    if not fb:
+        raise ValueError("OTR_SilentComposite: ffmpeg not found (%r)" % ffmpeg)
+    w, h, fps = _even(w), _even(h), max(1, int(fps))
+    floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
+    floor_frames = count_video_frames(base_video_path) if floor_ok else 0
+    segments, total = plan_timeline_segments(
+        manifest, floor_available=floor_ok, floor_frames=floor_frames)
+    if not segments or total <= 0:
+        raise ValueError("OTR_SilentComposite: manifest has no renderable beats")
+    workdir = tempfile.mkdtemp(prefix="otr_assemble_")
+    try:
+        seg_paths = []
+        for seg in segments:
+            seg_path = os.path.join(workdir, "seg_%04d.mp4" % seg["order"])
+            kind = seg["source"]
+            if kind == "clip" and not os.path.isfile(seg["path"]):
+                kind = "floor" if floor_ok else "black"   # vanished clip -> gap-fill
+            if kind == "clip":
+                _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
+                                w=w, h=h, fps=fps, start_frame=0)
+            elif kind == "floor":
+                _encode_segment(fb, base_video_path, seg["n_frames"], seg_path,
+                                w=w, h=h, fps=fps, start_frame=seg["src_start_frame"])
+            else:
+                _encode_black(fb, seg["n_frames"], seg_path, w=w, h=h, fps=fps)
+            seg_paths.append(seg_path)
+        listfile = os.path.join(workdir, "concat.txt")
+        with open(listfile, "w", encoding="utf-8") as f:
+            for sp in seg_paths:
+                f.write("file '%s'\n" % sp.replace("'", "'\\''"))
+        cmd = [fb, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
+               "-i", listfile, "-an", "-c", "copy", out_path]
+        assert "-shortest" not in cmd
+        p = _run(cmd)
+        if p.returncode != 0:
+            raise ValueError("OTR_SilentComposite: concat failed :: %s"
+                             % p.stderr.strip()[:300])
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    na = count_audio_streams(out_path)
+    if na != 0:
+        raise ValueError("OTR_SilentComposite: assembled has %d audio stream(s); "
+                         "must be 0 (V-1)" % na)
+    got = count_video_frames(out_path)
+    if got != total:
+        raise ValueError("OTR_SilentComposite: assembled %d frames != audio-derived "
+                         "budget %d frames (A/V sync guard)" % (got, total))
+    info = probe_video(out_path)
+    report.append("assembled %d beats -> %d frames @%dfps %sx%s silent; "
+                  "budget %d OK" % (len(segments), got, fps,
+                                    info.get("width", w), info.get("height", h), total))
+    return out_path, report
+
+
 class OTRSilentComposite:
     """Registered as ``OTR_SilentComposite``. Render output -> ONE always-silent
     canonical video (bt709/yuv420p/CFR, audio stripped). Mux happens downstream."""
@@ -155,6 +318,16 @@ class OTRSilentComposite:
                     "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
                 }),
+                "clip_manifest_json": ("STRING", {
+                    "default": "{}", "multiline": True, "forceInput": True,
+                    "tooltip": (
+                        "OTR_VideoRenderBatch(mode=episode) clip manifest. When "
+                        "it carries per-beat clips the composite ASSEMBLES a "
+                        "frame-accurate CFR timeline (each beat conformed to its "
+                        "audio-derived frame count; gaps filled from "
+                        "base_video_path). Empty -> the single-base floor path."
+                    ),
+                }),
             },
         }
 
@@ -174,20 +347,39 @@ class OTRSilentComposite:
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
     def composite(self, base_video_path, canvas_w=1472, canvas_h=832, fps=25,
-                  ffmpeg="ffmpeg", output_path="", gate_in=""):
+                  ffmpeg="ffmpeg", output_path="", gate_in="", clip_manifest_json="{}"):
         out = output_path.strip() or self._default_out(base_video_path)
+        manifest = {}
         try:
-            silent, report = normalize_to_silent_canonical(
-                base_video_path, out, w=int(canvas_w), h=int(canvas_h),
-                fps=int(fps), ffmpeg=ffmpeg,
-            )
+            m = json.loads(clip_manifest_json or "{}")
+            if isinstance(m, dict):
+                manifest = m
+        except (ValueError, TypeError):
+            manifest = {}
+        assemble = bool(manifest.get("clips"))
+        # the assemble timeline follows the audio-derived budget fps when present
+        eff_fps = int(manifest.get("fps") or fps) if assemble else int(fps)
+        try:
+            if assemble:
+                silent, report = assemble_silent_timeline(
+                    manifest, base_video_path, out, w=int(canvas_w),
+                    h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
+                )
+            else:
+                silent, report = normalize_to_silent_canonical(
+                    base_video_path, out, w=int(canvas_w), h=int(canvas_h),
+                    fps=int(fps), ffmpeg=ffmpeg,
+                )
         except ValueError as exc:
             log.error("[OTR_SilentComposite] %s", exc)
             return ("", f"error: {exc}")
         for line in report:
             log.info("[OTR_SilentComposite] %s", line)
-        return (silent, "OTR_SilentComposite OK -> " + silent + "\n" + "\n".join(report))
+        mode = "assemble" if assemble else "single-base"
+        return (silent, "OTR_SilentComposite OK (%s) -> %s\n%s"
+                % (mode, silent, "\n".join(report)))
 
 
 __all__ = ["OTRSilentComposite", "normalize_to_silent_canonical",
-           "count_audio_streams", "probe_video"]
+           "count_audio_streams", "probe_video", "count_video_frames",
+           "plan_timeline_segments", "assemble_silent_timeline"]

@@ -20,6 +20,7 @@ import pytest
 from nodes.otr_master_audio_mux import mux_master_audio, audio_pcm_sha, OTRMasterAudioMux
 from nodes.otr_silent_composite import (
     normalize_to_silent_canonical, count_audio_streams, probe_video, OTRSilentComposite,
+    plan_timeline_segments, assemble_silent_timeline, count_video_frames,
 )
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_shared import role_compat as rc
@@ -183,3 +184,83 @@ def test_new_render_nodes_have_no_shortest_cmd():
     comp = (REPO_ROOT / "nodes" / "otr_silent_composite.py").read_text(encoding="utf-8")
     # composite builds a cmd list; -shortest must not be an element of it
     assert '"-shortest"' not in comp.replace('assert "-shortest" not in cmd', "")
+
+
+# --------------------------------------------------------------------------- #
+# OTR_SilentComposite per-beat assemble (Chunk C): a frame-accurate CFR timeline
+# from a clip manifest -- frame counts only, gap-filled from the floor/black,
+# assembled length asserted == the audio-derived budget (pre-mux A/V guard).
+# --------------------------------------------------------------------------- #
+def test_plan_timeline_segments_clip_floor_black_and_total():
+    manifest = {"clips": [
+        {"shot_id": "s0", "target_frame_count": 20, "path": "/x/a.mp4",
+         "exists": True, "engine_id": "humo"},
+        {"shot_id": "s1", "target_frame_count": 30, "path": "", "exists": False,
+         "engine_id": "abstract"},                       # gap -> floor / black
+        {"shot_id": "s2", "target_frame_count": 0, "path": "/x/c.mp4",
+         "exists": True},                                # 0 frames -> skipped
+    ]}
+    segs, total = plan_timeline_segments(manifest, floor_available=True,
+                                         floor_frames=200)
+    assert total == 50 and len(segs) == 2
+    assert segs[0]["source"] == "clip" and segs[0]["n_frames"] == 20
+    assert segs[1]["source"] == "floor" and segs[1]["src_start_frame"] == 20
+    # with no floor the gap beat degrades to black so the episode still assembles
+    segs2, total2 = plan_timeline_segments(manifest, floor_available=False)
+    assert total2 == 50 and segs2[1]["source"] == "black"
+
+
+@needs_ffmpeg
+def test_assemble_silent_timeline_frame_accurate_and_silent(tmp_path):
+    a = tmp_path / "a.mp4"
+    b = tmp_path / "b.mp4"
+    floor = tmp_path / "floor.mp4"
+    _silent_video(a, 2.0)             # ~50 frames -> conformed to 20 (truncate)
+    _silent_video(b, 0.4)             # ~10 frames -> conformed to 30 (hold last)
+    _silent_video(floor, 3.0)
+    manifest = {"fps": 25, "clips": [
+        {"shot_id": "s0", "target_frame_count": 20, "path": str(a), "exists": True},
+        {"shot_id": "s1", "target_frame_count": 30, "path": str(b), "exists": True},
+    ]}
+    out = tmp_path / "assembled.mp4"
+    res, report = assemble_silent_timeline(manifest, str(floor), str(out),
+                                           w=320, h=240, fps=25)
+    assert count_video_frames(str(out)) == 50        # 20 + 30, frame-accurate
+    assert count_audio_streams(str(out)) == 0        # V-1: always silent
+
+
+@needs_ffmpeg
+def test_assemble_gap_fills_missing_clip_from_floor(tmp_path):
+    a = tmp_path / "a.mp4"
+    floor = tmp_path / "floor.mp4"
+    _silent_video(a, 1.0)
+    _silent_video(floor, 5.0)
+    manifest = {"fps": 25, "clips": [
+        {"shot_id": "s0", "target_frame_count": 25, "path": str(a), "exists": True},
+        {"shot_id": "s1", "target_frame_count": 25, "path": "", "exists": False},
+        {"shot_id": "s2", "target_frame_count": 25, "path": str(a), "exists": True},
+    ]}
+    out = tmp_path / "asm.mp4"
+    assemble_silent_timeline(manifest, str(floor), str(out), w=320, h=240, fps=25)
+    assert count_video_frames(str(out)) == 75        # gap-filled beat still counted
+    assert count_audio_streams(str(out)) == 0
+
+
+@needs_ffmpeg
+def test_silent_composite_node_assemble_mode_via_manifest(tmp_path):
+    import json
+    a = tmp_path / "a.mp4"
+    floor = tmp_path / "floor.mp4"
+    _silent_video(a, 1.0)
+    _silent_video(floor, 3.0)
+    manifest = {"fps": 25, "clips": [
+        {"shot_id": "s0", "target_frame_count": 25, "path": str(a), "exists": True},
+        {"shot_id": "s1", "target_frame_count": 15, "path": "", "exists": False},
+    ]}
+    out = tmp_path / "node_assembled.mp4"
+    silent, report = OTRSilentComposite().composite(
+        str(floor), canvas_w=320, canvas_h=240, fps=25,
+        output_path=str(out), clip_manifest_json=json.dumps(manifest))
+    assert silent == str(out) and "assemble" in report
+    assert count_video_frames(silent) == 40          # 25 + 15
+    assert count_audio_streams(silent) == 0
