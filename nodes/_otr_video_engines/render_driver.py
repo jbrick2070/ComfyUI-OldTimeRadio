@@ -412,8 +412,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
     # Carry the per-beat timing so the render node can slice the frozen master
     # mix when the ledger has no per-line wav (audio_ref is None in that case).
-    req["timing"]["start_s"] = line.get("start_s")
-    req["timing"]["dur_s"] = line.get("dur_s")
+    # SYNTHETIC shots (the opening-music scene, 2026-06-10) have no ledger
+    # line; the shot row itself carries start_s/dur_s -- fall back to it so
+    # the positioned timeline keeps every row placed.
+    req["timing"]["start_s"] = (line.get("start_s")
+                                if line.get("start_s") is not None
+                                else shot.get("start_s"))
+    req["timing"]["dur_s"] = (line.get("dur_s")
+                              if line.get("dur_s") is not None
+                              else shot.get("dur_s"))
     req["char_id"] = char_id
     return req
 

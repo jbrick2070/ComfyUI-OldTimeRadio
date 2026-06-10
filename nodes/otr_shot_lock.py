@@ -109,7 +109,11 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
             if isinstance(c, dict) and str(c.get("char_id") or "") == str(char_id):
                 entry = c
                 break
-    for key in ("portrait_prompt", "appearance", "description"):
+    # character_description added 2026-06-10 (operator look-QA): the writer's
+    # RICH per-character physical description lives under that key on the
+    # cast row; without it the M4 prompts lost the character grounding.
+    for key in ("portrait_prompt", "appearance", "description",
+                "character_description"):
         val = entry.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
@@ -215,6 +219,45 @@ def extract_beats(ledger: dict) -> list:
             "dur_s": ln.get("dur_s", ln.get("duration_s")),
         })
     return beats
+
+
+#: The synthetic OPENING-MUSIC beat id (operator look-QA 2026-06-10): the
+#: opening theme plays over the episode head (audio starts at first-line
+#: start_s, typically ~8-10s in) but no ledger LINE covers that span, so the
+#: head fell to the procgen floor. A synthetic music_visual beat gives the
+#: open a REAL rendered scene on the music engine (ltx_video in production).
+OPENING_MUSIC_BEAT_ID = "b000_music_open"
+_OPENING_MIN_S = 2.0
+
+
+def derive_opening_music_beat(ledger: dict, fps: int):
+    """``(beat, frames)`` for the head-gap opening-music scene, or ``(None, 0)``.
+
+    Reads the FIRST non-skipped line's ``start_s`` from the frozen ledger
+    (read-only); a head gap >= 2s earns the synthetic beat. Pure."""
+    lines = [ln for ln in (ledger or {}).get("lines") or []
+             if isinstance(ln, dict) and not ln.get("skip")]
+    if not lines:
+        return None, 0
+    try:
+        first_start = float(lines[0].get("start_s") or 0.0)
+    except (TypeError, ValueError):
+        return None, 0
+    if first_start < _OPENING_MIN_S:
+        return None, 0
+    frames = int(round(first_start * int(fps or 25)))
+    beat = {
+        "beat_id": OPENING_MUSIC_BEAT_ID,
+        "role": Role.MUSIC_VISUAL.value,
+        "char_id": "",
+        "text": "",
+        "samples": None,
+        "sample_rate": None,
+        "dur_s": first_start,
+        "_synthetic_open": True,
+        "_start_s": 0.0,
+    }
+    return beat, frames
 
 
 def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
@@ -550,9 +593,17 @@ def build_execution_plan(beats, budget, creative, policy):
     shots = []
     for b in beats:
         cre = creative.get(b["beat_id"], {})
+        _timing = ({"start_s": b.get("_start_s", 0.0), "dur_s": b.get("dur_s")}
+                   if b.get("_synthetic_open") else None)
         shots.append({
             "shot_id": f"shot_{b['beat_id']}",
-            "source_line_ids": [b["beat_id"]],
+            # Synthetic beats have no ledger LINE, so the shot row itself
+            # carries the timeline position (the render driver falls back to
+            # it when the line lookup is empty).
+            **({"start_s": _timing["start_s"], "dur_s": _timing["dur_s"]}
+               if _timing else {}),
+            "source_line_ids": [] if b.get("_synthetic_open")
+            else [b["beat_id"]],
             "group_id": f"grp_{b['role']}",
             # The shot's video ROLE, stamped explicitly (2026-06-10): the
             # render driver's role-scoped behaviors (the LTX radio-open
@@ -681,6 +732,20 @@ class OTRShotLock:
         beats = extract_beats(led)
         budget = compute_clip_budget(beats, policy, fps)
         warnings.extend(budget.get("warnings", []))
+
+        # The OPENING-MUSIC scene (operator look-QA 2026-06-10): injected
+        # AFTER the budget so the real beats keep their exact cumulative-
+        # samples frame math; the synthetic head beat adds its own frames.
+        _open_beat, _open_frames = derive_opening_music_beat(led, fps)
+        if _open_beat is not None and _open_frames > 0:
+            beats.insert(0, _open_beat)
+            budget["per_beat"][OPENING_MUSIC_BEAT_ID] = _open_frames
+            budget["total_frames"] = int(budget.get("total_frames") or 0) \
+                + _open_frames
+            report.append(
+                "opening-music scene injected: %d frames (head 0..%.2fs) on "
+                "the music_visual engine" % (_open_frames,
+                                             _open_frames / max(1, fps)))
 
         creative, cre_warn = derive_creative_directives(
             beats, meta, led,

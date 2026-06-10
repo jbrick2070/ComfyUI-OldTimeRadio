@@ -62,17 +62,30 @@ def _read_setting(meta: dict) -> str:
 
 
 def _appearance_for_char(cast: list, char_id: str) -> str:
-    """Appearance text looked up by char_id ONLY (BUG-098), never display name."""
+    """Appearance text looked up by char_id ONLY (BUG-098), never display name.
+
+    Key chain includes ``character_description`` (operator look-QA
+    2026-06-10): the writer stamps the RICH per-character physical
+    description on the cast row as ``character_description`` (the
+    ``portrait_prompt`` mirror lives under meta.visual_plan keyed by NAME,
+    not on the row), so without this key every character fell to the same
+    generic setting+anchor fallback -> ONE shared portrait for the whole
+    cast, styled as an actor in a radio booth."""
     cid = str(char_id or "")
     for c in cast or []:
         if isinstance(c, dict) and str(c.get("char_id") or "") == cid:
-            return str(c.get("portrait_prompt") or c.get("appearance") or "").strip()
+            return str(c.get("portrait_prompt") or c.get("appearance")
+                       or c.get("character_description") or "").strip()
     return ""
 
 
-#: Shared portrait style anchor (mirrors the shipped batch_flux_portrait_render
-#: default so gen-1 Flux output stays consistent across the cast).
-STYLE_ANCHOR = "head-and-shoulders studio portrait, neutral lighting, cinematic"
+#: Shared portrait style anchor. Reworded 2026-06-10 (operator look-QA): the
+#: old "studio portrait, neutral lighting" framing read as an ACTOR in a
+#: recording booth; portraits must show the CHARACTER in character, in the
+#: story's world -- never a voice actor at a microphone.
+STYLE_ANCHOR = ("in-character cinematic head-and-shoulders portrait, "
+                "period-accurate costume and environment, dramatic film "
+                "lighting, no microphone, not a recording studio")
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
 #: owns ``ledger['cast']``; the announcer is the station voice, never a cast
