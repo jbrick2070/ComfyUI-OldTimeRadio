@@ -564,3 +564,123 @@ def test_inprocess_gen_fn_resolves_engine_from_registry(clean_image_registry):
     assert px.shape == (4, 4, 3) and int(px[0, 0, 0]) == 9
     assert captured["req"]["engine_id"] == "flux_gen1"
     assert captured["prepared"] == {"engine_id": "flux_gen1"}
+
+
+# --------------------------------------------------------------------------- #
+# ANNOUNCER radio-style portrait (the b001/b005 intro/outro starvation fix).
+# Announcer beats are talking beats; without an init_image HuMo fails its
+# instant guard and the beat starves to the still floor. The announcer is a
+# SYNTHETIC non-cast subject (CastLock owns cast) minted from the lines.
+# --------------------------------------------------------------------------- #
+
+def test_announcer_line_char_ids_pure():
+    lines = [
+        {"line_id": "b000", "speaker_role": "music_open", "char_id": "music_open"},
+        {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"},
+        {"line_id": "b002", "speaker_role": "character", "char_id": "c01"},
+        {"line_id": "b005", "speaker_role": "announcer", "char_id": "announcer"},
+        "garbage-row",
+        {"line_id": "b006", "speaker_role": "announcer"},   # no char_id -> default
+    ]
+    assert mbp.announcer_line_char_ids(lines) == ["announcer"]
+    assert mbp.announcer_line_char_ids([]) == []
+    assert mbp.announcer_line_char_ids(None) == []
+
+
+def test_meta_brief_announcer_prompt_added_radio_style():
+    """Lines with an announcer role mint a radio-style announcer prompt keyed
+    by the LINE's char_id; the prompt is never empty and carries the radio
+    styling so the portrait reads as period broadcast."""
+    cast = [{"char_id": "c1", "name": "EDNA", "portrait_prompt": "an older lighthouse keeper"}]
+    meta = {"story_brief_terms": {"setting": ["a fogbound harbor town"]}}
+    lines = [
+        {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"},
+        {"line_id": "b002", "speaker_role": "character", "char_id": "c1"},
+    ]
+    out, _warns = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
+    assert set(out) == {"c1", "announcer"}
+    ann = out["announcer"]
+    assert ann["prompt"], "announcer prompt must never be empty"
+    assert ann["source"].startswith("announcer_")
+    low = ann["prompt"].lower()
+    assert "radio" in low and "microphone" in low, \
+        "announcer portrait must be radio-styled (operator directive)"
+    assert ann["prompt_hash"]
+
+
+def test_meta_brief_announcer_not_added_without_announcer_lines():
+    cast = [{"char_id": "c1", "portrait_prompt": "a spacer"}]
+    meta = {}
+    lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c1"}]
+    out, _w = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
+    assert "announcer" not in out
+    out2, _w2 = mbp.derive_image_prompts(cast, meta, llm_fn=None)  # lines omitted
+    assert "announcer" not in out2
+
+
+def test_meta_brief_announcer_not_duplicated_when_cast_covers_it():
+    """If a (weird) episode carries a real cast row with the announcer id, the
+    cast entry wins -- no synthetic duplicate."""
+    cast = [{"char_id": "announcer", "portrait_prompt": "the station voice in a booth"}]
+    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
+    out, _w = mbp.derive_image_prompts(cast, {}, llm_fn=None, lines=lines)
+    assert list(out) == ["announcer"]
+    assert not out["announcer"]["source"].startswith("announcer_"), \
+        "a real cast row must not be relabeled as synthetic"
+
+
+def test_meta_brief_announcer_llm_refined_keeps_grounding():
+    """The synthetic announcer entry rides the SAME llm + consistency path."""
+    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
+    out, _w = mbp.derive_image_prompts(
+        [], {}, llm_fn=lambda _p: "a velvet-voiced radio announcer, chrome microphone, art deco studio",
+        lines=lines)
+    assert out["announcer"]["source"] == "announcer_llm"
+    assert "radio" in out["announcer"]["prompt"].lower()
+
+
+def test_stamp_portrait_non_cast_strict_vs_relaxed(tmp_path):
+    """Default stays BUG-098 fail-closed; require_cast_entry=False writes the
+    content-addressed PNG, skips the cast stamp, and NEVER adds a cast row."""
+    from nodes._otr_shared import portrait_ledger as pl
+    led = {"cast": [{"char_id": "c1", "name": "X"}]}
+    px = _np_pixels(42)
+    with pytest.raises(pl.PortraitUnresolved):
+        pl.stamp_portrait(led, "announcer", px, output_dir=str(tmp_path))
+    path = pl.stamp_portrait(led, "announcer", px, output_dir=str(tmp_path),
+                             require_cast_entry=False)
+    assert path.exists() and path.suffix == ".png"
+    assert [c["char_id"] for c in led["cast"]] == ["c1"], \
+        "cast is CastLock's frozen authority -- never grown by a portrait stamp"
+    assert "portrait_content_hash" not in led["cast"][0]
+
+
+def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_path):
+    """dispatch_images mints the announcer portrait, records it in
+    ledger['images'] keyed object_id='announcer' (the index the render path
+    resolves init_image from), and leaves cast untouched."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"cast": [{"char_id": "c1", "name": "EDNA"}]}
+    policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}, "granularity": {}}
+    prompts = {
+        "c1": {"prompt": "a keeper, harbor", "prompt_hash": "ph1", "source": "llm"},
+        "announcer": {"prompt": mbp.ANNOUNCER_PORTRAIT_ANCHOR,
+                      "prompt_hash": "ph-ann", "source": "announcer_template"},
+    }
+    led, done, _r, warns = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=lambda _req: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+    )
+    assert done.startswith("image:done:")
+    by_id = {i["object_id"]: i for i in led["images"]["images"]}
+    assert set(by_id) == {"c1", "announcer"}
+    assert os.path.exists(by_id["announcer"]["path"])
+    assert [c["char_id"] for c in led["cast"]] == ["c1"]
+    assert not any("announcer" in w for w in warns), \
+        "announcer mint must not warn: %r" % warns
+    # the video render path resolves init_image through _portrait_index
+    from nodes._otr_video_engines import render_driver as rd
+    idx = rd._portrait_index(led)
+    assert idx.get("announcer") == by_id["announcer"]["path"]

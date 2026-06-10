@@ -166,6 +166,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     rev = int(images_section.get("image_revision") or 0) + 1
     made = 0
     reused = 0
+    # Synthetic non-cast subjects (the ANNOUNCER radio-style portrait): their
+    # portrait is recorded in ledger['images'] below -- the index the render
+    # path resolves init_image from -- but there is no cast row to stamp, so
+    # stamp_portrait must not fail-closed on them (cast stays CastLock's
+    # frozen authority; never added to here).
+    cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
     for cid, pinfo in (image_prompts or {}).items():
         prompt = str((pinfo or {}).get("prompt") or "")
         prompt_hash = str((pinfo or {}).get("prompt_hash") or "")
@@ -205,7 +211,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
             )
             content_hash = _pl.compute_portrait_hash(pixels)
-            path = _pl.stamp_portrait(ledger, cid, pixels, output_dir=output_dir)
+            path = _pl.stamp_portrait(ledger, cid, pixels, output_dir=output_dir,
+                                      require_cast_entry=(cid in cast_ids))
         except _lease.LeaseTimeout as exc:
             warnings.append(f"{cid}: GPU lease timeout ({exc}); skipped")
             continue

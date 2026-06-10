@@ -250,6 +250,37 @@ class TestBuildRequestFromShotPerBeatAudio:
         assert ledger["audio"]["master_audio_sha256"] == original_sha
         assert ledger["audio"]["ledger_frozen"] is True
 
+    def test_announcer_beat_resolves_init_image_and_slice(self, tmp_path):
+        """The b001/b005 keystone gap, CPU-proven end to end: an ANNOUNCER beat
+        whose ledger carries (a) a minted announcer portrait in
+        ledger['images'] (the radio-style image; object_id='announcer') and
+        (b) start_s/dur_s line timing resolves BOTH init_image AND a sliced
+        audio_ref -- the two inputs eng_humo's instant guard requires. Root
+        cause of the starvation was the MISSING announcer portrait, not the
+        slice (forensics 2026-06-09: all 5 slice files existed, keys matched
+        the re-resolved master WAV; the humo attempt failed in <1s on
+        init_image='')."""
+        portrait = tmp_path / "announcer_radio.png"
+        portrait.write_bytes(b"\x89PNG\r\n\x1a\n fake")
+        ledger = _ledger_with_line("b001", char_id="announcer",
+                                   start_s=9.5, dur_s=9.40375,
+                                   portrait_path=str(portrait))
+        ledger["lines"][0]["speaker_role"] = "announcer"
+        shot = _shot("b001")
+        sliced = str(tmp_path / "slice_b001.wav")
+        master = str(tmp_path / "master.wav")
+        open(master, "wb").close()
+        with mock.patch("nodes._otr_video_engines.render_driver._slice_master_audio",
+                        return_value=sliced) as m:
+            req = rd.build_request_from_shot(shot, ledger,
+                                             master_audio_path=master)
+        m.assert_called_once_with(master, 9.5, 9.40375)
+        assert req["audio_ref"] == {"path": sliced}
+        assert req["asset_refs"]["init_image"] == str(portrait), (
+            "announcer beat must resolve the radio-style portrait as "
+            "init_image -- without it HuMo fails its instant guard and the "
+            "intro/outro starve to the still floor")
+
 
 # --------------------------------------------------------------------------- #
 # run_real_episode: master_audio_path threads through

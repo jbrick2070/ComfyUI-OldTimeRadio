@@ -123,7 +123,8 @@ def resolve_portrait_path(ledger: dict, char_id: str,
 
 
 def stamp_portrait(ledger: dict, char_id: str, decoded_pixels,
-                   output_dir: Optional[str] = None) -> Path:
+                   output_dir: Optional[str] = None,
+                   require_cast_entry: bool = True) -> Path:
     """Hash ``decoded_pixels``, write the PNG content-addressed (never
     overwriting an existing identical file), stamp the cast entry's
     ``portrait_content_hash`` and return the path.
@@ -131,6 +132,14 @@ def stamp_portrait(ledger: dict, char_id: str, decoded_pixels,
     A regenerated (pixel-different) portrait yields a NEW hash + path and
     re-stamps the ledger -- the prior file is left intact. PIL is imported
     lazily (V-12).
+
+    ``require_cast_entry`` (default True, the BUG-098 fail-closed contract):
+    when False, a ``char_id`` with no cast row skips the cast-entry stamp
+    instead of raising -- for SYNTHETIC non-cast portrait subjects (the
+    station ANNOUNCER radio-style portrait). ``ledger['cast']`` stays
+    CastLock's frozen authority: this function never ADDS a cast row; the
+    portrait is still recorded by the caller in ``ledger['images']`` (the
+    index the video render path resolves ``init_image`` from).
     """
     h = compute_portrait_hash(decoded_pixels)
     path = portrait_path_for_hash(h, output_dir)
@@ -139,9 +148,14 @@ def stamp_portrait(ledger: dict, char_id: str, decoded_pixels,
         _write_png(decoded_pixels, path)
     entry = _cast_entry_for_char(ledger, char_id)
     if entry is None:
-        raise PortraitUnresolved(
-            f"cannot stamp portrait: char_id {char_id!r} not in ledger cast"
-        )
+        if require_cast_entry:
+            raise PortraitUnresolved(
+                f"cannot stamp portrait: char_id {char_id!r} not in ledger cast"
+            )
+        log.info("[portrait_ledger] non-cast portrait char_id=%s -> %s "
+                 "(cast stamp skipped; recorded via ledger['images'])",
+                 char_id, path.name)
+        return path
     entry["portrait_content_hash"] = h
     log.info("[portrait_ledger] stamped char_id=%s -> %s", char_id, path.name)
     return path

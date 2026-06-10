@@ -74,6 +74,41 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
 #: default so gen-1 Flux output stays consistent across the cast).
 STYLE_ANCHOR = "head-and-shoulders studio portrait, neutral lighting, cinematic"
 
+#: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
+#: owns ``ledger['cast']``; the announcer is the station voice, never a cast
+#: row). Announcer beats are talking beats, so HuMo needs an ``init_image``
+#: for them exactly like character beats -- without one the intro/outro
+#: starve to the still floor (the b001/b005 keystone gap). The pseudo-id
+#: matches the ``char_id`` the writer stamps on announcer lines.
+ANNOUNCER_CHAR_ID = "announcer"
+
+#: Radio-style announcer portrait anchor (operator-directed 2026-06-09:
+#: "announcer should get a 'radio' style image"). A human face stays in
+#: frame so the audio_driven_face family can drive the mouth; the styling
+#: reads unmistakably as period radio.
+ANNOUNCER_PORTRAIT_ANCHOR = (
+    "vintage 1940s radio announcer at a large chrome ribbon microphone, "
+    "suit and tie, art deco broadcast studio backdrop, ON AIR sign glow, "
+    "warm tube lighting"
+)
+
+
+def announcer_line_char_ids(lines) -> list:
+    """Distinct ``char_id``s of ledger lines spoken by the ANNOUNCER role, in
+    first-appearance order (normally just ``["announcer"]``). The video render
+    path resolves ``init_image`` by the LINE's char_id, so prompts are keyed
+    the same way. Pure; tolerates malformed rows."""
+    out: list = []
+    for ln in lines or []:
+        if not isinstance(ln, dict):
+            continue
+        if str(ln.get("speaker_role") or "") != "announcer":
+            continue
+        cid = str(ln.get("char_id") or "") or ANNOUNCER_CHAR_ID
+        if cid not in out:
+            out.append(cid)
+    return out
+
 
 def compose_image_prompt_fallback(meta: dict, char: dict) -> str:
     """Deterministic brief-composed portrait prompt -- NEVER empty.
@@ -131,17 +166,33 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
-                         consistency_gate_warn_only: bool = False):
+                         consistency_gate_warn_only: bool = False, lines=None):
     """Per-character image prompts: ``{char_id: {prompt, prompt_hash, source}}``.
 
     LLM (temp=0, injected or lazily resolved) refines each; empty/unparseable ->
     reseed -> deterministic fallback. ``prompt_hash`` is taken AFTER the call.
     Never raises; never emits an empty prompt. Returns ``(prompts, warnings)``.
+
+    ``lines`` (optional, the frozen ledger lines, READ-ONLY): when any line is
+    spoken by the ANNOUNCER role, a radio-style announcer portrait prompt is
+    appended for each announcer char_id not already covered -- announcer beats
+    are talking beats and starve HuMo without an ``init_image``. The synthetic
+    entry rides the SAME llm/template/consistency path as cast characters.
     """
     warnings: list = []
     setting = _read_setting(meta)
     out: dict = {}
-    for char in cast or []:
+    roster = list(cast or [])
+    cast_ids = {str(c.get("char_id") or "") for c in roster if isinstance(c, dict)}
+    for cid in announcer_line_char_ids(lines):
+        if cid in cast_ids:
+            continue                      # a real cast row already covers it
+        roster.append({
+            "char_id": cid,
+            "portrait_prompt": ANNOUNCER_PORTRAIT_ANCHOR,
+            "_synthetic_announcer": True,
+        })
+    for char in roster:
         if not isinstance(char, dict):
             continue
         cid = str(char.get("char_id") or "")
@@ -177,6 +228,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 warnings.append(msg + "; fell back to template")
                 prompt = compose_image_prompt_fallback(meta, char)
                 source = "template_consistency"
+        if char.get("_synthetic_announcer"):
+            source = "announcer_" + source   # traceable in reports/ledger
         out[cid] = {
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
@@ -242,12 +295,14 @@ class OTRMetaBriefImagePromptGen:
             led = {}
         meta = led.get("meta") if isinstance(led.get("meta"), dict) else {}
         cast = led.get("cast") if isinstance(led.get("cast"), list) else []
+        lines = led.get("lines") if isinstance(led.get("lines"), list) else []
 
         warnings: list = []
         llm_fn = _resolve_writer_llm(meta, warnings)
         prompts, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,
             consistency_gate_warn_only=bool(consistency_gate_warn_only),
+            lines=lines,
         )
         warnings.extend(warn2)
 
