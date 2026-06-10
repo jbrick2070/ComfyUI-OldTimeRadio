@@ -187,6 +187,18 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             "path": path or "", "src_start_frame": int(src_start),
             "n_frames": int(n), "engine_id": engine_id})
 
+    def _floor_aligned(start_cursor, n):
+        """Timeline-aligned floor slice start (production restore 2026-06-10):
+        gaps used to slice the procgen from frame 0 (the open repeated); the
+        OLD episodes ran the procgen CONTINUOUSLY underneath, so head gaps show
+        the radio open, inter-beat gaps the matching mid-roll, and the TAIL the
+        rolling-credits post-roll. Clamped so n frames remain. (The procgen may
+        run at a different fps than the composite -- ~4% drift at 24v25 -- an
+        acceptable skew for a background/credits roll.)"""
+        if gap_src != "floor":
+            return 0
+        return min(int(start_cursor), max(0, ff - int(n)))
+
     positioned = (target_total_frames is not None and rows
                   and all(r.get("start_s") is not None for r in rows))
     if positioned:
@@ -194,12 +206,14 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             n = int(r.get("target_frame_count") or 0)
             start_frame = int(round(float(r.get("start_s") or 0) * fps))
             if start_frame > cursor:                       # head / inter-beat gap
-                emit(gap_src, "", start_frame - cursor, 0)
+                gap_n = start_frame - cursor
+                emit(gap_src, "", gap_n, _floor_aligned(cursor, gap_n))
                 cursor = start_frame
             if r.get("exists") and r.get("path"):
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
             else:
-                emit(gap_src, "", n, 0, r.get("shot_id"), r.get("engine_id"))
+                emit(gap_src, "", n, _floor_aligned(cursor, n),
+                     r.get("shot_id"), r.get("engine_id"))
             cursor += n
     else:                                                  # SEQUENTIAL (legacy)
         for r in rows:
@@ -213,7 +227,11 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 emit("black", "", n, 0, r.get("shot_id"), r.get("engine_id"))
             cursor += n
     if target_total_frames is not None and int(target_total_frames) > cursor:
-        emit(gap_src, "", int(target_total_frames) - cursor, 0)   # tail to master len
+        # Tail to the master length. With a floor available this slice is the
+        # END of the procgen -- the ROLLING-CREDITS post-roll riding under the
+        # closing theme (production restore 2026-06-10).
+        tail_n = int(target_total_frames) - cursor
+        emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
     return segments, cursor
 
@@ -283,10 +301,29 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     # (legacy / non-assemble path).
     mft_total = int((manifest or {}).get("total_target_frames") or 0)
     target_total = mft_total if mft_total > 0 else None
-    if target_total is None and floor_ok:
+    if floor_ok:
+        # PRODUCTION RESTORE (2026-06-10): the procgen base runs the FULL
+        # episode length -- opening theme pad + drama + the rolling-credits
+        # post-roll under the closing theme. The beats-only budget CUT the
+        # video at the last drama beat, so the credits roll vanished from the
+        # rewired chain. Extend the assembled length to the base duration so
+        # the tail segment (sliced from the procgen END by the planner)
+        # restores the credits. The mux gate stays safe: the base was rendered
+        # to the master mix length, so v_dur <= a_dur + tol still holds.
         master_dur = _probe_duration(base_video_path)
         if master_dur > 0:
-            target_total = int(round(master_dur * fps))
+            # -1 frame headroom: the terminal mux REFUSES v_dur > a_dur + tol
+            # (tol = 1 frame); the base was rendered to the master-mix length,
+            # so shaving one frame guarantees the gate even on rounding.
+            base_total = max(0, int(round(master_dur * fps)) - 1)
+            if base_total > 0 and (target_total is None
+                                   or base_total > target_total):
+                if target_total is not None:
+                    report.append(
+                        "credits post-roll restored: tail %d -> %d frames "
+                        "(procgen end-slice under the closing theme)"
+                        % (target_total, base_total))
+                target_total = base_total
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)

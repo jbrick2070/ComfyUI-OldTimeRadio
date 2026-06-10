@@ -119,13 +119,17 @@ def test_wan_role_fit_image_to_video_needs_init_image():
 # --------------------------------------------------------------------------- #
 def test_ltx_assert_usable_flag_then_sage_then_install(monkeypatch):
     eng = vreg.get_engine("ltx_video")
-    monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
+    # PROMOTED DEFAULT-ON (production restore 2026-06-10): the saved
+    # production workflow routes the radio open through ltx_video, so the
+    # engine is enabled UNLESS explicitly opted out with =0.
+    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "0")
     with pytest.raises(vreg.EngineUnusable) as e1:
         eng.assert_usable(host_caps={}, profile={})
     assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Flag set, SageAttention resident -> BUG-070 INCOMPATIBLE_PROFILE (fail closed
-    # BEFORE the checkpoint check / any forward).
-    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
+    # Default (flag UNSET) = enabled -> falls through to the SageAttention
+    # gate: resident Sage -> BUG-070 INCOMPATIBLE_PROFILE (fail closed BEFORE
+    # the checkpoint check / any forward).
+    monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
     monkeypatch.setitem(sys.modules, "sageattention",
                         types.ModuleType("sageattention"))
     with pytest.raises(vreg.EngineUnusable) as e2:

@@ -95,8 +95,25 @@ def _resolve_captions_ass(source_mp4: Path, style: str = "") -> tuple[Optional[s
     """
     if build_ass_from_ledger is None:
         return (None, "caption builder unavailable (_otr_captions import failed)")
+    # Episode id = the source stem MINUS the post-chain suffixes (capstone
+    # production fix 2026-06-10): the blend's source is now the per-episode
+    # "<slug>_silent.mp4" (or "..._procgen_blended.mp4"), so the raw stem
+    # resolved "<slug>_silent_ledger.json" -- which never exists -- and
+    # captions only worked when the SAME-process in-flight singleton happened
+    # to point at this episode. A ComfyUI Desktop render misses entirely.
     episode_id = source_mp4.stem
+    for _suffix in ("_procgen_blended", "_silent"):
+        if episode_id.endswith(_suffix):
+            episode_id = episode_id[: -len(_suffix)]
     ledger = otr_audio_dir(episode_id) / f"{episode_id}_ledger.json"
+    if not ledger.is_file():
+        # Layout-relative fallback: the source lives INSIDE the episode folder
+        # (otr/episodes/<slug>/...), so its sibling audio/ dir carries the
+        # ledger regardless of which output root the server pinned.
+        sib = source_mp4.parent / "audio"
+        cands = sorted(sib.glob("*_ledger.json")) if sib.is_dir() else []
+        if cands:
+            ledger = cands[0]
     if not ledger.is_file():
         try:
             from . import _otr_ledger as _OTRL  # type: ignore

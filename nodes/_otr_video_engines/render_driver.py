@@ -382,6 +382,23 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     text_prompt = str(creative.get("text_prompt") or "")
     if text_prompt:
         req["text_prompt"] = text_prompt
+    # THE LTX RADIO OPEN (production restore 2026-06-10): when the announcer /
+    # music beats render on a TEXT-driven engine (ltx_video per the saved
+    # production VideoDirector), they carry the OLD-TIME-RADIO visual -- the
+    # period radio-station open the episodes had before the platform rewire --
+    # instead of the writer's drama scene prompt. Role-scoped + engine-scoped
+    # + env-overridable; talking-character beats are untouched.
+    if (str(shot.get("role") or "") in ("announcer_visual", "music_visual")
+            and str(shot.get("engine_id") or "") == "ltx_video"):
+        radio_prompt = os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip() or (
+            "a 1940s radio station studio, art-deco brass microphone, "
+            "glowing amber vacuum tube dials, ON AIR sign lit, warm tungsten "
+            "light, gentle film grain, slow cinematic dolly, period drama")
+        if req.get("text_prompt") != radio_prompt:
+            _LOG.warning("[OTR.render_driver] LTX RADIO OPEN: %s beat %s "
+                         "prompt -> the period radio-station visual",
+                         shot.get("role"), shot.get("shot_id"))
+        req["text_prompt"] = radio_prompt
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}

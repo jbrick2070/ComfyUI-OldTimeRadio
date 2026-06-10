@@ -110,11 +110,17 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         """Fail closed before any forward: the opt-in flag, then the BUG-070
         SageAttention gate, then checkpoint presence (verify-at-build). Imports
         nothing heavy -- runs at lock/validate time on the CPU box."""
-        if os.getenv(self.requires_flag, "0") != "1":
+        # PROMOTED DEFAULT-ON 2026-06-10 (production restore): the saved
+        # production workflow routes the announcer/music radio open through
+        # ltx_video, and a ComfyUI Desktop render must work from the file
+        # alone (no env patching). LTX was GPU-proven on this stack
+        # (49f/14.9s, capstone night). Set OTR_ENABLE_LTX_VIDEO=0 to opt OUT;
+        # the Sage gate + checkpoint presence below still fail CLOSED on any
+        # box that cannot actually render it (-> LOUD fallback chain).
+        if os.getenv(self.requires_flag, "1") == "0":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "ltx_video is opt-in; set %s=1 and install the LTX wrapper + "
-                "checkpoints" % self.requires_flag, kind="video")
+                "ltx_video disabled by %s=0" % self.requires_flag, kind="video")
         _MC.assert_sage_not_patched(self.name, self.family)   # BUG-070 (S5 gate)
         if not self._installed():
             raise EngineUnusable(
