@@ -219,8 +219,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         if not prompt:
             prompt = compose_image_prompt_fallback(meta, char)
             source = "template"
-        # Story-consistency gate (schema assertion, v1).
-        if not _passes_consistency(prompt, appearance, setting):
+        # Story-consistency gate (schema assertion, v1). The synthetic
+        # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM
+        # line that drops the radio styling for pure story-setting flavor
+        # fails the gate and falls back to the radio template (operator
+        # directive 2026-06-09: the announcer gets a RADIO-style image).
+        gate_setting = "" if char.get("_synthetic_announcer") else setting
+        if not _passes_consistency(prompt, appearance, gate_setting):
             msg = f"image prompt for {cid} missing appearance/setting trait"
             if consistency_gate_warn_only:
                 warnings.append(msg + " (warn-only; kept)")

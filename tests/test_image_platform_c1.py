@@ -639,6 +639,34 @@ def test_meta_brief_announcer_llm_refined_keeps_grounding():
     assert "radio" in out["announcer"]["prompt"].lower()
 
 
+def test_meta_brief_announcer_gate_requires_radio_grounding():
+    """An LLM line that drops the radio styling for pure story-setting flavor
+    FAILS the announcer's gate (appearance-only grounding) and falls back to
+    the radio template -- even when the line is grounded in the setting.
+    (Live finding 2026-06-09: the Ticking Countdown announcer portrait came
+    out as a modern control-room figure because the gate accepted
+    setting-grounded prompts. Operator directive: radio style.)"""
+    meta = {"story_brief_terms": {"setting": ["a mission control countdown"]}}
+    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
+    out, warns = mbp.derive_image_prompts(
+        [], meta,
+        llm_fn=lambda _p: "a tense mission control countdown operator at a console",
+        lines=lines)
+    ann = out["announcer"]
+    assert ann["source"] == "announcer_template_consistency", \
+        "setting-only grounding must fail the announcer gate (got %r)" % ann["source"]
+    low = ann["prompt"].lower()
+    assert "radio" in low and "microphone" in low
+    assert any("missing appearance/setting" in w for w in warns)
+    # a CHARACTER with the same setting-grounded line still passes (the
+    # relaxed gate is announcer-only)
+    cast = [{"char_id": "c1", "portrait_prompt": "a flight controller"}]
+    out2, _w2 = mbp.derive_image_prompts(
+        cast, meta,
+        llm_fn=lambda _p: "a tense mission control countdown operator at a console")
+    assert out2["c1"]["source"] == "llm"
+
+
 def test_stamp_portrait_non_cast_strict_vs_relaxed(tmp_path):
     """Default stays BUG-098 fail-closed; require_cast_entry=False writes the
     content-addressed PNG, skips the cast stamp, and NEVER adds a cast row."""
