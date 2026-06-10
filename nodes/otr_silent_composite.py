@@ -157,6 +157,26 @@ def _probe_duration(path):
         return 0.0
 
 
+def _probe_audio_duration(path):
+    """FIRST AUDIO STREAM duration in seconds; 0.0 when absent/unavailable.
+
+    The credits-tail cap (2026-06-10): the procgen base VIDEO runs ~20s past
+    the master mix it carries (its own silent post-roll), so capping the
+    assembled length at the base's AUDIO duration keeps the credits riding
+    under the closing theme while honoring the terminal mux's v<=a gate."""
+    fp = _ffprobe_bin()
+    if not fp or not os.path.isfile(path):
+        return 0.0
+    p = _run([fp, "-v", "error", "-select_streams", "a:0",
+              "-show_entries", "stream=duration",
+              "-of", "default=noprint_wrappers=1:nokey=1", path])
+    out = (p.stdout or "").strip().splitlines()
+    try:
+        return float(out[0]) if out else 0.0
+    except (ValueError, IndexError):
+        return 0.0
+
+
 def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                            target_total_frames=None, fps=None):
     """Pure: the frame-accurate per-beat segment plan from a clip manifest.
@@ -310,11 +330,29 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         # the tail segment (sliced from the procgen END by the planner)
         # restores the credits. The mux gate stays safe: the base was rendered
         # to the master mix length, so v_dur <= a_dur + tol still holds.
-        master_dur = _probe_duration(base_video_path)
+        # The cap is the MASTER MIX duration -- NOT the base's video length
+        # (the procgen runs ~20s past the master with its own silent
+        # post-roll) and NOT the base's embedded audio either (the encoder
+        # silence-pads it to the video length; both live catches 2026-06-10:
+        # 123.5s video vs 103.6s master = the terminal mux REFUSED). The real
+        # master WAV lives in the base's sibling audio dir (the per-episode
+        # layout) -- probe the LONGEST *_master.wav there (a stub copy can
+        # coexist after the rename); fall back to the base audio stream, then
+        # the container. -1 frame headroom absorbs rounding.
+        master_dur = 0.0
+        try:
+            import glob as _glob
+            _sib = os.path.join(os.path.dirname(base_video_path),
+                                "*_master.wav")
+            for _cand in _glob.glob(_sib):
+                master_dur = max(master_dur, _probe_audio_duration(_cand))
+        except Exception:  # noqa: BLE001 -- best-effort; fallbacks below
+            pass
+        if master_dur <= 0:
+            master_dur = _probe_audio_duration(base_video_path)
+        if master_dur <= 0:
+            master_dur = _probe_duration(base_video_path)
         if master_dur > 0:
-            # -1 frame headroom: the terminal mux REFUSES v_dur > a_dur + tol
-            # (tol = 1 frame); the base was rendered to the master-mix length,
-            # so shaving one frame guarantees the gate even on rounding.
             base_total = max(0, int(round(master_dur * fps)) - 1)
             if base_total > 0 and (target_total is None
                                    or base_total > target_total):
