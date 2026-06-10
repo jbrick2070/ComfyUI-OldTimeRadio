@@ -384,11 +384,29 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
             raise SoakFail("floor leg: still_kenburns absent: %r" % hist)
         print("[soak] FLOOR histogram OK: %r" % hist, flush=True)
     elif expect_engine:
-        if set(hist) != {expect_engine} or hist[expect_engine] != n_beats:
-            raise SoakFail("histogram %r != {%r: %d} -- a beat fell off the "
-                           "expected engine" % (hist, expect_engine, n_beats))
-        print("[soak] %s:%d histogram OK" % (expect_engine, n_beats),
-              flush=True)
+        # TALKING-BEATS-ONLY assert (2026-06-10 marathon refinement): a big
+        # episode legitimately routes music/visual beats to the visualizer --
+        # whole-histogram equality false-failed the 160w/4ch finale
+        # ({humo:8, visualizer:1}). The real production invariant: every shot
+        # PLANNED for the keystone stays ON the keystone (no LOUD fallbacks
+        # off it), and at least one such shot exists.
+        trace = report.get("trace") or []
+        planned = [t for t in trace
+                   if (t.get("attempts") or [""])[0] == expect_engine]
+        fell_off = [t for t in planned
+                    if t.get("final_engine") != expect_engine]
+        if not planned:
+            raise SoakFail("no shot was planned for %r (histogram %r)"
+                           % (expect_engine, hist))
+        if fell_off:
+            raise SoakFail("%d/%d %s-planned shot(s) fell off the keystone: "
+                           "%r (histogram %r)"
+                           % (len(fell_off), len(planned), expect_engine,
+                              [(t.get("shot_id"), t.get("final_engine"))
+                               for t in fell_off], hist))
+        print("[soak] %s keystone OK: %d/%d planned shots stayed on it "
+              "(histogram %r)" % (expect_engine, len(planned), len(planned),
+                                  hist), flush=True)
     else:
         print("[soak] EXPERIMENT histogram (informational): %r over %d beats"
               % (hist, n_beats), flush=True)
