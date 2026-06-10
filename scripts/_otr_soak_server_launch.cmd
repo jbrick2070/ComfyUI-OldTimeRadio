@@ -1,8 +1,11 @@
 @echo off
 rem v1.4 capstone headless server launch -- verified recipe (docs/VIDEO_BUILD_HANDOFF.md)
-rem usage: _otr_soak_server_launch.cmd <logfile> [HUMO=0 | LTX | WAN]
+rem usage: _otr_soak_server_launch.cmd <logfile> [FLOOR | LTX | WAN]
 rem   (default)  humo:5 production path (OTR_ENABLE_HUMO=1)
-rem   HUMO=0     heavy engines OFF (the still-floor soak leg)
+rem   FLOOR      heavy engines OFF (the still-floor soak leg). NOTE: the old
+rem              token "HUMO=0" NEVER matched -- cmd splits arguments on "=",
+rem              so %2 arrived as "HUMO" and the else-branch enabled HuMo
+rem              (2026-06-10 marathon catch).
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
 rem   WAN        Wan i2v opt-in ON, HuMo OFF
 set HF_HOME=C:\ComfyUI-Models\huggingface
@@ -29,7 +32,7 @@ if not exist "%OTR_TMP%" mkdir "%OTR_TMP%"
 set TEMP=%OTR_TMP%
 set TMP=%OTR_TMP%
 set OTR_GPU_LEASE_DIR=%OTR_TMP%
-if /i "%2"=="HUMO=0" (
+if /i "%2"=="FLOOR" (
   set OTR_ENABLE_HUMO=
   echo [launch] heavy engines OFF ^(floor leg^)
 ) else if /i "%2"=="LTX" (

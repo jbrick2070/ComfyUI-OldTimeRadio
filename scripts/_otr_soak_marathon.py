@@ -125,7 +125,7 @@ PLAYLIST = [
                   (N_WRITER, "creative_writing_model", "comfy:slot-a"),
                   (N_WRITER, "technical_model", "comfy:slot-a")],
          expect_engine="humo"),
-    dict(leg="ep06_floor_30w", lane="HUMO=0",
+    dict(leg="ep06_floor_30w", lane="FLOOR",
          env={}, words=30, chars=2,
          patches=[(N_CHARVOICE, "engine", "indextts2"),
                   (N_MUSIC, "engine", "stable_audio_3")],
