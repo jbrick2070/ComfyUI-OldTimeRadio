@@ -57,6 +57,12 @@
   master hash; the 16 kHz Rhubarb input is a downsample of the provided 44.1 kHz slice (the
   adapter never sees the master); pose-envelope/UV metrics actually emitted into qc; one
   binding spike sequence stated everywhere.
+- **Story-assets addendum (operator-directed, post-campaign):** new section 2.5 binds the 3D
+  path to the UPSTREAM story assets -- script text feeds Rhubarb (`--dialogFile`), ledger
+  beats + M4 mood drive a deterministic shot grammar, the shipped per-line delivery vectors
+  modulate the idle layer, C's scene stills are the plates, bust framing hides the decapitation
+  stump, and the only candidate NEW input asset (a "bust card" body underlay) is explicitly
+  deferred to v1.1 via the existing C engine. T4 + the DoD now FAIL a clip that ignores these.
 - Citations: [v1.4-III], [SUB-B], [DEP], [PS-3D], [3DC], [GOFWD], [ROUTE-01], [B-SHIP],
   [PASS-3D], [FORK-RT], [H-RT] = this hardening campaign (passes 1-3).
 
@@ -119,6 +125,44 @@ GPU-backed, Blender, and any in-process fallback forward) brackets with the shar
 `otr_gpu_residency.lockdir` lease + NVML residual-floor (~768 MB) check; per-spawn peaks
 measured separately vs 14000 [PASS-3D #3, H-RT]. Driver curves travel as
 `conditioning_refs["arkit_curves_json"]` -- no schema change [H-RT].
+
+## 2.5 Upstream story assets -> the visual story (ledger / script / M4 / 2D stills)
+
+The pipeline already produces everything a good-looking, story-driven episode needs; the 3D
+path CONSUMES these rather than synthesizing new asset classes. This section is binding for
+W7 (it is what makes the output a STORY, not a tech demo):
+
+- **Script text -> phonemes (free lip-sync quality).** The ledger carries every line's exact
+  text. Rhubarb accepts a dialog file (`--dialogFile`) and produces markedly cleaner phonemes
+  with it than audio-only guessing [PS-3D "script-first variant"]. The Slot-2a extraction
+  ALWAYS passes the line text from the ledger script; the curve cache key gains the
+  script-line text hash. No new asset -- the script finally feeds the face.
+- **Ledger beats + M4 mood -> deterministic SHOT GRAMMAR.** Per-beat camera/framing/light are
+  POLICY-derived, not hard-coded: announcer beats = locked center bust; character dialogue =
+  alternating 3/4 framings INSIDE the +/-15-deg bake cone; M4 mood/emotional-peak fields =
+  slow push-in; scene transitions stay procgen title cards. Selection is seeded per the OTR
+  true-randomization contract (OS entropy, `OTR_CAST_SEED`-style env override for
+  reproducibility) and recorded in the render manifest. M4 remains the single prompt/style
+  authority (V-11: policy fields, no new widgets); the stylized-shader palette derives from
+  the episode's M4 style fields so 3D shots match the episode grade.
+- **Delivery vectors -> the idle layer.** The shipped per-line delivery vectors (indextts2/
+  chatterbox expressive lane) modulate the procedural blink/eye-dart/brow idle layer and the
+  camera micro-energy, deterministically (vector in the curve cache key; `OTR_DELIVERY_VECTOR=0`
+  kills it, matching the audio lane). The same emotion that shapes the VOICE now shapes the
+  face and camera -- zero new models.
+- **C's scene stills ARE the background plates.** The alpha head composites over the
+  EXISTING Subproject-C scene still (ken-burns motion) or `ltx_video` clip per the shipped
+  conditional-background sub-DAG -- stated explicitly so nobody synthesizes new plates for v1.
+- **Framing hides the neck stump (the decapitation contract).** Slot-1.5 slices below the
+  neck; v1's shot grammar therefore mandates BUST framing -- the frame bottom sits ABOVE the
+  hole-filled stump in every grammar variant (period radio-studio close-up language, which fits
+  the show). A LOOK-gate check asserts no stump pixels in any delivered frame.
+- **The ONLY candidate NEW asset is deferred:** an optional "bust card" (head-and-shoulders
+  body underlay so wider shots can show a torso) -- if ever wanted, it is ONE M4-prompted
+  variant from the EXISTING C image engine (a policy row, not a new pipeline), v1.1 at the
+  earliest. Everything else (portraits, plates, line timing, script text, delivery vectors,
+  mood) already exists upstream; the template is fetched (section 5) and the mapping table is
+  authored -- no other inputs are synthesized.
 
 ## 3. Carry-in: the 3D image-routing MUST-FIXES (non-negotiable; code-verified still OPEN)
 
@@ -187,7 +231,9 @@ MIT, Step1X-3D Apache-2.0, Rhubarb MIT, ICT-FaceKit MIT (DATA audit, section 5),
 | **ARKit-52 template** (`OTR_B_ARKIT_TEMPLATE_NPZ`: `verts/faces/mouth_idx + delta_<name> x52`, matching `_b_harness.ARKIT_52`) | **FETCHABLE** (was assumed operator-blocked [B-SHIP]) | Derive from **USC ICT-FaceKit** (MIT; ARKit-named shapes with `_L/_R` splits). Converter merges ONLY canonically-singular shapes (browInnerUp, cheekPuff, ...), PRESERVES the canonically-asymmetric L/R pairs, via a checked-in **`facekit_to_arkit.json`** name map (classes copy / merge_to_unilateral / split_preserved / drop) and emits a **machine-readable conversion report** (source name, target name, class, vertex count, topology hash, delta-norm stats); a MISSING shape is a HARD FAIL -- never a zero-delta placeholder [H-RT, GPT/DeepSeek]. Validates exactly 52 deltas + `mouth_idx` + manifoldness; jawOpen/mouthClose/mouthFunnel deformation smoke (reuse `wrap_topology_check` max_delta_ratio<=0.5 as a property test on all 52 deltas at weight 1.0); SEMANTIC checks beyond name-count: coordinate-system/scale vs the harness convention, left/right delta sign sanity, per-shape delta-norm ranges, golden deformation thumbnails (a 52-name npz can still be semantically wrong) [H-RT p2, GPT]; pins `ARKIT_TEMPLATE_HASH`. License gate: audit the model-DATA terms, pin commit + per-asset SHA-256; fetch = separate acquisition step. REJECTED: MetaHuman extracts (Epic), paid add-ons [FORK-RT]. |
 | **~25-mesh keystone corpus** (`OTR_B_MESH_DIR`) | **GENERATED by the pipeline** | TripoSG sidecar from ~25 real Flux portraits incl. adversarial (glasses, hair-over-face, profile, open mouth, low-res) **+ period-style cases (sepia/monochrome, high-contrast studio light, hats, microphone occlusion)** [PS-3D, H-RT]. Corpus is probe_c EVIDENCE only -- never a runtime gate (section 7.1). |
 | TripoSG / Step1X-3D weights | Fetchable (HF, ungated) into `C:\ComfyUI-Models` | After S-3D-0; SHA-256 pinned |
-| Rhubarb binary + `rhubarb_to_arkit.json` | Fetchable (MIT) / authored in-repo | Mapping reviewable, golden curve plots |
+| Rhubarb binary + `rhubarb_to_arkit.json` | Fetchable (MIT) / authored in-repo | Mapping reviewable, golden curve plots; driver ALWAYS fed the ledger script line via `--dialogFile` (section 2.5) |
+| Background plates | **REUSE C's scene stills / ltx clips -- no new synthesis** | Conditional-background sub-DAG (section 2.5) |
+| "Bust card" body underlay | OPTIONAL, v1.1+ -- one M4-prompted variant from the EXISTING C engine | Only if wider-than-bust shots are ever wanted (section 2.5) |
 | Blender (standalone) | Fetchable into `C:\ComfyUI-Models\tools\` | Operator INFORMED (not an interactive gate) [H-RT, Gemini] |
 | **cu128 TOOLKIT** | OPERATOR-BLOCKED, **deferred out of v1** | Only Hunyuan3D/TRELLIS/SuGaR/flash_attn [B-SHIP] |
 | A2F-3D weights + TRT | Operator-gated (NVOML read) | Appendix tier |
@@ -358,6 +404,11 @@ head:
   full 52-channel facial performance; assert all non-driven channels are idle-layer or zero;
   side-by-side Rhubarb-vs-silence mouth-closure test + max-mouth-open-on-silence guard
   [H-RT p2, GPT].
+- **Story integration QC (section 2.5 enforced here)**: T4's clip is rendered from a REAL
+  ledger beat -- script line fed to Rhubarb via dialogFile, shot grammar selected from the
+  beat's role + M4 mood, delivery vector modulating the idle layer, plate = the episode's C
+  still, no stump pixels in frame. A clip that passes the mechanical gates but used none of
+  the upstream story assets FAILS T4.
 - **Driver QC suite**: golden plots for the viseme->ARKit mapping; jawOpen/mouthClose/
   mouthFunnel/mouthPucker sanity ranges; silence closes the mouth within N frames; coefficients
   clamped to [0,1]; Savitzky-Golay smoothing; the deterministic blink/eye-dart layer NEVER
@@ -407,10 +458,13 @@ required before episodes use 3D, or after?
 ## 9. Definition of done
 
 **v1-usable**: a live `triposg_talk` clip in a REAL episode -- generated mesh, 52-key wrap,
-Rhubarb-synced to frozen audio, portrait-baked or stylized look (LOOK gate green), alpha
-composited + flattened, master audio byte-identical, all spawns <= 14.0 GB, request-hash +
-manifest deterministic, mesh-cache hit on line 2, fail-closed LOUD to humo when assets absent,
-full suite + Bug Bible green, soak (or sanctioned smoke) re-certified with the real trail.
+Rhubarb-synced to frozen audio **with the ledger script line driving the phonemes, the beat's
+role + M4 mood driving the shot grammar, the delivery vector driving the idle layer, and the
+episode's C still as the plate (section 2.5 -- the ledger and script visibly telling the
+story)**, portrait-baked or stylized look (LOOK gate green), alpha composited + flattened,
+master audio byte-identical, all spawns <= 14.0 GB, request-hash + manifest deterministic,
+mesh-cache hit on line 2, fail-closed LOUD to humo when assets absent, full suite + Bug Bible
+green, soak (or sanctioned smoke) re-certified with the real trail.
 **B-parity ship**: `step1x3d_talk` selectable and passing the same per-engine gates; the
 playground opens after that.
 
