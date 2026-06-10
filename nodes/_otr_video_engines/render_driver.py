@@ -388,7 +388,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # period radio-station open the episodes had before the platform rewire --
     # instead of the writer's drama scene prompt. Role-scoped + engine-scoped
     # + env-overridable; talking-character beats are untouched.
-    if (str(shot.get("role") or "") in ("announcer_visual", "music_visual")
+    _shot_role = str(shot.get("role") or "")
+    if not _shot_role:
+        # Resilience: older planned ledgers carry the role only inside
+        # group_id ("grp_<role>") -- parse it so the radio-open behavior
+        # never silently skips (2026-06-10 acceptance catch).
+        _gid = str(shot.get("group_id") or "")
+        if _gid.startswith("grp_"):
+            _shot_role = _gid[len("grp_"):]
+    if (_shot_role in ("announcer_visual", "music_visual")
             and str(shot.get("engine_id") or "") == "ltx_video"):
         radio_prompt = os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip() or (
             "a 1940s radio station studio, art-deco brass microphone, "

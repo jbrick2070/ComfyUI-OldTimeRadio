@@ -554,6 +554,10 @@ def build_execution_plan(beats, budget, creative, policy):
             "shot_id": f"shot_{b['beat_id']}",
             "source_line_ids": [b["beat_id"]],
             "group_id": f"grp_{b['role']}",
+            # The shot's video ROLE, stamped explicitly (2026-06-10): the
+            # render driver's role-scoped behaviors (the LTX radio-open
+            # prompt) read it; before this only group_id embedded the role.
+            "role": b["role"],
             "engine_id": engine_for(b["role"]),
             "profile_id": "",
             "family": "",
