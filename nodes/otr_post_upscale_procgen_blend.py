@@ -263,6 +263,28 @@ def _stamp_ledger_final_video_path(
         return (False, f"ledger stamp failed: {type(exc).__name__}: {exc}")
 
 
+def _probe_dims(path: Path, ffmpeg: str = "ffmpeg") -> "Optional[tuple]":
+    """(width, height) of the first video stream via ffprobe, or None.
+    Best-effort: a probe failure returns None and the blend falls back to the
+    legacy self-referential scale (the pre-2026-06-09 behavior)."""
+    ffprobe = "ffprobe"
+    if ffmpeg and ffmpeg != "ffmpeg":
+        cand = str(Path(ffmpeg).with_name("ffprobe.exe"))
+        if Path(cand).is_file():
+            ffprobe = cand
+    try:
+        out = subprocess.run(
+            [ffprobe, "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0",
+             str(path)],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout.strip()
+        w, h = out.split("x")[:2]
+        return int(w), int(h)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _build_blend_cmd(
     source_mp4: Path,
     procgen_mp4: Path,
@@ -273,6 +295,7 @@ def _build_blend_cmd(
     shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
     green_only_overlay: bool = False,
     captions_ass_path: Optional[str] = None,
+    source_dims: "Optional[tuple]" = None,
 ) -> list[str]:
     """Build the ffmpeg command for procgen-over-source blend.
 
@@ -365,9 +388,19 @@ def _build_blend_cmd(
     # libass ``ass`` filter at native 1080p. Pure video op -- audio is still
     # mapped via ``-c:a copy`` below, so C7 byte-identity is untouched.
     blend_label = "[vpre]" if captions_ass_path else "[v]"
+    # 2026-06-09 dim-conform fix (capstone soak catch): the legacy
+    # ``scale=-2:ih`` referenced the PROCGEN'S OWN height -- a no-op that only
+    # worked when the source was already 1080p (post-RTXUpscale). The blend
+    # filter hard-fails on a size mismatch (1472x832 source vs 1920x1080
+    # procgen). Scale the procgen EXPLICITLY to the probed source dims (the
+    # ~0.4% aspect difference is imperceptible for a full-frame CRT overlay).
+    if source_dims:
+        sw, sh = int(source_dims[0]), int(source_dims[1])
+        conform = f"scale={sw}:{sh}"
+    else:
+        conform = "scale=-2:ih:force_original_aspect_ratio=decrease,crop=iw:ih"
     filter_complex = (
-        f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
-        f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}{green_only_step}[pgn];"
+        f"[1:v]{conform},setpts=PTS-STARTPTS{crush_step}{green_only_step}[pgn];"
         f"{main_format_step}"
         f"{main_input_label}[pgn]blend=all_mode={blend_mode}:"
         f"all_opacity={blend_opacity:.3f}:shortest=1{post_blend_format}{blend_label}"
@@ -586,14 +619,13 @@ class PostUpscaleProcgenBlend:
             log.warning("[PostUpscaleProcgenBlend] %s", msg)
             return ("", msg)
 
-        # Final blended mp4 always lands in otr_obs_dir() -- the
-        # broadcast folder. Source comes from per-episode upscaled/
-        # (BUG-LOCAL-108 path-cleanup 2026-05-05); writing the blend
-        # alongside the source would put it back in upscaled/ and break
-        # the "exactly one mp4 per episode in obs/" contract.
-        obs_dir = otr_obs_dir()
-        obs_dir.mkdir(parents=True, exist_ok=True)
-        output_path = obs_dir / f"{src.stem}{out_suffix}{src.suffix}"
+        # LAYOUT CHANGE (operator directive 2026-06-09): otr/obs holds ONLY
+        # the muxed FINAL deliverable (published by OTR_MasterAudioMux). The
+        # blend output is now a SILENT intermediate consumed by the mux, so it
+        # lands NEXT TO its source inside the per-episode folder
+        # (otr/episodes/<ep>/) -- never in obs. (Pre-refactor the blend WAS
+        # the terminal deliverable and wrote to otr_obs_dir() directly.)
+        output_path = src.parent / f"{src.stem}{out_suffix}{src.suffix}"
 
         if bypass:
             try:
@@ -664,6 +696,10 @@ class PostUpscaleProcgenBlend:
             log.info("[PostUpscaleProcgenBlend] captions: %s", cap_msg)
             report_lines.append(f"captions: {cap_msg}")
 
+        src_dims = _probe_dims(src, ffmpeg=ffmpeg)
+        if src_dims:
+            report_lines.append("conform: procgen scaled to source %dx%d"
+                                % src_dims)
         cmd = _build_blend_cmd(
             source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,
             blend_mode=blend_mode, blend_opacity=float(blend_opacity),
@@ -671,6 +707,7 @@ class PostUpscaleProcgenBlend:
             shadow_crush_threshold=int(shadow_crush_threshold),
             green_only_overlay=bool(green_only_overlay),
             captions_ass_path=captions_ass_path,
+            source_dims=src_dims,
         )
         # Run with cwd = the .ass folder so the libass filter resolves the
         # subtitle by basename (sidesteps Windows drive-colon filtergraph

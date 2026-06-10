@@ -95,6 +95,28 @@ PLAYLIST = [
                   (N_WRITER, "creative_writing_model", GEMMA),
                   (N_WRITER, "technical_model", GEMMA)],
          expect_engine="humo"),
+    # Cloud writer lanes (operator-authorized 2026-06-09 night: "use an
+    # openrouter claude or a comfy credit gpt -- mix it up to be sure they
+    # all work"; spend = cents/episode, well under the $20 autonomy line).
+    # The slot MODEL resolves to the live catalog first-choice inside
+    # run_leg; a missing key/auth fails CLOSED with a named error -- which is
+    # itself the lane evidence.
+    dict(leg="ep05b_openrouter_claude_60w", lane="",
+         env={"OTR_ENABLE_OPENROUTER": "1"},
+         words=60, chars=2,
+         patches=[(N_CHARVOICE, "engine", "indextts2"),
+                  (N_MUSIC, "engine", "stable_audio_3"),
+                  (N_WRITER, "creative_writing_model", "openrouter:slot-a"),
+                  (N_WRITER, "technical_model", "openrouter:slot-a")],
+         expect_engine="humo"),
+    dict(leg="ep05c_comfy_credits_40w", lane="",
+         env={"OTR_ENABLE_COMFY_CREDITS": "1"},
+         words=40, chars=2,
+         patches=[(N_CHARVOICE, "engine", "indextts2"),
+                  (N_MUSIC, "engine", "stable_audio_3"),
+                  (N_WRITER, "creative_writing_model", "comfy:slot-a"),
+                  (N_WRITER, "technical_model", "comfy:slot-a")],
+         expect_engine="humo"),
     dict(leg="ep06_floor_30w", lane="HUMO=0",
          env={}, words=30, chars=2,
          patches=[(N_CHARVOICE, "engine", "indextts2"),

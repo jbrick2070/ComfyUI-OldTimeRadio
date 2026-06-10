@@ -399,13 +399,19 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
     # stem, which now carries post-chain suffixes (_silent_procgen_blended).
     slug = os.path.basename(os.path.dirname(final_mp4))
     audio_dir = os.path.join(EPISODES_DIR, slug, "audio")
-    # The master WAV keeps its capture-time pending_* name after the episode
-    # dir is renamed to the slug -- resolve it by suffix, never by slug.
+    # After the pending->slug rename BOTH master names can coexist (the
+    # capture-time pending_*_master.wav and the slug-named copy). Prefer the
+    # slug-named master (the mux re-resolves to it); fall back to the single
+    # remaining candidate.
     masters = sorted(glob.glob(os.path.join(audio_dir, "*_master.wav")))
-    if len(masters) != 1:
-        raise SoakFail("expected exactly one *_master.wav in %r, found %r"
-                       % (audio_dir, masters))
-    master_wav = masters[0]
+    if not masters:
+        raise SoakFail("no *_master.wav in %r" % audio_dir)
+    slug_named = [m for m in masters
+                  if os.path.basename(m) == slug + "_master.wav"]
+    master_wav = (slug_named or masters)[0]
+    if len(masters) > 1:
+        print("[soak] note: %d master WAVs after rename; using %s"
+              % (len(masters), os.path.basename(master_wav)), flush=True)
     ledger_path = os.path.join(audio_dir, slug + "_ledger.json")
     final_sha = pcm_sha256(final_mp4)
     master_sha = pcm_sha256(master_wav)
