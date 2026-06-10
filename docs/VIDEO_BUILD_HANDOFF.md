@@ -34,7 +34,20 @@ Finish the v1.4 2D capstone: the multi-model soak marathon is running overnight 
 - `cmd /c start` from a detached parent never spawns the child -- the marathon Popens the launcher directly with CREATE_NO_WINDOW.
 - An episode is ~35-45 min on the humo path at 30-60w (HuMo 14B ~45-100 s/it under load); LTX clips are ~15 s each.
 
-### MARATHON (running when this was written)
+### MARATHON RESULTS (final tally as of ~03:00; the 160w/4ch finale was still rendering -- check `marathon_20260610_025015/results.jsonl` for its row)
+| leg | result | histogram / evidence |
+|---|---|---|
+| quick test 30w (pre-marathon) | **PASS** | humo:5; pcm `e77afa966375`; ep `signal_lost_pulse_of_progress_20260609_212124` |
+| all-LTX 120w | **PASS** (10.5 min) | `{ltx_video:5}`; ep `signal_lost_record_of_the_leviathan_20260610_000210` |
+| LTX-base + latentsync combo 120w | **PASS** | `{still_kenburns:4, latentsync:1}` -- one REAL lipsync beat over an LTX base; misses fell LOUDLY to the floor (face-detect per generated base is a lottery; future: OTR_LSYNC_BASE_ENGINE=still_kenburns over the cast portrait for reliable faces) |
+| humo + bark + musicgen 60w | **PASS** | `{humo:5}`; bark + musicgen live in the logs |
+| humo + gemma writer 80w | **PASS** | `{humo:5}` |
+| floor 30w (FLOOR lane) | **PASS** | `{still_kenburns:5}` -- the procgen-only path renders the full deliverable (this IS the future low-VRAM mode's engine side) |
+| dia voice | named FAIL-CLOSED | `Dia Path B not installed` -- its sidecar venv was never installed on this box; leg swapped out |
+| OpenRouter claude writer | transport PASS / content FAIL-CLOSED | submit + remote calls worked; the generated script flunked the CastLock structural gate (`needs_full_rerun`) and the episode refused to render -- gates working as designed (cents spent) |
+| Comfy-Credits writer | named FAIL-CLOSED | `ComfyCreditsConfigError: No Comfy credentials` -- headless server has no logged-in Comfy Desktop; expected |
+
+### MARATHON (runner details)
 - Runner: `scripts/_otr_soak_marathon.py --hours 4.3`, console -> `scripts/_otr_soak_capstone_results/marathon_console2.log`, per-run dir `scripts/_otr_soak_capstone_results/marathon_<stamp>/` (marathon.log + results.jsonl + per-leg JSON evidence + per-leg server logs).
 - 9-leg repeating playlist: ep01 all-LTX 120w; ep02 LTX-base+latentsync combo 120w; ep03 humo+bark+musicgen 60w; ep04 humo+gemma 80w; ep05 humo+dia+gemma 60w; ep05b OpenRouter-claude writer 60w; ep05c Comfy-Credits writer 40w; ep06 floor 30w; ep07 humo 160w/4ch. Strict humo histogram on production legs; informational on experiment legs; ALL hard gates (playable AAC obs + byte-identical archival + hygiene + VRAM) every leg; errors log with tracebacks and the loop continues.
 
