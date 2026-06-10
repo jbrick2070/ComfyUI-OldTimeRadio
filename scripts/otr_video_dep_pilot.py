@@ -118,6 +118,24 @@ OPT_IN_ENGINES = {
             "peak, and render-twice determinism on sm_120"
         ),
     },
+    # The 1.7B HuMo downgrade tier (OOM/VRAM hard auto-downgrade target before
+    # latentsync/still). Same in-process HuMo wrapper + flag as the 14B keystone;
+    # its own UNET, NO LoRA, more steps -- a lighter real talking face.
+    "humo_1.7B": {
+        "lib_module": "humo",
+        "adapter_class": "HuMo17BEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_HUMO",
+        "assumed_call": (
+            "in-process: same HuMo ComfyUI wrapper node classes as the 14B tier "
+            "but the 1.7B UNET, LoRA-free, ~20 steps / cfg 5.0 (own "
+            "OTR_HUMO_17B_* knobs). The OOM/VRAM hard auto-downgrade lands here "
+            "before latentsync/still so a heavy episode keeps a real face.  "
+            "# TODO-for-GPU-smoke: confirm the 1.7B weight loads, fits a tighter "
+            "VRAM budget than the 14B, does not swap torch or pull "
+            "xformers/flash_attn/sageattention, and render-twice determinism"
+        ),
+    },
     # Phase 3 / B opt-in: character_3d dark scaffold adapters. Both run in
     # their own cu128 sidecar venv (NOT the ComfyUI cu130 venv); the venv
     # python path is OTR_B_SIDECAR_PYTHON (hunyuan3d) /

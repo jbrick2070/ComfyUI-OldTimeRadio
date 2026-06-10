@@ -221,9 +221,9 @@ def test_real_humo_chain_resolves_and_restamps_to_floor():
     def fallback_of(name):
         return getattr(vreg.get_engine(name), "fallback_engine", None)
     chain = resolve_fallback_chain("humo", fallback_of)
-    assert chain == ["humo", "latentsync", "still_kenburns"]
-    fam = {"humo": "audio_driven_face", "latentsync": "lipsync_overlay",
-           "still_kenburns": "static_motion"}
+    assert chain == ["humo", "humo_1.7B", "latentsync", "still_kenburns"]
+    fam = {"humo": "audio_driven_face", "humo_1.7B": "audio_driven_face",
+           "latentsync": "lipsync_overlay", "still_kenburns": "static_motion"}
     row = {"shot_id": "shot_09", "engine_id": "humo",
            "family": fam["humo"], "degradation_trail": []}
     for frm, to in zip(chain, chain[1:]):
@@ -232,7 +232,8 @@ def test_real_humo_chain_resolves_and_restamps_to_floor():
     assert row["engine_id"] == "still_kenburns"
     assert fallback_of("still_kenburns") is None  # radio floor terminates
     assert row["degradation_trail"] == [
-        "humo->latentsync (oom)", "latentsync->still_kenburns (oom)"]
+        "humo->humo_1.7B (oom)", "humo_1.7B->latentsync (oom)",
+        "latentsync->still_kenburns (oom)"]
 
 
 # --------------------------------------------------------------------------- #

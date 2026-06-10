@@ -53,6 +53,7 @@ SYNTH_FALLBACKS = {"hunyuan3d_talk": "humo"}
 #: not-yet-registered B engine + the A/cheap engines).
 ENGINE_FAMILY = {
     "hunyuan3d_talk": "character_3d", "humo": "audio_driven_face",
+    "humo_1.7B": "audio_driven_face",
     "latentsync": "lipsync_overlay", "still_kenburns": "static_motion",
     "ltx_video": "text_to_video", "wan_i2v": "image_to_video",
     "abstract": "abstract", "station_card": "static_image_gen",
@@ -75,12 +76,13 @@ _PROFILES = (
 _CHAR3D = ("character_video", "hunyuan3d_talk", "character_3d")
 #: The heavy engines the soak forces to OOM on the character_3d shot so the chain
 #: walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"hunyuan3d_talk", "humo", "latentsync"})
+OOM_ENGINES = frozenset({"hunyuan3d_talk", "humo", "humo_1.7B", "latentsync"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: The expected character_3d degradation trail to the radio floor.
-EXPECTED_OOM_TRAIL = ["hunyuan3d_talk->humo (oom)", "humo->latentsync (oom)",
+EXPECTED_OOM_TRAIL = ["hunyuan3d_talk->humo (oom)", "humo->humo_1.7B (oom)",
+                      "humo_1.7B->latentsync (oom)",
                       "latentsync->still_kenburns (oom)"]
 
 

@@ -24,7 +24,8 @@ from nodes._otr_shared.fallback import resolve_fallback_chain
 def test_fallback_chain_character3d_converges_to_floor():
     fb = rd.make_fallback_of()
     chain = resolve_fallback_chain("hunyuan3d_talk", fb)
-    assert chain == ["hunyuan3d_talk", "humo", "latentsync", "still_kenburns"]
+    assert chain == ["hunyuan3d_talk", "humo", "humo_1.7B",
+                     "latentsync", "still_kenburns"]
 
 
 def test_fallback_dangling_engine_gets_universal_floor():

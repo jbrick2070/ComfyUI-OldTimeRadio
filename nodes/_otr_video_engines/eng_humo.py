@@ -90,10 +90,13 @@ class HuMoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
-    #: Family-degradation next hop. A render-time failure falls here, then on to
-    #: the radio floor: humo -> latentsync -> still_kenburns (see
-    #: nodes/_otr_shared/fallback.py). One single-linked hop per engine.
-    fallback_engine = "latentsync"
+    #: Family-degradation next hop. The 14B keystone degrades FIRST to the 1.7B
+    #: HuMo tier -- a real talking face that fits a tighter VRAM budget -- on an
+    #: OOM/VRAM (or any HARD) failure, ONLY then to latentsync and the still
+    #: floor: humo -> humo_1.7B -> latentsync -> still_kenburns (operator hard
+    #: auto-downgrade rule 2026-06-09; see nodes/_otr_shared/fallback.py). One
+    #: single-linked hop per engine; the LOUD restamp happens in the render node.
+    fallback_engine = "humo_1.7B"
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
@@ -118,6 +121,16 @@ class HuMoEngine(_MC.MotionEngineBase):
         headless-safe). The full MODEL+CLIP+VAE+AUDIO_ENCODER multi-handle load
         (+ the low/high/gguf tier pick) is the GPU smoke."""
         return os.path.exists(self._ckpt_path())
+
+    # ---- sampler tier (overridable per HuMo tier; the 1.7B downgrade isolates
+    # ---- its own steps/cfg so the 14B OTR_HUMO_STEPS/CFG never bleed into it) --
+    def _steps(self):
+        """KSampler steps for this tier. 14B + lightx2v distill = 6 (fast)."""
+        return int(os.environ.get("OTR_HUMO_STEPS", "6"))
+
+    def _cfg(self):
+        """KSampler cfg for this tier. 14B + lightx2v distill = 1.0."""
+        return float(os.environ.get("OTR_HUMO_CFG", "1.0"))
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -196,8 +209,8 @@ class HuMoEngine(_MC.MotionEngineBase):
         LoadImage->ref_image; WanHuMoImageToVideo->KSampler->VAEDecode."""
         from . import wrapper_bridge as _wb
         names = self._loader_names()
-        steps = int(os.environ.get("OTR_HUMO_STEPS", "6"))
-        cfg = float(os.environ.get("OTR_HUMO_CFG", "1.0"))
+        steps = self._steps()
+        cfg = self._cfg()
         positive = plan.get("text_prompt") or "a person speaking, subtle facial motion"
         negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
         W = _wb.Wire
@@ -433,4 +446,55 @@ class HuMoEngine(_MC.MotionEngineBase):
         }
 
 
-__all__ = ["HuMoEngine"]
+#: 1.7B fallback-tier defaults (the lighter, no-LoRA talking face). Env-isolated
+#: from the 14B knobs via the OTR_HUMO_17B_* namespace so a 14B OTR_HUMO_STEPS=6
+#: / OTR_HUMO_CFG=1.0 never bleeds into this slower tier.
+_HUMO_17B_UNET = "humo_1.7B_fp16.safetensors"
+
+
+@register
+class HuMo17BEngine(HuMoEngine):
+    """The 1.7B HuMo downgrade tier. The OOM/VRAM hard auto-downgrade from the
+    14B keystone lands HERE before latentsync/still, so a heavy episode that
+    can't fit the 14B keeps a REAL audio-driven talking face. Config is isolated
+    from the 14B env: its own UNET, NO LoRA (the lightx2v distill is 14B-shaped
+    and shape-mismatches the 1.7B tier), and its own steps/cfg via OTR_HUMO_17B_*
+    (defaults: 20 steps / cfg 5.0 -- the distill shortcut is gone so it needs
+    more steps). Shares roles / required_inputs / requires_flag / the in-process
+    graph topology with the 14B base; only the tier config differs. Degrades on
+    to latentsync, then the still floor."""
+
+    name = "humo_1.7B"
+    engine_version = "1"
+    fallback_engine = "latentsync"
+
+    def _ckpt_path(self):
+        env = os.environ.get("OTR_HUMO_17B_CKPT")
+        if env:
+            return env
+        name = os.environ.get("OTR_HUMO_17B_UNET_NAME") or _HUMO_17B_UNET
+        try:
+            import folder_paths  # type: ignore
+            p = folder_paths.get_full_path("diffusion_models", name)
+            if p:
+                return p
+        except Exception:  # noqa: BLE001 - headless/CPU: fall back to a join
+            pass
+        return os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
+
+    def _loader_names(self):
+        names = super()._loader_names()
+        names["unet"] = os.path.basename(self._ckpt_path())
+        # The 14B-shaped lightx2v distill LoRA is incompatible with 1.7B: run
+        # LoRA-free (more steps below make up for the lost distill shortcut).
+        names["lora"] = os.environ.get("OTR_HUMO_17B_LORA_NAME", "none")
+        return names
+
+    def _steps(self):
+        return int(os.environ.get("OTR_HUMO_17B_STEPS", "20"))
+
+    def _cfg(self):
+        return float(os.environ.get("OTR_HUMO_17B_CFG", "5.0"))
+
+
+__all__ = ["HuMoEngine", "HuMo17BEngine"]

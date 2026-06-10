@@ -66,11 +66,11 @@ def test_assert_usable_advances_to_missing_model_with_flag_on(monkeypatch):
 def test_humo_fallback_chain_and_demo():
     r = SMK.run_smoke("humo")
     assert _check(r, "fallback_chain")["detail"] == \
-        "humo -> latentsync -> still_kenburns"
+        "humo -> humo_1.7B -> latentsync -> still_kenburns"
     demo = r["fallback_demo"]
-    assert demo["chain"] == ["humo", "latentsync", "still_kenburns"]
+    assert demo["chain"] == ["humo", "humo_1.7B", "latentsync", "still_kenburns"]
     assert demo["converges_to_floor"] is True
-    assert len(demo["decisions"]) == 2
+    assert len(demo["decisions"]) == 3
     assert all(d["block_class"] == "hard" and d["failure_kind"] == "oom"
                and d["video_revision"] == 1 for d in demo["decisions"])
     assert all("frozen audio untouched" in line for line in demo["logs"])

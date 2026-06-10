@@ -66,7 +66,7 @@ def test_two_episode_soak_passes_all_invariants():
     assert any("determinism" in c for c in checks)
 
 
-def test_character_3d_oom_converges_to_floor_with_three_restamps():
+def test_character_3d_oom_converges_to_floor_with_four_restamps():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
     sec = result["e1"]["ledger"]["video"]
     oom = {s["shot_id"]: s for s in sec["shots"]}[result["meta"]["oom_shot_id"]]
@@ -74,7 +74,8 @@ def test_character_3d_oom_converges_to_floor_with_three_restamps():
     assert oom["family"] == "static_motion"
     assert oom["degradation_trail"] == SOAK.EXPECTED_OOM_TRAIL
     decisions = sec["runtime_fallback_decisions"]
-    assert len(decisions) == 3
+    # 4 hops now: hunyuan3d_talk -> humo -> humo_1.7B -> latentsync -> still_kenburns
+    assert len(decisions) == 4
     assert all(d["failure_kind"] == "oom" and d["block_class"] == "hard"
                and d["video_revision"] == 1 for d in decisions)
 
