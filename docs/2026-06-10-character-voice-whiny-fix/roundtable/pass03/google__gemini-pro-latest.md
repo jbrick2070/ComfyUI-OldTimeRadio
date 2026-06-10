@@ -1,0 +1,39 @@
+<!-- requested_model: ~google/gemini-pro-latest | resolved_model: google/gemini-3.1-pro-preview-20260219 -->
+
+Here is an independent review of the v3 plan, focusing on acoustic realities, voice-direction principles, and the specific mechanics of your ComfyUI/IndexTTS2 pipeline.
+
+### 1. Blind Spots (What the DOC misses)
+
+*   **The Resampling Formant Shift (G14 interaction):** The DOC notes refs are 44.1 kHz and the engine is 22.05 kHz, but misses the psychoacoustic consequence. If IndexTTS2’s internal audio loader (UNSURE: likely `torchaudio.load` or `librosa` inside the isolated worker) handles the 44.1 -> 22.05 downsample with a cheap/nearest-neighbor algorithm or poor anti-aliasing, it can cause a slight upward formant shift. Upward formants literally shrink the perceived vocal tract size, turning a warm adult voice into a thinner, younger, or "munchkin/whiny" voice. 
+*   **The "Contradiction" Whine (G6 + G8 interaction):** The DOC notes that keyword vectors saturate `afraid/sad/surprised`. But it misses how zero-shot models resolve conflicting conditioning. If a line has a high `calm` score (from the default floor) but the text contains `?` or `!`, the model is receiving a contradictory prompt: "Read this high-arousal text with low-arousal phonation." In many TTS latent spaces, the mathematical compromise between "calm" and "urgent" is *pleading/whining* (suppressed vocal effort + rising pitch contour).
+*   **The Crest Factor Mismatch (G15):** The DOC mentions loudness (RMS) matching, but misses *density* (Crest Factor = Peak / RMS). Announcer models like Kokoro are typically highly compressed and dense (low crest factor). Zero-shot cloners are highly dynamic (high crest factor). If you RMS-match a dynamic voice to a compressed voice, the dynamic voice's body (the low-mids) will sit too low in the mix, making it sound weak and distant. Listeners interpret a "distant/weak" character as lacking authority (i.e., whiny).
+
+### 2. Craft (Voice Director / Audio Post perspective)
+
+*   **The "Hanging Tail" Anchor:** A voice director knows that a zero-shot cloner disproportionately anchors its baseline pitch and confidence on the *final second* of the reference clip. The current trimmer (and the proposed P2d fix) just looks for "voiced runs." If a 10-second cut happens to end mid-sentence or on an upward/hesitant inflection, the clone inherits that hesitation as its baseline personality. 
+    *   *Automatable fix:* In `classify_and_trim`, instead of just taking the longest voiced run, calculate the F0 slope of the final 500ms of the candidate trim. Reject trims that end with a rising F0 (an implied question/interruption). Force the trimmer to end on a downward, authoritative cadence.
+*   **The `!` Override for Interrogatives:** When actors naturally read a short question (e.g., "What?"), they often default to a high, pleading pitch. Directors fix this by telling them to "demand the answer, don't ask for it." 
+    *   *Automatable fix:* In the P1.3 punctuation lever, don't just test replacing `?` with `.`. Test replacing short interrogatives (under 5 words) with `!` (e.g., "What!"). This forces the engine's text-prosody module to use a commanding, downward-driving contour instead of a rising, whiny one.
+*   **Anchoring the Chest Voice:** Thin voices lack low-midrange weight (150-300 Hz). In post-production, you don't just turn them up; you compress the low-mids so the "chest" of the voice never drops below a certain threshold. 
+
+### 3. Critique of the Plan (P0–P4)
+
+*   **P0 Cell 8 (Fixed-character-seed) is a trap:** G17 correctly identifies that per-line seeds cause wandering stances. However, fixing the seed *per character* for the entire episode (Cell 8) is highly risky. In many zero-shot models, the seed dictates the specific prosody contour/rhythm. If you use the exact same seed for a 3-word line and a 20-word line, the model may force the exact same rhythmic cadence, resulting in a robotic, repetitive, or glitchy read. *Correction:* The seed should be stable but text-dependent (e.g., `hash(char_id + line_id)`), which is actually what `_seed_to_int64(engine, request.stable_line_seed)` already does. The "wandering" is a feature of zero-shot TTS, not a bug. If you want consistency, you lower the temperature (if IndexTTS2 exposes it) or rely on `emo_alpha`, not a fixed RNG seed.
+*   **P2d (Trimmer Fix) is mis-ordered and insufficient:** The plan says to fix the trimmer "BEFORE any future ref download." But G18 proves the *existing* curated refs (the quiet ones) never went through a working trim. You shouldn't just fix the trimmer for the future; you must re-trim the 4 offending curated originals immediately, or at least run them through the P2d loudness-normalization.
+*   **P1.1 (Delivery Table v2) - The Cap Strategy:** The plan suggests "primary + 1 secondary max" (Gemini's idea). This is riskier than it looks. If a line is "What? No! Run!", and you cap it to Surprise + Angry, you drop Fear entirely. A safer, cheaper step that dominates this is simply **dividing the final vector by its sum** if the sum exceeds 1.0 (Normalize-sum). This preserves the *ratio* of the writer's intent without saturating the model's latent space.
+*   **P3b (Resolve-once cache):** This is excellent and necessary, but ensure the cache key includes the `episode_seed`. If it doesn't, a character will draw the same voice across entirely different episodes, breaking the "uniform per-episode lottery" design (G4). *(Note: The DOC does specify `episode` in the key, so this is just a strict enforcement check).*
+
+### 4. Wildcards (30-minute experiments)
+
+*   **Wildcard 1: The "Prepend-and-Slice" Authority Hack (Speculation)**
+    *   *Concept:* Zero-shot models often struggle to establish authority on the first word of a line, especially if it's a question.
+    *   *Experiment:* In the adapter (`eng_indextts2.py`), intercept the text. Prepend a strong, declarative anchor word and a period: `"Listen. [Actual Line]"`. Render the audio, then programmatically slice off the first ~0.8 seconds (or use silence detection to drop the first word). 
+    *   *Why it might work:* It forces the TTS text-encoder to start the generation in an authoritative, declarative latent state, eliminating the hesitant/whiny onset.
+*   **Wildcard 2: Offline Resample & Pre-Emphasis of the Bank**
+    *   *Concept:* Bypass any internal IndexTTS2 resampling degradation (Blind Spot 1) and artificially boost the chest resonance of the prompts.
+    *   *Experiment:* Take the 4 worst-performing male refs. Offline, resample them to exactly 22050 Hz using a high-quality polyphase filter (so the worker doesn't have to). Apply a +3dB EQ shelf below 300 Hz. Save as new SHA'd refs. Run them in P0. 
+    *   *Why it might work:* If the cloner is faithfully copying the spectral tilt of the prompt, feeding it a pre-warmed, natively-sampled WAV forces it to generate a thicker, heavier voice.
+*   **Wildcard 3: The "Anti-Whine" Punctuation Strip**
+    *   *Concept:* The adapter currently passes `?` and `!` into the engine (G12). IndexTTS2 might have an overly aggressive internal prosody model for punctuation that overrides your emotion vector.
+    *   *Experiment:* Add a P0 cell where you strip *all* terminal punctuation (replace `?` and `!` with a single space or comma) and rely *100% on the emotion vector* to carry the intent. 
+    *   *Why it might work:* It completely isolates the emotion vector from the text-encoder's punctuation bias. If this cell sounds flat but authoritative (not whiny), it proves the whine is coming almost entirely from the engine's hardcoded reaction to the `?` token.

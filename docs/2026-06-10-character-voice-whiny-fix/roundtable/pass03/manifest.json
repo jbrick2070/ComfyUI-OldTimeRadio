@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-10T18:23:51.722499+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-10-character-voice-whiny-fix__problem-statement.md",
+  "prompt_tokens_est": 24580,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 24716,
+      "completion_tokens": 7970,
+      "cost_usd": 0.110595
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 28392,
+      "completion_tokens": 5535,
+      "cost_usd": 0.09084
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 24390,
+      "completion_tokens": 1977,
+      "cost_usd": 0.03543
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 26265,
+      "completion_tokens": 2563,
+      "cost_usd": 0.013655085
+    }
+  ],
+  "total_cost_usd": 0.2505
+}
