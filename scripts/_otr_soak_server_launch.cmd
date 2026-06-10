@@ -12,6 +12,9 @@ set NVIDIA_TF32_OVERRIDE=0
 set TOKENIZERS_PARALLELISM=false
 set OTR_CAST_SEED=42
 set OTR_STYLE_SEED=42
+rem Hydrate per-user secrets a detached shell may not have inherited (the DC
+rem service env snapshot predates setx -- known gotcha). Value is NEVER echoed.
+for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User')"`) do set OPENROUTER_API_KEY=%%k
 rem OUTPUT UNIFICATION (operator directive 2026-06-09): even headless, ALL
 rem outputs -- episodes, portraits, finals, EVERYTHING -- land in the REAL
 rem output folder the operator watches. --output-directory pins ComfyUI's

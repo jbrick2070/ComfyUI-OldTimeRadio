@@ -94,11 +94,13 @@ PLAYLIST = [
                   (N_WRITER, "creative_writing_model", GEMMA),
                   (N_WRITER, "technical_model", GEMMA)],
          expect_engine="humo"),
-    dict(leg="ep05_humo_dia_gemma_60w", lane="",
-         env={}, words=60, chars=2,
-         patches=[(N_CHARVOICE, "engine", "dia"),
+    # dia swapped out 2026-06-10: its Path-B sidecar venv is NOT installed on
+    # this box (named fail-closed documented in marathon_20260610_022442).
+    dict(leg="ep05_humo_idx_musicgen_100w", lane="",
+         env={}, words=100, chars=3,
+         patches=[(N_CHARVOICE, "engine", "indextts2"),
                   (N_MUSIC, "engine", "musicgen"),
-                  (N_WRITER, "creative_writing_model", GEMMA),
+                  (N_WRITER, "creative_writing_model", MISTRAL),
                   (N_WRITER, "technical_model", GEMMA)],
          expect_engine="humo"),
     # Cloud writer lanes (operator-authorized 2026-06-09 night: "use an
@@ -146,13 +148,26 @@ def log_line(fh, msg):
 
 
 def kill_server():
-    subprocess.run(
-        ["powershell", "-NoProfile", "-Command",
-         "(Get-NetTCPConnection -LocalPort 8000 -State Listen "
-         "-ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique"
-         " | %{ Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"],
-        capture_output=True, check=False)
-    time.sleep(6)
+    """Kill the :8000 server and WAIT until the port actually closes.
+
+    2026-06-10 marathon catch: without the wait, launch_server's first poll
+    can hit the DYING previous server, return 'up' instantly, and the leg
+    submits against the STALE env (r06's openrouter slot rejected
+    value_not_in_list because the old no-flag schema answered)."""
+    for _ in range(10):
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(Get-NetTCPConnection -LocalPort 8000 -State Listen "
+             "-ErrorAction SilentlyContinue).OwningProcess | Select-Object "
+             "-Unique | %{ Stop-Process -Id $_ -Force "
+             "-ErrorAction SilentlyContinue }"],
+            capture_output=True, check=False)
+        time.sleep(4)
+        try:
+            requests.get(COMFY + "/system_stats", timeout=3)
+        except Exception:  # noqa: BLE001 -- port closed = done
+            return
+    raise RuntimeError("port 8000 still answering after kill attempts")
 
 
 def write_extra_env(env: dict):
@@ -186,7 +201,7 @@ def launch_server(log_path: str, lane: str, timeout_s: int = 240) -> bool:
     return False
 
 
-def run_marathon(hours: float, max_eps: int) -> int:
+def run_marathon(hours: float, max_eps: int, skip: int = 0) -> int:
     stamp = time.strftime("%Y%m%d_%H%M%S")
     out_dir = os.path.join(soak.RESULTS_DIR, "marathon_" + stamp)
     os.makedirs(out_dir, exist_ok=True)
@@ -197,10 +212,12 @@ def run_marathon(hours: float, max_eps: int) -> int:
     log_line(fh, "MARATHON start: %.1fh budget, %d-leg playlist (then repeat),"
              " results -> %s" % (hours, len(PLAYLIST), out_dir))
     results = []
-    i = 0
-    while time.time() < deadline and i < max_eps:
+    i = int(skip)                          # resume mid-playlist after a fix
+    n_run = 0
+    while time.time() < deadline and n_run < max_eps:
         spec = dict(PLAYLIST[i % len(PLAYLIST)])
         i += 1
+        n_run += 1
         leg = "r%02d_%s" % (i, spec["leg"])
         row = {"leg": leg, "lane": spec.get("lane", ""),
                "started": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -267,8 +284,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=float, default=5.0)
     ap.add_argument("--max-eps", type=int, default=99)
+    ap.add_argument("--skip", type=int, default=0,
+                    help="start at playlist index N (resume after a fix)")
     args = ap.parse_args(argv)
-    return run_marathon(args.hours, args.max_eps)
+    return run_marathon(args.hours, args.max_eps, skip=args.skip)
 
 
 if __name__ == "__main__":
