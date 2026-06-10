@@ -1,8 +1,30 @@
 
 **Last updated:** 2026-06-09  
 **Branch:** `v2.0-alpha`  
-**HEAD:** `317a295` (fix(mux): re-resolve master audio after pending->slug rename; smoke slot-picker by type — PUSHED, origin == HEAD)  
+**HEAD:** `ea024c7` (feat(humo): bake the FAST 14B Kijai+lightx2v 6-step tier in as the default keystone — PUSHED, origin == HEAD)  
 **Commits ahead of origin:** 0 (in sync)
+
+## HuMo KEYSTONE LIVE-VERIFIED on the 14B FAST tier (2026-06-09)
+
+Run `ceef5e1b` / episode_id `pending_20260609_170145`. Booted env (echoed):
+`OTR_ENABLE_HUMO=1`, `OTR_HUMO_UNET_NAME=Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`,
+`OTR_HUMO_LORA_NAME=lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`,
+`OTR_HUMO_STEPS=6`, `OTR_HUMO_CFG=1.0`. These are now the BAKED-IN defaults in
+`eng_humo.py` (commit `ea024c7`) — only the enable flag is needed; the UNET resolves
+via `folder_paths`/extra_model_paths. Live proof: `Requested to load WAN21_HuMo` +
+WhisperLargeV3/WanTEModel/WanVAE, KSampler bar `0/6` (6 steps), ~2 min/beat,
+VRAM peak **13.8 GB ≤ 14.5**. `engine_histogram={"humo":3,"still_kenburns":2}`;
+final mp4 PCM `093e3d7eb129` == master (byte-identical). NB clip files at
+`C:\ComfyUI-Models\diffusion_models\Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`
++ `C:\ComfyUI-Models\loras\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`.
+
+OPEN follow-ups: (1) 2 talking beats (b001/b005) still fell back with
+`GraphExecutionError: humo ... audio=''` — a per-beat audio-slice timing edge case
+(intro/outro beats get no sliceable clip), NOT a config issue. (2) Operator directive
+2026-06-09: the OOM/VRAM fallback must degrade **humo_14B -> humo_1.7B -> latentsync ->
+still** (keep a real talking face before the still floor), per the ROADMAP hard
+auto-downgrade rule, with LOUD restamp. Currently the chain is humo -> latentsync ->
+still (single humo engine, no 1.7B tier).
 
 ---
 
