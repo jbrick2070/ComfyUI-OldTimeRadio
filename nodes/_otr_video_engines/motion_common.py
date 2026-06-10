@@ -52,20 +52,33 @@ ISOLATION_SIDECAR_OPTIONAL = "sidecar_optional"
 # BUG-070 SageAttention contamination gate
 # --------------------------------------------------------------------------- #
 def sageattention_patched(modules=None, env=None):
-    """True if SageAttention is RESIDENT / forced on (not merely installed).
+    """True if SageAttention is ACTIVE / forced on (not merely installed).
 
-    Detected WITHOUT importing anything heavy: a custom node that activates
-    SageAttention (e.g. KJNodes) leaves ``sageattention`` in ``sys.modules`` at
-    startup, and an explicit operator override ``OTR_SAGEATTENTION_PATCHED=1``
-    forces the gate closed for a wrapper that monkeypatched comfy attention
-    without leaving the module visible. Pure + side-effect free (reads
-    ``sys.modules`` / ``os.environ`` only; never imports sageattention).
+    2026-06-09 (capstone soak catch): current ComfyUI core imports
+    ``sageattention`` UNCONDITIONALLY at ``comfy.ldm.modules.attention``
+    import -- an availability probe that leaves the module in ``sys.modules``
+    on EVERY boot when the pip package is installed, regardless of
+    ``--use-sage-attention``. Module residency therefore no longer implies
+    activation. Inside a live ComfyUI process the REAL activation switch is
+    ``comfy.model_management.sage_attention_enabled()`` -- consult it.
+
+    Precedence: the explicit operator override ``OTR_SAGEATTENTION_PATCHED=1``
+    (a wrapper that monkeypatched comfy attention invisibly) -> the live
+    comfy activation switch -> the ``sys.modules`` heuristic (non-comfy
+    contexts, e.g. CPU tests, which inject ``modules``/``env``). Pure +
+    side-effect free; never imports sageattention itself.
     """
-    mods = sys.modules if modules is None else modules
-    if "sageattention" in mods:
-        return True
     environ = os.environ if env is None else env
-    return environ.get("OTR_SAGEATTENTION_PATCHED", "0") == "1"
+    if environ.get("OTR_SAGEATTENTION_PATCHED", "0") == "1":
+        return True
+    if modules is None and env is None:
+        try:
+            from comfy import model_management as _mm
+            return bool(_mm.sage_attention_enabled())
+        except Exception:  # noqa: BLE001 -- not inside ComfyUI; heuristic below
+            pass
+    mods = sys.modules if modules is None else modules
+    return "sageattention" in mods
 
 
 def assert_sage_not_patched(engine_name, family, *, modules=None, env=None):

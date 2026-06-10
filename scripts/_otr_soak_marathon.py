@@ -69,7 +69,13 @@ PLAYLIST = [
                "scene_broll=ltx_video,music_visual=ltx_video,"
                "background_abstract=ltx_video"),
               "OTR_ENABLE_LATENTSYNC": "1",
-              "OTR_LSYNC_BASE_ENGINE": "ltx_video"},
+              "OTR_LSYNC_BASE_ENGINE": "ltx_video",
+              # The headless server resolves the Path-B defaults under the
+              # INSTALL root (junction) -- pin the real Documents install.
+              "OTR_LATENTSYNC_VENV":
+              r"C:\Users\jeffr\Documents\ComfyUI\latentsync\.venv\Scripts\python.exe",
+              "OTR_LATENTSYNC_REPO":
+              r"C:\Users\jeffr\Documents\ComfyUI\latentsync\repo"},
          words=120, chars=2,
          patches=[(N_CHARVOICE, "engine", "indextts2"),
                   (N_MUSIC, "engine", "stable_audio_3")],

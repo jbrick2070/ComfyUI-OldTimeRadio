@@ -213,7 +213,13 @@ class WanI2VEngine(_MC.MotionEngineBase):
             plan["target_frame_count"] or self.target_fps,
             min_frames=_WAN_MIN_FRAMES, max_frames=_WAN_MAX_FRAMES)
         graph = self._build_graph(request, image_name, plan, length, width, height)
-        results = _wb.run_graph(graph, classes)
+        # free_after_use (2026-06-09, the LTX capstone catch applied here
+        # preemptively): umt5-fp8 + the 14B fp8 Wan UNET must not stay
+        # co-resident through the sampler on a 16 GB card. "unet" is kept for
+        # the V-4 patcher teardown, "vae" for the decode, the terminal for the
+        # IMAGE read-out.
+        results = _wb.run_graph(graph, classes, free_after_use=True,
+                                keep={"unet", "vae", self._TERMINAL})
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers

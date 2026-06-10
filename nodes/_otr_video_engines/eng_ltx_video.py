@@ -265,7 +265,15 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
         graph = self._build_graph(plan, length, width, height)
-        results = _wb.run_graph(graph, classes)
+        # free_after_use (2026-06-09 capstone catch): the fp16 T5 encoder
+        # (~9.5 GB) must NOT stay co-resident with the LTX UNET through the
+        # sampler -- the first live clip breached the machine-wide 14.5 GB
+        # ceiling (15.5 GB incl. the desktop baseline). The bridge frees each
+        # intermediate (encoder/conds/latent) once its last consumer ran;
+        # "checkpoint" is kept for the V-4 patcher teardown, the terminal for
+        # the IMAGE read-out.
+        results = _wb.run_graph(graph, classes, free_after_use=True,
+                                keep={"checkpoint", self._TERMINAL})
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers

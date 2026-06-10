@@ -863,6 +863,7 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     request = build_request(shot, assets, frame_count, canvas)
     t0 = time.time()
     try:
+        _provide_lipsync_base(engine_name, request)   # combo seam (env-gated)
         clip = _render_one(engine_name, request, force_oom=False)
         return {"ok": True, "engine": engine_name,
                 "elapsed_s": round(time.time() - t0, 1),
