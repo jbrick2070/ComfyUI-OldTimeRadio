@@ -692,26 +692,30 @@ class TestWriterB2aSurface:
             f"news_briefs_required (slot 18); got {wv[18]!r}"
         )
         # Slots 19/20: the S2 OpenRouter slot-slug pickers, appended at the
-        # END. The shipped bake pins the recommended slugs; creative/technical
-        # stay LOCAL at wv[3]/wv[4], so these slots are inert unless a handle
-        # is selected. A saved slug is preserved verbatim (preservation rule).
-        assert wv[19] == "anthropic/claude-opus-4.8", (
-            f"openrouter_slot_a_model (slot 19) drifted: {wv[19]!r}"
+        # END. PRODUCTION RESTORE 2026-06-10: the shipped bake previously
+        # pinned the recommended slugs, but ComfyUI's /prompt validator
+        # REJECTS an out-of-catalog value whenever the remote lane is OFF
+        # (value_not_in_list) -- the saved file would not queue AS-IS. The
+        # bake now ships the DISABLED SENTINELS; an operator who enables a
+        # lane picks a slug in the UI and the preservation rule keeps it.
+        assert wv[19] == "(enable OpenRouter)", (
+            f"openrouter_slot_a_model (slot 19) must ship the disabled "
+            f"sentinel (the saved file must queue with lanes off); got "
+            f"{wv[19]!r}"
         )
-        assert wv[20] == "deepseek/deepseek-v4-pro", (
-            f"openrouter_slot_b_model (slot 20) drifted: {wv[20]!r}"
+        assert wv[20] == "(enable OpenRouter)", (
+            f"openrouter_slot_b_model (slot 20) must ship the disabled "
+            f"sentinel; got {wv[20]!r}"
         )
-        # Slots 21/22: the Comfy Credits slot-slug pickers, appended at the
-        # END. The shipped bake pins the recommended Comfy-lane slugs
-        # (Anthropic tops out at claude-opus-4.7 on Comfy's curated catalog);
-        # creative/technical stay LOCAL at wv[3]/wv[4], so these slots are
-        # inert unless a comfy:slot handle is selected. A saved slug is
-        # preserved verbatim (preservation rule).
-        assert wv[21] == "anthropic/claude-opus-4.7", (
-            f"comfy_slot_a_model (slot 21) drifted: {wv[21]!r}"
+        # Slots 21/22: the Comfy Credits slot-slug pickers -- same sentinel
+        # rule as 19/20.
+        assert wv[21] == "(enable Comfy Credits)", (
+            f"comfy_slot_a_model (slot 21) must ship the disabled sentinel; "
+            f"got {wv[21]!r}"
         )
-        assert wv[22] == "deepseek/deepseek-v4-pro", (
-            f"comfy_slot_b_model (slot 22) drifted: {wv[22]!r}"
+        assert wv[22] == "(enable Comfy Credits)", (
+            f"comfy_slot_b_model (slot 22) must ship the disabled sentinel; "
+            f"got {wv[22]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

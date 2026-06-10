@@ -37,7 +37,9 @@ def test_ltx_video_registered_and_dark():
     eng = vreg.get_engine("ltx_video")
     assert isinstance(eng, LtxVideoEngine)
     assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
-    assert eng.default_roles == ()                 # not a default -> dark
+    # PRODUCTION RESTORE 2026-06-10: no longer dark -- the announcer radio
+    # open + the theme-music visual are the engine's in-stack defaults.
+    assert eng.default_roles == ("announcer_visual", "music_visual")
     assert eng.requires_flag == "OTR_ENABLE_LTX_VIDEO"
     assert eng.required_inputs == ("text_prompt",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
@@ -62,15 +64,20 @@ def test_wan_i2v_registered_and_dark():
 # Registry gating (dark until the opt-in flag) + role membership
 # --------------------------------------------------------------------------- #
 def test_registry_gates_ltx_until_flag(monkeypatch):
+    # PRODUCTION RESTORE 2026-06-10: announcer_visual + music_visual are the
+    # engine's DEFAULT roles (the LTX radio open + theme-music visual in the
+    # shipped workflow) -- registry-usable with NO env. scene_broll /
+    # background_abstract stay flag-gated extras (the generic registry gate).
     monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
-    for role in ("scene_broll", "background_abstract", "music_visual"):
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("ltx_video", role)          # dark -> GATED_BY_FLAG
-    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
-    for role in ("scene_broll", "background_abstract", "music_visual"):
+    for role in ("announcer_visual", "music_visual"):
         assert vreg.assert_usable("ltx_video", role) == "ltx_video"
-    with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("ltx_video", "announcer_visual")   # role not served
+    for role in ("scene_broll", "background_abstract"):
+        with pytest.raises(vreg.EngineUnusable):
+            vreg.assert_usable("ltx_video", role)          # gated extra
+    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
+    for role in ("scene_broll", "background_abstract", "music_visual",
+                 "announcer_visual"):
+        assert vreg.assert_usable("ltx_video", role) == "ltx_video"
 
 
 def test_registry_gates_wan_until_flag(monkeypatch):
@@ -92,12 +99,14 @@ def test_ltx_role_fit_text_to_video():
     eng = vreg.get_engine("ltx_video")
     desc = {"engine_id": "ltx_video", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
-    for role in ("scene_broll", "background_abstract", "music_visual"):
+    # announcer_visual GRANTED 2026-06-10 (the non-lipsync LTX radio open);
+    # character_video stays excluded (a talking face needs lipsync).
+    for role in ("scene_broll", "background_abstract", "music_visual",
+                 "announcer_visual"):
         assert rc.engine_fits_role(desc, role) is True
-    for role in ("announcer_visual", "character_video"):
-        assert rc.engine_fits_role(desc, role) is False
+    assert rc.engine_fits_role(desc, "character_video") is False
     assert "ltx_video" in rc.filter_engines_for_role("background_abstract", [desc])
-    assert rc.filter_engines_for_role("announcer_visual", [desc]) == []
+    assert rc.filter_engines_for_role("announcer_visual", [desc]) == ["ltx_video"]
 
 
 def test_wan_role_fit_image_to_video_needs_init_image():

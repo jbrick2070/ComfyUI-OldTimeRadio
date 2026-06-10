@@ -53,9 +53,20 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     name = "ltx_video"
     family = "text_to_video"
     # Generative motion b-roll / background / music visuals -- the roles whose
-    # only required input is a text prompt. NOT a talking-head role (no lipsync).
-    roles = ("scene_broll", "background_abstract", "music_visual")
-    default_roles = ()
+    # only required input is a text prompt. ``announcer_visual`` GRANTED
+    # 2026-06-10 (production restore): the operator's radio OPEN renders the
+    # period radio-station b-roll on the announcer beats INSTEAD of a
+    # lip-synced face -- the deliberate "like before" look (the role supplies
+    # text_prompt; LTX ignores the beat's audio_ref by family). A talking-face
+    # announcer remains available by selecting humo on the OTR_VideoDirector
+    # announcer slot.
+    roles = ("scene_broll", "background_abstract", "music_visual",
+             "announcer_visual")
+    # PRODUCTION DEFAULTS 2026-06-10: the shipped workflow routes the radio
+    # OPEN (announcer) + the theme-music visual through ltx_video, so those
+    # two roles are the engine's in-stack defaults (registry-usable with no
+    # env). scene_broll / background_abstract stay flag-gated extras.
+    default_roles = ("announcer_visual", "music_visual")
     fallback_engine = "still_kenburns"
     required_inputs = ("text_prompt",)
     commercial_clean = False            # license is profile data; verify-at-build
