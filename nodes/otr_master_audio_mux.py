@@ -313,7 +313,8 @@ class OTRMasterAudioMux:
         fb = _ffmpeg_bin("ffmpeg") or "ffmpeg"
         p = _run([fb, "-y", "-loglevel", "error", "-i", final,
                   "-map", "0:v", "-map", "0:a",
-                  "-c:v", "copy", "-c:a", "aac", "-b:a", "320k", dst])
+                  "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
+                  "-ar", "48000", dst])
         if p.returncode != 0:
             raise OSError("obs publish (aac viewing copy) failed: %s"
                           % p.stderr.strip()[:300])
