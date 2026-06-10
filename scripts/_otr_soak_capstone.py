@@ -141,10 +141,24 @@ def _snapshot_tree(root: str) -> set:
     return out
 
 
-def assert_no_stray_writes(before: set, root: str, sys_temp_before: set):
+def _obs_dir() -> str:
+    """The OPERATOR-facing obs dir (mirrors the mux's OTR_OBS_DIR pin)."""
+    return os.environ.get("OTR_OBS_DIR", "").strip() or os.path.join(
+        SERVER_OUTPUT, "otr", "obs")
+
+
+def _obs_listing() -> set:
+    d = _obs_dir()
+    return set(os.listdir(d)) if os.path.isdir(d) else set()
+
+
+def assert_no_stray_writes(before: set, root: str, sys_temp_before: set,
+                           obs_before: set):
     """OUTPUT HYGIENE gate 2: every file the run created under the server
-    output root must live under ``otr\\``; and the SYSTEM temp dir gained no
-    new ``otr_*`` entries (proving the in-tree TEMP repoint held)."""
+    output root must live under ``otr\\``; the SYSTEM temp dir gained no new
+    ``otr_*`` entries (proving the in-tree TEMP repoint held); and the
+    operator's obs dir gained EXACTLY the final mp4 (JSON reports live in
+    otr/state)."""
     after = _snapshot_tree(root)
     new = after - before
     stray = sorted(p for p in new
@@ -152,22 +166,17 @@ def assert_no_stray_writes(before: set, root: str, sys_temp_before: set):
     if stray:
         raise SoakFail("stray writes OUTSIDE output\\otr\\: %r"
                        % stray[:20])
-    sys_temp = os.environ.get("SystemTempProbe") or os.path.join(
-        os.environ.get("LOCALAPPDATA", ""), "Temp")
+    sys_temp = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp")
     if os.path.isdir(sys_temp):
         now = {e for e in os.listdir(sys_temp) if e.lower().startswith("otr")}
         leaked = now - sys_temp_before
         if leaked:
             raise SoakFail("run leaked otr_* entries into the system temp "
                            "dir %r: %r" % (sys_temp, sorted(leaked)[:10]))
-    # obs holds ONLY the final deliverable: this run may add exactly one mp4
-    # there, nothing else (JSON reports live in otr/state).
-    obs_prefix = os.path.normpath(os.path.join("otr", "obs")).lower()
-    obs_new = sorted(p for p in new
-                     if os.path.normpath(p).lower().startswith(obs_prefix))
+    obs_new = sorted(_obs_listing() - obs_before)
     if len(obs_new) != 1 or not obs_new[0].lower().endswith(".mp4"):
-        raise SoakFail("otr/obs must gain EXACTLY the final mp4; this run "
-                       "added: %r" % obs_new)
+        raise SoakFail("the operator obs dir %r must gain EXACTLY the final "
+                       "mp4; this run added: %r" % (_obs_dir(), obs_new))
     print("[soak] no stray writes outside otr (%d new in-tree files; obs "
           "gained only %s)" % (len(new), obs_new[0]), flush=True)
 
@@ -193,11 +202,12 @@ def ffprobe_streams(path: str) -> dict:
 
 
 def assert_obs_final_playable(after_ts: float, master_wav: str) -> str:
-    """OUTPUT HYGIENE gate 1: the deliverable is a REAL playable mp4 in
-    output\\otr\\obs -- video stream + audio stream, non-zero size, duration
-    == master within tolerance, and a full decode succeeds. JSON is not a
-    deliverable."""
-    obs_dir = os.path.join(SERVER_OUTPUT, "otr", "obs")
+    """OUTPUT HYGIENE gate 1: the deliverable is a REAL playable mp4 in the
+    OPERATOR'S output\\otr\\obs -- video stream + audio stream, non-zero size,
+    duration == master within tolerance, and a full decode succeeds. JSON is
+    not a deliverable. ``OTR_OBS_DIR`` mirrors the server-side publish pin."""
+    obs_dir = os.environ.get("OTR_OBS_DIR", "").strip() or os.path.join(
+        SERVER_OUTPUT, "otr", "obs")
     cands = [(os.path.getmtime(p), p) for p
              in glob.glob(os.path.join(obs_dir, "*_final.mp4"))
              if os.path.getmtime(p) > after_ts]
@@ -284,9 +294,11 @@ def run_leg(leg: str, expect_floor: bool) -> int:
 
     tree_before = _snapshot_tree(SERVER_OUTPUT)
     sys_temp_before = _sys_temp_otr_entries()
+    obs_before = _obs_listing()
     print("[soak] hygiene baseline: %d files under server output; %d otr_* "
-          "system-temp entries" % (len(tree_before), len(sys_temp_before)),
-          flush=True)
+          "system-temp entries; obs(%s)=%d files"
+          % (len(tree_before), len(sys_temp_before), _obs_dir(),
+             len(obs_before)), flush=True)
 
     schemas = fetch_schemas()
     wf = load_workflow(WORKFLOW_PATH)
@@ -357,10 +369,19 @@ def run_leg(leg: str, expect_floor: bool) -> int:
         print("[soak] humo:%d histogram OK" % n_beats, flush=True)
 
     final_mp4 = newest_final_mp4(started)
-    slug = os.path.basename(final_mp4).replace("_silent_final.mp4", "")
-    master_wav = os.path.join(EPISODES_DIR, slug, "audio", slug + "_master.wav")
-    ledger_path = os.path.join(EPISODES_DIR, slug, "audio",
-                               slug + "_ledger.json")
+    # The episode slug IS the per-episode folder name (layout:
+    # otr/episodes/<slug>/<...>_final.mp4) -- never parse it from the file
+    # stem, which now carries post-chain suffixes (_silent_procgen_blended).
+    slug = os.path.basename(os.path.dirname(final_mp4))
+    audio_dir = os.path.join(EPISODES_DIR, slug, "audio")
+    # The master WAV keeps its capture-time pending_* name after the episode
+    # dir is renamed to the slug -- resolve it by suffix, never by slug.
+    masters = sorted(glob.glob(os.path.join(audio_dir, "*_master.wav")))
+    if len(masters) != 1:
+        raise SoakFail("expected exactly one *_master.wav in %r, found %r"
+                       % (audio_dir, masters))
+    master_wav = masters[0]
+    ledger_path = os.path.join(audio_dir, slug + "_ledger.json")
     final_sha = pcm_sha256(final_mp4)
     master_sha = pcm_sha256(master_wav)
     if final_sha != master_sha:
@@ -372,11 +393,20 @@ def run_leg(leg: str, expect_floor: bool) -> int:
     # OUTPUT HYGIENE hard gates (operator directive 2026-06-09): a real
     # playable deliverable in otr/obs + zero writes outside the otr tree.
     obs_mp4 = assert_obs_final_playable(started, master_wav)
-    obs_sha = pcm_sha256(obs_mp4)
-    if obs_sha != master_sha:
-        raise SoakFail("obs deliverable audio NOT byte-identical: %s != %s"
-                       % (obs_sha[:12], master_sha[:12]))
-    assert_no_stray_writes(tree_before, SERVER_OUTPUT, sys_temp_before)
+    # The obs deliverable is the WATCHABLE copy: AAC viewing audio (standard
+    # players reject raw PCM-in-MP4 -- operator screenshot 2026-06-09). The
+    # byte-identical PCM proof is the archival final above; here assert the
+    # obs audio is actually the playable codec.
+    obs_codecs = [s.get("codec_name") for s in
+                  ffprobe_streams(obs_mp4).get("streams", [])
+                  if s.get("codec_type") == "audio"]
+    if obs_codecs != ["aac"]:
+        raise SoakFail("obs deliverable audio codec %r != ['aac'] -- not "
+                       "playable in standard players" % obs_codecs)
+    print("[soak] obs viewing audio OK: aac (archival PCM byte-identical "
+          "final kept in the episode folder)", flush=True)
+    assert_no_stray_writes(tree_before, SERVER_OUTPUT, sys_temp_before,
+                           obs_before)
 
     with open(ledger_path, "r", encoding="utf-8") as f:
         ledger = json.load(f)

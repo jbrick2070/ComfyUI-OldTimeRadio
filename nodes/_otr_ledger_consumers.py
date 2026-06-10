@@ -120,6 +120,15 @@ def cast_lookup(ledger: dict, char_id: str) -> dict:
             continue
         if str(entry.get("char_id") or "") == str(char_id):
             return entry
+    # Role-tag alias (capstone soak catch 2026-06-09): announcer-pass lines can
+    # carry the ROLE TAG ('announcer') instead of the cast row id ('c01') --
+    # run2's intro line b001 did. Resolve the tag to the ANNOUNCER cast row so
+    # the announcer engine reads ITS OWN voice fields instead of an empty dict.
+    if str(char_id).strip().lower() == "announcer":
+        for entry in ledger.get("cast") or []:
+            if isinstance(entry, dict) and \
+                    str(entry.get("name") or "").strip().upper() == "ANNOUNCER":
+                return entry
     return {}
 
 

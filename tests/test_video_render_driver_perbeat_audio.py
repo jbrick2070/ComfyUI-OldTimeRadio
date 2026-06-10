@@ -401,4 +401,5 @@ class TestVideoRenderBatchMasterAudioInput:
         assert lnk[2] == 1,  f"link 264 src slot must be 1 (output_path), got {lnk[2]}"
         assert lnk[3] == 92, f"link 264 dst must be node 92 (VideoRenderBatch), got {lnk[3]}"
         assert lnk[4] == 1,  f"link 264 dst slot must be 1 (master_audio_path), got {lnk[4]}"
-        assert wf["last_link_id"] == 264
+        # Floor pin (later graph work appends links -- 2026-06-09 blend stage).
+        assert wf["last_link_id"] >= 264

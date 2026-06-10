@@ -82,7 +82,12 @@ class TestChunkEWire:
         assert len(ids) == len(set(ids)), f"Duplicate link IDs: {[x for x in ids if ids.count(x)>1]}"
 
     def test_last_link_id_updated(self):
-        assert self.wf.get("last_link_id") == 264
+        # Chunk E intent: the counter advanced past the 263/264 wiring. Later
+        # graph work appends links (2026-06-09: 265/266 procgen-blend stage),
+        # so pin the floor, not equality.
+        assert self.wf.get("last_link_id") >= 264
+        assert self.wf.get("last_link_id") == max(
+            L[0] for L in self.wf["links"])
 
 
 # ---------------------------------------------------------------------------

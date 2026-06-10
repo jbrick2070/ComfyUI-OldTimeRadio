@@ -100,8 +100,9 @@ def test_master_audio_mux_is_output_node():
 @needs_ffmpeg
 def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     """OUTPUT HYGIENE (2026-06-09): the muxed FINAL episode mp4 is the
-    deliverable and must ALSO land in <output>/otr/obs -- byte-equal to the
-    episodes copy. JSON is not a deliverable."""
+    deliverable and must ALSO land in <output>/otr/obs as the WATCHABLE copy
+    (video stream untouched, audio AAC -- standard players reject raw
+    PCM-in-MP4). The archival byte-identical PCM final stays in episodes/."""
     master = tmp_path / "master.wav"
     silent = tmp_path / "silent.mp4"
     _sine(master)
@@ -110,13 +111,24 @@ def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     fake_fp = types.SimpleNamespace(
         get_output_directory=lambda: str(tmp_path / "out"))
     monkeypatch.setitem(sys.modules, "folder_paths", fake_fp)
+    monkeypatch.delenv("OTR_OBS_DIR", raising=False)
     node = OTRMasterAudioMux()
     final, status = node.mux(str(silent), str(master))
     assert final and os.path.isfile(final)
     obs = tmp_path / "out" / "otr" / "obs" / os.path.basename(final)
     assert obs.is_file(), "final mp4 was not published to otr/obs"
-    assert obs.stat().st_size == os.path.getsize(final)
     assert "obs_publish OK" in status
+    # the obs copy carries PLAYABLE aac audio; the archival final stays pcm.
+    def _codecs(path, kind):
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", kind,
+             "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, check=True).stdout.split()
+        return out
+    assert _codecs(obs, "a") == ["aac"]
+    assert _codecs(final, "a")[0].startswith("pcm")
+    # video stream is copied, not re-encoded (same codec both files).
+    assert _codecs(obs, "v") == _codecs(final, "v")
 
 
 # --------------------------------------------------------------------------- #

@@ -271,9 +271,13 @@ class OTRMasterAudioMux:
             root = "."
         # OUTPUT HYGIENE (operator directive 2026-06-09): the final lands in
         # the episode's OWN folder under otr/episodes/<ep>/ (the obs copy is
-        # the only file outside it). <ep> = the silent stem minus "_silent".
+        # the only file outside it). <ep> = the input stem minus the known
+        # post-chain suffixes (the blend stage appends "_procgen_blended").
         stem = os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
-        ep = stem[:-len("_silent")] if stem.endswith("_silent") else stem
+        ep = stem
+        for suffix in ("_procgen_blended", "_silent"):
+            if ep.endswith(suffix):
+                ep = ep[: -len(suffix)]
         out_dir = os.path.join(root, "otr", "episodes", ep)
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_final.mp4")
@@ -281,21 +285,42 @@ class OTRMasterAudioMux:
     def _publish_to_obs(self, final: str) -> str:
         """OUTPUT HYGIENE (operator directive 2026-06-09): the FINAL playable
         episode mp4 is the deliverable and must land in ``<output>/otr/obs``
-        (the folder the operator watches), not only ``otr/episodes``. Publish a
+        (the folder the OPERATOR watches), not only ``otr/episodes``. Publish a
         copy there LOUDLY; failure to publish is a real error (the deliverable
-        gate), not a warning."""
-        try:
-            import folder_paths  # type: ignore
-            root = folder_paths.get_output_directory()
-        except Exception:  # noqa: BLE001
-            root = "."
-        obs_dir = os.path.join(root, "otr", "obs")
+        gate), not a warning.
+
+        ``OTR_OBS_DIR`` pins the operator-facing obs dir explicitly -- on this
+        box the headless server renders into the ComfyUI-Installs tree while
+        the operator watches ``Documents\\ComfyUI\\output\\otr\\obs``, so the
+        launch recipe sets it (two-tree split, 2026-06-09 operator report)."""
+        obs_dir = os.environ.get("OTR_OBS_DIR", "").strip()
+        if not obs_dir:
+            try:
+                import folder_paths  # type: ignore
+                root = folder_paths.get_output_directory()
+            except Exception:  # noqa: BLE001
+                root = "."
+            obs_dir = os.path.join(root, "otr", "obs")
         os.makedirs(obs_dir, exist_ok=True)
         dst = os.path.join(obs_dir, os.path.basename(final))
-        import shutil
-        shutil.copy2(final, dst)
+        # PLAYABILITY (operator screenshot 2026-06-09): -c:a copy from the WAV
+        # master leaves raw PCM ("ipcm") in the MP4 -- byte-identical but
+        # unplayable in standard players (Windows Media Player refuses the
+        # audio). The obs deliverable is the WATCHABLE copy: video stream
+        # copied untouched, audio encoded AAC-320k. The ARCHIVAL byte-identical
+        # PCM final stays in otr/episodes/<ep>/ (mux gate already asserted it
+        # against the frozen master; the master itself is never touched).
+        fb = _ffmpeg_bin("ffmpeg") or "ffmpeg"
+        p = _run([fb, "-y", "-loglevel", "error", "-i", final,
+                  "-map", "0:v", "-map", "0:a",
+                  "-c:v", "copy", "-c:a", "aac", "-b:a", "320k", dst])
+        if p.returncode != 0:
+            raise OSError("obs publish (aac viewing copy) failed: %s"
+                          % p.stderr.strip()[:300])
         log.warning("[OTR_MasterAudioMux] LOUD publish: final episode -> %s "
-                    "(%d bytes)", dst, os.path.getsize(dst))
+                    "(%d bytes; video copy + AAC-320k viewing audio; archival "
+                    "PCM byte-identical final: %s)",
+                    dst, os.path.getsize(dst), final)
         return dst
 
     def mux(self, silent_video_path, master_audio_path, audio_done="", fps=25,
