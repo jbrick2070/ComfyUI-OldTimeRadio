@@ -287,7 +287,9 @@ phrasing everywhere, no harness change [H-RT].
 **Sprint sequencing -- THREE PARALLEL TRACKS (head-to-toe optimization, 2026-06-09).** The
 spike table below is the DEPENDENCY order, not a serial schedule; T2b is the only join point:
 
-- **Track 1 (GPU/sidecar, operator-gated):** S-3D-0 -> weights -> T3 corpus.
+- **Track 1 (GPU/sidecar, operator-gated):** S-3D-0 -> weights -> T3 corpus. **Risk-burndown
+  order (reviewer-insisted 2026-06-09): S-3D-0 runs in WINDOW 1** -- it is the only question
+  that can kill the lane, so it gets answered before the CPU windows are spent, not after.
 - **Track 2 (CPU/template, independent of Track 1):** T1 converter -> T2a smoke. Needs only
   the ICT fetch -- can start the same hour as S-3D-0.
 - **Track 3 (CPU/repo, NO-REGRET -- start anytime, even before the green-light):** the W7-pre

@@ -177,8 +177,19 @@ artifact renders this file -- no human tracker edits needed.
   **Exit:** v1-usable DECLARED in SPRINT_STATUS; B-parity (step1x3d_talk) spins out as its own
   later sprint.
 
-## Window mapping (suggested; one gate per session)
-CW-3D-1 = R1+R3 | CW-3D-2 = R2 | CW-3D-3 = R4 | CW-3D-4 = R5 | CW-3D-5 = T1+T2a |
-CW-3D-6 = G0+G1 (operator present) | CW-3D-7 = G2 | CW-3D-8 = G3 | CW-3D-9 = W1 |
-CW-3D-10 = W2 | CW-3D-11 = W3. Each window: start with the otr-3d-handoff kickoff prompt,
+## Window mapping (one gate per session) -- S-3D-0 FIRST (risk-burndown, reviewer-insisted 2026-06-09)
+**CW-3D-1 = G0 S-3D-0 (operator present)** -- answer the one question that can kill the GPU
+lane BEFORE sinking CPU windows into it; R1 may run in parallel the same day (different
+files, no collision). Then:
+CW-3D-2 = R1+R3 | CW-3D-3 = R2 | CW-3D-4 = R4 | CW-3D-5 = R5 | CW-3D-6 = T1+T2a |
+CW-3D-7 = G1 | CW-3D-8 = G2 | CW-3D-9 = G3 | CW-3D-10 = W1 | CW-3D-11 = W2 | CW-3D-12 = W3.
+A G0 NO-GO does NOT cancel CW-3D-2..6 (Lane R/T survives it) -- it just forces the operator
+branch decision before CW-3D-7. Each window: start with the otr-3d-handoff kickoff prompt,
 end at its gate + commit (code+status together) + regenerate the handoff.
+
+**Watch-items (acknowledged, not gates):** (1) the T2b threshold is a hard binary on a small
+corpus -- a couple of unlucky meshes defer 3D entirely; mitigations = the mesh-pack portrait
+quality + the bounded retry, and the operator MAY expand the corpus (e.g. 40 meshes, same
+<20% rate) for more signal before accepting a marginal verdict. (2) v1 lip-sync is
+Rhubarb-level (phoneme visemes -- "mouth-readable", plan 7.4), so the LOOK contract + shot
+grammar carry the visual quality; A2F-3D stays the opt-in upgrade path.

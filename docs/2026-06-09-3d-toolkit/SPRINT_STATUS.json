@@ -10,7 +10,7 @@
     "T2b_keystone": "pending",
     "v1_usable": "pending"
   },
-  "next_action": "Operator: green-light Lane R/T (no-regret CPU) and/or Lane G (S-3D-0).",
+  "next_action": "Window 1 = G0 S-3D-0 probe (operator present) -- answer the lane-killer question first; R1 may run in parallel. Operator green-light starts it.",
   "blockers": [],
   "tickets": [
     { "id": "R1", "lane": "R", "title": "W7-pre migration slice (triposg_talk dark adapter + renames)", "status": "pending", "note": "", "updated": "2026-06-09" },
