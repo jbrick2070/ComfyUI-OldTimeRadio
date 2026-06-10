@@ -157,6 +157,29 @@ W7 (it is what makes the output a STORY, not a tech demo):
   neck; v1's shot grammar therefore mandates BUST framing -- the frame bottom sits ABOVE the
   hole-filled stump in every grammar variant (period radio-studio close-up language, which fits
   the show). A LOOK-gate check asserts no stump pixels in any delivered frame.
+- **The mesh-portrait HANDSHAKE -- the 2D engine learns it is feeding a 3D model.** The
+  plumbing is the section-3 capability chain: the 3D adapter declares
+  `requires_mesh_portrait=True` -> `OTR_VideoDirector` policy -> `OTR_ImageDirector` lock ->
+  **M4, which emits the mesh-optimized framing IN THE TEXT PROMPT** (the technical model owns
+  it; no new widget/mode, per [ROUTE-01]). The optimized-asset CONTRACT the M4 prompt encodes
+  when the flag is set (derived from the known wrap-killers in the adversarial corpus):
+  front-facing (yaw within ~+/-10 deg), neutral-to-mild expression with the **mouth CLOSED**
+  (open mouths wreck the mouth-loop topology), full head + hairline + both ears in frame,
+  even diffuse lighting (no hard side shadows -- they poison depth), sharp focus / no motion
+  blur, NO glasses/hat/microphone occluding the face, plain mid-tone background (clean
+  silhouette for mesh extraction), head dominant with shoulders visible (the same asset still
+  serves the bake and HuMo). Cached with `purpose="mesh_portrait"` metadata (object_id +
+  variant + engine_id + prompt_hash) so 2D and 3D portraits coexist without splitting
+  character identity -- and per the character-level rule, once a character is 3D-assigned the
+  clean portrait is used GLOBALLY for them.
+  **Firing discipline (keeps the [ROUTE-01] verdict):** DEFAULT = stock flux portraits first;
+  the handshake fires (a) automatically in the bounded retry -- mesh quality gate fails ->
+  ONE `mesh_portrait` variant via the EXISTING C dispatcher -> retry once; and (b) as the
+  GLOBAL default for 3D-assigned characters ONLY if the T3/T2b evidence says stock portraits
+  wrap poorly. T3 therefore generates the corpus from STOCK portraits, records the
+  per-portrait wrap outcome, and T2b's report ends with an explicit
+  **stock-vs-mesh-prompt recommendation** -- the keystone data, not a hunch, decides whether
+  the 2D engine is always told.
 - **The ONLY candidate NEW asset is deferred:** an optional "bust card" (head-and-shoulders
   body underlay so wider shots can show a torso) -- if ever wanted, it is ONE M4-prompted
   variant from the EXISTING C image engine (a policy row, not a new pipeline), v1.1 at the
@@ -250,7 +273,7 @@ phrasing everywhere, no harness change [H-RT].
 | **S-3D-0 (gates the lane)** | TripoSG sidecar venv OFFLINE from wheels only (`--only-binary=:all:`, `build_sidecar_env()` sanitizer); self-test: import clean + SDPA + no flash_attn + portrait->GLB + manifold + mesh-spawn VRAM <= 14000 | Any source build -> NO-GO. **Pre-step before declaring dead: swap the extraction stage to a wheel-clean CPU marching-cubes -- candidates in order: `skimage.measure.marching_cubes` (scipy stack, pure wheels), `PyMCubes` (verify a binary wheel exists for the sidecar python), else NO -- and RECORD the exact outcome so the operator decides informed** [H-RT p2]. Hard NO-GO -> **OPERATOR DECISION**: (a) v1 ships HuMo-2D only, 3D stays deferred; or (b) operator approves the machine-level cu128 toolkit install (VS2022 BuildTools + nvcc 12.8 + ninja; hours) and the lane proceeds compiled. Neither is automatic [H-RT, GPT]. ORDERING NOTE: the shipped spike README says "cheap keystone screen first" -- that rule predates the corpus-honest reorder (the binding keystone needs TripoSG meshes, so S-3D-0 must precede it); T2a remains the cheap screen; update the README wording in the W7-pre docs task [H-RT p2, GPT] |
 | **T1 template** | Fetch ICT-FaceKit (pinned commit) -> converter + report (section 5) -> pin `ARKIT_TEMPLATE_HASH` | Fail-closed: 52 deltas + mouth_idx + deformation smoke, else phase stays parked |
 | **T2a wrap smoke (NON-BINDING)** | Existing `probe_c` synthetic harness + the real template | Labelled NON-BINDING [B-SHIP]; minutes |
-| **T3 corpus** | TripoSG generates the 25-mesh corpus (adversarial + period styles) | 25 meshes; probe_b manifold pre-screen each, **plus trimesh/Blender self-intersection + normal-orientation checks (manifold_report alone misses self-intersection)** [H-RT, GPT] |
+| **T3 corpus** | TripoSG generates the 25-mesh corpus from **STOCK flux portraits** (adversarial + period styles), recording the per-portrait wrap outcome -- T3 doubles as the stock-portrait spike that decides the mesh-portrait handshake default; T2b's report ends with the stock-vs-mesh-prompt recommendation (section 2.5) | 25 meshes; probe_b manifold pre-screen each, **plus trimesh/Blender self-intersection + normal-orientation checks (manifold_report alone misses self-intersection)** [H-RT, GPT] |
 | **T2b KEYSTONE (BINDING)** | `probe_c` wrap on the TripoSG corpus; automated deformation-transfer, TIMEBOX ~1 week [PASS-3D] | GO = failures <= 4/25. NO-GO -> HuMo-2D stays; character_3d deferred [GOFWD] |
 | **T4 driver + alpha + LOOK** | Rhubarb -> curves -> Blender alpha render -> SilentComposite flatten -> mux; all spawn peaks measured | One real talking alpha clip; onset +-1 frame compensated INSIDE the fixed-length clip -- **the delivered silent clip keeps EXACTLY the ledger `target_frame_count` sum; never shortened** (V-1 stays untouchable) [H-RT, GPT]; audio stream hash == master; yuv420p after flatten; checkerboard seam golden (straight-vs-premultiplied documented); LOOK gate per section 7.4 |
 
