@@ -544,8 +544,11 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         gen = make_generate_fn(entry)
 
         def _call(prompt: str) -> str:
+            # 0.1 not 0.0: the local HF lane hardcodes do_sample=True and
+            # transformers rejects a non-positive temperature (live 30w4
+            # catch); 0.1 is near-greedy for short derivation prompts.
             return gen([{"role": "user", "content": str(prompt)}],
-                       temperature=0.0, max_new_tokens=300)
+                       temperature=0.1, max_new_tokens=300)
 
         return _call
     except Exception as exc:  # noqa: BLE001
