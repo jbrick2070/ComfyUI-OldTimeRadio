@@ -476,7 +476,13 @@ gate if Step1X's SDXL texture stage is ever enabled.
 **Operator decisions (not blockers):** (a) green-light S-3D-0; (b) the S-3D-0 NO-GO branch
 choice if it fires; (c) A2F-3D NVOML acceptability (only when the opt-in tier is wanted);
 (d) Hunyuan3D NC sign-off (only if ever wanted); (e) B-parity timing -- is the second engine
-required before episodes use 3D, or after?
+required before episodes use 3D, or after? (f) PARKED UX idea (operator, 2026-06-09): relocate
+the per-role visual pickers (announcer/music/cast-dialogue) up into the first node -- NOT in
+this sprint: node 1 (writer) is in the FROZEN audio-spine set (widget_vector_exact golden), so
+widget relocation churns the protected vector + re-goldens + re-certs for zero new capability;
+near-term answer = canvas LAYOUT (place the Director visually beside node 1; cosmetic, free);
+if single-surface control is still wanted later, scope a separate post-3D UX sprint and weigh
+losing the per-role greyed-dropdown fail-closed affordance (V-6).
 
 ## 9. Definition of done
 
