@@ -168,11 +168,14 @@ def write_extra_env(env: dict):
 
 
 def launch_server(log_path: str, lane: str, timeout_s: int = 240) -> bool:
-    cmd = ["cmd", "/c", "start", "otr-marathon-server", "/min",
-           "cmd", "/c", LAUNCHER, log_path]
+    """Spawn the launcher DIRECTLY (no `start` hop -- `cmd /c start` from a
+    detached parent never spawned the child on this box). CREATE_NO_WINDOW
+    (0x08000000) keeps it headless; the launcher redirects the server's own
+    stdout into ``log_path``."""
+    cmd = ["cmd", "/c", LAUNCHER, log_path]
     if lane:
         cmd.append(lane)
-    subprocess.Popen(cmd, shell=False)
+    subprocess.Popen(cmd, shell=False, creationflags=0x08000000)
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         try:
