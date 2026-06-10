@@ -208,6 +208,35 @@ class TestEpisodeAssemblerWavSave:
 # 3. validate_workflow_contract on the rewired JSON
 # ---------------------------------------------------------------------------
 
+class TestPackageRegistrationsRetired:
+    """Chunk E completion: the retired types are gone from the PACKAGE-level
+    lazy registration table too (the 2026-06-08 pass cleared only the module
+    -level mapping in otr_shot_duration_calculator.py, so the picker still
+    showed a tombstoned node). Raw-source check, matching
+    TestWorkflowJsonClean's convention (no heavy package import)."""
+
+    PKG_INIT = REPO_ROOT / "__init__.py"
+
+    @pytest.mark.parametrize("reg_key", [
+        '"OTR_FixedShotDurationStub":',
+        '"OTR_FluxBranchGate":',
+        '"OTR_DeferredCheckpointLoader":',
+        '"OTR_DeferredLtxTextEncoderLoader":',
+    ])
+    def test_registration_row_gone(self, reg_key):
+        raw = self.PKG_INIT.read_text(encoding="utf-8")
+        assert reg_key not in raw, (
+            f"{reg_key} must not be registered in the package table "
+            "(Chunk E retire; the type is tombstoned in DELETED_NODE_TYPES)"
+        )
+
+    def test_retired_modules_deleted(self):
+        assert not (REPO_ROOT / "visual" / "flux_branch_gate.py").exists(), \
+            "visual/flux_branch_gate.py must be deleted (Chunk E)"
+        assert not (REPO_ROOT / "nodes" / "_otr_deferred_loaders.py").exists(), \
+            "nodes/_otr_deferred_loaders.py must be deleted (Chunk E; V-5)"
+
+
 class TestWorkflowContractPostChunkE:
     def test_validate_passes(self):
         try:
@@ -240,6 +269,12 @@ class TestTombstonesRaiseValidationError:
         "OTR_ShotDurationCalculator",
         "OTR_FixedShotDurationStub",
         "OTR_RenderPlan",
+        # Chunk E completion (2026-06-09): the legacy FLUX topology gate +
+        # the gate-bound loader shells (V-5: no deferred-loader shell
+        # nodes survive; loading is adapter-internal).
+        "OTR_FluxBranchGate",
+        "OTR_DeferredCheckpointLoader",
+        "OTR_DeferredLtxTextEncoderLoader",
     ])
     def test_tombstoned_node_raises(self, node_type):
         try:

@@ -182,37 +182,32 @@ _NODE_MODULES = {
     # in the same commit (Prime Directive 2: never double-load
     # Mistral-Nemo on the 16 GB card).
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
-    # Sprint H §3.7 follow-up gate (Jeffrey 2026-05-17, mirror of
-    # OTR_LtxBranchGate after b5c1441 proved the pattern): forces
-    # every FLUX consumer to wait until OTR_LedgerFreezeCascade
-    # has emitted its script_json (writer fully done + Gemma
-    # evicted via the cascade's finally-block unload_llm).
-    "OTR_FluxBranchGate":          (".visual.flux_branch_gate",        "FluxBranchGate",        " FLUX Branch Gate (topology)"),
-    # Sprint H §3.7 Path G (Jeffrey 2026-05-18): deferred-loader
-    # wrappers. Retest #13 produced the campaign's core finding:
-    # ComfyUI's executor pre-loads CheckpointLoaderSimple +
-    # LTXAVTextEncoderLoader at graph-start regardless of any
-    # downstream gate ([FluxBranchGate] fire reading 22.18 GiB
-    # confirmed the worst-case scenario). Gates defer consumer
-    # execution; deferred loaders defer the loader's GPU
-    # materialization itself by adding gate_signal (STRING,
-    # forceInput=True) as a required input. ComfyUI topo-sorts
-    # them downstream of OTR_LedgerFreezeCascade.script_json.
-    "OTR_DeferredCheckpointLoader": (".nodes._otr_deferred_loaders",   "DeferredCheckpointLoader", " Deferred Checkpoint Loader (gate-bound)"),
-    "OTR_DeferredLtxTextEncoderLoader": (".nodes._otr_deferred_loaders", "DeferredLtxTextEncoderLoader", " Deferred LTX Text Encoder Loader (gate-bound)"),
+    # OTR_FluxBranchGate -- DELETED in the Chunk E cleanbreak completion
+    # (2026-06-09). The Sprint H 3.7 FLUX topology gate only sequenced the
+    # legacy FLUX batch chain (deleted in the CW cleanbreak); the platform
+    # image gate (OTR_ImageGenDispatcher) is ordered by audio_done +
+    # script_json edges instead. Tombstoned in DELETED_NODE_TYPES.
+    # OTR_DeferredCheckpointLoader + OTR_DeferredLtxTextEncoderLoader --
+    # DELETED in the Chunk E cleanbreak completion (2026-06-09). V-5: ALL
+    # model loading is adapter-internal (comfy model_management); no
+    # deferred-loader shell nodes survive. Their only consumers were the
+    # deleted legacy FLUX/LTX batch chains. Tombstoned in
+    # DELETED_NODE_TYPES; the Sprint H finding they encoded (executor
+    # pre-loads loaders at graph-start regardless of downstream gates)
+    # lives on in the adapters' lazy in-execute loading.
     # OTR_VideoPlan -- DELETED in CW-1 (2026-06-06) of the OTR video platform
     # build. Its prompt-generation + planning was absorbed by OTR_ShotLock
     # (M4 per-beat creative derivation). The legacy FLUX/HuMo/LTX render chain
     # it fed was unwired from otr_scifi_16gb_full.json in the same commit; the
     # type is in the workflow validator's DELETED_NODE_TYPES sentinel so a
     # stale workflow referencing it fails loudly (must be re-saved).
-    # v2.0 multi-clip shot expansion (needs shot durations from audio
-    # timeline). Sprint E E8 rename: was OTR_ShotDurationCalculator;
-    # the new name surfaces the stub-nature of the current implementation
-    # (hand-crafted JSON array of durations until Bark audio-timeline
-    # wiring lands). Per CLAUDE.md no-back-compat: no alias for the old
-    # name.
-    "OTR_FixedShotDurationStub":  (".nodes.otr_shot_duration_calculator", "OTRFixedShotDurationStub", " OTR Fixed Shot Duration Stub"),
+    # OTR_FixedShotDurationStub -- registration REMOVED in the Chunk E
+    # cleanbreak completion (2026-06-09; the module-level mapping was
+    # already cleared 2026-06-08). OTR_ShotLock owns ALL per-episode
+    # budget / shot-duration logic. The class + pure helpers stay in
+    # nodes/otr_shot_duration_calculator.py for unit tests only; the type
+    # is tombstoned in DELETED_NODE_TYPES so stale workflow JSONs fail
+    # loudly at validation.
     # OTR_PostAudioVideoPipeline -- DELETED S27 (commit lands in s27-
     # cleanbreak-tail). The class was a subprocess trigger for the
     # pre-2026-04-27 HuMo batch + concat pipeline; it was superseded

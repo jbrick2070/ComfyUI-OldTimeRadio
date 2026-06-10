@@ -42,8 +42,9 @@ os.environ.setdefault("OTR_TEST_MODE", "1")
 # Shared `folder_paths` stub (2026-05-21).
 #
 # `folder_paths` is a ComfyUI-runtime module, absent in the bare pytest
-# sandbox. Node modules import it at module level (e.g.
-# `nodes/_otr_deferred_loaders.py`), and a few node INPUT_TYPES() bodies
+# sandbox. Node modules import it at module level (the original case was
+# the legacy `nodes/_otr_deferred_loaders.py`, retired in the Chunk E
+# cleanbreak), and a few node INPUT_TYPES() bodies
 # call `folder_paths.get_filename_list(...)`.
 #
 # Before this block, three test modules

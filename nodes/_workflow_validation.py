@@ -116,6 +116,16 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_ShotDurationCalculator",  # old name, renamed to OTR_FixedShotDurationStub
                                    # then fully superseded by ShotLock budget
     "OTR_FixedShotDurationStub",   # stub replacement, now superseded
+    # Chunk E cleanbreak completion (2026-06-09): the legacy gate-bound
+    # loader shells + the FLUX topology gate are retired. V-5 (execution
+    # plan): ALL model loading is adapter-internal via comfy
+    # model_management -- no deferred-loader shell nodes survive. Their
+    # only consumers were the legacy FLUX/LTX batch chains deleted in the
+    # CW cleanbreak; the platform render path (OTR_VideoRenderBatch +
+    # registry adapters) loads everything inside the adapters.
+    "OTR_FluxBranchGate",              # legacy FLUX topology gate (Sprint H)
+    "OTR_DeferredCheckpointLoader",    # gate-bound FLUX loader shell (V-5)
+    "OTR_DeferredLtxTextEncoderLoader",  # gate-bound LTX loader shell (V-5)
 })
 
 

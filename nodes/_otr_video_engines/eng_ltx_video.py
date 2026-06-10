@@ -34,9 +34,11 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # graph executor, the silent bt709 encode, the VRAM guard) are proven in
 # wrapper_bridge; the GRAPH below is the ASSUMED native LTXV text->video topology
 # and is VERIFY-ON-GPU: the box runs the LTX 2.3 stack (gemma encoder + distilled
-# LoRA + audio nodes, see nodes/_otr_deferred_loaders.py), so the operator confirms
-# / replaces the node candidates + widgets against the installed wrapper INPUT_TYPES
-# (and the exact temporal length rule) before enabling. Filenames are env-overridable.
+# LoRA + audio nodes), so the operator confirms / replaces the node candidates +
+# widgets against the installed wrapper INPUT_TYPES (and the exact temporal length
+# rule) before enabling. Filenames are env-overridable. (The legacy gate-bound
+# deferred-loader shells were retired in the Chunk E cleanbreak -- V-5: loading
+# is adapter-internal, lazy, inside execute.)
 _LTX_MIN_FRAMES = 9
 _LTX_DEFAULT_W = 768
 _LTX_DEFAULT_H = 512
