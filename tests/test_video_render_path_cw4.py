@@ -97,6 +97,28 @@ def test_master_audio_mux_is_output_node():
     assert "audio_done" in it["optional"]            # gate mirrors audio_done
 
 
+@needs_ffmpeg
+def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
+    """OUTPUT HYGIENE (2026-06-09): the muxed FINAL episode mp4 is the
+    deliverable and must ALSO land in <output>/otr/obs -- byte-equal to the
+    episodes copy. JSON is not a deliverable."""
+    master = tmp_path / "master.wav"
+    silent = tmp_path / "silent.mp4"
+    _sine(master)
+    _silent_video(silent)
+    import types
+    fake_fp = types.SimpleNamespace(
+        get_output_directory=lambda: str(tmp_path / "out"))
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_fp)
+    node = OTRMasterAudioMux()
+    final, status = node.mux(str(silent), str(master))
+    assert final and os.path.isfile(final)
+    obs = tmp_path / "out" / "otr" / "obs" / os.path.basename(final)
+    assert obs.is_file(), "final mp4 was not published to otr/obs"
+    assert obs.stat().st_size == os.path.getsize(final)
+    assert "obs_publish OK" in status
+
+
 # --------------------------------------------------------------------------- #
 # OTR_SilentComposite -- always-silent canonical output (V-1)
 # --------------------------------------------------------------------------- #

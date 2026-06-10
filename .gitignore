@@ -149,6 +149,13 @@ workflows/*.json.bak
 # versioned by exception so it can never disappear again. ---
 !scripts/_otr_indextts2_worker.py
 
+# --- 2026-06-09 v1.4 capstone soak: essential source, not per-task scratch.
+# The soak driver + the one-shot engine smoke + the verified launch recipe are
+# the production-stable stamp's tooling -- keep them versioned by exception.
+!scripts/_otr_soak_capstone.py
+!scripts/_otr_single_engine_smoke.py
+!scripts/_otr_soak_server_launch.cmd
+
 # --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
 # <output>/otr/state/ ---
 # The legacy <repo>/config/news_history.json is read-only-fallback for

@@ -395,9 +395,13 @@ class OTRSilentComposite:
             root = folder_paths.get_output_directory()
         except Exception:  # noqa: BLE001
             root = "."
-        out_dir = os.path.join(root, "otr", "episodes")
-        os.makedirs(out_dir, exist_ok=True)
+        # OUTPUT HYGIENE (operator directive 2026-06-09): every per-episode
+        # asset lives INSIDE that episode's own folder under otr/episodes/<ep>/
+        # -- never loose at the episodes root. The base video stem IS the
+        # episode slug.
         stem = os.path.splitext(os.path.basename(base_video_path or "episode"))[0]
+        out_dir = os.path.join(root, "otr", "episodes", stem)
+        os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
     def composite(self, base_video_path, canvas_w=1472, canvas_h=832, fps=25,

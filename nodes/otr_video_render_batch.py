@@ -99,7 +99,9 @@ class OTRVideoRenderBatch:
             name = "node_soak.json"
         ok = bool(report.get("ok"))
         payload = json.dumps(report, ensure_ascii=True, default=str)
-        sub = "obs" if mode == "episode" else "aship"
+        # OUTPUT HYGIENE (operator directive 2026-06-09): otr/obs holds ONLY
+        # the final playable episode mp4 -- JSON run artifacts go to otr/state.
+        sub = "state" if mode == "episode" else "aship"
         try:                                  # durable artifacts the operator polls
             base = os.environ.get("OTR_OUTPUT_DIR") or "."
             out_dir = os.path.join(base, "otr", sub)

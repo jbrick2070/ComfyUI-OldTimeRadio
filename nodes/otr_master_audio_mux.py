@@ -269,10 +269,34 @@ class OTRMasterAudioMux:
             root = folder_paths.get_output_directory()
         except Exception:  # noqa: BLE001
             root = "."
-        out_dir = os.path.join(root, "otr", "episodes")
-        os.makedirs(out_dir, exist_ok=True)
+        # OUTPUT HYGIENE (operator directive 2026-06-09): the final lands in
+        # the episode's OWN folder under otr/episodes/<ep>/ (the obs copy is
+        # the only file outside it). <ep> = the silent stem minus "_silent".
         stem = os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
+        ep = stem[:-len("_silent")] if stem.endswith("_silent") else stem
+        out_dir = os.path.join(root, "otr", "episodes", ep)
+        os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_final.mp4")
+
+    def _publish_to_obs(self, final: str) -> str:
+        """OUTPUT HYGIENE (operator directive 2026-06-09): the FINAL playable
+        episode mp4 is the deliverable and must land in ``<output>/otr/obs``
+        (the folder the operator watches), not only ``otr/episodes``. Publish a
+        copy there LOUDLY; failure to publish is a real error (the deliverable
+        gate), not a warning."""
+        try:
+            import folder_paths  # type: ignore
+            root = folder_paths.get_output_directory()
+        except Exception:  # noqa: BLE001
+            root = "."
+        obs_dir = os.path.join(root, "otr", "obs")
+        os.makedirs(obs_dir, exist_ok=True)
+        dst = os.path.join(obs_dir, os.path.basename(final))
+        import shutil
+        shutil.copy2(final, dst)
+        log.warning("[OTR_MasterAudioMux] LOUD publish: final episode -> %s "
+                    "(%d bytes)", dst, os.path.getsize(dst))
+        return dst
 
     def mux(self, silent_video_path, master_audio_path, audio_done="", fps=25,
             ffmpeg="ffmpeg", output_path=""):
@@ -282,9 +306,11 @@ class OTRMasterAudioMux:
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
             )
+            obs_copy = self._publish_to_obs(final)
+            report.append("obs_publish OK -> " + obs_copy)
         except _Interrupted:
             raise
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             log.error("[OTR_MasterAudioMux] %s", exc)
             return ("", f"error: {exc}")
         for line in report:
