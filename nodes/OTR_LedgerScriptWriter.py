@@ -3693,14 +3693,55 @@ class OTR_LedgerScriptWriter:
                     len(landed),
                 )
 
-        # --- I.6. Self-vocative scrub (operator look-QA 2026-06-10) --
-        # The composer sometimes opens a line with the SPEAKER'S OWN
-        # first name as a vocative ("GULLIVER REEVES: Gulliver, have
-        # you...") -- a character addressing themselves. Deterministic
-        # scrub, pre-freeze (audio has not rendered yet, so the text
-        # edit is safe): strip the leading self-vocative + separator,
-        # re-capitalize, restamp word_count. LOUD per fix; never touches
-        # a line that addresses ANOTHER character.
+        # --- I.6. Dialogue scrubs (operator look-QA 2026-06-10) ------
+        # Deterministic, pre-freeze (audio has not rendered yet, so the
+        # text edits are safe), LOUD per fix.
+        #
+        # (a) STAGE-DIRECTION scrub: the composer sometimes embeds a
+        # parenthetical/bracketed action inside the LINE TEXT --
+        # '..."Observe." (HAYES VANCE removes a vintage pocket watch
+        # from...)' -- which the TTS then SPEAKS and the captions
+        # display (look-QA round 4). Radio-drama dialogue carries no
+        # parentheticals, so every (...) / [...] span is stripped; a
+        # line left with <2 words keeps its original text (warned).
+        # Symmetric wrapping double-quotes are unwrapped in the same
+        # pass.
+        _sd_re = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]")
+        _sd_fixed = 0
+        for _ln in led.data.get("lines") or []:
+            if not isinstance(_ln, dict) or _ln.get("skip"):
+                continue
+            _txt = str(_ln.get("text") or "")
+            _new = _sd_re.sub(" ", _txt)
+            _new = re.sub(r"\s{2,}", " ", _new).strip()
+            if (len(_new) >= 2 and _new[0] == '"' and _new[-1] == '"'
+                    and _new.count('"') == 2):
+                _new = _new[1:-1].strip()
+            if _new == _txt.strip():
+                continue
+            if len(_new.split()) < 2:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] stage-direction scrub would "
+                    "empty line %s; original text kept", _ln.get("line_id"))
+                continue
+            log.warning(
+                "[OTR_LedgerScriptWriter] stage-direction scrub %s: %r -> %r",
+                _ln.get("line_id"), _txt[:70], _new[:70])
+            _ln["text"] = _new
+            _ln["word_count"] = len(_new.split())
+            _sd_fixed += 1
+        if _sd_fixed:
+            led.save()
+            log.warning(
+                "[OTR_LedgerScriptWriter] stage-direction scrub fixed %d "
+                "line(s) pre-freeze", _sd_fixed)
+
+        # (b) SELF-VOCATIVE scrub: the composer sometimes opens a line
+        # with the SPEAKER'S OWN first name as a vocative ("GULLIVER
+        # REEVES: Gulliver, have you...") -- a character addressing
+        # themselves. Strip the leading self-vocative + separator,
+        # re-capitalize, restamp word_count; never touches a line that
+        # addresses ANOTHER character.
         _voc_fixed = 0
         _name_by_cid = {
             str(c.get("char_id") or ""): str(c.get("name") or "")

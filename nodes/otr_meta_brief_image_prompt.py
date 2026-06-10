@@ -152,13 +152,34 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str) -> str:
     appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
     return (
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
-        "line, no preamble) for this character. Ground it in the appearance and "
-        "the story setting; keep it photographic and period-consistent.\n"
+        "line, no preamble) for this character. The image MUST depict the "
+        "CHARACTER THEMSELVES -- a person with a clearly visible face, "
+        "head-and-shoulders -- IN CHARACTER inside the story's world. NEVER "
+        "an empty room, an object, scenery alone, or a microphone without a "
+        "person. Ground it in the appearance and the story setting; keep it "
+        "photographic and period-consistent.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
         f"style_anchor: {STYLE_ANCHOR}\n"
         "Return only the prompt line."
     )
+
+
+#: Person-evidence vocabulary for the portrait guard: an accepted prompt that
+#: matches NONE of these almost certainly depicts scenery/objects (the
+#: "microphone, no person" live catch, look-QA round 4) -> template fallback.
+_PERSON_WORDS = re.compile(
+    r"\b(face|faces|person|man|woman|portrait|eyes|hair|head|gentleman|lady|"
+    r"his|her|he|she|year-old|years old|beard|jaw|brow|cheek|smile|"
+    r"expression|wearing|suit|uniform|coat|engineer|worker|officer|host|"
+    r"announcer|operator|controller|captain|doctor|detective|pilot|"
+    r"scientist|reporter|narrator|figure)\b",
+    re.IGNORECASE)
+
+
+def _depicts_person(prompt: str) -> bool:
+    """True when the prompt carries any person-evidence token."""
+    return bool(_PERSON_WORDS.search(prompt or ""))
 
 
 def _clean_llm_prompt(raw: str) -> str:
@@ -251,6 +272,17 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 warnings.append(msg + "; fell back to template")
                 prompt = compose_image_prompt_fallback(meta, char)
                 source = "template_consistency"
+        # PERSON GUARD (look-QA round 4, 2026-06-10): a portrait prompt that
+        # depicts no person (the live "microphone under a lamp" catch for a
+        # cast character) falls back to the template, which LEADS with the
+        # writer's physical character description. Always enforced -- a
+        # face-less init_image also starves the audio-driven-face engine.
+        if not _depicts_person(prompt):
+            warnings.append(
+                f"image prompt for {cid} depicts no PERSON; fell back to "
+                f"the appearance template")
+            prompt = compose_image_prompt_fallback(meta, char)
+            source = "template_person_guard"
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
         out[cid] = {

@@ -225,7 +225,9 @@ def test_meta_brief_prompt_temp0_hash_reseed_fallback():
     cast = [{"char_id": "c1", "name": "BABA", "portrait_prompt": "a tall weathered spacer"}]
     meta = {"story_brief_terms": {"setting": ["a derelict orbital station"]}}
 
-    good = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "a tall weathered spacer, station, photographic")
+    # "lined face" keeps the person guard satisfied (look-QA round 4): a
+    # portrait prompt with NO person-evidence now falls back to template.
+    good = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "a tall weathered spacer, lined face, station, photographic")
     p = good[0]["c1"]
     assert p["source"] == "llm" and p["prompt_hash"]
 

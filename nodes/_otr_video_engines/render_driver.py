@@ -396,31 +396,49 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     text_prompt = str(creative.get("text_prompt") or "")
     if text_prompt:
         req["text_prompt"] = text_prompt
-    # THE LTX RADIO OPEN (production restore 2026-06-10): when the announcer /
-    # music beats render on a TEXT-driven engine (ltx_video per the saved
-    # production VideoDirector), they carry the OLD-TIME-RADIO visual -- the
-    # period radio-station open the episodes had before the platform rewire --
-    # instead of the writer's drama scene prompt. Role-scoped + engine-scoped
-    # + env-overridable; talking-character beats are untouched.
+    # THE LTX SCENE OPEN (reworked 2026-06-10 look-QA round 4): announcer /
+    # music beats on a TEXT-driven engine get a prompt GROUNDED IN THE
+    # EPISODE'S OWN BRIEF (setting + style + a vintage radio in frame) -- the
+    # source of the old episodes' scenic, varied opens. The first cut here
+    # hardcoded one generic "radio station studio" string, which rendered the
+    # same orange studio blob on every beat of every episode (operator catch:
+    # "the music LTX used to look real nice"). Precedence: the writer's M4
+    # creative prompt (when present) > OTR_LTX_RADIO_PROMPT (explicit
+    # operator override) > the brief-composed scene prompt.
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside
-        # group_id ("grp_<role>") -- parse it so the radio-open behavior
+        # group_id ("grp_<role>") -- parse it so the scene-open behavior
         # never silently skips (2026-06-10 acceptance catch).
         _gid = str(shot.get("group_id") or "")
         if _gid.startswith("grp_"):
             _shot_role = _gid[len("grp_"):]
     if (_shot_role in ("announcer_visual", "music_visual")
-            and str(shot.get("engine_id") or "") == "ltx_video"):
-        radio_prompt = os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip() or (
-            "a 1940s radio station studio, art-deco brass microphone, "
-            "glowing amber vacuum tube dials, ON AIR sign lit, warm tungsten "
-            "light, gentle film grain, slow cinematic dolly, period drama")
-        if req.get("text_prompt") != radio_prompt:
-            _LOG.warning("[OTR.render_driver] LTX RADIO OPEN: %s beat %s "
-                         "prompt -> the period radio-station visual",
-                         shot.get("role"), shot.get("shot_id"))
-        req["text_prompt"] = radio_prompt
+            and str(shot.get("engine_id") or "") == "ltx_video"
+            and not text_prompt):
+        scene_prompt = os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
+        if not scene_prompt:
+            _meta = (ledger or {}).get("meta") or {}
+            _terms = _meta.get("story_brief_terms") or {}
+            _setting_raw = _terms.get("setting") if isinstance(_terms, dict) \
+                else None
+            _setting = ", ".join(
+                [str(t).strip() for t in (_setting_raw or [])
+                 if str(t).strip()][:2])
+            _style = str(_meta.get("style") or "").strip().replace("_", " ")
+            _parts = ["cinematic establishing shot"]
+            if _setting:
+                _parts.append(_setting)
+            if _style:
+                _parts.append(f"{_style} period atmosphere")
+            _parts += ["a vintage radio set glowing in the scene",
+                       "moody dusk light", "gentle film grain",
+                       "slow cinematic camera drift", "no on-screen text"]
+            scene_prompt = ", ".join(_parts)
+        _LOG.warning("[OTR.render_driver] LTX SCENE OPEN: %s beat %s prompt "
+                     "composed from the episode brief: %.90s...",
+                     _shot_role, shot.get("shot_id"), scene_prompt)
+        req["text_prompt"] = scene_prompt
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
