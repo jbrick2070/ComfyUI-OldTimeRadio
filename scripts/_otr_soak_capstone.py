@@ -63,6 +63,10 @@ REPORT_PATH = os.path.join(SERVER_OUTPUT, "otr", "state",
 RESULTS_DIR = os.path.join(_HERE, "_otr_soak_capstone_results")
 VRAM_CEILING_MB = 14.5 * 1024
 POLL_TIMEOUT_S = 5400
+#: target_words patched into the writer. 30 = the proven smoke config; 0 =
+#: do NOT patch -- the canonical workflow's own saved default runs (the REAL
+#: full episode; the marathon driver sets this).
+SMOKE_WORDS = 30
 
 
 class SoakFail(AssertionError):
@@ -281,7 +285,17 @@ def load_run_report(after_ts: float) -> dict:
 # --------------------------------------------------------------------------- #
 # one leg
 # --------------------------------------------------------------------------- #
-def run_leg(leg: str, expect_floor: bool) -> int:
+def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
+            extra_patches=None) -> int:
+    """One full-episode soak leg with the HARD gates.
+
+    ``expect_engine``: "humo" (default) asserts the strict production
+    histogram {"humo": n_beats}; "" / None logs the histogram WITHOUT a strict
+    engine assert (the dropdown-rotation / forced-engine experiment legs --
+    completion, playable-obs, byte-identity, hygiene and VRAM gates still
+    apply). ``extra_patches``: list of (node_id, widget_name, value) applied
+    on top of the standard smoke patches (the multi-LLM / multi-voice /
+    multi-music dropdown rotation)."""
     started = time.time()
     print("[soak] leg=%s COMFYUI_URL=%s started=%s"
           % (leg, COMFYUI_URL, time.strftime("%H:%M:%S")), flush=True)
@@ -323,9 +337,16 @@ def run_leg(leg: str, expect_floor: bool) -> int:
         val = _first_choice(1, slot)
         if val is not None:
             patch_widget_by_name(wf, 1, slot, val, schemas)
-    patch_widget_by_name(wf, 1, "target_words", 30, schemas)
-    patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "act_count", "1", schemas)
+    if SMOKE_WORDS:
+        patch_widget_by_name(wf, 1, "target_words", SMOKE_WORDS, schemas)
+        patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
+        patch_widget_by_name(wf, 1, "act_count", "1", schemas)
+    else:
+        print("[soak] running the workflow's OWN saved defaults (real full "
+              "episode)", flush=True)
+    for nid, widget, value in (extra_patches or []):
+        patch_widget_by_name(wf, int(nid), widget, value, schemas)
+        print("[soak] patch: node %s %s=%r" % (nid, widget, value), flush=True)
 
     api = workflow_to_api_prompt(wf, schemas)
     with VramSampler() as vram:
@@ -362,11 +383,15 @@ def run_leg(leg: str, expect_floor: bool) -> int:
         if hist.get("still_kenburns", 0) <= 0:
             raise SoakFail("floor leg: still_kenburns absent: %r" % hist)
         print("[soak] FLOOR histogram OK: %r" % hist, flush=True)
+    elif expect_engine:
+        if set(hist) != {expect_engine} or hist[expect_engine] != n_beats:
+            raise SoakFail("histogram %r != {%r: %d} -- a beat fell off the "
+                           "expected engine" % (hist, expect_engine, n_beats))
+        print("[soak] %s:%d histogram OK" % (expect_engine, n_beats),
+              flush=True)
     else:
-        if set(hist) != {"humo"} or hist["humo"] != n_beats:
-            raise SoakFail("histogram %r != {'humo': %d} -- a beat fell off "
-                           "the keystone" % (hist, n_beats))
-        print("[soak] humo:%d histogram OK" % n_beats, flush=True)
+        print("[soak] EXPERIMENT histogram (informational): %r over %d beats"
+              % (hist, n_beats), flush=True)
 
     final_mp4 = newest_final_mp4(started)
     # The episode slug IS the per-episode folder name (layout:

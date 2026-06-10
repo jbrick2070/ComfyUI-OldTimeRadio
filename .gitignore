@@ -155,6 +155,7 @@ workflows/*.json.bak
 !scripts/_otr_soak_capstone.py
 !scripts/_otr_single_engine_smoke.py
 !scripts/_otr_soak_server_launch.cmd
+!scripts/_otr_soak_marathon.py
 
 # --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
 # <output>/otr/state/ ---

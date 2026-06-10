@@ -420,6 +420,51 @@ def _render_one(engine_name, request, *, force_oom):
                 pass
 
 
+#: Default text prompt for an on-the-fly lipsync BASE clip -- face-forward so
+#: the overlay's landmarker has a mouth to drive (env-overridable).
+_LSYNC_BASE_PROMPT = (
+    "close-up portrait of a 1940s radio actor speaking into a studio "
+    "microphone, face centered, warm tungsten light, period drama")
+
+
+def _provide_lipsync_base(engine_name, request):
+    """Provider seam (operator ask 2026-06-09, the LTX+latentsync combo): a
+    ``lipsync_overlay`` engine needs a BASE clip; when the request has none and
+    ``OTR_LSYNC_BASE_ENGINE`` names a provider (e.g. ``ltx_video``), render the
+    base IN-LINE first and feed its path as ``base_clip_ref``. LOUD; additive;
+    no env -> no behavior change. A base-render failure leaves base_clip_ref
+    unset so the overlay fails its own usability check and the normal LOUD
+    fallback chain runs."""
+    if engine_family(engine_name, "") != "lipsync_overlay":
+        return
+    get = request.get if isinstance(request, dict) else (
+        lambda k, d=None: getattr(request, k, d))
+    if get("base_clip_ref"):
+        return
+    base_engine = os.environ.get("OTR_LSYNC_BASE_ENGINE", "").strip()
+    if not base_engine:
+        return
+    base_req = copy.deepcopy(request) if isinstance(request, dict) else dict(request)
+    base_req["base_clip_ref"] = None
+    base_req["audio_ref"] = None          # the base is SILENT b-roll (V-1)
+    base_req["text_prompt"] = os.environ.get(
+        "OTR_LSYNC_BASE_PROMPT", _LSYNC_BASE_PROMPT)
+    _LOG.warning("[OTR video] LOUD lipsync base: rendering %s base for shot %s "
+                 "via %s (OTR_LSYNC_BASE_ENGINE)", engine_name,
+                 base_req.get("shot_id"), base_engine)
+    try:
+        base_clip = _render_one(base_engine, base_req, force_oom=False)
+    except Exception as exc:              # noqa: BLE001 -- LOUD; chain handles it
+        _LOG.warning("[OTR video] lipsync base render FAILED (%s: %s) -- the "
+                     "overlay will fail closed and walk its fallback chain",
+                     type(exc).__name__, str(exc).splitlines()[0][:160])
+        return
+    path = (base_clip or {}).get("path") or ""
+    if path:
+        request["base_clip_ref"] = {"path": path}
+        _LOG.warning("[OTR video] lipsync base ready: %s", path)
+
+
 def render_shot(shot, request, *, fallback_of, video_revision,
                 oom_engines=frozenset(), oom_shot_id=None):
     """Render ONE shot through the fallback chain LOUDLY until a clip renders.
@@ -440,6 +485,7 @@ def render_shot(shot, request, *, fallback_of, video_revision,
         force = (sid == oom_shot_id and cand in oom_engines)
         attempts.append(cand)
         try:
+            _provide_lipsync_base(cand, request)
             clip = _render_one(cand, request, force_oom=force)
             used_mb = _mc.vram_used_mb()
             return clip, out_shot, decisions, attempts, used_mb
@@ -533,10 +579,69 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None,
             master_audio_path = _reresolve_master_audio(str(master_audio_path))
         except Exception:  # noqa: BLE001 - never block the render on re-resolve
             pass
+    ledger = apply_engine_override(ledger)
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
     return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
                        request_builder=rb, canvas=canvas)
+
+
+def parse_engine_override(spec: str) -> dict:
+    """Parse ``OTR_FORCE_ENGINE_MAP`` (pure). Grammar: comma-separated
+    ``role=engine`` pairs; the role ``*`` means EVERY shot regardless of role.
+    Examples: ``*=ltx_video`` (the all-LTX episode);
+    ``character_video=latentsync,announcer_visual=latentsync,scene_broll=ltx_video``.
+    Unknown engines raise at parse time (fail-closed, before any render)."""
+    out = {}
+    for pair in (spec or "").split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(
+                "OTR_FORCE_ENGINE_MAP entry %r is not role=engine" % pair)
+        role, engine = (s.strip() for s in pair.split("=", 1))
+        if engine not in ENGINE_FAMILY and not _vreg.is_registered(engine):
+            raise ValueError(
+                "OTR_FORCE_ENGINE_MAP names unknown engine %r" % engine)
+        out[role] = engine
+    return out
+
+
+def apply_engine_override(ledger):
+    """Experiment knob (operator ask 2026-06-09: the all-LTX / LTX+latentsync
+    episodes): when ``OTR_FORCE_ENGINE_MAP`` is set, re-route each planned
+    shot's ``engine_id``/``family`` by role BEFORE rendering, LOUDLY. The
+    fallback chains stay intact (a forced engine that fails still degrades to
+    the radio floor with the usual LOUD restamp). Returns the (possibly
+    rewritten) ledger; a parse error logs LOUD and leaves the plan untouched
+    (fail-safe: the production plan renders rather than aborting)."""
+    spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
+    if not spec:
+        return ledger
+    try:
+        mapping = parse_engine_override(spec)
+    except ValueError as exc:
+        _LOG.warning("[OTR video] OTR_FORCE_ENGINE_MAP IGNORED (parse): %s", exc)
+        return ledger
+    section = (ledger.get("video") or {})
+    n = 0
+    for shot in section.get("shots") or []:
+        role = str(shot.get("role") or "")
+        engine = mapping.get(role) or mapping.get("*")
+        if not engine or shot.get("engine_id") == engine:
+            continue
+        _LOG.warning(
+            "[OTR video] LOUD ENGINE OVERRIDE shot=%s role=%s %s -> %s "
+            "(OTR_FORCE_ENGINE_MAP)", shot.get("shot_id"), role or "?",
+            shot.get("engine_id"), engine)
+        shot["engine_id"] = engine
+        shot["family"] = engine_family(engine, shot.get("family"))
+        n += 1
+    if n:
+        _LOG.warning("[OTR video] engine override applied to %d shot(s): %r",
+                     n, mapping)
+    return ledger
 
 
 def build_clip_manifest(result, *, episode_id=""):
@@ -779,6 +884,7 @@ __all__ = [
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "run_real_episode", "build_clip_manifest",
+    "parse_engine_override", "apply_engine_override",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
     "run_gpu_soak", "render_single",
 ]

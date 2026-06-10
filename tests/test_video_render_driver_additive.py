@@ -408,3 +408,125 @@ def test_video_render_batch_mode_combo_offers_episode():
     from nodes.otr_video_render_batch import OTRVideoRenderBatch
     modes = OTRVideoRenderBatch.INPUT_TYPES()["required"]["mode"][0]
     assert "episode" in modes and "soak" in modes and "single" in modes
+
+
+# --------------------------------------------------------------------------- #
+# OTR_FORCE_ENGINE_MAP override + the lipsync base provider (2026-06-09,
+# operator experiment knob: the all-LTX / LTX+latentsync episodes)
+# --------------------------------------------------------------------------- #
+def test_parse_engine_override_grammar():
+    m = rd.parse_engine_override("*=ltx_video")
+    assert m == {"*": "ltx_video"}
+    m = rd.parse_engine_override(
+        "character_video=latentsync, scene_broll=ltx_video")
+    assert m == {"character_video": "latentsync", "scene_broll": "ltx_video"}
+    with pytest.raises(ValueError):
+        rd.parse_engine_override("character_video")          # no '='
+    with pytest.raises(ValueError):
+        rd.parse_engine_override("*=not_a_real_engine_xyz")  # unknown engine
+
+
+def test_apply_engine_override_rewrites_by_role(monkeypatch):
+    led = _two_shot_ledger()
+    led["video"]["shots"][0]["role"] = "character_video"
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    out = rd.apply_engine_override(led)
+    assert out["video"]["shots"][0]["engine_id"] == "ltx_video"
+    assert out["video"]["shots"][0]["family"] == "text_to_video"
+    # the other role is untouched
+    assert out["video"]["shots"][1]["engine_id"] == "stub_fail"
+
+
+def test_apply_engine_override_star_and_noenv(monkeypatch):
+    led = _two_shot_ledger()
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=still_kenburns")
+    out = rd.apply_engine_override(led)
+    assert all(s["engine_id"] == "still_kenburns"
+               for s in out["video"]["shots"])
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    led2 = _two_shot_ledger()
+    out2 = rd.apply_engine_override(led2)
+    assert out2 is led2                       # no env -> no rewrite, same obj
+
+
+def test_apply_engine_override_bad_spec_failsafe(monkeypatch):
+    led = _two_shot_ledger()
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "garbage-without-equals")
+    out = rd.apply_engine_override(led)       # LOUD log; plan untouched
+    assert out["video"]["shots"][0]["engine_id"] == "stub_ok"
+
+
+class _StubLipsync(_StubBase):
+    name = "stub_lipsync"
+    family = "lipsync_overlay"
+
+    def render_clip(self, request, prepared):
+        assert request.get("base_clip_ref"), "base must be provided first"
+        return {"raw": True, "base": request["base_clip_ref"]["path"]}
+
+
+class _StubBaseProvider(_StubBase):
+    name = "stub_baseprov"
+    family = "text_to_video"
+
+    def render_clip(self, request, prepared):
+        assert request.get("audio_ref") is None     # the base is SILENT (V-1)
+        return {"raw": True}
+
+    def canonicalize(self, raw, request, profile=None):
+        return {"clip_id": request["shot_id"], "engine_id": self.name,
+                "family": self.family, "frame_count": 25,
+                "path": "X:/fake/base_clip.mp4"}
+
+
+@pytest.fixture
+def lipsync_registry():
+    saved = dict(vreg._VIDEO_REGISTRY._registry)
+    vreg.register(_StubLipsync())
+    vreg.register(_StubBaseProvider())
+    try:
+        yield vreg._VIDEO_REGISTRY
+    finally:
+        vreg._VIDEO_REGISTRY._registry.clear()
+        vreg._VIDEO_REGISTRY._registry.update(saved)
+
+
+def test_provide_lipsync_base_renders_and_stamps(monkeypatch, lipsync_registry):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_baseprov")
+    monkeypatch.setattr(rd, "ENGINE_FAMILY",
+                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
+    req = {"shot_id": "shot_x", "base_clip_ref": None,
+           "audio_ref": {"path": "a.wav"}, "text_prompt": "scene",
+           "timing": {"target_frame_count": 25},
+           "canvas": {"w": 64, "h": 64, "fps": 25, "aspect_policy": "pad"},
+           "seed_bundle": {"request_seed": 1}}
+    rd._provide_lipsync_base("stub_lipsync", req)
+    assert req["base_clip_ref"] == {"path": "X:/fake/base_clip.mp4"}
+    # the ORIGINAL request's audio_ref is untouched (only the base is silent)
+    assert req["audio_ref"] == {"path": "a.wav"}
+
+
+def test_provide_lipsync_base_noenv_noop(monkeypatch, lipsync_registry):
+    monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
+    monkeypatch.setattr(rd, "ENGINE_FAMILY",
+                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
+    req = {"shot_id": "shot_x", "base_clip_ref": None}
+    rd._provide_lipsync_base("stub_lipsync", req)
+    assert req["base_clip_ref"] is None
+
+
+def test_provide_lipsync_base_failure_is_loud_not_fatal(monkeypatch,
+                                                        lipsync_registry):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_fail_base_xyz")
+    monkeypatch.setattr(rd, "ENGINE_FAMILY",
+                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
+    req = {"shot_id": "shot_x", "base_clip_ref": None}
+    rd._provide_lipsync_base("stub_lipsync", req)   # unknown engine -> LOUD
+    assert req["base_clip_ref"] is None             # overlay will fail-closed
+
+
+def test_provide_lipsync_base_non_overlay_noop(monkeypatch):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_baseprov")
+    req = {"shot_id": "shot_x", "base_clip_ref": None}
+    rd._provide_lipsync_base("stub_ok", req)        # abstract family -> no-op
+    assert req["base_clip_ref"] is None
