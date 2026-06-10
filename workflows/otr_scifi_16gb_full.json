@@ -73,10 +73,10 @@
         true,
         true,
         true,
-        "anthropic/claude-opus-4.8",
-        "deepseek/deepseek-v4-pro",
-        "anthropic/claude-opus-4.7",
-        "deepseek/deepseek-v4-pro"
+        "(enable OpenRouter)",
+        "(enable OpenRouter)",
+        "(enable Comfy Credits)",
+        "(enable Comfy Credits)"
       ],
       "inputs": [],
       "outputs": [
