@@ -531,12 +531,21 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         warnings.append("no writer model in meta; creative derivation uses template")
         return None
     try:  # lazy: never import the loader at module scope (V-12)
-        from ._otr_model_loader import make_generate_fn  # type: ignore
+        # FIXED 2026-06-10 (operator look-QA root cause): this called
+        # make_generate_fn(model_id, slot=...) -- a signature that never
+        # existed -- so the LLM path failed on EVERY live run and the
+        # deterministic template silently carried all creative/image
+        # derivation. The real seam is request_slot(slot, model_id) ->
+        # cache entry (a same-model call is a cache HIT, no reload) ->
+        # make_generate_fn(entry) -> gen(messages, ...).
+        from ._otr_model_loader import make_generate_fn, request_slot  # type: ignore
 
-        gen = make_generate_fn(model_id, slot="technical")
+        entry = request_slot("technical", model_id)  # LLM slot: technical
+        gen = make_generate_fn(entry)
 
         def _call(prompt: str) -> str:
-            return gen(prompt, temperature=0.0)
+            return gen([{"role": "user", "content": str(prompt)}],
+                       temperature=0.0, max_new_tokens=300)
 
         return _call
     except Exception as exc:  # noqa: BLE001

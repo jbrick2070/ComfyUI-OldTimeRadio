@@ -129,8 +129,13 @@ def compose_image_prompt_fallback(meta: dict, char: dict) -> str:
     ``"{appearance}, {setting} setting, {style anchor}"`` with empty parts
     dropped; degrades to the style anchor alone if the brief + cast are bare.
     """
+    # Same key chain as _appearance_for_char incl. character_description
+    # (2026-06-10): this fallback is what actually runs whenever the LLM is
+    # unavailable, and it read only the two empty keys -- every character got
+    # the identical setting+anchor prompt -> ONE shared portrait.
     appearance = str(
-        (char or {}).get("portrait_prompt") or (char or {}).get("appearance") or ""
+        (char or {}).get("portrait_prompt") or (char or {}).get("appearance")
+        or (char or {}).get("character_description") or ""
     ).strip()
     setting = _read_setting(meta)
     parts = []
