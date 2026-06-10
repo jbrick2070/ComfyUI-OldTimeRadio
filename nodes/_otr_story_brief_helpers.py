@@ -14,12 +14,15 @@ One helper per consumer shape. The alternative was N slightly-different
 bad implementations across N consumer files (refinement section 5).
 
 Module is PURE: no I/O, no GPU, no ComfyUI imports, no MusicGen import.
-The dependency direction is consumer -> helper (e.g. C5g wires
-`nodes/musicgen_theme.py` to import `get_story_brief_music_mood`),
-NEVER the reverse. The `test_get_music_mood_no_musicgen_import` test
-in `tests/test_story_brief_helpers_c5b.py` locks this property via
-AST inspection so a future refactor cannot accidentally introduce a
-circular import.
+The dependency direction is consumer -> helper, NEVER the reverse.
+(2026-06-10 gap audit: the historical music consumer
+`nodes/musicgen_theme.py` no longer exists -- the live music lane reads
+the brief via `nodes/_otr_music_prompt.py`'s own protocol. The live
+VISUAL consumers are the prompt finisher's callers: ShotLock M4, the
+image-prompt deriver, and the render driver's scene composer.) The
+`test_get_music_mood_no_musicgen_import` test in
+`tests/test_story_brief_helpers_c5b.py` locks the no-reverse-import
+property via AST inspection.
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
@@ -130,13 +133,12 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
     Returns the resolved status string so the caller can branch on it
     if needed. Each consumer calls this exactly ONCE per run with its
     own `log` (logging.Logger) and a string consumer_id from the
-    canonical set:
+    canonical set (refreshed 2026-06-10 gap audit -- the legacy batch
+    renderers are gone; the live consumers are):
 
-        flux_env       OTR_BatchFluxRender
-        flux_portrait  OTR_BatchFluxPortraitRender
-        ltx            OTR_BatchLTXRender
-        humo           OTR_BatchHumoRender
-        musicgen       OTR_MusicGenTheme
+        ltx_scene_open  render_driver.run_real_episode (scene composer)
+        shotlock_m4     OTR_ShotLock (per-beat creative derivation)
+        flux_portrait   OTR_MetaBriefImagePromptGen (portrait prompts)
 
     The log line format is uniform across consumers so soak diagnostics
     can grep one canonical pattern instead of N consumer-specific log
@@ -154,9 +156,13 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
     terms = m.get("story_brief_terms") or {} if status == "ok" else {}
     if not isinstance(terms, dict):
         terms = {}
-    n_setting = len(terms.get("setting") or [])
-    n_lighting = len(terms.get("lighting") or [])
-    n_atmosphere = len(terms.get("atmosphere") or [])
+    def _n(key):
+        v = terms.get(key)
+        return len(v) if isinstance(v, list) else (1 if v else 0)
+
+    n_setting = _n("setting")
+    n_lighting = _n("lighting")
+    n_atmosphere = _n("atmosphere")
     log.info(
         "[story_brief:%s] status=%s brief_chars=%d "
         "terms=setting=%d/lighting=%d/atmosphere=%d",
@@ -282,10 +288,11 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
     base = (prompt or "").strip().rstrip(",")
     if not base:
         return ""
-    keep_no_text = NO_TEXT_CLAUSE in base
+    # Preserve the clause only when TRAILING (pass-02 panel: an occurrence
+    # mid-prompt is content, not a render constraint to relocate).
+    keep_no_text = base.endswith(NO_TEXT_CLAUSE)
     if keep_no_text:
-        base = base.replace(NO_TEXT_CLAUSE, "").replace(", ,", ",")
-        base = base.strip().rstrip(",").strip()
+        base = base[: -len(NO_TEXT_CLAUSE)].strip().rstrip(",").strip()
     pieces = [base, get_era_tail(meta)]
     if style_tail:
         pieces.append(STYLE_TAIL_DEFAULT)
@@ -299,4 +306,8 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
         out = cut.rstrip(" ,")
     if keep_no_text:
         out = f"{out}, {NO_TEXT_CLAUSE}"
+    if max_chars and len(out) > max_chars:
+        # Hard guarantee for pathological small caps (pass-02 panel): the
+        # cap wins even over the preserved clause + the 20-char floor.
+        out = out[:max_chars].rstrip(" ,")
     return out

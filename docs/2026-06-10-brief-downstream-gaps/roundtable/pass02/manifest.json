@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-10T22:18:45.219805+00:00",
+  "doc": "docs\\2026-06-10-brief-downstream-gaps\\roundtable\\pass01_plan.md",
+  "prompt_tokens_est": 30214,
+  "models": [
+    {
+      "requested_model": "openai/gpt-5.5",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 29477,
+      "completion_tokens": 4800,
+      "cost_usd": null
+    },
+    {
+      "requested_model": "google/gemini-3.1-pro-preview",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 34394,
+      "completion_tokens": 11996,
+      "cost_usd": null
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 31848,
+      "completion_tokens": 7211,
+      "cost_usd": 0.020127449999999998
+    }
+  ],
+  "total_cost_usd": 0.0201
+}

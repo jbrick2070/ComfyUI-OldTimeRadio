@@ -1,4 +1,4 @@
-# Brief-to-Downstream Gap Fix Plan -- v1 (post pass-01 roundtable, grounded)
+# Brief-to-Downstream Gap Fix Plan -- FINAL (pass-02 CONVERGED; see pass02_judgment.md)
 
 The gap matrix (G1-G8) stands as in pass00 with one amendment: meta.visual_plan
 is NOT orphaned (radio editor / casting / HUD genre consume it). The fix design
@@ -11,9 +11,10 @@ ERA_TAIL_DEFAULT   = "timeless cinematic aesthetic"
 STYLE_TAIL_DEFAULT = "cinematic, 35mm film look, subtle film grain, volumetric lighting"
 
 def get_era_tail(meta) -> str
-    # legacy _resolve_era_tail precedence, ported:
-    # atmosphere_line -> visual_palette (top 3, joined) -> v1 lighting
-    # (get_story_brief_lighting) -> ERA_TAIL_DEFAULT. Never raises, never "".
+    # legacy _resolve_era_tail behavior, ported: CONCATENATION of all
+    # non-empty signals in legacy order (atmosphere_line, visual_palette
+    # top 3, v1 lighting); ERA_TAIL_DEFAULT only when ALL are empty.
+    # Never raises, never "".
 
 def finish_visual_prompt(meta, prompt, *, max_chars=None, style_tail=True) -> str
     # prompt + ", " + era_tail [+ ", " + STYLE_TAIL_DEFAULT if style_tail]
@@ -44,8 +45,10 @@ Order of precedence for a text-engine shot (`ltx_video` / `wan_i2v`):
    background_abstract included), not only announcer/music -- kills the
    "a 1940s radio studio" generic default for text engines.
 - Keep the `group_id` -> role fallback parsing.
-- Lipsync base (`_provide_lipsync_base`): prefer the request's existing
-  (finished) `text_prompt` when non-default; `OTR_LSYNC_BASE_PROMPT` verbatim.
+- Lipsync base (`_provide_lipsync_base`): env override verbatim; otherwise
+  the FACE-FORWARD default stands (pass-02 decision: the overlay's
+  landmarker needs a mouth -- a scene prompt re-breaks the combo lane's
+  face-detect; the request prompt is deliberately NOT used).
 
 ## F3. M4 + portraits
 
@@ -82,7 +85,8 @@ Order of precedence for a text-engine shot (`ltx_video` / `wan_i2v`):
 ## Acceptance (after fixes, ONE 30w production render)
 
 Logs show `[story_brief:ltx_scene_open]`, `[story_brief:shotlock_m4]`,
-`[story_brief:flux_portrait]`; the scene-open prompt carries brief prose +
+`[story_brief:flux_portrait]` AND at least one "LTX SCENE ... composed from
+the episode brief" line (proving the scene branch actually ran); the scene-open prompt carries brief prose +
 era tail within budget; portrait/M4 prompts end with the tails; suite + Bug
 Bible green; audio byte-identical; operator eyeball gates the look.
 
