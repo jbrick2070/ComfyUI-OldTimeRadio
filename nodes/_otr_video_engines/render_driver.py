@@ -378,6 +378,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
+    # FULL-FRAME landscape for the generative-motion engines (operator
+    # look-QA 2026-06-10): build_request's default canvas is the HuMo
+    # PORTRAIT (480x832, the accepted talking-head pillarbox), and LTX/Wan
+    # inherited it -- skinny portrait b-roll in a 1472x832 frame. Those
+    # engines render the composite canvas instead (both dims /32 for the
+    # LTX latent grid; env-overridable).
+    if str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v"):
+        _lc = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
+        try:
+            _lw, _lh = (int(x) for x in _lc.lower().split("x", 1))
+        except (ValueError, AttributeError):
+            _lw, _lh = 1472, 832
+        req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
+        req["init_w"], req["init_h"] = _lw, _lh
     creative = shot.get("creative") or {}
     text_prompt = str(creative.get("text_prompt") or "")
     if text_prompt:

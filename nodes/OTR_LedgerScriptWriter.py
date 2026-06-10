@@ -3693,6 +3693,48 @@ class OTR_LedgerScriptWriter:
                     len(landed),
                 )
 
+        # --- I.6. Self-vocative scrub (operator look-QA 2026-06-10) --
+        # The composer sometimes opens a line with the SPEAKER'S OWN
+        # first name as a vocative ("GULLIVER REEVES: Gulliver, have
+        # you...") -- a character addressing themselves. Deterministic
+        # scrub, pre-freeze (audio has not rendered yet, so the text
+        # edit is safe): strip the leading self-vocative + separator,
+        # re-capitalize, restamp word_count. LOUD per fix; never touches
+        # a line that addresses ANOTHER character.
+        _voc_fixed = 0
+        _name_by_cid = {
+            str(c.get("char_id") or ""): str(c.get("name") or "")
+            for c in (led.data.get("cast") or []) if isinstance(c, dict)
+        }
+        for _ln in led.data.get("lines") or []:
+            if not isinstance(_ln, dict) or _ln.get("skip"):
+                continue
+            _nm = _name_by_cid.get(str(_ln.get("char_id") or ""), "")
+            _first = (_nm.split() or [""])[0]
+            _txt = str(_ln.get("text") or "")
+            if len(_first) < 2 or not _txt:
+                continue
+            _m = re.match(
+                r"^\s*" + re.escape(_first) + r"\s*[,!?—…:;-]+\s*",
+                _txt, flags=re.IGNORECASE)
+            if not _m:
+                continue
+            _rest = _txt[_m.end():].lstrip()
+            if len(_rest.split()) < 2:
+                continue                      # never empty a line
+            _fixed = _rest[0].upper() + _rest[1:]
+            log.warning(
+                "[OTR_LedgerScriptWriter] self-vocative scrub %s (%s): "
+                "%r -> %r", _ln.get("line_id"), _nm, _txt[:60], _fixed[:60])
+            _ln["text"] = _fixed
+            _ln["word_count"] = len(_fixed.split())
+            _voc_fixed += 1
+        if _voc_fixed:
+            led.save()
+            log.warning(
+                "[OTR_LedgerScriptWriter] self-vocative scrub fixed %d "
+                "line(s) pre-freeze", _voc_fixed)
+
         # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was
         # stamped progressively inside the composer loop (Phase 2B).
