@@ -1,0 +1,31 @@
+{
+  "sprint": "OTR 3D Toolkit v1 (character_3d)",
+  "plan": "docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md",
+  "tickets_doc": "docs/2026-06-09-3d-toolkit/SUBAGENT_SPRINT_PLAN.md",
+  "updated": "2026-06-09",
+  "updated_by": "planner-window (Fable)",
+  "operator_green_light": "NOT GIVEN -- 3D PARKED; Lane R/T may start on operator word, Lane G needs explicit go",
+  "gates": {
+    "S-3D-0": "pending",
+    "T2b_keystone": "pending",
+    "v1_usable": "pending"
+  },
+  "next_action": "Operator: green-light Lane R/T (no-regret CPU) and/or Lane G (S-3D-0).",
+  "blockers": [],
+  "tickets": [
+    { "id": "R1", "lane": "R", "title": "W7-pre migration slice (triposg_talk dark adapter + renames)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "R2", "lane": "R", "title": "ImageDirector + capability hardening (fail-closed)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "R3", "lane": "R", "title": "Request-builder migration (schema-valid VideoRequest)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "R4", "lane": "R", "title": "Directory-clip plumbing + SilentComposite dir input", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "R5", "lane": "R", "title": "Cache + ledger contracts (keys, prune wiring, atomicity)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "T1", "lane": "T", "title": "ICT-FaceKit -> ARKit-52 converter + template hash", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "T2a", "lane": "T", "title": "Wrap smoke on real template (NON-BINDING)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "G0", "lane": "G", "title": "S-3D-0 no-compile sidecar probe (GATES THE LANE)", "status": "pending", "note": "operator green-light required", "updated": "2026-06-09" },
+    { "id": "G1", "lane": "G", "title": "Weights + 25-mesh corpus (one spawn, mesh-pack portraits)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "G2", "lane": "G", "title": "T2b BINDING keystone wrap (GO <= 4/25 failures)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "G3", "lane": "G", "title": "T4 driver + alpha + LOOK gate", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "W1", "lane": "W", "title": "triposg_talk live forward", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "W2", "lane": "W", "title": "Story wiring (pack, shot grammar, dialogFile, vectors)", "status": "pending", "note": "", "updated": "2026-06-09" },
+    { "id": "W3", "lane": "W", "title": "Soak re-cert + v1-usable DoD", "status": "pending", "note": "", "updated": "2026-06-09" }
+  ]
+}
