@@ -1,193 +1,52 @@
+# OTR Video Platform -- HANDOFF -- CORE BUILD DONE (humo:5 live) -- remaining = CAPSTONE soak + LTX lane + fetch Wan/latentsync -- 2026-06-09 (night)
 
-**Last updated:** 2026-06-09  
-**Branch:** `v2.0-alpha`  
-**HEAD:** `ea024c7` (feat(humo): bake the FAST 14B Kijai+lightx2v 6-step tier in as the default keystone — PUSHED, origin == HEAD)  
-**Commits ahead of origin:** 0 (in sync)
+> **CANONICAL LOCATION:** this in-repo file (`docs/VIDEO_BUILD_HANDOFF.md`) is the SINGLE git-tracked source of truth. The old copy at `C:\Users\jeffr\Documents\otr-video-roundtable\VIDEO_BUILD_HANDOFF.md` is retired to a redirect stub -- always read/update THIS file. The v1.4 execution plan + the roundtable source docs still live in `C:\Users\jeffr\Documents\otr-video-roundtable\`.
 
-## HuMo KEYSTONE LIVE-VERIFIED on the 14B FAST tier (2026-06-09)
+## ACTIVE MISSION (the only active build)
+The OTR Video Engine core is DONE: the platform is wired into real episodes, real HuMo 14B renders EVERY talking beat (announcer included -> `engine_histogram={"humo":5}`), audio byte-identical, the auto-downgrade chain fired live, and the legacy procgen-only path is retired. What remains is the **capstone + the last opt-in lane**: (1) a full-episode SOAK to declare the humo:5 production path stable + deterministic; (2) the LTX opt-in lane (so LTX actually renders, not just fail-closed); (3) FETCH + verify the remaining model lanes (Wan ckpt, latentsync sidecar -- download into C:\ComfyUI-Models yourself; 3D stays parked). Plan + sources folder: `C:\Users\jeffr\Documents\otr-video-roundtable\`.
 
-Run `ceef5e1b` / episode_id `pending_20260609_170145`. Booted env (echoed):
-`OTR_ENABLE_HUMO=1`, `OTR_HUMO_UNET_NAME=Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`,
-`OTR_HUMO_LORA_NAME=lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`,
-`OTR_HUMO_STEPS=6`, `OTR_HUMO_CFG=1.0`. These are now the BAKED-IN defaults in
-`eng_humo.py` (commit `ea024c7`) — only the enable flag is needed; the UNET resolves
-via `folder_paths`/extra_model_paths. Live proof: `Requested to load WAN21_HuMo` +
-WhisperLargeV3/WanTEModel/WanVAE, KSampler bar `0/6` (6 steps), ~2 min/beat,
-VRAM peak **13.8 GB ≤ 14.5**. `engine_histogram={"humo":3,"still_kenburns":2}`;
-final mp4 PCM `093e3d7eb129` == master (byte-identical). NB clip files at
-`C:\ComfyUI-Models\diffusion_models\Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`
-+ `C:\ComfyUI-Models\loras\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`.
-
-DONE follow-up: the **hard auto-downgrade tier** is wired (commit `dc2d539`). The
-chain is now **humo -> humo_1.7B -> latentsync -> still_kenburns** (registry-verified
-deterministically); on an OOM/VRAM (or any HARD) failure the 14B keystone degrades
-FIRST to the 1.7B HuMo tier (a real talking face) before latentsync/still, with a LOUD
-restamp (the swap log now also carries `detail=`). `humo_1.7B` is a registered engine
-(`HuMo17BEngine`, `requires_flag=OTR_ENABLE_HUMO`) with env-isolated config
-(`OTR_HUMO_17B_*`: own UNET `humo_1.7B_fp16.safetensors`, NO LoRA, 20 steps / cfg 5.0)
-so the 14B `OTR_HUMO_STEPS/CFG` never bleed in. Soak trail is now 4 hops; suite 3777.
-
-OPEN follow-up: 2 talking beats (b001/b005) still fell back with
-`GraphExecutionError: humo ... audio=''` — a per-beat audio-slice timing edge case
-(intro/outro beats get no sliceable clip), NOT a config issue. The 1.7B tier won't
-fix audio='' (same missing input), so those still degrade to the floor; the real fix
-is the per-beat slice timing for intro/outro beats.
-
----
-
-## ACTIVE MISSION
-
-Build the OTR Video Engine per the execution plan:
-
-- Repo: `docs/OTR_VIDEO_ENGINE__EXECUTION-PLAN_v1.4.md`
-- Canonical: `C:\Users\jeffr\Documents\otr-video-roundtable\OTR_VIDEO_ENGINE__EXECUTION-PLAN_v1.4.md`
-
-**Current step: FULL SMOKE PASSES end-to-end (2026-06-09, commit 317a295). The procgen-video full pipeline renders writer → indextts2/kokoro/SA3 audio → Flux portraits (c01/c02/c03) → HuMo→latentsync→still_kenburns LOUD fallbacks → SilentComposite → MasterAudioMux → `_final.mp4`. Gate verified: `v=41.72s a=49.24s` audio-longer-than-video PASSES. Audio byte-identical (PCM SHA `b90837aae107`, final mp4 audio codec `pcm_s16le`). Suite 3777 passed. NEXT: Subproject C — note Flux portrait gen_fn already runs live in the smoke (832x1216, seed=42, steps=20, cfg=1.0); confirm it meets the Subproject C spec, otherwise proceed to HuMo keystone verify (HuMo needs its weights on disk — currently dependency_missing → still_kenburns fallback).**
-
----
-
-## HARD RULES
-
-- Do NOT start / resume / "continue" any other sprint — NOT story-spine, NOT story-pipeline, NOT any audio sprint, NOT any other ROADMAP item. They are PARKED.
-- Audio is SHIPPED; the audio script ledger is FROZEN (read-only). Never reopen or modify it.
+## HARD RULES (copy verbatim)
+- Do NOT start / resume / "continue" any other sprint -- NOT story-spine, NOT story-pipeline, NOT any audio sprint, NOT any other ROADMAP item. They are PARKED.
+- The audio refactor is SHIPPED; the audio script ledger is FROZEN (read-only). Per-beat audio only SLICES the frozen master read-only -- it NEVER mutates the master. byte-identical master + mux-LAST (`-c:a copy`, no `-shortest`); `test_audio_byte_identical` stays GREEN at every step.
 - Ignore any stale `session_handoff.md` and any memory / ROADMAP entry implying other "active" work. The video engine is the ONLY active build until the operator says otherwise.
-- Invariants in force at all times:
-  - Byte-identical master audio + mux-LAST
-  - Single resident heavy engine, VRAM peak ≤ 14.5 GB (3D engines: 14.0 GB)
-  - Cloud / OpenRouter allowed (Jeffrey lifted 100%-local rule 2026-06-04; `feedback_cloud_lanes_ok.md`)
-  - Determinism via seed-keyed cache
-  - Every in-render fallback LOUD (log + ledger restamp; never silent)
-  - V-6: all engines unconditionally imported in `__init__.py`; usability gated in `assert_usable` only
-  - V-12: cold-import clean (no torch/diffusers/comfy at module scope)
-  - UTF-8 no BOM; SFW; no "dummy" → use "placeholder"
-- Commit per green chunk. Do NOT push unprompted.
-- UPDATE otr-build-tracker artifact every session — preserve gauge + lanes styling.
-- PRIME DIRECTIVE: never hand the operator a script/cmd/PowerShell block to run. Use Desktop Commander first, then Windows MCP. YOU run everything.
+- Invariants: single resident heavy engine <= 14.5 GB; BUG-291 detach reclaim (`reclaim_idle_models`, never `unload_all_models`); determinism (`OTR_CAST_SEED`/`OTR_STYLE_SEED`/`PYTHONHASHSEED`); every in-render fallback LOUD (log swap + ledger restamp); V-12 cold-import isolation; UTF-8 no BOM; SFW.
+- Cloud lanes OK (100%-local rule lifted 2026-06-04): OpenRouter + Comfy Credits + roundtable spend < $20 fine; estimate silently, run, state the spend after.
+- RUN-IDENTITY DISCIPLINE: pin every result to THAT run's own prompt_id + episode_id; prove config from the LIVE server log (loader lines + KSampler step bar), never an orphan report; launch the server with stdout -> a grep-able log, NEVER `| Out-Null`.
+- UPDATE the `otr-build-tracker` (Cowork artifact) every session: write your rows to the on-disk file `C:\Users\jeffr\OneDrive\Documents\Claude\Artifacts\otr-build-tracker\index.html` (FABLE TESTER table), preserving the gauge + lanes styling. NOTE: only the planner window can refresh the LIVE widget the operator sees -- so also REPORT your tracker row in your summary so the planner can sync the view.
 
----
+## AUTONOMY (operator-authorized 2026-06-09 -- run to 100% of the CODEABLE scope)
+Go as far as possible without asking. Build additively; full regression (`tests/` + Bug Bible + `test_audio_byte_identical`) after every change; commit AND PUSH per green chunk via Desktop Commander (cmd), verify HEAD==origin + no-BOM + AST after. RUN the GPU yourself headless on `:8000` (recipe below) -- never hand the operator a script. Roundtable 2-3 panels for a real fork, ground against the code, then proceed. For OPERATOR-GATED items, do NOT spin -- log it, note exactly what to drop, move on. STOP only for a truly irreversible / audio-mutating change or a self-run you genuinely cannot do.
 
-## HEADLESS SERVER ENV (MACHINE SETUP — NOT in git; reproduce on a fresh box)
+## WHERE WE ARE (filled from the 2026-06-09 sessions only)
+**State: CORE BUILD DONE. humo:5 live-proven; cleanbreak shipped; downgrade fired live. All pushed.**
+- **humo:5 PROVEN LIVE** (Fable, run `caa5b13a`, ep `pending_20260609_180911` "Ticking Countdown"): `engine_histogram={"humo":5}` -- every talking beat incl. b001/b005 announcer on real HuMo first attempt. Mux `audio_byte_identical OK` + independent PCM-SHA256 recompute `final==master (f76d056db713)`; VRAM peak 3.4 GB.
+- **Intro/outro fix root-caused correctly** (the old `audio=''` diagnosis was WRONG): all 5 audio slices existed; the real cause was `init_image=''` -- the announcer is not a cast row, so no portrait was minted and eng_humo's instant guard tripped. Fix: radio-style announcer portrait minted via the same LLM/template path; `stamp_portrait(require_cast_entry=False)` for non-cast subjects only (cast never grown). +8 tests.
+- **Chunk-E cleanbreak SHIPPED**: Gate 1 was already live + test-pinned (links 263/264 in, 248/262 cut, floor 246 kept). Removed the `OTR_FixedShotDurationStub` package registration; DELETED `OTR_FluxBranchGate` + the 2 V-5 deferred-loader shells (~570 lines) + tombstoned in `DELETED_NODE_TYPES`; ghost-node check green on a live restart. +6 tests.
+- **14B fast config is the BAKED-IN default** (`ea024c7`): only `OTR_ENABLE_HUMO=1` needed (6-step / lightx2v / cfg 1.0 / shift 8 / 14B Kijai ckpt).
+- **Hard auto-downgrade FIRED LIVE**: env-broken 14B -> `LOUD FALLBACK humo->humo_1.7B reason=dependency_missing block_class=hard rev=1`, frozen audio untouched, final clip on the real 1.7B face BEFORE the floor. `humo_1.7B` real render verified (33f, 61.7s). Chain: `humo -> humo_1.7B -> latentsync -> still_kenburns`.
+- **Gates GREEN:** full `tests/` 3794 pass; Bug Bible green; `test_audio_byte_identical` green + independent hash, per chunk.
 
-The headless ComfyUI on :8000 runs from the `ComfyUI-Installs` tree but needs the
-canonical model store + sidecars wired in. These are machine-local and CANNOT be
-pushed — recreate them before any live smoke or they fail mid-render:
+### Commits -- VERIFY with `git fetch` + `git log --oneline -15` FIRST
+The latest (Fable) session pushed 4 commits; origin reported IN SYNC at **`fe56a94`** (HEAD==origin, AST/BOM clean). Sprint commits: `29c2723` announcer-portrait fix (#1); `bc8d095` Chunk-E cleanbreak (#2); `fe56a94` humo:5 live proof + live-verify (#3) (+ one polish commit between). The earlier keystone/auto-downgrade lineage (`...ea024c7 -> dc2d539 -> 251cce4`) is already in origin.
 
-1. **Python:** launch with the deps venv, NOT the bare uv python (the uv
-   interpreter lacks `sqlalchemy`/torch). Exact launch (YOU run it via Desktop
-   Commander, persistent process):
-   ```
-   set HF_HOME=C:\ComfyUI-Models\huggingface
-   C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
-     C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\main.py ^
-     --port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI
-   ```
-2. **`HF_HOME=C:\ComfyUI-Models\huggingface`** — without it the server resolves
-   HF to the install dir's INCOMPLETE cache and hangs re-downloading mistral-nemo
-   (the real 5×4.57GB shards live under `C:\ComfyUI-Models\huggingface`).
-3. **`extra_model_paths.yaml`** at `C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\`
-   pointing `base_path: C:/ComfyUI-Models/` (checkpoints, clip, unet, vae,
-   diffusion_models, loras, text_encoders, …). Fixes `folder_paths`-based lookups
-   (SA3 music ckpt, Flux, etc.). Confirmed by the startup "Adding extra search
-   path …" lines.
-4. **Two junctions into the install** (OTR resolves these by `models_dir` join, so
-   `extra_model_paths` does NOT cover them):
-   - `...\ComfyUI\custom_nodes\...\index-tts`  →  `C:\Users\jeffr\Documents\ComfyUI\index-tts` (indextts2 sidecar venv + checkpoints)
-   - `...\ComfyUI\models\TTS`  →  `C:\ComfyUI-Models\TTS` (kokoro voices incl. `bm_fable.pt`, indextts2 refs)
-   ```
-   mklink /J "...\ComfyUI\index-tts"  "C:\Users\jeffr\Documents\ComfyUI\index-tts"
-   mklink /J "...\ComfyUI\models\TTS" "C:\ComfyUI-Models\TTS"
-   ```
-   (the OTR custom_node itself is already a junction → the Documents repo.)
+### Seeded-launch recipe (VERIFIED on this box)
+- Server main: `C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\main.py`. venv python: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (bare uv python lacks deps).
+- Env: `HF_HOME=C:\ComfyUI-Models\huggingface` + determinism (`CUBLAS_WORKSPACE_CONFIG=:4096:8`, `PYTHONHASHSEED=0`, `NVIDIA_TF32_OVERRIDE=0`, `TOKENIZERS_PARALLELISM=false`) + `OTR_ENABLE_HUMO=1` (+ `OTR_CAST_SEED=42` `OTR_STYLE_SEED=42`).
+- Launch: `--port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI`, NO `--highvram`, stdout -> a grep-able log (NEVER `| Out-Null`).
+- Machine setup already in place (NOT git): `extra_model_paths.yaml` at the install root -> `C:\ComfyUI-Models`; junctions `index-tts` + `models\TTS` into the install. Smoke: `scripts\queue_smoke.py` (otr_api defaults COMFYUI_URL to `:8000`). The server log may print an HF token -- do NOT echo/persist it.
 
-Non-fatal startup noise (ignore): prestartup emoji `charmap` error, sqlite
-"unable to open database file" → "Using RAM pressure cache".
+## REMAINING (drive to 100% of the codeable scope, in order)
+**#1 -- CAPSTONE: full-episode SOAK on the humo:5 production path.** Run a full episode end-to-end TWICE back-to-back on the 5080 (the A-ship soak pattern). Prove: `humo:5` both runs (all talking beats real HuMo), audio byte-identical both runs, deterministic (same cast/style with the seeds), VRAM peak <= 14.5 GB, and the still floor still renders with heavy engines OFF. The "production-stable" stamp. Capture the histogram + hashes; commit the soak driver/results.
+**#2 -- LTX opt-in lane.** `ltx_video` currently fails-closed LOUD on the BUG-070 Sage gate while KJNodes/HuMo is resident (by design). Make LTX actually render via the sanctioned path: a Sage-free boot lane OR the cu128 sidecar (V-12 isolation -- do NOT contaminate the main venv). Prove one live LTX clip renders + fails-closed cleanly when unavailable. If a dependency only the operator can install is needed, log it.
+**#3 -- FETCH the missing assets YOURSELF, then verify live (NOT operator-blocked -- download into `C:\ComfyUI-Models` like every prior session did).** Use `scripts/hf_download_driver.py`, `scripts/download_video_stack_weights.ps1`, the HF cache at `C:\ComfyUI-Models\huggingface` (HF user already authed). (a) **Wan 2.2 i2v**: download into `C:\ComfyUI-Models\diffusion_models`, set `OTR_WAN_I2V_CKPT`, render one live clip + confirm fail-closed NAMED when absent. (b) **latentsync**: run its cu128 SIDECAR installer (`scripts/_otr_latentsync_install.ps1`; SEPARATE venv, never the main one), prove one live pass. (c) optional **14B resident-config perf re-capture**. Commit+push each as it goes green. Only ping the operator if a specific download is genuinely gated/unavailable on HF.
+**#4 -- 3D `character_3d` stays PARKED** (more than a download: needs a cu128 toolchain + the ARKit-52 routing must-fixes). The 3D phase is being planned separately in `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md`. Do NOT start 3D this window.
 
----
+## FIRST ACTIONS for the new window
+1. `git fetch` + `git log --oneline -15` + `git status` -- confirm HEAD==origin (`fe56a94`).
+2. Read in full: this doc + `C:\Users\jeffr\Documents\otr-video-roundtable\OTR_VIDEO_ENGINE__EXECUTION-PLAN_v1.4.md`.
+3. Give a 5-line summary of the SOAK plan (#1) to prove comprehension (which driver, what asserts humo:5 + byte-identical + determinism + VRAM, how the 2 runs are cache-busted).
+4. Then PROCEED autonomously: #1 soak -> #2 LTX lane -> #3 FETCH Wan + latentsync into `C:\ComfyUI-Models` and verify live (#4 3D stays parked). Regression-green + commit AND PUSH per chunk, RUN every smoke yourself headless on `:8000`, write your FABLE TESTER row + report it. STOP only for a truly irreversible / audio-mutating change or a self-run you cannot do.
 
-## WHERE WE ARE
-
-### This session: MasterAudioMux gate fix (3 commits, NOT pushed)
-
-Root cause found and fixed: the MasterAudioMux duration gate was using
-`abs(v_dur - a_dur) > tol`, which fired because the master WAV (45.75 s) includes
-opening/closing themes (10 s + 8 s) that are NOT in the drama-only SilentComposite
-(38.28 s). The gate has been changed to `v_dur > a_dur + tol` — audio longer than
-video is intentional and safe. Three commits landed:
-
-| Commit | File | Fix |
-|--------|------|-----|
-| `5dbe334` | `nodes/otr_silent_composite.py` | Prefer `manifest["total_target_frames"]` over `_probe_duration()` for frame budget |
-| `76633eb` | `scripts/queue_smoke.py` | Resolve OpenRouter/Comfy slot pickers via live `/object_info` first-choice instead of stale sentinel string |
-| `2ac76a6` | `nodes/otr_master_audio_mux.py` | Gate direction fix: `v_dur > a_dur + tol` (was `abs(v-a) > tol`); added comment explaining intentional gap |
-
-Suite: 3777 pass / 0 fail after all 3 fixes.
-
-**Infrastructure:** junction created at
-`C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`
-→ repo so headless server loads OTR nodes. Headless server was confirmed running
-on :8000 (venv python, PID 15840-ish) with OTR import log visible.
-
-### Pending: smoke re-run on :8000
-
-The fix is loaded in the running server. The smoke has NOT been re-queued since
-the gate fix. This is the immediate next step:
-
-```
-C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
-  C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\queue_smoke.py
-```
-
-Expected: `_final.mp4` appears in node 85 outputs; `v_dur=38.28s < a_dur=45.75s`
-gate passes; PCM SHA256 of `_final.mp4` audio == PCM SHA256 of master WAV.
-
-Polling script: `outputs/poll_8000.py` (prompt_id must be updated after re-queue).
-
-### After smoke passes
-
-1. **Push 3 commits** (`5dbe334`, `76633eb`, `2ac76a6`) — Desktop Commander git push.
-2. **Subproject C — Flux portrait gen_fn:** ComfyUI-load Flux.1-dev UNET+CLIP+VAE
-   → CLIPTextEncode MetaBrief prompt → KSampler → VAEDecode → uint8 →
-   `dispatch_images`, under residency lease + single-resident-heavy budget.
-3. **HuMo keystone verify:** CLIPS > 0, HuMo gets init_image, audio byte-identical,
-   VRAM ≤ 14.5 GB.
-
-### Prior milestones (this branch)
-
-| Commit | What |
-|--------|------|
-| `24e171b` | Phase 3: character_3d dark scaffold (18 tests, schemas len=8) |
-| `19afaea` | Phase 1: LTX GPU-verify (CLIPLoader+T5-XXL split, OTR_TEST_MODE VRAM guard) |
-| `1c88c69` | Chunk E cleanbreak: EpisodeAssembler WAV save + link surgery |
-| `f2e603e` | M1 first watchable episode (tag: m1-first-episode) |
-| `f003978` | B-SHIP (tag: B-ship, pushed; origin == local) |
-
----
-
-## OPEN OPERATOR / GPU GATES
-
-| Gate | Status | Unblocks |
-|------|--------|----------|
-| **Smoke re-run on :8000** | **READY — server live with gate fix loaded** | push 3 commits + Subproject C |
-| Wan-i2v ckpt on disk (`OTR_WAN_I2V_CKPT`) | BLOCKED: no ckpt | Phase 2 Wan live-verify |
-| cu128 toolkit + latentsync sidecar venv | BLOCKED: no cu128 toolkit | Phase 4 latentsync live-verify |
-| ~25 real meshes + ARKit-52 .npz + cu128 | BLOCKED: no assets | Phase 5 character_3d LIVE keystone |
-
----
-
-## FIRST ACTIONS FOR NEXT SESSION
-
-1. Verify headless server is still running on :8000 (`curl http://127.0.0.1:8000/system_stats` via DC).
-   If not: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m comfy ...` — see prior session for exact launch command.
-2. Queue smoke: run `scripts/queue_smoke.py` via DC.
-3. Poll `/history/<prompt_id>` until `completed=true`; confirm `_final.mp4` in node 85 outputs + PCM hash match.
-4. If smoke passes: push 3 commits, then proceed to Subproject C Flux portrait gen_fn.
-5. Wait for operator go before writing any new production code.
-
----
-
-## PARKED — NOT NOW
-
-- Story-spine sprint
-- Story-pipeline v4
-- Any audio sprint (audio is SHIPPED)
-- Any other ROADMAP item not in the GO-FORWARD video lanes above
+## PARKED -- not now (future opt-in, NOT active)
+- 3D `character_3d` reopen -- planned in `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md` (portrait -> Hunyuan3D/TRELLIS mesh -> ARKit-52 wrap -> A2F-3D -> composite). Blocked on real assets (~25 meshes `OTR_B_MESH_DIR`, an ARKit-52 template `.npz` `OTR_B_ARKIT_TEMPLATE_NPZ`, a cu128 toolchain) + the 3D image-routing must-fixes in `VIDEO_OPTIN_GOFORWARD_PLAN.md`. Reopen record: `docs/2026-06-08-b-ship/B_SHIP_RESULTS.md`.
+- Story-spine / story-pipeline / any audio sprint (SHIPPED + frozen). Any other ROADMAP item.
