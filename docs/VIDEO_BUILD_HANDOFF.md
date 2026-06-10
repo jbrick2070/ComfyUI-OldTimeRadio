@@ -46,6 +46,7 @@ Finish the v1.4 2D capstone: the multi-model soak marathon is running overnight 
 | dia voice | named FAIL-CLOSED | `Dia Path B not installed` -- its sidecar venv was never installed on this box; leg swapped out |
 | OpenRouter claude writer | transport PASS / content FAIL-CLOSED | submit + remote calls worked; the generated script flunked the CastLock structural gate (`needs_full_rerun`) and the episode refused to render -- gates working as designed (cents spent) |
 | Comfy-Credits writer | named FAIL-CLOSED | `ComfyCreditsConfigError: No Comfy credentials` -- headless server has no logged-in Comfy Desktop; expected |
+| humo 160w/4ch finale | **RENDERED + DELIVERED** (gate misclass) | `{humo:8, visualizer:1}` -- 9 beats, all 8 TALKING beats real HuMo, the music beat correctly routed to the visualizer; obs deliverable `signal_lost_whispers_of_betrayal_20260610_030539_..._final.mp4` (18.7MB AAC) is in obs. The driver's strict `expect_engine="humo"` asserts ALL beats humo -- WRONG at episode sizes that produce music beats. GATE REFINEMENT (small, next session): assert "every TALKING beat == humo" instead of whole-histogram equality. |
 
 ### MARATHON (runner details)
 - Runner: `scripts/_otr_soak_marathon.py --hours 4.3`, console -> `scripts/_otr_soak_capstone_results/marathon_console2.log`, per-run dir `scripts/_otr_soak_capstone_results/marathon_<stamp>/` (marathon.log + results.jsonl + per-leg JSON evidence + per-leg server logs).
