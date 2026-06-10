@@ -412,10 +412,17 @@ def test_passpm_empty_json_reseed_then_template():
     )
     c = creative["b1"]
     assert c["source"] in ("template", "template_consistency")
-    assert c["text_prompt"] == sl._deterministic_template(
+    # Gap-audit F3 (2026-06-10): prompts are now FINISHED (era tail + film
+    # style tail appended) after the gates and before the hash -- the
+    # template is the prompt's HEAD, no longer its entirety.
+    _template = sl._deterministic_template(
         "a tall weathered spacer with a scar", "a derelict orbital station",
         "hello there",
     )
+    assert c["text_prompt"].startswith(_template)
+    from nodes._otr_story_brief_helpers import STYLE_TAIL_DEFAULT
+    assert c["text_prompt"].endswith(STYLE_TAIL_DEFAULT)
+    assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])
     assert calls["n"] == 3  # initial + 2 reseeds
     assert any("reseed" in w for w in warns)
 

@@ -402,6 +402,10 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
         "expression, motion, and camera direction that fits the character and "
         "the setting. Reply ONLY with a JSON list of objects "
         '{"beat_id","expression","motion","camera"}.',
+        # Gap-audit F3 (2026-06-10): the era/style tails are APPENDED later
+        # by the prompt finisher -- the model must not duplicate them.
+        "Do not include film-stock, film-grain, or lighting-style terms; "
+        "they are appended automatically later.",
         f"Setting: {setting}",
         "Beats:",
     ]
@@ -498,6 +502,21 @@ def derive_creative_directives(
                 )
                 text_prompt = _deterministic_template(appearance, setting, b["text"])
                 source = "template_consistency"
+            # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
+            # atmosphere/palette/lighting) + the film style tail, restored
+            # from the deleted legacy composer. MUST run after the
+            # consistency gate and BEFORE prompt_hash so the stored hash
+            # matches the rendered prompt. Fail-soft.
+            try:
+                try:
+                    from ._otr_story_brief_helpers import (  # type: ignore
+                        finish_visual_prompt)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_story_brief_helpers import (  # type: ignore
+                        finish_visual_prompt)
+                text_prompt = finish_visual_prompt(meta, text_prompt)
+            except Exception:  # noqa: BLE001
+                pass
             creative[b["beat_id"]] = {
                 "expression": d.get("expression", ""),
                 "motion": d.get("motion", ""),
@@ -740,6 +759,18 @@ class OTRShotLock:
         fps = int(canvas.get("fps") or 25)
         report: list = []
         warnings: list = []
+
+        # Brief disposition, ONCE per run (gap-audit G4 restore).
+        try:
+            try:
+                from ._otr_story_brief_helpers import (  # type: ignore
+                    log_story_brief_disposition)
+            except ImportError:  # pragma: no cover
+                from _otr_story_brief_helpers import (  # type: ignore
+                    log_story_brief_disposition)
+            log_story_brief_disposition(meta, "shotlock_m4", log)
+        except Exception:  # noqa: BLE001
+            pass
 
         beats = extract_beats(led)
         budget = compute_clip_budget(beats, policy, fps)

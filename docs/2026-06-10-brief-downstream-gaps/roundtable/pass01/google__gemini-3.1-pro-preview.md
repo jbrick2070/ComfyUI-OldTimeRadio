@@ -1,0 +1,9 @@
+<!-- requested_model: google/gemini-3.1-pro-preview | resolved_model: google/gemini-3.1-pro-preview-20260219 -->
+
+VERDICT: no. The shared finishing seam spams disposition logs N times per run, drops the v2 brief fields from the era tail, and blows the LTX character budget.
+
+MUST-FIX BEFORE BUILD:
+1. [F1] `log_story_brief_disposition` spam. F1 proposes calling the disposition logger inside `finish_visual_prompt`. Since this runs per-prompt (per-character in `derive_image_prompts`, per-beat in `derive_creative_directives`, per-shot in `build_request_from_shot`), it will log N times per run, violating the helper's strict "exactly ONCE per run" invariant. Fix: Remove the call from `finish_visual_prompt`. Call `log_story_brief_disposition` exactly once at the node/batch level in `OTRShotLock.lock`, `OTRMetaBriefImagePromptGen.generate`, and `run_real_episode`.
+2. [F1] Missing v2 brief fields in the era tail. F1 relies solely on `get_story_brief_lighting(meta)` for the era tail. The legacy `_resolve_era_tail` also read `atmosphere_line` and `visual_palette` to enrich the tail. Using only the v1 helper leaves these v2 fields orphaned. Fix: Update `finish_visual_prompt` (or create a new helper) to read and prepend `atmosphere_line` and `visual_palette` from the brief, matching the legacy behavior.
+3. [F1 / F2] LTX character budget overflow. LTX has a strict 220-240 char budget. Appending the full era tail (v2 fields + lighting) and the ~70-char style tail to the 90-char `get_story_brief_ltx` core will exceed this cap, causing truncation or failure. Fix: Make `finish_visual_prompt` budget-aware (e.g., accept an `is_ltx` flag) to omit the style tail and aggressively trim the era tail for LTX.
+4. [F1] Style-preset awareness violates BUG-LOCAL-250. F1 specifies making the style tail "style-preset

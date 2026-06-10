@@ -161,6 +161,8 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str) -> str:
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
         f"style_anchor: {STYLE_ANCHOR}\n"
+        "Do not include film-stock, film-grain, or lighting-style terms; "
+        "they are appended automatically later.\n"
         "Return only the prompt line."
     )
 
@@ -285,6 +287,20 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             source = "template_person_guard"
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
+        # FINISH the prompt (gap-audit F3, 2026-06-10): era tail + film style
+        # tail, restored from the deleted legacy composer. Runs AFTER the
+        # consistency + person guards (finishing never re-triggers them) and
+        # BEFORE the hash so the stamped hash matches the rendered prompt.
+        try:
+            try:
+                from ._otr_story_brief_helpers import (  # type: ignore
+                    finish_visual_prompt)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_story_brief_helpers import (  # type: ignore
+                    finish_visual_prompt)
+            prompt = finish_visual_prompt(meta, prompt)
+        except Exception:  # noqa: BLE001
+            pass
         out[cid] = {
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
@@ -353,6 +369,17 @@ class OTRMetaBriefImagePromptGen:
         lines = led.get("lines") if isinstance(led.get("lines"), list) else []
 
         warnings: list = []
+        # Brief disposition, ONCE per run (gap-audit G4 restore).
+        try:
+            try:
+                from ._otr_story_brief_helpers import (  # type: ignore
+                    log_story_brief_disposition)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_story_brief_helpers import (  # type: ignore
+                    log_story_brief_disposition)
+            log_story_brief_disposition(meta, "flux_portrait", log)
+        except Exception:  # noqa: BLE001
+            pass
         llm_fn = _resolve_writer_llm(meta, warnings)
         prompts, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,

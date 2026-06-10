@@ -3984,11 +3984,15 @@ class OTR_LedgerScriptWriter:
         #     portrait_prompt and notes; now portrait_prompt is the only
         #     character description surface (S6.2).
         #
-        # portrait_prompt is the cast row's character_description. The
-        # downstream FLUX composer (compose_shot_prompt) appends era_tail
-        # + style_tail at render time, so this short, content-focused
-        # field is the right Tier-1 input. The 3-tier fallback in
-        # resolve_character_portrait already covers the empty case.
+        # portrait_prompt is the cast row's character_description.
+        # (2026-06-10 gap-audit doc fix: the legacy compose_shot_prompt
+        # referenced here was DELETED with otr_video_plan.py; the live
+        # seam that appends era_tail + style_tail is now
+        # _otr_story_brief_helpers.finish_visual_prompt, called by
+        # ShotLock M4, the image-prompt deriver, and the render driver's
+        # scene composer.) This short, content-focused field is the right
+        # Tier-1 input. The 3-tier fallback in resolve_character_portrait
+        # already covers the empty case.
         #
         # scenes is intentionally empty -- the writer doesn't emit
         # scene-level visual blocking today. OTR_VideoPlan handles the

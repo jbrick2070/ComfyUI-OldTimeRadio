@@ -396,49 +396,64 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     text_prompt = str(creative.get("text_prompt") or "")
     if text_prompt:
         req["text_prompt"] = text_prompt
-    # THE LTX SCENE OPEN (reworked 2026-06-10 look-QA round 4): announcer /
-    # music beats on a TEXT-driven engine get a prompt GROUNDED IN THE
-    # EPISODE'S OWN BRIEF (setting + style + a vintage radio in frame) -- the
-    # source of the old episodes' scenic, varied opens. The first cut here
-    # hardcoded one generic "radio station studio" string, which rendered the
-    # same orange studio blob on every beat of every episode (operator catch:
-    # "the music LTX used to look real nice"). Precedence: the writer's M4
-    # creative prompt (when present) > OTR_LTX_RADIO_PROMPT (explicit
-    # operator override) > the brief-composed scene prompt.
+    # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
+    # hardened: docs/2026-06-10-brief-downstream-gaps/). Any ltx_video /
+    # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
+    # THE EPISODE'S OWN BRIEF -- the source of the old episodes' scenic,
+    # varied opens -- finished with the brief's era tail under the LTX char
+    # budget. Covers ALL roles (announcer/music opens AND scene_broll /
+    # background_abstract), killing the generic "a 1940s radio studio"
+    # default for text engines. Precedence: M4 creative prompt (finished at
+    # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
+    # finishing) > brief-composed + finished.
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside
-        # group_id ("grp_<role>") -- parse it so the scene-open behavior
-        # never silently skips (2026-06-10 acceptance catch).
+        # group_id ("grp_<role>") -- parse it so scene composition never
+        # silently skips (2026-06-10 acceptance catch).
         _gid = str(shot.get("group_id") or "")
         if _gid.startswith("grp_"):
             _shot_role = _gid[len("grp_"):]
-    if (_shot_role in ("announcer_visual", "music_visual")
-            and str(shot.get("engine_id") or "") == "ltx_video"
+    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v")
             and not text_prompt):
-        scene_prompt = os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
-        if not scene_prompt:
+        _is_open = _shot_role in ("announcer_visual", "music_visual")
+        _override = (os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
+                     if _is_open else "")
+        if _override:
+            _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
+                         "= OTR_LTX_RADIO_PROMPT operator override "
+                         "(verbatim, unfinished)",
+                         _shot_role, shot.get("shot_id"))
+            req["text_prompt"] = _override
+        else:
+            try:
+                from .._otr_story_brief_helpers import (  # type: ignore
+                    finish_visual_prompt, get_story_brief_ltx)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_story_brief_helpers import (  # type: ignore
+                    finish_visual_prompt, get_story_brief_ltx)
             _meta = (ledger or {}).get("meta") or {}
-            _terms = _meta.get("story_brief_terms") or {}
-            _setting_raw = _terms.get("setting") if isinstance(_terms, dict) \
-                else None
-            _setting = ", ".join(
-                [str(t).strip() for t in (_setting_raw or [])
-                 if str(t).strip()][:2])
-            _style = str(_meta.get("style") or "").strip().replace("_", " ")
-            _parts = ["cinematic establishing shot"]
-            if _setting:
-                _parts.append(_setting)
-            if _style:
-                _parts.append(f"{_style} period atmosphere")
-            _parts += ["a vintage radio set glowing in the scene",
-                       "moody dusk light", "gentle film grain",
-                       "slow cinematic camera drift", "no on-screen text"]
-            scene_prompt = ", ".join(_parts)
-        _LOG.warning("[OTR.render_driver] LTX SCENE OPEN: %s beat %s prompt "
-                     "composed from the episode brief: %.90s...",
-                     _shot_role, shot.get("shot_id"), scene_prompt)
-        req["text_prompt"] = scene_prompt
+            core = get_story_brief_ltx(_meta)
+            if not core:
+                _terms = _meta.get("story_brief_terms") or {}
+                _setting_raw = (_terms.get("setting")
+                                if isinstance(_terms, dict) else None)
+                _setting = ", ".join(
+                    [str(t).strip() for t in (_setting_raw or [])
+                     if str(t).strip()][:2])
+                core = ("cinematic establishing shot"
+                        + (f", {_setting}" if _setting else ""))
+            clauses = ["slow cinematic camera drift", "no on-screen text"]
+            if _is_open:
+                clauses.insert(0, "a vintage radio set glowing in the scene")
+            scene_prompt = finish_visual_prompt(
+                _meta, f"{core}, {', '.join(clauses)}",
+                max_chars=240, style_tail=False)
+            _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
+                         "composed from the episode brief (%d chars): "
+                         "%.90s...", _shot_role, shot.get("shot_id"),
+                         len(scene_prompt), scene_prompt)
+            req["text_prompt"] = scene_prompt
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
@@ -511,6 +526,12 @@ def _provide_lipsync_base(engine_name, request):
     base_req = copy.deepcopy(request) if isinstance(request, dict) else dict(request)
     base_req["base_clip_ref"] = None
     base_req["audio_ref"] = None          # the base is SILENT b-roll (V-1)
+    # Gap-audit F2 decision (2026-06-10): the panel suggested preferring the
+    # request's brief-grounded prompt here, but the FACE-FORWARD default is
+    # functional, not aesthetic -- the overlay's landmarker needs a mouth,
+    # and a scene-y prompt re-breaks the combo lane's face-detect lottery.
+    # Env override verbatim; otherwise the face-forward default stands.
+    # Revisit only if the lipsync combo lane is promoted past experiment.
     base_req["text_prompt"] = os.environ.get(
         "OTR_LSYNC_BASE_PROMPT", _LSYNC_BASE_PROMPT)
     _LOG.warning("[OTR video] LOUD lipsync base: rendering %s base for shot %s "
@@ -637,6 +658,20 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None,
     per-beat slice and starved HuMo (audio_ref=''). Re-resolve to the SAME
     master file under the renamed dir using the same contract the terminal mux
     uses. Read-only; the audio bytes are never touched."""
+    # Brief disposition, ONCE per episode run (gap-audit G4 restore): the
+    # canonical [story_brief:<id>] line proving the brief reached the scene
+    # composer. Fail-soft -- never blocks the render.
+    try:
+        try:
+            from .._otr_story_brief_helpers import (  # type: ignore
+                log_story_brief_disposition)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                log_story_brief_disposition)
+        log_story_brief_disposition((ledger or {}).get("meta") or {},
+                                    "ltx_scene_open", _LOG)
+    except Exception:  # noqa: BLE001
+        pass
     if master_audio_path:
         try:
             from ..otr_master_audio_mux import _reresolve_master_audio

@@ -179,9 +179,14 @@ def get_story_brief_music_mood(meta: Any) -> list[str]:
     section 8.2.
 
     Dependency direction: consumer -> helper. This module does NOT
-    import musicgen_theme; the consumer (`nodes/musicgen_theme.py`)
-    imports THIS helper at C5g. The `test_get_music_mood_no_musicgen_
-    import` test locks the direction.
+    import musicgen_theme; the consumer imports THIS helper.
+
+    DEPRECATED-IN-PLACE (2026-06-10 gap audit): the consumer named here
+    historically, ``nodes/musicgen_theme.py``, no longer exists (audio
+    cleanbreak); the LIVE music lane reads the brief through its own
+    protocol in ``nodes/_otr_music_prompt.py`` (v2 music_mood_terms -> v1
+    fallback) and does NOT call this helper. Kept for compatibility; do
+    not wire new consumers to it without checking _otr_music_prompt first.
     """
     m = _meta(meta)
     if get_story_brief_status(m) != "ok":
@@ -198,4 +203,100 @@ def get_story_brief_music_mood(meta: Any) -> list[str]:
         t = str(raw).strip().lower()
         if t in _MUSIC_MOOD_VOCAB and t not in out:
             out.append(t)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# The prompt FINISHER (2026-06-10 brief-downstream gap audit, F1).
+#
+# The CW-1 teardown deleted otr_video_plan.py, the only consumer that appended
+# the brief's era prose + the film style tail to visual prompts -- every
+# post-refactor prompt rendered without them (gap G2/G3, roundtable-hardened
+# fix docs/2026-06-10-brief-downstream-gaps/). These helpers restore that
+# finishing as ONE shared seam. Pure functions: no logging here (the
+# disposition log keeps its once-per-run contract at the NODE level), no
+# dedupe, no style presets (3-model panel consensus cuts).
+# ---------------------------------------------------------------------------
+
+#: Era-tail fallback when the brief is absent/failed/empty (legacy
+#: _DEFAULT_ERA_TAIL, otr_video_plan.py).
+ERA_TAIL_DEFAULT = "timeless cinematic aesthetic"
+
+#: The film aesthetic tail (legacy _DEFAULT_STYLE_TAIL, otr_video_plan.py).
+STYLE_TAIL_DEFAULT = ("cinematic, 35mm film look, subtle film grain, "
+                      "volumetric lighting")
+
+#: The render-constraint clause the LTX scene prompts carry; preserved
+#: verbatim through max_chars trimming.
+NO_TEXT_CLAUSE = "no on-screen text"
+
+
+def get_era_tail(meta: Any) -> str:
+    """The brief-derived era/aesthetic tail; NEVER empty, never raises.
+
+    Ports the legacy ``_resolve_era_tail`` precedence (Sprint 8.7):
+    ``atmosphere_line`` -> ``visual_palette`` (top 3) -> v1
+    lighting+atmosphere (:func:`get_story_brief_lighting`) -> the
+    :data:`ERA_TAIL_DEFAULT` constant. v2 fields come through the canonical
+    brief reader; every failure path degrades, fail-soft.
+    """
+    atmosphere_line = ""
+    palette: list[str] = []
+    try:
+        try:
+            from ._otr_brief_reader import _read_brief_field  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_brief_reader import _read_brief_field  # type: ignore
+        raw_line = _read_brief_field(meta, "atmosphere_line", default="")
+        if isinstance(raw_line, str):
+            atmosphere_line = raw_line.strip()
+        raw_palette = _read_brief_field(meta, "visual_palette", default=[])
+        if isinstance(raw_palette, list):
+            palette = [str(t).strip() for t in raw_palette
+                       if str(t).strip()][:3]
+    except Exception:  # noqa: BLE001 -- reader unavailable -> v1-only
+        pass
+    v1_tail = (get_story_brief_lighting(meta) or "").strip()
+    parts: list[str] = []
+    if atmosphere_line:
+        parts.append(atmosphere_line)
+    if palette:
+        parts.extend(palette)
+    if v1_tail:
+        parts.append(v1_tail)
+    return ", ".join(parts) or ERA_TAIL_DEFAULT
+
+
+def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
+                         style_tail: bool = True) -> str:
+    """``prompt + ", " + era_tail [+ ", " + STYLE_TAIL_DEFAULT]`` -- the one
+    shared finishing seam every visual prompt site calls.
+
+    ``max_chars`` (0 = uncapped): word-boundary trim of the FINISHED string
+    for budgeted consumers (LTX motion budget is 220-240 chars); a trailing
+    :data:`NO_TEXT_CLAUSE` present in ``prompt`` survives the trim (it is a
+    render constraint, not flavor). Callers run their guards BEFORE this and
+    compute prompt hashes AFTER it. Pure; never raises; empty ``prompt``
+    returns '' (finishing never invents a subject).
+    """
+    base = (prompt or "").strip().rstrip(",")
+    if not base:
+        return ""
+    keep_no_text = NO_TEXT_CLAUSE in base
+    if keep_no_text:
+        base = base.replace(NO_TEXT_CLAUSE, "").replace(", ,", ",")
+        base = base.strip().rstrip(",").strip()
+    pieces = [base, get_era_tail(meta)]
+    if style_tail:
+        pieces.append(STYLE_TAIL_DEFAULT)
+    out = ", ".join(p for p in pieces if p)
+    if max_chars and len(out) > max_chars:
+        budget = max_chars - (len(NO_TEXT_CLAUSE) + 2 if keep_no_text else 0)
+        cut = out[:max(budget, 20)]
+        idx = cut.rfind(" ")
+        if idx >= 20:
+            cut = cut[:idx]
+        out = cut.rstrip(" ,")
+    if keep_no_text:
+        out = f"{out}, {NO_TEXT_CLAUSE}"
     return out
