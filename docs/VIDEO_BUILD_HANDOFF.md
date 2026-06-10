@@ -18,13 +18,20 @@ final mp4 PCM `093e3d7eb129` == master (byte-identical). NB clip files at
 `C:\ComfyUI-Models\diffusion_models\Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`
 + `C:\ComfyUI-Models\loras\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`.
 
-OPEN follow-ups: (1) 2 talking beats (b001/b005) still fell back with
+DONE follow-up: the **hard auto-downgrade tier** is wired (commit `dc2d539`). The
+chain is now **humo -> humo_1.7B -> latentsync -> still_kenburns** (registry-verified
+deterministically); on an OOM/VRAM (or any HARD) failure the 14B keystone degrades
+FIRST to the 1.7B HuMo tier (a real talking face) before latentsync/still, with a LOUD
+restamp (the swap log now also carries `detail=`). `humo_1.7B` is a registered engine
+(`HuMo17BEngine`, `requires_flag=OTR_ENABLE_HUMO`) with env-isolated config
+(`OTR_HUMO_17B_*`: own UNET `humo_1.7B_fp16.safetensors`, NO LoRA, 20 steps / cfg 5.0)
+so the 14B `OTR_HUMO_STEPS/CFG` never bleed in. Soak trail is now 4 hops; suite 3777.
+
+OPEN follow-up: 2 talking beats (b001/b005) still fell back with
 `GraphExecutionError: humo ... audio=''` — a per-beat audio-slice timing edge case
-(intro/outro beats get no sliceable clip), NOT a config issue. (2) Operator directive
-2026-06-09: the OOM/VRAM fallback must degrade **humo_14B -> humo_1.7B -> latentsync ->
-still** (keep a real talking face before the still floor), per the ROADMAP hard
-auto-downgrade rule, with LOUD restamp. Currently the chain is humo -> latentsync ->
-still (single humo engine, no 1.7B tier).
+(intro/outro beats get no sliceable clip), NOT a config issue. The 1.7B tier won't
+fix audio='' (same missing input), so those still degrade to the floor; the real fix
+is the per-beat slice timing for intro/outro beats.
 
 ---
 
