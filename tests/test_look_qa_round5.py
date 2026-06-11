@@ -27,10 +27,13 @@ from nodes import otr_shot_lock as _sl                               # noqa: E40
 # --------------------------------------------------------------------------- #
 
 class TestLtxFrameCap:
-    def test_over_cap_ask_caps_to_121(self, monkeypatch):
+    def test_over_cap_ask_caps_to_default(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        # the 2026-06-10 mud open: a 238-frame ask for the 9.5s gap
-        assert _ltx._ltx_frame_length(238, 24) == 121
+        # the 2026-06-10 mud open: a 238-frame ask for the 9.5s gap. Default
+        # cap = 169, the live-DECODE-PROVEN length on this wrapper stack (121
+        # trips the wrapper VAEDecode tensor mismatch -- ticking_lab catch).
+        assert _ltx._ltx_frame_length(238, 24) == 169
+        assert _ltx._LTX_MAX_FRAMES_DEFAULT == 169
 
     def test_under_cap_ask_snaps_8n1(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
@@ -47,7 +50,7 @@ class TestLtxFrameCap:
 
     def test_invalid_env_falls_to_default(self, monkeypatch):
         monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "not-a-number")
-        assert _ltx._ltx_frame_length(238, 24) == 121
+        assert _ltx._ltx_frame_length(238, 24) == 169
 
     def test_below_floor_env_clamps(self, monkeypatch):
         monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "2")
@@ -137,6 +140,13 @@ class TestPerBeatScenePrompts:
     def test_beat_clauses_unmapped_intent_loose_fallback(self):
         out = _rd._beat_clauses({"beat_intent": "brooding"}, "shot_x")
         assert out == ["a beat of brooding"]
+
+    def test_beat_clauses_free_text_intent_bounded(self):
+        # live catch: the writer emits SENTENCES as beat_intent
+        out = _rd._beat_clauses(
+            {"beat_intent": "Open the episode and orient the listener "
+                            "to the stakes."}, "shot_x")
+        assert out == ["a beat of open the episode and orient the"]
 
     def test_beat_clauses_absent_fields_skip(self):
         assert _rd._beat_clauses({}, "shot_x") == []

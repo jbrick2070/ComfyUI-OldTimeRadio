@@ -376,9 +376,14 @@ def _beat_clauses(line, shot_id):
     if intent:
         mapped = _INTENT_CLAUSES.get(intent)
         if mapped is None:
-            mapped = "a beat of %s" % intent
+            # The writer's beat_intent vocabulary is FREE TEXT (live catch
+            # 2026-06-10: "open the episode and orient the listener."), not
+            # enum tokens -- bound the loose clause to its first 6 words and
+            # drop trailing punctuation so the scene prompt stays prompt-like.
+            short = " ".join(intent.split()[:6]).rstrip(".,;:!?")
+            mapped = "a beat of %s" % short
             _LOG.info("[OTR.render_driver] unmapped beat_intent %r on %s -- "
-                      "using the loose clause", intent, shot_id)
+                      "using the loose clause %r", intent, shot_id, mapped)
         out.append(mapped)
     arc = str((line or {}).get("arc_phase") or "").strip().lower()
     if arc in _ARC_CLAUSES:

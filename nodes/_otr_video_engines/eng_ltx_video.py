@@ -44,11 +44,15 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # is adapter-internal, lazy, inside execute.)
 _LTX_MIN_FRAMES = 9
 # Frame-ask CAP (look-QA round 5, D1): LTX coherence collapses far past its
-# proven envelope (49-121f live; the 2026-06-10 mud open was a 238f ask for the
-# 9.5s synthetic music gap). Asks above the cap render the cap; the composite's
-# existing hold-last-frame (tpad clone) fills the rest of the beat window.
-# 121 = 8*15+1 survives the 8n+1 snap intact. Env-overridable, clamped LOUD.
-_LTX_MAX_FRAMES_DEFAULT = 121
+# proven envelope (the 2026-06-10 mud open was a 238f ask -> 233f render for
+# the 9.5s synthetic music gap). Asks above the cap render the cap; the
+# composite's existing hold-last-frame (tpad clone) fills the rest of the beat
+# window. DEFAULT 169 (8*21+1): live-DECODE-PROVEN on this box's LTX wrapper
+# (Symphony b001, 2026-06-10). 121 is NOT usable as the default here -- the
+# installed wrapper's VAEDecode raises a tensor-shape mismatch (256 vs 128,
+# dim 1) on the smaller latent (caught live, ticking_lab run; all three LTX
+# beats fell LOUD to the still floor). Env-overridable, clamped LOUD.
+_LTX_MAX_FRAMES_DEFAULT = 169
 
 
 def _env_int(name, default, floor):
