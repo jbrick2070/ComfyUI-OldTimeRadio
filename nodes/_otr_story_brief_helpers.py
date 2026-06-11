@@ -237,14 +237,22 @@ STYLE_TAIL_DEFAULT = ("cinematic, 35mm film look, subtle film grain, "
 NO_TEXT_CLAUSE = "no on-screen text"
 
 
-def get_era_tail(meta: Any) -> str:
+def get_era_tail(meta: Any, profile: str = "full") -> str:
     """The brief-derived era/aesthetic tail; NEVER empty, never raises.
 
-    Ports the legacy ``_resolve_era_tail`` precedence (Sprint 8.7):
-    ``atmosphere_line`` -> ``visual_palette`` (top 3) -> v1
+    ``profile="full"`` (default; every pre-still-spine call site, behavior
+    unchanged) ports the legacy ``_resolve_era_tail`` precedence (Sprint
+    8.7): ``atmosphere_line`` -> ``visual_palette`` (top 3) -> v1
     lighting+atmosphere (:func:`get_story_brief_lighting`) -> the
     :data:`ERA_TAIL_DEFAULT` constant. v2 fields come through the canonical
     brief reader; every failure path degrades, fail-soft.
+
+    ``profile="still"`` (still-spine ST-1): the TRIMMED tail for still-image
+    prompts -- atmosphere line + palette top-2 + lighting top-2, capped at
+    ~120 chars on a word boundary. Stills carry their subject up front; the
+    full tail diet would push FLUX toward atmosphere soup. The per-episode
+    palette color (e.g. Mars = red) comes through HERE by design -- the
+    still profile trims the tail, never deletes it.
     """
     atmosphere_line = ""
     palette: list[str] = []
@@ -262,8 +270,26 @@ def get_era_tail(meta: Any) -> str:
                        if str(t).strip()][:3]
     except Exception:  # noqa: BLE001 -- reader unavailable -> v1-only
         pass
+    if profile == "still":
+        m = _meta(meta)
+        terms = m.get("story_brief_terms") or {}
+        if not isinstance(terms, dict):
+            terms = {}
+        lighting = [str(t).strip() for t in (terms.get("lighting") or [])
+                    if str(t).strip()][:2]
+        parts = []
+        if atmosphere_line:
+            parts.append(atmosphere_line)
+        parts.extend(palette[:2])
+        parts.extend(lighting)
+        out = ", ".join(parts) or ERA_TAIL_DEFAULT
+        if len(out) > 120:                 # word-boundary trim (~120 chars)
+            cut = out[:120]
+            idx = cut.rfind(" ")
+            out = (cut[:idx] if idx >= 20 else cut).rstrip(" ,")
+        return out
     v1_tail = (get_story_brief_lighting(meta) or "").strip()
-    parts: list[str] = []
+    parts = []
     if atmosphere_line:
         parts.append(atmosphere_line)
     if palette:
@@ -271,6 +297,83 @@ def get_era_tail(meta: Any) -> str:
     if v1_tail:
         parts.append(v1_tail)
     return ", ".join(parts) or ERA_TAIL_DEFAULT
+
+
+# ---------------------------------------------------------------------------
+# Still-spine ST-1 (2026-06-10): the shared OPEN SUBJECT + the 5-layer still
+# prompt composer. The render driver's concrete radio-set subject wording
+# MOVES here (one source of truth -- the driver's LTX text prompt and the
+# scene STILL prompt for the same beat lead with the SAME subject string;
+# the parity test in tests/test_still_spine_helpers.py locks it). Layer
+# order restores the proven 6/5 composer (legacy otr_video_plan.py PASS-3:
+# subject first, scene context, framing hint, era tail, style tail -- FLUX
+# weights earlier tokens more heavily).
+# ---------------------------------------------------------------------------
+
+def get_open_subject(role: str, synthetic: bool) -> str:
+    """The CONCRETE radio-set subject for an OPEN beat (r5b operator catch:
+    image models render narrative loglines as murk -- opens lead with a
+    picture, never a sentence). Wording moved VERBATIM from the render
+    driver's round-5 scene composer; the driver now calls this. Pure."""
+    if synthetic:
+        return ("a vintage radio set warming up on a wooden "
+                "table, glowing dials and tubes, warm "
+                "tungsten light")
+    if str(role or "") == "announcer_visual":
+        return ("a 1940s radio station studio, a vintage "
+                "radio set glowing warmly, lit dials and "
+                "tubes, warm tungsten light")
+    return ("a vintage radio set glowing warmly, warm "
+            "dial light")
+
+
+#: Framing hints (layer 3 of the 5-layer still composer). The macro framing
+#: is the 6/5 look the operator wants back; the portrait framing matches the
+#: round-5 three-quarter STYLE_ANCHOR decision ("more body -- better").
+STILL_FRAMING_OPEN = "full-frame macro, centered subject"
+STILL_FRAMING_PORTRAIT = "three-quarter framing showing head and upper body"
+
+
+def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
+                         beat_id: str = "", char_entry: Any = None) -> str:
+    """ONE still-image prompt in the legacy 5-layer order: subject /
+    setting top-2 / framing hint / TRIMMED era tail (still profile) /
+    style tail. Scene kinds append the :data:`NO_TEXT_CLAUSE` (a render
+    constraint stills must carry; portraits never need it).
+
+    ``kind``: ``"portrait"`` leads with the character's own description
+    (``portrait_prompt`` -> ``appearance`` -> ``character_description`` on
+    ``char_entry``); every scene kind (``scene_open`` / ``scene_beat``)
+    leads with :func:`get_open_subject` (``synthetic`` = kind=="scene_open"
+    -- the b000 opening-music beat is the synthetic open). Pure; never
+    raises; never returns empty (the subject layer always exists).
+    """
+    is_portrait = (kind == "portrait")
+    if is_portrait:
+        ce = char_entry if isinstance(char_entry, dict) else {}
+        subject = str(ce.get("portrait_prompt") or ce.get("appearance")
+                      or ce.get("character_description") or "").strip()
+        if not subject:
+            subject = "a period-dressed character, face clearly visible"
+    else:
+        subject = get_open_subject(role, synthetic=(kind == "scene_open"))
+    m = _meta(meta)
+    terms = m.get("story_brief_terms") or {}
+    if not isinstance(terms, dict):
+        terms = {}
+    setting = ", ".join([str(t).strip() for t in (terms.get("setting") or [])
+                         if str(t).strip()][:2])
+    framing = STILL_FRAMING_PORTRAIT if is_portrait else STILL_FRAMING_OPEN
+    pieces = [subject]
+    if setting:
+        pieces.append(setting)
+    pieces.append(framing)
+    pieces.append(get_era_tail(meta, profile="still"))
+    pieces.append(STYLE_TAIL_DEFAULT)
+    out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
+    if not is_portrait:
+        out = f"{out}, {NO_TEXT_CLAUSE}"
+    return out
 
 
 def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,

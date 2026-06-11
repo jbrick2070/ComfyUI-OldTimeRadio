@@ -545,10 +545,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         else:
             try:
                 from .._otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt, get_story_brief_ltx)
+                    finish_visual_prompt, get_open_subject,
+                    get_story_brief_ltx)
             except ImportError:  # pragma: no cover -- flat test imports
                 from _otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt, get_story_brief_ltx)
+                    finish_visual_prompt, get_open_subject,
+                    get_story_brief_ltx)
             _meta = (ledger or {}).get("meta") or {}
             _terms = _meta.get("story_brief_terms") or {}
 
@@ -568,17 +570,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # variety either way.
             clauses = []
             if _is_open:
-                if _is_synthetic_open:
-                    subject = ("a vintage radio set warming up on a wooden "
-                               "table, glowing dials and tubes, warm "
-                               "tungsten light")
-                elif _shot_role == "announcer_visual":
-                    subject = ("a 1940s radio station studio, a vintage "
-                               "radio set glowing warmly, lit dials and "
-                               "tubes, warm tungsten light")
-                else:
-                    subject = ("a vintage radio set glowing warmly, warm "
-                               "dial light")
+                # Still-spine ST-1: the concrete radio-set wording MOVED to
+                # the shared helper -- the scene STILL prompt for this beat
+                # leads with the SAME subject (parity-locked).
+                subject = get_open_subject(_shot_role, _is_synthetic_open)
                 _setting = _term_join("setting", 2)
                 _atmo = _term_join("atmosphere", 1)
                 core = subject
