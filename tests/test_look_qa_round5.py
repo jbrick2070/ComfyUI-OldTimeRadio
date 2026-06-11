@@ -35,9 +35,18 @@ class TestLtxFrameCap:
         assert _ltx._ltx_frame_length(238, 24) == 169
         assert _ltx._LTX_MAX_FRAMES_DEFAULT == 169
 
-    def test_under_cap_ask_snaps_8n1(self, monkeypatch):
+    def test_short_ask_raised_to_decode_floor(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        assert _ltx._ltx_frame_length(50, 24) == 49      # 8n+1 snap below cap
+        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
+        # the r5b live catch: b004's 137f ask hit the wrapper VAEDecode
+        # tensor mismatch -- short asks are raised into the tiled band
+        assert _ltx._ltx_frame_length(137, 24) == 169
+        assert _ltx._ltx_frame_length(50, 24) == 169
+
+    def test_decode_floor_env_override(self, monkeypatch):
+        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
+        monkeypatch.setenv("OTR_LTX_MIN_DECODE_FRAMES", "49")
+        assert _ltx._ltx_frame_length(50, 24) == 49      # 8n+1 snap, low floor
 
     def test_cap_env_override_respected(self, monkeypatch):
         monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "57")
@@ -57,9 +66,21 @@ class TestLtxFrameCap:
         out = _ltx._ltx_frame_length(238, 24)
         assert out == _ltx._LTX_MIN_FRAMES
 
-    def test_zero_ask_uses_fallback(self, monkeypatch):
+    def test_zero_ask_uses_fallback_then_floor(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        assert _ltx._ltx_frame_length(0, 24) == 17       # 24 -> snap 17
+        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
+        # fallback ask (24) also rises to the decode floor
+        assert _ltx._ltx_frame_length(0, 24) == 169
+
+    def test_cap_below_floor_wins(self, monkeypatch):
+        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "57")
+        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
+        # an operator cap below the decode floor is honored: the effective
+        # floor clamps to the cap (min(169, 57) = 57), so a 30f ask rises
+        # only to 57, never past the operator's ceiling
+        assert _ltx._ltx_frame_length(30, 24) == 57
+        assert _ltx._ltx_frame_length(238, 24) == 57
+
 
 
 # --------------------------------------------------------------------------- #

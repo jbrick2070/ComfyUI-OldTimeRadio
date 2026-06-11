@@ -74,11 +74,22 @@ def _env_int(name, default, floor):
     return val
 
 
+#: The DECODE floor (round 5, ticking_lab + r5b live catches): at the
+#: 1472x832 landscape canvas the installed wrapper's VAEDecode survives ONLY
+#: in its tiled band -- 169f and 233f decode clean, 121f and 137f raise the
+#: tensor 256-vs-128 (dim 1) mismatch. Short asks are RAISED to the floor
+#: (safe: the composite TRUNCATES long sources to the beat window), long asks
+#: are CAPPED. With both defaults at 169, every landscape LTX clip renders
+#: the one proven length.
+_LTX_DECODE_FLOOR_DEFAULT = 169
+
+
 def _ltx_frame_length(target_frame_count, fallback):
     """The FINAL LTX graph length for a shot's frame ask: floor to
-    ``_LTX_MIN_FRAMES``, cap at ``OTR_LTX_MAX_FRAMES`` (default 121, LOUD when
-    capping -- the composite hold-fills the window), then snap to LTX's 8n+1
-    rule. Pure given the env; CPU-tested (round 5 F1)."""
+    ``_LTX_MIN_FRAMES``, cap at ``OTR_LTX_MAX_FRAMES`` (LOUD -- the composite
+    hold-fills the window), RAISE short asks to ``OTR_LTX_MIN_DECODE_FRAMES``
+    (LOUD -- the composite truncates; see the decode-band note above), then
+    snap to LTX's 8n+1 rule. Pure given the env; CPU-tested (round 5 F1)."""
     length = max(_LTX_MIN_FRAMES, int(target_frame_count or fallback))
     cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT,
                    _LTX_MIN_FRAMES)
@@ -86,6 +97,17 @@ def _ltx_frame_length(target_frame_count, fallback):
         _LOG.warning("[eng_ltx_video] frame ask %d exceeds cap %d -- capping "
                      "(window fill = composite hold-last-frame)", length, cap)
         length = cap
+    floor = _env_int("OTR_LTX_MIN_DECODE_FRAMES", _LTX_DECODE_FLOOR_DEFAULT,
+                     _LTX_MIN_FRAMES)
+    # An operator cap BELOW the decode floor wins (test rigs / tiny canvases
+    # have their own decode behavior) -- the floor never exceeds the cap.
+    floor = min(floor, cap)
+    if length < floor:
+        _LOG.warning("[eng_ltx_video] frame ask %d below the decode floor %d "
+                     "-- raising (the wrapper VAEDecode fails outside its "
+                     "tiled band at this canvas; the composite truncates to "
+                     "the beat window)", length, floor)
+        length = floor
     return ((length - 1) // 8) * 8 + 1
 
 
