@@ -542,6 +542,23 @@ class TestDispatcherStillSpine:
         assert row["init_source"] == "scene_still"
         assert row["init_image_used"] == "still_b001_abc.png"
 
+    def test_st7_ordering_gate_node_contracts(self):
+        """ST-7 ordering: the render node declares the image_done forceInput
+        gate (W4) and the dispatcher declares episode_id (DS-3) -- the json
+        wires are pinned in test_workflow_live_passes_validator."""
+        from nodes.otr_video_render_batch import OTRVideoRenderBatch
+        from nodes.otr_image_gen_dispatcher import OTRImageGenDispatcher
+        rb_opt = OTRVideoRenderBatch.INPUT_TYPES()["optional"]
+        assert "image_done" in rb_opt
+        assert rb_opt["image_done"][1].get("forceInput") is True
+        di_opt = OTRImageGenDispatcher.INPUT_TYPES()["optional"]
+        assert "episode_id" in di_opt
+        assert di_opt["episode_id"][1].get("forceInput") is True
+        # ShotLock's additive episode_id output (slot 4)
+        from nodes.otr_shot_lock import OTRShotLock
+        assert OTRShotLock.RETURN_NAMES[4] == "episode_id"
+        assert OTRShotLock.RETURN_TYPES[4] == "STRING"
+
     def test_unkeyed_episode_is_loud(self, tmp_path):
         import numpy as np
         from nodes import otr_image_gen_dispatcher as disp
