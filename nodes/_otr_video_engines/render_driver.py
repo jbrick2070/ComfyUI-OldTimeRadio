@@ -25,6 +25,7 @@ import functools
 import hashlib
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -364,6 +365,37 @@ def _beat_id_for_shot(shot):
 #: drag node-registration side effects into the engine package.
 _OPENING_MUSIC_SUFFIX = "b000_music_open"
 
+#: HuMo-seam ticket Part C (2026-06-11). Broadcast-gear scrub for CHARACTER
+#: face beats -- LOCAL mirror of nodes/otr_meta_brief_image_prompt._GEAR_WORDS
+#: (the node module registers classes at import; mirroring follows the
+#: _OPENING_MUSIC_SUFFIX local-constant pattern -- keep the two regexes in
+#: LOCKSTEP; tests/test_brief_prompt_finishing.py pins the parity). NO
+#: negations anywhere: negative phrasing PLANTS the tokens (the c01 giant-mic
+#: lesson) -- gear is scrubbed from the OUTPUT, never "no microphone"-ed.
+_GEAR_WORDS_RD = re.compile(
+    r"\s*\b(?:radios?|microphones?|mics?|broadcasts?|broadcasters?|"
+    r"broadcasting|recording\s+studios?|radio\s+(?:station|studio|set|"
+    r"booth)s?|studios?|on[- ]air(?:\s+sign)?)\b[,;]?",
+    re.IGNORECASE)
+
+#: Gear-free fallback prompt for a CHARACTER face beat whose shot carries no
+#: M4 creative prompt (the proven microphone re-introduction path). Keeps the
+#: face anchored for the audio_driven_face family; zero broadcast tokens.
+_CHAR_FACE_FALLBACK_PROMPT = (
+    "close-up cinematic portrait of a person speaking, face centered, subtle "
+    "facial motion, period 1940s costume, warm tungsten light, film drama")
+
+
+def _scrub_gear(prompt: str) -> str:
+    """Remove broadcast-gear tokens from a character prompt, tidying the
+    leftover separators. Pure; '' stays ''. Mirrors
+    otr_meta_brief_image_prompt._scrub_gear_words (lockstep)."""
+    out = _GEAR_WORDS_RD.sub("", prompt or "")
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"(,\s*)+,", ", ", out)
+    out = re.sub(r"\s+,", ",", out)
+    return out.strip(" ,;").strip()
+
 #: Round 5 F2 -- beat_intent -> scene clause. Unmapped intents fall back to a
 #: loose "a beat of <intent>" clause + one INFO line (never a silent skip).
 _INTENT_CLAUSES = {
@@ -487,6 +519,27 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "scene still in the ledger -- falling back to the pre-spine "
                 "init (%s)", _family, shot.get("shot_id"), _bid,
                 init_source)
+    # LTX-I2V ticket Part B (2026-06-11, env-gated, default OFF): with
+    # OTR_ENABLE_LTX_I2V=1 an ltx_video shot conditions on the beat's FLUX
+    # scene still (init_source=scene_still in the trace); a missing still
+    # falls back LOUD to the round-5 text path -- never silent. Flag unset =
+    # LTX stays text-only (the still-spine v1 CUT; decode-band guard intact).
+    if (str(shot.get("engine_id") or "") == "ltx_video"
+            and os.environ.get("OTR_ENABLE_LTX_I2V", "0") == "1"):
+        _bid = _beat_id_for_shot(shot)
+        _still = _still_index(ledger).get(_bid, "")
+        if _still:
+            init_image = _still
+            init_source = "scene_still"
+            _LOG.warning(
+                "[OTR.render_driver] LTX-I2V: beat %s conditioning on scene "
+                "still %s (OTR_ENABLE_LTX_I2V=1)", _bid,
+                os.path.basename(_still))
+        else:
+            _LOG.warning(
+                "[OTR.render_driver] LTX-I2V LOUD: OTR_ENABLE_LTX_I2V=1 but "
+                "beat %s has NO scene still in the ledger -- falling back to "
+                "the round-5 TEXT path (never silent)", _bid)
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
@@ -543,13 +596,57 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _lw, _lh = 1472, 832
         req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
         req["init_w"], req["init_h"] = _lw, _lh
+    _shot_role = str(shot.get("role") or "")
+    if not _shot_role:
+        # Resilience: older planned ledgers carry the role only inside
+        # group_id ("grp_<role>") -- parse it so role-dependent prompt
+        # handling never silently skips (2026-06-10 acceptance catch).
+        _gid = str(shot.get("group_id") or "")
+        if _gid.startswith("grp_"):
+            _shot_role = _gid[len("grp_"):]
     creative = shot.get("creative") or {}
     text_prompt = str(creative.get("text_prompt") or "")
+    _fam = engine_family(str(shot.get("engine_id") or ""), "")
+    _is_char_face_beat = (_fam == "audio_driven_face"
+                          and _shot_role not in ("announcer_visual",
+                                                 "music_visual"))
     if text_prompt:
+        # HuMo-seam ticket Part C (2026-06-11): CHARACTER face beats get the
+        # gear scrub (the c01 lesson: scrub the OUTPUT, never add "no
+        # microphone" -- negations PLANT the tokens). ANNOUNCER beats are
+        # exempt (radio-styled BY DESIGN).
+        if _is_char_face_beat:
+            _scrubbed = _scrub_gear(text_prompt)
+            if _scrubbed and _scrubbed != text_prompt:
+                _LOG.warning(
+                    "[OTR.render_driver] HuMo character beat %s: broadcast-"
+                    "gear tokens scrubbed from the M4 prompt (announcer "
+                    "stays radio-styled)", _beat_id_for_shot(shot))
+                text_prompt = _scrubbed
         req["text_prompt"] = text_prompt
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),
                            beat=_beat_id_for_shot(shot))
+    elif _fam == "audio_driven_face":
+        # HuMo-seam ticket Part C: a FACE beat with NO M4 creative prompt is
+        # the proven microphone re-introduction path -- the build_request
+        # studio default ("a 1940s radio studio... on air") re-dresses the
+        # gear the FLUX portraits were scrubbed of. LOUD + a gear-free
+        # fallback for character beats; the announcer keeps the studio
+        # default (radio-styled by design). Never silent.
+        if _is_char_face_beat:
+            _LOG.warning(
+                "[OTR.render_driver] HuMo character beat %s carries NO M4 "
+                "creative prompt (ShotLock seam gap) -- rendering on the "
+                "gear-free character fallback prompt (LOUD)",
+                _beat_id_for_shot(shot))
+            req["text_prompt"] = _CHAR_FACE_FALLBACK_PROMPT
+            _stamp_prompt_meta(req, "default_scrubbed",
+                               _CHAR_FACE_FALLBACK_PROMPT,
+                               beat=_beat_id_for_shot(shot))
+        else:
+            _stamp_prompt_meta(req, "default", req.get("text_prompt", ""),
+                               beat=_beat_id_for_shot(shot))
     # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
     # hardened: docs/2026-06-10-brief-downstream-gaps/). Any ltx_video /
     # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
@@ -559,15 +656,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # background_abstract), killing the generic "a 1940s radio studio"
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
-    # finishing) > brief-composed + finished.
-    _shot_role = str(shot.get("role") or "")
-    if not _shot_role:
-        # Resilience: older planned ledgers carry the role only inside
-        # group_id ("grp_<role>") -- parse it so scene composition never
-        # silently skips (2026-06-10 acceptance catch).
-        _gid = str(shot.get("group_id") or "")
-        if _gid.startswith("grp_"):
-            _shot_role = _gid[len("grp_"):]
+    # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
     if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v")
             and not text_prompt):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
@@ -641,9 +730,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             clauses.extend(_beat_clauses(line, shot.get("shot_id")))
             clauses.extend(["slow cinematic camera drift",
                             "no on-screen text"])
+            # LTX-I2V ticket Part A (2026-06-11): era_profile="still" -- the
+            # TRIMMED still-profile tail (atmosphere + palette top-2 +
+            # lighting top-2, ~120 chars) replaces the FULL era tail so LTX
+            # scene prompts share the stills' palette diet (fixes the reddish
+            # drift; the get_open_subject lead stays parity-locked).
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
-                max_chars=240, style_tail=False)
+                max_chars=240, style_tail=False, era_profile="still")
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "composed from the episode brief (%d chars): "
                          "%.90s...", _shot_role, shot.get("shot_id"),

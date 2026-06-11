@@ -256,6 +256,19 @@ def test_base_engine_still_kenburns_synthesizes_base_from_portrait(monkeypatch, 
     _os.remove(path)
 
 
+def test_base_engine_existing_provider_base_wins(monkeypatch, tmp_path):
+    """A driver-provided base ALREADY on disk wins over adapter synthesis --
+    the render_driver _provide_lipsync_base seam must never double-render."""
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "still_kenburns")
+    prov = tmp_path / "driver_base.mp4"
+    prov.write_bytes(b"00")
+    portrait = tmp_path / "p.png"
+    portrait.write_bytes(b"\x89PNG\r\n\x1a\n")
+    path, source = _eng()._resolve_base_clip(
+        _req(portrait=str(portrait), base_clip=str(prov)))
+    assert (path, source) == (str(prov), "provider")
+
+
 def test_build_worker_request_base_override_takes_precedence():
     eng = _eng()
     req = _req(base_clip="prov.mp4")

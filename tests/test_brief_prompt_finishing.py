@@ -140,6 +140,124 @@ def test_scene_open_brief_core_and_budget(monkeypatch):
     assert req2["text_prompt"] == "OPERATOR SAYS EXACTLY THIS"
 
 
+# --------------------------------------------------------------------------- #
+# LTX-I2V ticket Part A (2026-06-11): scene prompts ride the STILL era tail
+# --------------------------------------------------------------------------- #
+def test_finish_era_profile_default_is_full_byte_identical():
+    full = sbh.finish_visual_prompt(_OK_META, "a keeper at the rail")
+    explicit = sbh.finish_visual_prompt(_OK_META, "a keeper at the rail",
+                                        era_profile="full")
+    assert full == explicit
+
+
+def test_finish_era_profile_still_uses_trimmed_tail():
+    out = sbh.finish_visual_prompt(_OK_META, "a keeper at the rail",
+                                   style_tail=False, era_profile="still")
+    assert out.startswith("a keeper at the rail")
+    tail = sbh.get_era_tail(_OK_META, profile="still")
+    assert out.endswith(tail)
+
+
+def test_ltx_scene_prompt_uses_still_profile_tail(monkeypatch):
+    """The driver's LTX scene composer must share the stills' palette diet:
+    the composed prompt's era tail is the STILL profile, not the full one."""
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    # A palette-heavy brief where full vs still tails visibly diverge.
+    meta = {
+        "story_brief_status": "ok",
+        "story_brief": "A dim relay station on the Martian flats at dusk.",
+        "story_brief_terms": {
+            "setting": ["a dim relay station"],
+            "lighting": ["red dust haze", "low tungsten"],
+            "atmosphere": ["oppressive"],
+        },
+        "visual_palette": ["rust red", "burnt orange", "deep crimson"],
+        "atmosphere_line": "rust-red dust hangs over the flats",
+    }
+    still_tail = sbh.get_era_tail(meta, profile="still")
+    ledger = {"meta": meta, "lines": []}
+    shot = {"shot_id": "shot_b009", "source_line_ids": [],
+            "role": "scene_broll", "engine_id": "ltx_video",
+            "group_id": "grp_scene_broll", "target_frame_count": 50,
+            "creative": {}}
+    req = rd.build_request_from_shot(shot, ledger)
+    p = req["text_prompt"]
+    # The still tail leads the tail section (the 240-char cap may trim its
+    # end, so assert the still tail's HEAD made it in right after the clauses
+    # and the full top-3 palette did NOT ride along whole).
+    assert still_tail.split(",")[0] in p
+    full_tail = sbh.get_era_tail(meta, profile="full")
+    if full_tail != still_tail:
+        assert full_tail not in p
+
+
+# --------------------------------------------------------------------------- #
+# HuMo-seam ticket Part C (2026-06-11): M4 -> HuMo prompt + the gear scrub
+# --------------------------------------------------------------------------- #
+def _face_shot(role, creative=None, shot_id="shot_b003"):
+    return {"shot_id": shot_id, "source_line_ids": ["b003"], "role": role,
+            "engine_id": "humo", "group_id": f"grp_{role}",
+            "target_frame_count": 50, "creative": creative or {}}
+
+
+_FACE_LEDGER = {"meta": _OK_META, "lines": [
+    {"line_id": "b003", "char_id": "c1", "speaker_role": "char_voice",
+     "text": "The storm speaks.", "start_s": 1.0, "dur_s": 3.0}]}
+
+
+def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
+    from nodes._otr_video_engines import render_driver as rd
+    creative = {"text_prompt": ("KEEPER, 60s weathered face, speaking into a "
+                                "studio microphone, lantern glow"),
+                "source": "llm"}
+    req = rd.build_request_from_shot(
+        _face_shot("character_video", creative), _FACE_LEDGER)
+    p = req["text_prompt"]
+    assert req["_prompt_source"] == "m4"
+    assert "microphone" not in p.lower() and "studio" not in p.lower()
+    assert "weathered face" in p          # the creative content survived
+    assert "no microphone" not in p.lower()   # NEVER negations
+
+
+def test_humo_announcer_beat_keeps_radio_styling():
+    from nodes._otr_video_engines import render_driver as rd
+    creative = {"text_prompt": ("vintage radio announcer at a chrome "
+                                "microphone, ON AIR sign"), "source": "llm"}
+    req = rd.build_request_from_shot(
+        _face_shot("announcer_visual", creative), _FACE_LEDGER)
+    assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
+    assert req["_prompt_source"] == "m4"
+
+
+def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
+    from nodes._otr_video_engines import render_driver as rd
+    req = rd.build_request_from_shot(
+        _face_shot("character_video", {}), _FACE_LEDGER)
+    p = req["text_prompt"]
+    assert req["_prompt_source"] == "default_scrubbed"
+    assert p == rd._CHAR_FACE_FALLBACK_PROMPT
+    assert not rd._GEAR_WORDS_RD.search(p)
+    assert "no " not in p.lower()                      # no negations
+
+
+def test_humo_announcer_beat_missing_creative_keeps_studio_default():
+    from nodes._otr_video_engines import render_driver as rd
+    req = rd.build_request_from_shot(
+        _face_shot("announcer_visual", {}), _FACE_LEDGER)
+    assert req["_prompt_source"] == "default"
+    assert "radio studio" in req["text_prompt"]        # by-design default
+
+
+def test_gear_scrub_regex_lockstep_with_image_prompt_module():
+    """The driver's local mirror must stay in LOCKSTEP with the image-prompt
+    module's _GEAR_WORDS (the shared-scrub contract of the ticket)."""
+    from nodes._otr_video_engines import render_driver as rd
+    assert rd._GEAR_WORDS_RD.pattern == mbp._GEAR_WORDS.pattern
+    sample = "a person speaking, studio microphone, on-air sign, lantern glow"
+    assert rd._scrub_gear(sample) == mbp._scrub_gear_words(sample)
+
+
 def test_scene_broll_on_ltx_no_longer_generic(monkeypatch):
     """GPT#8: a no-creative scene_broll shot on ltx_video gets the brief
     core, not the generic '1940s radio studio' default."""

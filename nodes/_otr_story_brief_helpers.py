@@ -377,7 +377,8 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
 
 
 def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
-                         style_tail: bool = True) -> str:
+                         style_tail: bool = True,
+                         era_profile: str = "full") -> str:
     """``prompt + ", " + era_tail [+ ", " + STYLE_TAIL_DEFAULT]`` -- the one
     shared finishing seam every visual prompt site calls.
 
@@ -387,6 +388,13 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
     render constraint, not flavor). Callers run their guards BEFORE this and
     compute prompt hashes AFTER it. Pure; never raises; empty ``prompt``
     returns '' (finishing never invents a subject).
+
+    ``era_profile`` (LTX-I2V ticket Part A, 2026-06-11): passed through to
+    :func:`get_era_tail`. Default ``"full"`` = every pre-existing call site,
+    byte-identical. The LTX scene composer passes ``"still"`` so VIDEO
+    prompts share the stills' trimmed palette diet (the full top-3 palette
+    tail is what dragged LTX scene clips reddish while the FLUX stills,
+    already on the still profile, stayed balanced).
     """
     base = (prompt or "").strip().rstrip(",")
     if not base:
@@ -396,7 +404,7 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
     keep_no_text = base.endswith(NO_TEXT_CLAUSE)
     if keep_no_text:
         base = base[: -len(NO_TEXT_CLAUSE)].strip().rstrip(",").strip()
-    pieces = [base, get_era_tail(meta)]
+    pieces = [base, get_era_tail(meta, profile=era_profile)]
     if style_tail:
         pieces.append(STYLE_TAIL_DEFAULT)
     out = ", ".join(p for p in pieces if p)

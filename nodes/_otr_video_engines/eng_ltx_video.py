@@ -216,6 +216,93 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
+    # ---- LTX-I2V (ticket Part B, 2026-06-11; env-gated, DEFAULT OFF) ----
+    # With OTR_ENABLE_LTX_I2V=1 AND a request init image present, render_clip
+    # builds the image-conditioned wrapper graph (LTXVImgToVideo) instead of
+    # txt2vid. ENGINE_FAMILY stays text_to_video (no registry/family change,
+    # no new widgets) -- the branch lives entirely inside the adapter. The
+    # decode band is UNTOUCHED: the same _ltx_frame_length floor/cap governs
+    # both paths (do NOT touch the 169f floor). Probe-first discipline: one
+    # clip on the GPU box verifying the wrapper's image-conditioning nodes
+    # (resolve_graph_classes fail-LOUD), the 1472x832 decode floor with an
+    # init image, and the dimension/crop behavior -- BEFORE enabling more
+    # beats.
+    @staticmethod
+    def _i2v_enabled() -> bool:
+        return os.environ.get("OTR_ENABLE_LTX_I2V", "0") == "1"
+
+    @staticmethod
+    def _init_image_path(request) -> str:
+        """The request's init image path (asset_refs still/init_image/image),
+        '' when none. Same key set the cheap families + latentsync read."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        assets = get("asset_refs") or {}
+        if isinstance(assets, dict):
+            for key in ("still", "init_image", "image"):
+                v = assets.get(key)
+                if isinstance(v, str) and v:
+                    return v
+                if isinstance(v, dict) and v.get("path"):
+                    return v["path"]
+        return ""
+
+    def _use_i2v(self, request) -> bool:
+        """True iff the env flag is on AND the request carries an init image
+        that exists on disk. Flag on + missing/stale init = LOUD fallback to
+        the text path (never silent); flag off = text path, byte-identical."""
+        if not self._i2v_enabled():
+            return False
+        p = self._init_image_path(request)
+        if p and os.path.exists(p):
+            return True
+        _LOG.warning(
+            "[eng_ltx_video] LTX-I2V LOUD: OTR_ENABLE_LTX_I2V=1 but the "
+            "request carries no on-disk init image (%r) -- falling back to "
+            "the text->video path", p)
+        return False
+
+    def _node_candidates_i2v(self):
+        """The image-conditioned graph's node candidates. resolve_graph_classes
+        fail-LOUD names any missing wrapper class (the probe's first gate)."""
+        cands = dict(self._node_candidates())
+        del cands["latent"]
+        cands["loadimage"] = ("LoadImage",)
+        cands["img2vid"] = ("LTXVImgToVideo",)
+        return cands
+
+    def _build_graph_i2v(self, plan, length, width, height, image_name):
+        """The declarative image-conditioned LTXV graph: LoadImage ->
+        LTXVImgToVideo(positive,negative,vae,image,...) -> LTXVConditioning ->
+        KSampler -> VAEDecode. VERIFY-ON-GPU (the Part-B probe): exact input
+        names + the strength/compression widgets of the installed wrapper's
+        LTXVImgToVideo, and the decode/crop behavior at 1472x832."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        graph = self._build_graph(plan, length, width, height)
+        del graph["latent"]
+        graph["loadimage"] = {"class": "loadimage",
+                              "inputs": {"image": image_name}}
+        try:
+            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
+        except (TypeError, ValueError):
+            strength = 1.0
+        graph["img2vid"] = {
+            "class": "img2vid",
+            "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
+                       "vae": W("checkpoint", 2), "image": W("loadimage", 0),
+                       "width": int(width), "height": int(height),
+                       "length": int(length), "batch_size": 1,
+                       # REQUIRED by the installed wrapper (live /object_info
+                       # 2026-06-11); conditioning strength of the init frame.
+                       "strength": strength}}
+        graph["cond"] = {
+            "class": "cond",
+            "inputs": {"positive": W("img2vid", 0), "negative": W("img2vid", 1),
+                       "frame_rate": float(self.target_fps)}}
+        graph["ksampler"]["inputs"]["latent_image"] = W("img2vid", 2)
+        return graph
+
     # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----
     # Topology:
     #   CheckpointLoaderSimple (model slot-0, vae slot-2; clip slot-1 = None
@@ -343,16 +430,33 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         import tempfile
         plan = self._build_render_request(request)            # pure, CPU-tested
-        classes = getattr(self, "_classes", None) \
-            or _wb.resolve_graph_classes(self._node_candidates())
+        use_i2v = self._use_i2v(request)
+        if use_i2v:
+            # Part-B branch: image-conditioned graph. resolve_graph_classes
+            # fail-LOUD names a missing LTXVImgToVideo (the probe gate).
+            classes = _wb.resolve_graph_classes(self._node_candidates_i2v())
+        else:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
         # LTX requires length == 8n+1 and dims multiple-of-32; the frame ask is
         # floored/capped/snapped by the pure helper (round 5 F1: a >cap ask is
         # rendered AT the cap and the composite hold-fills the beat window).
+        # The decode floor governs BOTH paths (i2v included -- do not touch).
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
-        graph = self._build_graph(plan, length, width, height)
+        if use_i2v:
+            init_path = self._init_image_path(request)
+            image_name = _wb.stage_into_comfy_input(init_path)
+            _LOG.warning(
+                "[eng_ltx_video] LTX-I2V: conditioning on init image %s "
+                "(%dx%d, length %d)", os.path.basename(init_path),
+                width, height, length)
+            graph = self._build_graph_i2v(plan, length, width, height,
+                                          image_name)
+        else:
+            graph = self._build_graph(plan, length, width, height)
         # free_after_use (2026-06-09 capstone catch): the fp16 T5 encoder
         # (~9.5 GB) must NOT stay co-resident with the LTX UNET through the
         # sampler -- the first live clip breached the machine-wide 14.5 GB

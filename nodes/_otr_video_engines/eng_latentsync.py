@@ -314,6 +314,12 @@ class LatentSyncEngine:
         base_engine_id = (os.getenv(_BASE_ENGINE_ENV, "") or "").strip()
         if not base_engine_id:
             return provider_base, "provider"
+        # The render_driver's _provide_lipsync_base seam may have ALREADY
+        # rendered a base via this same env (driver-side provider). A present
+        # base wins -- this adapter-side synthesis is the in-adapter backstop
+        # for paths that bypass the driver seam, never a double render.
+        if provider_base and os.path.exists(provider_base):
+            return provider_base, "provider"
 
         portrait = self._portrait_path(request)
         if not portrait or not os.path.exists(portrait):

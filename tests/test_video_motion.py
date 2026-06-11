@@ -345,5 +345,117 @@ def test_new_motion_source_is_ascii_no_em_dash():
         src.encode("ascii")                            # ASCII-only source
 
 
+# --------------------------------------------------------------------------- #
+# LTX-I2V ticket Part B (2026-06-11): env-gated img2vid branch (DEFAULT OFF)
+# --------------------------------------------------------------------------- #
+def _i2v_req(init_path=""):
+    r = {"shot_id": "s1", "text_prompt": "a relay station at dusk",
+         "timing": {"target_frame_count": 50},
+         "seed_bundle": {"request_seed": 7},
+         "canvas": {"w": 1472, "h": 832, "fps": 25}}
+    if init_path:
+        r["asset_refs"] = {"init_image": init_path}
+    return r
+
+
+def test_i2v_default_off_even_with_init(monkeypatch, tmp_path):
+    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+    eng = vreg.get_engine("ltx_video")
+    p = tmp_path / "still.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n")
+    assert eng._use_i2v(_i2v_req(str(p))) is False
+
+
+def test_i2v_flag_on_missing_init_falls_back_loud(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
+    eng = vreg.get_engine("ltx_video")
+    assert eng._use_i2v(_i2v_req()) is False                  # no init at all
+    assert eng._use_i2v(_i2v_req("Z:/nope/still.png")) is False  # stale path
+
+
+def test_i2v_flag_on_with_init_engages(monkeypatch, tmp_path):
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
+    eng = vreg.get_engine("ltx_video")
+    p = tmp_path / "still.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n")
+    assert eng._use_i2v(_i2v_req(str(p))) is True
+
+
+def test_i2v_candidates_and_graph_topology():
+    eng = vreg.get_engine("ltx_video")
+    cands = eng._node_candidates_i2v()
+    assert "latent" not in cands
+    assert cands["img2vid"] == ("LTXVImgToVideo",)
+    assert cands["loadimage"] == ("LoadImage",)
+    plan = {"text_prompt": "x", "negative_prompt": "", "fps": 25,
+            "target_frame_count": 169, "seed": 7}
+    g = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
+    assert "latent" not in g
+    assert g["loadimage"]["inputs"]["image"] == "still.png"
+    iv = g["img2vid"]["inputs"]
+    assert iv["length"] == 169 and iv["width"] == 1472 and iv["height"] == 832
+    assert iv["strength"] == 1.0   # REQUIRED input on the installed wrapper
+    # KSampler samples the img2vid latent; conditioning reads img2vid 0/1.
+    assert tuple(g["ksampler"]["inputs"]["latent_image"]) == ("img2vid", 2)
+    assert tuple(g["cond"]["inputs"]["positive"]) == ("img2vid", 0)
+    assert tuple(g["cond"]["inputs"]["negative"]) == ("img2vid", 1)
+    # txt2vid graph untouched by the branch
+    g2 = eng._build_graph(plan, 169, 1472, 832)
+    assert "latent" in g2 and "img2vid" not in g2
+
+
+def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
+    """Flag on + a scene still in the ledger -> the ltx request shows
+    init_source=scene_still; no still -> LOUD text-path fallback."""
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    still = tmp_path / "scene_b001.png"
+    still.write_bytes(b"\x89PNG\r\n\x1a\n")
+    ledger = {
+        "meta": {"story_brief_status": "ok", "story_brief": "a relay station",
+                 "story_brief_terms": {"setting": ["a relay station"]}},
+        "lines": [{"line_id": "b001", "char_id": "announcer",
+                   "speaker_role": "announcer", "text": "Tonight...",
+                   "start_s": 0.0, "dur_s": 5.0}],
+        "images": {"images": [{"object_id": "scene_b001", "kind": "scene_wide",
+                               "beat_id": "b001", "path": str(still)}]},
+    }
+    shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
+            "role": "announcer_visual", "engine_id": "ltx_video",
+            "group_id": "grp_announcer_visual", "target_frame_count": 50,
+            "creative": {}}
+    req = rd.build_request_from_shot(shot, ledger)
+    assert req["_init_source"] == "scene_still"
+    assert req["asset_refs"]["init_image"] == str(still)
+    # missing still -> LOUD text path (init_source stays pre-i2v)
+    ledger2 = dict(ledger, images={"images": []})
+    req2 = rd.build_request_from_shot(shot, ledger2)
+    assert req2["_init_source"] != "scene_still"
+
+
+def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    still = tmp_path / "scene_b001.png"
+    still.write_bytes(b"\x89PNG\r\n\x1a\n")
+    ledger = {
+        "meta": {"story_brief_status": "ok", "story_brief": "a relay station",
+                 "story_brief_terms": {"setting": ["a relay station"]}},
+        "lines": [{"line_id": "b001", "char_id": "announcer",
+                   "speaker_role": "announcer", "text": "Tonight...",
+                   "start_s": 0.0, "dur_s": 5.0}],
+        "images": {"images": [{"object_id": "scene_b001", "kind": "scene_wide",
+                               "beat_id": "b001", "path": str(still)}]},
+    }
+    shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
+            "role": "announcer_visual", "engine_id": "ltx_video",
+            "group_id": "grp_announcer_visual", "target_frame_count": 50,
+            "creative": {}}
+    req = rd.build_request_from_shot(shot, ledger)
+    assert req["_init_source"] != "scene_still"   # the still-spine v1 CUT holds
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
