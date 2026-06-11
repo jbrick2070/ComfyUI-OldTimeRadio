@@ -63,6 +63,26 @@ def _img_stub(**kw):
     return types.SimpleNamespace(**base)
 
 
+# Still-spine ST-2: derive_image_prompts emits + dispatch_images consumes the
+# ONE versioned {"version": 1, "objects": [...]} payload (pass-02 item 1; no
+# dual-schema shims). These builders shape test portrait objects.
+def _pobj(cid, prompt, prompt_hash, source="llm", role="character_video"):
+    return {"object_id": cid, "kind": "portrait", "role": role,
+            "char_id": cid, "w": 832, "h": 1216,
+            "prompt": prompt, "prompt_hash": prompt_hash, "source": source}
+
+
+def _payload(*objs):
+    return {"version": 1, "objects": list(objs)}
+
+
+def _by_id(payload_and_warns_or_payload):
+    p = payload_and_warns_or_payload
+    if isinstance(p, tuple):
+        p = p[0]
+    return mbp.objects_by_id(p)
+
+
 # --------------------------------------------------------------------------- #
 def test_image_cold_import_no_heavy_libs():
     """Importing the image registry + nodes pulls NO heavy lib (V-12)."""
@@ -228,12 +248,13 @@ def test_meta_brief_prompt_temp0_hash_reseed_fallback():
     # "lined face" keeps the person guard satisfied (look-QA round 4): a
     # portrait prompt with NO person-evidence now falls back to template.
     good = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "a tall weathered spacer, lined face, station, photographic")
-    p = good[0]["c1"]
+    p = _by_id(good)["c1"]
     assert p["source"] == "llm" and p["prompt_hash"]
+    assert p["kind"] == "portrait" and p["w"] == 832 and p["h"] == 1216
 
     # empty LLM -> reseed -> deterministic template (NEVER empty)
     empties = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "")
-    p2 = empties[0]["c1"]
+    p2 = _by_id(empties)["c1"]
     assert p2["source"].startswith("template") and p2["prompt"]
     assert "spacer" in p2["prompt"] and "station" in p2["prompt"]
     # hash is taken AFTER the call (matches the final prompt text)
@@ -257,7 +278,7 @@ def test_meta_brief_consistency_gate_fallback():
     meta = {"story_brief_terms": {"setting": ["a neon market"]}}
     # LLM returns a prompt missing both appearance + setting -> gate -> template
     out, warns = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "totally unrelated text")
-    assert out["c1"]["source"] == "template_consistency"
+    assert _by_id(out)["c1"]["source"] == "template_consistency"
     assert any("missing appearance/setting" in w for w in warns)
 
 
@@ -287,7 +308,7 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
-    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"
 
     calls = {"n": 0}
@@ -317,7 +338,7 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     assert len(led2["images"]["images"]) == 1
 
     # change the prompt hash -> new cache key -> REGEN -> new content hash/file
-    prompts2 = {"c1": {"prompt": "a spacer, ruined station", "prompt_hash": "ph2", "source": "llm"}}
+    prompts2 = _payload(_pobj("c1", "a spacer, ruined station", "ph2"))
     led3, _d3, _r3, _w3 = disp.dispatch_images(
         led2, policy, prompts2, gen_fn=gen_fn, output_dir=str(tmp_path), lockdir=lockdir,
     )
@@ -333,7 +354,7 @@ def test_dispatcher_fail_closed_unusable_engine(clean_image_registry, tmp_path):
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "ghost"}},
               "seed": {"request_seed": 0}}
-    prompts = {"c1": {"prompt": "x, y", "prompt_hash": "ph", "source": "llm"}}
+    prompts = _payload(_pobj("c1", "x, y", "ph"))
     led, done, _r, warns = disp.dispatch_images(
         ledger, policy, prompts, gen_fn=lambda r: _np_pixels(5),
         output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
@@ -438,7 +459,7 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
-    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     side = _write_png(tmp_path / "from_sidecar.png", val=77)
 
     led, done, _r, warns = disp.dispatch_images(
@@ -462,7 +483,7 @@ def test_dispatcher_skips_truncated_handoff_fail_closed(clean_image_registry, tm
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
-    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     empty = tmp_path / "truncated.png"
     empty.write_bytes(b"")
 
@@ -531,7 +552,7 @@ def test_dispatcher_render_failure_degrades_to_floor(clean_image_registry, tmp_p
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
-    prompts = {"c1": {"prompt": "a spacer, station", "prompt_hash": "ph1", "source": "llm"}}
+    prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
 
     def boom(_req):
         raise RuntimeError("no CUDA / wrapper node missing on this box")
@@ -600,8 +621,11 @@ def test_meta_brief_announcer_prompt_added_radio_style():
         {"line_id": "b002", "speaker_role": "character", "char_id": "c1"},
     ]
     out, _warns = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
-    assert set(out) == {"c1", "announcer"}
-    ann = out["announcer"]
+    objs = _by_id(out)
+    portraits = {k for k, v in objs.items() if v["kind"] == "portrait"}
+    assert portraits == {"c1", "announcer"}
+    ann = objs["announcer"]
+    assert ann["role"] == "announcer_visual"
     assert ann["prompt"], "announcer prompt must never be empty"
     assert ann["source"].startswith("announcer_")
     low = ann["prompt"].lower()
@@ -615,9 +639,9 @@ def test_meta_brief_announcer_not_added_without_announcer_lines():
     meta = {}
     lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c1"}]
     out, _w = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
-    assert "announcer" not in out
+    assert "announcer" not in _by_id(out)
     out2, _w2 = mbp.derive_image_prompts(cast, meta, llm_fn=None)  # lines omitted
-    assert "announcer" not in out2
+    assert "announcer" not in _by_id(out2)
 
 
 def test_meta_brief_announcer_not_duplicated_when_cast_covers_it():
@@ -626,8 +650,9 @@ def test_meta_brief_announcer_not_duplicated_when_cast_covers_it():
     cast = [{"char_id": "announcer", "portrait_prompt": "the station voice in a booth"}]
     lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
     out, _w = mbp.derive_image_prompts(cast, {}, llm_fn=None, lines=lines)
-    assert list(out) == ["announcer"]
-    assert not out["announcer"]["source"].startswith("announcer_"), \
+    objs = _by_id(out)
+    assert [k for k, v in objs.items() if v["kind"] == "portrait"] == ["announcer"]
+    assert not objs["announcer"]["source"].startswith("announcer_"), \
         "a real cast row must not be relabeled as synthetic"
 
 
@@ -637,8 +662,9 @@ def test_meta_brief_announcer_llm_refined_keeps_grounding():
     out, _w = mbp.derive_image_prompts(
         [], {}, llm_fn=lambda _p: "a velvet-voiced radio announcer, chrome microphone, art deco studio",
         lines=lines)
-    assert out["announcer"]["source"] == "announcer_llm"
-    assert "radio" in out["announcer"]["prompt"].lower()
+    ann = _by_id(out)["announcer"]
+    assert ann["source"] == "announcer_llm"
+    assert "radio" in ann["prompt"].lower()
 
 
 def test_meta_brief_announcer_gate_requires_radio_grounding():
@@ -654,7 +680,7 @@ def test_meta_brief_announcer_gate_requires_radio_grounding():
         [], meta,
         llm_fn=lambda _p: "a tense mission control countdown operator at a console",
         lines=lines)
-    ann = out["announcer"]
+    ann = _by_id(out)["announcer"]
     assert ann["source"] == "announcer_template_consistency", \
         "setting-only grounding must fail the announcer gate (got %r)" % ann["source"]
     low = ann["prompt"].lower()
@@ -666,7 +692,7 @@ def test_meta_brief_announcer_gate_requires_radio_grounding():
     out2, _w2 = mbp.derive_image_prompts(
         cast, meta,
         llm_fn=lambda _p: "a tense mission control countdown operator at a console")
-    assert out2["c1"]["source"] == "llm"
+    assert _by_id(out2)["c1"]["source"] == "llm"
 
 
 def test_stamp_portrait_non_cast_strict_vs_relaxed(tmp_path):
@@ -694,11 +720,11 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
     ledger = {"cast": [{"char_id": "c1", "name": "EDNA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
-    prompts = {
-        "c1": {"prompt": "a keeper, harbor", "prompt_hash": "ph1", "source": "llm"},
-        "announcer": {"prompt": mbp.ANNOUNCER_PORTRAIT_ANCHOR,
-                      "prompt_hash": "ph-ann", "source": "announcer_template"},
-    }
+    prompts = _payload(
+        _pobj("c1", "a keeper, harbor", "ph1"),
+        _pobj("announcer", mbp.ANNOUNCER_PORTRAIT_ANCHOR, "ph-ann",
+              source="announcer_template", role="announcer_visual"),
+    )
     led, done, _r, warns = disp.dispatch_images(
         ledger, policy, prompts, gen_fn=lambda _req: _np_pixels(7),
         output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",

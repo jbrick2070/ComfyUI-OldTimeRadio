@@ -144,7 +144,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
                     handoff_wait_attempts: int = 40, handoff_wait_sleep_s: float = 0.05):
-    """Generate (or cache-reuse) one portrait per character; stamp the ledger.
+    """Generate (or cache-reuse) every image OBJECT (portraits + scene
+    stills); stamp the ledger.
+
+    ``image_prompts`` is the ONE versioned ``{"version": 1, "objects": [...]}``
+    payload from ``derive_image_prompts`` (still-spine ST-2 / pass-02 item 1:
+    objects only -- never bare char_id maps; no dual-schema shims).
 
     ``gen_fn(request: dict) -> (numpy uint8 array | .png path)`` is the only GPU
     step (injected in tests; the real Flux path on the operator smoke). Returns
@@ -161,22 +166,31 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     seed = int(((image_policy or {}).get("seed") or {}).get("request_seed") or 0)
     other_engine = ((image_policy or {}).get("image_models") or {}).get("other_beats_image_model") or {}
     engine_id = other_engine.get("engine_id") if isinstance(other_engine, dict) else str(other_engine or "")
-    role = "character_video"
 
     rev = int(images_section.get("image_revision") or 0) + 1
     made = 0
     reused = 0
-    # Synthetic non-cast subjects (the ANNOUNCER radio-style portrait): their
-    # portrait is recorded in ledger['images'] below -- the index the render
-    # path resolves init_image from -- but there is no cast row to stamp, so
-    # stamp_portrait must not fail-closed on them (cast stays CastLock's
-    # frozen authority; never added to here).
+    # Synthetic non-cast subjects (the ANNOUNCER radio-style portrait + every
+    # scene still): they are recorded in ledger['images'] below -- the index
+    # the render path resolves init_image from -- but there is no cast row to
+    # stamp, so stamp_portrait must not fail-closed on them (cast stays
+    # CastLock's frozen authority; never added to here).
     cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
-    for cid, pinfo in (image_prompts or {}).items():
-        prompt = str((pinfo or {}).get("prompt") or "")
-        prompt_hash = str((pinfo or {}).get("prompt_hash") or "")
+    objects = (image_prompts or {}).get("objects") or []
+    for obj in objects:
+        if not isinstance(obj, dict):
+            continue
+        oid = str(obj.get("object_id") or "")
+        kind = str(obj.get("kind") or "portrait")
+        role = str(obj.get("role") or "character_video")
+        char_id = str(obj.get("char_id") or "")
+        beat_id = str(obj.get("beat_id") or "")
+        prompt = str(obj.get("prompt") or "")
+        prompt_hash = str(obj.get("prompt_hash") or "")
+        if not oid:
+            continue
         if not engine_id:
-            warnings.append(f"{cid}: no image engine selected; skipped (fail-closed)")
+            warnings.append(f"{oid}: no image engine selected; skipped (fail-closed)")
             continue
         try:
             _assert_not_path(prompt)
@@ -184,24 +198,26 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             warnings.append(str(exc))
             continue
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
-        key = request_cache_key(role, cid, prompt_hash, seed, engine_id, eng_version)
+        key = request_cache_key(role, oid, prompt_hash, seed, engine_id, eng_version)
         if key in cache_index:
             reused += 1
-            report.append(f"{cid}: cache HIT ({cache_index[key][:12]})")
+            report.append(f"{oid}: cache HIT ({cache_index[key][:12]})")
             continue
         # cache miss -> assert usable (fail-closed) -> lease -> generate -> stamp
         try:
             _ireg.assert_usable(engine_id, role)
         except Exception as exc:  # noqa: BLE001  (EngineUnusable et al.)
-            warnings.append(f"{cid}: engine '{engine_id}' not usable for {role} ({exc}); skipped")
+            warnings.append(f"{oid}: engine '{engine_id}' not usable for {role} ({exc}); skipped")
             continue
         if gen_fn is None:
-            warnings.append(f"{cid}: no gen_fn (GPU render is the operator smoke); skipped on CPU")
+            warnings.append(f"{oid}: no gen_fn (GPU render is the operator smoke); skipped on CPU")
             continue
         request = {
-            "request_id": key, "role": role, "object_id": cid,
+            "request_id": key, "role": role, "object_id": oid,
+            "kind": kind, "char_id": char_id, "beat_id": beat_id,
             "engine_id": engine_id, "engine_version": eng_version,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
+            "w": int(obj.get("w") or 0), "h": int(obj.get("h") or 0),
         }
         lease = None
         try:
@@ -211,20 +227,24 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
             )
             content_hash = _pl.compute_portrait_hash(pixels)
-            path = _pl.stamp_portrait(ledger, cid, pixels, output_dir=output_dir,
-                                      require_cast_entry=(cid in cast_ids))
+            # portraits stamp the cast row (require_cast_entry for real cast);
+            # scene stills only write the content-addressed file (no cast row
+            # could ever exist for a beat).
+            path = _pl.stamp_portrait(
+                ledger, oid, pixels, output_dir=output_dir,
+                require_cast_entry=(kind == "portrait" and oid in cast_ids))
         except _lease.LeaseTimeout as exc:
-            warnings.append(f"{cid}: GPU lease timeout ({exc}); skipped")
+            warnings.append(f"{oid}: GPU lease timeout ({exc}); skipped")
             continue
         except ImageHandoffTimeout as exc:
-            warnings.append(f"{cid}: image handoff not ready ({exc}); skipped")
+            warnings.append(f"{oid}: image handoff not ready ({exc}); skipped")
             continue
         except Exception as exc:  # noqa: BLE001 -- any render failure -> floor
             # The image GATE never crashes the episode: a wrapper-node-missing /
-            # CUDA-OOM / decode failure means this object simply has no portrait,
-            # so HuMo degrades to the radio floor LOUD downstream. Logged LOUD.
+            # CUDA-OOM / decode failure means this object simply has no image,
+            # so the render path degrades to the radio floor LOUD downstream.
             warnings.append(
-                f"{cid}: image render failed ({type(exc).__name__}: {exc}); "
+                f"{oid}: image render failed ({type(exc).__name__}: {exc}); "
                 "skipped (radio floor will be used)")
             continue
         finally:
@@ -233,16 +253,22 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # post-generation residency confirm (best-effort; gates the C->A handoff).
         if not _lease.wait_until_below_mb(15000, attempts=3, sleep_s=0.0):
             log.info("[OTR_ImageGenDispatcher] NVML re-probe inconclusive (CPU/no-NVML or busy)")
-        image_id = f"img_{cid}_{content_hash[:12]}"
-        images.append({
-            "image_id": image_id, "role": role, "object_id": cid,
+        image_id = f"img_{oid}_{content_hash[:12]}"
+        row = {
+            "image_id": image_id, "role": role, "object_id": oid,
+            "kind": kind,
             "path": str(path), "engine_id": engine_id, "engine_version": eng_version,
             "request_hash": key, "portrait_content_hash": content_hash,
-            "prompt_hash": prompt_hash, "provenance": {"source": (pinfo or {}).get("source", "")},
-        })
+            "prompt_hash": prompt_hash, "provenance": {"source": obj.get("source", "")},
+        }
+        if char_id:
+            row["char_id"] = char_id
+        if beat_id:
+            row["beat_id"] = beat_id
+        images.append(row)
         cache_index[key] = image_id
         made += 1
-        report.append(f"{cid}: generated -> {os.path.basename(str(path))}")
+        report.append(f"{oid}: generated -> {os.path.basename(str(path))}")
 
     ledger["images"] = {
         "image_revision": rev,
@@ -316,7 +342,7 @@ class OTRImageGenDispatcher:
                 }),
                 "image_prompts_json": ("STRING", {
                     "multiline": True, "default": "{}", "forceInput": True,
-                    "tooltip": "OTR_MetaBriefImagePromptGen output (char_id -> prompt + hash).",
+                    "tooltip": "OTR_MetaBriefImagePromptGen output: the versioned {\"objects\":[...]} payload (portraits + scene stills).",
                 }),
             },
             "optional": {

@@ -112,6 +112,112 @@ ANNOUNCER_PORTRAIT_ANCHOR = (
 )
 
 
+#: Portrait canvas (the proven FLUX portrait dims; unchanged by the spine).
+PORTRAIT_W = 832
+PORTRAIT_H = 1216
+
+
+def _landscape_still_dims():
+    """(w, h) for SCENE stills: the landscape composite canvas, each dim
+    snapped DOWN to /32 (the latent-grid contract). Env-overridable via
+    OTR_VIDEO_LANDSCAPE_CANVAS (the same knob the render driver reads)."""
+    import os
+    raw = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
+    try:
+        w, h = (int(x) for x in raw.lower().split("x", 1))
+    except (ValueError, AttributeError):
+        w, h = 1472, 832
+    return max(32, (w // 32) * 32), max(32, (h // 32) * 32)
+
+
+def _iter_beat_lines(lines):
+    """(beat_id, line) pairs mirroring OTR_ShotLock's beat-id scheme exactly
+    (line_id or beat_%04d over the NON-SKIPPED lines) so a still minted here
+    joins the ShotLock shot rows downstream. Pure."""
+    live = [ln for ln in (lines or [])
+            if isinstance(ln, dict) and not ln.get("skip")]
+    for i, ln in enumerate(live):
+        yield str(ln.get("line_id") or f"beat_{i:04d}"), ln
+
+
+def derive_scene_still_targets(lines, fps: int = 25):
+    """Still-spine ST-2: the v1 SCENE-STILL targets -- open + announcer +
+    outro ONLY (panel cut: not every beat) -- derived from the LINES via pure
+    helpers, never from ``video.shots`` (graph order: image gen runs BEFORE
+    ShotLock). Returns ``(targets, warnings)``; each target is
+    ``{beat_id, kind, role, source}``.
+
+    The OPEN comes from the same pure helper ShotLock uses
+    (``derive_opening_music_beat``). That helper needs the first line's
+    ``start_s`` -- which the audio path persists to the DISK ledger, not to
+    this node's pre-audio ``script_json``. When timing is UNKNOWN (first
+    line carries no ``start_s``) the open target is still emitted
+    (``source="scene_pretiming"``, warned LOUD): production always opens on
+    the music head gap, and an unused still costs one render while a
+    MISSING open still costs the 6/5 look.
+    """
+    warnings: list = []
+    targets: list = []
+    seen: set = set()
+
+    def _add(beat_id, kind, role, source):
+        if beat_id and beat_id not in seen:
+            seen.add(beat_id)
+            targets.append({"beat_id": beat_id, "kind": kind,
+                            "role": role, "source": source})
+
+    try:  # lazy: one source of truth for the open beat + the role map
+        from .otr_shot_lock import (
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
+            derive_opening_music_beat)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from otr_shot_lock import (  # type: ignore
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
+            derive_opening_music_beat)
+
+    live = [ln for _bid, ln in _iter_beat_lines(lines)]
+    beat, _frames = derive_opening_music_beat({"lines": list(lines or [])},
+                                              int(fps or 25))
+    if beat is not None:
+        _add(str(beat.get("beat_id") or OPENING_MUSIC_BEAT_ID),
+             "scene_open", str(beat.get("role") or "music_visual"),
+             "scene_timed")
+    elif live and live[0].get("start_s") is None:
+        warnings.append(
+            "scene_open b000: line timing absent (pre-audio ledger); "
+            "emitting the open still target OPTIMISTICALLY -- production "
+            "opens on the music head gap; an unused still is cheap, a "
+            "missing open still loses the 6/5 look")
+        _add(OPENING_MUSIC_BEAT_ID, "scene_open", "music_visual",
+             "scene_pretiming")
+
+    scene_roles = ("announcer_visual", "music_visual")
+    first_ann = None
+    last_scene = None
+    for bid, ln in _iter_beat_lines(lines):
+        role = SPEAKER_TO_VIDEO_ROLE.get(
+            str(ln.get("speaker_role") or "").strip().lower(), "")
+        if role == "announcer_visual" and first_ann is None:
+            first_ann = (bid, role)
+        if role in scene_roles:
+            last_scene = (bid, role)
+    if first_ann:
+        _add(first_ann[0], "scene_beat", first_ann[1], "scene_role_map")
+    if last_scene and (not first_ann or last_scene[0] != first_ann[0]):
+        _add(last_scene[0], "scene_beat", last_scene[1], "scene_role_map")
+    return targets, warnings
+
+
+def objects_by_id(payload) -> dict:
+    """``{object_id: object}`` accessor over the versioned ``{"objects":[...]}``
+    payload (portrait object_ids are the char_ids). Pure, tolerant."""
+    out: dict = {}
+    for obj in (payload or {}).get("objects") or []:
+        if isinstance(obj, dict) and obj.get("object_id"):
+            out.setdefault(str(obj["object_id"]), obj)
+    return out
+
+
 def announcer_line_char_ids(lines) -> list:
     """Distinct ``char_id``s of ledger lines spoken by the ANNOUNCER role, in
     first-appearance order (normally just ``["announcer"]``). The video render
@@ -237,18 +343,27 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
-                         consistency_gate_warn_only: bool = False, lines=None):
-    """Per-character image prompts: ``{char_id: {prompt, prompt_hash, source}}``.
+                         consistency_gate_warn_only: bool = False, lines=None,
+                         fps: int = 25):
+    """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
+    (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
+    schema in the same patch; no dual-schema shims).
 
-    LLM (temp=0, injected or lazily resolved) refines each; empty/unparseable ->
-    reseed -> deterministic fallback. ``prompt_hash`` is taken AFTER the call.
-    Never raises; never emits an empty prompt. Returns ``(prompts, warnings)``.
+    Each object carries ``object_id`` / ``kind`` / ``role`` / ``w`` / ``h`` /
+    ``prompt`` / ``prompt_hash`` / ``source`` plus ``char_id`` (portraits;
+    object_id == char_id) or ``beat_id`` (scene stills). Guards branch by
+    KIND before running: the person guard + gear scrub run ONLY on
+    kind=portrait; scene stills get the no-text clause (inside
+    ``compose_still_prompt``) and skip the person guard entirely.
 
-    ``lines`` (optional, the frozen ledger lines, READ-ONLY): when any line is
-    spoken by the ANNOUNCER role, a radio-style announcer portrait prompt is
-    appended for each announcer char_id not already covered -- announcer beats
-    are talking beats and starve HuMo without an ``init_image``. The synthetic
-    entry rides the SAME llm/template/consistency path as cast characters.
+    Portrait path: LLM (temp=0, injected or lazily resolved) refines each;
+    empty/unparseable -> reseed -> deterministic fallback. ``prompt_hash`` is
+    taken AFTER the call. Never raises; never emits an empty prompt.
+    Returns ``(payload, warnings)``.
+
+    ``lines`` (optional, the frozen ledger lines, READ-ONLY): announcer
+    portrait minting (as before) PLUS the v1 scene-still targets
+    (open/announcer/outro via :func:`derive_scene_still_targets`).
     """
     warnings: list = []
     setting = _read_setting(meta)
@@ -349,8 +464,61 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
             "source": source,
+            "_role": ("announcer_visual" if _is_announcer_row
+                      else "character_video"),
         }
-    return out, warnings
+
+    # ---- assemble the ONE versioned object payload (pass-02 item 1) ----
+    objects: list = []
+    for cid, pinfo in out.items():
+        objects.append({
+            "object_id": cid,                 # portrait object_id == char_id
+            "kind": "portrait",
+            "role": pinfo.pop("_role", "character_video"),
+            "char_id": cid,
+            "w": PORTRAIT_W, "h": PORTRAIT_H,
+            "prompt": pinfo["prompt"],
+            "prompt_hash": pinfo["prompt_hash"],
+            "source": pinfo["source"],
+        })
+
+    # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
+    # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The
+    # prompt comes from the shared 5-layer composer (subject parity with the
+    # driver's text prompts is locked in tests); no LLM call, no person
+    # guard, no gear scrub -- guards branch by kind BEFORE running.
+    scene_targets, scene_warns = ([], [])
+    if lines:
+        try:
+            scene_targets, scene_warns = derive_scene_still_targets(
+                lines, fps=fps)
+        except Exception as exc:  # noqa: BLE001 -- stills never kill prompts
+            warnings.append(f"scene-still derivation failed ({exc}); "
+                            "episode renders without scene stills (LOUD)")
+    warnings.extend(scene_warns)
+    if scene_targets:
+        try:
+            from ._otr_story_brief_helpers import (  # type: ignore
+                compose_still_prompt)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                compose_still_prompt)
+        sw, sh = _landscape_still_dims()
+        for tgt in scene_targets:
+            sprompt = compose_still_prompt(
+                meta, kind=tgt["kind"], role=tgt["role"],
+                beat_id=tgt["beat_id"])
+            objects.append({
+                "object_id": f"still_{tgt['beat_id']}",
+                "kind": tgt["kind"],
+                "role": tgt["role"],
+                "beat_id": tgt["beat_id"],
+                "w": sw, "h": sh,
+                "prompt": sprompt,
+                "prompt_hash": _content_hash(sprompt),
+                "source": tgt["source"],
+            })
+    return {"version": 1, "objects": objects}, warnings
 
 
 def _resolve_writer_llm(meta, warnings):
@@ -425,21 +593,27 @@ class OTRMetaBriefImagePromptGen:
         except Exception:  # noqa: BLE001
             pass
         llm_fn = _resolve_writer_llm(meta, warnings)
-        prompts, warn2 = derive_image_prompts(
+        payload, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,
             consistency_gate_warn_only=bool(consistency_gate_warn_only),
             lines=lines,
         )
         warnings.extend(warn2)
 
-        report = [f"image_prompts: {len(prompts)} characters"]
-        for cid, p in prompts.items():
-            report.append(f"  {cid}: source={p['source']} hash={p['prompt_hash'][:8]}")
+        objs = payload.get("objects") or []
+        report = [f"image_prompts v{payload.get('version')}: "
+                  f"{len(objs)} objects"]
+        for obj in objs:
+            ident = obj.get("char_id") or obj.get("beat_id") or ""
+            report.append(
+                f"  {obj['object_id']}: kind={obj['kind']} role={obj['role']}"
+                f" {obj['w']}x{obj['h']} id={ident}"
+                f" source={obj['source']} hash={obj['prompt_hash'][:8]}")
         for w in warnings:
             report.append(f"WARN: {w}")
             log.warning("[OTR_MetaBriefImagePromptGen] %s", w)
 
         return (
-            json.dumps(prompts, ensure_ascii=True, separators=(",", ":")),
+            json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
             "\n".join(report),
         )

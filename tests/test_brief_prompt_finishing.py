@@ -75,7 +75,7 @@ def test_image_prompt_hash_matches_finished_prompt():
     cast = [{"char_id": "c1", "name": "KEEPER",
              "character_description": "60s, weathered face, oilskin coat"}]
     out, _w = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
-    entry = out["c1"]
+    entry = mbp.objects_by_id(out)["c1"]
     assert "lantern glow" in entry["prompt"]          # finished
     assert entry["prompt_hash"] == mbp._content_hash(entry["prompt"])
 
@@ -90,7 +90,7 @@ def test_image_person_guard_then_finish_no_retrigger():
     out, warns = mbp.derive_image_prompts(
         cast, _OK_META,
         llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
-    entry = out["c1"]
+    entry = mbp.objects_by_id(out)["c1"]
     assert entry["source"] == "template_person_guard"
     assert "weathered face" in entry["prompt"]        # template led
     assert "lantern glow" in entry["prompt"]          # finished after guard

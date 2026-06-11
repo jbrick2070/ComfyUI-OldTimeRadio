@@ -384,8 +384,9 @@ class TestPortraitGearScrub:
              "portrait_prompt": "a stocky engineer near a radio console"},
         ]
         prompts, warnings = mb.derive_image_prompts(cast, {}, llm_fn=None)
-        assert "radio" in prompts["c01"]["prompt"].lower()      # exempt
-        assert "radio" not in prompts["c02"]["prompt"].lower()  # scrubbed
+        objs = mb.objects_by_id(prompts)
+        assert "radio" in objs["c01"]["prompt"].lower()      # exempt
+        assert "radio" not in objs["c02"]["prompt"].lower()  # scrubbed
         assert any("gear tokens scrubbed" in w for w in warnings)
 
     def test_style_anchor_positive_only_three_quarter(self):
