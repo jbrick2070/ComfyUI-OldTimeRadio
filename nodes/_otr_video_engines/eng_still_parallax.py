@@ -46,6 +46,30 @@ _LOG = logging.getLogger("OTR.video.eng_still_parallax")
 _DA2_SMALL_REPO = "depth-anything/Depth-Anything-V2-Small-hf"
 _DA2_CACHE_DIRNAME = "models--depth-anything--Depth-Anything-V2-Small-hf"
 
+
+def resolve_model_src(path):
+    """Resolve a directory for ``from_pretrained(local_files_only=True)``.
+
+    A plain local model dir (``config.json`` beside the weights) passes
+    through unchanged. An HF CACHE repo dir (``models--*``) resolves to its
+    newest ``snapshots/<rev>`` that contains ``config.json`` --
+    ``from_pretrained`` CANNOT take the cache repo dir itself (proven live
+    2026-06-11, the A-lane fix: repo dir raises OSError, snapshot loads).
+    Pure stdlib; never imports transformers."""
+    snaps = os.path.join(path, "snapshots")
+    if not os.path.isdir(snaps):
+        return path
+    best = None
+    best_mtime = None
+    for name in sorted(os.listdir(snaps)):
+        cand = os.path.join(snaps, name)
+        if not os.path.isfile(os.path.join(cand, "config.json")):
+            continue
+        mtime = os.path.getmtime(cand)
+        if best is None or mtime > best_mtime:
+            best, best_mtime = cand, mtime
+    return best or path
+
 _AMP_DEFAULT = 14.0
 
 
@@ -176,10 +200,13 @@ class StillParallaxEngine(_CheapFamilyBase):
         return _DA2_CACHE_DIRNAME          # relative -> exists() False -> LOUD
 
     def _installed(self):
-        """True iff the pinned DA-V2-SMALL snapshot exists locally (cheap, no
-        import). Offline-first: a missing model FAILS CLOSED -- this engine
-        never downloads at render time."""
-        return os.path.isdir(self._model_dir())
+        """True iff a LOADABLE DA-V2-SMALL snapshot exists locally (cheap,
+        stdlib-only: resolves the HF-cache snapshot and requires its
+        config.json). Offline-first: a missing model FAILS CLOSED -- this
+        engine never downloads at render time."""
+        src = resolve_model_src(self._model_dir())
+        return os.path.isdir(src) and os.path.isfile(
+            os.path.join(src, "config.json"))
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -214,7 +241,8 @@ class StillParallaxEngine(_CheapFamilyBase):
         from transformers import (AutoImageProcessor,
                                   AutoModelForDepthEstimation)
         import torch
-        src = self._model_dir()
+        # HF-cache repo dirs resolve to their newest snapshot (A-lane fix).
+        src = resolve_model_src(self._model_dir())
         self._processor = AutoImageProcessor.from_pretrained(
             src, local_files_only=True)
         model = AutoModelForDepthEstimation.from_pretrained(

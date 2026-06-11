@@ -94,10 +94,16 @@ def test_still_parallax_assert_usable_flag_then_model(monkeypatch, tmp_path):
     msg = str(e2.value)
     assert "OTR_DEPTH_ANYTHING_V2_DIR" in msg
     assert "Depth-Anything-V2-Small-hf" in msg
-    # Snapshot present -> usable (the dir check is the cheap CPU gate).
-    present = tmp_path / "da2s"
-    present.mkdir()
-    monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(present))
+    # A bare dir is NOT enough (A-lane fix 2026-06-11): the resolved source
+    # must carry config.json or from_pretrained would fail at load time.
+    bare = tmp_path / "da2s"
+    bare.mkdir()
+    monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(bare))
+    with pytest.raises(vreg.EngineUnusable) as e3:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
+    # LOADABLE snapshot present -> usable (the cheap CPU gate).
+    (bare / "config.json").write_text("{}", encoding="utf-8")
     assert eng.assert_usable(host_caps={}, profile={}) == "still_parallax"
 
 
@@ -224,3 +230,49 @@ def test_still_parallax_source_is_ascii_no_em_dash():
     src = src_path.read_text(encoding="utf-8")
     assert "—" not in src                 # em-dash forbidden (CLAUDE.md)
     src.encode("ascii")                        # ASCII-only source
+
+
+# --------------------------------------------------------------------------- #
+# A-lane fix (2026-06-11): HF-cache snapshot resolution for from_pretrained
+# --------------------------------------------------------------------------- #
+def test_resolve_model_src_hf_cache_layout(tmp_path):
+    """from_pretrained CANNOT load an HF cache REPO dir (models--*) -- only
+    its snapshots/<rev> (proven live 2026-06-11: repo dir raises OSError,
+    snapshot loads). resolve_model_src maps repo-cache dirs to the newest
+    config.json-bearing snapshot and passes plain dirs through."""
+    from nodes._otr_video_engines.eng_still_parallax import resolve_model_src
+
+    # Plain local model dir: passes through unchanged.
+    plain = tmp_path / "plain_model"
+    plain.mkdir()
+    (plain / "config.json").write_text("{}", encoding="utf-8")
+    assert resolve_model_src(str(plain)) == str(plain)
+
+    # HF cache repo dir: resolves into snapshots/<rev> with config.json.
+    repo = tmp_path / "models--depth-anything--Depth-Anything-V2-Small-hf"
+    incomplete = repo / "snapshots" / "aaaa"      # no config.json -> skipped
+    incomplete.mkdir(parents=True)
+    good = repo / "snapshots" / "bbbb"
+    good.mkdir()
+    (good / "config.json").write_text("{}", encoding="utf-8")
+    assert resolve_model_src(str(repo)) == str(good)
+
+    # No usable snapshot: falls back to the input (load then fails LOUD).
+    empty = tmp_path / "models--empty"
+    (empty / "snapshots").mkdir(parents=True)
+    assert resolve_model_src(str(empty)) == str(empty)
+
+
+def test_installed_requires_loadable_snapshot(tmp_path, monkeypatch):
+    """_installed() is True only when the RESOLVED source carries a
+    config.json -- a bare cache dir without a snapshot is NOT installed
+    (fail-closed at assert_usable, not at load time)."""
+    eng = vreg.get_engine("still_parallax")
+    repo = tmp_path / "models--depth-anything--Depth-Anything-V2-Small-hf"
+    (repo / "snapshots").mkdir(parents=True)
+    monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(repo))
+    assert eng._installed() is False
+    snap = repo / "snapshots" / "rev0"
+    snap.mkdir()
+    (snap / "config.json").write_text("{}", encoding="utf-8")
+    assert eng._installed() is True
