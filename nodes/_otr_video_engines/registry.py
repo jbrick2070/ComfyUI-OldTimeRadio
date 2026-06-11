@@ -167,11 +167,12 @@ CAPABILITIES = {
     # DRAFT pending the E-1 probe on the 5080; Blender renders AFTER the
     # BUG-291 reclaim barrier so the classes never co-reside. Tencent
     # community license (E-7 record gates default-on).
+    # A4 audit 2026-06-11: the all-in-one hy3d checkpoint EMBEDS the DINO
+    # image encoder + ShapeVAE -- no separate clip-vision requirement.
     "mesh_stage": {"vram_class": "medium", "vram_estimate_mb": 8000,
                    "required_toolchain": None, "requires_sidecar": False,
                    "cpu_ok": False,
                    "model_requirements": ["hunyuan3d-dit-v2-mv",
-                                          "clip-vision-h",
                                           "blender-portable"]},
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
