@@ -1196,7 +1196,15 @@ def build_clip_manifest(result, *, episode_id=""):
         sid = shot.get("shot_id")
         clip = clips.get(sid) or {}
         path = str(clip.get("path") or "")
-        exists = bool(path) and os.path.exists(path)
+        ctype = str(clip.get("type") or "video")
+        if ctype == "directory":
+            # 3D plan 7.2 p3: a directory clip is real when the dir holds
+            # EXACTLY target_frame_count sorted nonzero frames (shared rule).
+            from .directory_clip import frame_dir_summary
+            exists, _n, _b = frame_dir_summary(
+                path, expect_frames=shot.get("target_frame_count"))
+        else:
+            exists = bool(path) and os.path.isfile(path)
         tfc = int(shot.get("target_frame_count") or 0)
         total += tfc
         eid = clip.get("engine_id") or shot.get("engine_id")
@@ -1223,6 +1231,7 @@ def build_clip_manifest(result, *, episode_id=""):
             "engine_id": eid,
             "family": clip.get("family") or shot.get("family") or "",
             "path": path,
+            "type": ctype,
             "frame_count": int(clip.get("frame_count") or 0),
             "target_frame_count": tfc,
             "start_s": start_s,
@@ -1251,10 +1260,20 @@ def build_clip_manifest(result, *, episode_id=""):
 # A-S7.5 full-episode soak (two back-to-back episodes on REAL engines)
 # --------------------------------------------------------------------------- #
 def _clip_summary(clip):
-    """Compact, JSON-able view of a rendered clip + its on-disk reality."""
+    """Compact, JSON-able view of a rendered clip + its on-disk reality.
+
+    Directory semantics (3D plan 7.2 p3): a ``type=="directory"`` clip is
+    "real" when the dir exists with EXACTLY ``frame_count`` sorted nonzero
+    frames (the shared :mod:`directory_clip` rule); ``size`` is the frames'
+    total bytes so ``all_clips_real``'s ``size > 0`` keeps working."""
     path = (clip or {}).get("path", "")
-    exists = bool(path) and os.path.exists(path)
-    size = os.path.getsize(path) if exists else 0
+    if (clip or {}).get("type") == "directory":
+        from .directory_clip import frame_dir_summary
+        exists, _n, size = frame_dir_summary(
+            path, expect_frames=(clip or {}).get("frame_count"))
+    else:
+        exists = bool(path) and os.path.isfile(path)
+        size = os.path.getsize(path) if exists else 0
     return {"engine_id": (clip or {}).get("engine_id"),
             "family": (clip or {}).get("family"),
             "frame_count": (clip or {}).get("frame_count"),

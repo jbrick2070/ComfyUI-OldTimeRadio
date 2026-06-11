@@ -298,6 +298,86 @@ def _encode_black(fb, n_frames, seg_path, *, w, h, fps):
                          % (os.path.basename(seg_path), p.stderr.strip()[:200]))
 
 
+# --------------------------------------------------------------------------- #
+# Directory-clip read path (3D plan 7.2 -- the character_3d alpha handoff).
+# A clip row may point at a DIRECTORY of straight-alpha RGBA frames (PNG/EXR,
+# sorted by name) instead of an mp4. The segment encoder lists the frames via
+# the shared nodes/_otr_video_engines/directory_clip.py rule, plays them at
+# the canonical fps via an ffconcat list (no %06d numbering assumption),
+# OVERLAYS them centered on the background (the floor slice when available,
+# else black -- the W7 provider-plate composite arrives with the 3D lane),
+# and FLATTENS to opaque yuv420p. ffmpeg's overlay expects STRAIGHT
+# (non-premultiplied) alpha -- exactly the validated contract. The webm/vp9 /
+# mov/prores4444 alpha-VIDEO branches are CUT from v1 [H-RT, GPT].
+# --------------------------------------------------------------------------- #
+def _is_frame_dir(path) -> bool:
+    """True when ``path`` is a readable directory-clip frame dir (tolerant)."""
+    try:
+        from ._otr_video_engines.directory_clip import frame_dir_summary
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines.directory_clip import frame_dir_summary  # type: ignore
+    ok, _n, _b = frame_dir_summary(path)
+    return ok
+
+
+def _write_frames_concat(frames, listfile, fps):
+    """An ffconcat v1 list playing each frame for exactly 1/fps seconds
+    (sorted-by-name order is the caller's contract)."""
+    with open(listfile, "w", encoding="utf-8") as f:
+        f.write("ffconcat version 1.0\n")
+        for fp in frames:
+            f.write("file '%s'\n" % fp.replace("\\", "/").replace("'", "'\\''"))
+            f.write("duration %.6f\n" % (1.0 / float(fps)))
+        # concat-demuxer quirk: the LAST entry's duration is honored only if
+        # the file is listed once more (else the final frame is dropped early)
+        f.write("file '%s'\n" % frames[-1].replace("\\", "/").replace("'", "'\\''"))
+
+
+def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
+                             bg_path="", bg_start_frame=0):
+    """One canonical silent segment of EXACTLY ``n_frames`` from a straight-
+    alpha frame DIRECTORY: frames sorted by name -> overlay (centered) on the
+    background -> flatten yuv420p. FAIL CLOSED on a bad directory or ffmpeg
+    error. ``bg_path`` (the floor) is sliced at ``bg_start_frame``; absent ->
+    black."""
+    try:
+        from ._otr_video_engines.directory_clip import list_directory_frames
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines.directory_clip import list_directory_frames  # type: ignore
+    frames = list_directory_frames(frame_dir)   # raises ValueError, named
+    workdir = os.path.dirname(seg_path)
+    listfile = os.path.join(
+        workdir, os.path.basename(seg_path) + ".frames.ffconcat")
+    _write_frames_concat(frames, listfile, fps)
+    if bg_path and os.path.isfile(bg_path):
+        bg_in = ["-i", bg_path]
+        trim = (("trim=start_frame=%d,setpts=PTS-STARTPTS,"
+                 % int(bg_start_frame)) if int(bg_start_frame) > 0 else "")
+        bg_filter = ("[0:v]" + trim +
+                     "scale=%d:%d:force_original_aspect_ratio=decrease,"
+                     "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d,"
+                     "tpad=stop_mode=clone:stop_duration=3600[bg]"
+                     % (w, h, w, h, fps))
+    else:
+        bg_in = ["-f", "lavfi", "-i",
+                 "color=c=black:s=%dx%d:r=%d" % (w, h, fps)]
+        bg_filter = "[0:v]null[bg]"
+    fg_filter = ("[1:v]format=rgba,fps=%d,scale=%d:%d:"
+                 "force_original_aspect_ratio=decrease[fg]" % (fps, w, h))
+    graph = (bg_filter + ";" + fg_filter +
+             ";[bg][fg]overlay=(W-w)/2:(H-h)/2:eof_action=repeat:format=auto,"
+             "format=yuv420p")
+    cmd = [fb, "-y", "-loglevel", "error"] + bg_in + [
+        "-f", "concat", "-safe", "0", "-i", listfile, "-an",
+        "-filter_complex", graph,
+        "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+    p = _run(cmd)
+    if p.returncode != 0:
+        raise ValueError(
+            "OTR_SilentComposite: directory-clip segment failed (%s) :: %s"
+            % (os.path.basename(seg_path), p.stderr.strip()[:300]))
+
+
 def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                              h=832, fps=25, ffmpeg="ffmpeg"):
     """Assemble a beat-ordered clip manifest into ONE always-silent canonical
@@ -373,9 +453,20 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         for seg in segments:
             seg_path = os.path.join(workdir, "seg_%04d.mp4" % seg["order"])
             kind = seg["source"]
-            if kind == "clip" and not os.path.isfile(seg["path"]):
-                kind = "floor" if floor_ok else "black"   # vanished clip -> gap-fill
             if kind == "clip":
+                # 3D plan 7.2: a clip row may be a straight-alpha frame
+                # DIRECTORY (the character_3d handoff) instead of an mp4.
+                if os.path.isdir(seg["path"]) and _is_frame_dir(seg["path"]):
+                    kind = "dir_clip"
+                elif not os.path.isfile(seg["path"]):
+                    kind = "floor" if floor_ok else "black"   # vanished clip
+            if kind == "dir_clip":
+                _encode_segment_from_dir(
+                    fb, seg["path"], seg["n_frames"], seg_path,
+                    w=w, h=h, fps=fps,
+                    bg_path=base_video_path if floor_ok else "",
+                    bg_start_frame=seg["src_start_frame"])
+            elif kind == "clip":
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=0)
             elif kind == "floor":
