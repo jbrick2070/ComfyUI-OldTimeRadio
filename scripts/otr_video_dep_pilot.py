@@ -120,6 +120,30 @@ OPT_IN_ENGINES = {
             "box confirming the parallax reads + render-twice determinism"
         ),
     },
+    # 0-E easy on-ramp: the traditional 3D chain. The mesher drives ComfyUI
+    # CORE hy3d nodes in-process (the "lib" is the comfy host itself --
+    # absent in the pytest sandbox, present in production); Blender is a
+    # spawned exe, not an importable lib (OTR_BLENDER_EXE assert_usable
+    # gate). Tencent community license -- E-7 record before default-on.
+    "mesh_stage": {
+        "lib_module": "comfy",
+        "adapter_class": "MeshStageEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_MESH_STAGE",
+        "assumed_call": (
+            "in-process core nodes: CheckpointLoaderSimple(hy3d-dit-v2-mv) + "
+            "CLIPVisionLoader/Encode -> Hunyuan3Dv2Conditioning -> "
+            "KSampler(EmptyLatentHunyuan3Dv2) -> VAEDecodeHunyuan3D -> "
+            "VoxelToMesh -> SaveGLB; then BUG-291 reclaim barrier; then "
+            "pinned portable Blender --background --factory-startup "
+            "--python-exit-code 1 (WORKBENCH matcap turntable, straight-"
+            "alpha PNG dir, atomic publish).  "
+            "# TODO-for-GPU-smoke: confirm the installed core hy3d node "
+            "INPUT_TYPES + SaveGLB filename pattern, the E-1 VRAM probe on "
+            "the 5080 (DRAFT 8000 MB), the cube self-test, and one E-6 "
+            "acceptance render per slot at 1472x832"
+        ),
+    },
     "wan_i2v": {
         "lib_module": "wan",
         "adapter_class": "WanI2VEngine",

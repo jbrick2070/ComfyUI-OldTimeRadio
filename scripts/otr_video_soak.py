@@ -65,6 +65,7 @@ ENGINE_FAMILY = {
     "ltx_video": "text_to_video",
     "ltx_orbit": "text_to_video",
     "wan_i2v": "image_to_video",
+    "mesh_stage": "image_to_video",
     "station_card": "static_image_gen",
     "abstract": "abstract",
 }

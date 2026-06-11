@@ -162,6 +162,17 @@ CAPABILITIES = {
                        "required_toolchain": None, "requires_sidecar": False,
                        "cpu_ok": True,
                        "model_requirements": ["depth-anything-v2-small-hf"]},
+    # mesh_stage (0-E easy on-ramp): hy3d-2mv core-node mesher (in-process,
+    # compile-free) + headless portable Blender stage. vram_estimate is a
+    # DRAFT pending the E-1 probe on the 5080; Blender renders AFTER the
+    # BUG-291 reclaim barrier so the classes never co-reside. Tencent
+    # community license (E-7 record gates default-on).
+    "mesh_stage": {"vram_class": "medium", "vram_estimate_mb": 8000,
+                   "required_toolchain": None, "requires_sidecar": False,
+                   "cpu_ok": False,
+                   "model_requirements": ["hunyuan3d-dit-v2-mv",
+                                          "clip-vision-h",
+                                          "blender-portable"]},
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.1-i2v"]},

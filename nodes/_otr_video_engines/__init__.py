@@ -84,6 +84,19 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# 0-E easy on-ramp (2026-06-11): mesh_stage -- the traditional local 3D
+# chain (portrait -> hy3d-2mv core-node mesh -> cached GLB -> pinned
+# portable Blender turntable stage -> straight-alpha frame directory).
+# DEFAULT-OFF / selectable (empty default_roles + OTR_ENABLE_MESH_STAGE,
+# Tencent license record gates any default-on, E-7); fails closed without
+# Blender + the hy3d checkpoint. Cold-import clean (lazy torch/comfy/PIL
+# inside load/render_clip). Guarded so a packaging quirk never breaks the
+# namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_mesh_stage as _eng_mesh_stage  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # character_3d dark scaffold adapters (W7-pre slice): triposg_talk (the v1
 # no-compile lane, S-3D-0-gated) + hunyuan3d_talk/trellis_talk (the deferred
