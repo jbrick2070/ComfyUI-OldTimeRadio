@@ -34,3 +34,16 @@
 
 ## BLOCKERS
 (none yet)
+
+## OPERATOR LOOK-QA NOTE (~05:45, operator awake briefly)
+Operator observed the latest renders still show the SAME script + reddish
+stills (not the 6/5 bluish-crystal LTX look). Diagnosis, agreed deferred:
+(1) the server still runs PRE-RESTART code, so the Part-A still-profile era
+tail (the reddish-drift fix) is not live in any render yet; (2) the sweep
+pins request_seed=42 and only engine widgets change between legs, so
+ComfyUI's node cache REUSES the writer script / frozen audio / content-
+addressed FLUX stills across legs -- by design for crash-coverage speed +
+attribution, but it is NOT a fresh creative run. ACCEPTANCE TEST AFTER the
+sweep + the ComfyUI restart: one fresh full-json render on saved defaults
+(no patches, OS-entropy seeds) = the real look test for the reddish fix; if
+still warm-tinted, open a small palette-diet tuning ticket post-sprints.
