@@ -55,6 +55,19 @@ so nothing here blocks selecting them for look-QA.
 - **Blender (portable, pinned)**: GPL-3.0 application; invoking it as a
   subprocess does not affect OTR code licensing; rendered output frames
   carry no Blender license burden.
+  - **PINNED BUILD (recorded 2026-06-11, ticket A1):** Blender **4.5.10
+    LTS** (build date 2026-05-19), official portable zip
+    `blender-4.5.10-windows-x64.zip` from
+    `download.blender.org/release/Blender4.5/`.
+  - zip sha256
+    `ef6d846b8015f47ade6df3f9322ce17419080a5d922fa562b6c966064fe30dce`
+    (verified MATCH against the official `blender-4.5.10.sha256`
+    manifest at download time).
+  - Installed at `C:\ComfyUI-Models\tools\blender-4.5.10\`;
+    `OTR_BLENDER_EXE` (User env) points at its `blender.exe`.
+  - GPL boundary note: Blender is a SPAWNED application binary
+    (`--background` subprocess); OTR links no Blender code, so GPL-3.0
+    imposes nothing on OTR sources; frames rendered with it are ours.
 
 ## Sign-off (operator only)
 
