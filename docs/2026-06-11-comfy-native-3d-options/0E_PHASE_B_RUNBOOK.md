@@ -22,6 +22,14 @@ a server you did not start; never the Wan superset env (CS-3).**
   (`<prefix>_<counter:05>_.glb`; prefix must live under the comfy output dir).
   Widgets are EXPLICIT (V3 nodes backfill nothing). Suite 4100/0 green.
 
+## B-0 -- CLAIM GUARD (collision safety; multiple watchers may exist)
+
+Before ANY Phase B action: if `scripts\_otr_0e_phase_b_claim.txt` EXISTS,
+another session already runs Phase B -- STOP and exit quietly. Otherwise
+write it (session id + timestamp) FIRST, then proceed. Delete it only on
+Phase B completion (leave it on failure, with a FAILED line appended, so
+the next watcher escalates to the operator instead of re-running blind).
+
 ## B-1 -- E-1 VRAM probe (replaces the DRAFT 8000MB registry row)
 
 1. Confirm the go-file exists. If a stale SOAK server still holds :8000
