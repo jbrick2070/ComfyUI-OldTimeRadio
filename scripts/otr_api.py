@@ -32,6 +32,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import sys
 import time
 import uuid
 from typing import Any, Callable
@@ -742,6 +743,65 @@ def poll_history(
     return ("TIMEOUT", "")
 
 
+# ---------------------------------------------------------------------------
+# GATE B S2 -- the headless profile seam (the drift kill, decision doc sec. 8)
+# ---------------------------------------------------------------------------
+#: Headless creative whitelist -- MIRROR of
+#: nodes._otr_workflow_apply.CREATIVE_WHITELIST (parity-pinned by
+#: tests/test_workflow_apply.py). Engine/feature widgets are NEVER patched
+#: directly by scripts; they go through apply_profile_to_workflow.
+CREATIVE_WHITELIST = frozenset({
+    "target_words", "num_characters", "act_count", "request_seed",
+    "seed_mode",
+    "episode_title", "custom_premise", "style_custom",
+    "openrouter_slot_a_model", "openrouter_slot_b_model",
+    "comfy_slot_a_model", "comfy_slot_b_model",
+    "creative_writing_model", "technical_model",
+})
+
+
+def patch_creative(workflow: dict, node_id: int, widget_name: str, value: Any,
+                   schemas: dict) -> None:
+    """The ONLY sanctioned direct-widget patch for headless scripts: refuses
+    any widget not on the creative whitelist (managed engine/feature widgets
+    are applied via :func:`apply_profile_to_workflow` -- the ONE applier)."""
+    if widget_name not in CREATIVE_WHITELIST:
+        raise ValueError(
+            f"patch_creative: widget {widget_name!r} is not on the creative "
+            f"whitelist; managed widgets are patched ONLY via "
+            f"apply_profile_to_workflow(--profile). Whitelist: "
+            f"{sorted(CREATIVE_WHITELIST)!r}"
+        )
+    patch_widget_by_name(workflow, node_id, widget_name, value, schemas)
+
+
+def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
+    """Apply a capability profile to a loaded workflow via the ONE applier
+    (``nodes._otr_workflow_apply.apply_profile``) using THESE (live) schemas,
+    and print the resolved profile LOUD (decision doc section 8). ``profile``
+    is a committed profile id (str) or an already-validated profile dict.
+    Returns the patched DEEP COPY."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from nodes._otr_shared.capability_profiles import load_profile
+    from nodes._otr_workflow_apply import apply_profile
+
+    if isinstance(profile, str):
+        profile = load_profile(profile)
+    flat = []
+    for section in ("role_overrides", "slot_overrides", "features"):
+        for k, v in (profile.get(section) or {}).items():
+            flat.append(f"{section}.{k}={v}")
+    sp = profile.get("seed_policy") or {}
+    flat.append(f"seed_policy.request_seed={sp.get('request_seed')}")
+    flat.append(f"seed_policy.seed_mode={sp.get('seed_mode')}")
+    print("[otr_api] RESOLVED PROFILE %s (%s) -- %d overrides:\n  %s"
+          % (profile.get("id"), profile.get("display_name"), len(flat),
+             "\n  ".join(flat)), flush=True)
+    return apply_profile(workflow, profile, schemas=schemas)
+
+
 def queue_snapshot() -> tuple[int, int]:
     """Return (running_count, pending_count) from /queue. Best-effort."""
     try:
@@ -776,6 +836,9 @@ __all__ = [
     "load_workflow",
     "fetch_schemas",
     "patch_widget_by_name",
+    "patch_creative",
+    "apply_profile_to_workflow",
+    "CREATIVE_WHITELIST",
     "workflow_to_api_prompt",
     "submit_prompt",
     "poll_history",

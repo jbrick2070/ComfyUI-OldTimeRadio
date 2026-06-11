@@ -286,16 +286,18 @@ def load_run_report(after_ts: float) -> dict:
 # one leg
 # --------------------------------------------------------------------------- #
 def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
-            extra_patches=None) -> int:
+            extra_patches=None, profile: str = "") -> int:
     """One full-episode soak leg with the HARD gates.
 
     ``expect_engine``: "humo" (default) asserts the strict production
     histogram {"humo": n_beats}; "" / None logs the histogram WITHOUT a strict
     engine assert (the dropdown-rotation / forced-engine experiment legs --
     completion, playable-obs, byte-identity, hygiene and VRAM gates still
-    apply). ``extra_patches``: list of (node_id, widget_name, value) applied
-    on top of the standard smoke patches (the multi-LLM / multi-voice /
-    multi-music dropdown rotation)."""
+    apply). ``profile``: a committed capability-profile id; managed engine /
+    feature widgets are applied via the ONE applier (GATE B S2 -- the
+    hand-coded patch-list drift channel is CLOSED). ``extra_patches``: list of
+    (node_id, widget_name, value) -- CREATIVE WHITELIST ONLY (a managed name
+    here raises SoakFail pointing at --profile)."""
     started = time.time()
     print("[soak] leg=%s COMFYUI_URL=%s started=%s"
           % (leg, COMFYUI_URL, time.strftime("%H:%M:%S")), flush=True)
@@ -316,6 +318,9 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
 
     schemas = fetch_schemas()
     wf = load_workflow(WORKFLOW_PATH)
+    if profile:
+        from otr_api import apply_profile_to_workflow
+        wf = apply_profile_to_workflow(wf, profile, schemas)
 
     def _node_type(node_id):
         for n in wf.get("nodes", []):
@@ -344,7 +349,15 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
     else:
         print("[soak] running the workflow's OWN saved defaults (real full "
               "episode)", flush=True)
+    from otr_api import CREATIVE_WHITELIST
     for nid, widget, value in (extra_patches or []):
+        # S2 whitelist enforcement: a managed engine/feature widget here is
+        # EXACTLY the patch-list drift channel this gate kills.
+        if widget not in CREATIVE_WHITELIST:
+            raise SoakFail(
+                "extra_patches: widget %r is not on the creative whitelist; "
+                "select engines/features via profile=<id> (the ONE applier), "
+                "never a hand-coded patch list" % widget)
         patch_widget_by_name(wf, int(nid), widget, value, schemas)
         print("[soak] patch: node %s %s=%r" % (nid, widget, value), flush=True)
 
@@ -524,13 +537,16 @@ def main(argv=None) -> int:
                          "of humo:N")
     ap.add_argument("--compare", nargs=2, metavar=("A", "B"),
                     help="assert determinism between two saved legs")
+    ap.add_argument("--profile", default="",
+                    help="committed capability profile id applied via the ONE "
+                         "applier (GATE B S2) before the smoke patches")
     args = ap.parse_args(argv)
     try:
         if args.compare:
             return compare_legs(*args.compare)
         if not args.leg:
             ap.error("--leg or --compare required")
-        return run_leg(args.leg, args.expect_floor)
+        return run_leg(args.leg, args.expect_floor, profile=args.profile)
     except SoakFail as exc:
         print("[soak] FAIL: %s" % exc, flush=True)
         return 1

@@ -28,9 +28,10 @@ if _HERE not in sys.path:
 
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
+    apply_profile_to_workflow,
     fetch_schemas,
     load_workflow,
-    patch_widget_by_name,
+    patch_creative,
     submit_prompt,
     workflow_to_api_prompt,
 )
@@ -43,6 +44,18 @@ WORKFLOW_PATH = os.path.join(
 
 
 def main() -> int:
+    # GATE B S2 headless conversion: --profile <id> routes EVERY managed
+    # engine/feature widget through the ONE applier (apply_profile_to_
+    # workflow, LOUD resolved-profile print). Only whitelisted CREATIVE
+    # widgets are patched directly below (patch_creative refuses the rest)
+    # -- the hand-coded patch-list drift channel is closed.
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--profile", default="",
+                    help="committed capability profile id (config/profiles/)"
+                         " to apply via the ONE applier before queueing")
+    args = ap.parse_args()
+
     print(f"COMFYUI_URL = {COMFYUI_URL}", flush=True)
     print(f"workflow    = {WORKFLOW_PATH}", flush=True)
 
@@ -51,6 +64,8 @@ def main() -> int:
 
     print("Loading + patching workflow...", flush=True)
     wf = load_workflow(WORKFLOW_PATH)
+    if args.profile:
+        wf = apply_profile_to_workflow(wf, args.profile, schemas)
 
     # Remote-LLM slot pickers: set to the first valid option from the live
     # schema (which is either the sentinel when disabled, or the catalog default
@@ -86,12 +101,13 @@ def main() -> int:
     ):
         _val = _first_choice(1, _slot)
         if _val is not None:
-            patch_widget_by_name(wf, 1, _slot, _val, schemas)
+            patch_creative(wf, 1, _slot, _val, schemas)
 
-    # Patch by NAME -- robust against future widget reorders.
-    patch_widget_by_name(wf, 1, "target_words", 30, schemas)
-    patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "act_count", "1", schemas)
+    # Whitelisted CREATIVE patches only (S2: patch_creative refuses managed
+    # engine/feature widgets -- those ride --profile via the ONE applier).
+    patch_creative(wf, 1, "target_words", 30, schemas)
+    patch_creative(wf, 1, "num_characters", 2, schemas)
+    patch_creative(wf, 1, "act_count", "1", schemas)
 
     api = workflow_to_api_prompt(wf, schemas)
     prompt_id = submit_prompt(api)

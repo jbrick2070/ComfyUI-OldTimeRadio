@@ -1247,7 +1247,7 @@ def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None,
     """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back,
     assert every invariant, and return the structured report. Raises
     :class:`SoakError` on a violation (never a fake pass)."""
-    ceiling = int(vram_ceiling_mb or _mc.VRAM_CEILING_MB)
+    ceiling = int(vram_ceiling_mb or _mc.dynamic_vram_ceiling_mb())
     section, meta = build_soak_fixture(n_beats=n_beats, oom_index=oom_index)
     ledger = build_full_ledger(section)
     fb = make_fallback_of()

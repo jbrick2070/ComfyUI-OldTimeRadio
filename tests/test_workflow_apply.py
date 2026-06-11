@@ -250,3 +250,52 @@ def test_patch_creative_refuses_managed_engine_widget(schemas, master_copy):
     with pytest.raises(ProfileError, match="not on the creative whitelist"):
         wa.patch_creative(master_copy, director["id"], "announcer_video_model",
                           "still_kenburns", schemas=schemas)
+
+
+# ---------------------------------------------------------------------------
+# S2 headless conversion (the drift kill, decision doc section 8)
+# ---------------------------------------------------------------------------
+def test_creative_whitelist_parity_package_vs_script():
+    """scripts/otr_api.CREATIVE_WHITELIST mirrors the package's -- one
+    whitelist, two lanes, never diverging."""
+    assert otr_api.CREATIVE_WHITELIST == wa.CREATIVE_WHITELIST
+
+
+def test_script_patch_creative_refuses_managed_names(schemas, master_copy):
+    with pytest.raises(ValueError, match="creative whitelist"):
+        otr_api.patch_creative(master_copy, 81, "engine", "bark", schemas)
+
+
+def test_apply_profile_to_workflow_headless_seam(schemas, master_copy, capsys):
+    """The script-lane seam drives the SAME applier: identity on 16gb_full,
+    LOUD resolved-profile print."""
+    applied = otr_api.apply_profile_to_workflow(master_copy, "16gb_full", schemas)
+    out = capsys.readouterr().out
+    assert "RESOLVED PROFILE 16gb_full" in out
+    assert wa.workflow_to_api_prompt(applied, schemas) == \
+        wa.workflow_to_api_prompt(master_copy, schemas)
+
+
+def test_scripts_never_direct_patch_managed_widget_names(mapping):
+    """REGRESSION (decision doc sec. 8): no tracked top-level script may call
+    patch_widget_by_name with a MANAGED widget-name literal -- managed widgets
+    reach the graph ONLY via the applier. (Creative/unmanaged names stay
+    allowed; the whitelist guards those at runtime.)"""
+    import re as _re
+    managed_names = set()
+    for section in ("managed", "emit_only"):
+        for entry in mapping[section].values():
+            for _ntype, widget in entry["targets"]:
+                managed_names.add(widget)
+    scripts_dir = REPO_ROOT / "scripts"
+    offenders = []
+    for py in scripts_dir.glob("*.py"):
+        src = py.read_text(encoding="utf-8", errors="replace")
+        for m in _re.finditer(r"patch_widget_by_name\s*\(([^)]*)\)", src):
+            call = m.group(1)
+            for name in managed_names:
+                if _re.search(r"['\"]%s['\"]" % _re.escape(name), call):
+                    offenders.append(f"{py.name}: {name}")
+    assert not offenders, (
+        "managed widgets patched directly in scripts (use "
+        "apply_profile_to_workflow / --profile instead): %r" % offenders)

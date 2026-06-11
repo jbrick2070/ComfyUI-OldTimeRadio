@@ -37,8 +37,10 @@ import requests  # noqa: E402  (provided by the ComfyUI venv)
 
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
+    apply_profile_to_workflow,
     fetch_schemas,
     load_workflow,
+    patch_creative,
     patch_widget_by_name,
     poll_history,
     submit_prompt,
@@ -126,10 +128,13 @@ def build_patches(combo: dict) -> list[tuple[int, str, object]]:
         (N_WRITER, "act_count", str(combo["acts"])),
         (N_WRITER, "creative_writing_model", combo["creative"]),
         (N_WRITER, "technical_model", combo["technical"]),
+        # GATE B S2: the ENGINE selections (char_engine / music) moved OUT of
+        # this hand-coded patch list into combo_profile() -- the ONE applier
+        # patches managed widgets. CastLock policy knobs are neither managed
+        # nor whitelisted-creative; they stay direct (the regression test
+        # bans MANAGED names only).
         (N_CASTLOCK, "voice_bank", combo["voice_bank"]),
         (N_CASTLOCK, "allow_voice_reuse", bool(combo["reuse"])),
-        (N_CHARVOICE, "engine", combo["char_engine"]),
-        (N_MUSIC, "engine", combo["music"]),
     ]
     # Bind the cloud slot picker only when a cloud handle is the writer model.
     if combo.get("or_a_model"):
@@ -137,6 +142,23 @@ def build_patches(combo: dict) -> list[tuple[int, str, object]]:
     if combo.get("comfy_a_model"):
         p.append((N_WRITER, "comfy_slot_a_model", combo["comfy_a_model"]))
     return p
+
+
+def combo_profile(combo: dict) -> dict:
+    """An EPHEMERAL capability profile for one combo: the committed 16gb_full
+    base with this combo's engine slots overridden. Managed widgets reach the
+    graph ONLY via the applier (GATE B S2); cross-validation still applies
+    when the profile rides apply_profile_to_workflow."""
+    import copy as _copy
+    repo_root = os.path.dirname(_HERE)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from nodes._otr_shared.capability_profiles import load_profile
+
+    profile = _copy.deepcopy(load_profile("16gb_full"))
+    profile["slot_overrides"]["char_voice_engine"] = combo["char_engine"]
+    profile["slot_overrides"]["music_engine"] = combo["music"]
+    return profile
 
 
 def ledger_summary() -> dict:
@@ -178,9 +200,17 @@ def run_one(combo: dict, schemas: dict, timeout_s: int) -> dict:
     # 1) Load a fresh copy + apply patches (a patch error is a SETUP fault).
     try:
         wf = load_workflow(WORKFLOW_PATH)
-        applied = []
+        # Managed engine widgets ride the ONE applier (GATE B S2)...
+        wf = apply_profile_to_workflow(wf, combo_profile(combo), schemas)
+        applied = [f"profile:char_voice_engine={combo['char_engine']}",
+                   f"profile:music_engine={combo['music']}"]
+        # ...creative widgets ride the whitelist; CastLock policy knobs are
+        # unmanaged + stay direct.
         for nid, widget, value in build_patches(combo):
-            patch_widget_by_name(wf, nid, widget, value, schemas)
+            if widget in ("voice_bank", "allow_voice_reuse"):
+                patch_widget_by_name(wf, nid, widget, value, schemas)
+            else:
+                patch_creative(wf, nid, widget, value, schemas)
             applied.append(f"{nid}.{widget}={value}")
         rec["patches"] = applied
         api = workflow_to_api_prompt(wf, schemas)

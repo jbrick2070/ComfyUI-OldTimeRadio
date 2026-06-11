@@ -16,8 +16,10 @@ if _HERE not in sys.path:
 
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
+    apply_profile_to_workflow,
     fetch_schemas,
     load_workflow,
+    patch_creative,
     patch_widget_by_name,
     submit_prompt,
     workflow_to_api_prompt,
@@ -28,16 +30,30 @@ WORKFLOW_PATH = os.path.join(
 )
 
 
+def _profile_with_char_engine(engine: str) -> dict:
+    """16gb_full with the char-voice slot overridden -- managed engine widgets
+    ride the ONE applier (GATE B S2), never a hand patch."""
+    import copy
+    repo_root = os.path.dirname(_HERE)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from nodes._otr_shared.capability_profiles import load_profile
+    profile = copy.deepcopy(load_profile("16gb_full"))
+    profile["slot_overrides"]["char_voice_engine"] = engine
+    return profile
+
+
 def main() -> int:
     print(f"COMFYUI_URL = {COMFYUI_URL}", flush=True)
     schemas = fetch_schemas()
     wf = load_workflow(WORKFLOW_PATH)
-    patch_widget_by_name(wf, 1, "target_words", 30, schemas)
-    patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "act_count", "1", schemas)
-    # the change under test: character voices on chatterbox (node 81), with the
-    # cast-lock bank already at default + auto_registry (node 80).
-    patch_widget_by_name(wf, 81, "engine", "chatterbox", schemas)
+    patch_creative(wf, 1, "target_words", 30, schemas)
+    patch_creative(wf, 1, "num_characters", 2, schemas)
+    patch_creative(wf, 1, "act_count", "1", schemas)
+    # the change under test: character voices on chatterbox via the applier;
+    # the cast-lock bank knob is unmanaged policy (node 80) and stays direct.
+    wf = apply_profile_to_workflow(wf, _profile_with_char_engine("chatterbox"),
+                                   schemas)
     patch_widget_by_name(wf, 80, "voice_bank", "default", schemas)
     api = workflow_to_api_prompt(wf, schemas)
     pid = submit_prompt(api)

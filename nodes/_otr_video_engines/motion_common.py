@@ -33,7 +33,26 @@ from .._otr_shared import gpu_residency as _GR
 from .registry import EngineUnusable, EngineUsabilityReason
 
 #: Machine-wide VRAM ceiling for the single resident heavy engine (A invariant).
+#: This constant is the 16 GB-box FALLBACK; runtime consumers read
+#: :func:`dynamic_vram_ceiling_mb` so a profile-stamped run (GATE B S1/S2:
+#: OTR_WorkflowValidator exports ``OTR_VRAM_CEILING_MB`` every execution, and
+#: headless launchers set it directly) tightens the budget WITHOUT a code edit.
 VRAM_CEILING_MB = 14500
+
+
+def dynamic_vram_ceiling_mb() -> int:
+    """The ACTIVE machine-wide VRAM ceiling, read at DISPATCH time (GATE B S1:
+    env > the 14500 fallback -- no graph introspection). Invalid env values
+    fall back LOUD-less to the constant (the validator already warned)."""
+    raw = (os.environ.get("OTR_VRAM_CEILING_MB") or "").strip()
+    if raw:
+        try:
+            val = int(raw)
+            if val > 0:
+                return val
+        except ValueError:
+            pass
+    return VRAM_CEILING_MB
 
 #: Aspect policies an init image may be fit into the canvas with (mirrors
 #: schemas.Canvas.aspect_policy). Each uses ONE uniform scale, so the aspect ratio
@@ -197,7 +216,7 @@ def vram_used_mb():
     return _GR.probe_used_mb()
 
 
-def assert_vram_within_ceiling(label="render", ceiling_mb=VRAM_CEILING_MB):
+def assert_vram_within_ceiling(label="render", ceiling_mb=None):
     """Mid-sampling NVML guard: assert machine-wide used VRAM has not breached the
     single-heavy-engine ceiling DURING a render.
 
@@ -208,6 +227,8 @@ def assert_vram_within_ceiling(label="render", ceiling_mb=VRAM_CEILING_MB):
     that path). Raises ``RuntimeError`` on a breach; returns the used MB (or
     ``None`` when NVML is absent).
     """
+    if ceiling_mb is None:
+        ceiling_mb = dynamic_vram_ceiling_mb()   # env-at-dispatch (GATE B S1)
     used = vram_used_mb()
     if used is None:
         return None
@@ -272,7 +293,8 @@ class MotionEngineBase:
         had_lease = lease is not None
         _GR.release(lease)
         if had_lease:
-            _GR.wait_until_below_mb(VRAM_CEILING_MB, attempts=3, sleep_s=2.0)
+            _GR.wait_until_below_mb(dynamic_vram_ceiling_mb(),
+                                    attempts=3, sleep_s=2.0)
 
     @staticmethod
     def _detach_patchers(prepared):
@@ -292,7 +314,8 @@ class MotionEngineBase:
 
 
 __all__ = [
-    "VRAM_CEILING_MB", "ASPECT_POLICIES", "DEFAULT_ASPECT_POLICY",
+    "VRAM_CEILING_MB", "dynamic_vram_ceiling_mb",
+    "ASPECT_POLICIES", "DEFAULT_ASPECT_POLICY",
     "ISOLATION_IN_PROCESS", "ISOLATION_SIDECAR_REQUIRED",
     "ISOLATION_SIDECAR_OPTIONAL", "sageattention_patched",
     "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
