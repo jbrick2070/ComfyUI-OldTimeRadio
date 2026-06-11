@@ -51,7 +51,7 @@ import _otr_soak_capstone as soak  # noqa: E402
 
 SUMMARY_PATH = os.path.join(_HERE, "coverage_sweep_summary.json")
 
-#: Director slot -> (profile role_overrides key, registry role token).
+#: OTR_VideoDirector slot -> (profile role_overrides key, registry role token).
 SLOTS = (
     ("announcer_visual", "announcer_visual"),
     ("music_visual", "music_visual"),
@@ -77,7 +77,7 @@ def profile_for(slot_key: str, engine: str) -> dict:
     profile["role_overrides"][slot_key] = engine
     if slot_key == "other_beats_visual":
         # node 92's render default tracks the character engine so the live
-        # render path and the Director policy agree.
+        # render path and the OTR_VideoDirector policy agree.
         profile["slot_overrides"]["video_render_engine"] = engine
     return profile
 
