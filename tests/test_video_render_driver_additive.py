@@ -49,7 +49,7 @@ def test_build_soak_fixture_shape_and_empty_trails():
     assert len(section["shots"]) == 12
     assert meta["oom_shot_id"] == "shot_0005"
     oom = section["shots"][5]
-    assert (oom["engine_id"], oom["family"]) == ("hunyuan3d_talk", "character_3d")
+    assert (oom["engine_id"], oom["family"]) == ("triposg_talk", "character_3d")
     # every shot starts with an empty degradation trail
     assert all(s["degradation_trail"] == [] for s in section["shots"])
     # shot 0 is the first profile in the rotation
@@ -77,6 +77,7 @@ def test_classify_failure_specific_kind_mappings():
 def test_make_fallback_of_overlay_and_terminus():
     fb = rd.make_fallback_of(synth={"custom_engine": "humo"})
     assert fb("custom_engine") == "humo"
+    assert fb("triposg_talk") == "humo"                 # default synth overlay
     assert fb("hunyuan3d_talk") == "humo"               # default synth overlay
     assert fb("still_kenburns") is None                 # floor is terminal
     assert fb("zzz_not_registered_nonfloor") == rd.UNIVERSAL_FLOOR

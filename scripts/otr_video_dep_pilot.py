@@ -136,9 +136,31 @@ OPT_IN_ENGINES = {
             "xformers/flash_attn/sageattention, and render-twice determinism"
         ),
     },
-    # Phase 3 / B opt-in: character_3d dark scaffold adapters. Both run in
-    # their own cu128 sidecar venv (NOT the ComfyUI cu130 venv); the venv
-    # python path is OTR_B_SIDECAR_PYTHON (hunyuan3d) /
+    # W7-pre: the v1 NO-COMPILE character_3d lane (3D plan section 4).
+    # Prebuilt cu128 wheels + SDPA only (no source builds, no cu128 toolkit);
+    # gated on the S-3D-0 sidecar probe + the T2b keystone.
+    "triposg_talk": {
+        "lib_module": "triposg",
+        "adapter_class": "TripoSGTalkEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_TRIPOSG_TALK",
+        "assumed_call": (
+            "cu128 sidecar (OTR_TRIPOSG_SIDECAR_PYTHON venv, wheels-only): "
+            "TripoSG portrait->GLB geometry, template shrinkwrap (trimesh + "
+            "scipy), Rhubarb CPU viseme curves, Blender headless alpha frames; "
+            "inputs: audio_ref WAV + init_image MESH PORTRAIT + ARKit-52 "
+            "template NPZ; output: alpha frame DIRECTORY at the episode 16:9 "
+            "canvas. MIT license (commercial_clean=True). VRAM sub-ceiling "
+            "14000 MB.  "
+            "# TODO-for-GPU-smoke: S-3D-0 -- sidecar venv builds OFFLINE from "
+            "wheels only (--only-binary=:all:), self-test imports clean (SDPA, "
+            "no flash_attn), portrait->GLB manifold, mesh-spawn VRAM <= 14000; "
+            "then the T2b keystone (probe_c wrap on the TripoSG corpus)."
+        ),
+    },
+    # Phase 3 / B opt-in: character_3d dark scaffold adapters (DEFERRED cu128
+    # TOOLKIT lane). Both run in their own cu128 sidecar venv (NOT the ComfyUI
+    # cu130 venv); the venv python path is OTR_B_SIDECAR_PYTHON (hunyuan3d) /
     # OTR_TRELLIS_SIDECAR_PYTHON (trellis). Asset-gated (Phase 5 keystone:
     # real meshes + ARKit-52 template + probe_c <20% binding GO).
     "hunyuan3d_talk": {

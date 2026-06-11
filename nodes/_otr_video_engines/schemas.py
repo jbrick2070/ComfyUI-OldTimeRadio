@@ -250,6 +250,13 @@ class AdapterDescriptor(_Forbid):
     provider_vram_tier: str = "radio"
     preprocess_manifest: dict = Field(default_factory=dict)
     dependency_manifest: dict = Field(default_factory=dict)
+    #: 3D capability flag (3D plan section 3): True for engines that consume a
+    #: clean front-facing MESH PORTRAIT (the character_3d lane). The
+    #: ImageDirector granularity lock reads THIS field -- never a hard-coded
+    #: family check -- so custom 3D engines declare it explicitly. A REAL
+    #: schema field because the model is extra="forbid" (an ad-hoc key would
+    #: be rejected).
+    requires_mesh_portrait: bool = False
 
 
 class VideoProfileRow(_Forbid):
@@ -264,6 +271,9 @@ class VideoProfileRow(_Forbid):
     dependency_manifest: dict = Field(default_factory=dict)
     preprocess_manifest: dict = Field(default_factory=dict)
     license: dict = Field(default_factory=dict)
+    #: Mirrors AdapterDescriptor.requires_mesh_portrait (3D plan section 3) so
+    #: profile rows carry the 3D capability without an ad-hoc key.
+    requires_mesh_portrait: bool = False
 
 
 class ExecutionGroup(_Forbid):

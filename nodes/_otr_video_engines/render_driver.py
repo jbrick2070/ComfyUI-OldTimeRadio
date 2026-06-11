@@ -45,14 +45,17 @@ FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
 #: -- every chain terminates at a registered radio floor that always renders).
 UNIVERSAL_FLOOR = "still_kenburns"
 
-#: Subproject-B character_3d engine -> its A-side audio_driven_face fallback.
-#: hunyuan3d_talk ships with B (not registered yet), so the hop is overlaid here
-#: (mirrors scripts/otr_video_soak.make_fallback_of) to resolve the chain now.
-SYNTH_FALLBACKS = {"hunyuan3d_talk": "humo"}
+#: character_3d engine -> its A-side audio_driven_face fallback. The 3D
+#: adapters self-register via eng_character_3d (W7-pre: triposg_talk is the v1
+#: no-compile lane; hunyuan3d_talk/trellis_talk stay registered-dark for the
+#: deferred toolkit lane); the overlay keeps the chains resolvable in contexts
+#: that never import that module (mirrors scripts/otr_video_soak).
+SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
 
 #: engine_id -> family, for restamping onto a fallback engine (covers the
-#: not-yet-registered B engine + the A/cheap engines).
+#: possibly-unimported 3D engines + the A/cheap engines).
 ENGINE_FAMILY = {
+    "triposg_talk": "character_3d",
     "hunyuan3d_talk": "character_3d", "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "latentsync": "lipsync_overlay", "still_kenburns": "static_motion",
@@ -73,16 +76,22 @@ _PROFILES = (
     ("background_abstract", "abstract", "abstract"),
     ("announcer_visual", "station_card", "static_image_gen"),
 )
-#: The forced-OOM character_3d group (Subproject B family; degrades to humo).
-_CHAR3D = ("character_video", "hunyuan3d_talk", "character_3d")
+#: The forced-OOM character_3d group (W7-pre: triposg_talk is the v1 3D lane;
+#: degrades to humo).
+_CHAR3D = ("character_video", "triposg_talk", "character_3d")
 #: The heavy engines the soak forces to OOM on the character_3d shot so the chain
 #: walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"hunyuan3d_talk", "humo", "humo_1.7B", "latentsync"})
+OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B", "latentsync"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: The expected character_3d degradation trail to the radio floor.
-EXPECTED_OOM_TRAIL = ["hunyuan3d_talk->humo (oom)", "humo->humo_1.7B (oom)",
+#: SEMANTICS TO PRESERVE (3D plan 7.0, judge ruling): the TRAIL lists 4 hops
+#: while assert_soak_ok expects exactly 3 LOUD OOM *decisions* -- the
+#: humo->humo_1.7B hop is an INTRA-ENGINE tier swap, not a restamp decision.
+#: The soak is green with this shape; keep the two constants consistent under
+#: the triposg_talk name, never "fix" one without the other.
+EXPECTED_OOM_TRAIL = ["triposg_talk->humo (oom)", "humo->humo_1.7B (oom)",
                       "humo_1.7B->latentsync (oom)",
                       "latentsync->still_kenburns (oom)"]
 
@@ -1234,7 +1243,9 @@ def assert_soak_ok(report):
     if report["episode_1"]["decisions"] != report["episode_2"]["decisions"]:
         raise SoakError("non-deterministic: the two episodes' fallback "
                         "decisions differ")
-    if (report["input_oom_engine"] != "hunyuan3d_talk"
+    # W7-pre rename: the fixture's character_3d shot is triposg_talk now
+    # (3D plan 7.0; p3 Gemini -- this carryover check follows the new id).
+    if (report["input_oom_engine"] != "triposg_talk"
             or report["input_oom_trail"]):
         raise SoakError("carryover: the shared input fixture was mutated")
     checks.append("determinism: two back-to-back episodes identical "

@@ -151,6 +151,14 @@ CAPABILITIES = {
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.1-i2v"]},
+    # triposg_talk: the v1 NO-COMPILE character_3d lane -- prebuilt cu128
+    # wheels only (NO cu128_toolkit requirement; that distinction is the whole
+    # point of the lane, 3D plan section 4). Still flag-gated dark at the
+    # adapter (OTR_ENABLE_TRIPOSG_TALK + S-3D-0), so an enable-set "fit" never
+    # means "renders today" -- assert_usable stays the usability authority.
+    "triposg_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
+                     "required_toolchain": None, "requires_sidecar": True,
+                     "cpu_ok": False, "model_requirements": ["triposg"]},
     "hunyuan3d_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                        "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
                        "cpu_ok": False, "model_requirements": ["hunyuan3d-2"]},

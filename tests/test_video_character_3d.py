@@ -1,13 +1,15 @@
-"""CPU tests for the character_3d dark scaffold (Phase 3 / B opt-in).
+"""CPU tests for the character_3d dark scaffold (W7-pre migration slice).
 
 Covers: registry presence, family-in-FAMILIES, role-fit, fail-closed reasons
-(flag -> venv -> mesh -> ARKit-52), fallback chain terminates at still_kenburns,
-cold-import clean (V-12). No GPU, no model load, no sidecar. UTF-8, no BOM,
-ASCII-only source.
+(hunyuan/trellis: flag -> venv -> mesh -> ARKit-52, semantics UNCHANGED;
+triposg: flag -> venv -> weights -> template(+hash) -> rhubarb -> blender,
+NEVER the generated-mesh dir), the requires_mesh_portrait capability field,
+fallback chain terminates at still_kenburns, cold-import clean (V-12). No GPU,
+no model load, no sidecar. UTF-8, no BOM, ASCII-only source.
 
 These are ADD-ONLY (dark scaffold renders nothing): the adapters are registered
-but always fail-closed until the Phase 5 GPU keystone is cleared (real meshes +
-ARKit-52 template + cu128 toolchain + probe_c < 20%% binding GO).
+but always fail-closed until their gates clear (triposg: S-3D-0 + T2b keystone;
+hunyuan/trellis: the deferred cu128 toolkit lane).
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import eng_character_3d  # noqa: F401 -- registers
 
 
-CHAR3D_ENGINES = ("hunyuan3d_talk", "trellis_talk")
+CHAR3D_ENGINES = ("triposg_talk", "hunyuan3d_talk", "trellis_talk")
 CHAR3D_ROLES = ("announcer_visual", "character_video")
 
 
@@ -82,8 +84,11 @@ def test_char3d_required_inputs():
 def _clear_3d_env(monkeypatch):
     for var in (
         "OTR_ENABLE_CHARACTER_3D", "OTR_ENABLE_TRELLIS_TALK",
+        "OTR_ENABLE_TRIPOSG_TALK",
         "OTR_B_SIDECAR_PYTHON", "OTR_TRELLIS_SIDECAR_PYTHON",
+        "OTR_TRIPOSG_SIDECAR_PYTHON", "OTR_TRIPOSG_WEIGHTS_DIR",
         "OTR_B_MESH_DIR", "OTR_B_ARKIT_TEMPLATE_NPZ",
+        "OTR_B_ARKIT_TEMPLATE_HASH", "OTR_RHUBARB_EXE", "OTR_BLENDER_EXE",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -165,6 +170,141 @@ def test_hunyuan3d_fails_closed_no_arkit_npz(monkeypatch, tmp_path):
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
     assert "OTR_B_ARKIT_TEMPLATE_NPZ" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# triposg_talk fail-closed (its OWN helper: flag -> venv -> weights ->
+# template(+hash) -> rhubarb -> blender; NEVER the generated-mesh dir)
+# ---------------------------------------------------------------------------
+
+def _stage_triposg_assets(monkeypatch, tmp_path, *, upto):
+    """Stage fake triposg prerequisites in dependency order; ``upto`` names the
+    LAST one staged so the next check in the chain is the one that fails."""
+    order = ("venv", "weights", "npz", "rhubarb", "blender")
+    monkeypatch.setenv("OTR_ENABLE_TRIPOSG_TALK", "1")
+    stage = order[:order.index(upto) + 1] if upto else ()
+    if "venv" in stage:
+        venv = tmp_path / "python.exe"
+        venv.write_bytes(b"x")
+        monkeypatch.setenv("OTR_TRIPOSG_SIDECAR_PYTHON", str(venv))
+    if "weights" in stage:
+        weights = tmp_path / "triposg_weights"
+        weights.mkdir(exist_ok=True)
+        monkeypatch.setenv("OTR_TRIPOSG_WEIGHTS_DIR", str(weights))
+    if "npz" in stage:
+        npz = tmp_path / "arkit52.npz"
+        npz.write_bytes(b"fake-npz")
+        monkeypatch.setenv("OTR_B_ARKIT_TEMPLATE_NPZ", str(npz))
+    if "rhubarb" in stage:
+        rhubarb = tmp_path / "rhubarb.exe"
+        rhubarb.write_bytes(b"x")
+        monkeypatch.setenv("OTR_RHUBARB_EXE", str(rhubarb))
+    if "blender" in stage:
+        blender = tmp_path / "blender.exe"
+        blender.write_bytes(b"x")
+        monkeypatch.setenv("OTR_BLENDER_EXE", str(blender))
+
+
+def test_triposg_fails_closed_no_flag(monkeypatch):
+    _clear_3d_env(monkeypatch)
+    eng = vreg.get_engine("triposg_talk")
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable({}, {})
+    assert exc.value.reason is vreg.EngineUsabilityReason.GATED_BY_FLAG
+    assert "OTR_ENABLE_TRIPOSG_TALK" in str(exc.value)
+
+
+@pytest.mark.parametrize("upto,expect_env", [
+    (None, "OTR_TRIPOSG_SIDECAR_PYTHON"),
+    ("venv", "OTR_TRIPOSG_WEIGHTS_DIR"),
+    ("weights", "OTR_B_ARKIT_TEMPLATE_NPZ"),
+    ("npz", "OTR_RHUBARB_EXE"),
+    ("rhubarb", "OTR_BLENDER_EXE"),
+])
+def test_triposg_fail_closed_order(monkeypatch, tmp_path, upto, expect_env):
+    """Each missing prerequisite is named in dependency order (3D plan 7.1)."""
+    _clear_3d_env(monkeypatch)
+    _stage_triposg_assets(monkeypatch, tmp_path, upto=upto)
+    eng = vreg.get_engine("triposg_talk")
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable({}, {})
+    assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
+    assert expect_env in str(exc.value)
+
+
+def test_triposg_never_gates_on_the_generated_mesh_dir(monkeypatch, tmp_path):
+    """The 7.1 deadlock fix: OTR_B_MESH_DIR is probe_c EVIDENCE, never a gate
+    (prepare() is what GENERATES meshes). With every real prerequisite staged
+    and NO mesh dir, assert_usable PASSES."""
+    _clear_3d_env(monkeypatch)
+    _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
+    assert "OTR_B_MESH_DIR" not in os.environ
+    eng = vreg.get_engine("triposg_talk")
+    assert eng.assert_usable({}, {}) == "triposg_talk"
+
+
+def test_triposg_template_hash_pin_mismatch_fails_closed(monkeypatch, tmp_path):
+    """When OTR_B_ARKIT_TEMPLATE_HASH is set, a sha256 mismatch FAILS CLOSED
+    (a stale/wrong template never reaches the wrap)."""
+    _clear_3d_env(monkeypatch)
+    _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
+    monkeypatch.setenv("OTR_B_ARKIT_TEMPLATE_HASH", "0" * 64)
+    eng = vreg.get_engine("triposg_talk")
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable({}, {})
+    assert "MISMATCH" in str(exc.value)
+
+
+def test_triposg_template_hash_pin_match_passes(monkeypatch, tmp_path):
+    import hashlib
+    _clear_3d_env(monkeypatch)
+    _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
+    digest = hashlib.sha256(b"fake-npz").hexdigest()
+    monkeypatch.setenv("OTR_B_ARKIT_TEMPLATE_HASH", digest)
+    eng = vreg.get_engine("triposg_talk")
+    assert eng.assert_usable({}, {}) == "triposg_talk"
+
+
+def test_triposg_recheck_every_attempt_no_cached_missing(monkeypatch, tmp_path):
+    """7.1: re-check on EVERY attempt -- a prerequisite that appears between
+    attempts flips the verdict (no cached "missing")."""
+    _clear_3d_env(monkeypatch)
+    _stage_triposg_assets(monkeypatch, tmp_path, upto="rhubarb")
+    eng = vreg.get_engine("triposg_talk")
+    with pytest.raises(vreg.EngineUnusable):
+        eng.assert_usable({}, {})
+    blender = tmp_path / "blender.exe"
+    blender.write_bytes(b"x")
+    monkeypatch.setenv("OTR_BLENDER_EXE", str(blender))
+    assert eng.assert_usable({}, {}) == "triposg_talk"
+
+
+# ---------------------------------------------------------------------------
+# requires_mesh_portrait capability (3D plan section 3)
+# ---------------------------------------------------------------------------
+
+def test_char3d_adapters_declare_requires_mesh_portrait():
+    for name in CHAR3D_ENGINES:
+        assert getattr(vreg.get_engine(name), "requires_mesh_portrait", False) \
+            is True, f"{name} must declare requires_mesh_portrait=True"
+
+
+def test_requires_mesh_portrait_is_a_real_schema_field():
+    """AdapterDescriptor / VideoProfileRow are extra='forbid'; the capability
+    is a REAL field (default False) so declaring it never rejects."""
+    from nodes._otr_video_engines.schemas import (AdapterDescriptor,
+                                                  VideoProfileRow)
+    d = AdapterDescriptor(engine_id="x", family="character_3d",
+                          requires_mesh_portrait=True)
+    assert d.requires_mesh_portrait is True
+    assert AdapterDescriptor(engine_id="y",
+                             family="abstract").requires_mesh_portrait is False
+    r = VideoProfileRow(profile_id="p", engine_id="x", family="character_3d",
+                        requires_mesh_portrait=True)
+    assert r.requires_mesh_portrait is True
+    with pytest.raises(Exception):
+        AdapterDescriptor(engine_id="x", family="character_3d",
+                          requires_mesh_portait=True)  # typo'd key -> forbid
 
 
 # ---------------------------------------------------------------------------

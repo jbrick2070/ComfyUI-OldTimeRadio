@@ -10,10 +10,11 @@ SHIPPED A-S7 decision machinery (the retry taxonomy + the fallback-chain
 resolver + the durable LOUD ledger restamp) using an INJECTED fake renderer that
 simulates the OOM. It proves -- without a GPU -- that the episode completes with
 every beat producing a clip, that the character_3d group degrades
-``hunyuan3d_talk -> humo -> latentsync -> still_kenburns`` to the always-succeeds
-radio floor with a LOUD restamp at the SAME ``video_revision``, that the frozen
-audio section is byte-identical before and after, and that two back-to-back runs
-are deterministic with no cross-episode carryover.
+``triposg_talk -> humo -> humo_1.7B -> latentsync -> still_kenburns`` (W7-pre:
+triposg_talk is the v1 3D lane) to the always-succeeds radio floor with a LOUD
+restamp at the SAME ``video_revision``, that the frozen audio section is
+byte-identical before and after, and that two back-to-back runs are
+deterministic with no cross-episode carryover.
 
 The LIVE GPU soak (the real OTR_VideoRenderBatch + the real engines on the 5080,
 VRAM <= 14.5 GB, render-twice pixels, the real audio byte-identical mux) is the
@@ -54,6 +55,7 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 
 #: engine_id -> family, for restamping a shot onto its fallback engine.
 ENGINE_FAMILY = {
+    "triposg_talk": "character_3d",
     "hunyuan3d_talk": "character_3d",
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
@@ -76,12 +78,13 @@ _PROFILES = (
     ("announcer_visual", "station_card", "static_image_gen"),
 )
 
-#: The forced-OOM character_3d group (Subproject B family; degrades to humo).
-_CHAR3D = ("character_video", "hunyuan3d_talk", "character_3d")
+#: The forced-OOM character_3d group (W7-pre: triposg_talk is the v1 3D lane;
+#: degrades to humo).
+_CHAR3D = ("character_video", "triposg_talk", "character_3d")
 
 #: The heavy engines the soak forces to OOM on the character_3d shot so the
 #: chain walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"hunyuan3d_talk", "humo", "humo_1.7B", "latentsync"})
+OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B", "latentsync"})
 
 
 class OomSignal(RuntimeError):
@@ -134,13 +137,15 @@ def build_full_ledger(section: dict) -> dict:
 
 def make_fallback_of():
     """Return a ``fallback_of(name) -> next | None`` over the REAL registry plus
-    the synthetic ``character_3d -> humo`` Subproject-B hop.
+    the synthetic ``character_3d -> humo`` hop.
 
-    humo -> latentsync -> still_kenburns come from the live adapters'
-    ``fallback_engine``; ``hunyuan3d_talk`` is not registered yet (ships with B)
-    so its hop is overlaid. A floor engine returns ``None`` (terminal).
+    humo -> humo_1.7B -> latentsync -> still_kenburns come from the live
+    adapters' ``fallback_engine``; the 3D adapters are not imported by this
+    harness (eng_character_3d stays unloaded) so their hop is overlaid
+    (W7-pre: triposg_talk is the v1 lane; hunyuan3d_talk stays registered-dark
+    in the repo). A floor engine returns ``None`` (terminal).
     """
-    synth = {"hunyuan3d_talk": "humo"}
+    synth = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
 
     def fallback_of(name):
         if name in synth:
@@ -235,8 +240,12 @@ def run_two_episode_soak(*, n_beats: int = 40, oom_index: int = 20) -> dict:
             "render_calls_1": r1.calls, "render_calls_2": r2.calls}
 
 
-#: The expected character_3d degradation trail to the radio floor.
-EXPECTED_OOM_TRAIL = ["hunyuan3d_talk->humo (oom)", "humo->humo_1.7B (oom)",
+#: The expected character_3d degradation trail to the radio floor. This CPU
+#: harness's fake renderer raises at EVERY hop, so here the 4-hop trail pairs
+#: with 4 decisions (unlike render_driver's GPU soak, where humo->humo_1.7B is
+#: an intra-engine tier swap and only 3 decisions appear -- semantics
+#: preserved per the 3D plan 7.0 judge ruling).
+EXPECTED_OOM_TRAIL = ["triposg_talk->humo (oom)", "humo->humo_1.7B (oom)",
                       "humo_1.7B->latentsync (oom)",
                       "latentsync->still_kenburns (oom)"]
 
@@ -299,7 +308,7 @@ def assert_soak_ok(result: dict):
     # no carryover: the shared input fixture was not mutated by either run.
     in_oom = {s["shot_id"]: s for s in
               result["input_ledger"]["video"]["shots"]}[meta["oom_shot_id"]]
-    if in_oom["engine_id"] != "hunyuan3d_talk" or in_oom["degradation_trail"]:
+    if in_oom["engine_id"] != "triposg_talk" or in_oom["degradation_trail"]:
         raise SoakError("carryover: the input fixture was mutated by a run")
     checks.append("determinism: two back-to-back episodes identical; input "
                   "fixture unmutated (no carryover)")

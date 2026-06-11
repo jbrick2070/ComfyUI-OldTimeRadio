@@ -4,8 +4,9 @@ The soak drives a synthetic 40-beat, all-roles / all-families episode through th
 shipped A-S7 decision machinery TWICE back-to-back, forcing a mid-episode OOM on
 the character_3d group. These tests pin: the fixture shape (all roles + families,
 one character_3d group), that every beat produces a clip, that the character_3d
-group converges hunyuan3d_talk -> humo -> latentsync -> still_kenburns to the
-radio floor with three LOUD restamps at the SAME video_revision, that the frozen
+group converges triposg_talk -> humo -> humo_1.7B -> latentsync ->
+still_kenburns (W7-pre: triposg_talk is the v1 3D lane) to the radio floor with
+LOUD restamps at the SAME video_revision, that the frozen
 audio section is byte-identical after the run, that two runs are deterministic
 with no carryover, and (negative control) that a floor that cannot render fails
 LOUDLY rather than passing silently. The live 5080 render is the operator gate.
@@ -48,7 +49,7 @@ def test_fixture_is_40_beats_all_roles_all_families():
         assert fam in families
     char3d = [s for s in shots if s["family"] == "character_3d"]
     assert len(char3d) == 1 and char3d[0]["shot_id"] == meta["oom_shot_id"]
-    assert char3d[0]["engine_id"] == "hunyuan3d_talk"
+    assert char3d[0]["engine_id"] == "triposg_talk"
 
 
 def test_fixture_rejects_out_of_range_oom_index():
@@ -109,7 +110,7 @@ def test_two_runs_are_deterministic_and_leave_input_unmutated():
     in_shots = {s["shot_id"]: s
                 for s in result["input_ledger"]["video"]["shots"]}
     oom_in = in_shots[result["meta"]["oom_shot_id"]]
-    assert oom_in["engine_id"] == "hunyuan3d_talk" and oom_in["degradation_trail"] == []
+    assert oom_in["engine_id"] == "triposg_talk" and oom_in["degradation_trail"] == []
 
 
 # --------------------------------------------------------------------------- #

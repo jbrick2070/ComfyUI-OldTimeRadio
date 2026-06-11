@@ -72,12 +72,12 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# Phase 3 / B opt-in: register the character_3d dark scaffold adapters
-# (hunyuan3d_talk + trellis_talk). Both are DEFAULT-OFF / dark and FAIL CLOSED
-# until the Phase 5 GPU keystone is cleared (real meshes + ARKit-52 template +
-# cu128 toolchain + probe_c < 20% binding GO). Imported UNCONDITIONALLY here so
-# both engines appear in the static per-role dropdown (V-6: the COMBO always
-# shows the full registry; the usability gate is assert_usable, not the import).
+# character_3d dark scaffold adapters (W7-pre slice): triposg_talk (the v1
+# no-compile lane, S-3D-0-gated) + hunyuan3d_talk/trellis_talk (the deferred
+# cu128 toolkit lane). All three are DEFAULT-OFF / dark and FAIL CLOSED until
+# their gates clear. Imported UNCONDITIONALLY here so all three appear in the
+# static per-role dropdown (V-6: the COMBO always shows the full registry; the
+# usability gate is assert_usable, not the import).
 # Cold-import clean (V-12): eng_character_3d imports only stdlib + the dep-free
 # registry, no torch/diffusers/comfy at module scope. Guarded so a packaging
 # quirk never breaks the namespace import.
