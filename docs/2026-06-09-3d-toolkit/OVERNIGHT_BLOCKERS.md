@@ -1,5 +1,12 @@
 # Overnight session log -- 2026-06-10/11 (GATE B foundation, autonomous)
 
+## MORNING SUMMARY part 2 (written ~05:00 after your "keep going" -- newest first)
+**5 more commits, 37a3800 -> ade8068, all pushed. Suite 4013/0. The DROPDOWN COVERAGE SWEEP (GATE A item 4) is RUNNING DETACHED right now** -- 16 legs (every video-dropdown engine option from the registry x enabled(16gb_full); the 4 cu128-toolkit 3D darks recorded SKIPPED_DISABLED), one 30-word full episode each through ephemeral profiles on the ONE applier, capstone gates per leg. Watch: `scripts/coverage_sweep.log` + `scripts/coverage_sweep_summary.json` (rewritten after every leg). Expect several hours.
+
+7. **S2 stamps + assertion @ 1ef6786** -- node-63 gains the 3 optional stamp widgets (profile_id/master_hash/generated_by); master padded UNSTAMPED + the 63->87 gate_in wire added (your "holy grail" json edited in place, 23-line diff); startup assertion (validate_anyway can NEVER skip it) with the no-cuda->cpu_floor / low-VRAM->8gb_lite suggestion table; env export every run (OTR_VRAM_CEILING_MB/OTR_ACTIVE_PROFILE/OTR_SNAPSHOT_HASH, smaller ceiling wins LOUD). Image-lane topology VERIFIED: dispatcher (91) is transitively downstream of the gate via ShotLock -- no extra gate input needed.
+8. **Headless drift kill @ 5b73001** -- otr_api patch_creative + apply_profile_to_workflow (LOUD resolved-profile print); queue_smoke/capstone-soak --profile; combo-matrix + chatterbox/matrix smokes converted off hand patch lists; REGRESSION test bans direct patches of managed widget names in scripts. S1: dynamic_vram_ceiling_mb() env-at-dispatch + the blocking cold-import gate test.
+9. **Sweep runner @ 29d0e39 + stale-server shim @ ade8068** -- IMPORTANT: the live server still runs PRE-RESTART code, so headless submits trim the empty stamp slots + skip the OLD validator's disk-side check, both LOUD. **RESTART ComfyUI Desktop when you're up** to load tonight's code (stamp assertion, gear scrub, LTX-I2V branch, P-OBS, the applier-aware validator) -- the shim retires itself after that.
+
 ## MORNING SUMMARY (read this first; written ~04:00 2026-06-11)
 **ALL scope DONE + pushed. 7 commits, 6a1b716 -> fe4a08e, HEAD == origin/v2.0-alpha. Suite 3995/0 (was 3903; +92 new tests). Bug Bible: the 5 pre-existing baseline failures only, none new. Audio byte-identical green throughout. No blockers hit.**
 
