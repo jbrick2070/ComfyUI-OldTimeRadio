@@ -21,10 +21,13 @@ primary checkpoint path the load probe checks (verify-at-build; default under
 """
 from __future__ import annotations
 
+import logging
 import os
 
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
+
+_LOG = logging.getLogger("OTR.video.eng_ltx_video")
 
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
@@ -40,6 +43,48 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # deferred-loader shells were retired in the Chunk E cleanbreak -- V-5: loading
 # is adapter-internal, lazy, inside execute.)
 _LTX_MIN_FRAMES = 9
+# Frame-ask CAP (look-QA round 5, D1): LTX coherence collapses far past its
+# proven envelope (49-121f live; the 2026-06-10 mud open was a 238f ask for the
+# 9.5s synthetic music gap). Asks above the cap render the cap; the composite's
+# existing hold-last-frame (tpad clone) fills the rest of the beat window.
+# 121 = 8*15+1 survives the 8n+1 snap intact. Env-overridable, clamped LOUD.
+_LTX_MAX_FRAMES_DEFAULT = 121
+
+
+def _env_int(name, default, floor):
+    """``int(os.environ[name])`` with a LOUD warning + ``default`` on a missing/
+    invalid value and a LOUD clamp up to ``floor``. Pure given the env."""
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return int(default)
+    try:
+        val = int(str(raw).strip())
+    except (TypeError, ValueError):
+        _LOG.warning("[eng_ltx_video] invalid %s=%r -- using default %d",
+                     name, raw, default)
+        return int(default)
+    if val < floor:
+        _LOG.warning("[eng_ltx_video] %s=%d below floor %d -- clamping",
+                     name, val, floor)
+        return int(floor)
+    return val
+
+
+def _ltx_frame_length(target_frame_count, fallback):
+    """The FINAL LTX graph length for a shot's frame ask: floor to
+    ``_LTX_MIN_FRAMES``, cap at ``OTR_LTX_MAX_FRAMES`` (default 121, LOUD when
+    capping -- the composite hold-fills the window), then snap to LTX's 8n+1
+    rule. Pure given the env; CPU-tested (round 5 F1)."""
+    length = max(_LTX_MIN_FRAMES, int(target_frame_count or fallback))
+    cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT,
+                   _LTX_MIN_FRAMES)
+    if length > cap:
+        _LOG.warning("[eng_ltx_video] frame ask %d exceeds cap %d -- capping "
+                     "(window fill = composite hold-last-frame)", length, cap)
+        length = cap
+    return ((length - 1) // 8) * 8 + 1
+
+
 _LTX_DEFAULT_W = 768
 _LTX_DEFAULT_H = 512
 _LTX_DEFAULT_NEGATIVE = (
@@ -275,10 +320,10 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
-        # LTX requires length == 8n+1 and dims multiple-of-32.
-        length = max(_LTX_MIN_FRAMES,
-                     int(plan["target_frame_count"] or self.target_fps))
-        length = ((length - 1) // 8) * 8 + 1               # snap to 8n+1
+        # LTX requires length == 8n+1 and dims multiple-of-32; the frame ask is
+        # floored/capped/snapped by the pure helper (round 5 F1: a >cap ask is
+        # rendered AT the cap and the composite hold-fills the beat window).
+        length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
         graph = self._build_graph(plan, length, width, height)

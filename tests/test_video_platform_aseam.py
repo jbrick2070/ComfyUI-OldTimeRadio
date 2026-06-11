@@ -412,14 +412,18 @@ def test_passpm_empty_json_reseed_then_template():
     )
     c = creative["b1"]
     assert c["source"] in ("template", "template_consistency")
-    # Gap-audit F3 (2026-06-10): prompts are now FINISHED (era tail + film
-    # style tail appended) after the gates and before the hash -- the
-    # template is the prompt's HEAD, no longer its entirety.
+    # Gap-audit F3 (2026-06-10): prompts are FINISHED (era tail + film style
+    # tail) after the gates and before the hash. Round 5 F3 (2026-06-10
+    # evening): the SUBJECT ANCHOR now LEADS every talking-head prompt
+    # (face/framing tokens first -- the b002 no-person catch); the template
+    # follows the anchor as the prompt's body.
     _template = sl._deterministic_template(
         "a tall weathered spacer with a scar", "a derelict orbital station",
         "hello there",
     )
-    assert c["text_prompt"].startswith(_template)
+    assert c["text_prompt"].startswith(
+        sl._subject_anchor("a tall weathered spacer with a scar"))
+    assert _template in c["text_prompt"]
     from nodes._otr_story_brief_helpers import STYLE_TAIL_DEFAULT
     assert c["text_prompt"].endswith(STYLE_TAIL_DEFAULT)
     assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])

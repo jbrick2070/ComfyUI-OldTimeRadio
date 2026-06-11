@@ -142,12 +142,21 @@ class OTRVideoRenderBatch:
         ep = _rd.run_real_episode(ledger,
                                   master_audio_path=str(master_audio_path or ""))
         manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
+        # Round 5 F2 (warn-only): the per-beat brief-composed prompts must
+        # actually DIFFER -- an all-equal sha set means the beat clauses never
+        # landed (the 2026-06-10 "one terse prompt x3" eyeball failure).
+        diversity = _rd.ltx_prompt_diversity_status(ep.get("trace"))
+        if not diversity.get("ok"):
+            log.warning("[OTR_VideoRenderBatch] LTX prompt diversity FAILED: "
+                        "%s brief-composed prompts all identical (%s)",
+                        diversity.get("n"), diversity.get("sha8s"))
         report = {
             "ok": manifest["clip_count"] > 0, "mode": "episode",
             "episode_id": episode_id, "n_beats": manifest["n_beats"],
             "clip_count": manifest["clip_count"],
             "engine_histogram": manifest["engine_histogram"],
             "video_revision": manifest["video_revision"],
+            "prompt_diversity": diversity,
             "vram_peak_mb": ep.get("vram_peak_mb"), "trace": ep.get("trace"),
         }
         return (report, json.dumps(manifest, ensure_ascii=True, default=str),

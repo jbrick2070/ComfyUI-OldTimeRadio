@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 
 log = logging.getLogger("OTR")
 
@@ -205,15 +206,50 @@ def extract_beats(ledger: dict) -> list:
             ln for ln in (ledger or {}).get("lines") or []
             if isinstance(ln, dict) and not ln.get("skip")
         ]
+    # Round 5 F5: lines may carry a NAME-scheme char_id (the announcer lines
+    # stamp 'announcer') while the cast table + portrait index key by row id
+    # (c01..). Normalize at the JOIN -- on the BEAT row only (frozen line rows
+    # are never touched): an unknown char_id that case-insensitively matches a
+    # cast row's name resolves to that row's char_id.
+    cast_rows = [c for c in (ledger or {}).get("cast") or []
+                 if isinstance(c, dict)]
+    cast_ids = {str(c.get("char_id") or "") for c in cast_rows}
+    name_to_id = {str(c.get("name") or "").strip().lower():
+                  str(c.get("char_id") or "")
+                  for c in cast_rows if c.get("name") and c.get("char_id")}
+
+    def _normalize_char_id(cid: str) -> str:
+        if not cid or cid in cast_ids:
+            return cid
+        return name_to_id.get(cid.strip().lower(), cid)
+
+    id_to_first = {str(c.get("char_id") or ""):
+                   (str(c.get("name") or "").split() or [""])[0]
+                   for c in cast_rows}
     beats = []
     for i, ln in enumerate(lines):
         if not isinstance(ln, dict):
             continue
+        cid = _normalize_char_id(str(ln.get("char_id") or ""))
+        text = str(ln.get("text") or "").strip()
+        # Round 5 F4 backstop (warn-only -- the ledger is FROZEN here): a
+        # talking-head line that still opens with its own speaker's name as
+        # a vocative means the writer's attribution repair missed it; the
+        # beat renders with the stamped face, so make the miss LOUD.
+        first = id_to_first.get(cid, "")
+        if (len(first) > 1 and text.lower().startswith(first.lower())
+                and re.match(r"^\s*" + re.escape(first) + r"\s*[,!?:;-]",
+                             text, flags=re.IGNORECASE)):
+            log.warning(
+                "[OTR_ShotLock] line %s text opens with its OWN speaker's "
+                "name (%s) -- probable mis-attribution shipped from the "
+                "writer; the beat renders with char_id=%s's face",
+                ln.get("line_id"), first, cid)
         beats.append({
             "beat_id": str(ln.get("line_id") or f"beat_{i:04d}"),
             "role": _video_role_for_line(ln),
-            "char_id": str(ln.get("char_id") or ""),
-            "text": str(ln.get("text") or "").strip(),
+            "char_id": cid,
+            "text": text,
             "samples": ln.get("samples", ln.get("audio_samples")),
             "sample_rate": ln.get("sample_rate"),
             "dur_s": ln.get("dur_s", ln.get("duration_s")),
@@ -338,7 +374,12 @@ def _deterministic_template(appearance: str, setting: str, beat_text: str) -> st
 
 def _prompt_is_consistent(text_prompt: str, appearance: str, setting: str) -> bool:
     """Schema-level consistency: the prompt must carry the cast's core trait
-    token and the brief setting (v1 gate; LLM-as-judge is v2)."""
+    token and the brief setting (v1 gate; LLM-as-judge is v2).
+
+    SCOPE (round 5): only ever called for CHARACTER_BEARING_ROLES beats (the
+    char_beats loop in derive_creative_directives) -- object-only b-roll
+    prompts never pass through here, so the person checks must not be reused
+    for non-character roles."""
     if not text_prompt:
         return False
     low = text_prompt.lower()
@@ -349,6 +390,38 @@ def _prompt_is_consistent(text_prompt: str, appearance: str, setting: str) -> bo
         tok in low for tok in _core_tokens(setting)
     )
     return appearance_ok and setting_ok
+
+
+#: Person-anchor vocabulary (round 5 F3): a talking-head prompt must show the
+#: character. Checked on the UNANCHORED candidate (the LLM's contribution),
+#: within a bounded head, so the anchor itself can never satisfy the guard.
+_PERSON_TOKENS = ("face", "portrait", "speaking", "camera", "close-up",
+                  "mid-shot")
+_PERSON_GUARD_HEAD = 160
+
+
+def _person_anchor_ok(text_prompt: str, appearance: str) -> bool:
+    """True when the prompt's HEAD (first ``_PERSON_GUARD_HEAD`` chars) carries
+    a core appearance token AND a person/framing token -- the b002 lesson: a
+    prompt that describes props/scenery without the character lets HuMo walk
+    away from the init portrait. Pure; character-bearing beats only."""
+    if not text_prompt:
+        return False
+    head = text_prompt[:_PERSON_GUARD_HEAD].lower()
+    appearance_ok = (not appearance) or any(
+        tok in head for tok in _core_tokens(appearance)
+    )
+    person_ok = any(tok in head for tok in _PERSON_TOKENS)
+    return appearance_ok and person_ok
+
+
+def _subject_anchor(appearance: str) -> str:
+    """The leading subject clause prepended to EVERY talking-head prompt path
+    (round 5 F3): face/framing tokens lead (engines weigh leading tokens
+    hardest), the appearance (bounded) follows. Pure."""
+    base = "face visible, speaking to camera"
+    app = (appearance or "").strip().rstrip(",.;: ")
+    return f"{base}, {app[:120].rstrip(', ')}" if app else base
 
 
 def _core_tokens(text: str) -> list:
@@ -406,6 +479,11 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
         # by the prompt finisher -- the model must not duplicate them.
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.",
+        # Round 5 F3 (the b002 no-person catch): any authored text_prompt must
+        # keep the character on screen -- props/scenery alone lose the face.
+        "If you author a text_prompt, describe the named character as the "
+        "VISIBLE subject (face-forward, mid-shot or closer); never describe "
+        "scenery or props without the character.",
         f"Setting: {setting}",
         "Beats:",
     ]
@@ -494,14 +572,30 @@ def derive_creative_directives(
                 text_prompt = _deterministic_template(appearance, setting, b["text"])
                 source = "template"
                 d = {k: "" for k in _DIRECTIVE_KEYS}
-            if not _prompt_is_consistent(text_prompt, appearance, setting):
+            # Round 5 F3: BOTH gates run on the UNANCHORED candidate (the
+            # anchor would otherwise satisfy them tautologically -- pass03
+            # panel catch). The person gate binds the AUTHORED freeform
+            # text_prompt path only (the b002 lesson: an action/prop-only
+            # authored prompt lets HuMo abandon the init portrait). The
+            # composed-directives path leads with the appearance by
+            # construction, and the deterministic template IS the sanctioned
+            # fallback -- both get the anchor regardless.
+            _person_ok = (not llm_text
+                          or _person_anchor_ok(text_prompt, appearance))
+            if not (_prompt_is_consistent(text_prompt, appearance, setting)
+                    and _person_ok):
                 level = "WARN" if consistency_gate_warn_only else "FAIL-CLOSED"
                 warnings.append(
                     f"consistency gate {level} for beat {b['beat_id']}: prompt "
-                    f"missing cast/setting trait; using template fallback"
+                    f"missing cast/setting trait or person anchor; using "
+                    f"template fallback"
                 )
                 text_prompt = _deterministic_template(appearance, setting, b["text"])
                 source = "template_consistency"
+            # The subject anchor leads EVERY talking-head prompt path (llm,
+            # composed, template): face/framing tokens first, bounded
+            # appearance after -- prepended AFTER the gates, BEFORE finishing.
+            text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
             # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
             # atmosphere/palette/lighting) + the film style tail, restored
             # from the deleted legacy composer. MUST run after the
@@ -640,6 +734,10 @@ def build_execution_plan(beats, budget, creative, policy):
             # render driver's role-scoped behaviors (the LTX radio-open
             # prompt) read it; before this only group_id embedded the role.
             "role": b["role"],
+            # Round 5 F5: the NORMALIZED char_id rides the shot row so the
+            # render driver's portrait join never depends on the raw line
+            # scheme (the announcer's 'announcer' -> cast row id case).
+            "char_id": b.get("char_id", ""),
             "engine_id": engine_for(b["role"]),
             "profile_id": "",
             "family": "",

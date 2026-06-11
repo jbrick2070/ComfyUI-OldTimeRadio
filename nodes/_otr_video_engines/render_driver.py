@@ -333,6 +333,89 @@ def _beat_id_for_shot(shot):
     return sid[len("shot_"):] if sid.startswith("shot_") else sid
 
 
+#: Mirrors ``otr_shot_lock.OPENING_MUSIC_BEAT_ID`` -- duplicated as a local
+#: constant (round 5): importing the ShotLock node module from the driver would
+#: drag node-registration side effects into the engine package.
+_OPENING_MUSIC_SUFFIX = "b000_music_open"
+
+#: Round 5 F2 -- beat_intent -> scene clause. Unmapped intents fall back to a
+#: loose "a beat of <intent>" clause + one INFO line (never a silent skip).
+_INTENT_CLAUSES = {
+    "revelation": "a moment of revelation",
+    "reveal": "a moment of revelation",
+    "discovery": "awe and discovery",
+    "wonder": "awe and discovery",
+    "dread": "gathering tension",
+    "tension": "gathering tension",
+    "warning": "gathering tension",
+    "conflict": "voices in conflict",
+    "confrontation": "voices in conflict",
+    "calm": "a quiet steady moment",
+    "comfort": "a quiet steady moment",
+    "urgency": "urgent momentum",
+    "resolution": "the tension easing",
+}
+
+#: Round 5 F2 -- arc_phase -> tone clause (exact-match; absent/unknown skips).
+_ARC_CLAUSES = {
+    "setup": "early scene-setting calm",
+    "rising": "rising stakes",
+    "climax": "the story's peak intensity",
+    "falling": "the aftermath settling",
+    "resolution": "aftermath hush",
+}
+
+
+def _beat_clauses(line, shot_id):
+    """Per-beat scene clauses from the FROZEN line's own signals (round 5 F2:
+    ``visual_plan.scenes`` is empty post-CW-1, so beat variety comes from
+    ``beat_intent`` + ``arc_phase``). Absent fields skip silently; an unmapped
+    intent gets the loose clause + one INFO line. Pure, read-only."""
+    out = []
+    intent = str((line or {}).get("beat_intent") or "").strip().lower()
+    if intent:
+        mapped = _INTENT_CLAUSES.get(intent)
+        if mapped is None:
+            mapped = "a beat of %s" % intent
+            _LOG.info("[OTR.render_driver] unmapped beat_intent %r on %s -- "
+                      "using the loose clause", intent, shot_id)
+        out.append(mapped)
+    arc = str((line or {}).get("arc_phase") or "").strip().lower()
+    if arc in _ARC_CLAUSES:
+        out.append(_ARC_CLAUSES[arc])
+    return out
+
+
+def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
+    """Stamp prompt observability onto the request (round 5 F2): source enum
+    (m4|env|brief+beat), sha8, char count -- ``run_episode`` copies them onto
+    the trace rows (durable in the node-92 /history report) and one INFO line
+    makes operator log review mechanical."""
+    sha8 = hashlib.sha256(str(prompt).encode("utf-8")).hexdigest()[:8]
+    req["_prompt_source"] = source
+    if subsource:
+        req["_prompt_subsource"] = subsource
+    req["_prompt_sha8"] = sha8
+    req["_prompt_chars"] = len(str(prompt))
+    _LOG.info("[OTR.render_driver] prompt source=%s sha8=%s chars=%d beat=%s "
+              "| %.100s", source, sha8, len(str(prompt)), beat, prompt)
+
+
+def ltx_prompt_diversity_status(trace):
+    """Diversity status over the BRIEF-COMPOSED text-engine prompts in a
+    :func:`run_episode` trace (round 5 acceptance: the per-beat composition
+    must actually differ). ``ok`` is vacuously True for n < 2; operator
+    ``env``-override prompts are exempt (an override may legitimately repeat).
+    Pure; returns ``{n, distinct, ok, sha8s}``."""
+    shas = [str(r.get("prompt_sha8") or "") for r in (trace or [])
+            if isinstance(r, dict)
+            and r.get("prompt_source") == "brief+beat"
+            and r.get("prompt_sha8")]
+    distinct = len(set(shas))
+    return {"n": len(shas), "distinct": distinct,
+            "ok": (len(shas) < 2) or distinct > 1, "sha8s": shas}
+
+
 def build_request_from_shot(shot, ledger, *, canvas=None,
                             master_audio_path=""):
     """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
@@ -348,8 +431,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     per-line ``*_wav_path``.  Passed in via :func:`run_real_episode` so the
     file is never mutated (read-only ``ffmpeg -i``)."""
     line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
-    char_id = str(line.get("char_id") or "")
+    # Round 5 F5: the SHOT row carries the ShotLock-normalized char_id (the
+    # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
+    # raw line value for pre-round-5 planned ledgers.
+    char_id = str(shot.get("char_id") or line.get("char_id") or "")
     init_image = _portrait_index(ledger).get(char_id, "")
+    if (not init_image
+            and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
+            == "audio_driven_face"):
+        # The b002-class silent miss: a talking-head shot whose char_id has no
+        # portrait previously surfaced only as eng_humo's fail-closed error
+        # mid-render. Warn at the JOIN so the gap is visible upstream.
+        _LOG.warning("[OTR.render_driver] talking-head shot %s char_id=%r has "
+                     "NO portrait-index entry -- HuMo will fail closed to its "
+                     "fallback chain", shot.get("shot_id"), char_id)
     audio = _voice_audio_for_line(line)
     # Per-beat audio fallback: slice the FROZEN master when no per-line wav.
     # The master is opened read-only by ffmpeg; the slice lands in a temp dir
@@ -396,6 +491,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     text_prompt = str(creative.get("text_prompt") or "")
     if text_prompt:
         req["text_prompt"] = text_prompt
+        _stamp_prompt_meta(req, "m4", text_prompt,
+                           subsource=str(creative.get("source") or ""),
+                           beat=_beat_id_for_shot(shot))
     # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
     # hardened: docs/2026-06-10-brief-downstream-gaps/). Any ltx_video /
     # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
@@ -416,7 +514,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _shot_role = _gid[len("grp_"):]
     if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v")
             and not text_prompt):
-        _is_open = _shot_role in ("announcer_visual", "music_visual")
+        # Round 5 F2: synthetic-open detection by STRUCTURE (empty
+        # source_line_ids / the ShotLock beat-id suffix), never role alone;
+        # role still picks the clause WORDING below.
+        _sids = shot.get("source_line_ids")
+        _is_synthetic_open = ((isinstance(_sids, list) and not _sids)
+                              or str(shot.get("shot_id") or "")
+                              .endswith(_OPENING_MUSIC_SUFFIX))
+        _is_open = (_is_synthetic_open
+                    or _shot_role in ("announcer_visual", "music_visual"))
         _override = (os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
                      if _is_open else "")
         if _override:
@@ -425,6 +531,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                          "(verbatim, unfinished)",
                          _shot_role, shot.get("shot_id"))
             req["text_prompt"] = _override
+            _stamp_prompt_meta(req, "env", _override,
+                               beat=_beat_id_for_shot(shot))
         else:
             try:
                 from .._otr_story_brief_helpers import (  # type: ignore
@@ -443,9 +551,23 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                      if str(t).strip()][:2])
                 core = ("cinematic establishing shot"
                         + (f", {_setting}" if _setting else ""))
-            clauses = ["slow cinematic camera drift", "no on-screen text"]
-            if _is_open:
-                clauses.insert(0, "a vintage radio set glowing in the scene")
+            # Per-beat composition (round 5 F2): role clause FIRST (the
+            # bright-radio look survives the 240 trim), then the beat's OWN
+            # clauses from the frozen line's beat_intent / arc_phase -- the
+            # per-beat variety the empty visual_plan.scenes can't supply.
+            clauses = []
+            if _is_synthetic_open:
+                clauses.append("opening establishing shot, the radio warming "
+                               "up, warm glowing dial light")
+            elif _shot_role == "announcer_visual":
+                clauses.append("a vintage radio set glowing warmly, lit "
+                               "dials and tubes")
+            elif _shot_role == "music_visual":
+                clauses.append("the radio warming up, warm glowing dial "
+                               "light")
+            clauses.extend(_beat_clauses(line, shot.get("shot_id")))
+            clauses.extend(["slow cinematic camera drift",
+                            "no on-screen text"])
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=240, style_tail=False)
@@ -454,6 +576,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                          "%.90s...", _shot_role, shot.get("shot_id"),
                          len(scene_prompt), scene_prompt)
             req["text_prompt"] = scene_prompt
+            _stamp_prompt_meta(req, "brief+beat", scene_prompt,
+                               beat=_beat_id_for_shot(shot))
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
@@ -626,8 +750,16 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             section = _rt.append_runtime_fallback_decision(section, rec)
         clips[out_shot["shot_id"]] = clip
         new_shots.append(out_shot)
-        trace.append({"shot_id": out_shot["shot_id"], "attempts": attempts,
-                      "final_engine": out_shot["engine_id"]})
+        row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
+               "final_engine": out_shot["engine_id"]}
+        # Round 5 F2: prompt observability rides the trace (durable in the
+        # node-92 /history report) -- the diversity gate + the operator's
+        # "did the prompts actually differ" check read these.
+        for key in ("_prompt_source", "_prompt_subsource", "_prompt_sha8",
+                    "_prompt_chars"):
+            if isinstance(request, dict) and key in request:
+                row[key.lstrip("_")] = request[key]
+        trace.append(row)
         if used:
             vram_peak = max(vram_peak, int(used))
     section["shots"] = new_shots
@@ -768,13 +900,23 @@ def build_clip_manifest(result, *, episode_id=""):
         tfc = int(shot.get("target_frame_count") or 0)
         total += tfc
         eid = clip.get("engine_id") or shot.get("engine_id")
-        sids = shot.get("source_line_ids")
-        bid = str(sids[0]) if isinstance(sids, list) and sids else str(sid or "")
+        # Round 5 F5: beat ids via the shared rule (synthetic -> the bare
+        # beat id, not "shot_..."), and start_s falls back to the SHOT row's
+        # stamp -- one None row silently degraded the whole composite from
+        # positioned to sequential mode (plan_timeline_segments requires ALL
+        # rows positioned; the 2026-06-10 acceptance episode hit this).
+        bid = _beat_id_for_shot(shot)
         sraw = lines.get(bid, {}).get("start_s")
+        if sraw in (None, ""):
+            sraw = shot.get("start_s")
         try:
             start_s = float(sraw) if sraw not in (None, "") else None
         except (TypeError, ValueError):
             start_s = None
+        # Round 5 F5: the talking-head face check is mechanical -- each row
+        # carries the resolved char_id + the portrait it staged.
+        row_char = str(shot.get("char_id")
+                       or lines.get(bid, {}).get("char_id") or "")
         rows.append({
             "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
@@ -783,6 +925,8 @@ def build_clip_manifest(result, *, episode_id=""):
             "frame_count": int(clip.get("frame_count") or 0),
             "target_frame_count": tfc,
             "start_s": start_s,
+            "char_id": row_char,
+            "init_image": _portrait_index(led).get(row_char, ""),
             "exists": exists,
         })
         if exists:

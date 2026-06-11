@@ -3776,6 +3776,77 @@ class OTR_LedgerScriptWriter:
                 "[OTR_LedgerScriptWriter] self-vocative scrub fixed %d "
                 "line(s) pre-freeze", _voc_fixed)
 
+        # (c) SELF-VOCATIVE ATTRIBUTION repair (round 5, 2026-06-10) --
+        # the LAST pre-freeze word on speaker identity, deliberately AFTER
+        # every text-mutating pass: the b004 acceptance catch was a line
+        # REWRITTEN after scrubs (a)/(b) into "Gulliver, it's not just a
+        # machine..." while stamped char_id=GULLIVER -- the content belongs
+        # to the OTHER character (a self-vocative is an address, and you do
+        # not address yourself). Deterministic, no LLM:
+        #   * exactly TWO character rows in the cast -> re-attribute the
+        #     line to the interlocutor (text kept -- it is now a CORRECT
+        #     address), LOUD;
+        #   * ambiguous (3+ characters) -> strip the leading vocative like
+        #     scrub (b) (which already ran, BEFORE the late rewrites) and
+        #     LOUD-warn the attribution; never silent, never raises.
+        # Runs pre-freeze and pre-TTS, so the corrected speaker's voice is
+        # the one minted. Frozen ledgers are never re-touched (this is the
+        # writer; the ledger freezes after J).
+        _att_fixed = 0
+        _char_rows = [
+            c for c in (led.data.get("cast") or [])
+            if isinstance(c, dict)
+            and str(c.get("name") or "").strip().upper() != "ANNOUNCER"
+            and str(c.get("char_id") or "")
+        ]
+        for _ln in led.data.get("lines") or []:
+            if not isinstance(_ln, dict) or _ln.get("skip"):
+                continue
+            _cid = str(_ln.get("char_id") or "")
+            _nm = _name_by_cid.get(_cid, "")
+            _first = (_nm.split() or [""])[0]
+            _txt = str(_ln.get("text") or "")
+            if len(_first) < 2 or not _txt:
+                continue
+            _m = re.match(
+                r"^\s*" + re.escape(_first) + r"\s*[,!?—…:;-]+\s*",
+                _txt, flags=re.IGNORECASE)
+            if not _m:
+                continue
+            _others = [c for c in _char_rows
+                       if str(c.get("char_id") or "") != _cid]
+            if len(_char_rows) == 2 and len(_others) == 1:
+                _new_cid = str(_others[0].get("char_id") or "")
+                log.warning(
+                    "[OTR_LedgerScriptWriter] self-vocative re-attribution "
+                    "%s: %s->%s (%r is %s addressing %s)",
+                    _ln.get("line_id"), _cid, _new_cid, _txt[:50],
+                    _others[0].get("name"), _nm)
+                _ln["char_id"] = _new_cid
+                _att_fixed += 1
+            else:
+                _rest = _txt[_m.end():].lstrip()
+                if len(_rest.split()) >= 2:
+                    _fixed = _rest[0].upper() + _rest[1:]
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] self-vocative LATE strip "
+                        "%s (%s, ambiguous %d-char cast): %r -> %r",
+                        _ln.get("line_id"), _nm, len(_char_rows),
+                        _txt[:50], _fixed[:50])
+                    _ln["text"] = _fixed
+                    _ln["word_count"] = len(_fixed.split())
+                    _att_fixed += 1
+                else:
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] self-vocative on %s (%s) "
+                        "left as-is (strip would empty the line; ambiguous "
+                        "cast)", _ln.get("line_id"), _nm)
+        if _att_fixed:
+            led.save()
+            log.warning(
+                "[OTR_LedgerScriptWriter] self-vocative attribution pass "
+                "fixed %d line(s) pre-freeze", _att_fixed)
+
         # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was
         # stamped progressively inside the composer loop (Phase 2B).
