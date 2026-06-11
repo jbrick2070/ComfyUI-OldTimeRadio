@@ -318,6 +318,8 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
 
     schemas = fetch_schemas()
     wf = load_workflow(WORKFLOW_PATH)
+    from otr_api import normalize_stamp_widgets_for_live_schema
+    wf = normalize_stamp_widgets_for_live_schema(wf, schemas)
     if profile:
         from otr_api import apply_profile_to_workflow
         wf = apply_profile_to_workflow(wf, profile, schemas)

@@ -802,6 +802,39 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     return apply_profile(workflow, profile, schemas=schemas)
 
 
+def normalize_stamp_widgets_for_live_schema(workflow: dict, schemas: dict) -> dict:
+    """STALE-SERVER COMPAT SHIM (2026-06-11): the master gained the three
+    node-63 stamp widgets (GATE B S2), but a long-running ComfyUI keeps the
+    OLD class until restart -- its live /object_info shows 3 validator slots
+    while the saved json carries 6, so API conversion refuses (correctly).
+    When the LIVE schema is the short one AND the three extra saved slots are
+    all EMPTY (the unstamped master), trim them LOUDLY so headless runs work
+    against the not-yet-restarted server. A STAMPED snapshot is NEVER trimmed
+    -- the stamp must not be silently dropped; restart the server instead."""
+    for node in workflow.get("nodes", []):
+        if node.get("type") != "OTR_WorkflowValidator":
+            continue
+        try:
+            live = _serialized_slot_names("OTR_WorkflowValidator", schemas)
+        except KeyError:
+            return workflow
+        wv = node.get("widgets_values") or []
+        if len(live) == 3 and len(wv) == 6:
+            if any(str(v or "") for v in wv[3:]):
+                raise ValueError(
+                    "node 63 carries a NON-EMPTY stamp but the live server "
+                    "still runs the pre-stamp validator class -- RESTART "
+                    "ComfyUI to load the new code (the stamp is never "
+                    "silently dropped)."
+                )
+            print("[otr_api] LOUD stale-server shim: live validator schema "
+                  "predates the stamp widgets; trimming the 3 EMPTY stamp "
+                  "slots for this submit (restart ComfyUI to retire this "
+                  "shim).", flush=True)
+            node["widgets_values"] = wv[:3]
+    return workflow
+
+
 def queue_snapshot() -> tuple[int, int]:
     """Return (running_count, pending_count) from /queue. Best-effort."""
     try:

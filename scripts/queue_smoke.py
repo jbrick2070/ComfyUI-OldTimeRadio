@@ -64,6 +64,8 @@ def main() -> int:
 
     print("Loading + patching workflow...", flush=True)
     wf = load_workflow(WORKFLOW_PATH)
+    from otr_api import normalize_stamp_widgets_for_live_schema
+    wf = normalize_stamp_widgets_for_live_schema(wf, schemas)
     if args.profile:
         wf = apply_profile_to_workflow(wf, args.profile, schemas)
 
