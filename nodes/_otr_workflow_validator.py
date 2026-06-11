@@ -48,6 +48,27 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
 
 
+def _resolve_workflow_path(path: str) -> Path:
+    """GATE B S2 code-defect fix (2026-06-11, spec section 2 'verified ground
+    truth'): non-empty RELATIVE paths used to resolve against the process CWD
+    -- correct only by accident under ComfyUI Desktop and silently wrong for
+    headless runs launched from any other directory (`IS_CHANGED` then hashed
+    a phantom mtime=0, so on-disk edits never re-triggered validation).
+
+    Resolution contract (shared by `_load_workflow` AND `IS_CHANGED`):
+      * empty       -> the canonical `_DEFAULT_WORKFLOW_PATH` (explicit, logged
+                       by _load_workflow -- the E5 behavior, kept);
+      * relative    -> anchored at the REPO ROOT (never the process CWD);
+      * absolute    -> taken as-is.
+    """
+    if not path:
+        return _DEFAULT_WORKFLOW_PATH
+    p = Path(path)
+    if not p.is_absolute():
+        p = _REPO_ROOT / p
+    return p
+
+
 def _load_workflow(path: str) -> dict[str, Any]:
     # Sprint E E5 / H5: explicit empty-string fallback. The shipped
     # workflow JSON ships the validator widget as "" (per the S29
@@ -64,9 +85,12 @@ def _load_workflow(path: str) -> dict[str, Any]:
             "resolved to canonical _DEFAULT_WORKFLOW_PATH=%s",
             _DEFAULT_WORKFLOW_PATH,
         )
-        p = _DEFAULT_WORKFLOW_PATH
-    else:
-        p = Path(path)
+    p = _resolve_workflow_path(path)
+    if path and str(p) != path:
+        log.info(
+            "OTR_WorkflowValidator: relative workflow_json_path %r resolved "
+            "against the repo root -> %s", path, p,
+        )
     if not p.is_file():
         raise FileNotFoundError(
             f"OTR_WorkflowValidator: workflow JSON not found at {p!r}"
@@ -194,9 +218,12 @@ class WorkflowValidator:
     def IS_CHANGED(cls, workflow_json_path: str, validate_anyway: bool,
                    strict_unknown_types: bool) -> str:
         """Re-run on any change to the inputs OR to the workflow JSON
-        on disk. mtime + path is the canonical change signal."""
+        on disk. mtime + path is the canonical change signal. Uses the
+        SAME repo-root resolution as `_load_workflow` (GATE B S2 defect
+        fix) so a relative path hashes the real file's mtime instead of
+        a CWD-dependent phantom."""
         try:
-            p = Path(workflow_json_path) if workflow_json_path else _DEFAULT_WORKFLOW_PATH
+            p = _resolve_workflow_path(workflow_json_path)
             mtime = p.stat().st_mtime_ns if p.is_file() else 0
         except OSError:
             mtime = 0
