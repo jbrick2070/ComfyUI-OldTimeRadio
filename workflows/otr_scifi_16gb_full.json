@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 93,
-  "last_link_id": 269,
+  "last_link_id": 270,
   "nodes": [
     {
       "id": 63,
@@ -1021,7 +1021,8 @@
           "name": "video_policy_json",
           "type": "STRING",
           "links": [
-            251
+            251,
+            270
           ],
           "slot_index": 0
         }
@@ -1059,7 +1060,13 @@
         42,
         "{}"
       ],
-      "inputs": [],
+      "inputs": [
+        {
+          "name": "video_policy_json",
+          "type": "STRING",
+          "link": 270
+        }
+      ],
       "outputs": [
         {
           "name": "image_policy_json",
@@ -1783,6 +1790,14 @@
       63,
       0,
       87,
+      0,
+      "STRING"
+    ],
+    [
+      270,
+      87,
+      0,
+      88,
       0,
       "STRING"
     ]

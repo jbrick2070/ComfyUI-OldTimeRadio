@@ -271,7 +271,23 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     ``(patched_ledger, image_done, report, warnings)``. Never raises on a normal
     miss; ``assert_usable`` failures are recorded as warnings + skipped
     (fail-closed: that object simply has no image, never a silent wrong engine).
+
+    EXCEPTION -- the downstream 3D HALT (3D plan section 3): a policy whose
+    ``locked_3d_slots`` carry ``granularity == per_beat`` RAISES before any
+    object is dispatched. That combination means a requires_mesh_portrait
+    video engine would get a fresh portrait (= a mesh REBUILD) per beat; the
+    ImageDirector already fails closed on it, so reaching here means the
+    policy was hand-crafted or stale -- a malformed POLICY, not a normal miss.
     """
+    locked_3d = set((image_policy or {}).get("locked_3d_slots") or [])
+    gran_by_slot = (image_policy or {}).get("granularity") or {}
+    viol = sorted(s for s in locked_3d if gran_by_slot.get(s) == "per_beat")
+    if viol:
+        raise ValueError(
+            "OTR_ImageGenDispatcher HALT: 3D-locked slot(s) %s carry "
+            "granularity=per_beat (mesh-rebuild-per-beat). The image policy "
+            "is malformed/stale -- re-run OTR_ImageDirector (it fails closed "
+            "on this) instead of hand-editing image_policy_json." % viol)
     warnings: list = []
     report: list = []
     cast = ledger.get("cast") if isinstance(ledger.get("cast"), list) else []

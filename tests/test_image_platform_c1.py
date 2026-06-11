@@ -159,6 +159,11 @@ def test_image_role_filter_shared(clean_image_registry):
     assert "txt" in fit and "needs_audio" not in fit
 
 
+#: Minimal VALID video policy for director calls with no 3D engine in play
+#: (video_policy_json is REQUIRED + fail-closed per the 3D plan section 3).
+_EMPTY_VIDEO_POLICY = json.dumps({"video_models": {}})
+
+
 def test_image_director_policy_json_and_seed(clean_image_registry):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
@@ -167,6 +172,7 @@ def test_image_director_policy_json_and_seed(clean_image_registry):
         other_beats_image_model="flux_gen1", announcer_granularity="per_object",
         music_granularity="per_object", other_beats_granularity="per_beat",
         fresh_cap=15, seed_mode="request_hash", request_seed=7,
+        video_policy_json=_EMPTY_VIDEO_POLICY,
     )
     policy = json.loads(out[0])
     assert policy["image_models"]["music_image_model"]["engine_id"] == "flux_gen1"
@@ -188,43 +194,166 @@ def test_image_director_fail_closed_incompatible_pick(clean_image_registry):
             other_beats_image_model="needs_audio", announcer_granularity="per_object",
             music_granularity="per_object", other_beats_granularity="per_object",
             fresh_cap=15, seed_mode="request_hash", request_seed=0,
+            video_policy_json=_EMPTY_VIDEO_POLICY,
         )
 
 
-def test_3d_granularity_lock(clean_image_registry, clean_video_registry):
-    """A role whose paired VIDEO engine is character_3d is hard-locked to
-    per_object; per_beat is rejected with a warning (PASS-IMG MUST-FIX #2)."""
+def _direct_kwargs(**over):
+    """Baseline director kwargs (flux everywhere, per_object everywhere)."""
+    kw = dict(
+        announcer_image_model="flux_gen1", music_image_model="flux_gen1",
+        other_beats_image_model="flux_gen1", announcer_granularity="per_object",
+        music_granularity="per_object", other_beats_granularity="per_object",
+        fresh_cap=15, seed_mode="request_hash", request_seed=0,
+        video_policy_json=_EMPTY_VIDEO_POLICY,
+    )
+    kw.update(over)
+    return kw
+
+
+def _mesh3d_stub(**kw):
+    import types
+    base = dict(
+        name="mesh3d", roles=("character_video",),
+        default_roles=("character_video",), family="character_3d",
+        required_inputs=("text_prompt",), requires_mesh_portrait=True,
+    )
+    base.update(kw)
+    return types.SimpleNamespace(**base)
+
+
+def test_3d_granularity_lock_per_beat_raises(clean_image_registry,
+                                             clean_video_registry):
+    """3D plan section 3: a role whose paired VIDEO engine declares
+    requires_mesh_portrait REJECTS per_beat with a RAISE (no coercion --
+    fresh-per-beat would rebuild the mesh per beat)."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    import types
     clean_video_registry._registry.clear()
-    clean_video_registry._registry["mesh3d"] = types.SimpleNamespace(
-        name="mesh3d", roles=("character_video",), default_roles=("character_video",),
-        family="character_3d", required_inputs=("text_prompt",),
-    )
+    clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
     video_policy = json.dumps({"video_models": {
         "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
     }})
-    out = OTRImageDirector().direct(
-        announcer_image_model="flux_gen1", music_image_model="flux_gen1",
-        other_beats_image_model="flux_gen1", announcer_granularity="per_object",
-        music_granularity="per_object", other_beats_granularity="per_beat",
-        fresh_cap=15, seed_mode="request_hash", request_seed=0,
-        video_policy_json=video_policy,
-    )
+    with pytest.raises(ValueError, match="per_object"):
+        OTRImageDirector().direct(**_direct_kwargs(
+            other_beats_granularity="per_beat",
+            video_policy_json=video_policy))
+
+
+def test_3d_granularity_lock_per_object_passes(clean_image_registry,
+                                               clean_video_registry):
+    """With per_object picked, the 3D-locked slot is recorded and the policy
+    emits (the lock is CHARACTER-level per_object: one portrait per character
+    used globally)."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    clean_video_registry._registry.clear()
+    clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
+    video_policy = json.dumps({"video_models": {
+        "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
+    }})
+    out = OTRImageDirector().direct(**_direct_kwargs(
+        video_policy_json=video_policy))
     policy = json.loads(out[0])
     assert policy["granularity"]["other_beats_image_model"] == "per_object"
     assert "other_beats_image_model" in policy["locked_3d_slots"]
-    assert any("locked to per_object" in w for w in policy["warnings"])
 
 
 def test_3d_lock_pure_fn():
+    """enforce_3d_granularity_lock RAISES on a locked slot that is not
+    per_object (fail-closed; the old coercion is gone) and passes through a
+    compliant dict unchanged."""
     warns: list = []
+    with pytest.raises(ValueError, match="per_object"):
+        enforce_3d_granularity_lock(
+            {"a": "per_beat", "b": "per_object"}, {"a"}, warns)
     out = enforce_3d_granularity_lock(
-        {"a": "per_beat", "b": "per_object"}, {"a"}, warns,
+        {"a": "per_object", "b": "per_beat"}, {"a"}, warns)
+    assert out == {"a": "per_object", "b": "per_beat"}  # unlocked b untouched
+
+
+def test_video_policy_json_is_required_and_fail_closed():
+    """3D plan section 3: video_policy_json is a REQUIRED forceInput link
+    (ComfyUI enforces wired connections for required inputs only) and the
+    parse fails closed on empty/malformed/non-policy payloads."""
+    it = OTRImageDirector.INPUT_TYPES()
+    assert "video_policy_json" in it["required"]
+    assert "video_policy_json" not in (it.get("optional") or {})
+    spec = it["required"]["video_policy_json"][1]
+    assert spec.get("forceInput") is True  # never an auto-generated widget
+    for bad in ("", "   ", "not json", "[1,2]", "{}",
+                '{"video_models": "nope"}'):
+        with pytest.raises(ValueError):
+            OTRImageDirector().direct(**_direct_kwargs(video_policy_json=bad))
+
+
+def test_unregistered_video_engine_fails_closed(clean_image_registry,
+                                                clean_video_registry):
+    """An UNREGISTERED video engine in the policy raises -- its
+    requires_mesh_portrait capability cannot be read (covers custom adapters
+    that never registered; never a silent not-3D guess)."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    clean_video_registry._registry.clear()
+    video_policy = json.dumps({"video_models": {
+        "other_beats_video_model": {"engine_id": "ghost_engine", "custom": True},
+    }})
+    with pytest.raises(ValueError, match="ghost_engine"):
+        OTRImageDirector().direct(**_direct_kwargs(
+            video_policy_json=video_policy))
+
+
+def test_char3d_family_without_capability_fails_closed(clean_image_registry,
+                                                       clean_video_registry):
+    """A registered character_3d-family engine that does NOT declare
+    requires_mesh_portrait raises (the family says 3D but the lock cannot
+    prove it -- fail closed, never a hard-coded family check)."""
+    import types
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    clean_video_registry._registry.clear()
+    clean_video_registry._registry["old3d"] = types.SimpleNamespace(
+        name="old3d", roles=("character_video",), default_roles=(),
+        family="character_3d", required_inputs=("audio_ref", "init_image"),
     )
-    assert out["a"] == "per_object" and out["b"] == "per_object"
-    assert warns
+    video_policy = json.dumps({"video_models": {
+        "other_beats_video_model": {"engine_id": "old3d", "custom": False},
+    }})
+    with pytest.raises(ValueError, match="requires_mesh_portrait"):
+        OTRImageDirector().direct(**_direct_kwargs(
+            video_policy_json=video_policy))
+
+
+def test_triposg_talk_locks_via_real_registry():
+    """The REAL registered triposg_talk adapter (W7-pre) drives the lock via
+    its requires_mesh_portrait=True declaration -- no registry stubbing."""
+    from nodes._otr_video_engines import eng_character_3d  # noqa: F401
+    locked = three_d_locked_slots({"video_models": {
+        "other_beats_video_model": {"engine_id": "triposg_talk",
+                                    "custom": False},
+    }})
+    assert "other_beats_image_model" in locked
+
+
+def test_non_3d_engine_does_not_lock():
+    """A registered engine with requires_mesh_portrait absent and a non-3D
+    family locks nothing (capability default False)."""
+    from nodes._otr_video_engines import eng_humo  # noqa: F401
+    locked = three_d_locked_slots({"video_models": {
+        "other_beats_video_model": {"engine_id": "humo", "custom": False},
+    }})
+    assert locked == set()
+
+
+def test_dispatcher_halts_on_3d_per_beat_policy():
+    """Defense-in-depth (3D plan section 3): a hand-crafted/stale policy with
+    a 3D-locked slot at per_beat HALTS the dispatcher before any object is
+    dispatched."""
+    with pytest.raises(ValueError, match="HALT"):
+        disp.dispatch_images(
+            {}, {"locked_3d_slots": ["other_beats_image_model"],
+                 "granularity": {"other_beats_image_model": "per_beat"}},
+            {"version": 1, "objects": []}, gen_fn=lambda req: None)
 
 
 def test_no_hardcoded_image_engine_name(clean_image_registry):
