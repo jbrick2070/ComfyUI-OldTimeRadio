@@ -469,6 +469,53 @@ class TestDispatcherStillSpine:
         assert req["_init_source"] == "portrait"   # fell back, stamped truthfully
         assert req["asset_refs"]["init_image"] == str(portrait)
 
+    def test_st5_kenburns_reads_driver_built_request(self, tmp_path):
+        """ST-5/W6 pin: the request the DRIVER builds for a static_motion
+        shot is readable by still_kenburns' own _still_path (the ST-0 probe,
+        locked as a test) -- the 6/5 conditioned look ships through this
+        seam with zero new GPU risk."""
+        from nodes._otr_video_engines import render_driver as rd
+        from nodes._otr_video_engines.cheap_families import StillKenBurnsFamily
+        still = tmp_path / "still_b001_xyz.png"
+        still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        ledger = {
+            "video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b001", "start_s": 0.0, "dur_s": 2.0}],
+            "images": {"images": [
+                {"object_id": "still_b001", "kind": "scene_open",
+                 "beat_id": "b001", "path": str(still)}]},
+        }
+        shot = {"shot_id": "shot_b001", "engine_id": "still_kenburns",
+                "family": "static_motion", "target_frame_count": 25,
+                "source_line_ids": ["b001"], "char_id": "", "creative": {}}
+        req = rd.build_request_from_shot(shot, ledger)
+        eng = StillKenBurnsFamily()
+        assert eng.uses_still is True
+        assert eng._still_path(req) == str(still)
+
+    def test_st5_wan_i2v_reads_driver_built_request(self, tmp_path):
+        """ST-5/W6 pin: the same driver-built request feeds wan_i2v's
+        _init_image_ref (init = the beat's scene still under the
+        OTR_ENABLE_WAN_I2V opt-in; the adapter itself stays flag-gated)."""
+        from nodes._otr_video_engines import render_driver as rd
+        from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
+        still = tmp_path / "still_b002_xyz.png"
+        still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        ledger = {
+            "video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b002", "start_s": 0.0, "dur_s": 2.0}],
+            "images": {"images": [
+                {"object_id": "still_b002", "kind": "scene_beat",
+                 "beat_id": "b002", "path": str(still)}]},
+        }
+        shot = {"shot_id": "shot_b002", "engine_id": "wan_i2v",
+                "family": "image_to_video", "target_frame_count": 25,
+                "source_line_ids": ["b002"], "char_id": "", "creative": {}}
+        req = rd.build_request_from_shot(shot, ledger)
+        eng = WanI2VEngine() if isinstance(WanI2VEngine, type) else WanI2VEngine
+        assert eng._init_image_ref(req) == str(still)
+        assert req["_init_source"] == "scene_still"
+
     def test_st4_manifest_rows_gain_init_source(self):
         from nodes._otr_video_engines import render_driver as rd
         result = {
