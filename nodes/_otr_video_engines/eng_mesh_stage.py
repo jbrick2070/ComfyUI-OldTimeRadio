@@ -40,8 +40,12 @@ are imported LAZILY inside load / render_clip.
 
 Config (env): ``OTR_ENABLE_MESH_STAGE`` opt-in flag; ``OTR_BLENDER_EXE``
 pinned portable Blender (fail-closed LOUD, no dev-path hardcode);
-``OTR_HY3D_CKPT`` / ``OTR_HY3D_CKPT_NAME`` / ``OTR_HY3D_CLIP_VISION`` model
-overrides; ``OTR_MESH_CACHE_DIR`` the GLB cache root; ``OTR_MESH_STAGE_*``
+``OTR_HY3D_CKPT`` / ``OTR_HY3D_CKPT_NAME`` model overrides (the all-in-one
+checkpoint EMBEDS the DINO image encoder ``conditioner.main_image_encoder.*``
+and the ShapeVAE ``vae.*`` -- no separate CLIP-vision file, A4 audit
+2026-06-11); ``OTR_MESH_CACHE_DIR`` the GLB cache root (MUST live under the
+ComfyUI output dir -- core SaveGLB refuses prefixes outside it; the default
+``<comfy>/output/otr/mesh_cache`` complies); ``OTR_MESH_STAGE_*``
 stage knobs (frames cap, timeout, selftest skip).
 """
 from __future__ import annotations
@@ -323,11 +327,6 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.environ.get("OTR_HY3D_CKPT_NAME") or os.path.basename(
             self._ckpt_path())
 
-    @staticmethod
-    def _clip_vision_name():
-        return os.environ.get("OTR_HY3D_CLIP_VISION",
-                              "clip_vision_h.safetensors")
-
     def _installed(self):
         """True iff the hy3d checkpoint exists on disk (cheap, no import).
         The full node-class check is load()/the GPU probe."""
@@ -358,26 +357,29 @@ class MeshStageEngine(_CheapFamilyBase):
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "%s not installed: hy3d checkpoint=%s (OTR_HY3D_CKPT) + CLIP "
-                "vision=%s (OTR_HY3D_CLIP_VISION) -- install and verify the "
-                "core hy3d nodes on the GPU box (probe-first)"
-                % (self.name, self._ckpt_path(), self._clip_vision_name()),
+                "%s not installed: hy3d all-in-one checkpoint=%s "
+                "(OTR_HY3D_CKPT; embeds the DINO image encoder + ShapeVAE) "
+                "-- install and verify the core hy3d nodes on the GPU box "
+                "(probe-first)" % (self.name, self._ckpt_path()),
                 kind="video")
         return self.name
 
-    # ---- E-1: the ASSUMED native hy3d-2mv graph (VERIFY-ON-GPU) ----
+    # ---- E-1: the native hy3d graph (A4-audited vs the install) ----
     def _node_candidates(self):
-        """Ordered ComfyUI node-class candidates per graph node. The 0-E spec
-        verified these classes PRESENT in the running install:
-        EmptyLatentHunyuan3Dv2 / Hunyuan3Dv2Conditioning[MultiView] /
-        VAEDecodeHunyuan3D / VoxelToMesh / SaveGLB. Loader + CLIP-vision pair
-        is the standard core topology -- the GPU probe confirms INPUT_TYPES
-        + widget names before enabling (LTX probe_f3 discipline)."""
+        """Ordered ComfyUI node-class candidates per graph node. A4 audit
+        2026-06-11 verified the topology against the INSTALLED core source
+        AND the shipped official blueprint ('Image to Model (Hunyuan3d
+        2.1)' -- same core nodes as 2.0-mv): the loader is
+        **ImageOnlyCheckpointLoader** (returns MODEL / CLIP_VISION / VAE;
+        the all-in-one hy3d checkpoint embeds the DINO image encoder and
+        ShapeVAE, so there is NO separate CLIPVisionLoader file), and the
+        MODEL is patched by **ModelSamplingAuraFlow** before the KSampler
+        (blueprint shift=1). Runtime behavior remains VERIFY-ON-GPU."""
         return {
-            "checkpoint": ("CheckpointLoaderSimple",),
-            "clipvision": ("CLIPVisionLoader",),
+            "checkpoint": ("ImageOnlyCheckpointLoader",),
             "cv_encode": ("CLIPVisionEncode",),
             "loadimage": ("LoadImage",),
+            "modelsampling": ("ModelSamplingAuraFlow",),
             "cond": ("Hunyuan3Dv2Conditioning",),
             "latent": ("EmptyLatentHunyuan3Dv2",),
             "ksampler": ("KSampler",),
@@ -388,10 +390,24 @@ class MeshStageEngine(_CheapFamilyBase):
 
     def _build_mesh_graph(self, image_name, seed, glb_prefix):
         """The declarative portrait->GLB graph (wrapper_bridge.run_graph
-        format). ASSUMED topology, VERIFY-ON-GPU (probe-first):
-        CheckpointLoaderSimple -> (CLIPVisionLoader -> CLIPVisionEncode) ->
-        Hunyuan3Dv2Conditioning -> KSampler(EmptyLatentHunyuan3Dv2) ->
-        VAEDecodeHunyuan3D -> VoxelToMesh -> SaveGLB."""
+        format). Topology + widget sets VERIFIED against the INSTALLED core
+        source + official blueprint 2026-06-11 (comfy_extras/
+        nodes_hunyuan3d.py + nodes_save_3d.py + nodes_video_model.py +
+        nodes_model_advanced.py + nodes.py CLIPVisionEncode); runtime
+        behavior still VERIFY-ON-GPU:
+        ImageOnlyCheckpointLoader(MODEL/CLIP_VISION/VAE) ->
+        ModelSamplingAuraFlow(shift=1) + CLIPVisionEncode(embedded encoder)
+        -> Hunyuan3Dv2Conditioning -> KSampler(EmptyLatentHunyuan3Dv2) ->
+        VAEDecodeHunyuan3D -> VoxelToMesh -> SaveGLB.
+
+        The hy3d nodes are V3 ``IO.ComfyNode`` classes: ``EXECUTE_NORMALIZED``
+        calls ``execute(**inputs)`` with NO schema-default backfill, so every
+        required widget must be passed EXPLICITLY (``crop``, ``num_chunks``,
+        ``octree_resolution``, ``algorithm`` were the 2026-06-11 A4 audit
+        gaps). SaveGLB resolves ``filename_prefix`` through
+        ``folder_paths.get_save_image_path`` -> ``<prefix>_<counter:05>_.glb``
+        and REFUSES prefixes outside the ComfyUI output dir -- the cache root
+        (OTR_MESH_CACHE_DIR) must stay under it (the default does)."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         steps = int(os.environ.get("OTR_HY3D_STEPS", "30"))
@@ -399,13 +415,18 @@ class MeshStageEngine(_CheapFamilyBase):
         return {
             "checkpoint": {"class": "checkpoint",
                            "inputs": {"ckpt_name": self._ckpt_name()}},
-            "clipvision": {"class": "clipvision",
-                           "inputs": {"clip_name": self._clip_vision_name()}},
             "loadimage": {"class": "loadimage",
                           "inputs": {"image": image_name}},
             "cv_encode": {"class": "cv_encode",
-                          "inputs": {"clip_vision": W("clipvision", 0),
-                                     "image": W("loadimage", 0)}},
+                          # slot 1 = the checkpoint's EMBEDDED DINO encoder
+                          "inputs": {"clip_vision": W("checkpoint", 1),
+                                     "image": W("loadimage", 0),
+                                     # required combo (installed nodes.py)
+                                     "crop": "center"}},
+            "modelsampling": {"class": "modelsampling",
+                              # blueprint pins shift=1 (node default 1.73)
+                              "inputs": {"model": W("checkpoint", 0),
+                                         "shift": 1.0}},
             "cond": {"class": "cond",
                      "inputs": {"clip_vision_output": W("cv_encode", 0)}},
             "latent": {"class": "latent", "inputs": {"resolution": 3072,
@@ -414,15 +435,22 @@ class MeshStageEngine(_CheapFamilyBase):
                          "inputs": {"seed": int(seed or 0), "steps": steps,
                                     "cfg": cfg, "sampler_name": "euler",
                                     "scheduler": "normal", "denoise": 1.0,
-                                    "model": W("checkpoint", 0),
+                                    "model": W("modelsampling", 0),
                                     "positive": W("cond", 0),
                                     "negative": W("cond", 1),
                                     "latent_image": W("latent", 0)}},
             "vaedecode": {"class": "vaedecode",
                           "inputs": {"samples": W("ksampler", 0),
-                                     "vae": W("checkpoint", 2)}},
+                                     "vae": W("checkpoint", 2),
+                                     # V3 schema defaults, passed EXPLICITLY
+                                     # (EXECUTE_NORMALIZED backfills nothing)
+                                     "num_chunks": 8000,
+                                     "octree_resolution": 256}},
             "voxeltomesh": {"class": "voxeltomesh",
                             "inputs": {"voxel": W("vaedecode", 0),
+                                       # required combo; "surface net" is the
+                                       # schema's first/default option
+                                       "algorithm": "surface net",
                                        "threshold": 0.6}},
             "saveglb": {"class": "saveglb",
                         "inputs": {"mesh": W("voxeltomesh", 0),

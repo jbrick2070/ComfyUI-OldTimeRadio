@@ -376,3 +376,51 @@ def test_cold_import_mesh_stage_no_heavy_libs():
     r = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),
                        capture_output=True, text=True)
     assert r.returncode == 0, f"heavy libs pulled at import:\n{r.stdout}\n{r.stderr}"
+
+
+# --------------------------------------------------------------------------- #
+# A4 schema audit (2026-06-11): explicit widgets vs the INSTALLED core nodes
+# --------------------------------------------------------------------------- #
+def test_mesh_graph_passes_every_required_widget_explicitly():
+    """The installed hy3d nodes are V3 IO.ComfyNode classes whose
+    EXECUTE_NORMALIZED backfills NO schema defaults, and core
+    CLIPVisionEncode requires its crop combo -- so the declarative graph
+    must carry every required widget EXPLICITLY. crop / num_chunks /
+    octree_resolution / algorithm were the 2026-06-11 A4 audit gaps; this
+    pins them against regression."""
+    eng = vreg.get_engine("mesh_stage")
+    graph = eng._build_mesh_graph("portrait.png", 7, "prefix")
+    assert graph["cv_encode"]["inputs"]["crop"] == "center"
+    assert graph["vaedecode"]["inputs"]["num_chunks"] == 8000
+    assert graph["vaedecode"]["inputs"]["octree_resolution"] == 256
+    assert graph["voxeltomesh"]["inputs"]["algorithm"] == "surface net"
+    assert graph["voxeltomesh"]["inputs"]["threshold"] == 0.6
+    # KSampler keeps its full required widget set (already complete).
+    ks = graph["ksampler"]["inputs"]
+    for widget in ("seed", "steps", "cfg", "sampler_name", "scheduler",
+                   "denoise"):
+        assert widget in ks
+
+
+def test_mesh_graph_official_blueprint_wiring():
+    """A4 audit: the loader is ImageOnlyCheckpointLoader (the all-in-one
+    hy3d checkpoint embeds the DINO image encoder + ShapeVAE -- verified
+    vae./conditioner.main_image_encoder. keys in the safetensors header),
+    the encoder comes from checkpoint slot 1 (NOT a CLIPVisionLoader
+    file), and the MODEL is patched by ModelSamplingAuraFlow shift=1
+    before the KSampler -- the shipped official blueprint wiring."""
+    eng = vreg.get_engine("mesh_stage")
+    cands = eng._node_candidates()
+    assert cands["checkpoint"] == ("ImageOnlyCheckpointLoader",)
+    assert "clipvision" not in cands           # embedded encoder, no loader
+    assert cands["modelsampling"] == ("ModelSamplingAuraFlow",)
+    graph = eng._build_mesh_graph("portrait.png", 7, "prefix")
+    assert "clipvision" not in graph
+    cv = graph["cv_encode"]["inputs"]["clip_vision"]
+    assert (cv.src, cv.slot) == ("checkpoint", 1)
+    vae = graph["vaedecode"]["inputs"]["vae"]
+    assert (vae.src, vae.slot) == ("checkpoint", 2)
+    msl = graph["modelsampling"]["inputs"]
+    assert msl["shift"] == 1.0
+    model = graph["ksampler"]["inputs"]["model"]
+    assert (model.src, model.slot) == ("modelsampling", 0)

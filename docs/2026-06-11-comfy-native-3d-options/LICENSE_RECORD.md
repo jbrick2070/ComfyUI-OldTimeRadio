@@ -31,6 +31,26 @@ so nothing here blocks selecting them for look-QA.
   mesh itself (GLB cache) stays local and is never redistributed.
 - Acceptable-use policy: the Tencent AUP applies; OTR's SFW invariant
   already constrains content harder than the AUP.
+- **CHECKPOINT PINNED (2026-06-11, ticket A4):**
+  `C:\ComfyUI-Models\checkpoints\hunyuan3d-dit-v2-mv.safetensors`
+  (4,928,151,562 bytes), sha256
+  `d36f5881bcdc56726b73e517cd444c13c60732431622da7268145355c8d38e9c`
+  (verified MATCH vs the HF LFS oid). Source:
+  `Comfy-Org/hunyuan3D_2.0_repackaged` `split_files/
+  hunyuan3d-dit-v2-mv_fp16.safetensors` -- BYTE-IDENTICAL (same LFS oid)
+  to `tencent/Hunyuan3D-2mv` `hunyuan3d-dit-v2-mv/model.fp16.safetensors`,
+  so the Tencent license applies unchanged. ALL-IN-ONE verified from the
+  safetensors header: `model.*` (DiT) + `vae.*` (ShapeVAE) +
+  `conditioner.main_image_encoder.*` (DINO image encoder) -- loads via
+  core `ImageOnlyCheckpointLoader`, no separate CLIP-vision file.
+- **LICENSE TEXT ON FILE for the sign-off:** `hy3d-2mv-LICENSE.txt` +
+  `hy3d-2mv-NOTICE.txt` beside this record (fetched from the
+  tencent/Hunyuan3D-2mv repo, sizes match the repo listing). Headline
+  facts visible on its face (operator still VERIFIES the full text):
+  "TENCENT HUNYUAN 3D 2.0 COMMUNITY LICENSE AGREEMENT" (release
+  2025-01-21); territory exclusion stated up front ("DOES NOT APPLY IN
+  THE EUROPEAN UNION, UNITED KINGDOM AND SOUTH KOREA"); the MAU
+  threshold clause is in the grant conditions.
 
 ## License hedge (recorded, unprobed)
 
@@ -52,6 +72,10 @@ so nothing here blocks selecting them for look-QA.
   **CC-BY-NC** and are BANNED from this engine -- never swap them in
   without reopening this record. Pinned HF repo:
   `depth-anything/Depth-Anything-V2-Small-hf`.
+  - **SNAPSHOT FETCHED (2026-06-11, ticket A3):** revision
+    `5426e4f0f36572d16453bbda7a8389317b1bef99` in the HF cache under
+    `C:\ComfyUI-Models\huggingface` (SMALL only; Base/Large NOT fetched,
+    per the ban above).
 - **Blender (portable, pinned)**: GPL-3.0 application; invoking it as a
   subprocess does not affect OTR code licensing; rendered output frames
   carry no Blender license burden.
