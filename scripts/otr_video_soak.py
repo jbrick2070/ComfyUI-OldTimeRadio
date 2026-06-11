@@ -61,6 +61,7 @@ ENGINE_FAMILY = {
     "humo_1.7B": "audio_driven_face",
     "latentsync": "lipsync_overlay",
     "still_kenburns": "static_motion",
+    "still_parallax": "static_motion",
     "ltx_video": "text_to_video",
     "ltx_orbit": "text_to_video",
     "wan_i2v": "image_to_video",

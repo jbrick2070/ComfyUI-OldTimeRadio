@@ -1,0 +1,226 @@
+"""0-E ticket 2 CPU tests -- still_parallax (2.5D depth parallax over stills).
+
+The DA-V2-SMALL model is absent in the pytest sandbox, so every test here
+exercises the COLD path: registration (selectable-not-default), the
+fail-closed usability ladder (opt-in flag -> local model snapshot), the
+role_compat fit (all three OTR_VideoDirector slots; background_abstract
+excluded -- no still to warp), and the PURE parallax math (deterministic,
+frame-0 identity, depth-weighted shift, edge clamp, no-stretch cover box).
+The live depth inference + look-QA is the GPU/operator step, NOT covered
+here.
+"""
+from __future__ import annotations
+
+import importlib.util
+import pathlib
+import subprocess
+import sys
+
+import pytest
+
+from nodes._otr_shared import role_compat as rc
+from nodes._otr_video_engines import registry as vreg
+from nodes._otr_video_engines import render_driver as rd
+from nodes._otr_video_engines import schemas as sc
+from nodes._otr_video_engines.eng_still_parallax import (
+    StillParallaxEngine,
+    fit_cover_box,
+    normalize_depth,
+    parallax_offsets,
+    synth_parallax_frames,
+)
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+# --------------------------------------------------------------------------- #
+# Registration: selectable-not-default until operator look-QA (0-E gate)
+# --------------------------------------------------------------------------- #
+def test_still_parallax_registered_selectable_not_default():
+    assert vreg.is_registered("still_parallax")
+    eng = vreg.get_engine("still_parallax")
+    assert isinstance(eng, StillParallaxEngine)
+    assert eng.family == "static_motion" and eng.family in sc.FAMILIES
+    assert eng.default_roles == ()             # NEVER a default until look-QA
+    assert eng.requires_flag == "OTR_ENABLE_STILL_PARALLAX"
+    assert eng.required_inputs == ("init_image",)
+    assert eng.commercial_clean is True        # Apache-2.0 SMALL ckpt pinned
+    assert eng.fallback_engine == "still_kenburns"
+    assert "still_parallax" in vreg.all_engine_names()   # full dropdown (V-6)
+    assert "not real 3D" in eng.honest_label   # the honest 0-E label
+    for role in rc.ROLES:                      # never the default for ANY role
+        assert vreg.default_engine_for_role(role) != "still_parallax"
+
+
+def test_still_parallax_fits_three_slots_not_background():
+    from nodes.otr_video_director import VIDEO_SLOT_ROLES
+    eng = vreg.get_engine("still_parallax")
+    desc = {"engine_id": "still_parallax", "roles": eng.roles,
+            "required_inputs": eng.required_inputs}
+    for slot, slot_roles in VIDEO_SLOT_ROLES.items():
+        assert any(rc.engine_fits_role(desc, role) for role in slot_roles), slot
+    for role in ("announcer_visual", "music_visual", "character_video",
+                 "scene_broll"):
+        assert rc.engine_fits_role(desc, role) is True
+    # background_abstract supplies ONLY text_prompt -- no still to warp, so
+    # the role is excluded fail-closed (and the engine does not list it).
+    assert rc.engine_fits_role(desc, "background_abstract") is False
+
+
+def test_registry_gates_still_parallax_until_flag(monkeypatch):
+    monkeypatch.delenv("OTR_ENABLE_STILL_PARALLAX", raising=False)
+    eng = vreg.get_engine("still_parallax")
+    for role in eng.roles:                     # opt-in: dark for EVERY role
+        with pytest.raises(vreg.EngineUnusable):
+            vreg.assert_usable("still_parallax", role)
+    monkeypatch.setenv("OTR_ENABLE_STILL_PARALLAX", "1")
+    for role in eng.roles:
+        assert vreg.assert_usable("still_parallax", role) == "still_parallax"
+
+
+def test_still_parallax_assert_usable_flag_then_model(monkeypatch, tmp_path):
+    eng = vreg.get_engine("still_parallax")
+    monkeypatch.delenv("OTR_ENABLE_STILL_PARALLAX", raising=False)
+    with pytest.raises(vreg.EngineUnusable) as e1:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
+    # Flag on but the pinned local snapshot missing -> MISSING_MODEL naming
+    # the env knob + the HF repo id (offline-first: never a runtime fetch).
+    monkeypatch.setenv("OTR_ENABLE_STILL_PARALLAX", "1")
+    monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(tmp_path / "absent"))
+    with pytest.raises(vreg.EngineUnusable) as e2:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e2.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
+    msg = str(e2.value)
+    assert "OTR_DEPTH_ANYTHING_V2_DIR" in msg
+    assert "Depth-Anything-V2-Small-hf" in msg
+    # Snapshot present -> usable (the dir check is the cheap CPU gate).
+    present = tmp_path / "da2s"
+    present.mkdir()
+    monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(present))
+    assert eng.assert_usable(host_caps={}, profile={}) == "still_parallax"
+
+
+# --------------------------------------------------------------------------- #
+# Pure parallax math (deterministic; no RNG, no model, no ffmpeg)
+# --------------------------------------------------------------------------- #
+def test_normalize_depth_minmax_and_flat():
+    import numpy as np
+    d = normalize_depth([[0.0, 5.0], [10.0, 5.0]])
+    assert d.dtype.name == "float32"
+    assert d[0, 0] == 0.0 and d[1, 0] == 1.0 and d[0, 1] == 0.5
+    flat = normalize_depth(np.full((4, 4), 7.25))
+    assert flat.min() == flat.max() == 0.0     # flat scene -> no parallax
+
+
+def test_parallax_offsets_loop_and_identity():
+    offs = parallax_offsets(5, 3.0)
+    assert len(offs) == 5
+    assert offs[0] == (0.0, 0.0)               # frame 0 IS the still
+    assert abs(offs[-1][0]) < 1e-9 and abs(offs[-1][1]) < 1e-9   # loops
+    assert abs(offs[1][0] - 3.0) < 1e-9        # quarter phase = full amp
+    assert parallax_offsets(1, 3.0) == [(0.0, 0.0)]   # n=1 degenerate
+    assert parallax_offsets(5, 3.0) == offs    # deterministic, no RNG
+
+
+def test_synth_parallax_frames_depth_weighted_shift_and_clamp():
+    import numpy as np
+    h, w, amp, n = 8, 8, 2.0, 5
+    img = np.zeros((h, w, 3), dtype="uint8")
+    img[:, :, 0] = np.arange(w, dtype="uint8")[None, :] * 10   # x-gradient
+    depth = np.zeros((h, w), dtype="float32")
+    depth[h // 2:, :] = 1.0                    # top = far, bottom = near
+    frames = synth_parallax_frames(img, depth, n, amp)
+    assert frames.shape == (n, h, w, 3) and frames.dtype.name == "uint8"
+    assert np.array_equal(frames[0], img)      # frame-0 identity
+    assert np.array_equal(frames[-1], img)     # seamless loop
+    # Quarter phase (frame 1): dx=amp, dy=0. Far rows (off=-1) sample x+amp
+    # (content slides LEFT); near rows (off=+1) sample x-amp (slides RIGHT).
+    assert frames[1][0, 3, 0] == 50            # far: img[., 3+2] = 50
+    assert frames[1][7, 3, 0] == 10            # near: img[., 3-2] = 10
+    # Edge clamp: the gather never reads outside the still.
+    assert frames[1][0, 7, 0] == 70            # far at right edge clamps to 7
+    assert np.array_equal(frames, synth_parallax_frames(img, depth, n, amp))
+    with pytest.raises(ValueError):
+        synth_parallax_frames(img[:, :, 0], depth, n, amp)     # bad img shape
+    with pytest.raises(ValueError):
+        synth_parallax_frames(img, depth[:4, :], n, amp)       # shape mismatch
+
+
+def test_fit_cover_box_uniform_no_stretch():
+    sw, sh, left, top = fit_cover_box(480, 832, 1280, 720)
+    assert sw >= 1280 and sh >= 720            # covers the canvas
+    assert abs(sw / 480 - sh / 832) < 0.01     # ONE uniform scale (no stretch)
+    assert left == (sw - 1280) // 2 and top == (sh - 720) // 2   # centered
+    sw2, sh2, left2, top2 = fit_cover_box(1472, 832, 1472, 832)
+    assert (sw2, sh2, left2, top2) == (1472, 832, 0, 0)          # exact fit
+
+
+# --------------------------------------------------------------------------- #
+# LOUD missing-still behavior (honest engine: never a slate under this stamp)
+# --------------------------------------------------------------------------- #
+def test_render_clip_missing_still_raises_dependency_missing():
+    eng = vreg.get_engine("still_parallax")
+    req = {"shot_id": "s1", "canvas": {"w": 64, "h": 48, "fps": 25},
+           "timing": {"target_frame_count": 3}, "asset_refs": {}}
+    with pytest.raises(FileNotFoundError):
+        eng.render_clip(req)
+    # The chain classifies it DEPENDENCY_MISSING -> LOUD skip to the floor.
+    assert rd.classify_failure(FileNotFoundError("x")).name == "DEPENDENCY_MISSING"
+
+
+# --------------------------------------------------------------------------- #
+# Driver maps + capability row (BOTH copies; the 0-E wiring contract)
+# --------------------------------------------------------------------------- #
+def test_engine_family_and_fallback_chain_both_copies():
+    assert rd.ENGINE_FAMILY["still_parallax"] == "static_motion"
+    assert rd.engine_family("still_parallax") == "static_motion"
+    assert rd.make_fallback_of()("still_parallax") == "still_kenburns"
+    assert "still_parallax" not in rd.FLOOR_NAMES   # model-gated, NOT a floor
+    soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
+    spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)
+    soak = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(soak)
+    assert soak.ENGINE_FAMILY["still_parallax"] == "static_motion"
+
+
+def test_capability_row_is_cpu_degradable_light():
+    row = vreg.CAPABILITIES["still_parallax"]
+    assert row["cpu_ok"] is True               # CPU-degradable by design
+    assert row["vram_class"] == "light"
+    assert row["required_toolchain"] is None and row["requires_sidecar"] is False
+    assert row["model_requirements"] == ["depth-anything-v2-small-hf"]
+
+
+def test_canonical_clip_stamps_parallax():
+    eng = vreg.get_engine("still_parallax")
+    clip = eng._floor_clip({"shot_id": "s9"}, "C:/p.mp4", 25, 40)
+    assert clip["engine_id"] == "still_parallax"
+    assert clip["family"] == "static_motion"
+    assert clip["has_audio"] is False          # V-1: mux owns audio
+    assert clip["pixel_format"] == "yuv420p" and clip["matrix"] == "bt709"
+    assert eng.canonicalize(clip, {}, {}) is clip   # identity canonicalize
+
+
+# --------------------------------------------------------------------------- #
+# Cold-import + ASCII source (V-12 / CLAUDE.md)
+# --------------------------------------------------------------------------- #
+def test_cold_import_still_parallax_no_heavy_libs():
+    code = (
+        "import sys;"
+        "import nodes._otr_video_engines.eng_still_parallax;"
+        "heavy=[m for m in ('torch','transformers','diffusers') "
+        "if m in sys.modules];"
+        "print('HEAVY', heavy);"
+        "sys.exit(1 if heavy else 0)"
+    )
+    r = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),
+                       capture_output=True, text=True)
+    assert r.returncode == 0, f"heavy libs pulled at import:\n{r.stdout}\n{r.stderr}"
+
+
+def test_still_parallax_source_is_ascii_no_em_dash():
+    src_path = REPO_ROOT / "nodes" / "_otr_video_engines" / "eng_still_parallax.py"
+    src = src_path.read_text(encoding="utf-8")
+    assert "—" not in src                 # em-dash forbidden (CLAUDE.md)
+    src.encode("ascii")                        # ASCII-only source

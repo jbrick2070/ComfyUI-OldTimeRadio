@@ -59,8 +59,14 @@ def test_probe_one_absent_lib_is_clean_and_imports_no_banned_dep():
     for name in PILOT.OPT_IN_ENGINES:
         v = PILOT.probe_one(name, do_import=True)
         assert v["engine"] == name
-        # Library absent in the sandbox -> a clean, non-crashing verdict.
-        assert v["status"] in {"lib_absent", "import_error"}, v
+        if PILOT.OPT_IN_ENGINES[name].get("lib_in_stack"):
+            # In-stack rows (spine deps, e.g. transformers for
+            # still_parallax) report the truthful lib_in_stack verdict; the
+            # real gate is the local model snapshot via assert_usable.
+            assert v["status"] == "lib_in_stack", v
+        else:
+            # Library absent in the sandbox -> a clean, non-crashing verdict.
+            assert v["status"] in {"lib_absent", "import_error"}, v
         assert v["adapter_registered"] is True, "adapter must be registered"
         assert "TODO-for-GPU-smoke" in v["assumed_call"]
         assert v["import_clean_ready"] is False

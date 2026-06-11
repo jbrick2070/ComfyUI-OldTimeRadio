@@ -155,6 +155,13 @@ CAPABILITIES = {
     "ltx_orbit": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["ltx-video-2b"]},
+    # still_parallax (0-E easy on-ramp): DepthAnythingV2-SMALL (~25M params,
+    # Apache-2.0 -- the bigger DA-V2 ckpts are CC-BY-NC and banned) + a pure
+    # numpy warp. cpu_ok: CPU-degradable by design (slower, same contract).
+    "still_parallax": {"vram_class": "light", "vram_estimate_mb": 500,
+                       "required_toolchain": None, "requires_sidecar": False,
+                       "cpu_ok": True,
+                       "model_requirements": ["depth-anything-v2-small-hf"]},
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.1-i2v"]},

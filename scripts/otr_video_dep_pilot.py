@@ -101,6 +101,25 @@ OPT_IN_ENGINES = {
             "169f decode band, and render-twice determinism on sm_120"
         ),
     },
+    # 0-E easy on-ramp: 2.5D depth parallax over existing stills.
+    # DepthAnythingV2-SMALL pinned (Apache-2.0; the bigger DA-V2 ckpts are
+    # CC-BY-NC and banned). CPU-degradable; in-process transformers.
+    "still_parallax": {
+        "lib_module": "transformers",
+        "lib_in_stack": True,           # spine dep; gate = local DA-V2-S snapshot
+        "adapter_class": "StillParallaxEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_STILL_PARALLAX",
+        "assumed_call": (
+            "in-process: AutoModelForDepthEstimation (DA-V2-SMALL, "
+            "local_files_only) -> one depth map per still -> pure-numpy "
+            "depth-weighted sway -> encode_frames_to_silent_mp4; CUDA when "
+            "present, CPU otherwise (same contract).  "
+            "# TODO-for-GPU-smoke: pre-fetch depth-anything/"
+            "Depth-Anything-V2-Small-hf into the HF cache, one clip on the "
+            "box confirming the parallax reads + render-twice determinism"
+        ),
+    },
     "wan_i2v": {
         "lib_module": "wan",
         "adapter_class": "WanI2VEngine",
@@ -404,6 +423,22 @@ def probe_one(engine_name, *, do_import=True):
     }
     if not do_import:
         verdict["status"] = "not_imported"
+        return verdict
+
+    if spec.get("lib_in_stack"):
+        # The engine's libraries are SPINE dependencies (already resident in
+        # the main venv -- e.g. transformers for still_parallax). Re-importing
+        # the spine inside the pilot proves nothing and would smear the dep
+        # snapshot for the later probes; the engine's REAL gate is its local
+        # model snapshot, enforced fail-closed by assert_usable, never a lib
+        # import. import_clean_ready stays False (readiness is a GPU/asset
+        # call, same as every other row).
+        verdict["status"] = "lib_in_stack"
+        verdict["note"] = (
+            f"{spec['lib_module']} is a spine dependency (already in the "
+            f"main venv); the gating asset is the LOCAL model snapshot "
+            f"checked by assert_usable -- nothing to import-probe here"
+        )
         return verdict
 
     before = dep_snapshot()

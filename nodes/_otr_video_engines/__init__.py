@@ -72,6 +72,19 @@ except Exception:  # noqa: BLE001
     pass
 
 
+# 0-E easy on-ramp (2026-06-11): still_parallax -- 2.5D depth parallax over
+# existing stills (DepthAnythingV2-SMALL, Apache, pinned). DEFAULT-OFF /
+# selectable (empty default_roles + OTR_ENABLE_STILL_PARALLAX) until operator
+# look-QA; fails closed without the local model. Cold-import clean (lazy
+# torch/transformers/PIL/numpy inside load/render_clip). Guarded so a
+# packaging quirk never breaks the namespace import. (ltx_orbit, the first
+# 0-E engine, registers inside eng_ltx_video above.)
+try:  # pragma: no cover - trivial guard
+    from . import eng_still_parallax as _eng_still_parallax  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # character_3d dark scaffold adapters (W7-pre slice): triposg_talk (the v1
 # no-compile lane, S-3D-0-gated) + hunyuan3d_talk/trellis_talk (the deferred
 # cu128 toolkit lane). All three are DEFAULT-OFF / dark and FAIL CLOSED until
