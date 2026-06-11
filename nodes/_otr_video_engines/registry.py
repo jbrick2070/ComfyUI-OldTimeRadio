@@ -148,6 +148,13 @@ CAPABILITIES = {
     "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["ltx-video-2b"]},
+    # ltx_orbit (0-E easy on-ramp): the camera-orbit PROMPT PRESET over the
+    # existing LTX adapter -- IDENTICAL physics to ltx_video (same checkpoint,
+    # same graph, same VRAM), so the row mirrors it. Selectable-not-default
+    # (opt-in flag at the adapter) until operator look-QA.
+    "ltx_orbit": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": False,
+                  "model_requirements": ["ltx-video-2b"]},
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.1-i2v"]},

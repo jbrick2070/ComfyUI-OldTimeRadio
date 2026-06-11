@@ -202,16 +202,24 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         if os.getenv(self.requires_flag, "1") == "0":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "ltx_video disabled by %s=0" % self.requires_flag, kind="video")
+                "%s disabled by %s=0" % (self.name, self.requires_flag),
+                kind="video")
+        self._assert_stack_ready()
+        return self.name
+
+    def _assert_stack_ready(self):
+        """The shared post-flag usability ladder (BUG-070 Sage gate, then
+        checkpoint + T5 presence). Factored so the 0-E preset engines run the
+        IDENTICAL stack checks after their own opt-in flag gate."""
         _MC.assert_sage_not_patched(self.name, self.family)   # BUG-070 (S5 gate)
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "ltx_video not installed: checkpoint=%s (OTR_LTX_VIDEO_CKPT) + "
+                "%s not installed: checkpoint=%s (OTR_LTX_VIDEO_CKPT) + "
                 "T5 encoder=%s (OTR_LTX_T5_ENCODER) -- both required for v0.9; "
                 "install and verify on the GPU box"
-                % (self._ckpt_path(), self._text_encoder_name()), kind="video")
-        return self.name
+                % (self.name, self._ckpt_path(), self._text_encoder_name()),
+                kind="video")
 
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
@@ -478,7 +486,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         os.close(fd)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_vram_within_ceiling("ltx_video-render")  # PASS-PM mid-render
+            _MC.assert_vram_within_ceiling(self.name + "-render")  # PASS-PM mid-render
         return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):
@@ -525,4 +533,80 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         }
 
 
-__all__ = ["LtxVideoEngine"]
+# --------------------------------------------------------------------------- #
+# ltx_orbit -- the 0-E easy on-ramp "3D-feel" camera-orbit preset (2026-06-11)
+# --------------------------------------------------------------------------- #
+#: The v1 orbit preset (ONE preset, turntable-style; the optional camera-LoRA
+#: is v1.1 and gated on naming the exact asset + license -- 0-E spec). Appended
+#: to the shot's prompt; env-overridable, deterministic given the env.
+_ORBIT_PROMPT_DEFAULT = (
+    "camera slowly orbiting the subject in a smooth circular arc, steady "
+    "orbital dolly move, strong motion parallax, subject centered and at a "
+    "consistent scale, cinematic depth")
+#: Orbit-specific negative additions (the base default negative still applies;
+#: these suppress the locked-off look the preset exists to avoid).
+_ORBIT_NEGATIVE_DEFAULT = (
+    "static camera, locked-off shot, frozen frame, camera shake, jump cut")
+
+
+@register
+class LtxOrbitEngine(LtxVideoEngine):
+    """``ltx_orbit`` -- a camera-orbit PROMPT PRESET over the existing LTX
+    adapter (0-E ticket 1; zero new deps, zero new graph topology).
+
+    HONEST LABEL: this is "3D-feel", NOT real 3D -- it renders the same LTX
+    text->video forward with orbit-camera prompt language appended; there is no
+    mesh, no depth map, no camera rig. The first REAL 3D object ships with
+    ``mesh_stage``. Registered SELECTABLE-NOT-DEFAULT (empty ``default_roles``
+    + its own opt-in flag) until operator look-QA passes; serves ALL THREE
+    OTR_VideoDirector dropdown slots (announcer / music / other-beats incl.
+    character_video -- honest-label motion, no lip-sync claim).
+    """
+
+    name = "ltx_orbit"
+    honest_label = "3D-feel camera orbit (LTX prompt preset -- not real 3D)"
+    # All three OTR_VideoDirector slots: announcer_video_model,
+    # music_video_model, and other_beats_video_model (character_video /
+    # scene_broll / background_abstract). required_inputs stays
+    # ("text_prompt",), which every role supplies (role_compat AS-1), so the
+    # engine fits all five roles.
+    roles = ("announcer_visual", "music_visual", "character_video",
+             "scene_broll", "background_abstract")
+    #: NEVER a default until the operator's look-QA promotes it (0-E gate).
+    default_roles = ()
+    requires_flag = "OTR_ENABLE_LTX_ORBIT"
+    engine_version = "1"
+
+    def assert_usable(self, host_caps, profile, request_template=None):
+        """Fail closed: ltx_orbit is OPT-IN (default OFF -- the 0-E lane lands
+        selectable-not-default), then the identical LTX stack ladder (BUG-070
+        Sage gate + checkpoint/T5 presence) via ``_assert_stack_ready``."""
+        if os.getenv(self.requires_flag, "0") != "1":
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
+                "%s is opt-in (0-E easy on-ramp; selectable-not-default until "
+                "operator look-QA); set %s=1 to enable it"
+                % (self.name, self.requires_flag), kind="video")
+        self._assert_stack_ready()
+        return self.name
+
+    def _build_render_request(self, request):
+        """Pure: the base LTX plan with the orbit preset appended to the
+        positive prompt and the orbit negatives appended to the EFFECTIVE
+        negative (base default preserved when the request carries none).
+        Deterministic given the env; the seed flows through untouched (V-7)."""
+        plan = super()._build_render_request(request)
+        orbit = (os.environ.get("OTR_LTX_ORBIT_PROMPT")
+                 or _ORBIT_PROMPT_DEFAULT).strip()
+        base = (plan.get("text_prompt") or "").strip()
+        plan["text_prompt"] = (base + ", " + orbit) if base else orbit
+        orbit_neg = (os.environ.get("OTR_LTX_ORBIT_NEGATIVE")
+                     or _ORBIT_NEGATIVE_DEFAULT).strip()
+        base_neg = (plan.get("negative_prompt") or "").strip() or \
+            os.environ.get("OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE).strip()
+        plan["negative_prompt"] = (base_neg + ", " + orbit_neg) if base_neg \
+            else orbit_neg
+        return plan
+
+
+__all__ = ["LtxVideoEngine", "LtxOrbitEngine"]

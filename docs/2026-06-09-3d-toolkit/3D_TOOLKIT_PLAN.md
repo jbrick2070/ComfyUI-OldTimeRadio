@@ -9,6 +9,84 @@
 > `otr_image_director.py`). Artifacts:
 > `otr-video-roundtable\roundtable_campaign\2026-06-09-3dplan\h_pass01..02\` (+ judgments).
 
+## 0. EXECUTION SEQUENCING -- non-3D foundation gate FIRST (added 2026-06-10, operator-directed: ONE forward plan, not three)
+
+This 3D plan is the SINGLE forward plan. Two non-3D items gate it (do them FIRST, in order); the switchable-workflow DISTRIBUTION work tails it. Detailed spec for the switchable items: `docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md` -- its S0-S6 are sequenced HERE, so it is a spec / decision record, NOT a separate plan to track.
+
+**EXECUTION ORDER (do in this sequence; the GATE blocks below are the detailed spec for each step):**
+1. **Punch list** (in flight) -- captions + LTX radio open + procgen rolling credits baked INTO the production JSON, proven by a render FROM it; operator look-QA. *(GATE A)*
+2. **latentsync-100% + the demos** -- the `OTR_LSYNC_BASE_ENGINE=still_kenburns` fix + BOTH the two-demo set AND the mixed showcase episode (operator SEES the five working). *(GATE A)*
+3. **Switchable foundation S0 -> S1 -> S2** -- profiles + registry enable-set + the ONE applier that DELETES the hand-coded patch lists (the drift cause) + the 3 code-defect fixes. *(GATE B)*
+4. **Dropdown coverage sweep** -- every announcer / music / cast engine option renders a 30-word FULL episode on the S2 applier; no crashes, credits + subtitles present. *(GATE A acceptance, powered by GATE B's applier)*
+5. **THEN the 3D sprints** -- begin with this plan's carry-in image-routing must-fixes (section 3).
+6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README. *(closing phase)*
+
+**LIVE STATUS + OPEN TICKETS (2026-06-11, one-plan rule: track them HERE; the dated docs
+are evidence records, not plans):**
+- **Item 4 (sweep): RUN 2 IN FLIGHT.** Run 0 (overnight, old server code) legs 1-6 PASS;
+  run 1 VOID (Wan-superset launch env co-staged Wan TE beside HuMo-14B -> offload thrash,
+  operator-side miss); run 2 = 9 legs on tonight's code, clean env. Wan legs deferred to
+  a supervised final batch. Evidence: `docs/2026-06-11-coverage-sweep-triage__tickets.md`.
+- **CS-1** latentsync legs must show latentsync in the trace (run-0 "PASS" was
+  fallback-only on stale code) -- BOTH legs re-running in run 2; resolves there.
+- **CS-2** machine NVML pins ~16 GB on every leg vs the 14.5 ceiling while driver-phase
+  attribution reads 3.1-3.5 GB -- needs phase attribution; operator decision post-restart.
+- **CS-3** wan_i2v dropdown legs need Wan AND HuMo in one episode; if both always
+  co-stage, wan options are 16gb-tier-incompatible as wired -- supervised wan batch
+  decides; fix candidates: dispatch-time Wan TE staging / wan-leg characters pinned to
+  humo_1.7B / enable-set incompatibility row.
+- **0-E on-ramp** (`ltx_orbit`, `still_parallax`, `mesh_stage`): tickets E-1..E-7 below
+  in 0-E; gated on Track-3 plumbing merge + sweep completion; coder-window ready.
+- Operator gates unchanged: Desktop relaunch (look-QA), fresh-render reddish acceptance
+  test, latentsync demo set + mixed showcase, whiny-voice P0 matrix + reel, S-3D-0 green
+  light, v2.0-alpha-stable tag decision.
+
+**PARALLEL TRACK (audio -- NOT in the video serial order): the character-voice "whiny" fix.** Runs in its OWN window alongside this runway -- own plan `docs/2026-06-10-character-voice-whiny-fix__problem-statement.md` (v3.1 CONVERGED, live 4-model panel, @9181fda) + tracker P3 row. Audio vs the video engines are different code areas, so it never blocks the video sprints. ONE coupling: the video demos (punch list / latentsync / coverage sweep) carry these character voices in their FROZEN master, so land at least P-OBS (logging) + P0-zero (bark proof) + the cheap ref/delivery fixes (loudness-normalize the low-RMS refs, expose `emo_alpha`, per-character seed) BEFORE the operator's video look-QA / the coverage sweep, so the demos sound right. Frozen-audio spine stays untouched (upstream TTS only).
+
+- **GATE A -- operator acceptance: SEE it all working (in flight now).** In real renders from `workflows/otr_scifi_16gb_full.json`, the operator must SEE working: **LTX** (the radio open) + **HuMo** (character beats; already proven byte-identical `humo:5`) + **latentsync at 100%** + **rolling credits** + **burned-in SDH subtitles**. Then operator look-QA passes.
+  - The captions + LTX-open + credits are the punch list (baked INTO the production JSON, proven by a render FROM that file).
+  - **latentsync at 100% = the ONE new item beyond the punch list.** Today it is a ~1/5 face-lottery (`latentsync:1` in the marathon: only beats with a detectable face land, the rest fall LOUD to floor). FIX = `OTR_LSYNC_BASE_ENGINE=still_kenburns` -- run lip-sync over a clean cast portrait so EVERY beat has a face to track; verify it hits all beats, not a subset.
+  - **Demos (operator wants BOTH, 2026-06-10):** (1) the two-demo set -- a production episode (HuMo character + LTX open + credits + captions) + a latentsync render (still_kenburns base, reliable on all beats); AND (2) a MIXED episode (LTX open + one HuMo character + one latentsync character + credits + captions) as the single "see it all" showcase.
+  - **DROPDOWN COVERAGE SWEEP (operator-required 2026-06-10):** every engine option in the **announcer**, **music**, and **cast/character** video dropdowns must render a FULL short episode (30 words is fine) WITHOUT crashing -- deliverable playable, credits + subtitles present. This proves no dropdown option is broken before a user selects it. Enumerate the valid options per role from the registry (not a hard-coded list); best run as an extended marathon/coverage playlist (one short episode per role x engine), gated like the soak (playable AAC + byte-identical archival + hygiene + VRAM). Marathon-sized (overnight). It should consume the S2 `--profile` applier once that lands -- NOT hand-coded patch lists.
+  - (GATE A is a band-aid until GATE B makes it structurally durable; latentsync-100% + the coverage sweep ride the same applier.)
+- **GATE B -- switchable foundation S0-S2 (BEFORE the 3D sprints):**
+  - S0 profile foundation (schema + `config/profiles/` 3 tiers + checked-in widget MAPPING JSON + image-lane gate topology).
+  - S1 registry capability declarations + derived enable-set + BLOCKING cold-import gate + dynamic VRAM ceiling.
+  - **S2 = the DRIFT KILL:** ONE applier consumed by the generator, the headless scripts, and CI -- DELETES the hand-coded patch lists that caused the captions/credits/LTX drift; fixes the 3 code defects (`_load_workflow`/`IS_CHANGED` repo-root, node-63 empty validator path, engine-selectors-outside-the-Directors); its "punch-list acceptance demo" cements GATE A.
+  - *Why before 3D:* `character_3d` wires into the SAME production workflow and runs headless soaks. Built on the single-source-of-truth applier (not patch lists), 3D cannot reintroduce the drift, and those 3 code defects would otherwise bite 3D's headless runs. `character_3d` then drops into the S0/S1 profile + enable-set framework as a clean default-off, fail-closed switch -- the switchable plan's section 12 explicitly keeps the profile design from blocking it.
+- **THEN the 3D sprints below** (begin with this plan's OWN carry-in image-routing must-fixes, section 3).
+- **CLOSING PHASE -- switchable distribution S3-S6 (AFTER the 3D work):** generator + `.gen.json` tier snapshots (S3); 8gb_lite / cpu_floor tier reality (S4); install wizard + model fetch (S5); README/newbie refresh (S6). Ship-time packaging, deferred so the tier snapshots include `character_3d` from day one.
+
+### 0-E. PARALLEL TRACK (3D easy on-ramp -- ADDITIVE lane, operator-ordered 2026-06-11)
+
+Three no-toolchain LOCAL engines join the video dropdowns as the QUICK 3D test cases,
+in parallel with this plan's runway -- NOTHING here removes or re-gates the toolkit lane
+above (TripoSG/ARKit/Rhubarb/Blender talking heads and their S-3D-0 gates stay exactly
+as written; this lane BRIDGES to it: same Blender render seam, mesher swappable, rig
+arrives with the toolkit). Converged via a 2-pass 4-reviewer roundtable grounded on the
+live install (~$0.22): spec + tickets E-1..E-7 =
+`docs/2026-06-11-comfy-native-3d-options/roundtable/pass02_plan.md` (judgments + raw
+reviews alongside).
+
+1. **`ltx_orbit`** (~1 day) -- camera-orbit prompt preset on the EXISTING LTX adapter;
+   zero new deps; "3D-feel" honest label; all three dropdown slots.
+2. **`still_parallax`** (1-2 days) -- 2.5D depth parallax over existing FLUX stills;
+   DepthAnythingV2-SMALL pinned (Apache; the bigger DA-V2 ckpts are CC-BY-NC);
+   extends the static_motion cheap family; CPU-degradable.
+3. **`mesh_stage`** (3-5 days) -- the TRADITIONAL chain: portrait -> Hunyuan3D-2mv
+   NATIVE ComfyUI-core mesh gen (nodes verified PRESENT in the running install,
+   compile-free) -> cached GLB per character (canonical-portrait key, manifest sidecar)
+   -> pinned portable Blender headless stage (WORKBENCH matcap v1, turntable-orbit
+   preset, exact ledger frame count, atomic frame-dir publish) -> compositor. First
+   REAL 3D OBJECT in the workflow. TripoSR(MIT)+marching-cubes = license-hedge mesher.
+   NO-GO deps named in the spec (nvdiffrast/spconv/flash-attn class = the same cu128
+   wall this plan already documents). EEVEE banned v1 headless; Cycles = v1.5 tier.
+
+GATES: rides Track-3's directory-clip plumbing (must MERGE first); registry/profile
+edits land after the running coverage sweep; selectable-not-default until operator
+look-QA; Tencent license record before any default-on. Animation tier-1 = camera/object
+motion only -- rigged/talking 3D remains THIS plan's toolkit lanes.
+
 ## What changed v1 -> v2 (and why)
 
 - **Reconciled plan vs the SHIPPED dark scaffold** (all panelists): the repo already registers

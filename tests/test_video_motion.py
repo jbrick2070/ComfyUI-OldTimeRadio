@@ -23,7 +23,7 @@ from nodes._otr_shared import role_compat as rc
 from nodes._otr_video_engines import motion_common as mc
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
-from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
+from nodes._otr_video_engines.eng_ltx_video import LtxOrbitEngine, LtxVideoEngine
 from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -300,6 +300,111 @@ def test_canonicalize_silent_bt709():
         assert clip["frame_count"] == 40 and clip["fps"] == 25
         assert clip["engine_id"] == name and clip["path"] == "C:/o.mp4"
         assert clip["clip_id"] == "s1"
+
+
+# --------------------------------------------------------------------------- #
+# ltx_orbit -- the 0-E easy on-ramp camera-orbit preset (2026-06-11)
+# Selectable-not-default until operator look-QA; honest "3D-feel" label.
+# --------------------------------------------------------------------------- #
+def test_ltx_orbit_registered_selectable_not_default():
+    assert vreg.is_registered("ltx_orbit")
+    eng = vreg.get_engine("ltx_orbit")
+    assert isinstance(eng, LtxOrbitEngine) and isinstance(eng, LtxVideoEngine)
+    assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
+    assert eng.default_roles == ()             # NEVER a default until look-QA
+    assert eng.requires_flag == "OTR_ENABLE_LTX_ORBIT"
+    assert eng.required_inputs == ("text_prompt",)
+    assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
+    assert "ltx_orbit" in vreg.all_engine_names()   # full static dropdown (V-6)
+    assert "not real 3D" in eng.honest_label        # the honest 0-E label
+    for role in rc.ROLES:                      # never the default for ANY role
+        assert vreg.default_engine_for_role(role) != "ltx_orbit"
+
+
+def test_ltx_orbit_fits_all_three_director_slots():
+    from nodes.otr_video_director import VIDEO_SLOT_ROLES
+    eng = vreg.get_engine("ltx_orbit")
+    desc = {"engine_id": "ltx_orbit", "roles": eng.roles,
+            "required_inputs": eng.required_inputs}
+    for slot, slot_roles in VIDEO_SLOT_ROLES.items():
+        assert any(rc.engine_fits_role(desc, role) for role in slot_roles), slot
+    # Honest-label motion serves character_video too (no lip-sync claim).
+    assert rc.engine_fits_role(desc, "character_video") is True
+
+
+def test_registry_gates_ltx_orbit_until_flag(monkeypatch):
+    monkeypatch.delenv("OTR_ENABLE_LTX_ORBIT", raising=False)
+    eng = vreg.get_engine("ltx_orbit")
+    for role in eng.roles:                     # opt-in: dark for EVERY role
+        with pytest.raises(vreg.EngineUnusable):
+            vreg.assert_usable("ltx_orbit", role)
+    monkeypatch.setenv("OTR_ENABLE_LTX_ORBIT", "1")
+    for role in eng.roles:
+        assert vreg.assert_usable("ltx_orbit", role) == "ltx_orbit"
+
+
+def test_ltx_orbit_assert_usable_flag_then_stack(monkeypatch):
+    eng = vreg.get_engine("ltx_orbit")
+    # Opt-in semantics (UNLIKE the promoted-default-on base): flag unset = dark.
+    monkeypatch.delenv("OTR_ENABLE_LTX_ORBIT", raising=False)
+    with pytest.raises(vreg.EngineUnusable) as e1:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
+    # Flag on -> the IDENTICAL LTX stack ladder: BUG-070 Sage gate first ...
+    monkeypatch.setenv("OTR_ENABLE_LTX_ORBIT", "1")
+    monkeypatch.setitem(sys.modules, "sageattention",
+                        types.ModuleType("sageattention"))
+    with pytest.raises(vreg.EngineUnusable) as e2:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e2.value.reason == vreg.EngineUsabilityReason.INCOMPATIBLE_PROFILE
+    # ... then checkpoint presence, fail closed NAMED as ltx_orbit.
+    monkeypatch.delitem(sys.modules, "sageattention", raising=False)
+    monkeypatch.delenv("OTR_SAGEATTENTION_PATCHED", raising=False)
+    monkeypatch.setenv("OTR_LTX_VIDEO_CKPT", str(REPO_ROOT / "_no_ckpt.safetensors"))
+    with pytest.raises(vreg.EngineUnusable) as e3:
+        eng.assert_usable(host_caps={}, profile={})
+    assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
+    assert "ltx_orbit" in str(e3.value)
+
+
+def test_ltx_orbit_preset_appends_orbit_language(monkeypatch):
+    monkeypatch.delenv("OTR_LTX_ORBIT_PROMPT", raising=False)
+    monkeypatch.delenv("OTR_LTX_ORBIT_NEGATIVE", raising=False)
+    monkeypatch.delenv("OTR_LTX_NEGATIVE", raising=False)
+    orbit = vreg.get_engine("ltx_orbit")
+    base = vreg.get_engine("ltx_video")
+    req = {"text_prompt": "a neon diner", "negative_prompt": "blurry",
+           "timing": {"target_frame_count": 50}, "seed_bundle": {"request_seed": 7}}
+    a, b = orbit._build_render_request(req), orbit._build_render_request(req)
+    assert a == b                              # render-twice stability (V-7)
+    assert a["text_prompt"].startswith("a neon diner, ")
+    assert "orbit" in a["text_prompt"]         # the preset is APPENDED
+    assert a["negative_prompt"].startswith("blurry, ")
+    assert "static camera" in a["negative_prompt"]
+    assert a["seed"] == 7 and a["target_frame_count"] == 50 and a["fps"] == 25
+    # The PARENT ltx_video plan is untouched (no preset contamination).
+    p = base._build_render_request(req)
+    assert "orbit" not in p["text_prompt"] and p["negative_prompt"] == "blurry"
+    # No request negative -> the base DEFAULT negative is preserved + extended.
+    bare = orbit._build_render_request(
+        {"text_prompt": "x", "timing": {}, "seed_bundle": {}})
+    assert bare["negative_prompt"].startswith("low quality")
+    assert "static camera" in bare["negative_prompt"]
+    # Env override wins (deterministic given the env).
+    monkeypatch.setenv("OTR_LTX_ORBIT_PROMPT", "spin around")
+    assert orbit._build_render_request(req)["text_prompt"] == \
+        "a neon diner, spin around"
+
+
+def test_ltx_orbit_fallback_chain_family_and_stamps():
+    from nodes._otr_video_engines import render_driver as rd
+    assert rd.ENGINE_FAMILY["ltx_orbit"] == "text_to_video"
+    assert rd.engine_family("ltx_orbit") == "text_to_video"
+    assert rd.make_fallback_of()("ltx_orbit") == "still_kenburns"  # floor terminus
+    clip = vreg.get_engine("ltx_orbit").canonicalize(
+        {"out_path": "C:/o.mp4", "frame_count": 9}, {"shot_id": "s1"}, {})
+    assert clip["engine_id"] == "ltx_orbit"    # the ledger stamps ORBIT, not ltx
+    assert clip["family"] == "text_to_video" and clip["has_audio"] is False
 
 
 # --------------------------------------------------------------------------- #

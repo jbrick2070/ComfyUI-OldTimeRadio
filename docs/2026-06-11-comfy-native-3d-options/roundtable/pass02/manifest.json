@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-11T16:40:54.747843+00:00",
+  "doc": "docs\\2026-06-11-comfy-native-3d-options\\roundtable\\pass02_input.md",
+  "prompt_tokens_est": 4047,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 4181,
+      "completion_tokens": 3969,
+      "cost_usd": 0.04491625
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 4676,
+      "completion_tokens": 4231,
+      "cost_usd": 0.048155
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 4212,
+      "completion_tokens": 1406,
+      "cost_usd": 0.00878
+    }
+  ],
+  "total_cost_usd": 0.1019
+}

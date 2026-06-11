@@ -62,6 +62,7 @@ ENGINE_FAMILY = {
     "latentsync": "lipsync_overlay",
     "still_kenburns": "static_motion",
     "ltx_video": "text_to_video",
+    "ltx_orbit": "text_to_video",
     "wan_i2v": "image_to_video",
     "station_card": "static_image_gen",
     "abstract": "abstract",
