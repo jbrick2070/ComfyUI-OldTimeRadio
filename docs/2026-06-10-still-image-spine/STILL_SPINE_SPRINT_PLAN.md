@@ -106,6 +106,21 @@ plan's character-level image routing (VIDEO_OPTIN_GOFORWARD_PLAN Phase 5 +
 the image-routing must-fixes) consumes character stills from the SAME rows
 when 3D reopens. No portrait-only assumptions anywhere in the new schema.
 
+**Relationship to the 3D plan (operator concern 2026-06-10: do NOT undo it --
+the "3D plan" front-loads non-3D foundation work).** Verified compatible,
+nothing reversed: the 3D plan's section-0 sequencing (Gate A punch list ->
+latentsync-100% -> Gate B switchable S0-S2 -> dropdown sweep -> 3D sprints)
+stays intact and PARKED on operator GO. This spine BUILDS the layer those
+steps assume: 3D plan section 2.5 says "C's scene stills ARE the background
+plates" and the 3D image pack = "2 extra rows in the image plan" -- the spine
+IS that image plan (the 3D pack becomes two extra object rows later). ST-0's
+kenburns external-init also directly serves Gate A's latentsync-100% fix
+(`OTR_LSYNC_BASE_ENGINE=still_kenburns` over clean portraits). The Director
+must-fixes (3D plan section 3: video_policy_json required+fail-closed,
+`_is_3d_engine` via registry metadata) are NOT touched here and land later on
+top of this schema. Do not modify `docs/2026-06-09-3d-toolkit/
+3D_TOOLKIT_PLAN.md` from this sprint.
+
 ## Comfy-node + environment gotchas (QA checklist for the builder)
 
 - **Python module cache**: ComfyUI does NOT reload edited .py -- relaunch the
