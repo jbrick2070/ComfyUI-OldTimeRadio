@@ -290,6 +290,32 @@ def _portrait_index(ledger):
     return out
 
 
+def _still_index(ledger):
+    """``{beat_id: still_path}`` over ``ledger['images']['images']`` rows with
+    ``kind=scene_*`` (the still-spine ST-3 dispatcher write-back). The NEWEST
+    row for a beat wins (a cache-hit materialization appends a fresh row whose
+    path is the current episode's copy). Pure, tolerant."""
+    out = {}
+    imgs = ((ledger or {}).get("images") or {}).get("images") or []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        if not str(im.get("kind") or "").startswith("scene_"):
+            continue
+        bid = str(im.get("beat_id") or "")
+        path = str(im.get("path") or "")
+        if bid and path:
+            out[bid] = path
+    return out
+
+
+#: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine
+#: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_kenburns) take
+#: asset_refs.init_image from the beat's scene still; audio_driven_face keeps
+#: the character portrait; text engines (ltx_video) stay text-only by design.
+_SCENE_INIT_FAMILIES = frozenset({"image_to_video", "static_motion"})
+
+
 def _line_index(ledger):
     """``{line_id: line}`` from the frozen ledger lines. ``line_id`` equals a
     beat_id equals a shot's ``source_line_ids[0]``."""
@@ -440,7 +466,27 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
     # raw line value for pre-round-5 planned ledgers.
     char_id = str(shot.get("char_id") or line.get("char_id") or "")
-    init_image = _portrait_index(ledger).get(char_id, "")
+    _family = engine_family(str(shot.get("engine_id") or ""), "")
+    portrait = _portrait_index(ledger).get(char_id, "")
+    init_image = portrait
+    init_source = "portrait" if portrait else "none"
+    # Family-based init selection (still-spine ST-4 / W6): static_motion +
+    # image_to_video shots drift/animate the beat's SCENE STILL (the 6/5
+    # look); a missing still falls back to today's behavior LOUD -- never a
+    # silent empty init into a fail-closed engine. audio_driven_face keeps
+    # the portrait; text engines are unchanged (LTX text-only by design).
+    if _family in _SCENE_INIT_FAMILIES:
+        _bid = _beat_id_for_shot(shot)
+        _still = _still_index(ledger).get(_bid, "")
+        if _still:
+            init_image = _still
+            init_source = "scene_still"
+        else:
+            _LOG.warning(
+                "[OTR.render_driver] LOUD: %s-family shot %s beat %s has NO "
+                "scene still in the ledger -- falling back to the pre-spine "
+                "init (%s)", _family, shot.get("shot_id"), _bid,
+                init_source)
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
@@ -478,6 +524,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
+    # ST-4 / pass-02 Gem-3: init observability stamped on the REQUEST (the
+    # established _prompt_* pattern); run_episode copies them to trace rows
+    # so the W7 acceptance check is mechanical.
+    req["_init_source"] = init_source if init_image else "none"
+    req["_init_image"] = os.path.basename(init_image) if init_image else ""
     # FULL-FRAME landscape for the generative-motion engines (operator
     # look-QA 2026-06-10): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox), and LTX/Wan
@@ -778,7 +829,7 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
         # node-92 /history report) -- the diversity gate + the operator's
         # "did the prompts actually differ" check read these.
         for key in ("_prompt_source", "_prompt_subsource", "_prompt_sha8",
-                    "_prompt_chars"):
+                    "_prompt_chars", "_init_source", "_init_image"):
             if isinstance(request, dict) and key in request:
                 row[key.lstrip("_")] = request[key]
         trace.append(row)
@@ -911,6 +962,11 @@ def build_clip_manifest(result, *, episode_id=""):
     canvas = section.get("canonical_canvas") or {}
     lines = {str(ln.get("line_id")): ln for ln in (led.get("lines") or [])
              if isinstance(ln, dict) and ln.get("line_id")}
+    # ST-4: init observability joins the manifest rows via the trace (the
+    # request stamps run_episode copied; keyed by shot_id).
+    trace_by_shot = {str(r.get("shot_id") or ""): r
+                     for r in (result.get("trace") or [])
+                     if isinstance(r, dict)}
     rows = []
     total = 0
     hist = {}
@@ -939,6 +995,7 @@ def build_clip_manifest(result, *, episode_id=""):
         # carries the resolved char_id + the portrait it staged.
         row_char = str(shot.get("char_id")
                        or lines.get(bid, {}).get("char_id") or "")
+        trow = trace_by_shot.get(str(sid or ""), {})
         rows.append({
             "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
@@ -949,6 +1006,8 @@ def build_clip_manifest(result, *, episode_id=""):
             "start_s": start_s,
             "char_id": row_char,
             "init_image": _portrait_index(led).get(row_char, ""),
+            "init_source": str(trow.get("init_source") or ""),
+            "init_image_used": str(trow.get("init_image") or ""),
             "exists": exists,
         })
         if exists:

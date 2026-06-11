@@ -409,6 +409,92 @@ class TestDispatcherStillSpine:
             ireg._IMAGE_REGISTRY._registry.clear()
             ireg._IMAGE_REGISTRY._registry.update(saved)
 
+    def test_st4_still_index_and_family_init(self, tmp_path):
+        """ST-4 / W6: _still_index keys scene_* rows by beat_id (newest row
+        wins); image_to_video + static_motion shots take init from the scene
+        still; audio_driven_face keeps the portrait; a missing still falls
+        back LOUD to the pre-spine init; _init_source/_init_image stamped."""
+        from nodes._otr_video_engines import cheap_families  # noqa: F401
+        from nodes._otr_video_engines import render_driver as rd
+        still = tmp_path / "still_b007_abc.png"
+        still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        portrait = tmp_path / "c01_portrait.png"
+        portrait.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        ledger = {
+            "video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b007", "char_id": "c01",
+                       "start_s": 1.0, "dur_s": 2.0}],
+            "images": {"images": [
+                {"object_id": "c01", "kind": "portrait", "char_id": "c01",
+                 "path": str(portrait)},
+                {"object_id": "still_b007", "kind": "scene_beat",
+                 "beat_id": "b007", "path": "stale.png"},
+                {"object_id": "still_b007", "kind": "scene_beat",
+                 "beat_id": "b007", "path": str(still)},   # newest wins
+            ]},
+        }
+        assert rd._still_index(ledger) == {"b007": str(still)}
+
+        def shot(engine, family):
+            return {"shot_id": "shot_b007", "beat_id": "b007",
+                    "engine_id": engine, "family": family,
+                    "target_frame_count": 25, "source_line_ids": ["b007"],
+                    "char_id": "c01", "creative": {}}
+
+        # static_motion + image_to_video -> scene still
+        for eng, fam in (("still_kenburns", "static_motion"),
+                         ("wan_i2v", "image_to_video")):
+            req = rd.build_request_from_shot(shot(eng, fam), ledger)
+            assert req["_init_source"] == "scene_still", eng
+            assert req["_init_image"] == still.name
+            assert req["asset_refs"]["init_image"] == str(still)
+        # audio_driven_face -> portrait (unchanged)
+        req = rd.build_request_from_shot(
+            shot("humo", "audio_driven_face"), ledger)
+        assert req["_init_source"] == "portrait"
+        assert req["asset_refs"]["init_image"] == str(portrait)
+        # text engine -> portrait-by-char (pre-spine behavior, unchanged)
+        req = rd.build_request_from_shot(
+            shot("ltx_video", "text_to_video"), ledger)
+        assert req["_init_source"] == "portrait"
+
+        # missing scene still -> LOUD fallback to the pre-spine init
+        ledger2 = {k: (dict(v) if isinstance(v, dict) else v)
+                   for k, v in ledger.items()}
+        ledger2["images"] = {"images": [
+            {"object_id": "c01", "kind": "portrait", "char_id": "c01",
+             "path": str(portrait)}]}
+        req = rd.build_request_from_shot(
+            shot("wan_i2v", "image_to_video"), ledger2)
+        assert req["_init_source"] == "portrait"   # fell back, stamped truthfully
+        assert req["asset_refs"]["init_image"] == str(portrait)
+
+    def test_st4_manifest_rows_gain_init_source(self):
+        from nodes._otr_video_engines import render_driver as rd
+        result = {
+            "ledger": {
+                "video": {"video_revision": 1, "fps": 25,
+                          "canonical_canvas": {"w": 1472, "h": 832},
+                          "shots": [{"shot_id": "shot_b001",
+                                     "source_line_ids": ["b001"],
+                                     "engine_id": "wan_i2v",
+                                     "target_frame_count": 25,
+                                     "char_id": "c01", "start_s": 0.0}]},
+                "lines": [{"line_id": "b001", "start_s": 0.0}],
+                "images": {"images": []},
+            },
+            "clips": {"shot_b001": {"path": "", "engine_id": "wan_i2v",
+                                    "frame_count": 0}},
+            "trace": [{"shot_id": "shot_b001", "attempts": 1,
+                       "final_engine": "wan_i2v",
+                       "init_source": "scene_still",
+                       "init_image": "still_b001_abc.png"}],
+        }
+        man = rd.build_clip_manifest(result, episode_id="ep")
+        row = man["clips"][0]
+        assert row["init_source"] == "scene_still"
+        assert row["init_image_used"] == "still_b001_abc.png"
+
     def test_unkeyed_episode_is_loud(self, tmp_path):
         import numpy as np
         from nodes import otr_image_gen_dispatcher as disp
