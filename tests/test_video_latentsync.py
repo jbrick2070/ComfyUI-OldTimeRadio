@@ -187,5 +187,83 @@ def test_cold_import_adapter_no_heavy_libs():
     assert r.returncode == 0, f"heavy libs pulled at import:\n{r.stdout}\n{r.stderr}"
 
 
+# --------------------------------------------------------------------------- #
+# GATE A latentsync-100% fix: OTR_LSYNC_BASE_ENGINE base-clip synthesis
+# --------------------------------------------------------------------------- #
+import os as _os
+import shutil as _shutil
+
+_HAS_FFMPEG = _shutil.which("ffmpeg") is not None
+
+
+def _png(tmp_path):
+    """A tiny real PNG on disk (ffmpeg-generated; no PIL dependency)."""
+    p = tmp_path / "portrait.png"
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+         "-i", "color=c=gray:s=64x64", "-frames:v", "1", str(p)],
+        check=True, capture_output=True)
+    return str(p)
+
+
+def _req(portrait="", base_clip="", frames=6):
+    r = {"shot_id": "s1", "canvas": {"w": 96, "h": 64, "fps": 25},
+         "timing": {"target_frame_count": frames},
+         "audio_ref": {"path": "x.wav"}}
+    if portrait:
+        r["asset_refs"] = {"init_image": portrait}
+    if base_clip:
+        r["base_clip_ref"] = {"path": base_clip}
+    return r
+
+
+def test_base_engine_env_unset_keeps_provider_base(monkeypatch):
+    monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
+    path, source = _eng()._resolve_base_clip(_req(base_clip="prov.mp4"))
+    assert (path, source) == ("prov.mp4", "provider")
+
+
+def test_base_engine_no_portrait_falls_back_loud_to_provider(monkeypatch):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "still_kenburns")
+    path, source = _eng()._resolve_base_clip(_req(base_clip="prov.mp4"))
+    assert path == "prov.mp4" and source == "provider_fallback_no_portrait"
+
+
+def test_base_engine_no_portrait_no_provider_raises_loud(monkeypatch):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "still_kenburns")
+    with pytest.raises(RuntimeError, match="failing closed"):
+        _eng()._resolve_base_clip(_req())
+
+
+def test_base_engine_unknown_engine_raises_named(monkeypatch, tmp_path):
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "no_such_engine")
+    portrait = tmp_path / "p.png"
+    portrait.write_bytes(b"\x89PNG\r\n\x1a\n")
+    with pytest.raises(RuntimeError, match="not a registered video engine"):
+        _eng()._resolve_base_clip(_req(portrait=str(portrait)))
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_base_engine_still_kenburns_synthesizes_base_from_portrait(monkeypatch, tmp_path):
+    """The 100% path: env set + portrait present -> a real Ken Burns base clip
+    rendered from the clean portrait, regardless of any provider base."""
+    from nodes._otr_video_engines import cheap_families  # noqa: F401 (registers)
+    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "still_kenburns")
+    portrait = _png(tmp_path)
+    path, source = _eng()._resolve_base_clip(_req(portrait=portrait, base_clip="prov.mp4"))
+    assert source == "base_engine:still_kenburns"
+    assert path != "prov.mp4" and _os.path.exists(path) and _os.path.getsize(path) > 0
+    _os.remove(path)
+
+
+def test_build_worker_request_base_override_takes_precedence():
+    eng = _eng()
+    req = _req(base_clip="prov.mp4")
+    w = eng._build_worker_request(req, "out.mp4", base_clip_override="synth.mp4")
+    assert w["base_clip"] == "synth.mp4"
+    w2 = eng._build_worker_request(req, "out.mp4")
+    assert w2["base_clip"] == "prov.mp4"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -38,6 +38,7 @@ BOM, ASCII-only source.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -45,6 +46,17 @@ import tempfile
 from .._otr_shared import gpu_residency as _GR
 from .._otr_shared import sidecar as _SC
 from .registry import EngineUnusable, EngineUsabilityReason, register
+
+log = logging.getLogger("OTR.latentsync")
+
+#: GATE A latentsync-100% fix (2026-06-11; 3D plan section 0). Today latentsync
+#: is a ~1/5 face-lottery: only beats whose PROVIDER base clip carries a
+#: detectable face land; the rest fall LOUD to the floor. With this env set to a
+#: registered still-capable engine (canonically ``still_kenburns``), the adapter
+#: synthesizes its OWN base clip from the request's clean cast portrait
+#: (asset_refs init image) so EVERY beat has a face to track. Default unset =
+#: shipped provider-base behavior, unchanged.
+_BASE_ENGINE_ENV = "OTR_LSYNC_BASE_ENGINE"
 
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))   # ...\ComfyUI-OldTimeRadio
@@ -155,7 +167,14 @@ class LatentSyncEngine:
             if not isinstance(ready, dict):
                 raise ValueError("readiness was not a JSON object: %r" % line[:200])
         except (TimeoutError, EOFError, ValueError) as exc:
-            _SC.close_worker(proc, stderr)
+            # BUG-09.02 belt-and-suspenders: close_worker reaps the process,
+            # but if it ever fails partway we still guarantee the kill so a
+            # wedged sidecar can never outlive a failed startup.
+            try:
+                _SC.close_worker(proc, stderr)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
             raise RuntimeError(
                 "LatentSync worker failed to start: %s (see %s)" % (exc, err_path))
         if ready.get("ready") is not True:
@@ -192,7 +211,10 @@ class LatentSyncEngine:
         any protocol error so a hung worker never wedges the render thread."""
         self.load()
         out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_lsync_")
-        req = self._build_worker_request(request, out_path)
+        base_clip, base_source = self._resolve_base_clip(request)
+        log.info(
+            "LatentSync base clip resolved: source=%s path=%s", base_source, base_clip)
+        req = self._build_worker_request(request, out_path, base_clip_override=base_clip)
         try:
             self._proc.stdin.write(json.dumps(req, ensure_ascii=True) + "\n")
             self._proc.stdin.flush()
@@ -252,11 +274,97 @@ class LatentSyncEngine:
             return ref.get("path") or ""
         return getattr(ref, "path", "") or ""
 
-    def _build_worker_request(self, request, out_path):
+    @staticmethod
+    def _portrait_path(request):
+        """A clean portrait/still path from the request's asset_refs (the same
+        key set the cheap families read: still / init_image / image), falling
+        back to a top-level init_image. Returns "" when none present."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        assets = get("asset_refs") or {}
+        if isinstance(assets, dict):
+            for key in ("still", "init_image", "image"):
+                v = assets.get(key)
+                if isinstance(v, str) and v:
+                    return v
+                if isinstance(v, dict) and v.get("path"):
+                    return v["path"]
+        v = get("init_image")
+        if isinstance(v, str) and v:
+            return v
+        if isinstance(v, dict) and v.get("path"):
+            return v["path"]
+        return ""
+
+    def _resolve_base_clip(self, request):
+        """Resolve the base clip latentsync overlays onto. Returns
+        ``(path, source_tag)``.
+
+        * ``OTR_LSYNC_BASE_ENGINE`` unset -> the provider base clip from
+          ``base_clip_ref`` (shipped behavior, byte-identical).
+        * env set (e.g. ``still_kenburns``) -> synthesize the base FROM the
+          request's clean cast portrait via that registered engine, so every
+          beat has a trackable face (the GATE A 100% fix). Missing portrait
+          falls back LOUD to the provider base; missing BOTH raises (the
+          driver's LOUD restamp-to-floor path -- never silent).
+        """
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        provider_base = self._ref_path(get("base_clip_ref"))
+        base_engine_id = (os.getenv(_BASE_ENGINE_ENV, "") or "").strip()
+        if not base_engine_id:
+            return provider_base, "provider"
+
+        portrait = self._portrait_path(request)
+        if not portrait or not os.path.exists(portrait):
+            if provider_base:
+                log.warning(
+                    "LatentSync: %s=%s but the request carries no portrait/init "
+                    "image (asset_refs still/init_image/image); falling back "
+                    "LOUD to the provider base clip %r.",
+                    _BASE_ENGINE_ENV, base_engine_id, provider_base)
+                return provider_base, "provider_fallback_no_portrait"
+            raise RuntimeError(
+                "LatentSync: %s=%s requires a portrait/init image on the "
+                "request (asset_refs still/init_image/image) and none is "
+                "present, and there is no provider base_clip_ref either -- "
+                "failing closed (LOUD)." % (_BASE_ENGINE_ENV, base_engine_id))
+
+        from .registry import get_engine  # registry import is dep-free
+        try:
+            base_eng = get_engine(base_engine_id)
+        except KeyError as exc:
+            raise RuntimeError(
+                "LatentSync: %s=%r is not a registered video engine: %s"
+                % (_BASE_ENGINE_ENV, base_engine_id, exc))
+        if not callable(getattr(base_eng, "render_clip", None)):
+            raise RuntimeError(
+                "LatentSync: %s=%r cannot render a base clip (no render_clip)"
+                % (_BASE_ENGINE_ENV, base_engine_id))
+
+        base_request = {
+            "shot_id": (get("shot_id") or "lsync_base"),
+            "canvas": get("canvas") or {},
+            "timing": get("timing") or {},
+            "text_prompt": get("text_prompt") or "latentsync base portrait",
+            "asset_refs": {"init_image": portrait},
+        }
+        clip = base_eng.render_clip(base_request, None)
+        path = (clip or {}).get("path", "") if isinstance(clip, dict) else ""
+        if not path or not os.path.exists(path):
+            raise RuntimeError(
+                "LatentSync: base engine %r did not produce a base clip on "
+                "disk (got %r) -- failing closed (LOUD)." % (base_engine_id, path))
+        return path, "base_engine:%s" % base_engine_id
+
+    def _build_worker_request(self, request, out_path, base_clip_override=None):
         """Pure: build the line-JSON request the worker consumes from a platform
-        VideoRequest-shaped object OR a plain dict. No IO, no heavy import."""
+        VideoRequest-shaped object OR a plain dict. No IO, no heavy import.
+        ``base_clip_override`` (from _resolve_base_clip) takes precedence over
+        the request's base_clip_ref."""
         get = request.get if isinstance(request, dict) else (lambda k, d=None: getattr(request, k, d))
-        base_clip = self._ref_path(get("base_clip_ref"))
+        base_clip = base_clip_override if base_clip_override is not None \
+            else self._ref_path(get("base_clip_ref"))
         audio = self._ref_path(get("audio_ref"))
         timing = get("timing") or {}
         t_get = timing.get if isinstance(timing, dict) else (lambda k, d=None: getattr(timing, k, d))
