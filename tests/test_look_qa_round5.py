@@ -360,6 +360,49 @@ class TestSelfVocativeBackstop:
 
 
 # --------------------------------------------------------------------------- #
+# Portrait gear scrub (round 5 operator directive: no radio/mic/studio in
+# CHARACTER portrait prompts; the ANNOUNCER keeps radio styling by design)
+# --------------------------------------------------------------------------- #
+
+class TestPortraitGearScrub:
+    def test_scrub_removes_gear_tokens(self):
+        from nodes import otr_meta_brief_image_prompt as mb
+        out = mb._scrub_gear_words(
+            "a stocky engineer holding a microphone, beside a vintage radio "
+            "set, in a recording studio, warm light")
+        low = out.lower()
+        assert "microphone" not in low and "radio" not in low \
+            and "studio" not in low
+        assert "stocky engineer" in out and "warm light" in out
+
+    def test_character_prompt_scrubbed_announcer_exempt(self):
+        from nodes import otr_meta_brief_image_prompt as mb
+        cast = [
+            {"char_id": "c01", "name": "ANNOUNCER",
+             "portrait_prompt": "a radio announcer at a glowing radio set"},
+            {"char_id": "c02", "name": "HAYES VANCE",
+             "portrait_prompt": "a stocky engineer near a radio console"},
+        ]
+        prompts, warnings = mb.derive_image_prompts(cast, {}, llm_fn=None)
+        assert "radio" in prompts["c01"]["prompt"].lower()      # exempt
+        assert "radio" not in prompts["c02"]["prompt"].lower()  # scrubbed
+        assert any("gear tokens scrubbed" in w for w in warnings)
+
+    def test_style_anchor_positive_only_three_quarter(self):
+        from nodes import otr_meta_brief_image_prompt as mb
+        low = mb.STYLE_ANCHOR.lower()
+        assert "three-quarter" in low
+        assert "no microphone" not in low and "not a recording" not in low
+
+    def test_instruction_bans_gear_and_asks_upper_body(self):
+        from nodes import otr_meta_brief_image_prompt as mb
+        req = mb._build_char_prompt_request(
+            {"char_id": "c02", "portrait_prompt": "an engineer"}, {}, "lab")
+        assert "Do not mention radios" in req
+        assert "head and upper body" in req
+
+
+# --------------------------------------------------------------------------- #
 # F5 -- join hardening + manifest positioned-mode fallback
 # --------------------------------------------------------------------------- #
 

@@ -83,9 +83,15 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
 #: old "studio portrait, neutral lighting" framing read as an ACTOR in a
 #: recording booth; portraits must show the CHARACTER in character, in the
 #: story's world -- never a voice actor at a microphone.
-STYLE_ANCHOR = ("in-character cinematic head-and-shoulders portrait, "
-                "period-accurate costume and environment, dramatic film "
-                "lighting, no microphone, not a recording studio")
+# Round 5 operator notes (2026-06-10): the wider framing is a KEEPER ("this
+# week's portraits show more body -- better"), so it is now intentional
+# (three-quarter, not head-and-shoulders). The old "no microphone, not a
+# recording studio" NEGATIONS are gone -- negative phrasing PLANTS the tokens
+# in the image embedding (the c01 giant-mic catch); gear words are instead
+# scrubbed from the OUTPUT (see _GEAR_WORDS) and banned in the instruction.
+STYLE_ANCHOR = ("in-character cinematic three-quarter portrait, face clearly "
+                "visible, period-accurate costume and environment, dramatic "
+                "film lighting")
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
 #: owns ``ledger['cast']``; the announcer is the station voice, never a cast
@@ -154,15 +160,18 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str) -> str:
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
         "line, no preamble) for this character. The image MUST depict the "
         "CHARACTER THEMSELVES -- a person with a clearly visible face, "
-        "head-and-shoulders -- IN CHARACTER inside the story's world. NEVER "
-        "an empty room, an object, scenery alone, or a microphone without a "
-        "person. Ground it in the appearance and the story setting; keep it "
+        "three-quarter framing showing head and upper body -- IN CHARACTER "
+        "inside the story's world. NEVER an empty room, an object, or scenery "
+        "alone. Ground it in the appearance and the story setting; keep it "
         "photographic and period-consistent.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
         f"style_anchor: {STYLE_ANCHOR}\n"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
+        "Do not mention radios, microphones, studios, or any broadcasting "
+        "equipment anywhere in the prompt -- the character is a person in "
+        "the STORY's world, not a performer at a station.\n"
         "Return only the prompt line."
     )
 
@@ -182,6 +191,27 @@ _PERSON_WORDS = re.compile(
 def _depicts_person(prompt: str) -> bool:
     """True when the prompt carries any person-evidence token."""
     return bool(_PERSON_WORDS.search(prompt or ""))
+
+
+#: Broadcast-gear vocabulary (round 5 operator directive 2026-06-10): CHARACTER
+#: portrait prompts must not mention radio/mic/studio gear -- the tokens drag
+#: FLUX toward microphones and consoles (the c01 giant-mic catch). The
+#: ANNOUNCER is exempt (his portrait is radio-styled BY DESIGN).
+_GEAR_WORDS = re.compile(
+    r"\s*\b(?:radios?|microphones?|mics?|broadcasts?|broadcasters?|"
+    r"broadcasting|recording\s+studios?|radio\s+(?:station|studio|set|"
+    r"booth)s?|studios?|on[- ]air(?:\s+sign)?)\b[,;]?",
+    re.IGNORECASE)
+
+
+def _scrub_gear_words(prompt: str) -> str:
+    """Remove broadcast-gear tokens from a CHARACTER portrait prompt, tidying
+    the leftover separators. Pure; '' stays ''."""
+    out = _GEAR_WORDS.sub("", prompt or "")
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"(,\s*)+,", ", ", out)
+    out = re.sub(r"\s+,", ",", out)
+    return out.strip(" ,;").strip()
 
 
 def _clean_llm_prompt(raw: str) -> str:
@@ -285,6 +315,20 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 f"the appearance template")
             prompt = compose_image_prompt_fallback(meta, char)
             source = "template_person_guard"
+        # GEAR SCRUB (round 5 operator directive): character portraits never
+        # mention radio/mic/studio gear -- the tokens pull FLUX toward
+        # equipment (the c01 giant-mic catch). The ANNOUNCER keeps his radio
+        # styling by design (radio-grounding gate): synthetic announcer rows
+        # AND a cast row literally named ANNOUNCER are exempt.
+        _is_announcer_row = bool(
+            char.get("_synthetic_announcer")
+            or str(char.get("name") or "").strip().upper() == "ANNOUNCER")
+        if not _is_announcer_row:
+            _scrubbed = _scrub_gear_words(prompt)
+            if _scrubbed != prompt:
+                warnings.append(
+                    f"image prompt for {cid}: broadcast-gear tokens scrubbed")
+                prompt = _scrubbed or compose_image_prompt_fallback(meta, char)
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
         # FINISH the prompt (gap-audit F3, 2026-06-10): era tail + film style
