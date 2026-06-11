@@ -61,6 +61,15 @@
     "commercial_clean": {
       "type": "boolean",
       "description": "I-8 three-state input at the bank layer: true = clean, false = known-gated (non-blocking warning). A missing value is fail-closed at the release gate, not here."
+    },
+    "quality_tier": {
+      "type": "string",
+      "description": "Whiny-fix P2b ADDITIVE curation field, stamped by the operator's blind audition reel: 'a' (lead-grade) / 'b' (minor-role grade) / 'reject' (never cast). Absent/empty = not yet audited; behavior unchanged."
+    },
+    "style_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Whiny-fix P2b ADDITIVE curation tags, e.g. lead_safe / nasal_risk. Consumed by the deterministic tier pre-filter (filter_by_quality_tier); never reweights scores."
     }
   }
 }

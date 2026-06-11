@@ -138,6 +138,179 @@ def list_donation_wavs():
     return base  # {handle: repo_path}
 
 
+# --------------------------------------------------------------------------- #
+# Whiny-fix P2a: --audit -- acoustic report over the EXISTING bank (CPU, no
+# downloads, no bank writes). Composite "must-listen" ranking only -- NEVER
+# auto-rejects (tiers are stamped by the operator's blind reel, P2b).
+# --------------------------------------------------------------------------- #
+_QUIET_ORIGINALS = ("stuart_bell", "peter_yearsley", "bill_boerst", "caro_davy")
+_SUSPECT_FEMALE_TAGS = ("vz_donor_james", "vz_donor_hillbilly_jim")
+
+
+def _resolve_ref_audit_path(ref_path):
+    """Resolve a bank ref_path to disk (mirrors the adapter's resolution)."""
+    if os.path.isabs(ref_path) and os.path.exists(ref_path):
+        return ref_path
+    rp = ref_path.replace("\\", "/")
+    stripped = rp[len("models/"):] if rp.startswith("models/") else rp
+    for cand in (os.path.join("C:\\ComfyUI-Models", stripped),
+                 os.path.join(os.path.dirname(REPO), rp),
+                 os.path.abspath(ref_path)):
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def _audit_one(path, gender_tag):
+    """All P2a metrics for ONE reference WAV. Returns a dict (pure CPU)."""
+    import numpy as np
+    import soundfile as sf
+    import librosa
+
+    wav, sr = sf.read(path, dtype="float32", always_2d=False)
+    wav = _to_mono(np.asarray(wav))
+    n = wav.size
+    dur = n / float(sr)
+    dc = float(np.mean(wav))
+    rms = float(np.sqrt(np.mean(np.square(wav)))) or 1e-9
+    peak = float(np.max(np.abs(wav))) or 1e-9
+    crest = peak / rms
+    clipping = int(np.sum(np.abs(wav) >= 0.985))
+
+    f0, voiced, _ = librosa.pyin(wav, sr=sr, fmin=65, fmax=400,
+                                 frame_length=2048, hop_length=256)
+    vmask = np.isfinite(f0) & (voiced if voiced is not None else np.isfinite(f0))
+    voiced_frac = float(vmask.mean()) if vmask.size else 0.0
+    med_f0 = float(np.nanmedian(f0[vmask])) if vmask.sum() else 0.0
+    f0_std = float(np.nanstd(f0[vmask])) if vmask.sum() else 0.0
+
+    # end-of-line rise: median voiced F0 of the last 500 ms vs the body
+    hop = 256
+    tail_frames = int(0.5 * sr / hop)
+    rise_semitones = 0.0
+    if vmask.sum() > tail_frames:
+        tail_mask = vmask.copy()
+        tail_mask[:-tail_frames] = False
+        body_mask = vmask & ~tail_mask
+        if tail_mask.sum() >= 3 and body_mask.sum() >= 3:
+            tail_f0 = float(np.nanmedian(f0[tail_mask]))
+            body_f0 = float(np.nanmedian(f0[body_mask]))
+            if tail_f0 > 0 and body_f0 > 0:
+                rise_semitones = 12.0 * float(np.log2(tail_f0 / body_f0))
+
+    # average magnitude spectrum -> centroid, slope, band ratios (voiced-ish
+    # proxy: whole file; the refs are speech-dense by construction)
+    spec = np.abs(np.fft.rfft(wav * np.hanning(n))) if n else np.zeros(1)
+    freqs = np.fft.rfftfreq(n, 1.0 / sr) if n else np.zeros(1)
+    total = float(np.sum(spec)) or 1e-9
+    centroid = float(np.sum(freqs * spec) / total)
+    band = (freqs >= 200) & (freqs <= 4000)
+    slope = 0.0
+    if band.sum() > 10:
+        x = np.log10(freqs[band])
+        y = 20.0 * np.log10(spec[band] + 1e-12)
+        slope = float(np.polyfit(x, y, 1)[0])          # dB per decade
+    lo, hi = (120, 350) if gender_tag != "female" else (180, 450)
+    chest = (freqs >= lo) & (freqs <= hi)
+    chest_ratio = float(np.sum(spec[chest]) / total)
+    nasal = (freqs >= 1000) & (freqs <= 2500)
+    nasal_ratio = float(np.sum(spec[nasal]) / total)
+
+    # frame RMS stats: breath tail + pause-SNR proxy
+    frame = 1024
+    nf = max(1, n // frame)
+    frames = wav[: nf * frame].reshape(nf, frame)
+    frms = np.sqrt(np.mean(np.square(frames), axis=1)) + 1e-9
+    body_rms = float(np.median(frms))
+    floor_rms = float(np.percentile(frms, 10))
+    pause_snr_db = 20.0 * float(np.log10(body_rms / floor_rms))
+    tail_n = int(0.2 * sr)
+    tail_rms = float(np.sqrt(np.mean(np.square(wav[-tail_n:])))) if n > tail_n else rms
+    breath_tail_ratio = tail_rms / (rms or 1e-9)
+
+    return {
+        "duration_s": round(dur, 2), "sample_rate": int(sr),
+        "dc_offset": round(dc, 5), "rms": round(rms, 4),
+        "rms_db": round(20.0 * float(np.log10(rms)), 1),
+        "crest_factor": round(crest, 2), "clipping_count": clipping,
+        "median_f0_hz": round(med_f0, 1), "f0_std_hz": round(f0_std, 1),
+        "voiced_fraction": round(voiced_frac, 3),
+        "final_rise_semitones": round(rise_semitones, 2),
+        "spectral_centroid_hz": round(centroid, 1),
+        "spectral_slope_db_per_decade": round(slope, 1),
+        "chest_weight_ratio": round(chest_ratio, 4),
+        "nasal_band_ratio": round(nasal_ratio, 4),
+        "pause_snr_db": round(pause_snr_db, 1),
+        "breath_tail_ratio": round(breath_tail_ratio, 3),
+    }
+
+
+def audit(args):
+    """--audit: metric report + composite must-listen ranking over the bank."""
+    bank = load_bank()
+    rows = []
+    for v in bank["voices"]:
+        if v.get("engine") != args.audit_engine:
+            continue
+        vid = v["voice_ref_id"]
+        path = _resolve_ref_audit_path(v.get("ref_path") or "")
+        if not path:
+            rows.append({"voice_ref_id": vid, "error": "ref WAV not found on disk",
+                         "ref_path": v.get("ref_path")})
+            continue
+        try:
+            m = _audit_one(path, str(v.get("gender") or ""))
+        except Exception as exc:  # noqa: BLE001 -- report, never abort the audit
+            rows.append({"voice_ref_id": vid, "error": repr(exc)})
+            continue
+        flags = []
+        if 145.0 <= m["median_f0_hz"] <= 185.0:
+            flags.append("gender_ambiguous_f0")
+        if m["rms"] < 0.07:
+            flags.append("low_rms_unnormalized")
+        if any(q in vid for q in _QUIET_ORIGINALS):
+            flags.append("quiet_original_g18")
+        if vid in _SUSPECT_FEMALE_TAGS and v.get("gender") == "female":
+            flags.append("suspect_female_tag")
+        if m["final_rise_semitones"] > 2.0:
+            flags.append("terminal_rise_in_ref")
+        if m["clipping_count"] > 50:
+            flags.append("clipping")
+        # Composite must-listen score (BIGGER = listen sooner). Heuristic
+        # whine-risk weighting; ranking only -- tiers come from the reel.
+        score = (
+            max(0.0, 0.10 - m["rms"]) * 40.0
+            + max(0.0, m["final_rise_semitones"]) * 0.5
+            + max(0.0, 0.05 - m["chest_weight_ratio"]) * 20.0
+            + m["nasal_band_ratio"] * 5.0
+            + (1.0 if m["clipping_count"] > 50 else 0.0)
+            + max(0.0, 20.0 - m["pause_snr_db"]) * 0.05
+        )
+        rows.append({"voice_ref_id": vid, "gender": v.get("gender"),
+                     "quality_tier": v.get("quality_tier") or "",
+                     "must_listen_score": round(score, 3),
+                     "flags": flags, **m})
+    ranked = sorted(
+        (r for r in rows if "error" not in r),
+        key=lambda r: -r["must_listen_score"])
+    print(f"AUDIT: {len(rows)} {args.audit_engine} refs "
+          f"({sum(1 for r in rows if 'error' in r)} unreadable)")
+    print(f"{'rank':<5}{'voice_ref_id':<28}{'score':<8}{'rms':<7}"
+          f"{'f0':<7}{'rise':<7}flags")
+    for i, r in enumerate(ranked, 1):
+        print(f"{i:<5}{r['voice_ref_id']:<28}{r['must_listen_score']:<8}"
+              f"{r['rms']:<7}{r['median_f0_hz']:<7}"
+              f"{r['final_rise_semitones']:<7}{','.join(r['flags']) or '-'}")
+    for r in rows:
+        if "error" in r:
+            print(f"ERROR {r['voice_ref_id']}: {r['error']}")
+    out = args.audit_json
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump({"engine": args.audit_engine, "rows": rows}, f, indent=1)
+    print(f"full report -> {out}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scan", type=int, default=30, help="how many donations to download + classify")
@@ -146,10 +319,19 @@ def main():
     ap.add_argument("--seg-seconds", type=float, default=12.0)
     ap.add_argument("--refs-dir", default=DEFAULT_REFS_DIR)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--audit", action="store_true",
+                    help="P2a: acoustic audit of the EXISTING bank (no downloads, "
+                         "no bank writes); composite must-listen ranking")
+    ap.add_argument("--audit-engine", default="indextts2")
+    ap.add_argument("--audit-json",
+                    default=os.path.join(REPO, "scripts", "_otr_ref_audit_report.json"))
     ap.add_argument("--source", choices=["donations", "lj-speech", "rhasspy"], default="donations",
                     help="donations = kyutai CC0 voice-donations; lj-speech = LJ Speech (PD US female); "
                          "rhasspy = Rhasspy Kathleen + Kerstin (CC0, GitHub sparse-checkout)")
     args = ap.parse_args()
+
+    if args.audit:
+        return audit(args)
 
     if args.source == "lj-speech":
         return add_lj_speech(args)

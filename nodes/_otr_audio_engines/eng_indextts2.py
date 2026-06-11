@@ -165,6 +165,24 @@ class IndexTTS2Engine:
         from .._otr_script_prep import clean_spoken_text
         return clean_spoken_text(text)
 
+    @staticmethod
+    def current_emo_alpha() -> float:
+        """The active emotion-blend strength (whiny-fix P1.2).
+
+        ``OTR_INDEXTTS2_EMO_ALPHA`` env, clamped to 0..1, default 1.0 (today's
+        shipped behavior). The worker already accepts a per-request value (G7)
+        -- this is the cheapest dominant lever; the default is re-anchored from
+        the operator's P0 audition matrix when it lands. Read per render so a
+        long-running server picks up env changes."""
+        raw = os.getenv("OTR_INDEXTTS2_EMO_ALPHA", "1.0")
+        try:
+            a = float(raw)
+        except (TypeError, ValueError):
+            return 1.0
+        if a != a:  # NaN
+            return 1.0
+        return min(1.0, max(0.0, a))
+
     # ---- one dialogue line -> mono AUDIO {"waveform","sample_rate"} ----
     def _resolve_ref(self, ref):
         """Bank ref_paths are relative to the ComfyUI root (e.g.
@@ -189,7 +207,7 @@ class IndexTTS2Engine:
             "text": text,
             "ref_clip": ref_clip_path,
             "emo_vector": self.emo_list(delivery_vector),
-            "emo_alpha": 1.0,
+            "emo_alpha": self.current_emo_alpha(),
             "seed": int(seed),
             "out_path": out_path,
             "verbose": False,

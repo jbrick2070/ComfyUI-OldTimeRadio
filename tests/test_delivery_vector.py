@@ -51,6 +51,95 @@ def test_stamp_handles_empty_ledger():
     assert stamp_delivery_vectors({"lines": []}) == {"lines": []}
 
 
+# --------------------------------------------------------------------------- #
+# Whiny-fix P1.1: delivery table v2 properties + the stamped-version guard
+# --------------------------------------------------------------------------- #
+import random as _random
+
+from nodes._otr_delivery_vector import select_delivery_vector
+
+
+def test_v2_table_version():
+    assert DELIVERY_TABLE_VERSION == "v2"
+
+
+def test_pure_neutral_text_sends_no_aroused_dims():
+    v = deterministic_delivery_vector("The report is on the desk.")
+    for e in ("angry", "afraid", "surprised", "happy"):
+        assert v[e] == 0.0, e
+
+
+def test_question_only_line_never_saturates_surprised():
+    v = deterministic_delivery_vector("Is that the relay station????")
+    assert v["surprised"] < 0.5
+
+
+def test_punctuation_counts_once_not_per_occurrence():
+    one = deterministic_delivery_vector("Stop right there!")
+    many = deterministic_delivery_vector("Stop!!! right!!! there!!!")
+    for e in EMOTIONS:
+        if e != "calm":
+            assert many[e] == one[e], e
+
+
+def test_stop_word_interrogatives_demoted():
+    v = deterministic_delivery_vector("What do you mean, who was it, how odd.")
+    assert v["surprised"] == 0.0
+
+
+def test_debleat_terminal_question_with_fear_demotes_surprised():
+    base = deterministic_delivery_vector("Danger! Is it behind you?")
+    # afraid cues present + terminal '?' -> surprised demoted under afraid
+    assert base["afraid"] > base["surprised"]
+
+
+def test_secondary_mass_cap_holds_on_random_corpora():
+    rng = _random.Random(20260611)
+    vocab = ["help", "run", "danger", "sorry", "lost", "gone", "impossible",
+             "suddenly", "laugh", "joy", "fool", "never", "sick", "vile",
+             "remember", "once", "the", "a", "station", "relay", "dusk"]
+    for _ in range(200):
+        text = " ".join(rng.choice(vocab) for _ in range(rng.randint(3, 25)))
+        text += rng.choice(["", "?", "!", "...", "?!"])
+        v = deterministic_delivery_vector(text, rng.random())
+        noncalm = sorted((v[e] for e in EMOTIONS if e != "calm"), reverse=True)
+        # primary may be anything <=1; every secondary capped at 0.5
+        assert all(x <= 0.5 for x in noncalm[1:]), (text, v)
+
+
+def test_select_prefers_stamped_on_version_match():
+    stamped = {e: 0.0 for e in EMOTIONS}
+    stamped["angry"] = 1.0
+    line = {"delivery": {"emotion_vector": stamped, "version": DELIVERY_TABLE_VERSION}}
+    vec, src = select_delivery_vector(line, "calm words here.")
+    assert vec is stamped and src == f"stamped:{DELIVERY_TABLE_VERSION}"
+
+
+def test_select_rederives_on_stale_stamp_version():
+    stale = {e: 0.0 for e in EMOTIONS}
+    stale["surprised"] = 1.0
+    line = {"delivery": {"emotion_vector": stale, "version": "v1"},
+            "line_id": "L1"}
+    vec, src = select_delivery_vector(line, "The report is on the desk.")
+    assert vec is not stale
+    assert src.startswith("rederived_stale_stamp")
+    assert vec["surprised"] == 0.0
+
+
+def test_select_derives_when_no_stamp():
+    vec, src = select_delivery_vector({}, "Danger! Run!")
+    assert src == "derived" and vec["afraid"] > 0.0
+
+
+def test_stamp_now_writes_v2_and_guard_accepts_it():
+    led = {"lines": [{"text": "Help! Is it behind you?", "char_id": "c1"}]}
+    out = stamp_delivery_vectors(led)
+    ln = out["lines"][0]
+    assert ln["delivery"]["version"] == "v2"
+    vec, src = select_delivery_vector(ln, "Help! Is it behind you?")
+    assert src == "stamped:v2" and vec == ln["delivery"]["emotion_vector"]
+
+
 if __name__ == "__main__":
     import pytest
 

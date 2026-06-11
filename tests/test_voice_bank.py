@@ -218,7 +218,101 @@ def test_announcer_voice_ref_raises_for_engine_without_ref():
 
 
 def test_casting_policy_version_is_pinned():
-    assert CASTING_POLICY_VERSION == "1"
+    # v2 = the 2026-06-11 whiny-fix weighted-lottery re-baseline (operator-
+    # directed): scores WEIGHT the in-tier draw instead of only sorting it.
+    # Bumping this constant is a deliberate C7 re-baseline of casting draws.
+    assert CASTING_POLICY_VERSION == "2"
+
+
+# ----------------------------------------------------------------------------
+# Whiny-fix: weighted lottery (casting v2) + quality tiers
+# ----------------------------------------------------------------------------
+def _tiered(vid, tier="", tags=(), **kw):
+    base = _entry(vid, **kw)
+    return VoiceBankEntry(**{**base.__dict__, "quality_tier": tier,
+                             "style_tags": tuple(tags)})
+
+
+def test_weighted_lottery_favors_higher_scores():
+    """v2: within ONE ladder tier the higher-scored entry must win the draw
+    more often. Both entries land in the gender-only tier (no timbre match for
+    either, so no earlier tier fires); 'scored' additionally matches role+age
+    (score 130) vs 'bare' (100) -- weights 131 vs 101."""
+    bank = (
+        _entry("scored", timbre=("nasal",), roles=("char_voice",), age="adult"),
+        _entry("bare", timbre=("nasal",), roles=("announcer_voice",), age="elder"),
+    )
+    wins = {"scored": 0, "bare": 0}
+    for i in range(400):
+        e = _cast(bank, char_id=f"c{i}", allow_voice_reuse=True)
+        wins[e.voice_ref_id] += 1
+    assert wins["scored"] > wins["bare"], wins
+    assert wins["bare"] > 0, "lower-score entries must keep a small chance"
+
+
+def test_weighted_lottery_deterministic_per_slot():
+    bank = (_entry("a"), _entry("b"), _entry("c"))
+    picks = {_cast(bank, allow_voice_reuse=True).voice_ref_id for _ in range(5)}
+    assert len(picks) == 1, "same slot identity must always draw the same ref"
+
+
+def test_uniform_v1_draw_reachable_via_env(monkeypatch):
+    bank = (
+        _entry("full_match", timbre=("nasal",), roles=("char_voice",), age="adult"),
+        _entry("bare_gender", timbre=("nasal",), roles=("announcer_voice",), age="elder"),
+    )
+    monkeypatch.setenv("OTR_CAST_WEIGHTED", "0")
+    uniform = [_cast(bank, char_id=f"u{i}", allow_voice_reuse=True).voice_ref_id
+               for i in range(200)]
+    share = uniform.count("bare_gender") / len(uniform)
+    assert 0.3 < share < 0.7, f"uniform draw expected near 50/50, got {share}"
+
+
+def test_reject_tier_never_casts():
+    bank = (
+        _tiered("good_ref", tier="a", tags=("lead_safe",)),
+        _tiered("bad_ref", tier="reject"),
+    )
+    for i in range(50):
+        e = _cast(bank, char_id=f"r{i}", allow_voice_reuse=True)
+        assert e.voice_ref_id == "good_ref"
+
+
+def test_filter_by_quality_tier_stages():
+    from nodes._otr_voice_bank import filter_by_quality_tier
+    a_lead = _tiered("a_lead", tier="a", tags=("lead_safe",))
+    a_plain = _tiered("a_plain", tier="a")
+    b_ref = _tiered("b_ref", tier="b")
+    rej = _tiered("rej", tier="reject")
+    untiered = _tiered("untiered")
+    pool = (a_lead, a_plain, b_ref, rej, untiered)
+    # reject dropped always; non-lead keeps everything else
+    assert rej not in filter_by_quality_tier(pool)
+    assert set(filter_by_quality_tier(pool)) == {a_lead, a_plain, b_ref, untiered}
+    # leads: tier-a lead_safe wins when present
+    assert filter_by_quality_tier(pool, lead=True) == [a_lead]
+    # leads with no lead_safe: all tier-a
+    pool2 = (a_plain, b_ref, untiered)
+    assert filter_by_quality_tier(pool2, lead=True) == [a_plain]
+    # un-audited bank: passes through unchanged (no tiers stamped anywhere)
+    pool3 = (untiered, _tiered("untiered2"))
+    assert filter_by_quality_tier(pool3, lead=True) == list(pool3)
+
+
+def test_additive_tier_fields_parse_from_bank_rows():
+    from nodes._otr_voice_bank import _entry_from_dict
+    row = {
+        "voice_ref_id": "x", "engine": "indextts2", "gender": "male",
+        "timbre": ["warm"], "roles": ["char_voice"], "age_band": "adult",
+        "ref_path": "refs/x.wav", "ref_sha256": "s", "commercial_clean": True,
+        "quality_tier": "a", "style_tags": ["lead_safe"],
+    }
+    e = _entry_from_dict(row)
+    assert e.quality_tier == "a" and e.style_tags == ("lead_safe",)
+    # absent fields default empty (un-audited bank unchanged)
+    del row["quality_tier"], row["style_tags"]
+    e2 = _entry_from_dict(row)
+    assert e2.quality_tier == "" and e2.style_tags == ()
 
 
 def test_source_is_ascii_no_em_dash():

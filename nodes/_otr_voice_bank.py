@@ -33,7 +33,12 @@ from typing import List, Optional, Tuple
 
 log = logging.getLogger("OTR")
 
-CASTING_POLICY_VERSION = "1"
+# v2 (2026-06-11, whiny-fix, operator-directed): scores now WEIGHT the in-tier
+# lottery instead of only sorting it (G4 -- the pick was uniform across the
+# tier, so a perfectly-scored ref and a barely-matching one drew equally).
+# Version bump = deliberate C7 re-baseline of all future casting draws.
+# OTR_CAST_WEIGHTED=0 restores the uniform v1 draw for A/B comparison.
+CASTING_POLICY_VERSION = "2"
 VOICE_BANK_SCHEMA_VERSION = "1"
 
 _BANK_FILENAME = "voice_reference_bank.json"
@@ -76,6 +81,12 @@ class VoiceBankEntry:
     ref_path: str
     ref_sha256: str
     commercial_clean: bool
+    # Whiny-fix P2 ADDITIVE curation fields (default-empty = bank not yet
+    # audited; behavior unchanged until the operator's audition reel stamps
+    # them). quality_tier: "a" | "b" | "reject" | ""; style_tags e.g.
+    # ("lead_safe", "nasal_risk").
+    quality_tier: str = ""
+    style_tags: Tuple[str, ...] = ()
 
 
 # --------------------------------------------------------------------------- #
@@ -150,6 +161,8 @@ def _entry_from_dict(d: dict) -> VoiceBankEntry:
         ref_path=str(d["ref_path"]),
         ref_sha256=str(d["ref_sha256"]),
         commercial_clean=bool(d["commercial_clean"]),
+        quality_tier=str(d.get("quality_tier") or ""),
+        style_tags=tuple(str(t) for t in (d.get("style_tags") or [])),
     )
 
 
@@ -266,7 +279,11 @@ def assign_voice_for_slot(
     """
     entries = bank if bank is not None else load_voice_bank()[0]
     used = set(used_voice_ref_ids or ())
-    candidates = [e for e in entries if e.engine == engine]
+    # Whiny-fix P2c stage 1: audited rejects NEVER cast (deterministic pool
+    # pre-filter -- never a score reweight). Un-audited entries (empty tier)
+    # pass untouched, so the un-audited bank behaves exactly as before.
+    candidates = [e for e in entries
+                  if e.engine == engine and e.quality_tier != "reject"]
     if require_commercial_clean:
         candidates = [e for e in candidates if e.commercial_clean is True]
     if not candidates:
@@ -293,7 +310,17 @@ def assign_voice_for_slot(
                 e.voice_ref_id,
             ),
         )
-        return random.Random(seed).choice(pool)
+        # Casting v2 (whiny-fix, operator-directed): scores WEIGHT the lottery
+        # (score+1 so a zero-score candidate keeps a small chance instead of
+        # vanishing); deterministic in the same stable_cast_seed. The G4 v1
+        # uniform draw stays reachable via OTR_CAST_WEIGHTED=0 for A/B.
+        if os.getenv("OTR_CAST_WEIGHTED", "1") == "0":
+            return random.Random(seed).choice(pool)
+        weights = [
+            _score(e, gender=gender, timbre=timbre, role=role, age_band=age_band) + 1
+            for e in pool
+        ]
+        return random.Random(seed).choices(pool, weights=weights, k=1)[0]
 
     def _ladder_pick(exclude_used: bool) -> Optional[VoiceBankEntry]:
         for dims in _LADDER:
@@ -325,6 +352,28 @@ def assign_voice_for_slot(
             f"(engine {engine!r}, role {role!r}, gender {gender!r}); {detail}"
         )
     return chosen
+
+
+def filter_by_quality_tier(entries, *, lead: bool = False):
+    """Whiny-fix P2c: the deterministic two-stage POOL PRE-FILTER (shared by
+    CastLock's caster AND the render-time ``_resolve_clone_ref_path`` so
+    tier-reject refs cannot leak through the fallback route -- G16).
+
+    * ``reject`` entries are dropped ALWAYS.
+    * ``lead=True``: prefer tier-a ``lead_safe`` if any survive; else tier-a;
+      else the full non-reject pool (the configured degrade).
+    * Un-audited banks (no tiers stamped) pass through unchanged.
+
+    NEVER reweights scores -- pre-filter only.
+    """
+    pool = [e for e in entries if getattr(e, "quality_tier", "") != "reject"]
+    if not lead:
+        return pool
+    tier_a = [e for e in pool if getattr(e, "quality_tier", "") == "a"]
+    if tier_a:
+        lead_safe = [e for e in tier_a if "lead_safe" in getattr(e, "style_tags", ())]
+        return lead_safe or tier_a
+    return pool
 
 
 def announcer_voice_ref(

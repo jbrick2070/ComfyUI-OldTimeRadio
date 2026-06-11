@@ -83,9 +83,15 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
     absolute path ONLY if the file exists on disk; None -> the caller's bark
     fallback renders the line. Never raises (a bad bank just means bark)."""
     try:
-        from ._otr_voice_bank import assign_voice_for_slot, load_voice_bank
+        from ._otr_voice_bank import (
+            assign_voice_for_slot, filter_by_quality_tier, load_voice_bank,
+        )
 
         bank, _ = load_voice_bank()
+        # Whiny-fix P2c (G16): the render-time fallback consumes the SAME
+        # tier-filtered pool as the caster, so audited rejects can never leak
+        # through this route. Un-audited banks pass through unchanged.
+        bank = tuple(filter_by_quality_tier(bank))
     except Exception:  # noqa: BLE001
         return None
     entry = None
@@ -398,19 +404,19 @@ class OTRVoiceNodeBase:
             else:
                 voice_ref = cast.get(ref_field)
             delivery_vector = None
+            _dv_source = "off"
             if _delivery_on:
-                _dl = ln.get("delivery")
-                _stamped = _dl.get("emotion_vector") if isinstance(_dl, dict) else None
-                if isinstance(_stamped, dict) and _stamped:
-                    delivery_vector = _stamped
-                else:
-                    _tension = ln.get("scene_tension", ln.get("tension", 0.0)) or 0.0
-                    try:
-                        from ._otr_delivery_vector import deterministic_delivery_vector
-                        delivery_vector = deterministic_delivery_vector(text, float(_tension))
-                    except Exception as _e:  # noqa: BLE001 -- best-effort, never fatal
-                        log.debug("[OTR] delivery derive failed: %s", _e)
-                        delivery_vector = None
+                _tension = ln.get("scene_tension", ln.get("tension", 0.0)) or 0.0
+                try:
+                    # Whiny-fix P1.1: ONE chooser -- stamped vector with the
+                    # version guard (stale v1 stamps re-derive LOUDLY), else
+                    # derived from PREPARED text (G13: never raw text).
+                    from ._otr_delivery_vector import select_delivery_vector
+                    delivery_vector, _dv_source = select_delivery_vector(
+                        ln, _neutral_prepare_text(text), float(_tension))
+                except Exception as _e:  # noqa: BLE001 -- best-effort, never fatal
+                    log.debug("[OTR] delivery derive failed: %s", _e)
+                    delivery_vector, _dv_source = None, "error"
             prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
             request = build_resolved_request(
                 role=self.ROLE,
@@ -456,6 +462,33 @@ class OTRVoiceNodeBase:
                 # clone engine clones a real voice. None -> fallback below.
                 voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
             fb_name = _engine_missing_ref_fallback(adapter)
+            # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
+            # char -> voice_ref_id -> ref basename -> engine -> alpha ->
+            # delivery version/state/source -> seed. Render_log line + runtime
+            # log mirror; this is the observability floor every later step
+            # (P0-zero, the audit, P3a durable stamping) builds on.
+            _alpha_fn = getattr(adapter, "current_emo_alpha", None)
+            _alpha = _alpha_fn() if callable(_alpha_fn) else None
+            if delivery_vector is None:
+                _vec_state = "omitted"
+            elif not any(float(v or 0.0) > 0.0 for v in delivery_vector.values()):
+                _vec_state = "zero"
+            else:
+                _vec_state = "nonzero"
+            try:
+                from ._otr_delivery_vector import DELIVERY_TABLE_VERSION as _DTV
+            except Exception:  # noqa: BLE001
+                _DTV = "?"
+            _pobs = (
+                f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} -> "
+                f"voice_ref_id={voice_ref_id or '-'} "
+                f"ref={os.path.basename(voice_ref) if voice_ref else '-'} "
+                f"engine={engine} "
+                f"alpha={'n/a' if _alpha is None else _alpha} "
+                f"delivery={_DTV}:{_vec_state}({_dv_source}) seed={engine_seed}"
+            )
+            log_lines.append(_pobs)
+            log.info("[OTR voice P-OBS] %s", _pobs)
             if (self.ROLE in ("char_voice", "announcer_voice")
                     and _engine_requires_voice_ref(adapter)
                     and not voice_ref and fb_name):
@@ -471,6 +504,14 @@ class OTRVoiceNodeBase:
                         f"WAVs (or set cast_voice_policy=auto_registry) to enable it."
                     )
                 bark_seed = _seed_to_int64(fb_name, request.stable_line_seed)
+                _pobs_fb = (
+                    f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} -> "
+                    f"FALLBACK engine={fb_name} preset="
+                    f"{voice_preset or 'v2/en_speaker_6'} (no usable ref for "
+                    f"'{engine}') delivery=omitted seed={bark_seed}"
+                )
+                log_lines.append(_pobs_fb)
+                log.warning("[OTR voice P-OBS] %s", _pobs_fb)
                 with deterministic_inference(bark_seed, warn_only=True):
                     audio = _bark_fb.generate_voice(
                         prepared, voice_preset or "v2/en_speaker_6", None, bark_seed,
@@ -496,6 +537,18 @@ class OTRVoiceNodeBase:
                 audio = adapter.generate_voice(
                     prepared, voice_ref, delivery_vector, engine_seed,
                 )
+            # P-OBS sample-rate assert: a primary-engine clip whose rate does
+            # not match the pack rate is a real defect (the pack would crash
+            # or silently resample later) -- LOUD, never silent.
+            _got_sr = int(audio.get("sample_rate", sr) or sr)
+            if _got_sr != sr:
+                _sr_msg = (
+                    f"{self.ROLE}: WARNING line={line_id or occ} clip sample "
+                    f"rate {_got_sr} != pack rate {sr} (engine {engine}) -- "
+                    f"investigate before trusting this episode's voice lane"
+                )
+                log_lines.append(_sr_msg)
+                log.warning("[OTR voice P-OBS] %s", _sr_msg)
             clips.append(audio)
         if _bark_fb is not None:
             try:
