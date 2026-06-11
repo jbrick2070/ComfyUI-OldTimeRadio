@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 93,
-  "last_link_id": 266,
+  "last_link_id": 267,
   "nodes": [
     {
       "id": 63,
@@ -1237,7 +1237,9 @@
         {
           "name": "image_done",
           "type": "STRING",
-          "links": [],
+          "links": [
+            267
+          ],
           "slot_index": 1
         },
         {
@@ -1290,6 +1292,11 @@
           "widget": {
             "name": "master_audio_path"
           }
+        },
+        {
+          "name": "image_done",
+          "type": "STRING",
+          "link": 267
         }
       ],
       "outputs": [
@@ -1729,6 +1736,14 @@
       0,
       93,
       0,
+      "STRING"
+    ],
+    [
+      267,
+      91,
+      1,
+      92,
+      2,
       "STRING"
     ]
   ],

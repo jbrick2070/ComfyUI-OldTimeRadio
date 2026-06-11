@@ -104,3 +104,17 @@ def test_production_workflow_visual_structure_pinned():
     assert links[247][1:5] == [84, 0, 86, 0]   # composite -> caption node
     assert links[266][1:5] == [86, 0, 93, 0]   # caption -> blend source
     assert links[250][1:5] == [93, 0, 85, 0]   # blend final -> terminal mux
+
+    # -- 4. the W4 image-before-video gate (still-spine ST-0.2) ---------------
+    # OTR_ImageGenDispatcher.image_done (91 out 1) must reach the render
+    # node's image_done input so video render NEVER starts before every
+    # episode still exists on disk. The ledger data edge (260) orders the
+    # pair today; this explicit gate pins the contract against rewiring.
+    n92 = nodes[92]
+    assert n92["type"] == "OTR_VideoRenderBatch"
+    gate = [i for i in n92["inputs"] if i.get("name") == "image_done"]
+    assert gate and gate[0].get("link") == 267, (
+        "node 92 image_done gate input missing or unwired (W4)")
+    assert links[267][1:3] == [91, 1], (
+        "image_done gate must come from OTR_ImageGenDispatcher out 1")
+    assert links[260][1:5] == [91, 0, 92, 0]   # dispatcher ledger -> render

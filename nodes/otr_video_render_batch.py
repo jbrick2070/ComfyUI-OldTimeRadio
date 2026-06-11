@@ -67,12 +67,25 @@ class OTRVideoRenderBatch:
                         "LOUD on missing per-line wavs."
                     ),
                 }),
+                "image_done": ("STRING", {
+                    "multiline": True, "default": "", "forceInput": True,
+                    "tooltip": (
+                        "Image-done gate (mirrors audio_done; ST-0.2 still-spine). "
+                        "Wire from OTR_ImageGenDispatcher.image_done so the video "
+                        "render cannot start before every episode still exists on "
+                        "disk (W4). Opaque STRING; the token is never parsed."
+                    ),
+                }),
             },
         }
 
     def render(self, mode, beats, oom_index, frame_count,
                engine="humo", portrait_path="", audio_path="",
-               patched_ledger_json="{}", master_audio_path=""):
+               patched_ledger_json="{}", master_audio_path="",
+               image_done=""):
+        # ``image_done`` is the W4 ordering gate (opaque STRING token from
+        # OTR_ImageGenDispatcher): consuming it forces ComfyUI to finish the
+        # image phase -- every episode still on disk -- before this node runs.
         # NOTE: this MUST run inside ComfyUI's executor thread (i.e. submitted via
         # /prompt, not a background HTTP-route thread): only there does ComfyUI's
         # model_management evict the umt5/whisper encoders between encode and
