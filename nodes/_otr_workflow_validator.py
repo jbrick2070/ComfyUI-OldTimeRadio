@@ -212,11 +212,22 @@ class WorkflowValidator:
                 "validate_anyway": ("BOOLEAN", {"default": True}),
                 "strict_unknown_types": ("BOOLEAN", {"default": True}),
             },
+            # GATE B S2 STAMP (the switchable-workflow decision doc, section
+            # 4): the THREE stamp widgets are the ONLY new optional fields
+            # allowed on this node. The MASTER ships them empty (unstamped);
+            # emit_snapshot (S3) writes them on generated .gen.json tiers.
+            # Node `properties` were rejected (not executable in API prompts).
+            "optional": {
+                "profile_id": ("STRING", {"multiline": False, "default": ""}),
+                "master_hash": ("STRING", {"multiline": False, "default": ""}),
+                "generated_by": ("STRING", {"multiline": False, "default": ""}),
+            },
         }
 
     @classmethod
     def IS_CHANGED(cls, workflow_json_path: str, validate_anyway: bool,
-                   strict_unknown_types: bool) -> str:
+                   strict_unknown_types: bool, profile_id: str = "",
+                   master_hash: str = "", generated_by: str = "") -> str:
         """Re-run on any change to the inputs OR to the workflow JSON
         on disk. mtime + path is the canonical change signal. Uses the
         SAME repo-root resolution as `_load_workflow` (GATE B S2 defect
@@ -227,13 +238,134 @@ class WorkflowValidator:
             mtime = p.stat().st_mtime_ns if p.is_file() else 0
         except OSError:
             mtime = 0
-        return f"{workflow_json_path}|{mtime}|{validate_anyway}|{strict_unknown_types}"
+        return (f"{workflow_json_path}|{mtime}|{validate_anyway}|"
+                f"{strict_unknown_types}|{profile_id}|{master_hash}|"
+                f"{generated_by}")
+
+    # ------------------------------------------------------------------ #
+    # GATE B S2: stamp assertion + runtime env export (decision doc sec. 4)
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _detect_host() -> dict:
+        """Cheap host reality: platform + CUDA presence + total VRAM (MB).
+        Separated for testability (tests monkeypatch this)."""
+        import platform as _platform
+        sysname = _platform.system()
+        info = {
+            "platform": ("mac" if sysname == "Darwin"
+                         else "win" if sysname == "Windows" else "any"),
+            "has_cuda": False,
+            "vram_mb": 0,
+        }
+        try:
+            import torch
+            if torch.cuda.is_available():
+                info["has_cuda"] = True
+                info["vram_mb"] = int(
+                    torch.cuda.get_device_properties(0).total_memory
+                    // (1024 * 1024))
+        except Exception:  # noqa: BLE001 -- detection must never crash
+            pass
+        return info
+
+    def _assert_stamp(self, workflow_json_path: str, profile_id: str,
+                      master_hash: str, generated_by: str) -> str:
+        """The S2 startup assertion: a STAMPED workflow must match the
+        committed profile AND the detected host reality, else the prompt
+        ABORTS with a reason -> suggestion table (no cuda -> cpu_floor;
+        VRAM < 10 GB -> 8gb_lite; mac -> cpu_floor). ACTIVE whenever
+        profile_id is non-empty; ``validate_anyway`` can NEVER skip it.
+        On pass, exports the runtime env (every execution -- stale values
+        from a previous prompt are overwritten; an operator-set conflicting
+        ceiling warns LOUD and the SMALLER value wins)."""
+        from ._otr_shared.capability_profiles import ProfileError, load_profile
+        try:
+            profile = load_profile(profile_id)
+        except ProfileError as e:
+            raise ValueError(
+                f"OTR_WorkflowValidator: stamped profile_id {profile_id!r} "
+                f"failed to load: {e}") from e
+
+        host = self._detect_host()
+        problems = []
+        if profile["device_backend"] == "cuda" and not host["has_cuda"]:
+            suggestion = "cpu_floor"
+            problems.append(
+                f"profile {profile_id!r} requires CUDA but this host has none"
+                + (" (mac)" if host["platform"] == "mac" else "")
+                + f" -> suggested tier: {suggestion}")
+        elif (profile["device_backend"] == "cuda"
+              and host["vram_mb"]
+              and host["vram_mb"] < int(profile["vram_budget_mb"])):
+            suggestion = ("8gb_lite" if host["vram_mb"] >= 7_300
+                          else "cpu_floor")
+            problems.append(
+                f"profile {profile_id!r} budgets "
+                f"{profile['vram_budget_mb']} MB VRAM but this host reports "
+                f"{host['vram_mb']} MB -> suggested tier: {suggestion}")
+        if profile["platform"] not in ("any", host["platform"]):
+            problems.append(
+                f"profile {profile_id!r} targets platform "
+                f"{profile['platform']!r}; this host is "
+                f"{host['platform']!r} -> suggested tier: cpu_floor")
+        if problems:
+            raise ValueError(
+                "OTR_WorkflowValidator: STAMP ASSERTION FAILED (the stamped "
+                "snapshot does not fit this machine; validate_anyway never "
+                "skips this):\n  " + "\n  ".join(problems))
+
+        # Runtime export -- EVERY execution, not "if unset" (a long-running
+        # server persists env across prompts; stale values are overwritten).
+        budget = int(profile["vram_budget_mb"])
+        ceiling = budget
+        cur = (os.environ.get("OTR_VRAM_CEILING_MB") or "").strip()
+        if cur:
+            try:
+                cur_i = int(cur)
+            except ValueError:
+                cur_i = None
+            if cur_i is not None and cur_i != budget:
+                ceiling = min(cur_i, budget)
+                log.warning(
+                    "OTR_WorkflowValidator: OTR_VRAM_CEILING_MB=%s conflicts "
+                    "with profile %r budget %d -- the SMALLER value (%d) "
+                    "wins (LOUD)", cur, profile_id, budget, ceiling)
+        os.environ["OTR_VRAM_CEILING_MB"] = str(ceiling)
+        os.environ["OTR_ACTIVE_PROFILE"] = profile_id
+        snapshot_hash = ""
+        try:
+            p = _resolve_workflow_path(workflow_json_path)
+            if p.is_file():
+                import hashlib
+                snapshot_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+        except OSError:
+            pass
+        os.environ["OTR_SNAPSHOT_HASH"] = snapshot_hash
+        msg = (f"stamp OK: profile={profile_id} ceiling={ceiling}MB "
+               f"snapshot_sha={snapshot_hash[:12] or 'n/a'}"
+               + (f" generated_by={generated_by}" if generated_by else ""))
+        log.info("OTR_WorkflowValidator: %s (master_hash=%s)",
+                 msg, master_hash[:12] or "n/a")
+        return msg
 
     def validate(self, workflow_json_path: str,
                  validate_anyway: bool,
-                 strict_unknown_types: bool):
+                 strict_unknown_types: bool,
+                 profile_id: str = "",
+                 master_hash: str = "",
+                 generated_by: str = ""):
+        # The stamp assertion + env export run FIRST whenever profile_id is
+        # non-empty -- validate_anyway only skips the CONTRACT check below,
+        # never this (decision doc section 4; CI rejects snapshots shipping
+        # validate_anyway=false at S3).
+        stamp_msg = ""
+        if (profile_id or "").strip():
+            stamp_msg = self._assert_stamp(
+                workflow_json_path, profile_id.strip(),
+                str(master_hash or ""), str(generated_by or ""))
         if not validate_anyway:
-            msg = "OTR_WorkflowValidator: validate_anyway=False -- skipped."
+            msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
+                   "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))
             log.info(msg)
             return (msg,)
 
@@ -288,6 +420,7 @@ class WorkflowValidator:
             f"strict_unknown_types={strict_unknown_types}, "
             f"path={workflow_json_path or str(_DEFAULT_WORKFLOW_PATH)!r}"
             f", widget_vector_drift=0"
+            + (f" | {stamp_msg}" if stamp_msg else "")
         )
         log.info(msg)
         return (msg,)

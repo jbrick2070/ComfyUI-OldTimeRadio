@@ -183,3 +183,119 @@ class TestAdversarialWorkflow:
                 validate_anyway=True,
                 strict_unknown_types=False,
             )
+
+
+# ---------------------------------------------------------------------------
+# GATE B S2: stamp widgets + startup assertion + runtime env export
+# ---------------------------------------------------------------------------
+
+def _host(has_cuda=True, vram_mb=16384, platform="win"):
+    return {"has_cuda": has_cuda, "vram_mb": vram_mb, "platform": platform}
+
+
+class TestStampAssertion:
+    def test_input_types_carries_exactly_three_optional_stamp_widgets(self):
+        it = WorkflowValidator.INPUT_TYPES()
+        assert list(it["optional"]) == ["profile_id", "master_hash",
+                                        "generated_by"], (
+            "the three stamp widgets are the ONLY optional fields allowed "
+            "on node 63 (decision doc section 4)")
+
+    def test_master_ships_unstamped_with_padded_vector(self):
+        wf = json.loads(_DEFAULT_WORKFLOW_PATH.read_text(encoding="utf-8"))
+        n63 = next(n for n in wf["nodes"]
+                   if n["type"] == "OTR_WorkflowValidator")
+        assert n63["widgets_values"] == ["", True, True, "", "", ""], (
+            "master must pad the three stamp slots EMPTY (unstamped) in the "
+            "same commit as the INPUT_TYPES change")
+
+    def test_unstamped_run_exports_nothing(self, monkeypatch):
+        monkeypatch.delenv("OTR_ACTIVE_PROFILE", raising=False)
+        node = WorkflowValidator()
+        (msg,) = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False)
+        assert "stamp OK" not in msg
+        assert "OTR_ACTIVE_PROFILE" not in __import__("os").environ
+
+    def test_stamped_run_exports_env(self, monkeypatch):
+        import os
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host()))
+        monkeypatch.delenv("OTR_VRAM_CEILING_MB", raising=False)
+        monkeypatch.delenv("OTR_ACTIVE_PROFILE", raising=False)
+        monkeypatch.delenv("OTR_SNAPSHOT_HASH", raising=False)
+        node = WorkflowValidator()
+        (msg,) = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                               profile_id="16gb_full")
+        assert "stamp OK" in msg
+        assert os.environ["OTR_VRAM_CEILING_MB"] == "14500"
+        assert os.environ["OTR_ACTIVE_PROFILE"] == "16gb_full"
+        assert len(os.environ["OTR_SNAPSHOT_HASH"]) == 64
+
+    def test_no_cuda_aborts_suggesting_cpu_floor(self, monkeypatch):
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host(has_cuda=False)))
+        node = WorkflowValidator()
+        with pytest.raises(ValueError, match="cpu_floor"):
+            node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                          profile_id="16gb_full")
+
+    def test_low_vram_aborts_suggesting_8gb_lite(self, monkeypatch):
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host(vram_mb=8192)))
+        node = WorkflowValidator()
+        with pytest.raises(ValueError, match="8gb_lite"):
+            node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                          profile_id="16gb_full")
+
+    def test_validate_anyway_false_never_skips_the_assertion(self, monkeypatch):
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host(has_cuda=False)))
+        node = WorkflowValidator()
+        with pytest.raises(ValueError, match="validate_anyway never skips"):
+            node.validate(str(_DEFAULT_WORKFLOW_PATH), False, False,
+                          profile_id="16gb_full")
+
+    def test_unknown_profile_id_aborts_naming_known(self, monkeypatch):
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host()))
+        node = WorkflowValidator()
+        with pytest.raises(ValueError, match="16gb_full"):
+            node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                          profile_id="no_such_tier")
+
+    def test_conflicting_smaller_operator_ceiling_wins(self, monkeypatch):
+        import os
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host()))
+        monkeypatch.setenv("OTR_VRAM_CEILING_MB", "8000")
+        node = WorkflowValidator()
+        node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                      profile_id="16gb_full")
+        assert os.environ["OTR_VRAM_CEILING_MB"] == "8000"   # smaller wins
+
+    def test_is_changed_varies_on_stamp(self):
+        a = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,
+                                         True)
+        b = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,
+                                         True, profile_id="16gb_full")
+        assert a != b
+
+    def test_gate_wired_63_to_87_and_image_lane_downstream(self):
+        """S2 ordering guarantee + the S0 topology verification: node 63's
+        validation_report feeds OTR_VideoDirector.gate_in, and the image
+        DISPATCH lane (node 91) is transitively downstream of the gate via
+        ShotLock's policy input -- no dispatcher gate input needed."""
+        wf = json.loads(_DEFAULT_WORKFLOW_PATH.read_text(encoding="utf-8"))
+        links = {l[0]: l for l in wf["links"]}
+        n87 = next(n for n in wf["nodes"] if n["type"] == "OTR_VideoDirector")
+        gate = next(i for i in n87["inputs"] if i["name"] == "gate_in")
+        lnk = links[gate["link"]]
+        assert (lnk[1], lnk[2]) == (63, 0), "gate_in must come from node 63"
+        # transitivity: 87 -> (video_policy_json) -> 90 -> (script_json) -> 91
+        n90 = next(n for n in wf["nodes"] if n["type"] == "OTR_ShotLock")
+        pol = next(i for i in n90["inputs"] if i["name"] == "video_policy_json")
+        assert links[pol["link"]][1] == 87
+        n91 = next(n for n in wf["nodes"]
+                   if n["type"] == "OTR_ImageGenDispatcher")
+        sj = next(i for i in n91["inputs"] if i["name"] == "script_json")
+        assert links[sj["link"]][1] == 90

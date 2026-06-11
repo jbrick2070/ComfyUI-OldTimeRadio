@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 93,
-  "last_link_id": 268,
+  "last_link_id": 269,
   "nodes": [
     {
       "id": 63,
@@ -23,7 +23,9 @@
         {
           "name": "validation_report",
           "type": "STRING",
-          "links": null,
+          "links": [
+            269
+          ],
           "shape": 3,
           "label": "validation_report"
         }
@@ -35,7 +37,10 @@
       "widgets_values": [
         "",
         true,
-        true
+        true,
+        "",
+        "",
+        ""
       ]
     },
     {
@@ -1004,7 +1009,13 @@
         "auto",
         "{}"
       ],
-      "inputs": [],
+      "inputs": [
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 269
+        }
+      ],
       "outputs": [
         {
           "name": "video_policy_json",
@@ -1765,6 +1776,14 @@
       4,
       91,
       4,
+      "STRING"
+    ],
+    [
+      269,
+      63,
+      0,
+      87,
+      0,
       "STRING"
     ]
   ],
