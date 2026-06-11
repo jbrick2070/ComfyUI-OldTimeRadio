@@ -761,3 +761,63 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
     from nodes._otr_video_engines import render_driver as rd
     idx = rd._portrait_index(led)
     assert idx.get("announcer") == by_id["announcer"]["path"]
+
+
+# --------------------------------------------------------------------------- #
+# Operator ticket 2026-06-11: stale pending_* stills dir -- mux-style re-resolve
+# --------------------------------------------------------------------------- #
+def _episodes_fixture(tmp_path, final_slug="signal_lost_rapid_roots_x"):
+    """A renamed-episode disk layout: the final dir holds the newest ledger;
+    the pending dir is GONE (the rename already happened)."""
+    root = tmp_path / "otr" / "episodes"
+    audio = root / final_slug / "audio"
+    audio.mkdir(parents=True)
+    (audio / f"{final_slug}_ledger.json").write_text("{}", encoding="utf-8")
+    return root
+
+
+def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch):
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = _episodes_fixture(tmp_path)
+    warns = []
+    stale = str(root / "pending_20260611_010101" / "stills")
+    new_dir, new_ep = _reresolve_episode_stills_dir("pending_20260611_010101", stale, warns)
+    assert new_ep == "signal_lost_rapid_roots_x"
+    assert new_dir == str(root / "signal_lost_rapid_roots_x" / "stills")
+    assert warns and "re-resolved" in warns[0]
+
+
+def test_reresolve_pending_dir_still_live_is_untouched(tmp_path, monkeypatch):
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = _episodes_fixture(tmp_path)
+    live = root / "pending_20260611_020202"
+    (live / "stills").mkdir(parents=True)   # rename has NOT happened yet
+    warns = []
+    d, e = _reresolve_episode_stills_dir(
+        "pending_20260611_020202", str(live / "stills"), warns)
+    assert (d, e) == (str(live / "stills"), "pending_20260611_020202")
+    assert not warns
+
+
+def test_reresolve_non_pending_id_untouched(tmp_path, monkeypatch):
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = _episodes_fixture(tmp_path)
+    target = str(root / "my_final_episode" / "stills")
+    warns = []
+    assert _reresolve_episode_stills_dir("my_final_episode", target, warns) == \
+        (target, "my_final_episode")
+    assert not warns
+
+
+def test_reresolve_skipped_in_test_mode(tmp_path, monkeypatch):
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    root = _episodes_fixture(tmp_path)
+    stale = str(root / "pending_20260611_030303" / "stills")
+    warns = []
+    assert _reresolve_episode_stills_dir("pending_20260611_030303", stale, warns) == \
+        (stale, "pending_20260611_030303")
+    assert not warns

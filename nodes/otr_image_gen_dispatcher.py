@@ -189,6 +189,59 @@ def apply_fresh_cap(n_requested: int, fresh_cap: int, beat_budget: int) -> int:
     return max(0, min(int(n_requested), cap))
 
 
+def _reresolve_episode_stills_dir(ep, ep_dir, warnings):
+    """Rename-proof the EPISODE stills dir (operator ticket 2026-06-11; the
+    OTR_MasterAudioMux ``_reresolve_master_audio`` contract applied to the
+    dispatcher).
+
+    The episode dir starts life as ``episodes/pending_<ts>/``; SignalLostVideo
+    renames it to the final title slug once the audio title is finalized. The
+    dispatcher's wired ``episode_id`` was captured BEFORE that rename, so a
+    post-rename dispatch would re-CREATE the stale ``pending_*`` dir and strand
+    every still outside the real episode folder. Re-resolve via the newest
+    on-disk ledger (the same durable-ledger contract the mux + ShotLock use):
+
+    * non-``pending_*`` id, or the pending dir still exists (rename has not
+      happened yet) -> unchanged;
+    * pending dir GONE -> the newest ledger's episode dir is the rename target;
+      re-key there with a LOUD log + warning. Never silent;
+    * any probe failure -> unchanged (the shipped behavior).
+
+    Returns ``(ep_dir, ep)``. ``OTR_TEST_MODE=1`` skips the disk scan (mirrors
+    the mux; the helper itself stays directly testable with the env cleared).
+    """
+    try:
+        if os.environ.get("OTR_TEST_MODE") == "1":
+            return ep_dir, ep
+        if not str(ep).startswith("pending_"):
+            return ep_dir, ep
+        episode_dir = os.path.dirname(str(ep_dir))          # .../episodes/<ep>
+        if os.path.isdir(episode_dir):
+            return ep_dir, ep                               # rename not yet happened
+        from pathlib import Path
+        from ._otr_ledger import find_most_recent_ledger
+        episodes_root = os.path.dirname(episode_dir)        # .../episodes
+        p = find_most_recent_ledger([Path(episodes_root)])
+        if not p:
+            return ep_dir, ep
+        new_episode_dir = Path(p).parent.parent             # <root>/<ep>/audio/x_ledger.json
+        if new_episode_dir.is_dir() and new_episode_dir.parent == Path(episodes_root):
+            new_ep = new_episode_dir.name
+            log.warning(
+                "[OTR_ImageGenDispatcher] LOUD re-resolve: episode_id %r is a "
+                "stale pending id (its dir was renamed after capture); stills "
+                "re-keyed to the newest ledger's episode dir %r (same episode, "
+                "post-rename name).", ep, new_ep)
+            warnings.append(
+                f"episode stills dir re-resolved: stale {ep!r} -> {new_ep!r} "
+                f"(title rename happened before image dispatch; LOUD)")
+            return str(new_episode_dir / "stills"), new_ep
+    except Exception as exc:  # noqa: BLE001 -- never block dispatch on the probe
+        log.warning(
+            "[OTR_ImageGenDispatcher] episode stills re-resolve skipped: %s", exc)
+    return ep_dir, ep
+
+
 def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     """Copy a still into the EPISODE stills dir (idempotent; readable name
     ``{object_id}_{hash12}.png``). Returns the episode-local path. Lazy
@@ -240,6 +293,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "episode_id missing (input unwired AND not in the ledger); "
             "stills materialize under episodes/unkeyed_episode/ (LOUD)")
     ep_dir = str(_pl.episode_stills_dir(ep, output_dir=output_dir))
+    # Operator ticket 2026-06-11: the title rename (pending_* -> final slug)
+    # can land BEFORE image dispatch; re-key the stills dir to the renamed
+    # episode dir via the newest on-disk ledger (mux-style re-resolve, LOUD).
+    ep_dir, ep = _reresolve_episode_stills_dir(ep, ep_dir, warnings)
     ep_rows: list = []
 
     rev = int(images_section.get("image_revision") or 0) + 1
