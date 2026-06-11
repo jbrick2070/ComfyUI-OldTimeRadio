@@ -426,12 +426,12 @@ def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
             "group_id": "grp_announcer_visual", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
-    assert req["_init_source"] == "scene_still"
+    assert req["observability"]["init_source"] == "scene_still"
     assert req["asset_refs"]["init_image"] == str(still)
     # missing still -> LOUD text path (init_source stays pre-i2v)
     ledger2 = dict(ledger, images={"images": []})
     req2 = rd.build_request_from_shot(shot, ledger2)
-    assert req2["_init_source"] != "scene_still"
+    assert req2["observability"]["init_source"] != "scene_still"
 
 
 def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
@@ -454,7 +454,7 @@ def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
             "group_id": "grp_announcer_visual", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
-    assert req["_init_source"] != "scene_still"   # the still-spine v1 CUT holds
+    assert req["observability"]["init_source"] != "scene_still"   # the still-spine v1 CUT holds
 
 
 if __name__ == "__main__":

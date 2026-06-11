@@ -214,7 +214,7 @@ def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
     req = rd.build_request_from_shot(
         _face_shot("character_video", creative), _FACE_LEDGER)
     p = req["text_prompt"]
-    assert req["_prompt_source"] == "m4"
+    assert req["observability"]["prompt_source"] == "m4"
     assert "microphone" not in p.lower() and "studio" not in p.lower()
     assert "weathered face" in p          # the creative content survived
     assert "no microphone" not in p.lower()   # NEVER negations
@@ -227,7 +227,7 @@ def test_humo_announcer_beat_keeps_radio_styling():
     req = rd.build_request_from_shot(
         _face_shot("announcer_visual", creative), _FACE_LEDGER)
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
-    assert req["_prompt_source"] == "m4"
+    assert req["observability"]["prompt_source"] == "m4"
 
 
 def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
@@ -235,7 +235,7 @@ def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
     req = rd.build_request_from_shot(
         _face_shot("character_video", {}), _FACE_LEDGER)
     p = req["text_prompt"]
-    assert req["_prompt_source"] == "default_scrubbed"
+    assert req["observability"]["prompt_source"] == "default_scrubbed"
     assert p == rd._CHAR_FACE_FALLBACK_PROMPT
     assert not rd._GEAR_WORDS_RD.search(p)
     assert "no " not in p.lower()                      # no negations
@@ -245,7 +245,7 @@ def test_humo_announcer_beat_missing_creative_keeps_studio_default():
     from nodes._otr_video_engines import render_driver as rd
     req = rd.build_request_from_shot(
         _face_shot("announcer_visual", {}), _FACE_LEDGER)
-    assert req["_prompt_source"] == "default"
+    assert req["observability"]["prompt_source"] == "default"
     assert "radio studio" in req["text_prompt"]        # by-design default
 
 

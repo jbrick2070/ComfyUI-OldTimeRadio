@@ -234,12 +234,14 @@ class TestBuildRequestFromShotPerBeatAudio:
         assert req["audio_ref"] is None
 
     def test_timing_carried_onto_request(self):
-        """start_s / dur_s from the ledger line are carried onto req['timing']."""
+        """start_s / dur_s from the ledger line are carried onto req['timing']
+        (the schema spelling: dur_s -> target_duration_s, W7-pre migration)."""
         ledger = _ledger_with_line("b007", start_s=5.0, dur_s=7.5)
         shot = _shot("b007")
         req = rd.build_request_from_shot(shot, ledger)
         assert req["timing"]["start_s"] == 5.0
-        assert req["timing"]["dur_s"] == 7.5
+        assert req["timing"]["target_duration_s"] == 7.5
+        assert "dur_s" not in req["timing"]
 
     def test_audio_frozen_section_untouched(self):
         """The frozen audio section in the ledger must not be modified."""

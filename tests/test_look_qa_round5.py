@@ -192,16 +192,16 @@ class TestPerBeatScenePrompts:
         req = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)
         assert req["text_prompt"] == "the operator prompt"
-        assert req["_prompt_source"] == "env"
+        assert req["observability"]["prompt_source"] == "env"
 
     def test_brief_prompt_stamps_meta(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         req = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)
-        assert req["_prompt_source"] == "brief+beat"
-        assert len(req["_prompt_sha8"]) == 8
-        assert req["_prompt_chars"] == len(req["text_prompt"])
+        assert req["observability"]["prompt_source"] == "brief+beat"
+        assert len(req["observability"]["prompt_sha8"]) == 8
+        assert req["observability"]["prompt_chars"] == len(req["text_prompt"])
 
     def test_m4_creative_prompt_stamped_m4(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
@@ -210,8 +210,8 @@ class TestPerBeatScenePrompts:
                   creative={"text_prompt": "a writer prompt", "source": "llm"})
         req = _rd.build_request_from_shot(s, led)
         assert req["text_prompt"] == "a writer prompt"
-        assert req["_prompt_source"] == "m4"
-        assert req["_prompt_subsource"] == "llm"
+        assert req["observability"]["prompt_source"] == "m4"
+        assert req["observability"]["prompt_subsource"] == "llm"
 
 
 class TestPromptDiversityStatus:

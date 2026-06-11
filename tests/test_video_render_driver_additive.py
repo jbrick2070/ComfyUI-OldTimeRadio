@@ -244,8 +244,12 @@ def test_build_request_from_shot_maps_portrait_audio_prompt_timing():
     assert req["audio_ref"] == {"path": "X:/a/seg_b002.wav"}
     assert req["text_prompt"] == "c03 reacts, close-up"
     assert req["timing"]["target_frame_count"] == 40
-    assert req["timing"]["start_s"] == 2.0 and req["timing"]["dur_s"] == 1.6
-    assert req["char_id"] == "c03"
+    # W7-pre builder migration: the schema field is target_duration_s (never
+    # dur_s); char_id rides in conditioning_refs (top-level = schema extra).
+    assert req["timing"]["start_s"] == 2.0
+    assert req["timing"]["target_duration_s"] == 1.6
+    assert req["conditioning_refs"]["char_id"] == "c03"
+    assert "char_id" not in req and "dur_s" not in req["timing"]
 
 
 def test_build_request_from_shot_no_portrait_or_audio_is_blank():
@@ -523,7 +527,160 @@ def test_provide_lipsync_base_failure_is_loud_not_fatal(monkeypatch,
                         dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
     req = {"shot_id": "shot_x", "base_clip_ref": None}
     rd._provide_lipsync_base("stub_lipsync", req)   # unknown engine -> LOUD
-    assert req["base_clip_ref"] is None             # overlay will fail-closed
+    assert req["base_clip_ref"] is None
+
+
+# --------------------------------------------------------------------------- #
+# W7-pre builder migration (3D plan 7.0): the builders emit SCHEMA-VALID
+# VideoRequest dicts; the chain re-validates family inputs per candidate; the
+# AS-2 resolver-prune fires on a family-changing fallback.
+# --------------------------------------------------------------------------- #
+def _char3d_ledger():
+    """A ShotLock-shaped ledger whose single shot is the v1 character_3d
+    engine (triposg_talk) with a resolvable portrait + per-line voice wav."""
+    return {
+        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+                  "ledger_frozen": True},
+        "lines": [
+            {"line_id": "b010", "char_id": "c07", "speaker_role": "character",
+             "start_s": 4.0, "dur_s": 2.4, "bark_wav_path": "X:/a/b010.wav"},
+        ],
+        "images": {"images": [
+            {"object_id": "c07", "path": "X:/img/c07.png"},
+        ]},
+        "video": {"video_revision": 1, "fps": 25, "shots": [
+            {"shot_id": "shot_b010", "source_line_ids": ["b010"],
+             "role": "character_video", "engine_id": "triposg_talk",
+             "family": "character_3d", "group_id": "grp_char",
+             "target_frame_count": 60, "degradation_trail": [],
+             "creative": {"text_prompt": "c07 speaks, lantern glow"}},
+        ]},
+    }
+
+
+def test_built_character_3d_request_is_schema_valid():
+    """The 7.0 code-verified gap, closed: VideoRequest.model_validate accepts
+    the builder output verbatim (no init_w/init_h, no timing.dur_s, no
+    top-level char_id; role/family_hint/profile_id emitted; observability is
+    the schema-real field)."""
+    from nodes._otr_video_engines.schemas import VideoRequest
+    led = _char3d_ledger()
+    req = rd.build_request_from_shot(led["video"]["shots"][0], led)
+    model = VideoRequest.model_validate(req)
+    assert model.family_hint == "character_3d"
+    assert model.role == "character_video"
+    assert model.conditioning_refs["char_id"] == "c07"
+    assert model.timing.target_duration_s == 2.4
+    assert model.timing.source_line_ids == ["b010"]
+    assert "init_w" not in req and "init_h" not in req
+    # the soak/global-assets builder is schema-valid too
+    soak_req = rd.build_request(
+        {"shot_id": "shot_0003", "role": "scene_broll",
+         "engine_id": "still_kenburns", "family": "static_motion"},
+        {"init_image": "p.png", "audio_ref": "a.wav"}, 25)
+    VideoRequest.model_validate(soak_req)
+
+
+def test_character_3d_request_missing_inputs_fails_closed():
+    """character_3d REQUIRES audio_ref + init_image: a ledger with neither
+    yields a request that model_validate REJECTS (defense in depth for the
+    adapter-boundary validation, 3D plan 7.2)."""
+    from nodes._otr_video_engines.schemas import VideoRequest
+    led = _char3d_ledger()
+    led["images"] = {"images": []}
+    led["lines"][0].pop("bark_wav_path")
+    req = rd.build_request_from_shot(led["video"]["shots"][0], led)
+    with pytest.raises(Exception):
+        VideoRequest.model_validate(req)
+
+
+def test_family_input_gap_skips_candidate_loudly(monkeypatch, stub_registry):
+    """p3 down-chain shape: a lipsync_overlay candidate whose base_clip_ref
+    the request cannot supply is SKIPPED with a LOUD DEPENDENCY_MISSING
+    decision -- the wrong-shaped request never reaches the engine."""
+    from nodes._otr_video_engines import eng_latentsync  # noqa: F401
+    monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
+    shot = {"shot_id": "shot_gap", "beat_id": "bg", "role": "character_video",
+            "engine_id": "latentsync", "family": "lipsync_overlay",
+            "group_id": "g", "target_frame_count": 25,
+            "degradation_trail": []}
+    req = rd.build_request(shot, {"init_image": "p.png", "audio_ref": "a.wav"},
+                           25)
+    fb = {"latentsync": "stub_ok"}.get
+    clip, out_shot, decisions, attempts, _ = rd.render_shot(
+        shot, req, fallback_of=fb, video_revision=1)
+    assert attempts == ["latentsync", "stub_ok"]
+    assert out_shot["engine_id"] == "stub_ok"
+    assert len(decisions) == 1
+    assert decisions[0]["failure_kind"] == "dependency_missing"
+    assert decisions[0]["from_engine"] == "latentsync"
+
+
+def test_prune_fires_on_family_changing_fallback(stub_registry):
+    """AS-2 wiring (3D plan 7.0 p3): a character_3d consumer degrading to a
+    different family prunes its execution group + cascades the orphaned
+    background provider, in the same ledger transaction as the restamp."""
+    class _Stub3DFail(_StubBase):
+        name = "stub_3d_fail"
+        family = "character_3d"
+        roles = ("character_video",)
+
+        def render_clip(self, request, prepared):
+            raise RuntimeError("3d forward unavailable")
+
+    vreg.register(_Stub3DFail())
+    led = rd.build_full_ledger({
+        "video_revision": 1, "fps": 25,
+        "execution_groups": [
+            {"group_id": "grp_bg", "kind": "provider", "engine_id": "ltx_video",
+             "profile_id": "", "depends_on": [],
+             "produces_base_for": ["grp_char"]},
+            {"group_id": "grp_char", "kind": "consumer",
+             "engine_id": "stub_3d_fail", "profile_id": "",
+             "depends_on": ["grp_bg"], "produces_base_for": []},
+        ],
+        "shots": [
+            {"shot_id": "shot_3d", "beat_id": "b3d", "role": "character_video",
+             "engine_id": "stub_3d_fail", "family": "character_3d",
+             "group_id": "grp_char", "target_frame_count": 25,
+             "degradation_trail": []},
+        ]})
+    res = rd.run_episode(
+        led, fallback_of={"stub_3d_fail": "stub_ok"}.get,
+        assets={"init_image": "p.png", "audio_ref": "a.wav"})
+    out = res["ledger"]["video"]
+    shot = out["shots"][0]
+    assert shot["engine_id"] == "stub_ok"          # degraded LOUD
+    assert shot["family"] == "abstract"            # family changed
+    # the degraded consumer's group AND the orphaned background provider are
+    # both gone (the ledger only lists groups that actually run as planned)
+    assert out["execution_groups"] == []
+    assert len(out["runtime_fallback_decisions"]) == 1
+    # the input fixture is untouched (deep-copy transaction)
+    assert [g["group_id"] for g in led["video"]["execution_groups"]] \
+        == ["grp_bg", "grp_char"]
+    assert res["ledger"]["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+
+
+def test_same_family_fallback_does_not_prune(stub_registry):
+    """A within-family fallback (stub_fail -> stub_ok, both abstract) leaves
+    the execution groups exactly as planned."""
+    led = rd.build_full_ledger({
+        "video_revision": 1, "fps": 25,
+        "execution_groups": [
+            {"group_id": "g0", "kind": "consumer", "engine_id": "stub_fail",
+             "profile_id": "", "depends_on": [], "produces_base_for": []},
+        ],
+        "shots": [
+            {"shot_id": "shot_0000", "beat_id": "b0",
+             "role": "background_abstract", "engine_id": "stub_fail",
+             "family": "abstract", "group_id": "g0",
+             "target_frame_count": 25, "degradation_trail": []},
+        ]})
+    res = rd.run_episode(led, fallback_of={"stub_fail": "stub_ok"}.get)
+    out = res["ledger"]["video"]
+    assert out["shots"][0]["engine_id"] == "stub_ok"
+    assert [g["group_id"] for g in out["execution_groups"]] == ["g0"]             # overlay will fail-closed
 
 
 def test_provide_lipsync_base_non_overlay_noop(monkeypatch):

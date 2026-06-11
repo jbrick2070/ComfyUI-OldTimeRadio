@@ -32,6 +32,7 @@ import time
 
 from .._otr_shared import retry_taxonomy as _rt
 from .._otr_shared.fallback import resolve_fallback_chain
+from .._otr_shared.resolver import prune_orphaned_groups
 from . import motion_common as _mc
 from . import registry as _vreg
 
@@ -106,6 +107,14 @@ class RenderFloorError(RuntimeError):
     (the soak's negative control; should never happen with a working ffmpeg)."""
 
 
+class FamilyInputGap(RuntimeError):
+    """A fallback candidate's FAMILY requires request inputs this request
+    cannot satisfy (p3 down-chain shape, 3D plan 7.0): e.g. ``lipsync_overlay``
+    needs ``base_clip_ref`` that a ``character_3d`` request lacks. Classified
+    DEPENDENCY_MISSING -- the chain SKIPS the candidate LOUDLY to a compatible
+    floor instead of feeding a 3D request to latentsync."""
+
+
 class SoakError(AssertionError):
     """An A-S7.5 soak invariant was violated (the soak FAILED)."""
 
@@ -141,7 +150,7 @@ def classify_failure(exc):
         return _rt.FailureKind.OOM
     name = type(exc).__name__
     if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",
-                "KeyError", "FileNotFoundError"):
+                "KeyError", "FileNotFoundError", "FamilyInputGap"):
         return _rt.FailureKind.DEPENDENCY_MISSING
     if name == "GraphExecutionError":
         return _rt.FailureKind.INVALID_DAG
@@ -186,8 +195,17 @@ def build_full_ledger(section):
 
 
 def build_request(shot, assets, frame_count, canvas=None):
-    """A VideoRequest-shaped dict per shot (deterministic: the seed is keyed to
-    the shot id so render-twice is identical -- V-7)."""
+    """A SCHEMA-VALID ``VideoRequest`` dict per shot (deterministic: the seed
+    is keyed to the shot id so render-twice is identical -- V-7).
+
+    W7-pre builder migration (3D plan 7.0, code-verified gap): the emitted
+    dict passes ``VideoRequest.model_validate`` -- the old extras
+    ``init_w``/``init_h`` are GONE (the adapters' aspect hint defaulted to the
+    canvas dims anyway = an identity transform; hand-built requests may still
+    carry the hint, the builders just never emit it), ``role`` /
+    ``family_hint`` / ``profile_id`` are emitted, and observability stamps
+    ride the REAL ``observability`` field -- never top-level underscore
+    extras."""
     assets = assets or {}
     portrait = assets.get("init_image", "")
     audio = assets.get("audio_ref", "")
@@ -198,16 +216,22 @@ def build_request(shot, assets, frame_count, canvas=None):
         idx = 0
     seed = (idx * 1009 + 7) & 0x7FFFFFFF
     cw, ch = (canvas or (480, 832))
+    family = engine_family(str(shot.get("engine_id") or ""),
+                           shot.get("family")) or "abstract"
     return {
         "shot_id": sid, "request_id": sid,
+        "role": str(shot.get("role") or ""),
+        "family_hint": family,
+        "profile_id": str(shot.get("profile_id") or ""),
         "text_prompt": "a 1940s radio studio, warm tungsten light, on air",
         "asset_refs": {"init_image": portrait} if portrait else {},
+        "conditioning_refs": {},
         "audio_ref": {"path": audio} if audio else None,
         "base_clip_ref": None,
         "timing": {"target_frame_count": int(frame_count)},
         "canvas": {"w": int(cw), "h": int(ch), "fps": 25, "aspect_policy": "pad"},
         "seed_bundle": {"request_seed": seed},
-        "init_w": 480, "init_h": 832,
+        "observability": {},
     }
 
 
@@ -459,16 +483,19 @@ def _beat_clauses(line, shot_id):
 
 
 def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
-    """Stamp prompt observability onto the request (round 5 F2): source enum
-    (m4|env|brief+beat), sha8, char count -- ``run_episode`` copies them onto
-    the trace rows (durable in the node-92 /history report) and one INFO line
-    makes operator log review mechanical."""
+    """Stamp prompt observability onto the request's ``observability`` dict
+    (round 5 F2): source enum (m4|env|brief+beat), sha8, char count --
+    ``run_episode`` copies them onto the trace rows (durable in the node-92
+    /history report) and one INFO line makes operator log review mechanical.
+    The W7-pre builder migration moved these off the top level: VideoRequest
+    is extra="forbid", so underscore extras made every request schema-invalid."""
     sha8 = hashlib.sha256(str(prompt).encode("utf-8")).hexdigest()[:8]
-    req["_prompt_source"] = source
+    obs = req.setdefault("observability", {})
+    obs["prompt_source"] = source
     if subsource:
-        req["_prompt_subsource"] = subsource
-    req["_prompt_sha8"] = sha8
-    req["_prompt_chars"] = len(str(prompt))
+        obs["prompt_subsource"] = subsource
+    obs["prompt_sha8"] = sha8
+    obs["prompt_chars"] = len(str(prompt))
     _LOG.info("[OTR.render_driver] prompt source=%s sha8=%s chars=%d beat=%s "
               "| %.100s", source, sha8, len(str(prompt)), beat, prompt)
 
@@ -586,17 +613,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
-    # ST-4 / pass-02 Gem-3: init observability stamped on the REQUEST (the
-    # established _prompt_* pattern); run_episode copies them to trace rows
-    # so the W7 acceptance check is mechanical.
-    req["_init_source"] = init_source if init_image else "none"
-    req["_init_image"] = os.path.basename(init_image) if init_image else ""
+    # ST-4 / pass-02 Gem-3: init observability stamped on the REQUEST's
+    # observability dict (the round-5 pattern, schema-real since the W7-pre
+    # builder migration); run_episode copies them to trace rows so the W7
+    # acceptance check is mechanical.
+    req["observability"]["init_source"] = init_source if init_image else "none"
+    req["observability"]["init_image"] = (os.path.basename(init_image)
+                                          if init_image else "")
     # FULL-FRAME landscape for the generative-motion engines (operator
     # look-QA 2026-06-10): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox), and LTX/Wan
     # inherited it -- skinny portrait b-roll in a 1472x832 frame. Those
     # engines render the composite canvas instead (both dims /32 for the
-    # LTX latent grid; env-overridable).
+    # LTX latent grid; env-overridable). The old init_w/init_h echo is gone
+    # (W7-pre: schema extras; the aspect hint equalled the canvas = identity).
     if str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v"):
         _lc = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
         try:
@@ -604,7 +634,6 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lw, _lh = 1472, 832
         req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
-        req["init_w"], req["init_h"] = _lw, _lh
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside
@@ -761,27 +790,89 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # mix when the ledger has no per-line wav (audio_ref is None in that case).
     # SYNTHETIC shots (the opening-music scene, 2026-06-10) have no ledger
     # line; the shot row itself carries start_s/dur_s -- fall back to it so
-    # the positioned timeline keeps every row placed.
-    req["timing"]["start_s"] = (line.get("start_s")
-                                if line.get("start_s") is not None
-                                else shot.get("start_s"))
-    req["timing"]["dur_s"] = (line.get("dur_s")
-                              if line.get("dur_s") is not None
-                              else shot.get("dur_s"))
-    req["char_id"] = char_id
+    # the positioned timeline keeps every row placed. W7-pre migration: the
+    # schema field is ``target_duration_s`` (never ``dur_s``); a missing value
+    # is OMITTED (the Timing default 0.0 applies) -- an explicit None fails
+    # ``model_validate``.
+    _start = (line.get("start_s") if line.get("start_s") is not None
+              else shot.get("start_s"))
+    if _start is not None:
+        req["timing"]["start_s"] = float(_start)
+    _dur = (line.get("dur_s") if line.get("dur_s") is not None
+            else shot.get("dur_s"))
+    if _dur is not None:
+        req["timing"]["target_duration_s"] = float(_dur)
+    # Thread the beat identity for downstream cache keys (3D plan 7.3: the
+    # CURVE key needs line_id) -- the schema-real Timing.source_line_ids.
+    _sids = shot.get("source_line_ids")
+    req["timing"]["source_line_ids"] = (
+        [str(s) for s in _sids] if isinstance(_sids, list) and _sids
+        else ([_beat_id_for_shot(shot)] if _beat_id_for_shot(shot) else []))
+    # char_id rides in conditioning_refs (W7-pre migration: a top-level
+    # char_id is a schema extra; VideoRequest is extra="forbid").
+    if char_id:
+        req["conditioning_refs"]["char_id"] = char_id
     return req
 
 
 # --------------------------------------------------------------------------- #
 # The in-process render (the GPU slice)
 # --------------------------------------------------------------------------- #
+def _present_request_tokens(request):
+    """The role_compat input tokens a request dict actually carries (mirrors
+    ``schemas.VideoRequest._present_input_tokens`` for plain dicts)."""
+    get = request.get if isinstance(request, dict) else (
+        lambda k, d=None: getattr(request, k, d))
+    present = set()
+    if get("text_prompt"):
+        present.add("text_prompt")
+    if "init_image" in (get("asset_refs") or {}):
+        present.add("init_image")
+    if get("audio_ref") is not None:
+        present.add("audio_ref")
+    if get("base_clip_ref"):
+        present.add("base_clip_ref")
+    return present
+
+
+def _assert_family_inputs_satisfiable(engine_name, request):
+    """p3 down-chain request shape (3D plan 7.0): before attempting a fallback
+    CANDIDATE, re-validate the ONE request against the candidate FAMILY's
+    required inputs. A family whose requirements the request cannot satisfy
+    (e.g. ``lipsync_overlay`` needs ``base_clip_ref`` a ``character_3d``
+    request lacks) raises :class:`FamilyInputGap` -- the chain SKIPS it LOUDLY
+    (decision + restamp) instead of feeding the wrong-shaped request to the
+    engine. Runs AFTER ``_provide_lipsync_base`` so the sanctioned base
+    provider seam can legitimately satisfy ``lipsync_overlay`` first. The
+    no-input floor families are always satisfiable, so termination holds."""
+    from .schemas import FAMILY_REQUIRED_INPUTS
+    fam = engine_family(engine_name, "")
+    required = FAMILY_REQUIRED_INPUTS.get(fam, ())
+    present = _present_request_tokens(request)
+    if fam == "static_image_gen":
+        if not ({"text_prompt", "init_image"} & present):
+            raise FamilyInputGap(
+                "candidate %r (family %s) needs text_prompt or init_image; "
+                "the request carries neither -- LOUD skip down the chain"
+                % (engine_name, fam))
+        return
+    missing = [t for t in required if t not in present]
+    if missing:
+        raise FamilyInputGap(
+            "candidate %r (family %s) requires input(s) %s the request does "
+            "not carry -- LOUD skip down the chain (never feed a wrong-shaped "
+            "request to an engine)" % (engine_name, fam, missing))
+
+
 def _render_one(engine_name, request, *, force_oom):
     """Attempt ONE candidate engine: assert_usable -> prepare -> render_clip ->
     canonicalize, always teardown. ``force_oom`` raises BEFORE any work (the
-    soak's deterministic mid-episode OOM). Raises on failure; returns the
-    canonical clip dict on success."""
+    soak's deterministic mid-episode OOM -- it precedes the family-input check
+    so the soak's expected OOM trail is exactly preserved). Raises on failure;
+    returns the canonical clip dict on success."""
     if force_oom:
         raise OomSignal("forced soak OOM on %s" % engine_name)
+    _assert_family_inputs_satisfiable(engine_name, request)
     if not _vreg.is_registered(engine_name):
         raise LookupError("engine %r is not registered" % engine_name)
     eng = _vreg.get_engine(engine_name)
@@ -924,17 +1015,45 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             oom_engines=oom_engines, oom_shot_id=oom_shot_id)
         for rec in decisions:
             section = _rt.append_runtime_fallback_decision(section, rec)
+        # AS-2 resolver-prune wiring (3D plan 7.0 p3, code-verified gap:
+        # resolver.py shipped the orphaned-background prune but nothing called
+        # it): on a FAMILY-CHANGING fallback the planned execution group no
+        # longer runs as planned -- prune the degraded consumer's group id and
+        # cascade any provider thereby orphaned (the character_3d -> humo
+        # background case), in the SAME in-memory ledger transaction as the
+        # restamp + decision append. LOUD; groups absent = no-op (the soak
+        # fixture carries none).
+        if (decisions and out_shot.get("family") != shot.get("family")
+                and section.get("execution_groups")):
+            gid = str(out_shot.get("group_id") or "")
+            groups = section["execution_groups"]
+            if gid and any(g.get("group_id") == gid for g in groups):
+                pruned = prune_orphaned_groups(groups, [gid])
+                dropped = sorted({g["group_id"] for g in groups}
+                                 - {g["group_id"] for g in pruned})
+                section["execution_groups"] = pruned
+                _LOG.warning(
+                    "[OTR video] LOUD AS-2 PRUNE: shot %s family fallback "
+                    "%s->%s orphaned execution group(s) %s -- removed from "
+                    "the plan (same revision)", out_shot.get("shot_id"),
+                    shot.get("family"), out_shot.get("family"), dropped)
         clips[out_shot["shot_id"]] = clip
         new_shots.append(out_shot)
         row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
                "final_engine": out_shot["engine_id"]}
         # Round 5 F2: prompt observability rides the trace (durable in the
         # node-92 /history report) -- the diversity gate + the operator's
-        # "did the prompts actually differ" check read these.
-        for key in ("_prompt_source", "_prompt_subsource", "_prompt_sha8",
-                    "_prompt_chars", "_init_source", "_init_image"):
-            if isinstance(request, dict) and key in request:
-                row[key.lstrip("_")] = request[key]
+        # "did the prompts actually differ" check read these. The stamps live
+        # on the request's schema-real ``observability`` dict (W7-pre builder
+        # migration; the legacy top-level ``_<key>`` spelling is still read
+        # for hand-built requests).
+        obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
+        for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
+                    "prompt_chars", "init_source", "init_image"):
+            if key in obs:
+                row[key] = obs[key]
+            elif isinstance(request, dict) and ("_" + key) in request:
+                row[key] = request["_" + key]
         trace.append(row)
         if used:
             vram_peak = max(vram_peak, int(used))
@@ -1309,7 +1428,7 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
 __all__ = [
     "FLOOR_NAMES", "UNIVERSAL_FLOOR", "SYNTH_FALLBACKS", "ENGINE_FAMILY",
     "OOM_ENGINES", "FROZEN_AUDIO_SHA", "EXPECTED_OOM_TRAIL",
-    "OomSignal", "RenderFloorError", "SoakError",
+    "OomSignal", "RenderFloorError", "SoakError", "FamilyInputGap",
     "make_fallback_of", "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",

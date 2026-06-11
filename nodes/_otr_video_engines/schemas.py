@@ -156,6 +156,13 @@ class VideoRequest(_Forbid):
     quality: Quality = Field(default_factory=Quality)
     policy: Policy = Field(default_factory=Policy)
     locked_against_audio_rev: Optional[str] = None
+    #: Trace-only observability stamps (round-5 F2 prompt provenance +
+    #: still-spine ST-4 init provenance). NEVER conditioning, never hashed
+    #: into request identity; ``run_episode`` copies these onto trace rows.
+    #: A REAL field (W7-pre builder migration) because the model is
+    #: extra="forbid" -- the old top-level ``_prompt_*``/``_init_*`` keys
+    #: made every built request schema-invalid.
+    observability: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check_family_required_inputs(self) -> "VideoRequest":

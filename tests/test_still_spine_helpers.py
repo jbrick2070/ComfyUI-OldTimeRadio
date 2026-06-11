@@ -445,18 +445,18 @@ class TestDispatcherStillSpine:
         for eng, fam in (("still_kenburns", "static_motion"),
                          ("wan_i2v", "image_to_video")):
             req = rd.build_request_from_shot(shot(eng, fam), ledger)
-            assert req["_init_source"] == "scene_still", eng
-            assert req["_init_image"] == still.name
+            assert req["observability"]["init_source"] == "scene_still", eng
+            assert req["observability"]["init_image"] == still.name
             assert req["asset_refs"]["init_image"] == str(still)
         # audio_driven_face -> portrait (unchanged)
         req = rd.build_request_from_shot(
             shot("humo", "audio_driven_face"), ledger)
-        assert req["_init_source"] == "portrait"
+        assert req["observability"]["init_source"] == "portrait"
         assert req["asset_refs"]["init_image"] == str(portrait)
         # text engine -> portrait-by-char (pre-spine behavior, unchanged)
         req = rd.build_request_from_shot(
             shot("ltx_video", "text_to_video"), ledger)
-        assert req["_init_source"] == "portrait"
+        assert req["observability"]["init_source"] == "portrait"
 
         # missing scene still -> LOUD fallback to the pre-spine init
         ledger2 = {k: (dict(v) if isinstance(v, dict) else v)
@@ -466,7 +466,7 @@ class TestDispatcherStillSpine:
              "path": str(portrait)}]}
         req = rd.build_request_from_shot(
             shot("wan_i2v", "image_to_video"), ledger2)
-        assert req["_init_source"] == "portrait"   # fell back, stamped truthfully
+        assert req["observability"]["init_source"] == "portrait"   # fell back, stamped truthfully
         assert req["asset_refs"]["init_image"] == str(portrait)
 
     def test_st5_kenburns_reads_driver_built_request(self, tmp_path):
@@ -514,7 +514,7 @@ class TestDispatcherStillSpine:
         req = rd.build_request_from_shot(shot, ledger)
         eng = WanI2VEngine() if isinstance(WanI2VEngine, type) else WanI2VEngine
         assert eng._init_image_ref(req) == str(still)
-        assert req["_init_source"] == "scene_still"
+        assert req["observability"]["init_source"] == "scene_still"
 
     def test_st4_manifest_rows_gain_init_source(self):
         from nodes._otr_video_engines import render_driver as rd
