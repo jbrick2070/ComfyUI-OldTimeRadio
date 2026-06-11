@@ -144,7 +144,20 @@ class TestPerBeatScenePrompts:
         s = _shot("shot_b000_music_open", "announcer_visual",
                   source_line_ids=[], start_s=0.0, dur_s=9.5)
         p = _rd.build_request_from_shot(s, led)["text_prompt"]
-        assert "opening establishing shot" in p
+        assert "warming up on a wooden table" in p
+
+    def test_open_leads_with_concrete_subject_not_logline(self, monkeypatch):
+        # the r5b operator catch: LTX paints narrative prose as murk -- the
+        # OPEN must lead with the radio-set subject; the brief contributes
+        # TERMS (setting/atmosphere), never the logline sentence.
+        monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+        led = _scene_ledger()
+        p = _rd.build_request_from_shot(
+            _shot("shot_b001", "announcer_visual"), led)["text_prompt"]
+        assert p.startswith("a 1940s radio station studio")
+        assert "An innovator unveils a machine" not in p   # logline banned
+        assert "foundry" in p                              # setting term in
+        assert "wonder mood" in p                          # atmosphere term in
 
     def test_bright_tokens_survive_the_finisher(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)

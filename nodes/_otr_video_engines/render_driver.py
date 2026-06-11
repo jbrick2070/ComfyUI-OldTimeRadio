@@ -519,13 +519,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _shot_role = _gid[len("grp_"):]
     if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v")
             and not text_prompt):
-        # Round 5 F2: synthetic-open detection by STRUCTURE (empty
-        # source_line_ids / the ShotLock beat-id suffix), never role alone;
-        # role still picks the clause WORDING below.
+        # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
+        # beat-id suffix is definitive; empty source_line_ids counts only
+        # for OPEN roles (a hypothetical provider/b-roll shot without source
+        # lines must not inherit the radio-open subject).
         _sids = shot.get("source_line_ids")
-        _is_synthetic_open = ((isinstance(_sids, list) and not _sids)
-                              or str(shot.get("shot_id") or "")
-                              .endswith(_OPENING_MUSIC_SUFFIX))
+        _suffix_hit = str(shot.get("shot_id") or "").endswith(
+            _OPENING_MUSIC_SUFFIX)
+        _no_sids = isinstance(_sids, list) and not _sids
+        _is_synthetic_open = (_suffix_hit
+                              or (_no_sids and _shot_role in
+                                  ("announcer_visual", "music_visual")))
         _is_open = (_is_synthetic_open
                     or _shot_role in ("announcer_visual", "music_visual"))
         _override = (os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
@@ -546,30 +550,48 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 from _otr_story_brief_helpers import (  # type: ignore
                     finish_visual_prompt, get_story_brief_ltx)
             _meta = (ledger or {}).get("meta") or {}
-            core = get_story_brief_ltx(_meta)
-            if not core:
-                _terms = _meta.get("story_brief_terms") or {}
-                _setting_raw = (_terms.get("setting")
-                                if isinstance(_terms, dict) else None)
-                _setting = ", ".join(
-                    [str(t).strip() for t in (_setting_raw or [])
-                     if str(t).strip()][:2])
-                core = ("cinematic establishing shot"
-                        + (f", {_setting}" if _setting else ""))
-            # Per-beat composition (round 5 F2): role clause FIRST (the
-            # bright-radio look survives the 240 trim), then the beat's OWN
-            # clauses from the frozen line's beat_intent / arc_phase -- the
-            # per-beat variety the empty visual_plan.scenes can't supply.
+            _terms = _meta.get("story_brief_terms") or {}
+
+            def _term_join(key, n):
+                raw = _terms.get(key) if isinstance(_terms, dict) else None
+                return ", ".join([str(t).strip() for t in (raw or [])
+                                  if str(t).strip()][:n])
+
+            # Per-beat composition (round 5 F2 + the r5b operator catch):
+            # LTX renders NARRATIVE PROSE as murk -- a logline like "a
+            # scientist apologizes after heated debate" is not a picture. So
+            # OPEN roles lead with the CONCRETE radio-set subject (the look
+            # the operator wants back) and take the brief's setting /
+            # atmosphere TERMS as context -- never the logline sentence.
+            # Non-open text-engine roles (scene_broll etc.) keep the logline
+            # core. Beat clauses (beat_intent / arc_phase) carry the per-beat
+            # variety either way.
             clauses = []
-            if _is_synthetic_open:
-                clauses.append("opening establishing shot, the radio warming "
-                               "up, warm glowing dial light")
-            elif _shot_role == "announcer_visual":
-                clauses.append("a vintage radio set glowing warmly, lit "
-                               "dials and tubes")
-            elif _shot_role == "music_visual":
-                clauses.append("the radio warming up, warm glowing dial "
-                               "light")
+            if _is_open:
+                if _is_synthetic_open:
+                    subject = ("a vintage radio set warming up on a wooden "
+                               "table, glowing dials and tubes, warm "
+                               "tungsten light")
+                elif _shot_role == "announcer_visual":
+                    subject = ("a 1940s radio station studio, a vintage "
+                               "radio set glowing warmly, lit dials and "
+                               "tubes, warm tungsten light")
+                else:
+                    subject = ("a vintage radio set glowing warmly, warm "
+                               "dial light")
+                _setting = _term_join("setting", 2)
+                _atmo = _term_join("atmosphere", 1)
+                core = subject
+                if _setting:
+                    clauses.append(_setting)
+                if _atmo:
+                    clauses.append(f"{_atmo} mood")
+            else:
+                core = get_story_brief_ltx(_meta)
+                if not core:
+                    _setting = _term_join("setting", 2)
+                    core = ("cinematic establishing shot"
+                            + (f", {_setting}" if _setting else ""))
             clauses.extend(_beat_clauses(line, shot.get("shot_id")))
             clauses.extend(["slow cinematic camera drift",
                             "no on-screen text"])
