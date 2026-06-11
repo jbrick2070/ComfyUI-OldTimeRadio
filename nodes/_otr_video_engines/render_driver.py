@@ -244,22 +244,80 @@ def build_request(shot, assets, frame_count, canvas=None):
 # beat's ``[start_s, start_s+dur_s]`` timing that OTR_EpisodeAssembler
 # already stamped onto every ``lines[]`` entry.  The master file is opened
 # read-only by ffmpeg (``-i``); output goes to a dedicated temp directory so
-# the master is NEVER mutated (V-1 / audio spine frozen).  The slice is
-# deterministically keyed to the (path, start_s, dur_s) triple so a second
-# render of the same beat reuses the cached file without re-running ffmpeg.
+# the master is NEVER mutated (V-1 / audio spine frozen).
+#
+# CACHE KEYS -- the 7.3 slice/curve SPLIT (don't over-key the cheap WAV):
+# the SLICE key binds the master CONTENT hash
+# (``ledger['audio']['master_audio_sha256']``) + start_s + dur_s + sample
+# rate + channels + slicer version -- the shipped path-only key
+# under-invalidated when a NEW master landed at the SAME path.  The CURVE
+# key (the W7 Rhubarb driver's artifact) DERIVES from the slice key and
+# additionally binds line_id + fps + driver version + viseme-mapping hash +
+# onset policy -- driver-side concerns that must never churn the cheap WAV.
+# The HuMo 44.1 kHz mono slice semantics are UNCHANGED; the driver's 16 kHz
+# input is a DOWNSAMPLE OF THE SLICE, never a re-slice of the master.
 # --------------------------------------------------------------------------- #
 
-def _slice_master_audio(master_path, start_s, dur_s):
+#: Bumps when the SLICE ffmpeg recipe changes (codec/rate/channels/trim
+#: semantics) -- part of the slice cache key, so old cached WAVs invalidate.
+SLICER_VERSION = "2"
+
+#: The HuMo slice recipe constants (UNCHANGED semantics -- 7.3: HuMo's
+#: slicer is NOT changed; they are named so the cache key can bind them).
+_SLICE_SAMPLE_RATE = 44100
+_SLICE_CHANNELS = 1
+
+
+def slice_cache_key(master_hash, start_s, dur_s, *,
+                    sample_rate=_SLICE_SAMPLE_RATE,
+                    channels=_SLICE_CHANNELS,
+                    slicer_version=SLICER_VERSION,
+                    master_path=""):
+    """The SLICE cache key (3D plan 7.3): master CONTENT hash + timing +
+    rate + channels + slicer version. ``master_path`` participates ONLY when
+    ``master_hash`` is empty (the legacy hashless caller keeps the shipped
+    path-keyed behavior instead of all colliding on one key). Pure; 16-hex."""
+    ident = str(master_hash or "") or ("path:%s" % master_path)
+    return hashlib.sha256(
+        ("slice|v%s|%s|%.6f|%.6f|ar%d|ac%d"
+         % (slicer_version, ident, float(start_s), float(dur_s),
+            int(sample_rate), int(channels))).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def curve_cache_key(slice_key, line_id, *, fps, driver_version,
+                    mapping_hash, onset_policy="onset_in_clip_v1"):
+    """The CURVE cache key (3D plan 7.3): the W7 Rhubarb->ARKit curve file
+    binds the SLICE key (content-true audio identity) + line_id + fps +
+    driver version + viseme-mapping-table hash + onset policy. Changing any
+    driver-side input regenerates curves WITHOUT touching the cheap WAV
+    (the split's whole point). Pure; 16-hex."""
+    return hashlib.sha256(
+        ("curve|%s|line=%s|fps=%d|drv=%s|map=%s|onset=%s"
+         % (slice_key, line_id, int(fps), driver_version, mapping_hash,
+            onset_policy)).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def _slice_master_audio(master_path, start_s, dur_s, master_hash=""):
     """ffmpeg-slice ``[start_s, start_s+dur_s]`` from the FROZEN master into a
     temp WAV.  Read-only (``-i`` only, never ``-o`` on the master).  Returns
     the temp path on success, ``""`` on failure (LOUD warning logged).
 
-    The output file is cached by a hash of ``(start_s, dur_s, master_path)``
-    so render-twice is deterministic without re-running ffmpeg."""
-    key = hashlib.sha256(
-        ("%.6f|%.6f|%s" % (float(start_s), float(dur_s), master_path)
-         ).encode("utf-8")
-    ).hexdigest()[:16]
+    The output file is cached by :func:`slice_cache_key` so render-twice is
+    deterministic without re-running ffmpeg AND a new master at the same
+    path invalidates (the content hash is the identity). ``master_hash`` is
+    fed from ``ledger['audio']['master_audio_sha256']`` by
+    :func:`build_request_from_shot`; a hashless call keeps the legacy
+    path-keyed behavior with a LOUD warning."""
+    if not master_hash:
+        _LOG.warning("[OTR.render_driver] _slice_master_audio called WITHOUT "
+                     "the master content hash -- slice cache falls back to "
+                     "the path-keyed identity (under-invalidates on a new "
+                     "master at the same path); thread "
+                     "ledger['audio']['master_audio_sha256'] in")
+    key = slice_cache_key(master_hash, start_s, dur_s,
+                          master_path=master_path)
     tmp_dir = os.path.join(tempfile.gettempdir(), "otr_audio_slices")
     try:
         os.makedirs(tmp_dir, exist_ok=True)
@@ -275,7 +333,8 @@ def _slice_master_audio(master_path, start_s, dur_s):
         "-ss", "%.6f" % float(start_s),
         "-t",  "%.6f" % float(dur_s),
         "-i",  master_path,
-        "-vn", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "1",
+        "-vn", "-c:a", "pcm_s16le",
+        "-ar", str(_SLICE_SAMPLE_RATE), "-ac", str(_SLICE_CHANNELS),
         out,
     ]
     try:
@@ -595,8 +654,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         dur_s = line.get("dur_s")
         if (start_s is not None and dur_s is not None
                 and float(dur_s) > 0):
+            # 7.3 slice key: the master CONTENT hash is the cache identity
+            # (a new master at the same path invalidates the slice).
+            _mhash = str(((ledger or {}).get("audio") or {})
+                         .get("master_audio_sha256") or "")
             sliced = _slice_master_audio(master_audio_path,
-                                         float(start_s), float(dur_s))
+                                         float(start_s), float(dur_s),
+                                         master_hash=_mhash)
             if sliced:
                 _LOG.info("[OTR.render_driver] per-beat audio: sliced "
                           "%s @%.3f+%.3fs -> %s (beat %s)",
@@ -1451,6 +1515,7 @@ __all__ = [
     "make_fallback_of", "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
+    "SLICER_VERSION", "slice_cache_key", "curve_cache_key",
     "run_real_episode", "build_clip_manifest",
     "parse_engine_override", "apply_engine_override",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",

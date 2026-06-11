@@ -92,14 +92,12 @@ class TestSliceMasterAudio:
         assert out == ""
 
     def test_caches_hit_skips_ffmpeg(self, tmp_path, monkeypatch):
-        """If the output file already exists and is non-empty, ffmpeg is not called."""
+        """If the output file already exists and is non-empty, ffmpeg is not
+        called (keyed via slice_cache_key -- the 7.3 split)."""
         master = tmp_path / "master.mp4"
         master.write_bytes(b"fake")
-        # Pre-create the expected cache file
-        import hashlib, tempfile as _tf
-        key = hashlib.sha256(
-            ("%.6f|%.6f|%s" % (1.5, 3.0, str(master))).encode("utf-8")
-        ).hexdigest()[:16]
+        import tempfile as _tf
+        key = rd.slice_cache_key("", 1.5, 3.0, master_path=str(master))
         cache_dir = os.path.join(_tf.gettempdir(), "otr_audio_slices")
         os.makedirs(cache_dir, exist_ok=True)
         cached = os.path.join(cache_dir, "slice_%s.wav" % key)
@@ -147,6 +145,76 @@ class TestSliceMasterAudio:
 
 
 # --------------------------------------------------------------------------- #
+# 7.3 slice/curve cache-key SPLIT (3D plan; don't over-key the cheap WAV)
+# --------------------------------------------------------------------------- #
+
+class TestSliceCurveCacheKeySplit:
+    def test_master_content_hash_is_the_slice_identity(self):
+        """A NEW master at the SAME path invalidates (the shipped path-only
+        key under-invalidated); the path is ignored once a hash is given."""
+        a = rd.slice_cache_key("hash_aaa", 1.0, 2.0, master_path="X:/m.mp4")
+        b = rd.slice_cache_key("hash_bbb", 1.0, 2.0, master_path="X:/m.mp4")
+        assert a != b
+        # path does not participate when the content hash is present
+        c = rd.slice_cache_key("hash_aaa", 1.0, 2.0, master_path="Y:/other.mp4")
+        assert a == c
+
+    def test_hashless_fallback_is_path_keyed(self):
+        a = rd.slice_cache_key("", 1.0, 2.0, master_path="X:/m.mp4")
+        b = rd.slice_cache_key("", 1.0, 2.0, master_path="Y:/other.mp4")
+        assert a != b          # legacy callers do not all collide on one key
+        assert a == rd.slice_cache_key("", 1.0, 2.0, master_path="X:/m.mp4")
+
+    def test_slice_key_binds_timing_rate_channels_version(self):
+        base = dict(sample_rate=44100, channels=1, slicer_version="2")
+        k = rd.slice_cache_key("h", 1.0, 2.0, **base)
+        assert k != rd.slice_cache_key("h", 1.5, 2.0, **base)
+        assert k != rd.slice_cache_key("h", 1.0, 2.5, **base)
+        assert k != rd.slice_cache_key("h", 1.0, 2.0,
+                                       **dict(base, sample_rate=16000))
+        assert k != rd.slice_cache_key("h", 1.0, 2.0,
+                                       **dict(base, channels=2))
+        assert k != rd.slice_cache_key("h", 1.0, 2.0,
+                                       **dict(base, slicer_version="3"))
+
+    def test_curve_key_binds_driver_inputs_slice_key_does_not(self):
+        """The SPLIT: driver-side inputs (line_id / fps / driver version /
+        mapping hash / onset policy) churn ONLY the curve key -- the cheap
+        44.1k WAV key never moves."""
+        sk = rd.slice_cache_key("h", 1.0, 2.0)
+        base = dict(fps=25, driver_version="rhubarb-1.13",
+                    mapping_hash="map_v1", onset_policy="onset_in_clip_v1")
+        ck = rd.curve_cache_key(sk, "b001", **base)
+        assert ck != rd.curve_cache_key(sk, "b002", **base)
+        assert ck != rd.curve_cache_key(sk, "b001", **dict(base, fps=24))
+        assert ck != rd.curve_cache_key(
+            sk, "b001", **dict(base, driver_version="rhubarb-1.14"))
+        assert ck != rd.curve_cache_key(
+            sk, "b001", **dict(base, mapping_hash="map_v2"))
+        assert ck != rd.curve_cache_key(
+            sk, "b001", **dict(base, onset_policy="other"))
+        # the curve key DERIVES from the slice key (audio identity flows in)
+        sk2 = rd.slice_cache_key("h2", 1.0, 2.0)
+        assert ck != rd.curve_cache_key(sk2, "b001", **base)
+        # and the slice key itself is untouched by any driver input
+        assert sk == rd.slice_cache_key("h", 1.0, 2.0)
+
+    def test_build_request_from_shot_threads_the_ledger_hash(self):
+        """build_request_from_shot feeds master_audio_sha256 into the slicer
+        (the 7.3 mechanics: the signature gained the hash)."""
+        ledger = _ledger_with_line("b009", wav_path="", start_s=1.0, dur_s=2.0)
+        shot = _shot("b009")
+        with mock.patch("nodes._otr_video_engines.render_driver."
+                        "_slice_master_audio", return_value="") as m:
+            with mock.patch("nodes._otr_video_engines.render_driver."
+                            "os.path.isfile", return_value=True):
+                rd.build_request_from_shot(shot, ledger,
+                                           master_audio_path="/fake/m.mp4")
+        assert m.call_count == 1
+        assert m.call_args.kwargs.get("master_hash") == rd.FROZEN_AUDIO_SHA
+
+
+# --------------------------------------------------------------------------- #
 # build_request_from_shot -- per-beat audio path
 # --------------------------------------------------------------------------- #
 
@@ -179,7 +247,8 @@ class TestBuildRequestFromShotPerBeatAudio:
                             side_effect=lambda p: p == master or orig_isfile(p)):
                 req = rd.build_request_from_shot(shot, ledger,
                                                  master_audio_path=master)
-        m.assert_called_once_with(master, 2.0, 4.5)
+        m.assert_called_once_with(master, 2.0, 4.5,
+                                  master_hash=rd.FROZEN_AUDIO_SHA)
         assert req["audio_ref"] == {"path": sliced}
 
     def test_no_audio_when_master_empty(self):
@@ -276,7 +345,8 @@ class TestBuildRequestFromShotPerBeatAudio:
                         return_value=sliced) as m:
             req = rd.build_request_from_shot(shot, ledger,
                                              master_audio_path=master)
-        m.assert_called_once_with(master, 9.5, 9.40375)
+        m.assert_called_once_with(master, 9.5, 9.40375,
+                                  master_hash=rd.FROZEN_AUDIO_SHA)
         assert req["audio_ref"] == {"path": sliced}
         assert req["asset_refs"]["init_image"] == str(portrait), (
             "announcer beat must resolve the radio-style portrait as "
