@@ -543,9 +543,10 @@ def test_shotlock_end_to_end_stamps_video_section():
         "canvas": {"w": 832, "h": 480, "fps": 25},
         "other_beats": {"clip_mode": "unique_per_beat", "pool_n": 8},
     })
-    patched, rev, report, done = OTRShotLock().lock(
+    patched, rev, report, done, episode_id = OTRShotLock().lock(
         json.dumps(led), audio_done="audio:done", video_policy_json=policy,
     )
+    assert episode_id == ""          # fixture ledger carries no episode_id
     out = json.loads(patched)
     assert out["video"]["video_revision"] == 1 == rev
     assert len(out["video"]["shots"]) == 2
@@ -709,7 +710,7 @@ def test_clip_budget_empty_script_radio_floor():
     assert budget["per_beat"] == {}
 
     led = json.dumps({"cast": [], "lines": [], "meta": {}})
-    patched, rev, report, done = OTRShotLock().lock(
+    patched, rev, report, done, _epid = OTRShotLock().lock(
         led, audio_done="audio:done", video_policy_json="{}",
     )
     out = json.loads(patched)

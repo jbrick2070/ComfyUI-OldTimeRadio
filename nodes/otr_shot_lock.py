@@ -768,8 +768,13 @@ class OTRShotLock:
 
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "lock"
-    RETURN_TYPES = ("STRING", "INT", "STRING", "STRING")
-    RETURN_NAMES = ("patched_ledger_json", "video_revision", "shot_report", "done")
+    # episode_id output is ADDITIVE (still-spine ST-6 / DS-3): ShotLock holds
+    # the audio-overlaid ledger, so it is the in-graph episode_id authority;
+    # the saved json wires it into OTR_ImageGenDispatcher.episode_id so every
+    # still lands in episodes/<ep>/stills/. Existing slot indexes unchanged.
+    RETURN_TYPES = ("STRING", "INT", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("patched_ledger_json", "video_revision", "shot_report",
+                    "done", "episode_id")
     OUTPUT_NODE = False
 
     @classmethod
@@ -931,4 +936,6 @@ class OTRShotLock:
 
         patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         done = f"shot_lock:done:rev={revision}"
-        return (patched, int(revision), "\n".join(report), done)
+        episode_id = str(led.get("episode_id")
+                         or (led.get("meta") or {}).get("episode_id") or "")
+        return (patched, int(revision), "\n".join(report), done, episode_id)

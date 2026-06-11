@@ -118,3 +118,13 @@ def test_production_workflow_visual_structure_pinned():
     assert links[267][1:3] == [91, 1], (
         "image_done gate must come from OTR_ImageGenDispatcher out 1")
     assert links[260][1:5] == [91, 0, 92, 0]   # dispatcher ledger -> render
+
+    # -- 5. the episode_id wire (still-spine ST-6 / DS-3) ---------------------
+    # ShotLock's additive episode_id output (out 4) feeds the dispatcher's
+    # episode_id input so every still lands in episodes/<ep>/stills/.
+    n91 = nodes[91]
+    epi = [i for i in n91["inputs"] if i.get("name") == "episode_id"]
+    assert epi and epi[0].get("link") == 268, (
+        "dispatcher episode_id input missing or unwired (ST-6)")
+    assert links[268][1:3] == [90, 4], (
+        "episode_id must come from OTR_ShotLock out 4")
