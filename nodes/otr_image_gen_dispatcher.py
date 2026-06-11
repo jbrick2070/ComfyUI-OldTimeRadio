@@ -84,13 +84,62 @@ def _content_hash(obj) -> str:
     ).hexdigest()
 
 
-def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_version) -> str:
+def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_version,
+                      kind="", w=0, h=0) -> str:
     """The dispatch dedup key (PASS-IMG MUST-FIX #5). A change in ANY field ->
-    new key -> regen -> new content hash -> B's mesh cache invalidates."""
+    new key -> regen -> new content hash -> B's mesh cache invalidates.
+
+    Still-spine ST-3 (pass-02 Gem-1): the key gains ``kind`` + ``w`` + ``h``
+    so a landscape scene still and a portrait of the same subject can never
+    collide, and a dim change regenerates."""
     return _content_hash([
         str(role), str(object_id), str(prompt_hash), int(seed),
         str(engine_id), str(engine_version),
+        str(kind), int(w or 0), int(h or 0),
     ])
+
+
+def resolve_object_seed(seed_cfg, object_id, prompt_hash) -> int:
+    """Per-object seed under the V-7 request-hash scheme: ``mode=request_hash``
+    (the ImageDirector default) derives a deterministic seed from
+    ``request_seed + object_id + prompt_hash`` so every object gets its own
+    seed while the whole episode stays reproducible; ``mode=fixed`` returns
+    ``request_seed`` verbatim. Pure."""
+    cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
+    base = int(cfg.get("request_seed") or 0)
+    if str(cfg.get("mode") or "request_hash") != "request_hash":
+        return base
+    digest = hashlib.sha256(
+        f"{base}:{object_id}:{prompt_hash}".encode()).hexdigest()
+    return int(digest[:8], 16)
+
+
+#: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
+#: honored -- announcer stills render on the announcer slot, music/open stills
+#: on the music slot; characters + scene b-roll + background on other_beats).
+_ROLE_TO_IMAGE_SLOT = {
+    "announcer_visual": "announcer_image_model",
+    "music_visual": "music_image_model",
+}
+
+
+def resolve_engine_for_role(image_policy, role):
+    """``(engine_id, slot_name, fallback_used)`` for an object role. An empty
+    named slot falls back to ``other_beats_image_model`` (the caller warns
+    LOUD); never raises."""
+    models = (image_policy or {}).get("image_models") or {}
+    slot = _ROLE_TO_IMAGE_SLOT.get(str(role or ""), "other_beats_image_model")
+
+    def _eid(entry):
+        if isinstance(entry, dict):
+            return str(entry.get("engine_id") or "")
+        return str(entry or "")
+
+    engine_id = _eid(models.get(slot))
+    if engine_id:
+        return engine_id, slot, False
+    fb = _eid(models.get("other_beats_image_model"))
+    return fb, slot, slot != "other_beats_image_model" and bool(fb)
 
 
 def _assert_not_path(prompt: str) -> None:
@@ -140,10 +189,23 @@ def apply_fresh_cap(n_requested: int, fresh_cap: int, beat_budget: int) -> int:
     return max(0, min(int(n_requested), cap))
 
 
+def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
+    """Copy a still into the EPISODE stills dir (idempotent; readable name
+    ``{object_id}_{hash12}.png``). Returns the episode-local path. Lazy
+    shutil; raises on a failed copy (the caller warns + falls back)."""
+    import shutil
+    os.makedirs(str(ep_dir), exist_ok=True)
+    dst = os.path.join(str(ep_dir), f"{object_id}_{str(content_hash)[:12]}.png")
+    if not os.path.exists(dst):
+        shutil.copyfile(str(src_path), dst)
+    return dst
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
-                    handoff_wait_attempts: int = 40, handoff_wait_sleep_s: float = 0.05):
+                    handoff_wait_attempts: int = 40, handoff_wait_sleep_s: float = 0.05,
+                    episode_id: str = ""):
     """Generate (or cache-reuse) every image OBJECT (portraits + scene
     stills); stamp the ledger.
 
@@ -163,9 +225,22 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     images_section = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
     cache_index = dict(images_section.get("cache_index") or {})
     images = list(images_section.get("images") or [])
-    seed = int(((image_policy or {}).get("seed") or {}).get("request_seed") or 0)
-    other_engine = ((image_policy or {}).get("image_models") or {}).get("other_beats_image_model") or {}
-    engine_id = other_engine.get("engine_id") if isinstance(other_engine, dict) else str(other_engine or "")
+    seed_cfg = (image_policy or {}).get("seed") or {}
+
+    # Episode keying (still-spine ST-3 / W3): every still materializes into
+    # episodes/<ep>/stills/ so the episode folder is self-contained. The id
+    # comes from the wired input first, then the ledger; an unkeyed dispatch
+    # is LOUD, never silent.
+    ep = str(episode_id
+             or (ledger or {}).get("episode_id")
+             or ((ledger or {}).get("meta") or {}).get("episode_id") or "")
+    if not ep:
+        ep = "unkeyed_episode"
+        warnings.append(
+            "episode_id missing (input unwired AND not in the ledger); "
+            "stills materialize under episodes/unkeyed_episode/ (LOUD)")
+    ep_dir = str(_pl.episode_stills_dir(ep, output_dir=output_dir))
+    ep_rows: list = []
 
     rev = int(images_section.get("image_revision") or 0) + 1
     made = 0
@@ -187,8 +262,17 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         beat_id = str(obj.get("beat_id") or "")
         prompt = str(obj.get("prompt") or "")
         prompt_hash = str(obj.get("prompt_hash") or "")
+        obj_w = int(obj.get("w") or 0)
+        obj_h = int(obj.get("h") or 0)
         if not oid:
             continue
+        # Slot resolution per OBJECT role (ST-3: the ImageDirector slots
+        # finally honored); empty named slot -> other_beats fallback, LOUD.
+        engine_id, slot, fell_back = resolve_engine_for_role(image_policy, role)
+        if fell_back:
+            warnings.append(
+                f"{oid}: image slot {slot} empty; fell back to "
+                "other_beats_image_model (LOUD)")
         if not engine_id:
             warnings.append(f"{oid}: no image engine selected; skipped (fail-closed)")
             continue
@@ -197,12 +281,53 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         except ValueError as exc:
             warnings.append(str(exc))
             continue
+        seed = resolve_object_seed(seed_cfg, oid, prompt_hash)
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
-        key = request_cache_key(role, oid, prompt_hash, seed, engine_id, eng_version)
+        key = request_cache_key(role, oid, prompt_hash, seed, engine_id,
+                                eng_version, kind=kind, w=obj_w, h=obj_h)
         if key in cache_index:
-            reused += 1
-            report.append(f"{oid}: cache HIT ({cache_index[key][:12]})")
-            continue
+            # Cache HIT (pass-02 Gem-2): the hit must STILL materialize into
+            # the CURRENT episode's stills/ + append a fresh ledger row --
+            # the old `continue` silently left episode folders missing every
+            # reused still. A stale index entry (file gone) degrades to a
+            # fresh render below, LOUD.
+            hit_id = cache_index[key]
+            src = ""
+            ref_row = None
+            for im in images:
+                if isinstance(im, dict) and im.get("image_id") == hit_id:
+                    ref_row = im
+                    src = str(im.get("pool_path") or im.get("path") or "")
+                    break
+            if src and os.path.exists(src):
+                try:
+                    dst = _materialize_episode_copy(
+                        src, ep_dir, oid,
+                        (ref_row or {}).get("portrait_content_hash") or "x")
+                except OSError as exc:
+                    warnings.append(
+                        f"{oid}: episode materialization of cache hit failed "
+                        f"({exc}); row points at the pool copy (LOUD)")
+                    dst = src
+                fresh = dict(ref_row or {})
+                fresh.update({
+                    "image_id": hit_id, "object_id": oid, "kind": kind,
+                    "role": role, "path": dst, "pool_path": src,
+                    "provenance": {"source": "cache_hit"},
+                })
+                if char_id:
+                    fresh["char_id"] = char_id
+                if beat_id:
+                    fresh["beat_id"] = beat_id
+                images.append(fresh)
+                ep_rows.append(fresh)
+                reused += 1
+                report.append(f"{oid}: cache HIT ({hit_id[:12]}) -> "
+                              f"{os.path.basename(dst)}")
+                continue
+            warnings.append(
+                f"{oid}: cache index entry {hit_id[:12]} has no on-disk file; "
+                "regenerating (LOUD)")
         # cache miss -> assert usable (fail-closed) -> lease -> generate -> stamp
         try:
             _ireg.assert_usable(engine_id, role)
@@ -217,7 +342,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "kind": kind, "char_id": char_id, "beat_id": beat_id,
             "engine_id": engine_id, "engine_version": eng_version,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
-            "w": int(obj.get("w") or 0), "h": int(obj.get("h") or 0),
+            # w/h end-to-end (pass-02 Gem-1): the engine call reads
+            # width/height (flux_gen1._flux_params request precedence), so
+            # landscape scene stills are REAL, not env defaults.
+            "w": obj_w, "h": obj_h,
+            "width": obj_w or None, "height": obj_h or None,
         }
         lease = None
         try:
@@ -254,11 +383,24 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         if not _lease.wait_until_below_mb(15000, attempts=3, sleep_s=0.0):
             log.info("[OTR_ImageGenDispatcher] NVML re-probe inconclusive (CPU/no-NVML or busy)")
         image_id = f"img_{oid}_{content_hash[:12]}"
+        # Materialize the fresh render into the EPISODE stills dir (ST-3/W3);
+        # the ledger row's `path` is the EPISODE-LOCAL copy, `pool_path` the
+        # content-addressed global cache file.
+        try:
+            ep_path = _materialize_episode_copy(str(path), ep_dir, oid,
+                                                content_hash)
+        except OSError as exc:
+            warnings.append(
+                f"{oid}: episode materialization failed ({exc}); row points "
+                "at the pool copy (LOUD)")
+            ep_path = str(path)
         row = {
             "image_id": image_id, "role": role, "object_id": oid,
             "kind": kind,
-            "path": str(path), "engine_id": engine_id, "engine_version": eng_version,
+            "path": ep_path, "pool_path": str(path),
+            "engine_id": engine_id, "engine_version": eng_version,
             "request_hash": key, "portrait_content_hash": content_hash,
+            "content_hash": content_hash, "w": obj_w, "h": obj_h,
             "prompt_hash": prompt_hash, "provenance": {"source": obj.get("source", "")},
         }
         if char_id:
@@ -266,17 +408,45 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         if beat_id:
             row["beat_id"] = beat_id
         images.append(row)
+        ep_rows.append(row)
         cache_index[key] = image_id
         made += 1
-        report.append(f"{oid}: generated -> {os.path.basename(str(path))}")
+        report.append(f"{oid}: generated -> {os.path.basename(ep_path)}")
 
     ledger["images"] = {
         "image_revision": rev,
+        "episode_id": ep,
         "granularity_by_role": (image_policy or {}).get("granularity") or {},
         "images": images,
         "cache_index": cache_index,
         "warnings": warnings,
     }
+    # stills_manifest.json beside the episode stills (ST-3/W3): the durable
+    # per-episode index of every still this dispatch materialized. Fail-soft.
+    if ep_rows:
+        try:
+            os.makedirs(ep_dir, exist_ok=True)
+            manifest = {
+                "episode_id": ep, "image_revision": rev,
+                "stills": [{
+                    "object_id": r.get("object_id"),
+                    "kind": r.get("kind"),
+                    "role": r.get("role"),
+                    "char_id": r.get("char_id", ""),
+                    "beat_id": r.get("beat_id", ""),
+                    "path": r.get("path"),
+                    "content_hash": (r.get("content_hash")
+                                     or r.get("portrait_content_hash")),
+                    "prompt_hash": r.get("prompt_hash"),
+                    "provenance": r.get("provenance"),
+                } for r in ep_rows],
+            }
+            with open(os.path.join(ep_dir, "stills_manifest.json"), "w",
+                      encoding="utf-8") as f:
+                json.dump(manifest, f, ensure_ascii=True, indent=2)
+        except OSError as exc:
+            warnings.append(f"stills_manifest.json write failed ({exc}); "
+                            "episode stills are on disk but unindexed (LOUD)")
     image_done = f"image:done:rev={rev} made={made} reused={reused}"
     report.insert(0, f"image_dispatch rev={rev}: made={made} reused={reused} total={len(images)}")
     for w in warnings:
@@ -350,6 +520,16 @@ class OTRImageGenDispatcher:
                     "multiline": True, "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (e.g. audio_done); opaque STRING.",
                 }),
+                "episode_id": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": (
+                        "Episode id (still-spine ST-3/DS-3; wired in the saved "
+                        "json). Every still materializes into "
+                        "episodes/<episode_id>/stills/ + stills_manifest.json. "
+                        "Falls back to the ledger's episode_id; an unkeyed "
+                        "dispatch is LOUD."
+                    ),
+                }),
             },
         }
 
@@ -357,7 +537,8 @@ class OTRImageGenDispatcher:
     def VALIDATE_INPUTS(cls, **kwargs):
         return True
 
-    def dispatch(self, script_json, image_policy_json="{}", image_prompts_json="{}", gate_in=""):
+    def dispatch(self, script_json, image_policy_json="{}", image_prompts_json="{}",
+                 gate_in="", episode_id=""):
         led = self._loads(script_json, {})
         policy = self._loads(image_policy_json, {})
         prompts = self._loads(image_prompts_json, {})
@@ -369,6 +550,7 @@ class OTRImageGenDispatcher:
         # directly with an injected gen_fn.
         led, image_done, report, _warn = dispatch_images(
             led, policy, prompts, gen_fn=_inprocess_gen_fn,
+            episode_id=str(episode_id or ""),
         )
         patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         return (patched, image_done, report)

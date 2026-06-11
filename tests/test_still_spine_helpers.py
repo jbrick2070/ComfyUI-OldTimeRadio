@@ -302,3 +302,139 @@ class TestSceneStillObjects:
         b, _ = mbp.derive_image_prompts([], _meta_ok(), llm_fn=None,
                                         lines=_lines_timed())
         assert a == b
+
+
+# ---------------------------------------------------------------------------
+# 5. ST-3: dispatcher -- slots, seeds, cache key, episode dir (W2/W3 seams)
+# ---------------------------------------------------------------------------
+
+
+class TestDispatcherStillSpine:
+    def test_slot_resolution_per_role(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        policy = {"image_models": {
+            "announcer_image_model": {"engine_id": "eng_a"},
+            "music_image_model": {"engine_id": "eng_m"},
+            "other_beats_image_model": {"engine_id": "eng_o"},
+        }}
+        assert disp.resolve_engine_for_role(policy, "announcer_visual") == \
+            ("eng_a", "announcer_image_model", False)
+        assert disp.resolve_engine_for_role(policy, "music_visual") == \
+            ("eng_m", "music_image_model", False)
+        assert disp.resolve_engine_for_role(policy, "character_video") == \
+            ("eng_o", "other_beats_image_model", False)
+        assert disp.resolve_engine_for_role(policy, "scene_broll") == \
+            ("eng_o", "other_beats_image_model", False)
+
+    def test_slot_fallback_is_flagged(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        policy = {"image_models": {
+            "other_beats_image_model": {"engine_id": "eng_o"}}}
+        eid, slot, fell = disp.resolve_engine_for_role(policy, "music_visual")
+        assert (eid, slot, fell) == ("eng_o", "music_image_model", True)
+
+    def test_seed_request_hash_per_object(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        cfg = {"mode": "request_hash", "request_seed": 7}
+        s1 = disp.resolve_object_seed(cfg, "c1", "ph1")
+        s2 = disp.resolve_object_seed(cfg, "still_b000", "ph2")
+        assert s1 != s2                              # per-object
+        assert s1 == disp.resolve_object_seed(cfg, "c1", "ph1")  # stable
+        fixed = {"mode": "fixed", "request_seed": 7}
+        assert disp.resolve_object_seed(fixed, "anything", "ph") == 7
+
+    def test_cache_key_gains_kind_w_h(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        base = ("r", "o", "ph", 1, "e", "1")
+        assert disp.request_cache_key(*base, kind="portrait", w=832, h=1216) \
+            != disp.request_cache_key(*base, kind="scene_open", w=832, h=1216)
+        assert disp.request_cache_key(*base, kind="scene_open", w=1472, h=832) \
+            != disp.request_cache_key(*base, kind="scene_open", w=832, h=832)
+
+    def test_scene_still_dispatch_end_to_end(self, tmp_path):
+        """A scene object renders on the MUSIC slot, lands in the episode
+        stills dir + the manifest, carries w/h to the engine call, and never
+        touches cast."""
+        import numpy as np
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_image_engines import registry as ireg
+        saved = dict(ireg._IMAGE_REGISTRY._registry)
+        try:
+            import types
+            ireg._IMAGE_REGISTRY._registry.clear()
+            ireg._IMAGE_REGISTRY._registry["flux_gen1"] = types.SimpleNamespace(
+                name="flux_gen1", roles=("music_visual", "character_video"),
+                default_roles=("music_visual",), commercial_clean=True,
+                requires_flag=None, required_inputs=("text_prompt",),
+                engine_version="1")
+            ledger = {"episode_id": "ep_scene", "cast": []}
+            policy = {"image_models": {
+                "music_image_model": {"engine_id": "flux_gen1"},
+                "other_beats_image_model": {"engine_id": "flux_gen1"}},
+                "seed": {"mode": "request_hash", "request_seed": 3}}
+            payload = {"version": 1, "objects": [{
+                "object_id": "still_b000_music_open", "kind": "scene_open",
+                "role": "music_visual", "beat_id": "b000_music_open",
+                "w": 1472, "h": 832,
+                "prompt": "a vintage radio set warming up, no on-screen text",
+                "prompt_hash": "ph-open", "source": "scene_timed"}]}
+            seen = {}
+
+            def gen_fn(req):
+                seen.update(req)
+                return np.full((8, 8, 3), 50, dtype=np.uint8)
+
+            led, done, _r, warns = disp.dispatch_images(
+                ledger, policy, payload, gen_fn=gen_fn,
+                output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+            )
+            assert warns == []
+            assert seen["engine_id"] == "flux_gen1"
+            assert seen["width"] == 1472 and seen["height"] == 832
+            assert seen["kind"] == "scene_open"
+            row = led["images"]["images"][0]
+            assert row["kind"] == "scene_open"
+            assert row["beat_id"] == "b000_music_open"
+            assert "otr/episodes/ep_scene/stills/" in \
+                row["path"].replace("\\", "/")
+            import os, json as _json
+            assert os.path.exists(row["path"])
+            man = _json.loads(open(
+                os.path.join(os.path.dirname(row["path"]),
+                             "stills_manifest.json"),
+                encoding="utf-8").read())
+            assert man["stills"][0]["beat_id"] == "b000_music_open"
+            assert led["cast"] == []        # cast never grown by a scene still
+        finally:
+            ireg._IMAGE_REGISTRY._registry.clear()
+            ireg._IMAGE_REGISTRY._registry.update(saved)
+
+    def test_unkeyed_episode_is_loud(self, tmp_path):
+        import numpy as np
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_image_engines import registry as ireg
+        saved = dict(ireg._IMAGE_REGISTRY._registry)
+        try:
+            import types
+            ireg._IMAGE_REGISTRY._registry.clear()
+            ireg._IMAGE_REGISTRY._registry["flux_gen1"] = types.SimpleNamespace(
+                name="flux_gen1", roles=("character_video",),
+                default_roles=(), commercial_clean=True, requires_flag=None,
+                required_inputs=("text_prompt",), engine_version="1")
+            ledger = {"cast": [{"char_id": "c1", "name": "X"}]}
+            policy = {"image_models": {
+                "other_beats_image_model": {"engine_id": "flux_gen1"}},
+                "seed": {"request_seed": 0}}
+            payload = {"version": 1, "objects": [{
+                "object_id": "c1", "kind": "portrait",
+                "role": "character_video", "char_id": "c1",
+                "w": 832, "h": 1216, "prompt": "a person, face visible",
+                "prompt_hash": "ph", "source": "template"}]}
+            _led, _d, _r, warns = disp.dispatch_images(
+                ledger, policy, payload,
+                gen_fn=lambda _q: np.full((4, 4, 3), 9, dtype=np.uint8),
+                output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir")
+            assert any("episode_id missing" in w for w in warns)
+        finally:
+            ireg._IMAGE_REGISTRY._registry.clear()
+            ireg._IMAGE_REGISTRY._registry.update(saved)

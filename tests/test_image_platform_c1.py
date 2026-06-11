@@ -305,7 +305,8 @@ def _np_pixels(val):
 def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_path):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    ledger = {"episode_id": "ep_test",
+              "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
@@ -322,20 +323,35 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     assert calls["n"] == 1 and done.startswith("image:done:")
     img = led["images"]["images"][0]
     assert img["path"].endswith(".png")
-    # content-addressed at output/otr/stills/{portrait_content_hash}.png (AS-5)
-    assert img["path"].replace("\\", "/").endswith(
+    # ST-3/W3: the row path is the EPISODE-LOCAL copy; the content-addressed
+    # global pool copy (AS-5) is pool_path and both exist on disk.
+    assert "otr/episodes/ep_test/stills/" in img["path"].replace("\\", "/")
+    assert img["pool_path"].replace("\\", "/").endswith(
         f"otr/stills/{img['portrait_content_hash']}.png"
     )
-    # cast was stamped so the AS-5 resolver round-trips
+    assert os.path.exists(img["path"]) and os.path.exists(img["pool_path"])
+    # stills_manifest.json written beside the episode stills
+    mpath = pathlib.Path(img["path"]).parent / "stills_manifest.json"
+    assert mpath.exists()
+    man = json.loads(mpath.read_text(encoding="utf-8"))
+    assert man["episode_id"] == "ep_test"
+    assert man["stills"][0]["object_id"] == "c1"
+    # cast was stamped so the AS-5 resolver round-trips to the POOL copy
     from nodes._otr_shared import portrait_ledger as pl
-    assert pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path)) == pathlib.Path(img["path"])
+    assert pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path)) \
+        == pathlib.Path(img["pool_path"])
 
-    # re-run, SAME prompt -> cache HIT (no regen)
+    # re-run, SAME prompt -> cache HIT (no regen) BUT the hit still
+    # materializes into the episode + appends a FRESH row (pass-02 Gem-2)
     led2, _d2, _r2, _w2 = disp.dispatch_images(
         led, policy, prompts, gen_fn=gen_fn, output_dir=str(tmp_path), lockdir=lockdir,
     )
     assert calls["n"] == 1               # gen_fn NOT called again
-    assert len(led2["images"]["images"]) == 1
+    rows = led2["images"]["images"]
+    assert len(rows) == 2                # fresh ledger row per dispatch
+    assert rows[1]["provenance"]["source"] == "cache_hit"
+    assert os.path.exists(rows[1]["path"])
+    assert rows[0]["portrait_content_hash"] == rows[1]["portrait_content_hash"]
 
     # change the prompt hash -> new cache key -> REGEN -> new content hash/file
     prompts2 = _payload(_pobj("c1", "a spacer, ruined station", "ph2"))
@@ -456,7 +472,8 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     the dispatcher waits for it, content-addresses it + stamps the ledger."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    ledger = {"episode_id": "ep_test",
+              "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
@@ -469,9 +486,10 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     )
     assert warns == []
     img = led["images"]["images"][0]
-    assert img["path"].replace("\\", "/").endswith(
+    assert img["pool_path"].replace("\\", "/").endswith(
         f"otr/stills/{img['portrait_content_hash']}.png"
     )
+    assert "otr/episodes/ep_test/stills/" in img["path"].replace("\\", "/")
     assert done.startswith("image:done:")
 
 
@@ -717,8 +735,11 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
     resolves init_image from), and leaves cast untouched."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    ledger = {"cast": [{"char_id": "c1", "name": "EDNA"}]}
-    policy = {"image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+    ledger = {"episode_id": "ep_test",
+              "cast": [{"char_id": "c1", "name": "EDNA"}]}
+    policy = {"image_models": {
+                  "other_beats_image_model": {"engine_id": "flux_gen1"},
+                  "announcer_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(
         _pobj("c1", "a keeper, harbor", "ph1"),

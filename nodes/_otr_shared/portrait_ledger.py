@@ -41,17 +41,36 @@ class PortraitUnresolved(LookupError):
     receive a silently-guessed path."""
 
 
-def stills_root(output_dir: Optional[str] = None) -> Path:
-    """The ``<output>/otr/stills`` directory. ``output_dir`` overrides the
-    ComfyUI output root (used by tests). Falls back to ComfyUI ``folder_paths``,
-    then the CWD -- resolved LAZILY so import stays dependency-free (V-12)."""
+def _output_base(output_dir: Optional[str] = None) -> str:
+    """The ComfyUI output root (``output_dir`` overrides; tests). Falls back
+    to ComfyUI ``folder_paths``, then the CWD -- resolved LAZILY (V-12)."""
     if output_dir is None:
         try:
             import folder_paths  # type: ignore
             output_dir = folder_paths.get_output_directory()
         except Exception:  # noqa: BLE001
             output_dir = "."
-    return Path(output_dir).joinpath(*_STILLS_SUBDIR)
+    return str(output_dir)
+
+
+def stills_root(output_dir: Optional[str] = None) -> Path:
+    """The ``<output>/otr/stills`` directory (the content-addressed global
+    pool). ``output_dir`` overrides the ComfyUI output root (used by tests)."""
+    return Path(_output_base(output_dir)).joinpath(*_STILLS_SUBDIR)
+
+
+def episode_stills_dir(episode_id: str,
+                       output_dir: Optional[str] = None) -> Path:
+    """``<output>/otr/episodes/<episode_id>/stills`` -- the EPISODE-LOCAL
+    still directory (still-spine ST-3 / W3): every still the dispatcher mints
+    or cache-reuses is materialized here so the episode folder is the one
+    self-contained unit of output (and the 3D plan's future consumers read
+    character stills from the same rows). The global pool stays the
+    content-addressed cache; this is the per-episode view of it."""
+    ep = str(episode_id or "").strip()
+    if not ep:
+        raise PortraitUnresolved("empty episode_id for episode_stills_dir")
+    return Path(_output_base(output_dir)) / "otr" / "episodes" / ep / "stills"
 
 
 def compute_portrait_hash(decoded_pixels) -> str:

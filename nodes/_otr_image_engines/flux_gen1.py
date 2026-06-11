@@ -87,8 +87,13 @@ class FluxGen1ImageEngine:
             "cfg": _efloat("OTR_FLUX_CFG", 1.0),
             "sampler_name": os.environ.get("OTR_FLUX_SAMPLER", "euler"),
             "scheduler": os.environ.get("OTR_FLUX_SCHEDULER", "simple"),
-            "width": int(get("width") or _eint("OTR_FLUX_WIDTH", 832)),
-            "height": int(get("height") or _eint("OTR_FLUX_HEIGHT", 1216)),
+            # Request dims take precedence (still-spine ST-3 / pass-02 Gem-1:
+            # w/h plumbed end-to-end so landscape SCENE stills are real);
+            # the env knobs remain the no-request default.
+            "width": int(get("width") or get("w")
+                         or _eint("OTR_FLUX_WIDTH", 832)),
+            "height": int(get("height") or get("h")
+                          or _eint("OTR_FLUX_HEIGHT", 1216)),
         }
 
     def _node_candidates(self):
