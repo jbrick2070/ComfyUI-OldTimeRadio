@@ -105,3 +105,57 @@ assert_usable = _VIDEO_REGISTRY.assert_usable
 # Re-export the protocol core under the video namespace for adapters that prefer
 # an explicit base reference (duck-typing still works without it).
 __all__.append("EngineCore")
+
+
+# ---------------------------------------------------------------------------
+# GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
+# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE the
+# per-profile enable-set -- never hand-listed per profile. A new engine ships
+# its own row here; zero profile edits.
+#
+# Keys per row (validated by capability_profiles.validate_declaration):
+#   vram_class          cpu | light | medium | heavy (GPU residency class)
+#   vram_estimate_mb    DRAFT estimates pending operator probe runs (Lever-1
+#                       register) -- policy-grade, not benchmark-grade.
+#   required_toolchain  None, or "cu128_toolkit" (source builds; operator-
+#                       blocked per the 3D plan -- keeps hunyuan/trellis dark).
+#   requires_sidecar    True when the engine runs in an isolated sidecar venv.
+#   cpu_ok              True when the engine can run with no GPU at all
+#                       (procgen/CPU lanes; the cpu_floor tier filter).
+#   model_requirements  informational model-asset ids for the S5 wizard.
+# ---------------------------------------------------------------------------
+CAPABILITIES = {
+    "abstract": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                 "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "still_kenburns": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                       "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "station_card": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "visualizer": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "flux_still": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": False,
+                   "model_requirements": ["flux.1-dev"]},
+    "humo": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+             "requires_sidecar": False, "cpu_ok": False,
+             "model_requirements": ["HuMo-17B"]},
+    "humo_1.7B": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": False,
+                  "model_requirements": ["HuMo-1.7B"]},
+    "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
+                   "requires_sidecar": True, "cpu_ok": False,
+                   "model_requirements": ["latentsync-1.5"]},
+    "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": False,
+                  "model_requirements": ["ltx-video-2b"]},
+    "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+                "requires_sidecar": False, "cpu_ok": False,
+                "model_requirements": ["wan2.1-i2v"]},
+    "hunyuan3d_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
+                       "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
+                       "cpu_ok": False, "model_requirements": ["hunyuan3d-2"]},
+    "trellis_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
+                     "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
+                     "cpu_ok": False, "model_requirements": ["trellis"]},
+}
+__all__.append("CAPABILITIES")

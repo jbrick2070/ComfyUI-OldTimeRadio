@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "_comment": "GATE B S0 (2026-06-10): the SINGLE checked-in map from profile keys to graph widgets. Read from REAL INPUT_TYPES (verified by tests/test_capability_profiles.py + tests/test_workflow_apply.py). Consumed by BOTH the applier (nodes/_otr_workflow_apply.py) and the coverage tests. Keys are dotted profile paths; targets are [node_type, widget_name] pairs -- raw node ids are BANNED (nodes are found by type, which must be unique in the graph). 'registry' names the engine namespace whose enable-set validates the value (null = not an engine value).",
+  "managed": {
+    "role_overrides.announcer_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "announcer_video_model"]]
+    },
+    "role_overrides.music_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "music_video_model"]]
+    },
+    "role_overrides.other_beats_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "other_beats_video_model"]]
+    },
+    "role_overrides.announcer_image": {
+      "registry": "image",
+      "targets": [["OTR_VideoDirector", "announcer_image_model"], ["OTR_ImageDirector", "announcer_image_model"]]
+    },
+    "role_overrides.music_image": {
+      "registry": "image",
+      "targets": [["OTR_VideoDirector", "music_image_model"], ["OTR_ImageDirector", "music_image_model"]]
+    },
+    "role_overrides.other_beats_image": {
+      "registry": "image",
+      "targets": [["OTR_VideoDirector", "other_beats_image_model"], ["OTR_ImageDirector", "other_beats_image_model"]]
+    },
+    "slot_overrides.char_voice_engine": {
+      "registry": "audio",
+      "targets": [["OTR_BatchCharacterVoices", "engine"]]
+    },
+    "slot_overrides.announcer_voice_engine": {
+      "registry": "audio",
+      "targets": [["OTR_AnnouncerVoice", "engine"]]
+    },
+    "slot_overrides.music_engine": {
+      "registry": "audio",
+      "targets": [["OTR_StableAudioTheme", "engine"]]
+    },
+    "slot_overrides.video_render_engine": {
+      "registry": "video",
+      "targets": [["OTR_VideoRenderBatch", "engine"]]
+    },
+    "slot_overrides.sequencer_default_tts": {
+      "registry": "audio",
+      "targets": [["OTR_SceneSequencer", "default_tts"]]
+    },
+    "features.burn_captions": {
+      "registry": null,
+      "targets": [["OTR_PostUpscaleProcgenBlend", "burn_captions"]]
+    },
+    "features.caption_style": {
+      "registry": null,
+      "targets": [["OTR_PostUpscaleProcgenBlend", "caption_style"]]
+    },
+    "seed_policy.request_seed": {
+      "registry": null,
+      "targets": [["OTR_VideoDirector", "request_seed"], ["OTR_ImageDirector", "request_seed"]]
+    },
+    "seed_policy.seed_mode": {
+      "registry": null,
+      "targets": [["OTR_VideoDirector", "seed_mode"], ["OTR_ImageDirector", "seed_mode"]]
+    }
+  },
+  "emit_only": {
+    "workflow_json_path": {
+      "registry": null,
+      "targets": [["OTR_WorkflowValidator", "workflow_json_path"]]
+    }
+  },
+  "exempt_node_types": ["OTR_LedgerScriptWriter"],
+  "never_patch_widget_names": ["seed", "noise_seed"]
+}

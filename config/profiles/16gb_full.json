@@ -1,0 +1,40 @@
+{
+  "id": "16gb_full",
+  "display_name": "16 GB NVIDIA (full)",
+  "status": "shipping",
+  "platform": "any",
+  "device_backend": "cuda",
+  "vram_budget_mb": 14500,
+  "toolchains": [],
+  "allow_sidecars": true,
+  "max_model_class": "heavy",
+  "role_overrides": {
+    "announcer_visual": "ltx_video",
+    "music_visual": "ltx_video",
+    "other_beats_visual": "humo",
+    "announcer_image": "flux_gen1",
+    "music_image": "flux_gen1",
+    "other_beats_image": "flux_gen1"
+  },
+  "slot_overrides": {
+    "char_voice_engine": "indextts2",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "humo",
+    "sequencer_default_tts": "bark"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": true,
+    "extra_args": []
+  }
+}

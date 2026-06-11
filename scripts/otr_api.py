@@ -87,7 +87,14 @@ def _is_widget_backed(spec: Any) -> bool:
         if isinstance(spec, (list, tuple)) and len(spec) > 0
         else spec
     )
-    if isinstance(type_def, list):  # dropdown
+    # GATE B S2 parity fix (2026-06-11): COMBO choices may be declared as a
+    # list OR a tuple (e.g. OTR_LedgerFreezeCascade.render_selection ships a
+    # tuple). The saved widgets_values carries a slot either way, and the
+    # validator's _wv_is_widget_backed already accepts both -- the list-only
+    # check here silently DROPPED tuple-form dropdowns from the slot map,
+    # shifting every later slot (the BUG-210 class). Keep in lockstep with
+    # nodes/_otr_workflow_apply._is_widget_backed (parity-tested).
+    if isinstance(type_def, (list, tuple)):  # dropdown
         return True
     if isinstance(type_def, str) and type_def in _WIDGET_PRIMITIVE_TYPES:
         return True

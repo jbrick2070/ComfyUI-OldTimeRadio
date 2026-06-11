@@ -176,3 +176,39 @@ def assert_usable(name: str, role: str) -> str:
             f"enable it",
         )
     return name
+
+
+# ---------------------------------------------------------------------------
+# GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
+# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
+# the per-profile enable-set. DATA ONLY: this block changes no audio runtime
+# behavior (the frozen audio spine is untouched). vram_estimate_mb values are
+# DRAFT estimates pending operator probe runs. cpu_ok = the engine can render
+# (slowly) with no GPU -- the cpu_floor tier filter.
+# ---------------------------------------------------------------------------
+CAPABILITIES = {
+    "bark": {"vram_class": "light", "vram_estimate_mb": 4000, "required_toolchain": None,
+             "requires_sidecar": False, "cpu_ok": True,
+             "model_requirements": ["suno-bark"]},
+    "kokoro": {"vram_class": "light", "vram_estimate_mb": 1000, "required_toolchain": None,
+               "requires_sidecar": False, "cpu_ok": True,
+               "model_requirements": ["kokoro-82m"]},
+    "indextts2": {"vram_class": "medium", "vram_estimate_mb": 5000, "required_toolchain": None,
+                  "requires_sidecar": True, "cpu_ok": False,
+                  "model_requirements": ["indextts2"]},
+    "chatterbox": {"vram_class": "medium", "vram_estimate_mb": 5000, "required_toolchain": None,
+                   "requires_sidecar": True, "cpu_ok": False,
+                   "model_requirements": ["chatterbox"]},
+    "dia": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
+            "requires_sidecar": True, "cpu_ok": False,
+            "model_requirements": ["dia-1.6b"]},
+    "musicgen": {"vram_class": "medium", "vram_estimate_mb": 4500, "required_toolchain": None,
+                 "requires_sidecar": False, "cpu_ok": True,
+                 "model_requirements": ["musicgen-small"]},
+    "stable_audio_music": {"vram_class": "medium", "vram_estimate_mb": 6500,
+                           "required_toolchain": None, "requires_sidecar": False,
+                           "cpu_ok": False, "model_requirements": ["stable-audio-open"]},
+    "stable_audio_3": {"vram_class": "medium", "vram_estimate_mb": 6500,
+                       "required_toolchain": None, "requires_sidecar": False,
+                       "cpu_ok": False, "model_requirements": ["stable-audio-open-3"]},
+}

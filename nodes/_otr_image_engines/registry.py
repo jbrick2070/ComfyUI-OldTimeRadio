@@ -95,3 +95,39 @@ all_engine_names = _IMAGE_REGISTRY.all_engine_names
 engines_for_role = _IMAGE_REGISTRY.engines_for_role
 default_engine_for_role = _IMAGE_REGISTRY.default_engine_for_role
 assert_usable = _IMAGE_REGISTRY.assert_usable
+
+
+# ---------------------------------------------------------------------------
+# GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
+# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
+# the per-profile enable-set -- never hand-listed per profile. A new engine
+# ships its own row here; zero profile edits. vram_estimate_mb values are
+# DRAFT estimates pending operator probe runs.
+# ---------------------------------------------------------------------------
+CAPABILITIES = {
+    "flux_gen1": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": False,
+                  "model_requirements": ["flux.1-dev"]},
+    "chroma_hd": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": False,
+                  "model_requirements": ["chroma-hd"]},
+    "flux2_klein": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
+                    "requires_sidecar": False, "cpu_ok": False,
+                    "model_requirements": ["flux.2-klein"]},
+    "hidream_i1": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": False,
+                   "model_requirements": ["hidream-i1"]},
+    "lumina_image": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+                     "requires_sidecar": False, "cpu_ok": False,
+                     "model_requirements": ["lumina-image-2"]},
+    "qwen_image": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": False,
+                   "model_requirements": ["qwen-image"]},
+    "sd35_large": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": False,
+                   "model_requirements": ["sd3.5-large"]},
+    "z_image_turbo": {"vram_class": "light", "vram_estimate_mb": 4000, "required_toolchain": None,
+                      "requires_sidecar": False, "cpu_ok": False,
+                      "model_requirements": ["z-image-turbo"]},
+}
+__all__.append("CAPABILITIES")

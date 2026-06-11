@@ -1,0 +1,40 @@
+{
+  "id": "8gb_lite",
+  "display_name": "8 GB NVIDIA (lite)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "vram_budget_mb": 7300,
+  "toolchains": [],
+  "allow_sidecars": false,
+  "max_model_class": "medium",
+  "role_overrides": {
+    "announcer_visual": "station_card",
+    "music_visual": "visualizer",
+    "other_beats_visual": "still_kenburns",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "other_beats_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "char_voice_engine": "bark",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "still_kenburns",
+    "sequencer_default_tts": "bark"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": []
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "cpu_floor",
+  "display_name": "CPU floor (no GPU; Mac ships AS this tier)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cpu",
+  "vram_budget_mb": 0,
+  "toolchains": [],
+  "allow_sidecars": false,
+  "max_model_class": "cpu",
+  "role_overrides": {
+    "announcer_visual": "station_card",
+    "music_visual": "visualizer",
+    "other_beats_visual": "still_kenburns"
+  },
+  "slot_overrides": {
+    "char_voice_engine": "bark",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "musicgen",
+    "video_render_engine": "still_kenburns",
+    "sequencer_default_tts": "bark"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": []
+  }
+}
