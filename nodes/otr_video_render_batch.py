@@ -44,7 +44,7 @@ class OTRVideoRenderBatch:
                 "frame_count": ("INT", {"default": 25, "min": 1, "max": 240}),
             },
             "optional": {
-                "engine": ("STRING", {"default": "humo"}),
+                "engine": ("STRING", {"default": "humo_1.7B"}),
                 "portrait_path": ("STRING", {"default": ""}),
                 "audio_path": ("STRING", {"default": ""}),
                 "patched_ledger_json": ("STRING", {
@@ -81,7 +81,7 @@ class OTRVideoRenderBatch:
         }
 
     def render(self, mode, beats, oom_index, frame_count,
-               engine="humo", portrait_path="", audio_path="",
+               engine="humo_1.7B", portrait_path="", audio_path="",
                patched_ledger_json="{}", master_audio_path="",
                image_done=""):
         # ``image_done`` is the W4 ordering gate (opaque STRING token from

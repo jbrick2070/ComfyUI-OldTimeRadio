@@ -51,8 +51,13 @@ rem Marathon per-leg env injection: the playlist runner writes this file with
 rem extra `set X=Y` lines (engine override map, opt-in flags) and deletes it
 rem after the leg. Absent file = no-op.
 if exist "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd" call "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd"
+rem Optional %3 DEBUG (CS-4 diagnosis, 2026-06-11): comfy model-management
+rem logs at DEBUG show per-model partial load/unload sizes -- the residency
+rem attribution evidence. Same recipe otherwise.
+set _OTR_VERBOSE=
+if /i "%3"=="DEBUG" set _OTR_VERBOSE=--verbose DEBUG
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\main.py ^
   --port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI ^
-  --output-directory %OTR_REAL_OUTPUT% ^
+  --output-directory %OTR_REAL_OUTPUT% %_OTR_VERBOSE% ^
   > "%1" 2>&1

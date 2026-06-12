@@ -1,94 +1,94 @@
-# OTR Video Platform -- HANDOFF -- THE STILL-SPINE BUILD (2026-06-10 night)
+# OTR Video Platform -- HANDOFF -- CS-4 CRITICAL PATH; SWEEP PAUSED 6/16; 0-E AGENT LIVE (2026-06-11 late)
 
 > **CANONICAL LOCATION:** this in-repo file (`docs/VIDEO_BUILD_HANDOFF.md`) is
 > the SINGLE git-tracked source of truth for the video build.
 
 ## ACTIVE MISSION (the only active build)
 
-Build the **2D-still spine** from the BUILD-READY sprint plan
-`docs/2026-06-10-still-image-spine/STILL_SPINE_SPRINT_PLAN.md` (tickets
-ST-0..ST-8, seam map W1-W8, gotcha checklist). Panel record:
-`docs/2026-06-10-still-image-spine/roundtable/` (2 passes, CONVERGED; Fable
-sat as the 4th panelist). GOAL: the next 30-word production render opens on
-6/5-quality macro-radio stills + shot-accurate in-character portraits, ALL
-saved under `episodes/<ep>/stills/`, FEEDING the video engines as inputs
-(kenburns + wan_i2v v1; LTX stays text-only by design), with `init_source`
-trace proof -- expandable to 3D consumers later. Current step: **ST-0 probes**
-(kenburns external-init; the render node's image_done gate), then ST-1..ST-8
-in order, commit+push per green chunk.
+The forward order is `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md` **section 0**,
+which now carries LIVE STATUS + OPEN TICKETS + RUNWAY TO DONE (one-plan rule:
+everything tracks THERE; read it first). **CURRENT STEP: fix CS-4** -- new-code HuMo
+sampling thrash, the critical path blocking item 4's sweep remainder, the wan batch,
+0-E Phase B, AND the operator look-QA. Then finish item 4 (9 legs + BOTH latentsync
+re-legs + the supervised wan batch), then the operator gates (look-QA, license
+sign-off, S-3D-0 green light), then item 5 (3D sprints) and closing S3-S6.
+CORRECTION vs the prior handoff: the sweep is NOT finished -- the `done:true` was a
+per-batch artifact; real state = 6/16 PASS (run 0, old code), runs 1-2 VOIDED by CS-4.
+PARALLEL: the 0-E follow-through agent runs Phase A (Blender 4.5.10 pinned + cube
+self-test PASSED + ckpt/depth fetches) and idles polling
+`scripts\_otr_0e_gpu_go.txt`; the PLANNER creates that file ONLY after CS-4 + sweep +
+wan land. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1 sec 5-7).
 
-## HARD RULES (copy verbatim)
+## HARD RULES (copy verbatim into the handoff on HAND OFF)
 
-- Do NOT start / resume / "continue" any other sprint -- NOT story-spine, NOT
-  story-pipeline, NOT any audio sprint, NOT 3D (PARKED), NOT switchable-
-  workflow (GO pending), NOT whiny-voice (GO pending), NOT the LTX-AV lane
-  (P4, ANOTHER window owns it; never during this build).
-- The audio refactor is SHIPPED; the audio script ledger is FROZEN
-  (read-only). Byte-identical master audio + mux-LAST;
-  `test_audio_byte_identical` stays GREEN at every step.
-- Ignore any stale `session_handoff.md` and any memory / ROADMAP entry
-  implying other "active" work.
-- **GIT POLICY (operator, 2026-06-10 -- supersedes all older handoff lines):
-  ONE branch v2.0-alpha; COMMIT AND PUSH together, every green chunk,
-  immediately. The operator eyeball gates TAGS/promotions
-  (v2.0-alpha-stable, prod, main) -- NEVER pushes. After every push verify
-  HEAD==origin, no 0-byte files, no BOM, AST parse.**
-- Invariants: single resident heavy engine <= 14.5 GB machine-NVML; BUG-291
-  detach reclaim; LOUD fallbacks (log + ledger restamp, never silent);
-  fail-soft never fail-episode; V-12 isolation; engine-agnostic (no model is
-  "primary"); no new widgets beyond the planned json relinks (IN PLACE in
-  `workflows/otr_scifi_16gb_full.json`, never a runner patch); UTF-8 no BOM;
-  SFW. Suite (3863/0 + 28 skip baseline) + Bug Bible green at every commit.
+- The forward order is 3D-plan **section 0**. Do NOT start/resume/"continue"
+  any OTHER sprint -- NOT story-spine, NOT story-pipeline, NOT the broader
+  audio stack, NOT any other ROADMAP item. PARKED.
+- The audio SPINE is SHIPPED + FROZEN: byte-identical master + mux-LAST (no
+  `-shortest`); `test_audio_byte_identical` stays GREEN. The ONLY sanctioned
+  audio work is the character-voice "whiny" fix
+  (`docs/2026-06-10-character-voice-whiny-fix__problem-statement.md`) --
+  UPSTREAM TTS only.
+- EVERY session (planner AND coder) UPDATES the `otr-build-tracker` (content;
+  preserve gauge + lanes styling). Never tell a window "don't touch the
+  tracker". It is the durable roadmap.
+- Ignore any stale `session_handoff.md` / memory / ROADMAP "active" entry.
+  Section 0 + the tracker are the source of truth until the operator says
+  otherwise.
+- Invariants: single resident heavy engine <= 14.5 GB (host NVML); 100%
+  local/offline; determinism (seed-keyed); every in-render fallback LOUD;
+  UTF-8 no BOM; SFW; V-12 dependency isolation.
+- v2.0 PRODUCTION / main is GATED until all the operator's work is done; a
+  `v2.0-alpha-stable` tag on `v2.0-alpha` is fine; prod/main is NOT.
+- GIT POLICY (operator 2026-06-10): ONE branch v2.0-alpha; commit AND push
+  together per green chunk; the operator eyeball gates TAGS/promotions only;
+  verify HEAD==origin / no 0-byte / no BOM / AST after every push.
+- COORDINATION (operator 2026-06-11): ONE coder window in the repo's code at a
+  time; the 0-E agent's Phase B + any new coder window serialize via the
+  planner's GO file. Never run two coders in overlapping files.
 
-## WHERE WE ARE (2026-06-10 night session; nothing invented)
+## WHERE WE ARE (2026-06-11 day/late planner session; nothing invented)
 
-- **Round 5 SHIPPED + PUSHED** (HEAD == origin @ `64e9411`; the old 13-commit
-  push gate is DEAD -- everything is on GitHub): LTX frame cap + DECODE FLOOR
-  169 (the installed wrapper's VAEDecode fails below ~169f at 1472x832 --
-  tensor 256-vs-128; 169/233 proven), per-beat brief+beat LTX prompts +
-  prompt sha8 trace + diversity gate (node-92 report), talking-head subject
-  anchor + authored-prompt person gate, writer self-vocative ATTRIBUTION
-  repair (last pre-freeze slot), shot-row char_id join + announcer id
-  normalization, manifest positioned-mode start_s fallback, concrete
-  radio-subject opens (narrative loglines render as murk -- operator catch),
-  portrait GEAR SCRUB + three-quarter framing (negations planted the mic).
-  Commits: 5b2012e, bdef529, 7ae7782, 379dd41, d087bfa (+1351d78 git policy,
-  64e9411 still-spine docs).
-- **Acceptance renders tonight**: ticking_lab (diversity proven; exposed the
-  decode band), shattered_silencing (operator caught the logline murk),
-  **alien_frequencies = ZERO fallbacks, ltx:4/humo:2, diversity 4/4 distinct,
-  all nine gates green, byte-identical 6146e49a1c6b** -- awaiting the
-  operator eyeball (gates the v2.0-alpha-stable TAG only).
-- **Suite 3863/0** + Bug Bible green (canonical invocation). The optional
-  `--pack-dir` deep scan carries 5 PRE-EXISTING findings (not from these
-  commits).
-- **Known open seams** (tickets, NOT this build): M4 creative prompts never
-  reach HuMo requests in the live graph (cast beats render on the default
-  studio prompt + portrait init -- the new trace observability proves it);
-  era-tail full diet on video surfaces; global stills pool retirement; LTX
-  img2vid probe.
-- **The 6/5 reference** (operator north star): preserved legacy composer at
-  `docs/2026-06-10-brief-downstream-gaps/legacy_otr_video_plan_e74a3ce.py.txt`;
-  input-history comparison at
-  `docs/2026-06-10-flux-and-ltx-input-comparison__last-week-vs-today.md`.
-- Episode palette note: per-episode color (e.g. Mars = red) comes from the
-  brief's era tail BY DESIGN; the still profile trims it, never deletes it.
+- **CS-4 (CRITICAL): post-overnight code thrashes HuMo sampling** -- 153->1,788
+  s/it vs the 14-18 baseline; repro'd on a CLEAN env + idle box; r5d same-install
+  baseline (7.2 s/it) pins it to the code era; WanTE/WanVAE staging = HuMo-normal
+  (run-1's superset attribution RETRACTED). Bisect set + repro in
+  `docs/2026-06-11-coverage-sweep-triage__tickets.md` (suspect #1 = 1ef6786, the
+  63->87 master-json gate wire; the json edit travels WITH the code checkout --
+  A/B them together). A thrash-era headless server may be on :8000 for repro.
+- **Sweep (item 4) PAUSED 6/16**: run 0 (old code) legs 1-6 PASS; CS-1 = run-0's
+  latentsync "PASS" was fallback-only (stale code; attempts trace proves the LOUD
+  chain worked) -- BOTH latentsync legs re-run post-fix; CS-2 = machine NVML
+  ~16 GB pin vs the 14.5 ceiling while driver-phase reads 3.1-3.5 GB (phase
+  attribution needed); CS-3 rescoped = wan+humo 16gb coexistence unproven
+  (supervised wan batch post-fix).
+- **0-E on-ramp**: CPU side SHIPPED @ a05dbda/3b535c7/1daaa6a (suite 4096/0;
+  selectable-not-default; LICENSE_RECORD.md gates default-on). The follow-through
+  agent is LIVE in Phase A; Phase B (E-1 probe, E-6 renders, per-engine sweep
+  legs) HELD on the GO file.
+- **One-plan consolidation**: section 0-E + LIVE STATUS/OPEN TICKETS + RUNWAY TO
+  DONE (~6-9 sprints; S-3D-0/T2b shortcut forks -> ~2-3) live in section 0.
+  Roundtable evidence: `docs/2026-06-11-comfy-native-3d-options/` (2 passes,
+  ~$0.22, grounded on the live install -- hy3d-2mv core nodes verified present).
+- **Git**: origin/v2.0-alpha @ 1daaa6a (+ anything the live agents have pushed
+  since). Planner docs edits (3D plan section-0 blocks, triage doc, this handoff,
+  roundtable docs) are WORKING-TREE; they ride the next coder commit+push.
+- Track 3 = CLOSED (230fe4e..1571e0f); GATE B S0-S2 COMPLETE (6a1b716..230fe4e);
+  stale-server shim RETIRED (fresh processes load tonight's code).
 
 ## FIRST ACTIONS for the next session (then STOP for operator go)
 
-1. Read `docs/2026-06-10-still-image-spine/STILL_SPINE_SPRINT_PLAN.md` FULLY
-   (tickets + the W1-W8 seam map + the gotcha checklist), then the roundtable
-   `pass01_plan.md` + `pass02_judgment.md` (the 7 folded items are binding).
-2. `git status -sb` (expect clean, HEAD==origin on v2.0-alpha) + run the full
-   suite + Bug Bible; confirm 3863/0 + green BEFORE coding.
-3. Give the operator a 5-line summary of ST-0..ST-2 (the probes + helpers +
-   schema) with their pass/fail asserts to prove comprehension.
-4. No code until the operator confirms. Then build in ticket order,
-   commit+push per green chunk, and finish with the ST-8 acceptance render +
-   eyeball frames + STOP.
+1. Read 3D_TOOLKIT_PLAN.md **section 0** (LIVE STATUS + RUNWAY first) + this
+   handoff; skim the otr-build-tracker; `git log --oneline -12` + `git status`.
+2. Check CS-4: if the fix landed (humo smoke in the 14-18 s/it class + one sweep
+   leg PASS <= 50 min), resume item 4 (9 legs -> latentsync re-legs -> supervised
+   wan batch), then create `scripts\_otr_0e_gpu_go.txt` to release 0-E Phase B.
+   If NOT fixed: the CS-4 kickoff (triage doc / tracker foot) goes to a FRESH
+   coder window -- never alongside another coder in the same files.
+3. State the CURRENT STEP per section 0 in <=5 lines; STOP for operator GO.
 
 ## PARKED -- not now
 
-M4->HuMo seam (own ticket); LTX img2vid probe; global-pool retirement; 3D
-toolkit (own plan); switchable-workflow S0-S6 (GO pending); whiny-voice P0-P4
-(GO pending); LTX-AV lane (P4 -- other window); MuseTalk; RTXUpscale.
+Story-spine; story-pipeline; broader audio stack; MuseTalk; RTXUpscale;
+LTX-AV lane (own plan, gated); switchable S3-S6 (closing phase, AFTER 3D);
+3D GPU lanes (T/G/W) until S-3D-0 + the operator green light.

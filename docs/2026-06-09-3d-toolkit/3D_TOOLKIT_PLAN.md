@@ -23,10 +23,15 @@ This 3D plan is the SINGLE forward plan. Two non-3D items gate it (do them FIRST
 
 **LIVE STATUS + OPEN TICKETS (2026-06-11, one-plan rule: track them HERE; the dated docs
 are evidence records, not plans):**
-- **Item 4 (sweep): RUN 2 IN FLIGHT.** Run 0 (overnight, old server code) legs 1-6 PASS;
-  run 1 VOID (Wan-superset launch env co-staged Wan TE beside HuMo-14B -> offload thrash,
-  operator-side miss); run 2 = 9 legs on tonight's code, clean env. Wan legs deferred to
-  a supervised final batch. Evidence: `docs/2026-06-11-coverage-sweep-triage__tickets.md`.
+- **Item 4 (sweep): paused on CS-4 — OPERATOR REROUTE 2026-06-11 late.** Run 0 (old
+  code) legs 1-6 PASS; runs 1-2 on new code thrash HuMo-14B sampling (153->1,788 s/it).
+  **Operator called the tier question: the working HuMo = humo_1.7B (the 6/5 / BUG-265
+  Option C default; ~3.9 GB, big margin); the 14B verified once at 13.8/14.5 = 0.7 GB
+  margin and CS-4 is that margin dying. DEFAULT FLIPS BACK TO humo_1.7B (14B = opt-in);
+  CS-4's first test = the smoke on 1.7B new code — if full-speed, CS-4 downgrades to an
+  open ticket and the queue (sweep remainder, wan batch, 0-E Phase B, look-QA) resumes
+  on the 1.7B default immediately.** Detail + directive text:
+  `docs/2026-06-11-coverage-sweep-triage__tickets.md` (CS-4).
 - **CS-1** latentsync legs must show latentsync in the trace (run-0 "PASS" was
   fallback-only on stale code) -- BOTH legs re-running in run 2; resolves there.
 - **CS-2** machine NVML pins ~16 GB on every leg vs the 14.5 ceiling while driver-phase
@@ -40,6 +45,20 @@ are evidence records, not plans):**
 - Operator gates unchanged: Desktop relaunch (look-QA), fresh-render reddish acceptance
   test, latentsync demo set + mixed showcase, whiny-voice P0 matrix + reel, S-3D-0 green
   light, v2.0-alpha-stable tag decision.
+
+**RUNWAY TO DONE (sprint count, stamped 2026-06-11; update on every tick):**
+~6-9 coder-window sprints remain to "plan fully done incl. closing phase":
+(s1) Track-3 remainder (W7-pre slice, ImageDirector fail-closed, builder migration,
+cache keys) -- partially in flight; (s2) S-3D-0 + T1 + T2a (the lane-killer spike +
+template + wrap smoke); (s3-s4) T3 corpus + T2b KEYSTONE (timeboxed ~1 week, the big
+GO/NO-GO); (s5) T4 driver + alpha + LOOK gate; (s6-s7) W7 production wiring + soak =
+"v1-usable"; (s8-s9) closing S3-S6 distribution. TWO SHORTCUT FORKS: S-3D-0 NO-GO
+(wheels fail + operator declines the cu128 toolkit) OR T2b keystone NO-GO -> plan's own
+contingency = HuMo-2D stays, character_3d defers -> done collapses to ~2-3 sprints
+(0-E engines + closing phase). 0-E ships the visible 3D win independent of the long
+lane (CPU side ALREADY shipped @ 1daaa6a), so the keystone carries no demo pressure.
+Done definitions stay split: "v1-usable" (one engine, one real episode) vs "B-parity
+ship" (>=2 engines binds at SHIP, not first light).
 
 **PARALLEL TRACK (audio -- NOT in the video serial order): the character-voice "whiny" fix.** Runs in its OWN window alongside this runway -- own plan `docs/2026-06-10-character-voice-whiny-fix__problem-statement.md` (v3.1 CONVERGED, live 4-model panel, @9181fda) + tracker P3 row. Audio vs the video engines are different code areas, so it never blocks the video sprints. ONE coupling: the video demos (punch list / latentsync / coverage sweep) carry these character voices in their FROZEN master, so land at least P-OBS (logging) + P0-zero (bark proof) + the cheap ref/delivery fixes (loudness-normalize the low-RMS refs, expose `emo_alpha`, per-character seed) BEFORE the operator's video look-QA / the coverage sweep, so the demos sound right. Frozen-audio spine stays untouched (upstream TTS only).
 
@@ -86,6 +105,16 @@ GATES: rides Track-3's directory-clip plumbing (must MERGE first); registry/prof
 edits land after the running coverage sweep; selectable-not-default until operator
 look-QA; Tencent license record before any default-on. Animation tier-1 = camera/object
 motion only -- rigged/talking 3D remains THIS plan's toolkit lanes.
+
+RESEARCH-WATCH (operator-flagged 2026-06-11, NOT a build item): **NVIDIA MotionBricks**
+(GR00T-WholeBodyControl monorepo, preview 2026-04-27) -- real-time latent full-body
+motion synthesis, ~2.2 GiB checkpoints (tiny), Apache-2 code + NV Open Model License
+weights. NOT too big -- too EARLY: it emits SKELETON motion and assumes a rigged
+character; our meshes are unrigged (the auto-rig gap this plan already parks), and the
+full release (~1 month out, GEAR-SONIC-embedded) is a moving target. REVISIT when
+(a) the full release lands, (b) mesh_stage's Blender seam is look-QA-proven, and
+(c) any local auto-rig path exists -- then it becomes the tier-2 body-language lane
+(per-beat primitives driven by episode tension/disposition).
 
 ## What changed v1 -> v2 (and why)
 

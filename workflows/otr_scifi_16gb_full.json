@@ -994,7 +994,7 @@
       "widgets_values": [
         "ltx_video",
         "ltx_video",
-        "humo",
+        "humo_1.7B",
         "flux_gen1",
         "flux_gen1",
         "flux_gen1",
@@ -1306,7 +1306,7 @@
         40,
         20,
         25,
-        "humo",
+        "humo_1.7B",
         "",
         ""
       ],

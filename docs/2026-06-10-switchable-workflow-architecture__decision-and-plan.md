@@ -3,6 +3,8 @@
 *3 grounded passes, converged. Campaign artifacts: `docs/2026-06-10-switchable-workflow-architecture/roundtable/` (pass00-03 plans, raw reviews, judgment logs). Source problem statement: `2026-06-10-switchable-workflow-architecture__problem-statement.md`.*
 *STATUS: PLANNING ONLY. No code has been written. The sprint plan below is a DRAFT awaiting operator go.*
 
+> **EXECUTION ORDER (operator-directed 2026-06-10):** this doc is a SPEC / decision record, NOT a separate plan to track. Its sprints are sequenced inside the 3D plan -- S0-S2 are GATE B (BEFORE the 3D sprints; the drift kill), S3-S6 are the closing distribution phase (AFTER the 3D work). See `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md` section 0. One forward plan, not three.
+
 ---
 
 ## 1. The decision
