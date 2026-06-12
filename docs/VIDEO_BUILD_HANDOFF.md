@@ -1,4 +1,4 @@
-# OTR Video Platform -- HANDOFF -- CS-4 CRITICAL PATH; SWEEP PAUSED 6/16; 0-E AGENT LIVE (2026-06-11 late)
+# OTR Video Platform -- HANDOFF -- CS-4 RESOLVED (1.7B default @ 955f134); SWEEP CLEAR TO RESUME; 0-E PHASE B AWAITS GO (2026-06-11 night)
 
 > **CANONICAL LOCATION:** this in-repo file (`docs/VIDEO_BUILD_HANDOFF.md`) is
 > the SINGLE git-tracked source of truth for the video build.
@@ -7,17 +7,22 @@
 
 The forward order is `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md` **section 0**,
 which now carries LIVE STATUS + OPEN TICKETS + RUNWAY TO DONE (one-plan rule:
-everything tracks THERE; read it first). **CURRENT STEP: fix CS-4** -- new-code HuMo
-sampling thrash, the critical path blocking item 4's sweep remainder, the wan batch,
-0-E Phase B, AND the operator look-QA. Then finish item 4 (9 legs + BOTH latentsync
-re-legs + the supervised wan batch), then the operator gates (look-QA, license
-sign-off, S-3D-0 green light), then item 5 (3D sprints) and closing S3-S6.
-CORRECTION vs the prior handoff: the sweep is NOT finished -- the `done:true` was a
-per-batch artifact; real state = 6/16 PASS (run 0, old code), runs 1-2 VOIDED by CS-4.
-PARALLEL: the 0-E follow-through agent runs Phase A (Blender 4.5.10 pinned + cube
-self-test PASSED + ckpt/depth fetches) and idles polling
-`scripts\_otr_0e_gpu_go.txt`; the PLANNER creates that file ONLY after CS-4 + sweep +
-wan land. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1 sec 5-7).
+everything tracks THERE; read it first). **CS-4 IS RESOLVED** (2026-06-11 night,
+coder window): NO code regression -- the umt5 TE stays 5,248 MB resident through
+HuMo sampling (DEBUG VBAR evidence), which starves only the 16.5 GB 14B; the
+operator flipped the default character tier to **humo_1.7B** (BUG-265 Option C
+restored) @ `955f134`; ACCEPTANCE leg PASS 38 min on fixed HEAD (histogram
+{ltx_video:3, humo_1.7B:3}, audio byte-identical, render-phase peak 10,305 MB).
+**CURRENT STEP: resume item 4** (planner window) -- the sweep remainder on the
+1.7B default (registry now enumerates 31 options / 27 runnable incl. the 0-E
+engines: re-derive the leg list) + BOTH latentsync re-legs + the supervised wan
+batch; then create `scripts\_otr_0e_gpu_go.txt` to release 0-E Phase B; then the
+operator gates (look-QA, license sign-off, S-3D-0 green light), item 5 (3D
+sprints), closing S3-S6. The 14B humo leg is OPERATOR-DEPRIORITIZED (opt-in only;
+CS-4-open = the lazy post-encode TE-detach ticket). OPS GUARDRAIL: no heavy
+parallel agent work (suites / multi-GB downloads / Blender) while a timed GPU
+leg renders. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1
+sec 5-7).
 
 ## HARD RULES (copy verbatim into the handoff on HAND OFF)
 
@@ -47,21 +52,26 @@ wan land. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1 sec 5
   time; the 0-E agent's Phase B + any new coder window serialize via the
   planner's GO file. Never run two coders in overlapping files.
 
-## WHERE WE ARE (2026-06-11 day/late planner session; nothing invented)
+## WHERE WE ARE (2026-06-11 night, post-CS-4 coder session; nothing invented)
 
-- **CS-4 (CRITICAL): post-overnight code thrashes HuMo sampling** -- 153->1,788
-  s/it vs the 14-18 baseline; repro'd on a CLEAN env + idle box; r5d same-install
-  baseline (7.2 s/it) pins it to the code era; WanTE/WanVAE staging = HuMo-normal
-  (run-1's superset attribution RETRACTED). Bisect set + repro in
-  `docs/2026-06-11-coverage-sweep-triage__tickets.md` (suspect #1 = 1ef6786, the
-  63->87 master-json gate wire; the json edit travels WITH the code checkout --
-  A/B them together). A thrash-era headless server may be on :8000 for repro.
-- **Sweep (item 4) PAUSED 6/16**: run 0 (old code) legs 1-6 PASS; CS-1 = run-0's
-  latentsync "PASS" was fallback-only (stale code; attempts trace proves the LOUD
-  chain worked) -- BOTH latentsync legs re-run post-fix; CS-2 = machine NVML
-  ~16 GB pin vs the 14.5 ceiling while driver-phase reads 3.1-3.5 GB (phase
-  attribution needed); CS-3 rescoped = wan+humo 16gb coexistence unproven
-  (supervised wan batch post-fix).
+- **CS-4 RESOLVED -- no code regression; 1.7B default shipped @ `955f134`.**
+  Mechanism (DEBUG VBAR + the operator's BUG-291/265 pointer): the umt5 TE stays
+  5,248 MB resident through HuMo sampling -- by design for the 1.7B stack (fits
+  whole; 9.9-26 s/it flat), fatal for the 16.5 GB 14B (~10 GB budget -> per-step
+  paging, 46->119 s/it idle, 153->1,788 under the 0-E agent's parallel box load;
+  the 12-14 "healthy" class was always the 1.7B's). The legacy BUG-291 FLUX class
+  is NOT re-opened (FLUX VBAR = 0 at HuMo entry; greps for the old EXIT-eviction /
+  PHASE-C probe lines come back empty in every current-era log). 14B = selectable
+  opt-in; fallback chain unchanged; CS-4-open = lazy post-encode TE-detach ticket.
+  Full record: `docs/2026-06-11-coverage-sweep-triage__tickets.md`.
+- **Sweep (item 4) CLEAR TO RESUME on the 1.7B default**: run 0 legs 1-6 PASS
+  stand + the humo_1.7B leg = PASS x2 (33 min pre-flip; 38 min ACCEPTANCE on
+  fixed HEAD, histogram {ltx_video:3, humo_1.7B:3}); 14B leg
+  OPERATOR-DEPRIORITIZED. Registry enumerates 31 options / 27 runnable now (0-E
+  engines aboard) -- re-derive the leg list. CS-1 = BOTH latentsync legs still
+  re-run; CS-2 = phase attribution still open (note: the 1.7B leg's render-phase
+  peak reads 10,305 MB vs the 14B-era ~16 GB pins -- partial answer); CS-3 =
+  supervised wan batch post-resume.
 - **0-E on-ramp**: CPU side SHIPPED @ a05dbda/3b535c7/1daaa6a (suite 4096/0;
   selectable-not-default; LICENSE_RECORD.md gates default-on). The follow-through
   agent is LIVE in Phase A; Phase B (E-1 probe, E-6 renders, per-engine sweep
@@ -70,9 +80,9 @@ wan land. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1 sec 5
   DONE (~6-9 sprints; S-3D-0/T2b shortcut forks -> ~2-3) live in section 0.
   Roundtable evidence: `docs/2026-06-11-comfy-native-3d-options/` (2 passes,
   ~$0.22, grounded on the live install -- hy3d-2mv core nodes verified present).
-- **Git**: origin/v2.0-alpha @ 1daaa6a (+ anything the live agents have pushed
-  since). Planner docs edits (3D plan section-0 blocks, triage doc, this handoff,
-  roundtable docs) are WORKING-TREE; they ride the next coder commit+push.
+- **Git**: origin/v2.0-alpha @ `955f134` (CS-4 flip) + the wrap docs commit after
+  it; HEAD==origin verified per push (no 0-byte / no BOM / AST clean). The planner
+  docs edits that were working-tree rode the `955f134` chunk as directed.
 - Track 3 = CLOSED (230fe4e..1571e0f); GATE B S0-S2 COMPLETE (6a1b716..230fe4e);
   stale-server shim RETIRED (fresh processes load tonight's code).
 
@@ -80,11 +90,12 @@ wan land. Whiny-voice P0 audition stays an operator GPU sitting (plan v3.1 sec 5
 
 1. Read 3D_TOOLKIT_PLAN.md **section 0** (LIVE STATUS + RUNWAY first) + this
    handoff; skim the otr-build-tracker; `git log --oneline -12` + `git status`.
-2. Check CS-4: if the fix landed (humo smoke in the 14-18 s/it class + one sweep
-   leg PASS <= 50 min), resume item 4 (9 legs -> latentsync re-legs -> supervised
-   wan batch), then create `scripts\_otr_0e_gpu_go.txt` to release 0-E Phase B.
-   If NOT fixed: the CS-4 kickoff (triage doc / tracker foot) goes to a FRESH
-   coder window -- never alongside another coder in the same files.
+2. CS-4 is DONE (1.7B default @ 955f134; acceptance leg PASS 38 min). Resume
+   item 4: re-derive the leg list from the registry (31 options / 27 runnable
+   now), run the remainder on the 1.7B default -> BOTH latentsync re-legs ->
+   the supervised wan batch; then create `scripts\_otr_0e_gpu_go.txt` to release
+   0-E Phase B. Skip the 14B humo leg (OPERATOR-DEPRIORITIZED). Keep the box
+   quiet during timed legs (the CS-4 ops guardrail).
 3. State the CURRENT STEP per section 0 in <=5 lines; STOP for operator GO.
 
 ## PARKED -- not now

@@ -23,15 +23,25 @@ This 3D plan is the SINGLE forward plan. Two non-3D items gate it (do them FIRST
 
 **LIVE STATUS + OPEN TICKETS (2026-06-11, one-plan rule: track them HERE; the dated docs
 are evidence records, not plans):**
-- **Item 4 (sweep): paused on CS-4 — OPERATOR REROUTE 2026-06-11 late.** Run 0 (old
-  code) legs 1-6 PASS; runs 1-2 on new code thrash HuMo-14B sampling (153->1,788 s/it).
-  **Operator called the tier question: the working HuMo = humo_1.7B (the 6/5 / BUG-265
-  Option C default; ~3.9 GB, big margin); the 14B verified once at 13.8/14.5 = 0.7 GB
-  margin and CS-4 is that margin dying. DEFAULT FLIPS BACK TO humo_1.7B (14B = opt-in);
-  CS-4's first test = the smoke on 1.7B new code — if full-speed, CS-4 downgrades to an
-  open ticket and the queue (sweep remainder, wan batch, 0-E Phase B, look-QA) resumes
-  on the 1.7B default immediately.** Detail + directive text:
-  `docs/2026-06-11-coverage-sweep-triage__tickets.md` (CS-4).
+- **Item 4 (sweep): CLEAR TO RESUME — CS-4 RESOLVED-BY-REROUTE 2026-06-11 night
+  (default character tier flipped to humo_1.7B @ `955f134`; 14B = opt-in,
+  OPERATOR-DEPRIORITIZED).** Run 0 legs 1-6 PASS stand. Mechanism NAMED (DEBUG VBAR +
+  the operator's BUG-291/265 history pointer): the umt5 TE stays **5,248 MB resident
+  through HuMo sampling** — fine for the 1.7B stack (fits whole, zero paging), fatal
+  for the 16.5 GB 14B (~10 GB budget -> per-step paging: 46->119 s/it idle, 153->1,788
+  under the 0-E agent's parallel box load; the healthy 12-14 s/it class was always the
+  1.7B's; NO code regression in 6a1b716..230fe4e — window diff is CPU-side, the 63->87
+  wire is a STRING link, FLUX VBAR = 0 at HuMo entry). **ACCEPTANCE PASSED on fixed
+  HEAD: the humo_1.7B leg = PASS 38 min, histogram {ltx_video:3, humo_1.7B:3}, audio
+  byte-identical, render-phase peak 10,305 MB <= ceiling.** CS-4-open (lazy, nothing
+  queues behind it): targeted post-encode TE detach for the 14B opt-in lane (BUG-291
+  detach ladder at the encode->sample seam; mind the BUG-265 fragmentation note) —
+  the same TE-residency delta will matter for wan/ltx peaks. OPS GUARDRAIL: no heavy
+  parallel agent work (suites / multi-GB downloads / Blender) during timed GPU legs.
+  NOTE for the remainder count: the registry now enumerates **31 options / 27
+  runnable** (the 0-E engines joined the dropdowns) — re-derive the leg list before
+  resuming. Evidence: `docs/2026-06-11-coverage-sweep-triage__tickets.md`
+  (CS-4 RESOLUTION + acceptance record).
 - **CS-1** latentsync legs must show latentsync in the trace (run-0 "PASS" was
   fallback-only on stale code) -- BOTH legs re-running in run 2; resolves there.
 - **CS-2** machine NVML pins ~16 GB on every leg vs the 14.5 ceiling while driver-phase

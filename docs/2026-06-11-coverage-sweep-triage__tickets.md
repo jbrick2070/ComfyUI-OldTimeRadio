@@ -35,7 +35,10 @@ Triage policy: failures become TICKETS, not immediate fixes (operator directive)
 | 6 | announcer / latentsync | PASS | 2351s | **NO — fell back, see TICKET CS-1** |
 | 7 | announcer / still_kenburns | running (started 08:00) | — | — |
 | 8-11 | music / ltx_video, visualizer, abstract, wan_i2v | queued | — | — |
-| 12-16 | other_beats / flux_still, humo, humo_1.7B, latentsync, wan_i2v | queued | — | — |
+| 12 | other_beats / flux_still | queued | — | — |
+| 13 | other_beats / humo (14B) | **OPERATOR-DEPRIORITIZED** (CS-4 amendment; opt-in only, not chased) | — | — |
+| 14 | other_beats / humo_1.7B | **PASS x2** (CS-4 first test + ACCEPTANCE on the flipped default) | 1980s / **2296s** | **YES (humo_1.7B:3 + ltx_video:3 over 6 beats)** |
+| 15-16 | other_beats / latentsync, wan_i2v | queued | — | — |
 | — | announcer+other_beats / hunyuan3d_talk, trellis_talk (4 legs) | SKIPPED_DISABLED | — | missing_toolchain (cu128), expected |
 
 All 6 completed legs: playable final mp4 in episodes/ + obs/, 6 beats,
@@ -158,7 +161,16 @@ render-phase driver VRAM 3.1–3.5 GB.
   **humo_1.7B at current HEAD: 9.9 s/it FLAT** (20-step block, zero escalation, zero
   paging — `WAN21_HuMo 3320MB Staged. 0 patches`), better than the 12-14 documented
   class, same session/box as the 14B's 46->119. CS-4 DOWNGRADES to CS-4-open per the
-  amendment; the deep bisect is skipped.
+  amendment; the deep bisect is skipped. Full leg PASS 1980s (33 min), all soak gates.
+- **ACCEPTANCE (revised, both prongs) PASSED on fixed HEAD `955f134`:** the
+  `--only other_beats_visual_humo_1_7B` leg re-run post-flip = **PASS in 2,296s
+  (38 min <= 50)**: engine histogram **{ltx_video: 3, humo_1.7B: 3} over 6 beats**
+  (the target engine actually rendered every character beat — no fallback), 1.7B
+  step classes 11.6 / 13.6 / 26.1 s/it FLAT per beat (frame-count-proportional, zero
+  escalation), audio byte-identical (pcm 734861c59f75), playable obs final (50.58s,
+  full decode clean), hygiene clean, render-phase VRAM peak **10,305 MB <= 14,848**
+  (the 14B pinned ~15.5-16.1 GB at the same seam). The committed 16gb_full profile
+  resolved `other_beats_visual=humo_1.7B` live — the flip is wired, not just on disk.
 - **Shipped (this session):** the operator policy flip — default character tier =
   **humo_1.7B** in `config/profiles/16gb_full.json` (role + slot overrides),
   `workflows/otr_scifi_16gb_full.json` (node-87 `other_beats_video_model`, node-92
