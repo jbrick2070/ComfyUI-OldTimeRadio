@@ -32,19 +32,35 @@ function Dig($m){ $line = "{0} | {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 Dig "START -- engines (easiest first): $($ENGINES -join ', ')"
 "started=$((Get-Date).ToString('o'))" | Set-Content -Path $MARKER -Encoding ascii
 
-# 1. Fresh server on current code.
+# 1. Fresh server on current code -- via the CANONICAL launcher
+#    (_otr_soak_server_launch.cmd, the verified recipe): output pinned to the
+#    real Documents tree (--output-directory + OTR_OUTPUT_DIR), TEMP/TMP
+#    repointed in-tree (the hygiene gate), HF_HOME + determinism env, default
+#    lane = OTR_ENABLE_HUMO=1 (LTX is default-on). The 2026-06-12 hand-rolled
+#    boot missed ALL of that: server wrote to the install-root output (orphan
+#    report), %TEMP% leaked otr_floor_* files, and no 0-E flags meant every
+#    3D engine fell back gated_by_flag.
 $listen = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-if($listen){ foreach($pid in ($listen.OwningProcess | Select-Object -Unique)){ Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 3 }
+if($listen){ foreach($srvPid in ($listen.OwningProcess | Select-Object -Unique)){ Stop-Process -Id $srvPid -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 3 }
 Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*Documents\ComfyUI\.venv*' } | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
-$env:HF_HOME = 'C:\ComfyUI-Models\huggingface'
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
-$srvArgs = @("`"$MAIN`"", '--port','8000','--cuda-malloc','--user-directory',"`"$USERDIR`"")
-$srv = Start-Process -FilePath $VENV -ArgumentList $srvArgs -WorkingDirectory $COMFYBASE -RedirectStandardOutput $SRVLOG -RedirectStandardError $SRVERR -WindowStyle Hidden -PassThru
+$LAUNCHCMD = Join-Path $REPO 'scripts\_otr_soak_server_launch.cmd'
+# The 0-E opt-in flags ride the launcher's per-leg env-injection seam
+# (_marathon_extra_env.cmd: called if present). Removed after health check.
+$EXTRAENV = Join-Path $REPO 'scripts\_otr_soak_capstone_results\_marathon_extra_env.cmd'
+New-Item -ItemType Directory -Force -Path (Split-Path $EXTRAENV) | Out-Null
+@('set OTR_ENABLE_LTX_ORBIT=1',
+  'set OTR_ENABLE_STILL_PARALLAX=1',
+  'set OTR_ENABLE_MESH_STAGE=1') | Set-Content -Path $EXTRAENV -Encoding ascii
+Dig "0-E enable flags staged (ltx_orbit/still_parallax/mesh_stage) via the launcher env seam"
+$srv = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "`"$LAUNCHCMD`" `"$SRVLOG`"") -WindowStyle Hidden -PassThru
 Dig "server launched pid=$($srv.Id); waiting for health..."
 $up=$false
-for($i=0;$i -lt 30;$i++){ Start-Sleep -Seconds 10; try { $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8000/system_stats' -UseBasicParsing -TimeoutSec 5; if($r.StatusCode -eq 200){ $oi=Invoke-WebRequest -Uri 'http://127.0.0.1:8000/object_info/OTR_VideoDirector' -UseBasicParsing -TimeoutSec 5; if($oi.StatusCode -eq 200){ $up=$true; Dig "server healthy after ~$([int](($i+1)*10))s"; break } } } catch {} }
-if(-not $up){ Dig "SERVER DID NOT COME UP -- aborting"; Remove-Item $MARKER -ErrorAction SilentlyContinue; exit 2 }
+# Full Documents custom_nodes set loads headless now -- allow up to 10 min.
+for($i=0;$i -lt 60;$i++){ Start-Sleep -Seconds 10; try { $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8000/system_stats' -UseBasicParsing -TimeoutSec 5; if($r.StatusCode -eq 200){ $oi=Invoke-WebRequest -Uri 'http://127.0.0.1:8000/object_info/OTR_VideoDirector' -UseBasicParsing -TimeoutSec 5; if($oi.StatusCode -eq 200){ $up=$true; Dig "server healthy after ~$([int](($i+1)*10))s"; break } } } catch {} }
+if(-not $up){ Dig "SERVER DID NOT COME UP -- aborting"; Remove-Item $MARKER, $EXTRAENV -ErrorAction SilentlyContinue; exit 2 }
+Remove-Item $EXTRAENV -ErrorAction SilentlyContinue   # flags are in the server process now
 
 # 2. Run each 3D engine, easiest first, on the character slot.
 $env:PYTHONPATH = $COMFYBASE

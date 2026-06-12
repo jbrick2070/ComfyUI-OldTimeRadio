@@ -1,0 +1,29 @@
+# Headless copy of %APPDATA%\ComfyUI\extra_models_config.yaml (2026-06-12).
+# Why a copy: the Desktop yaml's desktop_extensions entry points at the OLD
+# v1 install (AppData\Local\Programs\ComfyUI\...) which no longer exists --
+# headless main.py crashes in execute_prestartup_script (FileNotFoundError).
+# This copy keeps the model dirs + the Documents custom_nodes mapping (the
+# wrapper packs: ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...)
+# and drops the dead desktop_extensions section. If the Desktop app moves
+# again, refresh this file from the Desktop yaml.
+comfyui_desktop:
+  is_default: true
+  base_path: C:/Users/jeffr/Documents/ComfyUI
+  download_model_base: C:/ComfyUI-Models
+  custom_nodes: custom_nodes/
+  checkpoints: C:/ComfyUI-Models/checkpoints/
+  text_encoders: |
+       C:/ComfyUI-Models/text_encoders/
+       C:/ComfyUI-Models/clip/
+  clip_vision: C:/ComfyUI-Models/clip_vision/
+  configs: C:/ComfyUI-Models/configs/
+  controlnet: C:/ComfyUI-Models/controlnet/
+  diffusion_models: |
+                C:/ComfyUI-Models/diffusion_models
+                C:/ComfyUI-Models/unet
+  embeddings: C:/ComfyUI-Models/embeddings/
+  loras: C:/ComfyUI-Models/loras/
+  upscale_models: C:/ComfyUI-Models/upscale_models/
+  vae: C:/ComfyUI-Models/vae/
+  audio_encoders: C:/ComfyUI-Models/audio_encoders/
+  model_patches: C:/ComfyUI-Models/model_patches/

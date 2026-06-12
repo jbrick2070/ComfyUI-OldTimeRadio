@@ -8,8 +8,9 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 (planner session, cont.). **Branch:** `v2.0-alpha`. **HEAD:** `ef49e09`
-> (HEAD==origin). Update the "Last updated / HEAD" line and the relevant section on every tick.
+> **Last updated:** 2026-06-12 ~12:20 (3D quick-smoke harness-fix session; handing to Opus).
+> **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
+> push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
 ---
 
@@ -30,9 +31,31 @@ migration + cache-key split all verified landed; no open code). The next forward
 smoke -- one 30-word character-slot test per 0-E engine, EASIEST -> HARDEST (`ltx_orbit` ->
 `still_parallax` -> `mesh_stage`), via `scripts/otr_3d_quick_tests.ps1` on a fresh :8000. Results +
 verdicts land in `scripts/otr_3d_quick_digest.md` (marker `scripts/.otr_3d_quick_active` exists
-while running). NEXT WINDOW: read that digest for pass/fail per engine; fix the hardest ones that
-fail and re-run that engine's leg (`python scripts/otr_coverage_sweep.py --only
-other_beats_visual_<engine>`).
+while running). **Round 1 (10:43) = 3/3 SOAK_FAIL, ALL HARNESS-SIDE -- fixed 12:00-12:16, clean
+re-run launched 12:16:43** (server boot ~7.5 min w/ full custom nodes, then ~10-17 min/leg).
+Round-1 root causes + fixes (all landed, uncommitted-or-committed per git):
+1. Sweep checked the OLD output tree (Documents) while the hand-rolled server boot wrote to the
+   install root -> orphan-report reject. FIX: `otr_coverage_sweep.py` resolves the server output
+   dynamically (env override, else newest `otr/episodes` mtime, LOUD).
+2. The ps1 hand-rolled the server boot -- no 0-E enable flags (every 3D engine fell back
+   `gated_by_flag`), no TEMP repoint (`otr_floor_*` leaked into %TEMP% = hygiene fail), wrong
+   output dir. FIX: ps1 now boots via the CANONICAL `_otr_soak_server_launch.cmd` and stages
+   `OTR_ENABLE_LTX_ORBIT/STILL_PARALLAX/MESH_STAGE=1` through the launcher's
+   `_marathon_extra_env.cmd` seam (removed post-health).
+3. Headless boots loaded ONLY the install-root custom_nodes (OldTimeRadio junction) -- NO
+   ComfyUI-LTXVideo wrapper -> `WrapperNodeMissing: LTXVImgToVideoConditionOnly` -> ltx_video
+   fell to the floor on EVERY leg (this also would have broken the 27-leg overnight sweep).
+   FIX: launcher passes `--extra-model-paths-config scripts\_otr_headless_model_paths.yaml`
+   (headless-safe copy of the Desktop yaml; the Desktop one's desktop_extensions points at the
+   dead v1 install path and crashes main.py prestartup).
+4. ps1 `foreach($pid ...)` used the read-only automatic $pid -> instant death when a :8000
+   listener existed. FIX: renamed $srvPid. (Plus a one-line for-loop comment bug.)
+KNOWN-GOOD evidence from round 1: episode renders end-to-end, obs final playable, audio
+byte-identical; all failures were env/harness. ACCEPTANCE for round 2: engine under test appears
+in the trace (not fallback-only) + capstone gates. NEXT WINDOW: read the digest; if a leg fails
+ENGINE-side now, fix that engine and re-run just its leg (server must be up; PYTHONPATH to the
+install root; `python scripts/otr_coverage_sweep.py --only other_beats_visual_<engine>`).
+NOTE: suite 4141/0 + Bug Bible green after the sweep-resolver change.
 
 ---
 
@@ -172,6 +195,16 @@ so the keystone carries no demo pressure.
 ---
 
 ## 6. WHERE WE ARE (factual; recent first)
+
+- **2026-06-12 (midday, harness-fix session -> Opus):** 3D quick-smoke round 1 = 3/3 SOAK_FAIL,
+  all harness-side (see section 1 for the 4 root causes + fixes: sweep output resolver,
+  canonical-launcher boot + 0-E flags via env seam, headless model-paths yaml for the wrapper
+  custom nodes, $pid PS bug). Suite 4141/0 + Bug Bible green. Clean re-run launched 12:16:43
+  detached; monitor `scripts/otr_3d_quick_digest.md`. The `--extra-model-paths-config` launcher fix
+  also UNBLOCKS the 27-leg overnight sweep's ltx/latentsync legs (they would all have floored on
+  WrapperNodeMissing). Touched: `scripts/otr_coverage_sweep.py`, `scripts/otr_3d_quick_tests.ps1`,
+  `scripts/_otr_soak_server_launch.cmd`, NEW `scripts/_otr_headless_model_paths.yaml` (+ throwaway
+  helper ps1s under scripts/). Commit pending; do NOT push unprompted (operator kickoff rule).
 
 - **2026-06-12 (cont.):** Track-3 (s1) verified COMPLETE (no open code). Consolidated the whole
   go-forward plan into THIS file (single source of truth); demoted VIDEO_BUILD_HANDOFF.md + 3D plan

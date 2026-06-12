@@ -33,10 +33,42 @@ for p in (_HERE, _REPO):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-# The live Desktop server's output tree on this box (the capstone default
-# points at the old install; the probe-verified live tree is Documents).
-os.environ.setdefault(
-    "OTR_SOAK_SERVER_OUTPUT", r"C:\Users\jeffr\Documents\ComfyUI\output")
+# Resolve the live server's output tree DYNAMICALLY (the 2026-06-12 Desktop-v2
+# install move made any hardcoded pin go stale: the server now writes under
+# ComfyUI-Installs, not Documents). Honor an explicit env override; otherwise
+# pick the candidate whose otr/episodes tree was written most recently, and
+# say so LOUDLY so a wrong pick is visible in every leg log.
+_OUTPUT_CANDIDATES = (
+    r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\output",
+    r"C:\Users\jeffr\Documents\ComfyUI\output",
+)
+
+
+def _resolve_server_output() -> str:
+    explicit = os.environ.get("OTR_SOAK_SERVER_OUTPUT")
+    if explicit:
+        print(f"[sweep] server output (env override): {explicit}", flush=True)
+        return explicit
+
+    def _episodes_mtime(root):
+        try:
+            return os.path.getmtime(os.path.join(root, "otr", "episodes"))
+        except OSError:
+            return -1.0
+
+    scored = [(_episodes_mtime(c), c) for c in _OUTPUT_CANDIDATES]
+    best_mtime, best = max(scored)
+    if best_mtime < 0:
+        raise SystemExit(
+            "[sweep] FATAL: no candidate server output tree has otr/episodes; "
+            "set OTR_SOAK_SERVER_OUTPUT explicitly. Candidates tried: "
+            + "; ".join(_OUTPUT_CANDIDATES))
+    print(f"[sweep] server output (auto, newest otr/episodes): {best}",
+          flush=True)
+    return best
+
+
+os.environ["OTR_SOAK_SERVER_OUTPUT"] = _resolve_server_output()
 
 from nodes._otr_shared.capability_profiles import (  # noqa: E402
     availability, cross_validate_profile, load_profile, load_widget_mapping,

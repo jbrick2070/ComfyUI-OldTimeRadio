@@ -69,8 +69,20 @@ rem logs at DEBUG show per-model partial load/unload sizes -- the residency
 rem attribution evidence. Same recipe otherwise.
 set _OTR_VERBOSE=
 if /i "%3"=="DEBUG" set _OTR_VERBOSE=--verbose DEBUG
+rem CUSTOM NODES (2026-06-12, Desktop-v2 install move): the install root's
+rem custom_nodes holds ONLY the OldTimeRadio junction -- the wrapper packs
+rem (ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...) live in
+rem Documents\ComfyUI\custom_nodes, mapped by the Desktop app's
+rem extra_models_config.yaml. Headless boots MUST pass a yaml or every
+rem ltx_video/latentsync render falls to the floor (WrapperNodeMissing:
+rem LTXVImgToVideoConditionOnly -- the 3D quick-smoke catch). We pass OUR
+rem headless copy (_otr_headless_model_paths.yaml) because the Desktop yaml's
+rem desktop_extensions entry points at the dead v1 install path and crashes
+rem main.py's prestartup scan (FileNotFoundError).
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\main.py ^
   --port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI ^
-  --output-directory %OTR_REAL_OUTPUT% %_OTR_VERBOSE% ^
+  --output-directory %OTR_REAL_OUTPUT% ^
+  --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
+  %_OTR_VERBOSE% ^
   > "%1" 2>&1
