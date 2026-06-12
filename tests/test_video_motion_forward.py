@@ -42,6 +42,12 @@ def _ltx_fakes(np, n=4):
         "latent": _mk(lambda self, **k: (("latent",),)),
         "cond": _mk(lambda self, **k: (("p",), ("n",))),
         "ksampler": _mk(lambda self, **k: (("latent",),)),
+        # LK-1b distilled chain fakes (the default sampling mode)
+        "samplersel": _mk(lambda self, **k: (("sampler",),)),
+        "sigmas": _mk(lambda self, **k: (("sigmas",),)),
+        "noise": _mk(lambda self, **k: (("noise",),)),
+        "guider": _mk(lambda self, **k: (("guider",),)),
+        "sampleradv": _mk(lambda self, **k: (("latent",), ("denoised",))),
         "vaedecode": _mk(lambda self, **k: (img,)),
     }
 
@@ -62,7 +68,10 @@ def _wan_fakes(np, n=4):
 
 
 # --- topology -------------------------------------------------------------- #
-def test_ltx_graph_topology():
+def test_ltx_graph_topology_ksampler_rollback(monkeypatch):
+    """OTR_LTX_SAMPLER=ksampler restores the round-5 30-step graph."""
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "ksampler")
+    monkeypatch.delenv("OTR_LTX_CFG", raising=False)
     eng = LtxVideoEngine()
     cand = eng._node_candidates()
     assert cand["latent"] == ("EmptyLTXVLatentVideo",)
@@ -82,7 +91,83 @@ def test_ltx_graph_topology():
     assert ks["positive"] == wb.Wire("cond", 0)
     assert ks["negative"] == wb.Wire("cond", 1)
     assert ks["latent_image"] == wb.Wire("latent", 0)
+    assert ks["cfg"] == 3.0                     # the ksampler-mode default
+    assert "sampleradv" not in g and "guider" not in g
     assert g[eng._TERMINAL]["inputs"]["vae"] == wb.Wire("checkpoint", 2)
+
+
+def test_ltx_graph_topology_distilled_default(monkeypatch):
+    """LK-1b: the DEFAULT graph is the legacy distilled chain (8-step
+    LTX_DISTILLED_SIGMAS + euler + CFGGuider cfg=1.0) -- the 6/5 look."""
+    from nodes._otr_video_engines.eng_ltx_video import LTX_DISTILLED_SIGMAS
+    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)
+    monkeypatch.delenv("OTR_LTX_CFG", raising=False)
+    monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
+    eng = LtxVideoEngine()
+    assert eng._sampler_mode() == "distilled"
+    cand = eng._node_candidates_sampling()
+    assert "ksampler" not in cand
+    assert cand["samplersel"] == ("KSamplerSelect",)
+    assert cand["noise"] == ("RandomNoise",)
+    assert cand["guider"] == ("CFGGuider",)
+    assert cand["sampleradv"] == ("SamplerCustomAdvanced",)
+    assert "sigmas" not in cand                # injected post-resolve
+    plan = eng._build_render_request(
+        {"text_prompt": "x", "negative_prompt": "y",
+         "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 2}})
+    g = eng._build_graph(plan, 49, 768, 512)
+    assert "ksampler" not in g
+    assert g["samplersel"]["inputs"]["sampler_name"] == "euler"
+    assert g["sigmas"]["inputs"]["values"] == list(LTX_DISTILLED_SIGMAS)
+    assert len(g["sigmas"]["inputs"]["values"]) == 9      # 8 sampling steps
+    assert g["noise"]["inputs"]["noise_seed"] == plan["seed"]
+    gd = g["guider"]["inputs"]
+    assert gd["cfg"] == 1.0                    # legacy distilled LTX_CFG
+    assert gd["model"] == wb.Wire("checkpoint", 0)   # 2B default: NO LoRA
+    assert "lora" not in g
+    sa = g["sampleradv"]["inputs"]
+    assert sa["sampler"] == wb.Wire("samplersel", 0)
+    assert sa["sigmas"] == wb.Wire("sigmas", 0)
+    assert sa["latent_image"] == wb.Wire("latent", 0)
+    assert g[eng._TERMINAL]["inputs"]["samples"] == wb.Wire("sampleradv", 0)
+
+
+def test_ltx_distilled_lora_gating(monkeypatch, tmp_path):
+    """The 22B distilled LoRA wires ONLY on a 22B ckpt with the file on
+    disk; the 2B default and a missing file render WITHOUT it (LOUD)."""
+    eng = LtxVideoEngine()
+    plan = {"text_prompt": "x", "negative_prompt": "y", "fps": 25,
+            "target_frame_count": 49, "seed": 2}
+    # 2B default name -> never wired, regardless of the file.
+    monkeypatch.setenv("OTR_LTX_VIDEO_CKPT_NAME", "ltx-video-2b-v0.9.safetensors")
+    assert eng._use_distilled_lora() is False
+    # 22B ckpt + file on disk -> wired between checkpoint and the guider.
+    monkeypatch.setenv("OTR_LTX_VIDEO_CKPT_NAME", "ltx-2.3-22b-dev.safetensors")
+    lora_rel = "test_distilled_lora.safetensors"
+    (tmp_path / lora_rel).write_bytes(b"x")
+    monkeypatch.setenv("OTR_LTX_DISTILLED_LORA", lora_rel)
+    monkeypatch.setenv("HF_HOME", str(tmp_path / "huggingface"))
+    monkeypatch.setattr(
+        "nodes._otr_video_engines.eng_ltx_video._COMFY_ROOT", "Z:/nope")
+    # HF_HOME-derived loras dir = tmp_path/loras; place the file there.
+    (tmp_path / "loras").mkdir()
+    (tmp_path / "loras" / lora_rel).write_bytes(b"x")
+    assert eng._use_distilled_lora() is True
+    g = eng._build_graph(plan, 49, 768, 512)
+    assert g["lora"]["inputs"]["lora_name"] == lora_rel
+    assert g["lora"]["inputs"]["strength_model"] == 0.7
+    assert g["lora"]["inputs"]["model"] == wb.Wire("checkpoint", 0)
+    assert g["guider"]["inputs"]["model"] == wb.Wire("lora", 0)
+    # 22B ckpt + file MISSING -> LOUD render without it.
+    monkeypatch.setenv("OTR_LTX_DISTILLED_LORA", "gone.safetensors")
+    assert eng._use_distilled_lora() is False
+    g2 = eng._build_graph(plan, 49, 768, 512)
+    assert "lora" not in g2
+
+
+def test_ltx_sampler_mode_invalid_falls_back_loud(monkeypatch):
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "warp_drive")
+    assert LtxVideoEngine._sampler_mode() == "distilled"
 
 
 def test_wan_graph_topology():

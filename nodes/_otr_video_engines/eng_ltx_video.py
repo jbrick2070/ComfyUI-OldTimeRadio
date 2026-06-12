@@ -18,6 +18,14 @@ shared helpers + the registry. UTF-8, no BOM, ASCII-only source.
 Config (env): ``OTR_ENABLE_LTX_VIDEO`` opt-in flag; ``OTR_LTX_VIDEO_CKPT`` the
 primary checkpoint path the load probe checks (verify-at-build; default under
 ``ComfyUI/models/checkpoints``).
+
+LK-1 look restoration (2026-06-11): ``OTR_LTX_SAMPLER`` selects the sampling
+chain -- ``distilled`` (DEFAULT: the legacy 8-step LTX_DISTILLED_SIGMAS +
+euler + CFGGuider cfg=1.0 path that produced the 6/5 look) or ``ksampler``
+(the round-5 30-step rollback). ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots
+condition on their ST-3 scene stills (``OTR_LTX_I2V_STRENGTH`` default 0.75,
+the legacy Goofer-tuned value). The 22B distilled LoRA wires only on a
+22B-tier checkpoint (``OTR_LTX_DISTILLED_LORA`` / ``_STRENGTH``).
 """
 from __future__ import annotations
 
@@ -115,6 +123,53 @@ _LTX_DEFAULT_W = 768
 _LTX_DEFAULT_H = 512
 _LTX_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
+
+# --------------------------------------------------------------------------- #
+# LK-1b (2026-06-11 look restoration): the legacy distilled sampler config.
+# Recovered from the deleted OTR_BatchLTXRender (d57535ac; final form
+# 70d379b~1) -- the engine that rendered the 6/5 look the operator wants
+# back. Evidence trail: the box's User env pins OTR_LTX_ENGINE=v0_9 and the
+# legacy node's own default was v0_9 ("visually indistinguishable from
+# v2_3 on OTR content", 4.4x faster), so the production look was the 2B
+# v0.9 checkpoint + THIS schedule -- NOT the 22B RES4LYF path.
+# --------------------------------------------------------------------------- #
+
+#: Distilled sigma schedule from ComfyUI-Goofer, proven on RTX 5080
+#: Blackwell. 8 sampling steps, last sigma 0.0 = full denoise.
+LTX_DISTILLED_SIGMAS = (
+    1.0, 0.99375, 0.9875, 0.98125, 0.975,
+    0.909375, 0.725, 0.421875, 0.0,
+)
+
+#: CFG for the distilled schedule (legacy LTX_CFG: no classifier-free
+#: guidance needed on the distilled path) vs the round-5 KSampler default.
+_LTX_DISTILLED_CFG = 1.0
+_LTX_KSAMPLER_CFG = 3.0
+
+#: The legacy workflow's distilled LoRA (nodes 60/61 consolidated @0.7,
+#: bfc761a). Its keys target the LTX 2.3 22B DiT, so it is wired ONLY when
+#: the active checkpoint is a 22B file -- on the default 2B v0.9 ckpt a
+#: LoraLoaderModelOnly apply would be a silent key-mismatch no-op.
+_LTX_DISTILLED_LORA_DEFAULT = os.path.join(
+    "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
+_LTX_DISTILLED_LORA_STRENGTH = 0.7
+
+
+class _SigmasFromValues:
+    """In-adapter graph node: a float32 SIGMAS tensor from literal values.
+
+    The stock workflow fed SamplerCustomAdvanced via a ManualSigmas node;
+    this avoids guessing that node's widget API by mirroring the legacy
+    ``torch.tensor(LTX_DISTILLED_SIGMAS, dtype=torch.float32)`` exactly.
+    Injected into the resolved-classes mapping by ``render_clip`` (it is
+    not a registered ComfyUI node). Lazy torch import (V-12)."""
+
+    FUNCTION = "get"
+
+    def get(self, values):
+        import torch  # lazy -- only inside an actual GPU render
+        return (torch.tensor([float(v) for v in values],
+                             dtype=torch.float32),)
 
 
 @register
@@ -224,20 +279,19 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
-    # ---- LTX-I2V (ticket Part B, 2026-06-11; env-gated, DEFAULT OFF) ----
-    # With OTR_ENABLE_LTX_I2V=1 AND a request init image present, render_clip
-    # builds the image-conditioned wrapper graph (LTXVImgToVideo) instead of
-    # txt2vid. ENGINE_FAMILY stays text_to_video (no registry/family change,
-    # no new widgets) -- the branch lives entirely inside the adapter. The
-    # decode band is UNTOUCHED: the same _ltx_frame_length floor/cap governs
-    # both paths (do NOT touch the 169f floor). Probe-first discipline: one
-    # clip on the GPU box verifying the wrapper's image-conditioning nodes
-    # (resolve_graph_classes fail-LOUD), the 1472x832 decode floor with an
-    # init image, and the dimension/crop behavior -- BEFORE enabling more
-    # beats.
+    # ---- LTX-I2V (ticket Part B 2026-06-11; LK-1a: DEFAULT ON) ----
+    # With the flag on (DEFAULT since LK-1a -- the 2026-06-11 look
+    # restoration; the Part-B probe PASSED at 1472x832x169f) AND a request
+    # init image present, render_clip builds the image-conditioned wrapper
+    # graph (LTXVImgToVideo) instead of txt2vid. ENGINE_FAMILY stays
+    # text_to_video (no registry/family change, no new widgets) -- the
+    # branch lives entirely inside the adapter. The decode band is
+    # UNTOUCHED: the same _ltx_frame_length floor/cap governs both paths
+    # (do NOT touch the 169f floor). Set OTR_ENABLE_LTX_I2V=0 to restore
+    # the text-only path (the murk the operator rejected).
     @staticmethod
     def _i2v_enabled() -> bool:
-        return os.environ.get("OTR_ENABLE_LTX_I2V", "0") == "1"
+        return os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"
 
     @staticmethod
     def _init_image_path(request) -> str:
@@ -265,15 +319,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         if p and os.path.exists(p):
             return True
         _LOG.warning(
-            "[eng_ltx_video] LTX-I2V LOUD: OTR_ENABLE_LTX_I2V=1 but the "
-            "request carries no on-disk init image (%r) -- falling back to "
-            "the text->video path", p)
+            "[eng_ltx_video] LTX-I2V LOUD: i2v enabled (default since LK-1a) "
+            "but the request carries no on-disk init image (%r) -- falling "
+            "back to the text->video path", p)
         return False
 
     def _node_candidates_i2v(self):
-        """The image-conditioned graph's node candidates. resolve_graph_classes
-        fail-LOUD names any missing wrapper class (the probe's first gate)."""
-        cands = dict(self._node_candidates())
+        """The image-conditioned graph's node candidates (on the ACTIVE
+        sampling set -- LK-1b). resolve_graph_classes fail-LOUD names any
+        missing wrapper class (the probe's first gate)."""
+        cands = dict(self._node_candidates_sampling())
         del cands["latent"]
         cands["loadimage"] = ("LoadImage",)
         cands["img2vid"] = ("LTXVImgToVideo",)
@@ -291,10 +346,14 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         del graph["latent"]
         graph["loadimage"] = {"class": "loadimage",
                               "inputs": {"image": image_name}}
+        # LK-1b: 0.75 is the legacy OTR_BatchLTXRender / Goofer-tuned
+        # conditioning strength ("strong reference, but leaves room for the
+        # model to add motion") -- the 6/5-look value. The Part-B probe ran
+        # at 1.0; the A/B acceptance pair compares the restored default.
         try:
-            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
+            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
         except (TypeError, ValueError):
-            strength = 1.0
+            strength = 0.75
         graph["img2vid"] = {
             "class": "img2vid",
             "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
@@ -308,7 +367,10 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "class": "cond",
             "inputs": {"positive": W("img2vid", 0), "negative": W("img2vid", 1),
                        "frame_rate": float(self.target_fps)}}
-        graph["ksampler"]["inputs"]["latent_image"] = W("img2vid", 2)
+        # LK-1b: the sampler node differs by mode -- rewire whichever holds
+        # the latent_image input (distilled = SamplerCustomAdvanced).
+        sampler_node = "sampleradv" if "sampleradv" in graph else "ksampler"
+        graph[sampler_node]["inputs"]["latent_image"] = W("img2vid", 2)
         return graph
 
     # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----
@@ -337,6 +399,75 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "ksampler": ("KSampler",),
             "vaedecode": ("VAEDecode",),
         }
+
+    # ---- LK-1b: sampler mode + distilled LoRA resolution ----
+    @staticmethod
+    def _sampler_mode() -> str:
+        """``distilled`` (DEFAULT -- the legacy 8-step euler/CFG-1.0 path,
+        the 6/5 look) or ``ksampler`` (the round-5 30-step path, kept as
+        the rollback). Invalid values fall back LOUD to distilled."""
+        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
+        if mode not in ("distilled", "ksampler"):
+            _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
+                         "using the distilled default", mode)
+            mode = "distilled"
+        return mode
+
+    def _distilled_lora_file(self):
+        """``(lora_name, abs_path)`` for the distilled LoRA; ``abs_path`` is
+        '' when the file is not on disk. Searched under the ComfyUI-relative
+        loras dir + the HF_HOME-derived shared-models loras dir (the same
+        two roots ``_ckpt_path`` walks)."""
+        name = os.environ.get("OTR_LTX_DISTILLED_LORA",
+                              _LTX_DISTILLED_LORA_DEFAULT)
+        if not name:
+            return "", ""
+        cand_dirs = [os.path.join(_COMFY_ROOT, "models", "loras")]
+        hf_home = os.environ.get("HF_HOME", "")
+        if hf_home:
+            cand_dirs.append(os.path.join(os.path.dirname(hf_home), "loras"))
+        for d in cand_dirs:
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                return name, p
+        return name, ""
+
+    def _use_distilled_lora(self) -> bool:
+        """True iff the active checkpoint is a 22B-tier file AND the
+        distilled LoRA exists on disk (verified BEFORE wiring, per the
+        LK-1 ticket). The default 2B v0.9 ckpt never wires it (the LoRA's
+        keys target the 22B DiT -- applying it there is a silent no-op,
+        which is worse than not wiring it). A 22B ckpt with the LoRA file
+        missing renders WITHOUT it, LOUD -- never silent."""
+        if "22b" not in self._ckpt_name().lower():
+            return False
+        name, path = self._distilled_lora_file()
+        if path:
+            return True
+        _LOG.warning(
+            "[eng_ltx_video] LK-1b LOUD: 22B checkpoint %s but the distilled "
+            "LoRA %r is NOT on disk -- rendering WITHOUT it (un-distilled "
+            "22B at distilled sigmas degrades; install the LoRA or set "
+            "OTR_LTX_DISTILLED_LORA)", self._ckpt_name(), name)
+        return False
+
+    def _node_candidates_sampling(self):
+        """The ACTIVE sampling candidates: the base set, with the KSampler
+        node swapped for the legacy distilled chain (KSamplerSelect +
+        RandomNoise + CFGGuider + SamplerCustomAdvanced) in distilled mode,
+        plus LoraLoaderModelOnly when the distilled LoRA wires. The SIGMAS
+        source is the in-adapter ``_SigmasFromValues`` (injected after
+        resolve -- it is not a registered node class)."""
+        cands = dict(self._node_candidates())
+        if self._sampler_mode() == "distilled":
+            del cands["ksampler"]
+            cands["samplersel"] = ("KSamplerSelect",)
+            cands["noise"] = ("RandomNoise",)
+            cands["guider"] = ("CFGGuider",)
+            cands["sampleradv"] = ("SamplerCustomAdvanced",)
+        if self._use_distilled_lora():
+            cands["lora"] = ("LoraLoaderModelOnly",)
+        return cands
 
     def _ckpt_name(self):
         return os.environ.get("OTR_LTX_VIDEO_CKPT_NAME") or os.path.basename(
@@ -377,12 +508,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
           LTXVConditioning -> KSampler -> VAEDecode."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
-        steps = int(os.environ.get("OTR_LTX_STEPS", "30"))
-        cfg = float(os.environ.get("OTR_LTX_CFG", "3.0"))
+        mode = self._sampler_mode()
+        cfg_default = (_LTX_DISTILLED_CFG if mode == "distilled"
+                       else _LTX_KSAMPLER_CFG)
+        try:
+            cfg = float(os.environ.get("OTR_LTX_CFG", str(cfg_default)))
+        except (TypeError, ValueError):
+            cfg = cfg_default
         positive = plan.get("text_prompt") or "a cinematic scene"
         negative = plan.get("negative_prompt") or os.environ.get(
             "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
-        return {
+        seed = int(plan.get("seed", 0))
+        graph = {
             "checkpoint": {"class": "checkpoint",
                            "inputs": {"ckpt_name": self._ckpt_name()}},
             # encoder: CLIPLoader loads T5-XXL from text_encoders/ (type=ltxv).
@@ -401,18 +538,68 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "cond": {"class": "cond",
                      "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
                                 "frame_rate": float(self.target_fps)}},
-            "ksampler": {"class": "ksampler",
-                         "inputs": {"seed": int(plan.get("seed", 0)), "steps": steps,
-                                    "cfg": cfg, "sampler_name": "euler",
-                                    "scheduler": "normal", "denoise": 1.0,
-                                    "model": W("checkpoint", 0),
-                                    "positive": W("cond", 0),
-                                    "negative": W("cond", 1),
-                                    "latent_image": W("latent", 0)}},
-            "vaedecode": {"class": "vaedecode",
-                          "inputs": {"samples": W("ksampler", 0),
-                                     "vae": W("checkpoint", 2)}},
         }
+        # LK-1b: the distilled LoRA wires between the checkpoint and the
+        # sampler's MODEL input -- ONLY on a 22B-tier ckpt with the file
+        # verified on disk (_use_distilled_lora). The 2B default never
+        # wires it.
+        model_wire = W("checkpoint", 0)
+        if self._use_distilled_lora():
+            lora_name, lora_path = self._distilled_lora_file()
+            try:
+                lora_strength = float(os.environ.get(
+                    "OTR_LTX_DISTILLED_LORA_STRENGTH",
+                    str(_LTX_DISTILLED_LORA_STRENGTH)))
+            except (TypeError, ValueError):
+                lora_strength = _LTX_DISTILLED_LORA_STRENGTH
+            _LOG.warning("[eng_ltx_video] LK-1b: distilled LoRA wired: %s "
+                         "@ %.2f (%s)", lora_name, lora_strength, lora_path)
+            graph["lora"] = {"class": "lora",
+                             "inputs": {"lora_name": lora_name,
+                                        "strength_model": lora_strength,
+                                        "model": model_wire}}
+            model_wire = W("lora", 0)
+        if mode == "distilled":
+            # The legacy OTR_BatchLTXRender sampling chain, verbatim:
+            # KSamplerSelect("euler") + RandomNoise(seed) + CFGGuider(1.0) +
+            # SamplerCustomAdvanced(LTX_DISTILLED_SIGMAS). 8 steps; the
+            # sigma schedule IS the step count (OTR_LTX_STEPS is a
+            # ksampler-mode knob only).
+            graph["samplersel"] = {"class": "samplersel",
+                                   "inputs": {"sampler_name": "euler"}}
+            graph["sigmas"] = {"class": "sigmas",
+                               "inputs": {"values":
+                                          list(LTX_DISTILLED_SIGMAS)}}
+            graph["noise"] = {"class": "noise",
+                              "inputs": {"noise_seed": seed}}
+            graph["guider"] = {"class": "guider",
+                               "inputs": {"model": model_wire,
+                                          "positive": W("cond", 0),
+                                          "negative": W("cond", 1),
+                                          "cfg": cfg}}
+            graph["sampleradv"] = {
+                "class": "sampleradv",
+                "inputs": {"noise": W("noise", 0), "guider": W("guider", 0),
+                           "sampler": W("samplersel", 0),
+                           "sigmas": W("sigmas", 0),
+                           "latent_image": W("latent", 0)}}
+            samples = W("sampleradv", 0)
+        else:
+            steps = int(os.environ.get("OTR_LTX_STEPS", "30"))
+            graph["ksampler"] = {
+                "class": "ksampler",
+                "inputs": {"seed": seed, "steps": steps,
+                           "cfg": cfg, "sampler_name": "euler",
+                           "scheduler": "normal", "denoise": 1.0,
+                           "model": model_wire,
+                           "positive": W("cond", 0),
+                           "negative": W("cond", 1),
+                           "latent_image": W("latent", 0)}}
+            samples = W("ksampler", 0)
+        graph["vaedecode"] = {"class": "vaedecode",
+                              "inputs": {"samples": samples,
+                                         "vae": W("checkpoint", 2)}}
+        return graph
 
     # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
@@ -426,7 +613,10 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 "LTX wrapper + ckpt, set OTR_ENABLE_LTX_VIDEO=1, and run the CW-6 "
                 "GPU smoke" % self._ckpt_path())
         from . import wrapper_bridge as _wb
-        self._classes = _wb.resolve_graph_classes(self._node_candidates())
+        # LK-1b: resolve the ACTIVE sampling set (distilled chain by
+        # default) so the cache matches what render_clip builds.
+        self._classes = _wb.resolve_graph_classes(
+            self._node_candidates_sampling())
         self._loaded = True
 
     def render_clip(self, request, prepared):
@@ -439,13 +629,21 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         import tempfile
         plan = self._build_render_request(request)            # pure, CPU-tested
         use_i2v = self._use_i2v(request)
+        # LK-1b: resolve the ACTIVE candidate set (sampler mode + LoRA
+        # wiring are env/ckpt-dependent). A load()-time cache (or a test's
+        # injected fakes) wins on the non-i2v path; resolve_graph_classes
+        # fail-LOUD names every missing wrapper class at once.
         if use_i2v:
-            # Part-B branch: image-conditioned graph. resolve_graph_classes
-            # fail-LOUD names a missing LTXVImgToVideo (the probe gate).
             classes = _wb.resolve_graph_classes(self._node_candidates_i2v())
         else:
-            classes = getattr(self, "_classes", None) \
-                or _wb.resolve_graph_classes(self._node_candidates())
+            classes = dict(getattr(self, "_classes", None)
+                           or _wb.resolve_graph_classes(
+                               self._node_candidates_sampling()))
+        if self._sampler_mode() == "distilled":
+            # The SIGMAS source is in-adapter (not a registered node class);
+            # injected AFTER resolve so the resolver never sees it. A test
+            # fake may pre-supply its own "sigmas" class.
+            classes.setdefault("sigmas", _SigmasFromValues)
         width, height = self._dims(request)
         # LTX requires length == 8n+1 and dims multiple-of-32; the frame ask is
         # floored/capped/snapped by the pure helper (round 5 F1: a >cap ask is

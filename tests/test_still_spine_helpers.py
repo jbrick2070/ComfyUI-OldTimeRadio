@@ -409,7 +409,7 @@ class TestDispatcherStillSpine:
             ireg._IMAGE_REGISTRY._registry.clear()
             ireg._IMAGE_REGISTRY._registry.update(saved)
 
-    def test_st4_still_index_and_family_init(self, tmp_path):
+    def test_st4_still_index_and_family_init(self, tmp_path, monkeypatch):
         """ST-4 / W6: _still_index keys scene_* rows by beat_id (newest row
         wins); image_to_video + static_motion shots take init from the scene
         still; audio_driven_face keeps the portrait; a missing still falls
@@ -453,10 +453,18 @@ class TestDispatcherStillSpine:
             shot("humo", "audio_driven_face"), ledger)
         assert req["observability"]["init_source"] == "portrait"
         assert req["asset_refs"]["init_image"] == str(portrait)
-        # text engine -> portrait-by-char (pre-spine behavior, unchanged)
+        # text engine (ltx_video): LK-1a flipped i2v DEFAULT ON -- the scene
+        # still wins when present; OTR_ENABLE_LTX_I2V=0 restores the
+        # pre-spine portrait-by-char init.
+        monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+        req = rd.build_request_from_shot(
+            shot("ltx_video", "text_to_video"), ledger)
+        assert req["observability"]["init_source"] == "scene_still"
+        monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
         req = rd.build_request_from_shot(
             shot("ltx_video", "text_to_video"), ledger)
         assert req["observability"]["init_source"] == "portrait"
+        monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
 
         # missing scene still -> LOUD fallback to the pre-spine init
         ledger2 = {k: (dict(v) if isinstance(v, dict) else v)

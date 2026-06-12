@@ -451,7 +451,7 @@ def test_new_motion_source_is_ascii_no_em_dash():
 
 
 # --------------------------------------------------------------------------- #
-# LTX-I2V ticket Part B (2026-06-11): env-gated img2vid branch (DEFAULT OFF)
+# LTX-I2V ticket Part B (2026-06-11): img2vid branch -- DEFAULT ON since LK-1a
 # --------------------------------------------------------------------------- #
 def _i2v_req(init_path=""):
     r = {"shot_id": "s1", "text_prompt": "a relay station at dusk",
@@ -463,8 +463,17 @@ def _i2v_req(init_path=""):
     return r
 
 
-def test_i2v_default_off_even_with_init(monkeypatch, tmp_path):
+def test_i2v_default_on_with_init(monkeypatch, tmp_path):
+    """LK-1a: i2v is the DEFAULT -- flag unset + an on-disk init engages."""
     monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+    eng = vreg.get_engine("ltx_video")
+    p = tmp_path / "still.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n")
+    assert eng._use_i2v(_i2v_req(str(p))) is True
+
+
+def test_i2v_opt_out_restores_text_only(monkeypatch, tmp_path):
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     eng = vreg.get_engine("ltx_video")
     p = tmp_path / "still.png"
     p.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -486,7 +495,10 @@ def test_i2v_flag_on_with_init_engages(monkeypatch, tmp_path):
     assert eng._use_i2v(_i2v_req(str(p))) is True
 
 
-def test_i2v_candidates_and_graph_topology():
+def test_i2v_candidates_and_graph_topology(monkeypatch):
+    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)   # distilled default
+    monkeypatch.delenv("OTR_LTX_I2V_STRENGTH", raising=False)
+    monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = vreg.get_engine("ltx_video")
     cands = eng._node_candidates_i2v()
     assert "latent" not in cands
@@ -499,21 +511,28 @@ def test_i2v_candidates_and_graph_topology():
     assert g["loadimage"]["inputs"]["image"] == "still.png"
     iv = g["img2vid"]["inputs"]
     assert iv["length"] == 169 and iv["width"] == 1472 and iv["height"] == 832
-    assert iv["strength"] == 1.0   # REQUIRED input on the installed wrapper
-    # KSampler samples the img2vid latent; conditioning reads img2vid 0/1.
-    assert tuple(g["ksampler"]["inputs"]["latent_image"]) == ("img2vid", 2)
+    # LK-1b: strength REQUIRED on the installed wrapper; 0.75 = the legacy
+    # Goofer-tuned conditioning default (was 1.0 on the probe).
+    assert iv["strength"] == 0.75
+    # The distilled sampler samples the img2vid latent; conditioning reads
+    # img2vid 0/1 (LK-1b: SamplerCustomAdvanced, not KSampler).
+    assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("img2vid", 2)
     assert tuple(g["cond"]["inputs"]["positive"]) == ("img2vid", 0)
     assert tuple(g["cond"]["inputs"]["negative"]) == ("img2vid", 1)
     # txt2vid graph untouched by the branch
     g2 = eng._build_graph(plan, 169, 1472, 832)
     assert "latent" in g2 and "img2vid" not in g2
+    # ksampler rollback mode keeps the old i2v rewire target
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "ksampler")
+    g3 = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
+    assert tuple(g3["ksampler"]["inputs"]["latent_image"]) == ("img2vid", 2)
 
 
 def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
-    """Flag on + a scene still in the ledger -> the ltx request shows
-    init_source=scene_still; no still -> LOUD text-path fallback."""
+    """DEFAULT-ON (LK-1a) + a scene still in the ledger -> the ltx request
+    shows init_source=scene_still; no still -> LOUD text-path fallback."""
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
+    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)   # the default
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     still = tmp_path / "scene_b001.png"
     still.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -540,8 +559,9 @@ def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
 
 
 def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
+    """Explicit opt-OUT (=0) restores the pre-LK-1 text-only behavior."""
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     still = tmp_path / "scene_b001.png"
     still.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -559,7 +579,7 @@ def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
             "group_id": "grp_announcer_visual", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
-    assert req["observability"]["init_source"] != "scene_still"   # the still-spine v1 CUT holds
+    assert req["observability"]["init_source"] != "scene_still"   # opt-out holds
 
 
 if __name__ == "__main__":

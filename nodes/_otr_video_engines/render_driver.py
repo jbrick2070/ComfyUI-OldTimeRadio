@@ -616,13 +616,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "scene still in the ledger -- falling back to the pre-spine "
                 "init (%s)", _family, shot.get("shot_id"), _bid,
                 init_source)
-    # LTX-I2V ticket Part B (2026-06-11, env-gated, default OFF): with
-    # OTR_ENABLE_LTX_I2V=1 an ltx_video shot conditions on the beat's FLUX
-    # scene still (init_source=scene_still in the trace); a missing still
-    # falls back LOUD to the round-5 text path -- never silent. Flag unset =
-    # LTX stays text-only (the still-spine v1 CUT; decode-band guard intact).
+    # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
+    # look restoration): every ltx_video shot conditions on the beat's
+    # ST-3-minted scene still (init_source=scene_still in the trace) --
+    # the music open b000 included (its text-only render was the murk
+    # cause). A missing still falls back LOUD to the round-5 text path --
+    # never silent. Set OTR_ENABLE_LTX_I2V=0 to restore text-only LTX.
     if (str(shot.get("engine_id") or "") == "ltx_video"
-            and os.environ.get("OTR_ENABLE_LTX_I2V", "0") == "1"):
+            and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(_bid, "")
         if _still:
@@ -630,13 +631,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_source = "scene_still"
             _LOG.warning(
                 "[OTR.render_driver] LTX-I2V: beat %s conditioning on scene "
-                "still %s (OTR_ENABLE_LTX_I2V=1)", _bid,
+                "still %s (default since LK-1a)", _bid,
                 os.path.basename(_still))
         else:
             _LOG.warning(
-                "[OTR.render_driver] LTX-I2V LOUD: OTR_ENABLE_LTX_I2V=1 but "
-                "beat %s has NO scene still in the ledger -- falling back to "
-                "the round-5 TEXT path (never silent)", _bid)
+                "[OTR.render_driver] LTX-I2V LOUD: i2v is enabled (default "
+                "since LK-1a) but beat %s has NO scene still in the ledger "
+                "-- falling back to the round-5 TEXT path (never silent)",
+                _bid)
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
