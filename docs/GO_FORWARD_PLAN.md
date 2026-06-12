@@ -8,7 +8,7 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 (planner session). **Branch:** `v2.0-alpha`. **HEAD:** `847e2de`
+> **Last updated:** 2026-06-12 (planner session, cont.). **Branch:** `v2.0-alpha`. **HEAD:** `ef49e09`
 > (HEAD==origin). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
 ---
@@ -22,10 +22,17 @@ code is current, runs all 27 runnable legs on the `humo_1.7B` default, and the `
 task writes `scripts/sweep_monitor_digest.md` every 30 min and creates `scripts/_otr_0e_gpu_go.txt`
 on a clean 27/27 PASS (else it HOLDS and reports the failures).
 
-**Active coding (operator-directed 2026-06-12, "most upstream, work down"):** the Track-3 remainder.
-The upstream-most item (section-3 image-routing must-fixes) is LANDED + green (see Open Tickets ->
-TRACK-3). Working downstream from there: builder migration + cache-key metadata (audit-then-fix; the
-docs run ahead of the code, so verify each is actually open before editing).
+**Track-3 (s1) is COMPLETE** (planner audit 2026-06-12 -- image-routing must-fixes + builder
+migration + cache-key split all verified landed; no open code). The next forward-order code (s2 =
+3D spike lane) is operator-gated.
+
+**IN FLIGHT (detached, decoupled from the 27-leg sweep -- operator-directed 2026-06-12):** quick 3D
+smoke -- one 30-word character-slot test per 0-E engine, EASIEST -> HARDEST (`ltx_orbit` ->
+`still_parallax` -> `mesh_stage`), via `scripts/otr_3d_quick_tests.ps1` on a fresh :8000. Results +
+verdicts land in `scripts/otr_3d_quick_digest.md` (marker `scripts/.otr_3d_quick_active` exists
+while running). NEXT WINDOW: read that digest for pass/fail per engine; fix the hardest ones that
+fail and re-run that engine's leg (`python scripts/otr_coverage_sweep.py --only
+other_beats_visual_<engine>`).
 
 ---
 
@@ -166,7 +173,12 @@ so the keystone carries no demo pressure.
 
 ## 6. WHERE WE ARE (factual; recent first)
 
-- **2026-06-12 (this session):** coverage sweep launched live on a fresh :8000 boot, then DEFERRED
+- **2026-06-12 (cont.):** Track-3 (s1) verified COMPLETE (no open code). Consolidated the whole
+  go-forward plan into THIS file (single source of truth); demoted VIDEO_BUILD_HANDOFF.md + 3D plan
+  section 0 to pointers; re-pointed the tracker. Consolidated the handoff skills into ONE installed
+  `otr-handoff` skill (old `otr-build-handoff` + `otr-video-handoff` deleted). Launched the decoupled
+  3D quick-smoke (see section 1 IN FLIGHT). Pushed docs @ `ef49e09`. Handed off to a fresh window.
+- **2026-06-12 (earlier):** coverage sweep launched live on a fresh :8000 boot, then DEFERRED
   per operator -> GPU freed for coding. Built the one-click overnight path: `otr_overnight_sweep_launch.ps1`
   + the `otr-overnight-sweep` (manual) + `otr-sweep-monitor` (30-min, marker-guarded) tasks. Synced
   repo to `847e2de`. Verified + doc-corrected the Track-3 section-3 image-routing must-fixes (LANDED,
