@@ -1652,3 +1652,32 @@ waits until v2.0 ships"), batch-promote after v2.0 lands.
 **Files changed:** `nodes/_otr_video_engines/render_driver.py`.
 
 ---
+
+### BUG-LOCAL-113: FLUX colour bleed — portraits too blue, radio still too red [FIXED 2026-06-12 @ b1d1bf2]
+
+**Symptom:** Character portraits had a blue cast on sci-fi episodes; the radio-set still image had a red cast on period drama episodes. Both issues were visual-only (audio unaffected).
+
+**Root cause (portrait blue/red):** `finish_visual_prompt()` in `otr_meta_brief_image_prompt.py` was called with `era_profile="full"`, which injects the episode's ambient colour palette (e.g. `neon blue`, `amber glow`) into character face prompts. FLUX takes these palette tokens literally and tints the portrait.
+
+**Root cause (radio still):** `get_open_subject()` in `_otr_story_brief_helpers.py` used `"warm tungsten light"` in the radio-set string, which skewed the still orange-red on period drama episodes. The `render_driver.py` default `text_prompt` also contained `"radio station studio"` (not matching the test contract substring `"radio studio"`).
+
+**Fix:**
+- `otr_meta_brief_image_prompt.py`: changed `era_profile="full"` → `era_profile="portrait"`. Portrait profile includes atmosphere mood line and lighting terms only — never the episode colour palette.
+- `_otr_story_brief_helpers.py`: updated all three `get_open_subject()` return strings to neutral wording; portrait profile in `get_era_tail()` now also appends lighting terms (required for `lantern glow` test contracts).
+- `render_driver.py`: default `text_prompt` restored to `"a 1940s radio studio, on air sign illuminated, period broadcast set"`.
+
+**Files changed:** `nodes/otr_meta_brief_image_prompt.py`, `nodes/_otr_story_brief_helpers.py`, `nodes/_otr_video_engines/render_driver.py`.
+
+---
+
+### BUG-LOCAL-113b: LTX animation reverts to subtle pan-in [FIXED 2026-06-12 @ e3edce9]
+
+**Symptom:** LTX radio clips showed only a slow camera pan with no dynamic motion, despite BUG-LOCAL-095 (I2V) and BUG-LOCAL-112 (prompt length) being fixed.
+
+**Root cause:** `_sampler_mode()` in `eng_ltx_video.py` defaulted to `"distilled"` (8-step `LTX_DISTILLED_SIGMAS` + CFGGuider cfg=1.0). This path combined with I2V conditioning produces only subtle motion. The 6/5-era look used `ksampler` (30-step euler, cfg=3.0) which generates dynamic motion.
+
+**Fix:** Changed `_sampler_mode()` default from `"distilled"` to `"ksampler"`. The distilled path remains available as `OTR_LTX_SAMPLER=distilled` rollback. Test contracts updated: `test_ltx_graph_topology_distilled_default` now explicitly sets `OTR_LTX_SAMPLER=distilled`; `test_ltx_distilled_lora_gating` likewise; invalid-fallback test now expects `"ksampler"`.
+
+**Files changed:** `nodes/_otr_video_engines/eng_ltx_video.py`, `tests/test_video_motion.py`, `tests/test_video_motion_forward.py`.
+
+---
