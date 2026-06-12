@@ -225,7 +225,7 @@ def build_request(shot, assets, frame_count, canvas=None):
         "role": str(shot.get("role") or ""),
         "family_hint": family,
         "profile_id": str(shot.get("profile_id") or ""),
-        "text_prompt": "a 1940s radio studio, warm tungsten light, on air",
+        "text_prompt": "a 1940s radio studio, on air sign illuminated, period broadcast set",
         "asset_refs": {"init_image": portrait} if portrait else {},
         "conditioning_refs": {},
         "audio_ref": {"path": audio} if audio else None,
@@ -477,7 +477,7 @@ _GEAR_WORDS_RD = re.compile(
 #: face anchored for the audio_driven_face family; zero broadcast tokens.
 _CHAR_FACE_FALLBACK_PROMPT = (
     "close-up cinematic portrait of a person speaking, face centered, subtle "
-    "facial motion, period 1940s costume, warm tungsten light, film drama")
+    "facial motion, period 1940s costume, dramatic film lighting")
 
 
 def _scrub_gear(prompt: str) -> str:

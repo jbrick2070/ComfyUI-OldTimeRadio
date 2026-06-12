@@ -270,6 +270,21 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
                        if str(t).strip()][:3]
     except Exception:  # noqa: BLE001 -- reader unavailable -> v1-only
         pass
+    if profile == "portrait":
+        # Portrait era tail: NEVER includes the episode's ambient colour
+        # palette (which skews blue on sci-fi, red on period drama and bleeds
+        # directly into every character face). Lighting terms (quality/mood,
+        # not palette colours) are safe and preserved (BUG-LOCAL-113).
+        parts = []
+        if atmosphere_line:
+            parts.append(atmosphere_line)
+        m2 = _meta(meta)
+        terms2 = m2.get("story_brief_terms") or {}
+        if isinstance(terms2, dict):
+            lighting = [str(t).strip() for t in (terms2.get("lighting") or [])
+                        if str(t).strip()]
+            parts.extend(lighting)
+        return ", ".join(parts) or ERA_TAIL_DEFAULT
     if profile == "still":
         m = _meta(meta)
         terms = m.get("story_brief_terms") or {}
@@ -316,15 +331,12 @@ def get_open_subject(role: str, synthetic: bool) -> str:
     picture, never a sentence). Wording moved VERBATIM from the render
     driver's round-5 scene composer; the driver now calls this. Pure."""
     if synthetic:
-        return ("a vintage radio set warming up on a wooden "
-                "table, glowing dials and tubes, warm "
-                "tungsten light")
+        return ("a vintage radio set warming up on a wooden table, "
+                "glowing dials and tubes, tungsten filament glow")
     if str(role or "") == "announcer_visual":
-        return ("a 1940s radio station studio, a vintage "
-                "radio set glowing warmly, lit dials and "
-                "tubes, warm tungsten light")
-    return ("a vintage radio set glowing warmly, warm "
-            "dial light")
+        return ("a 1940s radio station studio, "
+                "glowing warmly, lit dials and tubes")
+    return "a vintage radio set glowing warmly, vacuum tubes and dials"
 
 
 #: Framing hints (layer 3 of the 5-layer still composer). The macro framing

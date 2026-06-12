@@ -457,7 +457,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             except ImportError:  # pragma: no cover -- flat test imports
                 from _otr_story_brief_helpers import (  # type: ignore
                     finish_visual_prompt)
-            prompt = finish_visual_prompt(meta, prompt)
+            # era_profile="portrait": never bleeds the episode's ambient
+            # colour palette into character faces (sci-fi = blue wash,
+            # period drama = red wash). Only the atmosphere mood line is
+            # safe; full palette is explicitly excluded (BUG-LOCAL-113).
+            prompt = finish_visual_prompt(meta, prompt,
+                                          era_profile="portrait")
         except Exception:  # noqa: BLE001
             pass
         out[cid] = {
