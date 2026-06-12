@@ -1,4 +1,4 @@
-# OTR Video Platform -- HANDOFF -- CS-4 RESOLVED (1.7B default @ 955f134); SWEEP CLEAR TO RESUME; 0-E PHASE B AWAITS GO (2026-06-11 night)
+# OTR Video Platform -- HANDOFF -- BUG-LOCAL-113+113b FIXED (FLUX colour + LTX animation @ e3edce9); ComfyUI RESTART NEEDED; OH-4 AWAITS GO (2026-06-12)
 
 > **CANONICAL LOCATION:** this in-repo file (`docs/VIDEO_BUILD_HANDOFF.md`) is
 > the SINGLE git-tracked source of truth for the video build.
@@ -52,7 +52,7 @@ sec 5-7).
   time; the 0-E agent's Phase B + any new coder window serialize via the
   planner's GO file. Never run two coders in overlapping files.
 
-## WHERE WE ARE (2026-06-11 night, post-CS-4 coder session; nothing invented)
+## WHERE WE ARE (2026-06-12, post-BUG-LOCAL-113 coder session; nothing invented)
 
 - **CS-4 RESOLVED -- no code regression; 1.7B default shipped @ `955f134`.**
   Mechanism (DEBUG VBAR + the operator's BUG-291/265 pointer): the umt5 TE stays
@@ -80,9 +80,22 @@ sec 5-7).
   DONE (~6-9 sprints; S-3D-0/T2b shortcut forks -> ~2-3) live in section 0.
   Roundtable evidence: `docs/2026-06-11-comfy-native-3d-options/` (2 passes,
   ~$0.22, grounded on the live install -- hy3d-2mv core nodes verified present).
-- **Git**: origin/v2.0-alpha @ `955f134` (CS-4 flip) + the wrap docs commit after
-  it; HEAD==origin verified per push (no 0-byte / no BOM / AST clean). The planner
-  docs edits that were working-tree rode the `955f134` chunk as directed.
+- **BUG-LOCAL-113 FIXED @ b1d1bf2**: FLUX colour bleed eliminated. Portrait
+  `era_profile` switched to `"portrait"` -- strips the episode's ambient palette
+  (sci-fi neon blue, period drama amber) from character face prompts; only
+  atmosphere mood line + lighting terms pass through. Radio-still wording in
+  `get_open_subject()` neutralised. `render_driver.py` default prompt restored to
+  match test contract (`"radio studio"` substring). 4128/0 suite green.
+- **BUG-LOCAL-113b FIXED @ e3edce9**: LTX animation restored. `_sampler_mode()`
+  default changed from `"distilled"` (8-step, cfg=1.0, subtle pan-in) to
+  `"ksampler"` (30-step euler, cfg=3.0, 6/5 dynamic motion). Distilled path kept
+  as `OTR_LTX_SAMPLER=distilled` rollback. Test contracts updated (4 tests now
+  explicitly set `OTR_LTX_SAMPLER=distilled` where they test the distilled path).
+- **RESTART ComfyUI Desktop** to load all new code into the live server (three
+  commits since last restart: `aba0c5a`, `b1d1bf2`, `e3edce9`).
+- **OH-4 AWAITS GO**: 14-entry / ~8.2 GB live→attic migration STAGED but not
+  executed. Operator says "go OH-4" to run it.
+- **Git**: origin/v2.0-alpha @ `32da37a`; HEAD==origin; AST clean; no 0-byte; no BOM.
 - Track 3 = CLOSED (230fe4e..1571e0f); GATE B S0-S2 COMPLETE (6a1b716..230fe4e);
   stale-server shim RETIRED (fresh processes load tonight's code).
 
@@ -90,13 +103,17 @@ sec 5-7).
 
 1. Read 3D_TOOLKIT_PLAN.md **section 0** (LIVE STATUS + RUNWAY first) + this
    handoff; skim the otr-build-tracker; `git log --oneline -12` + `git status`.
-2. CS-4 is DONE (1.7B default @ 955f134; acceptance leg PASS 38 min). Resume
+2. **OPERATOR: restart ComfyUI Desktop** before any GPU work (three commits since
+   last restart: aba0c5a BUG-LOCAL-095/112, b1d1bf2 BUG-LOCAL-113 colour,
+   e3edce9 LTX ksampler default).
+3. If operator says "go OH-4": run the 14-entry live→attic migration (OH-4).
+4. CS-4 is DONE (1.7B default @ 955f134; acceptance leg PASS 38 min). Resume
    item 4: re-derive the leg list from the registry (31 options / 27 runnable
    now), run the remainder on the 1.7B default -> BOTH latentsync re-legs ->
    the supervised wan batch; then create `scripts\_otr_0e_gpu_go.txt` to release
    0-E Phase B. Skip the 14B humo leg (OPERATOR-DEPRIORITIZED). Keep the box
    quiet during timed legs (the CS-4 ops guardrail).
-3. State the CURRENT STEP per section 0 in <=5 lines; STOP for operator GO.
+5. State the CURRENT STEP per section 0 in <=5 lines; STOP for operator GO.
 
 ## PARKED -- not now
 
