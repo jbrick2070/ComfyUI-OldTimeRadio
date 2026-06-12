@@ -50,16 +50,25 @@ if(-not $up){ Dig "SERVER DID NOT COME UP -- aborting"; Remove-Item $MARKER -Err
 $env:PYTHONPATH = $COMFYBASE
 foreach($eng in $ENGINES){
   $leg = "other_beats_visual_$eng"
-  $log = Join-Path $REPO ("scripts\otr_3d_quick_{0}.log" -f $eng)
+  $log  = Join-Path $REPO ("scripts\otr_3d_quick_{0}.log" -f $eng)
+  $elog = Join-Path $REPO ("scripts\otr_3d_quick_{0}.err.log" -f $eng)
   Dig "=== TEST $eng (leg $leg) START ==="
   $t0 = Get-Date
-  & $VENV -u 'scripts\otr_coverage_sweep.py' --only $leg *> $log
-  $rc = $LASTEXITCODE
+  # Start-Process redirect streams stdout LIVE to the file (unlike '*>' which buffers).
+  $proc = Start-Process -FilePath $VENV -ArgumentList @('-u','scripts\otr_coverage_sweep.py','--only',$leg) -WorkingDirectory $REPO -RedirectStandardOutput $log -RedirectStandardError $elog -WindowStyle Hidden -PassThru
+  $beat = 0
+  while(-not $proc.HasExited){
+    Start-Sleep -Seconds 60
+    $beat++
+    $last = (Select-String -Path $log -Pattern 't=\s*\d+s.*vram_peak=\d+MB' -ErrorAction SilentlyContinue | Select-Object -Last 1).Line
+    $now = (Select-String -Path $log -Pattern '=== LEG|QUEUED|vram_peak=\d+MB' -ErrorAction SilentlyContinue | Select-Object -Last 1).Line
+    Dig ("   {0} heartbeat #{1}: {2}" -f $eng, $beat, ($(if($last){$last.Trim()}elseif($now){$now.Trim()}else{'(no progress line yet)'})))
+  }
+  $rc = $proc.ExitCode
   $mins = [math]::Round(((Get-Date) - $t0).TotalMinutes,1)
-  # pull the verdict line the harness prints
   $verdict = (Select-String -Path $log -Pattern 'sweep_.* -> (PASS|RC_\d+|SOAK_FAIL|ERROR|PROFILE_INVALID)' | Select-Object -Last 1).Line
-  if(-not $verdict){ $verdict = (Select-String -Path $log -Pattern '(PASS|SOAK_FAIL|ERROR|PROFILE_INVALID)' | Select-Object -Last 1).Line }
-  Dig "=== TEST $eng DONE rc=$rc ${mins}min :: $verdict ==="
+  if(-not $verdict){ $verdict = (Select-String -Path $log -Pattern '(COMPLETE:|SOAK_FAIL|ERROR|PROFILE_INVALID)' | Select-Object -Last 1).Line }
+  Dig "=== TEST $eng DONE rc=$rc ${mins}min :: $($verdict) ==="
 }
 Dig "ALL DONE"
 Remove-Item $MARKER -ErrorAction SilentlyContinue
