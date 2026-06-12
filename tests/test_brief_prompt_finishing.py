@@ -114,9 +114,10 @@ def test_shotlock_m4_prompt_hash_matches_finished_prompt():
     assert cre["prompt_hash"] == sl._content_hash(cre["text_prompt"])
 
 
-def test_scene_open_brief_core_and_budget(monkeypatch):
-    """render_driver composes the scene prompt from the SHORT brief within
-    the LTX budget; the operator env override is verbatim."""
+def test_scene_open_motion_and_budget(monkeypatch):
+    """An OPEN (announcer/music) role renders the 6/5 MOTION template within
+    budget (the i2v still carries the look); a NON-open text role still composes
+    from the SHORT brief within budget; the operator env override is verbatim."""
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     ledger = {
@@ -131,9 +132,16 @@ def test_scene_open_brief_core_and_budget(monkeypatch):
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
     p = req["text_prompt"]
-    assert "lighthouse" in p                    # the brief core made it in
-    assert p.endswith(rd_no_text := "no on-screen text"), p
-    assert len(p) <= 242
+    assert p.startswith("Continuous shot, same console")   # the motion template
+    assert "Tuning dial needle sweeps" in p                # motion verb present
+    assert len(p) <= 240
+    # NON-open text-engine role still composes from the brief within budget,
+    # ending on the camera/no-text clauses.
+    broll = dict(shot, shot_id="shot_b002", role="scene_broll",
+                 group_id="grp_scene_broll")
+    p3 = rd.build_request_from_shot(broll, ledger)["text_prompt"]
+    assert p3.endswith("no on-screen text"), p3
+    assert len(p3) <= 242
     # env override: verbatim, unfinished
     monkeypatch.setenv("OTR_LTX_RADIO_PROMPT", "OPERATOR SAYS EXACTLY THIS")
     req2 = rd.build_request_from_shot(shot, ledger)

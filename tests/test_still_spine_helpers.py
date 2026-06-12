@@ -69,15 +69,18 @@ class TestGetOpenSubject:
 
 
 class TestDriverParity:
-    """The ONE-source-of-truth contract: the driver imports and calls
-    get_open_subject; the old inline wording is GONE from the driver."""
+    """The STILL prompt carries the LOOK subject (get_open_subject, in the image
+    helper). The driver's OPEN VIDEO prompt is MOTION-centric (6/5
+    BUG-LOCAL-112) -- it no longer inlines the radio-set subject; that wording
+    lives only in the still helper, never inline in the driver."""
 
-    def test_driver_calls_helper(self):
+    def test_driver_open_video_prompt_is_motion_not_subject(self):
         import inspect
         from nodes._otr_video_engines import render_driver as rd
         src = inspect.getsource(rd)
-        assert "get_open_subject" in src
-        # the moved literal must not survive inline in the driver
+        # the OPEN video prompt is built from the motion templates ...
+        assert "_LTX_MOTION_PROMPT_BY_ROLE" in src
+        # ... and the moved set-subject literal never survives inline here
         assert "warming up on a wooden" not in src
 
     @pytest.mark.parametrize("kind,role,synthetic", [

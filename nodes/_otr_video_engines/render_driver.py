@@ -459,6 +459,57 @@ def _beat_id_for_shot(shot):
 #: drag node-registration side effects into the engine package.
 _OPENING_MUSIC_SUFFIX = "b000_music_open"
 
+#: 6/5 motion-centric LTX prompts (BUG-LOCAL-112, restored 2026-06-12 from the
+#: legacy ``batch_ltx_render._PROMPT_BY_ROLE``). The i2v anchor carries the LOOK
+#: from the FLUX still; the video prompt's ONLY job is MOTION. Design rules
+#: (MAD-verified): every sentence is a motion verb, NO set-dressing nouns, NO
+#: negation, total <= 240 chars, first motion verb within the first 140. The
+#: refactor had diluted these into ~185-char scene-DESCRIPTIVE "brief+beat"
+#: prompts ("a 1940s radio station studio, glowing warmly..."), which the model
+#: reads as "render this set" -> flat Ken-Burns pans on the conditioned still.
+_LTX_MOTION_PROMPT_BY_ROLE = {
+    "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
+                  "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
+                  "trembles. Dust motes drift. Slow handheld dolly forward."),
+    "music_open": ("Continuous shot, same console throughout. Dial whip-pans "
+                   "across frequencies. Tube filaments ignite from cold to "
+                   "white-hot. Speaker grille vibrates aggressively. Dynamic "
+                   "dolly push forward."),
+    "music_close": ("Continuous shot, same console throughout. Dial settles. "
+                    "Tube filaments cool from white through deep amber. Smoke "
+                    "trails from cooling tubes. Slow dolly pull back."),
+    "music_inter": ("Continuous shot, same console throughout. Dial steady, "
+                    "glowing. Oscilloscope dances to the rhythm. VU meters "
+                    "bounce. Tubes pulse with the bass. Slow orbit around the "
+                    "speaker."),
+    "sfx": ("Continuous shot, same console throughout. Snap zoom on the dial as "
+            "needle spikes hard. Tubes surge with electric arcs. Speaker grille "
+            "rattles violently. Quick whip-pan to the dial."),
+}
+#: BUG-LOCAL-112 char budget for the motion prompt (verb-only core + optional
+#: short brief fragment appended AFTER, dropped if it breaks the budget).
+_LTX_MOTION_PROMPT_MAX = 240
+
+
+def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
+    """Map an OTR shot role + beat id to a :data:`_LTX_MOTION_PROMPT_BY_ROLE`
+    key, or ``""`` if the beat is not a radio-console motion beat. Pure."""
+    sid = str(shot_id or "")
+    role = str(shot_role or "")
+    # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
+    # b000_music_open structure is definitive, NOT the role) -- check it first.
+    if is_synthetic_open or sid.endswith(_OPENING_MUSIC_SUFFIX):
+        return "music_open"
+    if "sfx" in role or sid.startswith("sfx") or "_sfx" in sid:
+        return "sfx"
+    if role == "announcer_visual":
+        return "announcer"
+    if role == "music_visual":
+        if any(t in sid for t in ("close", "outro", "_end", "tag", "sign_off")):
+            return "music_close"
+        return "music_inter"
+    return ""
+
 #: HuMo-seam ticket Part C (2026-06-11). Broadcast-gear scrub for CHARACTER
 #: face beats -- LOCAL mirror of nodes/otr_meta_brief_image_prompt._GEAR_WORDS
 #: (the node module registers classes at import; mirroring follows the
@@ -788,15 +839,42 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             req["text_prompt"] = _override
             _stamp_prompt_meta(req, "env", _override,
                                beat=_beat_id_for_shot(shot))
+        elif _is_open:
+            # 6/5 MOTION-CENTRIC restoration (BUG-LOCAL-112): the announcer /
+            # music radio-console beats render a MOTION-ONLY prompt. The i2v
+            # anchor carries the LOOK from the FLUX still, so the prompt's only
+            # job is to MOVE. The refactor had led with a scene-DESCRIPTIVE
+            # subject ("a 1940s radio station studio, glowing warmly...") which
+            # the model reads as "render this set" -> flat Ken-Burns pans on the
+            # conditioned still. An optional short atmosphere fragment appends
+            # AFTER the motion verbs, dropped if it breaks the 240-char budget.
+            _motion_key = _ltx_motion_role_key(
+                _shot_role, shot.get("shot_id"), _is_synthetic_open)
+            scene_prompt = (_LTX_MOTION_PROMPT_BY_ROLE.get(_motion_key)
+                            or _LTX_MOTION_PROMPT_BY_ROLE["announcer"])
+            _meta = (ledger or {}).get("meta") or {}
+            _terms = (_meta.get("story_brief_terms")
+                      if isinstance(_meta, dict) else None) or {}
+            _atmo = ", ".join([str(t).strip() for t in
+                               (_terms.get("atmosphere") or [])
+                               if str(t).strip()][:1])
+            if (_atmo and len(scene_prompt) + len(_atmo) + 7
+                    <= _LTX_MOTION_PROMPT_MAX):
+                scene_prompt = f"{scene_prompt} {_atmo} mood."
+            _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
+                         "centric prompt (role=%s, %d chars): %.90s...",
+                         _shot_role, shot.get("shot_id"), _motion_key,
+                         len(scene_prompt), scene_prompt)
+            req["text_prompt"] = scene_prompt
+            _stamp_prompt_meta(req, "motion_role", scene_prompt,
+                               beat=_beat_id_for_shot(shot))
         else:
             try:
                 from .._otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt, get_open_subject,
-                    get_story_brief_ltx)
+                    finish_visual_prompt, get_story_brief_ltx)
             except ImportError:  # pragma: no cover -- flat test imports
                 from _otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt, get_open_subject,
-                    get_story_brief_ltx)
+                    finish_visual_prompt, get_story_brief_ltx)
             _meta = (ledger or {}).get("meta") or {}
             _terms = _meta.get("story_brief_terms") or {}
 
@@ -805,42 +883,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 return ", ".join([str(t).strip() for t in (raw or [])
                                   if str(t).strip()][:n])
 
-            # Per-beat composition (round 5 F2 + the r5b operator catch):
-            # LTX renders NARRATIVE PROSE as murk -- a logline like "a
-            # scientist apologizes after heated debate" is not a picture. So
-            # OPEN roles lead with the CONCRETE radio-set subject (the look
-            # the operator wants back) and take the brief's setting /
-            # atmosphere TERMS as context -- never the logline sentence.
-            # Non-open text-engine roles (scene_broll etc.) keep the logline
-            # core. Beat clauses (beat_intent / arc_phase) carry the per-beat
-            # variety either way.
-            clauses = []
-            if _is_open:
-                # Still-spine ST-1: the concrete radio-set wording MOVED to
-                # the shared helper -- the scene STILL prompt for this beat
-                # leads with the SAME subject (parity-locked).
-                subject = get_open_subject(_shot_role, _is_synthetic_open)
+            # Non-open text-engine roles (scene_broll etc.) keep the brief
+            # logline core + beat clauses; the announcer/music OPEN roles use
+            # the motion-centric branch above (the i2v still carries the look).
+            core = get_story_brief_ltx(_meta)
+            if not core:
                 _setting = _term_join("setting", 2)
-                _atmo = _term_join("atmosphere", 1)
-                core = subject
-                if _setting:
-                    clauses.append(_setting)
-                if _atmo:
-                    clauses.append(f"{_atmo} mood")
-            else:
-                core = get_story_brief_ltx(_meta)
-                if not core:
-                    _setting = _term_join("setting", 2)
-                    core = ("cinematic establishing shot"
-                            + (f", {_setting}" if _setting else ""))
-            clauses.extend(_beat_clauses(line, shot.get("shot_id")))
-            clauses.extend(["slow cinematic camera drift",
-                            "no on-screen text"])
-            # LTX-I2V ticket Part A (2026-06-11): era_profile="still" -- the
-            # TRIMMED still-profile tail (atmosphere + palette top-2 +
-            # lighting top-2, ~120 chars) replaces the FULL era tail so LTX
-            # scene prompts share the stills' palette diet (fixes the reddish
-            # drift; the get_open_subject lead stays parity-locked).
+                core = ("cinematic establishing shot"
+                        + (f", {_setting}" if _setting else ""))
+            clauses = list(_beat_clauses(line, shot.get("shot_id")))
+            clauses.extend(["slow cinematic camera drift", "no on-screen text"])
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=188, style_tail=False, era_profile="still")

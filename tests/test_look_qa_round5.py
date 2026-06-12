@@ -123,48 +123,57 @@ def _shot(shot_id, role, engine="ltx_video", source_line_ids=None, **kw):
 
 
 class TestPerBeatScenePrompts:
-    def test_three_ltx_prompts_differ(self, monkeypatch):
+    def test_role_motion_templates_motion_centric(self, monkeypatch):
+        # 6/5 BUG-LOCAL-112 restoration: different ROLES get different motion
+        # templates; same-role beats SHARE the template (visual variety comes
+        # from the per-beat i2v still, not the text prompt). All motion-centric.
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
-        shots = [
+        p_music = _rd.build_request_from_shot(
             _shot("shot_b000_music_open", "music_visual",
-                  source_line_ids=[], start_s=0.0, dur_s=9.5),
-            _shot("shot_b001", "announcer_visual"),
-            _shot("shot_b005", "announcer_visual"),
-        ]
-        prompts = [_rd.build_request_from_shot(s, led)["text_prompt"]
-                   for s in shots]
-        assert len(set(prompts)) == 3, prompts
-        assert all(len(p) <= 240 for p in prompts)
+                  source_line_ids=[], start_s=0.0, dur_s=9.5), led)["text_prompt"]
+        p_ann1 = _rd.build_request_from_shot(
+            _shot("shot_b001", "announcer_visual"), led)["text_prompt"]
+        p_ann2 = _rd.build_request_from_shot(
+            _shot("shot_b005", "announcer_visual"), led)["text_prompt"]
+        for p in (p_music, p_ann1, p_ann2):
+            assert p.startswith("Continuous shot, same console")
+            assert len(p) <= 240
+        assert p_music != p_ann1            # music_open vs announcer template
+        assert p_ann1 == p_ann2             # same role -> same template
 
     def test_synthetic_open_detected_by_structure_not_role(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
-        # role says announcer_visual, but EMPTY source_line_ids = synthetic
+        # role says announcer_visual, but EMPTY source_line_ids + the
+        # b000_music_open suffix = synthetic music open -> the music_open MOTION
+        # template wins over the role (structure is definitive).
         s = _shot("shot_b000_music_open", "announcer_visual",
                   source_line_ids=[], start_s=0.0, dur_s=9.5)
         p = _rd.build_request_from_shot(s, led)["text_prompt"]
-        assert "warming up on a wooden table" in p
+        assert "whip-pans across frequencies" in p   # the music_open template
 
-    def test_open_leads_with_concrete_subject_not_logline(self, monkeypatch):
-        # the r5b operator catch: LTX paints narrative prose as murk -- the
-        # OPEN must lead with the radio-set subject; the brief contributes
-        # TERMS (setting/atmosphere), never the logline sentence.
+    def test_open_leads_with_motion_not_subject(self, monkeypatch):
+        # 6/5 BUG-LOCAL-112: the i2v still carries the LOOK; the video prompt is
+        # MOTION-ONLY -> it leads with the motion frame, NOT the set subject
+        # (the pre-112 dilution that caused flat Ken-Burns pans).
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         p = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)["text_prompt"]
-        assert p.startswith("a 1940s radio station studio")
-        assert "An innovator unveils a machine" not in p   # logline banned
-        assert "foundry" in p                              # setting term in
-        assert "wonder mood" in p                          # atmosphere term in
+        assert p.startswith("Continuous shot, same console")
+        assert "Tuning dial needle sweeps" in p            # motion verb present
+        assert not p.startswith("a 1940s radio station")   # NOT the set subject
+        assert "An innovator unveils a machine" not in p   # logline still banned
 
-    def test_bright_tokens_survive_the_finisher(self, monkeypatch):
+    def test_motion_template_passed_through_not_finished(self, monkeypatch):
+        # motion template is verbatim (+ optional atmosphere fragment); it is
+        # NOT run through finish_visual_prompt, so its motion verbs survive.
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         p = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)["text_prompt"]
-        assert "glowing warmly" in p and "dials" in p
+        assert "Vacuum tubes pulse" in p and "Brass speaker grille trembles" in p
 
     def test_beat_clauses_intent_and_arc(self):
         line = {"beat_intent": "revelation", "arc_phase": "rising"}
@@ -194,12 +203,14 @@ class TestPerBeatScenePrompts:
         assert req["text_prompt"] == "the operator prompt"
         assert req["observability"]["prompt_source"] == "env"
 
-    def test_brief_prompt_stamps_meta(self, monkeypatch):
+    def test_motion_prompt_stamps_meta(self, monkeypatch):
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         req = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)
-        assert req["observability"]["prompt_source"] == "brief+beat"
+        # OPEN roles now stamp motion_role (the brief+beat path is for non-open
+        # text-engine roles like scene_broll).
+        assert req["observability"]["prompt_source"] == "motion_role"
         assert len(req["observability"]["prompt_sha8"]) == 8
         assert req["observability"]["prompt_chars"] == len(req["text_prompt"])
 
