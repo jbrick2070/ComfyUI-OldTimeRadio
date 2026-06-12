@@ -146,12 +146,15 @@ class TestPerBeatScenePrompts:
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         # role says announcer_visual, but EMPTY source_line_ids + the
-        # b000_music_open suffix = synthetic music open -> the music_open MOTION
-        # template wins over the role (structure is definitive).
+        # b000_music_open suffix = synthetic music open -> a MUSIC motion
+        # template wins over the role (structure is definitive). The opening
+        # beat is retargeted to the calmer music_inter template (2026-06-12).
+        monkeypatch.delenv("OTR_LTX_OPEN_MOTION_KEY", raising=False)
         s = _shot("shot_b000_music_open", "announcer_visual",
                   source_line_ids=[], start_s=0.0, dur_s=9.5)
         p = _rd.build_request_from_shot(s, led)["text_prompt"]
-        assert "whip-pans across frequencies" in p   # the music_open template
+        assert "Oscilloscope dances to the rhythm" in p   # music_inter template
+        assert "vibrates aggressively" not in p           # NOT the harsh open
 
     def test_open_leads_with_motion_not_subject(self, monkeypatch):
         # 6/5 BUG-LOCAL-112: the i2v still carries the LOOK; the video prompt is

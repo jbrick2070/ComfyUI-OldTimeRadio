@@ -499,7 +499,14 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
     # b000_music_open structure is definitive, NOT the role) -- check it first.
     if is_synthetic_open or sid.endswith(_OPENING_MUSIC_SUFFIX):
-        return "music_open"
+        # Operator 2026-06-12: the music_open template's aggressive verbs
+        # (whip-pans / "vibrates aggressively" / dynamic dolly push) SMEAR on
+        # the 2B LTX model -> the "first radio, not sharp" open. Retarget the
+        # opening-music beat to the calmer music_inter motion (dial steady,
+        # oscilloscope, slow orbit). Tunable via OTR_LTX_OPEN_MOTION_KEY.
+        _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_inter")
+        return (_open_key if _open_key in _LTX_MOTION_PROMPT_BY_ROLE
+                else "music_inter")
     if "sfx" in role or sid.startswith("sfx") or "_sfx" in sid:
         return "sfx"
     if role == "announcer_visual":
@@ -673,6 +680,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # the music open b000 included (its text-only render was the murk
     # cause). A missing still falls back LOUD to the round-5 text path --
     # never silent. Set OTR_ENABLE_LTX_I2V=0 to restore text-only LTX.
+    _i2v_still_missing = False
     if (str(shot.get("engine_id") or "") == "ltx_video"
             and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
         _bid = _beat_id_for_shot(shot)
@@ -685,11 +693,18 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "still %s (default since LK-1a)", _bid,
                 os.path.basename(_still))
         else:
+            # Operator 2026-06-12: every i2v beat MUST have its still. The
+            # derive_scene_still_targets coverage fix should make this
+            # unreachable; if a still is STILL absent the degrade must be LOUD
+            # IN THE TRACE (stamped below), never a silent text-only render.
+            _i2v_still_missing = True
             _LOG.warning(
-                "[OTR.render_driver] LTX-I2V LOUD: i2v is enabled (default "
-                "since LK-1a) but beat %s has NO scene still in the ledger "
-                "-- falling back to the round-5 TEXT path (never silent)",
-                _bid)
+                "[OTR.render_driver] LTX-I2V MISSING-STILL (LOUD): i2v is "
+                "enabled but beat %s has NO scene still in the ledger -- "
+                "rendering text-only and STAMPING the trace as a degrade "
+                "(init_source=missing_scene_still). This should not happen "
+                "after the still-spine coverage fix; investigate the image "
+                "phase for beat %s.", _bid, _bid)
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
@@ -736,7 +751,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # observability dict (the round-5 pattern, schema-real since the W7-pre
     # builder migration); run_episode copies them to trace rows so the W7
     # acceptance check is mechanical.
-    req["observability"]["init_source"] = init_source if init_image else "none"
+    if _i2v_still_missing:
+        # LOUD trace degrade: an i2v beat that rendered with no scene still.
+        req["observability"]["init_source"] = "missing_scene_still"
+        req["observability"]["i2v_still_missing"] = True
+    else:
+        req["observability"]["init_source"] = (init_source if init_image
+                                               else "none")
     req["observability"]["init_image"] = (os.path.basename(init_image)
                                           if init_image else "")
     # FULL-FRAME landscape for the generative-motion engines (operator
@@ -905,7 +926,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                                beat=_beat_id_for_shot(shot))
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
-    req["seed_bundle"] = {"request_seed": _seed_from_hash(req_hash, shot.get("shot_id"))}
+    _video_seed = _seed_from_hash(req_hash, shot.get("shot_id"))
+    req["seed_bundle"] = {"request_seed": _video_seed}
+    # Operator 2026-06-12: surface the per-beat LTX/video sampler seed (the
+    # deterministic request-hash seed the engines render with) in the trace so
+    # future renders are apples-to-apples with the 6/5 baseline.
+    req["observability"]["video_seed"] = _video_seed
     # Carry the per-beat timing so the render node can slice the frozen master
     # mix when the ledger has no per-line wav (audio_ref is None in that case).
     # SYNTHETIC shots (the opening-music scene, 2026-06-10) have no ledger
@@ -1183,7 +1209,8 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
         # for hand-built requests).
         obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
         for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
-                    "prompt_chars", "init_source", "init_image"):
+                    "prompt_chars", "init_source", "init_image",
+                    "i2v_still_missing", "video_seed"):
             if key in obs:
                 row[key] = obs[key]
             elif isinstance(request, dict) and ("_" + key) in request:

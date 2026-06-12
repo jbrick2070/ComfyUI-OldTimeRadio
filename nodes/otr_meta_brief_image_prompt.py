@@ -192,19 +192,19 @@ def derive_scene_still_targets(lines, fps: int = 25):
              "scene_pretiming")
 
     scene_roles = ("announcer_visual", "music_visual")
-    first_ann = None
-    last_scene = None
+    # EVERY i2v beat must carry its OWN scene still (operator 2026-06-12: "my
+    # stills ARE the look; every i2v beat must have its still"). The v1 panel
+    # cut (open + FIRST announcer + LAST scene only) left MIDDLE announcer/music
+    # beats (e.g. b003) with NO still -> a silent text-only LTX i2v fallback,
+    # which is exactly the flat/unanchored beat the operator caught. Cover ALL
+    # announcer/music beats now (the open b000 is already added above; _add
+    # dedupes via `seen`). The per-beat visual variety the motion-prompt design
+    # relies on comes from these per-beat stills.
     for bid, ln in _iter_beat_lines(lines):
         role = SPEAKER_TO_VIDEO_ROLE.get(
             str(ln.get("speaker_role") or "").strip().lower(), "")
-        if role == "announcer_visual" and first_ann is None:
-            first_ann = (bid, role)
         if role in scene_roles:
-            last_scene = (bid, role)
-    if first_ann:
-        _add(first_ann[0], "scene_beat", first_ann[1], "scene_role_map")
-    if last_scene and (not first_ann or last_scene[0] != first_ann[0]):
-        _add(last_scene[0], "scene_beat", last_scene[1], "scene_role_map")
+            _add(bid, "scene_beat", role, "scene_role_map")
     return targets, warnings
 
 
