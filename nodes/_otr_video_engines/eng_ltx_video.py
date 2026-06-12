@@ -23,9 +23,9 @@ LK-1 look restoration (2026-06-11): ``OTR_LTX_SAMPLER`` selects the sampling
 chain -- ``distilled`` (DEFAULT: the legacy 8-step LTX_DISTILLED_SIGMAS +
 euler + CFGGuider cfg=1.0 path that produced the 6/5 look) or ``ksampler``
 (the round-5 30-step rollback). ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots
-condition on their ST-3 scene stills (``OTR_LTX_I2V_STRENGTH`` default 0.75,
-the legacy Goofer-tuned value). The 22B distilled LoRA wires only on a
-22B-tier checkpoint (``OTR_LTX_DISTILLED_LORA`` / ``_STRENGTH``).
+condition on their ST-3 scene stills (``OTR_LTX_I2V_STRENGTH`` default 1.0,
+probe-proven; 0.75 re-noises into mush at 1472x832). The 22B distilled LoRA
+wires only on a 22B-tier checkpoint (``OTR_LTX_DISTILLED_LORA``/``_STRENGTH``).
 """
 from __future__ import annotations
 
@@ -346,14 +346,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         del graph["latent"]
         graph["loadimage"] = {"class": "loadimage",
                               "inputs": {"image": image_name}}
-        # LK-1b: 0.75 is the legacy OTR_BatchLTXRender / Goofer-tuned
-        # conditioning strength ("strong reference, but leaves room for the
-        # model to add motion") -- the 6/5-look value. The Part-B probe ran
-        # at 1.0; the A/B acceptance pair compares the restored default.
+        # LK-1c mush fix (operator eyeball 2026-06-11 night): strength 1.0
+        # is the PROBE-PROVEN default on LTXVImgToVideo -- the C2/C4 matrix
+        # showed 0.75 (the legacy LTXVAddGuide keyframe value) lets the 2B
+        # re-noise the still into red mush at 1472x832; at 1.0 the still's
+        # detail/palette hold under BOTH the distilled and ksampler chains.
+        # (The legacy 0.75 belonged to a DIFFERENT node + 832x480 canvas.)
         try:
-            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
+            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
         except (TypeError, ValueError):
-            strength = 0.75
+            strength = 1.0
         graph["img2vid"] = {
             "class": "img2vid",
             "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),

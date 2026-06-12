@@ -511,9 +511,9 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
     assert g["loadimage"]["inputs"]["image"] == "still.png"
     iv = g["img2vid"]["inputs"]
     assert iv["length"] == 169 and iv["width"] == 1472 and iv["height"] == 832
-    # LK-1b: strength REQUIRED on the installed wrapper; 0.75 = the legacy
-    # Goofer-tuned conditioning default (was 1.0 on the probe).
-    assert iv["strength"] == 0.75
+    # LK-1c mush fix: strength REQUIRED on the installed wrapper; 1.0 =
+    # the probe-proven default (0.75 re-noised the still into red mush).
+    assert iv["strength"] == 1.0
     # The distilled sampler samples the img2vid latent; conditioning reads
     # img2vid 0/1 (LK-1b: SamplerCustomAdvanced, not KSampler).
     assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("img2vid", 2)

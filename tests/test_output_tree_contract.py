@@ -163,10 +163,14 @@ def test_ci_ban_otr_path_composition_outside_authority():
     """No module outside nodes/_otr_paths.py may compose
     comfy_output_dir()/"otr"; no module may hand-join "otr" with a
     non-contract top-level component (episodes/obs are the only ones)."""
+    # The OH-4 migration doctor must reference LEGACY locations (it is the
+    # tool that empties them); it is the ONE sanctioned exception besides
+    # the path authority itself.
+    allow = {"nodes/_otr_paths.py", "scripts/otr_tree_doctor.py"}
     offenders = []
     for p in _py_sources():
         rel = p.relative_to(REPO_ROOT).as_posix()
-        if rel == "nodes/_otr_paths.py":
+        if rel in allow:
             continue
         try:
             src = p.read_text(encoding="utf-8")
