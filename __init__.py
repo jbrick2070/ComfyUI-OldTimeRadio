@@ -524,6 +524,18 @@ try:
 except Exception as _otr_render_route_err:
     print(f"[OldTimeRadio] render route registration skipped: {_otr_render_route_err}")
 
+# =====================================================================
+# OH-3 janitor (output-tree contract 2026-06-11): server-boot sweep of
+# stale episodes/_shared/tmp entries -- the ONE sanctioned auto-delete --
+# plus the _shared README drop. Fully fail-soft: a janitor problem must
+# never block node registration.
+# =====================================================================
+try:
+    from .nodes._otr_janitor import run_boot_sweep as _otr_boot_sweep
+    _otr_boot_sweep()
+except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
+    print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_janitor_err}")
+
 __all__ = [
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",

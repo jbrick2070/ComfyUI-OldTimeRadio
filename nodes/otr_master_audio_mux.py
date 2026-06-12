@@ -334,6 +334,20 @@ class OTRMasterAudioMux:
             )
             obs_copy = self._publish_to_obs(final)
             report.append("obs_publish OK -> " + obs_copy)
+            # OH-3 (output-tree contract 2026-06-11): post-publish janitor
+            # pass over episodes/_shared/tmp -- the ONE sanctioned
+            # auto-delete; fully fail-soft (PD1, never blocks the mux).
+            try:
+                from ._otr_janitor import sweep_shared_tmp
+                _jrep = sweep_shared_tmp()
+                if _jrep.deleted:
+                    report.append("janitor: swept %d stale tmp entr%s"
+                                  % (len(_jrep.deleted),
+                                     "y" if len(_jrep.deleted) == 1
+                                     else "ies"))
+            except Exception as _jexc:  # noqa: BLE001 -- PD1
+                log.info("[OTR_MasterAudioMux] janitor sweep skipped: %s",
+                         _jexc)
         except _Interrupted:
             raise
         except (ValueError, OSError) as exc:
