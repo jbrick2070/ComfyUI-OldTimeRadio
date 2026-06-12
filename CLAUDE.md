@@ -1,5 +1,14 @@
 ## HEADLESS BOOT + MONITORING GOTCHAS (2026-06-12 -- do not relose)
 
+- **DIRECTIVE -- before EVERY new headless run, aggressively reset first.** The
+  soak/quick-smoke harness boots ONE server, runs all legs against it, and does
+  NOT tear it down at the end -- it sits RESIDENT holding ~60% VRAM. Never assume a
+  prior run cleaned up. Kill ALL python BEFORE launching and verify the GPU is idle:
+  `Stop-Process -Name python,pythonw -Force -ErrorAction SilentlyContinue`; confirm
+  `Get-NetTCPConnection -LocalPort 8000 -State Listen` is empty; confirm
+  `nvidia-smi --query-gpu=memory.used --format=csv,noheader` dropped to the desktop
+  baseline (~1.5GB) before booting the fresh server.
+
 - **Headless ComfyUI boot needs UTF-8.** A detached cmd inherits the Windows
   cp1252 console codec, so OTR `prestartup_script.py` crashes the instant it
   prints an emoji (UnicodeEncodeError on U+2705/U+2713) -> boot dies ~13s, exit 1,

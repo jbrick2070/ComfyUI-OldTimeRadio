@@ -1073,6 +1073,20 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
     rev = int(section["video_revision"])
     clips, new_shots, trace = {}, [], []
     vram_peak = 0
+    # Stills-first VRAM discipline (operator 2026-06-12, "evict flux when all
+    # stills are done"): every portrait + scene still is already minted to disk
+    # by the image phase -- build_request_from_shot only RESOLVES ledger paths,
+    # it never regenerates Flux. So the Flux/LLM still-phase models are idle-but-
+    # resident here and pin ~4.7GB+ that machine-wide NVML counts against the V-3
+    # render-phase ceiling (the 15-16GB pin; CS-2). Evict them 100% BEFORE the
+    # first video beat so HuMo/LTX load into a clean GPU and the render-phase peak
+    # reflects ONE resident heavy engine. LOUD by contract; a no-op off the box.
+    try:
+        from . import wrapper_bridge as _wb
+        _wb.reclaim_idle_models(
+            " (pre-render: all stills minted, freeing the still/portrait phase)")
+    except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
+        _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)
     for shot in section["shots"]:
         if request_builder is not None:
             request = request_builder(shot, ledger, canvas=canvas)
