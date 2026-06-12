@@ -9,6 +9,13 @@ rem              (2026-06-10 marathon catch).
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
 rem   WAN        Wan i2v opt-in ON, HuMo OFF
 set HF_HOME=C:\ComfyUI-Models\huggingface
+rem UTF-8 stdio (2026-06-12): a detached cmd inherits the cp1252 console codec,
+rem so ComfyUI's logger crashes the instant OTR prestartup prints an emoji
+rem (UnicodeEncodeError on the U+2705/U+2713 glyphs) -> boot dies ~13s, exit 1,
+rem "SERVER DID NOT COME UP" failure. Desktop used to set this for us; the
+rem v2 install move dropped it. Force UTF-8 mode for stdio + filesystem.
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
 set CUBLAS_WORKSPACE_CONFIG=:4096:8
 set PYTHONHASHSEED=0
 set NVIDIA_TF32_OVERRIDE=0

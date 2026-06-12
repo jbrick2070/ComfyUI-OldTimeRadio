@@ -42,7 +42,10 @@ Dig "START -- engines (easiest first): $($ENGINES -join ', ')"
 #    3D engine fell back gated_by_flag.
 $listen = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
 if($listen){ foreach($srvPid in ($listen.OwningProcess | Select-Object -Unique)){ Stop-Process -Id $srvPid -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 3 }
-Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*Documents\ComfyUI\.venv*' } | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+# Kill by CommandLine (Get-Process .Path is BLANK for processes whose path we
+# can't read -> the old Where Path filter silently skipped a half-booted server
+# and the fresh boot then collided / never came up). CIM CommandLine is reliable.
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*Documents\ComfyUI\.venv*' -and $_.CommandLine -like '*main.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
 $LAUNCHCMD = Join-Path $REPO 'scripts\_otr_soak_server_launch.cmd'
@@ -54,7 +57,12 @@ New-Item -ItemType Directory -Force -Path (Split-Path $EXTRAENV) | Out-Null
   'set OTR_ENABLE_STILL_PARALLAX=1',
   'set OTR_ENABLE_MESH_STAGE=1') | Set-Content -Path $EXTRAENV -Encoding ascii
 Dig "0-E enable flags staged (ltx_orbit/still_parallax/mesh_stage) via the launcher env seam"
-$srv = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "`"$LAUNCHCMD`" `"$SRVLOG`"") -WindowStyle Hidden -PassThru
+# Run the .cmd DIRECTLY as -FilePath. The old `cmd.exe /c "<launch>" "<log>"`
+# form hit cmd's two-quoted-token stripping rule (4 quotes -> cmd ate the outer
+# pair -> mangled path -> launcher never ran -> ZERO log output -> "did not come
+# up"). Start-Process runs a .cmd via cmd.exe automatically and passes the single
+# quoted arg through as %1, so no /c quote war.
+$srv = Start-Process -FilePath $LAUNCHCMD -ArgumentList "`"$SRVLOG`"" -WindowStyle Hidden -PassThru
 Dig "server launched pid=$($srv.Id); waiting for health..."
 $up=$false
 # Full Documents custom_nodes set loads headless now -- allow up to 10 min.

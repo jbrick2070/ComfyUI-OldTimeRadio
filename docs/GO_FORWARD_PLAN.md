@@ -8,7 +8,7 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 ~12:20 (3D quick-smoke harness-fix session; handing to Opus).
+> **Last updated:** 2026-06-12 ~13:27 (3D quick-smoke ROUND 2 root-caused + fixed; harness boots healthy in ~20s; legs running).
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
@@ -195,6 +195,22 @@ so the keystone carries no demo pressure.
 ---
 
 ## 6. WHERE WE ARE (factual; recent first)
+
+- **2026-06-12 (~13:27, ROUND 2 root-cause + fix, Opus):** the round-2 quick-smoke had ABORTED
+  ("SERVER DID NOT COME UP" 12:28). Two NEW bugs, both now fixed + verified:
+  (1) **UTF-8 boot crash** -- the detached headless launcher inherited the cp1252 console codec, so
+  OTR `prestartup_script.py` crashed the instant it printed an emoji (UnicodeEncodeError on U+2705/
+  U+2713) -> boot died ~13s, exit 1. ComfyUI Desktop used to set UTF-8 for us; the v2 install move
+  dropped it. FIX: `set PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8` in `_otr_soak_server_launch.cmd`.
+  (2) **Start-Process quote-mangling** -- the ps1 booted via `cmd.exe /c "<launcher>" "<log>"`, which
+  hits cmd's two-quoted-token stripping rule (4 quotes -> outer pair eaten -> mangled path -> launcher
+  never ran -> ZERO log output). FIX: run the `.cmd` directly as `-FilePath`; also hardened the kill
+  (CIM CommandLine, not `Get-Process .Path` which is blank for unreadable processes). VERIFIED: clean
+  boot reaches healthy in ~20s (NOT the 7-8 min the prior handoff feared -- it was crashing, not slow);
+  `system_stats`/`OTR_VideoDirector`/`LTXVImgToVideoConditionOnly` all 200; 0 import failures; 0 charmap.
+  Harness now runs the legs (ltx_orbit first). Touched: `scripts/_otr_soak_server_launch.cmd`,
+  `scripts/otr_3d_quick_tests.ps1`. NOTE: this UTF-8 fix ALSO unblocks the 27-leg overnight sweep
+  (same launcher) -- every leg would have died the same way. Commit pending; do NOT push unprompted.
 
 - **2026-06-12 (midday, harness-fix session -> Opus):** 3D quick-smoke round 1 = 3/3 SOAK_FAIL,
   all harness-side (see section 1 for the 4 root causes + fixes: sweep output resolver,
