@@ -1626,3 +1626,29 @@ and the fix is verified:
 
 Per memory note ("Keep ROADMAP + BUG_LOG live; Bible promotion
 waits until v2.0 ships"), batch-promote after v2.0 lands.
+
+### BUG-LOCAL-095: LTXVImgToVideo strength=1.0 freeze-frame [FIXED 2026-06-11 @ aba0c5a]
+
+**Symptom:** I2V clips rendered as static freeze-frames — every frame identical to the init still.
+
+**Root cause:** `LTXVImgToVideo` with `strength=1.0` encodes the init image into ALL latent frames, not just the conditioning. The sampler receives a fully-encoded latent with zero noise, producing a static output.
+
+**Prior attempt:** Lowering strength to 0.75 re-noised 25% of the 1472×832 signal, causing red/mush artifacts (the 2B model cannot reconstruct quality at that resolution with 25% noise).
+
+**Fix:** Replaced `LTXVImgToVideoConditionOnly` in `_node_candidates_i2v()`. This node outputs `(CONDITIONING, CONDITIONING)` only — it wires the image into first-frame conditioning but does NOT produce a latent. The existing `EmptyLTXVLatentVideo` latent node (kept in the graph) feeds the sampler as pure noise, enabling real motion denoising.
+
+**Files changed:** `nodes/_otr_video_engines/eng_ltx_video.py` — `_node_candidates_i2v()`, `_build_graph_i2v()`; `tests/test_video_motion.py`.
+
+---
+
+### BUG-LOCAL-112: LTX prompt > 188 chars dilutes motion signal [FIXED 2026-06-11 @ aba0c5a]
+
+**Symptom:** LTX I2V clips showed minimal or no motion even with `LTXVImgToVideoConditionOnly` correctly wired.
+
+**Root cause:** `finish_visual_prompt()` in `render_driver.py` was called with `max_chars=240`. LTX-Video's 2B model loses motion signal when the prompt exceeds ~161-188 characters — the motion verbs get diluted by scene description tokens beyond the effective attention window.
+
+**Fix:** Changed `max_chars=240` → `max_chars=188` in `render_driver.py` for the LTX scene prompt composition path.
+
+**Files changed:** `nodes/_otr_video_engines/render_driver.py`.
+
+---
