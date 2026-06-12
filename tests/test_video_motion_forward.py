@@ -97,14 +97,14 @@ def test_ltx_graph_topology_ksampler_rollback(monkeypatch):
 
 
 def test_ltx_graph_topology_distilled_default(monkeypatch):
-    """LK-1b: the DEFAULT graph is the legacy distilled chain (8-step
-    LTX_DISTILLED_SIGMAS + euler + CFGGuider cfg=1.0) -- the 6/5 look."""
+    """Explicit distilled mode: 8-step LTX_DISTILLED_SIGMAS + euler + CFGGuider
+    cfg=1.0 rollback path (OTR_LTX_SAMPLER=distilled). DEFAULT is now ksampler."""
     from nodes._otr_video_engines.eng_ltx_video import LTX_DISTILLED_SIGMAS
-    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "distilled")   # explicit, not default
     monkeypatch.delenv("OTR_LTX_CFG", raising=False)
     monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = LtxVideoEngine()
-    assert eng._sampler_mode() == "distilled"
+    assert eng._sampler_mode() == "distilled"   # explicit env, not the default
     cand = eng._node_candidates_sampling()
     assert "ksampler" not in cand
     assert cand["samplersel"] == ("KSamplerSelect",)
@@ -134,7 +134,9 @@ def test_ltx_graph_topology_distilled_default(monkeypatch):
 
 def test_ltx_distilled_lora_gating(monkeypatch, tmp_path):
     """The 22B distilled LoRA wires ONLY on a 22B ckpt with the file on
-    disk; the 2B default and a missing file render WITHOUT it (LOUD)."""
+    disk; the 2B default and a missing file render WITHOUT it (LOUD).
+    Requires distilled mode explicitly -- LoRA gates on the guider node."""
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "distilled")   # LoRA lives in distilled path
     eng = LtxVideoEngine()
     plan = {"text_prompt": "x", "negative_prompt": "y", "fps": 25,
             "target_frame_count": 49, "seed": 2}
@@ -167,7 +169,7 @@ def test_ltx_distilled_lora_gating(monkeypatch, tmp_path):
 
 def test_ltx_sampler_mode_invalid_falls_back_loud(monkeypatch):
     monkeypatch.setenv("OTR_LTX_SAMPLER", "warp_drive")
-    assert LtxVideoEngine._sampler_mode() == "distilled"
+    assert LtxVideoEngine._sampler_mode() == "ksampler"
 
 
 def test_wan_graph_topology():

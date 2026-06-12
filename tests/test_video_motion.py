@@ -496,7 +496,7 @@ def test_i2v_flag_on_with_init_engages(monkeypatch, tmp_path):
 
 
 def test_i2v_candidates_and_graph_topology(monkeypatch):
-    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)   # distilled default
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "distilled")   # explicit: test distilled I2V path
     monkeypatch.delenv("OTR_LTX_I2V_STRENGTH", raising=False)
     monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = vreg.get_engine("ltx_video")

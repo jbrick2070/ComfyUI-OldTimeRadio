@@ -20,9 +20,9 @@ primary checkpoint path the load probe checks (verify-at-build; default under
 ``ComfyUI/models/checkpoints``).
 
 LK-1 look restoration (2026-06-11): ``OTR_LTX_SAMPLER`` selects the sampling
-chain -- ``distilled`` (DEFAULT: the legacy 8-step LTX_DISTILLED_SIGMAS +
-euler + CFGGuider cfg=1.0 path that produced the 6/5 look) or ``ksampler``
-(the round-5 30-step rollback). ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots
+chain -- ``ksampler`` (DEFAULT: 30-step euler cfg=3.0, the 6/5 dynamic-motion
+look) or ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0 rollback; subtle
+pan-in only with I2V). ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots
 condition on their ST-3 scene stills (``OTR_LTX_I2V_STRENGTH`` default 1.0,
 probe-proven; 0.75 re-noises into mush at 1472x832). The 22B distilled LoRA
 wires only on a 22B-tier checkpoint (``OTR_LTX_DISTILLED_LORA``/``_STRENGTH``).
@@ -419,14 +419,15 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # ---- LK-1b: sampler mode + distilled LoRA resolution ----
     @staticmethod
     def _sampler_mode() -> str:
-        """``distilled`` (DEFAULT -- the legacy 8-step euler/CFG-1.0 path,
-        the 6/5 look) or ``ksampler`` (the round-5 30-step path, kept as
-        the rollback). Invalid values fall back LOUD to distilled."""
-        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
+        """``ksampler`` (DEFAULT -- 30-step euler cfg=3.0, 6/5 dynamic-motion
+        look) or ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0; subtle
+        pan-in only, kept as rollback). Invalid values fall back LOUD to
+        ksampler. Override via OTR_LTX_SAMPLER env var."""
+        mode = os.environ.get("OTR_LTX_SAMPLER", "ksampler").strip().lower()
         if mode not in ("distilled", "ksampler"):
             _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
-                         "using the distilled default", mode)
-            mode = "distilled"
+                         "using ksampler default", mode)
+            mode = "ksampler"
         return mode
 
     def _distilled_lora_file(self):
