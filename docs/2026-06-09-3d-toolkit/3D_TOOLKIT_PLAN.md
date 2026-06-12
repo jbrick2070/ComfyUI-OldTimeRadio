@@ -1,4 +1,11 @@
-# OTR 3D Toolkit Plan v2 -- the `character_3d` family (NEXT PHASE, canonical)
+# OTR 3D Toolkit Plan v2 -- the `character_3d` family (NEXT PHASE)
+
+> **POINTER (2026-06-12):** The canonical project go-forward plan is now
+> `docs/GO_FORWARD_PLAN.md`. THIS file is the DETAIL SPEC for forward-order item 5 (the 3D
+> sprints) -- read it for the `character_3d` design, the cu128 question, assets, and the
+> section-3 image-routing must-fixes (LANDED). For the current step, runway, and open tickets
+> across the whole build, see `GO_FORWARD_PLAN.md` (it wins on any disagreement). Section 0
+> below is retained as history; its forward order is mirrored in the canonical doc.
 
 > **STATUS: v2, ROUNDTABLE-HARDENED 2026-06-09 (three passes; campaign closed at the pass
 > cap -- architecture stable since pass 1, pass-3 findings were wiring-contract level only).** 3D stays **PARKED --
@@ -339,10 +346,22 @@ W7 (it is what makes the output a STORY, not a tech demo):
   mood) already exists upstream; the template is fetched (section 5) and the mapping table is
   authored -- no other inputs are synthesized.
 
-## 3. Carry-in: the 3D image-routing MUST-FIXES (non-negotiable; code-verified still OPEN)
+## 3. Carry-in: the 3D image-routing MUST-FIXES (non-negotiable)
+
+> **STATUS 2026-06-12 (planner audit, code-verified): ALL FIVE MUST-FIXES BELOW ARE LANDED + GREEN.**
+> Grounded against the live tree: `video_policy_json` is in the `required` dict with
+> `forceInput:True` and `_parse_video_policy_required` raises on empty/malformed/non-object
+> (`otr_image_director.py`); `enforce_3d_granularity_lock` RAISES (fail-closed, no coercion);
+> `_is_3d_engine` reads the real `requires_mesh_portrait` capability (fails closed on unregistered
+> + on `character_3d`-family-without-cap, never a hard-coded family check); `requires_mesh_portrait:
+> bool = False` is a REAL field on BOTH `AdapterDescriptor` and `VideoProfileRow` (`schemas.py`,
+> `extra="forbid"`-safe); the three `eng_character_3d` engines declare `requires_mesh_portrait =
+> True`; and the dispatcher carries the downstream per_beat HALT (`otr_image_gen_dispatcher.py`).
+> Tests green: `tests/test_image_platform_c1.py` + `tests/test_otr_workflow_validator.py` =
+> 68 passed / 1 skipped. The text below is kept as the historical spec; do NOT re-implement it.
 
 Carried from [GOFWD]/[ROUTE-01]; the hardening pass RE-VERIFIED each against the live
-`otr_image_director.py` -- all still open. Land WITH the character_3d wiring, as these exact
+`otr_image_director.py`. Landed WITH (ahead of) the character_3d wiring, as these exact
 edits [H-RT]:
 
 - **`video_policy_json` is still OPTIONAL** (in the `optional` dict of `INPUT_TYPES`, default

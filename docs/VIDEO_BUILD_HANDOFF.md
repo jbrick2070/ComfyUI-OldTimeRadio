@@ -1,3 +1,8 @@
+> **POINTER (2026-06-12):** The canonical go-forward plan is now `docs/GO_FORWARD_PLAN.md`
+> (single source of truth: forward order + runway + open tickets + current step + hard rules).
+> READ THAT FIRST. The content below is retained as the dated handoff snapshot / history --
+> when it disagrees with `GO_FORWARD_PLAN.md`, the GO-FORWARD PLAN wins.
+
 # OTR Video Platform -- HANDOFF -- BUG-LOCAL-113+113b FIXED (FLUX colour + LTX animation @ e3edce9); ComfyUI RESTART NEEDED; OH-4 AWAITS GO (2026-06-12)
 
 > **CANONICAL LOCATION:** this in-repo file (`docs/VIDEO_BUILD_HANDOFF.md`) is
