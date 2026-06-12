@@ -3,7 +3,12 @@
 A character's portrait still is identified by the CONTENT of its decoded pixels,
 not by a filename or a generation seed: ``portrait_content_hash =
 sha256(decoded_pixels.tobytes())``. The file lives at a deterministic,
-content-addressed location ``<output>/otr/stills/{portrait_content_hash}.png``.
+content-addressed location
+``<output>/otr/episodes/_shared/cache/{portrait_content_hash}.png``
+(the OH-1 output-tree contract, 2026-06-11: the pool moved from the old
+top-level ``otr/stills/`` into the ``episodes/_shared`` system tier --
+cache entries are cross-episode copies, NEVER the only copy; the
+episode's own ``stills/`` dir holds the asset of record).
 
 Two consequences the platform relies on:
 
@@ -31,8 +36,10 @@ from typing import Optional
 
 log = logging.getLogger("OTR.portrait_ledger")
 
-#: ``<output>/otr/stills`` -- the content-addressed still directory.
-_STILLS_SUBDIR = ("otr", "stills")
+#: ``<output>/otr/episodes/_shared/cache`` -- the content-addressed
+#: cross-episode pool (OH-1: moved from the old top-level ``otr/stills``;
+#: ``_shared`` is the reserved system tier, never an episode).
+_STILLS_SUBDIR = ("otr", "episodes", "_shared", "cache")
 
 
 class PortraitUnresolved(LookupError):
@@ -54,8 +61,9 @@ def _output_base(output_dir: Optional[str] = None) -> str:
 
 
 def stills_root(output_dir: Optional[str] = None) -> Path:
-    """The ``<output>/otr/stills`` directory (the content-addressed global
-    pool). ``output_dir`` overrides the ComfyUI output root (used by tests)."""
+    """The ``<output>/otr/episodes/_shared/cache`` directory (the
+    content-addressed cross-episode pool; OH-1). ``output_dir``
+    overrides the ComfyUI output root (used by tests)."""
     return Path(_output_base(output_dir)).joinpath(*_STILLS_SUBDIR)
 
 

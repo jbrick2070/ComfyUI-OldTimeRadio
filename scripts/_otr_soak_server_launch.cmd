@@ -25,9 +25,11 @@ rem folder_paths; OTR_OUTPUT_DIR pins the OTR writers to the same tree.
 set OTR_REAL_OUTPUT=C:\Users\jeffr\Documents\ComfyUI\output
 set OTR_OUTPUT_DIR=%OTR_REAL_OUTPUT%
 set OTR_OBS_DIR=%OTR_REAL_OUTPUT%\otr\obs
-rem OUTPUT HYGIENE: every temp/scratch write (tempfile.* in-process AND ffmpeg
-rem children) stays UNDER output\otr\tmp -- nothing outside the otr tree.
-set OTR_TMP=%OTR_REAL_OUTPUT%\otr\tmp
+rem OUTPUT HYGIENE (OH-2, output-tree contract 2026-06-11): every temp/scratch
+rem write (tempfile.* in-process AND ffmpeg children) stays UNDER the reserved
+rem system tier episodes\_shared\tmp -- the otr top level is EXACTLY
+rem episodes + obs. The janitor sweeps stale entries here (OH-3).
+set OTR_TMP=%OTR_REAL_OUTPUT%\otr\episodes\_shared\tmp
 if not exist "%OTR_TMP%" mkdir "%OTR_TMP%"
 set TEMP=%OTR_TMP%
 set TMP=%OTR_TMP%

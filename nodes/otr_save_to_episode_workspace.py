@@ -9,11 +9,11 @@ tree-walking. This node reads the in-flight Ledger singleton at runtime,
 derives the episode_id, and writes images to the canonical per-episode
 ``stills/`` or ``portraits/`` directory.
 
-Falls back to the legacy flat dirs (``_legacy_stills/`` /
-``_legacy_portraits/``) when no singleton is available -- preserves
-backward compatibility for headless / standalone test invocations.
-Never raises: a save failure is logged and silently skipped so a broken
-save doesn't crash the whole workflow.
+OH-1 (output-tree contract, 2026-06-11): the legacy flat-dir fallback
+(``_legacy_stills/`` / ``_legacy_portraits/``) is REMOVED. A save with
+no resolvable in-flight episode now fails LOUD (RuntimeError) instead of
+silently littering the otr/ top level -- the same loud-failure posture
+as the BAD_IMAGE_SAVE gate below.
 
 BUG-LOCAL-028 fix (2026-05-03 EVENING).
 """
@@ -67,17 +67,24 @@ def _resolve_episode_id() -> Optional[str]:
 
 
 def _resolve_target_dir(role_kind: str, episode_id: Optional[str]) -> Path:
-    """Pick the right per-episode (or legacy fallback) directory.
+    """Pick the right per-episode directory (OH-1: episode_id REQUIRED).
 
     Unknown ``role_kind`` defaults to ``stills`` to preserve existing
     behavior for legacy workflows that pass an empty string. The
-    underlying ``otr_stills_dir`` / ``otr_portraits_dir`` helpers
-    handle the ``episode_id == ""`` legacy fallback themselves.
+    underlying ``otr_stills_dir`` / ``otr_portraits_dir`` helpers RAISE
+    LOUD (``OtrPathContractError``) on an empty episode_id -- the
+    legacy flat-dir fallback is gone.
     """
+    if not episode_id:
+        raise RuntimeError(
+            "SaveToEpisodeWorkspace: no in-flight episode could be "
+            "resolved (ledger singleton missing) -- refusing to save "
+            "outside the per-episode workspace (output-tree contract, "
+            "2026-06-11). Run the writer first so a ledger exists.")
     if role_kind == "portraits":
-        return _OTRP.otr_portraits_dir(episode_id or "")
+        return _OTRP.otr_portraits_dir(episode_id)
     # Default: stills for any unknown role_kind.
-    return _OTRP.otr_stills_dir(episode_id or "")
+    return _OTRP.otr_stills_dir(episode_id)
 
 
 def _next_index(target_dir: Path, pattern: str) -> int:
@@ -163,23 +170,14 @@ class SaveToEpisodeWorkspace:
             )
             return {}
 
-        if episode_id:
-            log.info(
-                "[SaveToEpisodeWorkspace] saving to per-episode dir: %s "
-                "(role_kind=%s, ep=%s, pattern=%s)",
-                target_dir,
-                role_kind,
-                episode_id,
-                filename_pattern,
-            )
-        else:
-            log.warning(
-                "[SaveToEpisodeWorkspace] no in-flight ledger singleton -- "
-                "falling back to legacy dir: %s (role_kind=%s, pattern=%s)",
-                target_dir,
-                role_kind,
-                filename_pattern,
-            )
+        log.info(
+            "[SaveToEpisodeWorkspace] saving to per-episode dir: %s "
+            "(role_kind=%s, ep=%s, pattern=%s)",
+            target_dir,
+            role_kind,
+            episode_id,
+            filename_pattern,
+        )
 
         next_idx = _next_index(target_dir, filename_pattern)
         ui_results = []

@@ -113,12 +113,14 @@ class OTRVideoRenderBatch:
             name = "node_soak.json"
         ok = bool(report.get("ok"))
         payload = json.dumps(report, ensure_ascii=True, default=str)
-        # OUTPUT HYGIENE (operator directive 2026-06-09): otr/obs holds ONLY
-        # the final playable episode mp4 -- JSON run artifacts go to otr/state.
-        sub = "state" if mode == "episode" else "aship"
+        # OUTPUT HYGIENE (output-tree contract OH-1, 2026-06-11): ALL JSON
+        # run artifacts (episode reports AND the soak/single probe reports
+        # that used to land in the now-retired top-level otr/aship) go to
+        # the per-machine state tier episodes/_shared/state via the ONE
+        # path authority -- never a hand-composed otr/<sub> join.
         try:                                  # durable artifacts the operator polls
-            base = os.environ.get("OTR_OUTPUT_DIR") or "."
-            out_dir = os.path.join(base, "otr", sub)
+            from ._otr_paths import otr_state_dir
+            out_dir = str(otr_state_dir())
             os.makedirs(out_dir, exist_ok=True)
             with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
                 f.write(payload)

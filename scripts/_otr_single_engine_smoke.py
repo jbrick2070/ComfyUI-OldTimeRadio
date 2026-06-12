@@ -77,9 +77,10 @@ def main(argv=None) -> int:
                     pass
     except Exception as exc:  # noqa: BLE001
         print("[single] history fetch failed: %s" % exc, flush=True)
-    # Durable fallback: the node also writes otr/aship/node_single_<engine>.json
+    # Durable fallback: the node writes node_single_<engine>.json to the
+    # state tier (OH-2: episodes/_shared/state; otr/aship is retired).
     if not report:
-        p = os.path.join(REPORT_DIR, "otr", "aship",
+        p = os.path.join(REPORT_DIR, "otr", "episodes", "_shared", "state",
                          "node_single_%s.json" % args.engine)
         if os.path.isfile(p) and os.path.getmtime(p) > started:
             report = json.load(open(p, encoding="utf-8"))

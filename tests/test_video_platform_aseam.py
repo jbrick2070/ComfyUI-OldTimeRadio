@@ -625,7 +625,10 @@ def test_portrait_ledger_resolution(tmp_path):
         {"char_id": "c2", "name": "NOON"},  # no portrait stamped
     ]}
     p = pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path))
-    assert p == tmp_path / "otr" / "stills" / f"{h}.png"
+    # OH-1 (output-tree contract 2026-06-11): the content-addressed pool
+    # moved from top-level otr/stills to the episodes/_shared/cache tier.
+    assert p == (tmp_path / "otr" / "episodes" / "_shared" / "cache"
+                 / f"{h}.png")
 
     # Lookup is by char_id ONLY -- the display name does not resolve.
     with pytest.raises(pl.PortraitUnresolved):

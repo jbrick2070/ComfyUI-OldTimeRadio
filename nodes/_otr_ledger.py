@@ -368,7 +368,13 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             # workspace is the only contract.
             # Per-episode workspace layout (post 2026-05-02 EVENING):
             # ledgers under <dir>/<episode_id>/audio/*_ledger.json.
-            candidates.extend(d.glob("*/audio/*_ledger.json"))
+            # OH-1 (output-tree contract 2026-06-11): SKIP `_`-prefixed
+            # reserved system entries (episodes/_shared is never an
+            # episode) -- ledger auto-pick must not treat the system
+            # tier as an episode dir.
+            candidates.extend(
+                p for p in d.glob("*/audio/*_ledger.json")
+                if not p.parent.parent.name.startswith("_"))
         except Exception as exc:
             log.warning("[OTR_Ledger] ledger glob failed in %s: %s", d, exc)
     if not candidates:

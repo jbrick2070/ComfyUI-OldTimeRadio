@@ -58,8 +58,10 @@ SERVER_OUTPUT = os.environ.get(
     "OTR_SOAK_SERVER_OUTPUT",
     r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\output")
 EPISODES_DIR = os.path.join(SERVER_OUTPUT, "otr", "episodes")
-REPORT_PATH = os.path.join(SERVER_OUTPUT, "otr", "state",
-                           "node_episode_report.json")
+# OH-2 (output-tree contract 2026-06-11): node run reports live in the
+# per-machine state tier episodes/_shared/state (otr/state is retired).
+REPORT_PATH = os.path.join(SERVER_OUTPUT, "otr", "episodes", "_shared",
+                           "state", "node_episode_report.json")
 RESULTS_DIR = os.path.join(_HERE, "_otr_soak_capstone_results")
 VRAM_CEILING_MB = 14.5 * 1024
 POLL_TIMEOUT_S = 5400
@@ -159,10 +161,12 @@ def _obs_listing() -> set:
 def assert_no_stray_writes(before: set, root: str, sys_temp_before: set,
                            obs_before: set):
     """OUTPUT HYGIENE gate 2: every file the run created under the server
-    output root must live under ``otr\\``; the SYSTEM temp dir gained no new
-    ``otr_*`` entries (proving the in-tree TEMP repoint held); and the
-    operator's obs dir gained EXACTLY the final mp4 (JSON reports live in
-    otr/state)."""
+    output root must live under ``otr\\``; every otr/ write must land under
+    the contract top level (EXACTLY ``episodes`` + ``obs``; ``_shared`` is
+    a reserved system entry that is never an episode; obs stays FLAT); the
+    SYSTEM temp dir gained no new ``otr_*`` entries (proving the in-tree
+    TEMP repoint held); and the operator's obs dir gained EXACTLY the final
+    mp4 (JSON reports live in episodes/_shared/state)."""
     after = _snapshot_tree(root)
     new = after - before
     stray = sorted(p for p in new
@@ -170,6 +174,35 @@ def assert_no_stray_writes(before: set, root: str, sys_temp_before: set,
     if stray:
         raise SoakFail("stray writes OUTSIDE output\\otr\\: %r"
                        % stray[:20])
+    # OH-2 contract gate: otr/ top level is EXACTLY episodes + obs.
+    bad_top = sorted(p for p in new
+                     if os.path.normpath(p).lower().startswith("otr" + os.sep)
+                     and (os.path.normpath(p).split(os.sep) + ["", ""])[1]
+                     not in ("episodes", "obs"))
+    if bad_top:
+        raise SoakFail("OUTPUT-TREE CONTRACT violated: new files outside "
+                       "otr\\{episodes,obs}: %r" % bad_top[:20])
+    # obs/ stays FLAT (no subdirs): any new obs path with extra components
+    # fails.
+    obs_nested = sorted(
+        p for p in new
+        if os.path.normpath(p).lower().startswith(
+            os.path.join("otr", "obs") + os.sep)
+        and len(os.path.normpath(p).split(os.sep)) > 3)
+    if obs_nested:
+        raise SoakFail("obs/ must stay FLAT; nested entries: %r"
+                       % obs_nested[:10])
+    # episodes/ children created by the run must be real episodes or the
+    # reserved _shared tier -- and _shared must never look like an episode
+    # (no audio/ ledger inside it).
+    shared_ledgers = sorted(
+        p for p in new
+        if os.path.normpath(p).lower().startswith(
+            os.path.join("otr", "episodes", "_shared") + os.sep)
+        and p.lower().endswith("_ledger.json"))
+    if shared_ledgers:
+        raise SoakFail("episodes/_shared must NEVER be an episode (found "
+                       "ledger writes): %r" % shared_ledgers[:10])
     sys_temp = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp")
     if os.path.isdir(sys_temp):
         now = {e for e in os.listdir(sys_temp) if e.lower().startswith("otr")}

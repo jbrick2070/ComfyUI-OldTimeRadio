@@ -453,10 +453,11 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     img = led["images"]["images"][0]
     assert img["path"].endswith(".png")
     # ST-3/W3: the row path is the EPISODE-LOCAL copy; the content-addressed
-    # global pool copy (AS-5) is pool_path and both exist on disk.
+    # cross-episode cache copy (AS-5; OH-1: episodes/_shared/cache) is
+    # pool_path and both exist on disk.
     assert "otr/episodes/ep_test/stills/" in img["path"].replace("\\", "/")
     assert img["pool_path"].replace("\\", "/").endswith(
-        f"otr/stills/{img['portrait_content_hash']}.png"
+        f"otr/episodes/_shared/cache/{img['portrait_content_hash']}.png"
     )
     assert os.path.exists(img["path"]) and os.path.exists(img["pool_path"])
     # stills_manifest.json written beside the episode stills
@@ -615,8 +616,9 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     )
     assert warns == []
     img = led["images"]["images"][0]
+    # OH-1: the AS-5 pool moved to the episodes/_shared/cache tier.
     assert img["pool_path"].replace("\\", "/").endswith(
-        f"otr/stills/{img['portrait_content_hash']}.png"
+        f"otr/episodes/_shared/cache/{img['portrait_content_hash']}.png"
     )
     assert "otr/episodes/ep_test/stills/" in img["path"].replace("\\", "/")
     assert done.startswith("image:done:")

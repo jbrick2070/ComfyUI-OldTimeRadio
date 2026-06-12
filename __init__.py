@@ -455,10 +455,11 @@ try:
     from aiohttp import web as _otr_web2  # type: ignore
 
     def _otr_render_report_dir():
-        base = _otr_ro.environ.get("OTR_OUTPUT_DIR") or _otr_ro.path.abspath(
-            _otr_ro.path.join(_otr_ro.path.dirname(_otr_ro.path.abspath(__file__)),
-                              "..", "..", "output"))
-        d = _otr_ro.path.join(base, "otr", "aship")
+        # OH-1 (output-tree contract 2026-06-11): probe/soak reports go to
+        # the per-machine state tier episodes/_shared/state via the ONE
+        # path authority (the old top-level otr/aship is RETIRED).
+        from .nodes._otr_paths import otr_state_dir as _otr_state_dir
+        d = str(_otr_state_dir())
         _otr_ro.makedirs(d, exist_ok=True)
         return d
 

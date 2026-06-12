@@ -30,12 +30,37 @@ locked 2026-04-27. None of them ``mkdir`` on access -- callers do that
 explicitly when they know they're about to write -- because read-only
 consumers (e.g. ledger auto-discover) shouldn't accidentally create
 empty dirs as a side effect.
+
+OUTPUT TREE CONTRACT (operator law 2026-06-11; OH-1 -- see
+docs/2026-06-11-output-tree-consolidation/OUTPUT_TREE_CONTRACT.md):
+``<output>/otr/`` contains EXACTLY two top-level entries:
+
+  * ``episodes/<episode_id>/...`` -- the asset of record for everything
+    episode-scoped, plus the RESERVED system tier ``episodes/_shared/``
+    holding ``cache/`` (content-addressed cross-episode copies; never
+    the only copy), ``tmp/`` (scratch; TEMP/TMP/OTR_GPU_LEASE_DIR;
+    janitor-swept) and ``state/`` (per-machine state).
+  * ``obs/`` -- FINAL deliverable videos ONLY, flat, OBS-watched.
+
+Every OUTPUT helper below validates its result against that contract
+(``_validate_contract``) and the production write helpers RAISE LOUD on
+an empty/invalid ``episode_id`` -- the silent ``_legacy_*`` fallbacks
+are KILLED. Input/models/log/HF resolvers are exempt (not OTR-output
+paths). Walkers over ``episodes/`` must skip ``_``-prefixed entries
+(``_shared`` is never an episode) -- see ``is_reserved_episode_entry``.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
 from typing import Optional
+
+
+class OtrPathContractError(ValueError):
+    """An OTR output-path request violates the output-tree contract
+    (empty/invalid episode_id, traversal, or a result outside
+    ``otr/{episodes,obs}``). Raised LOUD -- never a silent legacy
+    fallback (OH-1, operator law 2026-06-11)."""
 
 
 # Walk-up math: this file lives at
@@ -152,6 +177,87 @@ def comfy_input_dir() -> Path:
     return Path.cwd() / "input"
 
 
+# --------------------------------------------------------------------- #
+# Output-tree contract plumbing (OH-1)
+# --------------------------------------------------------------------- #
+
+#: The ONLY entries allowed at the ``otr/`` top level.
+_OTR_TOP_ALLOWED = ("episodes", "obs")
+
+#: The reserved system tier under ``episodes/`` (never an episode).
+SHARED_DIRNAME = "_shared"
+
+
+def is_reserved_episode_entry(name: str) -> bool:
+    """True for ``episodes/`` children that are NOT episodes (the
+    ``_``-prefixed system tier, e.g. ``_shared``). EVERY walker over
+    ``otr_episodes_root()`` must skip these (ledger auto-pick named --
+    see ``_otr_ledger.find_most_recent_ledger``)."""
+    return str(name or "").startswith("_")
+
+
+def _validate_episode_id(episode_id: str) -> str:
+    """A production write helper's ``episode_id`` must be a non-empty
+    single path component and not the reserved system tier. RAISES
+    :class:`OtrPathContractError` LOUD -- the ``_legacy_*`` fallback
+    era is over (OH-1)."""
+    eid = str(episode_id or "").strip()
+    if not eid:
+        raise OtrPathContractError(
+            "empty episode_id: per-episode output helpers REQUIRE a real "
+            "episode_id (the _legacy_* fallbacks were removed by the "
+            "output-tree contract, 2026-06-11)")
+    if any(t in eid for t in ("/", "\\", "..", "\x00")):
+        raise OtrPathContractError(
+            "episode_id %r contains a path separator/traversal token" % eid)
+    if is_reserved_episode_entry(eid):
+        raise OtrPathContractError(
+            "episode_id %r is a reserved system entry (%s is never an "
+            "episode)" % (eid, SHARED_DIRNAME))
+    return eid
+
+
+def _validate_contract(p: Path) -> Path:
+    """Assert ``p`` lands under ``otr/{episodes,obs}`` (resolve() +
+    relative_to -- the OH-1 output-helper guard). Scoped to OUTPUT
+    helpers ONLY; input/models/log/HF resolvers never call this."""
+    base = (comfy_output_dir() / "otr").resolve()
+    try:
+        rel = p.resolve().relative_to(base)
+    except ValueError:
+        raise OtrPathContractError(
+            "output path %s escapes the otr/ root %s" % (p, base))
+    parts = rel.parts
+    if not parts or parts[0] not in _OTR_TOP_ALLOWED:
+        raise OtrPathContractError(
+            "output path %s violates the output-tree contract: otr/ top "
+            "level is EXACTLY %r (got %r)"
+            % (p, list(_OTR_TOP_ALLOWED), parts[:1]))
+    return p
+
+
+def otr_shared_root() -> Path:
+    """The reserved system tier: ``<output>/otr/episodes/_shared/``.
+    Never an episode; walkers skip it (``is_reserved_episode_entry``)."""
+    return _validate_contract(otr_episodes_root() / SHARED_DIRNAME)
+
+
+def otr_shared_cache_dir() -> Path:
+    """Content-addressed cross-episode CACHE tier:
+    ``<output>/otr/episodes/_shared/cache/``. Holds e.g. the AS-5
+    content-addressed portrait/still pool (``{sha256}.png``). A cache
+    entry is NEVER the only copy -- the episode dir holds the asset of
+    record (ST-3 materialization)."""
+    return _validate_contract(otr_shared_root() / "cache")
+
+
+def otr_shared_tmp_dir() -> Path:
+    """Scratch tier: ``<output>/otr/episodes/_shared/tmp/``. The launch
+    scripts point TEMP/TMP/OTR_GPU_LEASE_DIR here; the janitor sweeps
+    stale entries (the ONE sanctioned auto-delete, OH-3)."""
+    return _validate_contract(otr_shared_root() / "tmp")
+
+
 def otr_episodes_root() -> Path:
     """Root of the per-episode workspace tree: ``<output>/otr/episodes/``.
 
@@ -176,14 +282,14 @@ def otr_audio_dir(episode_id: str = "") -> Path:
     voice-path-cleanbreak S23.1 along with the helper that owned
     them.)
 
-    The ``episode_id`` argument is REQUIRED for new code. Calls without
-    it fall back to a degraded per-episode-less path under
-    ``<output>/otr/_legacy_audio/`` -- this exists ONLY so legacy code
-    paths that auto-pick across episodes don't crash; production
-    write-sites must pass a real ``episode_id``.
+    The ``episode_id`` argument is REQUIRED: an empty/invalid value
+    RAISES :class:`OtrPathContractError` LOUD (OH-1 -- the
+    ``_legacy_audio`` fallback was removed by the output-tree
+    contract, 2026-06-11).
 
     For ledger auto-pick across all episodes, use
-    ``otr_episodes_root()`` and walk ``*/audio/*_ledger.json``.
+    ``otr_episodes_root()`` and walk ``*/audio/*_ledger.json``
+    (skipping ``_``-prefixed entries -- ``is_reserved_episode_entry``).
 
     Cache trade-off (Jeffrey acknowledged 2026-05-02 EVENING):
     MusicGen + AudioGen used to write SHA-keyed cache files into a
@@ -193,9 +299,8 @@ def otr_audio_dir(episode_id: str = "") -> Path:
     even when prompts are identical. Acceptable cost for the cleaner
     organization; revisit only if cache loss becomes a wallclock pain.
     """
-    if episode_id:
-        return otr_episodes_root() / episode_id / "audio"
-    return comfy_output_dir() / "otr" / "_legacy_audio"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "audio")
 
 
 # S28 cleanbreak: otr_legacy_audio_dir() removed. The pre-BUG-079
@@ -210,21 +315,22 @@ def otr_stills_dir(episode_id: str = "") -> Path:
 
     Holds ``full_env_NNNNN_.png`` cast environment portraits and the
     ``radio_bookend_<episode_id>.png`` LTX I2V reference still.
-    Without ``episode_id`` falls back to ``<output>/otr/_legacy_stills/``.
+    An empty/invalid ``episode_id`` RAISES LOUD (OH-1; the
+    ``_legacy_stills`` fallback is gone). The cross-episode
+    content-addressed pool lives at ``otr_shared_cache_dir()``.
     """
-    if episode_id:
-        return otr_episodes_root() / episode_id / "stills"
-    return comfy_output_dir() / "otr" / "_legacy_stills"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "stills")
 
 
 def otr_portraits_dir(episode_id: str = "") -> Path:
     """Per-episode PASS1 character portrait dir:
     ``<output>/otr/episodes/<episode_id>/portraits/``.
-    Without ``episode_id`` falls back to ``<output>/otr/_legacy_portraits/``.
+    An empty/invalid ``episode_id`` RAISES LOUD (OH-1; the
+    ``_legacy_portraits`` fallback is gone).
     """
-    if episode_id:
-        return otr_episodes_root() / episode_id / "portraits"
-    return comfy_output_dir() / "otr" / "_legacy_portraits"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "portraits")
 
 
 def otr_videos_dir(episode_id: str) -> Path:
@@ -235,7 +341,8 @@ def otr_videos_dir(episode_id: str) -> Path:
     ``music_opening_001.mp4`` (LTX music), ``l001.mp4`` (LTX announcer),
     etc. VideoComposite reads these and assembles the final composite.
     """
-    return otr_episodes_root() / episode_id / "videos"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "videos")
 
 
 def otr_composited_dir(episode_id: str) -> Path:
@@ -250,7 +357,8 @@ def otr_composited_dir(episode_id: str) -> Path:
     contract once OTR_PostUpscaleProcgenBlend started writing the
     real final there too).
     """
-    return otr_episodes_root() / episode_id / "composited"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "composited")
 
 
 def otr_upscaled_dir(episode_id: str) -> Path:
@@ -269,22 +377,25 @@ def otr_upscaled_dir(episode_id: str) -> Path:
     library stays clean. Mirror of ``otr_composited_dir`` but for the
     upscale stage of the chain.
     """
-    return otr_episodes_root() / episode_id / "upscaled"
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "upscaled")
 
 
 def otr_state_dir() -> Path:
-    """Per-machine OTR runtime-state dir: ``<output>/otr/state/``.
+    """Per-machine OTR runtime-state dir:
+    ``<output>/otr/episodes/_shared/state/``.
 
     BUG-LOCAL-090 (2026-05-04): added so persistent runtime state
-    (news_history.json, future per-machine cursors) lives under the
-    user's ComfyUI output tree -- the natural per-machine state tier --
-    instead of polluting the source repo's ``config/`` folder. State
-    that's per-episode goes under ``otr/episodes/<episode_id>/``;
-    state that's per-machine and not tied to any episode goes here.
+    (news_history.json, node run reports, future per-machine cursors)
+    lives under the user's ComfyUI output tree. MOVED by the
+    output-tree contract (OH-1, 2026-06-11) from the old top-level
+    ``otr/state/`` into the ``episodes/_shared`` system tier -- the
+    otr/ top level is EXACTLY ``episodes`` + ``obs``. State that's
+    per-episode goes under ``otr/episodes/<episode_id>/``.
 
     Caller is responsible for ``mkdir(parents=True, exist_ok=True)``.
     """
-    return comfy_output_dir() / "otr" / "state"
+    return _validate_contract(otr_shared_root() / "state")
 
 
 def otr_obs_dir() -> Path:
@@ -313,7 +424,7 @@ def otr_obs_dir() -> Path:
     ``otr_upscaled_dir(episode_id)`` instead -- intermediates live
     under their episode, only the broadcast cut lives here.
     """
-    return comfy_output_dir() / "otr" / "obs"
+    return _validate_contract(comfy_output_dir() / "otr" / "obs")
 
 
 def episodes_for_obs_dir(episode_id: str = "") -> Path:
@@ -517,6 +628,11 @@ __all__ = [
     "comfy_output_dir",
     "comfy_input_dir",
     "comfy_models_dir",
+    "OtrPathContractError",
+    "is_reserved_episode_entry",
+    "otr_shared_root",
+    "otr_shared_cache_dir",
+    "otr_shared_tmp_dir",
     "otr_audio_dir",
     # S28 cleanbreak: dropped "otr_legacy_audio_dir".
     "otr_stills_dir",

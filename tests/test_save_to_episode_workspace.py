@@ -148,8 +148,10 @@ def test_portraits_role_routes_to_portraits_dir(save_node, tmp_path):
     assert not stills_dir.exists() or not list(stills_dir.glob("*.png"))
 
 
-def test_falls_back_to_legacy_dir_when_no_singleton(save_node, tmp_path):
-    """No singleton -> legacy flat dir, no exception, image still saved."""
+def test_raises_loud_when_no_singleton(save_node, tmp_path):
+    """OH-1 (output-tree contract 2026-06-11): no in-flight episode ->
+    RAISE LOUD; the legacy flat-dir fallback is gone and NOTHING is
+    written outside the per-episode workspace."""
     fake_comfy_out = tmp_path / "ComfyUI_output"
 
     with mock.patch(
@@ -159,18 +161,15 @@ def test_falls_back_to_legacy_dir_when_no_singleton(save_node, tmp_path):
         "nodes._otr_ledger.in_flight_ledger_path",
         return_value=None,
     ):
-        result = save_node.save(
-            images=[_fake_image_tensor()],
-            role_kind="stills",
-            filename_pattern="full_env",
-        )
+        with pytest.raises(RuntimeError):
+            save_node.save(
+                images=[_fake_image_tensor()],
+                role_kind="stills",
+                filename_pattern="full_env",
+            )
 
     legacy_dir = fake_comfy_out / "otr" / "_legacy_stills"
-    saved = list(legacy_dir.glob("full_env_*.png"))
-    assert len(saved) == 1, (
-        f"fallback path -- expected 1 PNG in _legacy_stills/, got {saved}"
-    )
-    assert "ui" in result
+    assert not legacy_dir.exists(), "legacy flat dir must never be created"
 
 
 def test_per_episode_counter_starts_at_1(save_node, tmp_path):
@@ -220,15 +219,23 @@ def test_per_episode_counter_starts_at_1(save_node, tmp_path):
 
 
 def test_save_never_raises_on_mkdir_failure(save_node, tmp_path):
-    """Save must NEVER raise -- a broken save can't crash the workflow."""
+    """A FILESYSTEM failure after episode resolution must not crash the
+    workflow (the LOUD no-episode guard is a separate, intentional
+    raise -- see test_raises_loud_when_no_singleton)."""
+    ep_id = "signal_lost_mkdirfail_20260611_000000"
     fake_comfy_out = tmp_path / "ComfyUI_output"
+    audio_dir = fake_comfy_out / "otr" / "episodes" / ep_id / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    ledger_path = audio_dir / f"{ep_id}_ledger.json"
+    ledger_path.write_text('{"episode_id": "' + ep_id + '"}',
+                           encoding="utf-8")
 
     with mock.patch(
         "nodes._otr_paths.comfy_output_dir",
         return_value=fake_comfy_out,
     ), mock.patch(
         "nodes._otr_ledger.in_flight_ledger_path",
-        return_value=None,
+        return_value=ledger_path,
     ), mock.patch(
         "pathlib.Path.mkdir",
         side_effect=OSError("disk full"),
