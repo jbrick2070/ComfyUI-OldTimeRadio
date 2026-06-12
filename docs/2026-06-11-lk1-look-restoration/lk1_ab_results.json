@@ -1,0 +1,16 @@
+[
+  {
+    "beat": "b005",
+    "leg": "A_text_ksampler",
+    "video": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_plasmas_embrace_20260611_201117\\qa\\lk1_ab\\lk1_b005_A_00001_.webm",
+    "sheet": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_plasmas_embrace_20260611_201117\\qa\\lk1_ab\\sheet_b005_A_text_ksampler.png",
+    "seconds": 235.6
+  },
+  {
+    "beat": "b005",
+    "leg": "B_still_distilled",
+    "video": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_plasmas_embrace_20260611_201117\\qa\\lk1_ab\\lk1_b005_B_00001_.webm",
+    "sheet": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_plasmas_embrace_20260611_201117\\qa\\lk1_ab\\sheet_b005_B_still_distilled.png",
+    "seconds": 50.1
+  }
+]
