@@ -95,8 +95,10 @@ legacy procgen-only path gone) + all video models verified live + the first 1-2 
 rendering. The future-state 3D playground is BEYOND done (separate project).
 
 ~6-9 coder-window sprints remain:
-- **(s1) Track-3 remainder** -- W7-pre slice, ImageDirector fail-closed (DONE), builder migration,
-  cache keys. *Partially in flight (image-routing must-fixes LANDED 2026-06-12).*
+- **(s1) Track-3 remainder** -- W7-pre slice, ImageDirector fail-closed, builder migration, cache
+  keys. **DONE 2026-06-12 (planner audit, code-verified):** all landed -- image-routing must-fixes
+  (68/1 green), schema-valid `build_request` (init_w/init_h extras gone, observability on the real
+  field), and the slice/curve cache-key split. No open code in s1.
 - **(s2)** S-3D-0 + T1 + T2a (the lane-killer spike + template + wrap smoke).
 - **(s3-s4)** T3 corpus + T2b KEYSTONE (timeboxed ~1 week, the big GO/NO-GO).
 - **(s5)** T4 driver + alpha + LOOK gate.
@@ -145,10 +147,11 @@ so the keystone carries no demo pressure.
   `_is_3d_engine` reads the real `requires_mesh_portrait` capability; that field is real on
   `AdapterDescriptor` + `VideoProfileRow`; the dispatcher per_beat HALT). Tests:
   `test_image_platform_c1.py` + `test_otr_workflow_validator.py` = 68 passed / 1 skipped. Doc
-  corrected: 3D plan section 3 banner. REMAINING in s1: builder migration (request builders emit
-  non-schema-valid extras `init_w/init_h`/`dur_s`/`char_id` -- validate at the adapter boundary),
-  cache-key metadata (object_id + variant/purpose + engine_id + prompt_hash). AUDIT each before
-  coding -- docs are ahead of code.
+  corrected: 3D plan section 3 banner. **s1 builder migration + cache keys ALSO landed**
+  (`build_request` emits a schema-valid `VideoRequest` -- the init_w/init_h extras are gone,
+  observability rides the real field; the slice/curve cache-key split is shipped). **Track-3 (s1)
+  is COMPLETE -- no open code.** The next forward-order code (s2 = S-3D-0 + T1 + T2a) is the 3D
+  spike lane, GATED on the operator green light + the coverage sweep.
 - **LK-1** (LTX look restoration) -- BUG-LOCAL-113 (FLUX colour bleed) + 113b (LTX ksampler 30-step
   default) FIXED @`8115c72`/`e3edce9`. Stills confirmed good.
 - **0-E on-ramp** -- tickets E-1..E-7; gated on the sweep GO file; coder-window ready.
