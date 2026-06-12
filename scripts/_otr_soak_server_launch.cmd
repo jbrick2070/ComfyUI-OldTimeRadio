@@ -13,8 +13,19 @@ set CUBLAS_WORKSPACE_CONFIG=:4096:8
 set PYTHONHASHSEED=0
 set NVIDIA_TF32_OVERRIDE=0
 set TOKENIZERS_PARALLELISM=false
-set OTR_CAST_SEED=42
-set OTR_STYLE_SEED=42
+rem C7 byte-identity seeds (BUG-LOCAL-269/270): ONLY pinned when the caller
+rem sets OTR_C7=1 (regression/baseline runs). Production headless runs leave
+rem these UNSET so every episode rolls a fresh OS-entropy cast + style --
+rem pinning them here was why every run cast GULLIVER REEVES with the same
+rem red-wash style (2026-06-12 operator catch).
+if defined OTR_C7 (
+  set OTR_CAST_SEED=42
+  set OTR_STYLE_SEED=42
+  echo [launch] C7 mode: OTR_CAST_SEED=42 OTR_STYLE_SEED=42 ^(byte-identity^)
+) else (
+  set OTR_CAST_SEED=
+  set OTR_STYLE_SEED=
+)
 rem Hydrate per-user secrets a detached shell may not have inherited (the DC
 rem service env snapshot predates setx -- known gotcha). Value is NEVER echoed.
 for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User')"`) do set OPENROUTER_API_KEY=%%k
