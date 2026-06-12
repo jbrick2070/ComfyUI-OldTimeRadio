@@ -1,0 +1,18 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: no. The prompt composition path for announcer_visual and music_visual in the new lane is unspecified; the negative‑prompt baseline, budget cap, and music‑visual tail are undefined, blocking build.
+
+MUST-FIX BEFORE BUILD:
+1. [Open questions §1 “PROMPT SOURCES per role”] The plan claims text_prompt arrives already finished, but ShotLock does not produce a finished prompt for announcer_visual beats (CHARACTER_BEARING_ROLES = {CHARACTER_VIDEO} only). The plan must specify that the render driver (or a prompt‑builder node) will compose the announcer_visual prompt using `get_story_brief_ltx(meta, 90)` → `finish_visual_prompt(meta, base, max_chars=240)` (or via `OTR_LTX_RADIO_PROMPT` override) BEFORE passing the request to `ltx_av_talk`. Else the adapter receives an empty prompt.
+2. [Open questions §5 “NEGATIVE PROMPT”] No negative prompt is defined for the AV lane. The existing `_LTX_DEFAULT_NEGATIVE` (eng_ltx_video.py) may not suit the audio‑conditioned model. Must specify a baseline negative string (e.g., `f"{_LTX_DEFAULT_NEGATIVE}, static, frozen, still image, silence"`) and allow override via `OTR_LTX_AV_NEGATIVE`; the adapter must read it from request.negative_prompt.
+3. [Open questions §4 “PROMPT BUDGET”] The plan defers the 240‑char cap decision to M0 but must define a concrete fallback. REQUIRED: the M0 probe must measure whether longer prompts improve motion quality; if inconclusive, the cap stays at 240 chars for consistency. The plan must record this as a build gate.
+4. [Open questions §2 “TALKING-HEAD PROMPT CONTENT”] The plan omits the template shape that the upstream composer must use for talking‑head beats. MUST SPECIFY: for `ltx_av_talk` beats, the prompt shall be composed as `"{appearance or brief_fragment}, {setting}, {beat_text (optional)}, speaking, {era_tail}, {style_tail}, no on-screen text"`. This keeps the prompt grounded and avoids self‑vocative traps (no character names in the positive prompt). The negative prompt must include “text” (already in `_LTX_DEFAULT_NEGATIVE`) to suppress unwanted captions.
+5. [Open questions §3 “MUSIC PROMPT CONTENT”] The plan says reuse `get_story_brief_ltx` verbatim with a small additive tail, but the tail is undefined. MUST DEFINE a constant tail for `ltx_av_music` prompts, e.g.: `"smooth camera motion, dynamic lighting, audio‑reactive visuals"`. This suffix is appended after the brief fragment and before `era_tail`/`style_tail`, within the budget cap. Without it, the prompt lacks motion cue and falls back to still scene composition.
+
+SHOULD-CONSIDER:
+- [Open questions §7] `OTR_LTX_RADIO_PROMPT` env should be honoured by the AV lane for announcer beats, maintaining the existing override contract. The same env name works because it is role‑scoped, not engine‑scoped.
+- [Open questions §6] Person‑guard for video prompts is unnecessary; the guard applies upstream on the portrait (init_image) prompt. Document this to avoid scope creep.
+
+OPEN-QUESTIONS:
+- How does the LTX‑AV model’s audio conditioning interact with the text prompt? The M0 probe must verify that the music tail does not degrade lip‑sync for talking‑head beats.
+- Are any further “motion‑focused” negative terms required to prevent static renders? The M0 probe should test [“static”, “frozen”, “still image”] against the base negative.

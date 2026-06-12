@@ -52,6 +52,26 @@ are evidence records, not plans):**
   humo_1.7B / enable-set incompatibility row.
 - **0-E on-ramp** (`ltx_orbit`, `still_parallax`, `mesh_stage`): tickets E-1..E-7 below
   in 0-E; gated on Track-3 plumbing merge + sweep completion; coder-window ready.
+- **LK-1 (LTX look restoration — operator problem #2, 2026-06-11 night; runs FIRST
+  after the queue drains, before OH):** the 6/5 "bluish-crystal" look was lost in the
+  platform refactor via three concrete drops, evidence-grounded: (1) the music open
+  renders TEXT-ONLY (trace: b000 init_source=none) — the legacy OTR_BatchLTXRender
+  conditioned on radio_bookend.png; (2) announcer LTX beats anchor on the c01 PORTRAIT
+  while the ST-3-minted scene stills (still_b001/still_b005) go unused; (3) the legacy
+  LTX_DISTILLED_SIGMAS schedule + distilled-LoRA config did not survive into
+  eng_ltx_video. FIX: wire each LTX shot's minted scene still as init via the
+  PROBE-PASSED LTX-I2V branch (OTR_ENABLE_LTX_I2V, 1472x832x169f proven); port the
+  distilled sigma schedule/LoRA; palette-diet on brief prompts = secondary knob.
+  ACCEPTANCE: same-seed A/B pair (text-only vs still-conditioned open) + 3-frame
+  contact sheet -> operator eyeball. Stills themselves are NOT the problem (FLUX
+  output confirmed good — operator screenshot 2026-06-11).
+- **OH (output-tree consolidation, operator-ordered 2026-06-11 night):** otr/ top level
+  = episodes/ + obs/ ONLY; every episode asset of record in episodes/<id>/ logical
+  subfolders; system tiers -> episodes/_shared/{cache,tmp,state}; ~8.4 GB dead debris
+  -> attic outside otr/ (operator approves deletes). Converged 1-pass roundtable
+  (~$0.10, Option B unanimous). Tickets OH-0..OH-5 + the binding contract:
+  `docs/2026-06-11-output-tree-consolidation/OUTPUT_TREE_CONTRACT.md`. SEQUENCE: after
+  the current GPU queue drains, BEFORE item 5 (3D meshes must be born per-episode).
 - Operator gates unchanged: Desktop relaunch (look-QA), fresh-render reddish acceptance
   test, latentsync demo set + mixed showcase, whiny-voice P0 matrix + reel, S-3D-0 green
   light, v2.0-alpha-stable tag decision.

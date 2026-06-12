@@ -1,0 +1,6 @@
+tests\test_video_engine_registry_base_additive.py
+tests\test_video_fallback_chain_additive.py
+tests\test_video_humo.py
+tests\test_audio_byte_identical.py
+nodes\_otr_video_engines\registry.py
+nodes\_otr_video_engines\schemas.py
