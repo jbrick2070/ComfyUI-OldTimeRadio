@@ -501,31 +501,34 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
     monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = vreg.get_engine("ltx_video")
     cands = eng._node_candidates_i2v()
-    assert "latent" not in cands
-    assert cands["img2vid"] == ("LTXVImgToVideo",)
+    # BUG-LOCAL-095 fix: LTXVImgToVideoConditionOnly keeps the latent node
+    # (it produces no latent itself -- the sampler needs EmptyLTXVLatentVideo).
+    assert "latent" in cands
+    assert cands["img2vid"] == ("LTXVImgToVideoConditionOnly",)
     assert cands["loadimage"] == ("LoadImage",)
     plan = {"text_prompt": "x", "negative_prompt": "", "fps": 25,
             "target_frame_count": 169, "seed": 7}
     g = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
-    assert "latent" not in g
+    # latent node MUST be present -- ConditionOnly doesn't produce a latent.
+    assert "latent" in g
     assert g["loadimage"]["inputs"]["image"] == "still.png"
     iv = g["img2vid"]["inputs"]
     assert iv["length"] == 169 and iv["width"] == 1472 and iv["height"] == 832
-    # LK-1c mush fix: strength REQUIRED on the installed wrapper; 1.0 =
-    # the probe-proven default (0.75 re-noised the still into red mush).
-    assert iv["strength"] == 1.0
-    # The distilled sampler samples the img2vid latent; conditioning reads
-    # img2vid 0/1 (LK-1b: SamplerCustomAdvanced, not KSampler).
-    assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("img2vid", 2)
+    # LTXVImgToVideoConditionOnly has NO "strength" widget; presence would
+    # cause a wrapper INPUT_TYPES mismatch at execution time.
+    assert "strength" not in iv
+    # Distilled sampler's latent_image comes from EmptyLTXVLatentVideo,
+    # NOT from img2vid (ConditionOnly emits only conditioning, no latent).
+    assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("latent", 0)
     assert tuple(g["cond"]["inputs"]["positive"]) == ("img2vid", 0)
     assert tuple(g["cond"]["inputs"]["negative"]) == ("img2vid", 1)
     # txt2vid graph untouched by the branch
     g2 = eng._build_graph(plan, 169, 1472, 832)
     assert "latent" in g2 and "img2vid" not in g2
-    # ksampler rollback mode keeps the old i2v rewire target
+    # ksampler rollback mode: latent also from "latent" node, not img2vid
     monkeypatch.setenv("OTR_LTX_SAMPLER", "ksampler")
     g3 = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
-    assert tuple(g3["ksampler"]["inputs"]["latent_image"]) == ("img2vid", 2)
+    assert tuple(g3["ksampler"]["inputs"]["latent_image"]) == ("latent", 0)
 
 
 def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):

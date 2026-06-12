@@ -327,52 +327,66 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     def _node_candidates_i2v(self):
         """The image-conditioned graph's node candidates (on the ACTIVE
         sampling set -- LK-1b). resolve_graph_classes fail-LOUD names any
-        missing wrapper class (the probe's first gate)."""
+        missing wrapper class (the probe's first gate).
+
+        BUG-LOCAL-095 fix (2026-06-11): LTXVImgToVideoConditionOnly, NOT
+        LTXVImgToVideo. The difference is fundamental:
+        - LTXVImgToVideo encodes the image INTO the latent (slot 2) and
+          conditions all frames. At strength 1.0 that is a freeze-frame;
+          at 0.75 the 2B re-noises the still into red mush at 1472x832.
+        - LTXVImgToVideoConditionOnly only embeds the image into the FIRST
+          FRAME CONDITIONING (pos/neg, slots 0/1). The sampler still receives
+          a pure-noise EmptyLTXVLatentVideo latent -- the model generates motion
+          freely from frame 1 onward while being anchored to the still's look.
+        Therefore: keep "latent" (EmptyLTXVLatentVideo) in the candidate set;
+        the sampler's latent_image comes from "latent", not "img2vid"."""
         cands = dict(self._node_candidates_sampling())
-        del cands["latent"]
+        # Keep "latent" (EmptyLTXVLatentVideo) -- ConditionOnly output is
+        # (CONDITIONING, CONDITIONING) only; it does not produce a latent.
         cands["loadimage"] = ("LoadImage",)
-        cands["img2vid"] = ("LTXVImgToVideo",)
+        cands["img2vid"] = ("LTXVImgToVideoConditionOnly",)
         return cands
 
     def _build_graph_i2v(self, plan, length, width, height, image_name):
-        """The declarative image-conditioned LTXV graph: LoadImage ->
-        LTXVImgToVideo(positive,negative,vae,image,...) -> LTXVConditioning ->
-        KSampler -> VAEDecode. VERIFY-ON-GPU (the Part-B probe): exact input
-        names + the strength/compression widgets of the installed wrapper's
-        LTXVImgToVideo, and the decode/crop behavior at 1472x832."""
+        """The declarative image-conditioned LTXV graph (BUG-LOCAL-095 fix):
+
+          LoadImage -> LTXVImgToVideoConditionOnly(positive, negative, vae,
+              image, ...) -> LTXVConditioning -> [sampler](latent from
+              EmptyLTXVLatentVideo) -> VAEDecode.
+
+        LTXVImgToVideoConditionOnly embeds the init image into the FIRST FRAME
+        CONDITIONING only (outputs pos+neg conditioning, NO latent). The sampler
+        gets a pure-noise EmptyLTXVLatentVideo latent so it generates real motion.
+        LTXVImgToVideo (the old node) with strength=1.0 froze every frame;
+        at 0.75 it re-noised into mush. ConditionOnly is the DMM-proven path.
+        VERIFY-ON-GPU: exact input names of the installed wrapper's
+        LTXVImgToVideoConditionOnly and decode/crop at 1472x832."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         graph = self._build_graph(plan, length, width, height)
-        del graph["latent"]
+        # Keep "latent" (EmptyLTXVLatentVideo) -- ConditionOnly does NOT
+        # produce a latent; the sampler needs pure-noise init for motion.
         graph["loadimage"] = {"class": "loadimage",
                               "inputs": {"image": image_name}}
-        # LK-1c mush fix (operator eyeball 2026-06-11 night): strength 1.0
-        # is the PROBE-PROVEN default on LTXVImgToVideo -- the C2/C4 matrix
-        # showed 0.75 (the legacy LTXVAddGuide keyframe value) lets the 2B
-        # re-noise the still into red mush at 1472x832; at 1.0 the still's
-        # detail/palette hold under BOTH the distilled and ksampler chains.
-        # (The legacy 0.75 belonged to a DIFFERENT node + 832x480 canvas.)
-        try:
-            strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
-        except (TypeError, ValueError):
-            strength = 1.0
+        # LTXVImgToVideoConditionOnly: takes (positive, negative, vae, image,
+        # width, height, length, batch_size); outputs (CONDITIONING, CONDITIONING).
+        # No "strength" widget -- the image is always embedded at full weight
+        # into the first-frame conditioning. That is what gives motion.
         graph["img2vid"] = {
             "class": "img2vid",
             "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
                        "vae": W("checkpoint", 2), "image": W("loadimage", 0),
                        "width": int(width), "height": int(height),
-                       "length": int(length), "batch_size": 1,
-                       # REQUIRED by the installed wrapper (live /object_info
-                       # 2026-06-11); conditioning strength of the init frame.
-                       "strength": strength}}
+                       "length": int(length), "batch_size": 1}}
         graph["cond"] = {
             "class": "cond",
             "inputs": {"positive": W("img2vid", 0), "negative": W("img2vid", 1),
                        "frame_rate": float(self.target_fps)}}
-        # LK-1b: the sampler node differs by mode -- rewire whichever holds
-        # the latent_image input (distilled = SamplerCustomAdvanced).
+        # BUG-LOCAL-095: sampler latent_image comes from the pure-noise
+        # EmptyLTXVLatentVideo ("latent"), NOT from the img2vid node (which
+        # produces no latent). This is what enables motion past frame 0.
         sampler_node = "sampleradv" if "sampleradv" in graph else "ksampler"
-        graph[sampler_node]["inputs"]["latent_image"] = W("img2vid", 2)
+        graph[sampler_node]["inputs"]["latent_image"] = W("latent", 0)
         return graph
 
     # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----

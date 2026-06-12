@@ -843,7 +843,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # drift; the get_open_subject lead stays parity-locked).
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
-                max_chars=240, style_tail=False, era_profile="still")
+                max_chars=188, style_tail=False, era_profile="still")
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "composed from the episode brief (%d chars): "
                          "%.90s...", _shot_role, shot.get("shot_id"),
