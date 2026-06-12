@@ -501,34 +501,43 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
     monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = vreg.get_engine("ltx_video")
     cands = eng._node_candidates_i2v()
-    # BUG-LOCAL-095 fix: LTXVImgToVideoConditionOnly keeps the latent node
-    # (it produces no latent itself -- the sampler needs EmptyLTXVLatentVideo).
+    # Installed wrapper API (2026-06-12): LTXVImgToVideoConditionOnly CONSUMES the
+    # pure-noise EmptyLTXVLatentVideo ("latent") and returns the image-anchored
+    # latent, so the latent node stays in the candidate set.
     assert "latent" in cands
     assert cands["img2vid"] == ("LTXVImgToVideoConditionOnly",)
     assert cands["loadimage"] == ("LoadImage",)
     plan = {"text_prompt": "x", "negative_prompt": "", "fps": 25,
             "target_frame_count": 169, "seed": 7}
     g = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
-    # latent node MUST be present -- ConditionOnly doesn't produce a latent.
+    # latent node MUST be present -- img2vid takes it as an input.
     assert "latent" in g
     assert g["loadimage"]["inputs"]["image"] == "still.png"
     iv = g["img2vid"]["inputs"]
-    assert iv["length"] == 169 and iv["width"] == 1472 and iv["height"] == 832
-    # LTXVImgToVideoConditionOnly has NO "strength" widget; presence would
-    # cause a wrapper INPUT_TYPES mismatch at execution time.
-    assert "strength" not in iv
-    # Distilled sampler's latent_image comes from EmptyLTXVLatentVideo,
-    # NOT from img2vid (ConditionOnly emits only conditioning, no latent).
-    assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("latent", 0)
-    assert tuple(g["cond"]["inputs"]["positive"]) == ("img2vid", 0)
-    assert tuple(g["cond"]["inputs"]["negative"]) == ("img2vid", 1)
+    # Installed signature: (vae, image, latent, strength) -> LATENT. No
+    # positive/negative/width/height/length; feeding the old kwargs raised
+    # "unexpected keyword argument 'positive'". strength MUST be present (1.0 default).
+    assert tuple(iv["vae"]) == ("checkpoint", 2)
+    assert tuple(iv["image"]) == ("loadimage", 0)
+    assert tuple(iv["latent"]) == ("latent", 0)
+    assert iv["strength"] == 1.0
+    assert "positive" not in iv and "negative" not in iv
+    # Distilled sampler's latent_image is the image-anchored img2vid LATENT now
+    # (NOT the raw pure-noise latent); conditioning flows from the text encoders.
+    assert tuple(g["sampleradv"]["inputs"]["latent_image"]) == ("img2vid", 0)
+    assert tuple(g["cond"]["inputs"]["positive"]) == ("pos", 0)
+    assert tuple(g["cond"]["inputs"]["negative"]) == ("neg", 0)
     # txt2vid graph untouched by the branch
     g2 = eng._build_graph(plan, 169, 1472, 832)
     assert "latent" in g2 and "img2vid" not in g2
-    # ksampler rollback mode: latent also from "latent" node, not img2vid
+    # ksampler rollback mode: latent_image also comes from img2vid
     monkeypatch.setenv("OTR_LTX_SAMPLER", "ksampler")
     g3 = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
-    assert tuple(g3["ksampler"]["inputs"]["latent_image"]) == ("latent", 0)
+    assert tuple(g3["ksampler"]["inputs"]["latent_image"]) == ("img2vid", 0)
+    # strength is env-overridable + clamped
+    monkeypatch.setenv("OTR_LTX_I2V_STRENGTH", "0.5")
+    g4 = eng._build_graph_i2v(plan, 169, 1472, 832, "still.png")
+    assert g4["img2vid"]["inputs"]["strength"] == 0.5
 
 
 def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):

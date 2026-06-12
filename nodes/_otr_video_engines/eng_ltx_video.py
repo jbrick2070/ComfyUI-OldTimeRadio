@@ -341,26 +341,29 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         Therefore: keep "latent" (EmptyLTXVLatentVideo) in the candidate set;
         the sampler's latent_image comes from "latent", not "img2vid"."""
         cands = dict(self._node_candidates_sampling())
-        # Keep "latent" (EmptyLTXVLatentVideo) -- ConditionOnly output is
-        # (CONDITIONING, CONDITIONING) only; it does not produce a latent.
+        # Keep "latent" (EmptyLTXVLatentVideo) -- the installed ConditionOnly node
+        # CONSUMES that pure-noise latent (writes the image into its first frame +
+        # a noise_mask) and returns the conditioned latent for the sampler.
         cands["loadimage"] = ("LoadImage",)
         cands["img2vid"] = ("LTXVImgToVideoConditionOnly",)
         return cands
 
     def _build_graph_i2v(self, plan, length, width, height, image_name):
-        """The declarative image-conditioned LTXV graph (BUG-LOCAL-095 fix):
+        """The declarative image-conditioned LTXV graph (BUG-LOCAL-095 motion
+        contract; rewired 2026-06-12 for the installed wrapper API):
 
-          LoadImage -> LTXVImgToVideoConditionOnly(positive, negative, vae,
-              image, ...) -> LTXVConditioning -> [sampler](latent from
-              EmptyLTXVLatentVideo) -> VAEDecode.
+          EmptyLTXVLatentVideo("latent") + LoadImage -> LTXVImgToVideoConditionOnly
+              (vae, image, latent, strength=1.0) -> [sampler].latent_image ->
+              VAEDecode; conditioning from CLIPTextEncode -> LTXVConditioning("cond").
 
-        LTXVImgToVideoConditionOnly embeds the init image into the FIRST FRAME
-        CONDITIONING only (outputs pos+neg conditioning, NO latent). The sampler
-        gets a pure-noise EmptyLTXVLatentVideo latent so it generates real motion.
-        LTXVImgToVideo (the old node) with strength=1.0 froze every frame;
-        at 0.75 it re-noised into mush. ConditionOnly is the DMM-proven path.
-        VERIFY-ON-GPU: exact input names of the installed wrapper's
-        LTXVImgToVideoConditionOnly and decode/crop at 1472x832."""
+        The installed LTXVImgToVideoConditionOnly writes the encoded image into the
+        FIRST latent frame(s) and attaches noise_mask = 1.0-strength there (1.0 on
+        all later frames). At strength=1.0 the first frame is locked to the still
+        and the rest denoise freely -> anchored start + real motion. This keeps the
+        BUG-LOCAL-095 contract that defeated the LTXVImgToVideo freeze/red-mush;
+        only the node's signature changed (it now takes + returns a LATENT instead
+        of emitting conditioning, so positive/negative come from the text encoders).
+        VERIFY-ON-GPU: motion is present (NOT a freeze-frame) + decode/crop 1472x832."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         graph = self._build_graph(plan, length, width, height)
@@ -368,25 +371,33 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # produce a latent; the sampler needs pure-noise init for motion.
         graph["loadimage"] = {"class": "loadimage",
                               "inputs": {"image": image_name}}
-        # LTXVImgToVideoConditionOnly: takes (positive, negative, vae, image,
-        # width, height, length, batch_size); outputs (CONDITIONING, CONDITIONING).
-        # No "strength" widget -- the image is always embedded at full weight
-        # into the first-frame conditioning. That is what gives motion.
+        # LTXVImgToVideoConditionOnly (installed wrapper API, confirmed 2026-06-12):
+        # inputs (vae, image, latent, strength[, bypass]); returns ONE LATENT.
+        # Its generate() writes the encoded image into the FIRST latent frame(s)
+        # and attaches noise_mask = 1.0-strength on those frames (1.0 elsewhere).
+        # At strength=1.0 the first frame is LOCKED to the still (mask 0.0) while
+        # every later frame is freely denoised (mask 1.0) -> anchored start + real
+        # motion. This PRESERVES the BUG-LOCAL-095 motion contract (no freeze, no
+        # red mush); only the node's signature changed. It no longer emits
+        # conditioning -- positive/negative still flow from the text encoders via
+        # the base "cond" (LTXVConditioning) node, left untouched here.
+        # (Pre-2026-06-12 the node took positive/negative and output conditioning;
+        # feeding the old kwargs now raises "unexpected keyword argument 'positive'".)
+        try:
+            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
+        except (TypeError, ValueError):
+            cond_strength = 1.0
+        cond_strength = max(0.0, min(1.0, cond_strength))
         graph["img2vid"] = {
             "class": "img2vid",
-            "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
-                       "vae": W("checkpoint", 2), "image": W("loadimage", 0),
-                       "width": int(width), "height": int(height),
-                       "length": int(length), "batch_size": 1}}
-        graph["cond"] = {
-            "class": "cond",
-            "inputs": {"positive": W("img2vid", 0), "negative": W("img2vid", 1),
-                       "frame_rate": float(self.target_fps)}}
-        # BUG-LOCAL-095: sampler latent_image comes from the pure-noise
-        # EmptyLTXVLatentVideo ("latent"), NOT from the img2vid node (which
-        # produces no latent). This is what enables motion past frame 0.
+            "inputs": {"vae": W("checkpoint", 2), "image": W("loadimage", 0),
+                       "latent": W("latent", 0), "strength": cond_strength}}
+        # The image-anchored latent (carrying its first-frame noise_mask) IS the
+        # sampler's latent_image now -- NOT the raw pure-noise EmptyLTXVLatentVideo.
+        # Conditioning is unchanged: the base "cond" node still reads pos/neg from
+        # the text encoders, so motion past frame 0 is driven normally.
         sampler_node = "sampleradv" if "sampleradv" in graph else "ksampler"
-        graph[sampler_node]["inputs"]["latent_image"] = W("latent", 0)
+        graph[sampler_node]["inputs"]["latent_image"] = W("img2vid", 0)
         return graph
 
     # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----
