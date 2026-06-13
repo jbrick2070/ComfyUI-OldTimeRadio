@@ -68,9 +68,15 @@ ONE coder window in the code at a time; serialize the Wan window vs any other vi
    `wan_ti2v`) pass, so it stays RED until item 3 lands; that is expected. This re-run also answers the
    one open R2 question: whether `humo_1.7B` renders NATIVE char beats at 70w once its enable flag is on
    (the soak floored it only because the flag was off). **GATE-A precondition: harden the
-   sweep FIRST (section 4A M1-M4) -- as wired it scores a silent fallback, an
-   empty-results run, OR a missing VRAM measurement as GREEN, so "coverage sweep GREEN"
-   is meaningless until those land.**
+   sweep FIRST (section 4A M1-M4) -- DONE 2026-06-13: the M1-M5 acceptance gate landed
+   (`scripts/otr_coverage_sweep.py --acceptance`), so a silent fallback / empty-results
+   run / missing VRAM measurement now scores RED, not GREEN.**
+   **S6 harness reality:** `otr_coverage_sweep.py` enumerates ONLY the visual-engine
+   leg-set today (the dropdown rotation). The writer-LLM leg-set (node-1
+   `creative_writing_model`/`technical_model`) and the curated voice-variation leg-set
+   are NOT yet wired into a runnable harness -- TODO: point them at a real driver
+   (e.g. a `run_combo_matrix.py`) or run them as separate parametrized soak legs.
+   "Coverage sweep GREEN" today means the visual-engine set only.
 5. **3D sprints.** s2 = S-3D-0 spike + T1 template + T2a wrap smoke; then the `character_3d` family
    (image-routing must-fixes already landed). Detail in the 3D plan (pointers).
 6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README (closing phase).
@@ -100,6 +106,10 @@ that commit + git history of this file.
   mode, `canonicalize`, profile hook + tests) -- do NOT alias `WanI2VEngine`.
 - **Eyeball gate.** Present both webms (I2V-14B vs TI2V-5B, same still + prompt) in
   `docs/2026-06-12-ltx23-motion/wan_clips/`. Bar = real camera motion, still preserved, no warp.
+  **S3 motion risk to watch:** the wired I2V-14B fp8 is a SINGLE low-noise expert (the
+  two-expert HIGH/LOW MoE handoff, Path B, is NOT wired -- see `eng_wan_i2v` header). If
+  the "real camera motion" bar FAILS (motion too subtle / static), the Path B two-expert
+  HIGH/LOW handoff is the mitigation, not a knob tweak. Call this out at the eyeball.
 - **Risk CS-3 (reframed):** sequential-residency, NOT co-residency -- see section 4A M9
   and the section-5 CS-3 entry. The supervised Wan batch proves the inter-beat reclaim,
   it does not "decide if they co-stage."
@@ -113,15 +123,31 @@ grounding against the real code. Full judgment + raw reviews:
 `docs/2026-06-13-goforward-wan-hardening/`. These gate item 3 (Wan) and item 4 (sweep
 GREEN). MUST-FIX -- until M1-M4 land, a GREEN sweep is meaningless:
 
-> **STATUS 2026-06-13 (autonomous build):** the GATE-A precondition M1-M5 has
-> LANDED and is unit-tested. M1 + M4 = `9b2294b` (no-runtime-fallback gate +
-> VRAM fail-closed, 12 tests); M2 + M3 + M5 = `0ab55bc` (sweep `--acceptance`
-> mode: empty/required-engine exit code + Wan enable-flag / OTR_TEST_MODE /
-> --exclude preflight, 17 tests). The coverage sweep can now DETECT what it
-> gates. M6/M7 (Wan loader + clip-contract) and the S-fixes follow; M9 (CS-3
-> sequential residency) stays a live-GPU proof obligation. The sweep still goes
-> RED in acceptance until `wan_ti2v` is built + both Wan engines PASS -- that is
-> correct by construction (item 3 must land first).
+> **STATUS 2026-06-13 (autonomous build) -- LANDING LEDGER:**
+> - **M1 + M4** `9b2294b` -- no-runtime-fallback gate + VRAM fail-closed (12 tests).
+> - **M2 + M3 + M5** `0ab55bc` -- sweep `--acceptance`: empty/required-engine exit
+>   code + Wan enable-flag / OTR_TEST_MODE / --exclude preflight (17 tests).
+> - **M6** `ec91a3c` -- `assert_usable` preflights UNET + umt5 CLIP + VAE (8 tests).
+> - **M7** `f71edaa` -- render_clip ffprobe-PROVES the silent-clip contract (13 tests).
+> - **S1 + S5** `dfe9ab5` -- wan_i2v vram_estimate 14500 + real wan2.2-i2v asset id.
+> - **S7 + S10** `f3a529f` -- per-shot/seed init staging + Pillow-required fail-loud.
+> - **S3 / S6 / S8** -- folded into this doc (MoE eyeball risk, sweep-harness reality,
+>   the exact acceptance invocation below).
+>
+> **DEFERRED (blocked, not skipped):** **M8 + S2** (wan_ti2v VAE fail-closed + its
+> CAPABILITIES row) need the `wan_ti2v` engine, whose 5B core node class must be
+> captured from a live `/object_info` first (the registry consistency invariant
+> forbids a CAPABILITIES row without a registered engine). **M9** (CS-3 sequential
+> residency) + **S4** (leg isolation/reclaim) + **S9** (post-reset verify) are
+> live-GPU proof obligations for the acceptance run. The acceptance sweep is RED by
+> construction until `wan_ti2v` is built and BOTH Wan engines PASS -- correct, not a bug.
+>
+> **S8 -- exact acceptance invocation** (ComfyUI venv python; live server on :8000;
+> `OTR_TEST_MODE` UNSET; `OTR_ENABLE_WAN_I2V=1` (+ `OTR_ENABLE_WAN_TI2V=1` once built);
+> Wan UNET + umt5 CLIP + VAE on disk):
+> `python scripts\otr_coverage_sweep.py --acceptance --only wan`
+> (`--only wan` matches the `sweep_<slot>_wan_i2v` / `_wan_ti2v` legs; drop `--only`
+> for the full visual set. `--exclude` of a core Wan engine is REFUSED in acceptance.)
 
 - **M1 -- the sweep is BLIND to silent fallback.** `otr_coverage_sweep.py` runs every
   leg with `expect_engine=""`, which `_otr_soak_capstone.py:464` treats as
