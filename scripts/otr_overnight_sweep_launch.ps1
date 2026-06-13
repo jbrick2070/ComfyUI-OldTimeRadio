@@ -48,6 +48,18 @@ $env:HF_HOME = 'C:\ComfyUI-Models\huggingface'
 # news_seed) instead of HALTING the leg. Production leaves this unset so the
 # graph widget default (news_briefs_required=True, fail-closed) governs.
 $env:OTR_NEWS_BRIEFS_REQUIRED = '0'
+# R2 + 0-E coverage: make the engine enable-set EXPLICIT in this launcher so the
+# nightly never depends on ambient env. The 2026-06-13 soak floored humo_1.7B
+# (58x) / humo (10x) to still_kenburns with reason=gated_by_flag because
+# OTR_ENABLE_HUMO was unset at this direct main.py boot (the canonical
+# _otr_soak_server_launch.cmd sets it; this ps1 bypassed it). That is NOT an OOM
+# or a forward/wrapper bug -- the HuMo in-process VRAM path (CS-4/BUG-291) is left
+# untouched. Production ship-defaults still gate HuMo OFF; this only makes the
+# engine selectable so the soak permutation legs actually exercise it.
+$env:OTR_ENABLE_HUMO = '1'
+$env:OTR_ENABLE_LTX_ORBIT = '1'
+$env:OTR_ENABLE_STILL_PARALLAX = '1'
+$env:OTR_ENABLE_MESH_STAGE = '1'
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_ENABLE_OPENROUTER -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_CAST_SEED -ErrorAction SilentlyContinue

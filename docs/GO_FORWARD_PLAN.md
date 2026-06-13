@@ -8,7 +8,40 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 LATE (coder: section 1A TASK 0 + Phase 1 + the 5 code-gap fixes DONE and
+> **Last updated:** 2026-06-13 (CODER, soak-fix batch -- R3+R1 LANDED & committed, R2 RESOLVED via
+> the live log. HEAD a31fc24 (R3) -> d33c51f (R1), plus this doc + the R2 launcher fix (NOT yet
+> committed at time of writing). (1) **R3 DONE @ a31fc24:** news key_term prune-to-floor (A2b in
+> `news_interpreter._content_validator` + shared `_term_in_source_strict`, 4 tests) + the
+> `OTR_NEWS_BRIEFS_REQUIRED=0` soak hatch (A2a in `OTR_LedgerScriptWriter` + both launchers). (2)
+> **R1 DONE @ d33c51f:** new `nodes/_otr_video_engines/_tmp.py` fail-closed in-tree allocator
+> (`otr_engine_tmp_mp4`) + all 7 call-site swaps (6 engines + render_driver `audio_slices` rename) +
+> `tests/test_engine_tmp_in_tree.py` (helper behavior + AST forbidden-temp ban over the video-engine
+> package). (3) **R2 RESOLVED (NOT OOM, NOT forward -- it was `gated_by_flag`):** pulled the
+> `format_swap_log` LOUD-FALLBACK lines from the live `comfyui_8000.err.log` -- humo_1.7B floored 58x
+> / humo 10x to still_kenburns with `reason=dependency_missing detail="EngineUnusable ... gated_by_flag
+> -- humo is opt-in; set OTR_ENABLE_HUMO=1"`. HuMo was simply NOT ENABLED at the nightly's direct
+> main.py boot (it bypassed the canonical `_otr_soak_server_launch.cmd` which sets the flag). This
+> RECONCILES the apparent CS-4 contradiction (CS-4 ran 3/3 native WITH HuMo enabled) -> CS-4 stands;
+> the in-process VRAM path is UNTOUCHED per the plan's gate. FIX = made the enable-set explicit in
+> `otr_overnight_sweep_launch.ps1` (OTR_ENABLE_HUMO + the 0-E flags). Native-render verification (does
+> humo_1.7B render 6 beats/70w in-VRAM) is a GPU-soak item, DEFERRED. Suite 4150 pass / Bug Bible 16
+> pass green after R1+R3. NEXT (operator-directed): proceed to Wan section 1A, then the rest of the
+> forward plan; headless/GPU tests LAST.)
+> **Last updated:** 2026-06-13 (planner, soak-review reconciliation pass: cross-checked the soak findings
+> against the big log + open tickets. Two ALREADY-TACKLED items RESURFACED and are now flagged in section 5
+> -- (1) SOAK-R1 is the same `otr_floor_*`->%TEMP% leak the 2026-06-12 3D-quick round-1 "fixed" via the
+> launcher's ambient TEMP repoint only (engines still use bare mktemp -> structural section-1B fix
+> supersedes it); (2) CS-4 "RESOLVED" (humo_1.7B 3/3 native) CONTRADICTS SOAK-R2 (same default 0/6 at 70w)
+> -> downgraded to RESOLVED-WITH-CAVEAT pending the format_swap_log reconcile. Doc-only edits; no code.)
+> **Last updated:** 2026-06-13 (planner, overnight-soak window: ran the dropdown coverage sweep TWICE
+> -- 2x 25 non-Wan legs, 70-word full episodes, 3D engines on. Both 0/25, but EVERY leg rendered a
+> playable, byte-identical final; the failures are ONE systemic hygiene temp-leak (R1) + an intermittent
+> designed writer halt (R3) + a HuMo default-flooring quality finding (R2). Fable reviewed +
+> roundtable-hardened the fixes; the full build-ready coder spec is BAKED IN BELOW as section 1B
+> (one-doc rule -- `scripts/FABLE_SOAK_REVIEW.md` is an evidence copy only). Soak-fix coder thread is
+> QUEUED; the Wan smoke (section 1A) stays the operator's separately-gated thread. NO code pushed;
+> enable-set + section 1A untouched; Wan parked.)
+> **Last updated (2026-06-12 LATE):** (coder: section 1A TASK 0 + Phase 1 + the 5 code-gap fixes DONE and
 > PUSHED @ `2fbc2f3` on v2.0-alpha). TASK 0: node signatures verified vs live /object_info (core
 > UNETLoader / CLIPLoader type=wan / WanImageToVideo[positive,negative,latent] / KSampler / VAEDecode +
 > ModelSamplingSD3; the 5B latent node is `Wan22ImageToVideoLatent`); Sage assert PASS (`Using pytorch
@@ -47,6 +80,11 @@ NOT a verify/enable); 8gb = Wan 2.2 TI2V-5B (two fetches: model + wan2.2 VAE). L
 (LatentSync/HuMo). **The full build-ready coder spec is EMBEDDED below as section 1A** (folded in from
 the old `WAN_VIDEO_CODER_PROMPT.md`, which is now DELETED -- one-doc rule; hardened + GPT-5.5
 roundtabled 2026-06-12). Paste section 1A as message #1 of a fresh coder window.
+
+**PARALLEL CODER THREAD (queued 2026-06-13) -- the SOAK FIX BATCH (section 1B).** The overnight coverage
+sweep (forward-order item 4) ran 2x25 non-Wan legs and is RED on a systemic temp-leak (R1) + writer halt
+(R3) + HuMo default flooring (R2). Section 1B is the build-ready coder spec to turn the non-Wan sweep
+green -- R1 FIRST. Serialize vs the Wan window via this GO file (ONE coder in the code at a time).
 
 ---
 
@@ -170,6 +208,101 @@ serialize via the GO file; update THIS doc + the otr-build-tracker every session
 (`pass01_judgment.md` = accepted/tempered/rejected).
 
 ---
+## 1B. SOAK-GREEN FIX BATCH -- UPSTREAM -> DOWNSTREAM (build-ready coder spec; paste to a coder window)
+
+Goal: turn the non-Wan coverage sweep (forward-order item 4) green. Both 2026-06-13 passes were 0/25,
+yet EVERY leg produced a playable OBS final with byte-identical master audio -- so these are targeted
+fixes, not a rebuild. Work the pipeline in STAGE ORDER below; the only re-order is that R1 (the
+render-stage temp-leak) flips most legs green, so land it FIRST within its stage. After each change run
+full `tests/` + Bug Bible (baseline 4136/5, sage); commit per green chunk; do NOT push unprompted. Wan
+parked; enable-set + section 1A untouched. Evidence: `scripts/overnight_soak_report.md`,
+`scripts/overnight_soak_run.log`, `scripts/FABLE_SOAK_REVIEW.md` (grounded + 2-model roundtable).
+
+### STAGE 1 -- WRITER / NEWS (node 1, most upstream) -- R3 key_term halt (intermittent ~1-2/25)
+Working-as-designed fail-closed, not a bug: `OTR_LedgerScriptWriter` exhausts the structured_call
+retries on `PostValidationError: V1: key_term '<theme>' not in source` (gemma invents a theme
+abstraction); `news_briefs_required` defaults TRUE so it HALTS + re-queues. Production re-rolls RSS; a
+soak/batch can't, so a bad story draw aborts the leg. Two policy fixes:
+- A2a (soak escape hatch, trivial): at `OTR_LedgerScriptWriter.py:~2446`, if
+  `os.environ.get("OTR_NEWS_BRIEFS_REQUIRED")=="0"` set `_news_required=False`; set that env in the soak
+  launcher. Off by default; production keeps the widget default. (`os` already imported.)
+- A2b (durable product fix): in `news_interpreter.py::_content_validator` (~798-820), BEFORE returning
+  the V1 failure, prune key_terms that fail a strict word-boundary in-source match and accept if
+  `>=_MIN_KEY_TERMS` survive (NewsBriefs is a plain BaseModel -> assignment safe; `re` already imported).
+  Prunes, never relaxes: <2 grounded terms still halts at V0. Test `tests/test_news_v1_prune.py`
+  (4 terms / 2 fabricated -> prunes to 2 valid; 1-in-source -> still V0-fails).
+
+### STAGE 2 -- AUDIO SPINE -- FROZEN, no change
+Byte-identical master + mux-LAST stay green; the soak proved audio byte-identical on every leg. Do not
+touch (only the upstream whiny-voice TTS fix is ever sanctioned, separate track).
+
+### STAGE 3 -- VISUAL ENGINES / PER-BEAT RENDER -- R1 temp-routing (LAND FIRST) + R2 HuMo flooring
+**R1 -- floor/cheap-family temp-file leak (PRIMARY; flips most legs green).** 7 render helpers mint their
+intermediate mp4 via `tempfile.mktemp/mkstemp` (no `dir=`) / `gettempdir()`, so it lands in the system
+temp dir (%LOCALAPPDATA%\Temp) and is never unlinked (the clip path is consumed downstream by
+SilentComposite, so the engine can't unlink synchronously). They DEPEND on the launcher's ambient TEMP
+repoint holding for the live server -- it didn't -- so the hygiene gate `assert_no_stray_writes`
+(`_otr_soak_capstone.py:212`) fails on every full leg. Sites -> leaked prefix:
+`cheap_families.py:122` otr_floor_* (every leg) - `eng_still_parallax.py:302` otr_parallax_* -
+`eng_ltx_video.py:721` otr_ltx_* - `eng_humo.py:342` otr_humo_* - `eng_latentsync.py:213` otr_lsync_* -
+`eng_wan_i2v.py:286` otr_wan_* (parked; fix anyway) - `render_driver.py:323` gettempdir()/otr_audio_slices.
+Fix: route every intermediate to the in-tree tmp tier (otr/episodes/_shared/tmp), which the OH-3 janitor
+already sweeps, so the clip path stays valid through the compositor and is cleaned after.
+- NEW `nodes/_otr_video_engines/_tmp.py`: `otr_engine_tmp_mp4(prefix)` resolves
+  `_otr_paths.otr_shared_tmp_dir()` (makedirs), `mkstemp(..., dir=that)`, close+unlink -> returns a
+  NON-EXISTENT path (legacy mktemp contract; OTR ffmpeg all pass `-y`). FAIL-CLOSED: if the dir can't
+  resolve and `OTR_TEST_MODE` is unset -> RAISE (never fall back to the system temp dir -- the
+  roundtable MUST-FIX that otherwise preserves the leak). Cold-import clean (V-12), stdlib only at module
+  scope, lazy `_otr_paths` import, UTF-8/ASCII.
+- Swap the 6 engine sites to `from ._tmp import otr_engine_tmp_mp4` + `out_path = otr_engine_tmp_mp4(prefix)`
+  (delete the dead `os.close(fd)` on the two mkstemp sites + the now-unused lazy `import tempfile`).
+- `render_driver.py:323`: base = `_in_tree_tmp_dir() or gettempdir()`, leaf `audio_slices` (drop the
+  `otr_` prefix so even the fallback never matches the gate's otr* scan).
+- Tests: `tests/test_engine_tmp_in_tree.py` (monkeypatch otr_shared_tmp_dir -> tmp_path; assert path
+  under it, non-existent on return, no otr_* in gettempdir; + fail-closed RuntimeError case). Extend the
+  b7 AST forbidden-sweep: no `nodes/**` may `mktemp(`/`mkstemp(`/`gettempdir()` an `otr_*` artifact except
+  via `otr_engine_tmp_mp4`/`_in_tree_tmp_dir`. Risk LOW (parent dir moves only). Acceptance: a 1-leg soak
+  goes hygiene-green.
+**R2 -- HuMo / motion engines floor at 70w (DEFAULT char path quality finding).** All HuMo handles on
+disk; init_image + per-beat audio wired correctly; the demotion happens at LOAD/FORWARD and the fallback
+chain (humo->humo_1.7B->latentsync->still_kenburns) catches it LOUD. EXPECTED: latentsync 0/6 (needs a
+base_clip_ref the 70w soak doesn't supply), triposg/mesh_stage 0/6 (3D toolchain/assets). CONCERNING:
+the DEFAULT humo_1.7B 0/6 with all files present = a runtime forward/lease failure or a co-residency
+spike, NOT missing input. DO NOT blind-edit the in-process VRAM path (CS-4/BUG-291 is the most fragile
+area). GATE on ONE log line: pull a HuMo leg's `format_swap_log` from the LIVE server `otr_runtime.log`
+(the client `overnight_soak_run.log` has only the histogram) and branch -- `kind==OOM` -> land the CS-4
+lazy umt5-TE detach (free umt5 after CLIPTextEncode, before the HuMo sampler) + confirm the 1.7B
+pre-render reclaim drains the still phase; a forward/wrapper error -> fix wrapper-node resolution / Sage
+/ the 4n+1 length path in `eng_humo._build_graph`. Keep HuMo selectable-not-default until it lands; the
+eventual fix is GPU-soaked (<=14.5GB, audio byte-identical) before shipping. Test: GPU-smoke asserts
+final_engine=="humo_1.7B" (real face, not still_kenburns) on a fixed-seed 1-beat episode.
+
+### STAGE 4 -- COMPOSITE + MUX -- FROZEN, no change
+SilentComposite + MasterAudioMux untouched; mux-LAST, no `-shortest`, `test_audio_byte_identical` green.
+
+### STAGE 5 -- HYGIENE GATE + HARNESS + RELEASE DEFAULTS (most downstream)
+- Re-run the 2-pass soak after STAGE 1+3 -- expect ~25/25 on the still/flux/parallax/visualizer/ltx_orbit
+  beats (HuMo/latentsync/3D stay selectable until R2).
+- Output-tree resolver must prefer the LIVE server's `OTR_OUTPUT_DIR` (query /system_stats or boot env),
+  fail LOUD on mismatch -- it picked the stale Documents tree until OTR_SOAK_SERVER_OUTPUT was pinned.
+- `--exclude ENGINE` (repeatable) argparse in `scripts/_otr_overnight_soak_run.py` -- `availability()` is
+  pure profile-fit and never reads OTR_ENABLE_WAN_I2V, so Wan enumerates as runnable unless filtered.
+- Run the OH-3 janitor sweep of `otr_shared_tmp_dir()` at server boot (baseline showed a growing 233-entry
+  %TEMP% backlog); optionally filter the hygiene gate to mtime>leg_start (belt-and-suspenders after R1).
+- Heartbeat: widen the 60s `t=` line to 120-180s / log-on-change; wire status from /queue+/history.
+- **SHIP DEFAULTS now (operator eyeballs 2-3 finals/slot):** announcer_visual=`flux_still` (selectable
+  station_card, still_parallax); music_visual=`visualizer` (selectable ltx_orbit premium-motion,
+  abstract); other_beats/character=`flux_still` (selectable still_parallax). Gate OFF as default until
+  R1/R2 land (keep selectable): humo, humo_1.7B, latentsync, triposg_talk, mesh_stage. wan_i2v parked.
+  Longer episodes: same still-first defaults; re-rank against a 150w/300w soak before changing.
+
+Bigger follow-ons (ranked): a VRAM-budget-aware scheduler (demote heavy engines at PLAN time, not via
+caught OOM -- roots out R2); one sanctioned temp allocator + AST ban (kills the R1 class permanently);
+look-QA automation (face-present on char beats, motion-energy on music beats); longer-episode soak tiers;
+Wan bring-up once unparked.
+
+---
+
 ### (historical -- superseded 2026-06-12 night; all three engines now GREEN)
 **Item 4 -- the dropdown coverage sweep -- is DEFERRED to an on-demand overnight run** (operator
 chose to code first; GPU freed 2026-06-12). Fire it via the one-click `otr-overnight-sweep`
@@ -343,7 +476,7 @@ so the keystone carries no demo pressure.
   proven).
 - **Lane 2 -- Wired into real episodes:** DONE (full smoke renders real beats headless, mux audio
   byte-identical to master).
-- **Lane 3 -- Video models verified live:** ~60%. CS-4 RESOLVED (humo_1.7B default @ `955f134`);
+- **Lane 3 -- Video models verified live:** ~60%. CS-4 RESOLVED-WITH-CAVEAT (humo_1.7B default @ `955f134`; but SOAK-R2 shows that default flooring 0/6 at 70w -- reconcile);
   LTX GPU-verified; Flux live; LK look fixes shipped @`8115c72`. Remaining = the coverage-sweep
   remainder (overnight) + Wan/latentsync legs.
 - **Lane 4 -- First 1-2 3D models rendering:** ~65%. 0-E CPU chain SHIPPED + Phase A complete;
@@ -355,7 +488,11 @@ so the keystone carries no demo pressure.
   sampling -- fine for the 1.7B stack, fatal for the 16.5 GB 14B. NO code regression. ACCEPTANCE
   PASSED: humo_1.7B leg = PASS 38 min, histogram {ltx_video:3, humo_1.7B:3}, audio byte-identical,
   render-phase peak 10,305 MB. `CS-4-open` (lazy): targeted post-encode TE detach for the 14B
-  opt-in lane. Evidence: `docs/2026-06-11-coverage-sweep-triage__tickets.md`.
+  opt-in lane. Evidence: `docs/2026-06-11-coverage-sweep-triage__tickets.md`. **CAVEAT (2026-06-13):**
+  SOAK-R2 shows this same humo_1.7B default flooring 0/6 at 70w -- the reroute avoided the 14B OOM but
+  does NOT by itself guarantee a native 1.7B talking face under the soak's 6-beat/70w load. Reconcile
+  via SOAK-R2's `format_swap_log` (config diff vs regression) before declaring the default char path
+  closed; downgrade this from RESOLVED to RESOLVED-WITH-CAVEAT.
 - **CS-1** -- the two latentsync legs must show latentsync IN THE TRACE (a prior "PASS" was
   fallback-only); BOTH re-run in the sweep.
 - **CS-2** -- machine NVML pins ~16 GB on every leg vs the 14.5 ceiling while driver-phase
@@ -363,6 +500,25 @@ so the keystone carries no demo pressure.
   peak is a partial answer).
 - **CS-3** -- wan_i2v legs need Wan AND HuMo in one episode; if they always co-stage, wan options
   are 16gb-tier-incompatible as wired -- the supervised wan batch decides.
+- **SOAK-R1 (PRIMARY, OPEN)** -- floor/cheap-family temp-leak fails the hygiene gate on every full leg
+  (both 2026-06-13 passes). Fix = section 1B STAGE 3 (in-tree `_tmp.py` + 7 swaps + AST ban). Flips the
+  non-Wan sweep green. **RECURRENCE (already-tackled, resurfaced):** this is the SAME `otr_floor_*` ->
+  %TEMP% leak hit by the 2026-06-12 3D-quick round-1 (section 1 historical, root-cause #2). That pass
+  "fixed" it only by booting through the launcher's AMBIENT `TEMP` repoint (`_otr_soak_server_launch.cmd`)
+  -- the engines still use bare `mktemp`, so it came straight back the moment the overnight-soak server
+  booted on a path where the repoint did not hold. The section-1B in-tree helper is the STRUCTURAL fix
+  and supersedes the ambient patch (do not rely on TEMP again).
+- **SOAK-R2 (OPEN)** -- the DEFAULT humo_1.7B floors 0/6 char beats at 70w (all models on disk);
+  root-cause via ONE `otr_runtime.log` `format_swap_log` line before any VRAM edit (section 1B STAGE 3).
+  Keep HuMo selectable-not-default meanwhile. **CONTRADICTS CS-4 (already-tackled, resurfaced):** the
+  CS-4 acceptance had humo_1.7B render 3/3 NATIVE beats (histogram {ltx_video:3, humo_1.7B:3}, 38 min,
+  render-phase peak 10,305 MB); the soak has the SAME engine 0/6. The `format_swap_log` step MUST
+  reconcile the two -- a config / word-count / beat-count diff (CS-4 acceptance was a different, shorter
+  episode; the soak forces humo_1.7B into 6 beats/leg at 70w) vs a real regression since `955f134`.
+  Until reconciled, CS-4 is RESOLVED-WITH-CAVEAT, not closed.
+- **SOAK-R3 (OPEN, intermittent ~1-2/25)** -- writer key_term V1 halt on a fabricated theme word;
+  A2a env hatch (soak) + A2b prune-to-floor (durable), section 1B STAGE 1. Working-as-designed halt,
+  policy change only.
 - **TRACK-3 (s1):** the 3D image-routing MUST-FIXES are **LANDED + green 2026-06-12**
   (`video_policy_json` required+forceInput+fail-closed; `enforce_3d_granularity_lock` raises;
   `_is_3d_engine` reads the real `requires_mesh_portrait` capability; that field is real on
