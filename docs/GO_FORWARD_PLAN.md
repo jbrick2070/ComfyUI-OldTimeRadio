@@ -245,7 +245,15 @@ NOTE: suite 4141/0 + Bug Bible green after the sweep-resolver change.
    episode on the S2 applier; no crashes, credits + subtitles present. *(GATE A acceptance, powered
    by GATE B's applier)* -- **CURRENTLY HERE; deferred to the overnight task (section 1).**
    **OVERNIGHT SOAK SCOPE (operator-decided 2026-06-12): PERMUTATION MATRIX ONLY** -- many short
-   30-word legs across the engine permutations; NO single giant episode this round. **Wan is a CORE,
+   **~70-word FULL END-TO-END legs** (length = my pick per the operator: richer than 30 words = more
+   beats/motion/visual surface, still enough legs to fit a night) across the engine permutations; NO
+   single giant episode this round. Each leg is a COMPLETE render (writer -> audio -> visuals ->
+   SilentComposite -> MasterAudioMux; credits + subtitles present) and generates a UNIQUE story via
+   FRESH OS-ENTROPY creative RNGs (cast/style/announcer/story) -- NO cached/fixed script reuse, NO seed
+   pins (do NOT set OTR_C7/OTR_CAST_SEED/OTR_STYLE_SEED; each leg logs `cast RNG seed=... (OS entropy)`)
+   per [[true randomization]]. V-7 determinism is unaffected (per-seed reproducibility within a render,
+   not run-to-run sameness); per leg the audio mux is still byte-identical (master vs final WITHIN the
+   leg). **Wan is a CORE,
    FIRST-CLASS, BLOCKING permutation engine** (operator 2026-06-12, supersedes the earlier
    dark/optional call): `wan_i2v` (and `wan_ti2v` once built) enumerate + run as core video-engine
    legs like any other engine, and COUNT toward the sweep pass gate (`passed == len`) -- the sweep is
@@ -254,8 +262,24 @@ NOTE: suite 4141/0 + Bug Bible green after the sweep-resolver change.
    so `availability()` returns ok and the wan leg enumerates as runnable (no non-blocking partition --
    Wan is core). EXPECTED: the sweep stays RED until the section-1A Wan build + code-gap fixes land;
    that is correct (Wan is the headline video engine). `wan_ti2v` joins once that engine exists
-   (section 1A task 3). A long mixed episode is the only thing that exercises CS-3 (Wan+HuMo co-stage
-   VRAM) -- deferred this round per the operator; revisit after the Wan eyeball.
+   (section 1A task 3).
+   **MATRIX DIMENSIONS (operator 2026-06-12):** cover (1) MULTIPLE WRITER LLMs and (2) MULTIPLE engine
+   variations for EACH of the three visual slots -- `music_visual`, `announcer_visual`,
+   `other_beats_visual`/cast (Wan core in the video slots). Structure it ADDITIVE, not a full
+   cross-product: a WRITER leg-set that varies the writer LLM (node 1 `creative_writing_model`/
+   `technical_model`) at default visuals, PLUS the existing visual-engine leg-set that varies each
+   slot's engine at the default writer. Full LLM x visual cross = ~100+ legs / multi-night = OPT-IN
+   quality run, not the nightly. CODER: enumerate the writer-LLM options the same way
+   `enumerate_options()` pulls visual engines from the registry (local Ollama tags + configured cloud
+   slugs); add a `writer_llm` slot dimension to the sweep; each writer leg is a core blocking leg too.
+   **(3) VOICE VARIATIONS too (operator 2026-06-12)** -- not just one voice per engine: vary the cast
+   VOICE within the voice engines as its own leg-set (different `voice_ref_id`/preset picks across
+   indextts2 / bark / kokoro / chatterbox / dia), so the matrix exercises multiple actual voices, not
+   just each engine once. With the unique-story-per-leg RNG already drawing fresh cast each run, the
+   coder adds a small curated voice-variation leg-set (e.g. 2-3 distinct refs per voice engine) on top
+   of the per-engine legs; keep it additive (do not cross voices x writers x visuals).
+   A long mixed episode is the only thing that exercises CS-3 (Wan+HuMo co-stage VRAM) -- deferred this
+   round per the operator; revisit after the Wan eyeball.
 5. **THEN the 3D sprints** -- begin with the 3D plan's image-routing must-fixes (section 3 of that
    spec -- now LANDED), then the `character_3d` family.
 6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README. *(closing
