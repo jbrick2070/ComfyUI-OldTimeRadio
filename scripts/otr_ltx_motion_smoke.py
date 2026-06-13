@@ -39,10 +39,12 @@ MOTION_PROMPT = ("Continuous shot, same console throughout. Tuning dial needle "
                  "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
                  "trembles. Dust motes drift. Slow handheld dolly forward.")
 NEG = "low quality, worst quality, blurry, distorted, watermark, text, static"
+# The ComfyUI-Goofer 8-step distilled schedule (== OTR LTX_DISTILLED_SIGMAS).
+GOOFER_SIGMAS = "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
 
 
 def build_workflow(a) -> dict:
-    return {
+    wf = {
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": a.ckpt}},
         "2": {"class_type": "CLIPLoader",
@@ -61,12 +63,6 @@ def build_workflow(a) -> dict:
         "8": {"class_type": "LTXVConditioning",
               "inputs": {"positive": ["3", 0], "negative": ["4", 0],
                          "frame_rate": float(a.fps)}},
-        "9": {"class_type": "KSampler",
-              "inputs": {"seed": a.seed, "steps": a.steps, "cfg": a.cfg,
-                         "sampler_name": a.sampler, "scheduler": a.scheduler,
-                         "denoise": 1.0, "model": ["1", 0],
-                         "positive": ["8", 0], "negative": ["8", 1],
-                         "latent_image": ["7", 0]}},
         "10": {"class_type": "VAEDecode",
                "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
         "11": {"class_type": "SaveWEBM",
@@ -74,10 +70,37 @@ def build_workflow(a) -> dict:
                           "filename_prefix": f"otr_ltxmotion/{a.tag}",
                           "codec": "vp9", "fps": float(a.fps), "crf": 18.0}},
     }
+    if a.mode == "goofer":
+        # The ComfyUI-Goofer distilled chain: KSamplerSelect + ManualSigmas(8-step)
+        # + CFGGuider(cfg=1.0) + RandomNoise -> SamplerCustomAdvanced. cfg + sigmas
+        # forced to the Goofer recipe regardless of --cfg/--scheduler.
+        wf["9a"] = {"class_type": "KSamplerSelect",
+                    "inputs": {"sampler_name": a.sampler}}
+        wf["9b"] = {"class_type": "ManualSigmas",
+                    "inputs": {"sigmas": a.sigmas}}
+        wf["9c"] = {"class_type": "RandomNoise",
+                    "inputs": {"noise_seed": a.seed}}
+        wf["9d"] = {"class_type": "CFGGuider",
+                    "inputs": {"model": ["1", 0], "positive": ["8", 0],
+                               "negative": ["8", 1], "cfg": 1.0}}
+        wf["9"] = {"class_type": "SamplerCustomAdvanced",
+                   "inputs": {"noise": ["9c", 0], "guider": ["9d", 0],
+                              "sampler": ["9a", 0], "sigmas": ["9b", 0],
+                              "latent_image": ["7", 0]}}
+    else:
+        wf["9"] = {"class_type": "KSampler",
+                   "inputs": {"seed": a.seed, "steps": a.steps, "cfg": a.cfg,
+                              "sampler_name": a.sampler, "scheduler": a.scheduler,
+                              "denoise": 1.0, "model": ["1", 0],
+                              "positive": ["8", 0], "negative": ["8", 1],
+                              "latent_image": ["7", 0]}}
+    return wf
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
+    p.add_argument("--mode", default="ksampler", choices=["ksampler", "goofer"])
+    p.add_argument("--sigmas", default=GOOFER_SIGMAS)
     p.add_argument("--sampler", default="euler")
     p.add_argument("--scheduler", default="normal")
     p.add_argument("--length", type=int, default=97)
