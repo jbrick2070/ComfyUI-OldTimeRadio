@@ -244,6 +244,18 @@ NOTE: suite 4141/0 + Bug Bible green after the sweep-resolver change.
 4. **Dropdown coverage sweep** -- every announcer/music/cast engine option renders a 30-word FULL
    episode on the S2 applier; no crashes, credits + subtitles present. *(GATE A acceptance, powered
    by GATE B's applier)* -- **CURRENTLY HERE; deferred to the overnight task (section 1).**
+   **OVERNIGHT SOAK SCOPE (operator-decided 2026-06-12): PERMUTATION MATRIX ONLY** -- many short
+   30-word legs across the engine permutations; NO single giant episode this round. **Wan is a CORE,
+   FIRST-CLASS, BLOCKING permutation engine** (operator 2026-06-12, supersedes the earlier
+   dark/optional call): `wan_i2v` (and `wan_ti2v` once built) enumerate + run as core video-engine
+   legs like any other engine, and COUNT toward the sweep pass gate (`passed == len`) -- the sweep is
+   NOT green until Wan passes. CODER CHANGE to `scripts/otr_coverage_sweep.py`: boot the sweep server
+   with `OTR_ENABLE_WAN_I2V=1` + `OTR_WAN_I2V_CKPT=...wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`
+   so `availability()` returns ok and the wan leg enumerates as runnable (no non-blocking partition --
+   Wan is core). EXPECTED: the sweep stays RED until the section-1A Wan build + code-gap fixes land;
+   that is correct (Wan is the headline video engine). `wan_ti2v` joins once that engine exists
+   (section 1A task 3). A long mixed episode is the only thing that exercises CS-3 (Wan+HuMo co-stage
+   VRAM) -- deferred this round per the operator; revisit after the Wan eyeball.
 5. **THEN the 3D sprints** -- begin with the 3D plan's image-routing must-fixes (section 3 of that
    spec -- now LANDED), then the `character_3d` family.
 6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README. *(closing
