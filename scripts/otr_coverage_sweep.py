@@ -90,6 +90,77 @@ SLOTS = (
     ("other_beats_visual", "character_video"),
 )
 
+#: The CORE/BLOCKING Wan engines the GATE-A acceptance sweep must exercise --
+#: never --exclude-able in acceptance, each gated behind its enable flag. The
+#: sweep is NOT green until BOTH pass (GO_FORWARD section 4A M2 + M3).
+CORE_WAN_ENGINES = ("wan_i2v", "wan_ti2v")
+WAN_ENABLE_FLAGS = {"wan_i2v": "OTR_ENABLE_WAN_I2V",
+                    "wan_ti2v": "OTR_ENABLE_WAN_TI2V"}
+
+
+# --------------------------------------------------------------------------- #
+# acceptance gates (pure -- CPU-testable; GO_FORWARD section 4A M2 + M3 + M5)
+# --------------------------------------------------------------------------- #
+def acceptance_preflight(env, registered_engines, exclude_args):
+    """GATE-A acceptance preflight. Returns a list of BLOCKING problem strings
+    (empty == clear). Pure: ``env`` is a mapping and ``registered_engines`` is
+    the enumerated registry set, so it is CPU-testable with no server.
+
+    M5: ``OTR_TEST_MODE`` MUST be unset, else eng_wan_i2v skips its render-phase
+    VRAM<=14.5GB assert. M3: every REGISTERED core Wan engine must have its
+    enable flag set to "1" (a gated-off Wan leg enumerates "run", fails
+    assert_usable closed, falls back, and -- pre-M1 -- false-passes; the same
+    gated_by_flag mechanism that floored HuMo-1.7B), and ``--exclude`` must not
+    filter a core Wan engine (the non-Wan sweep's escape hatch is forbidden)."""
+    problems = []
+    test_mode = str(env.get("OTR_TEST_MODE", "")).strip()
+    if test_mode not in ("", "0"):
+        problems.append(
+            "OTR_TEST_MODE=%r is set -- it MUST be unset for acceptance so the "
+            "Wan render-phase VRAM<=14.5GB assert actually runs (M5)" % test_mode)
+    for engine in CORE_WAN_ENGINES:
+        if engine not in registered_engines:
+            # wan_ti2v may not be registered yet (8GB tier not built). A
+            # not-yet-registered core engine is caught by the RESULTS gate (M2),
+            # not the enable-flag preflight.
+            continue
+        flag = WAN_ENABLE_FLAGS[engine]
+        if str(env.get(flag, "0")).strip() != "1":
+            problems.append(
+                "core Wan engine %s is registered but its enable flag %s != 1 "
+                "(M3: acceptance must enable it, else it falls back closed)"
+                % (engine, flag))
+    for ex in exclude_args:
+        hit = next((e for e in CORE_WAN_ENGINES if ex and ex in e), None)
+        if hit is not None:
+            problems.append(
+                "--exclude %r filters core Wan engine %s -- forbidden in "
+                "acceptance (M3)" % (ex, hit))
+    return problems
+
+
+def sweep_exit_code(results, acceptance, required_engines=CORE_WAN_ENGINES):
+    """The sweep process exit code (0 == GREEN). GO_FORWARD section 4A M2.
+
+    The old ``return 0 if passed == len(results)`` made ``0 == 0`` read GREEN on
+    an EMPTY result set (``--only``/``--exclude`` filtered everything out, or
+    ``wan_ti2v`` is unregistered). Here an empty result set is always RED, and a
+    GREEN run needs every leg to PASS. In ``acceptance`` mode it is additionally
+    RED unless every required core engine (wan_i2v AND wan_ti2v) is present in
+    the results with a PASS verdict."""
+    if not results:
+        return 1
+    if not all(r.get("verdict") == "PASS" for r in results):
+        return 1
+    if acceptance:
+        passed_legs = [r.get("leg", "") for r in results
+                       if r.get("verdict") == "PASS"]
+        for engine in required_engines:
+            token = engine.replace(".", "_")
+            if not any(token in leg for leg in passed_legs):
+                return 1
+    return 0
+
 
 def enumerate_options():
     """(slot_key, engine, reason) per dropdown option, FROM THE REGISTRY.
@@ -123,6 +194,13 @@ def main() -> int:
                          "--exclude wan. availability() is pure profile-fit and "
                          "never reads OTR_ENABLE_WAN_I2V, so Wan enumerates as "
                          "runnable unless filtered here (the non-Wan sweep).")
+    ap.add_argument("--acceptance", action="store_true",
+                    help="GATE-A acceptance mode (GO_FORWARD 4A): assert ZERO "
+                         "runtime fallbacks per leg (M1), preflight the Wan "
+                         "enable flags + OTR_TEST_MODE-unset + forbid --exclude "
+                         "of core Wan (M3/M5), and require wan_i2v AND wan_ti2v "
+                         "to PASS (M2). Without it the sweep is the informational "
+                         "dropdown-rotation coverage pass.")
     args = ap.parse_args()
 
     options = enumerate_options()
@@ -133,6 +211,18 @@ def main() -> int:
           % (len(options), len(runnable), len(skipped)), flush=True)
     for s, e, r in skipped:
         print("[sweep]   SKIPPED_DISABLED %s=%s (%s)" % (s, e, r), flush=True)
+
+    if args.acceptance:
+        enumerated = {e for _s, e, _r in options}
+        problems = acceptance_preflight(os.environ, enumerated, args.exclude)
+        if problems:
+            print("[sweep] ACCEPTANCE PREFLIGHT FAILED (%d blocker(s)):"
+                  % len(problems), flush=True)
+            for p in problems:
+                print("[sweep]   BLOCK: %s" % p, flush=True)
+            return 2
+        print("[sweep] acceptance preflight OK: OTR_TEST_MODE unset, core Wan "
+              "enable flags set, no --exclude of core Wan", flush=True)
 
     mapping = load_widget_mapping()
     results = []
@@ -168,7 +258,7 @@ def main() -> int:
         t1 = time.time()
         try:
             rc = soak.run_leg(leg, expect_floor=False, expect_engine="",
-                              profile=profile)
+                              profile=profile, forbid_fallback=args.acceptance)
             verdict = "PASS" if rc == 0 else "RC_%d" % rc
         except soak.SoakFail as exc:
             verdict = "SOAK_FAIL"
@@ -193,10 +283,23 @@ def main() -> int:
 
     _write_summary(options, results, t0, done=True)
     passed = sum(1 for r in results if r["verdict"] == "PASS")
-    print("[sweep] COMPLETE: %d/%d legs PASS (%d skipped-disabled) in %.0f min"
-          % (passed, len(results), len(skipped), (time.time() - t0) / 60.0),
-          flush=True)
-    return 0 if passed == len(results) else 1
+    rc = sweep_exit_code(results, acceptance=args.acceptance)
+    print("[sweep] COMPLETE: %d/%d legs PASS (%d skipped-disabled) in %.0f min "
+          "-> exit %d%s"
+          % (passed, len(results), len(skipped), (time.time() - t0) / 60.0, rc,
+             " [ACCEPTANCE]" if args.acceptance else ""), flush=True)
+    if rc != 0 and not results:
+        print("[sweep] RED: zero legs ran (filters excluded everything, or no "
+              "engine registered) -- an empty sweep is NOT a pass (M2)",
+              flush=True)
+    elif rc != 0 and args.acceptance:
+        missing = [e for e in CORE_WAN_ENGINES
+                   if not any(e.replace(".", "_") in r.get("leg", "")
+                              for r in results if r.get("verdict") == "PASS")]
+        if missing:
+            print("[sweep] RED: acceptance requires PASS for core Wan engine(s) "
+                  "%r -- absent from results (M2)" % missing, flush=True)
+    return rc
 
 
 def _write_summary(options, results, t0, done):
