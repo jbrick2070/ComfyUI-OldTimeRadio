@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-06-13T21:22:24.502389+00:00",
+  "doc": "docs\\2026-06-13-goforward-wan-hardening\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 21880,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 26413,
+      "completion_tokens": 1996,
+      "cost_usd": 0.05297625
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 24657,
+      "completion_tokens": 12559,
+      "cost_usd": 0.021652125
+    }
+  ],
+  "total_cost_usd": 0.0746
+}
