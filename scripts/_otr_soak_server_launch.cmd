@@ -36,6 +36,11 @@ if defined OTR_C7 (
 rem Hydrate per-user secrets a detached shell may not have inherited (the DC
 rem service env snapshot predates setx -- known gotcha). Value is NEVER echoed.
 for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User')"`) do set OPENROUTER_API_KEY=%%k
+rem Hydrate OTR_BLENDER_EXE from the User env too (mesh_stage's pinned portable
+rem Blender; a detached cmd doesn't inherit setx User env -- the same gotcha).
+rem Without it mesh_stage fails closed missing_model -> falls back to
+rem still_parallax (the 2026-06-12 catch: PASS but engine NOT in the trace).
+for /f "usebackq delims=" %%b in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_BLENDER_EXE','User')"`) do set OTR_BLENDER_EXE=%%b
 rem OUTPUT UNIFICATION (operator directive 2026-06-09): even headless, ALL
 rem outputs -- episodes, portraits, finals, EVERYTHING -- land in the REAL
 rem output folder the operator watches. --output-directory pins ComfyUI's
