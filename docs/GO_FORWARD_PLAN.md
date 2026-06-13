@@ -8,7 +8,12 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 (planner HARDENING pass on the Wan coder prompt: grounded the on-disk reality -- 16gb engine is a low-noise-only PLACEHOLDER graph (no high-noise expert on disk), 8gb tier is TWO fetches (5B + wan2.2 VAE), sage-sidecar + assert-in-trace + render-phase-NVML caveats added. Hardened kickoff ready. NEXT = the Wan smoke, coder window. HEAD ae94970, 22 commits unpushed; docs edits this session uncommitted.)
+> **Last updated:** 2026-06-12 (planner: hardened + GPT-5.5-roundtabled the Wan smoke spec and FOLDED IT
+> INTO this doc as section 1A -- the standalone `WAN_VIDEO_CODER_PROMPT.md` is DELETED (one-doc rule).
+> Grounded code gaps now captured: dead `aspect_plan`, post-encode NVML assert misses the sampler peak,
+> topo-order loads UNET before the CLIP free, GGUF/TI2V loader-mode switch, TI2V engine fully
+> unspecified, Sage in-process assert. NEXT = the Wan smoke, coder window (paste section 1A). HEAD
+> ae94970 + docs commit cf7a0ad; further docs edits this session uncommitted.)
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
@@ -27,29 +32,133 @@ MODEL: LTX-2.3 22B = real motion but does NOT fit the 14.5GB ceiling; the old 2B
 but warps. **DECISION (operator): move the video engine to the Wan 2.2 family, two sizes mapped to
 the 8gb/16gb profile tiers, lip-sync kept SEPARATE (LatentSync/HuMo).**
 
-**NEXT CONCRETE STEP -- the Wan 2.2 video-engine SMOKE (coder window):** see
-`docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md` (the ready-to-paste kickoff). Smoke-first,
-EYEBALL-gated (visual, not MAD):
-- **16GB tier = Wan 2.2 I2V-14B** -- LESS DONE THAN THE OLD NOTE CLAIMED (planner hardening
-  2026-06-12): `eng_wan_i2v.py` exists but its `_build_graph` is a SINGLE-UNETLoader + single-KSampler
-  PLACEHOLDER marked "ASSUMED/VERIFY-ON-GPU" -- it does NOT implement the two-expert HIGH/LOW MoE
-  sigma-split its own docstring promises. ONLY the LOW-noise expert is on disk
-  (`wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, 13.3GB); the high-noise expert is NOT.
-  -> SMOKE Path A (low-noise-only, zero download) first; Path B (true two-expert A14B = fetch high-noise
-  + rebuild w/ ModelSamplingSD3 + KSamplerAdvanced split) only if A's motion disappoints. The engine
-  already does `free_after_use keep={unet,vae,terminal}` (umt5 TE freed pre-sampler, CS-4-style) but
-  it is UNVERIFIED on GPU. Fetch GGUF Q5 only if the fp8 render-phase peak busts 14.5GB.
-- **8GB tier = Wan 2.2 TI2V-5B GGUF Q6** -- TWO fetches (NOT one): the 5B model AND the new Wan2.2
-  high-compression VAE (only `wan_2.1_vae` is on disk and it won't drive the 5B). Dense 5B (not a MoE);
-  different node class; wire as a 2nd selectable Wan engine, smoke one b-roll clip.
-ACCEPTANCE: operator eyeballs both clips (real camera motion + still preserved + NO warp); audio
-spine untouched (Wan video is silent; mux byte-identical); smoke must ASSERT wan-in-trace (no
-fallback-PASS, CS-1) + record render-phase NVML separately from whole-run (CS-2); only THEN map to
-tiers + wire the episode (CS-3 = Wan+HuMo co-stage risk). NOTE: `UnetLoaderGGUF` installed; Wan S2V
-sampler nodes are NOT; `umt5_xxl_fp8` + `wan_2.1_vae` on disk; SageAttention is currently importable
-(BUG-070: `resolve_isolation` escalates wan to a cu128 sidecar -- decide uninstall-sage vs sidecar
-before the smoke). All models under `C:\ComfyUI-Models`. Hardened kickoff:
-`docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md`.
+**NEXT CONCRETE STEP -- the Wan 2.2 video-engine SMOKE (coder window).** Smoke-first, EYEBALL-gated
+(visual, not MAD). 16gb = Wan 2.2 I2V-14B (low-noise expert on disk; engine is a PLACEHOLDER graph,
+NOT a verify/enable); 8gb = Wan 2.2 TI2V-5B (two fetches: model + wan2.2 VAE). Lip-sync stays SEPARATE
+(LatentSync/HuMo). **The full build-ready coder spec is EMBEDDED below as section 1A** (folded in from
+the old `WAN_VIDEO_CODER_PROMPT.md`, which is now DELETED -- one-doc rule; hardened + GPT-5.5
+roundtabled 2026-06-12). Paste section 1A as message #1 of a fresh coder window.
+
+---
+
+## 1A. WAN 2.2 VIDEO SMOKE -- BUILD-READY CODER SPEC (embedded; paste to the coder window)
+
+Goal: prove TWO selectable Wan 2.2 VIDEO engines via the FAST smoke harness -- one b-roll motion clip
+from each for Jeffrey's eyeball -- BEFORE any episode wiring. Lip-sync stays SEPARATE on
+LatentSync/HuMo (talking beats route there); the Wan engines do b-roll + camera motion only.
+
+**Grounded on-disk reality (verified 2026-06-12; all models under `C:\ComfyUI-Models`):**
+- ON DISK: `diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors` (~13.3GB, LOW-noise
+  expert ONLY); `text_encoders\umt5_xxl_fp8_e4m3fn_scaled.safetensors`; `vae\wan_2.1_vae.safetensors`.
+- NOT on disk (each = a fetch + sha256 + license, fail-closed, no runtime download): the Wan 2.2
+  HIGH-noise 14B expert; Wan 2.2 TI2V-5B (any quant); the Wan2.2 high-compression VAE (the 5B needs
+  it; `wan_2.1_vae` will NOT drive the 5B); any Wan camera LoRA.
+- `UnetLoaderGGUF` is installed. Wan S2V sampler nodes are NOT.
+- `nodes/_otr_video_engines/eng_wan_i2v.py` EXISTS but its `_build_graph` is a SINGLE-`UNETLoader` +
+  single-`KSampler` PLACEHOLDER marked "ASSUMED/VERIFY-ON-GPU" -- it does NOT implement the two-expert
+  HIGH/LOW MoE sigma-split its own docstring promises, and it has the grounded bugs listed under
+  "Code gaps" below. So the 16gb engine is a BUILD, not a verify/enable.
+
+**TASK 0 -- verify node signatures + isolation BEFORE any render (do not skip).** The exact failure
+that burned a leg this session was node-API drift (`ltx_orbit` passed a `positive=` kwarg a rewritten
+node rejected). (a) Confirm installed signatures of `UNETLoader`, `CLIPLoader` (does it take
+`type="wan"`+`device`?), `WanImageToVideo`, `KSampler`, `VAEDecode`, `ModelSamplingSD3`, and for the
+5B the TI2V latent node + its VAE/TE; reconcile vs `eng_wan_i2v._node_candidates()`/`_build_graph()`
+and FIX the graph to match BEFORE rendering. (b) Print the resolved signatures + model visibility in a
+tiny preflight. (c) **SageAttention isolation:** `WanI2VEngine.resolve_isolation()` escalates to a
+cu128 sidecar whenever `sageattention_patched()` is true -- using core nodes does NOT bypass that code
+path. For the fast in-process smoke, DISABLE/uninstall/prevent SageAttention import AND assert
+`WanI2VEngine().resolve_isolation()` returns in-process; otherwise provision + test the cu128 sidecar
+first. (Sage is currently importable on the box: suite baseline is 4136/5, NOT 4141/0 -- do not chase
+the 5 sage tests as your regression.)
+
+**USE CORE Comfy Wan nodes, NOT the KJ wrapper.** The KJ Wan wrapper's gate-F pin audit wants
+numpy<2 / transformers<=4.51.3; this box is numpy 2.4 / transformers 5.5, and KJNodes is what drags in
+SageAttention. Core Comfy supports A14B natively. Keep the graph on core nodes (`UNETLoader`/
+`CLIPLoader`/`WanImageToVideo`/`KSampler`/`VAEDecode`/`ModelSamplingSD3`). Add `ModelSamplingSD3`
+(sigma shift ~8.0 for 14B, ~5.0 for 5B) -- the placeholder omits it and motion/quality suffers without
+it; record its installed input names + the per-tier defaults in TASK 0.
+
+**Code gaps in `eng_wan_i2v.py` to FIX (grounded; GPT-5.5 roundtable 2026-06-12):**
+1. **`aspect_plan` is dead code.** `render_clip` computes `plan["aspect_plan"]` then stages the RAW
+   init image and `LoadImage`s it -- the pad/crop is never applied (a non-landscape still can be handed
+   raw to `WanImageToVideo` and distort). FIX: materialize the padded/cropped landscape image per
+   `_aspect_plan()` and stage THAT derived file, OR verify the installed `WanImageToVideo` cover/pads
+   without stretch and delete the false engine-level guarantee.
+2. **Render-phase NVML is not actually captured.** `assert_vram_within_ceiling("wan_i2v-render")` fires
+   AFTER `encode_frames_to_silent_mp4` (post-GPU, instantaneous) -> misses the sampler peak. FIX: poll
+   NVML across the render window (first heavy model load through `VAEDecode`) and report whole-run AND
+   render-phase peak separately. Do NOT treat the post-render assert as the 14.5GB gate.
+3. **Execution order loads `UNETLoader` before the CLIP is freed.** `wrapper_bridge._topo_order` is
+   wave-by-wave Kahn (alpha ties): `unet` runs in wave 0, `pos`/`neg` + the `clip` free in wave 1. GPU
+   co-residency is then gated by Comfy's lazy `load_models_gpu` at the sampler -- UNVERIFIED until
+   measured (gap #2). IF the render-phase peak busts 14.5GB, split text-encode into a pre-pass (encode
+   -> free umt5 -> then build the sampler graph) so the umt5 TE (~5.2GB) never co-resides with the 14B
+   (this is the CS-4 mechanism that killed the HuMo 14B).
+4. **GGUF + TI2V need a loader-mode switch.** `_node_candidates()` resolves `UNETLoader` only and
+   `_build_graph()` always emits `unet_name`/`weight_dtype`. FIX: add an explicit loader mode/config,
+   resolve `UnetLoaderGGUF`, emit its installed input names (after TASK 0), and cover BOTH safetensors
+   and GGUF branches fail-closed.
+5. **Stale docstrings.** `eng_wan_i2v` strings still say "install the Wan wrapper + KJNodes pin audit"
+   -- contradicts the core-nodes decision; update them so nobody follows the forbidden dep path.
+
+**Temperature / seeds / determinism + I/O contract:**
+- Wan is TEMPERATURE-FREE (diffusion: seed/steps/cfg/sampler/scheduler/denoise only; temperature lives
+  only in the text writer, not exercised here). The smoke uses a FIXED motion-prompt STRING + a FIXED
+  seed, NO LLM in the loop -- the only variable is the seed.
+- Seed path (verified): `seed_bundle.request_seed` -> `plan["seed"]` -> `KSampler` seed. Log the seed
+  in the clip filename.
+- Determinism (V-7) = SEED-KEYED INPUTS, not bit-identical pixels (GPU attention is not bit-stable).
+  Same seed/prompt/model -> output frame count/fps/dims MUST match; perceptual/hash drift is LOGGED
+  with tolerance, not pass/fail.
+- Output clip contract (engine, Phase 2): silent **mp4** (h264/yuv420p/bt709), `fps 25`, `frame_count`,
+  **`has_audio` MUST be False** (V-1: only `OTR_MasterAudioMux` emits audio -> frozen spine stays
+  byte-identical).
+
+**TASKS (in order):**
+1. **TASK 0 (above), then 16GB Path A smoke -- Phase 1 (FAST eyeball, bare /prompt graph).** Clone
+   `scripts/otr_ltx_motion_smoke.py` -> `scripts/otr_wan_smoke.py` (SaveWEBM): render ONE b-roll clip
+   (radio-console still + fixed motion prompt) at 832x480, fixed seed, low-noise expert. **Pass the
+   loader the basename under `diffusion_models` (NOT the absolute `OTR_WAN_I2V_CKPT` path) and verify
+   `_otr_headless_model_paths.yaml` exposes `C:\ComfyUI-Models\diffusion_models`; fail BEFORE `/prompt`
+   if the name is not visible to Comfy.** No dispatcher/trace/audio assertions in Phase 1. If the fp8
+   render-phase peak busts 14.5GB, fetch GGUF Q5_K_M (~10-11GB) + load via `UnetLoaderGGUF`.
+2. **16GB Phase 2 -- ENGINE leg.** Drive `eng_wan_i2v.render_clip` via the real path
+   (`scripts/otr_run_leg.ps1` / `coverage_sweep --only ...`) after the code-gap fixes. ASSERT `wan_i2v`
+   is the final_engine in the trace (FAIL LOUD on fallback, CS-1) + render-phase NVML <=14.5GB +
+   byte-identical audio mux + silent mp4 contract. **Kill/reset the Phase-1 server before this** (a
+   resident server skews NVML / double-loads).
+3. **8GB tier -- fetch + wire TI2V-5B as a SEPARATE engine.** Pull the TI2V-5B GGUF (Q6 or Q5_K_M) AND
+   the wan2.2 VAE into `C:\ComfyUI-Models\`; record HF repo + sha256 + license each (machine-readable
+   manifest, fail-closed). Define a NEW engine `wan_ti2v` (its own flag/model/VAE env names, registry
+   registration, required_inputs, `_node_candidates` incl. the correct 5B latent node, loader mode,
+   `canonicalize` output, profile-selection hook + tests) -- do NOT just alias `WanI2VEngine`. Smoke
+   Phase 1 then Phase 2, same asserts.
+4. **Eyeball gate:** present BOTH webms (I2V-14B vs TI2V-5B, same still + prompt) under
+   `docs/2026-06-12-ltx23-motion/wan_clips/`. Bar is VISUAL (real camera motion, still preserved, no
+   warp). Lock nothing until Jeffrey confirms.
+5. **Only after eyeball PASS:** map I2V-14B -> 16gb video tier, TI2V-5B -> 8gb video tier, lip-sync on
+   LatentSync/HuMo. Episode per-beat routing (talking -> lip-sync; b-roll/console -> Wan) is a SEPARATE
+   step; **CS-3** (Wan+HuMo co-stage in one episode busting 16GB) is the open risk there -- record each
+   engine's standalone render-phase peak now to inform it.
+
+**DECISION GATE (16GB scope):** Path A = low-noise-only (zero download) FIRST. Path B = true two-expert
+A14B (fetch high-noise + two `UNETLoader`s + `ModelSamplingSD3` + `KSamplerAdvanced` start/end-step
+handoff, with explicit high-expert eviction before the low-expert load, peak measured across the
+handoff) ONLY if Path A's motion disappoints. Do not fetch the high-noise expert until then.
+
+**CUT from the first smoke (do not over-build):** the Wan camera LoRA (not on disk, not needed to prove
+two engines); MAD as a gate (visual is the bar; MAD misled the LTX eval -- optional log only); Path B;
+sidecar provisioning (if the in-process Sage assert passes).
+
+**Hard rules:** single resident heavy <=14.5GB (host NVML, render-phase); 100% local after the TI2V +
+VAE fetches; frozen audio spine untouched (`test_audio_byte_identical` green); determinism (seed-keyed);
+UTF-8 no BOM; SFW; commit per green chunk, do NOT push unprompted. Run full tests/ + Bug Bible after any
+code change (baseline 4136/5). Aggressively reset the GPU before EVERY boot. ONE coder window at a time;
+serialize via the GO file; update THIS doc + the otr-build-tracker every session.
+
+**Evidence:** roundtable (GPT-5.5, grounded) `docs/2026-06-12-ltx23-motion/roundtable-wan-prompt/`
+(`pass01_judgment.md` = accepted/tempered/rejected).
 
 ---
 ### (historical -- superseded 2026-06-12 night; all three engines now GREEN)
