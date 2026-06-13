@@ -118,6 +118,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="",
                     help="substring filter on '<slot>_<engine>' leg names")
+    ap.add_argument("--exclude", action="append", default=[],
+                    help="engine/leg substring(s) to SKIP (repeatable); e.g. "
+                         "--exclude wan. availability() is pure profile-fit and "
+                         "never reads OTR_ENABLE_WAN_I2V, so Wan enumerates as "
+                         "runnable unless filtered here (the non-Wan sweep).")
     args = ap.parse_args()
 
     options = enumerate_options()
@@ -135,6 +140,12 @@ def main() -> int:
     for slot_key, engine in runnable:
         leg = "sweep_%s_%s" % (slot_key, engine.replace(".", "_"))
         if args.only and args.only not in leg:
+            continue
+        _excl = next((x for x in args.exclude if x and (x in leg or x in engine)),
+                     None)
+        if _excl is not None:
+            print("[sweep]   SKIPPED_EXCLUDED %s (matched --exclude %r)"
+                  % (leg, _excl), flush=True)
             continue
         profile = profile_for(slot_key, engine)
         try:
