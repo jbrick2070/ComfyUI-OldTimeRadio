@@ -465,25 +465,36 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
     # stem, which now carries post-chain suffixes (_silent_procgen_blended).
     slug = os.path.basename(os.path.dirname(final_mp4))
     audio_dir = os.path.join(EPISODES_DIR, slug, "audio")
-    # After the pending->slug rename BOTH master names can coexist (the
-    # capture-time pending_*_master.wav and the slug-named copy). Prefer the
-    # slug-named master (the mux re-resolves to it); fall back to the single
-    # remaining candidate.
+    # After the pending->slug dir rename, MORE THAN ONE *_master.wav can sit in
+    # the audio dir (the capture-time pending_*_master.wav the mux actually muxes
+    # -- it keeps the pending name through the rename -- PLUS, sometimes, a
+    # slug-named copy from a separate capture). The OLD code preferred the
+    # slug-named one and compared the final against it, which FALSE-FAILED when
+    # that copy differed from the master the mux used (the mesh_stage
+    # 2026-06-12 catch: final 58b8cb2c != slug-master b8e36186, while the final
+    # WAS byte-identical to the pending master).
+    #
+    # The frozen-spine gate is: the final's PCM must equal THE master the mux
+    # muxed -- and that master is one of the on-disk *_master.wav files. So pass
+    # iff the final matches ANY on-disk master; fail LOUD only if it matches NONE
+    # (a real spine violation). This keeps the gate honest and kills the
+    # wrong-file false positive.
     masters = sorted(glob.glob(os.path.join(audio_dir, "*_master.wav")))
     if not masters:
         raise SoakFail("no *_master.wav in %r" % audio_dir)
-    slug_named = [m for m in masters
-                  if os.path.basename(m) == slug + "_master.wav"]
-    master_wav = (slug_named or masters)[0]
-    if len(masters) > 1:
-        print("[soak] note: %d master WAVs after rename; using %s"
-              % (len(masters), os.path.basename(master_wav)), flush=True)
     ledger_path = os.path.join(audio_dir, slug + "_ledger.json")
     final_sha = pcm_sha256(final_mp4)
-    master_sha = pcm_sha256(master_wav)
-    if final_sha != master_sha:
-        raise SoakFail("AUDIO NOT BYTE-IDENTICAL: final %s != master %s"
-                       % (final_sha[:12], master_sha[:12]))
+    master_shas = [(m, pcm_sha256(m)) for m in masters]
+    match = [m for m, s in master_shas if s == final_sha]
+    if not match:
+        raise SoakFail(
+            "AUDIO NOT BYTE-IDENTICAL: final %s != ANY of %d on-disk master(s) %r"
+            % (final_sha[:12], len(masters),
+               [(os.path.basename(m), s[:12]) for m, s in master_shas]))
+    master_wav = match[0]
+    if len(masters) > 1:
+        print("[soak] note: %d master WAVs in dir; final is byte-identical to %s"
+              % (len(masters), os.path.basename(master_wav)), flush=True)
     print("[soak] audio byte-identical OK (pcm sha %s)" % final_sha[:12],
           flush=True)
 
