@@ -182,6 +182,33 @@ node class from `/object_info` before coding (the "5B latent node" is underspeci
 
 ---
 
+## WAN 2.2 SMOKE BUILD — Phase 1 RESULT (2026-06-13)
+
+Branch: v2.0-alpha. HEAD == origin. Suite: 4141 passed, Bug Bible green.
+
+Commits landed:
+  - 2fbc2f3 — 5 code-gap fixes (TASK 0 + Phase 1)
+  - 8eaf058 — doc note
+
+Result: first Wan b-roll clip in hand — real motion, no warp, wan_i2v 14B fp8 in-process at ~14.5 GB ceiling. Phase 1 PROVEN.
+
+PHASE 2 — PARKED AT CS-3 SCOPING FORK
+Open scoping decision needed before continuing:
+  (a) Wan-only other-beats leg
+  (b) Full Wan+HuMo co-stage episode (~24 min render) — co-staging Wan b-roll + HuMo talking beats can bust 16 GB
+  (c) TI2V-5B fetch first so both eyeball clips are ready
+Phase 2 also requires `wan_i2v` added to the 16gb_full profile enable-set.
+
+COMPANION FINDINGS FROM 2026-06-13 OVERNIGHT COVERAGE SOAK
+  - 2-pass run on non-Wan engines: 0/25 PASS / every leg rendered a playable byte-identical final → sweep wrong-as-wired (CS-1 class). Coverage sweep ran every leg with expect_engine="" which the soak treats as informational; silent fall-back to radio floor scored PASS. Coverage GREEN was meaningless.
+  - R1 temp-leak fix (in-tree allocator + 7 call-site swaps + audio-slice rename + b7 AST ban) — GPU-PROVEN on full 70-word other_beats_visual_still_parallax leg. Audio byte-identical, VRAM peak 11.3 GB << 14.5 ceiling, zero stray writes outside otr.
+  - R2 HuMo native render — fix in place at harness level (explicit enable flag) but not yet exercised on a humo leg; ~22 min run to prove.
+  - R3 OTR_NEWS_BRIEFS_REQUIRED=0 env hatch + A2b prune-to-floor durable fix landed.
+
+WAN STAYS PARKED until the Phase-2 scoping decision is taken.
+
+---
+
 ## 5. OPEN TICKETS
 
 - **CS-1** -- the latentsync legs must show latentsync IN THE TRACE (a prior "PASS" was fallback-only);
