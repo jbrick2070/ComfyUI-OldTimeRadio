@@ -238,11 +238,14 @@ def test_ltx_render_clip_to_silent_mp4():
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_wan_render_clip_to_silent_mp4(tmp_path, monkeypatch):
     np = pytest.importorskip("numpy")
+    Image = pytest.importorskip("PIL.Image")
     in_dir = tmp_path / "in"
     in_dir.mkdir()
     src = tmp_path / "src"
     src.mkdir()
-    (src / "p.png").write_bytes(b"\x89PNGfake")
+    # A REAL png: S10 requires Pillow to materialize the init into the canvas;
+    # an unreadable source now fails LOUD instead of silently staging raw.
+    Image.new("RGB", (480, 832), (120, 60, 30)).save(src / "p.png")
     monkeypatch.setattr(wb, "comfy_input_dir", lambda: str(in_dir))
     eng = WanI2VEngine()
     eng._classes = _wan_fakes(np, n=4)
@@ -256,7 +259,8 @@ def test_wan_render_clip_to_silent_mp4(tmp_path, monkeypatch):
     try:
         assert p.exists() and clip["frame_count"] == 4
         assert clip["engine_id"] == "wan_i2v" and clip["has_audio"] is False
-        assert (in_dir / "p.png").exists()               # staged init image
+        # S7: staged under a per-shot/seed name, not the fixed otr_wan_init_WxH.
+        assert (in_dir / "otr_wan_init_s1_s3_832x480.png").exists()
         assert len(prepared["patchers"]) == 1            # unet MODEL retained
     finally:
         p.unlink(missing_ok=True)

@@ -486,13 +486,32 @@ class WanI2VEngine(_MC.MotionEngineBase):
         _MC.assert_aspect_policy(policy)
         return policy
 
+    def _staged_init_name(self, request, width, height):
+        """S7: the staged init-image basename, unique per (shot, seed, dims). The
+        old fixed ``otr_wan_init_WxH.png`` let two shots at the same dims clobber
+        each other's staged init; this keys on the shot id + request seed so each
+        beat stages its OWN init, while staying DETERMINISTIC for a given
+        (shot, seed) so the render-twice determinism contract (V-7) holds."""
+        import re
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        shot = str(get("shot_id") or get("request_id") or "wan")
+        seeds = get("seed_bundle") or {}
+        seed = (seeds.get("request_seed") if isinstance(seeds, dict)
+                else getattr(seeds, "request_seed", 0)) or 0
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", shot)[:48]
+        return "otr_wan_init_%s_s%d_%dx%d.png" % (
+            safe, int(seed), int(width), int(height))
+
     def _materialize_init_image(self, request, src_path, width, height):
         """Pad / crop the init image into the (width, height) canvas with ONE
         uniform scale per the aspect policy (N9: never a silent stretch), then
-        stage the DERIVED width x height image and return its basename. Uses the
-        TRUE on-disk dims (more robust than request init_w/init_h). Falls back to
-        staging the raw image only if Pillow is unavailable. Fail-closed NAMED on a
-        missing source."""
+        stage the DERIVED width x height image under a per-shot/seed name (S7) and
+        return its basename. Uses the TRUE on-disk dims (more robust than request
+        init_w/init_h). Pillow is REQUIRED (S10): a missing Pillow OR an
+        unreadable source fails LOUD -- the old silent raw-stage fallback leaned
+        on WanImageToVideo's internal cover-resize (N9 risk) and is removed.
+        Fail-closed NAMED on a missing source."""
         from . import wrapper_bridge as _wb
         if not src_path or not os.path.exists(src_path):
             raise _wb.GraphExecutionError(
@@ -500,11 +519,16 @@ class WanI2VEngine(_MC.MotionEngineBase):
         policy = self._aspect_policy(request)
         try:
             from PIL import Image
+        except ImportError as exc:               # S10: Pillow is mandatory
+            raise _wb.GraphExecutionError(
+                "wan_i2v requires Pillow to materialize the init image into the "
+                "canvas without a silent stretch (N9); install Pillow (%s)" % exc)
+        try:
             img = Image.open(src_path).convert("RGB")
-        except Exception:                        # noqa: BLE001 -- no PIL / unreadable
-            # No Pillow or an unreadable image -> stage the raw file and let
-            # WanImageToVideo's internal cover-resize handle it (still no stretch).
-            return _wb.stage_into_comfy_input(src_path)
+        except Exception as exc:                 # noqa: BLE001 -- unreadable source
+            raise _wb.GraphExecutionError(
+                "wan_i2v init image %r is unreadable (S10: no silent raw-stage "
+                "fallback): %s" % (src_path, exc))
         sw, sh = img.size
         plan = _MC.resolve_aspect_transform(sw, sh, int(width), int(height), policy)
         resized = img.resize((plan["scaled_w"], plan["scaled_h"]), Image.LANCZOS)
@@ -516,7 +540,7 @@ class WanI2VEngine(_MC.MotionEngineBase):
             canvas.paste(resized, (plan["pad_x"], plan["pad_y"]))
         dst_dir = _wb.comfy_input_dir()
         os.makedirs(dst_dir, exist_ok=True)
-        name = "otr_wan_init_%dx%d.png" % (int(width), int(height))
+        name = self._staged_init_name(request, width, height)
         canvas.save(os.path.join(dst_dir, name))
         return name
 
