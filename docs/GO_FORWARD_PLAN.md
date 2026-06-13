@@ -8,7 +8,7 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 ~20:15 (ALL THREE 0-E ENGINES GREEN on GPU: ltx_orbit + still_parallax + mesh_stage each PASS with the engine in the trace as final_engine. Auto-launcher + watchdog wired. Longer look-QA episode rendering.)
+> **Last updated:** 2026-06-12 ~23:00 (3 engines GREEN; LTX motion = MODEL problem; DECISION = move video to Wan 2.2 I2V-14B[16gb] + TI2V-5B[8gb], lip-sync separate. NEXT = the Wan smoke, coder window. HEAD ae94970, 22 commits unpushed.)
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
@@ -16,6 +16,33 @@
 
 ## 1. CURRENT STEP
 
+**ALL THREE 0-E ENGINES ARE GREEN** (ltx_orbit + still_parallax + mesh_stage each PASS on GPU with
+the engine IN THE TRACE as final_engine -- autonomous run 2026-06-12 night). The 3D quick-smoke goal
+is DONE.
+
+**ACTIVE THREAD = VIDEO MOTION ENGINE SELECTION (operator-driven).** Today's LTX is too static; a
+full investigation (fast isolated LTX smoke `scripts/otr_ltx_motion_smoke.py` + MAD metric
+`scripts/otr_ltx_mad.py` + a 3-model roundtable, all this session) proved the motion gap is the
+MODEL: LTX-2.3 22B = real motion but does NOT fit the 14.5GB ceiling; the old 2B v0.9 we run fits
+but warps. **DECISION (operator): move the video engine to the Wan 2.2 family, two sizes mapped to
+the 8gb/16gb profile tiers, lip-sync kept SEPARATE (LatentSync/HuMo).**
+
+**NEXT CONCRETE STEP -- the Wan 2.2 video-engine SMOKE (coder window):** see
+`docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md` (the ready-to-paste kickoff). Smoke-first,
+EYEBALL-gated (visual, not MAD):
+- **16GB tier = Wan 2.2 I2V-14B** -- MOSTLY HERE ALREADY: `nodes/_otr_video_engines/eng_wan_i2v.py`
+  is wired (`WanImageToVideo`, `OTR_ENABLE_WAN_I2V`/`OTR_WAN_I2V_CKPT`) and the fp8 14B is on disk
+  (`C:\ComfyUI-Models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, 13.3GB) ->
+  ENABLE + smoke one b-roll clip (peak NVML <=14.5GB), fetch GGUF Q5 only if the fp8 busts the ceiling.
+- **8GB tier = Wan 2.2 TI2V-5B GGUF Q6** -- NOT on disk -> one fetch into `C:\ComfyUI-Models\diffusion_models\`,
+  wire as a 2nd selectable Wan engine, smoke one b-roll clip.
+ACCEPTANCE: operator eyeballs both clips (real camera motion + still preserved + NO warp); audio
+spine untouched (Wan video is silent; mux byte-identical); only THEN map to tiers + wire the episode.
+NOTE: `UnetLoaderGGUF` installed; Wan S2V sampler nodes are NOT (TI2V/I2V use `WanImageToVideo`-class
+nodes -- the coder confirms). All models under `C:\ComfyUI-Models`.
+
+---
+### (historical -- superseded 2026-06-12 night; all three engines now GREEN)
 **Item 4 -- the dropdown coverage sweep -- is DEFERRED to an on-demand overnight run** (operator
 chose to code first; GPU freed 2026-06-12). Fire it via the one-click `otr-overnight-sweep`
 scheduled task ("Run now" at bedtime): it boots a fresh headless ComfyUI on :8000 with whatever
@@ -195,6 +222,33 @@ so the keystone carries no demo pressure.
 ---
 
 ## 6. WHERE WE ARE (factual; recent first)
+
+- **2026-06-12 (~23:00, LTX motion -> Wan 2.2 DECISION, Opus -- one long session):**
+  - **3 engines GREEN** (above). Plus shipped this session: boot fix (`748955b` UTF-8 + cmd quoting),
+    ltx_orbit API drift (`bcd811b`), stills-first reclaim (`e9743cc`, no-op on DynamicVRAM), motion
+    prompts (`db14f9e`), every-i2v-beat-gets-a-still + LOUD missing-still trace + music-open->inter +
+    video-seed stamp (`e635596`), auto render-launcher + watchdog (`fcae8e0`/`748...`), mesh_stage
+    audio false-fail fix (`f43db04`), soak NameError (`0901035`), Blender env hydrate (`439e481`),
+    mesh_cache under output (`f2dca88`), SaveGLB --disable-metadata (`69cb5ea`), mesh_cache under
+    episodes/_shared (`9d4a6b1`).
+  - **LTX MOTION INVESTIGATION (operator-driven, then PARKED in favor of Wan):** built a FAST isolated
+    LTX smoke (`scripts/otr_ltx_motion_smoke.py`, ~10-30s/clip, SaveWEBM) + MAD metric
+    (`scripts/otr_ltx_mad.py`). Decoded the 6/1+Goofer recipe (sampler `euler_cfg_pp` not `euler`;
+    distilled SamplerCustomAdvanced + 8 sigmas + cfg 1.0; cond_strength 0.75). Made the engine sampler
+    swappable (`OTR_LTX_SAMPLER_NAME` @`23aca22`). RESULT: on the v0.9 2B model NOTHING reproduces the
+    motion (euler 0.59 MAD freeze; cfg_pp 0.88 pan; cfg_pp@257 4.2 but WARPS per operator eyeball;
+    distilled chain 0.6-0.9; t2v 0.7). Root cause = the MODEL: **ComfyUI-Goofer runs LTX-2.3 22B-distilled
+    + gemma + a camera LoRA**, not v0.9. Clips in `docs/ltx_motion_clips/`, write-up
+    `docs/2026-06-12-ltx-motion-sweep.md`.
+  - **ROUNDTABLE** (gpt-5.5 + gemini-3.1-pro + grok-4.3 + Claude judge, ~$0.14,
+    `docs/2026-06-12-ltx23-motion/roundtable/`): UNANIMOUS the 22B-distilled fp8 (23.5GB) does NOT fit
+    the 14.5GB ceiling; the camera LoRA is model-matched (can't help v0.9). MAD != the visual gate.
+  - **DECISION (operator):** video engine -> **Wan 2.2** family, lip-sync kept SEPARATE
+    (LatentSync/HuMo). 16gb = Wan 2.2 I2V-14B (already wired `eng_wan_i2v.py` + fp8 on disk); 8gb =
+    Wan 2.2 TI2V-5B GGUF (fetch). Ready-to-paste coder kickoff:
+    `docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md` (the S2V variant was superseded by the
+    cleaner motion/lip-sync separation).
+  - **22 commits on `v2.0-alpha`, HEAD `ae94970`, NONE pushed** (operator gate). Server idle, GPU clean.
 
 - **2026-06-12 (~20:15, ALL THREE 0-E ENGINES GREEN, Opus -- autonomous run):** every 0-E engine
   now PASSES on GPU with the engine IN THE TRACE as final_engine:
