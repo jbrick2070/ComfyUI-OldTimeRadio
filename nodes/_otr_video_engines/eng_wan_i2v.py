@@ -60,6 +60,95 @@ _WAN_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
 
+# --------------------------------------------------------------------------- #
+# M7 silent-clip contract proof (GO_FORWARD 4A) -- ffprobe the emitted mp4 and
+# PROVE the color/stream contract before the mux trusts the self-declared dict.
+# --------------------------------------------------------------------------- #
+def _parse_fps(rate):
+    """An ffprobe ``num/den`` frame-rate string -> rounded int fps (0 if
+    unparseable / zero denominator)."""
+    try:
+        num, den = str(rate).split("/")
+        den = float(den)
+        return int(round(float(num) / den)) if den else 0
+    except (ValueError, ZeroDivisionError, AttributeError):
+        return 0
+
+
+def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
+    """Probe a clip's stream + color contract (read-only). Returns
+    ``{codec_types, video_codec, pix_fmt, color_space, color_primaries,
+    color_transfer, fps}``. Raises a NAMED GraphExecutionError on an ffprobe
+    failure (a missing ffprobe is a broken install, same class as the encoder's
+    missing-ffmpeg)."""
+    import json as _json
+    import subprocess as _sp
+
+    from . import wrapper_bridge as _wb
+    try:
+        proc = _sp.run(
+            [ffprobe, "-v", "error", "-show_entries",
+             "stream=codec_type,codec_name,pix_fmt,color_primaries,"
+             "color_transfer,color_space,avg_frame_rate,r_frame_rate",
+             "-of", "json", path],
+            stdout=_sp.PIPE, stderr=_sp.PIPE)
+    except FileNotFoundError as exc:
+        raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
+    if proc.returncode != 0:
+        raise _wb.GraphExecutionError(
+            "ffprobe failed for %r: %s"
+            % (path, proc.stderr.decode("utf-8", "replace")[:300]))
+    data = _json.loads(proc.stdout.decode("utf-8", "replace") or "{}")
+    streams = data.get("streams") or []
+    vids = [s for s in streams if s.get("codec_type") == "video"]
+    v = vids[0] if vids else {}
+    rate = v.get("avg_frame_rate") or v.get("r_frame_rate")
+    return {
+        "codec_types": [s.get("codec_type") for s in streams],
+        "video_codec": v.get("codec_name"),
+        "pix_fmt": v.get("pix_fmt"),
+        "color_space": v.get("color_space"),
+        "color_primaries": v.get("color_primaries"),
+        "color_transfer": v.get("color_transfer"),
+        "fps": _parse_fps(rate),
+    }
+
+
+def validate_silent_clip_contract(fields, expected_fps):
+    """PURE: assert a probed clip honours the OTR silent-clip contract -- EXACTLY
+    one video stream, NO audio (V-1), h264 / yuv420p / bt709 colorspace, and the
+    engine fps. The primaries/transfer tags are asserted only when ffprobe
+    surfaces them (libx264 + yuv420p reliably reports colorspace, not always the
+    primaries/transfer); ``unknown`` counts as unset. Raises GraphExecutionError
+    NAMED on any mismatch."""
+    from . import wrapper_bridge as _wb
+    types = list(fields.get("codec_types") or [])
+    if "audio" in types:
+        raise _wb.GraphExecutionError(
+            "silent-clip contract: clip carries an AUDIO stream (V-1: only the "
+            "mux adds audio); streams=%r" % types)
+    if types.count("video") != 1:
+        raise _wb.GraphExecutionError(
+            "silent-clip contract: expected EXACTLY one video stream, got %r"
+            % types)
+    checks = (("video_codec", "h264"), ("pix_fmt", "yuv420p"),
+              ("color_space", "bt709"))
+    for key, want in checks:
+        got = fields.get(key)
+        if got != want:
+            raise _wb.GraphExecutionError(
+                "silent-clip contract: %s=%r, expected %r" % (key, got, want))
+    for key in ("color_primaries", "color_transfer"):
+        got = fields.get(key)
+        if got and got not in ("bt709", "unknown"):
+            raise _wb.GraphExecutionError(
+                "silent-clip contract: %s=%r, expected bt709 or unset" % (key, got))
+    fps = int(fields.get("fps") or 0)
+    if fps != int(expected_fps):
+        raise _wb.GraphExecutionError(
+            "silent-clip contract: fps=%r, expected %r" % (fps, int(expected_fps)))
+
+
 @register
 class WanI2VEngine(_MC.MotionEngineBase):
     """The wan_i2v image->video adapter (in-process default; sidecar_optional)."""
@@ -338,6 +427,10 @@ class WanI2VEngine(_MC.MotionEngineBase):
         frames = _wb.images_to_uint8(images)
         out_path = otr_engine_tmp_mp4("otr_wan_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        # M7: PROVE the silent-clip color/stream contract on the emitted mp4
+        # before canonicalize self-declares it -- ffprobe is the source of truth,
+        # the hardcoded dict is not. Fail-LOUD NAMED on any drift.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         if not os.environ.get("OTR_TEST_MODE"):
             post_mb = _MC.vram_used_mb() or 0
             _LOG.info("[OTR video] wan_i2v VRAM render-phase peak %s MB / post %s "
