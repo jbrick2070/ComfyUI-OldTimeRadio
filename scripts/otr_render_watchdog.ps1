@@ -21,9 +21,16 @@ param(
     [int]$StallSeconds = 300,
     [int]$PollSeconds = 30,
     [int]$QueueFails = 3,
-    [string]$QueueUrl = 'http://127.0.0.1:8000/queue'
+    [string]$QueueUrl = 'http://127.0.0.1:8000/queue',
+    [string]$VerdictFile = ''
 )
 $ErrorActionPreference = 'SilentlyContinue'
+if (-not $VerdictFile) { $VerdictFile = "$LegLog.watchdog" }
+function Write-Verdict($state, $msg) {
+    "{0} | {1} | {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $state, $msg |
+        Set-Content -Path $VerdictFile -Encoding ascii
+}
+Write-Verdict 'RUNNING' 'watchdog armed'
 
 function Get-Heartbeat($path) {
     $m = Select-String -Path $path -Pattern '\[soak\] t=\s*(\d+)s' |
@@ -51,6 +58,7 @@ while ($true) {
     $verdict = Get-Verdict $LegLog
     if ($verdict) {
         Write-Host ("[watchdog] DONE {0} :: {1}" -f (Get-Date -Format HH:mm:ss), $verdict)
+        Write-Verdict 'DONE' $verdict
         exit 0
     }
 
@@ -71,13 +79,15 @@ while ($true) {
         (Get-Date -Format HH:mm:ss), $beat, $stalledFor, $qFail)
 
     if ($qFail -ge $QueueFails) {
-        Write-Host ("[watchdog] DEAD {0} :: queue endpoint down {1}x ({2})" -f `
-            (Get-Date -Format HH:mm:ss), $qFail, $QueueUrl)
+        $m = "queue endpoint down ${qFail}x ($QueueUrl)"
+        Write-Host ("[watchdog] DEAD {0} :: {1}" -f (Get-Date -Format HH:mm:ss), $m)
+        Write-Verdict 'DEAD' $m
         exit 2
     }
     if ($stalledFor -ge $StallSeconds) {
-        Write-Host ("[watchdog] DEAD {0} :: heartbeat stalled {1}s (last t={2}s) >= {3}s" -f `
-            (Get-Date -Format HH:mm:ss), $stalledFor, $lastBeat, $StallSeconds)
+        $m = "heartbeat stalled ${stalledFor}s (last t=${lastBeat}s) >= ${StallSeconds}s"
+        Write-Host ("[watchdog] DEAD {0} :: {1}" -f (Get-Date -Format HH:mm:ss), $m)
+        Write-Verdict 'DEAD' $m
         exit 2
     }
 }
