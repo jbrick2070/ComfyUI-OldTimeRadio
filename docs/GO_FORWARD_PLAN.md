@@ -8,12 +8,21 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 (planner: hardened + GPT-5.5-roundtabled the Wan smoke spec and FOLDED IT
-> INTO this doc as section 1A -- the standalone `WAN_VIDEO_CODER_PROMPT.md` is DELETED (one-doc rule).
-> Grounded code gaps now captured: dead `aspect_plan`, post-encode NVML assert misses the sampler peak,
-> topo-order loads UNET before the CLIP free, GGUF/TI2V loader-mode switch, TI2V engine fully
-> unspecified, Sage in-process assert. NEXT = the Wan smoke, coder window (paste section 1A). HEAD
-> ae94970 + docs commit cf7a0ad; further docs edits this session uncommitted.)
+> **Last updated:** 2026-06-12 LATE (coder: section 1A TASK 0 + Phase 1 + the 5 code-gap fixes DONE and
+> PUSHED @ `2fbc2f3` on v2.0-alpha). TASK 0: node signatures verified vs live /object_info (core
+> UNETLoader / CLIPLoader type=wan / WanImageToVideo[positive,negative,latent] / KSampler / VAEDecode +
+> ModelSamplingSD3; the 5B latent node is `Wan22ImageToVideoLatent`); Sage assert PASS (`Using pytorch
+> attention` -> resolve_isolation()==in_process). Phase 1 bare /prompt smoke (`scripts/otr_wan_smoke.py`)
+> rendered the low-noise 14B fp8 832x480 81f -> REAL camera motion, NO warp (clip in
+> `docs/2026-06-12-ltx23-motion/wan_clips/`); whole-run NVML peak 14499MB <= 14500 (razor-thin: the
+> text-encode co-residency moment; sampling itself ~12.7GB). 5 fixes in `eng_wan_i2v.py` (+ shared
+> `motion_common.VramPeakProbe`/`assert_peak_within_ceiling`): materialized aspect pad/crop+stage,
+> render-window NVML peak probe (not post-encode), GGUF/safetensors loader-mode switch, ModelSamplingSD3
+> shift (8.0), core-node docstrings; free_after_use is the CS-4 mitigation. Suite 4141 pass / Bug Bible
+> 16 pass green. NEXT = Phase 2 engine leg, BLOCKED on a CS-3 scoping call (see section 1).
+> **Last updated (prior):** 2026-06-12 (planner: hardened + GPT-5.5-roundtabled the Wan smoke spec and
+> FOLDED IT INTO this doc as section 1A -- standalone `WAN_VIDEO_CODER_PROMPT.md` DELETED, one-doc rule.
+> NEXT = the Wan smoke, coder window. HEAD ae94970 + docs commit cf7a0ad.)
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
