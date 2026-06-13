@@ -333,8 +333,26 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.exists(self._ckpt_path())
 
     def _cache_root(self):
-        return os.environ.get("OTR_MESH_CACHE_DIR") or os.path.join(
-            _COMFY_ROOT, "output", "otr", "mesh_cache")
+        if os.environ.get("OTR_MESH_CACHE_DIR"):
+            return os.environ["OTR_MESH_CACHE_DIR"]
+        # The mesh cache MUST live under ComfyUI's CONFIGURED output dir -- core
+        # SaveGLB resolves filename_prefix through folder_paths.get_save_image_path
+        # and REFUSES any path outside the active output folder. The headless
+        # launcher pins --output-directory to the Documents tree, so the old
+        # hardcoded <comfy_install>/output was a DIFFERENT tree -> SaveGLB raised
+        # "Saving image outside the output folder is not allowed" -> mesh_stage
+        # fell back to still_parallax (2026-06-12 catch). Honor the configured
+        # output (folder_paths), then OTR_OUTPUT_DIR, then the install default.
+        out = ""
+        try:
+            import folder_paths  # type: ignore  # ComfyUI runtime
+            out = folder_paths.get_output_directory()
+        except Exception:  # noqa: BLE001 -- off-box / pre-Comfy import
+            out = ""
+        if not out:
+            out = os.environ.get("OTR_OUTPUT_DIR") or os.path.join(
+                _COMFY_ROOT, "output")
+        return os.path.join(out, "otr", "mesh_cache")
 
     # ---- usability ladder (fail-closed; ORDER MATTERS; no heavy import) ----
     # flag -> Blender exe -> hy3d checkpoint. NEVER the cache/mesh dir (the
