@@ -174,9 +174,15 @@ CAPABILITIES = {
                    "cpu_ok": False,
                    "model_requirements": ["hunyuan3d-dit-v2-mv",
                                           "blender-portable"]},
-    "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+    # S1: vram_estimate raised 14000 -> 14500. The 14499 MB bare-/prompt smoke
+    # was WITHOUT free_after_use, which is LOAD-BEARING -- eng_wan_i2v.render_clip
+    # passes free_after_use=True so umt5-fp8 + the 14B fp8 UNET do not co-reside
+    # through the sampler on the 16 GB card; that mitigation is MANDATORY, not
+    # optional. S5: model_requirements is the real Wan 2.2 I2V asset id (was the
+    # stale wan2.1 label; the engine ckpt default is wan2.2-i2v.safetensors).
+    "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14500, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
-                "model_requirements": ["wan2.1-i2v"]},
+                "model_requirements": ["wan2.2-i2v"]},
     # triposg_talk: the v1 NO-COMPILE character_3d lane -- prebuilt cu128
     # wheels only (NO cu128_toolkit requirement; that distinction is the whole
     # point of the lane, 3D plan section 4). Still flag-gated dark at the
