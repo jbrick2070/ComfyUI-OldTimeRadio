@@ -82,6 +82,55 @@ class SoakFail(AssertionError):
 
 
 # --------------------------------------------------------------------------- #
+# acceptance gates (pure -- CPU-testable; GO_FORWARD section 4A M1 + M4)
+# --------------------------------------------------------------------------- #
+def assert_no_runtime_fallback(trace):
+    """M1 acceptance gate: every shot must render on the engine it was
+    REQUESTED with -- no silent runtime fallback anywhere in the trace.
+
+    ``attempts[0]`` is the requested registry engine_id and ``final_engine`` is
+    the engine that actually rendered (the render driver restamps it on a LOUD
+    swap); both are stable registry ids in the SAME namespace -- not a display
+    alias -- so ``final_engine != attempts[0]`` is exactly a runtime fallback.
+    This is the CS-1 detector the dropdown-rotation ``expect_engine=""`` mode is
+    BLIND to (it scores a silent fall-back to the radio floor as PASS). Fails
+    CLOSED: a trace row missing either field cannot be proven clean. Raises
+    :class:`SoakFail` naming every shot that fell off its requested engine."""
+    fell_off = []
+    for row in (trace or []):
+        if not isinstance(row, dict):
+            fell_off.append((None, None, None))
+            continue
+        attempts = row.get("attempts") or []
+        requested = attempts[0] if attempts else None
+        final = row.get("final_engine")
+        if requested is None or final is None or final != requested:
+            fell_off.append((row.get("shot_id"), requested, final))
+    if fell_off:
+        raise SoakFail(
+            "RUNTIME FALLBACK detected (CS-1): %d shot(s) did not render on "
+            "their requested engine (shot_id, requested, final): %r"
+            % (len(fell_off), fell_off[:20]))
+
+
+def resolve_driver_peak_mb(report):
+    """M4 fail-closed: the render-phase driver VRAM peak (MB) from the run
+    report, or ``None`` when the report carries no USABLE measurement.
+
+    A measurement is usable only if present AND > 0. The old
+    ``int(report.get("vram_peak_mb") or -1)`` default let a missing / 0 /
+    negative measurement slip past the ``> ceiling`` check, so the <=14.5 GB
+    invariant could read GREEN with NO measurement. The caller treats ``None``
+    as a GATE FAILURE."""
+    raw = report.get("vram_peak_mb")
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return val if val > 0 else None
+
+
+# --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
 def pcm_sha256(media_path: str) -> str:
@@ -325,16 +374,21 @@ def load_run_report(after_ts: float) -> dict:
 # one leg
 # --------------------------------------------------------------------------- #
 def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
-            extra_patches=None, profile: str = "") -> int:
+            extra_patches=None, profile: str = "",
+            forbid_fallback: bool = False) -> int:
     """One full-episode soak leg with the HARD gates.
 
     ``expect_engine``: "humo" (default) asserts the strict production
     histogram {"humo": n_beats}; "" / None logs the histogram WITHOUT a strict
     engine assert (the dropdown-rotation / forced-engine experiment legs --
     completion, playable-obs, byte-identity, hygiene and VRAM gates still
-    apply). ``profile``: a committed capability-profile id; managed engine /
-    feature widgets are applied via the ONE applier (GATE B S2 -- the
-    hand-coded patch-list drift channel is CLOSED). ``extra_patches``: list of
+    apply). ``forbid_fallback``: the M1 ACCEPTANCE gate -- assert ZERO runtime
+    fallbacks across the WHOLE trace (every shot's final_engine == its
+    requested attempts[0]); on for the GATE-A acceptance sweep, off for the
+    informational dropdown-rotation / known-degrade experiment legs.
+    ``profile``: a committed capability-profile id; managed engine / feature
+    widgets are applied via the ONE applier (GATE B S2 -- the hand-coded
+    patch-list drift channel is CLOSED). ``extra_patches``: list of
     (node_id, widget_name, value) -- CREATIVE WHITELIST ONLY (a managed name
     here raises SoakFail pointing at --profile)."""
     started = time.time()
@@ -465,6 +519,15 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
         print("[soak] EXPERIMENT histogram (informational): %r over %d beats"
               % (hist, n_beats), flush=True)
 
+    # M1 acceptance gate (GO_FORWARD 4A): no shot may silently fall back off the
+    # engine it was REQUESTED with. Independent of the keystone/floor histogram
+    # asserts above; on only for the GATE-A acceptance sweep (forbid_fallback).
+    if forbid_fallback:
+        trace = report.get("trace") or []
+        assert_no_runtime_fallback(trace)
+        print("[soak] no-fallback gate OK: all %d trace shot(s) rendered on "
+              "their requested engine" % len(trace), flush=True)
+
     final_mp4 = newest_final_mp4(started)
     # The episode slug IS the per-episode folder name (layout:
     # otr/episodes/<slug>/<...>_final.mp4) -- never parse it from the file
@@ -531,10 +594,19 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
     # that machine-wide NVML measurement (nodes/vram_context_test pattern).
     # The client-side whole-pipeline sample (which also spans the writer-LLM
     # phase, NOT part of V-3) is recorded as informational context only.
-    driver_peak = int(report.get("vram_peak_mb") or -1)
-    peaks = {"render_phase_driver_mb": driver_peak,
+    driver_peak = resolve_driver_peak_mb(report)
+    peaks = {"render_phase_driver_mb": driver_peak if driver_peak is not None
+             else -1,
              "whole_run_nvml_machine_mb": vram.peak_mb,
              "nvml_samples": vram.samples}
+    # M4 fail-closed (GO_FORWARD 4A): a missing / 0 / negative measurement is a
+    # GATE FAILURE, not a free pass -- the <=14.5 GB invariant cannot read GREEN
+    # without a real render-phase peak.
+    if driver_peak is None:
+        raise SoakFail(
+            "V-3 render-phase VRAM peak MISSING or <=0 in the run report "
+            "(vram_peak_mb=%r) -- the <=14.5 GB invariant cannot pass without a "
+            "measurement (M4 fail-closed)" % report.get("vram_peak_mb"))
     if driver_peak > VRAM_CEILING_MB:
         raise SoakFail("V-3 render-phase VRAM peak %dMB > ceiling %dMB"
                        % (driver_peak, VRAM_CEILING_MB))
