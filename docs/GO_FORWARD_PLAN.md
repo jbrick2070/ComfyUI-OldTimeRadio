@@ -8,7 +8,7 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 ~23:00 (3 engines GREEN; LTX motion = MODEL problem; DECISION = move video to Wan 2.2 I2V-14B[16gb] + TI2V-5B[8gb], lip-sync separate. NEXT = the Wan smoke, coder window. HEAD ae94970, 22 commits unpushed.)
+> **Last updated:** 2026-06-12 (planner HARDENING pass on the Wan coder prompt: grounded the on-disk reality -- 16gb engine is a low-noise-only PLACEHOLDER graph (no high-noise expert on disk), 8gb tier is TWO fetches (5B + wan2.2 VAE), sage-sidecar + assert-in-trace + render-phase-NVML caveats added. Hardened kickoff ready. NEXT = the Wan smoke, coder window. HEAD ae94970, 22 commits unpushed; docs edits this session uncommitted.)
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
@@ -30,16 +30,26 @@ the 8gb/16gb profile tiers, lip-sync kept SEPARATE (LatentSync/HuMo).**
 **NEXT CONCRETE STEP -- the Wan 2.2 video-engine SMOKE (coder window):** see
 `docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md` (the ready-to-paste kickoff). Smoke-first,
 EYEBALL-gated (visual, not MAD):
-- **16GB tier = Wan 2.2 I2V-14B** -- MOSTLY HERE ALREADY: `nodes/_otr_video_engines/eng_wan_i2v.py`
-  is wired (`WanImageToVideo`, `OTR_ENABLE_WAN_I2V`/`OTR_WAN_I2V_CKPT`) and the fp8 14B is on disk
-  (`C:\ComfyUI-Models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, 13.3GB) ->
-  ENABLE + smoke one b-roll clip (peak NVML <=14.5GB), fetch GGUF Q5 only if the fp8 busts the ceiling.
-- **8GB tier = Wan 2.2 TI2V-5B GGUF Q6** -- NOT on disk -> one fetch into `C:\ComfyUI-Models\diffusion_models\`,
-  wire as a 2nd selectable Wan engine, smoke one b-roll clip.
+- **16GB tier = Wan 2.2 I2V-14B** -- LESS DONE THAN THE OLD NOTE CLAIMED (planner hardening
+  2026-06-12): `eng_wan_i2v.py` exists but its `_build_graph` is a SINGLE-UNETLoader + single-KSampler
+  PLACEHOLDER marked "ASSUMED/VERIFY-ON-GPU" -- it does NOT implement the two-expert HIGH/LOW MoE
+  sigma-split its own docstring promises. ONLY the LOW-noise expert is on disk
+  (`wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, 13.3GB); the high-noise expert is NOT.
+  -> SMOKE Path A (low-noise-only, zero download) first; Path B (true two-expert A14B = fetch high-noise
+  + rebuild w/ ModelSamplingSD3 + KSamplerAdvanced split) only if A's motion disappoints. The engine
+  already does `free_after_use keep={unet,vae,terminal}` (umt5 TE freed pre-sampler, CS-4-style) but
+  it is UNVERIFIED on GPU. Fetch GGUF Q5 only if the fp8 render-phase peak busts 14.5GB.
+- **8GB tier = Wan 2.2 TI2V-5B GGUF Q6** -- TWO fetches (NOT one): the 5B model AND the new Wan2.2
+  high-compression VAE (only `wan_2.1_vae` is on disk and it won't drive the 5B). Dense 5B (not a MoE);
+  different node class; wire as a 2nd selectable Wan engine, smoke one b-roll clip.
 ACCEPTANCE: operator eyeballs both clips (real camera motion + still preserved + NO warp); audio
-spine untouched (Wan video is silent; mux byte-identical); only THEN map to tiers + wire the episode.
-NOTE: `UnetLoaderGGUF` installed; Wan S2V sampler nodes are NOT (TI2V/I2V use `WanImageToVideo`-class
-nodes -- the coder confirms). All models under `C:\ComfyUI-Models`.
+spine untouched (Wan video is silent; mux byte-identical); smoke must ASSERT wan-in-trace (no
+fallback-PASS, CS-1) + record render-phase NVML separately from whole-run (CS-2); only THEN map to
+tiers + wire the episode (CS-3 = Wan+HuMo co-stage risk). NOTE: `UnetLoaderGGUF` installed; Wan S2V
+sampler nodes are NOT; `umt5_xxl_fp8` + `wan_2.1_vae` on disk; SageAttention is currently importable
+(BUG-070: `resolve_isolation` escalates wan to a cu128 sidecar -- decide uninstall-sage vs sidecar
+before the smoke). All models under `C:\ComfyUI-Models`. Hardened kickoff:
+`docs/2026-06-12-ltx23-motion/WAN_VIDEO_CODER_PROMPT.md`.
 
 ---
 ### (historical -- superseded 2026-06-12 night; all three engines now GREEN)
