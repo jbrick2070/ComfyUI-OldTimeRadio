@@ -96,5 +96,13 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   --port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI ^
   --output-directory %OTR_REAL_OUTPUT% ^
   --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
+  --disable-metadata ^
   %_OTR_VERBOSE% ^
   > "%1" 2>&1
+rem --disable-metadata (2026-06-12): the core V3 SaveGLB node (mesh_stage) does
+rem `if cls.hidden.prompt is not None:` -- but cls.hidden is None when the node
+rem runs via OTR's in-process wrapper_bridge (ComfyUI only injects the hidden
+rem context in its own prompt executor) -> AttributeError -> mesh_stage fell
+rem back to still_parallax. --disable-metadata skips that metadata block (OTR
+rem carries its own ledger/manifest; embedded workflow JSON is unused). Content
+rem of saved mp4/wav is unchanged, so audio byte-identity holds.
