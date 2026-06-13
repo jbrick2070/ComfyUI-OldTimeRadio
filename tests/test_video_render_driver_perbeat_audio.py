@@ -97,8 +97,12 @@ class TestSliceMasterAudio:
         master = tmp_path / "master.mp4"
         master.write_bytes(b"fake")
         import tempfile as _tf
+        from nodes._otr_video_engines._tmp import _in_tree_tmp_dir
         key = rd.slice_cache_key("", 1.5, 3.0, master_path=str(master))
-        cache_dir = os.path.join(_tf.gettempdir(), "otr_audio_slices")
+        # R1: slices now land in the in-tree tmp tier (audio_slices leaf), with
+        # the system temp dir only as a fallback -- mirror the code's resolution.
+        _base = _in_tree_tmp_dir() or _tf.gettempdir()
+        cache_dir = os.path.join(_base, "audio_slices")
         os.makedirs(cache_dir, exist_ok=True)
         cached = os.path.join(cache_dir, "slice_%s.wav" % key)
         with open(cached, "wb") as f:

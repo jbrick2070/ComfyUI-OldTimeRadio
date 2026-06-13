@@ -281,7 +281,7 @@ class StillParallaxEngine(_CheapFamilyBase):
         a slate floor under the parallax stamp -- honest engines only)."""
         from . import wrapper_bridge as _wb       # lazy: cold-import clean
         import numpy as np
-        import tempfile
+        from ._tmp import otr_engine_tmp_mp4
         from PIL import Image
         w, h, fps = self._canvas_dims(request)
         n = self._frame_count(request, fps)
@@ -299,9 +299,7 @@ class StillParallaxEngine(_CheapFamilyBase):
         depth01 = self._depth_map(img)
         frames = synth_parallax_frames(
             np.asarray(img, dtype="uint8"), depth01, n, _amp_px())
-        fd, out_path = tempfile.mkstemp(suffix=".mp4",
-                                        prefix="otr_parallax_")
-        os.close(fd)
+        out_path = otr_engine_tmp_mp4("otr_parallax_")
         path, n_out = _wb.encode_frames_to_silent_mp4(frames, out_path, fps)
         return self._floor_clip(request, path, fps, n_out)
 

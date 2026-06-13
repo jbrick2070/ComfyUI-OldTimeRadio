@@ -116,10 +116,10 @@ class _CheapFamilyBase:
         humo -> latentsync -> still_kenburns converges on."""
         from . import wrapper_bridge as _wb       # lazy import: cold-import clean
         import os
-        import tempfile
+        from ._tmp import otr_engine_tmp_mp4
         w, h, fps = self._canvas_dims(request)
         n = self._frame_count(request, fps)
-        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_floor_%s_" % self.name)
+        out_path = otr_engine_tmp_mp4("otr_floor_%s_" % self.name)
         still = self._still_path(request) if self.uses_still else ""
         if still and os.path.exists(still):
             cmd = _wb.ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)

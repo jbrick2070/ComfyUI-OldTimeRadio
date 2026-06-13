@@ -320,7 +320,9 @@ def _slice_master_audio(master_path, start_s, dur_s, master_hash=""):
                      "ledger['audio']['master_audio_sha256'] in")
     key = slice_cache_key(master_hash, start_s, dur_s,
                           master_path=master_path)
-    tmp_dir = os.path.join(tempfile.gettempdir(), "otr_audio_slices")
+    from ._tmp import _in_tree_tmp_dir
+    _base = _in_tree_tmp_dir() or tempfile.gettempdir()
+    tmp_dir = os.path.join(_base, "audio_slices")
     try:
         os.makedirs(tmp_dir, exist_ok=True)
     except OSError as exc:

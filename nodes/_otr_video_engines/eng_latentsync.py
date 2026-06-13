@@ -41,7 +41,6 @@ import json
 import logging
 import os
 import subprocess
-import tempfile
 
 from .._otr_shared import gpu_residency as _GR
 from .._otr_shared import sidecar as _SC
@@ -210,7 +209,8 @@ class LatentSyncEngine:
         response (canonicalize normalizes it). Stream state is killed + reaped on
         any protocol error so a hung worker never wedges the render thread."""
         self.load()
-        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_lsync_")
+        from ._tmp import otr_engine_tmp_mp4
+        out_path = otr_engine_tmp_mp4("otr_lsync_")
         base_clip, base_source = self._resolve_base_clip(request)
         log.info(
             "LatentSync base clip resolved: source=%s path=%s", base_source, base_clip)

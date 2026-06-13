@@ -315,7 +315,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         canonicalize() normalises. Fail-closed NAMED if a wrapper node is missing
         or an input is absent."""
         from . import wrapper_bridge as _wb
-        import tempfile
+        from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested
         if not plan["audio_path"] or not plan["init_image"]:
             raise _wb.GraphExecutionError(
@@ -339,7 +339,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
-        out_path = tempfile.mktemp(suffix=".mp4", prefix="otr_humo_")
+        out_path = otr_engine_tmp_mp4("otr_humo_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # Restore the proven HuMo VRAM discipline the refactor dropped: the frames
         # are on disk, so evict the umt5 CLIP + whisper encoders (BUG-291 detach

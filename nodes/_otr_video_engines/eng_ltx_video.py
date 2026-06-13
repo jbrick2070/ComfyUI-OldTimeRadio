@@ -664,7 +664,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         the raw ``{out_path, frame_count}`` canonicalize() normalises. Fail-closed
         NAMED if a wrapper node is missing."""
         from . import wrapper_bridge as _wb
-        import tempfile
+        from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested
         use_i2v = self._use_i2v(request)
         # LK-1b: resolve the ACTIVE candidate set (sampler mode + LoRA
@@ -718,8 +718,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
-        fd, out_path = tempfile.mkstemp(suffix=".mp4", prefix="otr_ltx_")
-        os.close(fd)
+        out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         if not os.environ.get("OTR_TEST_MODE"):
             _MC.assert_vram_within_ceiling(self.name + "-render")  # PASS-PM mid-render
