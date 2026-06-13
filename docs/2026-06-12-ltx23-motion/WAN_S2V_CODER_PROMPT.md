@@ -18,6 +18,10 @@ window produces the proof; the episode integration is a later step.
   Q4_K_M (8GB).
 
 ## Grounded facts (verified on this box 2026-06-12)
+- **ALL models live under `C:\ComfyUI-Models`** (operator, canonical). Put the S2V
+  GGUFs in `C:\ComfyUI-Models\diffusion_models\` (where the existing Wan/HuMo
+  diffusion models are); text encoder -> `text_encoders\`, vae -> `vae\`. The
+  headless launcher's `_otr_headless_model_paths.yaml` already maps this tree.
 - GGUF loader **`UnetLoaderGGUF` is INSTALLED** (ComfyUI-GGUF). Good -- GGUF works.
 - `C:\ComfyUI-Models\vae\wan_2.1_vae.safetensors` is on disk (S2V is Wan-family; it
   likely reuses the Wan VAE -- VERIFY the exact VAE S2V wants).
