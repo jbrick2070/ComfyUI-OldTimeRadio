@@ -441,6 +441,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             mode = "ksampler"
         return mode
 
+    @staticmethod
+    def _sampler_name() -> str:
+        """The KSampler/KSamplerSelect ``sampler_name``. DEFAULT stays ``euler``
+        (today's behavior); override via OTR_LTX_SAMPLER_NAME. The 6/1 + 6/5
+        ledgers recorded ``euler_cfg_pp`` (CFG++) -- the documented dynamic-motion
+        sampler that the refactor never restored (operator catch 2026-06-12).
+        Swappable so the motion smoke can sweep euler vs euler_cfg_pp before we
+        lock the winner as the default."""
+        return os.environ.get("OTR_LTX_SAMPLER_NAME", "euler").strip()
+
     def _distilled_lora_file(self):
         """``(lora_name, abs_path)`` for the distilled LoRA; ``abs_path`` is
         '' when the file is not on disk. Searched under the ComfyUI-relative
@@ -594,7 +604,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             # sigma schedule IS the step count (OTR_LTX_STEPS is a
             # ksampler-mode knob only).
             graph["samplersel"] = {"class": "samplersel",
-                                   "inputs": {"sampler_name": "euler"}}
+                                   "inputs": {"sampler_name": self._sampler_name()}}
             graph["sigmas"] = {"class": "sigmas",
                                "inputs": {"values":
                                           list(LTX_DISTILLED_SIGMAS)}}
@@ -617,7 +627,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             graph["ksampler"] = {
                 "class": "ksampler",
                 "inputs": {"seed": seed, "steps": steps,
-                           "cfg": cfg, "sampler_name": "euler",
+                           "cfg": cfg, "sampler_name": self._sampler_name(),
                            "scheduler": "normal", "denoise": 1.0,
                            "model": model_wire,
                            "positive": W("cond", 0),
