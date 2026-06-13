@@ -94,11 +94,53 @@ class WanI2VEngine(_MC.MotionEngineBase):
             self.declared_isolation, _MC.sageattention_patched())
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
+    def _aux_loader_files(self):
+        """(label, folder_paths categories, basename, dir-override env) for the
+        REQUIRED aux graph loaders beyond the UNET ckpt: the umt5 CLIP and the
+        VAE. M6 (GO_FORWARD 4A): a forward dies mid-graph without these, so
+        assert_usable proves all three loaders present, not just the ckpt."""
+        names = self._loader_names()
+        return (
+            ("CLIP/umt5", ("text_encoders", "clip"), names["clip"],
+             "OTR_WAN_I2V_CLIP_DIR"),
+            ("VAE", ("vae",), names["vae"], "OTR_WAN_I2V_VAE_DIR"),
+        )
+
+    def _resolve_model_file(self, categories, name, env_dir):
+        """Full path of a model file: an explicit dir override (``env_dir``)
+        wins, then ComfyUI ``folder_paths`` (honours extra_model_paths.yaml),
+        then the standard ``models/<category>/<name>`` layout. Returns ``None``
+        when absent everywhere. The offline invariant means NO runtime fetch --
+        a missing file is fail-closed, never silently downloaded."""
+        base = os.environ.get(env_dir)
+        if base:
+            cand = os.path.join(base, name)
+            return cand if os.path.exists(cand) else None
+        for category in categories:
+            try:
+                import folder_paths            # ComfyUI runtime only
+                hit = folder_paths.get_full_path(category, name)
+                if hit:
+                    return hit
+            except Exception:                   # noqa: BLE001 -- no ComfyUI (tests)
+                pass
+            cand = os.path.join(_COMFY_ROOT, "models", category, name)
+            if os.path.exists(cand):
+                return cand
+        return None
+
+    def _missing_loaders(self):
+        """(label, basename) for every required aux loader file absent on disk
+        (UNET is checked separately by ``_installed``)."""
+        return [(label, name)
+                for (label, cats, name, env) in self._aux_loader_files()
+                if self._resolve_model_file(cats, name, env) is None]
+
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed before any forward: the opt-in flag, then checkpoint
-        presence. Wan TOLERATES Sage by escaping to a sidecar
-        (``resolve_isolation``), so it does NOT hard-fail on Sage the way
-        ltx_video does."""
+        """Fail closed before any forward: the opt-in flag, then ALL three graph
+        loaders (UNET + umt5 CLIP + VAE) present on disk. Wan TOLERATES Sage by
+        escaping to a sidecar (``resolve_isolation``), so it does NOT hard-fail
+        on Sage the way ltx_video does."""
         if os.getenv(self.requires_flag, "0") != "1":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
@@ -110,6 +152,17 @@ class WanI2VEngine(_MC.MotionEngineBase):
                 "wan_i2v checkpoint not found at %s; fetch the Wan 2.2 ckpt and "
                 "set OTR_WAN_I2V_CKPT (the core UNETLoader reads the basename)"
                 % self._ckpt_path(), kind="video")
+        missing = self._missing_loaders()
+        if missing:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "wan_i2v required loader file(s) absent: %s -- the core Wan graph "
+                "needs the umt5 CLIP and the VAE on disk too, not just the UNET "
+                "ckpt (offline invariant, no runtime fetch); fix the *_NAME envs "
+                "or point OTR_WAN_I2V_CLIP_DIR / OTR_WAN_I2V_VAE_DIR at the "
+                "installed basenames"
+                % ", ".join("%s=%r" % (lbl, nm) for lbl, nm in missing),
+                kind="video")
         return self.name
 
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
