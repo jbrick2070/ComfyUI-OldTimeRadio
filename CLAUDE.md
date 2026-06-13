@@ -9,6 +9,15 @@
   `nvidia-smi --query-gpu=memory.used --format=csv,noheader` dropped to the desktop
   baseline (~1.5GB) before booting the fresh server.
 
+- **A render that finished leaves the server RESIDENT (~9-10GB, 1% util) -- that
+  is NOT a crash.** Before declaring a run dead, read the server log: `Prompt
+  executed in HH:MM:SS` + `obs_publish OK` = it COMPLETED. The idle resident VRAM
+  is the no-teardown behavior. Caught twice 2026-06-12 (operator saw 9.7GB idle +
+  ":8000 queue down" and read it as dead; the leg had already PASSED).
+- **Use the watchdog for long renders** (`scripts/otr_render_watchdog.ps1 -LegLog
+  <leg.log>`): it declares the run DEAD on a 5-min heartbeat stall OR a down
+  :8000/queue endpoint (exit 2) instead of waiting the full ~24 min, and exits 0
+  with the verdict when the leg finishes. It REPORTS only; reset per the directive.
 - **Headless ComfyUI boot needs UTF-8.** A detached cmd inherits the Windows
   cp1252 console codec, so OTR `prestartup_script.py` crashes the instant it
   prints an emoji (UnicodeEncodeError on U+2705/U+2713) -> boot dies ~13s, exit 1,
