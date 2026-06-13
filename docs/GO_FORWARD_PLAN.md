@@ -8,7 +8,7 @@
 > Dated `docs/<date>-*` folders are EVIDENCE records (roundtables, problem statements), not
 > plans. When this doc and any other disagree, THIS doc wins.
 >
-> **Last updated:** 2026-06-12 ~13:27 (3D quick-smoke ROUND 2 root-caused + fixed; harness boots healthy in ~20s; legs running).
+> **Last updated:** 2026-06-12 ~20:15 (ALL THREE 0-E ENGINES GREEN on GPU: ltx_orbit + still_parallax + mesh_stage each PASS with the engine in the trace as final_engine. Auto-launcher + watchdog wired. Longer look-QA episode rendering.)
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (commit pending this session's harness fixes; do NOT
 > push unprompted). Update the "Last updated / HEAD" line and the relevant section on every tick.
 
@@ -195,6 +195,82 @@ so the keystone carries no demo pressure.
 ---
 
 ## 6. WHERE WE ARE (factual; recent first)
+
+- **2026-06-12 (~20:15, ALL THREE 0-E ENGINES GREEN, Opus -- autonomous run):** every 0-E engine
+  now PASSES on GPU with the engine IN THE TRACE as final_engine:
+  - **ltx_orbit** PASS `{ltx_orbit:3, ltx_video:3}`; render-phase 10.9GB.
+  - **still_parallax** PASS `{still_parallax:3, ltx_video:3}`; render-phase 11.1GB (a soak NameError
+    `master_sha` masked an earlier green -- fixed @`0901035`).
+  - **mesh_stage** PASS `{mesh_stage:2, ltx_video:3}`; render-phase 10.8GB; hy3d-2mv mesh -> SaveGLB
+    -> Blender orbit all live. SIX fixes to get there: soak 2-master audio false-fail (`f43db04`),
+    soak NameError (`0901035`), hydrate OTR_BLENDER_EXE in the launcher (`439e481`), mesh_cache under
+    the CONFIGURED output for SaveGLB (`f2dca88`), `--disable-metadata` for core SaveGLB's cls.hidden
+    (`69cb5ea`), mesh_cache under otr/episodes/_shared for the output-tree contract (`9d4a6b1`).
+  - TOOLING: `scripts/otr_run_leg.ps1` is the ONE render-launch path (reset->boot->leg->auto-armed
+    watchdog `scripts/otr_render_watchdog.ps1`, writes `<leglog>.watchdog` RUNNING/DONE/DEAD; declares
+    DEAD on a 5-min stall or down queue). `OTR_SMOKE_WORDS` env added for a longer episode.
+  - The watchdog caught a transient writer flake (style inventor recovered 4/5 descriptors) in 0 min
+    instead of a wasted 24-min wait -- re-ran clean.
+  - A longer (90-word) look-QA episode is rendering for the b003-middle-beat + motion-prompt eyeball.
+  - ~16 commits this session on `v2.0-alpha`, NONE pushed (operator gate).
+
+- **2026-06-12 (~15:05, ltx_orbit leg = FULL PASS, Opus):** the clean GPU re-run of
+  `other_beats_visual_ltx_orbit` **PASSED 1/1** (24 min; the real LTX render is ~3.8min/clip vs the
+  instant fallback). Histogram `{ltx_video:3, ltx_orbit:3}` over 6 beats -- ZERO still_kenburns
+  fallback; the API fix is fully validated. `V-3 render-phase VRAM peak OK: 10916MB <= 14848MB`
+  (the 16009MB whole-run spike was the Flux still phase, informational). Audio byte-identical OK;
+  playable obs final published. **KEY REFRAME: the VRAM ceiling was NOT the real blocker** -- the
+  earlier 15093/15245MB "render-phase" peaks were the FALLBACK path (still models resident while
+  still_kenburns ran in-phase); with the real engine the render-phase peak is a comfy 10.9GB. So the
+  V-3 measurement/eviction debate is MOOT for ltx_orbit. `e9743cc`'s reclaim detached 0 on DynamicVRAM
+  but its gc+soft_empty_cache may have helped trim the render-phase baseline; harmless either way.
+  Idle-after-run VRAM sat ~60% (9850MB = ComfyUI staging/cache of the resident server, NOT a leak) ->
+  killed per the new directive -> 2053MB. OPEN: re-run still_parallax (renders real; likely PASSes the
+  same way) + mesh_stage (still has the AUDIO-NOT-BYTE-IDENTICAL dig, task 6).
+  - **ltx_orbit API fix PROVEN ON GPU.** Clean re-run leg: the server log shows a LIVE 30-step LTX
+    KSampler @ ~7.6s/it -- ltx_orbit now renders REAL LTX video instead of the instant still_kenburns
+    fallback (the leg runs ~3-4min/clip longer for exactly this reason). The `positive`-kwarg drift is
+    fixed end-to-end @`bcd811b`.
+  - **VRAM eviction (e9743cc) is a NO-OP on this ComfyUI -- DynamicVRAM.** The pre-render reclaim
+    FIRED (`LOUD VRAM reclaim (pre-render: all stills minted...): detached 0 resident model(s)`) but
+    detached ZERO: ComfyUI 0.24.1 uses DynamicVRAM ("Model FluxClipModel_ prepared for dynamic VRAM
+    loading. 4777MB Staged"), so models are STAGED, not in `current_loaded_models` -- the BUG-291
+    `reclaim_idle_models` detach pattern finds nothing. Flux's ~4.7GB stays staged; peak still 16009MB.
+  - **The peak is NOT fatal (operator catch).** 16.3GB card, the render COMPLETES at 16009MB -- no OOM.
+    The 14.848GB V-3 gate is a SOFT policy gate that reads the whole-machine NVML pin (incl. the
+    DynamicVRAM-staged still models), NOT the ~3-3.5GB the render engine actually uses (CS-2). So the
+    real fix is the V-3 MEASUREMENT (attribute the render-phase engine VRAM / discount staged-but-idle
+    still models), OR a DynamicVRAM-aware free, OR adjust the ceiling -- NOT the detach eviction.
+    DECISION PENDING. e9743cc left in place (harmless, LOUD, helps a non-DynamicVRAM box) but it does
+    NOT move this gate.
+  - NET: ltx_orbit's engine bug is FIXED; the remaining "fail" on every leg is the V-3 VRAM gate,
+    which is a measurement/policy question, not a render failure. mesh_stage's AUDIO-NOT-BYTE-IDENTICAL
+    is still its own separate dig (task open).
+
+- **2026-06-12 (~14:05, 3D quick-smoke ALL 3 LEGS RAN, Opus):** harness fully working; all three
+  legs produced verdicts (none PASS yet -- real engine-side findings):
+  - **ltx_orbit** = was fallback-only (histogram all still_kenburns). Root cause: the installed
+    `LTXVImgToVideoConditionOnly` was rewritten (now `vae,image,latent,strength`->LATENT, no
+    positive/negative) -> OTR's old kwargs raised "unexpected keyword argument 'positive'".
+    FIXED @`bcd811b` (rewired `_build_graph_i2v`; motion contract preserved; test updated). NOT yet
+    re-run on GPU to confirm engine-in-trace.
+  - **still_parallax** = REAL ENGINE RUNS (histogram still_kenburns:3 + still_parallax:3 / 6 beats);
+    fails ONLY the VRAM ceiling (`render-phase peak 15245MB > 14848MB`).
+  - **mesh_stage** = fallback-only (fell to still_parallax) AND `AUDIO NOT BYTE-IDENTICAL`
+    (final 58b8cb2c != master b8e36186) -- a frozen-spine violation specific to the mesh_stage path;
+    needs its own dig.
+  - **COMMON BLOCKER = the 14.848GB VRAM ceiling** -- every leg peaks ~15.2-15.9GB because the
+    Flux/portrait/HuMo still-phase models are NOT evicted before the 3D/video render phase. This is
+    the operator's "stills first, then 3D" insight = CS-2. The fix (evict-before-render / phase
+    ordering, OR correct the V-3 NVML phase attribution) is the next decision; it unblocks ALL legs.
+  - **BASELINE DRIFT FOUND:** `sageattention` is now importable in the venv (`find_spec` True). This
+    pre-dates this session and FAILS 5 sage/dep-gating tests (test_video_motion ltx/ltx_orbit/wan
+    usable-flag + test_video_dep_pilot x2) -- NOT regressions from the ltx fix (confirmed by stash
+    test on clean HEAD). It also reopens BUG-070 risk for LTX (Sage process-aborts LTX). Suite is
+    therefore 4136/5 on this machine, NOT the handoff's "4141/0". NOT baselined into EXPECTED_FAILED
+    (would hide the BUG-070 risk) -- operator decides (uninstall sageattention vs accept).
+  - Commits this session: `748955b` (boot fix) + `bcd811b` (ltx i2v fix), both on `v2.0-alpha`, NOT
+    pushed.
 
 - **2026-06-12 (~13:27, ROUND 2 root-cause + fix, Opus):** the round-2 quick-smoke had ABORTED
   ("SERVER DID NOT COME UP" 12:28). Two NEW bugs, both now fixed + verified:
