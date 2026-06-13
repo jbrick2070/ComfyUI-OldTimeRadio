@@ -352,7 +352,14 @@ class MeshStageEngine(_CheapFamilyBase):
         if not out:
             out = os.environ.get("OTR_OUTPUT_DIR") or os.path.join(
                 _COMFY_ROOT, "output")
-        return os.path.join(out, "otr", "mesh_cache")
+        # MUST be under the configured output (SaveGLB) AND under the otr tree's
+        # RESERVED system tier (the OUTPUT-TREE CONTRACT: otr/ top level is
+        # EXACTLY episodes + obs; everything else lives under
+        # episodes/_shared). otr/mesh_cache was a stray top-level dir -> hygiene
+        # gate fail (2026-06-12 catch, after the mesh actually rendered). Nest
+        # it under episodes/_shared so SaveGLB + the output-tree contract both
+        # pass; _shared (not _shared/tmp) so the janitor does not sweep the cache.
+        return os.path.join(out, "otr", "episodes", "_shared", "mesh_cache")
 
     # ---- usability ladder (fail-closed; ORDER MATTERS; no heavy import) ----
     # flag -> Blender exe -> hy3d checkpoint. NEVER the cache/mesh dir (the
