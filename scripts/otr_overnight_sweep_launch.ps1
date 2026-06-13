@@ -44,6 +44,10 @@ Start-Sleep -Seconds 2
 
 # 2. Boot fresh headless server (clean env, normal VRAM, cuda-malloc).
 $env:HF_HOME = 'C:\ComfyUI-Models\huggingface'
+# R3 A2a: soak escape hatch -- a fabricated news key_term degrades (raw
+# news_seed) instead of HALTING the leg. Production leaves this unset so the
+# graph widget default (news_briefs_required=True, fail-closed) governs.
+$env:OTR_NEWS_BRIEFS_REQUIRED = '0'
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_ENABLE_OPENROUTER -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_CAST_SEED -ErrorAction SilentlyContinue

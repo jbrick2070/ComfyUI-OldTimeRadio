@@ -2446,6 +2446,19 @@ class OTR_LedgerScriptWriter:
             _news_required = bool(
                 resolved.get("news_briefs_required", True)
             )
+            # Soak/headless escape hatch: an explicit env override lets a
+            # batch run degrade (raw news_seed) instead of halting on a
+            # single fabricated key_term, without editing the graph widget.
+            # Production leaves this unset so the widget default governs.
+            import os  # stdlib; local import matches this file's convention
+            if os.environ.get("OTR_NEWS_BRIEFS_REQUIRED") == "0":
+                _news_required = False
+                log.warning(
+                    "[OTR_LedgerScriptWriter] OTR_NEWS_BRIEFS_REQUIRED=0 "
+                    "-- soak/headless escape hatch active; degrading "
+                    "instead of halting on news_interpreter failure: %s",
+                    exc,
+                )
             if _news_required:
                 log.error(
                     "[OTR_LedgerScriptWriter] news_interpreter "

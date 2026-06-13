@@ -58,6 +58,7 @@ Public surface
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from typing import Callable
 
@@ -249,6 +250,22 @@ class NewsBriefs(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+log = logging.getLogger("OTR")
+
+
+def _term_in_source_strict(term: str, source_text: str) -> bool:
+    """Strict word-boundary, case-insensitive in-source match for a single
+    key_term -- the deterministic half of V1 (no LLM judge). Shared by
+    ``v1_validate`` and the A2b prune-to-floor path so the two never drift.
+    """
+    pattern = (
+        r"(?<![A-Za-z0-9])"
+        + re.escape(term)
+        + r"(?![A-Za-z0-9])"
+    )
+    return re.search(pattern, source_text, re.IGNORECASE) is not None
+
+
 def v1_validate(
     brief: NewsBriefs,
     *,
@@ -297,12 +314,7 @@ def v1_validate(
     """
     failures: list[str] = []
     for term in brief.key_terms:
-        pattern = (
-            r"(?<![A-Za-z0-9])"
-            + re.escape(term)
-            + r"(?![A-Za-z0-9])"
-        )
-        if re.search(pattern, source_text, re.IGNORECASE):
+        if _term_in_source_strict(term, source_text):
             # Strict word-boundary accepted. No LLM call needed.
             continue
 
@@ -795,12 +807,7 @@ def build_news_briefs(
     # The schema accepts 1-6 key_terms (unit-test isolation); the
     # production contract is 2-6, enforced here as V0 -- <2 terms means
     # the LLM failed to surface enough journalistic anchors.
-    def _content_validator(brief: NewsBriefs) -> str | None:
-        if len(brief.key_terms) < _MIN_KEY_TERMS:
-            return (
-                f"V0: key_terms below production minimum "
-                f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})"
-            )
+    def _run_content_validators(brief: NewsBriefs) -> list[str]:
         v_failures: list[str] = []
         # Sprint 10B Wave 1 Agent A (2026-05-27): v1_validate gains an
         # optional judge_fn that escalates strict-word-boundary failures
@@ -815,8 +822,51 @@ def build_news_briefs(
         ))
         v_failures.extend(v2_validate(brief, source_text=source_text_full))
         v_failures.extend(v3_validate(brief, style=style))
-        if v_failures:
+        return v_failures
+
+    def _content_validator(brief: NewsBriefs) -> str | None:
+        if len(brief.key_terms) < _MIN_KEY_TERMS:
+            return (
+                f"V0: key_terms below production minimum "
+                f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})"
+            )
+        v_failures = _run_content_validators(brief)
+        if not v_failures:
+            return None
+        # A2b (durable, 2026-06-13): rather than HALT the whole episode on
+        # a single fabricated key_term, prune the key_terms that fail a
+        # STRICT word-boundary in-source match and re-validate on the
+        # grounded subset. Prunes, never relaxes:
+        #   * if fewer than _MIN_KEY_TERMS survive -> still halt (V0 floor);
+        #   * if all terms are already grounded (so the failure is V2/V3,
+        #     not fabrication) -> nothing to prune, halt loud;
+        #   * if pruning leaves any residual failure -> restore + halt loud.
+        # NewsBriefs is a plain BaseModel, so attribute assignment is safe.
+        grounded = [
+            t for t in brief.key_terms
+            if _term_in_source_strict(t, source_text_full)
+        ]
+        if (
+            len(grounded) < _MIN_KEY_TERMS
+            or len(grounded) == len(brief.key_terms)
+        ):
             return "; ".join(v_failures)
+        original_terms = list(brief.key_terms)
+        brief.key_terms = grounded
+        residual = _run_content_validators(brief)
+        if residual:
+            # Pruning did not clear every failure (e.g. a V2/V3 problem) --
+            # restore the original brief and halt loud; never silently ship
+            # a degraded brief that still fails a validator.
+            brief.key_terms = original_terms
+            return "; ".join(v_failures)
+        dropped = [t for t in original_terms if t not in grounded]
+        log.warning(
+            "[news_interpreter] V1 prune-to-floor (A2b): dropped %d "
+            "fabricated key_term(s) %r; kept %d grounded %r -- degraded "
+            "instead of halting the run.",
+            len(dropped), dropped, len(grounded), grounded,
+        )
         return None
 
     # structured_call returns only the validated instance, not its
