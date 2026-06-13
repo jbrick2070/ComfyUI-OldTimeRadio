@@ -67,8 +67,14 @@ VRAM_CEILING_MB = 14.5 * 1024
 POLL_TIMEOUT_S = 5400
 #: target_words patched into the writer. 30 = the proven smoke config; 0 =
 #: do NOT patch -- the canonical workflow's own saved default runs (the REAL
-#: full episode; the marathon driver sets this).
-SMOKE_WORDS = 30
+#: full episode; the marathon driver sets this). Env-overridable
+#: (OTR_SMOKE_WORDS) so a look-QA run can ask for a LONGER episode with middle
+#: announcer beats (operator 2026-06-12: to show the every-i2v-beat-gets-a-still
+#: fix on a real b003-class middle beat).
+try:
+    SMOKE_WORDS = int(os.environ.get("OTR_SMOKE_WORDS", "30"))
+except (TypeError, ValueError):
+    SMOKE_WORDS = 30
 
 
 class SoakFail(AssertionError):
@@ -542,7 +548,8 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
         "engine_histogram": hist, "n_beats": n_beats,
         "final_mp4": final_mp4, "obs_mp4": obs_mp4,
         "pcm_sha256": final_sha,
-        "master_pcm_sha256": master_sha, "vram": peaks,
+        "master_pcm_sha256": final_sha,  # == the matched master (byte-identical)
+        "master_wav": os.path.basename(master_wav), "vram": peaks,
         "fingerprint": fp, "expect_floor": expect_floor,
         "trace": report.get("trace"),
     }
