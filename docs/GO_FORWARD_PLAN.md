@@ -113,6 +113,16 @@ grounding against the real code. Full judgment + raw reviews:
 `docs/2026-06-13-goforward-wan-hardening/`. These gate item 3 (Wan) and item 4 (sweep
 GREEN). MUST-FIX -- until M1-M4 land, a GREEN sweep is meaningless:
 
+> **STATUS 2026-06-13 (autonomous build):** the GATE-A precondition M1-M5 has
+> LANDED and is unit-tested. M1 + M4 = `9b2294b` (no-runtime-fallback gate +
+> VRAM fail-closed, 12 tests); M2 + M3 + M5 = `0ab55bc` (sweep `--acceptance`
+> mode: empty/required-engine exit code + Wan enable-flag / OTR_TEST_MODE /
+> --exclude preflight, 17 tests). The coverage sweep can now DETECT what it
+> gates. M6/M7 (Wan loader + clip-contract) and the S-fixes follow; M9 (CS-3
+> sequential residency) stays a live-GPU proof obligation. The sweep still goes
+> RED in acceptance until `wan_ti2v` is built + both Wan engines PASS -- that is
+> correct by construction (item 3 must land first).
+
 - **M1 -- the sweep is BLIND to silent fallback.** `otr_coverage_sweep.py` runs every
   leg with `expect_engine=""`, which `_otr_soak_capstone.py:464` treats as
   informational (no assert), so a leg that silently falls back to `still_kenburns`
