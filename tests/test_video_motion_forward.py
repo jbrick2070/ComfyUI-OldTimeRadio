@@ -1,8 +1,9 @@
 """CPU tests for the in-process LTX + Wan forwards (A-ship render slices).
 
-These graphs are ASSUMED native topologies (VERIFY-ON-GPU): the box runs the LTX
-2.3 / KJ Wan 2.2 wrappers, so the operator confirms the node candidates + widgets
-against the installed INPUT_TYPES. The SHARED forward mechanics (node resolution,
+These graphs run on CORE ComfyUI nodes (LTX 2.x / core Wan 2.2 -- NOT the KJ Wan
+wrapper, which conflicts with the numpy2/transformers5 box and drags in Sage);
+the topologies are verified against the installed /object_info on the GPU box
+(2026-06-12). The SHARED forward mechanics (node resolution,
 the declarative executor, the silent bt709 encode, MODEL-patcher retention, the
 VRAM guard) are proven here by injecting fake ComfyUI node classes -- the proven
 path runs through to a real ffmpeg-encoded silent mp4. ffmpeg-running tests skip
@@ -56,6 +57,7 @@ def _wan_fakes(np, n=4):
     img = np.zeros((n, 24, 32, 3), dtype="float32")
     return {
         "unet": _mk(lambda self, **k: (_FakeModel(),)),
+        "modelsampling": _mk(lambda self, **k: (_FakeModel(),)),
         "clip": _mk(lambda self, **k: (object(),)),
         "pos": _mk(lambda self, **k: (("c",),)),
         "neg": _mk(lambda self, **k: (("c",),)),
@@ -184,8 +186,11 @@ def test_wan_graph_topology():
     wan = g["wan"]["inputs"]
     assert wan["start_image"] == wb.Wire("loadimage", 0)
     assert wan["length"] == 33 and wan["positive"] == wb.Wire("pos", 0)
+    # ModelSamplingSD3 sits between the UNET loader and the sampler (sigma shift).
+    assert g["modelsampling"]["inputs"]["model"] == wb.Wire("unet", 0)
+    assert cand["modelsampling"] == ("ModelSamplingSD3",)
     ks = g["ksampler"]["inputs"]
-    assert ks["model"] == wb.Wire("unet", 0)
+    assert ks["model"] == wb.Wire("modelsampling", 0)
     assert ks["latent_image"] == wb.Wire("wan", 2)
 
 

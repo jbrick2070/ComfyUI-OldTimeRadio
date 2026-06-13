@@ -239,6 +239,62 @@ def assert_vram_within_ceiling(label="render", ceiling_mb=None):
     return used
 
 
+class VramPeakProbe:
+    """Background NVML sampler: the PEAK machine-wide VRAM (MB) observed across a
+    render window (first heavy model load through VAEDecode), not just the
+    instantaneous pre/post boundary.
+
+    A post-render single read (the pattern this replaces) fires AFTER the GPU work
+    and misses the sampler / text-encode peak; this thread samples every
+    ``interval_s`` for the duration of the window so an additively-resident encoder
+    or LoRA delta that breaches mid-render is actually caught. A pure no-op (peak
+    stays 0) when NVML is unavailable (the CPU box); ``threading`` is stdlib so the
+    cold-import invariant (V-12) holds. Use ``start()`` before the render call and
+    ``stop()`` after the decoded IMAGE is in hand."""
+
+    def __init__(self, interval_s=1.0):
+        self._interval = float(interval_s)
+        self._stop = None
+        self._thread = None
+        self.peak_mb = 0
+
+    def _loop(self):
+        while not self._stop.is_set():
+            used = vram_used_mb()
+            if used is not None and used > self.peak_mb:
+                self.peak_mb = used
+            self._stop.wait(self._interval)
+
+    def start(self):
+        import threading
+        if vram_used_mb() is None:           # NVML absent (CPU box) -> no-op probe
+            return self
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+        return self
+
+    def stop(self):
+        if self._stop is not None:
+            self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+        return self.peak_mb
+
+
+def assert_peak_within_ceiling(peak_mb, label="render", ceiling_mb=None):
+    """Assert a MEASURED render-window peak (from :class:`VramPeakProbe`) has not
+    breached the single-heavy-engine ceiling. A no-op when ``peak_mb`` is 0/falsy
+    (NVML absent -> nothing measured). Raises ``RuntimeError`` on a breach."""
+    if ceiling_mb is None:
+        ceiling_mb = dynamic_vram_ceiling_mb()
+    if peak_mb and int(peak_mb) > int(ceiling_mb):
+        raise RuntimeError(
+            "VRAM ceiling breached across %s window: %d MB > %d MB (single "
+            "resident heavy engine)" % (label, int(peak_mb), int(ceiling_mb)))
+    return peak_mb
+
+
 # --------------------------------------------------------------------------- #
 # In-process motion-engine base (AS-3 lease + V-4 teardown)
 # --------------------------------------------------------------------------- #
@@ -320,5 +376,6 @@ __all__ = [
     "ISOLATION_SIDECAR_OPTIONAL", "sageattention_patched",
     "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
-    "assert_vram_within_ceiling", "MotionEngineBase",
+    "assert_vram_within_ceiling", "VramPeakProbe", "assert_peak_within_ceiling",
+    "MotionEngineBase",
 ]
