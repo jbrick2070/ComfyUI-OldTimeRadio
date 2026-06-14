@@ -60,6 +60,14 @@ ONE coder window in the code at a time; serialize the Wan window vs any other vi
 
 ## 2. HARD RULES (invariants -- apply every session)
 
+- **WORKFLOW SOURCE OF TRUTH (operator, hard):** `workflows/otr_scifi_16gb_full.json` IS the
+  production workflow. (1) ANY node / wiring / widget change MUST be made IN that file in the SAME
+  change as the code -- code that is not wired into this JSON is DORMANT and does nothing (the §4D
+  miss, 2026-06-13: node + blend input shipped + tested but unwired -> ran dead in production). After
+  editing, re-validate via `OTR_WorkflowValidator` + a JSON round-trip + the link/widget audit.
+  (2) EVERY API / headless / soak run MUST LOAD this real JSON -- never a stale copy, a generated
+  `.gen.json`, an ad-hoc graph, or the Linux-mount snapshot (the sandbox mount lags file writes; always
+  read/write the Windows path + verify via Desktop Commander).
 - Do ONLY the forward order (section 3). Everything else is PARKED (section 8) -- not story-spine, not
   story-pipeline, not the broader audio stack, not other ROADMAP items.
 - Audio SPINE is SHIPPED + FROZEN: byte-identical master + mux-LAST (no `-shortest`);
