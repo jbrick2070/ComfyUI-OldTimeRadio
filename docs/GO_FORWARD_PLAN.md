@@ -1,5 +1,17 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `75dc618` == origin):** Objective triage at clean
+> baseline `961d8fc` was fully GREEN (suite 4249 / Bug Bible 16 / tree clean). Per operator: SPLIT the
+> bug log -- `BUG_LOG.md` is now the ARCHIVE (reference only); new active log = `BUG_LOG_2026-06.md`
+> (epoch `BUG-LOCAL-400+`). Then fixed the first live bug **BUG-LOCAL-400** (`d967c6b`): the writer's 4
+> cloud model-slots (`openrouter_slot_a/b` + `comfy_slot_a/b`) failed ComfyUI COMBO validation with the
+> lanes ENABLED -- the dropdown builders dropped the `(enable …)` sentinel once a lane was on, but the
+> saved workflow stores that sentinel -> node 1 red, ALL outputs ignored (the operator's GUI symptom).
+> Robust fix: `_lead_with_sentinel()` makes the sentinel `choices[0]` in EVERY lane state (off stays the
+> default; symmetric to the 2026-06-10 lanes-OFF sentinel restore). Suite **4252** / Bug Bible green;
+> pushed. Operator must **restart ComfyUI Desktop** to load the new module, then re-Run. Forward order
+> (Wan / LTX-REGR / 3D) UNCHANGED -- this was a debug detour, not a forward-order advance.
+>
 > **LATEST SESSION -- 2026-06-14 eve (planner + live GPU smoke; HEAD `1483e48`, session doc edits UNCOMMITTED):**
 > Ran the operator's Wan-vs-LTX **opener eyeball** on the live 5080. DECISIVE RESULT: **Wan i2v 14B DRIFTS off
 > the input still** (not fixable by easy input knobs -- cfg2.0+locked prompt still drifts; cfg1.5 collapses to
@@ -443,6 +455,8 @@ engine, one real episode) vs "B-parity ship" (>=2 engines bind at SHIP).
   `otr-sweep-monitor`; digest `scripts/sweep_monitor_digest.md`; GO file `scripts/_otr_0e_gpu_go.txt`.
 - 3D spec (forward item 5): `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md`.
 - Switchable spec (items 3 + 6): `docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md`.
+- Bug log (this repo): ACTIVE = `BUG_LOG_2026-06.md` (epoch BUG-LOCAL-400+, started 2026-06-14);
+  ARCHIVE = `BUG_LOG.md` (BUG-LOCAL-001..~305, through 2026-06-12, reference only).
 - Bug Bible: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide` (`BUG_BIBLE.yaml` +
   `tests/bug_bible_regression.py`; run cd-to-root + venv python + RELATIVE path).
 - Full smoke harness: `scripts/queue_smoke.py` + `scripts/otr_api.py`.
