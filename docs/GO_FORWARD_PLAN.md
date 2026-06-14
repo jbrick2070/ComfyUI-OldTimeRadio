@@ -66,6 +66,10 @@ ONE coder window in the code at a time; serialize the Wan window vs any other vi
 
 ## 3. FORWARD ORDER (do in sequence)
 
+> **Two tracks, parallel.** Items 1-2 (punch-list audit, latentsync demos) are OPERATOR-GATED
+> (look-QA / demo review -- section 5); the ENGINE track (items 3-4, Wan + sweep GREEN) proceeds
+> NOW. "In sequence" applies WITHIN a track, not across the operator gate.
+
 1. **Punch list (GATE A).** Captions DONE (node 86 `OTR_CaptionBurn` in `otr_scifi_16gb_full.json`,
    profile resolves `burn_captions=True`). REMAINING: node-level audit of LTX radio-open + procgen
    rolling credits -- baked into the headless path but maybe NOT into the saved JSON; prove a render
@@ -264,7 +268,7 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 ## 4C. CREATIVE BACKLOG -- Procgen Visual Layer (pre-roundtable)
 
 > **STATUS: design-direction-only, `pre-roundtable`.** Two procgen-layer creative
-> ideas from the operator (2026-06-14). NO code work starts yet -- Jeffrey wants to
+> ideas from the operator (2026-06-13). NO code work starts yet -- Jeffrey wants to
 > round-robin these designs across the LLM panel (batch the two) BEFORE
 > implementation. Specified here so the panelists have grounded context. **Neither
 > touches the audio spine** (frozen, byte-identical) -- both are VISUAL procgen-layer
