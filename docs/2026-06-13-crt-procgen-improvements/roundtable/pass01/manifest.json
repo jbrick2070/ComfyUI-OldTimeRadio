@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-14T03:53:37.458989+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-13-crt-procgen-improvements\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 8895,
+  "models": [
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 10607,
+      "completion_tokens": 3476,
+      "cost_usd": 0.04801875
+    },
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 9443,
+      "completion_tokens": 3362,
+      "cost_usd": 0.045423750000000006
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 9977,
+      "completion_tokens": 3507,
+      "cost_usd": 0.007391085
+    }
+  ],
+  "total_cost_usd": 0.1008
+}

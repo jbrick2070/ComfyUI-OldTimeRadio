@@ -265,153 +265,132 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ---
 
-## 4C. CREATIVE BACKLOG -- Procgen Visual Layer (pre-roundtable)
+## 4C. CRT PROCGEN UPGRADE -- title card + gutter scopes (roundtable-hardened, SPRINT-READY)
 
-> **STATUS: design-direction-only, `pre-roundtable`.** Two procgen-layer creative
-> ideas from the operator (2026-06-13). NO code work starts yet -- Jeffrey wants to
-> round-robin these designs across the LLM panel (batch the two) BEFORE
-> implementation. Specified here so the panelists have grounded context. **Neither
-> touches the audio spine** (frozen, byte-identical) -- both are VISUAL procgen-layer
-> changes only. **GROUNDED 2026-06-13:** Claude analyzed the real draw code
-> (`_CRTRenderer.render()` in `nodes/video_engine.py`); the architectural-surface
-> notes + the design block below are now code-anchored, superseding the earlier
-> `OTR_PostUpscaleProcgenBlend` guess.
+> Roundtable-hardened 2026-06-13: 3 panels x 3 passes (gemini-3.1-pro + gpt-5.5 +
+> deepseek-v4-pro; Claude judge/grounder; ~$0.40; raw reviews + judgments in
+> `docs/2026-06-13-crt-procgen-improvements/roundtable/`). ONE file:
+> `nodes/video_engine.py` (`_CRTRenderer` + the `render_video` plumbing). NO new
+> node / widget / model / dependency; Pillow-only on CPU; the green-only `screen`
+> blend is untouched; the audio spine is frozen (byte-identical); deterministic per
+> seed. This window plans; the CODER window builds it.
 
-**Idea #1 -- Procgen episode title card on the first music cue.**
-- TRIGGER: the moment the episode's intro/opening music first starts (the first
-  music event), not the first dialogue.
-- RENDER: the show title **"SIGNAL LOST"** + the episode title (e.g. *"Mapping
-  Desperation"*) in big bold PROCGEN letters during the intro-music window -- a
-  movie-credits / title-sequence vibe, the title landing with the music swell.
-- CONSTRAINT: procgen-rendered (vector-style, integrated with the existing CRT/HUD
-  aesthetic), NOT a baked raster.
-- ARCHITECTURAL SURFACE (GROUNDED 2026-06-13 vs the real code): the draw surface is
-  `nodes/video_engine.py` class `_CRTRenderer.render()` -- the procgen frame drawer
-  inside `OTR_SignalLostVideo` (= `SignalLostVideoRenderer`). NOT
-  `OTR_PostUpscaleProcgenBlend`, which is only the downstream ffmpeg green-only
-  `screen` blend that lays procgen over the upscaled portrait. The persistent
-  "=== SIGNAL LOST ===" ident + `"{title}"` subtitle ALREADY draw every frame
-  (render() section 1, top-left), so Idea #1 is a windowed BIG treatment that then
-  DOCKS into that existing ident -- not a separate overlay that fades. The
-  first-music-cue window is derivable from `led` (render_video() already parses the
-  v2 ledger; b000 = music_open) and passed into `_CRTRenderer`; the per-frame
-  `volume[fi]` envelope (already computed by `_analyze_audio`) gives the swell timing.
-  No new model dependency.
+### Concept -- the signal-strength envelope is the conductor
+Re-enable the dormant `_brightness_ema` (disabled v1.5.1) as a DUAL EMA precomputed in
+`__init__`: slow `signal` (alpha ~0.05, ambient brightness) + fast `trig` (alpha ~0.3,
+lock/glitch triggers); `loss = 1 - signal`. Every dynamic element READS these
+(brightness, drift, lock, hierarchy) -- they are NEVER multiplied into the whole frame
+(that was the v1.5.1 "dimmed text unreadable" bug). Strong signal = crisp + locked;
+weak signal (the silent inter-beat gaps) = the receiver loses lock: the grid dims
+first, the scope spokes shorten, faint edge-static creeps, the ident flickers LAST.
+The picture loses the signal in the gaps and reacquires on the next cue -- one conceit
+that ties the title card (#1, "tune in") to the gutter scopes (#2, "hold the signal").
 
-**Idea #2 -- Move audio-reactive visuals to the side gutters; keep the portrait clean.**
-- TODAY: the green HUD ring + waveform overlay the CENTRAL portrait, partially
-  obscuring the character.
-- CHANGE: relocate the audio-reactive elements to the LEFT/RIGHT side gutters (the
-  negative space outside the central portrait area), so the portrait composition
-  lands clean and cinematic while the reactive layer still pulses with audio --
-  FRAMING the action instead of overlapping it.
-- DIRECTION (operator-confirmed 2026-06-13): KEEP the ring motif (it is core to the
-  CRT radar-scope aesthetic) but move it OFF the portrait into the side gutters -- two
-  rings, ONE PER SIDE. Final form is Claude's aesthetic call; see LOCKED DESIGN below.
-- ARCHITECTURAL SURFACE (GROUNDED 2026-06-13 vs the real code): LAYOUT-ONLY change in
-  `_CRTRenderer.render()` (`nodes/video_engine.py`), NOT the blend node. What sits on
-  the portrait today: the circular frequency RING (section 2, `cx=w/2, cy=0.42h,
-  r=min(w,h)/5`, pulses with `vol`) dead-centre over the face; its 12 orbiting
-  PARTICLES (section 3); the mirrored WAVEFORM (section 5, `y=0.72h`, full width) and
-  the FREQ BARS (section 6, `y=0.86h`). The helpers `_waveform_mirror(...x,y,w,h...)`
-  and `_freq_bars_wide(...x,y,w,h...)` are already position-parametrized, so relocating
-  is geometry + a vertical transpose; the RMS/FFT/wave data source is UNCHANGED.
-  GUTTER REALITY: HuMo character beats are 480x832 portrait pillarboxed into 1472x832
-  -> ~496px black gutter EACH SIDE (the blend already fills the pillarbox bars), so
-  gutters are real there; LTX/Wan b-roll beats are landscape full-frame (NO gutters).
-  Guaranteed empty gutter real-estate exists only on portrait beats -- see the OPEN
-  DECISION below.
+### #1 -- big-bold EPISODE-TITLE card on the b000 music intro
+Decode -> reveal -> POP -> dock. Active window `[music_open_start_f, music_open_end_f +
+dock_frames)`; decide the card state BEFORE section 1 draws (if active, skip the normal
+ident/subtitle/timestamp and draw the card; after, the docked state IS the normal
+section-1 draw).
+- A. carrier-lock: "SIGNAL LOST" decodes from a seeded scramble into the solid terminal
+  slab; a broken-phosphor-block carrier meter crawls to solid on the swell (`signal`).
+- B. HERO title (big + bold): the actual episode title at 2-3x `f_title`, fake-bold by
+  OVERSTRIKE with offsets `{(0,0),(1,0),(0,1),(1,1)}` (no real bold font is loaded),
+  decoded-fragment reveal stepping on INTEGER frames + a block cursor. Measure with
+  `ImageDraw.textbbox`, wrap/scale long titles to a max bbox before effects.
+- C. lock POP: a 1-2 frame brightness bloom + a small horizontal coordinate "tear"
+  (NOT a hue flash -- green-only blend; NOT `np.roll` -- see specs).
+- D. dock (raster collapse): in the tail frames, interpolate the hero bbox down into the
+  section-1 ident + subtitle coords. The intro scopes "tune in" (arcs -> full circles)
+  synced to the lock.
+- Outro bookend (conditional, S5): same logic on `music_close_*` if it resolves.
 
-**Claude design analysis (2026-06-13 -- GROUNDED against the real `_CRTRenderer` draw code; my best-judgment calls). The creative bullets below are now CONFIRMED by the code; the GROUNDED DELTAS block after them states what the code changes + the decisions I'd lock.**
+### #2 -- two asymmetric gutter SCOPES (replace center ring + particles + bottom waveform/bars)
+Matched circular form, ASYMMETRIC data + failure (asymmetry is what stops twin rings
+reading as wallpaper).
+- LEFT `_draw_fft_scope`: 32 radial FFT spokes + per-spoke phosphor comet-tails
+  (bounded lookback over `freqs[fi-6:fi+1]`); idle (low signal) -> slow rotating radar
+  sweep, phase from `fi/fps` (deterministic).
+- RIGHT `_draw_scope`: the `wave` samples traced around the circumference + a bright
+  electron SWEEP DOT with a short decaying trail (lookback over `waves`); idle ->
+  jittering baseline circle. Absorbs the old bottom waveform.
+- Graticules: `_precompute_graticules()` (mirrors the `_scanlines` precompute) ->
+  static tick/crosshair RGBA, alpha_composited (near-zero per-frame cost).
+- Retire sections 5 (`_waveform_mirror`) + 6 (`_freq_bars_wide`) CALLS; thin section-3
+  particles to a faint orbit with brightness ROLES (not hue). Cap all scope line widths
+  to 1-2px (the current code is 4px at 1920).
 
-- **Order: both worth doing; #2 FIRST, #1 second.** #2 fixes a composition error in ~100% of
-  runtime (chrome sitting on the face, the emotional subject) -- every-frame upside, and the
-  reactives get MORE legible once they stop fighting the portrait. #1 is a 4-8s delight moment that
-  lands far better on an already-clean stage. They are synergistic (the cleared gutters become part
-  of the title choreography).
-- **The bigger hit (push this hardest): make the chrome SIGNAL-DRIVEN, not signal-themed.** Derive a
-  "signal-strength" envelope from the audio and let it drive everything: strong signal
-  (dialogue/music) = portrait stable, rails bright + locked, idents steady; weak signal (the silent
-  gaps, scene seams) = rails decay inward, a faint scanline roll drifts the portrait, the call-sign
-  flickers -- the picture LITERALLY loses the signal in the gaps and reacquires on the next cue. This
-  turns the reactive layer from decoration into a narrative device, gives transitions a built-in
-  grammar (signal drop = the cut), and makes #1 ("tunes in") and #2 ("hold the signal") two faces of
-  ONE conceit. Cheap: same envelope feeds all of it. If only one thing goes to the panel as the
-  headline, it is this.
-- **#1 details.** Trap to avoid: a clean centered modern fade-in (reads as generic streaming, fights
-  the CRT soul) -- the title must feel DECODED/tuned-in, not "presented." SEQUENCE, don't stack:
-  `SIGNAL LOST` carrier-locks first (de-noise from green snow into a solid slab of the existing
-  terminal face, one-frame chromatic tear on lock = the station ID), THEN the episode title
-  teletype-reveals char-by-char with a cursor (the incoming transmission = the program). Timing OFF
-  the audio (anchor entrance to the music-cue start, exit to first-dialogue-minus-a-beat), not a fixed
-  clock. PERSIST BY DOCKING, not fading: the card is the BIRTH of the two persistent corner idents --
-  `SIGNAL LOST` shrinks to a corner call-sign/channel-bug, the episode title settles into the corner
-  terminal slot it already occupies. Palette stays green + one brief amber/white "signal acquired"
-  flash on lock. References: *The Outer Limits* cold open ("we control the horizontal/vertical") is
-  the spiritual touchstone; also *Twilight Zone* restraint, EBS/CONELRAD "please stand by" test cards,
-  Pip-Boy/WarGames phosphor for the type; borrow *Stranger Things*' letters-lock MECHANIC but NOT its
-  red-serif look.
-- **#2 form factor (REVISED 2026-06-13 -- rings, NOT rails).** The operator wants to keep the ring, and
-  I agree: it is truer to the radar-scope CRT aesthetic than abstract rails (my earlier pick), so I am
-  superseding the rails. My call: TWO rings, one per gutter, same circular FORM but ASYMMETRIC DATA --
-  LEFT = the existing FFT spoke-ring (the spectrum scope), RIGHT = a circular OSCILLOSCOPE (the waveform
-  traced around the circumference), which consolidates the old bottom mirrored-waveform into it. Asymmetric
-  data is what stops twin gutter rings reading as mirrored wallpaper. Reject: identical mirrored rings
-  (wallpaper), a 4-ring stacked "scope rack" (too busy for a dread show -- held only as a denser variant),
-  vertical EQ bars (Winamp cliche), VU needle gauges (too cozy-studio). Detail in LOCKED DESIGN.
-- **Risks / cliche watch.** Green-on-green luma muddle (enforce hierarchy: portrait brightest,
-  subtitles high-contrast, chrome dim -- watch subtitles hardest); glitch fatigue (reserve heavy
-  glitch for MOMENTS -- title lock, signal-loss gaps -- keep steady-state calm); symmetric mirrored
-  gutters read as wallpaper.
-- **Bonus swing: an OUTRO bookend.** On the closing music, `SIGNAL LOST` reasserts and the picture
-  drops to static/black (carrier drop, "we now return you to..."). Same toolkit as #1, bookends the
-  episode, and literally dramatizes the show's name.
-- **One-sentence evolution each, before code.** #1: reframe from "a title card" to "the birth of the
-  persistent idents" -- sequence carrier-lock -> teletype, drive timing off the music-cue + first-
-  dialogue stamps, then DOCK both into their permanent corner positions instead of fading. #2: reframe
-  from "move the reactives to the gutters" to "two asymmetric vertical signal-rails (waveform L /
-  spectrum R) whose brightness tracks an audio signal-strength envelope," consolidating the bottom
-  waveform into them so the clean portrait is framed, not crowded.
+### Sprint plan (one file; each sprint independently testable)
+- **S1 -- foundation.** Refactor `_CRTRenderer` to precompute `signal/loss/trig` in
+  `__init__` from the full arrays; resolve the timing dict; `import hashlib` + a local
+  seeded RNG; EMA read-only discipline. Regression: determinism + audio untouched.
+- **S2 -- gutter scopes.** Left/right scope helpers (bounded-lookback trails) +
+  graticules + masked gutter-rect layers; retire sections 5/6, thin section 3.
+- **S3 -- title card.** The b000-window state machine (decode->bold->POP->dock) +
+  intro-scope tune-in + section-1 suppression; the 2-beat gap-fill smoke.
+- **S4 -- envelope behaviors.** Vignette choke (bounded/floored/text-exempt), the
+  coordinate-offset sync-drift, per-element brightness hierarchy.
+- **S5 -- outro + regression.** Conditional `music_close` bookend (inside `total_frames`)
+  + full regression (determinism checksum on RGB frames, audio-byte-identical, no new
+  widget, CPU/VRAM unaffected).
 
-**LOCKED DESIGN (2026-06-13 -- operator-confirmed direction + Claude's aesthetic calls, grounded vs the real `_CRTRenderer` code):**
+### Concrete specs (the wiring -- baked from the QA rounds, do not re-derive)
+- **Signature:** `_CRTRenderer(w, h, title, volume, freqs, waves, fps, timing=None)`;
+  store `self.total = len(volume)`, `self.fps`; reduce to `render(self, fi)`; update the
+  `render_video` caller (current L1556 `renderer = _CRTRenderer(W,H,episode_title)` ->
+  pass the arrays + timing; L1559 closure -> `renderer.render(fi)`).
+- **Timing extractor:** the SceneSequencer stamps `led["lines"]` with `speaker_role` +
+  `start_s` + `dur_s` (persisted to the DISK ledger; resolve it the way
+  `otr_caption_burn` does -- the wire ledger may carry `start_s=None`). `music_open` =
+  the first line whose `speaker_role` is a music-open role; window =
+  `round(start_s*fps) .. round((start_s+dur_s)*fps)`; `first_dialogue_f` = first
+  dialogue line's `start_s*fps`; `music_close` = last music line. FALLBACK if `start_s`
+  is unavailable: derive the intro window from the `volume` envelope (music from frame 0
+  to the first dialogue onset), capped. Missing fields DISABLE that effect (no crash).
+- **Intervals:** half-open `start <= fi < end`; clamp to `[0, total)`; disable if None
+  or `end <= start`.
+- **Determinism:** `import hashlib`; per effect `seed = int.from_bytes(
+  hashlib.blake2s(f"{title}|{fi}|{salt}".encode()).digest()[:8], "big")`;
+  `rng = np.random.default_rng(seed)`; replace the section-8 `np.random.randint` with
+  `rng.integers`. `signal[0]=trig[0]=volume[0]`.
+- **Geometry (from the real portrait scale):** the 480x832 portrait -> ~626px wide at
+  1920, centered -> protected center band x in ~[647, 1273]; gutters [0,647] /
+  [1273,1920]. Ring centered in each gutter: `left_cx~=323`, `right_cx~=1596`,
+  `cy=h//2`, `r~=235`. **Clamp the circular-scope amplitude `amp <= r*0.35`** so
+  `r+amp <= gutter_half_width (~323)` -- never crosses the center band, never overflows
+  the frame edge.
+- **No `np.roll` on the frame:** it wraps the center into the portrait. Drift + tear =
+  a horizontal coordinate OFFSET applied to the gutter-scope + title DRAW coords only,
+  clamped so each bbox stays inside its gutter (no black edge, no center incursion);
+  center grid/background untouched.
+- **Center-band clip:** draw each scope onto a transparent layer sized to its gutter
+  rect and `alpha_composite` it (the layer bounds clip it); never draw scope primitives
+  onto the base image.
+- **Text exemption:** section-1 ident + the title card draw AFTER the section-8
+  vignette/choke multiply (or on a post-vignette pass), so the choke can never dim text.
+- **Trails are pure:** computed in `render(fi)` by bounded lookback over the input
+  arrays (N~6), NOT mutable per-frame state.
+- **Outro:** render only for `fi < total_frames`; leave `_hud_frames` append unchanged.
 
-- **The "signal-strength envelope" already exists -- WIRE it, don't build it.** `_analyze_audio()`
-  returns a normalized per-frame `volume[fi]` (RMS) + 32-bin `freq[fi]`, and `_CRTRenderer` already
-  carries a dormant EMA (`self._brightness_ema`, alpha 0.08) that v1.5.1 left disabled (render()
-  section 8b). Re-enable that EMA as the MASTER signal-strength driver (it already smooths transients)
-  and feed it to rail brightness + the carrier-lock/dropout behaviour. The headline conceit is near-free.
-- **#2 LOCKED (rings, not rails) -- do it FIRST.** Move the centre ring (section 2) OFF the portrait into
-  the side gutters as a MATCHED PAIR of CRT scopes: LEFT = the existing 32-spoke FFT ring (the spectrum
-  scope), RIGHT = a circular OSCILLOSCOPE (the `wave` samples traced around the circumference, radius =
-  base +- amplitude) which CONSOLIDATES the old bottom mirrored-waveform into it (no third reactive zone).
-  Same circular FORM (keeps the current look), ASYMMETRIC DATA (left spiky/spectrum, right smooth/waveform)
-  so the pair reads as a real two-instrument console, not mirrored wallpaper. Size each ring to its gutter
-  (radius ~= min(gutter_w, h) * 0.3, vertically centred ~0.5h); the 12 particles (section 3) thin to a
-  faint orbit around each ring (keeps life, no centre clutter). The centre column (the portrait region)
-  stays free of bright chrome -- only the dim grid + scanlines + vignette. Ring brightness + lock ride the
-  signal-strength EMA above.
-- **#1 LOCKED -- the big bold EPISODE TITLE is the hero.** The small persistent ident is already render()
-  section 1; #1 adds a WINDOWED title card over the b000 music-open window: the "SIGNAL LOST" show-ident
-  carrier-locks first (de-noise from the vol-gated snow already in render() section 8, ~line 321), THEN
-  the ACTUAL EPISODE TITLE reveals BIG + BOLD, centre stage, landing on the music swell as a brightness
-  "signal-acquired" POP (NOT a hue flash -- the green-only blend kills colour). Then it DOCKS: the card
-  shrinks into the EXISTING top-left ident + episode-title slot as the drama opens. Timed in the procgen
-  24fps clock off the b000 start/end + first-dialogue frame from `led` (already parsed in render_video).
-  Outro bookend = the same logic on music-close -> hand to the existing `_TelemetryHUDRenderer` post-roll.
-- **OPEN DECISION (the one genuinely-open item): landscape-beat gutters.** Gutters are guaranteed empty
-  only on pillarboxed portrait beats; LTX/Wan landscape beats fill 1472 wide. (A) accept the thin/dim
-  rails riding the landscape edges on b-roll beats (cheapest), or (B) the compositor
-  letterboxes/portrait-shrinks landscape beats so gutters always exist (cleaner, but touches composite
-  geometry + the canvas/aspect question). My lean = (A) for v1, revisit (B) only if it reads badly at the
-  eyeball. THIS is the item worth the panel's time; the rest is build.
-- **Scope reality:** all of this is ONE file -- `nodes/video_engine.py` (`_CRTRenderer` + the
-  `render_video` ledger-window plumbing). No audio-spine touch, no new model, no new node, no new widget.
-  The blend stays green-only `screen`, so every rail/title reads as green phosphor automatically.
+### v1 CUTS (panel consensus -- add later at the eyeball, not now)
+Telemetry micro-text labels (illegible green mush downscaled + clashes with the real
+`_TelemetryHUDRenderer`); the FFT peak-hold ghost ring + noise-floor shadow ring
+(comet-tails already give persistence); the oscilloscope free-running trigger seam;
+halation (a 2x per-frame draw pass threatens the 24fps gen speed); a formal hierarchy
+layer-floor system (use per-element brightness scaling -- grid scales down faster than
+the ident).
 
-**Next step (operator-triggered):** the design is LOCKED (operator direction + my aesthetic calls). The
-only open question = landscape-beat gutters (above). On your GO I package a `_CRTRenderer` implementation
-ticket for the coder window -- ONE file, no audio-spine / model / node / widget change, the green-only
-blend untouched. Still no code until you say go.
+### OPEN (operator's call) + VERIFY-AT-BUILD
+- **Landscape-beat gutters.** Per-beat gating is INFEASIBLE at procgen render time: the
+  floor is rendered before the clips exist and before the clip manifest, so
+  `_CRTRenderer` cannot know which beats will be landscape. v1 COMMITS to dim,
+  gutter-clamped scopes that read as faint edge telemetry on landscape b-roll. The
+  eyeball gate decides whether landscape needs a different treatment (a later option
+  would push the per-beat clip-type timeline into the renderer -- cross-file, not v1).
+- **Verify smokes (build-time):** (1) the exact disk-ledger `start_s`/`dur_s` field on a
+  real episode; (2) a 2-beat gap-fill smoke proving the title card stays at the open
+  (the timeline-aligned floor slice + frame-aligned blend already imply this); (3) a
+  determinism checksum over RGB frames (not mp4 bytes); (4) a long-title `textbbox`
+  overflow case; (5) the coordinate-offset bound (no black edge / no center incursion).
 
 ---
 
