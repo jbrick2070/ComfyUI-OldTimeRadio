@@ -44,6 +44,9 @@ GOOFER_SIGMAS = "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875
 
 
 def build_workflow(a) -> dict:
+    # i2v: sampler runs on the image-anchored latent (node 7). t2v: sampler runs
+    # on the raw pure-noise EmptyLTXVLatentVideo (node 6) -- no still anchor.
+    _latent_src = "6" if a.t2v else "7"
     wf = {
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": a.ckpt}},
@@ -93,13 +96,15 @@ def build_workflow(a) -> dict:
                               "sampler_name": a.sampler, "scheduler": a.scheduler,
                               "denoise": 1.0, "model": ["1", 0],
                               "positive": ["8", 0], "negative": ["8", 1],
-                              "latent_image": ["7", 0]}}
+                              "latent_image": [_latent_src, 0]}}
     return wf
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--mode", default="ksampler", choices=["ksampler", "goofer"])
+    p.add_argument("--t2v", action="store_true",
+                   help="TEXT-to-video: no i2v still anchor (full motion freedom)")
     p.add_argument("--sigmas", default=GOOFER_SIGMAS)
     p.add_argument("--sampler", default="euler")
     p.add_argument("--scheduler", default="normal")
