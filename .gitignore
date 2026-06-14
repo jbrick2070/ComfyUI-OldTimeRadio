@@ -206,3 +206,25 @@ models/openrouter_models.json
 # captures, matrix_results.jsonl, MATRIX_DONE marker). Reproducible output,
 # not source -- keep it on disk but out of git history and `git status`.
 scripts/_otr_matrix_out/
+
+# --- 2026-06-13 run-exhaust hygiene (soak / probe / sweep / motion-clip output) ---
+# GPU soak/sweep/motion runs drop ~50 MB of reproducible output into scripts/ and
+# docs/ every session: the 115-file soak-results dir, leg .err/.watchdog logs,
+# coverage-sweep shards, run digests/reports, and LTX/Wan motion clips. NOT source.
+# Deleted the 2026-06-12/13 batch from disk; pattern-ignore so they never re-clutter
+# git status. Canonical renders live under output/otr/{episodes,obs} (already ignored
+# via output/). Tracked READMEs inside the probe dirs stay tracked (ignore != untrack).
+scripts/_otr_soak_capstone_results/
+scripts/_otr_*_probes/
+scripts/coverage_sweep*.json
+scripts/coverage_sweep*.err
+scripts/*.log.err
+scripts/*.log.watchdog
+scripts/overnight_soak_*.json
+scripts/overnight_soak_*.md
+scripts/*_digest.md
+scripts/longterm_soak_*.md
+scripts/_otr_ref_audit_report.json
+docs/ltx_motion_clips/
+docs/*/wan_clips/
+*.webm
