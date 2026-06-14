@@ -5,24 +5,24 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-13, HEAD `ca10b63` (this window: PROCGEN §4C + §4D BUILT + SHIPPED
-> (`336fb41` floor + title card, `39aa6c9` scene-aware scopes node + 3-input blend, `3995bfb` docs --
-> §4C/§4D removed, build log at `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`);
-> §4D now WIRED into `otr_scifi_16gb_full.json` (`eb64cd1`: node 94 SceneAwareScopes + 3-input blend +
-> floor draw_scopes=False/fps=25 -- it had shipped DORMANT, operator caught it; validator/profiles/
-> audio-byte-identical green). Only a live full-episode render eyeball remains for procgen. Sweep
-> gained `--exclude-engine` exact-match (`ca10b63`). **OPERATOR STEER 2026-06-13: the non-Wan
-> permutation soak is ENOUGH** -- the non-lip-sync floors are fine for the 8GB tier but NOT the target;
-> stop grinding them, drive the runway at **making the Wan lane bug-free**. **LTX motion regression vs
-> the 5/30-6/5 era logged (LTX-REGR, §5) -- tackle AFTER Wan, NOT a blocker.** Suite green throughout;
-> HEAD==origin. **Next window = ONE thread: get Wan 2.2 bug-free (sections 1 + 4 + 4A).**)
+> **Last updated:** 2026-06-14, HEAD `56469bd` (procgen window, all SHIPPED + pushed; box now IDLE).
+> PROCGEN §4C+§4D built (`336fb41`/`39aa6c9`), §4C/§4D removed from this doc (build log at
+> `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`), and **§4D WIRED into
+> `otr_scifi_16gb_full.json`** (`eb64cd1`: node 94 SceneAwareScopes + 3-input blend + floor
+> draw_scopes=False/fps=25 -- it had shipped DORMANT, operator caught it). A 3-subagent wiring panel then
+> audited the whole JSON: **NO other dormant features**, all wiring semantically correct; only a stale
+> tooltip fixed (`c8c6d4d`). Sweep gained `--exclude-engine` exact-match (`ca10b63`). Standing rules
+> hardened: **workflow-source-of-truth** is now a HARD RULE here (§2) + in CLAUDE.md, and CLAUDE.md got a
+> true Cowork-operating-model rewrite (`5e4babd`/`56469bd`). Suite green throughout; HEAD==origin.
+> Only a live full-episode render eyeball remains for procgen (NOT a forward-order blocker).
+> **OPERATOR STEER: the non-Wan soak is ENOUGH** (the non-lip-sync floors are fine for 8GB, not the
+> target). **LTX motion regression vs the 5/30-6/5 era = LTX-REGR (§5), AFTER Wan.**
+> **NEXT WINDOW = ONE thread: get Wan 2.2 bug-free (sections 1 + 4 + 4A), then the forward order (§3).**)
 >
-> **RUNNING JOB (clean up before the Wan leg):** a non-Wan coverage sweep is STILL LIVE on the box
-> (`otr_coverage_sweep.py --strict-fallback --exclude wan/latentsync/triposg`, PID was 22472; ComfyUI
-> server PID was 39736; logs `scripts/_otr_longsoak_run.log`). Per the operator "enough" call + the
-> reset-before-run directive, the next window should kill the sweep + server **by PID** (NOT a blanket
-> `Stop-Process -Name python` -- that also kills the Claude MCP extension pythons) and confirm the GPU
-> drops to the desktop baseline (~1.5 GB) before booting fresh for Wan.
+> **BOX STATE (2026-06-14):** the non-Wan coverage sweep + ComfyUI server are STOPPED; GPU is idle
+> (~1.3 GB, nothing on :8000). Still RESET-VERIFY before booting fresh (section 4 of CLAUDE.md): kill any
+> stray server/harness by CommandLine (CIM) -- NOT a blanket `Stop-Process -Name python` -- and confirm
+> the GPU baseline + :8000 empty.
 >
 > **Hardening delta (2026-06-13):** the Wan Phase-2 + GATE-A coverage-sweep plan was
 > QA'd against the real code and roundtabled (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4,
