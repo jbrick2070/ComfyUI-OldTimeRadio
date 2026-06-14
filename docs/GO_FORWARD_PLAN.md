@@ -252,43 +252,12 @@ node class from `/object_info` before coding (the "5B latent node" is underspeci
 
 ---
 
-## WAN 2.2 SMOKE BUILD — Phase 1 RESULT (2026-06-13)
+## 4B. WAN PHASE 1 -- DONE (pointer)
 
-Branch: v2.0-alpha. HEAD == origin. Suite: 4141 passed, Bug Bible green.
-
-Commits landed:
-  - 2fbc2f3 — 5 code-gap fixes (TASK 0 + Phase 1)
-  - 8eaf058 — doc note
-
-Result: first Wan b-roll clip in hand — real motion, no warp, wan_i2v 14B fp8 in-process at ~14.5 GB ceiling. Phase 1 PROVEN.
-
-> **RECONCILED 2026-06-13 (post-section-4A):** the "PARKED AT CS-3 SCOPING FORK /
-> open scoping decision" framing just below is SUPERSEDED. CS-3 was reframed (section 5,
-> commit `531f2f4`) from a co-residency "decision" into a sequential-residency PROOF
-> obligation (per-beat NVML peak <= 14.5 GB + the inter-beat reclaim), so Phase 2 is
-> NOT blocked on a decision. The three options below are SEQUENCED follow-on work, not
-> mutually-exclusive choices: (a) = the wan_i2v-only engine leg = the ACTIVE next step
-> (section 1); (b) = the M9 CS-3 sequential-residency proof; (c) = the `wan_ti2v` 8GB
-> build. The section-4A sweep hardening that this overnight soak motivated has since
-> LANDED (see the section-4A ledger). Soak readiness + the enable-set check = the
-> forward-order item 4 blocker audit.
-
-PHASE 2 — PARKED AT CS-3 SCOPING FORK
-Open scoping decision needed before continuing:
-  (a) Wan-only other-beats leg
-  (b) Full Wan+HuMo co-stage episode (~24 min render) — co-staging Wan b-roll + HuMo talking beats can bust 16 GB
-  (c) TI2V-5B fetch first so both eyeball clips are ready
-Phase 2 also requires `wan_i2v` added to the 16gb_full profile enable-set.
-
-COMPANION FINDINGS FROM 2026-06-13 OVERNIGHT COVERAGE SOAK
-  - 2-pass run on non-Wan engines: 0/25 PASS / every leg rendered a playable byte-identical final → sweep wrong-as-wired (CS-1 class). Coverage sweep ran every leg with expect_engine="" which the soak treats as informational; silent fall-back to radio floor scored PASS. Coverage GREEN was meaningless.
-  - R1 temp-leak fix (in-tree allocator + 7 call-site swaps + audio-slice rename + b7 AST ban) — GPU-PROVEN on full 70-word other_beats_visual_still_parallax leg. Audio byte-identical, VRAM peak 11.3 GB << 14.5 ceiling, zero stray writes outside otr.
-  - R2 HuMo native render — fix in place at harness level (explicit enable flag) but not yet exercised on a humo leg; ~22 min run to prove.
-  - R3 OTR_NEWS_BRIEFS_REQUIRED=0 env hatch + A2b prune-to-floor durable fix landed.
-
-WAN STAYS PARKED until the Phase-2 scoping decision is taken.
-  ^ SUPERSEDED (see the RECONCILED banner above): Phase 2 is the ACTIVE next step
-    (section 1), no scoping decision pending; the section-4A hardening has LANDED.
+Phase 1 PROVEN: a real Wan b-roll clip (wan_i2v 14B fp8 in-process, ~14.5 GB; commits `2fbc2f3` +
+`8eaf058`). Phase 2 is the ACTIVE next step (section 1); remaining Wan work = sections 4 + 4A. The
+overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3 landed) live in git +
+`scripts/FABLE_SOAK_REVIEW.md`; the not-done remainder (R2 verify) is in section 5.
 
 ---
 
@@ -337,9 +306,62 @@ WAN STAYS PARKED until the Phase-2 scoping decision is taken.
   or a portrait-shrink), symmetric vs asymmetric L/R, interaction with the Idea-#1
   title card during the intro.
 
+**Claude first-cut critique (2026-06-13, pre-panel -- opinionated; the panel will pressure-test it).**
+
+- **Order: both worth doing; #2 FIRST, #1 second.** #2 fixes a composition error in ~100% of
+  runtime (chrome sitting on the face, the emotional subject) -- every-frame upside, and the
+  reactives get MORE legible once they stop fighting the portrait. #1 is a 4-8s delight moment that
+  lands far better on an already-clean stage. They are synergistic (the cleared gutters become part
+  of the title choreography).
+- **The bigger hit (push this hardest): make the chrome SIGNAL-DRIVEN, not signal-themed.** Derive a
+  "signal-strength" envelope from the audio and let it drive everything: strong signal
+  (dialogue/music) = portrait stable, rails bright + locked, idents steady; weak signal (the silent
+  gaps, scene seams) = rails decay inward, a faint scanline roll drifts the portrait, the call-sign
+  flickers -- the picture LITERALLY loses the signal in the gaps and reacquires on the next cue. This
+  turns the reactive layer from decoration into a narrative device, gives transitions a built-in
+  grammar (signal drop = the cut), and makes #1 ("tunes in") and #2 ("hold the signal") two faces of
+  ONE conceit. Cheap: same envelope feeds all of it. If only one thing goes to the panel as the
+  headline, it is this.
+- **#1 details.** Trap to avoid: a clean centered modern fade-in (reads as generic streaming, fights
+  the CRT soul) -- the title must feel DECODED/tuned-in, not "presented." SEQUENCE, don't stack:
+  `SIGNAL LOST` carrier-locks first (de-noise from green snow into a solid slab of the existing
+  terminal face, one-frame chromatic tear on lock = the station ID), THEN the episode title
+  teletype-reveals char-by-char with a cursor (the incoming transmission = the program). Timing OFF
+  the audio (anchor entrance to the music-cue start, exit to first-dialogue-minus-a-beat), not a fixed
+  clock. PERSIST BY DOCKING, not fading: the card is the BIRTH of the two persistent corner idents --
+  `SIGNAL LOST` shrinks to a corner call-sign/channel-bug, the episode title settles into the corner
+  terminal slot it already occupies. Palette stays green + one brief amber/white "signal acquired"
+  flash on lock. References: *The Outer Limits* cold open ("we control the horizontal/vertical") is
+  the spiritual touchstone; also *Twilight Zone* restraint, EBS/CONELRAD "please stand by" test cards,
+  Pip-Boy/WarGames phosphor for the type; borrow *Stranger Things*' letters-lock MECHANIC but NOT its
+  red-serif look.
+- **#2 form factor -- my pick over the dispatch gut and the obvious defaults: two ASYMMETRIC vertical
+  signal-rails** -- a continuous oscilloscope/waveform trace LEFT, a spectrum/waterfall trace RIGHT
+  (or L/R channels), brightness driven by the envelope. Reject: twin arcs (curves waste the tall
+  narrow gutter, half-ring reads as broken UI), vertical EQ bars (media-player/Winamp cliche), VU
+  needle gauges (period-correct but too cozy-studio for a dread show; fiddly at gutter scale),
+  silhouette-mirroring (pulls attention back to the portrait edge, defeats the goal). Asymmetry is
+  what makes the gutters read as a real instrument vs decoration. CONSOLIDATE the old bottom waveform
+  INTO the rails (don't end up with three reactive zones); bottom = subtitles + a thin baseline tuning
+  strip. 16:9 caveat: gutters are narrow -- may need a slight portrait-shrink/letterbox to give the
+  rails room.
+- **Risks / cliche watch.** Green-on-green luma muddle (enforce hierarchy: portrait brightest,
+  subtitles high-contrast, chrome dim -- watch subtitles hardest); glitch fatigue (reserve heavy
+  glitch for MOMENTS -- title lock, signal-loss gaps -- keep steady-state calm); symmetric mirrored
+  gutters read as wallpaper.
+- **Bonus swing: an OUTRO bookend.** On the closing music, `SIGNAL LOST` reasserts and the picture
+  drops to static/black (carrier drop, "we now return you to..."). Same toolkit as #1, bookends the
+  episode, and literally dramatizes the show's name.
+- **One-sentence evolution each, before code.** #1: reframe from "a title card" to "the birth of the
+  persistent idents" -- sequence carrier-lock -> teletype, drive timing off the music-cue + first-
+  dialogue stamps, then DOCK both into their permanent corner positions instead of fading. #2: reframe
+  from "move the reactives to the gutters" to "two asymmetric vertical signal-rails (waveform L /
+  spectrum R) whose brightness tracks an audio signal-strength envelope," consolidating the bottom
+  waveform into them so the clean portrait is framed, not crowded.
+
 **Next step (operator-triggered):** round-robin both ideas as a batch across the
-panel, ground every returned suggestion against the real procgen draw code, then
-fold the synthesized design into an implementation ticket here. Until then: no code.
+panel WITH the critique above in hand, ground every returned suggestion against the real procgen draw
+code, then fold the synthesized design into an implementation ticket here. Until then: no code.
 
 ---
 
