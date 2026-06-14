@@ -149,3 +149,35 @@ def test_exit_wan_i2v_token_does_not_match_wan_ti2v_leg():
     # wan_i2v requirement.
     results = [_leg("sweep_other_beats_visual_wan_ti2v")]
     assert sweep.sweep_exit_code(results, acceptance=True) == 1
+
+
+# --------------------------------------------------------------------------- #
+# --strict-fallback -- should_forbid_fallback (M1 decoupled from M2)
+# --------------------------------------------------------------------------- #
+def test_forbid_fallback_off_by_default():
+    assert sweep.should_forbid_fallback(False, False) is False
+
+
+def test_forbid_fallback_on_under_acceptance():
+    assert sweep.should_forbid_fallback(True, False) is True
+
+
+def test_forbid_fallback_on_under_strict_fallback():
+    # The whole point: M1 on WITHOUT the acceptance Wan-engine requirement.
+    assert sweep.should_forbid_fallback(False, True) is True
+
+
+def test_forbid_fallback_on_when_both():
+    assert sweep.should_forbid_fallback(True, True) is True
+
+
+def test_strict_fallback_exit_needs_no_wan_engine():
+    # strict-fallback uses non-acceptance exit semantics: a non-Wan all-PASS run
+    # is GREEN (no wan_i2v/wan_ti2v required), an empty run is RED.
+    non_wan = [_leg("sweep_other_beats_visual_latentsync"),
+               _leg("sweep_music_visual_visualizer")]
+    assert sweep.sweep_exit_code(non_wan, acceptance=False) == 0
+    assert sweep.sweep_exit_code([], acceptance=False) == 1
+    # A silent fallback would surface as a SOAK_FAIL leg (M1 raised) -> RED.
+    fell = [_leg("sweep_other_beats_visual_latentsync", "SOAK_FAIL")]
+    assert sweep.sweep_exit_code(fell, acceptance=False) == 1

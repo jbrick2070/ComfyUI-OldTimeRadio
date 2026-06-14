@@ -162,6 +162,15 @@ def sweep_exit_code(results, acceptance, required_engines=CORE_WAN_ENGINES):
     return 0
 
 
+def should_forbid_fallback(acceptance, strict_fallback):
+    """The M1 no-runtime-fallback (CS-1) gate is ON in ``acceptance`` mode OR in
+    ``strict_fallback`` mode. ``--strict-fallback`` DECOUPLES the CS-1 gate from
+    the full GATE-A Wan-engine requirement (M2), so the NON-Wan permutation soak
+    -- the set that originally false-greened -- can re-run with M1 active and a
+    clean GREEN/RED exit, WITHOUT wan_ti2v built. Pure."""
+    return bool(acceptance or strict_fallback)
+
+
 def enumerate_options():
     """(slot_key, engine, reason) per dropdown option, FROM THE REGISTRY.
     reason: "run" when in enabled(16gb_full); else the availability code."""
@@ -201,7 +210,15 @@ def main() -> int:
                          "of core Wan (M3/M5), and require wan_i2v AND wan_ti2v "
                          "to PASS (M2). Without it the sweep is the informational "
                          "dropdown-rotation coverage pass.")
+    ap.add_argument("--strict-fallback", action="store_true",
+                    help="Turn ON the M1 no-runtime-fallback (CS-1) gate WITHOUT "
+                         "the full GATE-A Wan-engine requirement -- so the NON-Wan "
+                         "permutation soak (the set that originally false-greened) "
+                         "re-runs with M1 active and a clean GREEN/RED exit, no "
+                         "wan_ti2v needed. Use with --exclude wan. Implied by "
+                         "--acceptance.")
     args = ap.parse_args()
+    forbid_fallback = should_forbid_fallback(args.acceptance, args.strict_fallback)
 
     options = enumerate_options()
     runnable = [(s, e) for s, e, r in options if r == "run"]
@@ -223,6 +240,10 @@ def main() -> int:
             return 2
         print("[sweep] acceptance preflight OK: OTR_TEST_MODE unset, core Wan "
               "enable flags set, no --exclude of core Wan", flush=True)
+    if forbid_fallback:
+        print("[sweep] M1 no-runtime-fallback gate: ON (%s)"
+              % ("acceptance" if args.acceptance else "strict-fallback"),
+              flush=True)
 
     mapping = load_widget_mapping()
     results = []
@@ -258,7 +279,7 @@ def main() -> int:
         t1 = time.time()
         try:
             rc = soak.run_leg(leg, expect_floor=False, expect_engine="",
-                              profile=profile, forbid_fallback=args.acceptance)
+                              profile=profile, forbid_fallback=forbid_fallback)
             verdict = "PASS" if rc == 0 else "RC_%d" % rc
         except soak.SoakFail as exc:
             verdict = "SOAK_FAIL"
