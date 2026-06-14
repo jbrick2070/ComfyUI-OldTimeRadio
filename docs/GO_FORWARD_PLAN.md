@@ -267,9 +267,12 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 4C. CRT PROCGEN UPGRADE -- title card + gutter scopes (roundtable-hardened, SPRINT-READY)
 
-> Roundtable-hardened 2026-06-13: 3 panels x 3 passes (gemini-3.1-pro + gpt-5.5 +
-> deepseek-v4-pro; Claude judge/grounder; ~$0.40; raw reviews + judgments in
-> `docs/2026-06-13-crt-procgen-improvements/roundtable/`). ONE file:
+> Roundtable-hardened 2026-06-13 -- CONVERGED over 4 passes: 3 QA passes (gemini-3.1-pro
+> + gpt-5.5 + deepseek-v4-pro) + a 4th convergence pass across 5 FRESH frontier families
+> (gpt-5.5 + grok-4.3 + kimi-k2.6 + mistral-large + qwen3-235b) that independently
+> re-derived the SAME architecture (validation), leaving only fine implementation
+> precision (folded below). Claude judge/grounder; ~$0.48; raw reviews + judgments in
+> `docs/2026-06-13-crt-procgen-improvements/roundtable/`. ONE file:
 > `nodes/video_engine.py` (`_CRTRenderer` + the `render_video` plumbing). NO new
 > node / widget / model / dependency; Pillow-only on CPU; the green-only `screen`
 > blend is untouched; the audio spine is frozen (byte-identical); deterministic per
@@ -288,15 +291,20 @@ that ties the title card (#1, "tune in") to the gutter scopes (#2, "hold the sig
 
 ### #1 -- big-bold EPISODE-TITLE card on the b000 music intro
 Decode -> reveal -> POP -> dock. Active window `[music_open_start_f, music_open_end_f +
-dock_frames)`; decide the card state BEFORE section 1 draws (if active, skip the normal
-ident/subtitle/timestamp and draw the card; after, the docked state IS the normal
-section-1 draw).
+dock_frames)` with `dock_frames = min(int(fps*0.5), first_dialogue_f - music_open_end_f)`
+(never overruns the first dialogue or `total`). Decide the card state BEFORE section 1
+draws: while active, SUPPRESS the original ident/subtitle/timestamp ELEMENTS (keep the
+section-1 layout + coords -- they are the dock target) and draw the card; after, the
+docked state IS the normal section-1 draw. The hero card OWNS the evacuated CENTRE during
+its window (EXEMPT from center-column sanctity -- there is no portrait at the open); the
+gutter-clamp + sanctity apply to the SCOPES and the DOCKED ident, NOT the intro hero.
 - A. carrier-lock: "SIGNAL LOST" decodes from a seeded scramble into the solid terminal
   slab; a broken-phosphor-block carrier meter crawls to solid on the swell (`signal`).
-- B. HERO title (big + bold): the actual episode title at 2-3x `f_title`, fake-bold by
-  OVERSTRIKE with offsets `{(0,0),(1,0),(0,1),(1,1)}` (no real bold font is loaded),
-  decoded-fragment reveal stepping on INTEGER frames + a block cursor. Measure with
-  `ImageDraw.textbbox`, wrap/scale long titles to a max bbox before effects.
+- B. HERO title (big + bold): the actual episode title at 2-3x `f_title`, CENTRE-anchored
+  in the evacuated centre (NOT gutter-clamped -- it is the hero), fake-bold by OVERSTRIKE
+  with offsets `{(0,0),(1,0),(0,1),(1,1)}` (no real bold font is loaded), decoded-fragment
+  reveal stepping on INTEGER frames + a block cursor. Measure with `ImageDraw.textbbox`;
+  wrap/scale to `max_w~=int(w*0.8)` / `max_h~=int(h*0.28)` with a min font floor first.
 - C. lock POP: a 1-2 frame brightness bloom + a small horizontal coordinate "tear"
   (NOT a hue flash -- green-only blend; NOT `np.roll` -- see specs).
 - D. dock (raster collapse): in the tail frames, interpolate the hero bbox down into the
@@ -321,14 +329,17 @@ reading as wallpaper).
 
 ### Sprint plan (one file; each sprint independently testable)
 - **S1 -- foundation.** Refactor `_CRTRenderer` to precompute `signal/loss/trig` in
-  `__init__` from the full arrays; resolve the timing dict; `import hashlib` + a local
-  seeded RNG; EMA read-only discipline. Regression: determinism + audio untouched.
+  `__init__` from the full arrays (convert `volume`/`freqs` to `np.array` FIRST -- they
+  are Python lists today); resolve the timing dict; `import hashlib` + a local seeded
+  RNG; EMA read-only discipline. **Land the draw-order layering here too** (base/scopes/
+  grid -> vignette/choke in numpy -> text + card overlay on top): S3 depends on it.
+  Regression: determinism + audio untouched.
 - **S2 -- gutter scopes.** Left/right scope helpers (bounded-lookback trails) +
   graticules + masked gutter-rect layers; retire sections 5/6, thin section 3.
 - **S3 -- title card.** The b000-window state machine (decode->bold->POP->dock) +
   intro-scope tune-in + section-1 suppression; the 2-beat gap-fill smoke.
-- **S4 -- envelope behaviors.** Vignette choke (bounded/floored/text-exempt), the
-  coordinate-offset sync-drift, per-element brightness hierarchy.
+- **S4 -- envelope behaviors.** The coordinate-offset sync-drift (gutter-clamped) +
+  per-element brightness hierarchy. (Signal-driven vignette choke is CUT from v1 -- see CUTS.)
 - **S5 -- outro + regression.** Conditional `music_close` bookend (inside `total_frames`)
   + full regression (determinism checksum on RGB frames, audio-byte-identical, no new
   widget, CPU/VRAM unaffected).
@@ -348,25 +359,29 @@ reading as wallpaper).
   to the first dialogue onset), capped. Missing fields DISABLE that effect (no crash).
 - **Intervals:** half-open `start <= fi < end`; clamp to `[0, total)`; disable if None
   or `end <= start`.
-- **Determinism:** `import hashlib`; per effect `seed = int.from_bytes(
-  hashlib.blake2s(f"{title}|{fi}|{salt}".encode()).digest()[:8], "big")`;
-  `rng = np.random.default_rng(seed)`; replace the section-8 `np.random.randint` with
-  `rng.integers`. `signal[0]=trig[0]=volume[0]`.
-- **Geometry (from the real portrait scale):** the 480x832 portrait -> ~626px wide at
-  1920, centered -> protected center band x in ~[647, 1273]; gutters [0,647] /
-  [1273,1920]. Ring centered in each gutter: `left_cx~=323`, `right_cx~=1596`,
-  `cy=h//2`, `r~=235`. **Clamp the circular-scope amplitude `amp <= r*0.35`** so
-  `r+amp <= gutter_half_width (~323)` -- never crosses the center band, never overflows
-  the frame edge.
-- **No `np.roll` on the frame:** it wraps the center into the portrait. Drift + tear =
-  a horizontal coordinate OFFSET applied to the gutter-scope + title DRAW coords only,
-  clamped so each bbox stays inside its gutter (no black edge, no center incursion);
-  center grid/background untouched.
+- **Determinism:** `import hashlib`; per effect (`salt` = a literal effect tag, e.g.
+  "noise"/"scramble") `seed = int.from_bytes(hashlib.blake2s(f"{title}|{fi}|{salt}"
+  .encode()).digest()[:8], "big")`; `rng = np.random.default_rng(seed)`; replace the
+  section-8 `np.random.randint(-i, i+1, ...)` with `rng.integers(-i, i+1, size=..., dtype=
+  np.int16)` (default `endpoint=False` keeps the SAME half-open range -- do not set
+  endpoint=True). `signal[0]=trig[0]=volume[0]` (guard empty `volume`).
+- **Geometry (COMPUTE from `w,h` -- the renderer also runs 1280x720 / 832x480 / 4K, so do
+  NOT bake 1920 constants):** `portrait_w = round(h*480/832)`;
+  `gutter = max(0,(w-portrait_w)//2)`; protected centre band = `[gutter, w-gutter]`;
+  `left_cx = gutter//2`, `right_cx = w-gutter//2`, `cy = h//2`,
+  `r = int(min(gutter*0.36, h*0.30))`. **Clamp the scope amplitude `amp <= r*0.35`** so
+  `r+amp <= gutter//2` -- never crosses the centre band, never overflows the edge.
+  (At 1920x1080 this gives gutter~=647, left_cx~=323, right_cx~=1596, r~=235.)
+- **No `np.roll` on the frame:** it wraps the centre into the portrait. Drift + the lock
+  tear = a horizontal coordinate OFFSET applied to the SCOPE draw coords (clamped inside
+  the gutter) and, during the title window, to the centre-anchored hero card (clamped
+  inside the frame -- no black edge); the steady-state centre grid/background is untouched.
+  The POP may be bloom-only if the tear reads risky (2 panels flagged the tear optional).
 - **Center-band clip:** draw each scope onto a transparent layer sized to its gutter
   rect and `alpha_composite` it (the layer bounds clip it); never draw scope primitives
   onto the base image.
-- **Text exemption:** section-1 ident + the title card draw AFTER the section-8
-  vignette/choke multiply (or on a post-vignette pass), so the choke can never dim text.
+- **Text exemption:** section-1 ident + the title card draw AFTER the section-8 vignette
+  multiply (the S1 layering pass), so the always-on vignette can never dim text.
 - **Trails are pure:** computed in `render(fi)` by bounded lookback over the input
   arrays (N~6), NOT mutable per-frame state.
 - **Outro:** render only for `fi < total_frames`; leave `_hud_frames` append unchanged.
@@ -377,7 +392,9 @@ Telemetry micro-text labels (illegible green mush downscaled + clashes with the 
 (comet-tails already give persistence); the oscilloscope free-running trigger seam;
 halation (a 2x per-frame draw pass threatens the 24fps gen speed); a formal hierarchy
 layer-floor system (use per-element brightness scaling -- grid scales down faster than
-the ident).
+the ident); the **signal-driven vignette choke** (it multiplies the whole frame -- the
+exact v1.5.1 readable-text risk; per-element brightness is enough. If ever re-added:
+`np.clip(1.0 - loss*0.6, 0.35, 1.0)` on the immutable base vignette, text-exempt).
 
 ### OPEN (operator's call) + VERIFY-AT-BUILD
 - **Landscape-beat gutters.** Per-beat gating is INFEASIBLE at procgen render time: the
@@ -386,8 +403,10 @@ the ident).
   gutter-clamped scopes that read as faint edge telemetry on landscape b-roll. The
   eyeball gate decides whether landscape needs a different treatment (a later option
   would push the per-beat clip-type timeline into the renderer -- cross-file, not v1).
-- **Verify smokes (build-time):** (1) the exact disk-ledger `start_s`/`dur_s` field on a
-  real episode; (2) a 2-beat gap-fill smoke proving the title card stays at the open
+- **Verify smokes (build-time):** (1) the exact disk-ledger schema on a real episode --
+  the `start_s`/`dur_s` fields, that `start_s` is in SECONDS (not 25fps timeline frames),
+  and the exact `speaker_role` string for the opening music (likely `music_open` /
+  `music_visual`); (2) a 2-beat gap-fill smoke proving the title card stays at the open
   (the timeline-aligned floor slice + frame-aligned blend already imply this); (3) a
   determinism checksum over RGB frames (not mp4 bytes); (4) a long-title `textbbox`
   overflow case; (5) the coordinate-offset bound (no black edge / no center incursion).
