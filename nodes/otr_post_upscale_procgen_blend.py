@@ -426,10 +426,16 @@ def _build_blend_cmd(
         scp_zero = (
             "colorchannelmixer="
             "rr=0:rg=0:rb=0:gr=0:gg=1:gb=0:br=0:bg=0:bb=0")
+        # green_only_step ALREADY ends with ',format=gbrp' when the overlay is
+        # ON, so only add the gbrp pin here when it is OFF. Appending a second
+        # 'format=gbrp' would collapse into 'format=gbrpformat=gbrp' -> ffmpeg
+        # rejects the bogus 'gbrpformat' option and the WHOLE §4D blend (scope
+        # overlay + SDH caption burn) silently falls back to source-copy.
+        # BUG-LOCAL-402.
+        pgn_gbrp = "" if green_only_step else ",format=gbrp"
         fc = (
             f"[0:v]format=gbrp[main];"
-            f"[1:v]{_conform},setpts=PTS-STARTPTS{crush_step}{green_only_step}"
-            f"format=gbrp[pgn];"
+            f"[1:v]{_conform},setpts=PTS-STARTPTS{crush_step}{green_only_step}{pgn_gbrp}[pgn];"
             f"[2:v]{_conform},setpts=PTS-STARTPTS,setsar=1,{scp_zero},"
             f"format=gbrp[scp];"
             f"[main][pgn]blend=all_mode={blend_mode}:"

@@ -110,6 +110,38 @@ def test_build_cmd_with_captions_appends_ass_by_basename():
     assert cmd[cmd.index("-c:a") + 1] == "copy"
 
 
+def test_build_cmd_3input_scopes_no_double_format_gbrp_bug402():
+    """BUG-LOCAL-402: the §4D 3-input blend (procgen floor + scene-aware scopes)
+    must emit a WELL-FORMED filter. green_only_step already ends with
+    ',format=gbrp', so a second pin used to collapse into 'format=gbrpformat=gbrp';
+    ffmpeg rejected the bogus 'gbrpformat' option and the WHOLE blend + SDH caption
+    burn silently fell back to source-copy on every episode. Guard both overlay
+    states + the caption burn on top of the 3-input graph."""
+    from nodes.otr_post_upscale_procgen_blend import _build_blend_cmd
+    for green in (True, False):
+        cmd = _build_blend_cmd(
+            source_mp4=Path("s.mp4"), procgen_mp4=Path("p.mp4"),
+            out_mp4=Path("o.mp4"), blend_mode="screen", blend_opacity=1.0,
+            ffmpeg="ffmpeg", scopes_mp4=Path("scopes.mp4"),
+            green_only_overlay=green,
+        )
+        fc = cmd[cmd.index("-filter_complex") + 1]
+        assert "gbrpformat" not in fc, f"green={green}: malformed filter -> {fc}"
+        # exactly three gbrp pins, each a labeled terminal: [main] [pgn] [scp]
+        assert fc.count("format=gbrp[") == 3, f"green={green}: {fc}"
+        # captions still burn on top of the 3-input blend (not lost to fallback)
+        cmd_cap = _build_blend_cmd(
+            source_mp4=Path("s.mp4"), procgen_mp4=Path("p.mp4"),
+            out_mp4=Path("o.mp4"), blend_mode="screen", blend_opacity=1.0,
+            ffmpeg="ffmpeg", scopes_mp4=Path("scopes.mp4"),
+            green_only_overlay=green,
+            captions_ass_path=r"C:\ep\audio\ep_captions.ass",
+        )
+        fc_cap = cmd_cap[cmd_cap.index("-filter_complex") + 1]
+        assert "gbrpformat" not in fc_cap
+        assert ";[vpre]ass=ep_captions.ass[v]" in fc_cap
+
+
 def test_ass_filter_arg_returns_basename_and_parent():
     from nodes.otr_post_upscale_procgen_blend import _ass_filter_arg
 
