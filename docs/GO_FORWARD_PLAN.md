@@ -305,9 +305,9 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   negative space outside the central portrait area), so the portrait composition
   lands clean and cinematic while the reactive layer still pulses with audio --
   FRAMING the action instead of overlapping it.
-- CREATIVE LATITUDE on form: vertical reactive bands, side-mounted oscilloscopes,
-  inverted/flipped versions of the current ring, etc. -- anything that reads well
-  and keeps the centre uncluttered.
+- DIRECTION (operator-confirmed 2026-06-13): KEEP the ring motif (it is core to the
+  CRT radar-scope aesthetic) but move it OFF the portrait into the side gutters -- two
+  rings, ONE PER SIDE. Final form is Claude's aesthetic call; see LOCKED DESIGN below.
 - ARCHITECTURAL SURFACE (GROUNDED 2026-06-13 vs the real code): LAYOUT-ONLY change in
   `_CRTRenderer.render()` (`nodes/video_engine.py`), NOT the blend node. What sits on
   the portrait today: the circular frequency RING (section 2, `cx=w/2, cy=0.42h,
@@ -351,16 +351,14 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   the spiritual touchstone; also *Twilight Zone* restraint, EBS/CONELRAD "please stand by" test cards,
   Pip-Boy/WarGames phosphor for the type; borrow *Stranger Things*' letters-lock MECHANIC but NOT its
   red-serif look.
-- **#2 form factor -- my pick over the dispatch gut and the obvious defaults: two ASYMMETRIC vertical
-  signal-rails** -- a continuous oscilloscope/waveform trace LEFT, a spectrum/waterfall trace RIGHT
-  (or L/R channels), brightness driven by the envelope. Reject: twin arcs (curves waste the tall
-  narrow gutter, half-ring reads as broken UI), vertical EQ bars (media-player/Winamp cliche), VU
-  needle gauges (period-correct but too cozy-studio for a dread show; fiddly at gutter scale),
-  silhouette-mirroring (pulls attention back to the portrait edge, defeats the goal). Asymmetry is
-  what makes the gutters read as a real instrument vs decoration. CONSOLIDATE the old bottom waveform
-  INTO the rails (don't end up with three reactive zones); bottom = subtitles + a thin baseline tuning
-  strip. 16:9 caveat: gutters are narrow -- may need a slight portrait-shrink/letterbox to give the
-  rails room.
+- **#2 form factor (REVISED 2026-06-13 -- rings, NOT rails).** The operator wants to keep the ring, and
+  I agree: it is truer to the radar-scope CRT aesthetic than abstract rails (my earlier pick), so I am
+  superseding the rails. My call: TWO rings, one per gutter, same circular FORM but ASYMMETRIC DATA --
+  LEFT = the existing FFT spoke-ring (the spectrum scope), RIGHT = a circular OSCILLOSCOPE (the waveform
+  traced around the circumference), which consolidates the old bottom mirrored-waveform into it. Asymmetric
+  data is what stops twin gutter rings reading as mirrored wallpaper. Reject: identical mirrored rings
+  (wallpaper), a 4-ring stacked "scope rack" (too busy for a dread show -- held only as a denser variant),
+  vertical EQ bars (Winamp cliche), VU needle gauges (too cozy-studio). Detail in LOCKED DESIGN.
 - **Risks / cliche watch.** Green-on-green luma muddle (enforce hierarchy: portrait brightest,
   subtitles high-contrast, chrome dim -- watch subtitles hardest); glitch fatigue (reserve heavy
   glitch for MOMENTS -- title lock, signal-loss gaps -- keep steady-state calm); symmetric mirrored
@@ -375,26 +373,31 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   spectrum R) whose brightness tracks an audio signal-strength envelope," consolidating the bottom
   waveform into them so the clean portrait is framed, not crowded.
 
-**GROUNDED DELTAS + the calls I'd lock (2026-06-13, vs the real `_CRTRenderer` code):**
+**LOCKED DESIGN (2026-06-13 -- operator-confirmed direction + Claude's aesthetic calls, grounded vs the real `_CRTRenderer` code):**
 
 - **The "signal-strength envelope" already exists -- WIRE it, don't build it.** `_analyze_audio()`
   returns a normalized per-frame `volume[fi]` (RMS) + 32-bin `freq[fi]`, and `_CRTRenderer` already
   carries a dormant EMA (`self._brightness_ema`, alpha 0.08) that v1.5.1 left disabled (render()
   section 8b). Re-enable that EMA as the MASTER signal-strength driver (it already smooths transients)
   and feed it to rail brightness + the carrier-lock/dropout behaviour. The headline conceit is near-free.
-- **#2 is the bigger, near-mechanical win -- do it FIRST.** Pull the dead-centre ring (section 2) + its
-  orbiting particles (section 3) OFF the portrait; rebuild as two asymmetric vertical rails in the gutter
-  x-bands -- LEFT = a vertical transpose of `_waveform_mirror`, RIGHT = a vertical transpose of
-  `_freq_bars_wide`. Consolidate the bottom waveform + bars INTO the rails (no third reactive zone). Keep
-  the centre column (~480-520px portrait region) free of bright chrome -- only the dim grid + scanlines +
-  vignette stay. A SMALL ring can survive as a "signal lock" indicator DOCKED to the corner ident, never
-  over the face.
-- **#1 is reframed by the code.** The persistent ident is already render() section 1, so #1 = (a) a
-  windowed BIG carrier-lock + char-by-char teletype over the b000 music-open window, then (b) a DOCK
-  animation shrinking it into the EXISTING top-left ident + top-right timestamp slots. The vol-gated
-  noise already in render() section 8 (~line 321) IS the "tuning-in snow" to de-noise FROM. Pass the
-  b000 start/end + first-dialogue frame from `led` into `_CRTRenderer`. Outro bookend = the same window
-  logic on the music-close beat, handing to the existing `_TelemetryHUDRenderer` post-roll.
+- **#2 LOCKED (rings, not rails) -- do it FIRST.** Move the centre ring (section 2) OFF the portrait into
+  the side gutters as a MATCHED PAIR of CRT scopes: LEFT = the existing 32-spoke FFT ring (the spectrum
+  scope), RIGHT = a circular OSCILLOSCOPE (the `wave` samples traced around the circumference, radius =
+  base +- amplitude) which CONSOLIDATES the old bottom mirrored-waveform into it (no third reactive zone).
+  Same circular FORM (keeps the current look), ASYMMETRIC DATA (left spiky/spectrum, right smooth/waveform)
+  so the pair reads as a real two-instrument console, not mirrored wallpaper. Size each ring to its gutter
+  (radius ~= min(gutter_w, h) * 0.3, vertically centred ~0.5h); the 12 particles (section 3) thin to a
+  faint orbit around each ring (keeps life, no centre clutter). The centre column (the portrait region)
+  stays free of bright chrome -- only the dim grid + scanlines + vignette. Ring brightness + lock ride the
+  signal-strength EMA above.
+- **#1 LOCKED -- the big bold EPISODE TITLE is the hero.** The small persistent ident is already render()
+  section 1; #1 adds a WINDOWED title card over the b000 music-open window: the "SIGNAL LOST" show-ident
+  carrier-locks first (de-noise from the vol-gated snow already in render() section 8, ~line 321), THEN
+  the ACTUAL EPISODE TITLE reveals BIG + BOLD, centre stage, landing on the music swell as a brightness
+  "signal-acquired" POP (NOT a hue flash -- the green-only blend kills colour). Then it DOCKS: the card
+  shrinks into the EXISTING top-left ident + episode-title slot as the drama opens. Timed in the procgen
+  24fps clock off the b000 start/end + first-dialogue frame from `led` (already parsed in render_video).
+  Outro bookend = the same logic on music-close -> hand to the existing `_TelemetryHUDRenderer` post-roll.
 - **OPEN DECISION (the one genuinely-open item): landscape-beat gutters.** Gutters are guaranteed empty
   only on pillarboxed portrait beats; LTX/Wan landscape beats fill 1472 wide. (A) accept the thin/dim
   rails riding the landscape edges on b-roll beats (cheapest), or (B) the compositor
@@ -405,10 +408,10 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   `render_video` ledger-window plumbing). No audio-spine touch, no new model, no new node, no new widget.
   The blend stays green-only `screen`, so every rail/title reads as green phosphor automatically.
 
-**Next step (operator-triggered):** grounding is DONE -- the design above is code-anchored. Either (a)
-round-robin ONLY the open landscape-gutter decision + the rail form-factor across 2-3 panels, or (b) go
-straight to a `_CRTRenderer` implementation ticket -- the mechanics are settled. Still no code until the
-operator says go.
+**Next step (operator-triggered):** the design is LOCKED (operator direction + my aesthetic calls). The
+only open question = landscape-beat gutters (above). On your GO I package a `_CRTRenderer` implementation
+ticket for the coder window -- ONE file, no audio-spine / model / node / widget change, the green-only
+blend untouched. Still no code until you say go.
 
 ---
 
