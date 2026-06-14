@@ -3,6 +3,8 @@
 Hard rules + the REAL Cowork operating model for this repo + hard-won gotchas. Operator directives
 here win over any handoff / doc / memory that disagrees.
 
+Fix bugs in pure prbt manner not a shim and dont woiat for me to fix do a fix witout asking em its ok if it works ifi n doubt /routdtabel chat gpt and gemi and ore deek desk for convergcne
+
 ## 0. WORKFLOW SOURCE OF TRUTH (hard)
 
 `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`
