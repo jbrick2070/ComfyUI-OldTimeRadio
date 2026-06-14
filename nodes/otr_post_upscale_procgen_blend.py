@@ -313,6 +313,7 @@ def _build_blend_cmd(
     green_only_overlay: bool = False,
     captions_ass_path: Optional[str] = None,
     source_dims: "Optional[tuple]" = None,
+    scopes_mp4: "Optional[Path]" = None,
 ) -> list[str]:
     """Build the ffmpeg command for procgen-over-source blend.
 
@@ -405,6 +406,57 @@ def _build_blend_cmd(
     # libass ``ass`` filter at native 1080p. Pure video op -- audio is still
     # mapped via ``-c:a copy`` below, so C7 byte-identity is untouched.
     blend_label = "[vpre]" if captions_ass_path else "[v]"
+    # conform helper (procgen scaled to the probed source dims; the scopes use
+    # the same target). Defined here so the 3-input branch can reuse it.
+    if source_dims:
+        sw, sh = int(source_dims[0]), int(source_dims[1])
+        _conform = f"scale={sw}:{sh}"
+    else:
+        _conform = "scale=-2:ih:force_original_aspect_ratio=decrease,crop=iw:ih"
+
+    # -- §4D 3-INPUT branch: procgen FLOOR + scene-aware SCOPES ----------
+    # [0:v]=source(upscaled) [1:v]=procgen floor [2:v]=scopes_only.mp4. A NEW
+    # gbrp-throughout double-blend (NOT appended to the 2-input graph -- that
+    # one converts to yuv420p before blend 1): screen the floor on, THEN
+    # LIGHTEN (max) the scopes on -- lighten (not a 2nd screen) so the two
+    # green layers do not compound brightness where they overlap. The scopes
+    # are green-only by construction; the colorchannelmixer zero-R+B is a
+    # belt-and-braces guard. Audio is still -map 0:a? -c:a copy (C7-safe).
+    if scopes_mp4 is not None:
+        scp_zero = (
+            "colorchannelmixer="
+            "rr=0:rg=0:rb=0:gr=0:gg=1:gb=0:br=0:bg=0:bb=0")
+        fc = (
+            f"[0:v]format=gbrp[main];"
+            f"[1:v]{_conform},setpts=PTS-STARTPTS{crush_step}{green_only_step}"
+            f"format=gbrp[pgn];"
+            f"[2:v]{_conform},setpts=PTS-STARTPTS,setsar=1,{scp_zero},"
+            f"format=gbrp[scp];"
+            f"[main][pgn]blend=all_mode={blend_mode}:"
+            f"all_opacity={blend_opacity:.3f}:shortest=1[tmp];"
+            f"[tmp][scp]blend=all_mode=lighten:shortest=1,"
+            f"format=yuv420p{blend_label}"
+        )
+        if captions_ass_path:
+            ass_name, _ass_cwd = _ass_filter_arg(captions_ass_path)
+            fc += f";[vpre]ass={ass_name}[v]"
+        return [
+            ffmpeg, "-y", "-loglevel", "error",
+            "-i", str(source_mp4),
+            "-i", str(procgen_mp4),
+            "-i", str(scopes_mp4),
+            "-filter_complex", fc,
+            "-filter_complex_threads", "2",
+            "-filter_threads", "2",
+            "-threads", "4",
+            "-max_muxing_queue_size", "1024",
+            "-map", "[v]",
+            "-map", "0:a?",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+            "-c:a", "copy",
+            str(out_mp4),
+        ]
+
     # 2026-06-09 dim-conform fix (capstone soak catch): the legacy
     # ``scale=-2:ih`` referenced the PROCGEN'S OWN height -- a no-op that only
     # worked when the source was already 1080p (post-RTXUpscale). The blend
@@ -601,6 +653,21 @@ class PostUpscaleProcgenBlend:
                         "green-CRT themed variant. Env OTR_CAPTION_STYLE overrides."
                     ),
                 }),
+                # §4D scene-aware scopes (APPENDED LAST per BUG-LOCAL-097: a new
+                # input only ever goes at the end -- widgets_values is
+                # positional). Path to OTR_SceneAwareScopes' scopes_only.mp4.
+                # When provided, the blend switches to the 3-input gbrp
+                # double-blend (procgen screen, then scopes lighten). Empty ->
+                # the unchanged single-procgen-blend path.
+                "scopes_mp4_path": ("STRING", {
+                    "default": "", "multiline": False,
+                    "tooltip": (
+                        "Optional path to OTR_SceneAwareScopes' scopes_only.mp4. "
+                        "Present -> procgen is screened on, then the scene-aware "
+                        "scopes are lightened on top (3-input gbrp blend). "
+                        "Empty -> the standard single-procgen blend (unchanged)."
+                    ),
+                }),
             },
         }
 
@@ -623,10 +690,16 @@ class PostUpscaleProcgenBlend:
         green_only_overlay: bool = _DEFAULT_GREEN_ONLY,
         burn_captions: bool = True,
         caption_style: str = _DEFAULT_CAPTION_STYLE,
+        scopes_mp4_path: str = "",
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
         pgn = Path(procgen_mp4_path).resolve() if procgen_mp4_path else None
+        scp = Path(scopes_mp4_path).resolve() if scopes_mp4_path else None
+        if scp is not None and not scp.is_file():
+            log.warning("[PostUpscaleProcgenBlend] scopes_mp4 %r not a file; "
+                        "ignoring (single-procgen blend)", scopes_mp4_path)
+            scp = None
 
         if src is None or not src.is_file():
             msg = (
@@ -725,7 +798,10 @@ class PostUpscaleProcgenBlend:
             green_only_overlay=bool(green_only_overlay),
             captions_ass_path=captions_ass_path,
             source_dims=src_dims,
+            scopes_mp4=scp,
         )
+        if scp is not None:
+            report_lines.append(f"scopes: 3-input blend (+{scp.name})")
         # Run with cwd = the .ass folder so the libass filter resolves the
         # subtitle by basename (sidesteps Windows drive-colon filtergraph
         # escaping). All input/output paths in cmd are absolute.

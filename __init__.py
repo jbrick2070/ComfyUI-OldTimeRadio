@@ -257,6 +257,12 @@ _NODE_MODULES = {
     # with the SIGNAL LOST CRT signature (audio-reactive scanlines +
     # flicker over the otherwise-static black surround).
     "OTR_PostUpscaleProcgenBlend": (".nodes.otr_post_upscale_procgen_blend", "PostUpscaleProcgenBlend", " Post-Upscale Procgen Blend (1080p)"),
+    # §4D v2 scene-aware scopes: a late, additive node that draws GREEN-ONLY
+    # audio-reactive scopes into the REAL per-beat gutters (read from the clip
+    # manifest), screened+lightened over the upscaled video by the blend's 3rd
+    # input. The floor keeps its full v1 video; only draw_scopes=False turns its
+    # in-frame scopes off so they don't double.
+    "OTR_SceneAwareScopes": (".nodes.otr_scene_aware_scopes", "SceneAwareScopes", " Scene-Aware Scopes (v2)"),
 
     # =========================================================================
     # OTR Open Video Model Platform -- A-Seam core (CW-1, 2026-06-06).
