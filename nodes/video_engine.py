@@ -272,7 +272,7 @@ def _resolve_title_timing(led, volume, fps, total_frames):
     # BUG-403/404 instrumentation (2026-06-14): localize the missing title card.
     # Shows whether the primary (music_open line) path or the first-dialogue
     # fallback resolved, and the final window. Remove once the root fix lands.
-    log.warning(
+    log.info(
         "[BUG-403/404 instr] _resolve_title_timing: music_open_line=%s "
         "first_dialogue_f=%s resolved_open=%s -> out=%s",
         (music_open.get("line_id") if isinstance(music_open, dict) else None),

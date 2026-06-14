@@ -225,12 +225,12 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     # the positioned/sequential decision + each row's start_s/exists so we can
     # see WHY [0, first_dialogue) is not a placed floor head-gap. Remove once the
     # root fix lands.
-    log.warning(
+    log.info(
         "[BUG-403/404 instr] plan_timeline_segments: positioned=%s "
         "target_total=%s n_rows=%d floor_available=%s floor_frames=%d",
         positioned, target_total_frames, len(rows), floor_available, ff)
     for _i, _r in enumerate(rows[:6]):
-        log.warning(
+        log.info(
             "[BUG-403/404 instr]   row[%d] shot=%s start_s=%r tfc=%s exists=%s "
             "path=...%s", _i, _r.get("shot_id"), _r.get("start_s"),
             _r.get("target_frame_count"), _r.get("exists"),
@@ -271,7 +271,7 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     # actually emits -- distinguishes "black gap because no clip placed at [0,..)"
     # vs "floor head-gap shown" vs "b000 clip shown". Remove with the fix.
     for _s in segments[:6]:
-        log.warning(
+        log.info(
             "[BUG-403/404 instr]   seg order=%s source=%s shot=%s src_start=%s "
             "n=%s", _s.get("order"), _s.get("source"), _s.get("shot_id"),
             _s.get("src_start_frame"), _s.get("n_frames"))
