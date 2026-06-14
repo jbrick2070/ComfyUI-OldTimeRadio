@@ -63,8 +63,8 @@ class OTRVideoRenderBatch:
                         "Beats whose ledger line has no per-line *_wav_path get "
                         "audio_ref filled by slicing [start_s, start_s+dur_s] from "
                         "this file (read-only ffmpeg; master is NEVER mutated). "
-                        "Wire from OTR_SignalLostVideo.video_path (the procgen mp4 "
-                        "carries the frozen master audio). Leave unset to degrade "
+                        "Wire from OTR_EpisodeAssembler.output_path (the frozen "
+                        "master WAV). Leave unset to degrade "
                         "LOUD on missing per-line wavs."
                     ),
                 }),

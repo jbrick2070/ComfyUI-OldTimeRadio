@@ -242,7 +242,7 @@ class OTRMasterAudioMux:
                 }),
                 "master_audio_path": ("STRING", {
                     "default": "", "forceInput": True,
-                    "tooltip": "Frozen master mix from OTR_SignalLostVideo.video_path (the procgen mp4 carries the master audio). Copied with -c:a copy.",
+                    "tooltip": "Frozen master mix from OTR_EpisodeAssembler.output_path (the master WAV). Copied with -c:a copy.",
                 }),
             },
             "optional": {
