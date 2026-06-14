@@ -224,22 +224,32 @@ def test_slot_picker_shows_catalog_when_enabled(enabled_cached):
     for mid in ("anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
                 "openai/gpt-4o", "x-ai/grok-2-mini"):
         assert mid in a
-    assert cat.OPENROUTER_ENABLE_SENTINEL not in a
+    # BUG-LOCAL-400: the enable-sentinel now leads in every state so the saved
+    # 'off' value validates -- it is present (choices[0]), not absent.
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
 
 
 def test_slot_a_lead_is_recommended_creative(enabled_cached):
-    assert cat.openrouter_catalog_dropdown_choices("a")[0] == \
-        orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+    # BUG-LOCAL-400: choices[0] is the enable-sentinel (off default); the first
+    # REAL slug is the recommended creative default.
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
 
 
 def test_slot_b_lead_is_recommended_technical(enabled_cached):
-    assert cat.openrouter_catalog_dropdown_choices("b")[0] == \
-        orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
+    # BUG-LOCAL-400: enable-sentinel leads; recommended technical is first real.
+    b = cat.openrouter_catalog_dropdown_choices("b")
+    assert b[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert b[1] == orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
 
 
 def test_per_slot_default_override_leads_when_present(enabled_cached, monkeypatch):
     monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "openai/gpt-4o")
-    assert cat.openrouter_catalog_dropdown_choices("a")[0] == "openai/gpt-4o"
+    # BUG-LOCAL-400: sentinel is choices[0]; the override leads the REAL slugs.
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert a[1] == "openai/gpt-4o"
 
 
 def test_per_slot_default_override_ignored_when_absent(enabled_cached, monkeypatch):
@@ -247,8 +257,10 @@ def test_per_slot_default_override_ignored_when_absent(enabled_cached, monkeypat
     constant for the dropdown lead (discovery can't show what isn't cached;
     S3 still honours an explicit saved slug at resolution)."""
     monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "ghost/not-in-cache")
-    assert cat.openrouter_catalog_dropdown_choices("a")[0] == \
-        orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+    # BUG-LOCAL-400: sentinel leads; recommended is the first real slug.
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
 
 
 # --- the catalog NEVER appears in creative/technical -----------------------
@@ -285,7 +297,9 @@ def test_allowlist_narrows(enabled_cached, monkeypatch):
     monkeypatch.setenv("OTR_OPENROUTER_MODEL_ALLOWLIST",
                        "anthropic/claude-opus-4.8,openai/gpt-4o")
     a = cat.openrouter_catalog_dropdown_choices("a")
-    assert set(a) == {"anthropic/claude-opus-4.8", "openai/gpt-4o"}
+    # BUG-LOCAL-400: the enable-sentinel is always present alongside the filtered set.
+    assert set(a) == {cat.OPENROUTER_ENABLE_SENTINEL,
+                      "anthropic/claude-opus-4.8", "openai/gpt-4o"}
 
 
 def test_denylist_removes(enabled_cached, monkeypatch):
@@ -296,22 +310,25 @@ def test_denylist_removes(enabled_cached, monkeypatch):
 def test_provider_filter_narrows(enabled_cached, monkeypatch):
     monkeypatch.setenv("OTR_OPENROUTER_PROVIDER_FILTER", "anthropic")
     a = cat.openrouter_catalog_dropdown_choices("a")
-    assert a == ["anthropic/claude-opus-4.8"]
+    # BUG-LOCAL-400: sentinel leads even a single-provider filtered list.
+    assert a == [cat.OPENROUTER_ENABLE_SENTINEL, "anthropic/claude-opus-4.8"]
 
 
 def test_favorites_float_after_lead(enabled_cached, monkeypatch):
     monkeypatch.setenv("OTR_OPENROUTER_FAVORITES", "openai/gpt-4o")
     a = cat.openrouter_catalog_dropdown_choices("a")
-    # lead is the recommended creative default; favorite comes right after.
-    assert a[0] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
-    assert a[1] == "openai/gpt-4o"
+    # BUG-LOCAL-400: sentinel leads; then the recommended default; then favorite.
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+    assert a[2] == "openai/gpt-4o"
 
 
 def test_recent_tier_orders_by_created_desc(enabled_cached, monkeypatch):
     """After the lead (opus, created 400 -> also newest), the remaining
     models follow newest-first: deepseek(300), gpt-4o(200), grok(100)."""
     a = cat.openrouter_catalog_dropdown_choices("a")
-    assert a == ["anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
+    assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
+                 "anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
                  "openai/gpt-4o", "x-ai/grok-2-mini"]
 
 
@@ -325,7 +342,8 @@ def test_empty_cache_when_enabled_shows_recommended_plus_sentinel(monkeypatch, t
     for k in _FILTER_ENV:
         monkeypatch.delenv(k, raising=False)
     a = cat.openrouter_catalog_dropdown_choices("a")
-    assert a == [orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+    assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
+                 orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
                  cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
 
 
@@ -339,3 +357,17 @@ def test_slot_picker_is_network_free(enabled_cached, monkeypatch):
     # Must build purely from the disk cache -- no fetch, no raise.
     out = cat.openrouter_catalog_dropdown_choices("a")
     assert "anthropic/claude-opus-4.8" in out
+
+
+# --- BUG-LOCAL-400: enable-sentinel stays a valid choice when ENABLED -------
+
+
+def test_enable_sentinel_leads_when_enabled_bug400(enabled_cached):
+    """BUG-LOCAL-400: with the lane ENABLED and the catalog populated, the
+    enable-sentinel MUST remain choices[0] (the slot's saved 'off' value + its
+    INPUT_TYPES default). If it falls out of the list, a saved workflow storing
+    the sentinel fails ComfyUI COMBO validation and every output is dropped."""
+    for slot in ("a", "b"):
+        choices = cat.openrouter_catalog_dropdown_choices(slot)
+        assert choices[0] == cat.OPENROUTER_ENABLE_SENTINEL
+        assert choices.count(cat.OPENROUTER_ENABLE_SENTINEL) == 1

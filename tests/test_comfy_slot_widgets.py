@@ -67,12 +67,26 @@ def test_slot_choices_disabled_show_enable_sentinel(comfy_off):
 def test_slot_choices_enabled_lead_with_recommended(comfy_on):
     a = cat.comfy_catalog_dropdown_choices("a")
     b = cat.comfy_catalog_dropdown_choices("b")
-    assert a[0] == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
-    assert b[0] == occ.COMFY_RECOMMENDED_TECHNICAL_DEFAULT
+    # BUG-LOCAL-400: the enable-sentinel leads in every state; the recommended
+    # default is the first REAL slug.
+    assert a[0] == cat.COMFY_ENABLE_SENTINEL
+    assert b[0] == cat.COMFY_ENABLE_SENTINEL
+    assert a[1] == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
+    assert b[1] == occ.COMFY_RECOMMENDED_TECHNICAL_DEFAULT
     # "the more options the better" -- the full pinned catalog is offered.
     for slug in occ.COMFY_LLM_MODELS:
         assert slug in a
     assert len(a) == len(set(a))  # deduped
+
+
+def test_enable_sentinel_leads_when_enabled_bug400(comfy_on):
+    """BUG-LOCAL-400: the enable-sentinel must remain choices[0] when the lane
+    is ENABLED so a saved workflow storing the sentinel validates (otherwise
+    ComfyUI COMBO validation rejects it and drops every output)."""
+    for slot in ("a", "b"):
+        choices = cat.comfy_catalog_dropdown_choices(slot)
+        assert choices[0] == cat.COMFY_ENABLE_SENTINEL
+        assert choices.count(cat.COMFY_ENABLE_SENTINEL) == 1
 
 
 def test_slot_choices_reject_bad_slot():

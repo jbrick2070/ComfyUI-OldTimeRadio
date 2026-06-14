@@ -130,3 +130,35 @@ def test_resolve_inputs_threads_slot_values():
     )
     assert out["openrouter_slot_a_model"] == "anthropic/claude-opus-4.8"
     assert out["openrouter_slot_b_model"] == "deepseek/deepseek-v4-pro"
+
+
+# --- BUG-LOCAL-400: saved sentinels must validate with lanes ENABLED ---------
+
+
+def test_saved_slot_sentinels_validate_with_lanes_enabled_bug400(monkeypatch):
+    """BUG-LOCAL-400 (the live GUI failure): the shipped workflow stores the
+    '(enable ...)' sentinel in all four writer slots (pinned by
+    test_workflow_json_guardrails). With the OpenRouter + Comfy Credits lanes
+    ENABLED, those saved values MUST remain members of the node's INPUT_TYPES
+    choices -- otherwise ComfyUI's COMBO validator rejects the prompt and every
+    output is dropped (server log: "Value not in list ... Output will be
+    ignored"). Before the fix the enabled dropdowns omitted the sentinel."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
+    monkeypatch.setenv("OTR_ENABLE_COMFY_CREDITS", "1")
+    spec = W.INPUT_TYPES()
+    saved = {
+        "openrouter_slot_a_model": cat.OPENROUTER_ENABLE_SENTINEL,
+        "openrouter_slot_b_model": cat.OPENROUTER_ENABLE_SENTINEL,
+        "comfy_slot_a_model": cat.COMFY_ENABLE_SENTINEL,
+        "comfy_slot_b_model": cat.COMFY_ENABLE_SENTINEL,
+    }
+    for key, saved_val in saved.items():
+        choices, meta = spec["optional"][key]
+        assert saved_val in choices, (
+            f"{key}: saved {saved_val!r} not in INPUT_TYPES choices "
+            f"(first 3: {choices[:3]}) -- COMBO validation would reject it"
+        )
+        assert meta["default"] in choices, (
+            f"{key}: default {meta['default']!r} not in choices"
+        )

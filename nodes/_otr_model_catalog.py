@@ -576,6 +576,22 @@ recommended default is offered alongside so the slot still has a valid pick."""
 _OPENROUTER_RECENT_COUNT = 8
 
 
+def _lead_with_sentinel(sentinel: str, choices: list[str]) -> list[str]:
+    """Return ``choices`` with ``sentinel`` guaranteed as the FIRST entry,
+    de-duplicated. The enable-sentinel is each slot's 'off / use-local' value
+    AND its INPUT_TYPES default; it MUST remain a valid choice in EVERY lane
+    state. Otherwise a saved workflow that stores the sentinel fails ComfyUI's
+    COMBO validation the instant the lane is enabled and the catalog replaces it
+    (BUG-LOCAL-400). Leading with it also keeps 'off' the default for a fresh
+    node, so enabling a lane never silently defaults a slot to a billable model.
+    """
+    out = [sentinel]
+    for c in choices:
+        if c != sentinel:
+            out.append(c)
+    return out
+
+
 def _csv_env(name: str) -> list[str]:
     """Parse a comma-separated env var into a stripped, non-empty list.
     Unset / empty -> []."""
@@ -626,9 +642,12 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     """Slug-picker choices for openrouter_slot_<slot>_model (slot 'a' / 'b').
 
+    Sentinel-led in EVERY state (BUG-LOCAL-400): OPENROUTER_ENABLE_SENTINEL is
+    always choices[0] -- the 'off / use-local' default -- so a saved workflow
+    that stores it validates whether or not the lane is enabled.
     Remote disabled -> [OPENROUTER_ENABLE_SENTINEL].
-    Remote enabled  -> an ordered, de-duplicated slug list drawn from the S0
-    disk cache, filtered by _filter_catalog_models:
+    Remote enabled  -> the sentinel, then an ordered, de-duplicated slug list
+    drawn from the S0 disk cache, filtered by _filter_catalog_models:
         1. recommended default for the slot -- the per-slot
            OTR_OPENROUTER_SLOT_x_DEFAULT override when set AND present in the
            filtered cache, else the OPENROUTER_RECOMMENDED_*_DEFAULT constant.
@@ -637,7 +656,8 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
         2. favorites -- OTR_OPENROUTER_FAVORITES, in operator order
         3. recent    -- top-N newest by `created`
         4. the rest  -- alphabetical by id
-    Enabled but empty/cold cache -> [recommended_default, EMPTY_CACHE_SENTINEL].
+    Enabled but empty/cold cache ->
+    [OPENROUTER_ENABLE_SENTINEL, recommended_default, EMPTY_CACHE_SENTINEL].
     INPUT_TYPES-safe: reads the disk cache only, never the network.
     """
     s = slot.strip().lower()
@@ -688,8 +708,10 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     if not models:
         # Cold / fully-filtered cache: keep the recommended default selectable
         # and flag that discovery is empty so the operator runs a refresh.
-        return [lead, OPENROUTER_EMPTY_CACHE_SENTINEL]
-    return ordered
+        return _lead_with_sentinel(
+            OPENROUTER_ENABLE_SENTINEL, [lead, OPENROUTER_EMPTY_CACHE_SENTINEL]
+        )
+    return _lead_with_sentinel(OPENROUTER_ENABLE_SENTINEL, ordered)
 
 
 # ---------------------------------------------------------------------------
@@ -709,10 +731,13 @@ rejected before backend resolution; it can never resolve as a slug."""
 def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
     """Slug-picker choices for comfy_slot_<slot>_model (slot 'a' / 'b').
 
+    Sentinel-led in EVERY state (BUG-LOCAL-400): COMFY_ENABLE_SENTINEL is always
+    choices[0] -- the 'off / use-local' default -- so a saved workflow that
+    stores it validates whether or not the lane is enabled.
     Lane disabled -> [COMFY_ENABLE_SENTINEL].
-    Lane enabled  -> the recommended default for the slot FIRST (so the
-    widget's default value is always selectable), then OTR_COMFY_FAVORITES
-    (operator order), then the full pinned catalog alphabetically. Deduped.
+    Lane enabled  -> the sentinel, then the recommended default for the slot,
+    then OTR_COMFY_FAVORITES (operator order), then the full pinned catalog
+    alphabetically. Deduped.
     INPUT_TYPES-safe: reads the pinned constant only, never the network.
     """
     s = slot.strip().lower()
@@ -741,7 +766,7 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
             _add(fav)
     for mid in sorted(catalog):
         _add(mid)
-    return ordered
+    return _lead_with_sentinel(COMFY_ENABLE_SENTINEL, ordered)
 
 
 # ---------------------------------------------------------------------------
