@@ -1,0 +1,38 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: no. The plan has a fundamental correctness defect in the double-blend filter chain and multiple underspecified dependencies that will cause build failures.
+
+MUST-FIX BEFORE BUILD:
+1. [§3] The double green-blend filter chain is incorrect as specified. The plan says `[main][procgen]blend=screen[tmp];[tmp][scopes]blend=screen[out]` but the grounding code shows the procgen blend already uses `format=gbrp` pinning with `[0:v]format=gbrp[main]` and `[main][pgn]blend=...`. Adding a third input requires a completely different filter graph topology. The current code has `main_format_step` that renames `[0:v]` to `[main]` — you cannot just append another blend to `[tmp]` because the format conversion happens before the first blend. Fix: The extended node must build a three-input filter chain from scratch when `scopes_mp4` is present: `[0:v]format=gbrp[main];[1:v]...format=gbrp[pgn];[2:v]...format=gbrp[scp];[main][pgn]blend=screen[tmp];[tmp][scp]blend=screen[out];[out]format=yuv420p[v]`. The scopes input must also go through `colorchannelmixer` (zero R+B) and `format=gbrp` before blending.
+
+2. [§4] `OTR_SignalLostVideo` INPUT_TYPES has no `draw_scopes` parameter. The plan says "add `draw_scopes: bool` (default `True` = v1 compat)" but the grounding excerpt shows the actual `INPUT_TYPES` dict with `required` keys `audio`, `script_json`, `news_used` and `optional` keys `fps`, `resolution`, `episode_title`, `closing_audio`. There is no `draw_scopes` field. Fix: Add `"draw_scopes": ("BOOLEAN", {"default": True})` to the `optional` dict in `INPUT_TYPES`.
+
+3. [§1] The scope extraction claims to pull `_waveform_mirror` and `_freq_bars_wide` into standalone helpers, but the grounding code shows these are instance methods of `_CRTRenderer` that access `self.w`, `self.h`, and draw non-green colors (CRT_CYAN, CRT_RED, CRT_AMBER in `_freq_bars_wide`). The plan says "GREEN-ONLY helpers" but the existing code uses red/cyan/amber in the frequency bars and cyan in the mirrored waveform. Fix: The extracted `draw_fft_scope` and `draw_scope` must hardcode green-only palette (e.g., `CRT_GREEN` for both top/bottom waveform, green-only gradient for freq bars) and accept `w, h` as parameters rather than relying on `self`. The plan must specify the exact green-only color mapping.
+
+4. [§2] The `OTR_SceneAwareScopes` node specification says it generates a "BLACK frame with GREEN-ONLY scopes" but does not define the node's `INPUT_TYPES`, `RETURN_TYPES`, `FUNCTION`, or `CATEGORY` — all required for ComfyUI node registration. The grounding shows the exact pattern used by `OTR_SilentComposite` and `PostUpscaleProcgenBlend`. Fix: Specify the complete node class skeleton matching the existing pattern, including `CATEGORY = "OldTimeRadio/v2/video"`, `FUNCTION = "render_scopes"`, `RETURN_TYPES = ("STRING",)`, `RETURN_NAMES = ("scopes_mp4_path",)`, and the full `INPUT_TYPES` dict with all required/optional fields.
+
+5. [§Beat map] The aspect resolver says "probe the clip `path` native dims (`ffprobe`)" but the plan does not specify how `OTR_SceneAwareScopes` gets the clip paths. The manifest JSON is passed as a string, and `plan_timeline_segments` returns segments with `path` fields — but only for `source=="clip"` segments. The plan must specify that the node parses the manifest JSON, calls `plan_timeline_segments`, and iterates segments to probe paths. Fix: Add explicit step: "Parse `clip_manifest_json` string to dict; call `plan_timeline_segments(manifest, target_total_frames=source_frame_count, fps=25)`; for each segment where `source=='clip'`, probe `segment['path']` via `ffprobe`."
+
+6. [§Audio re-analysis] The plan says "use `round(fi*sr/fps)..round((fi+1)*sr/fps)` chunk boundaries" but the grounding `_analyze_audio` uses `spf = sample_rate // fps` with `s = i * spf; e = min(s + spf, len(audio_np))`. These are NOT equivalent — integer division vs round-to-nearest will produce different chunk boundaries, especially at non-integer sample/frame ratios. The plan claims "frame-identical to a 25fps floor" but the floor uses `sr//fps` (integer truncation). Fix: Either (a) use the exact same `sr//fps` logic as the floor for true frame-identical output, or (b) document that scope audio analysis intentionally differs and accept non-identical frame alignment. The plan's claim of identity is false with the specified rounding.
+
+SHOULD-FIX:
+1. [§Pipeline] The wiring diagram shows `SceneAwareScopes` running "parallel to the upscale" but the node needs `clip_manifest_json` from `SilentComposite` — this is a data dependency, not an execution dependency. The plan should clarify that the manifest JSON string can be wired directly (it's just data, not a file path) and does not require SilentComposite to complete first. [ASSUMPTION: ComfyUI evaluates the graph DAG correctly with this wiring.]
+
+2. [§2] The plan says `canvas_w/h` are inputs but the gutter geometry section hardcodes 1920x1080 math (`portrait_w = round(480 * 1920/1472)`). If `canvas_w/h` are truly inputs, the geometry must be computed from them, not hardcoded. Fix: Derive all geometry from the input canvas dimensions, or remove `canvas_w/h` as inputs and hardcode 1920x1080 throughout.
+
+3. [§Beat map] The "portrait" vs "landscape" determination uses `h>w` but the gutter geometry assumes a specific portrait width (626px) in a 1920-wide canvas. If the canvas dimensions change, the portrait width and gutter calculations change. The plan should compute `portrait_w` from the actual canvas and the known 1472→1920 upscale ratio, or document the fixed assumption.
+
+4. [§3] The double-blend visibility concern ("Two green `screen` blends do not wash out") is flagged as OPEN but not resolved. Two successive screen blends will compound brightness — the scopes will be brighter where they overlap the procgen than where they don't. Fix: Either (a) use `blend=lighten` for the second blend (takes max of each channel, preventing double-brightening), or (b) reduce scope opacity in the second blend, or (c) accept the compounding and test visibility.
+
+5. [§1] The plan says "v1 must land first" for the scope extraction refactor, but does not specify what "land" means — merged to main? released? The v2 node cannot be built until the extracted helpers exist. Fix: Define the gate clearly (e.g., "v1 refactor merged to `main` and confirmed working in a full pipeline run before v2 development begins").
+
+OPTIONAL / NICE-TO-HAVE:
+- The `engine_id -> aspect` registry fallback is mentioned but not specified. If the ffprobe path works reliably for all clip sources, the registry may be unnecessary. Consider cutting it and failing loudly on un-probeable paths instead.
+- The plan mentions "Stable-hash seeded RNG (same as v1)" but the grounding code shows no RNG usage in `_analyze_audio` or `_CRTRenderer.render`. Verify: is there actually a seeded RNG in the floor that needs matching? If not, drop this requirement.
+
+CUT THESE (over-engineering):
+1. The `engine_id -> aspect` registry (§Beat map) — if `ffprobe` works on all clip paths (which it should, since they're pre-composite assets on disk), the registry is dead code. Cut it and rely solely on ffprobe with a hard failure for un-probeable files.
+
+2. The "Ultra-dim landscape edge variant" is already marked CUT in the plan. Confirm it is fully removed from scope.
+
+[ASSUMPTION] The `OTR_SceneAwareScopes` node will use the same `_find_ffmpeg` and subprocess pattern as the existing nodes for MP4 encoding. The plan does not specify the encoding pipeline (PIL frames → ffmpeg stdin, same as the floor).

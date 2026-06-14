@@ -1,129 +1,96 @@
 <!-- requested_model: mistralai/mistral-large-2512 | resolved_model: mistralai/mistral-large-2512 -->
 
 VERDICT: no
-The plan is conceptually sound but contains critical correctness and sequencing defects that would break determinism, timing, and the green-only blend invariant. It also over-engineers the EMA precompute and risks center-band incursion.
+
+The plan is conceptually strong but contains critical correctness and sequencing defects that would break determinism, timing, and the green-only blend invariant. Without fixes, the build will fail or produce incorrect output.
 
 ---
 
-MUST-FIX BEFORE BUILD
+### MUST-FIX BEFORE BUILD
 
-1. [Concept / Signature]
-   The plan assumes `_CRTRenderer` can be instantiated once with `title` and then called per-frame with `vol/freq/wave` arrays. The grounding code shows the constructor takes only `(w, h, title)` and the `render()` method takes `(fi, total, fps, vol, freq, wave)` as individual frame values.
-   Fix: Change the signature to `_CRTRenderer(w, h, title, volume, freqs, waves, fps, timing=None)` and store the full arrays in `__init__` so `render(fi)` can slice them. This is the only way to guarantee determinism (the EMA must see the full envelope) and to avoid passing the same arrays repeatedly.
+1. **[S1 / Signature]**
+   Defect: The plan changes `_CRTRenderer.__init__` to precompute `signal/loss/trig` from "the full arrays", but the grounding code shows the arrays (`vol`, `freq`, `wave`) are only available at `render_video` time (L1556), not at `__init__` time.
+   Fix: Precompute the EMAs in `render_video` after `_analyze_audio` and pass them as new arrays (`signal`, `trig`) to `_CRTRenderer.__init__`. Update the signature to `_CRTRenderer(w, h, title, signal, trig, ...)` and store them as `self.signal`, `self.trig`.
 
-2. [S1 / Determinism]
-   The plan says `signal[0]=trig[0]=volume[0]` but the grounding code shows `volume` is a list of floats, not a numpy array. The EMA precompute in `__init__` will fail if `volume` is not indexable.
-   Fix: Convert `volume` to a numpy array in `__init__` so the EMA can be precomputed: `self.volume = np.array(volume, dtype=np.float32)`.
+2. **[S1 / Determinism]**
+   Defect: The plan seeds the RNG with `f"{title}|{fi}|{salt}"`, but the grounding code shows the title is passed to `__init__` and the frame index `fi` is passed to `render(fi)`. The RNG must be seeded per-frame inside `render(fi)` using the stored `self.title` and the current `fi`.
+   Fix: Move the seeding logic into `render(fi)` and use `self.title` and `fi` to seed the RNG. Do not seed in `__init__`.
 
-3. [S1 / EMA Precompute]
-   The plan precomputes `signal` and `trig` in `__init__` but the grounding code shows the EMA update is done per-frame in `render()`. This is a sequencing defect: the EMA must be precomputed in `__init__` from the full `volume` array, not updated per-frame.
-   Fix: Move the EMA precompute to `__init__`:
-   ```python
-   self.signal = np.zeros_like(self.volume)
-   self.trig = np.zeros_like(self.volume)
-   self.signal[0] = self.trig[0] = self.volume[0]
-   for i in range(1, len(self.volume)):
-       self.signal[i] = 0.95 * self.signal[i-1] + 0.05 * self.volume[i]
-       self.trig[i] = 0.7 * self.trig[i-1] + 0.3 * self.volume[i]
-   ```
+3. **[S1 / EMA Initialization]**
+   Defect: The plan states `signal[0]=trig[0]=volume[0]`, but the grounding code shows `volume` is a list of floats, not a numpy array. The EMA precompute must handle the first frame explicitly.
+   Fix: In the EMA precompute loop, set `signal[0] = trig[0] = volume[0]` and then run the EMA update for `i >= 1`.
 
-4. [S3 / Title Card Timing]
-   The plan says the title card window is `[music_open_start_f, music_open_end_f + dock_frames)` but the grounding code shows the ledger may have `start_s=None`. The plan does not specify how to derive `dock_frames` or what to do if `start_s` is missing.
-   Fix: Add a fallback in `__init__`:
-   ```python
-   if timing and timing.get("music_open_start_s") is not None:
-       self.music_open_start_f = round(timing["music_open_start_s"] * fps)
-       self.music_open_end_f = round((timing["music_open_start_s"] + timing["music_open_dur_s"]) * fps)
-       self.dock_frames = 30  # 1.25s at 24fps
-   else:
-       # Fallback: music from frame 0 to first dialogue onset
-       first_dialogue_f = next((i for i, v in enumerate(self.volume) if v > 0.1), total_frames)
-       self.music_open_start_f = 0
-       self.music_open_end_f = min(first_dialogue_f, 96)  # cap at 4s
-       self.dock_frames = 0
-   ```
+4. **[S2 / Gutter Geometry]**
+   Defect: The plan specifies `left_cx~=323`, `right_cx~=1596`, `r~=235` and clamps `amp <= r*0.35`, but the grounding code shows the ring geometry is hardcoded to the center (`self._ring_cx = w // 2`). The gutter scopes must be drawn in their own coordinate systems, not the center ring’s.
+   Fix: Add new geometry fields in `__init__`: `self.left_cx`, `self.left_cy`, `self.left_r`, `self.right_cx`, `self.right_cy`, `self.right_r` and compute them from the gutter rects. Use these for the scope draws.
 
-5. [S2 / Scope Geometry]
-   The plan says "clamp the circular-scope amplitude `amp <= r*0.35`" but the grounding code shows the ring is drawn with `r = base_r + int(vol * base_r * 0.3)`. This would allow the ring to overflow the gutter if `vol` is high.
-   Fix: In `_draw_fft_scope` and `_draw_scope`, clamp the amplitude:
-   ```python
-   amp = min(int(vol * r * 0.35), int(r * 0.35))
-   ```
+5. **[S2 / Center-Band Clip]**
+   Defect: The plan says "draw each scope onto a transparent layer sized to its gutter rect and `alpha_composite` it", but the grounding code shows the scopes are drawn directly onto the base image. The layer bounds must clip the scopes to the gutter.
+   Fix: In `render(fi)`, create two transparent layers (`Image.new("RGBA", (gutter_width, h))`), draw the scopes onto them, and `alpha_composite` them onto the base image.
 
-6. [S2 / Center-Band Clip]
-   The plan says "draw each scope onto a transparent layer sized to its gutter rect and `alpha_composite` it" but the grounding code shows the scopes are drawn directly onto the base image. This risks center-band incursion.
-   Fix: In `render()`, before drawing the scopes, create a transparent layer for each gutter:
-   ```python
-   left_scope_layer = Image.new("RGBA", (647, h), (0, 0, 0, 0))
-   right_scope_layer = Image.new("RGBA", (647, h), (0, 0, 0, 0))
-   ```
-   Draw the scopes onto these layers, then `alpha_composite` them onto the base image.
+6. **[S3 / Title Card Timing]**
+   Defect: The plan uses `music_open_start_f` and `music_open_end_f` but the grounding code shows the timing is resolved from the ledger in `render_video`, not inside `_CRTRenderer`. The renderer must receive the resolved intervals as frame indices, not seconds.
+   Fix: In `render_video`, resolve the intervals to frame indices (`start_f = round(start_s * fps)`, `end_f = round((start_s + dur_s) * fps)`) and pass them to `_CRTRenderer.__init__` as `music_open_start_f`, `music_open_end_f`, `music_close_start_f`, `music_close_end_f`. Use these in `render(fi)` to gate the title card.
 
-7. [S4 / Text Exemption]
-   The plan says "section-1 ident + the title card draw AFTER the section-8 vignette/choke multiply" but the grounding code shows the title bar is drawn in section 1, before the vignette. This would dim the text.
-   Fix: Move the title bar draw to after the vignette multiply, or exempt it from the vignette by drawing it on a separate layer and compositing it last.
+7. **[S3 / Text Exemption]**
+   Defect: The plan says "section-1 ident + the title card draw AFTER the section-8 vignette/choke multiply", but the grounding code draws the title bar (section 1) before the vignette (section 8). The text exemption must be implemented as a post-vignette pass.
+   Fix: Split the title bar and title card draws into a separate `Image` layer, apply the vignette to the base image, then `alpha_composite` the text layer on top.
 
-8. [S5 / Outro]
-   The plan says "leave `_hud_frames` append unchanged" but the grounding code shows `_hud_frames` is appended after `total_frames`. The outro must not interfere with the HUD.
-   Fix: In `render()`, add:
-   ```python
-   if fi >= total_frames:
-       return _render_hud(fi - total_frames)
-   ```
+8. **[S4 / Coordinate Offset]**
+   Defect: The plan says "a horizontal coordinate OFFSET applied to the gutter-scope + title DRAW coords only", but the grounding code shows no offset mechanism. The offset must be computed per-frame and clamped to keep the scopes inside their gutters.
+   Fix: In `render(fi)`, compute the offset from the `trig` EMA (e.g., `offset = int((1 - trig[fi]) * 20)`), clamp it to `±(gutter_width - (r + amp))`, and apply it to the scope and title card draw coordinates.
+
+9. **[S5 / Outro Regression]**
+   Defect: The plan says "render only for `fi < total_frames`; leave `_hud_frames` append unchanged", but the grounding code shows the HUD frames are appended after `total_frames`. The outro must not render into the HUD frames.
+   Fix: In `render(fi)`, gate the outro logic with `if fi >= total_frames: return img` before any outro-specific draws.
 
 ---
 
-SHOULD-FIX
+### SHOULD-FIX
 
-1. [S1 / EMA Alpha]
-   The plan uses `alpha ~0.05` for `signal` and `alpha ~0.3` for `trig` but does not specify how these values are derived or if they are configurable. The grounding code shows the EMA alpha was hardcoded to 0.08.
-   Fix: Make the alphas configurable in `__init__`:
-   ```python
-   def __init__(self, ..., signal_alpha=0.05, trig_alpha=0.3):
-       self.signal_alpha = signal_alpha
-       self.trig_alpha = trig_alpha
-   ```
+1. **[S1 / EMA Alpha Values]**
+   Defect: The plan specifies `alpha ~0.05` (slow) and `alpha ~0.3` (fast), but the grounding code shows the disabled EMA uses `alpha = 0.08`. The values must be consistent with the signal/loss hierarchy.
+   Fix: Use `alpha_signal = 0.05` and `alpha_trig = 0.3` in the EMA precompute.
 
-2. [S3 / Title Card Reveal]
-   The plan says "decoded-fragment reveal stepping on INTEGER frames" but does not specify how the reveal is seeded or how long it takes. This could cause desync if the reveal duration is not fixed.
-   Fix: Add a fixed reveal duration (e.g., 24 frames) and seed the reveal order with the episode title.
+2. **[S2 / Scope Line Widths]**
+   Defect: The plan says "cap all scope line widths to 1-2px", but the grounding code shows the center ring uses `width=max(2, self.w // 400)` (4px at 1920). The scopes must use 1-2px.
+   Fix: Hardcode the scope line widths to 1 or 2 in the scope draw helpers.
 
-3. [S2 / Scope Trails]
-   The plan says "bounded lookback over `freqs[fi-6:fi+1]`" but the grounding code shows `freqs` is a list of numpy arrays. Slicing a list of arrays is inefficient.
-   Fix: Convert `freqs` to a numpy array in `__init__` so lookback is vectorized.
+3. **[S3 / Title Card Wrap]**
+   Defect: The plan says "wrap/scale long titles to a max bbox before effects", but the grounding code shows no wrap/scale logic. The title card must handle overflow.
+   Fix: In the title card draw, measure the title with `ImageDraw.textbbox`, and if it overflows, reduce the font size or wrap the text to fit the gutter width.
 
-4. [S4 / Coordinate Offset]
-   The plan says "a horizontal coordinate OFFSET applied to the gutter-scope + title DRAW coords only" but does not specify how the offset is bounded to prevent black edges.
-   Fix: In `render()`, compute the offset as:
-   ```python
-   offset = int(10 * math.sin(fi * 0.1))  # example
-   offset = max(-323, min(offset, 323))   # clamp to gutter width
-   ```
+4. **[S4 / Brightness Hierarchy]**
+   Defect: The plan says "per-element brightness hierarchy", but the grounding code shows brightness scaling is ad-hoc per section. The hierarchy must be explicit.
+   Fix: Define a brightness scale per element (e.g., `grid_brightness = signal[fi] * 0.7`, `ident_brightness = signal[fi] * 0.9`) and apply it consistently.
+
+5. **[S5 / Determinism Checksum]**
+   Defect: The plan says "a determinism checksum over RGB frames", but the grounding code shows no checksum logic. The checksum must be implemented in `render_video`.
+   Fix: After rendering all frames, compute a checksum of the RGB data (e.g., `hashlib.blake2s(frame.tobytes()).hexdigest()`) and log it.
 
 ---
 
-OPTIONAL / NICE-TO-HAVE
+### OPTIONAL / NICE-TO-HAVE
 
-- Add a debug mode that draws the gutter boundaries and scope layers for visual verification.
-- Precompute the graticules in `__init__` to avoid per-frame draw calls.
-
----
-
-CUT THESE (over-engineering)
-
-1. [Concept / Dual EMA]
-   The plan uses two EMAs (`signal` and `trig`) but the grounding code shows only one EMA was used. The second EMA adds complexity without a clear benefit.
-   Why safe to cut: The "signal loss in the gaps" effect can be achieved with a single EMA and a threshold. The dual EMA is not necessary for the aesthetic.
-
-2. [S3 / Title Card POP]
-   The plan says "a 1-2 frame brightness bloom + a small horizontal coordinate tear". The tear is over-engineering: a brightness bloom alone is sufficient for the "lock" effect.
-   Why safe to cut: The tear adds complexity and risks center-band incursion. The bloom is enough to convey the effect.
-
-3. [S2 / Scope Graticules]
-   The plan precomputes graticules as RGBA layers. The grounding code shows the graticules are drawn per-frame with `ImageDraw.line`. Precomputing them is unnecessary.
-   Why safe to cut: The graticules are simple lines; precomputing them saves negligible time and adds complexity.
+- Add a debug mode that renders the gutter rects and scope bounding boxes for visual verification.
+- Precompute the graticules as RGBA layers in `__init__` to reduce per-frame cost.
+- Add a fallback for missing fonts (the grounding code already has a fallback to `ImageFont.load_default()`).
 
 ---
 
-[ASSUMPTION] The ledger `timing` dict is passed to `_CRTRenderer` in the new signature. Verify the ledger structure contains `music_open_start_s` and `music_open_dur_s`.
-[ASSUMPTION] The `render_video` caller will be updated to pass the `volume`, `freqs`, `waves`, and `timing` arrays to `_CRTRenderer`. Verify this change.
+### CUT THESE (over-engineering)
+
+1. **[Dual EMA Precompute in `__init__`]**
+   Why: The EMA arrays can be precomputed in `render_video` and passed to `__init__`, avoiding the need to pass the full `volume` array to the renderer. The plan’s precompute in `__init__` is unnecessary complexity.
+
+2. **[Seeded RNG for Section 8 Noise]**
+   Why: The grounding code shows the noise in section 8 is already seeded by `np.random.randint`, which is deterministic per frame. Replacing it with a seeded RNG is redundant.
+
+3. **[Title Card Fake-Bold Overstrike]**
+   Why: The grounding code shows the title is drawn with a monospace font, and fake-bold may not be necessary for readability. The overstrike offsets can be removed if the font is sufficiently bold.
+
+4. **[Title Card Block Cursor]**
+   Why: The block cursor is a minor aesthetic detail that adds complexity to the reveal logic. It can be cut without losing the core effect.
+
+5. **[Scope Comet-Tails Lookback]**
+   Why: The lookback adds visual polish but requires storing 6 previous frames of data. A simpler decay (e.g., `brightness = freq[i] * (1 - lookback_factor)`) can achieve a similar effect with less code.
