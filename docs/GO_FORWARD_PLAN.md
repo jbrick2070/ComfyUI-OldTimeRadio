@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `9465dbd` == origin):** Objective triage at clean
+> **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `99320ae` == origin):** Objective triage at clean
 > baseline `961d8fc` was fully GREEN (suite 4249 / Bug Bible 16 / tree clean). Per operator: SPLIT the
 > bug log -- `BUG_LOG.md` is now the ARCHIVE (reference only); new active log = `BUG_LOG_2026-06.md`
 > (epoch `BUG-LOCAL-400+`). Then fixed the first live bug **BUG-LOCAL-400** (`d967c6b`): the writer's 4
@@ -13,7 +13,12 @@
 > wrote). The restarted run then reached **OTR_VideoDirector** and surfaced **BUG-LOCAL-401** (`9465dbd`):
 > `flux_still` was rejected for `music_video_model` because its `roles` tuple omitted `music_visual` --
 > fixed by tagging flux_still with all 5 roles (a still is the fast universal pick; needs only
-> text_prompt, supplied by every role). Suite **4253** green; pushed. Forward order
+> text_prompt, supplied by every role). Suite **4253** green; pushed. A live look-QA of the published
+> episode then found two more: **BUG-LOCAL-402** (`99320ae`, FIXED) -- the §4D procgen blend emitted
+> `format=gbrpformat`, so the scope overlay + SDH caption burn fell back to source-copy on EVERY render
+> (no burned subtitles, no audio-reactive scopes); suite **4254** green. STILL OPEN from the same look-QA
+> (separate, not yet chased): (a) the ~9.5s all-black OPENING (`b000_music_open` has no start_s/dur_s ->
+> the open still isn't composited over the music head-gap); (b) no TITLE card drawn. Forward order
 > (Wan / LTX-REGR / 3D) UNCHANGED -- this was a debug detour, not a forward-order advance.
 >
 > **LATEST SESSION -- 2026-06-14 eve (planner + live GPU smoke; HEAD `1483e48`, session doc edits UNCOMMITTED):**
