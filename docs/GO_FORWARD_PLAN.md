@@ -5,12 +5,14 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-13, HEAD `39aa6c9` (PROCGEN §4C + §4D BUILT + SHIPPED to `v2.0-alpha`:
-> floor foundation + big-bold episode-title card `336fb41`; scene-aware scopes node + 3-input blend
-> `39aa6c9`. Suite green: determinism + golden frames + audio byte-identical + b7 + Bug Bible; 4244
-> collected. §4C/§4D REMOVED from this doc (done -> git history + tracker + the build log at
-> `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`). Eyeball still gates a live
-> full-episode render + the v2 workflow wiring of the new node. Wan thread (section 1) UNCHANGED.)
+> **Last updated:** 2026-06-13, HEAD `3995bfb` (PROCGEN §4C + §4D BUILT + SHIPPED to `v2.0-alpha`
+> in a parallel window: floor foundation + big-bold episode-title card `336fb41`; scene-aware scopes
+> node `OTR_SceneAwareScopes` + 3-input blend `39aa6c9`; docs `3995bfb`. Suite green: determinism +
+> golden frames + audio byte-identical + b7 + Bug Bible; 4244 collected; HEAD==origin. §4C/§4D REMOVED
+> from this doc (done -> git history + tracker sprint-15 + the build log at
+> `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`). Procgen eyeball still gates a live
+> full-episode render + the v2 workflow wiring of the new node (NOT a forward-order blocker).
+> **The plan is now back to ONE active thread: the Wan 2.2 line (section 1) -- pick up there.**)
 >
 > **Hardening delta (2026-06-13):** the Wan Phase-2 + GATE-A coverage-sweep plan was
 > QA'd against the real code and roundtabled (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4,
