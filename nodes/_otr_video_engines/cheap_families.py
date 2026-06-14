@@ -193,7 +193,12 @@ class VisualizerFamily(_CheapFamilyBase):
 class FluxStillFamily(_CheapFamilyBase):
     name = "flux_still"
     family = "static_image_gen"
-    roles = ("announcer_visual", "scene_broll", "character_video")
+    # A plain still needs only text_prompt (supplied by EVERY role), so it is the
+    # fast, universal "just a still" pick -- eligible in all five roles. BUG-LOCAL-401:
+    # music_visual + background_abstract were missing, so music_video_model='flux_still'
+    # failed OTR_VideoDirector role validation even though a still is valid there.
+    roles = ("announcer_visual", "music_visual", "character_video",
+             "scene_broll", "background_abstract")
     default_roles = ()              # selectable peer; not the in-stack default
     required_inputs = ("text_prompt",)
     commercial_clean = False        # Flux.1-dev = BFL non-commercial (migration)

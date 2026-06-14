@@ -84,6 +84,21 @@ def test_uses_still_flags():
     assert vreg.get_engine("visualizer").uses_still is False
 
 
+def test_flux_still_fits_all_roles_bug401():
+    """BUG-LOCAL-401: flux_still is the fast 'just a still' pick and must be valid
+    in EVERY video role -- it needs only text_prompt, which every role supplies.
+    A missing role tag (music_visual / background_abstract) made
+    music_video_model='flux_still' fail OTR_VideoDirector validation at execute
+    even though a still is perfectly valid for a music beat."""
+    from nodes._otr_shared import role_compat as rc
+    eng = vreg.get_engine("flux_still")
+    desc = {"engine_id": "flux_still", "roles": tuple(eng.roles),
+            "required_inputs": tuple(eng.required_inputs)}
+    for role in ("announcer_visual", "music_visual", "character_video",
+                 "scene_broll", "background_abstract"):
+        assert rc.engine_fits_role(desc, role), f"flux_still must fit role {role!r}"
+
+
 # --- real ffmpeg renders (the floor leaf) ---------------------------------- #
 @pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
 @pytest.mark.parametrize("name", _FAMILIES)
