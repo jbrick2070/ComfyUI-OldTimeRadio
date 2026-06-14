@@ -1,5 +1,10 @@
 # OTR Bug Log
 
+> **ARCHIVE — reference only (as of 2026-06-14).** The ACTIVE bug log is
+> [`BUG_LOG_2026-06.md`](BUG_LOG_2026-06.md). Log NEW bugs there; this file is the
+> historical record (`BUG-LOCAL-001..~305`, through 2026-06-12) — consult it when
+> researching how a past issue was fixed. Do not append new entries here.
+
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
