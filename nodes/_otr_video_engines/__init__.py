@@ -55,6 +55,17 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# GO_FORWARD 4A (2026-06-14): register the Wan2.2 TI2V-5B 8GB-tier engine. Like
+# wan_i2v it is DEFAULT-OFF / dark (empty default_roles + gated behind
+# OTR_ENABLE_WAN_TI2V) and fails closed until the GGUF + the Wan2.2 VAE are on
+# disk. Its 5B core node class (Wan22ImageToVideoLatent) was captured from a live
+# /object_info before coding. Cold-import clean (V-12); guarded so a packaging
+# quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_wan_ti2v as _eng_wan_ti2v  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # M2 / A-S6: register the in-process HuMo audio-driven-face engine -- the
 # heaviest motion engine (loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via

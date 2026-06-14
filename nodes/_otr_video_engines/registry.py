@@ -183,6 +183,16 @@ CAPABILITIES = {
     "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14500, "required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.2-i2v"]},
+    # S2 (GO_FORWARD 4A): the 8GB-tier Wan2.2 TI2V-5B sibling. medium class /
+    # ~8000 MB DRAFT -- the 5B GGUF UNET is ~3.6 GB but the umt5 text-encode + the
+    # Wan2.2 VAE decode push the render-phase peak higher; verify on the 8GB probe
+    # / the Phase-2 measured peak and tighten. model_requirements is the real 5B
+    # asset id. Apache-2.0 (commercial-clean); built 2026-06-14 after the live
+    # /object_info node-class capture (the registry-consistency invariant forbids a
+    # row without a registered engine, so this lands WITH eng_wan_ti2v).
+    "wan_ti2v": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
+                 "requires_sidecar": False, "cpu_ok": False,
+                 "model_requirements": ["wan2.2-ti2v-5b"]},
     # triposg_talk: the v1 NO-COMPILE character_3d lane -- prebuilt cu128
     # wheels only (NO cu128_toolkit requirement; that distinction is the whole
     # point of the lane, 3D plan section 4). Still flag-gated dark at the

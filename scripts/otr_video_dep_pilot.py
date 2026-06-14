@@ -160,6 +160,26 @@ OPT_IN_ENGINES = {
             "determinism on sm_120"
         ),
     },
+    # GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B sibling. Same
+    # in-process / sidecar_optional model, but the 5B graph (Wan22ImageToVideoLatent
+    # + the Wan2.2 VAE, M8) and a GGUF UNET loader. Its 5B core node class was
+    # captured from a live /object_info before the engine was coded.
+    "wan_ti2v": {
+        "lib_module": "wan",
+        "adapter_class": "WanTi2vEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_WAN_TI2V",
+        "assumed_call": (
+            "in-process by default (sidecar_optional -> sidecar when SageAttention "
+            "is resident): drive the installed Wan 2.2 TI2V-5B graph "
+            "(UnetLoaderGGUF Q5_K_M + ModelSamplingSD3 shift 5.0 + "
+            "Wan22ImageToVideoLatent + the Wan2.2 VAE); the init_image is "
+            "padded/cropped into the canvas, never stretched.  "
+            "# TODO-for-GPU-smoke: confirm the 5B latent-node INPUT_TYPES, that the "
+            "Wan2.2 VAE decode fits the medium VRAM tier, and render-twice "
+            "determinism on sm_120"
+        ),
+    },
     "humo": {
         "lib_module": "humo",
         "adapter_class": "HuMoEngine",

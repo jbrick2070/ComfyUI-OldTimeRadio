@@ -68,7 +68,14 @@ if /i "%2"=="FLOOR" (
   set OTR_ENABLE_HUMO=
   set OTR_ENABLE_WAN_I2V=1
   set OTR_WAN_I2V_CKPT=C:\ComfyUI-Models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
-  echo [launch] WAN lane: OTR_ENABLE_WAN_I2V=1, HuMo OFF
+  rem GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B engine. Enabling
+  rem BOTH Wan engines is what the full --acceptance sweep preflight requires
+  rem (M3: every registered core Wan engine's enable flag must be 1). The 5B
+  rem REQUIRES the Wan2.2 VAE (M8), not the 2.1 VAE.
+  set OTR_ENABLE_WAN_TI2V=1
+  set OTR_WAN_TI2V_CKPT=C:\ComfyUI-Models\diffusion_models\Wan2.2-TI2V-5B-Q5_K_M.gguf
+  set OTR_WAN_TI2V_VAE_NAME=wan2.2_vae.safetensors
+  echo [launch] WAN lane: OTR_ENABLE_WAN_I2V=1 + OTR_ENABLE_WAN_TI2V=1, HuMo OFF
 ) else (
   set OTR_ENABLE_HUMO=1
 )

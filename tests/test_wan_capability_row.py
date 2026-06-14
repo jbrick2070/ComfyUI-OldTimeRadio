@@ -1,19 +1,20 @@
-"""GO_FORWARD section 4A S1 + S5 -- the wan_i2v CAPABILITIES row.
+"""GO_FORWARD section 4A S1 + S5 + S2 -- the Wan CAPABILITIES rows.
 
-S1: vram_estimate raised to the conservative 14500 (the 14499 MB smoke figure
-was WITHOUT the load-bearing free_after_use). S5: model_requirements carries
-the real Wan 2.2 I2V asset id, not the stale wan2.1 label.
+S1: wan_i2v vram_estimate raised to the conservative 14500 (the 14499 MB smoke
+figure was WITHOUT the load-bearing free_after_use). S5: model_requirements
+carries the real Wan 2.2 I2V asset id, not the stale wan2.1 label.
 
-(S2 -- a concrete wan_ti2v row -- is intentionally NOT added here: the registry
-consistency invariant requires every CAPABILITIES key to have a REGISTERED
-engine, and wan_ti2v is the deferred 8GB tier whose 5B core node class must be
-captured from a live /object_info before the engine is built.)
+S2 (2026-06-14): the concrete wan_ti2v 8GB-tier row now lands -- the 5B core node
+class (Wan22ImageToVideoLatent) was captured from a live /object_info and the
+engine (eng_wan_ti2v) is registered, so the registry-consistency invariant (every
+CAPABILITIES key has a REGISTERED engine) holds.
 """
 
 from __future__ import annotations
 
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import eng_wan_i2v  # noqa: F401  (register adapter)
+from nodes._otr_video_engines import eng_wan_ti2v  # noqa: F401  (register adapter)
 
 
 def test_wan_i2v_vram_estimate_is_conservative_14500():
@@ -29,4 +30,19 @@ def test_wan_i2v_model_requirement_is_wan22_not_stale_wan21():
 def test_wan_i2v_row_still_consistent_with_registry():
     # The S1/S5 edit must not break the every-row-has-an-engine invariant.
     assert "wan_i2v" in vreg.all_engine_names()
-    assert "wan_ti2v" not in vreg.CAPABILITIES  # deferred -- not yet built
+
+
+def test_wan_ti2v_row_present_and_registered():
+    # S2: the row + the engine land together (registry-consistency invariant).
+    assert "wan_ti2v" in vreg.CAPABILITIES
+    assert "wan_ti2v" in vreg.all_engine_names()
+
+
+def test_wan_ti2v_row_is_medium_class_8gb_tier():
+    row = vreg.CAPABILITIES["wan_ti2v"]
+    assert row["vram_class"] == "medium"
+    assert row["vram_estimate_mb"] == 8000
+    assert row["required_toolchain"] is None
+    assert row["requires_sidecar"] is False
+    assert row["cpu_ok"] is False
+    assert row["model_requirements"] == ["wan2.2-ti2v-5b"]
