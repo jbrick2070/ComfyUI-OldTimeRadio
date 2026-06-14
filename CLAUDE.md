@@ -1,3 +1,19 @@
+## WORKFLOW SOURCE OF TRUTH (operator -- hard rule)
+
+`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`
+IS my workflow.
+
+- ANY json / node / wiring / widget change MUST be made IN that file, in the SAME change as the code.
+  Code that is not wired into this JSON is DEAD -- "your updates are for naught" (the 2026-06-13 §4D
+  miss: a node + a new blend input shipped + tested but unwired -> ran dormant in production).
+- EVERY API / headless / soak run MUST LOAD this real JSON -- never a stale copy, a generated
+  `.gen.json`, an ad-hoc graph, or the Linux-mount snapshot (the sandbox mount lags file writes;
+  always read/write the Windows path and verify via Desktop Commander).
+- After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + the link/widget audit.
+
+When in doubt, use Desktop Commander / Windows MCP / the filesystem and DO IT yourself -- never ask me
+to run scripts (see PRIME DIRECTIVE below).
+
 ## HEADLESS BOOT + MONITORING GOTCHAS (2026-06-12 -- do not relose)
 
 - **DIRECTIVE -- before EVERY new headless run, aggressively reset first.** The
