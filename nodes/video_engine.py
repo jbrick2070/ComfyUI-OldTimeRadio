@@ -21,6 +21,7 @@ VRAM cost: zero. Runs entirely on CPU (numpy + PIL).
 v2.0  2026-04-05  Jeffrey Brick
 """
 
+import hashlib
 import json
 import logging
 import math
@@ -155,6 +156,125 @@ def _analyze_audio(audio_np, sample_rate, total_frames, fps):
 
 
 # -----------------------------------------------------------------------------
+# TITLE-CARD TIMING -- resolve the b000 music-open window from the ledger
+# -----------------------------------------------------------------------------
+# The SceneSequencer stamps led["lines"] with speaker_role + start_s + dur_s
+# (seconds). The opening music line is the carrier for the hero title card.
+_MUSIC_OPEN_ROLES = ("music_open", "music_visual")
+_SPEECH_ROLES_VIDEO = ("announcer", "character")
+
+
+def _envelope_intro_end(volume, fps, cap):
+    """Heuristic intro end-frame from the volume envelope: the first sustained
+    quiet dip AFTER the opening swell, within ``cap`` frames. 0 = undetectable
+    (the title card then stays disabled rather than guess)."""
+    v = np.asarray(volume, dtype=np.float32)
+    n = min(len(v), int(cap))
+    if n < int(fps):  # need at least ~1s of envelope
+        return 0
+    seg = v[:n]
+    thr = 0.25
+    risen = False
+    for i in range(n):
+        if seg[i] > 0.45:
+            risen = True
+        elif risen and seg[i] < thr:
+            return max(int(fps), i)
+    return 0
+
+
+def _resolve_title_timing(led, volume, fps, total_frames):
+    """Resolve the hero-title-card window from the ledger lines.
+
+    Returns a dict consumed by ``_CRTRenderer`` (``music_open_start_f`` /
+    ``music_open_end_f`` / ``first_dialogue_f`` / ``kind``) or ``{}`` when
+    nothing resolves (card disabled, no crash).
+
+    Primary: the first line whose ``speaker_role`` is a music-open role, using
+    its ``start_s``/``dur_s`` in SECONDS -> ``round(start_s*fps) ..
+    round((start_s+dur_s)*fps)``. Fallback (wire ledger may carry
+    ``start_s=None``): derive the intro window from the volume envelope (music
+    from frame 0 to the first dialogue onset), capped."""
+    try:
+        lines = (led or {}).get("lines") or []
+    except Exception:  # noqa: BLE001
+        lines = []
+    fps = int(fps) if fps else 24
+    total = int(total_frames or 0)
+    if total <= 0:
+        return {}
+
+    def _f(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    music_open = None
+    first_dialogue_f = None
+    music_close = None
+    for ln in lines:
+        if not isinstance(ln, dict):
+            continue
+        role = str(ln.get("speaker_role") or "")
+        if music_open is None and role in _MUSIC_OPEN_ROLES:
+            music_open = ln
+        if role == "music_close":
+            music_close = ln  # last wins
+        if first_dialogue_f is None and role in _SPEECH_ROLES_VIDEO:
+            s = _f(ln.get("start_s"))
+            if s is not None:
+                first_dialogue_f = int(round(s * fps))
+
+    out = {"kind": "open"}
+
+    # -- OPEN window --------------------------------------------------
+    resolved_open = False
+    if music_open is not None:
+        s = _f(music_open.get("start_s"))
+        d = _f(music_open.get("dur_s"))
+        if s is not None and d is not None and d > 0:
+            start_f = max(0, int(round(s * fps)))
+            end_f = min(total, int(round((s + d) * fps)))
+            if start_f < end_f:
+                out["music_open_start_f"] = start_f
+                out["music_open_end_f"] = end_f
+                if first_dialogue_f is not None:
+                    out["first_dialogue_f"] = first_dialogue_f
+                resolved_open = True
+    if not resolved_open:
+        # Fallback: volume-envelope intro window (wire start_s unavailable).
+        cap = min(total, int(fps * 12))  # <=12s intro ceiling
+        if first_dialogue_f is not None and first_dialogue_f > 0:
+            end_f = min(first_dialogue_f, cap)
+        else:
+            end_f = _envelope_intro_end(volume, fps, cap)
+        if end_f and end_f > 0:
+            out["music_open_start_f"] = 0
+            out["music_open_end_f"] = int(end_f)
+            if first_dialogue_f is not None:
+                out["first_dialogue_f"] = first_dialogue_f
+
+    # -- CLOSE window (S5 conditional outro bookend) ------------------
+    # Only resolves with real start_s/dur_s on the last music_close line and
+    # only when it lands inside total_frames (the credits HUD post-roll runs
+    # AFTER total). No envelope fallback for the close.
+    if music_close is not None:
+        s = _f(music_close.get("start_s"))
+        d = _f(music_close.get("dur_s"))
+        if s is not None and d is not None and d > 0:
+            cstart = int(round(s * fps))
+            cend = int(round((s + d) * fps))
+            if 0 <= cstart < cend <= total:
+                out["music_close_start_f"] = cstart
+                out["music_close_end_f"] = cend
+
+    if "music_open_start_f" in out or "music_close_start_f" in out:
+        return out
+    return {}
+
+
+# -----------------------------------------------------------------------------
 # CRT FRAME RENDERER - Pure Procedural Art
 # -----------------------------------------------------------------------------
 class _CRTRenderer:
@@ -164,13 +284,25 @@ class _CRTRenderer:
     Centre area is pure math-driven generative art.
     """
 
-    def __init__(self, w, h, title):
+    def __init__(self, w, h, title, volume, freqs, waves, fps, timing=None):
         self.w = w
         self.h = h
         self.title = title
+        self.fps = int(fps) if fps else 24
+
+        # -- Audio arrays (convert lists -> np FIRST; the EMA precompute and
+        #    the bounded-lookback trails index them every frame) ----------
+        self.volume = np.asarray(volume, dtype=np.float32) if len(volume) else \
+            np.zeros(0, dtype=np.float32)
+        self.freqs = list(freqs)   # list[np.ndarray] (32-bin)
+        self.waves = list(waves)   # list[np.ndarray] (~200 pt)
+        self.total = len(self.volume)
+        self.timing = dict(timing or {})
 
         # Fonts
-        self.f_title = _load_font(max(14, h // 30))
+        self._title_size = max(14, h // 30)
+        self._hero_size_max = max(28, h // 12)  # 2-3x f_title (#1 spec ceiling)
+        self.f_title = _load_font(self._title_size)
         self.f_sub   = _load_font(max(12, h // 38))
         self.f_small = _load_font(max(9, h // 72))
 
@@ -192,84 +324,193 @@ class _CRTRenderer:
         self._ring_cy = int(h * 0.42)
         self._ring_r = min(w, h) // 5
 
-        # v1.5 Adaptive Brightness Gating - EMA smoothed volume tracker
-        # Quiet scenes dim toward dark navy; loud scenes brighten to full phosphor.
-        # EMA smoothing prevents flickering on transient spikes.
-        self._brightness_ema = 0.5  # start at mid-brightness
-        self._brightness_alpha = 0.08  # EMA smoothing factor (lower = smoother)
+        # -- Title-bar layout (geometry from w/h, never baked 1920) -------
+        # These coords are the section-1 ident/subtitle/timestamp anchors AND
+        # the dock target for the hero card (#1 D: the docked state IS the
+        # normal section-1 draw).
+        self._pad = w // 48
+        self._ident_xy = (self._pad, self._pad // 2)
+        self._sub_xy   = (self._pad, self._pad // 2 + h // 18)
+        self._ts_x     = w - self._pad - w // 10
+        self._divider_y = h // 10
+
+        # -- DUAL signal-strength EMA (the conductor; #concept) -----------
+        # signal: slow ambient brightness (alpha ~0.05); trig: fast lock /
+        # glitch (alpha ~0.3); loss = 1 - signal. signal[0]=trig[0]=vol[0].
+        # READ-ONLY downstream -- never multiplied into the whole frame
+        # (that was the v1.5.1 unreadable-text bug).
+        sig = np.zeros(self.total, dtype=np.float32)
+        trg = np.zeros(self.total, dtype=np.float32)
+        if self.total > 0:
+            v0 = float(self.volume[0])
+            sig[0] = trg[0] = v0
+            a_s, a_t = 0.05, 0.30
+            for i in range(1, self.total):
+                vi = float(self.volume[i])
+                sig[i] = sig[i - 1] + a_s * (vi - sig[i - 1])
+                trg[i] = trg[i - 1] + a_t * (vi - trg[i - 1])
+        self._signal = sig
+        self._trig = trg
+        self._loss = (1.0 - sig).astype(np.float32)
+
+        # -- Title card windows (decode->reveal->POP->dock); [] disables --
+        self._cards = self._resolve_card_windows(self.timing)
+
+    # -- Deterministic per-frame RNG ------------------------------------
+    def _rng(self, fi, salt):
+        """A stable-hash-seeded Generator (fixes the v1 unseeded section-8
+        noise). seed = blake2s(title|fi|salt); same inputs -> same frame."""
+        seed = int.from_bytes(
+            hashlib.blake2s(f"{self.title}|{int(fi)}|{salt}".encode()).digest()[:8],
+            "big",
+        )
+        return np.random.default_rng(seed)
+
+    # -- Title card window resolution -----------------------------------
+    def _resolve_card_windows(self, timing):
+        """Return a list of hero-title-card window dicts (open + optional
+        close), each: {start_f, music_end_f, dock_frames, end_f, kind}.
+        Computes dock_frames so a window never overruns the first dialogue or
+        `total`. Missing fields -> the window is simply absent (no crash)."""
+        if not timing or self.total <= 0:
+            return []
+        total = int(self.total)
+        half = int(self.fps * 0.5)
+        cards = []
+
+        # OPEN: docks down into the section-1 ident before the first dialogue.
+        w0 = timing.get("music_open_start_f")
+        w1 = timing.get("music_open_end_f")
+        if w0 is not None and w1 is not None:
+            w0 = max(0, int(w0))
+            w1 = min(total, int(w1))
+            if w1 > w0:
+                first_dialogue_f = timing.get("first_dialogue_f")
+                if first_dialogue_f is not None:
+                    dock = max(0, min(half, int(first_dialogue_f) - w1))
+                else:
+                    dock = max(0, min(half, total - w1))
+                cards.append({
+                    "start_f": w0, "music_end_f": w1,
+                    "dock_frames": dock, "end_f": min(total, w1 + dock),
+                    "kind": "open",
+                })
+
+        # CLOSE (S5 bookend): reveal + POP, no dock (it rides into the credits
+        # tail); only when it resolved inside total_frames.
+        c0 = timing.get("music_close_start_f")
+        c1 = timing.get("music_close_end_f")
+        if c0 is not None and c1 is not None:
+            c0 = max(0, int(c0))
+            c1 = min(total, int(c1))
+            if c1 > c0:
+                cards.append({
+                    "start_f": c0, "music_end_f": c1,
+                    "dock_frames": 0, "end_f": c1, "kind": "close",
+                })
+        return cards
 
     # -- Public ----------------------------------------------------------
 
-    def render(self, fi, total, fps, vol, freq, wave):
-        """Render frame *fi* and return a PIL RGB Image."""
+    def render(self, fi, draw_scopes=True):
+        """Render frame *fi* and return a PIL RGB Image.
+
+        Draw order (S1): background (grid + gated scopes + bottom bar) ->
+        section-8 CRT post (scanlines/vignette/noise, numpy) -> THEN the
+        section-1 ident OR the hero title card, drawn AFTER the vignette so
+        the always-on vignette can never dim the text (the v1.5.1 bug)."""
+        total = self.total
+        fps = self.fps
+        if total <= 0:
+            return Image.new("RGB", (self.w, self.h), CRT_BG)
+        fi = max(0, min(int(fi), total - 1))
+        vol = float(self.volume[fi])
+        freq = self.freqs[fi]
+        wave = self.waves[fi]
+        signal = float(self._signal[fi])
+        loss = float(self._loss[fi])
+        t = fi / fps
+        pad = self._pad
+        ly = self._divider_y
+
+        # Is a hero title card active this frame? Decide BEFORE drawing so
+        # section-1 ident/subtitle/timestamp are suppressed while it owns the
+        # screen (the docked state after the window IS the normal section-1).
+        card = None
+        for c in self._cards:
+            if c["start_f"] <= fi < c["end_f"]:
+                card = c
+                break
+        card_active = card is not None
+
         img = Image.new("RGB", (self.w, self.h), CRT_BG)
         draw = ImageDraw.Draw(img)
-        t = fi / fps
-        dur = total / fps
-        pad = self.w // 48
 
-        # -- 1. Title bar ---------------------------------------------
-        draw.text((pad, pad // 2), "=== SIGNAL LOST ===",
-                  fill=CRT_GREEN, font=self.f_title)
-        sub = f'"{self.title}"'
-        draw.text((pad, pad // 2 + self.h // 18), sub,
-                  fill=CRT_DIM, font=self.f_sub)
-        # Divider
-        ly = self.h // 10
+        # -- divider (background chrome) ------------------------------
         draw.line([(pad, ly), (self.w - pad, ly)], fill=CRT_DARK, width=1)
 
-        # Timestamp (top-right)
-        mm, ss = int(t // 60), int(t % 60)
-        draw.text((self.w - pad - self.w // 10, pad // 2),
-                  f"{mm:02d}:{ss:02d}", fill=CRT_DIM, font=self.f_sub)
+        # -- 2/3/5/6. GATED SCOPE SECTIONS ----------------------------
+        # draw_scopes=False (v2 scene-aware path) skips {2,3,5,6} as a SET:
+        # section 3 reads section 2's `r`, so 2+3 go together; 5+6 are
+        # independent. {1,4,7,8} (title/grid/bottom/CRT) always draw.
+        if draw_scopes:
+            # -- 2. CIRCULAR FREQUENCY RING (centre) ------------------
+            cx, cy, base_r = self._ring_cx, self._ring_cy, self._ring_r
+            r = base_r + int(vol * base_r * 0.3)
+            # S4 sync-drift: in weak signal (silent gaps) the receiver loses
+            # lock -> a bounded horizontal coordinate offset (NOT np.roll, NOT
+            # a hue shift). Clamped so the ring never leaves the frame.
+            drift = int(round(loss * (self.w // 120)))
+            cx = max(r, min(self.w - r, cx + drift))
+            n_bars = min(32, len(freq))
+            for i in range(n_bars):
+                angle = 2 * math.pi * i / n_bars - math.pi / 2
+                bar_len = int(freq[i] * self.h * 0.18) + 2
+                x0 = cx + int(r * math.cos(angle))
+                y0 = cy + int(r * math.sin(angle))
+                x1 = cx + int((r + bar_len) * math.cos(angle))
+                y1 = cy + int((r + bar_len) * math.sin(angle))
+                g = int(255 * (1.0 - freq[i] * 0.6))
+                rb = int(freq[i] * 180)
+                col = (rb, g, max(20, 65 - int(freq[i] * 50)))
+                draw.line([(x0, y0), (x1, y1)], fill=col,
+                          width=max(2, self.w // 400))
 
-        # -- 2. CIRCULAR FREQUENCY RING (centre) ---------------------
-        cx, cy, base_r = self._ring_cx, self._ring_cy, self._ring_r
-        r = base_r + int(vol * base_r * 0.3)
-        n_bars = min(32, len(freq))
-        for i in range(n_bars):
-            angle = 2 * math.pi * i / n_bars - math.pi / 2
-            bar_len = int(freq[i] * self.h * 0.18) + 2
-            x0 = cx + int(r * math.cos(angle))
-            y0 = cy + int(r * math.sin(angle))
-            x1 = cx + int((r + bar_len) * math.cos(angle))
-            y1 = cy + int((r + bar_len) * math.sin(angle))
-            g = int(255 * (1.0 - freq[i] * 0.6))
-            rb = int(freq[i] * 180)
-            col = (rb, g, max(20, 65 - int(freq[i] * 50)))
-            draw.line([(x0, y0), (x1, y1)], fill=col, width=max(2, self.w // 400))
+            # Inner ring outline
+            ring_bright = min(1.0, 0.3 + vol * 0.7)
+            ring_col = tuple(min(255, int(c * ring_bright)) for c in CRT_GREEN)
+            bbox = [(cx - r, cy - r), (cx + r, cy + r)]
+            draw.ellipse(bbox, outline=ring_col, width=2)
 
-        # Inner ring outline
-        ring_bright = min(1.0, 0.3 + vol * 0.7)
-        ring_col = tuple(min(255, int(c * ring_bright)) for c in CRT_GREEN)
-        bbox = [(cx - r, cy - r), (cx + r, cy + r)]
-        draw.ellipse(bbox, outline=ring_col, width=2)
-
-        # -- 3. ORBITING PARTICLES ----------------------------------
-        n_particles = 12
-        for p in range(n_particles):
-            phase = 2 * math.pi * p / n_particles
-            orbit_r = r + int(self.h * 0.12) + int(vol * 30)
-            speed = 0.3 + freq[p % len(freq)] * 2.0
-            angle = phase + t * speed
-            px = cx + int(orbit_r * math.cos(angle))
-            py = cy + int(orbit_r * math.sin(angle) * 0.6)
-            size = max(2, int(3 + freq[p % len(freq)] * 8))
-            hue_shift = (p / n_particles + t * 0.05) % 1.0
-            if hue_shift < 0.33:
-                pcol = CRT_GREEN
-            elif hue_shift < 0.66:
-                pcol = CRT_CYAN
-            else:
-                pcol = CRT_AMBER
-            bright = min(1.0, 0.3 + freq[p % len(freq)] * 0.7)
-            pcol = tuple(min(255, int(c * bright)) for c in pcol)
-            draw.ellipse([(px - size, py - size), (px + size, py + size)],
-                         fill=pcol)
+            # -- 3. ORBITING PARTICLES -------------------------------
+            n_particles = 12
+            for p in range(n_particles):
+                phase = 2 * math.pi * p / n_particles
+                orbit_r = r + int(self.h * 0.12) + int(vol * 30)
+                speed = 0.3 + freq[p % len(freq)] * 2.0
+                angle = phase + t * speed
+                px = cx + int(orbit_r * math.cos(angle))
+                py = cy + int(orbit_r * math.sin(angle) * 0.6)
+                size = max(2, int(3 + freq[p % len(freq)] * 8))
+                hue_shift = (p / n_particles + t * 0.05) % 1.0
+                if hue_shift < 0.33:
+                    pcol = CRT_GREEN
+                elif hue_shift < 0.66:
+                    pcol = CRT_CYAN
+                else:
+                    pcol = CRT_AMBER
+                bright = min(1.0, 0.3 + freq[p % len(freq)] * 0.7)
+                pcol = tuple(min(255, int(c * bright)) for c in pcol)
+                draw.ellipse([(px - size, py - size), (px + size, py + size)],
+                             fill=pcol)
 
         # -- 4. GEOMETRIC GRID ----------------------------------------
+        # S4 brightness hierarchy: the grid dims FIRST when signal weakens
+        # (the silent inter-beat gaps) -- it scales down faster than the ident
+        # (which is drawn after the vignette at full brightness). signal-keyed
+        # so it is deterministic.
         grid_step = max(40, self.w // 24)
-        grid_alpha = max(8, int(15 + vol * 25))
+        grid_alpha = max(6, int((15 + vol * 25) * (0.35 + 0.65 * signal)))
         grid_col = (0, grid_alpha, int(grid_alpha * 0.4))
         for gx in range(pad, self.w - pad, grid_step):
             wobble = int(math.sin(gx * 0.01 + t * 2.0) * vol * 12)
@@ -280,21 +521,22 @@ class _CRTRenderer:
             draw.line([(pad + wobble, gy), (self.w - pad - wobble, gy)],
                       fill=grid_col, width=1)
 
-        # -- 5. MIRRORED WAVEFORM -------------------------------------
-        wave_y = int(self.h * 0.72)
-        wave_h = int(self.h * 0.12)
-        if wave is not None and len(wave) > 1:
-            self._waveform_mirror(draw, wave, pad, wave_y,
-                                  self.w - pad * 2, wave_h, vol, t)
+        if draw_scopes:
+            # -- 5. MIRRORED WAVEFORM ---------------------------------
+            wave_y = int(self.h * 0.72)
+            wave_h = int(self.h * 0.12)
+            if wave is not None and len(wave) > 1:
+                self._waveform_mirror(draw, wave, pad, wave_y,
+                                      self.w - pad * 2, wave_h, vol, t)
 
-        # -- 6. FREQUENCY BARS ----------------------------------------
-        bar_y = int(self.h * 0.86)
-        bar_h = int(self.h * 0.06)
-        if freq is not None:
-            self._freq_bars_wide(draw, freq, pad, bar_y,
-                                 self.w - pad * 2, bar_h, vol)
+            # -- 6. FREQUENCY BARS ------------------------------------
+            bar_y = int(self.h * 0.86)
+            bar_h = int(self.h * 0.06)
+            if freq is not None:
+                self._freq_bars_wide(draw, freq, pad, bar_y,
+                                     self.w - pad * 2, bar_h, vol)
 
-        # -- 7. Bottom bar --------------------------------------------
+        # -- 7. Bottom bar (dim chrome; stays pre-vignette) -----------
         by = self.h - pad
         draw.line([(pad, by - pad // 3), (self.w - pad, by - pad // 3)],
                   fill=CRT_DARK, width=1)
@@ -305,30 +547,193 @@ class _CRTRenderer:
                   f"frame {fi:05d}/{total:05d}",
                   fill=CRT_DARK, font=self.f_small)
 
-        # -- 8. CRT post-processing ----------------------------------
+        # -- 8. CRT post-processing (numpy; runs UNDER the text) ------
         img = Image.alpha_composite(img.convert("RGBA"),
                                      self._scanlines).convert("RGB")
 
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
-
-        # -- 8b. Adaptive Brightness Gating - DISABLED --------------
-        # Removed in v1.5.1: dimmed the CRT text to unreadable levels.
-        # Full brightness preserved (matches v1.4 behavior).
-
         img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
 
         if vol > 0.3:
             arr = np.array(img, dtype=np.int16)
             intensity = int(vol * 12)
-            noise = np.random.randint(-intensity, intensity + 1,
-                                       arr.shape, dtype=np.int16)
+            # Seeded (was unseeded np.random in v1) so the frame is
+            # deterministic per (title, fi).
+            noise = self._rng(fi, "noise").integers(
+                -intensity, intensity + 1, size=arr.shape, dtype=np.int16)
             arr = np.clip(arr + noise, 0, 255)
             img = Image.fromarray(arr.astype(np.uint8))
 
+        # -- 1. SECTION-1 TEXT / HERO CARD (drawn AFTER the vignette) -
+        # Text-exemption: the always-on vignette multiply above can never dim
+        # the ident or the hero card because they composite last.
+        draw = ImageDraw.Draw(img)
+        if card_active:
+            self._draw_title_card(draw, fi, card, signal, loss)
+        else:
+            self._draw_ident(draw, fi, t)
+
         return img
 
-    # -- Private drawing helpers -------------------------------------
+    # -- Section-1 ident (normal / docked state) ------------------------
+    def _draw_ident(self, draw, fi, t):
+        pad = self._pad
+        draw.text(self._ident_xy, "=== SIGNAL LOST ===",
+                  fill=CRT_GREEN, font=self.f_title)
+        draw.text(self._sub_xy, f'"{self.title}"',
+                  fill=CRT_DIM, font=self.f_sub)
+        mm, ss = int(t // 60), int(t % 60)
+        draw.text((self._ts_x, pad // 2),
+                  f"{mm:02d}:{ss:02d}", fill=CRT_DIM, font=self.f_sub)
+
+    # -- Hero title card (#1: decode -> reveal -> POP -> dock) ----------
+    _DECODE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%*+=-"
+
+    def _tw(self, draw, s, font):
+        b = draw.textbbox((0, 0), s, font=font)
+        return b[2] - b[0]
+
+    def _th(self, draw, s, font):
+        b = draw.textbbox((0, 0), s, font=font)
+        return b[3] - b[1]
+
+    def _wrap_words(self, draw, text, font, max_w):
+        """Greedy word-wrap so each line fits max_w (a single over-long word
+        is left to overflow -- the floor font already caps the size)."""
+        words = text.split()
+        if not words:
+            return [text]
+        lines, cur = [], words[0]
+        for wd in words[1:]:
+            if self._tw(draw, cur + " " + wd, font) <= max_w:
+                cur += " " + wd
+            else:
+                lines.append(cur)
+                cur = wd
+        lines.append(cur)
+        return lines
+
+    def _fit_hero(self, draw, title):
+        """Shrink the hero font (from f_hero ceiling to a floor) + word-wrap
+        until the block fits max_w ~= 0.8w / max_h ~= 0.28h. Returns
+        (font, lines, size)."""
+        title = (title or "SIGNAL").upper()
+        max_w = int(self.w * 0.8)
+        max_h = int(self.h * 0.28)
+        floor = max(16, self.h // 40)
+        size = self._hero_size_max
+        while True:
+            font = _load_font(size)
+            lines = self._wrap_words(draw, title, font, max_w)
+            tw = max((self._tw(draw, ln, font) for ln in lines), default=0)
+            th = sum(self._th(draw, ln, font) for ln in lines)
+            if (tw <= max_w and th <= max_h) or size <= floor:
+                return font, lines, size
+            size -= max(2, size // 12)
+
+    def _decode_line(self, text, reveal_n, rng):
+        """Left-to-right decode: the first reveal_n chars are solid; the rest
+        are seeded scramble (spaces stay spaces)."""
+        out = []
+        for i, ch in enumerate(text):
+            if ch == " " or i < reveal_n:
+                out.append(ch)
+            else:
+                out.append(self._DECODE_GLYPHS[
+                    int(rng.integers(0, len(self._DECODE_GLYPHS)))])
+        return "".join(out)
+
+    def _draw_carrier_meter(self, draw, level):
+        """A broken-phosphor carrier-strength meter under the ident: blocks
+        crawl to solid on the signal swell (level 0..1)."""
+        pad = self._pad
+        n = 16
+        bw = max(3, self.w // 160)
+        gap = max(2, bw // 2)
+        x0 = self._sub_xy[0]
+        y0 = self._sub_xy[1] + self.h // 22
+        filled = int(round(max(0.0, min(1.0, level)) * n))
+        for i in range(n):
+            x = x0 + i * (bw + gap)
+            on = i < filled
+            # broken phosphor: a couple of dim cells even when "on"
+            col = CRT_GREEN if (on and i % 5 != 4) else CRT_DARK
+            draw.rectangle([(x, y0), (x + bw, y0 + bw)], fill=col)
+
+    def _draw_title_card(self, draw, fi, card, signal, loss):
+        """The b000 music-open hero card. Phases inside the window:
+        reveal [start, music_end) -> POP (last 1-2 reveal frames) -> dock
+        [music_end, end). The docked target IS the section-1 ident."""
+        w0 = card["start_f"]
+        me = card["music_end_f"]
+        dock_frames = card["dock_frames"]
+        in_dock = fi >= me
+        reveal_span = max(1, me - w0)
+        p = 1.0 if in_dock else min(1.0, max(0.0, (fi - w0) / reveal_span))
+
+        # -- carrier-lock line "SIGNAL LOST" (decode scramble -> solid) ---
+        carrier_src = "=== SIGNAL LOST ==="
+        # solid chars proportional to p; '=' framing stays as-is
+        reveal_n = int(p * len(carrier_src))
+        carrier = self._decode_line(carrier_src, reveal_n, self._rng(fi, "carrier"))
+        draw.text(self._ident_xy, carrier, fill=CRT_GREEN, font=self.f_title)
+        self._draw_carrier_meter(draw, signal if not in_dock else 1.0)
+
+        # -- HERO title (big + bold, centre-anchored, EXEMPT from gutter) -
+        title = (self.title or "SIGNAL").upper()
+        font, lines, hero_size = self._fit_hero(draw, title)
+
+        # POP: a 1-2 frame brightness bloom right before lock (music_end).
+        pop = (not in_dock) and (1 <= (me - fi) <= 2)
+        if pop:
+            hero_col = (200, 255, 200)
+        else:
+            hero_col = CRT_GREEN
+
+        # decoded-fragment reveal across the wrapped lines (integer-frame).
+        total_chars = sum(len(ln) for ln in lines)
+        revealed = total_chars if in_dock else int(p * total_chars)
+        shown, consumed = [], 0
+        for ln in lines:
+            take = max(0, min(len(ln), revealed - consumed))
+            shown.append(self._decode_line(ln, take, self._rng(fi, "hero")))
+            consumed += len(ln)
+
+        # Block metrics at the (possibly docked) size.
+        if in_dock and dock_frames > 0:
+            d = min(1.0, max(0.0, (fi - me) / dock_frames))
+            cur_size = int(round(hero_size + (self._title_size - hero_size) * d))
+            font = _load_font(max(8, cur_size))
+            lines = self._wrap_words(draw, title, font, int(self.w * 0.8))
+            shown = lines  # fully decoded while docking
+        else:
+            d = 0.0
+
+        line_h = max(self._th(draw, s or "M", font) for s in shown)
+        block_h = line_h * len(shown) + (len(shown) - 1) * (line_h // 4)
+        # centre anchor -> dock target (the ident top-left) as d: 0 -> 1
+        cx_centre, cy_centre = self.w // 2, self.h // 2
+        top_centre = cy_centre - block_h // 2
+        ident_x, ident_y = self._ident_xy
+        # left/top of the block lerp from centred to the ident anchor.
+        for li, s in enumerate(shown):
+            tw = self._tw(draw, s, font)
+            x_centre = cx_centre - tw // 2
+            y_centre = top_centre + li * (line_h + line_h // 4)
+            x = int(round(x_centre + (ident_x - x_centre) * d))
+            y = int(round(y_centre + (ident_y - y_centre) * d))
+            # clamp inside the frame (no black edge from any drift/dock)
+            x = max(0, min(x, self.w - tw))
+            y = max(0, min(y, self.h - line_h))
+            # fake-bold by OVERSTRIKE (no real bold font is loaded)
+            for ox, oy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                draw.text((x + ox, y + oy), s, fill=hero_col, font=font)
+            # block cursor after the last revealed char (during reveal only)
+            if not in_dock and li == len(shown) - 1 and p < 1.0:
+                cur_w = max(4, line_h // 2)
+                draw.rectangle([(x + tw + 2, y), (x + tw + 2 + cur_w, y + line_h)],
+                               fill=hero_col)
 
     def _waveform_mirror(self, draw, wave, x, y, w, h, vol, t):
         mid = y + h // 2
@@ -1268,6 +1673,16 @@ class SignalLostVideoRenderer:
                 "closing_audio": ("AUDIO", {
                     "tooltip": "Unique closing music from MusicGen for the credits post-roll. If not connected, a gentle decay from the episode audio is used instead of looping."
                 }),
+                # APPENDED LAST (widgets_values is positional -- only ever
+                # append). v2 scene-aware path sets this False so the floor's
+                # in-frame scopes {2,3,5,6} (centre ring / particles /
+                # waveform / bars) turn OFF and OTR_SceneAwareScopes draws the
+                # scene-aware scopes downstream instead. Default True keeps the
+                # v1 floor visual for every existing saved workflow.
+                "draw_scopes": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Draw the floor's in-frame scopes (centre ring, orbit particles, waveform, freq bars). Default ON (v1). Set OFF for the v2 scene-aware-scopes pipeline, where OTR_SceneAwareScopes draws the scopes in the real per-beat gutters downstream."
+                }),
             },
         }
 
@@ -1277,7 +1692,7 @@ class SignalLostVideoRenderer:
 
     def render_video(self, audio, script_json, news_used,
                      fps=24, resolution="1920x1080",
-                     episode_title="", closing_audio=None):
+                     episode_title="", closing_audio=None, draw_scopes=True):
 
         from .story_orchestrator import _runtime_log
 
@@ -1554,11 +1969,15 @@ class SignalLostVideoRenderer:
         out_path = os.path.join(out_dir, f"signal_lost_{safe_title}_{ts}.mp4")
 
         # -- 5. Build frame generator ---------------------------------
-        renderer = _CRTRenderer(W, H, episode_title)
+        # Resolve the b000 music-open title-card window from the ledger lines
+        # (start_s/dur_s/speaker_role), with a volume-envelope fallback.
+        _title_timing = _resolve_title_timing(led, volume, fps, total_frames)
+        renderer = _CRTRenderer(W, H, episode_title, volume, freqs, waves, fps,
+                                timing=_title_timing)
         total_encode_frames = total_frames + _hud_frames
 
         def _render_crt(fi):
-            return renderer.render(fi, total_frames, fps, volume[fi], freqs[fi], waves[fi])
+            return renderer.render(fi, draw_scopes=draw_scopes)
 
         def _render_hud(hi):
             return _hud_renderer.render(hi, _hud_frames)
