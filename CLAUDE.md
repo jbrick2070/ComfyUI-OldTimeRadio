@@ -1,84 +1,116 @@
-## WORKFLOW SOURCE OF TRUTH (operator -- hard rule)
+# OTR -- Project Operating Rules (Claude in Cowork)
+
+Hard rules + the REAL Cowork operating model for this repo + hard-won gotchas. Operator directives
+here win over any handoff / doc / memory that disagrees.
+
+## 0. WORKFLOW SOURCE OF TRUTH (hard)
 
 `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`
 IS my workflow.
 
 - ANY json / node / wiring / widget change MUST be made IN that file, in the SAME change as the code.
   Code that is not wired into this JSON is DEAD -- "your updates are for naught" (the 2026-06-13 §4D
-  miss: a node + a new blend input shipped + tested but unwired -> ran dormant in production).
+  miss: a node + a new blend input shipped + tested but UNWIRED -> ran dormant in production).
 - EVERY API / headless / soak run MUST LOAD this real JSON -- never a stale copy, a generated
-  `.gen.json`, an ad-hoc graph, or the Linux-mount snapshot (the sandbox mount lags file writes;
-  always read/write the Windows path and verify via Desktop Commander).
-- After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + the link/widget audit.
+  `.gen.json`, an ad-hoc graph, or the Linux-mount snapshot.
+- Schema: litegraph. Top level = `nodes[]` + `links[]` + `last_node_id` + `last_link_id`; a link is
+  `[link_id, src_node, src_slot, dst_node, dst_slot, type]`; one output fans out via its `links` list.
+  `widgets_values` is POSITIONAL -- only ever APPEND a new optional widget at the END (inserting mid-list
+  shifts every saved value -> silent drift, BUG-LOCAL-097). A widget converted to an input keeps its
+  value slot AND gains an input with `"widget": {"name": ...}`.
+- After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + a link/widget audit
+  (widget-count vs live INPUT_TYPES, every wired input-name in INPUT_TYPES, link referential integrity).
 
-When in doubt, use Desktop Commander / Windows MCP / the filesystem and DO IT yourself -- never ask me
-to run scripts (see PRIME DIRECTIVE below).
+## 1. HOW COWORK ACTUALLY WORKS HERE (read this first)
 
-## HEADLESS BOOT + MONITORING GOTCHAS (2026-06-12 -- do not relose)
+- **Two separate filesystems.** The file tools (Read / Write / Edit) operate on the REAL Windows files --
+  that is your primary editor. **Desktop Commander** (`mcp__Desktop_Commander__*`) runs PowerShell on the
+  same real Windows box -- use it for git, the venv python, tests, and process control. The
+  `mcp__workspace__bash` Linux sandbox is a DIFFERENT machine: its mount LAGS the file-tool writes (shows
+  stale/truncated copies -> phantom "corruption") and has NO torch. Use bash only for quick greps of
+  UNCHANGED files; never trust it for current state and never run the suite there.
+- **The loop:** edit with the file tools -> verify/test with the Windows venv via Desktop Commander ->
+  commit AND push via DC git -> verify HEAD == origin.
+- **Test runner:** `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (torch 2.10). Run with
+  `$env:PYTHONUTF8=1`; `pytest -q -p no:cacheprovider`. The conftest sets `OTR_TEST_MODE`/`CUDA_VISIBLE_DEVICES=''`.
+  Bug Bible lives in a SEPARATE repo: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`
+  -- `cd` to its root and use the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
+  path fails to collect).
+- **PowerShell reality (DC runs powershell.exe):** use `;` to chain, NOT `&&`. Do NOT use
+  `python -c "..."` with nested quotes -- PowerShell mangles them; instead WRITE A TEMP `.py` file, run
+  it, then delete it. `2>&1` makes stderr render as scary red text -- that is NOT a failure; check the
+  exit code / output. Pipe noisy output through `Select-Object -Last N`.
+- **The ~60s MCP ceiling:** any single DC command that blocks longer (a `Start-Sleep` > ~45s, a big render
+  loop, the full ~4200-test suite, a slow boot wait) TIMES OUT and orphans the process. Background it to a
+  log and poll the log, or shrink the job (a test subset, fewer frames). DC itself is NOT flaky -- the
+  command was too long.
+- **Subagents (Agent tool)** are excellent for read-only fan-out audits, but TELL them to use Desktop
+  Commander + the Windows venv/path -- left to default they read the lagging Linux mount and report
+  phantom truncation/corruption (happened 2026-06-13; the third agent that used the Windows path was right).
+- **Stale git `index.lock`:** if `git add`/`commit` fails with "index.lock: File exists" AND
+  `Get-Process git` is empty, the lock is STALE (a real git op finishes in seconds) -- remove
+  `.git\index.lock` and retry. Do NOT remove it while a git process is actually running.
+- **One coder window in the code at a time** (serialize via `docs/GO_FORWARD_PLAN.md`). Two windows
+  editing the same file -- especially the workflow JSON -- is how it gets corrupted.
+- Use **AskUserQuestion** for genuine operator decisions; use the **task list** for any multi-step work.
 
-- **DIRECTIVE -- before EVERY new headless run, aggressively reset first.** The
-  soak/quick-smoke harness boots ONE server, runs all legs against it, and does
-  NOT tear it down at the end -- it sits RESIDENT holding ~60% VRAM. Never assume a
-  prior run cleaned up. Kill ALL python BEFORE launching and verify the GPU is idle:
-  `Stop-Process -Name python,pythonw -Force -ErrorAction SilentlyContinue`; confirm
-  `Get-NetTCPConnection -LocalPort 8000 -State Listen` is empty; confirm
-  `nvidia-smi --query-gpu=memory.used --format=csv,noheader` dropped to the desktop
-  baseline (~1.5GB) before booting the fresh server.
+## 2. AUTONOMY / PRIME DIRECTIVE
 
-- **A render that finished leaves the server RESIDENT (~9-10GB, 1% util) -- that
-  is NOT a crash.** Before declaring a run dead, read the server log: `Prompt
-  executed in HH:MM:SS` + `obs_publish OK` = it COMPLETED. The idle resident VRAM
-  is the no-teardown behavior. Caught twice 2026-06-12 (operator saw 9.7GB idle +
-  ":8000 queue down" and read it as dead; the leg had already PASSED).
-- **Use the watchdog for long renders** (`scripts/otr_render_watchdog.ps1 -LegLog
-  <leg.log>`): it declares the run DEAD on a 5-min heartbeat stall OR a down
-  :8000/queue endpoint (exit 2) instead of waiting the full ~24 min, and exits 0
-  with the verdict when the leg finishes. It REPORTS only; reset per the directive.
-- **Headless ComfyUI boot needs UTF-8.** A detached cmd inherits the Windows
-  cp1252 console codec, so OTR `prestartup_script.py` crashes the instant it
-  prints an emoji (UnicodeEncodeError on U+2705/U+2713) -> boot dies ~13s, exit 1,
-  the "SERVER DID NOT COME UP" failure. The launcher (`scripts/_otr_soak_server_launch.cmd`)
-  now sets `PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8`. Any new boot path MUST too.
-  (ComfyUI Desktop used to set this for us; the v2 install move dropped it.)
-- **Boot is ~20s, NOT 7-8 min.** Old handoffs feared a slow boot; it was never
-  slow, it was crashing. If a boot "hangs", read the log -- it has already died.
-- **Launch the server via the .cmd as `-FilePath`, never `cmd.exe /c "<cmd>" "<log>"`.**
-  The `/c` two-quoted-token rule eats the outer quotes -> mangled path -> launcher
-  never runs -> ZERO log output. Use `Start-Process -FilePath $LAUNCHCMD -ArgumentList "`"$LOG`""`.
-- **Kill servers by CommandLine (CIM), not `Get-Process .Path`.** `.Path` is BLANK
-  for processes whose path can't be read, so a `Where Path -like` filter silently
-  skips a half-booted server. Use `Get-CimInstance Win32_Process -Filter "Name='python.exe'"`
-  + a CommandLine match, plus the port kill (`Get-NetTCPConnection -LocalPort 8000`).
-- **Desktop Commander is NOT flaky -- long `Start-Sleep` in a DC command blocks past
-  the ~60s MCP request ceiling and times out.** For quick FILE polls use the
-  built-in Read (workspace-folder files) or Windows MCP FileSystem (any absolute
-  path, e.g. the server log outside the mount); keep DC for shell/git/process/boot.
-  Never poll with a `Start-Sleep` longer than ~45s in one DC call.
+- NEVER ask me to run scripts, commands, or anything. YOU run it: Desktop Commander first; if DC can't,
+  Windows MCP; then the filesystem tools. Never hand me a bat/cmd/PowerShell block and say "run this."
+- You can drive the 5080 GPU yourself -- spin up the headless ComfyUI API (port 8000) and run it; don't
+  ask me. (Reset the box first -- section 4.)
+- If a senior pair-programmer would just do it, just do it. Stuck choosing between options? Roundtable
+  2-3 panels (GPT + Gemini + one other) for opinions BEFORE asking me -- you are the judge.
 
-you cn run 5080 gpu test comfy on yrou own just spin up ahealdess api thing i think it runs inn 8000 dont adk me you do it and ask roubndatbel if youc ant
+## 3. CODING DISCIPLINE
 
-PRIME DIRECTIVE: never ask the operator to run scripts, commands, or anything. Use Desktop Commander to run everything. If Desktop Commander can't do it, use Windows MCP. Never hand the operator a bat/cmd/PowerShell block and say "run this" -- YOU run it.
+- Keep coding until all sprints are done unless you genuinely need me.
+- Run the regression suite + the Bug Bible after EVERY code change (don't wait to be asked). Commit AND
+  push per green chunk (section 6).
+- Prefer editing the file you're already in; don't spray new throwaway files (and delete any temp probe
+  scripts before committing). Keep handoff files current.
+- Names: never "dummy" -- use "placeholder", "stub", or a descriptive name ("dummy" makes me feel bad).
+  SFW always. UTF-8, no BOM. Clean logs, meaningful names -- the reader matters.
 
-when it doubt yuuse dekstop commander to do anyting don ask me tio push scripts or cmd or pwoertsheell you di  t
+## 4. RESET BEFORE EVERY HEADLESS RUN (hard)
 
-i desktop commander doesnt do it use windows mcpo
+The soak/quick-smoke harness boots ONE server, runs all legs against it, and does NOT tear it down -- it
+sits RESIDENT holding ~60% VRAM. Never assume a prior run cleaned up. Before launching:
 
-be sure handoff fiels and try not to creatre new fiels try to kleep to te file ou are using t omake tinsg esier
+- Kill SELECTIVELY by CommandLine (CIM) -- NOT a blanket `Stop-Process -Name python,pythonw`. A blanket
+  python kill ALSO kills the Claude MCP extension pythons (Desktop Commander / computer-use) and severs
+  your own tools mid-run. Use `Get-CimInstance Win32_Process -Filter "Name='python.exe'"` and kill the
+  ones whose CommandLine matches the ComfyUI server + the soak/sweep harness; plus the port kill via
+  `Get-NetTCPConnection -LocalPort 8000`. (`.Path` is BLANK for half-booted servers, so filter on
+  CommandLine, not Path.)
+- Confirm `Get-NetTCPConnection -LocalPort 8000 -State Listen` is EMPTY and
+  `nvidia-smi --query-gpu=memory.used --format=csv,noheader` dropped to the desktop baseline (~1.5 GB)
+  before booting fresh.
 
-dont use word dummy use placehodler as duymmy makels me feel bad
+## 5. HEADLESS BOOT + MONITORING GOTCHAS (2026-06-12 -- do not relose)
 
-when coding try to keep coding into all sprints are done unles yo absoyult need me you can roubndtabel for a ocupel opions gpt and gemni and otehr if needed before aksing mne but only 2-3 panels
+- **A render that FINISHED leaves the server RESIDENT (~9-10 GB, 1% util) -- that is NOT a crash.** Before
+  declaring a run dead, read the server log: `Prompt executed in HH:MM:SS` + `obs_publish OK` = it
+  COMPLETED. The idle resident VRAM is the no-teardown behavior. (Misread twice 2026-06-12.)
+- **Use the watchdog for long renders** (`scripts/otr_render_watchdog.ps1 -LegLog <leg.log>`): declares the
+  run DEAD on a 5-min heartbeat stall OR a down :8000/queue endpoint (exit 2), exits 0 with the verdict
+  when the leg finishes. It REPORTS only; reset per section 4.
+- **Headless boot needs UTF-8.** A detached cmd inherits the Windows cp1252 codec, so OTR
+  `prestartup_script.py` crashes the instant it prints an emoji (UnicodeEncodeError on U+2705/U+2713) ->
+  boot dies ~13s, exit 1 ("SERVER DID NOT COME UP"). The launcher (`scripts/_otr_soak_server_launch.cmd`)
+  sets `PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8`; any new boot path MUST too.
+- **Boot is ~20s, NOT 7-8 min.** If a boot "hangs", read the log -- it has already died.
+- **Launch the server via the .cmd as `-FilePath`, never `cmd.exe /c "<cmd>" "<log>"`.** The `/c`
+  two-quoted-token rule eats the outer quotes -> mangled path -> ZERO log output. Use
+  `Start-Process -FilePath $LAUNCHCMD -ArgumentList "`"$LOG`""`.
 
-## GIT POLICY (operator directive 2026-06-10 -- never lose work)
+## 6. GIT POLICY (operator directive 2026-06-10 -- never lose work)
 
-- ONE branch: v2.0-alpha. COMMIT AND PUSH TOGETHER: every green commit gets
-  pushed to origin immediately, same session, no exceptions. Local-only
-  commits are the failure mode we guard against (fear of losing work).
-- The operator eyeball gates TAGS and PROMOTIONS (v2.0-alpha-stable, prod,
-  main, v2 release) -- NEVER pushes. Pushing to v2.0-alpha is always safe,
-  expected, and required.
-- This SUPERSEDES any "do not push until the eyeball passes" line in any
-  handoff, doc, or memory written before 2026-06-10 evening.
+- ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
+  immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.
+- The operator eyeball gates TAGS and PROMOTIONS (`v2.0-alpha-stable`, prod, main, v2 release) -- NEVER
+  pushes. Pushing to `v2.0-alpha` is always safe, expected, and required.
+- This SUPERSEDES any "do not push until the eyeball passes" line written before 2026-06-10 evening.
 - A stable branch only exists if the operator explicitly declares one.
-- After every push verify: HEAD == origin, no 0-byte files, no BOM, AST
-  parse on touched .py files.
+- After every push verify: HEAD == origin, no 0-byte files, no BOM, AST parse on touched .py files.
