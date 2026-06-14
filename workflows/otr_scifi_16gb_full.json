@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 93,
-  "last_link_id": 270,
+  "last_node_id": 94,
+  "last_link_id": 273,
   "nodes": [
     {
       "id": 63,
@@ -294,7 +294,8 @@
           "name": "episode_audio",
           "type": "AUDIO",
           "links": [
-            15
+            15,
+            272
           ],
           "slot_index": 0
         },
@@ -349,9 +350,10 @@
       "widgets_values": [
         "[]",
         "[]",
-        24,
+        25,
         "1920x1080",
-        ""
+        "",
+        false
       ],
       "inputs": [
         {
@@ -1341,7 +1343,8 @@
           "name": "clip_manifest_json",
           "type": "STRING",
           "links": [
-            261
+            261,
+            271
           ],
           "slot_index": 1
         }
@@ -1382,6 +1385,14 @@
           "widget": {
             "name": "procgen_mp4_path"
           }
+        },
+        {
+          "name": "scopes_mp4_path",
+          "type": "STRING",
+          "link": 273,
+          "widget": {
+            "name": "scopes_mp4_path"
+          }
         }
       ],
       "outputs": [
@@ -1412,7 +1423,57 @@
         18,
         true,
         true,
-        "sdh_standard"
+        "sdh_standard",
+        ""
+      ]
+    },
+    {
+      "id": 94,
+      "type": "OTR_SceneAwareScopes",
+      "pos": [
+        4040.0,
+        660.0
+      ],
+      "size": [
+        340,
+        150
+      ],
+      "flags": {},
+      "order": 194,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_manifest_json",
+          "type": "STRING",
+          "link": 271,
+          "widget": {
+            "name": "clip_manifest_json"
+          }
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 272
+        }
+      ],
+      "outputs": [
+        {
+          "name": "scopes_mp4_path",
+          "type": "STRING",
+          "links": [
+            273
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_SceneAwareScopes"
+      },
+      "widgets_values": [
+        "",
+        1920,
+        1080,
+        "ffmpeg"
       ]
     }
   ],
@@ -1799,6 +1860,30 @@
       0,
       88,
       0,
+      "STRING"
+    ],
+    [
+      271,
+      92,
+      1,
+      94,
+      0,
+      "STRING"
+    ],
+    [
+      272,
+      7,
+      0,
+      94,
+      1,
+      "AUDIO"
+    ],
+    [
+      273,
+      94,
+      0,
+      93,
+      2,
       "STRING"
     ]
   ],
