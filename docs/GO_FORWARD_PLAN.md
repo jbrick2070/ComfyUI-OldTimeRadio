@@ -292,6 +292,57 @@ WAN STAYS PARKED until the Phase-2 scoping decision is taken.
 
 ---
 
+## 4C. CREATIVE BACKLOG -- Procgen Visual Layer (pre-roundtable)
+
+> **STATUS: design-direction-only, `pre-roundtable`.** Two procgen-layer creative
+> ideas from the operator (2026-06-14). NO code work starts yet -- Jeffrey wants to
+> round-robin these designs across the LLM panel (batch the two) BEFORE
+> implementation. Specified here so the panelists have grounded context. **Neither
+> touches the audio spine** (frozen, byte-identical) -- both are VISUAL procgen-layer
+> changes only. The architectural surface each touches is noted for grounding.
+
+**Idea #1 -- Procgen episode title card on the first music cue.**
+- TRIGGER: the moment the episode's intro/opening music first starts (the first
+  music event), not the first dialogue.
+- RENDER: the show title **"SIGNAL LOST"** + the episode title (e.g. *"Mapping
+  Desperation"*) in big bold PROCGEN letters during the intro-music window -- a
+  movie-credits / title-sequence vibe, the title landing with the music swell.
+- CONSTRAINT: procgen-rendered (vector-style, integrated with the existing CRT/HUD
+  aesthetic), NOT a baked raster.
+- ARCHITECTURAL SURFACE (grounding for the panel): detect the "first music event"
+  from the audio ledger / the music-engine invocation (profile
+  `music_engine=stable_audio_3`; the music beat is `b000`-class). Trigger a
+  time-windowed title-card overlay in the procgen sequencer for the intro-music
+  duration. Likely draw surface = `OTR_PostUpscaleProcgenBlend` (+ any downstream
+  procgen draw pass); the existing `OTR_SignalLostVideo` node already owns the
+  "SIGNAL LOST" identity. The episode title rides the ledger `meta`. No new model
+  dependency. Open design Qs for the panel: window length (whole intro cue vs first
+  N seconds?), fade in/out vs hard cut, layout vs the HUD elements of Idea #2.
+
+**Idea #2 -- Move audio-reactive visuals to the side gutters; keep the portrait clean.**
+- TODAY: the green HUD ring + waveform overlay the CENTRAL portrait, partially
+  obscuring the character.
+- CHANGE: relocate the audio-reactive elements to the LEFT/RIGHT side gutters (the
+  negative space outside the central portrait area), so the portrait composition
+  lands clean and cinematic while the reactive layer still pulses with audio --
+  FRAMING the action instead of overlapping it.
+- CREATIVE LATITUDE on form: vertical reactive bands, side-mounted oscilloscopes,
+  inverted/flipped versions of the current ring, etc. -- anything that reads well
+  and keeps the centre uncluttered.
+- ARCHITECTURAL SURFACE (grounding for the panel): LAYOUT-ONLY change in the procgen
+  renderer (`OTR_PostUpscaleProcgenBlend` + any downstream procgen draw passes). The
+  audio-reactive data source (the waveform/levels) is UNCHANGED -- this only moves
+  where it draws. No new model dependency, NO audio-spine touch. Open design Qs for
+  the panel: gutter width vs aspect (16:9 has narrow gutters -- may need a letterbox
+  or a portrait-shrink), symmetric vs asymmetric L/R, interaction with the Idea-#1
+  title card during the intro.
+
+**Next step (operator-triggered):** round-robin both ideas as a batch across the
+panel, ground every returned suggestion against the real procgen draw code, then
+fold the synthesized design into an implementation ticket here. Until then: no code.
+
+---
+
 ## 5. OPEN TICKETS
 
 - **CS-1** -- the latentsync legs must show latentsync IN THE TRACE (a prior "PASS" was fallback-only);
