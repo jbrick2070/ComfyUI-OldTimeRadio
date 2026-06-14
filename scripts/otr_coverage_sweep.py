@@ -199,10 +199,19 @@ def main() -> int:
     ap.add_argument("--only", default="",
                     help="substring filter on '<slot>_<engine>' leg names")
     ap.add_argument("--exclude", action="append", default=[],
-                    help="engine/leg substring(s) to SKIP (repeatable); e.g. "
+                    help="engine/leg SUBSTRING(s) to SKIP (repeatable); e.g. "
                          "--exclude wan. availability() is pure profile-fit and "
                          "never reads OTR_ENABLE_WAN_I2V, so Wan enumerates as "
-                         "runnable unless filtered here (the non-Wan sweep).")
+                         "runnable unless filtered here (the non-Wan sweep). "
+                         "NOTE: substring -- '--exclude humo' ALSO drops "
+                         "humo_1.7B (humo is a prefix). Use --exclude-engine for "
+                         "an exact engine-id match.")
+    ap.add_argument("--exclude-engine", action="append", default=[],
+                    help="EXACT engine-id(s) to SKIP (repeatable). Unlike "
+                         "--exclude (substring), this matches the engine id "
+                         "exactly -- so '--exclude-engine humo' drops ONLY the "
+                         "14B humo leg and KEEPS humo_1.7B. Guarded like "
+                         "--exclude: forbidden against core Wan in acceptance.")
     ap.add_argument("--acceptance", action="store_true",
                     help="GATE-A acceptance mode (GO_FORWARD 4A): assert ZERO "
                          "runtime fallbacks per leg (M1), preflight the Wan "
@@ -231,7 +240,10 @@ def main() -> int:
 
     if args.acceptance:
         enumerated = {e for _s, e, _r in options}
-        problems = acceptance_preflight(os.environ, enumerated, args.exclude)
+        # Guard BOTH exclude paths against core Wan (M5): an exact engine
+        # exclude must not be a back door around the substring guard.
+        problems = acceptance_preflight(os.environ, enumerated,
+                                        args.exclude + args.exclude_engine)
         if problems:
             print("[sweep] ACCEPTANCE PREFLIGHT FAILED (%d blocker(s)):"
                   % len(problems), flush=True)
@@ -257,6 +269,11 @@ def main() -> int:
         if _excl is not None:
             print("[sweep]   SKIPPED_EXCLUDED %s (matched --exclude %r)"
                   % (leg, _excl), flush=True)
+            continue
+        # Exact engine-id exclude (e.g. drop 14B 'humo' but keep 'humo_1.7B').
+        if engine in args.exclude_engine:
+            print("[sweep]   SKIPPED_EXCLUDED %s (matched --exclude-engine %r)"
+                  % (leg, engine), flush=True)
             continue
         profile = profile_for(slot_key, engine)
         try:
