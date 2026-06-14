@@ -7,7 +7,10 @@
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
 > **Last updated:** 2026-06-13, HEAD `ca10b63` (this window: PROCGEN §4C + §4D BUILT + SHIPPED
 > (`336fb41` floor + title card, `39aa6c9` scene-aware scopes node + 3-input blend, `3995bfb` docs --
-> §4C/§4D removed, build log at `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`); sweep
+> §4C/§4D removed, build log at `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`);
+> §4D now WIRED into `otr_scifi_16gb_full.json` (`eb64cd1`: node 94 SceneAwareScopes + 3-input blend +
+> floor draw_scopes=False/fps=25 -- it had shipped DORMANT, operator caught it; validator/profiles/
+> audio-byte-identical green). Only a live full-episode render eyeball remains for procgen. Sweep
 > gained `--exclude-engine` exact-match (`ca10b63`). **OPERATOR STEER 2026-06-13: the non-Wan
 > permutation soak is ENOUGH** -- the non-lip-sync floors are fine for the 8GB tier but NOT the target;
 > stop grinding them, drive the runway at **making the Wan lane bug-free**. **LTX motion regression vs

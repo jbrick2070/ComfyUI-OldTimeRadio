@@ -100,14 +100,23 @@ Branch `v2.0-alpha`. Base HEAD `a54df22`. Final HEAD `39aa6c9` (== origin).
   floor system -- all CUT from v1 (use per-element brightness scaling instead).
 - The engine-registry aspect path -- CUT in favor of `ffprobe` on the clip `path`.
 
+## v2 workflow wiring -- DONE (`eb64cd1`)
+Wired into `workflows/otr_scifi_16gb_full.json` (the single source of truth): new node 94
+`OTR_SceneAwareScopes`; `OTR_VideoRenderBatch`(92)`.clip_manifest_json` fan-out -> it
+(link 271, alongside the existing composite consumer); `OTR_EpisodeAssembler`(7)`.episode_audio`
+-> its `audio` (link 272); its `scopes_mp4_path` -> `OTR_PostUpscaleProcgenBlend`(93)'s new
+`scopes_mp4_path` input (link 273); floor `OTR_SignalLostVideo`(12) `draw_scopes=False` + `fps=25`.
+Validated: link referential integrity + NCM registration + INPUT_TYPES match + widget vectors;
+`test_default_workflow_validator` + widget-vector + guardrails + core + capability_profiles +
+audio-byte-identical + b7 + Bug Bible all green. (Originally the §4D code shipped DORMANT -- the
+production JSON had the node absent, the blend 2-input, the floor `draw_scopes` defaulting True /
+`fps` 24 -- caught by the operator; this commit makes it live.)
+
 ## What the eyeball still gates
 - A live **full-episode render** on the 5080 (the floor title card on a REAL b000 music-open
   window + the scene-aware scopes blended over a real upscaled mp4) -- confirm the
   `lighten` scopes stay visible over the floor CRT and the title decode/dock reads well.
-- **v2 workflow wiring:** add `OTR_SceneAwareScopes` between `OTRVideoRenderBatch`
-  (`clip_manifest_json`) and `OTR_PostUpscaleProcgenBlend` (`scopes_mp4_path`), and set the
-  floor `OTR_SignalLostVideo.draw_scopes=False` + `fps=25` in that workflow JSON (the static
-  shell is unchanged; no new widget added to it). prod/`main` remain GATED.
+  prod/`main` remain GATED until this passes.
 - Verify the REAL disk-ledger `speaker_role` string for the opening music on a live episode
   (resolver matches `music_open`/`music_visual`; a different string falls back to the
   volume-envelope window, which is safe but worth confirming).
