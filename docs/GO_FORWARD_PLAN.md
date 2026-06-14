@@ -18,13 +18,26 @@
 
 ## 1. CURRENT STEP
 
-**Active thread = Wan 2.2 video engine, Phase 2 (engine leg).** Phase 1 (a real I2V-14B b-roll clip)
-PASSED and the 5 code-gap fixes landed (`2fbc2f3`). Next: drive `eng_wan_i2v.render_clip` through the
-real path and assert it in the trace -- BLOCKED on a CS-3 scoping call (section 5). Spec = section 4.
+**Active thread = Wan 2.2 Phase 2 (engine leg) -- GATE-A hardening SHIPPED, soak UNBLOCKED.**
+Phase 1 (a real I2V-14B b-roll clip) PASSED + the 5 code-gap fixes landed (`2fbc2f3`). The section-4A
+GATE-A sweep hardening (M1-M7 + S1/S3/S5/S6/S7/S8/S10) LANDED 2026-06-13 -- HEAD `d30b88f` == origin,
+8 commits, 61 new unit tests, Bug Bible + audio byte-identical green throughout; a live in-process
+validation against the REAL installed Wan models (13.3 GB fp8 UNET + umt5 CLIP + VAE) PASSED. See the
+section-4A landing ledger. The coverage sweep can now DETECT a silent fallback / empty-results run /
+missing VRAM measurement -- no more false-GREEN.
 
-Soak fixes are DONE (R1 temp-leak `d33c51f`, R3 key_term `a31fc24`, R2 root-cause = `gated_by_flag` +
-explicit nightly enable-set `5231d31`, sweep `--exclude` `134f8e2`). Remaining soak work is the
-re-run to confirm green -- folded into forward-order item 4.
+**NEXT (no open "decision" -- CS-3 was reframed, see section 5):** drive `eng_wan_i2v.render_clip`
+through the real path and assert `wan_i2v` is the final_engine in the trace -- the M1 no-fallback gate
+now enforces this. Run it as a wan_i2v-only soak (`coverage_sweep --only` non-acceptance, OR
+`--acceptance --only wan` which exercises the leg but reports RED until wan_ti2v exists). Two follow-ons,
+not blockers: (1) the `wan_ti2v` 8GB engine -- capture the TI2V-5B core node class from a live
+`/object_info` FIRST, then build the engine + its CAPABILITIES row (unblocks M8/S2 + full `--acceptance`
+GREEN); (2) the M9 CS-3 sequential-residency proof (the mixed Wan+HuMo batch). Spec = section 4 + 4A.
+
+Soak fixes are DONE (R1 `d33c51f`, R3 `a31fc24`, R2 root-cause `gated_by_flag` + nightly enable-set
+`5231d31`, `--exclude` `134f8e2`). The soak RE-RUN is now UNBLOCKED for the wan_i2v leg + the non-Wan
+permutations; full `--acceptance` GREEN waits on `wan_ti2v` (RED-by-construction until then, correct).
+Blocker audit = forward-order item 4.
 
 ONE coder window in the code at a time; serialize the Wan window vs any other via this file.
 
@@ -77,6 +90,27 @@ ONE coder window in the code at a time; serialize the Wan window vs any other vi
    are NOT yet wired into a runnable harness -- TODO: point them at a real driver
    (e.g. a `run_combo_matrix.py`) or run them as separate parametrized soak legs.
    "Coverage sweep GREEN" today means the visual-engine set only.
+
+   **SOAK READINESS AUDIT (2026-06-13).** Walked the registry + harness. Conclusion:
+   **clear to run a wan_i2v-only soak today** (no wan_ti2v hard prereq for validation).
+   Verified live: `wan_i2v` enumerates `ok`/runnable under `16gb_full` (legs
+   `music_visual=wan_i2v` + `other_beats_visual=wan_i2v`) -- the old "add wan_i2v to the
+   enable-set" note is STALE/resolved. 27 legs enumerate; the only skips are
+   `hunyuan3d_talk`/`trellis_talk` (missing cu128 toolchain, expected darks). Wan models
+   on disk + `OTR_ENABLE_WAN_I2V=1` env known. **Two limitations to know:**
+   (i) `--acceptance` exit is RED-by-construction until `wan_ti2v` is built (M2 requires
+   BOTH Wan engines) -- expected; read the per-leg verdicts in `coverage_sweep_summary.json`,
+   the wan_i2v leg PASS/FAIL is the meaningful signal.
+   (ii) **The M1 no-fallback (CS-1) gate is bound to `--acceptance`** (`forbid_fallback=
+   args.acceptance`); the capstone CLI does not expose it. So re-running the NON-Wan
+   permutation soak (the set that originally false-greened) WITH the M1 fix active and a
+   clean GREEN/RED exit needs either `wan_ti2v` built OR a small **`--strict-fallback`**
+   flag that decouples M1 from the Wan-engine requirement (~10 lines; RECOMMENDED, optional
+   -- operator's call). Until then: `--acceptance --only wan` exercises M1 on the wan_i2v
+   legs (overall RED expected), and a non-acceptance sweep runs but with M1 OFF
+   (informational). No half-built code, no missing capability rows beyond the deferred
+   `wan_ti2v`, no broken tests (the 2 `test_model_catalog_scan` reds are pre-existing /
+   environmental, tracked separately).
 5. **3D sprints.** s2 = S-3D-0 spike + T1 template + T2a wrap smoke; then the `character_3d` family
    (image-routing must-fixes already landed). Detail in the 3D plan (pointers).
 6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README (closing phase).
@@ -228,6 +262,17 @@ Commits landed:
 
 Result: first Wan b-roll clip in hand — real motion, no warp, wan_i2v 14B fp8 in-process at ~14.5 GB ceiling. Phase 1 PROVEN.
 
+> **RECONCILED 2026-06-13 (post-section-4A):** the "PARKED AT CS-3 SCOPING FORK /
+> open scoping decision" framing just below is SUPERSEDED. CS-3 was reframed (section 5,
+> commit `531f2f4`) from a co-residency "decision" into a sequential-residency PROOF
+> obligation (per-beat NVML peak <= 14.5 GB + the inter-beat reclaim), so Phase 2 is
+> NOT blocked on a decision. The three options below are SEQUENCED follow-on work, not
+> mutually-exclusive choices: (a) = the wan_i2v-only engine leg = the ACTIVE next step
+> (section 1); (b) = the M9 CS-3 sequential-residency proof; (c) = the `wan_ti2v` 8GB
+> build. The section-4A sweep hardening that this overnight soak motivated has since
+> LANDED (see the section-4A ledger). Soak readiness + the enable-set check = the
+> forward-order item 4 blocker audit.
+
 PHASE 2 — PARKED AT CS-3 SCOPING FORK
 Open scoping decision needed before continuing:
   (a) Wan-only other-beats leg
@@ -242,6 +287,8 @@ COMPANION FINDINGS FROM 2026-06-13 OVERNIGHT COVERAGE SOAK
   - R3 OTR_NEWS_BRIEFS_REQUIRED=0 env hatch + A2b prune-to-floor durable fix landed.
 
 WAN STAYS PARKED until the Phase-2 scoping decision is taken.
+  ^ SUPERSEDED (see the RECONCILED banner above): Phase 2 is the ACTIVE next step
+    (section 1), no scoping decision pending; the section-4A hardening has LANDED.
 
 ---
 
