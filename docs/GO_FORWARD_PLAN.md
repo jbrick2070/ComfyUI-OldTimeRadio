@@ -5,8 +5,8 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-14 (overnight Wan window), HEAD `bcbe05a` -- **wan_ti2v 8GB-tier engine
-> BUILT, tested, pushed, and VALIDATED LIVE.** New `eng_wan_ti2v` (5B TI2V, GGUF UnetLoaderGGUF +
+> **Last updated:** 2026-06-14 (overnight Wan window + soak), HEAD `e314717` (== origin) -- **wan_ti2v
+> 8GB-tier engine BUILT, tested, pushed, and VALIDATED LIVE.** New `eng_wan_ti2v` (5B TI2V, GGUF UnetLoaderGGUF +
 > `Wan22ImageToVideoLatent` + the Wan2.2 VAE) after capturing the 5B core node class from a live
 > `/object_info` (VERIFY-AT-BUILD). Shares only the pure helpers via the new `wan_shared` mixin
 > (wan_i2v refactored onto it, behavior-preserving -- NOT a WanI2VEngine subclass). M8 (Wan2.2-VAE
@@ -24,6 +24,19 @@
 > render correctly live. (2) the I2V-14B vs TI2V-5B WEBM EYEBALL comparison (real camera motion / still
 > preserved / no warp). (3) the M9 CS-3 instrumented sequential-residency proof (partial evidence: the
 > mixed humo_1.7B+wan_i2v acceptance leg ran 21 wan clips with no ceiling-breach assertion firing).
+> **OVERNIGHT SOAK (this session, code-frozen at e314717):** a randomized 120-word episode soak on the
+> DEFAULT lane (16gb_full = LTX announcer/music + humo_1.7B character + flux images + full audio, HuMo
+> ON, OS-entropy cast/style) ran **5/5 episodes SUCCESS** (~66-80 min each; hit the 6h wall cap, stopped
+> clean). Verdicts: `scripts/_otr_120word_soak_summary.json`; driver `scripts/_otr_120word_soak.py`;
+> log `scripts/_otr_120word_soak.log`. This is strong production-stability evidence that the wan_ti2v
+> build + the wan_i2v mixin-refactor did NOT regress the production pipeline, AND CS-3-adjacent evidence
+> (LTX-heavy + HuMo-heavy sequential residency held across 5 long episodes, no OOM/crash). Episode
+> outputs are under the server output tree `C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes` + obs
+> finals -- NOT yet look-QA'd. **NEXT-SESSION TODO (operator wants: analyze + fix bugs + decide next):**
+> (a) look-QA the 5 overnight episodes (audio sync, captions, procgen scopes/credits, character look);
+> (b) the wan webm eyeball (14B vs `wan_ti2v_5b_smoke.mp4`); (c) then pick the forward-order move
+> (LTX-REGR section 5, OR the formal attended wan acceptance, OR 3D item 5). BOX STATE at handoff: the
+> default-lane server is still UP on :8000 (idle, ~1.9 GB) -- RESET-VERIFY before any new headless run.
 > **Earlier this same date (procgen window):** HEAD `56469bd`.
 > PROCGEN §4C+§4D built (`336fb41`/`39aa6c9`), §4C/§4D removed from this doc (build log at
 > `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`), and **§4D WIRED into
@@ -316,6 +329,14 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 ---
 
 ## 5. OPEN TICKETS
+
+- **Look-QA the 5 overnight 120-word episodes (NEW 2026-06-14).** The default-lane soak ran 5/5 SUCCESS
+  (LTX + humo_1.7B); the episode outputs (`...\output\otr\episodes` + obs finals) are NOT yet eyeballed.
+  Check audio sync, burned captions, procgen scopes/credits, character look. This is the operator's
+  "analyze the soak" item; verdicts in `scripts/_otr_120word_soak_summary.json`.
+- **Wan WEBM EYEBALL (NEW 2026-06-14).** Compare I2V-14B vs TI2V-5B (`docs/2026-06-14-wan-ti2v/
+  wan_ti2v_5b_smoke.mp4`): real camera motion, still preserved, no warp. If 14B motion too subtle ->
+  Path B two-expert handoff (S3).
 
 - **Non-Wan soak = ENOUGH (operator call 2026-06-13).** The non-Wan permutation coverage sweep
   (`--strict-fallback --exclude wan/latentsync/triposg`) has run sufficiently; do NOT keep grinding it.
