@@ -5,14 +5,21 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-13, HEAD `3995bfb` (PROCGEN §4C + §4D BUILT + SHIPPED to `v2.0-alpha`
-> in a parallel window: floor foundation + big-bold episode-title card `336fb41`; scene-aware scopes
-> node `OTR_SceneAwareScopes` + 3-input blend `39aa6c9`; docs `3995bfb`. Suite green: determinism +
-> golden frames + audio byte-identical + b7 + Bug Bible; 4244 collected; HEAD==origin. §4C/§4D REMOVED
-> from this doc (done -> git history + tracker sprint-15 + the build log at
-> `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`). Procgen eyeball still gates a live
-> full-episode render + the v2 workflow wiring of the new node (NOT a forward-order blocker).
-> **The plan is now back to ONE active thread: the Wan 2.2 line (section 1) -- pick up there.**)
+> **Last updated:** 2026-06-13, HEAD `ca10b63` (this window: PROCGEN §4C + §4D BUILT + SHIPPED
+> (`336fb41` floor + title card, `39aa6c9` scene-aware scopes node + 3-input blend, `3995bfb` docs --
+> §4C/§4D removed, build log at `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`); sweep
+> gained `--exclude-engine` exact-match (`ca10b63`). **OPERATOR STEER 2026-06-13: the non-Wan
+> permutation soak is ENOUGH** -- the non-lip-sync floors are fine for the 8GB tier but NOT the target;
+> stop grinding them, drive the runway at **making the Wan lane bug-free**. **LTX motion regression vs
+> the 5/30-6/5 era logged (LTX-REGR, §5) -- tackle AFTER Wan, NOT a blocker.** Suite green throughout;
+> HEAD==origin. **Next window = ONE thread: get Wan 2.2 bug-free (sections 1 + 4 + 4A).**)
+>
+> **RUNNING JOB (clean up before the Wan leg):** a non-Wan coverage sweep is STILL LIVE on the box
+> (`otr_coverage_sweep.py --strict-fallback --exclude wan/latentsync/triposg`, PID was 22472; ComfyUI
+> server PID was 39736; logs `scripts/_otr_longsoak_run.log`). Per the operator "enough" call + the
+> reset-before-run directive, the next window should kill the sweep + server **by PID** (NOT a blanket
+> `Stop-Process -Name python` -- that also kills the Claude MCP extension pythons) and confirm the GPU
+> drops to the desktop baseline (~1.5 GB) before booting fresh for Wan.
 >
 > **Hardening delta (2026-06-13):** the Wan Phase-2 + GATE-A coverage-sweep plan was
 > QA'd against the real code and roundtabled (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4,
@@ -272,8 +279,21 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
+- **Non-Wan soak = ENOUGH (operator call 2026-06-13).** The non-Wan permutation coverage sweep
+  (`--strict-fallback --exclude wan/latentsync/triposg`) has run sufficiently; do NOT keep grinding it.
+  The non-lip-sync FLOORS (`still_kenburns` / `still_parallax` / Ken-Burns / `station_card`) render fine
+  and are acceptable for the 8GB tier, but they are NOT the target experience -- the operator wants real
+  audio-driven lip-sync, not a still with motion. Focus the remaining runway on **getting the Wan lane
+  bug-free** (section 1 + 4 + 4A). A new sweep, if ever needed, should add `--exclude-engine humo` (the
+  exact-match flag added `ca10b63`: skips the 14B `humo` that TIMES OUT per CS-4, KEEPS `humo_1.7B`).
+- **LTX-REGR (operator 2026-06-13)** -- LTX clips no longer animate like the **2026-05-30..06-05** era
+  (motion lost / too static). `BUG-LOCAL-113b` (`8115c72`: ksampler 30-step euler cfg3.0 as the LTX
+  default, distilled 8-step = the `OTR_LTX_SAMPLER=distilled` rollback) was the prior fix, but the
+  operator STILL sees the regression. A "small smoke", **TACKLE AFTER Wan is bug-free** -- NOT a Wan
+  blocker. Re-verify the live LTX motion path against the 5/30 baseline (sampler mode, step count, cfg,
+  the frame cap + 169 decode floor from look-QA round 5).
 - **CS-1** -- the latentsync legs must show latentsync IN THE TRACE (a prior "PASS" was fallback-only);
-  re-verify in the sweep.
+  re-verify in the sweep. (Non-Wan -> deprioritized per the operator's "non-Wan soak = enough" call.)
 - **CS-2** -- machine NVML pins ~16 GB per leg vs the 14.5 ceiling while driver-phase attribution reads
   ~3 GB; needs phase attribution (the 1.7B leg's 10,305 MB render-phase peak is a partial answer).
 - **CS-3 (reframed 2026-06-13)** -- NOT a co-residency budget: wan_i2v (~14GB) +
