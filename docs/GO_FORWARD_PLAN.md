@@ -272,7 +272,10 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 > round-robin these designs across the LLM panel (batch the two) BEFORE
 > implementation. Specified here so the panelists have grounded context. **Neither
 > touches the audio spine** (frozen, byte-identical) -- both are VISUAL procgen-layer
-> changes only. The architectural surface each touches is noted for grounding.
+> changes only. **GROUNDED 2026-06-13:** Claude analyzed the real draw code
+> (`_CRTRenderer.render()` in `nodes/video_engine.py`); the architectural-surface
+> notes + the design block below are now code-anchored, superseding the earlier
+> `OTR_PostUpscaleProcgenBlend` guess.
 
 **Idea #1 -- Procgen episode title card on the first music cue.**
 - TRIGGER: the moment the episode's intro/opening music first starts (the first
@@ -282,15 +285,18 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   movie-credits / title-sequence vibe, the title landing with the music swell.
 - CONSTRAINT: procgen-rendered (vector-style, integrated with the existing CRT/HUD
   aesthetic), NOT a baked raster.
-- ARCHITECTURAL SURFACE (grounding for the panel): detect the "first music event"
-  from the audio ledger / the music-engine invocation (profile
-  `music_engine=stable_audio_3`; the music beat is `b000`-class). Trigger a
-  time-windowed title-card overlay in the procgen sequencer for the intro-music
-  duration. Likely draw surface = `OTR_PostUpscaleProcgenBlend` (+ any downstream
-  procgen draw pass); the existing `OTR_SignalLostVideo` node already owns the
-  "SIGNAL LOST" identity. The episode title rides the ledger `meta`. No new model
-  dependency. Open design Qs for the panel: window length (whole intro cue vs first
-  N seconds?), fade in/out vs hard cut, layout vs the HUD elements of Idea #2.
+- ARCHITECTURAL SURFACE (GROUNDED 2026-06-13 vs the real code): the draw surface is
+  `nodes/video_engine.py` class `_CRTRenderer.render()` -- the procgen frame drawer
+  inside `OTR_SignalLostVideo` (= `SignalLostVideoRenderer`). NOT
+  `OTR_PostUpscaleProcgenBlend`, which is only the downstream ffmpeg green-only
+  `screen` blend that lays procgen over the upscaled portrait. The persistent
+  "=== SIGNAL LOST ===" ident + `"{title}"` subtitle ALREADY draw every frame
+  (render() section 1, top-left), so Idea #1 is a windowed BIG treatment that then
+  DOCKS into that existing ident -- not a separate overlay that fades. The
+  first-music-cue window is derivable from `led` (render_video() already parses the
+  v2 ledger; b000 = music_open) and passed into `_CRTRenderer`; the per-frame
+  `volume[fi]` envelope (already computed by `_analyze_audio`) gives the swell timing.
+  No new model dependency.
 
 **Idea #2 -- Move audio-reactive visuals to the side gutters; keep the portrait clean.**
 - TODAY: the green HUD ring + waveform overlay the CENTRAL portrait, partially
@@ -302,15 +308,21 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 - CREATIVE LATITUDE on form: vertical reactive bands, side-mounted oscilloscopes,
   inverted/flipped versions of the current ring, etc. -- anything that reads well
   and keeps the centre uncluttered.
-- ARCHITECTURAL SURFACE (grounding for the panel): LAYOUT-ONLY change in the procgen
-  renderer (`OTR_PostUpscaleProcgenBlend` + any downstream procgen draw passes). The
-  audio-reactive data source (the waveform/levels) is UNCHANGED -- this only moves
-  where it draws. No new model dependency, NO audio-spine touch. Open design Qs for
-  the panel: gutter width vs aspect (16:9 has narrow gutters -- may need a letterbox
-  or a portrait-shrink), symmetric vs asymmetric L/R, interaction with the Idea-#1
-  title card during the intro.
+- ARCHITECTURAL SURFACE (GROUNDED 2026-06-13 vs the real code): LAYOUT-ONLY change in
+  `_CRTRenderer.render()` (`nodes/video_engine.py`), NOT the blend node. What sits on
+  the portrait today: the circular frequency RING (section 2, `cx=w/2, cy=0.42h,
+  r=min(w,h)/5`, pulses with `vol`) dead-centre over the face; its 12 orbiting
+  PARTICLES (section 3); the mirrored WAVEFORM (section 5, `y=0.72h`, full width) and
+  the FREQ BARS (section 6, `y=0.86h`). The helpers `_waveform_mirror(...x,y,w,h...)`
+  and `_freq_bars_wide(...x,y,w,h...)` are already position-parametrized, so relocating
+  is geometry + a vertical transpose; the RMS/FFT/wave data source is UNCHANGED.
+  GUTTER REALITY: HuMo character beats are 480x832 portrait pillarboxed into 1472x832
+  -> ~496px black gutter EACH SIDE (the blend already fills the pillarbox bars), so
+  gutters are real there; LTX/Wan b-roll beats are landscape full-frame (NO gutters).
+  Guaranteed empty gutter real-estate exists only on portrait beats -- see the OPEN
+  DECISION below.
 
-**Claude first-cut critique (2026-06-13, pre-panel -- opinionated; the panel will pressure-test it).**
+**Claude design analysis (2026-06-13 -- GROUNDED against the real `_CRTRenderer` draw code; my best-judgment calls). The creative bullets below are now CONFIRMED by the code; the GROUNDED DELTAS block after them states what the code changes + the decisions I'd lock.**
 
 - **Order: both worth doing; #2 FIRST, #1 second.** #2 fixes a composition error in ~100% of
   runtime (chrome sitting on the face, the emotional subject) -- every-frame upside, and the
@@ -363,9 +375,40 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   spectrum R) whose brightness tracks an audio signal-strength envelope," consolidating the bottom
   waveform into them so the clean portrait is framed, not crowded.
 
-**Next step (operator-triggered):** round-robin both ideas as a batch across the
-panel WITH the critique above in hand, ground every returned suggestion against the real procgen draw
-code, then fold the synthesized design into an implementation ticket here. Until then: no code.
+**GROUNDED DELTAS + the calls I'd lock (2026-06-13, vs the real `_CRTRenderer` code):**
+
+- **The "signal-strength envelope" already exists -- WIRE it, don't build it.** `_analyze_audio()`
+  returns a normalized per-frame `volume[fi]` (RMS) + 32-bin `freq[fi]`, and `_CRTRenderer` already
+  carries a dormant EMA (`self._brightness_ema`, alpha 0.08) that v1.5.1 left disabled (render()
+  section 8b). Re-enable that EMA as the MASTER signal-strength driver (it already smooths transients)
+  and feed it to rail brightness + the carrier-lock/dropout behaviour. The headline conceit is near-free.
+- **#2 is the bigger, near-mechanical win -- do it FIRST.** Pull the dead-centre ring (section 2) + its
+  orbiting particles (section 3) OFF the portrait; rebuild as two asymmetric vertical rails in the gutter
+  x-bands -- LEFT = a vertical transpose of `_waveform_mirror`, RIGHT = a vertical transpose of
+  `_freq_bars_wide`. Consolidate the bottom waveform + bars INTO the rails (no third reactive zone). Keep
+  the centre column (~480-520px portrait region) free of bright chrome -- only the dim grid + scanlines +
+  vignette stay. A SMALL ring can survive as a "signal lock" indicator DOCKED to the corner ident, never
+  over the face.
+- **#1 is reframed by the code.** The persistent ident is already render() section 1, so #1 = (a) a
+  windowed BIG carrier-lock + char-by-char teletype over the b000 music-open window, then (b) a DOCK
+  animation shrinking it into the EXISTING top-left ident + top-right timestamp slots. The vol-gated
+  noise already in render() section 8 (~line 321) IS the "tuning-in snow" to de-noise FROM. Pass the
+  b000 start/end + first-dialogue frame from `led` into `_CRTRenderer`. Outro bookend = the same window
+  logic on the music-close beat, handing to the existing `_TelemetryHUDRenderer` post-roll.
+- **OPEN DECISION (the one genuinely-open item): landscape-beat gutters.** Gutters are guaranteed empty
+  only on pillarboxed portrait beats; LTX/Wan landscape beats fill 1472 wide. (A) accept the thin/dim
+  rails riding the landscape edges on b-roll beats (cheapest), or (B) the compositor
+  letterboxes/portrait-shrinks landscape beats so gutters always exist (cleaner, but touches composite
+  geometry + the canvas/aspect question). My lean = (A) for v1, revisit (B) only if it reads badly at the
+  eyeball. THIS is the item worth the panel's time; the rest is build.
+- **Scope reality:** all of this is ONE file -- `nodes/video_engine.py` (`_CRTRenderer` + the
+  `render_video` ledger-window plumbing). No audio-spine touch, no new model, no new node, no new widget.
+  The blend stays green-only `screen`, so every rail/title reads as green phosphor automatically.
+
+**Next step (operator-triggered):** grounding is DONE -- the design above is code-anchored. Either (a)
+round-robin ONLY the open landscape-gutter decision + the rail form-factor across 2-3 panels, or (b) go
+straight to a `_CRTRenderer` implementation ticket -- the mechanics are settled. Still no code until the
+operator says go.
 
 ---
 
