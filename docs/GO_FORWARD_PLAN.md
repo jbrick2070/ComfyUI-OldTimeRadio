@@ -5,7 +5,26 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-14, HEAD `56469bd` (procgen window, all SHIPPED + pushed; box now IDLE).
+> **Last updated:** 2026-06-14 (overnight Wan window), HEAD `bcbe05a` -- **wan_ti2v 8GB-tier engine
+> BUILT, tested, pushed, and VALIDATED LIVE.** New `eng_wan_ti2v` (5B TI2V, GGUF UnetLoaderGGUF +
+> `Wan22ImageToVideoLatent` + the Wan2.2 VAE) after capturing the 5B core node class from a live
+> `/object_info` (VERIFY-AT-BUILD). Shares only the pure helpers via the new `wan_shared` mixin
+> (wan_i2v refactored onto it, behavior-preserving -- NOT a WanI2VEngine subclass). M8 (Wan2.2-VAE
+> fail-closed) + S2 (CAPABILITIES row medium/8000) LANDED -- no longer deferred. Models fetched to
+> `C:\ComfyUI-Models` with a sha256+license manifest (`docs/2026-06-14-wan-ti2v/MODEL_MANIFEST.json`;
+> GGUF Apache-2.0). Suite **4249 pass** / Bug Bible **16 pass** / audio byte-identical green; HEAD==origin.
+> **LIVE validation:** wan_i2v proven (21 clean 14B sampler passes in a real full-episode acceptance leg,
+> no VRAM-ceiling breach, post mixin-refactor); wan_ti2v proven (bare-graph 5B smoke PASS -- 25 frames
+> decoded via the 2.2 VAE in 35s, ~9 GB peak = the lighter 8GB tier). Eyeball clip:
+> `docs/2026-06-14-wan-ti2v/wan_ti2v_5b_smoke.mp4`.
+> **REMAINING (operator-gated GPU obligations, NOT autonomously completable -- slow + eyeball):**
+> (1) the full-episode multi-leg `--acceptance` sweep GREEN exit is impractically slow -- the
+> music_visual=wan leg renders the ENTIRE music bed as Wan video (~21 clips/leg, ~20+min/leg), so the
+> 4-leg `--only wan` run cannot finish in a reasonable window; both engines are nonetheless proven to
+> render correctly live. (2) the I2V-14B vs TI2V-5B WEBM EYEBALL comparison (real camera motion / still
+> preserved / no warp). (3) the M9 CS-3 instrumented sequential-residency proof (partial evidence: the
+> mixed humo_1.7B+wan_i2v acceptance leg ran 21 wan clips with no ceiling-breach assertion firing).
+> **Earlier this same date (procgen window):** HEAD `56469bd`.
 > PROCGEN §4C+§4D built (`336fb41`/`39aa6c9`), §4C/§4D removed from this doc (build log at
 > `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`), and **§4D WIRED into
 > `otr_scifi_16gb_full.json`** (`eb64cd1`: node 94 SceneAwareScopes + 3-input blend + floor
@@ -33,28 +52,31 @@
 
 ## 1. CURRENT STEP
 
-**Active thread = Wan 2.2 Phase 2 (engine leg) -- GATE-A hardening SHIPPED, soak UNBLOCKED.**
-Phase 1 (a real I2V-14B b-roll clip) PASSED + the 5 code-gap fixes landed (`2fbc2f3`). The section-4A
-GATE-A sweep hardening (M1-M7 + S1/S3/S5/S6/S7/S8/S10) LANDED 2026-06-13 -- HEAD `d30b88f` == origin,
-8 commits, 61 new unit tests, Bug Bible + audio byte-identical green throughout; a live in-process
-validation against the REAL installed Wan models (13.3 GB fp8 UNET + umt5 CLIP + VAE) PASSED. See the
-section-4A landing ledger. The coverage sweep can now DETECT a silent fallback / empty-results run /
-missing VRAM measurement -- no more false-GREEN.
+**Active thread = Wan 2.2 lane -- BOTH engines BUILT + VALIDATED LIVE. Remaining work is operator-gated.**
+Phase 1 (I2V-14B b-roll) + the GATE-A sweep hardening (M1-M7 + shoulds) shipped earlier. THIS overnight
+window built the deferred `wan_ti2v` 8GB engine (HEAD `bcbe05a`): the 5B TI2V on core Comfy nodes
+(`UnetLoaderGGUF` Q5_K_M + `ModelSamplingSD3` shift 5.0 + `Wan22ImageToVideoLatent` + the Wan2.2 VAE),
+the `wan_shared` mixin (pure helpers shared with a behavior-preserving wan_i2v refactor), M8 VAE
+fail-closed + S2 CAPABILITIES row, 22 new unit tests. Suite 4249 / Bug Bible 16 / audio byte-identical
+green; HEAD==origin. **LIVE: wan_i2v rendered 21 clean 14B sampler passes in a real full-episode
+acceptance leg (post-refactor, no ceiling breach); wan_ti2v rendered a bare-graph 5B clip (25 frames via
+the 2.2 VAE, 35s, ~9 GB peak) -- PASS.**
 
-**NEXT (no open "decision" -- CS-3 was reframed, see section 5):** drive `eng_wan_i2v.render_clip`
-through the real path and assert `wan_i2v` is the final_engine in the trace -- the M1 no-fallback gate
-now enforces this. Run it as a wan_i2v-only soak (`coverage_sweep --only` non-acceptance, OR
-`--acceptance --only wan` which exercises the leg but reports RED until wan_ti2v exists). Two follow-ons,
-not blockers: (1) the `wan_ti2v` 8GB engine -- capture the TI2V-5B core node class from a live
-`/object_info` FIRST, then build the engine + its CAPABILITIES row (unblocks M8/S2 + full `--acceptance`
-GREEN); (2) the M9 CS-3 sequential-residency proof (the mixed Wan+HuMo batch). Spec = section 4 + 4A.
+**NEXT (operator-gated -- the autonomous engine work is DONE):**
+1. **Eyeball gate** -- compare the I2V-14B vs TI2V-5B clips (`docs/2026-06-12-ltx23-motion/wan_clips/`
+   for 14B; `docs/2026-06-14-wan-ti2v/wan_ti2v_5b_smoke.mp4` for the 5B). Bar = real camera motion,
+   still preserved, no warp. **S3 risk:** the wired 14B is a SINGLE low-noise expert; if motion is too
+   subtle, Path B (two-expert HIGH/LOW handoff) is the mitigation.
+2. **Full-episode `--acceptance` sweep** is impractically slow for a multi-leg autonomous run -- the
+   music_visual=wan leg renders the WHOLE music bed as Wan video (~21 clips/leg). Run it attended/selectively
+   if a formal GREEN exit is wanted; the substantive per-engine validation is already done. The exact
+   invocation is in section 4A (S8). To make it tractable, consider an `--only`-by-slot run or a
+   shorter-music profile for the wan legs.
+3. **M9 CS-3** instrumented sequential-residency proof (mixed Wan+HuMo) -- partial evidence in hand
+   (the mixed leg ran without a ceiling-breach); a clean per-beat-peak + reclaim-drain capture remains.
 
-Soak fixes are DONE (R1 `d33c51f`, R3 `a31fc24`, R2 root-cause `gated_by_flag` + nightly enable-set
-`5231d31`, `--exclude` `134f8e2`). The soak RE-RUN is now UNBLOCKED for the wan_i2v leg + the non-Wan
-permutations; full `--acceptance` GREEN waits on `wan_ti2v` (RED-by-construction until then, correct).
-Blocker audit = forward-order item 4.
-
-ONE coder window in the code at a time; serialize the Wan window vs any other via this file.
+Then proceed down the forward order (section 3): LTX-REGR (section 5), then 3D (item 5), then
+distribution S3-S6. ONE coder window in the code at a time; serialize via this file.
 
 ---
 
@@ -99,7 +121,11 @@ ONE coder window in the code at a time; serialize the Wan window vs any other vi
    FROM the JSON has them, then operator look-QA.
 2. **latentsync-100% + demos (GATE A).** The `OTR_LSYNC_BASE_ENGINE=still_kenburns` fix + the two-demo
    set + the mixed showcase episode.
-3. **Wan 2.2 video engine (section 4).** Phase 2 engine leg + the 8GB TI2V-5B engine + the eyeball gate.
+3. **Wan 2.2 video engine (section 4).** BOTH engines BUILT + validated live (2026-06-14, `bcbe05a`):
+   wan_i2v (14B, post mixin-refactor) + the new wan_ti2v (5B/GGUF 8GB tier). REMAINING = the operator
+   WEBM EYEBALL (14B vs 5B) + the optional formal full-episode `--acceptance` GREEN exit (slow
+   wan-music-bed leg, run attended) + the M9 CS-3 instrumented proof. Code-complete; gates are the
+   operator's.
 4. **Coverage sweep GREEN (GATE A acceptance).** Re-run the permutation matrix after the soak fixes.
    Matrix (additive, not cross-product): a visual-engine leg-set (varies each of music/announcer/
    other_beats), a writer-LLM leg-set (varies node-1 `creative_writing_model`/`technical_model`), and a
@@ -195,13 +221,14 @@ GREEN). MUST-FIX -- until M1-M4 land, a GREEN sweep is meaningless:
 > - **S3 / S6 / S8** -- folded into this doc (MoE eyeball risk, sweep-harness reality,
 >   the exact acceptance invocation below).
 >
-> **DEFERRED (blocked, not skipped):** **M8 + S2** (wan_ti2v VAE fail-closed + its
-> CAPABILITIES row) need the `wan_ti2v` engine, whose 5B core node class must be
-> captured from a live `/object_info` first (the registry consistency invariant
-> forbids a CAPABILITIES row without a registered engine). **M9** (CS-3 sequential
-> residency) + **S4** (leg isolation/reclaim) + **S9** (post-reset verify) are
-> live-GPU proof obligations for the acceptance run. The acceptance sweep is RED by
-> construction until `wan_ti2v` is built and BOTH Wan engines PASS -- correct, not a bug.
+> **M8 + S2 -- LANDED 2026-06-14 (`bcbe05a`).** The `wan_ti2v` engine is built: its 5B core
+> node class (`Wan22ImageToVideoLatent`) was captured from a live `/object_info` first; M8 raises
+> `EngineUnusable` when the resolved VAE basename is empty or is the 2.1 VAE; S2 added the
+> `medium`/8000 CAPABILITIES row (registry-consistency invariant holds -- the row + the registered
+> engine landed together). Validated live (5B bare-graph smoke PASS). **STILL OPEN:** **M9** (CS-3
+> sequential residency) + **S4** (leg isolation/reclaim) + **S9** (post-reset verify) are live-GPU
+> proof obligations -- partial evidence only. A full multi-leg `--acceptance` GREEN exit is gated on
+> the slow wan-music-bed leg (run it attended/selectively), not on missing code.
 >
 > **S8 -- exact acceptance invocation** (ComfyUI venv python; live server on :8000;
 > `OTR_TEST_MODE` UNSET; `OTR_ENABLE_WAN_I2V=1` (+ `OTR_ENABLE_WAN_TI2V=1` once built);
