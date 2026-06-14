@@ -5,9 +5,10 @@
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
 >
 > **Branch:** `v2.0-alpha`. **HEAD:** see git (do not push unprompted).
-> **Last updated:** 2026-06-13 (lean cleanup: the soak-fix batch R1/R2/R3 + `--exclude` LANDED and
-> were removed from here; the "where we are" history + resolved tickets moved out to git/tracker.
-> Only open work remains. Doc-only.)
+> **Last updated:** 2026-06-13, HEAD `b6cfe62` (PROCGEN session: §4C CRT upgrade + §4D scene-aware
+> scopes roundtable-hardened -- 7 passes, ~$1.02 -- then LOCKED new-node-only + HANDED to a coder
+> window. Earlier: soak-fix batch + `--exclude` landed/removed; history + resolved tickets in
+> git/tracker. Only open work remains. Doc-only.)
 >
 > **Hardening delta (2026-06-13):** the Wan Phase-2 + GATE-A coverage-sweep plan was
 > QA'd against the real code and roundtabled (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4,
@@ -266,6 +267,13 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 ---
 
 ## 4C. CRT PROCGEN UPGRADE -- title card + gutter scopes (roundtable-hardened, SPRINT-READY)
+
+> **HANDOFF 2026-06-13 -> coder window.** §4C + §4D are the PROCGEN build, kicked off to a
+> dedicated coder window (kickoff in chat). That window builds §4C + §4D ONLY (not Wan, not
+> the sweep, not 3D). ON COMPLETION the coder REMOVES §4C + §4D from this doc (completed work
+> lives in git history + the tracker, not here -- per the section-3 rule) and logs what it
+> actually built in `docs/2026-06-13-crt-procgen-improvements/PROCGEN_BUILD_LOG.md`. §4D's
+> LOCKED new-node-only supersedes §4C's in-floor scope placement (scopes draw in the node).
 
 > Roundtable-hardened 2026-06-13 -- CONVERGED over 4 passes: 3 QA passes (gemini-3.1-pro
 > + gpt-5.5 + deepseek-v4-pro) + a 4th convergence pass across 5 FRESH frontier families
