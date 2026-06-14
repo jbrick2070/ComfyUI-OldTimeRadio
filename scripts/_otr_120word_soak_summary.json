@@ -1,0 +1,46 @@
+{
+ "profile": "16gb_full",
+ "target_words": 120,
+ "results": [
+  {
+   "ep": 1,
+   "seed": 952893031,
+   "nchars": 2,
+   "pid": "1c5b3fbc-c2ef-4749-93a9-a7e7039e7191",
+   "status": "success",
+   "secs": 4357.0
+  },
+  {
+   "ep": 2,
+   "seed": 1789278255,
+   "nchars": 2,
+   "pid": "10974ffd-b8ee-40b3-ba0f-f354c784608b",
+   "status": "success",
+   "secs": 4565.0
+  },
+  {
+   "ep": 3,
+   "seed": 1732631928,
+   "nchars": 2,
+   "pid": "09023ebf-2e67-4f5f-9d1c-a9d34179fbd8",
+   "status": "success",
+   "secs": 3980.0
+  },
+  {
+   "ep": 4,
+   "seed": 1155943401,
+   "nchars": 2,
+   "pid": "3ade70ee-1508-4ff6-9eea-e4aa26a533fc",
+   "status": "success",
+   "secs": 4117.0
+  },
+  {
+   "ep": 5,
+   "seed": 1396687817,
+   "nchars": 2,
+   "pid": "819fb629-dcd9-4945-974c-21ade75ffac7",
+   "status": "success",
+   "secs": 4821.0
+  }
+ ]
+}

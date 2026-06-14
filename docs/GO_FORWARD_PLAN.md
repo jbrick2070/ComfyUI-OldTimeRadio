@@ -1,5 +1,21 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-14 eve (planner + live GPU smoke; HEAD `1483e48`, session doc edits UNCOMMITTED):**
+> Ran the operator's Wan-vs-LTX **opener eyeball** on the live 5080. DECISIVE RESULT: **Wan i2v 14B DRIFTS off
+> the input still** (not fixable by easy input knobs -- cfg2.0+locked prompt still drifts; cfg1.5 collapses to
+> abstraction); **LTX 2B v0.9 HOLDS the composition** with subtle motion in all 3 modes (ksampler 30-step /
+> distilled / 1216x704 hires). **OPERATOR STEER: do NOT ditch any model** -- keep ALL selectable; make the
+> README transparent on what each gives. => LTX = opener DEFAULT; Wan i2v stays selectable (evolving/transform
+> b-roll, NOT held-still openers); **LTX-REGR promoted to active** (open Q narrowed to MOTION AMOUNT). Built an
+> interactive **`otr-render-bench`** artifact (rate each render + settings grid + sweep planner + export, with
+> embedded playable clips). Evidence: `docs/2026-06-14-wan-ti2v/EYEBALL_FINDINGS.md` +
+> `eyeball_frames/COMPARISON_montage.png`. The formal `--acceptance --only wan` (40w) reached leg 1/4 then was
+> **ABORTED** for an operator procgen emergency (my headless server held :8000 -> ComfyUI couldn't load his
+> procgen; box freed, :8000 released, GPU at baseline; **NO production code or workflow JSON was touched** --
+> the engine build is intact). Operator moved to a separate **procgen coding window**. **NEXT (awaiting operator
+> confirm):** lock LTX-default + Wan-selectable, then run the LTX `--strength`/sampler/steps/cfg MOTION sweep
+> (queue it in the render bench planner); README "what-to-expect-per-model" ticket logged (section 5).
+>
 > This file holds ONLY work that is still open. Completed work lives in git history, `BUG_LOG.md`,
 > and the `otr-build-tracker` artifact -- not here. `docs/VIDEO_BUILD_HANDOFF.md` and the 3D plan
 > section 0 are thin pointers to this file. When this doc and any other disagree, THIS doc wins.
@@ -65,7 +81,16 @@
 
 ## 1. CURRENT STEP
 
-**Active thread = Wan 2.2 lane -- BOTH engines BUILT + VALIDATED LIVE. Remaining work is operator-gated.**
+**2026-06-14 EYEBALL OUTCOME (supersedes the "Wan is the active thread" framing -- pending operator
+confirm):** the live Wan-vs-LTX opener smoke showed **Wan i2v 14B DRIFTS off the input still (not
+fixable by easy input knobs); LTX HOLDS the composition with subtle motion.** => recommend Wan i2v
+14B -> **BACK-BURNER for the music/announcer opener role**, LTX stays the opener engine, and
+**LTX-REGR (section 5) becomes the active thread**. A formal `--acceptance --only wan` (40w) is still
+running for the technical gate + the 5B in-episode clips. Evidence: `docs/2026-06-14-wan-ti2v/
+EYEBALL_FINDINGS.md` + `eyeball_frames/COMPARISON_montage.png`. The prior Wan-lane status below stays
+accurate for the ENGINE BUILD (both engines are built + technically validated).
+
+**Active thread (prior framing) = Wan 2.2 lane -- BOTH engines BUILT + VALIDATED LIVE. Remaining work is operator-gated.**
 Phase 1 (I2V-14B b-roll) + the GATE-A sweep hardening (M1-M7 + shoulds) shipped earlier. THIS overnight
 window built the deferred `wan_ti2v` 8GB engine (HEAD `bcbe05a`): the 5B TI2V on core Comfy nodes
 (`UnetLoaderGGUF` Q5_K_M + `ModelSamplingSD3` shift 5.0 + `Wan22ImageToVideoLatent` + the Wan2.2 VAE),
@@ -334,9 +359,16 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   (LTX + humo_1.7B); the episode outputs (`...\output\otr\episodes` + obs finals) are NOT yet eyeballed.
   Check audio sync, burned captions, procgen scopes/credits, character look. This is the operator's
   "analyze the soak" item; verdicts in `scripts/_otr_120word_soak_summary.json`.
-- **Wan WEBM EYEBALL (NEW 2026-06-14).** Compare I2V-14B vs TI2V-5B (`docs/2026-06-14-wan-ti2v/
-  wan_ti2v_5b_smoke.mp4`): real camera motion, still preserved, no warp. If 14B motion too subtle ->
-  Path B two-expert handoff (S3).
+- **Wan WEBM EYEBALL -- DONE 2026-06-14 (operator + Claude live smoke).** RESULT: **Wan i2v 14B
+  DRIFTS** -- holds the input still ~1 frame then re-interprets the scene into its own subject (a
+  generic tube close-up). NOT fixable by easy input knobs: cfg3.5->2.0 + a locked-tripod prompt STILL
+  drifts; cfg1.5 COLLAPSES into incoherent abstraction. **LTX (2B v0.9) HOLDS** the composition with
+  subtle motion in all 3 modes tested (ksampler 30-step, distilled, AND 1216x704 hires -- hires
+  answers the "low-res" note). => **RECOMMEND: Wan i2v 14B -> BACK-BURNER for the music/announcer
+  OPENER role** (keep selectable; revisit only with Path B two-expert handoff, GO_FORWARD 4A S3); LTX
+  stays the opener engine; **PROMOTE LTX-REGR (below) to the active thread.** Evidence:
+  `docs/2026-06-14-wan-ti2v/EYEBALL_FINDINGS.md` + `eyeball_frames/COMPARISON_montage.png`. AWAITS
+  operator confirm on the re-prioritization.
 
 - **Non-Wan soak = ENOUGH (operator call 2026-06-13).** The non-Wan permutation coverage sweep
   (`--strict-fallback --exclude wan/latentsync/triposg`) has run sufficiently; do NOT keep grinding it.
@@ -345,12 +377,16 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   audio-driven lip-sync, not a still with motion. Focus the remaining runway on **getting the Wan lane
   bug-free** (section 1 + 4 + 4A). A new sweep, if ever needed, should add `--exclude-engine humo` (the
   exact-match flag added `ca10b63`: skips the 14B `humo` that TIMES OUT per CS-4, KEEPS `humo_1.7B`).
-- **LTX-REGR (operator 2026-06-13)** -- LTX clips no longer animate like the **2026-05-30..06-05** era
-  (motion lost / too static). `BUG-LOCAL-113b` (`8115c72`: ksampler 30-step euler cfg3.0 as the LTX
-  default, distilled 8-step = the `OTR_LTX_SAMPLER=distilled` rollback) was the prior fix, but the
-  operator STILL sees the regression. A "small smoke", **TACKLE AFTER Wan is bug-free** -- NOT a Wan
-  blocker. Re-verify the live LTX motion path against the 5/30 baseline (sampler mode, step count, cfg,
-  the frame cap + 169 decode floor from look-QA round 5).
+- **LTX-REGR (operator 2026-06-13; PROMOTED to active 2026-06-14 pending operator confirm)** -- LTX
+  clips no longer animate like the **2026-05-30..06-05** era (motion lost / too static). `BUG-LOCAL-113b`
+  (`8115c72`: ksampler 30-step euler cfg3.0 as the LTX default, distilled 8-step = the
+  `OTR_LTX_SAMPLER=distilled` rollback) was the prior fix, but the operator STILL sees the regression.
+  **2026-06-14 eyeball update:** the Wan-vs-LTX smoke proved LTX HOLDS the still composition cleanly
+  (good) -- so the open question is narrowed to **MOTION AMOUNT** (5/30-6/5 read as more dynamic; the
+  current ksampler/distilled holds are subtle). With Wan i2v back-burnered for openers, this is the
+  recommended NEXT thread. Probe = an LTX **--strength / sampler-mode / step-count / cfg / frame-cap**
+  sweep (otr_ltx_motion_smoke.py exposes all of them; --strength is the prime motion lever, 1.0=max
+  freedom) against the 5/30 baseline + the 169 decode floor from look-QA round 5.
 - **CS-1** -- the latentsync legs must show latentsync IN THE TRACE (a prior "PASS" was fallback-only);
   re-verify in the sweep. (Non-Wan -> deprioritized per the operator's "non-Wan soak = enough" call.)
 - **CS-2** -- machine NVML pins ~16 GB per leg vs the 14.5 ceiling while driver-phase attribution reads
@@ -366,6 +402,12 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   fits 14.5 GB. The default char tier is `humo_1.7B` (`955f134`); the 14B is opt-in.
 - **R2 verify** -- confirm `humo_1.7B` renders native char beats at 70w with its enable flag ON (the
   soak floored it only via `gated_by_flag`); answered by the item-4 re-run.
+- **README "what to expect per video model" (operator 2026-06-14).** Once the opener model bake-off
+  settles (interactive render bench artifact `otr-render-bench` + `docs/2026-06-14-wan-ti2v/
+  EYEBALL_FINDINGS.md`), add a user-facing "what to expect from each video engine" section to the
+  README (newbie audience -- folds into S6/closing): Wan i2v 14B = drifts off the still (b-roll only,
+  NOT openers); LTX = holds composition + subtle motion (opener default); TI2V-5B = 8GB tier, lower-res.
+  Source the verdicts from the operator's bench ratings (export button).
 - **Ship defaults (release)** -- proposed: announcer + character = `flux_still`, music = `visualizer`
   (selectable: station_card, still_parallax, ltx_orbit, abstract). Keep HuMo/latentsync/3D
   selectable-not-default until verified. Operator eyeballs 2-3 finals/slot.
