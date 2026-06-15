@@ -1,5 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-14 eve (look-QA fix marathon; HEAD `94c2166` == origin):** All GREEN + PUSHED
+> (suite 4261/0, Bug Bible 16/7/3 throughout). Shipped FOUR look-QA fixes + ONE forensic:
+> **BUG-410 closing CREDITS — CLOSED + operator-verified (flux_still).** Root (runtime-probed): the floor
+> renders ~20s of scrolling credits out to 65.7s, but the new silent-composite + §4D-blend pipeline locked the
+> deliverable to the master-audio length (mux v<=a gate), cutting the scroll. 4-model roundtable converged
+> Option A (intentional SILENT post-roll): composite extends to floor length (`5361266`); §4D scopes
+> black-padded so `shortest=1` doesn't re-clamp; mux gate relaxed to `v<=a+OTR_MAX_CREDITS_TAIL_S` (45s,
+> fail-loud); credits ride over the HELD LAST clip/still (`229cade`, the 6/5 look — adapts to whatever's last).
+> Audio byte-identical. **BUG-409 title card — FIXED (`9e0b658`):** `_title_reveal_progress` resolves the
+> reveal in the first ~40% of the window then holds solid (env `OTR_TITLE_REVEAL_FRACTION`); close card stays
+> bounded to the main video (no credits overlap). **BUG-408 SA3 music — IMPLEMENTED + TUNED (`3a4f71d`,
+> `77e89ff`):** SA3-shaped prompt + real negative + per-cue `seconds_start` within a structural `seconds_total`
+> context (latent stays cue-length → determinism unchanged); 6-model roundtable baked the defaults
+> **context_s 30→12** (longest cue = one tight phrase so short cues are coherent slices), **cfg 6→7**, refined
+> negative; kept dpmpp_3m_sde_gpu@100; all env-overridable. **BUG-411 flux BOOKEND lush-tint — NEW forensic,
+> CODER-READY (`94c2166`):** the 6/5 image pipeline (`visual/batch_flux_render.py`) was wholly rewritten into
+> `_otr_image_engines/flux_gen1.py` + `meta_brief_image_prompt.py`; model/steps/cfg/sampler identical but the
+> rewrite DROPPED **FluxGuidance=3.5** + the cinematic **style suffix** + the radio broadcast-distress suffix +
+> bookend seed 4242 (6/5 widgets inspected + confirmed). **NEXT WINDOW = implement BUG-411** (restore those in
+> the new pipeline), see section 5 + BUG_LOG_2026-06.md. **OPERATOR-GATED remaining:** restart ComfyUI Desktop
+> to load BUG-409 + the SA3 defaults; A/B the music then RE-BASELINE the `test_audio_byte_identical` golden
+> (music bytes changed intentionally); eyeball BUG-409 title + the HuMo credits backdrop.
+>
 > **LATEST SESSION -- 2026-06-14 (autonomous fix+build window; HEAD `772a2eb` == origin):** All GREEN +
 > PUSHED. **Three opener/image fixes:** FIX1 `3ef0098` (BUG-403 opener centre black -- flux_still now
 > conditions on the beat scene still in render_driver.build_request_from_shot); FIX3 `9b028c8` (BUG-404
@@ -142,6 +165,20 @@
 ---
 
 ## 1. CURRENT STEP
+
+**>>> CURRENT STEP (2026-06-14 eve, operator-set HANDOFF FOCUS) = BUG-411 flux BOOKEND lush-tint restore.**
+The 6/5 image pipeline was wholly rewritten; the rewrite dropped the look levers (FluxGuidance=3.5 + the
+cinematic style suffix + the radio broadcast-distress suffix + bookend seed 4242). RESTORE them in the new
+`_otr_image_engines/flux_gen1.py` + `otr_meta_brief_image_prompt.py` pipeline:
+- BUILD: a `FluxGuidance` node (guidance ≈ 3.5, env `OTR_FLUX_GUIDANCE`) wired into the flux_gen1 graph
+  between the positive CLIP encode and the KSampler (HIGHEST IMPACT); re-add the cinematic style suffix +
+  the radio bookend broadcast-distress suffix to the image-prompt builder; keep the deterministic bookend seed.
+- ACCEPTANCE: a re-rendered bookend matches the 6/5 lush tint (dim amber+cyan rim light, 35mm grain, oil-slick
+  oxidized metal) — A/B vs `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\stills\radio_bookend_*.png`;
+  suite + Bug Bible green; commit+push per chunk.
+Full forensic + exact strings + 6/5 widget values: `BUG_LOG_2026-06.md` BUG-411 + section 5. The look-QA
+fixes BUG-408/409/410 from this session are DONE/closed (operator-gated A/B + golden re-baseline remain for
+the music). The Wan/LTX-REGR engine thread below stays the parallel ENGINE track.
 
 **2026-06-14 EYEBALL OUTCOME (supersedes the "Wan is the active thread" framing -- pending operator
 confirm):** the live Wan-vs-LTX opener smoke showed **Wan i2v 14B DRIFTS off the input still (not
