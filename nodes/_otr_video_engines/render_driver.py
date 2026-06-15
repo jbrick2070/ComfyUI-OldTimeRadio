@@ -805,6 +805,22 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lw, _lh = 1472, 832
         req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
+    # BUG-LOCAL-412 (operator 2026-06-15, "make it byte-identical to 6/5"): LTX-2B
+    # renders MUSH above its native 480p. The 6/5 openers/bookends rendered at
+    # 832x480 then upscaled to the composite, which is why they animated SHARP;
+    # the 2026-06-10 landscape-canvas change pushed LTX to render NATIVELY at
+    # 1472x832 -> "starts sharp then gets blurry" (the engine's own note: "0.75
+    # re-noises into mush at 1472x832"). Render LTX at its 6/5 native canvas and
+    # let OTR_SilentComposite scale the clip to the 1472x832 deliverable. The
+    # still/floor families (flux_still etc.) KEEP the full landscape canvas above.
+    # Env OTR_LTX_RENDER_CANVAS (default 832x480, the 6/5 value; /32-friendly).
+    if str(shot.get("engine_id") or "") == "ltx_video":
+        _lxc = os.environ.get("OTR_LTX_RENDER_CANVAS", "832x480")
+        try:
+            _lxw, _lxh = (int(x) for x in _lxc.lower().split("x", 1))
+        except (ValueError, AttributeError):
+            _lxw, _lxh = 832, 480
+        req["canvas"]["w"], req["canvas"]["h"] = _lxw, _lxh
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside

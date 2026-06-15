@@ -123,3 +123,30 @@ def test_assert_soak_ok_rejects_violations(mutate):
     mutate(report)
     with pytest.raises(rd.SoakError):
         rd.assert_soak_ok(report)
+
+
+def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
+    """BUG-LOCAL-412 (6/5 parity): ltx_video renders at its native 832x480
+    (LTX-2B mushes above 480p; the composite scales it up) while flux_still
+    keeps the full 1472x832 landscape canvas. Both env-overridable."""
+    monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
+    monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
+    ledger = {"video": {"video_revision": 1, "shots": []},
+              "lines": [{"line_id": "b001", "start_s": 0.0, "dur_s": 2.0}],
+              "images": {"images": []}}
+
+    def shot(engine, family):
+        return {"shot_id": "shot_b001", "beat_id": "b001",
+                "engine_id": engine, "family": family,
+                "target_frame_count": 169, "source_line_ids": ["b001"],
+                "char_id": "", "creative": {}}
+
+    req_ltx = rd.build_request_from_shot(shot("ltx_video", "text_to_video"),
+                                         ledger)
+    assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == (832, 480)
+    req_flux = rd.build_request_from_shot(shot("flux_still", "static_image_gen"),
+                                          ledger)
+    assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
+    monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
+    req2 = rd.build_request_from_shot(shot("ltx_video", "text_to_video"), ledger)
+    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (768, 432)

@@ -516,11 +516,13 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
     iv = g["img2vid"]["inputs"]
     # Installed signature: (vae, image, latent, strength) -> LATENT. No
     # positive/negative/width/height/length; feeding the old kwargs raised
-    # "unexpected keyword argument 'positive'". strength MUST be present (1.0 default).
+    # "unexpected keyword argument 'positive'". strength MUST be present
+    # (BUG-LOCAL-412: 0.75 default restored -- the 6/5 soft-anchor value, correct
+    # now that LTX renders at native 832x480 via OTR_LTX_RENDER_CANVAS).
     assert tuple(iv["vae"]) == ("checkpoint", 2)
     assert tuple(iv["image"]) == ("loadimage", 0)
     assert tuple(iv["latent"]) == ("latent", 0)
-    assert iv["strength"] == 1.0
+    assert iv["strength"] == 0.75
     assert "positive" not in iv and "negative" not in iv
     # Distilled sampler's latent_image is the image-anchored img2vid LATENT now
     # (NOT the raw pure-noise latent); conditioning flows from the text encoders.

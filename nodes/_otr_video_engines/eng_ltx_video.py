@@ -388,10 +388,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # the base "cond" (LTXVConditioning) node, left untouched here.
         # (Pre-2026-06-12 the node took positive/negative and output conditioning;
         # feeding the old kwargs now raises "unexpected keyword argument 'positive'".)
+        # BUG-LOCAL-412 (operator 2026-06-15, 6/5 parity): the 6/5 LTX recipe used
+        # I2V strength 0.75 at the 832x480 native canvas -- a SOFT anchor that
+        # leaves room for coherent motion. The post-refactor default was bumped to
+        # 1.0 to fight the mush at 1472x832, but that hard-locks frame 0 while later
+        # frames drift; now that render_driver renders LTX at native 832x480
+        # (OTR_LTX_RENDER_CANVAS) the 6/5 0.75 is correct again. Env-overridable.
         try:
-            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "1.0"))
+            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
         except (TypeError, ValueError):
-            cond_strength = 1.0
+            cond_strength = 0.75
         cond_strength = max(0.0, min(1.0, cond_strength))
         graph["img2vid"] = {
             "class": "img2vid",
