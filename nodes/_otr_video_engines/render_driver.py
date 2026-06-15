@@ -1466,6 +1466,58 @@ def apply_engine_override(ledger):
     return ledger
 
 
+#: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
+#: the prompt-only ltx_video / ltx_orbit + the additive LTX-AV audio lanes.
+_LTX_OPEN_ENGINES = frozenset(
+    {"ltx_video", "ltx_orbit", "ltx_av_talk", "ltx_av_music"})
+#: Roles whose beats are the radio-console OPENER -- expected to render on an
+#: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
+_LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})
+
+
+def check_ltx_open_health(manifest, *, strict=None):
+    """BUG-LOCAL-413 guard -- surface a radio-OPEN beat (announcer / music
+    console opener, incl. the synthetic b000 music_open) that did NOT render on
+    an LTX engine. The 6/15 ``eye_of_the_storm`` open was SOFT because the
+    episode rendered ZERO LTX clips and the open fell to the by-design procgen /
+    still_kenburns floor at raw 1472x832 (no upscale) -- a SILENT degrade. This
+    makes it LOUD: every offending open beat logs a warning; with strict mode
+    (env ``OTR_LTX_OPEN_STRICT=1`` or ``strict=True``) it RAISES so a build can
+    never ship a procgen-fallback open unnoticed. Pure read of the manifest
+    (never touches audio); the procgen floor STAYS the safety net -- this only
+    surfaces the degrade, it does not remove the fallback. Returns the list of
+    offending open rows (empty == healthy)."""
+    if strict is None:
+        strict = os.environ.get("OTR_LTX_OPEN_STRICT", "0") == "1"
+    bad = []
+    for row in (manifest or {}).get("clips") or []:
+        role = str(row.get("role") or "")
+        bid = str(row.get("beat_id") or "")
+        is_open = (role in _LTX_OPEN_ROLES
+                   or bid.endswith(_OPENING_MUSIC_SUFFIX))
+        if not is_open:
+            continue
+        eid = str(row.get("engine_id") or "")
+        if eid in _LTX_OPEN_ENGINES and row.get("exists"):
+            continue                      # healthy: a real LTX open clip
+        bad.append({"shot_id": row.get("shot_id"), "beat_id": bid,
+                    "role": role, "engine_id": eid,
+                    "exists": bool(row.get("exists"))})
+        _LOG.warning(
+            "[OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open "
+            "beat %s role=%s rendered on %r (exists=%s) -- NOT an LTX engine; "
+            "the open is the procgen/still floor (soft open). Expected one of "
+            "%r. Set OTR_LTX_OPEN_STRICT=1 to fail the build.",
+            bid or row.get("shot_id"), role, eid, bool(row.get("exists")),
+            tuple(sorted(_LTX_OPEN_ENGINES)))
+    if bad and strict:
+        raise RenderFloorError(
+            "LTX-OPEN HEALTH strict (BUG-LOCAL-413): %d radio-open beat(s) fell "
+            "to the procgen/still floor instead of an LTX engine: %r"
+            % (len(bad), [b["beat_id"] or b["shot_id"] for b in bad]))
+    return bad
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -1525,6 +1577,7 @@ def build_clip_manifest(result, *, episode_id=""):
         rows.append({
             "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
+            "role": str(shot.get("role") or ""),
             "family": clip.get("family") or shot.get("family") or "",
             "path": path,
             "type": ctype,
@@ -1539,7 +1592,7 @@ def build_clip_manifest(result, *, episode_id=""):
         })
         if exists:
             hist[eid] = hist.get(eid, 0) + 1
-    return {
+    manifest = {
         "episode_id": str(episode_id or ""),
         "video_revision": int(section.get("video_revision") or 1),
         "fps": int(section.get("fps") or 25),
@@ -1550,6 +1603,11 @@ def build_clip_manifest(result, *, episode_id=""):
         "engine_histogram": hist,
         "clips": rows,
     }
+    # BUG-LOCAL-413 guard: LOUD-warn (opt-in strict raises) if a radio-open beat
+    # fell to the procgen/still floor instead of an LTX engine -- so the 6/15
+    # silent soft-open can never ship unnoticed. Read-only; fallback untouched.
+    check_ltx_open_health(manifest)
+    return manifest
 
 
 # --------------------------------------------------------------------------- #
