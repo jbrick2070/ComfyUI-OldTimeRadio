@@ -19,13 +19,18 @@ Config (env): ``OTR_ENABLE_LTX_VIDEO`` opt-in flag; ``OTR_LTX_VIDEO_CKPT`` the
 primary checkpoint path the load probe checks (verify-at-build; default under
 ``ComfyUI/models/checkpoints``).
 
-LK-1 look restoration (2026-06-11): ``OTR_LTX_SAMPLER`` selects the sampling
-chain -- ``ksampler`` (DEFAULT: 30-step euler cfg=3.0, the 6/5 dynamic-motion
-look) or ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0 rollback; subtle
-pan-in only with I2V). ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots
-condition on their ST-3 scene stills (``OTR_LTX_I2V_STRENGTH`` default 1.0,
-probe-proven; 0.75 re-noises into mush at 1472x832). The 22B distilled LoRA
-wires only on a 22B-tier checkpoint (``OTR_LTX_DISTILLED_LORA``/``_STRENGTH``).
+LK-1 look restoration (2026-06-11) + BUG-LOCAL-412 restore (2026-06-14):
+``OTR_LTX_SAMPLER`` selects the sampling chain -- ``distilled`` (DEFAULT:
+8-step LTX_DISTILLED_SIGMAS cfg=1.0 + ``euler_cfg_pp``, the FAST 5/09-5/28-era
+recipe the operator confirmed as the good look) or ``ksampler`` (30-step euler
+cfg=3.0 round-5 path, kept selectable but SLOW). ``OTR_LTX_SAMPLER_NAME``
+default ``euler_cfg_pp`` (CFG++, the documented dynamic-motion sampler; the
+post-cleanbreak refactor had left it on plain ``euler``). ``OTR_ENABLE_LTX_I2V``
+defaults ON: LTX shots condition on their ST-3 scene stills
+(``OTR_LTX_I2V_STRENGTH`` default 1.0, probe-proven; 0.75 re-noises into mush at
+1472x832 -- the old 0.75 recipe was at 832x480, so drop the canvas too if you
+restore 0.75). The 22B distilled LoRA wires only on a 22B-tier checkpoint
+(``OTR_LTX_DISTILLED_LORA``/``_STRENGTH``).
 """
 from __future__ import annotations
 
@@ -430,26 +435,31 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # ---- LK-1b: sampler mode + distilled LoRA resolution ----
     @staticmethod
     def _sampler_mode() -> str:
-        """``ksampler`` (DEFAULT -- 30-step euler cfg=3.0, 6/5 dynamic-motion
-        look) or ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0; subtle
-        pan-in only, kept as rollback). Invalid values fall back LOUD to
-        ksampler. Override via OTR_LTX_SAMPLER env var."""
-        mode = os.environ.get("OTR_LTX_SAMPLER", "ksampler").strip().lower()
+        """``distilled`` (DEFAULT -- 8-step LTX_DISTILLED_SIGMAS cfg=1.0, the
+        FAST 5/09-5/28-era recipe) or ``ksampler`` (30-step euler cfg=3.0 round-5
+        path, kept as opt-in). Invalid values fall back LOUD to distilled.
+        Override via OTR_LTX_SAMPLER env var.
+
+        BUG-LOCAL-412 (operator 2026-06-14): restored the 8-step distilled path
+        as the DEFAULT. The 30-step ksampler was too SLOW and the 5/09 + 5/28
+        good bookends (l001 / b001) were the 8-step distilled euler_cfg_pp recipe
+        (forensic in BUG_LOG_2026-06.md). ksampler stays selectable for anyone
+        who wants the 30-step look and can spend the time."""
+        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
         if mode not in ("distilled", "ksampler"):
             _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
-                         "using ksampler default", mode)
-            mode = "ksampler"
+                         "using distilled default", mode)
+            mode = "distilled"
         return mode
 
     @staticmethod
     def _sampler_name() -> str:
-        """The KSampler/KSamplerSelect ``sampler_name``. DEFAULT stays ``euler``
-        (today's behavior); override via OTR_LTX_SAMPLER_NAME. The 6/1 + 6/5
-        ledgers recorded ``euler_cfg_pp`` (CFG++) -- the documented dynamic-motion
-        sampler that the refactor never restored (operator catch 2026-06-12).
-        Swappable so the motion smoke can sweep euler vs euler_cfg_pp before we
-        lock the winner as the default."""
-        return os.environ.get("OTR_LTX_SAMPLER_NAME", "euler").strip()
+        """The KSampler/KSamplerSelect ``sampler_name``. DEFAULT ``euler_cfg_pp``
+        (CFG++) -- the documented dynamic-motion sampler the 5/09+5/28+6/1+6/5
+        good LTX bookends recorded (BUG-LOCAL-412 forensic); override via
+        OTR_LTX_SAMPLER_NAME. The post-cleanbreak refactor had left it on plain
+        ``euler``; restored 2026-06-14 per operator ("make LTX just as it was")."""
+        return os.environ.get("OTR_LTX_SAMPLER_NAME", "euler_cfg_pp").strip()
 
     def _distilled_lora_file(self):
         """``(lora_name, abs_path)`` for the distilled LoRA; ``abs_path`` is
