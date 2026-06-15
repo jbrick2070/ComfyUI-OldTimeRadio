@@ -423,6 +423,24 @@ class SceneAwareScopes:
                 a = wf.mean(dim=0).cpu().numpy()
             else:
                 a = wf.cpu().numpy()
+            # BUG-LOCAL-406 FIX: the scopes track MUST span the full MASTER-audio
+            # length (= the composite's master-extended length), NOT just the
+            # beats-only total_target_frames. The downstream §4D 3-input blend
+            # (otr_post_upscale_procgen_blend) uses blend filter shortest=1, so a
+            # scopes input shorter than the master clamps the WHOLE blended video
+            # below the master length -> OTR_MasterAudioMux then clone-holds the
+            # last frame over the remaining closing-theme audio (the FREEZE +
+            # "no HUD treatment" the operator saw; regressed when the scopes node
+            # landed 2026-06-13). Pad the plan tail to the master length; tail
+            # frames stay None (no scope drawn -- a black frame the lighten-blend
+            # ignores), matching the suppressed credits/post-roll region.
+            master_frames = int(np.ceil(len(a) / sr * fps)) if sr else total
+            if master_frames > total:
+                plan = plan + [None] * (master_frames - total)
+                log.info("[SceneAwareScopes] BUG-406: extended scopes %d -> %d "
+                         "frames to span the master audio (no §4D blend clamp)",
+                         total, master_frames)
+                total = master_frames
             volume, freqs, waves = _analyze_audio_np(a, sr, total, fps)
         else:
             volume = [0.0] * total

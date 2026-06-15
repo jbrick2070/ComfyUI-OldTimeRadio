@@ -161,3 +161,35 @@ def test_silent_encode_no_audio_stream(tmp_path, monkeypatch):
         capture_output=True, text=True)
     assert pr.stdout.strip() == "", "scopes_only.mp4 must be silent (-an)"
     os.remove(path)
+
+
+def test_scopes_span_master_audio_no_blend_clamp_bug406(monkeypatch):
+    """BUG-LOCAL-406: the scopes track must span the full MASTER-audio length, not
+    the beats-only total_target_frames. The downstream §4D 3-input blend uses
+    shortest=1, so a scopes input shorter than the master clamps the whole blended
+    video below the master -> the mux clone-holds the last frame over the closing
+    theme (the FREEZE + missing HUD/scopes treatment). The node has the master
+    `audio` input, so it pads the plan tail to the master length."""
+    import json
+    import torch
+    monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
+    captured = {}
+
+    def _fake_encode(gen, total, out, w, h, fps, ffmpeg):
+        captured["total"] = total
+        captured["gen_n"] = sum(1 for _ in gen)   # drain: no IndexError on the tail
+
+    monkeypatch.setattr(sc, "_encode_silent_mp4", _fake_encode)
+
+    # beats budget = 50 frames (2 s @25); master audio = 5 s -> 125 frames.
+    m = {"episode_id": "ext", "fps": 25, "total_target_frames": 50,
+         "clips": [{"order": 0, "shot_id": "s1", "engine_id": "humo",
+                    "path": "/fake/portrait.mp4", "target_frame_count": 50,
+                    "start_s": 0.0, "exists": True}]}
+    sr = 24000
+    wf = torch.zeros(1, 1, int(sr * 5.0), dtype=torch.float32)   # 5 s master mix
+    sc.SceneAwareScopes().render_scopes(
+        json.dumps(m), audio={"waveform": wf, "sample_rate": sr},
+        out_w=160, out_h=90)
+    assert captured["total"] == 125          # extended from beats(50) to master(125)
+    assert captured["gen_n"] == 125          # frames render across the full span
