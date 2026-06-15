@@ -8,9 +8,10 @@ no PyPI dependency, no torch/numpy conflict on the Blackwell stack. Weights:
 
 Fail-closed: absent ComfyUI runtime or absent checkpoint raise a clear named
 error (the 6-class taxonomy's MISSING_MODEL), never a silent fetch or crash.
-SA3 community license = commercial-OK -> commercial_clean = True. Opt-in behind
-OTR_ENABLE_STABLE_AUDIO_3 until F validates render-twice determinism on sm_120,
-then promotion flips default_roles + clears the flag.
+SA3 community license = commercial-OK -> commercial_clean = True. PROMOTED
+2026-06-03 to the DEFAULT music engine (default_roles=("music",), no flag);
+prompt/conditioning/sampler defaults tuned 2026-06-14 (roundtable) for the show's
+short instrumental sci-fi cues -- see _SA3_* constants + generate_clip().
 """
 from __future__ import annotations
 
@@ -38,21 +39,54 @@ _CLIP_TYPE = os.environ.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 # keywords the brief already put in the prompt). NO fabricated musical key.
 _SA3_PERIOD_GENRE = (
     (("1920", "1930", "roaring"),
-     "vintage big-band orchestral, warm brass, upright bass, analog tape warmth"),
-    (("1940", "1950", "atomic", "pulp", "radio", "noir"),
-     "vintage orchestral sci-fi score, theremin, eerie strings, brass, timpani, "
+     "vintage instrumental big-band orchestral, warm brass, upright bass, "
      "analog tape warmth"),
+    (("1940", "1950", "atomic", "pulp", "radio", "noir"),
+     "vintage instrumental orchestral sci-fi score, theremin, eerie strings, "
+     "brass, timpani, analog tape warmth"),
     (("1960", "1970", "retro", "space age"),
-     "retro-futurist analog synth score, mellotron, electric piano, tape echo, "
-     "warm strings"),
+     "retro-futurist instrumental analog synth score, mellotron, electric "
+     "piano, tape echo, warm strings"),
 )
 _SA3_DEFAULT_GENRE = (
     "cinematic instrumental sci-fi underscore, small orchestra, low strings, "
     "soft brass, light percussion, analog tape warmth")
 
+# Negative prompt (roundtable 2026-06-14): the PRIMARY job is banning
+# vocals/speech (instrumental-only) + pushing AWAY from a clean modern sound
+# toward vintage tape. Deliberately does NOT ban "dissonant" / "out of tune" /
+# "harsh" / "muddy" -- those fight the wanted eerie / theremin / analog-tape
+# character (panel consensus: Opus, GPT, Gemini, Sonnet).
 _SA3_NEG_DEFAULT = (
     "vocals, singing, speech, spoken words, lyrics, voiceover, crowd noise, "
-    "harsh clipping, digital distortion, muddy mix, out of tune, low quality")
+    "modern pristine mix, digital distortion")
+
+
+def _env_float(name, default):
+    """Parse an env override as float; fall back to ``default`` (LOUD) on a bad
+    value instead of crashing the render."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return float(default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        log.warning("[OTR.sa3] %s=%r is not a float -- using default %s",
+                    name, raw, default)
+        return float(default)
+
+
+def _env_int(name, default):
+    """Parse an env override as int; fall back to ``default`` (LOUD) on a bad value."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return int(default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        log.warning("[OTR.sa3] %s=%r is not an int -- using default %s",
+                    name, raw, default)
+        return int(default)
 
 
 def _sa3_augment_prompt(prompt: str) -> str:
@@ -79,13 +113,17 @@ def _sa3_clip_window(prompt: str, dur: float, context_s: float):
     length + seed determinism are unchanged."""
     dur = float(dur)
     ctx = max(float(context_s), dur)
+    if float(context_s) < dur:
+        log.warning("[OTR.sa3] OTR_SA3_CONTEXT_S (%.1fs) < cue dur (%.1fs) -- "
+                    "context clamped to the cue length (structural context lost)",
+                    float(context_s), dur)
     low = (prompt or "").lower()
-    if "outro" in low:
-        start = max(0.0, ctx - dur)
-    elif "intro" in low:
-        start = 0.0
+    if "outro" in low or "closing" in low:
+        start = max(0.0, ctx - dur)          # resolving tail
+    elif "intro" in low or "opening" in low:
+        start = 0.0                          # build / head
     else:
-        start = max(0.0, (ctx - dur) / 2.0)
+        start = max(0.0, (ctx - dur) / 2.0)  # unresolved middle
     return start, ctx
 
 
@@ -166,14 +204,21 @@ class StableAudio3Engine:
         # context with a per-cue seconds_start. The LATENT stays exactly dur, so
         # clip length + seed determinism are unchanged; only the conditioning
         # window + prompt change. All knobs env-overridable for A/B tuning.
-        context_s = float(os.environ.get("OTR_SA3_CONTEXT_S", "30.0"))
+        # Defaults TUNED 2026-06-14 (roundtable). context=12s (= the longest
+        # cue) so each short cue is a coherent SLICE of a tight musical phrase,
+        # not an aimless fragment of a 30s piece; cfg=7.0 (SA3 native default)
+        # for stronger prompt adherence; sampler/steps stay Stable Audio's
+        # reference dpmpp_3m_sde_gpu @ 100 (determinism proven by the byte-
+        # identical golden). All env-overridable; the operator never NEEDS to set them.
+        context_s = _env_float("OTR_SA3_CONTEXT_S", 12.0)
         seconds_start, seconds_total = _sa3_clip_window(prompt, dur, context_s)
         pos_text = _sa3_augment_prompt(prompt)
         neg_text = os.environ.get("OTR_SA3_NEG_PROMPT", _SA3_NEG_DEFAULT)
-        steps = int(os.environ.get("OTR_SA3_STEPS", "100"))
-        cfg = float(os.environ.get("OTR_SA3_CFG", "6.0"))
+        steps = _env_int("OTR_SA3_STEPS", 100)
+        cfg = _env_float("OTR_SA3_CFG", 7.0)
         sampler = os.environ.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
         scheduler = os.environ.get("OTR_SA3_SCHEDULER", "exponential")
+        denoise = _env_float("OTR_SA3_DENOISE", 1.0)
 
         pos = comfy_nodes.CLIPTextEncode().encode(clip, pos_text)[0]
         neg = comfy_nodes.CLIPTextEncode().encode(clip, neg_text)[0]
@@ -182,7 +227,7 @@ class StableAudio3Engine:
         latent = audio_nodes.EmptyLatentAudio().generate(dur, 1)[0]
         sampled = comfy_nodes.KSampler().sample(
             model, seed, steps, cfg, sampler, scheduler,
-            pos, neg, latent, 1.0)[0]
+            pos, neg, latent, denoise)[0]
         audio = audio_nodes.VAEDecodeAudio().decode(vae, sampled)[0]
         # traceability for A/B listens (no determinism impact)
         _phash = hashlib.blake2s((pos_text + "||" + neg_text).encode()).hexdigest()[:8]

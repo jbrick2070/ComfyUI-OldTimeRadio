@@ -40,3 +40,9 @@ def test_sa3_clip_window_places_cue_in_context_bug408():
     # context is never shorter than the clip (a long clip widens the context)
     s, t = _sa3_clip_window("instrumental intro", 40.0, 30.0)
     assert t == 40.0 and s == 0.0
+    # "opening"/"closing" cue words also map (belt-and-braces alongside intro/outro)
+    # -- baked default context is 12s (= the longest cue, a tight phrase)
+    s, t = _sa3_clip_window("opening theme, slow build", 12.0, 12.0)
+    assert s == 0.0 and t == 12.0
+    s, t = _sa3_clip_window("closing theme, gentle decay", 8.0, 12.0)
+    assert abs(s - 4.0) < 1e-6 and t == 12.0
