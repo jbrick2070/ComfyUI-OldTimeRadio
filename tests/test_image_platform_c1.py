@@ -183,6 +183,27 @@ def test_image_director_policy_json_and_seed(clean_image_registry):
     assert "request_seed" in OTRImageDirector.INPUT_TYPES()["required"]
 
 
+def test_image_director_emits_distinct_per_role_picks_bug405(clean_image_registry):
+    # BUG-LOCAL-405: per-role image-model selection must reach image_policy
+    # VERBATIM per slot. The live bug was the SAVED workflow carrying flux_gen1
+    # in all three slots (so every still minted flux_gen1) -- NOT a director or
+    # dispatcher defect. Prove direct() emits the operator's DISTINCT picks per
+    # slot; the dispatcher then honors a usable engine and fails LOUD (never a
+    # silent flux substitution) on an unusable one.
+    clean_image_registry._registry.clear()
+    for nm in ("eng_ann", "eng_music", "eng_other"):
+        ireg.register(_img_stub(name=nm))
+    out = OTRImageDirector().direct(**_direct_kwargs(
+        announcer_image_model="eng_ann",
+        music_image_model="eng_music",
+        other_beats_image_model="eng_other",
+    ))
+    models = json.loads(out[0])["image_models"]
+    assert models["announcer_image_model"]["engine_id"] == "eng_ann"
+    assert models["music_image_model"]["engine_id"] == "eng_music"
+    assert models["other_beats_image_model"]["engine_id"] == "eng_other"
+
+
 def test_image_director_fail_closed_incompatible_pick(clean_image_registry):
     clean_image_registry._registry.clear()
     # an engine that needs audio_ref cannot serve background (other_beats supplies

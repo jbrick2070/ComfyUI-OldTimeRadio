@@ -342,6 +342,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # Slot resolution per OBJECT role (ST-3: the ImageDirector slots
         # finally honored); empty named slot -> other_beats fallback, LOUD.
         engine_id, slot, fell_back = resolve_engine_for_role(image_policy, role)
+        # BUG-LOCAL-405 (per-role image selection): LOUD trace of how each
+        # object's role resolved to a policy slot + engine, so an unexpected
+        # engine (e.g. every still minting flux_gen1 because the SAVED policy
+        # carried flux_gen1 in all slots) is visible in the server log instead
+        # of being inferred from the output. Permanent observability.
+        log.info(
+            "[OTR_ImageGenDispatcher] resolve: object=%s kind=%s role=%s -> "
+            "slot=%s engine=%s", oid, kind, role, slot, engine_id or "<none>")
         if fell_back:
             warnings.append(
                 f"{oid}: image slot {slot} empty; fell back to "
@@ -405,7 +413,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         try:
             _ireg.assert_usable(engine_id, role)
         except Exception as exc:  # noqa: BLE001  (EngineUnusable et al.)
-            warnings.append(f"{oid}: engine '{engine_id}' not usable for {role} ({exc}); skipped")
+            # BUG-LOCAL-405 fail-loud: a selected-but-unusable engine (opt-in
+            # flag off / weights absent / unbuilt stub) is SKIPPED -- the beat
+            # gets NO image and is NEVER silently substituted with flux. Say so
+            # explicitly so the operator enables+weights the engine or picks a
+            # usable one, rather than wondering why a still is missing.
+            warnings.append(
+                f"{oid}: selected image engine '{engine_id}' not usable for "
+                f"{role} ({exc}); SKIPPED -- no image minted, NOT silently "
+                f"substituted (enable the engine + provide its weights, or pick "
+                f"a usable engine).")
             continue
         if gen_fn is None:
             warnings.append(f"{oid}: no gen_fn (GPU render is the operator smoke); skipped on CPU")
