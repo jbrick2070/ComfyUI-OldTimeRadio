@@ -410,6 +410,18 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
+- **3D input images must be CLEAN / object-free (operator look-QA 2026-06-14 -- GO-FORWARD for the 3D sprint).**
+  The 3D rotating output looked like "a big ugly white-marble block" -- the classic single-image-to-3D
+  failure when the input is a scene/cluttered/background-y image. Image-to-mesh (TripoSG / character_3d)
+  needs a CLEAN, centered, BACKGROUND-FREE single subject. Forward item (folds into 3D plan item 5 +
+  its image-routing must-fixes): mint a DEDICATED "3D input" image per character -- isolated subject, no
+  background objects (background-removed or a no-bg prompt), centered -- and feed THAT to the mesh stage,
+  NOT the scene/portrait still. Until then the white-marble blob is expected; do not wire character_3d
+  for real until this lands.
+- **HuMo full-frame TEST (operator 2026-06-14 -- future experiment, NOT now).** Operator wants to
+  eventually SEE HuMo rendered full-frame (not the 480x832 portrait pillarbox). For now portrait stays
+  HuMo's REQUIREMENT -- BUG-407 shipped "full frame everything EXCEPT HuMo". Future: a HuMo full-frame /
+  16:9 smoke to evaluate whether the talking-head holds at a wider aspect before changing the default.
 - **Look-QA the 5 overnight 120-word episodes (NEW 2026-06-14).** The default-lane soak ran 5/5 SUCCESS
   (LTX + humo_1.7B); the episode outputs (`...\output\otr\episodes` + obs finals) are NOT yet eyeballed.
   Check audio sync, burned captions, procgen scopes/credits, character look. This is the operator's
