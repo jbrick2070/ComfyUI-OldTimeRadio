@@ -1,5 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-14 (autonomous fix+build window; HEAD `f0d8663` == origin):** All GREEN +
+> PUSHED. **Three opener/image fixes:** FIX1 `3ef0098` (BUG-403 opener centre black -- flux_still now
+> conditions on the beat scene still in render_driver.build_request_from_shot); FIX3 `9b028c8` (BUG-404
+> ~1s title card -- overlay_audio_timing before _resolve_title_timing); FIX2 `601c13b` (BUG-405 per-role
+> image model -- GROUNDED as config not a code bug: saved OTR_ImageDirector widgets are flux_gen1 x3 and
+> lumina/qwen/hidream are unbuilt opt-in stubs; added a LOUD dispatch trace, no JSON change). Diagnostic
+> instr removed `5899ec7`. **LUMINA-IMAGE 2.0 BUILT + GPU-PROVEN** (`b54657f`): real render_image (native
+> split-file recipe UNETLoader+CLIPLoader[lumina2/Gemma-2]+VAELoader+ModelSamplingAuraFlow->KSampler->
+> VAEDecode via wrapper_bridge); weights in C:\ComfyUI-Models; env set User-scope (OTR_ENABLE_LUMINA=1 +
+> OTR_LUMINA_CKPT/CLIP/VAE); graduated out of the stub-peer matrix + own test file; headless 5080 smoke =
+> 1024 still in ~20s, 1.1MB real image (docs/2026-06-14-closing-credits-freeze/lumina_smoke.png). **BUG-406
+> FIXED** (`f0d8663`, REGRESSION from the 06-13 scopes node): OTR_SceneAwareScopes rendered only the
+> beats-only total_target_frames, so when the master exceeds the beats the short scopes input clamped the
+> §4D 3-input blend (shortest=1) below the master -> OTR_MasterAudioMux clone-held the last frame over the
+> closing theme = the FREEZE + missing HUD/scopes treatment; PROVEN by durations (plunging_depths blend
+> 32.24s vs master 39.7s). Fix: render_scopes now spans the master-audio length (the node already gets the
+> master audio). Suite **4255** / Bug Bible **16** / audio byte-identical **9** GREEN; HEAD==origin on
+> v2.0-alpha; only dirty file is the operator's pre-existing CLAUDE.md edit (untouched). **NEXT = operator
+> look-QA a fresh real render:** (a) opener centre still (flux_still slot), (b) title card spans the
+> head-gap, (c) scopes/HUD run to the END of the closing theme (no freeze), (d) burned SDH captions,
+> (e) lumina_image selectable per image slot (GPU-proven). Wan/LTX-REGR/3D forward order (below) unchanged.
+>
 > **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `973567e` == origin):** Objective triage at clean
 > baseline `961d8fc` was fully GREEN (suite 4249 / Bug Bible 16 / tree clean). Per operator: SPLIT the
 > bug log -- `BUG_LOG.md` is now the ARCHIVE (reference only); new active log = `BUG_LOG_2026-06.md`
