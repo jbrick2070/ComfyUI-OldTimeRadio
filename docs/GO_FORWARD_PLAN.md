@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `99320ae` == origin):** Objective triage at clean
+> **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `973567e` == origin):** Objective triage at clean
 > baseline `961d8fc` was fully GREEN (suite 4249 / Bug Bible 16 / tree clean). Per operator: SPLIT the
 > bug log -- `BUG_LOG.md` is now the ARCHIVE (reference only); new active log = `BUG_LOG_2026-06.md`
 > (epoch `BUG-LOCAL-400+`). Then fixed the first live bug **BUG-LOCAL-400** (`d967c6b`): the writer's 4
@@ -16,10 +16,22 @@
 > text_prompt, supplied by every role). Suite **4253** green; pushed. A live look-QA of the published
 > episode then found two more: **BUG-LOCAL-402** (`99320ae`, FIXED) -- the §4D procgen blend emitted
 > `format=gbrpformat`, so the scope overlay + SDH caption burn fell back to source-copy on EVERY render
-> (no burned subtitles, no audio-reactive scopes); suite **4254** green. STILL OPEN from the same look-QA
-> (separate, not yet chased): (a) the ~9.5s all-black OPENING (`b000_music_open` has no start_s/dur_s ->
-> the open still isn't composited over the music head-gap); (b) no TITLE card drawn. Forward order
-> (Wan / LTX-REGR / 3D) UNCHANGED -- this was a debug detour, not a forward-order advance.
+> (no burned subtitles, no audio-reactive scopes); suite **4254** green. THEN instrumented the composite +
+> title timing (`91e9eff`/`8a517b1`, logging-only), a live 30w smoke, + a 4-model roundtable
+> (`e26744e`/`973567e`, ~$0.41) GROUNDED the opener: **403 placement is NOT a bug** -- positioned mode
+> places b000 at `[0,9.5s)`; the all-black opener was the BUG-402 casualty (now fixed -> opener shows
+> scopes + title). **THREE remaining, converged + grounded** (plan:
+> `docs/2026-06-14-opener-still-imagemodel/roundtable/pass01_plan.md`, mirrored in `BUG_LOG_2026-06.md`
+> for the coder): **FIX1** (BUG-403-remainder, opener centre still BLACK -- `flux_still.family` not in
+> `_SCENE_INIT_FAMILIES`, so it never conditions on the beat scene still; code-only in
+> `render_driver.build_request_from_shot`, LOUD if absent); **FIX3** (BUG-404, title window ~1s -- call
+> `otr_shot_lock.overlay_audio_timing(led)` before `_resolve_title_timing` in `SignalLostVideoRenderer`);
+> **FIX2** (BUG-405, per-role image model ignored -- policy carried flux_gen1, NOT a dispatcher bug; add a
+> LOUD dispatch log, re-render to capture the policy, then fix config/registry). **NEXT WINDOW = implement
+> FIX1 -> FIX3 -> FIX2** (suite + Bug Bible per chunk; any JSON change in `otr_scifi_16gb_full.json` +
+> re-validate; remove the `[BUG-403/404 instr]` logging once all three land). Cuts: NO 2nd music_open line
+> (breaks `derive_opening_music_beat`), NO dispatcher rewrite, NO composite-floor title card. The Wan /
+> LTX-REGR / 3D forward order (below) is UNCHANGED -- this whole arc was a debug detour.
 >
 > **LATEST SESSION -- 2026-06-14 eve (planner + live GPU smoke; HEAD `1483e48`, session doc edits UNCOMMITTED):**
 > Ran the operator's Wan-vs-LTX **opener eyeball** on the live 5080. DECISIVE RESULT: **Wan i2v 14B DRIFTS off
