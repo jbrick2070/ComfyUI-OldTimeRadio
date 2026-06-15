@@ -306,6 +306,21 @@ class TestSceneStillObjects:
         assert opn["prompt"] == expect
         assert opn["prompt_hash"] == mbp._content_hash(expect)
 
+    def test_portrait_carries_cinematic_grade_bug411(self):
+        """BUG-411 consistency (operator 2026-06-14): portraits now carry the
+        same cinematic GRADE tail as the scene stills, so a flux_still beat in
+        place of HuMo shows the 6/5 graded look. Radio tail stays OFF portraits
+        (a person is not a radio set); the gear scrub still removes radio words."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{"char_id": "c01",
+                 "portrait_prompt": "a weathered engineer, kind eyes"}]
+        payload, _w = mbp.derive_image_prompts(cast, _meta_ok(), llm_fn=None)
+        port = mbp.objects_by_id(payload)["c01"]
+        assert helpers.IMAGE_GRADE_TAIL in port["prompt"]
+        assert helpers.RADIO_BROADCAST_TAIL not in port["prompt"]
+        # idempotent: the grade tail appears exactly once
+        assert port["prompt"].count(helpers.IMAGE_GRADE_TAIL) == 1
+
     def test_payload_versioned_and_portraits_migrated(self):
         from nodes import otr_meta_brief_image_prompt as mbp
         cast = [{"char_id": "c01", "portrait_prompt": "a stocky engineer"}]

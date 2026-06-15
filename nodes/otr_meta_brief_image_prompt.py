@@ -453,16 +453,25 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         try:
             try:
                 from ._otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt)
+                    IMAGE_GRADE_TAIL, finish_visual_prompt)
             except ImportError:  # pragma: no cover -- flat test imports
                 from _otr_story_brief_helpers import (  # type: ignore
-                    finish_visual_prompt)
+                    IMAGE_GRADE_TAIL, finish_visual_prompt)
             # era_profile="portrait": never bleeds the episode's ambient
             # colour palette into character faces (sci-fi = blue wash,
             # period drama = red wash). Only the atmosphere mood line is
             # safe; full palette is explicitly excluded (BUG-LOCAL-113).
             prompt = finish_visual_prompt(meta, prompt,
                                           era_profile="portrait")
+            # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
+            # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
+            # so a flux_still beat standing in for a HuMo portrait shows the same
+            # graded look as the scene stills/bookend (flux_still Ken-Burns-
+            # animates the minted PNG, so the PNG must carry the grade). The
+            # radio broadcast-distress tail stays scene-still-only (a person is
+            # not a radio set). Idempotent -- never duplicates.
+            if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
+                prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
         except Exception:  # noqa: BLE001
             pass
         out[cid] = {
