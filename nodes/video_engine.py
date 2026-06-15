@@ -288,6 +288,25 @@ def _resolve_title_timing(led, volume, fps, total_frames):
     return {}
 
 
+def _title_reveal_progress(fi, w0, me, in_dock, reveal_frac=0.4):
+    """BUG-LOCAL-409: decode/reveal progress for the hero title card.
+
+    The reveal COMPLETES in the first ``reveal_frac`` of the ``[w0, me)`` window
+    and then HOLDS solid (p == 1.0) until the POP/dock -- previously it stretched
+    across the WHOLE window, so the title only resolved on the final frame (the
+    operator saw scramble for the entire duration). Returns p in [0.0, 1.0].
+    """
+    if in_dock:
+        return 1.0
+    try:
+        rf = float(reveal_frac)
+    except (TypeError, ValueError):
+        rf = 0.4
+    rf = min(1.0, max(0.05, rf))
+    span = max(1, int((int(me) - int(w0)) * rf))
+    return min(1.0, max(0.0, (int(fi) - int(w0)) / span))
+
+
 # -----------------------------------------------------------------------------
 # CRT FRAME RENDERER - Pure Procedural Art
 # -----------------------------------------------------------------------------
@@ -683,8 +702,13 @@ class _CRTRenderer:
         me = card["music_end_f"]
         dock_frames = card["dock_frames"]
         in_dock = fi >= me
-        reveal_span = max(1, me - w0)
-        p = 1.0 if in_dock else min(1.0, max(0.0, (fi - w0) / reveal_span))
+        # BUG-LOCAL-409: resolve the reveal in the first fraction of the window,
+        # then hold the solid title until the POP/dock (env OTR_TITLE_REVEAL_FRACTION).
+        try:
+            _rfrac = float(os.environ.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
+        except (TypeError, ValueError):
+            _rfrac = 0.4
+        p = _title_reveal_progress(fi, w0, me, in_dock, _rfrac)
 
         # -- carrier-lock line "SIGNAL LOST" (decode scramble -> solid) ---
         carrier_src = "=== SIGNAL LOST ==="

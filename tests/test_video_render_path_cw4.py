@@ -362,3 +362,20 @@ def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
     segs2, total2 = plan_timeline_segments(
         manifest, floor_available=False, target_total_frames=1543, fps=25)
     assert total2 == 1543 and segs2[0]["source"] == "black"
+
+
+def test_title_reveal_resolves_early_and_holds_bug409():
+    """BUG-LOCAL-409: the hero title decode/reveal must COMPLETE in the first
+    fraction of its window and then HOLD solid -- not resolve only on the last
+    frame (the operator saw the title scramble for the whole duration)."""
+    from nodes.video_engine import _title_reveal_progress
+    w0, me, frac = 0, 100, 0.4
+    assert _title_reveal_progress(0, w0, me, False, frac) == 0.0
+    assert _title_reveal_progress(20, w0, me, False, frac) < 1.0      # mid-reveal
+    assert _title_reveal_progress(40, w0, me, False, frac) >= 1.0     # resolved by ~40%
+    assert _title_reveal_progress(80, w0, me, False, frac) == 1.0     # held solid
+    assert _title_reveal_progress(99, w0, me, False, frac) == 1.0     # solid right before POP
+    assert _title_reveal_progress(50, w0, me, True, frac) == 1.0      # dock -> solid
+    # the OLD full-window stretch would still read p==0.4 at frame 40; the new
+    # pacing resolves strictly earlier than the linear whole-window progress
+    assert _title_reveal_progress(40, w0, me, False, frac) > (40 - w0) / (me - w0)
