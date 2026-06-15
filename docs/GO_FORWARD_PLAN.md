@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **LATEST SESSION -- 2026-06-14 (autonomous fix+build window; HEAD `f0d8663` == origin):** All GREEN +
+> **LATEST SESSION -- 2026-06-14 (autonomous fix+build window; HEAD `772a2eb` == origin):** All GREEN +
 > PUSHED. **Three opener/image fixes:** FIX1 `3ef0098` (BUG-403 opener centre black -- flux_still now
 > conditions on the beat scene still in render_driver.build_request_from_shot); FIX3 `9b028c8` (BUG-404
 > ~1s title card -- overlay_audio_timing before _resolve_title_timing); FIX2 `601c13b` (BUG-405 per-role
@@ -21,6 +21,13 @@
 > look-QA a fresh real render:** (a) opener centre still (flux_still slot), (b) title card spans the
 > head-gap, (c) scopes/HUD run to the END of the closing theme (no freeze), (d) burned SDH captions,
 > (e) lumina_image selectable per image slot (GPU-proven). Wan/LTX-REGR/3D forward order (below) unchanged.
+> **+ BUG-407 `977801a`:** flux_still + all still/floor families now FILL the 16:9 canvas -- **PORTRAIT is
+> HuMo-ONLY** now (audio_driven_face), exactly per operator directive (only HuMo needs portrait). **3D
+> GROUNDED (section 5):** the only installed/active 3D is HunyuanWorld-Mirror / WorldMirror 2.0 -- a
+> MULTI-VIEW SCENE reconstructor, NOT a single-image object-mesh maker; improved-3D-input is BLOCKED on an
+> operator PATH decision (scene-recon multi-view vs install a single-image-object tool) -- the two need
+> OPPOSITE inputs, so no prompts drafted yet. The "plaster-of-paris" blob = a single flat image fed to a
+> multi-view model. Example obs (pre-fix render, shows the now-fixed freeze + portrait): plunging_depths.
 >
 > **LATEST SESSION -- 2026-06-14 (DEBUG window; HEAD `973567e` == origin):** Objective triage at clean
 > baseline `961d8fc` was fully GREEN (suite 4249 / Bug Bible 16 / tree clean). Per operator: SPLIT the
@@ -410,14 +417,25 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
-- **3D input images must be CLEAN / object-free (operator look-QA 2026-06-14 -- GO-FORWARD for the 3D sprint).**
-  The 3D rotating output looked like "a big ugly white-marble block" -- the classic single-image-to-3D
-  failure when the input is a scene/cluttered/background-y image. Image-to-mesh (TripoSG / character_3d)
-  needs a CLEAN, centered, BACKGROUND-FREE single subject. Forward item (folds into 3D plan item 5 +
-  its image-routing must-fixes): mint a DEDICATED "3D input" image per character -- isolated subject, no
-  background objects (background-removed or a no-bg prompt), centered -- and feed THAT to the mesh stage,
-  NOT the scene/portrait still. Until then the white-marble blob is expected; do not wire character_3d
-  for real until this lands.
+- **IMPROVED 3D INPUT -- BLOCKED on a PATH DECISION (operator look-QA 2026-06-14; GROUNDED this session).**
+  The 3D rotating output looked like a "blobby plaster-of-paris" block. GROUNDING (checked logs + disk):
+  the ONLY 3D system actually installed/active is **HunyuanWorld-Mirror / WorldMirror 2.0**
+  (`custom_nodes/ComfyUI-HunyuanWorld-Mirror`, model `C:\ComfyUI-Models\WorldMirror-V2\HY-WorldMirror-2.0`)
+  -- NOT Blender, NOT OTR's deferred character_3d/TripoSG. Recent episode ledgers used NO 3D engine; the
+  server log only shows HWM loading (no episode rendered 3D). **WorldMirror is a MULTI-VIEW SCENE
+  reconstructor** (image SEQUENCE -> point cloud / Gaussian splat): per its docs 1 frame = "depth/normals
+  only"; good 3D needs **8-24 FEATURE-RICH frames, orbital/forward parallax, well-lit, 50-70% overlap**. A
+  single flat/low-feature image -> the plaster blob. So the earlier "clean / object-free single image"
+  idea is the OPPOSITE of what WorldMirror needs -- object-free helps only single-image-to-OBJECT-mesh
+  tools (TripoSG / Hunyuan3D-2 / TRELLIS), which are NOT installed. **OPEN DECISION (operator, next window)
+  -- the prompt strategy is opposite per path:** (A) WorldMirror scene/world -> improved input = GENERATE
+  an orbit/multi-view sequence + rich-textured scene prompts (NOT a plain bg); or (B) single-image ->
+  object mesh -> INSTALL TripoSG/Hunyuan3D-2 + clean isolated-subject prompts. Do NOT draft the improved
+  3D prompts (and do NOT wire character_3d) until the path is picked. A roundtable can harden the chosen
+  path's prompt set. (Note: the live roundtable launcher stalled this session -- the panel blocked with no
+  output; budget a retry or a smaller panel.) Example obs finals to eyeball the EPISODE look (these do NOT
+  contain 3D): `output\otr\obs\signal_lost_plunging_depths_20260614_185229_silent_procgen_blended_final.mp4`
+  (a pre-fix render -- shows the closing FREEZE + the skinny flux_still portrait, both now fixed at HEAD).
 - **HuMo full-frame TEST (operator 2026-06-14 -- future experiment, NOT now).** Operator wants to
   eventually SEE HuMo rendered full-frame (not the 480x832 portrait pillarbox). For now portrait stays
   HuMo's REQUIREMENT -- BUG-407 shipped "full frame everything EXCEPT HuMo". Future: a HuMo full-frame /
