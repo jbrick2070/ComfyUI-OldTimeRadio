@@ -1,5 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-14 overnight (autonomous; HEAD `cdc1411` == origin):** **BUG-411 flux BOOKEND
+> lush-tint restore IMPLEMENTED + PUSHED** (suite 4264/0, Bug Bible 16/7/3 throughout). Two green chunks:
+> **Chunk 1 (`bd1fbb2`) — FluxGuidance node** (the biggest factor): `flux_gen1.py` now wires a `FluxGuidance`
+> node between the positive CLIP encode and the KSampler (guidance env `OTR_FLUX_GUIDANCE` default **3.5**;
+> ksampler.positive reads the GUIDED conditioning); resolves via `wrapper_bridge` NODE_CLASS_MAPPINGS like any
+> core node, fails LOUD→radio floor if ever absent. **Chunk 2 (`cdc1411`) — restored still tails + bookend
+> seed**: `_otr_story_brief_helpers.py` adds `IMAGE_GRADE_TAIL` ("anamorphic lens, heavy vignette, muted color
+> grade, sharp focus" — the 6/5 `_DEFAULT_STYLE_SUFFIX` delta) + `RADIO_BROADCAST_TAIL` ("35mm film grain,
+> broadcast-distressed cinematic aesthetic, centered composition" — 6/5 `_RADIO_PROMPT_SUFFIX`), appended in
+> `compose_still_prompt` on the IMAGE STILL path ONLY (after STYLE_TAIL_DEFAULT, before NO_TEXT_CLAUSE — layer
+> order + no-text contract intact); the shared STYLE_TAIL_DEFAULT (LTX + character video) + the test-pinned
+> `get_open_subject` were deliberately NOT touched. `otr_image_gen_dispatcher.resolve_object_seed` pins the
+> radio bookend (`kind=="scene_open"`) to a fixed deterministic seed (env `OTR_RADIO_BOOKEND_SEED` default
+> **4242**, the 6/5 value). **NO workflow-JSON change** (FluxGuidance is internal to the engine's in-process
+> graph, only env knobs added — `otr_scifi_16gb_full.json` untouched). Forensic + chunk detail:
+> `BUG_LOG_2026-06.md` BUG-411. **OPERATOR-GATED NEXT (visual A/B — by design):** restart ComfyUI Desktop,
+> render, A/B the bookend vs `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\stills\
+> radio_bookend_*.png`; bump `OTR_FLUX_GUIDANCE` 3.5→4.0 if the tint isn't all the way there; optionally extend
+> `IMAGE_GRADE_TAIL` to portraits (left scoped-out). No unattended GPU render was run (box-collision risk + the
+> A/B is a human judgment). **ALSO STILL OPERATOR-GATED from the prior session:** BUG-408 music A/B + golden
+> re-baseline; BUG-409 title + HuMo credits backdrop eyeball. The Wan/LTX-REGR engine thread is unchanged.
+>
 > **LATEST SESSION -- 2026-06-14 eve (look-QA fix marathon; HEAD `94c2166` == origin):** All GREEN + PUSHED
 > (suite 4261/0, Bug Bible 16/7/3 throughout). Shipped FOUR look-QA fixes + ONE forensic:
 > **BUG-410 closing CREDITS — CLOSED + operator-verified (flux_still).** Root (runtime-probed): the floor
@@ -166,19 +188,21 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (2026-06-14 eve, operator-set HANDOFF FOCUS) = BUG-411 flux BOOKEND lush-tint restore.**
-The 6/5 image pipeline was wholly rewritten; the rewrite dropped the look levers (FluxGuidance=3.5 + the
-cinematic style suffix + the radio broadcast-distress suffix + bookend seed 4242). RESTORE them in the new
-`_otr_image_engines/flux_gen1.py` + `otr_meta_brief_image_prompt.py` pipeline:
-- BUILD: a `FluxGuidance` node (guidance ≈ 3.5, env `OTR_FLUX_GUIDANCE`) wired into the flux_gen1 graph
-  between the positive CLIP encode and the KSampler (HIGHEST IMPACT); re-add the cinematic style suffix +
-  the radio bookend broadcast-distress suffix to the image-prompt builder; keep the deterministic bookend seed.
-- ACCEPTANCE: a re-rendered bookend matches the 6/5 lush tint (dim amber+cyan rim light, 35mm grain, oil-slick
-  oxidized metal) — A/B vs `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\stills\radio_bookend_*.png`;
-  suite + Bug Bible green; commit+push per chunk.
+**>>> CURRENT STEP (2026-06-14 overnight) = BUG-411 flux BOOKEND lush-tint restore — CODE DONE, awaiting operator A/B.**
+IMPLEMENTED + PUSHED (HEAD `cdc1411`, suite 4264/0, Bug Bible 16/7/3). The three dropped look levers are
+restored in the new pipeline: (1) **FluxGuidance node @ 3.5** in `flux_gen1.py` (env `OTR_FLUX_GUIDANCE`,
+chunk `bd1fbb2`) — wired positive-CLIP→guidance→KSampler; (2) **cinematic grade tail** `IMAGE_GRADE_TAIL`
++ **radio broadcast-distress tail** `RADIO_BROADCAST_TAIL` appended in `compose_still_prompt` on the IMAGE
+STILL path only (chunk `cdc1411`); (3) **deterministic bookend seed 4242** pinned for `kind=="scene_open"`
+in `resolve_object_seed` (env `OTR_RADIO_BOOKEND_SEED`). Scoped so the shared LTX/character-video style tail
+and the test-pinned open-subject are untouched; NO workflow-JSON change.
+- ACCEPTANCE (operator, GPU/eyeball — by design): restart ComfyUI Desktop, render, A/B the bookend vs
+  `output\otr\episodes\signal_lost_melting_glass_pressure_20260605_093330\stills\radio_bookend_*.png` (dim
+  amber+cyan rim light, 35mm grain, oil-slick oxidized metal). Tuning if needed: `OTR_FLUX_GUIDANCE` 3.5→4.0;
+  optionally extend `IMAGE_GRADE_TAIL` to portraits (left scoped-out). No unattended overnight GPU render.
 Full forensic + exact strings + 6/5 widget values: `BUG_LOG_2026-06.md` BUG-411 + section 5. The look-QA
-fixes BUG-408/409/410 from this session are DONE/closed (operator-gated A/B + golden re-baseline remain for
-the music). The Wan/LTX-REGR engine thread below stays the parallel ENGINE track.
+fixes BUG-408/409/410 from the prior session are DONE/closed (operator-gated A/B + golden re-baseline remain
+for the music). The Wan/LTX-REGR engine thread below stays the parallel ENGINE track.
 
 **2026-06-14 EYEBALL OUTCOME (supersedes the "Wan is the active thread" framing -- pending operator
 confirm):** the live Wan-vs-LTX opener smoke showed **Wan i2v 14B DRIFTS off the input still (not
