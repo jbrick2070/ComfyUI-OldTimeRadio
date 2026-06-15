@@ -137,13 +137,26 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     v_dur = _probe_float(silent_video_path, "v:0")
     a_dur = _probe_float(master_audio_path, "a:0")
     tol = float(duration_tol_frames) / float(fps or 25)
-    if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + tol:
+    # BUG-LOCAL-410: the rolling-credits post-roll legitimately runs the VIDEO
+    # past the master audio -- the procgen floor renders ~20s of SCROLLING
+    # credits AFTER the closing theme ends, and they play in silence. Permit an
+    # intentional silent credits tail up to OTR_MAX_CREDITS_TAIL_S; still FAIL
+    # LOUD on gross drift (a real frame-budget bug that doubles the length). The
+    # audio stays byte-identical (-c:a copy of the master: the output audio
+    # STREAM is unchanged, only the container is longer; the SHA check below
+    # still proves it). The composite's own got==total frame-budget assert is
+    # the primary correctness guard; this bound is the final sanity ceiling.
+    max_tail_s = float(os.environ.get("OTR_MAX_CREDITS_TAIL_S", "45"))
+    if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
         raise ValueError(
-            f"OTR_MasterAudioMux: silent video {v_dur:.4f}s is LONGER than master "
-            f"audio {a_dur:.4f}s by > {tol:.4f}s -- the tail of the video would "
-            f"play silently; check the composite frame budget"
+            f"OTR_MasterAudioMux: silent video {v_dur:.4f}s exceeds master audio "
+            f"{a_dur:.4f}s by > the credits-tail budget ({max_tail_s:.1f}s + "
+            f"{tol:.4f}s) -- likely a composite frame-budget bug, not the "
+            f"intended rolling-credits post-roll"
         )
-    report.append(f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s tol={tol:.4f}s OK")
+    report.append(
+        f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
+        f"tail_budget={max_tail_s:.1f}s OK")
 
     _poll_interrupt()
     # mux-LAST: copy both streams, NO -shortest.

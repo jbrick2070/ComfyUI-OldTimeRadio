@@ -417,6 +417,27 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
+- **LOOK-QA BUGS (NEW 2026-06-14 eve — operator look-QA pass; all in `BUG_LOG_2026-06.md`):**
+  - **BUG-408 default MUSIC sounds non-musical (SA3).** DECIDED Path B (keep SA3, improve prompts/inputs/
+    conditioning). 4-model roundtable CONVERGED a buildable plan: `docs/2026-06-14-sa3-music-improvement/
+    roundtable/pass01_plan.md` (+ judgment). Grounded: JSON node 83 = `stable_audio_3` (SA3 is live);
+    `test_audio_byte_identical` sha256s the FULL audio → fix REQUIRES an operator-gated golden RE-BASELINE.
+    NEXT = coder implements seconds_total/seconds_start conditioning + SA3 prompt/negative + sampler
+    constants, operator A/B-listens, then re-baselines. CODER-READY.
+  - **BUG-409 title card scrambles the WHOLE window** — resolves only in the last ~1-2s. Root grounded:
+    `video_engine.py::_draw_title_card` `reveal_span = me - w0` (whole window). Fix = reveal completes in
+    first ~35-45% then HOLD solid → POP → dock. CODER-READY.
+  - **BUG-410 closing ROLLING CREDITS / Telemetry HUD GONE (regression vs 6/5)** — **FIXED 2026-06-14.**
+    Root (runtime-probed): floor renders the full ~20s credits scroll out to 65.7s, but the deliverable was
+    locked to the master-audio length (45.7s) by the mux v≤a gate, cutting the scroll. 4-model roundtable
+    (`docs/2026-06-14-credits-tail-fix/`, ~$0.22) converged Option A (allow an intentional SILENT credits
+    post-roll). Three surgical edits, NO JSON change, audio byte-identical: composite extends to floor length;
+    §4D scopes black-padded so `shortest=1` doesn't re-clamp; mux gate relaxed to `v ≤ a + OTR_MAX_CREDITS_TAIL_S`
+    (45s, fail-loud on gross drift). Suite 4257/0, Bug Bible 16/7/3 green. NEXT = operator look-QA a fresh render
+    (closing scrolls credits to the end, silent after the theme).
+  These are GATE-A look-QA items (operator-gated track), parallel to the engine forward order — NOT a
+  reordering of section 3.
+
 - **IMPROVED 3D INPUT -- BLOCKED on a PATH DECISION (operator look-QA 2026-06-14; GROUNDED this session).**
   The 3D rotating output looked like a "blobby plaster-of-paris" block. GROUNDING (checked logs + disk):
   the ONLY 3D system actually installed/active is **HunyuanWorld-Mirror / WorldMirror 2.0**

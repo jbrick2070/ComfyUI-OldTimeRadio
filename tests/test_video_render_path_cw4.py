@@ -70,13 +70,23 @@ def test_master_audio_mux_stream_hash_byte_identical(tmp_path):
 
 
 @needs_ffmpeg
-def test_master_audio_mux_no_shortest_and_duration_guard(tmp_path):
+def test_master_audio_mux_no_shortest_and_credits_tail_guard(tmp_path, monkeypatch):
     master = tmp_path / "m.wav"
     silent = tmp_path / "s.mp4"
     _sine(master, 2.0)
-    _silent_video(silent, 3.0)   # 1s longer than the audio -> must fail closed
+    _silent_video(silent, 3.0)   # 1s longer than the audio
+    # BUG-LOCAL-410: a MODERATE longer-than-audio video is the intentional
+    # rolling-credits post-roll (the credits scroll in silence after the closing
+    # theme) -> now ALLOWED, and the audio stays byte-identical (-c:a copy).
+    out_ok = tmp_path / "ok.mkv"
+    final, _r = mux_master_audio(str(silent), str(master), str(out_ok), fps=25)
+    assert os.path.isfile(final)
+    assert audio_pcm_sha(final) == audio_pcm_sha(str(master))
+    # GROSS drift PAST the credits-tail budget still FAILS LOUD (a real
+    # frame-budget bug, not the intended post-roll).
+    monkeypatch.setenv("OTR_MAX_CREDITS_TAIL_S", "0.25")
     with pytest.raises(ValueError):
-        mux_master_audio(str(silent), str(master), str(tmp_path / "o.mkv"), fps=25)
+        mux_master_audio(str(silent), str(master), str(tmp_path / "drift.mkv"), fps=25)
     # the node never silently truncates (no -shortest); the source proves it -- the
     # only '-shortest' token in the mux module is the V-2 guard assert, never a cmd arg.
     src = (REPO_ROOT / "nodes" / "otr_master_audio_mux.py").read_text(encoding="utf-8")
@@ -264,6 +274,31 @@ def test_assemble_silent_timeline_frame_accurate_and_silent(tmp_path):
     assert abs(count_video_frames(str(out)) - count_video_frames(str(floor))) <= 2
     assert count_video_frames(str(out)) >= 50        # the per-beat clips are included
     assert count_audio_streams(str(out)) == 0        # V-1: always silent
+
+
+@needs_ffmpeg
+def test_assemble_extends_to_floor_for_credits_tail_bug410(tmp_path):
+    """BUG-LOCAL-410: when the procgen floor runs PAST the master mix (its
+    rolling-credits post-roll), the assembled silent video must extend to the
+    FULL floor length so the credits SCROLL survives -- NOT cap at the shorter
+    sibling ``*_master.wav``, which cut the scroll to the static title card."""
+    a = tmp_path / "a.mp4"
+    floor = tmp_path / "floor.mp4"
+    master = tmp_path / "ep_master.wav"      # sibling *_master.wav (the old cap source)
+    _silent_video(a, 1.0)
+    _silent_video(floor, 4.0)                # ~100 frames = master + ~2s credits post-roll
+    _sine(master, 2.0)                       # master mix SHORTER than the floor
+    manifest = {"fps": 25, "clips": [
+        {"shot_id": "s0", "target_frame_count": 25, "path": str(a), "exists": True},
+    ]}
+    out = tmp_path / "asm.mp4"
+    assemble_silent_timeline(manifest, str(floor), str(out), w=320, h=240, fps=25)
+    fl = count_video_frames(str(floor))
+    asm = count_video_frames(str(out))
+    # extends to the FLOOR (credits preserved), NOT the ~50-frame master cap
+    assert abs(asm - fl) <= 2, f"assembled {asm} != floor {fl} -- credits scroll cut (BUG-410)"
+    assert asm > 60, f"assembled {asm} capped near the 2s master -- BUG-410 regression"
+    assert count_audio_streams(str(out)) == 0
 
 
 @needs_ffmpeg

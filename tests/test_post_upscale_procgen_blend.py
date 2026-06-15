@@ -127,8 +127,12 @@ def test_build_cmd_3input_scopes_no_double_format_gbrp_bug402():
         )
         fc = cmd[cmd.index("-filter_complex") + 1]
         assert "gbrpformat" not in fc, f"green={green}: malformed filter -> {fc}"
-        # exactly three gbrp pins, each a labeled terminal: [main] [pgn] [scp]
-        assert fc.count("format=gbrp[") == 3, f"green={green}: {fc}"
+        # exactly three gbrp pins (main, pgn, scp); none collapsed to gbrpformat
+        assert fc.count("format=gbrp") == 3, f"green={green}: {fc}"
+        # BUG-LOCAL-410: the scopes track is BLACK-padded past its end so the
+        # shortest=1 lighten-blend does not re-clamp the credits post-roll back
+        # to the (shorter) scopes length.
+        assert "tpad=stop_mode=add" in fc and "[scp]" in fc, f"green={green}: {fc}"
         # captions still burn on top of the 3-input blend (not lost to fallback)
         cmd_cap = _build_blend_cmd(
             source_mp4=Path("s.mp4"), procgen_mp4=Path("p.mp4"),

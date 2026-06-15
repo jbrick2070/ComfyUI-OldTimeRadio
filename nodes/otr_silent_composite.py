@@ -442,6 +442,20 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                         "(procgen end-slice under the closing theme)"
                         % (target_total, base_total))
                 target_total = base_total
+        # BUG-LOCAL-410: the master-mix cap above only carries the credits that
+        # fit UNDER the closing theme; the procgen floor renders ~20s MORE of
+        # SCROLLING credits past the master (the rolling-credits post-roll).
+        # Extend the assembled length to the floor's FULL video frame count so
+        # the scroll survives instead of being cut to the static title card.
+        # The mux now permits this intentional SILENT credits tail
+        # (OTR_MasterAudioMux: v <= a + OTR_MAX_CREDITS_TAIL_S); the audio stays
+        # byte-identical (the credits roll in silence after the theme ends).
+        if floor_frames > 0 and (target_total is None
+                                 or int(floor_frames) > int(target_total)):
+            report.append(
+                "BUG-410 credits scroll restored: tail %s -> %d frames "
+                "(full procgen post-roll)" % (target_total, int(floor_frames)))
+            target_total = int(floor_frames)
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)

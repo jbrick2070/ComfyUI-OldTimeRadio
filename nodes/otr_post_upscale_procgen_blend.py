@@ -437,7 +437,14 @@ def _build_blend_cmd(
             f"[0:v]format=gbrp[main];"
             f"[1:v]{_conform},setpts=PTS-STARTPTS{crush_step}{green_only_step}{pgn_gbrp}[pgn];"
             f"[2:v]{_conform},setpts=PTS-STARTPTS,setsar=1,{scp_zero},"
-            f"format=gbrp[scp];"
+            # BUG-LOCAL-410: the scopes track ends at the master-audio length,
+            # but the composite/floor now run ~20s longer for the rolling-
+            # credits post-roll. Without padding, the `shortest=1` lighten-blend
+            # below would re-clamp the deliverable back to the (shorter) scopes
+            # length and re-cut the credits scroll. Pad the scopes with BLACK
+            # past its end (lighten(credits, black) == credits, so the tail is
+            # untouched); `shortest=1` then clamps to the composite/floor length.
+            f"format=gbrp,tpad=stop_mode=add:color=black:stop_duration=3600[scp];"
             f"[main][pgn]blend=all_mode={blend_mode}:"
             f"all_opacity={blend_opacity:.3f}:shortest=1[tmp];"
             f"[tmp][scp]blend=all_mode=lighten:shortest=1,"
