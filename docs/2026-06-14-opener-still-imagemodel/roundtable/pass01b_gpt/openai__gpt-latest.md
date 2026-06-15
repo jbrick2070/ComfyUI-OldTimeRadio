@@ -1,0 +1,46 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: build-ready as-is? no. FIX 1 targets a post-render manifest field that the shown composite does not consume, and FIX 2/FIX 3 are still open-ended rather than build steps.
+
+MUST-FIX BEFORE BUILD:
+1. [FIX 1] Defect: the proposed seam is wrong. `render_driver.build_clip_manifest()` writes `"init_image"` only into the clip manifest after clips already exist; in the provided `otr_silent_composite.py`, `plan_timeline_segments()` and `assemble_silent_timeline()` do not read `init_image` at all. Changing this field will not fix a black centre inside `shot_b000_music_open`.
+   Concrete fix: move the fix to `render_driver.build_request_from_shot()`, before `build_request()` is called. Ensure `_beat_id_for_shot(shot)` resolves `b000_music_open`, and that the selected `init_image` comes from the opener scene still in `ledger["images"]["images"]`. If the opener row is not currently found by `_still_index()` because it has `object_id="still_b000_music_open"` but missing/mismatched `beat_id` or `kind`, extend `_still_index()` or add a separate opener-still resolver to handle that exact row shape. Add a LOUD warning/error path when `shot_id.endswith("b000_music_open")` and no still is resolved. [ASSUMPTION] The real ledger row shape is as stated in the plan; verify the actual row fields before coding the fallback.
+
+2. [FIX 1] Defect: the plan does not prove the opener still reaches the actual renderer. The code path that feeds render engines is `build_request_from_shot()` -> `build_request()` -> `asset_refs.init_image`; `build_clip_manifest()` is too late.
+   Concrete fix: add a pre-render trace/assertion in `run_episode()` or a unit test around `build_request_from_shot()` for the synthetic opener shot: `request["asset_refs"]["init_image"]` must be non-empty, `request["observability"]["init_source"] == "scene_still"` or a dedicated opener-still source, and the basename should match the opener still row. Only then optionally mirror that value into the manifest for diagnostics.
+
+3. [FIX 2] Defect: the plan is not actionable; it ends with “NEXT (verify-at-build)” and asks the panel where the drop happens. The grounded dispatcher excerpt already shows the in-graph `gen_fn` is model-agnostic: `_inprocess_gen_fn(request)` calls `_ireg.get_engine(request.get("engine_id"))` and `eng.render_image(request, prepared)`. The “gen_fn hardcoded to Flux” fork is not supported by the provided code.
+   Concrete fix: make this a deterministic workflow/policy fix first. Capture and inspect the actual `image_policy_json` emitted by `OTR_ImageDirector.direct()` in the saved `workflows/otr_scifi_16gb_full.json`. If it contains `flux_gen1`, update the saved ImageDirector widget values/wiring in the workflow so the policy emits `lumina_image`, `qwen_image`, and `hidream_i1`. If it already contains those selected engine IDs, then verify the image registry entries exist and their `assert_usable`/`render_image` implementations are registered under those exact IDs. Do not change dispatcher routing unless that verification contradicts the excerpt.
+
+4. [FIX 2] Defect: the symptom “6 stills minted with flux_gen1” cannot be explained by missing weights under the shown dispatcher; `dispatch_images()` catches `_ireg.assert_usable(engine_id, role)` failures and skips the object, it does not fall back to Flux. Treating this as a runtime fallback bug will send the build to the wrong area.
+   Concrete fix: add a one-line report/log in `dispatch_images()` before `_ireg.assert_usable()` recording `object_id`, `role`, `slot`, and resolved `engine_id`. Use that to prove whether the policy contains Flux or the selected models. Keep the existing fail-closed skip behavior for unusable engines.
+
+5. [FIX 3] Defect: “feed `_resolve_title_timing` the audio-timed lines” is not a concrete code change. In the provided `video_engine.SignalLostVideoRenderer.render_video()`, `led = _OTRLC.load_ledger(script_json)` is used directly, and `_resolve_title_timing(led, ...)` is called later. There is no shown overlay of post-audio timing in this path.
+   Concrete fix: in `video_engine.SignalLostVideoRenderer.render_video()`, immediately after `led = _OTRLC.load_ledger(script_json)`, overlay post-audio timing before HUD/title timing consumes `led`. Smallest grounded option: call `otr_shot_lock.overlay_audio_timing(led)` or factor that helper into a shared timing-overlay module if importing the node module is unacceptable. Then `_resolve_title_timing(led, volume, fps, total_frames)` will see `start_s` on dialogue/music lines. Add a regression check where pre-audio `script_json` lines lack `start_s`, disk ledger has first dialogue `start_s≈9.5`, and `_resolve_title_timing()` returns `music_open_end_f` near `first_dialogue_f`, not `25`.
+
+6. [FIX 3] Defect: the plan does not address sequencing for the legacy `[Video]` node. `SignalLostVideoRenderer.INPUT_TYPES` has `audio` and `script_json`, but no `audio_done`/ledger-timing gate. If the workflow passes the frozen pre-audio ledger, title timing remains dependent on the disk overlay race.
+   Concrete fix: verify `workflows/otr_scifi_16gb_full.json` wiring. If `script_json` into `OTR_SignalLostVideo` is pre-audio, either rewire it to the post-audio/assembled ledger carrying timing, or add an optional `audio_done`/timed-ledger input in the same workflow change. Do not claim code-only unless the saved workflow already feeds the timed ledger.
+
+SHOULD-FIX:
+1. [Invariants / positioned-sequential contract] Defect: the plan names the `all()` trap but does not specify a fix. Current `otr_silent_composite.plan_timeline_segments()` uses `all(r.get("start_s") is not None for r in rows)`; one untimed row still flips the entire assemble to sequential mode.
+   Concrete fix: add a LOUD diagnostic branch before computing `positioned`: when `target_total_frames is not None` and some but not all rows have `start_s`, log/report the missing `shot_id`/`beat_id` values. Prefer fail-closed or explicit fallback reporting over silent sequential mode. If changing behavior is too risky for this build, at minimum make the mode flip visible in the composite report, not just temporary BUG instrumentation.
+
+2. [FIX 1] Defect: the plan assumes `still_b000_music_open` is “recorded under `ledger['images']`” but does not state the exact row fields needed by `_still_index()`, which filters `kind.startswith("scene_")` and keys by `beat_id`.
+   Concrete fix: before coding, capture the actual opener still ledger row and assert it has `kind` starting with `scene_`, `beat_id == "b000_music_open"`, and a valid `path`. If not, fix the producer of that row or broaden `_still_index()` narrowly for `object_id == "still_" + beat_id`.
+
+3. [FIX 2] Defect: the plan mentions the saved workflow widgets are all `flux_gen1` but does not include the required source-of-truth workflow edit.
+   Concrete fix: update `workflows/otr_scifi_16gb_full.json` in the same change if the ImageDirector widget values are wrong. This is required by the document’s own “Workflow source of truth” invariant.
+
+4. [FIX 3] Defect: `_resolve_title_timing()` only recognizes dialogue roles `("announcer","character")`. The plan says this is not the current root, but if post-audio lines use `speaker_role="char_voice"` or `"dialogue"` instead of `"character"`, the bug persists.
+   Concrete fix: verify actual post-audio `speaker_role` values. If they include `"char_voice"` or `"dialogue"`, extend `_SPEECH_ROLES_VIDEO` in `video_engine.py` to include those exact roles.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add a temporary smoke assertion that the first `plan_timeline_segments()` segment for the opener is `source="clip"` with `shot_id="shot_b000_music_open"` and that the render trace for that shot has non-empty `init_image`.
+- Remove `[BUG-403/404 instr]` logs once the regression checks are in place.
+- Include the resolved `image_policy_json` and first few image-dispatch rows in the render report for operator QA.
+
+CUT THESE (over-engineering):
+1. [FIX 1 / Open question 1] Cut “add the opener still to `_portrait_index` under a stable key.” `_portrait_index()` is explicitly char-id keyed for portraits; overloading it with synthetic beat stills risks confusing dialogue portrait joins. Use `_still_index()`/opener-still resolution instead.
+2. [Rejected context / music_open line] Cut any synthesis of a second `music_open` ledger line. `otr_shot_lock.derive_opening_music_beat()` already creates the synthetic opener shot from first dialogue `start_s`; adding a real line risks changing that condition and duplicating the beat.
+3. [FIX 2] Cut dispatcher rewrite unless policy capture proves selected non-Flux engine IDs reach `dispatch_images()`. The shown `_inprocess_gen_fn()` already dispatches by `request["engine_id"]`; a premature rewrite is likely churn, not a fix.
+4. [FIX 3 / Open question 3] Cut “draw the title card on the positioned composite floor” for this build. The failing function is already localized in `video_engine._resolve_title_timing()`; fixing its input timing is smaller and avoids duplicating title-card logic in the composite path.
