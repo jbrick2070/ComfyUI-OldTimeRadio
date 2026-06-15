@@ -1408,19 +1408,6 @@ def build_clip_manifest(result, *, episode_id=""):
             start_s = float(sraw) if sraw not in (None, "") else None
         except (TypeError, ValueError):
             start_s = None
-        # BUG-403/404 instrumentation (2026-06-14, PRODUCER side): for the
-        # opening-music beat, show WHERE start_s resolves -- the b000_music_open
-        # line-key miss vs the synthetic shot's `_start_s` underscore-key -- so
-        # ONE smoke pinpoints the None-row -> sequential-mode root (not just that
-        # plan_timeline_segments sees None). Remove with the fix.
-        if "music_open" in str(bid):
-            _ln_hit = lines.get(bid)
-            _LOG.info(
-                "[BUG-403/404 instr] build_clip_manifest opener: bid=%s "
-                "line_hit=%s line.start_s=%r shot.start_s=%r shot._start_s=%r "
-                "-> row.start_s=%r tfc=%s exists=%s",
-                bid, _ln_hit is not None, (_ln_hit or {}).get("start_s"),
-                shot.get("start_s"), shot.get("_start_s"), start_s, tfc, exists)
         # Round 5 F5: the talking-head face check is mechanical -- each row
         # carries the resolved char_id + the portrait it staged.
         row_char = str(shot.get("char_id")

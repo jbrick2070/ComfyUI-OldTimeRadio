@@ -221,20 +221,6 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
 
     positioned = (target_total_frames is not None and rows
                   and all(r.get("start_s") is not None for r in rows))
-    # BUG-403/404 instrumentation (2026-06-14): localize the black opener. Logs
-    # the positioned/sequential decision + each row's start_s/exists so we can
-    # see WHY [0, first_dialogue) is not a placed floor head-gap. Remove once the
-    # root fix lands.
-    log.info(
-        "[BUG-403/404 instr] plan_timeline_segments: positioned=%s "
-        "target_total=%s n_rows=%d floor_available=%s floor_frames=%d",
-        positioned, target_total_frames, len(rows), floor_available, ff)
-    for _i, _r in enumerate(rows[:6]):
-        log.info(
-            "[BUG-403/404 instr]   row[%d] shot=%s start_s=%r tfc=%s exists=%s "
-            "path=...%s", _i, _r.get("shot_id"), _r.get("start_s"),
-            _r.get("target_frame_count"), _r.get("exists"),
-            str(_r.get("path") or "")[-40:])
     if positioned:
         for r in sorted(rows, key=lambda x: float(x.get("start_s") or 0)):
             n = int(r.get("target_frame_count") or 0)
@@ -267,14 +253,6 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         tail_n = int(target_total_frames) - cursor
         emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
-    # BUG-403/404 instrumentation (2026-06-14): the first segments the composite
-    # actually emits -- distinguishes "black gap because no clip placed at [0,..)"
-    # vs "floor head-gap shown" vs "b000 clip shown". Remove with the fix.
-    for _s in segments[:6]:
-        log.info(
-            "[BUG-403/404 instr]   seg order=%s source=%s shot=%s src_start=%s "
-            "n=%s", _s.get("order"), _s.get("source"), _s.get("shot_id"),
-            _s.get("src_start_frame"), _s.get("n_frames"))
     return segments, cursor
 
 
