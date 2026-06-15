@@ -85,6 +85,11 @@ class FluxGen1ImageEngine:
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_FLUX_STEPS", 20),
             "cfg": _efloat("OTR_FLUX_CFG", 1.0),
+            # FluxGuidance embedding (BUG-411 restore): Flux.1-dev runs cfg=1.0
+            # and takes its richness/adherence from the guidance value baked into
+            # the conditioning by a FluxGuidance node -- the 6/5 pipeline applied
+            # 3.5 and the rewrite dropped it, flattening the look. Env-overridable.
+            "guidance": _efloat("OTR_FLUX_GUIDANCE", 3.5),
             "sampler_name": os.environ.get("OTR_FLUX_SAMPLER", "euler"),
             "scheduler": os.environ.get("OTR_FLUX_SCHEDULER", "simple"),
             # Request dims take precedence (still-spine ST-3 / pass-02 Gem-1:
@@ -103,6 +108,9 @@ class FluxGen1ImageEngine:
             "ckpt": ("CheckpointLoaderSimple",),
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
+            # FluxGuidance lives in comfy_extras (nodes_flux); both the core and
+            # the model-advanced registrations expose the same class name.
+            "guidance": ("FluxGuidance",),
             "latent": ("EmptyLatentImage",),
             "ksampler": ("KSampler",),
             "decode": ("VAEDecode",),
@@ -119,6 +127,12 @@ class FluxGen1ImageEngine:
                     "inputs": {"text": params["prompt"], "clip": W("ckpt", 1)}},
             "neg": {"class": "neg",
                     "inputs": {"text": params["negative"], "clip": W("ckpt", 1)}},
+            # FluxGuidance bakes the guidance value into the POSITIVE conditioning
+            # (Flux.1-dev's real richness lever at cfg=1.0); the KSampler then
+            # reads the guided positive. BUG-411 restore (6/5 applied guidance 3.5).
+            "guidance": {"class": "guidance",
+                         "inputs": {"conditioning": W("pos", 0),
+                                    "guidance": float(params["guidance"])}},
             "latent": {"class": "latent",
                        "inputs": {"width": int(params["width"]),
                                   "height": int(params["height"]),
@@ -131,7 +145,7 @@ class FluxGen1ImageEngine:
                                     "scheduler": params["scheduler"],
                                     "denoise": 1.0,
                                     "model": W("ckpt", 0),
-                                    "positive": W("pos", 0),
+                                    "positive": W("guidance", 0),
                                     "negative": W("neg", 0),
                                     "latent_image": W("latent", 0)}},
             "decode": {"class": "decode",
@@ -182,9 +196,10 @@ class FluxGen1ImageEngine:
             # take the lease next (LOUD; detach only, never unload_all_models).
             _wb.reclaim_idle_models(reason="flux_gen1 post-decode")
         log.info(
-            "[OTR.image.flux_gen1] minted portrait %dx%d seed=%d steps=%d cfg=%.2f",
+            "[OTR.image.flux_gen1] minted portrait %dx%d seed=%d steps=%d "
+            "cfg=%.2f guidance=%.2f",
             params["width"], params["height"], params["seed"],
-            params["steps"], params["cfg"])
+            params["steps"], params["cfg"], params["guidance"])
         return frames[0]
 
     def teardown(self, prepared) -> None:  # pragma: no cover - GPU

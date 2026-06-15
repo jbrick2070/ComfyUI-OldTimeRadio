@@ -683,18 +683,26 @@ def test_flux_gen1_graph_spec_is_proven_recipe():
     assert params["ckpt_name"] == "flux1-dev-fp8.safetensors"   # the box default
     assert params["seed"] == 4242
     assert params["sampler_name"] == "euler" and params["scheduler"] == "simple"
+    # BUG-411 restore: FluxGuidance defaults to 3.5 (the 6/5 look lever).
+    assert params["guidance"] == 3.5
     graph = eng._build_flux_graph(params, Wire)
-    assert set(graph) == {"ckpt", "pos", "neg", "latent", "ksampler", "decode"}
+    assert set(graph) == {"ckpt", "pos", "neg", "guidance", "latent",
+                          "ksampler", "decode"}
     # CheckpointLoaderSimple out slots: 0=MODEL, 1=CLIP, 2=VAE (proven wiring)
     assert graph["pos"]["inputs"]["clip"] == Wire("ckpt", 1)
+    # FluxGuidance bakes guidance into the POSITIVE conditioning; the KSampler
+    # reads the GUIDED positive, not the raw CLIP encode (BUG-411).
+    assert graph["guidance"]["inputs"]["conditioning"] == Wire("pos", 0)
+    assert graph["guidance"]["inputs"]["guidance"] == 3.5
     assert graph["ksampler"]["inputs"]["model"] == Wire("ckpt", 0)
-    assert graph["ksampler"]["inputs"]["positive"] == Wire("pos", 0)
+    assert graph["ksampler"]["inputs"]["positive"] == Wire("guidance", 0)
     assert graph["ksampler"]["inputs"]["negative"] == Wire("neg", 0)
     assert graph["ksampler"]["inputs"]["latent_image"] == Wire("latent", 0)
     assert graph["decode"]["inputs"]["samples"] == Wire("ksampler", 0)
     assert graph["decode"]["inputs"]["vae"] == Wire("ckpt", 2)
     cands = eng._node_candidates()
     assert cands["ckpt"] == ("CheckpointLoaderSimple",)
+    assert cands["guidance"] == ("FluxGuidance",)
     assert cands["decode"] == ("VAEDecode",)
 
 
@@ -705,12 +713,14 @@ def test_flux_gen1_params_env_overridable(monkeypatch):
     monkeypatch.setenv("OTR_FLUX_STEPS", "8")
     monkeypatch.setenv("OTR_FLUX_WIDTH", "768")
     monkeypatch.setenv("OTR_FLUX_HEIGHT", "1024")
+    monkeypatch.setenv("OTR_FLUX_GUIDANCE", "2.0")
     from nodes._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
     params = FluxGen1ImageEngine()._flux_params({"prompt": "p", "seed": 7})
     assert params["ckpt_name"] == "my-flux.safetensors"
     assert params["steps"] == 8
     assert params["width"] == 768 and params["height"] == 1024
     assert params["seed"] == 7
+    assert params["guidance"] == 2.0   # BUG-411: env-overridable guidance
 
 
 def test_dispatcher_render_failure_degrades_to_floor(clean_image_registry, tmp_path):
