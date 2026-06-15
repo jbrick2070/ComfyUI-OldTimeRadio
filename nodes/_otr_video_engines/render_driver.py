@@ -1191,15 +1191,22 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
     # first video beat so HuMo/LTX load into a clean GPU and the render-phase peak
     # reflects ONE resident heavy engine. LOUD by contract; a no-op off the box.
     try:
-        from . import wrapper_bridge as _wb
-        # PHASE-BOUNDARY free (not the surgical post-decode reclaim): the detach-only
-        # path detached 0 under ComfyUI's dynamic-VRAM "Staged" model, leaving the
-        # ~16GB flux portrait stack pinned -> the 14B wan_i2v OOM'd at the ksampler.
-        # This canonically frees every idle model (cleanup_models_gc + free_memory +
-        # soft_empty_cache; never unload_all_models) so the first video beat loads
-        # into a clean GPU. MEASURED: the LOUD log reports torch-free MB before/after.
-        _wb.free_idle_models_before_phase(
-            " (pre-render: all stills minted, freeing the still/portrait phase)")
+        # PHASE-BOUNDARY residue free (stills -> video). A ComfyUI-only reclaim is
+        # NOT enough: the detach loop detached 0 AND free_memory freed 0MB live
+        # (measured 2026-06-15, torch-free 6939MB -> 6939MB), because the ~7GB
+        # resident residue is the OUT-OF-BAND transformers caches (the writer LLM,
+        # Bark, ...) loaded through OTR's OWN loaders -- ComfyUI's model_management
+        # cannot see them, so free_memory/empty_cache cannot touch them. The
+        # canonical Lever-1 freer releases the writer LLM + Bark FIRST, THEN
+        # ComfyUI FLUX (detach + unload_all_models), then flushes the allocator, so
+        # the first video beat (14B wan_i2v) loads into a clean GPU instead of
+        # OOMing at the ksampler. Best-effort (never raises); MEASURED telemetry.
+        from .._otr_vram_levers import free_otr_pipeline_residue as _free_residue
+        _rep = _free_residue(reason="pre-render: all stills minted")
+        _LOG.warning(
+            "[OTR video] pre-render residue free: ran=%s failed=%s free_gb_after=%s",
+            _rep.get("steps_run"), _rep.get("steps_failed"),
+            _rep.get("free_gb_after"))
     except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
         _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)
     for shot in section["shots"]:
