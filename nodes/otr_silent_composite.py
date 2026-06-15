@@ -445,6 +445,20 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)
+    # [BUG-406 instr] closing-freeze diagnostic (2026-06-14): does the frame
+    # budget extend to cover the CLOSING THEME (target_total > the beats-only
+    # mft_total via the floor credits-restore above), and is the TAIL floor-
+    # filled (rolling-credits/HUD post-roll) or a clone/black? floor_ok gates the
+    # extension. Remove once BUG-406 is fixed.
+    log.info(
+        "[BUG-406 instr] budget: mft_total=%s target_total=%s total=%s "
+        "floor_ok=%s floor_frames=%s fps=%s n_segments=%s",
+        mft_total, target_total, total, floor_ok, floor_frames, fps, len(segments))
+    for _s in segments[-4:]:
+        log.info(
+            "[BUG-406 instr]   TAIL seg order=%s source=%s shot=%s src_start=%s "
+            "n=%s", _s.get("order"), _s.get("source"), _s.get("shot_id"),
+            _s.get("src_start_frame"), _s.get("n_frames"))
     if not segments or total <= 0:
         raise ValueError("OTR_SilentComposite: manifest has no renderable beats")
     workdir = tempfile.mkdtemp(prefix="otr_assemble_")
