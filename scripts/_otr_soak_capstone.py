@@ -64,7 +64,16 @@ REPORT_PATH = os.path.join(SERVER_OUTPUT, "otr", "episodes", "_shared",
                            "state", "node_episode_report.json")
 RESULTS_DIR = os.path.join(_HERE, "_otr_soak_capstone_results")
 VRAM_CEILING_MB = 14.5 * 1024
-POLL_TIMEOUT_S = 5400
+# Per-leg render poll ceiling. Env-overridable (OTR_SOAK_POLL_TIMEOUT_S): the
+# 14B wan_i2v lane now RENDERS for real (the flux/residue OOM fix, 2026-06-15)
+# instead of falling back to stills in seconds, so a full Wan episode's
+# wall-clock at the 16GB edge can exceed the 90-min default -- an overnight soak
+# raises this. (The render-phase paging slowness itself is CS-3 inter-beat
+# reclaim, tracked separately; this knob only stops the poll from giving up.)
+try:
+    POLL_TIMEOUT_S = int(os.environ.get("OTR_SOAK_POLL_TIMEOUT_S", "5400"))
+except (TypeError, ValueError):
+    POLL_TIMEOUT_S = 5400
 #: target_words patched into the writer. 30 = the proven smoke config; 0 =
 #: do NOT patch -- the canonical workflow's own saved default runs (the REAL
 #: full episode; the marathon driver sets this). Env-overridable
