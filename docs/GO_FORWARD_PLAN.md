@@ -696,5 +696,5 @@ engine, one real episode) vs "B-parity ship" (>=2 engines bind at SHIP).
 
 ## 8. PARKED -- not now
 
-Story-spine; story-pipeline; broader audio stack; MuseTalk; RTXUpscale; LTX-AV lane (own plan, gated);
+Story-spine; story-pipeline; broader audio stack; MuseTalk; RTXUpscale; LTX-AV audio-input lane (CONVERGED-REFRESH, build-ready PENDING M0 graph-spike: `docs/2026-06-15-ltx-av-alternative/roundtable/pass03_plan_FINAL.md` -- 3 live panel passes 2026-06-15 re-grounded the 6/10 spec vs HEAD; probe-or-park on the 5080; Lane A = today's shipped LTX motion IS prod);
 switchable S3-S6 (closing phase, AFTER 3D); 3D GPU lanes until S-3D-0 + the operator green light.
