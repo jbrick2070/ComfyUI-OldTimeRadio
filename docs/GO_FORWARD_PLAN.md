@@ -426,14 +426,9 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   - **BUG-409 title card scrambles the WHOLE window** — **FIXED 2026-06-14 (`9e0b658`).** New
     `_title_reveal_progress` resolves the reveal in the first ~40% of the window then holds solid (env
     `OTR_TITLE_REVEAL_FRACTION`); close card stays bounded to the main video (no credits overlap). Suite 4259/0.
-  - **BUG-410 closing ROLLING CREDITS / Telemetry HUD GONE (regression vs 6/5)** — **FIXED 2026-06-14.**
-    Root (runtime-probed): floor renders the full ~20s credits scroll out to 65.7s, but the deliverable was
-    locked to the master-audio length (45.7s) by the mux v≤a gate, cutting the scroll. 4-model roundtable
-    (`docs/2026-06-14-credits-tail-fix/`, ~$0.22) converged Option A (allow an intentional SILENT credits
-    post-roll). Three surgical edits, NO JSON change, audio byte-identical: composite extends to floor length;
-    §4D scopes black-padded so `shortest=1` doesn't re-clamp; mux gate relaxed to `v ≤ a + OTR_MAX_CREDITS_TAIL_S`
-    (45s, fail-loud on gross drift). Suite 4257/0, Bug Bible 16/7/3 green. NEXT = operator look-QA a fresh render
-    (closing scrolls credits to the end, silent after the theme).
+  - **BUG-410 closing ROLLING CREDITS** — **CLOSED 2026-06-14 (operator-verified on flux_still).** Credits
+    scroll over the held last clip to the end again (silent after the theme). Detail in `BUG_LOG_2026-06.md`
+    + `docs/2026-06-14-credits-tail-fix/`. (HuMo backdrop not yet eyeballed — low risk, engine-agnostic path.)
   These are GATE-A look-QA items (operator-gated track), parallel to the engine forward order — NOT a
   reordering of section 3.
 
