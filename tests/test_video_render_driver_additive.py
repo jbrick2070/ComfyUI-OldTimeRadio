@@ -332,6 +332,27 @@ def test_build_request_from_shot_flux_still_missing_still_is_loud_not_black():
     assert req["observability"]["init_source"] == "none"
 
 
+def test_build_request_from_shot_flux_still_fills_landscape_canvas():
+    # 2026-06-14 operator catch: flux_still (and the other still/floor families)
+    # inherited build_request's 480x832 HuMo PORTRAIT default -> a skinny portrait
+    # pillarboxed in the 16:9 frame. Non-face engines must FILL the landscape
+    # canvas; only audio_driven_face (HuMo) keeps its portrait pillarbox.
+    led = _flux_still_opener_ledger()
+    req = rd.build_request_from_shot(led["video"]["shots"][0], led)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)
+    assert req["canvas"]["w"] > req["canvas"]["h"]        # landscape, not portrait
+
+
+def test_build_request_from_shot_humo_keeps_portrait_canvas():
+    # the talking-head face family is the ONE that stays portrait (the accepted
+    # pillarbox) -- the landscape fill must NOT touch audio_driven_face.
+    led = _real_ledger()
+    shot = dict(led["video"]["shots"][1])
+    shot["engine_id"] = "humo_1.7B"                        # audio_driven_face
+    req = rd.build_request_from_shot(shot, led)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (480, 832)  # portrait kept
+
+
 def test_voice_audio_resolver_engine_fields_and_sfx_exclusion():
     assert rd._voice_audio_for_line({"audio_wav_path": "a.wav"}) == "a.wav"
     assert rd._voice_audio_for_line({"indextts2_wav_path": "i.wav"}) == "i.wav"

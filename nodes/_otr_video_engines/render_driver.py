@@ -786,14 +786,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                                                else "none")
     req["observability"]["init_image"] = (os.path.basename(init_image)
                                           if init_image else "")
-    # FULL-FRAME landscape for the generative-motion engines (operator
-    # look-QA 2026-06-10): build_request's default canvas is the HuMo
-    # PORTRAIT (480x832, the accepted talking-head pillarbox), and LTX/Wan
-    # inherited it -- skinny portrait b-roll in a 1472x832 frame. Those
-    # engines render the composite canvas instead (both dims /32 for the
-    # LTX latent grid; env-overridable). The old init_w/init_h echo is gone
-    # (W7-pre: schema extras; the aspect hint equalled the canvas = identity).
-    if str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v"):
+    # FULL-FRAME landscape for EVERY non-talking-head engine (operator look-QA
+    # 2026-06-10 + 2026-06-14): build_request's default canvas is the HuMo
+    # PORTRAIT (480x832, the accepted talking-head pillarbox). LTX/Wan were given
+    # the landscape canvas in 2026-06-10, but the still/floor families
+    # (flux_still, station_card, still_kenburns, visualizer) STILL inherited the
+    # 480x832 portrait -> skinny-portrait b-roll pillarboxed in the 16:9 frame
+    # (2026-06-14 operator catch on flux_still). Give the composite landscape
+    # canvas to every engine EXCEPT the face families: audio_driven_face (HuMo)
+    # keeps its accepted portrait pillarbox; lipsync_overlay / character_3d align
+    # to a face. Both dims stay /32-friendly for the LTX latent grid; env-
+    # overridable via OTR_VIDEO_LANDSCAPE_CANVAS.
+    _canvas_fam = engine_family(str(shot.get("engine_id") or ""), "")
+    if _canvas_fam not in ("audio_driven_face", "lipsync_overlay", "character_3d"):
         _lc = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
         try:
             _lw, _lh = (int(x) for x in _lc.lower().split("x", 1))
