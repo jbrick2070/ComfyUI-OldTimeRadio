@@ -51,7 +51,12 @@ UNIVERSAL_FLOOR = "still_kenburns"
 #: no-compile lane; hunyuan3d_talk/trellis_talk stay registered-dark for the
 #: deferred toolkit lane); the overlay keeps the chains resolvable in contexts
 #: that never import that module (mirrors scripts/otr_video_soak).
-SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
+SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo",
+                   # LTX-AV lane (belt-and-braces for the guarded-import edge:
+                   # if eng_ltx_av fails to import, fallback_of still resolves a
+                   # chain that terminates at the floor). Mirrors each engine's
+                   # declared fallback_engine.
+                   "ltx_av_talk": "humo", "ltx_av_music": "ltx_video"}
 
 #: engine_id -> family, for restamping onto a fallback engine (covers the
 #: possibly-unimported 3D engines + the A/cheap engines).
@@ -65,6 +70,10 @@ ENGINE_FAMILY = {
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
     "abstract": "abstract", "station_card": "static_image_gen",
     "visualizer": "abstract", "flux_still": "static_image_gen",
+    # LTX-AV (audio-input) lane: talk reuses audio_driven_face (portrait I2V +
+    # audio), music is the NEW audio_conditioned_video family.
+    "ltx_av_talk": "audio_driven_face",
+    "ltx_av_music": "audio_conditioned_video",
 }
 
 #: The (role, engine, family) rotation covering all 5 roles + the 7 non-3D
@@ -751,6 +760,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         bid = _beat_id_for_shot(shot)
         start_s = line.get("start_s")
         dur_s = line.get("dur_s")
+        # M3 delta (c): the SYNTHETIC opening-music beat (b000) has no ledger
+        # line, so the per-line start_s/dur_s are absent. ltx_av_music is an
+        # audio-reactive lane that needs the per-beat slice -- fall back to the
+        # SHOT row's start_s/dur_s for THIS engine only, so every other engine
+        # keeps the line-backed slice path byte-identical.
+        if (start_s is None or dur_s is None) and \
+                str(shot.get("engine_id") or "") == "ltx_av_music":
+            if start_s is None:
+                start_s = shot.get("start_s")
+            if dur_s is None:
+                dur_s = shot.get("dur_s")
         if (start_s is not None and dur_s is not None
                 and float(dur_s) > 0):
             # 7.3 slice key: the master CONTENT hash is the cache identity
@@ -824,6 +844,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lxw, _lxh = 832, 480
         req["canvas"]["w"], req["canvas"]["h"] = _lxw, _lxh
+    # LTX-AV (audio-input) lane (M3 delta a): render at the M0-PROVEN-SAFE native
+    # canvas. 512x288 MEASURED 13688 MB peak <= 14500 on the 5080 at GGUF Q3_K_M;
+    # the 22B A2V model would blow the budget at the 480x832 portrait (talk) /
+    # 1472x832 landscape (music) defaults set above, so clamp BOTH ltx_av lanes
+    # here and let OTR_SilentComposite scale the clip to the deliverable. Diverges
+    # from ltx_video's 832x480 ON PURPOSE (heavier 22B). Env
+    # OTR_LTX_AV_RENDER_CANVAS (default 512x288; /32-friendly); M4 may bump it once
+    # a larger canvas is GPU-verified <= 14.5 GB.
+    if str(shot.get("engine_id") or "") in ("ltx_av_talk", "ltx_av_music"):
+        _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", "512x288")
+        try:
+            _avw, _avh = (int(x) for x in _avc.lower().split("x", 1))
+        except (ValueError, AttributeError):
+            _avw, _avh = 512, 288
+        req["canvas"]["w"], req["canvas"]["h"] = _avw, _avh
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside
@@ -885,7 +920,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
-    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v")
+    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_av_music")
             and not text_prompt):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
         # beat-id suffix is definitive; empty source_line_ids counts only
@@ -1074,7 +1109,16 @@ def _render_one(engine_name, request, *, force_oom):
     eng = _vreg.get_engine(engine_name)
     prepared = None
     try:
-        eng.assert_usable(host_caps={}, profile={})
+        # M3 delta (d): pass the request as the assert_usable template so an
+        # engine that validates request-shaped inputs (the LTX-AV av_dims gate
+        # on request.canvas) sees the real canvas. Guarded -- a legacy adapter
+        # whose assert_usable predates the request_template kwarg keeps working
+        # (TypeError -> retry without it); real usability rejections raise
+        # EngineUnusable, never TypeError, so this never masks one.
+        try:
+            eng.assert_usable(host_caps={}, profile={}, request_template=request)
+        except TypeError:
+            eng.assert_usable(host_caps={}, profile={})
         prepared = eng.prepare(host_caps={}, profile={}, session_ctx={})
         raw = eng.render_clip(request, prepared)
         return eng.canonicalize(raw, request, {})
@@ -1376,11 +1420,39 @@ def apply_engine_override(ledger):
         return ledger
     section = (ledger.get("video") or {})
     n = 0
+    try:
+        from .._otr_shared import role_compat as _role_compat
+    except Exception:  # noqa: BLE001 - never block the override on an import
+        _role_compat = None
     for shot in section.get("shots") or []:
         role = str(shot.get("role") or "")
         engine = mapping.get(role) or mapping.get("*")
         if not engine or shot.get("engine_id") == engine:
             continue
+        # M3 delta (f): OTR_FORCE_ENGINE_MAP is an UNCONDITIONAL operator
+        # experiment knob (forcing any engine onto any role is intentional, e.g.
+        # ltx_video onto character_video for b-roll) -- so the force is ALWAYS
+        # applied. But annotate a force that does NOT fit the role per the shared
+        # role_compat filter with a LOUD warning so a mis-route is visible; the
+        # render-time assert_usable gate is still the final authority (forcing
+        # never bypasses it -- an unfit pick degrades LOUD at render).
+        if _role_compat is not None and role and _vreg.is_registered(engine):
+            _eng = _vreg.get_engine(engine)
+            _desc = {"engine_id": engine,
+                     "roles": tuple(getattr(_eng, "roles", ()) or ()),
+                     "required_inputs": tuple(
+                         getattr(_eng, "required_inputs", ()) or ())}
+            try:
+                _fits = _role_compat.engine_fits_role(_desc, role)
+            except Exception:  # noqa: BLE001 - unknown role etc. -> warn unfit
+                _fits = False
+            if not _fits:
+                _LOG.warning(
+                    "[OTR video] OTR_FORCE_ENGINE_MAP: role=%s does NOT fit "
+                    "engine=%s per role_compat (roles=%r required_inputs=%r) -- "
+                    "applying the force anyway (operator experiment knob); it "
+                    "will degrade LOUD at render if assert_usable rejects it",
+                    role, engine, _desc["roles"], _desc["required_inputs"])
         _LOG.warning(
             "[OTR video] LOUD ENGINE OVERRIDE shot=%s role=%s %s -> %s "
             "(OTR_FORCE_ENGINE_MAP)", shot.get("shot_id"), role or "?",
