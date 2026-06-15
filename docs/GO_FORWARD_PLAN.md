@@ -188,8 +188,11 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (2026-06-14 overnight) = BUG-411 flux BOOKEND lush-tint restore — CODE DONE, awaiting operator A/B.**
-IMPLEMENTED + PUSHED (HEAD `cdc1411`, suite 4264/0, Bug Bible 16/7/3). The three dropped look levers are
+**>>> CURRENT STEP (2026-06-14 overnight) = BUG-411 flux lush-tint restore (bookend + ALL flux) — CODE DONE, awaiting operator A/B.**
+IMPLEMENTED + PUSHED (HEAD `1eb5c78`, suite 4265/0, Bug Bible 16/7/3). **Chunk 3 (`1eb5c78`)** extended the
+cinematic grade to PORTRAITS too (operator: "keep ALL flux consistent") — grounded that `flux_still`
+Ken-Burns-animates a pre-minted flux PNG, so every flux PNG (portrait + scene still + bookend) now carries the
+same grade and a flux_still beat standing in for HuMo matches the 6/5 look. The three dropped look levers are
 restored in the new pipeline: (1) **FluxGuidance node @ 3.5** in `flux_gen1.py` (env `OTR_FLUX_GUIDANCE`,
 chunk `bd1fbb2`) — wired positive-CLIP→guidance→KSampler; (2) **cinematic grade tail** `IMAGE_GRADE_TAIL`
 + **radio broadcast-distress tail** `RADIO_BROADCAST_TAIL` appended in `compose_still_prompt` on the IMAGE
