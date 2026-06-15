@@ -304,3 +304,58 @@ def test_video_legacy_list_raises(tmp_path):
     assert "legacy parser-list" in msg or "OTR_LedgerScriptWriter" in msg, (
         f"ValueError message should name the legacy shape; got: {msg!r}"
     )
+
+
+def test_resolve_title_timing_spans_head_gap_not_1s_bug404():
+    """BUG-LOCAL-404: with per-line audio timing present (the post-overlay state
+    render_video now guarantees), the hero title-card window spans
+    [0, first_dialogue) -- ~9.5s here -- NOT the ~1s volume-envelope fallback a
+    pre-audio (start_s-less) ledger collapsed to."""
+    import numpy as np
+    from nodes.video_engine import _resolve_title_timing
+
+    fps = 25
+    led = {"lines": [
+        {"line_id": "b001", "speaker_role": "announcer",
+         "start_s": 9.5, "dur_s": 8.87},
+        {"line_id": "b002", "speaker_role": "character",
+         "start_s": 18.37, "dur_s": 6.86},
+    ]}
+    total = fps * 60
+    # A flat/silent envelope: the heuristic fallback would give ~0 frames, so a
+    # nonzero head-gap window proves first_dialogue (not the envelope) drove it.
+    volume = np.zeros(total, dtype="float32")
+    out = _resolve_title_timing(led, volume, fps, total_frames=total)
+    exp_end = int(round(9.5 * fps))            # 238, the first-dialogue onset
+    assert out["music_open_start_f"] == 0
+    assert out["music_open_end_f"] == exp_end
+    assert out["first_dialogue_f"] == exp_end
+    assert out["music_open_end_f"] > fps       # not the ~1s collapse
+
+
+def test_overlay_audio_timing_stamps_start_s_from_disk_bug404(tmp_path, monkeypatch):
+    """BUG-LOCAL-404: overlay_audio_timing stamps per-line start_s/dur_s from the
+    newest on-disk ledger onto a pre-audio (timing-less) in-memory ledger, so
+    render_video's _resolve_title_timing sees real onsets. TEST_MODE skips the
+    disk read, so the test unsets it and points the finder at a temp ledger."""
+    import json as _json
+    from nodes import otr_shot_lock as sl
+
+    led = {"lines": [
+        {"line_id": "b001", "speaker_role": "announcer"},
+        {"line_id": "b002", "speaker_role": "character"},
+    ]}
+    disk = {"lines": [
+        {"line_id": "b001", "start_s": 9.5, "dur_s": 8.87},
+        {"line_id": "b002", "start_s": 18.37, "dur_s": 6.86},
+    ]}
+    p = tmp_path / "signal_lost_probe_ledger.json"
+    p.write_text(_json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.find_most_recent_ledger",
+                        lambda roots: p)
+
+    out = sl.overlay_audio_timing(led)
+    assert out["lines"][0]["start_s"] == 9.5
+    assert out["lines"][0]["dur_s"] == 8.87
+    assert out["lines"][1]["start_s"] == 18.37

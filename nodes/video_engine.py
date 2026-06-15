@@ -248,7 +248,21 @@ def _resolve_title_timing(led, volume, fps, total_frames):
         if first_dialogue_f is not None and first_dialogue_f > 0:
             end_f = min(first_dialogue_f, cap)
         else:
+            # FIX3 / BUG-LOCAL-404 guard: reaching the volume-envelope heuristic
+            # means NO music_open line resolved AND no first-dialogue onset --
+            # i.e. the lines carry no start_s (the audio-timing overlay is
+            # missing). That previously collapsed the card to ~1s SILENTLY;
+            # make it LOUD so a missing overlay can never quietly recur. The
+            # render_video overlay_audio_timing() call should keep this
+            # unreachable on a normal run.
             end_f = _envelope_intro_end(volume, fps, cap)
+            log.warning(
+                "[Video] title-card timing DEGRADE (BUG-404 guard): no "
+                "music_open line and no first-dialogue onset -- lines carry no "
+                "start_s, so the card window falls back to the volume-envelope "
+                "heuristic (end_f=%s). The audio-timing overlay should make "
+                "this unreachable; investigate the ledger timing for this run.",
+                end_f)
         if end_f and end_f > 0:
             out["music_open_start_f"] = 0
             out["music_open_end_f"] = int(end_f)
@@ -1724,6 +1738,16 @@ class SignalLostVideoRenderer:
         # as separate parameters instead of a director-shaped plan dict.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
+        # FIX3 / BUG-LOCAL-404: the script_json from the freeze cascade is
+        # PRE-audio -- its lines carry no start_s, so _resolve_title_timing
+        # (below) saw first_dialogue_f=None and collapsed the hero title-card
+        # window to the ~1s volume-envelope fallback. Overlay the real per-line
+        # audio timing from the newest on-disk ledger (the same disk contract
+        # ShotLock/SceneSequencer use; gated on audio_done by the time Video
+        # runs, fail-soft, skipped under OTR_TEST_MODE) so the card spans
+        # [0, first_dialogue). Import is lazy + side-effect-free.
+        from . import otr_shot_lock as _OTRSL
+        led = _OTRSL.overlay_audio_timing(led)
         _meta = led.get("meta") or {}
         voice_assignments = _OTRLC.voice_assignments_from_cast(led)
         style = _meta.get("style") or ""
