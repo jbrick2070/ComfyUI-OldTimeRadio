@@ -676,6 +676,30 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "scene still in the ledger -- falling back to the pre-spine "
                 "init (%s)", _family, shot.get("shot_id"), _bid,
                 init_source)
+    # FIX1 / BUG-LOCAL-403 (opener centre BLACK): flux_still is family
+    # "static_image_gen" -- in NEITHER _SCENE_INIT_FAMILIES nor the ltx_video
+    # branch -- so an opener that picks flux_still for the music slot kept
+    # init_image="" (the b000 music-open beat has char_id="") and the cheap
+    # family synthesized its dark floor (color=0x0A0E14) => a black centre.
+    # Condition flux_still on the beat's SCENE still like the other init-driven
+    # engines; LOUD if absent (never a silent black). station_card (the other
+    # static_image_gen family) is intentionally NOT included here -- its
+    # announcer-card behavior is unchanged.
+    if str(shot.get("engine_id") or "") == "flux_still":
+        _bid = _beat_id_for_shot(shot)
+        _still = _still_index(ledger).get(_bid, "")
+        if _still:
+            init_image = _still
+            init_source = "scene_still"
+            _LOG.info(
+                "[OTR.render_driver] flux_still: beat %s conditioning on scene "
+                "still %s (BUG-403 opener fix)", _bid, os.path.basename(_still))
+        else:
+            _LOG.warning(
+                "[OTR.render_driver] flux_still MISSING-STILL (LOUD): beat %s "
+                "has NO scene still in the ledger -- the cheap family will "
+                "synthesize its dark floor for this beat; investigate the "
+                "image phase for beat %s.", _bid, _bid)
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --

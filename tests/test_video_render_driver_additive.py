@@ -275,6 +275,63 @@ def test_build_request_from_shot_seed_keyed_to_hash_not_index():
     assert rd.build_request_from_shot(s1, led)["seed_bundle"] == r1["seed_bundle"]
 
 
+def _flux_still_opener_ledger():
+    """A ShotLock-shaped ledger whose OPENER beat (b000_music_open, char_id="")
+    picks flux_still for the music slot, with the ST-3 scene-still write-back
+    present (kind scene_open, beat_id b000_music_open) -- the real opener shape
+    from a live render (signal_lost_..._171037)."""
+    return {
+        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA, "ledger_frozen": True},
+        "lines": [
+            {"line_id": "b000_music_open", "char_id": "",
+             "speaker_role": "music_open", "start_s": 0.0, "dur_s": 9.5},
+            {"line_id": "b001", "char_id": "announcer", "speaker_role": "announcer",
+             "start_s": 9.5, "dur_s": 2.0, "bark_wav_path": "X:/a/seg_b001.wav"},
+        ],
+        "images": {"images": [
+            {"object_id": "still_b000_music_open", "kind": "scene_open",
+             "beat_id": "b000_music_open", "char_id": "",
+             "path": "X:/img/still_b000_music_open.png"},
+            {"object_id": "announcer", "kind": "portrait",
+             "path": "X:/img/announcer.png"},
+        ]},
+        "video": {"video_revision": 1, "fps": 25, "shots": [
+            {"shot_id": "shot_b000_music_open",
+             "source_line_ids": ["b000_music_open"],
+             "engine_id": "flux_still", "family": "static_image_gen",
+             "group_id": "grp_music", "target_frame_count": 238,
+             "degradation_trail": [], "render_request_hash": "hash_b000",
+             "cache_keys": {"request_hash": "hash_b000"},
+             "creative": {"text_prompt": "radio console, warm tungsten glow"}},
+        ]},
+    }
+
+
+def test_build_request_from_shot_flux_still_opener_conditions_on_scene_still():
+    # FIX1 / BUG-LOCAL-403: flux_still (family static_image_gen) must condition
+    # the opener on its beat scene still -- without it the cheap family draws a
+    # black floor (the all-black opener centre). beat_id b000_music_open keys
+    # both _beat_id_for_shot and the scene_open still row.
+    led = _flux_still_opener_ledger()
+    shot = led["video"]["shots"][0]
+    req = rd.build_request_from_shot(shot, led)
+    assert req["asset_refs"]["init_image"] == "X:/img/still_b000_music_open.png"
+    assert req["observability"]["init_source"] == "scene_still"
+
+
+def test_build_request_from_shot_flux_still_missing_still_is_loud_not_black():
+    # No scene still for the opener -> init stays empty (the cheap family will
+    # draw its floor) but the degrade is LOUD (the branch warns), never a silent
+    # scene_still claim. init_source falls back to "none".
+    led = _flux_still_opener_ledger()
+    led["images"]["images"] = [r for r in led["images"]["images"]
+                               if r["object_id"] != "still_b000_music_open"]
+    shot = led["video"]["shots"][0]
+    req = rd.build_request_from_shot(shot, led)
+    assert req["asset_refs"] == {}                       # no still -> empty
+    assert req["observability"]["init_source"] == "none"
+
+
 def test_voice_audio_resolver_engine_fields_and_sfx_exclusion():
     assert rd._voice_audio_for_line({"audio_wav_path": "a.wav"}) == "a.wav"
     assert rd._voice_audio_for_line({"indextts2_wav_path": "i.wav"}) == "i.wav"
