@@ -222,7 +222,10 @@ def test_wan_render_requires_init_image():
 
 # --- end-to-end with fakes + real ffmpeg ----------------------------------- #
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_ltx_render_clip_to_silent_mp4():
+def test_ltx_render_clip_to_silent_mp4(monkeypatch):
+    # Base (non-loop) render mechanics: pin the boomerang OFF so frame_count is
+    # the raw decode (the loop path has its own test below -- BUG-LOCAL-117d).
+    monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "off")
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
     eng._classes = _ltx_fakes(np, n=4)
@@ -236,6 +239,29 @@ def test_ltx_render_clip_to_silent_mp4():
         assert p.exists() and clip["frame_count"] == 4
         assert clip["has_audio"] is False and clip["engine_id"] == "ltx_video"
         assert len(prepared["patchers"]) == 1            # checkpoint MODEL retained
+    finally:
+        p.unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_ltx_render_clip_boomerang_default_on(monkeypatch):
+    # BUG-LOCAL-117d: loop_via_reverse is the ltx_video DEFAULT -> render_clip
+    # mirrors the decoded frames end-to-end (4 -> 2*4-1 = 7) through the encoder.
+    monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
+    np = pytest.importorskip("numpy")
+    eng = LtxVideoEngine()
+    eng._classes = _ltx_fakes(np, n=4)
+    req = {"shot_id": "s1", "text_prompt": "a neon diner",
+           "canvas": {"w": 768, "h": 512, "fps": 25},
+           "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
+    prepared = {"patchers": []}
+    raw = eng.render_clip(req, prepared)
+    assert raw["ltx_loop_via_reverse"] is True
+    clip = eng.canonicalize(raw, req, {})
+    p = pathlib.Path(clip["path"])
+    try:
+        assert p.exists() and clip["frame_count"] == 7    # 2*4 - 1, mirrored
+        assert clip["engine_id"] == "ltx_video"
     finally:
         p.unlink(missing_ok=True)
 

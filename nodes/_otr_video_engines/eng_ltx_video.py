@@ -96,6 +96,13 @@ def _env_int(name, default, floor):
 #: the one proven length.
 _LTX_DECODE_FLOOR_DEFAULT = 169
 
+#: BOOMERANG (loop_via_reverse, BUG-LOCAL-117d restore 2026-06-15): the proven-safe
+#: SOURCE half-length the loop renders at the native 832x480 canvas before the
+#: in-tensor mirror doubles it back. GPU-proven this session (97f decodes clean at
+#: 832x480 in 12s). This is the LOOP path's OWN floor and deliberately does NOT
+#: touch the 169 landscape floor above (which still guards the 1472x832 tiled band).
+_LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT = 97
+
 
 def _ltx_frame_length(target_frame_count, fallback):
     """The FINAL LTX graph length for a shot's frame ask: floor to
@@ -122,6 +129,40 @@ def _ltx_frame_length(target_frame_count, fallback):
                      "the beat window)", length, floor)
         length = floor
     return ((length - 1) // 8) * 8 + 1
+
+
+def _boomerang_frames(frames):
+    """Forward + reverse-minus-turnaround mirror: ``[0,1,2,3] -> [0,1,2,3,2,1,0]``
+    (length ``2N-1``; the duplicate LAST/turnaround frame is dropped). The
+    in-tensor equivalent of the 6/3 ffmpeg ``[b]reverse,trim=start_frame=1;
+    [a][r]concat`` boomerang (BUG-LOCAL-117d). ``frames`` is the uint8
+    ``[N,H,W,C]`` array from ``images_to_uint8``; returned unchanged when N<2.
+    Pure; CPU-testable (numpy imported lazily so module import stays cold V-12)."""
+    if len(frames) < 2:
+        return frames
+    import numpy as _np
+    return _np.concatenate([frames, frames[-2::-1]], axis=0)
+
+
+def _ltx_loop_source_length(target_frame_count, fallback):
+    """Boomerang SOURCE length: render ~half, the mirror (``2*src-1``) doubles it
+    back. Rounds the half UP and bumps until ``2*src-1 >= target`` so the composite
+    never freeze-fills the loop tail (the 169->161 shortfall the roundtable caught).
+    Floors at the PROVEN-safe native-canvas loop min (env
+    ``OTR_LTX_LOOP_MIN_DECODE_FRAMES`` default 97 -- NOT the global 169 decode
+    floor), snaps to 8n+1, caps at ``OTR_LTX_MAX_FRAMES``. Pure given the env."""
+    target = max(_LTX_MIN_FRAMES, int(target_frame_count or fallback))
+    cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
+    loop_min = _env_int("OTR_LTX_LOOP_MIN_DECODE_FRAMES",
+                        _LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
+    src_ask = (target + 1) // 2                         # round the half UP
+    src = ((max(src_ask, loop_min) - 1) // 8) * 8 + 1   # loop-floor, 8n+1 snap
+    if src > cap:
+        src = ((cap - 1) // 8) * 8 + 1
+    # Guarantee the mirrored clip covers the beat window (no composite freeze).
+    while (2 * src - 1) < target and src < cap:
+        src += 8
+    return src
 
 
 _LTX_DEFAULT_W = 768
@@ -205,6 +246,29 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
+    #: BUG-LOCAL-117d boomerang: ltx_video LOOPS by default (forward+reverse,
+    #: the 5/09-6/05 "more motion" look). LtxOrbitEngine overrides this to False
+    #: (orbit IS the motion; it inherits render_clip and must not auto-loop).
+    _LOOP_VIA_REVERSE_DEFAULT = True
+
+    def _loop_via_reverse(self) -> bool:
+        """Whether render_clip renders the boomerang (half-render + forward/reverse
+        mirror). ``OTR_LTX_LOOP_VIA_REVERSE``: truthy {on,1,true,yes}, false
+        {off,0,false,no}, invalid -> LOUD warn + engine default. Gated by the
+        per-engine ``_LOOP_VIA_REVERSE_DEFAULT`` so ltx_orbit never auto-loops
+        even with the env on."""
+        raw = os.environ.get("OTR_LTX_LOOP_VIA_REVERSE")
+        if raw is None:
+            return bool(self._LOOP_VIA_REVERSE_DEFAULT)
+        v = raw.strip().lower()
+        if v in ("on", "1", "true", "yes"):
+            return bool(self._LOOP_VIA_REVERSE_DEFAULT)
+        if v in ("off", "0", "false", "no"):
+            return False
+        _LOG.warning("[eng_ltx_video] OTR_LTX_LOOP_VIA_REVERSE=%r invalid "
+                     "(use on/off) -- using engine default %s", raw,
+                     self._LOOP_VIA_REVERSE_DEFAULT)
+        return bool(self._LOOP_VIA_REVERSE_DEFAULT)
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
@@ -706,6 +770,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
+        # BUG-LOCAL-117d boomerang restore: when looping, render the HALF source
+        # length here (after dims, before graph build) -- the in-tensor mirror
+        # below doubles it back to >= the beat window. Leaves the global
+        # _ltx_frame_length / 169 decode floor UNTOUCHED (this path has its own
+        # proven native-canvas floor). ltx_orbit is gated OFF via the class attr.
+        loop_via_reverse = self._loop_via_reverse()
+        if loop_via_reverse:
+            length = _ltx_loop_source_length(plan["target_frame_count"],
+                                             self.target_fps)
+            _LOG.warning("[eng_ltx_video] loop_via_reverse ON: render src=%d -> "
+                         "mirror %d frames (target %d) @ %dx%d", length,
+                         2 * length - 1, plan["target_frame_count"], width, height)
         if use_i2v:
             init_path = self._init_image_path(request)
             image_name = _wb.stage_into_comfy_input(init_path)
@@ -734,11 +810,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
+        if loop_via_reverse:
+            if len(frames) >= 2:
+                frames = _boomerang_frames(frames)
+            else:
+                _LOG.warning("[eng_ltx_video] loop_via_reverse: only %d frame(s) "
+                             "decoded -- skipping mirror", len(frames))
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         if not os.environ.get("OTR_TEST_MODE"):
             _MC.assert_vram_within_ceiling(self.name + "-render")  # PASS-PM mid-render
-        return {"out_path": path, "frame_count": n}
+        return {"out_path": path, "frame_count": n,
+                "ltx_loop_via_reverse": bool(loop_via_reverse)}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
@@ -827,6 +910,10 @@ class LtxOrbitEngine(LtxVideoEngine):
     default_roles = ()
     requires_flag = "OTR_ENABLE_LTX_ORBIT"
     engine_version = "1"
+    #: BUG-LOCAL-117d: ltx_orbit does NOT auto-boomerang -- the orbit camera move
+    #: IS the motion, and it inherits render_clip. Gated OFF so the loop never
+    #: fires for ltx_orbit (even with OTR_LTX_LOOP_VIA_REVERSE on).
+    _LOOP_VIA_REVERSE_DEFAULT = False
 
     def assert_usable(self, host_caps, profile, request_template=None):
         """Fail closed: ltx_orbit is OPT-IN (default OFF -- the 0-E lane lands

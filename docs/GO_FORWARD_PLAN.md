@@ -1,5 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-15 (day; LTX verify + MOTION forensic; HEAD `dfd6af4` == origin, NO new commits):**
+> GPU-verified the BUG-412 blur fix on a clean box via an isolated 832x480-vs-1472x832 A/B (otr_ltx_motion_smoke,
+> goofer/euler_cfg_pp): the FIX clip's detail-energy is ~4x the over-res clip (Laplacian var 86 vs 21) -- the mush
+> is GONE, dims ffprobe-confirmed. Then chased the operator's "less MOTION than 6/3" note vs the canonical good clip
+> `signal_lost_chilled_hope_20260603_161926/videos/b005.mp4`. **ROOT CAUSE = the BOOMERANG is gone.** b005's ledger
+> (commit `59d9179`) records `ltx_loop_via_reverse: true`; measured motion b005-vs-fix-smoke = framediff 2.34 vs 0.72
+> and optical-flow 0.061 vs 0.014 (~4x), and b005 is a detectable forward+reverse loop (mirror 0.65 ~= 0) while the
+> current `eng_ltx_video.py` has NO loop_via_reverse code (deleted in the `70d379b` cleanbreak from
+> `nodes/batch_ltx_render.py` -- BUG-LOCAL-117d). **De-risked the restore:** the 169 decode floor was a 1472x832
+> artifact (code note lines 90-97); a 97-frame half-render at 832x480 decodes CLEAN (12s GPU probe), so b005's
+> half-render+mirror is viable again at the native canvas. Reproduced b005 EXACTLY -- 97f render + the original
+> ffmpeg `split;[b]reverse,trim=start_frame=1;[a][r]concat` -> 193f @ 832x480 boomerang (demo in session outputs).
+> NEXT = restore loop_via_reverse in `eng_ltx_video.render_clip` (in-tensor mirror after `images_to_uint8`, env
+> `OTR_LTX_LOOP_VIA_REVERSE` default on). **The decode-floor fork is RESOLVED via a 3-model roundtable**
+> (GPT-5.5+Gemini-3.1-pro+DeepSeek-v4, $0.10, grounded+converged in 1 pass): boomerang-only source-length
+> helper with a hardcoded proven-safe min 97 @ 832x480, LEAVE the global `_ltx_frame_length`/169 floor
+> UNTOUCHED, gate `ltx_orbit` OFF (it inherits render_clip), round the half UP + `while 2*src-1<target: src+=8`
+> (freeze-shortfall fix), in-tensor `frames[-2::-1]` mirror after images_to_uint8, i2v stays ON. REJECTED:
+> canvas-aware global floor, runtime probe, full-render-then-slice (shallow motion). Build-ready spec +
+> judgment: `docs/2026-06-15-ltx-boomerang-floor/roundtable/pass01_plan.md` (+ pass01_judgment.md). NEXT =
+> implement that spec (suite 4266 + Bug Bible + audio-byte-identical per chunk; no JSON change), then GPU-verify
+> a 193f boomerang. Box: LTX server KILLED, GPU at baseline. (Earlier overnight note follows.)
+>
 > **LATEST SESSION -- 2026-06-15 overnight (autonomous; HEAD `1976842` == origin):** Big multi-thread night,
 > all GREEN + PUSHED (suite 4265/0, Bug Bible 16/7/3). **(1) BUG-411 flux lush-tint** fully shipped (3 chunks:
 > FluxGuidance 3.5 + still grade/radio tails + bookend seed 4242 + grade on portraits for full flux

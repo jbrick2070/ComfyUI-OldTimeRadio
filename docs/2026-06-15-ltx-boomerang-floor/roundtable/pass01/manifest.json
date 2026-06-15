@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-15T16:44:14.527573+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-15-ltx-boomerang-floor\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 13528,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 14052,
+      "completion_tokens": 2408,
+      "cost_usd": 0.041645
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 16224,
+      "completion_tokens": 2480,
+      "cost_usd": 0.045079999999999995
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 14896,
+      "completion_tokens": 7436,
+      "cost_usd": 0.01294908
+    }
+  ],
+  "total_cost_usd": 0.0997
+}
