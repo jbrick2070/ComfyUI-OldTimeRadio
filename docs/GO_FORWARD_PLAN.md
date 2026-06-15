@@ -15,6 +15,27 @@
 > NO-JSON-edit; M4 lip-sync-vs-HuMo A/B). GOLDEN `eng_ltx_video.py` UNTOUCHED. Records:
 > `docs/2026-06-15-ltx-av-alternative/M0_GRAPH_SPIKE_FINDINGS.md` (GO section at top). The §3 forward order
 > (Wan/3D/distribution) is unchanged -- ltx_av remains the operator-gated OPTIONAL track, now GREENLIT to build.
+> **>>> M1 SHIPPED (committed LOCAL `2adc282`, NOT pushed; suite 4305/0, Bug Bible 16/7/3, audio byte-identical):**
+> NEW `nodes/_otr_shared/av_dims.py` (snap-UP next_8n1 + assert_ltx_dims RAISES) + NEW
+> `nodes/_otr_video_engines/eng_ltx_av.py` (ltx_av_talk=audio_driven_face + ltx_av_music=audio_conditioned_video,
+> dark/flag-gated OTR_ENABLE_LTX_AV, in-process, NVML-fail-closed, BUG-070 Sage gate, weight floors, the
+> M0-grounded A2V graph with V-1 video-only decode) + schemas(+audio_conditioned_video family) + role_compat
+> (music_visual supplies audio_ref) + registry CAPABILITIES (vram 14000 from the probe) + __init__ guarded
+> import + dep-pilot rows + tests (test_av_dims, test_video_ltx_av) + 4 enumeration->membership fallout fixes.
+> Golden `eng_ltx_video.py` UNTOUCHED.
+> **>>> M3 SHIPPED + PUSHED (`c4d7815` == origin; suite 4311/0, Bug Bible 16/7/3, audio byte-identical):** the
+> LTX-AV lane is now SELECTABLE + sliced end-to-end in a real episode. render_driver additive deltas: (e)
+> ENGINE_FAMILY (ltx_av_talk=audio_driven_face, ltx_av_music=audio_conditioned_video); (+) SYNTH_FALLBACKS
+> (talk->humo, music->ltx_video); (a) VRAM-safe render-canvas clamp -- both lanes render at
+> OTR_LTX_AV_RENDER_CANVAS default 512x288 (the M0-proven 13688 MB<=14500 size; the 22B would blow the budget at
+> the 480x832/1472x832 defaults; composite upscales); (b) ltx_av_music joins the ltx_video scene-prompt branch
+> (talk rides the audio_driven_face prompt path); (c) synthetic-music b000 slices the frozen master from the SHOT
+> start_s/dur_s (every other engine byte-identical); (d) request_template passed to assert_usable (TypeError-
+> guarded); (f) force-map annotates an incompatible (role,engine) LOUD but still APPLIES (operator experiment
+> knob; assert_usable is the gate). + test_ltx_av_driver_wiring. pass03 CUT (i) slice-cache-key + (h) storm-lines.
+> **REMAINING: M4 GPU smoke** (forced-lane 30w + lip-sync-vs-HuMo A/B + N=3 no-OOM; confirms the A2V graph wiring
+> + canvas on-GPU; operator-present, box must be free) + small follow-on **(g) announcer-portrait alias** (today
+> announcer-talk with no portrait degrades LOUD humo->floor). The lane is functionally COMPLETE on the CPU side.
 >
 > **LATEST SESSION -- 2026-06-15 (day; LTX-AV [ltx_av] M0 GRAPH SPIKE -> PARKED; docs only, HEAD `c339392`,
 > NOT committed yet):** Ran the OPERATOR-GATED OPTIONAL ltx_av (audio-input / A2V) M0 probe-or-park. Captured
