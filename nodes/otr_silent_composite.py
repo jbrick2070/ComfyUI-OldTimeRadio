@@ -247,11 +247,25 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 emit("black", "", n, 0, r.get("shot_id"), r.get("engine_id"))
             cursor += n
     if target_total_frames is not None and int(target_total_frames) > cursor:
-        # Tail to the master length. With a floor available this slice is the
-        # END of the procgen -- the ROLLING-CREDITS post-roll riding under the
-        # closing theme (production restore 2026-06-10).
+        # Tail to the master length + the credits post-roll. The §4D floor layer
+        # lighten-blends the GREEN rolling credits on top; THIS segment is the
+        # BACKDROP behind them. BUG-410 look-QA follow-on: hold the LAST drama
+        # clip on screen (the 6/5 "credits over the scene" look) instead of the
+        # dark CRT telemetry card -- a short clip holds its last frame (tpad
+        # clone in _encode_segment), a long one plays its head. Fall back to the
+        # procgen END-slice / black when there is no real clip.
         tail_n = int(target_total_frames) - cursor
-        emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
+        _clip_rows = [r for r in rows if r.get("exists") and r.get("path")]
+        if positioned:
+            _last_clip = (max(_clip_rows, key=lambda r: float(r.get("start_s") or 0))
+                          if _clip_rows else None)
+        else:
+            _last_clip = _clip_rows[-1] if _clip_rows else None
+        if _last_clip is not None:
+            emit("clip", _last_clip.get("path"), tail_n, 0,
+                 _last_clip.get("shot_id"), _last_clip.get("engine_id"))
+        else:
+            emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
     return segments, cursor
 

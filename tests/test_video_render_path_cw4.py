@@ -351,10 +351,12 @@ def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
         manifest, floor_available=True, floor_frames=2000,
         target_total_frames=1543, fps=25)      # ~61.7s master
     assert total == 1543                        # assembled == master length
-    assert [s["source"] for s in segs] == ["floor", "clip", "floor", "clip", "floor"]
+    assert [s["source"] for s in segs] == ["floor", "clip", "floor", "clip", "clip"]
     assert segs[0]["n_frames"] == 240           # round(9.6*25) head intro
     assert segs[2]["n_frames"] == 10            # round(12.0*25) - (240+50) inter-beat gap
-    assert segs[-1]["source"] == "floor"        # closing-theme tail
+    # BUG-410: the closing tail now HOLDS the last drama clip as the backdrop for
+    # the rolling credits (the 6/5 "credits over the scene" look), not the floor
+    assert segs[-1]["source"] == "clip" and segs[-1]["path"] == "/x/b.mp4"
     assert sum(s["n_frames"] for s in segs) == 1543
     # no floor (black gap-fill) still reaches the master length
     segs2, total2 = plan_timeline_segments(
