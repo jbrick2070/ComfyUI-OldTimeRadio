@@ -88,3 +88,35 @@ reclaim the prior heavy engine before a beat that loads a DIFFERENT heavy engine
 (reuse when the next beat is the same engine; honor the retained Wan unet
 patcher). This makes the multi-beat Wan/HuMo episode fit + run fast, and unblocks
 the soak. Needs a GPU verify cycle.
+
+---
+
+## STAND-DOWN (operator "please stop all soaking" -- 2026-06-15)
+
+- **Stopped at:** all soak activity halted on the operator stop order.
+- **What was running:** nothing salvageable -- the overnight sweep's poller had
+  already died (the 10-min background-launch timeout); the server was grinding one
+  doomed prompt with no client. Both since killed.
+- **GPU state:** desktop baseline (~1.8 GB resident), `:8000` free, ComfyUI MCP
+  pythons left untouched (killed only main.py / coverage_sweep by CommandLine).
+- **Soak verdicts captured before stopping:** none clean -- 1 leg
+  (announcer_visual_ltx_video) was mid-render and incomplete (CS-3 thrash).
+- **Committed + pushed (stays):** the flux/residue OOM fix `0e1dc22` (+ `3bffd81`
+  cleanup, `c95ab96` env-timeout) -- PROVEN live (no OOM, residue 7991->65 MB,
+  14.4 GB free, wan_i2v ksampler 1.47 s/it). Branch v2.0-alpha, HEAD==origin.
+- **Uncommitted:** none requiring a reset; working tree clean apart from untracked
+  dev logs + this report.
+- **Ready to resume from:** the OOM fix is shipped. The remaining Wan-lane blocker
+  is CS-3 inter-beat reclaim (above) -- it touches `render_driver.run_episode`,
+  which the LTX/M3 session also owns, so it needs lane coordination.
+- **RECONCILIATION (important):** the original "targeted flux-patcher detach in
+  reclaim_idle_models, not unload_all_models" plan was based on the theory that the
+  pinned residue was ComfyUI-tracked FLUX patchers. LIVE DATA DISPROVED THAT: the
+  detach loop detached 0 and free_memory freed 0 MB -- the ~7-8 GB residue is the
+  OUT-OF-BAND writer LLM (Mistral-Nemo) + Bark, loaded through OTR's own loaders
+  and INVISIBLE to comfy.model_management. The canonical freer that handles them
+  (`free_otr_pipeline_residue`: unload_llm + _unload_bark + FLUX) is what shipped
+  in `0e1dc22` and is proven. A more-surgical variant that drops the
+  `unload_all_models` step (freeing the writer LLM via unload_llm only) would
+  likely still fit -- but confirming it needs a single-leg GPU verify, which the
+  stop-soaking order precludes right now.
