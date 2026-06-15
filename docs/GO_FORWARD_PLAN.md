@@ -1,5 +1,24 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-15 (day; FULL LTX MOTION OVERHAUL SHIPPED + verified; HEAD `5bcee2c` == origin):**
+> THREE pushed commits, all regression-GREEN (suite 4286/0, Bug Bible 16/7/3, audio byte-identical):
+> **(1) BLUR `4fc4268`** -- LTX renders native 832x480 (no 1472x832 mush). **(2) BOOMERANG `e8a74da`** --
+> restored `loop_via_reverse` in `eng_ltx_video.render_clip` (half-render + in-tensor `frames[-2::-1]` mirror;
+> boomerang-only floor `OTR_LTX_LOOP_MIN_DECODE_FRAMES`=97; ltx_orbit gated OFF; freeze-safe
+> `while 2*src-1<target`); roundtable-hardened (`docs/2026-06-15-ltx-boomerang-floor`). **(3) MOTION `5bcee2c`**
+> -- flipped `_sampler_mode` default distilled->ksampler (distilled GATES motion) + `OTR_LTX_OPEN_MOTION_KEY`
+> default music_inter->music_open (the 6/12 smear was the now-fixed 1472x832 blur). GPU A/B proved
+> music_open+ksampler30 = 7.85 framediff vs 0.84 current (~9x, near the 5/30 target 9.43, SHARP @ Laplacian
+> 934 vs 83); roundtable-hardened (`docs/2026-06-15-ltx-motion-faithful` -- panel caught the dynamic prompts
+> were never lost, only SUPPRESSED). Both env-reversible (`OTR_LTX_SAMPLER=distilled`,
+> `OTR_LTX_OPEN_MOTION_KEY=music_inter`). **VERIFIED in 2 real episodes:** the boomerang full-ep (loop fired 3x,
+> audio byte-identical) + a **100%-LTX 30-word episode** (`OTR_FORCE_ENGINE_MAP=*=ltx_video`: 4 overrides, 6
+> boomerang beats, ksampler-30, music_open opener, audio byte-identical, 13:13; `dragons_descent`). The LTX
+> chain now STACKS: SHARP (832x480) -> LOOPING (boomerang) -> DYNAMIC (ksampler+music_open). Cloud video/image
+> (Comfy Credits) adapters remain S0-BLOCKED / unwritten (no `OTR_COMFY_API_KEY`) -- NOT part of this arc; the
+> all-LTX soak was 100% local. **NEXT (operator look-QA):** eyeball the 2 episodes; then back to the forward
+> order (Wan / 3D / distribution). Box clean. (Investigation detail below.)
+>
 > **LATEST SESSION -- 2026-06-15 (day; LTX verify + MOTION forensic; HEAD `dfd6af4` == origin, NO new commits):**
 > GPU-verified the BUG-412 blur fix on a clean box via an isolated 832x480-vs-1472x832 A/B (otr_ltx_motion_smoke,
 > goofer/euler_cfg_pp): the FIX clip's detail-energy is ~4x the over-res clip (Laplacian var 86 vs 21) -- the mush
