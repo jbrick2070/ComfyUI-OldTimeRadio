@@ -1,5 +1,20 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-15 overnight (autonomous; HEAD `1976842` == origin):** Big multi-thread night,
+> all GREEN + PUSHED (suite 4265/0, Bug Bible 16/7/3). **(1) BUG-411 flux lush-tint** fully shipped (3 chunks:
+> FluxGuidance 3.5 + still grade/radio tails + bookend seed 4242 + grade on portraits for full flux
+> consistency). **(2) BUG-412 LTX-REGR** forensic + RESTORE shipped (`21bfe7a`): the LTX default is now the
+> FAST 8-step `distilled` + `euler_cfg_pp` recipe (operator: "make LTX as it was; 30-step too slow"); ksampler
+> 30-step stays opt-in via `OTR_LTX_SAMPLER=ksampler`. **(3) Comfy-Cloud engine build = S0 BLOCKED, no
+> adapters written** (correct per the hard-stop): `OTR_COMFY_API_KEY` is unset and the Desktop key is
+> keychain-encrypted (not extractable); see `docs/2026-06-14-comfy-cloud-image-video/S0_RESULTS.md` for the
+> one-line unblock (`setx OTR_COMFY_API_KEY ...`). **(4) All-LTX 120-word soak LAUNCHED + RUNNING** on the
+> local 5080 (headless server up on :8000, LTX lane, HuMo OFF) -- forces ltx_video on announcer+music+character
+> via the sanctioned profile role_overrides; verdicts land in `scripts/_otr_ltx_allroles_soak_summary.json`,
+> server log `scripts/_otr_ltx_soak_server_20260614_234303.log`, episodes under `output/otr/episodes` + obs.
+> **OPERATOR MORNING TODO:** read `MORNING_REPORT_2026-06-15.md` (repo root). **BOX STATE:** the soak server
+> is RESIDENT on :8000 -- RESET-VERIFY before any other GPU work.
+>
 > **LATEST SESSION -- 2026-06-14 overnight (autonomous; HEAD `cdc1411` == origin):** **BUG-411 flux BOOKEND
 > lush-tint restore IMPLEMENTED + PUSHED** (suite 4264/0, Bug Bible 16/7/3 throughout). Two green chunks:
 > **Chunk 1 (`bd1fbb2`) — FluxGuidance node** (the biggest factor): `flux_gen1.py` now wires a `FluxGuidance`
