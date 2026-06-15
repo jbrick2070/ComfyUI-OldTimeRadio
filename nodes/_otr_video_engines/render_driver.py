@@ -1192,7 +1192,13 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
     # reflects ONE resident heavy engine. LOUD by contract; a no-op off the box.
     try:
         from . import wrapper_bridge as _wb
-        _wb.reclaim_idle_models(
+        # PHASE-BOUNDARY free (not the surgical post-decode reclaim): the detach-only
+        # path detached 0 under ComfyUI's dynamic-VRAM "Staged" model, leaving the
+        # ~16GB flux portrait stack pinned -> the 14B wan_i2v OOM'd at the ksampler.
+        # This canonically frees every idle model (cleanup_models_gc + free_memory +
+        # soft_empty_cache; never unload_all_models) so the first video beat loads
+        # into a clean GPU. MEASURED: the LOUD log reports torch-free MB before/after.
+        _wb.free_idle_models_before_phase(
             " (pre-render: all stills minted, freeing the still/portrait phase)")
     except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
         _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)

@@ -301,6 +301,69 @@ def reclaim_idle_models(reason=""):
     return detached
 
 
+def free_idle_models_before_phase(reason=""):
+    """Phase-boundary VRAM reclaim (stills -> video): free EVERY idle model so the
+    next heavy engine loads into a clean GPU.
+
+    DISTINCT from :func:`reclaim_idle_models` (the post-decode reclaim, kept
+    surgical to protect the BUG-265 HuMo-resident path -- an aggressive free DURING
+    a resident render fragments the 16 GB allocator). This runs ONLY at the
+    inter-phase boundary where the image / LLM still-phase models are DEFINITIVELY
+    done (every portrait + scene still already minted to disk) and NO video engine
+    has loaded yet, so a full canonical free is safe -- nothing resident is wanted
+    next. It is exactly what the detach-only reclaim FAILED to do under ComfyUI's
+    dynamic-VRAM "Staged" model: the ~16 GB flux portrait stack stayed pinned, so
+    the 14B wan_i2v UNET OOM'd at the ksampler (the bare smoke fit at 14.5 GB only
+    with nothing else resident).
+
+    Canonical ComfyUI APIs only -- ``cleanup_models_gc`` (purge dead LoadedModels)
+    + ``free_memory`` (graduated unload of idle models; respects ``currently_used``
+    + ``keep_loaded``) + ``soft_empty_cache``. NEVER ``unload_all_models`` (V-4/V-5).
+    MEASURED + LOUD: logs torch-free VRAM before/after so a live run is self
+    -diagnosing. Returns freed MB (>=0), or -1 off the ComfyUI box / on CPU."""
+    try:
+        import comfy.model_management as _mm
+    except Exception:  # noqa: BLE001 -- not inside ComfyUI -> nothing to reclaim
+        return -1
+    import gc
+
+    def _free_mb():
+        try:
+            return int(_mm.get_free_memory(_mm.get_torch_device()) / (1024 * 1024))
+        except Exception:  # noqa: BLE001
+            return -1
+
+    before = _free_mb()
+    detached = reclaim_idle_models(reason)        # surgical detach of tracked patchers
+    unloaded = 0
+    try:
+        _mm.cleanup_models_gc()                   # drop dead LoadedModels (leak purge)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        dev = _mm.get_torch_device()
+        # free_memory(required=total) -> memory_to_free == currently-used, so every
+        # IDLE model unloads; currently_used + keep_loaded are untouched. This is
+        # the graduated canonical free, NOT the forbidden unload_all_models nuke.
+        unloaded = len(_mm.free_memory(_mm.get_total_memory(dev), dev,
+                                       keep_loaded=[]) or [])
+    except Exception:  # noqa: BLE001 -- best-effort; the detach already ran
+        pass
+    try:
+        gc.collect()
+        _mm.soft_empty_cache()                    # return freed blocks to the pool
+    except Exception:  # noqa: BLE001
+        pass
+    after = _free_mb()
+    freed = (after - before) if (before >= 0 and after >= 0) else -1
+    _LOG.warning(
+        "[OTR video] PHASE-BOUNDARY VRAM free%s: detached=%d unloaded=%d; "
+        "torch-free %sMB -> %sMB (freed %sMB)",
+        (" (%s)" % reason.strip()) if reason and reason.strip() else "",
+        detached, unloaded, before, after, freed)
+    return max(0, freed) if freed >= 0 else -1
+
+
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
               keep=None):
     """Execute a declarative node graph in dependency order; return the results.
