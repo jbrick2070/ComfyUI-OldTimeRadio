@@ -100,16 +100,16 @@ def test_ltx_graph_topology_ksampler_rollback(monkeypatch):
 
 def test_ltx_graph_topology_distilled_default(monkeypatch):
     """Distilled mode: 8-step LTX_DISTILLED_SIGMAS + euler_cfg_pp + CFGGuider
-    cfg=1.0 -- the DEFAULT path (BUG-LOCAL-412 restored 8-step distilled as the
-    default; ksampler is the opt-in 30-step). Env left UNSET to prove the
-    default; CFG/ckpt envs cleared so the distilled defaults apply."""
+    cfg=1.0 -- the OPT-IN fast path (2026-06-15: ksampler is the DEFAULT again
+    for dynamic motion; distilled stays selectable via OTR_LTX_SAMPLER=distilled).
+    CFG/ckpt envs cleared so the distilled defaults apply."""
     from nodes._otr_video_engines.eng_ltx_video import LTX_DISTILLED_SIGMAS
-    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)   # prove the DEFAULT
+    monkeypatch.setenv("OTR_LTX_SAMPLER", "distilled")    # distilled is opt-in now
     monkeypatch.delenv("OTR_LTX_SAMPLER_NAME", raising=False)
     monkeypatch.delenv("OTR_LTX_CFG", raising=False)
     monkeypatch.delenv("OTR_LTX_VIDEO_CKPT_NAME", raising=False)
     eng = LtxVideoEngine()
-    assert eng._sampler_mode() == "distilled"   # the new default
+    assert eng._sampler_mode() == "distilled"   # explicit opt-in
     cand = eng._node_candidates_sampling()
     assert "ksampler" not in cand
     assert cand["samplersel"] == ("KSamplerSelect",)
@@ -122,7 +122,7 @@ def test_ltx_graph_topology_distilled_default(monkeypatch):
          "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 2}})
     g = eng._build_graph(plan, 49, 768, 512)
     assert "ksampler" not in g
-    # BUG-LOCAL-412: the restored dynamic-motion sampler is the default
+    # the distilled chain uses euler_cfg_pp (the dynamic-motion sampler name)
     assert g["samplersel"]["inputs"]["sampler_name"] == "euler_cfg_pp"
     assert g["sigmas"]["inputs"]["values"] == list(LTX_DISTILLED_SIGMAS)
     assert len(g["sigmas"]["inputs"]["values"]) == 9      # 8 sampling steps
@@ -175,8 +175,15 @@ def test_ltx_distilled_lora_gating(monkeypatch, tmp_path):
 
 def test_ltx_sampler_mode_invalid_falls_back_loud(monkeypatch):
     monkeypatch.setenv("OTR_LTX_SAMPLER", "warp_drive")
-    # BUG-LOCAL-412: invalid now falls back to the distilled default (was ksampler)
-    assert LtxVideoEngine._sampler_mode() == "distilled"
+    # 2026-06-15: invalid falls back LOUD to the ksampler default (BUG-113b restored)
+    assert LtxVideoEngine._sampler_mode() == "ksampler"
+
+
+def test_ltx_sampler_default_is_ksampler(monkeypatch):
+    # 2026-06-15: ksampler (30-step, dynamic motion) is the DEFAULT again -- the
+    # distilled chain GATES motion (GPU A/B: 0.73 vs 7.85 framediff @ 832x480).
+    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)
+    assert LtxVideoEngine._sampler_mode() == "ksampler"
 
 
 def test_wan_graph_topology():

@@ -501,12 +501,15 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
     # b000_music_open structure is definitive, NOT the role) -- check it first.
     if is_synthetic_open or sid.endswith(_OPENING_MUSIC_SUFFIX):
-        # Operator 2026-06-12: the music_open template's aggressive verbs
-        # (whip-pans / "vibrates aggressively" / dynamic dolly push) SMEAR on
-        # the 2B LTX model -> the "first radio, not sharp" open. Retarget the
-        # opening-music beat to the calmer music_inter motion (dial steady,
-        # oscilloscope, slow orbit). Tunable via OTR_LTX_OPEN_MOTION_KEY.
-        _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_inter")
+        # Operator 2026-06-12 had retargeted this to the calm music_inter because
+        # the aggressive music_open verbs (whip-pans / "vibrates aggressively" /
+        # dynamic dolly push) SMEARED on the 2B LTX model. 2026-06-15: that smear
+        # was the 1472x832 OVER-RESOLUTION mush (BUG-412), FIXED at native 832x480
+        # -- a GPU A/B proved music_open now renders SHARP (Laplacian 934 vs 83)
+        # AND moves ~9x more (paired with the ksampler default). So the dynamic
+        # open is RESTORED as the default (operator "moving grooving"). music_inter
+        # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
+        _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
         return (_open_key if _open_key in _LTX_MOTION_PROMPT_BY_ROLE
                 else "music_inter")
     if "sfx" in role or sid.startswith("sfx") or "_sfx" in sid:

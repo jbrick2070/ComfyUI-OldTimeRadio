@@ -505,21 +505,22 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # ---- LK-1b: sampler mode + distilled LoRA resolution ----
     @staticmethod
     def _sampler_mode() -> str:
-        """``distilled`` (DEFAULT -- 8-step LTX_DISTILLED_SIGMAS cfg=1.0, the
-        FAST 5/09-5/28-era recipe) or ``ksampler`` (30-step euler cfg=3.0 round-5
-        path, kept as opt-in). Invalid values fall back LOUD to distilled.
-        Override via OTR_LTX_SAMPLER env var.
+        """``ksampler`` (DEFAULT -- 30-step euler cfg=3.0, DYNAMIC motion) or
+        ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0, FAST but motion-gated).
+        Invalid values fall back LOUD to ksampler. Override via OTR_LTX_SAMPLER.
 
-        BUG-LOCAL-412 (operator 2026-06-14): restored the 8-step distilled path
-        as the DEFAULT. The 30-step ksampler was too SLOW and the 5/09 + 5/28
-        good bookends (l001 / b001) were the 8-step distilled euler_cfg_pp recipe
-        (forensic in BUG_LOG_2026-06.md). ksampler stays selectable for anyone
-        who wants the 30-step look and can spend the time."""
-        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
+        BUG-LOCAL-113b made ksampler the DEFAULT for dynamic motion; BUG-LOCAL-412
+        reverted it to distilled for SPEED. A 2026-06-15 GPU A/B then PROVED
+        distilled GATES motion: the aggressive music_open prompt moved only 0.73
+        framediff at distilled vs 7.85 at ksampler-30 (near the 5/30 target 9.43),
+        and renders SHARP at native 832x480 (no smear). The boomerang's half-render
+        now offsets the 30-step cost. Operator 2026-06-15: "no static LTX -- moving
+        grooving." distilled stays opt-in via OTR_LTX_SAMPLER=distilled."""
+        mode = os.environ.get("OTR_LTX_SAMPLER", "ksampler").strip().lower()
         if mode not in ("distilled", "ksampler"):
             _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
-                         "using distilled default", mode)
-            mode = "distilled"
+                         "using ksampler default", mode)
+            mode = "ksampler"
         return mode
 
     @staticmethod
