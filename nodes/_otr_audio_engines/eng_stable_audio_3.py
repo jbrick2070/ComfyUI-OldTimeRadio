@@ -14,14 +14,79 @@ then promotion flips default_roles + clears the flag.
 """
 from __future__ import annotations
 
+import hashlib
+import logging
 import os
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+
+log = logging.getLogger("OTR")
 
 # Default model files in ComfyUI's models/ tree (Comfy-Org/stable-audio-3).
 _CKPT = os.environ.get("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
 _TENC = os.environ.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
 _CLIP_TYPE = os.environ.get("OTR_SA3_CLIP_TYPE", "stable_audio")
+
+# BUG-408: SA3 is a different model than the old MusicGen default and does NOT
+# respond to MusicGen-shaped abstract-mood prompts the same way -- it wants a
+# genre + instrumentation + production anchor and a real negative prompt, and it
+# needs a multi-second STRUCTURAL context (seconds_total) to sound like music
+# rather than an unstructured 4-12s texture. The fixes below are SA3-only and
+# keep the shared compose_music_prompt() contract unchanged.
+
+# Era -> genre/instrumentation anchor (deterministic; keyed on period/setting
+# keywords the brief already put in the prompt). NO fabricated musical key.
+_SA3_PERIOD_GENRE = (
+    (("1920", "1930", "roaring"),
+     "vintage big-band orchestral, warm brass, upright bass, analog tape warmth"),
+    (("1940", "1950", "atomic", "pulp", "radio", "noir"),
+     "vintage orchestral sci-fi score, theremin, eerie strings, brass, timpani, "
+     "analog tape warmth"),
+    (("1960", "1970", "retro", "space age"),
+     "retro-futurist analog synth score, mellotron, electric piano, tape echo, "
+     "warm strings"),
+)
+_SA3_DEFAULT_GENRE = (
+    "cinematic instrumental sci-fi underscore, small orchestra, low strings, "
+    "soft brass, light percussion, analog tape warmth")
+
+_SA3_NEG_DEFAULT = (
+    "vocals, singing, speech, spoken words, lyrics, voiceover, crowd noise, "
+    "harsh clipping, digital distortion, muddy mix, out of tune, low quality")
+
+
+def _sa3_augment_prompt(prompt: str) -> str:
+    """Prepend an SA3-shaped genre + instrumentation + production anchor to the
+    brief-derived prompt (era-aware via keywords). Keeps the existing mood /
+    setting / cue-arc text and the instrumental-only tail. Length-capped: one
+    genre clause + the existing prompt."""
+    low = (prompt or "").lower()
+    genre = _SA3_DEFAULT_GENRE
+    for keys, g in _SA3_PERIOD_GENRE:
+        if any(k in low for k in keys):
+            genre = g
+            break
+    base = (prompt or "").strip()
+    return f"{genre}, {base}" if base else genre
+
+
+def _sa3_clip_window(prompt: str, dur: float, context_s: float):
+    """Place the ``dur``-second clip within a ``context_s`` structural window per
+    cue so SA3 renders a real slice of a longer piece: an ``outro`` sits at the
+    TAIL (resolving), an ``intro`` at the HEAD (build), anything else in the
+    MIDDLE (unresolved bridge). Returns ``(seconds_start, seconds_total)``. The
+    latent length stays ``dur`` -- only the CONDITIONING window changes, so clip
+    length + seed determinism are unchanged."""
+    dur = float(dur)
+    ctx = max(float(context_s), dur)
+    low = (prompt or "").lower()
+    if "outro" in low:
+        start = max(0.0, ctx - dur)
+    elif "intro" in low:
+        start = 0.0
+    else:
+        start = max(0.0, (ctx - dur) / 2.0)
+    return start, ctx
 
 
 @register
@@ -97,15 +162,34 @@ class StableAudio3Engine:
         seed = int(seed)
         dur = float(duration_s)
 
-        pos = comfy_nodes.CLIPTextEncode().encode(clip, prompt)[0]
-        neg = comfy_nodes.CLIPTextEncode().encode(clip, "")[0]
+        # BUG-408: SA3-shaped prompt + real negative + a structural seconds_total
+        # context with a per-cue seconds_start. The LATENT stays exactly dur, so
+        # clip length + seed determinism are unchanged; only the conditioning
+        # window + prompt change. All knobs env-overridable for A/B tuning.
+        context_s = float(os.environ.get("OTR_SA3_CONTEXT_S", "30.0"))
+        seconds_start, seconds_total = _sa3_clip_window(prompt, dur, context_s)
+        pos_text = _sa3_augment_prompt(prompt)
+        neg_text = os.environ.get("OTR_SA3_NEG_PROMPT", _SA3_NEG_DEFAULT)
+        steps = int(os.environ.get("OTR_SA3_STEPS", "100"))
+        cfg = float(os.environ.get("OTR_SA3_CFG", "6.0"))
+        sampler = os.environ.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
+        scheduler = os.environ.get("OTR_SA3_SCHEDULER", "exponential")
+
+        pos = comfy_nodes.CLIPTextEncode().encode(clip, pos_text)[0]
+        neg = comfy_nodes.CLIPTextEncode().encode(clip, neg_text)[0]
         pos, neg = audio_nodes.ConditioningStableAudio().append(
-            pos, neg, 0.0, dur)
+            pos, neg, seconds_start, seconds_total)
         latent = audio_nodes.EmptyLatentAudio().generate(dur, 1)[0]
         sampled = comfy_nodes.KSampler().sample(
-            model, seed, 100, 6.0, "dpmpp_3m_sde_gpu", "exponential",
+            model, seed, steps, cfg, sampler, scheduler,
             pos, neg, latent, 1.0)[0]
         audio = audio_nodes.VAEDecodeAudio().decode(vae, sampled)[0]
+        # traceability for A/B listens (no determinism impact)
+        _phash = hashlib.blake2s((pos_text + "||" + neg_text).encode()).hexdigest()[:8]
+        log.info("[OTR.sa3] cue_window start=%.1fs total=%.1fs dur=%.1fs seed=%d "
+                 "steps=%d cfg=%.1f sampler=%s/%s prompt_hash=%s",
+                 seconds_start, seconds_total, dur, seed, steps, cfg,
+                 sampler, scheduler, _phash)
         # native AUDIO dict already carries {"waveform","sample_rate"}.
         sr = int(audio.get("sample_rate", self.sample_rate))
         return {"waveform": audio["waveform"], "sample_rate": sr}
