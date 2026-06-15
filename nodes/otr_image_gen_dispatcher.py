@@ -99,12 +99,23 @@ def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_vers
     ])
 
 
-def resolve_object_seed(seed_cfg, object_id, prompt_hash) -> int:
+def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
     """Per-object seed under the V-7 request-hash scheme: ``mode=request_hash``
     (the ImageDirector default) derives a deterministic seed from
     ``request_seed + object_id + prompt_hash`` so every object gets its own
     seed while the whole episode stays reproducible; ``mode=fixed`` returns
-    ``request_seed`` verbatim. Pure."""
+    ``request_seed`` verbatim. Pure.
+
+    BUG-411 restore: the radio BOOKEND (``kind == "scene_open"``) renders with a
+    FIXED deterministic seed (the 6/5 ``radio_bookend_seed=4242`` widget,
+    env-overridable via ``OTR_RADIO_BOOKEND_SEED``) so the opening radio still is
+    reproducible run-to-run independent of the request hash -- exactly the 6/5
+    behavior the rewrite lost."""
+    if str(kind or "") == "scene_open":
+        try:
+            return int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))
+        except (TypeError, ValueError):
+            return 4242
     cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
     base = int(cfg.get("request_seed") or 0)
     if str(cfg.get("mode") or "request_hash") != "request_hash":
@@ -362,7 +373,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         except ValueError as exc:
             warnings.append(str(exc))
             continue
-        seed = resolve_object_seed(seed_cfg, oid, prompt_hash)
+        seed = resolve_object_seed(seed_cfg, oid, prompt_hash, kind=kind)
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
         key = request_cache_key(role, oid, prompt_hash, seed, engine_id,
                                 eng_version, kind=kind, w=obj_w, h=obj_h)

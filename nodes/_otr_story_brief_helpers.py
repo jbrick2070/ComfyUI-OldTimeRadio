@@ -232,6 +232,25 @@ ERA_TAIL_DEFAULT = "timeless cinematic aesthetic"
 STYLE_TAIL_DEFAULT = ("cinematic, 35mm film look, subtle film grain, "
                       "volumetric lighting")
 
+#: BUG-411 restore (2026-06-14): the 6/5 FLUX image pipeline
+#: (visual/batch_flux_render.py) appended a RICHER cinematic grade than the
+#: shared STYLE_TAIL_DEFAULT. The image-pipeline rewrite into
+#: _otr_image_engines dropped the "anamorphic lens, heavy vignette, muted color
+#: grade, sharp focus" grade descriptors (legacy _DEFAULT_STYLE_SUFFIX), which
+#: flattened the look. Re-added on the IMAGE STILL path ONLY
+#: (compose_still_prompt, after STYLE_TAIL_DEFAULT); the shared tail that LTX
+#: scene clips + character video (style_tail=True) use stays untouched.
+IMAGE_GRADE_TAIL = ("anamorphic lens, heavy vignette, muted color grade, "
+                    "sharp focus")
+
+#: BUG-411: the 6/5 radio bookend / radio stills carried a broadcast-distress
+#: identity suffix appended to every radio prompt (legacy _RADIO_PROMPT_SUFFIX);
+#: the "35mm film grain, broadcast-distressed" grade IS the lush distressed
+#: tint the operator wants back. Re-added to the radio scene stills
+#: (open/announcer/music) so they read as a distressed period broadcast still.
+RADIO_BROADCAST_TAIL = ("35mm film grain, broadcast-distressed cinematic "
+                        "aesthetic, centered composition")
+
 #: The render-constraint clause the LTX scene prompts carry; preserved
 #: verbatim through max_chars trimming.
 NO_TEXT_CLAUSE = "no on-screen text"
@@ -382,6 +401,15 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     pieces.append(framing)
     pieces.append(get_era_tail(meta, profile="still"))
     pieces.append(STYLE_TAIL_DEFAULT)
+    if not is_portrait:
+        # BUG-411: restore the 6/5 cinematic grade + the radio broadcast-distress
+        # identity the image-pipeline rewrite dropped. Scene stills are all radio
+        # context (open/announcer/music), so both tails apply; appended AFTER the
+        # shared STYLE_TAIL_DEFAULT and BEFORE the NO_TEXT_CLAUSE so the 5-layer
+        # order and the no-text contract are preserved. Portraits are unchanged
+        # (they keep their three-quarter framing + the shared style tail).
+        pieces.append(IMAGE_GRADE_TAIL)
+        pieces.append(RADIO_BROADCAST_TAIL)
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"

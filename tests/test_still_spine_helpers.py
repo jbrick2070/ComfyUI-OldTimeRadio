@@ -180,6 +180,27 @@ class TestComposeStillPrompt:
             _meta_ok(), kind="scene_open", role="music_visual")
         assert a == b
 
+    def test_scene_carries_bug411_restored_tails(self):
+        """BUG-411: scene stills (the radio bookend) carry the restored 6/5
+        cinematic grade + broadcast-distress tails, AFTER the shared style tail
+        and BEFORE the no-text clause (layer order + no-text contract intact)."""
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="scene_open", role="music_visual")
+        assert helpers.IMAGE_GRADE_TAIL in p
+        assert helpers.RADIO_BROADCAST_TAIL in p
+        assert p.find(helpers.STYLE_TAIL_DEFAULT) < p.find(helpers.IMAGE_GRADE_TAIL)
+        assert p.find(helpers.IMAGE_GRADE_TAIL) < p.find(helpers.RADIO_BROADCAST_TAIL)
+        assert p.endswith(helpers.NO_TEXT_CLAUSE)
+
+    def test_portrait_has_no_radio_broadcast_tail(self):
+        """BUG-411 stays SCOPED: portraits do NOT gain the radio broadcast tail
+        (a person, not a radio set) -- the restore touches scene stills only."""
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="portrait",
+            char_entry={"portrait_prompt": "a weathered engineer"})
+        assert helpers.RADIO_BROADCAST_TAIL not in p
+        assert helpers.IMAGE_GRADE_TAIL not in p
+
 
 # ---------------------------------------------------------------------------
 # 4. ST-2: the versioned object payload (emission; W1 seam)
@@ -345,6 +366,21 @@ class TestDispatcherStillSpine:
         assert s1 == disp.resolve_object_seed(cfg, "c1", "ph1")  # stable
         fixed = {"mode": "fixed", "request_seed": 7}
         assert disp.resolve_object_seed(fixed, "anything", "ph") == 7
+
+    def test_bookend_scene_open_fixed_seed(self, monkeypatch):
+        """BUG-411: the radio bookend (kind=scene_open) pins to the
+        deterministic 6/5 seed 4242 (env-overridable), independent of the
+        request-hash; every other kind keeps its per-object hashed seed."""
+        from nodes import otr_image_gen_dispatcher as disp
+        cfg = {"mode": "request_hash", "request_seed": 99}
+        assert disp.resolve_object_seed(
+            cfg, "still_b000_music_open", "phX", kind="scene_open") == 4242
+        # other kinds untouched (no kind, or a non-open kind) -> hashed seed
+        assert disp.resolve_object_seed(
+            cfg, "still_b000_music_open", "phX", kind="scene_beat") != 4242
+        monkeypatch.setenv("OTR_RADIO_BOOKEND_SEED", "777")
+        assert disp.resolve_object_seed(
+            cfg, "anything", "ph", kind="scene_open") == 777
 
     def test_cache_key_gains_kind_w_h(self):
         from nodes import otr_image_gen_dispatcher as disp
