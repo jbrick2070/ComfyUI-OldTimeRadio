@@ -1,0 +1,26 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: no. The plan assumes a fallback ladder (`_otr_shared/fallback.py`) and seamless adapter-to-partner-node integration that are not grounded in the shown code; the credit guard is only sketched, and the cloud engine profile in the capabilities table is missing.
+
+MUST-FIX BEFORE BUILD:
+1. **[Section 4 / “Network failure ladder”]** The plan says cloud failures must degrade through “the existing fallback resolver (`_otr_shared/fallback.py`)” (cloud → local → radio floor). The grounding shows `dispatch_images` catches exceptions and *skips* the object with no alternative engine fallback. The design cannot rely on a mechanism that is not proven to exist or to be wired into the dispatchers. Fix: either demonstrate that `_otr_shared/fallback.py` is already integrated into the image/video dispatch paths, or add a concrete design for a fallback ladder within the dispatcher (e.g., try next eligible engine from registry).
+2. **[Section 1 / Section 4]** The plan states cloud adapters will call a Partner Node “under the hood” and use Comfy credits, but the dispatcher’s `gen_fn` contract expects a function that returns an image/video directly. It is unclear how the adapter will invoke a ComfyUI partner node class while retaining credit tracking and API‑key retrieval. Without specifying this seam, the architecture may become unbuildable. Fix: specify whether the adapter will call the cloud API directly (separate billing) or instantiate and execute a partner node class, and detail how the API key is accessed and credits consumed. Verify that partner nodes can be used programmatically outside a workflow graph.
+3. **[Section 4 / “Credit cost guard”]** The guard is mentioned as a per‑episode ceiling, but no storage location, cumulative tracking across multiple engine calls, or fault‑closed behavior is defined. The existing dispatcher has no credit‑budget mechanism. Fix: add a design for the cost guard: where the per‑episode limit lives (e.g., image policy field), how the adapter accumulates spent credits (instance variable across calls within one `dispatch_images` invocation), and how `assert_usable` or a pre‑call check enforces the budget.
+4. **[Section 4 / “Adapter rows” + Grounding vocab]** Cloud engines need a row in the `CAPABILITIES` table (image and video registries). No row is defined, and the existing categories (`vram_class`, `vram_estimate_mb`) have no “network‑only” class. Without a correct capability declaration the enable‑set derivation may exclude cloud engines. Fix: define a capability profile for every planned cloud engine, e.g. `vram_class = "cpu"`, `vram_estimate_mb = 0`, `cpu_ok = True`, `requires_sidecar = False`, and ensure it is included in the appropriate registry’s `CAPABILITIES` dict.
+
+SHOULD-FIX:
+1. **[Section 3a]** The `cloud_auto` meta‑engine adds routing logic (“easy mode”) that must know the slot mapping and duplicate the selection of underlying models. This can be deferred; v1 can provide the individual cloud models directly in the dropdowns, reducing implementation scope.
+2. **[Section 4 / “Credit cost guard”]** The plan proposes a per‑episode ceiling, but a simpler per‑generation credit cap or a spending alert may be sufficient for initial release. A full budget guard can be added later; the design should clarify the minimal viable guard.
+3. **[Section 4 / “commercial_clean”]** The plan says “set the flag conservatively per provider” but does not specify how to obtain or maintain the commercial‑use status. A hardcoded conservative table is acceptable, but the plan should commit to it and list the initial rows.
+4. **[Section 5]** The determinism caveat notes that cloud results are not bit‑reproducible; the document should explicitly state that the request‑based cache key will be used to store the *first* returned result, and that this is the intended behaviour for v1.
+5. **[Section 2b]** The cloud mapping for announcer video slot uses “LTX‑2 fast” when `audio_ref` is absent, but that engine is video‑only and expects an `init_image`. The design should confirm that an init image will be available (it is produced by the image still pipeline) or define a fallback.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add an estimated‑cost display in the Director nodes (not in scope of this research doc, but note the dependency)
+- Parallel cloud‑renders without acquiring the GPU lease (optimization, not correctness)
+
+CUT THESE (over-engineering):
+- **[Section 3a]** `cloud_auto` can be cut from v1. Individual cloud engine entries (Flux Pro, LTX‑2 fast, Kling Avatar, Luma Ray Flash) suffice; a zero‑config “easy” slot can be added later without changing the architecture.
+
+[ASSUMPTION] The plan assumes `_otr_shared/fallback.py` exists and provides an engine‑switching fallback ladder – not supported by the grounding; verify if this module is real and wired into dispatchers.
+[ASSUMPTION] The plan assumes that ComfyUI Partner Nodes can be invoked programmatically from an adapter class (not only as graph nodes) and will honour Comfy API keys and credit billing – verify against Partner Node implementation.
