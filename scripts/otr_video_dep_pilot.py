@@ -55,6 +55,36 @@ TOOL_VERSION = "2"
 # is the render interface the live GPU wiring must confirm AFTER this pilot proves
 # the import is clean -- the single source of truth the worker + adapter point at.
 OPT_IN_ENGINES = {
+    # LTX-AV (audio-input) lane -- in-process, flag-gated behind OTR_ENABLE_LTX_AV.
+    # Rides the same LTX/GGUF wrapper stack as ltx_video (no distinct pip lib);
+    # the real probe is "the ComfyUI-GGUF + ComfyUI-LTXVideo node classes resolve"
+    # which assert_usable enforces at render. Listed so the flag-gated invariant
+    # (every requires_flag engine is covered) holds.
+    "ltx_av_talk": {
+        "lib_module": "ltx_video",
+        "adapter_class": "LtxAvTalkEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_LTX_AV",
+        "assumed_call": (
+            "in-process ComfyUI graph (UnetLoaderGGUF + LTXAVTextEncoderLoader + "
+            "LTXVAudioVAEEncode + LTXVConcatAVLatent + SamplerCustomAdvanced + "
+            "LTXVSeparateAVLatent -> VAEDecodeTiled); GGUF Q3_K_M, Gemma-3 on CPU. "
+            "# TODO-for-GPU-smoke: confirm the LTX-2.3 A2V node classes resolve + "
+            "the full audio-conditioned forward holds <=14.5GB at the floor (M4)"
+        ),
+    },
+    "ltx_av_music": {
+        "lib_module": "ltx_video",
+        "adapter_class": "LtxAvMusicEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_LTX_AV",
+        "assumed_call": (
+            "in-process ComfyUI graph (text2vid base latent + audio-conditioned "
+            "concat -> LTXVSeparateAVLatent -> VAEDecodeTiled); GGUF Q3_K_M. "
+            "# TODO-for-GPU-smoke: confirm the audio-reactive music forward holds "
+            "<=14.5GB at the floor + the sync-loose look passes A/B (M4)"
+        ),
+    },
     "latentsync": {
         "lib_module": "latentsync",
         "adapter_class": "LatentSyncEngine",

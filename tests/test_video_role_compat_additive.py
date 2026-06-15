@@ -54,8 +54,10 @@ def test_background_abstract_supplies_only_text():
 def test_audio_engine_offered_only_where_audio_is_available():
     assert rc.engine_fits_role(AUDIO_FACE, rc.Role.ANNOUNCER_VISUAL.value) is True
     assert rc.engine_fits_role(AUDIO_FACE, rc.Role.CHARACTER_VIDEO.value) is True
-    # music role does not supply audio_ref -> excluded even though it is listed
-    assert rc.engine_fits_role(AUDIO_FACE, rc.Role.MUSIC_VISUAL.value) is False
+    # music role now SUPPLIES audio_ref (LTX-AV ltx_av_music lane, M1: the driver
+    # slices the per-beat master), so an audio_driven_face engine that lists
+    # music_visual now fits it too.
+    assert rc.engine_fits_role(AUDIO_FACE, rc.Role.MUSIC_VISUAL.value) is True
 
 
 def test_engine_excluded_when_role_not_listed():

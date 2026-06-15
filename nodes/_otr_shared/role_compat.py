@@ -56,8 +56,12 @@ ROLE_AVAILABLE_INPUTS: dict = {
     Role.ANNOUNCER_VISUAL.value: frozenset(
         {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}
     ),
+    # MUSIC_VISUAL supplies audio_ref (the per-beat slice of the frozen master)
+    # so the LTX-AV ``ltx_av_music`` audio-reactive engine fits this role (M1,
+    # unconditional). The slice is sync-loose for music -- precision is the talk
+    # lane's job -- but the audio input is genuinely available here.
     Role.MUSIC_VISUAL.value: frozenset(
-        {"text_prompt", "init_image", "base_clip_ref"}
+        {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}
     ),
     Role.CHARACTER_VIDEO.value: frozenset(
         {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}

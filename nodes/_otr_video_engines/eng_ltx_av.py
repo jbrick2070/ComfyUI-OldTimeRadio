@@ -1,0 +1,479 @@
+"""LTX-2.3 AUDIO-INPUT (A2V) lane -- additive, in-process, default-OFF / dark.
+
+A NEW, DARK, ADDITIVE engine pair that drives video from the per-beat slice of the
+FROZEN master audio + a text prompt (+ a FLUX still for the talk lane). It is NOT
+the golden prompt-only ``ltx_video`` engine and shares NO code or env with it --
+the two lanes diverge on purpose (this lane snaps frames UP via
+``av_dims.next_8n1``; ``eng_ltx_video`` snaps DOWN). ``eng_ltx_video.py`` is FROZEN
+and is never imported or touched here.
+
+Two adapters over one shared core (M0-GROUNDED graph; GGUF Q3_K_M proven on the
+RTX 5080 at 13688 MB peak <= the 14500 ceiling, Gemma-3 encoder offloaded to CPU):
+
+* ``ltx_av_talk``  -- roles (announcer_visual, character_video); family
+  ``audio_driven_face``; required text_prompt + audio_ref + init_image; lip-sync
+  attempt from the still (I2V) + the audio slice; fallback -> humo.
+* ``ltx_av_music`` -- role (music_visual,); family ``audio_conditioned_video``;
+  required text_prompt + audio_ref; audio-reactive scene motion (sync-loose);
+  fallback -> ltx_video.
+
+V-1 absolute: the lane DISCARDS LTX's audio side entirely -- the graph terminates
+at ``LTXVSeparateAVLatent -> video_latent -> VAEDecodeTiled`` (the audio_latent
+branch + ``LTXVAudioVAEDecode`` are never wired), the clip is ALWAYS silent
+(has_audio False), and only ``OTR_MasterAudioMux`` emits audio.
+``test_audio_byte_identical`` stays green.
+
+Cold-import clean (V-12): module scope imports only stdlib + the dep-free shared
+helpers + the registry. torch / the LTX wrapper nodes are imported LAZILY inside
+``load`` / ``render_clip`` (the GPU slice), never here. NVML is REQUIRED for this
+lane (heaviest engine) -- assert_usable fails CLOSED when NVML is absent so the
+ceiling guard can never silently no-op. UTF-8, no BOM, ASCII-only source.
+
+Config (env; each resolves via ComfyUI folder_paths so a box never needs a code
+edit): OTR_ENABLE_LTX_AV (opt-in flag); OTR_LTX_AV_UNET (GGUF unet in models/unet);
+OTR_LTX_AV_TEXT_ENCODER (Gemma-3 in text_encoders); OTR_LTX_AV_PROJECTION_CKPT
+(the LTX ckpt supplying the text-projection, in checkpoints); OTR_LTX_AV_VIDEO_VAE
++ OTR_LTX_AV_AUDIO_VAE (in vae). RESTART ComfyUI after any mid-render cancel
+(a wedged PID holds the AS-3 lease ~120 s; reclaim only frees dead PIDs).
+"""
+from __future__ import annotations
+
+import os
+
+from .._otr_shared import av_dims as _AVD
+from . import motion_common as _MC
+from .registry import EngineUnusable, EngineUsabilityReason, register
+
+# --- frame + canvas grounding (LTX-AV lane only; snap UP, never copy Lane A) ---
+_LTX_AV_MIN_FRAMES = _AVD._LTX_MIN_FRAMES        # 9 (8n+1 floor)
+_LTX_AV_MAX_FRAMES = int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))  # M0 initial
+_LTX_AV_NATIVE_W = 1472
+_LTX_AV_NATIVE_H = 832
+# Default sampler recipe (the M0-proven 8-step distilled-ish base pass; cfg 3.0
+# matched the probe). All env-overridable; never shared with eng_ltx_video.
+_LTX_AV_STEPS = int(os.environ.get("OTR_LTX_AV_STEPS", "8"))
+_LTX_AV_CFG = float(os.environ.get("OTR_LTX_AV_CFG", "3.0"))
+_LTX_AV_I2V_STRENGTH = float(os.environ.get("OTR_LTX_AV_I2V_STRENGTH", "1.0"))
+# ASCII-only negative (CLAUDE.md). One shared constant; cap 240 in the driver.
+_LTX_DEFAULT_NEGATIVE = (
+    "low quality, worst quality, blurry, jpeg artifacts, distorted, deformed, "
+    "static, frozen pose, still image, watermark, text")
+
+# Weight sanity floors (GiB) -- catch a truncated / wrong download, NOT exact
+# byte checks. Q3_K_M unet ~9.3 GiB; Gemma-3 fp4 ~8.2 GiB; video VAE ~1.35 GiB.
+_GiB = 1024 ** 3
+_FLOOR_UNET = 8 * _GiB
+_FLOOR_ENCODER = 6 * _GiB
+_FLOOR_VIDEO_VAE = 1 * _GiB
+_FLOOR_AUDIO_VAE = int(0.2 * _GiB)
+
+
+def _resolve(folder, name):
+    """Resolve a model filename to a full path via ComfyUI folder_paths (honors
+    extra_model_paths.yaml), with a best-effort join fallback for the headless /
+    CPU existence check (no folder_paths registered)."""
+    if not name:
+        return ""
+    try:
+        import folder_paths  # type: ignore
+        p = folder_paths.get_full_path(folder, name)
+        if p:
+            return p
+    except Exception:  # noqa: BLE001 - headless/CPU
+        pass
+    here = os.path.abspath(__file__)
+    comfy_models = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.dirname(here))))), "models", folder, name)
+    return comfy_models
+
+
+class _LtxAvBase(_MC.MotionEngineBase):
+    """Shared LTX-AV core: assert_usable gate, graph spec, render lifecycle.
+
+    Subclasses set the lane identity (name / family / roles / required_inputs /
+    fallback_engine) and ``_is_talk``. The I2V-vs-t2v branch is INTERNAL to
+    ``_build_graph`` so talk + music share one resident load path."""
+
+    default_roles = ()                  # dark: never a default for any role
+    commercial_clean = False            # license is profile data; verify-at-build
+    requires_flag = "OTR_ENABLE_LTX_AV"
+    engine_version = "1"
+    declared_isolation = _MC.ISOLATION_IN_PROCESS
+    target_fps = 25
+    _is_talk = False
+    _TERMINAL = "decode"
+
+    # ---- config resolution (env override -> folder_paths -> join) ----
+    def _unet_name(self):
+        return os.environ.get("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+
+    def _encoder_name(self):
+        return os.environ.get("OTR_LTX_AV_TEXT_ENCODER",
+                              "gemma_3_12B_it_fp4_mixed.safetensors")
+
+    def _projection_ckpt(self):
+        return os.environ.get("OTR_LTX_AV_PROJECTION_CKPT",
+                              "ltx-2.3-22b-dev.safetensors")
+
+    def _video_vae_name(self):
+        return os.environ.get("OTR_LTX_AV_VIDEO_VAE",
+                              "ltx-2.3-22b-dev_video_vae.safetensors")
+
+    def _audio_vae_name(self):
+        return os.environ.get("OTR_LTX_AV_AUDIO_VAE",
+                              "ltx-2.3-22b-dev_audio_vae.safetensors")
+
+    def _weight_paths(self):
+        """(label, full_path, floor_bytes) for each required weight artifact."""
+        return [
+            ("transformer GGUF", _resolve("unet", self._unet_name()), _FLOOR_UNET),
+            ("Gemma-3 text encoder",
+             _resolve("text_encoders", self._encoder_name()), _FLOOR_ENCODER),
+            ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
+            ("audio VAE", _resolve("vae", self._audio_vae_name()), _FLOOR_AUDIO_VAE),
+        ]
+
+    # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
+    def assert_usable(self, host_caps, profile, request_template=None):
+        """Ordered, fail-closed-before-GPU gate (six PINNED reasons only):
+        1 flag; 2 BUG-070 Sage gate; 3 NVML REQUIRED (this lane only -- fail
+        closed so the ceiling guard never silently no-ops); 4 node gate (every
+        required ComfyUI class resolves); 5 weight floors (realpath + size);
+        6 av_dims on request_template.canvas (None tolerated)."""
+        # 1 -- opt-in flag
+        if os.getenv(self.requires_flag, "0") != "1":
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
+                "%s is opt-in; set %s=1 and install the LTX-2.3 GGUF + Gemma-3 "
+                "encoder + LTX VAEs" % (self.name, self.requires_flag),
+                kind="video")
+        # 2 -- BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
+        _MC.assert_sage_not_patched(self.name, self.family)
+        # 3 -- NVML REQUIRED for the heaviest lane (grounded fail-open risk:
+        #      probe_used_mb()->0 makes the ceiling asserts no-op)
+        from .._otr_shared import gpu_residency as _GR
+        if not _GR.nvml_available():
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+                "%s requires NVML to enforce the %d MB ceiling; NVML is "
+                "unavailable on this host (the LTX-AV lane fails closed rather "
+                "than run an unbounded heavy forward)"
+                % (self.name, _MC.dynamic_vram_ceiling_mb()), kind="video")
+        # 4 -- node gate: every required ComfyUI class must resolve (lazy read)
+        from . import wrapper_bridge as _wb
+        missing = []
+        mapping = _wb.node_class_mappings()
+        for logical, candidates in self._node_candidates().items():
+            try:
+                _wb.resolve_node_class(candidates, mapping)
+            except Exception:  # noqa: BLE001 - collect every missing class
+                missing.append("/".join(candidates))
+        if missing:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "%s missing required ComfyUI node class(es): %s (install/update "
+                "ComfyUI-GGUF + ComfyUI-LTXVideo)" % (self.name, ", ".join(missing)),
+                kind="video")
+        # 5 -- weights present + above the sanity floor (realpath -> broken
+        #      symlinks fail)
+        for label, path, floor in self._weight_paths():
+            real = os.path.realpath(path) if path else ""
+            if not real or not os.path.exists(real):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                    "%s %s not found at %r (set the matching OTR_LTX_AV_* env)"
+                    % (self.name, label, path), kind="video")
+            if os.path.getsize(real) < floor:
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                    "%s %s at %r is below the %d-byte floor (truncated/wrong "
+                    "file?)" % (self.name, label, real, floor), kind="video")
+        # 6 -- dims on the provided canvas (None tolerated); wrap any ValueError
+        if request_template is not None:
+            try:
+                w, h = self._canvas_dims(request_template)
+                if w and h:
+                    _AVD.assert_ltx_dims(w, h, _LTX_AV_MIN_FRAMES)
+            except EngineUnusable:
+                raise
+            except Exception as exc:  # noqa: BLE001 - no raw ValueError escapes
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s canvas dims invalid for LTX: %s" % (self.name, exc),
+                    kind="video")
+        return self.name
+
+    # ---- graph spec (M0-grounded; classes resolve via wrapper_bridge) ----
+    def _node_candidates(self):
+        cands = {
+            "unet": ("UnetLoaderGGUF",),
+            "te": ("LTXAVTextEncoderLoader",),
+            "pos": ("CLIPTextEncode",),
+            "neg": ("CLIPTextEncode",),
+            "cond": ("LTXVConditioning",),
+            "modelsampling": ("ModelSamplingLTXV",),
+            "videovae": ("VAELoader",),
+            "audiovae": ("VAELoader",),
+            "loadaudio": ("LoadAudio",),
+            "audioenc": ("LTXVAudioVAEEncode",),
+            "concat": ("LTXVConcatAVLatent",),
+            "noise": ("RandomNoise",),
+            "ksel": ("KSamplerSelect",),
+            "sched": ("LTXVScheduler",),
+            "guider": ("CFGGuider",),
+            "sampler": ("SamplerCustomAdvanced",),
+            "separate": ("LTXVSeparateAVLatent",),
+            "decode": ("VAEDecodeTiled",),
+        }
+        if self._is_talk:
+            cands["loadimage"] = ("LoadImage",)
+            cands["i2v"] = ("LTXVImgToVideo",)
+        else:
+            cands["emptylatent"] = ("EmptyLTXVLatentVideo",)
+        return cands
+
+    def _build_graph(self, plan, length, width, height, audio_name, image_name):
+        """The declarative LTX-AV A2V graph (wrapper_bridge.run_graph format).
+
+        Common: GGUF unet -> ModelSamplingLTXV; LTXAVTextEncoderLoader (Gemma-3 on
+        CPU) -> pos/neg CLIPTextEncode -> LTXVConditioning; VAELoader x2
+        (video+audio); LoadAudio -> LTXVAudioVAEEncode. Talk branch: LoadImage ->
+        LTXVImgToVideo (I2V conditioning) -> video latent. Music branch:
+        EmptyLTXVLatentVideo. Both: LTXVConcatAVLatent(video,audio) ->
+        SamplerCustomAdvanced(LTXVScheduler/euler/CFGGuider) -> LTXVSeparateAVLatent
+        -> VAEDecodeTiled(video only; audio latent DROPPED, V-1)."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
+        negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        seed = int(plan.get("seed", 0) or 0)
+        g = {
+            "unet": {"class": "unet", "inputs": {"unet_name": self._unet_name()}},
+            "te": {"class": "te", "inputs": {
+                "text_encoder": self._encoder_name(),
+                "ckpt_name": self._projection_ckpt(), "device": "cpu"}},
+            "pos": {"class": "pos", "inputs": {"text": positive, "clip": W("te", 0)}},
+            "neg": {"class": "neg", "inputs": {"text": negative, "clip": W("te", 0)}},
+            "cond": {"class": "cond", "inputs": {
+                "positive": W("pos", 0), "negative": W("neg", 0),
+                "frame_rate": float(self.target_fps)}},
+            "modelsampling": {"class": "modelsampling", "inputs": {
+                "model": W("unet", 0), "max_shift": 2.05, "base_shift": 0.95}},
+            "videovae": {"class": "videovae",
+                         "inputs": {"vae_name": self._video_vae_name()}},
+            "audiovae": {"class": "audiovae",
+                         "inputs": {"vae_name": self._audio_vae_name()}},
+            "loadaudio": {"class": "loadaudio", "inputs": {"audio": audio_name}},
+            "audioenc": {"class": "audioenc", "inputs": {
+                "audio": W("loadaudio", 0), "audio_vae": W("audiovae", 0)}},
+            "noise": {"class": "noise", "inputs": {"noise_seed": seed}},
+            "ksel": {"class": "ksel", "inputs": {"sampler_name": "euler"}},
+        }
+        if self._is_talk:
+            g["loadimage"] = {"class": "loadimage", "inputs": {"image": image_name}}
+            g["i2v"] = {"class": "i2v", "inputs": {
+                "positive": W("cond", 0), "negative": W("cond", 1),
+                "vae": W("videovae", 0), "image": W("loadimage", 0),
+                "width": int(width), "height": int(height), "length": int(length),
+                "batch_size": 1, "strength": _LTX_AV_I2V_STRENGTH}}
+            video_latent = W("i2v", 2)
+            guider_pos, guider_neg = W("i2v", 0), W("i2v", 1)
+        else:
+            g["emptylatent"] = {"class": "emptylatent", "inputs": {
+                "width": int(width), "height": int(height),
+                "length": int(length), "batch_size": 1}}
+            video_latent = W("emptylatent", 0)
+            guider_pos, guider_neg = W("cond", 0), W("cond", 1)
+        g["concat"] = {"class": "concat", "inputs": {
+            "video_latent": video_latent, "audio_latent": W("audioenc", 0)}}
+        g["guider"] = {"class": "guider", "inputs": {
+            "model": W("modelsampling", 0), "positive": guider_pos,
+            "negative": guider_neg, "cfg": _LTX_AV_CFG}}
+        g["sched"] = {"class": "sched", "inputs": {
+            "steps": _LTX_AV_STEPS, "max_shift": 2.05, "base_shift": 0.95,
+            "stretch": True, "terminal": 0.1, "latent": W("concat", 0)}}
+        g["sampler"] = {"class": "sampler", "inputs": {
+            "noise": W("noise", 0), "guider": W("guider", 0),
+            "sampler": W("ksel", 0), "sigmas": W("sched", 0),
+            "latent_image": W("concat", 0)}}
+        g["separate"] = {"class": "separate",
+                         "inputs": {"av_latent": W("sampler", 0)}}
+        g["decode"] = {"class": "decode", "inputs": {
+            "samples": W("separate", 0), "vae": W("videovae", 0),
+            "tile_size": 512, "overlap": 64,
+            "temporal_size": 64, "temporal_overlap": 8}}
+        return g
+
+    # ---- residency ----
+    def load(self):
+        """Resolve the installed ComfyUI node classes (fail-closed NAMED if
+        absent). The heavy weight load happens when the loader nodes execute in
+        render_clip (ComfyUI's own model management); the AS-3 lease brackets the
+        real residency."""
+        from . import wrapper_bridge as _wb
+        self._classes = _wb.resolve_graph_classes(self._node_candidates())
+        self._loaded = True
+
+    def render_clip(self, request, prepared):
+        """Drive ONE audio-conditioned clip via the in-process LTX-AV graph and
+        encode the decoded IMAGE batch to a SILENT bt709 clip (V-1: the audio
+        latent is dropped at LTXVSeparateAVLatent; only the mux adds audio)."""
+        from . import wrapper_bridge as _wb
+        from ._tmp import otr_engine_tmp_mp4
+        plan = self._build_render_request(request)
+        if not plan["audio_path"]:
+            raise _wb.GraphExecutionError(
+                "%s requires audio_ref (got %r)" % (self.name, plan["audio_path"]))
+        if self._is_talk and not plan["init_image"]:
+            raise _wb.GraphExecutionError(
+                "%s (talk) requires init_image (got %r)"
+                % (self.name, plan["init_image"]))
+        classes = getattr(self, "_classes", None) \
+            or _wb.resolve_graph_classes(self._node_candidates())
+        audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
+        image_name = (_wb.stage_into_comfy_input(plan["init_image"])
+                      if self._is_talk and plan["init_image"] else "")
+        width, height = self._render_dims(request)
+        length = _AVD.next_8n1(plan["target_frame_count"] or self.target_fps)
+        if length > _LTX_AV_MAX_FRAMES:
+            length = _AVD.next_8n1(_LTX_AV_MAX_FRAMES)
+            if (length - 1) % _AVD._LTX_TEMPORAL_BASE != 0:
+                length = _LTX_AV_MAX_FRAMES
+        _AVD.assert_ltx_dims(width, height, length)
+        graph = self._build_graph(plan, length, width, height, audio_name, image_name)
+        results = _wb.run_graph(graph, classes)
+        images = results[self._TERMINAL][0]
+        self._retain_model_patchers(results, prepared)
+        frames = _wb.images_to_uint8(images)
+        out_path = otr_engine_tmp_mp4("otr_ltx_av_")
+        path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        # BUG-291 reclaim (LOUD; never unload_all): evict the umt5/Gemma encoder +
+        # idle patchers so the resident stack drops under the ceiling before the
+        # PASS-PM assert and the next beat starts drained.
+        _wb.reclaim_idle_models(reason="%s post-decode" % self.name)
+        if not os.environ.get("OTR_TEST_MODE"):
+            _MC.assert_vram_within_ceiling("%s-render" % self.name)
+        return {"out_path": path, "frame_count": n}
+
+    def canonicalize(self, raw, request, profile):
+        return self._clip_from_raw(raw, request)
+
+    def _retain_model_patchers(self, results, prepared):
+        """Best-effort V-4: keep the MODEL ModelPatchers the graph produced so
+        teardown can detach(unpatch_all=True) them."""
+        bucket = prepared.setdefault("patchers", self._patchers) \
+            if isinstance(prepared, dict) else self._patchers
+        seen = {id(p) for p in bucket}
+        for nid in ("unet", "modelsampling"):
+            out = results.get(nid)
+            if not out:
+                continue
+            obj = out[0]
+            if id(obj) not in seen and callable(getattr(obj, "detach", None)):
+                bucket.append(obj)
+                seen.add(id(obj))
+
+    # ---- pure helpers (CPU-testable; no wrapper, no heavy import) ----
+    @staticmethod
+    def _ref_path(ref):
+        """Pull a filesystem path out of an audio_ref / init_image that may be a
+        bare string OR a mapping carrying a ``path`` key (the AudioRef shape)."""
+        if not ref:
+            return ""
+        if isinstance(ref, str):
+            return ref
+        if isinstance(ref, dict):
+            return ref.get("path") or ""
+        return getattr(ref, "path", "") or ""
+
+    def _init_image_ref(self, request):
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        assets = get("asset_refs") or {}
+        if isinstance(assets, dict):
+            return assets.get("init_image") or ""
+        return ""
+
+    def _canvas_dims(self, request):
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        canvas = get("canvas") or {}
+        c_get = canvas.get if isinstance(canvas, dict) else (
+            lambda k, d=None: getattr(canvas, k, d))
+        return int(c_get("w", 0) or 0), int(c_get("h", 0) or 0)
+
+    def _render_dims(self, request):
+        """The render canvas: request.canvas.w/h when present, else the native
+        1472x832. Snapped to LTX's 32-multiple via assert_ltx_dims downstream."""
+        w, h = self._canvas_dims(request)
+        if w and h:
+            return w, h
+        return _LTX_AV_NATIVE_W, _LTX_AV_NATIVE_H
+
+    def _build_render_request(self, request):
+        """Pure: the normalized inference request the LTX-AV graph consumes."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        timing = get("timing") or {}
+        t_get = timing.get if isinstance(timing, dict) else (
+            lambda k, d=None: getattr(timing, k, d))
+        seeds = get("seed_bundle") or {}
+        s_get = seeds.get if isinstance(seeds, dict) else (
+            lambda k, d=None: getattr(seeds, k, d))
+        return {
+            "init_image": self._init_image_ref(request),
+            "audio_path": self._ref_path(get("audio_ref")),
+            "text_prompt": get("text_prompt") or "",
+            "fps": int(self.target_fps),
+            "target_frame_count": int(t_get("target_frame_count", 0) or 0),
+            "seed": int(s_get("request_seed", 0) or 0),
+        }
+
+    def _clip_from_raw(self, raw, request):
+        """Pure: shape a wrapper result into the silent CanonicalClip dict
+        (bt709 / yuv420p; has_audio False -- only OTR_MasterAudioMux adds audio)."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        raw = raw or {}
+        return {
+            "clip_id": get("shot_id") or get("request_id") or "ltx_av_clip",
+            "type": "video", "path": raw.get("out_path", ""),
+            "container": "mp4", "codec": "h264", "pixel_format": "yuv420p",
+            "fps": int(self.target_fps),
+            "frame_count": int(raw.get("frame_count", 0) or 0),
+            "has_audio": False,
+            "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
+            "engine_id": self.name, "family": self.family,
+        }
+
+
+@register
+class LtxAvTalkEngine(_LtxAvBase):
+    """LTX-AV talk lane: lip-sync attempt from the FLUX still (I2V) + the audio
+    slice. Reuses the ``audio_driven_face`` family; degrades to HuMo (then the
+    HuMo 1.7B tier -> latentsync -> still floor)."""
+
+    name = "ltx_av_talk"
+    family = "audio_driven_face"
+    roles = ("announcer_visual", "character_video")
+    required_inputs = ("text_prompt", "audio_ref", "init_image")
+    fallback_engine = "humo"
+    _is_talk = True
+
+
+@register
+class LtxAvMusicEngine(_LtxAvBase):
+    """LTX-AV music/scene lane: audio-reactive scene motion (sync-loose; the
+    visuals breathe with the track). NEW ``audio_conditioned_video`` family;
+    degrades to the golden prompt-only ``ltx_video`` (then the still floor)."""
+
+    name = "ltx_av_music"
+    family = "audio_conditioned_video"
+    roles = ("music_visual",)
+    required_inputs = ("text_prompt", "audio_ref")
+    fallback_engine = "ltx_video"
+    _is_talk = False
+
+
+__all__ = ["LtxAvTalkEngine", "LtxAvMusicEngine"]

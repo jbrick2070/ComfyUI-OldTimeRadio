@@ -1,5 +1,39 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-15 (day; LTX-AV [ltx_av] M0 GGUF RE-PROBE -> GO at Q3_K_M; SUPERSEDES the
+> same-day PARK below; docs only, NOT committed):** Operator revived Lane B via the GGUF route (build spec
+> `LTX-2.3_Audio_5080_ComfyUI_BuildSpec.md`). Fetched the GGUF A2V set to `C:\ComfyUI-Models` (unsloth:
+> dev-Q4_K_S + dev-Q3_K_M unet, video+audio VAE bf16, embeddings_connectors; manifest
+> `m0_gguf_model_manifest.json`). Live probes on the 5080 (T2V base, 512x288x97, 8 steps, Gemma-3 encoder on
+> CPU via `LTXAVTextEncoderLoader device=cpu` = 0 VRAM; `UnetLoaderGGUF`; GGUF metadata read OK):
+> **Q4_K_S peaked 15594 MB (> 14.5 cap, unet partial-unload at decode = thrash); Q3_K_M peaked 13688 MB
+> (<= 14.5 cap, NO decode unload), 8 steps/18 s, success.** **VERDICT = GO at Q3_K_M** (A2V audio VAE adds
+> ~0.34 GB -> ~14.0 GB, still under cap). Q3_K_M is the production quant; Q4_K_S = quality step-up only if the
+> ceiling is relaxed/run solo. Probe used a headless server on :8011 (alt port, torn down) since the operator
+> Desktop went down mid-session. **NEXT = M1-M4 ADDITIVE build** (`eng_ltx_av.py` singleton core + ltx_av_talk
+> /ltx_av_music + assert_usable + schemas family + CAPABILITIES from the probe; M2 frozen-audio V-1; M3 wiring
+> NO-JSON-edit; M4 lip-sync-vs-HuMo A/B). GOLDEN `eng_ltx_video.py` UNTOUCHED. Records:
+> `docs/2026-06-15-ltx-av-alternative/M0_GRAPH_SPIKE_FINDINGS.md` (GO section at top). The §3 forward order
+> (Wan/3D/distribution) is unchanged -- ltx_av remains the operator-gated OPTIONAL track, now GREENLIT to build.
+>
+> **LATEST SESSION -- 2026-06-15 (day; LTX-AV [ltx_av] M0 GRAPH SPIKE -> PARKED; docs only, HEAD `c339392`,
+> NOT committed yet):** Ran the OPERATOR-GATED OPTIONAL ltx_av (audio-input / A2V) M0 probe-or-park. Captured
+> the full LTX-2.3 A2V graph from a live `/object_info` (:8000 Desktop, 1608 classes) + the official bundled
+> template `video_ltx2_3_ia2v.json` (53-node subgraph). The terminal the plan flagged as unknown is GROUNDED:
+> `LTXVSeparateAVLatent(av_latent) -> video_latent -> VAEDecodeTiled` (drop the `LTXVAudioVAEDecode` branch =
+> the frozen-audio V-1 anchor). **VERDICT = PARK Lane B (operator, Route A):** the A2V model is a ~23 GB fp8
+> FULL checkpoint (`ltx-2.3-22b-dev-fp8.safetensors`, NOT on disk) + a ~8.8 GB Gemma-3-12B fp4 encoder; they
+> cannot be single-resident <=14500 MB on the 16 GB 5080, and block-swap/CPU-offload streams weights every
+> step -> too slow for per-beat production (offload-thrash). No heavy forward run (low ROI to prove an
+> arithmetic near-certainty; 23 GB download avoided). **Lane A (golden prompt-only `ltx_video`: boomerang +
+> ksampler + music_open + 832x480) UNTOUCHED, stays production.** Only future lead = a GGUF-Q3 (~9-11 GB)
+> quant (not on disk; needs `UnetLoaderGGUF` graph adaptation + audio/Gemma-path verification) -- separate
+> uncertain probe, on explicit revival only. Records: `docs/2026-06-15-ltx-av-alternative/
+> M0_GRAPH_SPIKE_FINDINGS.md` + the PARK note atop `roundtable/pass03_plan_FINAL.md` + `m0_object_info_full.json`
+> / `m0_template_ia2v.json`. **The forward order (section 3: Wan / 3D / distribution) is UNCHANGED** -- ltx_av
+> was an optional side track and is now closed (parked). Box clean (GPU idle ~1.8 GB, :8000 = operator Desktop,
+> not killed). M1-M4 never started (correctly gated behind an M0 GO that did not occur).
+>
 > **LATEST SESSION -- 2026-06-15 (day; FULL LTX MOTION OVERHAUL SHIPPED + verified; HEAD `5bcee2c` == origin):**
 > THREE pushed commits, all regression-GREEN (suite 4286/0, Bug Bible 16/7/3, audio byte-identical):
 > **(1) BLUR `4fc4268`** -- LTX renders native 832x480 (no 1472x832 mush). **(2) BOOMERANG `e8a74da`** --

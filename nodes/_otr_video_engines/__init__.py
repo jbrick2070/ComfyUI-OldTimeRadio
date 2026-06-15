@@ -67,6 +67,20 @@ except Exception:  # noqa: BLE001
     pass
 
 
+# 2026-06-15: register the LTX-2.3 AUDIO-INPUT (A2V) lane -- ltx_av_talk
+# (audio_driven_face) + ltx_av_music (audio_conditioned_video). ADDITIVE + DARK:
+# both are DEFAULT-OFF (empty default_roles + gated behind OTR_ENABLE_LTX_AV) so
+# they show in the static per-role dropdown (V-6) but never default and fail
+# closed until the GGUF unet + Gemma-3 encoder + LTX VAEs are on disk AND NVML is
+# available. The golden prompt-only eng_ltx_video is NEVER imported/touched here.
+# Cold-import clean (V-12: lazy LTX/GGUF wrapper + torch inside load/render_clip).
+# Guarded so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ltx_av as _eng_ltx_av  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # M2 / A-S6: register the in-process HuMo audio-driven-face engine -- the
 # heaviest motion engine (loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via
 # comfy.model_management). Like LTX/Wan it is DEFAULT-OFF / dark (empty

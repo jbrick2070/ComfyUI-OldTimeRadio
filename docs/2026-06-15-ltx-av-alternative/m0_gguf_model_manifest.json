@@ -1,0 +1,24 @@
+{
+  "repo": "unsloth/LTX-2.3-GGUF",
+  "license": "LTX-Video Open Weights License 0.X (Lightricks); GGUF quant by unsloth",
+  "files": [
+    {
+      "repo_file": "ltx-2.3-22b-dev-Q4_K_S.gguf",
+      "path": "C:\\ComfyUI-Models\\unet\\ltx-2.3-22b-dev-Q4_K_S.gguf",
+      "bytes": 13121256480,
+      "sha256": "3f7cb55f419bde9871eadf307e39518a3819b536652939da765965d537301a44"
+    },
+    {
+      "repo_file": "vae/ltx-2.3-22b-dev_video_vae.safetensors",
+      "path": "C:\\ComfyUI-Models\\vae\\ltx-2.3-22b-dev_video_vae.safetensors",
+      "bytes": 1452256522,
+      "sha256": "8732bb70cf4343541815f45c9f90f5ff0519d679bd63483afc27bf79a08d3f4e"
+    },
+    {
+      "repo_file": "vae/ltx-2.3-22b-dev_audio_vae.safetensors",
+      "path": "C:\\ComfyUI-Models\\vae\\ltx-2.3-22b-dev_audio_vae.safetensors",
+      "bytes": 364853140,
+      "sha256": "d7711812d9387ce940c2cd5d65a4f5a1e57bf6087cf618d89b56dd3c722c4dea"
+    }
+  ]
+}

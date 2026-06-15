@@ -26,7 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Single-sourced vocabularies
 # ---------------------------------------------------------------------------
 
-#: The eight video families (seven non-3D + ``character_3d`` added in Phase 3).
+#: The video families (seven non-3D + ``character_3d`` + the LTX-AV
+#: ``audio_conditioned_video`` lane for audio-reactive scene motion / music).
 FAMILIES: tuple = (
     "audio_driven_face",
     "lipsync_overlay",
@@ -36,6 +37,7 @@ FAMILIES: tuple = (
     "static_motion",
     "abstract",
     "character_3d",
+    "audio_conditioned_video",
 )
 
 #: Request-level required-input tokens (shared with role_compat).
@@ -60,6 +62,10 @@ FAMILY_REQUIRED_INPUTS: dict = {
     "static_motion": (),
     "abstract": (),
     "character_3d": ("audio_ref", "init_image"),
+    # LTX-AV music/scene lane: audio-reactive motion from a text prompt + the
+    # per-beat slice of the frozen master (no portrait needed -- that is the
+    # talk lane, which reuses audio_driven_face).
+    "audio_conditioned_video": ("text_prompt", "audio_ref"),
 }
 
 # Guard: FAMILIES and FAMILY_REQUIRED_INPUTS must stay in sync (Phase 3 spec).

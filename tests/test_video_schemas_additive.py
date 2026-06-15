@@ -29,9 +29,11 @@ def _req(**over):
 
 
 def test_families_and_tokens_are_single_sourced():
-    # Phase 3 added character_3d: FAMILIES is now 8; FAMILY_REQUIRED_INPUTS in sync.
-    assert len(sc.FAMILIES) == 8
+    # Phase 3 added character_3d (8th); the LTX-AV lane added the 9th family
+    # audio_conditioned_video. FAMILY_REQUIRED_INPUTS stays in sync.
+    assert len(sc.FAMILIES) == 9
     assert "character_3d" in sc.FAMILIES
+    assert "audio_conditioned_video" in sc.FAMILIES
     assert sc.REQUIRED_INPUT_TOKENS == (
         "text_prompt", "init_image", "audio_ref", "base_clip_ref")
     assert set(sc.FAMILY_REQUIRED_INPUTS) == set(sc.FAMILIES)

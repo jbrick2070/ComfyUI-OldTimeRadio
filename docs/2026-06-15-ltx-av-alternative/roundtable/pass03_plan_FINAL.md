@@ -1,5 +1,23 @@
 # LTX AUDIO-INPUT (A2V) ALTERNATIVE PATH -- CONVERGED (pass03 FINAL)
 
+> ## >>> M0 OUTCOME (2026-06-15): **PARKED.** Lane A stands as production. <<<
+> The M0 graph spike RAN and is decisive. The A2V topology is fully grounded (live `/object_info` @ :8000 +
+> the official bundled template `video_ltx2_3_ia2v.json`): the model is a **22B fp8 FULL checkpoint
+> `ltx-2.3-22b-dev-fp8.safetensors` (~23 GB)** via `CheckpointLoaderSimple` + a **Gemma-3-12B fp4** encoder
+> via `LTXAVTextEncoderLoader` (~8.8 GB) + a distilled motion LoRA + a two-stage base/`LTXVLatentUpsampler`
+> sampler. The frozen-audio terminal the plan needed is **confirmed real**:
+> `LTXVSeparateAVLatent(av_latent) -> video_latent -> VAEDecodeTiled` (drop the `LTXVAudioVAEDecode` audio
+> branch). **VERDICT = PARK (operator, Route A):** ~23 GB fp8 + ~8.8 GB Gemma cannot be single-resident under
+> 14500 MB on a 16 GB 5080; only block-swap/CPU-offload could cap peak, and it streams weights every step ->
+> too slow for per-beat production (the offload-thrash PARK condition). The fp8 dev checkpoint is not even on
+> disk; spending the 23 GB download for an empirical receipt of an arithmetic near-certainty is low ROI, so
+> no heavy forward was run. **Lane A (golden prompt-only `ltx_video`) is untouched and remains production.**
+> Only future lead for a 16 GB fit: a **GGUF-Q3 (~9-11 GB)** quant (not on disk; needs an `UnetLoaderGGUF`
+> graph adaptation + audio/Gemma-path verification) -- a separate, uncertain probe, pursue only on explicit
+> revival. Full capture + asset inventory: `docs/2026-06-15-ltx-av-alternative/M0_GRAPH_SPIKE_FINDINGS.md`
+> (+ `m0_object_info_full.json`, `m0_template_ia2v.json`). M1-M4 below remain un-started (no M0 GO).
+
+
 > CONVERGED after 3 live panel passes (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4) + Claude panelist/grounding,
 > ~$0.39 total. Verdict: the plan is SOUND; the remaining work is (1) DEFER to the locked 8-pass sprint plan
 > for internal contracts, (2) gate ALL of Lane B behind the M0 graph spike. This FINAL is a thin REFRESH

@@ -207,5 +207,21 @@ CAPABILITIES = {
     "trellis_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                      "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
                      "cpu_ok": False, "model_requirements": ["trellis"]},
+    # LTX-AV (audio-input) lane -- the LTX-2.3 22B audio-conditioned engines.
+    # vram_estimate is the M0-MEASURED Q3_K_M peak (13688 MB at 512x288x97, 8
+    # steps, Gemma-3 encoder offloaded to CPU via device=cpu) -- under the 14500
+    # ceiling; the audio VAE adds ~340 MB at the floor. Q4_K_S (15594 MB) is OVER
+    # and is a quality step-up only if the ceiling is relaxed / run solo. Both
+    # engines run in-process and are DEFAULT-OFF / dark (OTR_ENABLE_LTX_AV).
+    "ltx_av_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
+                    "required_toolchain": None, "requires_sidecar": False,
+                    "cpu_ok": False,
+                    "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
+                                           "ltx-2.3-audio-vae", "ltx-2.3-video-vae"]},
+    "ltx_av_music": {"vram_class": "heavy", "vram_estimate_mb": 14000,
+                     "required_toolchain": None, "requires_sidecar": False,
+                     "cpu_ok": False,
+                     "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
+                                            "ltx-2.3-audio-vae", "ltx-2.3-video-vae"]},
 }
 __all__.append("CAPABILITIES")
