@@ -418,15 +418,14 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 ## 5. OPEN TICKETS
 
 - **LOOK-QA BUGS (NEW 2026-06-14 eve — operator look-QA pass; all in `BUG_LOG_2026-06.md`):**
-  - **BUG-408 default MUSIC sounds non-musical (SA3).** DECIDED Path B (keep SA3, improve prompts/inputs/
-    conditioning). 4-model roundtable CONVERGED a buildable plan: `docs/2026-06-14-sa3-music-improvement/
-    roundtable/pass01_plan.md` (+ judgment). Grounded: JSON node 83 = `stable_audio_3` (SA3 is live);
-    `test_audio_byte_identical` sha256s the FULL audio → fix REQUIRES an operator-gated golden RE-BASELINE.
-    NEXT = coder implements seconds_total/seconds_start conditioning + SA3 prompt/negative + sampler
-    constants, operator A/B-listens, then re-baselines. CODER-READY.
-  - **BUG-409 title card scrambles the WHOLE window** — resolves only in the last ~1-2s. Root grounded:
-    `video_engine.py::_draw_title_card` `reveal_span = me - w0` (whole window). Fix = reveal completes in
-    first ~35-45% then HOLD solid → POP → dock. CODER-READY.
+  - **BUG-408 default MUSIC sounds non-musical (SA3).** **IMPLEMENTED 2026-06-14 (`3a4f71d`).** Path B:
+    SA3-shaped prompt + real negative + per-cue `seconds_start` within a 30s `seconds_total` context (latent
+    stays `dur` → length+determinism unchanged), env-overridable sampler knobs. Suite 4261/0. **OPERATOR-GATED:**
+    restart Desktop, A/B listen (tune `OTR_SA3_CFG/STEPS/CONTEXT_S`), then RE-BASELINE the `test_audio_byte_identical`
+    golden (intended music-bytes change). Plan: `docs/2026-06-14-sa3-music-improvement/roundtable/pass01_plan.md`.
+  - **BUG-409 title card scrambles the WHOLE window** — **FIXED 2026-06-14 (`9e0b658`).** New
+    `_title_reveal_progress` resolves the reveal in the first ~40% of the window then holds solid (env
+    `OTR_TITLE_REVEAL_FRACTION`); close card stays bounded to the main video (no credits overlap). Suite 4259/0.
   - **BUG-410 closing ROLLING CREDITS / Telemetry HUD GONE (regression vs 6/5)** — **FIXED 2026-06-14.**
     Root (runtime-probed): floor renders the full ~20s credits scroll out to 65.7s, but the deliverable was
     locked to the master-audio length (45.7s) by the mux v≤a gate, cutting the scroll. 4-model roundtable
