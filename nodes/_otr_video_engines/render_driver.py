@@ -1261,9 +1261,10 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
         # Bark, ...) loaded through OTR's OWN loaders -- ComfyUI's model_management
         # cannot see them, so free_memory/empty_cache cannot touch them. The
         # canonical Lever-1 freer releases the writer LLM + Bark FIRST, THEN
-        # ComfyUI FLUX (detach + unload_all_models), then flushes the allocator, so
-        # the first video beat (14B wan_i2v) loads into a clean GPU instead of
-        # OOMing at the ksampler. Best-effort (never raises); MEASURED telemetry.
+        # DETACHES any ComfyUI FLUX patcher (surgical; NO unload_all_models per
+        # V-4/V-5), then flushes the allocator, so the first video beat (14B
+        # wan_i2v) loads into a clean GPU instead of OOMing at the ksampler.
+        # Best-effort (never raises); MEASURED telemetry.
         from .._otr_vram_levers import free_otr_pipeline_residue as _free_residue
         _rep = _free_residue(reason="pre-render: all stills minted")
         _LOG.warning(
@@ -1272,7 +1273,31 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             _rep.get("free_gb_after"))
     except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
         _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)
+    _last_engine = None
     for shot in section["shots"]:
+        # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
+        # DIFFERENT engine than the one the prior beat left resident, drain the
+        # prior engine's residue and FLUSH the allocator, so two heavy engines
+        # never co-reside on the 16GB card -- the cause of the 29s/it edge
+        # page-thrash (ltx 12.5GB + humo 7GB -> 19.5GB). The per-beat teardown
+        # already DETACHES + waits, but it does not return the freed-but-cached
+        # blocks to the driver; the surgical Lever-1 freer's cuda flush does.
+        # SELECTIVE: same-engine consecutive beats SKIP this (no reload churn --
+        # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
+        # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
+        _this_engine = str(shot.get("engine_id") or "")
+        if _last_engine and _this_engine and _this_engine != _last_engine:
+            try:
+                from .._otr_vram_levers import (
+                    free_otr_pipeline_residue as _free_residue)
+                _ir = _free_residue(
+                    reason="inter-beat %s->%s" % (_last_engine, _this_engine))
+                _LOG.warning(
+                    "[OTR video] inter-beat reclaim %s->%s: free_gb_after=%s",
+                    _last_engine, _this_engine, _ir.get("free_gb_after"))
+            except Exception as _exc:  # noqa: BLE001 -- best-effort, never fatal
+                _LOG.warning(
+                    "[OTR video] inter-beat reclaim skipped: %s", _exc)
         if request_builder is not None:
             request = request_builder(shot, ledger, canvas=canvas)
         else:
@@ -1325,6 +1350,9 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
         trace.append(row)
         if used:
             vram_peak = max(vram_peak, int(used))
+        # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
+        # the next beat reclaims only when it crosses to a different engine.
+        _last_engine = str(out_shot.get("engine_id") or "")
     section["shots"] = new_shots
     ledger["video"] = section
     return {"ledger": ledger, "clips": clips, "trace": trace,
