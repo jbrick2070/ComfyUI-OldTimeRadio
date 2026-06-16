@@ -1,5 +1,25 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-15 (LTX 22B-GGUF SPLICE PLAN roundtable-hardened to convergence; READY TO CODE;
+> docs only, NOT committed yet):** The clean-break that replaces the production VIDEO LTX recipe (the buggy 2B
+> `ltx_video` path) with the VERIFIED mini-json recipe is fully specced + hardened across 5 grounded roundtable
+> passes (GPT-5.5 + Gemini-3.1-pro + Grok-4.3, ~$1.05). **Build-ready detail spec = `docs/2026-06-15-ltx-splice/
+> SPLICE_PLAN.md`** (this step's detail doc, like the 3D plan is for item 5; §12 = the grounded-final wiring).
+> **#1 INVARIANT: reproduce the frozen `workflows/ltx_bookend_mini_repro_gguf_mit.json` graph + values EXACTLY
+> (22B Q4 GGUF + distilled LoRA @0.70 + Gemma encoder + the distilled sampler chain + VAEDecodeTiled 512/64/4096/8
+> + i2v 0.75 + 832x480); the wiring around it is flexible but must NOT break the verified inner graph.** License-
+> clean (Apache GGUF + LTX-2 Community; NO RES4LYF/AGPL, NO VHS/GPL). Phase 0 = rip `ltx_orbit` ONLY; Phase 1 =
+> swap `LtxVideoEngine` loaders/decode to the GGUF recipe (serves announcer/music/scene-per-beat; HuMo keeps
+> faces; `ltx_av` stays dark). Operator decisions: distilled-GLOBAL default (`ksampler` = env knob only);
+> per-beat = scene/b-roll; LTX i2v init = full-frame FLUX still, NEVER a portrait.
+> **>>> THIS SUPERSEDES `LTX-REGR` (§5):** LTX-REGR planned to bake the *2B* recipe into `eng_ltx_video.py`; the
+> splice does the *22B GGUF* evolution instead — the coder must NOT do the 2B bake. **`ltx_orbit` is REMOVED
+> from the §5 "Ship defaults" list** (ripped Phase 0). BUG-411 (flux, §1) stays parallel/operator-gated — it
+> FEEDS the splice's full-frame i2v init, adjacent-supportive, NOT conflicting.
+> **NEXT = a fresh coder window codes Phase 0 -> Phase 1 autonomously** per SPLICE_PLAN.md + the test gate
+> (regression suite + Bug Bible + the structured graph-shape test + mini-output match + NVML/VRAM), commit+push
+> per green chunk on `v2.0-alpha`. The §3 forward order (Wan / 3D / distribution) is UNCHANGED.
+>
 > **LATEST SESSION -- 2026-06-15 (day; LTX-AV [ltx_av] M0 GGUF RE-PROBE -> GO at Q3_K_M; SUPERSEDES the
 > same-day PARK below; docs only, NOT committed):** Operator revived Lane B via the GGUF route (build spec
 > `LTX-2.3_Audio_5080_ComfyUI_BuildSpec.md`). Fetched the GGUF A2V set to `C:\ComfyUI-Models` (unsloth:
@@ -664,7 +684,11 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   audio-driven lip-sync, not a still with motion. Focus the remaining runway on **getting the Wan lane
   bug-free** (section 1 + 4 + 4A). A new sweep, if ever needed, should add `--exclude-engine humo` (the
   exact-match flag added `ca10b63`: skips the 14B `humo` that TIMES OUT per CS-4, KEEPS `humo_1.7B`).
-- **LTX-REGR (operator 2026-06-13; PROMOTED to active 2026-06-14 pending operator confirm)** -- LTX
+- **LTX-REGR — SUPERSEDED 2026-06-15 by the LTX 22B-GGUF splice** (`docs/2026-06-15-ltx-splice/SPLICE_PLAN.md`).
+  LTX-REGR's recommended fix was to bake the **2B** v0_9 recipe into `eng_ltx_video.py`; the splice instead swaps
+  `LtxVideoEngine` to the **22B GGUF** mini recipe (verified-working). **Do NOT do the 2B bake.** Original entry kept
+  below for history only:
+  **LTX-REGR (operator 2026-06-13; PROMOTED to active 2026-06-14 pending operator confirm)** -- LTX
   clips no longer animate like the **2026-05-30..06-05** era (motion lost / too static). `BUG-LOCAL-113b`
   (`8115c72`: ksampler 30-step euler cfg3.0 as the LTX default, distilled 8-step = the
   `OTR_LTX_SAMPLER=distilled` rollback) was the prior fix, but the operator STILL sees the regression.
@@ -707,7 +731,7 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   NOT openers); LTX = holds composition + subtle motion (opener default); TI2V-5B = 8GB tier, lower-res.
   Source the verdicts from the operator's bench ratings (export button).
 - **Ship defaults (release)** -- proposed: announcer + character = `flux_still`, music = `visualizer`
-  (selectable: station_card, still_parallax, ltx_orbit, abstract). Keep HuMo/latentsync/3D
+  (selectable: station_card, still_parallax, abstract — `ltx_orbit` ripped 2026-06-15 in the LTX splice Phase 0). Keep HuMo/latentsync/3D
   selectable-not-default until verified. Operator eyeballs 2-3 finals/slot.
 - **Harness polish** (minor) -- output-tree resolver should prefer the live server's `OTR_OUTPUT_DIR`
   (fail LOUD on mismatch); run the OH-3 janitor sweep at server boot; widen the heartbeat cadence.
