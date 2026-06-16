@@ -57,7 +57,6 @@ $env:OTR_NEWS_BRIEFS_REQUIRED = '0'
 # untouched. Production ship-defaults still gate HuMo OFF; this only makes the
 # engine selectable so the soak permutation legs actually exercise it.
 $env:OTR_ENABLE_HUMO = '1'
-$env:OTR_ENABLE_LTX_ORBIT = '1'
 $env:OTR_ENABLE_STILL_PARALLAX = '1'
 $env:OTR_ENABLE_MESH_STAGE = '1'
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue

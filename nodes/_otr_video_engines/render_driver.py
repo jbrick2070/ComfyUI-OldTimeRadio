@@ -66,7 +66,7 @@ ENGINE_FAMILY = {
     "humo_1.7B": "audio_driven_face",
     "latentsync": "lipsync_overlay", "still_kenburns": "static_motion",
     "still_parallax": "static_motion",
-    "ltx_video": "text_to_video", "ltx_orbit": "text_to_video",
+    "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
     "abstract": "abstract", "station_card": "static_image_gen",
     "visualizer": "abstract", "flux_still": "static_image_gen",
@@ -1495,9 +1495,9 @@ def apply_engine_override(ledger):
 
 
 #: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
-#: the prompt-only ltx_video / ltx_orbit + the additive LTX-AV audio lanes.
+#: the prompt-only ltx_video + the additive LTX-AV audio lanes.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx_orbit", "ltx_av_talk", "ltx_av_music"})
+    {"ltx_video", "ltx_av_talk", "ltx_av_music"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})

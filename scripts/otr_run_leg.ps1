@@ -17,10 +17,10 @@
 
   Usage:
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_run_leg.ps1 `
-        -Leg other_beats_visual_ltx_orbit
+        -Leg other_beats_visual_ltx_video
 #>
 param(
-    [string]$Leg = 'other_beats_visual_ltx_orbit',
+    [string]$Leg = 'other_beats_visual_ltx_video',
     [string]$StrengthI2V = '0.6',
     [string[]]$ExtraEnv = @(),
     [int]$StallSeconds = 300,
@@ -52,7 +52,7 @@ Say "after reset: :8000 listeners=$((Get-NetTCPConnection -LocalPort 8000 -State
 # 2. STAGE ENV --------------------------------------------------------------
 New-Item -ItemType Directory -Force -Path (Split-Path $EXTRA) | Out-Null
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
-$envLines = @('set OTR_ENABLE_LTX_ORBIT=1', 'set OTR_ENABLE_STILL_PARALLAX=1',
+$envLines = @('set OTR_ENABLE_STILL_PARALLAX=1',
     'set OTR_ENABLE_MESH_STAGE=1', 'set OTR_NEWS_BRIEFS_REQUIRED=0',
     "set OTR_LTX_I2V_STRENGTH=$StrengthI2V") + $ExtraEnv
 $envLines | Set-Content -Path $EXTRA -Encoding ascii

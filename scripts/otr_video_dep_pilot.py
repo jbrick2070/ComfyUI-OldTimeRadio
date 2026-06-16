@@ -114,23 +114,6 @@ OPT_IN_ENGINES = {
             "sageattention, and render-twice determinism on sm_120"
         ),
     },
-    # 0-E easy on-ramp: the camera-orbit PROMPT PRESET over the same in-process
-    # LTX wrapper (zero new deps -- same lib, same checkpoint, same graph).
-    # Own opt-in flag so it lands selectable-not-default until look-QA.
-    "ltx_orbit": {
-        "lib_module": "ltx_video",
-        "adapter_class": "LtxOrbitEngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_LTX_ORBIT",
-        "assumed_call": (
-            "in-process: identical to ltx_video (the orbit engine only appends "
-            "a camera-orbit prompt preset before the same wrapper graph); "
-            "honest '3D-feel' label, NOT real 3D.  "
-            "# TODO-for-GPU-smoke: one orbit clip on the GPU box -- confirm the "
-            "preset actually reads as an orbit at 1472x832 within the proven "
-            "169f decode band, and render-twice determinism on sm_120"
-        ),
-    },
     # 0-E easy on-ramp: 2.5D depth parallax over existing stills.
     # DepthAnythingV2-SMALL pinned (Apache-2.0; the bigger DA-V2 ckpts are
     # CC-BY-NC and banned). CPU-degradable; in-process transformers.

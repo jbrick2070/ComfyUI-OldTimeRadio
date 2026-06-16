@@ -102,8 +102,7 @@ except Exception:  # noqa: BLE001
 # selectable (empty default_roles + OTR_ENABLE_STILL_PARALLAX) until operator
 # look-QA; fails closed without the local model. Cold-import clean (lazy
 # torch/transformers/PIL/numpy inside load/render_clip). Guarded so a
-# packaging quirk never breaks the namespace import. (ltx_orbit, the first
-# 0-E engine, registers inside eng_ltx_video above.)
+# packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
     from . import eng_still_parallax as _eng_still_parallax  # noqa: F401
 except Exception:  # noqa: BLE001

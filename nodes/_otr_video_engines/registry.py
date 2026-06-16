@@ -148,13 +148,6 @@ CAPABILITIES = {
     "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["ltx-video-2b"]},
-    # ltx_orbit (0-E easy on-ramp): the camera-orbit PROMPT PRESET over the
-    # existing LTX adapter -- IDENTICAL physics to ltx_video (same checkpoint,
-    # same graph, same VRAM), so the row mirrors it. Selectable-not-default
-    # (opt-in flag at the adapter) until operator look-QA.
-    "ltx_orbit": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
-                  "requires_sidecar": False, "cpu_ok": False,
-                  "model_requirements": ["ltx-video-2b"]},
     # still_parallax (0-E easy on-ramp): DepthAnythingV2-SMALL (~25M params,
     # Apache-2.0 -- the bigger DA-V2 ckpts are CC-BY-NC and banned) + a pure
     # numpy warp. cpu_ok: CPU-degradable by design (slower, same contract).

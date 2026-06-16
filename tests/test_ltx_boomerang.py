@@ -2,7 +2,7 @@
 
 Covers the pure helpers (_boomerang_frames mirror semantics, _ltx_loop_source_length
 math incl. the freeze-shortfall the roundtable caught) and the env + per-engine
-class gate (_loop_via_reverse; ltx_orbit must never auto-loop). No GPU.
+class gate (_loop_via_reverse). No GPU.
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -12,7 +12,6 @@ import pytest
 
 from nodes._otr_video_engines.eng_ltx_video import (
     LtxVideoEngine,
-    LtxOrbitEngine,
     _boomerang_frames,
     _ltx_loop_source_length,
 )
@@ -74,16 +73,6 @@ def test_loop_min_env_override(monkeypatch):
 def test_video_loops_by_default(monkeypatch):
     monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
     assert LtxVideoEngine()._loop_via_reverse() is True
-
-
-def test_orbit_never_loops(monkeypatch):
-    # ltx_orbit inherits render_clip but must NOT auto-loop, even env-forced ON.
-    for val in (None, "on", "1", "true"):
-        if val is None:
-            monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
-        else:
-            monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", val)
-        assert LtxOrbitEngine()._loop_via_reverse() is False
 
 
 @pytest.mark.parametrize("val,expect", [
