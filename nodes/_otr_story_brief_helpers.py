@@ -362,7 +362,17 @@ def get_open_subject(role: str, synthetic: bool) -> str:
 #: is the 6/5 look the operator wants back; the portrait framing matches the
 #: round-5 three-quarter STYLE_ANCHOR decision ("more body -- better").
 STILL_FRAMING_OPEN = "full-frame macro, centered subject"
-STILL_FRAMING_PORTRAIT = "three-quarter framing showing head and upper body"
+STILL_FRAMING_PORTRAIT = ("three-quarter framing, full head and shoulders with "
+                          "clear headroom above, face unobstructed")
+#: Scene-BEAT framing (person beats, 2026-06-16 framing fix): the old scene path
+#: reused STILL_FRAMING_OPEN ("full-frame macro") which has NO headroom directive
+#: -> LTX i2v inherits the tight still and crops heads. Positive-only (FLUX plants
+#: negated tokens -- the c01 lesson); keeps the operator's wider three-quarter
+#: look, just guarantees the whole head + headroom. scene_open (the radio-set
+#: object beat) KEEPS the macro -- no person, no head to frame.
+STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, people shown with "
+                            "full heads and clear headroom inside frame, faces "
+                            "unobstructed, balanced composition")
 
 
 def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
@@ -394,7 +404,12 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         terms = {}
     setting = ", ".join([str(t).strip() for t in (terms.get("setting") or [])
                          if str(t).strip()][:2])
-    framing = STILL_FRAMING_PORTRAIT if is_portrait else STILL_FRAMING_OPEN
+    if is_portrait:
+        framing = STILL_FRAMING_PORTRAIT
+    elif kind == "scene_beat":
+        framing = STILL_FRAMING_SCENE_BEAT
+    else:
+        framing = STILL_FRAMING_OPEN
     pieces = [subject]
     if setting:
         pieces.append(setting)
