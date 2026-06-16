@@ -1,17 +1,21 @@
 """nodes/_otr_vram_levers.py -- pipeline VRAM-residue freeing (Lever 1).
 
 BUG-LOCAL-265 root cause: when the HuMo video phase loads, the OTR
-pipeline still holds VRAM in models loaded earlier in the run. Some of
-those are ComfyUI ModelPatcher objects (FLUX) that
-``comfy.model_management.unload_all_models()`` can evict -- but the
-writer LLM and Bark are loaded through OTR's OWN loaders, as raw
-``transformers`` objects cached in module-level dicts
+pipeline still holds VRAM in models loaded earlier in the run. The
+dominant pin -- proven on the wan_i2v 14B OOM (2026-06-15) -- is the
+writer LLM (Mistral-Nemo, ~7 GB) and Bark, loaded through OTR's OWN
+loaders as raw ``transformers`` objects cached in module-level dicts
 (``_otr_model_loader.LLM_CACHE``, ``_otr_bark_lib._BARK_CACHE``).
-``unload_all_models()`` cannot see those, so they stay resident and
-starve HuMo's VRAM budget.
+``comfy.model_management`` CANNOT see those (its detach loop /
+``unload_all_models`` / ``free_memory`` all report "0 models unloaded"
+against them), so they stay resident and starve the next heavy engine's
+VRAM budget. Any ComfyUI-tracked ModelPatcher (FLUX) is the lesser,
+already-dynamically-offloaded part.
 
-"Lever 1" is the fix: drain the OTR-owned caches AND the ComfyUI model
-manager, in one pass, before HuMo loads.
+"Lever 1" is the fix: drain the OTR-owned caches (unload_llm + bark)
+AND surgically DETACH any tracked ComfyUI patcher, in one pass, before
+the heavy engine loads. V-4 / V-5: it NEVER calls ``unload_all_models``
+-- the targeted detach is the actual VRAM move.
 
 ``free_otr_pipeline_residue()`` is the single canonical residue-freer.
 It is called from two sites:
@@ -116,15 +120,20 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
     """Free every model the OTR pipeline leaves resident before HuMo.
 
     Order matters: the out-of-band transformers caches (writer LLM,
-    Bark) are released FIRST so their weights leave the GPU before the
-    CUDA allocator's free-block coalesce runs; then ComfyUI's own model
-    manager evicts whatever it tracks (FLUX); then the cache flush hands
-    pages back to the driver.
+    Bark) -- the REAL residue, invisible to ``comfy.model_management`` --
+    are released FIRST so their weights leave the GPU before the CUDA
+    allocator's free-block coalesce runs; then any ComfyUI-tracked
+    patchers (FLUX) are DETACHED surgically (weights to the offload
+    device); then the cache flush hands pages back to the driver.
+
+    V-4 / V-5: this is the single-resident-engine discipline -- it NEVER
+    calls ``unload_all_models`` (the blanket registry nuke). The targeted
+    detach is the actual VRAM move; the registry clear is not needed.
 
     Steps:
       1. ``unload_llm()``           -- writer LLM (out-of-band cache)
       2. ``_unload_bark()``         -- Bark TTS (out-of-band cache)
-      3. ``mm.unload_all_models()`` -- ComfyUI-tracked models (FLUX)
+      3. detach tracked patchers    -- ComfyUI FLUX (weights -> offload dev)
       4. ``gc.collect()``
       5. ``mm.soft_empty_cache(force=True)``
       6. ``torch.cuda.synchronize() / empty_cache() / ipc_collect()``
@@ -199,12 +208,14 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
                 pass
         if _detached:
             steps_run.append(f"detach_patchers({_detached})")
-
-        try:
-            mm.unload_all_models()
-            steps_run.append("unload_all_models")
-        except Exception as exc:  # noqa: BLE001
-            steps_failed.append(f"unload_all_models ({exc})")
+        # V-4/V-5: NO ``unload_all_models``. The detach loop above already moved
+        # each tracked patcher's weights to the offload device (the actual VRAM
+        # move); clearing ComfyUI's model registry is not needed to free VRAM, and
+        # the blanket nuke is forbidden by the single-resident-engine invariant.
+        # The real residue the live data exposed -- the OUT-OF-BAND writer LLM +
+        # Bark, invisible to comfy.model_management -- is freed by steps 1-2, which
+        # ``unload_all_models`` never touched (it reported "0 models unloaded" on
+        # the wan_i2v OOM where the writer LLM was the ~7 GB pin).
 
     # 4: drop python refs so the allocator coalesce sees freed pages.
     try:
