@@ -1,5 +1,40 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-16 overnight (autonomous; LTX 22B-GGUF SPLICE SHIPPED + GPU-verified; HEAD `50347dd`
+> == origin):** The clean-break that replaces the buggy 2B `ltx_video` recipe with the VERIFIED frozen-mini GGUF
+> recipe is COMPLETE, GREEN, and PUSHED in two commits on `v2.0-alpha`. **PHASE 0 (`27e5637`) -- ripped `ltx_orbit`
+> ONLY:** deleted LtxOrbitEngine + @register + __all__ + the registry CAPABILITIES row + EVERY ltx_orbit /
+> OTR_ENABLE_LTX_ORBIT / _ORBIT_* ref (render_driver ENGINE_FAMILY + _LTX_OPEN_ENGINES, dep-pilot + soak family
+> tables, the sweep / run-leg / 3d-quick ps1 harness flags, the orbit unit tests). LtxVideoEngine + its boomerang /
+> i2v infra untouched. No JSON change. **PHASE 1 (`50347dd`) -- swapped LtxVideoEngine to the frozen mini**
+> (`workflows/ltx_bookend_mini_repro_gguf_mit.json`, reproduced EXACTLY per SPLICE_PLAN §12 GROUNDED FINAL):
+> UnetLoaderGGUF(ltx-2.3-22b-dev-Q4_K_S) -> LoraLoaderModelOnly @0.70 -> CFGGuider.model; LTXAVTextEncoderLoader
+> (Gemma-3 + projection ckpt, device=default) -> CLIPTextEncode x2 -> LTXVConditioning; distilled chain
+> (KSamplerSelect euler_cfg_pp + 8-step LTX_DISTILLED_SIGMAS + RandomNoise + CFGGuider cfg=1.0 +
+> SamplerCustomAdvanced) -> VAEDecodeTiled 512/64/4096/8 on the video VAE; i2v LTXVImgToVideoConditionOnly strength
+> 0.75 on the FULL-FRAME scene still (BUG-413, never a portrait); 832x480. distilled is the GLOBAL default with mini
+> values HARDCODED (env knobs ignored in distilled; ksampler keeps them). New resolvers
+> (_unet/_encoder/_projection/_video_vae) + _weight_paths with av-lane floors (unet 8 / enc 6 / vae 1 / lora 5 /
+> proj 30 GiB); LoRA tuple helper kept; assert_usable node-class gate mirrors eng_ltx_av; load() resolve-only;
+> keep={unet,lora,TERMINAL}, model=results.get(lora); commercial_clean=True; registry CAPABILITIES = 5-artifact GGUF.
+> REMOVED _ckpt_path / _ckpt_name / _text_encoder_name / _use_distilled_lora / OTR_LTX_VIDEO_CKPT* / OTR_LTX_T5_ENCODER.
+> **Tests:** full suite 4411 pass / 33 skip, Bug Bible 16/7/3, NEW `tests/test_ltx_gguf_splice.py` (per-mode graph
+> shape + banned-class + mechanical-cleanup + distilled value-pin + floors + i2v full-frame) all GREEN; workflow JSON
+> UNTOUCHED (git-clean + JSON round-trip 22 nodes/51 links). **GPU motion smoke (live :8000 LTX lane, box reset
+> first):** node-check = all 16 GGUF classes present (1624 total); **i2v mini renders end-to-end** (159 s, SHARP
+> Laplacian 396, framediff 0.78 = the correct still-anchored bookend); **t2v role render framediff 5.67 >= 2.0
+> (REAL MOTION) + SHARP (Laplacian 884).** **VRAM CAVEAT (the one open item):** peak ~15.8 GB measured via ComfyUI's
+> /prompt executor (Gemma encoder + GGUF unet co-resident at LOAD; the unet steady-load is 12.8 GB per the server
+> log). The ENGINE's `render_clip` frees the encoder BEFORE sampling (`free_after_use=True`, keep={unet,lora,terminal}),
+> so the production per-clip peak is expected <14.5 GB -- but that engine-path peak was NOT directly measured (the
+> smoke runs via /prompt, not render_clip). **OPERATOR NEXT (full-episode gate):** render a real episode and confirm
+> the engine-path NVML peak <=14.5 GB; if a many-shot episode shows pressure, apply the SPLICE_PLAN §9 mitigation =
+> Gemma `device="cpu"` (the av-lane-proven offload, ~0 GPU for the encoder, NOT a sacred-graph value) then look-QA the
+> LTX clips. `LTX-REGR` (§5) is SUPERSEDED (the 2B bake was NOT done); `ltx_orbit` is REMOVED from §5 ship defaults.
+> The §3 forward order (Wan eyeball / 3D / distribution) is UNCHANGED. Box reset clean (server killed, :8000 free,
+> GPU 1.2 GB baseline); temp GPU-smoke probe deleted. Smoke outputs: `output/otr_ltx_gguf_mit/repro_b001_00002_.webm`
+> (i2v) + `t2v_role_00001_.webm` (t2v) -- operator eyeball.
+>
 > **LATEST SESSION -- 2026-06-15 (LTX 22B-GGUF SPLICE PLAN roundtable-hardened to convergence; READY TO CODE;
 > docs only, NOT committed yet):** The clean-break that replaces the production VIDEO LTX recipe (the buggy 2B
 > `ltx_video` path) with the VERIFIED mini-json recipe is fully specced + hardened across 5 grounded roundtable
@@ -320,7 +355,17 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (2026-06-14 overnight) = BUG-411 flux lush-tint restore (bookend + ALL flux) — CODE DONE, awaiting operator A/B.**
+**>>> CURRENT STEP (2026-06-16) = LTX 22B-GGUF SPLICE SHIPPED (Phase 0 `27e5637` + Phase 1 `50347dd`, == origin); the ONE open item is the OPERATOR full-episode VRAM gate + LTX look-QA.**
+The production `ltx_video` engine now renders the VERIFIED frozen-mini GGUF recipe (full spec + the GPU motion-smoke
+result are in the latest-session block at the TOP of this file: i2v renders SHARP, t2v framediff 5.67 >= 2.0 = real
+motion). GREEN: suite 4411 / Bug Bible 16-7-3 / new `tests/test_ltx_gguf_splice.py` / workflow JSON untouched.
+**Operator next:** render a real episode, confirm the engine-path (free_after_use) NVML peak <=14.5 GB (the
+/prompt-executor smoke peaked ~15.8 GB at LOAD because it does not free the encoder; the engine frees Gemma before
+sampling), and eyeball the LTX clips; if a many-shot episode shows VRAM pressure, apply SPLICE_PLAN §9 (Gemma
+`device="cpu"`, the av-lane-proven offload). `LTX-REGR` (§5) SUPERSEDED; `ltx_orbit` REMOVED from ship defaults. The
+§3 forward order (Wan eyeball / 3D / distribution) is UNCHANGED.
+
+**PARALLEL operator-gated look-QA item (unchanged, NOT blocking the forward order) = BUG-411 flux lush-tint restore (bookend + ALL flux) — CODE DONE, awaiting operator A/B.**
 IMPLEMENTED + PUSHED (HEAD `1eb5c78`, suite 4265/0, Bug Bible 16/7/3). **Chunk 3 (`1eb5c78`)** extended the
 cinematic grade to PORTRAITS too (operator: "keep ALL flux consistent") — grounded that `flux_still`
 Ken-Burns-animates a pre-minted flux PNG, so every flux PNG (portrait + scene still + bookend) now carries the
