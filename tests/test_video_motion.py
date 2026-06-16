@@ -144,10 +144,11 @@ def test_ltx_assert_usable_flag_then_sage_then_install(monkeypatch):
     with pytest.raises(vreg.EngineUnusable) as e2:
         eng.assert_usable(host_caps={}, profile={})
     assert e2.value.reason == vreg.EngineUsabilityReason.INCOMPATIBLE_PROFILE
-    # Sage clear but the checkpoint absent -> MISSING_MODEL (still closed).
+    # Sage clear but a weight absent -> MISSING_MODEL (still closed). The GGUF
+    # recipe resolves 5 artifacts; point the unet at a bogus name to force it.
     monkeypatch.delitem(sys.modules, "sageattention", raising=False)
     monkeypatch.delenv("OTR_SAGEATTENTION_PATCHED", raising=False)
-    monkeypatch.setenv("OTR_LTX_VIDEO_CKPT", str(REPO_ROOT / "_no_ckpt.safetensors"))
+    monkeypatch.setenv("OTR_LTX_VIDEO_UNET", "_no_such_unet.gguf")
     with pytest.raises(vreg.EngineUnusable) as e3:
         eng.assert_usable(host_caps={}, profile={})
     assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
@@ -233,7 +234,12 @@ def test_wan_aspect_plan_from_request():
 # --------------------------------------------------------------------------- #
 def test_ltx_prepare_releases_lease_on_load_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_GPU_LEASE_DIR", str(tmp_path))
-    monkeypatch.setenv("OTR_LTX_VIDEO_CKPT", str(tmp_path / "_no_ckpt.safetensors"))
+    # No ComfyUI node classes registered -> load() resolves the GGUF graph
+    # classes and raises (WrapperNodeMissing, a RuntimeError); the AS-3 lease
+    # must be released, never stranded.
+    monkeypatch.setattr(
+        "nodes._otr_video_engines.wrapper_bridge.node_class_mappings",
+        lambda mapping=None: {} if mapping is None else mapping)
     eng = LtxVideoEngine()
     assert not gr.is_held()
     with pytest.raises(RuntimeError):
@@ -414,10 +420,10 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
     # "unexpected keyword argument 'positive'". strength MUST be present
     # (BUG-LOCAL-412: 0.75 default restored -- the 6/5 soft-anchor value, correct
     # now that LTX renders at native 832x480 via OTR_LTX_RENDER_CANVAS).
-    assert tuple(iv["vae"]) == ("checkpoint", 2)
+    assert tuple(iv["vae"]) == ("videovae", 0)   # GGUF recipe: the video VAE
     assert tuple(iv["image"]) == ("loadimage", 0)
     assert tuple(iv["latent"]) == ("latent", 0)
-    assert iv["strength"] == 0.75
+    assert iv["strength"] == 0.75                # distilled: HARDCODED to the mini
     assert "positive" not in iv and "negative" not in iv
     # Distilled sampler's latent_image is the image-anchored img2vid LATENT now
     # (NOT the raw pure-noise latent); conditioning flows from the text encoders.

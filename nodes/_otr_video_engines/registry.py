@@ -145,9 +145,17 @@ CAPABILITIES = {
     "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
                    "requires_sidecar": True, "cpu_ok": False,
                    "model_requirements": ["latentsync-1.5"]},
-    "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 12500, "required_toolchain": None,
+    # GGUF splice (2026-06-15): the production LTX video recipe is now the frozen
+    # mini -- 22B Q4_K_S GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX
+    # video VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class; the
+    # motion smoke re-measures the live peak (mini ~13 GB <= the 14.5 GB ceiling;
+    # no audio VAE on this lane). commercial_clean (Apache GGUF + LTX-2 Community
+    # model) is set True on the engine.
+    "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
-                  "model_requirements": ["ltx-video-2b"]},
+                  "model_requirements": ["ltx-2.3-22b-dev-gguf",
+                                         "ltx-2.3-distilled-lora", "gemma-3-12b",
+                                         "ltx-2.3-video-vae", "ltx-2.3-22b-dev"]},
     # still_parallax (0-E easy on-ramp): DepthAnythingV2-SMALL (~25M params,
     # Apache-2.0 -- the bigger DA-V2 ckpts are CC-BY-NC and banned) + a pure
     # numpy warp. cpu_ok: CPU-degradable by design (slower, same contract).

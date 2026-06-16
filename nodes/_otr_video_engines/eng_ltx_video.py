@@ -15,22 +15,26 @@ forward (the S5 exit gate). The heavy LTX import + sampling is the GPU-smoke
 slice; import-time here is cold-import clean (V-12) -- only stdlib + the dep-free
 shared helpers + the registry. UTF-8, no BOM, ASCII-only source.
 
-Config (env): ``OTR_ENABLE_LTX_VIDEO`` opt-in flag; ``OTR_LTX_VIDEO_CKPT`` the
-primary checkpoint path the load probe checks (verify-at-build; default under
-``ComfyUI/models/checkpoints``).
+Config (env): ``OTR_ENABLE_LTX_VIDEO`` opt-OUT flag (DEFAULT ON -- the saved
+workflow routes the radio open through ltx_video; set =0 to disable). The five
+GGUF-recipe weights each resolve via ComfyUI folder_paths (extra_model_paths.yaml
+-> C:\\ComfyUI-Models on this box), env-overridable: ``OTR_LTX_VIDEO_UNET`` (GGUF
+unet in models/unet), ``OTR_LTX_VIDEO_TEXT_ENCODER`` (Gemma-3 in text_encoders),
+``OTR_LTX_VIDEO_PROJECTION_CKPT`` (the LTX ckpt the encoder loader reads, in
+checkpoints), ``OTR_LTX_VIDEO_VAE`` (video VAE in vae), ``OTR_LTX_DISTILLED_LORA``
+(distilled LoRA in loras).
 
-LK-1 look restoration (2026-06-11) + BUG-LOCAL-412 restore (2026-06-14):
-``OTR_LTX_SAMPLER`` selects the sampling chain -- ``distilled`` (DEFAULT:
-8-step LTX_DISTILLED_SIGMAS cfg=1.0 + ``euler_cfg_pp``, the FAST 5/09-5/28-era
-recipe the operator confirmed as the good look) or ``ksampler`` (30-step euler
-cfg=3.0 round-5 path, kept selectable but SLOW). ``OTR_LTX_SAMPLER_NAME``
-default ``euler_cfg_pp`` (CFG++, the documented dynamic-motion sampler; the
-post-cleanbreak refactor had left it on plain ``euler``). ``OTR_ENABLE_LTX_I2V``
-defaults ON: LTX shots condition on their ST-3 scene stills
-(``OTR_LTX_I2V_STRENGTH`` default 1.0, probe-proven; 0.75 re-noises into mush at
-1472x832 -- the old 0.75 recipe was at 832x480, so drop the canvas too if you
-restore 0.75). The 22B distilled LoRA wires only on a 22B-tier checkpoint
-(``OTR_LTX_DISTILLED_LORA``/``_STRENGTH``).
+Recipe = the frozen mini ``workflows/ltx_bookend_mini_repro_gguf_mit.json`` (the
+VERIFIED-WORKING path, reproduced EXACTLY): the 22B Q4_K_S GGUF unet + the
+distilled LoRA @0.70 + the Gemma-3 text encoder + the distilled sampler chain
+(KSamplerSelect ``euler_cfg_pp`` + 8-step LTX_DISTILLED_SIGMAS + RandomNoise +
+CFGGuider cfg=1.0 + SamplerCustomAdvanced) + VAEDecodeTiled 512/64/4096/8 + i2v
+strength 0.75 at 832x480. ``OTR_LTX_SAMPLER`` default ``distilled`` (these values
+HARDCODED to the mini -- the #1 invariant; env knobs ignored in distilled mode);
+``ksampler`` keeps the 30-step manual A/B path (env knobs apply there only).
+``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots condition on their FULL-FRAME scene
+still (never a portrait), ``OTR_LTX_I2V_STRENGTH`` (ksampler mode only; distilled
+hardcodes 0.75).
 """
 from __future__ import annotations
 
@@ -45,6 +49,39 @@ _LOG = logging.getLogger("OTR.video.eng_ltx_video")
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
+
+
+def _resolve(folder, name):
+    """Resolve a model filename to a full path via ComfyUI folder_paths (honors
+    extra_model_paths.yaml -> C:\\ComfyUI-Models on this box), with a best-effort
+    join fallback for the headless / CPU existence check (no folder_paths
+    registered). Mirrors eng_ltx_av._resolve (the proven GGUF lane pattern)."""
+    if not name:
+        return ""
+    try:
+        import folder_paths  # type: ignore
+        p = folder_paths.get_full_path(folder, name)
+        if p:
+            return p
+    except Exception:  # noqa: BLE001 - headless/CPU has no folder_paths.get_full_path
+        pass
+    here = os.path.abspath(__file__)
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.dirname(here))))), "models", folder, name)
+
+
+# Weight sanity floors (GiB) -- catch a truncated / wrong download, NOT exact
+# byte checks. Grounded vs the on-disk GGUF set (2026-06-15): Q4_K_S unet
+# ~12.2 GiB; Gemma-3 fp4 ~8.8 GiB; video VAE ~1.35 GiB; distilled LoRA ~7.1 GiB;
+# projection ckpt ~43 GiB. Each floor sits well below the real size.
+# (eng_ltx_av.py:64-68 supplies the first three constants verbatim.)
+_GiB = 1024 ** 3
+_FLOOR_UNET = 8 * _GiB
+_FLOOR_ENCODER = 6 * _GiB
+_FLOOR_VIDEO_VAE = 1 * _GiB
+_FLOOR_LORA = 5 * _GiB
+_FLOOR_PROJECTION_CKPT = 30 * _GiB
 
 # A-ship in-process forward. The shared mechanics (node resolution, the declarative
 # graph executor, the silent bt709 encode, the VRAM guard) are proven in
@@ -165,19 +202,17 @@ def _ltx_loop_source_length(target_frame_count, fallback):
     return src
 
 
-_LTX_DEFAULT_W = 768
-_LTX_DEFAULT_H = 512
+_LTX_DEFAULT_W = 832
+_LTX_DEFAULT_H = 480
 _LTX_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
 # --------------------------------------------------------------------------- #
-# LK-1b (2026-06-11 look restoration): the legacy distilled sampler config.
-# Recovered from the deleted OTR_BatchLTXRender (d57535ac; final form
-# 70d379b~1) -- the engine that rendered the 6/5 look the operator wants
-# back. Evidence trail: the box's User env pins OTR_LTX_ENGINE=v0_9 and the
-# legacy node's own default was v0_9 ("visually indistinguishable from
-# v2_3 on OTR content", 4.4x faster), so the production look was the 2B
-# v0.9 checkpoint + THIS schedule -- NOT the 22B RES4LYF path.
+# The distilled GGUF sampler config -- the frozen mini recipe
+# (workflows/ltx_bookend_mini_repro_gguf_mit.json, the VERIFIED-WORKING path).
+# These values are HARDCODED in distilled mode (_build_graph) -- the #1 splice
+# invariant. The 8-step schedule originates from ComfyUI-Goofer, proven on the
+# RTX 5080 Blackwell box.
 # --------------------------------------------------------------------------- #
 
 #: Distilled sigma schedule from ComfyUI-Goofer, proven on RTX 5080
@@ -192,10 +227,9 @@ LTX_DISTILLED_SIGMAS = (
 _LTX_DISTILLED_CFG = 1.0
 _LTX_KSAMPLER_CFG = 3.0
 
-#: The legacy workflow's distilled LoRA (nodes 60/61 consolidated @0.7,
-#: bfc761a). Its keys target the LTX 2.3 22B DiT, so it is wired ONLY when
-#: the active checkpoint is a 22B file -- on the default 2B v0.9 ckpt a
-#: LoraLoaderModelOnly apply would be a silent key-mismatch no-op.
+#: The mini's distilled LoRA (ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1). Its
+#: keys target the LTX 2.3 22B DiT and it is ALWAYS wired on the 22B GGUF unet
+#: (the GGUF recipe wires it in BOTH sampler modes @0.70).
 _LTX_DISTILLED_LORA_DEFAULT = os.path.join(
     "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
 _LTX_DISTILLED_LORA_STRENGTH = 0.7
@@ -241,7 +275,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     default_roles = ("announcer_visual", "music_visual")
     fallback_engine = "still_kenburns"
     required_inputs = ("text_prompt",)
-    commercial_clean = False            # license is profile data; verify-at-build
+    commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = "OTR_ENABLE_LTX_VIDEO"
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
@@ -268,80 +302,93 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                      self._LOOP_VIA_REVERSE_DEFAULT)
         return bool(self._LOOP_VIA_REVERSE_DEFAULT)
 
-    # ---- config resolution (env override -> box default) ----
-    def _ckpt_path(self):
-        explicit = os.environ.get("OTR_LTX_VIDEO_CKPT")
-        if explicit:
-            return explicit
-        # Build candidate dirs: the ComfyUI-relative default + the HF_HOME-derived
-        # shared-models root (C:\ComfyUI-Models\huggingface -> C:\ComfyUI-Models).
-        # HF_HOME is always set in the OTR launch bat; this is the reliable source
-        # on this box.  Fall back to _COMFY_ROOT for other setups.
-        candidate_dirs = [os.path.join(_COMFY_ROOT, "models", "checkpoints")]
-        hf_home = os.environ.get("HF_HOME", "")
-        if hf_home:
-            candidate_dirs.append(
-                os.path.join(os.path.dirname(hf_home), "checkpoints"))
-        # Prefer the versioned on-disk name (v0.9+) before the bare default.
-        for d in candidate_dirs:
-            for name in ("ltx-video-2b-v0.9.safetensors", "ltx-video-2b.safetensors"):
-                p = os.path.join(d, name)
-                if os.path.exists(p):
-                    return p
-        # Nothing found; return HF_HOME-derived v0.9 path (or _COMFY_ROOT) so the
-        # MISSING_MODEL error message names the expected file.
-        fallback_dir = (os.path.join(os.path.dirname(hf_home), "checkpoints")
-                        if hf_home else candidate_dirs[0])
-        return os.path.join(fallback_dir, "ltx-video-2b-v0.9.safetensors")
+    # ---- config resolution (env override -> folder_paths -> join) ----
+    # The GGUF mini recipe's weight artifacts (defaults = the frozen mini's
+    # filenames, workflows/ltx_bookend_mini_repro_gguf_mit.json); each resolves
+    # via ComfyUI folder_paths so a box never needs a code edit. The distilled
+    # LoRA keeps its own (name, path) tuple helper (_distilled_lora_file, below).
+    def _unet_name(self):
+        return os.environ.get("OTR_LTX_VIDEO_UNET",
+                              "ltx-2.3-22b-dev-Q4_K_S.gguf")
 
-    def _installed(self):
-        """True iff the primary checkpoint AND T5 text encoder exist on disk
-        (no import -- cheap, headless-safe). The full wrapper check is the GPU
-        smoke. Both are required: the v0.9 checkpoint does not bundle T5."""
-        if not os.path.exists(self._ckpt_path()):
-            return False
-        te_name = self._text_encoder_name()
-        hf_home = os.environ.get("HF_HOME", "")
-        if hf_home:
-            te_path = os.path.join(
-                os.path.dirname(hf_home), "text_encoders", te_name)
-            if not os.path.exists(te_path):
-                return False
-        return True
+    def _encoder_name(self):
+        return os.environ.get("OTR_LTX_VIDEO_TEXT_ENCODER",
+                              "gemma_3_12B_it_fp4_mixed.safetensors")
+
+    def _projection_ckpt(self):
+        return os.environ.get("OTR_LTX_VIDEO_PROJECTION_CKPT",
+                              "ltx-2.3-22b-dev.safetensors")
+
+    def _video_vae_name(self):
+        return os.environ.get("OTR_LTX_VIDEO_VAE",
+                              "ltx-2.3-22b-dev_video_vae.safetensors")
+
+    def _weight_paths(self):
+        """(label, full_path, floor_bytes) for each required weight artifact:
+        GGUF unet, Gemma-3 text encoder, video VAE, distilled LoRA, projection
+        checkpoint. Mirrors eng_ltx_av._weight_paths (the proven GGUF lane)."""
+        lora_name, lora_path = self._distilled_lora_file()
+        return [
+            ("transformer GGUF", _resolve("unet", self._unet_name()), _FLOOR_UNET),
+            ("Gemma-3 text encoder",
+             _resolve("text_encoders", self._encoder_name()), _FLOOR_ENCODER),
+            ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
+            ("distilled LoRA", lora_path or _resolve("loras", lora_name), _FLOOR_LORA),
+            ("projection ckpt",
+             _resolve("checkpoints", self._projection_ckpt()), _FLOOR_PROJECTION_CKPT),
+        ]
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed before any forward: the opt-in flag, then the BUG-070
-        SageAttention gate, then checkpoint presence (verify-at-build). Imports
-        nothing heavy -- runs at lock/validate time on the CPU box."""
-        # PROMOTED DEFAULT-ON 2026-06-10 (production restore): the saved
-        # production workflow routes the announcer/music radio open through
-        # ltx_video, and a ComfyUI Desktop render must work from the file
-        # alone (no env patching). LTX was GPU-proven on this stack
-        # (49f/14.9s, capstone night). Set OTR_ENABLE_LTX_VIDEO=0 to opt OUT;
-        # the Sage gate + checkpoint presence below still fail CLOSED on any
-        # box that cannot actually render it (-> LOUD fallback chain).
+        """Ordered, fail-closed-before-GPU gate (PINNED reasons only); mirrors
+        eng_ltx_av.assert_usable (the proven GGUF lane), V-12-safe (no heavy
+        import -- runs at lock/validate time on the CPU box):
+        1 opt-in flag (DEFAULT ON -- the saved workflow routes the radio open
+          through ltx_video; set OTR_ENABLE_LTX_VIDEO=0 to opt OUT);
+        2 BUG-070 SageAttention gate (int8-PV aborts LTX silently);
+        3 the 5 GGUF weight artifacts present + above their sanity floor;
+        4 node gate -- every required ComfyUI class resolves (lazy mapping read).
+        All fail-closed NAMED EngineUnusable so the manager's fallback catches it."""
+        # 1 -- opt-in flag (DEFAULT ON; opt-out with =0)
         if os.getenv(self.requires_flag, "1") == "0":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
                 "%s disabled by %s=0" % (self.name, self.requires_flag),
                 kind="video")
-        self._assert_stack_ready()
-        return self.name
-
-    def _assert_stack_ready(self):
-        """The shared post-flag usability ladder (BUG-070 Sage gate, then
-        checkpoint + T5 presence). Factored so the 0-E preset engines run the
-        IDENTICAL stack checks after their own opt-in flag gate."""
-        _MC.assert_sage_not_patched(self.name, self.family)   # BUG-070 (S5 gate)
-        if not self._installed():
+        # 2 -- BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
+        _MC.assert_sage_not_patched(self.name, self.family)
+        # 3 -- weights present + above the sanity floor (realpath -> broken
+        #      symlinks fail)
+        for label, path, floor in self._weight_paths():
+            real = os.path.realpath(path) if path else ""
+            if not real or not os.path.exists(real):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                    "%s %s not found at %r (set the matching OTR_LTX_VIDEO_* env; "
+                    "install the LTX-2.3 GGUF unet + Gemma-3 encoder + LTX video "
+                    "VAE + distilled LoRA + projection ckpt)"
+                    % (self.name, label, path), kind="video")
+            if os.path.getsize(real) < floor:
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                    "%s %s at %r is below the %d-byte floor (truncated/wrong "
+                    "file?)" % (self.name, label, real, floor), kind="video")
+        # 4 -- node gate: every required ComfyUI class must resolve (lazy read)
+        from . import wrapper_bridge as _wb
+        missing = []
+        mapping = _wb.node_class_mappings()
+        for _logical, candidates in self._node_candidates().items():
+            try:
+                _wb.resolve_node_class(candidates, mapping)
+            except Exception:  # noqa: BLE001 - collect every missing class
+                missing.append("/".join(candidates))
+        if missing:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "%s not installed: checkpoint=%s (OTR_LTX_VIDEO_CKPT) + "
-                "T5 encoder=%s (OTR_LTX_T5_ENCODER) -- both required for v0.9; "
-                "install and verify on the GPU box"
-                % (self.name, self._ckpt_path(), self._text_encoder_name()),
+                "%s missing required ComfyUI node class(es): %s (install/update "
+                "ComfyUI-GGUF + ComfyUI-LTXVideo)" % (self.name, ", ".join(missing)),
                 kind="video")
+        return self.name
 
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
@@ -456,14 +503,20 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # 1.0 to fight the mush at 1472x832, but that hard-locks frame 0 while later
         # frames drift; now that render_driver renders LTX at native 832x480
         # (OTR_LTX_RENDER_CANVAS) the 6/5 0.75 is correct again. Env-overridable.
-        try:
-            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
-        except (TypeError, ValueError):
+        # GGUF splice: I2V strength 0.75 at native 832x480 (the mini's value).
+        # DISTILLED mode HARDCODES it to the mini (#1 invariant -- env ignored);
+        # ksampler/manual keeps the OTR_LTX_I2V_STRENGTH knob.
+        if self._sampler_mode() == "distilled":
             cond_strength = 0.75
+        else:
+            try:
+                cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
+            except (TypeError, ValueError):
+                cond_strength = 0.75
         cond_strength = max(0.0, min(1.0, cond_strength))
         graph["img2vid"] = {
             "class": "img2vid",
-            "inputs": {"vae": W("checkpoint", 2), "image": W("loadimage", 0),
+            "inputs": {"vae": W("videovae", 0), "image": W("loadimage", 0),
                        "latent": W("latent", 0), "strength": cond_strength}}
         # The image-anchored latent (carrying its first-frame noise_mask) IS the
         # sampler's latent_image now -- NOT the raw pure-noise EmptyLTXVLatentVideo.
@@ -473,52 +526,50 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         graph[sampler_node]["inputs"]["latent_image"] = W("img2vid", 0)
         return graph
 
-    # ---- in-process graph spec (GPU-VERIFIED 2026-06-09 probe_f3) ----
-    # Topology:
-    #   CheckpointLoaderSimple (model slot-0, vae slot-2; clip slot-1 = None
-    #   for the v0.9 checkpoint -- no bundled T5) +
-    #   CLIPLoader(type=ltxv, t5xxl_fp16.safetensors) (clip slot-0) ->
-    #   CLIPTextEncode x2 -> EmptyLTXVLatentVideo ->
-    #   LTXVConditioning -> KSampler -> VAEDecode.
-    # LTX 2.3 secondary: LTXVGemmaCLIPModelLoader for the encoder slot if
-    # switching to the 22B gemma-based model (requires different ckpt path +
-    # different graph topology for LTXVBaseSampler; left as operator-gated).
+    # ---- in-process graph spec (the frozen GGUF mini recipe;
+    # workflows/ltx_bookend_mini_repro_gguf_mit.json -- the VERIFIED-WORKING path)
+    # Topology (distilled default):
+    #   UnetLoaderGGUF -> LoraLoaderModelOnly(distilled @0.70) -> CFGGuider.model;
+    #   LTXAVTextEncoderLoader(Gemma-3 + projection ckpt) -> CLIPTextEncode x2 ->
+    #   LTXVConditioning; EmptyLTXVLatentVideo -> SamplerCustomAdvanced
+    #   (KSamplerSelect euler_cfg_pp + ManualSigmas 8-step + RandomNoise +
+    #   CFGGuider cfg=1.0) -> VAEDecodeTiled(512/64/4096/8, video VAE).
     def _node_candidates(self):
-        """Ordered ComfyUI node-class candidates per graph node.
-        GPU-verified against the box's LTX v0.9 + T5-XXL install (probe_f3)."""
+        """Ordered ComfyUI node-class candidates per BASE graph node (the GGUF
+        mini recipe). The 5 loaders/decode live here so they propagate to the
+        sampling + i2v candidate sets (which build on this) AND to the
+        assert_usable node gate. resolve_graph_classes fail-LOUD names any
+        missing wrapper class."""
         return {
-            "checkpoint": ("CheckpointLoaderSimple",),
-            # CLIPLoader loads T5-XXL from text_encoders/ with type=ltxv.
-            # Secondary: LTXAVTextEncoderLoader (LTX-AV / Gemma path; requires
-            # gemma encoder + ltxv ckpt_name, different tokenizer).
-            "encoder": ("CLIPLoader",),
+            "unet": ("UnetLoaderGGUF",),
+            "lora": ("LoraLoaderModelOnly",),
+            "videovae": ("VAELoader",),
+            "te": ("LTXAVTextEncoderLoader",),
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "latent": ("EmptyLTXVLatentVideo",),
             "cond": ("LTXVConditioning",),
             "ksampler": ("KSampler",),
-            "vaedecode": ("VAEDecode",),
+            "vaedecode": ("VAEDecodeTiled",),
         }
 
     # ---- LK-1b: sampler mode + distilled LoRA resolution ----
     @staticmethod
     def _sampler_mode() -> str:
-        """``ksampler`` (DEFAULT -- 30-step euler cfg=3.0, DYNAMIC motion) or
-        ``distilled`` (8-step LTX_DISTILLED_SIGMAS cfg=1.0, FAST but motion-gated).
-        Invalid values fall back LOUD to ksampler. Override via OTR_LTX_SAMPLER.
-
-        BUG-LOCAL-113b made ksampler the DEFAULT for dynamic motion; BUG-LOCAL-412
-        reverted it to distilled for SPEED. A 2026-06-15 GPU A/B then PROVED
-        distilled GATES motion: the aggressive music_open prompt moved only 0.73
-        framediff at distilled vs 7.85 at ksampler-30 (near the 5/30 target 9.43),
-        and renders SHARP at native 832x480 (no smear). The boomerang's half-render
-        now offsets the 30-step cost. Operator 2026-06-15: "no static LTX -- moving
-        grooving." distilled stays opt-in via OTR_LTX_SAMPLER=distilled."""
-        mode = os.environ.get("OTR_LTX_SAMPLER", "ksampler").strip().lower()
+        """``distilled`` (DEFAULT -- the frozen GGUF mini recipe: 8-step
+        LTX_DISTILLED_SIGMAS, ``euler_cfg_pp``, CFGGuider cfg=1.0, distilled LoRA
+        @0.70 on the 22B GGUF unet -- the VERIFIED-WORKING path) or ``ksampler``
+        (30-step euler manual A/B path, kept selectable via OTR_LTX_SAMPLER=
+        ksampler). In distilled mode the recipe values are HARDCODED to the mini
+        (env knobs ignored; see _build_graph) -- the #1 splice invariant. The env
+        knobs (OTR_LTX_CFG / _SAMPLER_NAME / _DISTILLED_LORA_STRENGTH /
+        _I2V_STRENGTH) apply to ksampler/manual only. Invalid falls back LOUD to
+        distilled."""
+        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
         if mode not in ("distilled", "ksampler"):
             _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
-                         "using ksampler default", mode)
-            mode = "ksampler"
+                         "using distilled default", mode)
+            mode = "distilled"
         return mode
 
     @staticmethod
@@ -533,8 +584,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     def _distilled_lora_file(self):
         """``(lora_name, abs_path)`` for the distilled LoRA; ``abs_path`` is
         '' when the file is not on disk. Searched under the ComfyUI-relative
-        loras dir + the HF_HOME-derived shared-models loras dir (the same
-        two roots ``_ckpt_path`` walks)."""
+        loras dir + the HF_HOME-derived shared-models loras dir (C:\\ComfyUI-Models
+        on this box). Kept as a (name, path) tuple per the splice plan (the new
+        4-artifact resolvers handle the rest)."""
         name = os.environ.get("OTR_LTX_DISTILLED_LORA",
                               _LTX_DISTILLED_LORA_DEFAULT)
         if not name:
@@ -549,32 +601,14 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 return name, p
         return name, ""
 
-    def _use_distilled_lora(self) -> bool:
-        """True iff the active checkpoint is a 22B-tier file AND the
-        distilled LoRA exists on disk (verified BEFORE wiring, per the
-        LK-1 ticket). The default 2B v0.9 ckpt never wires it (the LoRA's
-        keys target the 22B DiT -- applying it there is a silent no-op,
-        which is worse than not wiring it). A 22B ckpt with the LoRA file
-        missing renders WITHOUT it, LOUD -- never silent."""
-        if "22b" not in self._ckpt_name().lower():
-            return False
-        name, path = self._distilled_lora_file()
-        if path:
-            return True
-        _LOG.warning(
-            "[eng_ltx_video] LK-1b LOUD: 22B checkpoint %s but the distilled "
-            "LoRA %r is NOT on disk -- rendering WITHOUT it (un-distilled "
-            "22B at distilled sigmas degrades; install the LoRA or set "
-            "OTR_LTX_DISTILLED_LORA)", self._ckpt_name(), name)
-        return False
-
     def _node_candidates_sampling(self):
-        """The ACTIVE sampling candidates: the base set, with the KSampler
-        node swapped for the legacy distilled chain (KSamplerSelect +
-        RandomNoise + CFGGuider + SamplerCustomAdvanced) in distilled mode,
-        plus LoraLoaderModelOnly when the distilled LoRA wires. The SIGMAS
-        source is the in-adapter ``_SigmasFromValues`` (injected after
-        resolve -- it is not a registered node class)."""
+        """The ACTIVE sampling candidates: the base set (which ALREADY includes
+        the GGUF unet + distilled LoRA + video VAE + Gemma text-encoder loaders),
+        with the KSampler node swapped for the distilled chain (KSamplerSelect +
+        RandomNoise + CFGGuider + SamplerCustomAdvanced) in distilled mode. The
+        SIGMAS source is the in-adapter ``_SigmasFromValues`` (injected after
+        resolve -- not a registered node class). The distilled LoRA is ALWAYS
+        present (the GGUF recipe wires it in BOTH sampler modes)."""
         cands = dict(self._node_candidates())
         if self._sampler_mode() == "distilled":
             del cands["ksampler"]
@@ -582,29 +616,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             cands["noise"] = ("RandomNoise",)
             cands["guider"] = ("CFGGuider",)
             cands["sampleradv"] = ("SamplerCustomAdvanced",)
-        if self._use_distilled_lora():
-            cands["lora"] = ("LoraLoaderModelOnly",)
         return cands
-
-    def _ckpt_name(self):
-        return os.environ.get("OTR_LTX_VIDEO_CKPT_NAME") or os.path.basename(
-            self._ckpt_path())
-
-    def _text_encoder_name(self):
-        """T5-XXL file name for CLIPLoader (type=ltxv).  Env override -> auto-
-        detect from the shared HF_HOME-derived text_encoders dir -> fallback.
-        Verified GPU smoke: t5xxl_fp16.safetensors (probe_f3 2026-06-09)."""
-        explicit = os.environ.get("OTR_LTX_T5_ENCODER")
-        if explicit:
-            return explicit
-        hf_home = os.environ.get("HF_HOME", "")
-        if hf_home:
-            te_dir = os.path.join(os.path.dirname(hf_home), "text_encoders")
-            for name in ("t5xxl_fp16.safetensors", "t5xxl_fp8_e4m3fn.safetensors",
-                         "t5xxl_fp8.safetensors", "t5-xxl.safetensors"):
-                if os.path.exists(os.path.join(te_dir, name)):
-                    return name
-        return "t5xxl_fp16.safetensors"   # default name expected on this box
 
     def _dims(self, request):
         """(width, height) from the request canvas with LTX landscape defaults."""
@@ -618,37 +630,63 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return w, h
 
     def _build_graph(self, plan, length, width, height):
-        """The declarative LTXV graph (wrapper_bridge.run_graph format).
-        GPU-verified topology 2026-06-09 (probe_f3, RTX 5080):
-          CheckpointLoaderSimple -> CLIPLoader(ltxv/T5-XXL) ->
-          CLIPTextEncode x2 -> EmptyLTXVLatentVideo ->
-          LTXVConditioning -> KSampler -> VAEDecode."""
+        """The declarative LTXV graph -- the frozen GGUF mini recipe reproduced
+        EXACTLY (workflows/ltx_bookend_mini_repro_gguf_mit.json, the
+        VERIFIED-WORKING path; the #1 splice invariant):
+          UnetLoaderGGUF -> LoraLoaderModelOnly(distilled @0.70) -> CFGGuider.model
+          LTXAVTextEncoderLoader(Gemma-3 + projection ckpt) -> CLIPTextEncode x2 ->
+          LTXVConditioning; EmptyLTXVLatentVideo; (distilled) KSamplerSelect
+          euler_cfg_pp + ManualSigmas 8-step + RandomNoise + CFGGuider cfg=1.0 +
+          SamplerCustomAdvanced -> VAEDecodeTiled(512/64/4096/8, video VAE)."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         mode = self._sampler_mode()
-        cfg_default = (_LTX_DISTILLED_CFG if mode == "distilled"
-                       else _LTX_KSAMPLER_CFG)
-        try:
-            cfg = float(os.environ.get("OTR_LTX_CFG", str(cfg_default)))
-        except (TypeError, ValueError):
-            cfg = cfg_default
+        # DISTILLED is the GGUF mini production recipe -- its values are HARDCODED
+        # to the mini (the #1 invariant; env knobs ignored in distilled mode and
+        # apply to the ksampler/manual A/B path only).
+        if mode == "distilled":
+            cfg = _LTX_DISTILLED_CFG                # 1.0 (mini CFGGuider)
+            sampler_name = "euler_cfg_pp"           # mini KSamplerSelect
+            lora_strength = _LTX_DISTILLED_LORA_STRENGTH   # 0.70 (mini LoRA)
+        else:
+            try:
+                cfg = float(os.environ.get("OTR_LTX_CFG", str(_LTX_KSAMPLER_CFG)))
+            except (TypeError, ValueError):
+                cfg = _LTX_KSAMPLER_CFG
+            sampler_name = self._sampler_name()
+            try:
+                lora_strength = float(os.environ.get(
+                    "OTR_LTX_DISTILLED_LORA_STRENGTH",
+                    str(_LTX_DISTILLED_LORA_STRENGTH)))
+            except (TypeError, ValueError):
+                lora_strength = _LTX_DISTILLED_LORA_STRENGTH
         positive = plan.get("text_prompt") or "a cinematic scene"
         negative = plan.get("negative_prompt") or os.environ.get(
             "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0))
+        lora_name, _lora_path = self._distilled_lora_file()
         graph = {
-            "checkpoint": {"class": "checkpoint",
-                           "inputs": {"ckpt_name": self._ckpt_name()}},
-            # encoder: CLIPLoader loads T5-XXL from text_encoders/ (type=ltxv).
-            # The v0.9 checkpoint does NOT bundle T5; slot-1 from CheckpointLoaderSimple
-            # returns None. CLIPLoader is the correct path for this box.
-            "encoder": {"class": "encoder",
-                        "inputs": {"clip_name": self._text_encoder_name(),
-                                   "type": "ltxv"}},
+            # GGUF unet -> distilled LoRA (ALWAYS wired; the mini's @0.70). The
+            # LoRA node returns a PATCHED reference to the base unet -- both are
+            # kept in render_clip's VRAM keep-set so free_after_use never dangles
+            # the patcher.
+            "unet": {"class": "unet",
+                     "inputs": {"unet_name": self._unet_name()}},
+            "lora": {"class": "lora",
+                     "inputs": {"lora_name": lora_name,
+                                "strength_model": lora_strength,
+                                "model": W("unet", 0)}},
+            # Gemma-3 text encoder (reads the projection ckpt) + the video VAE.
+            "te": {"class": "te",
+                   "inputs": {"text_encoder": self._encoder_name(),
+                              "ckpt_name": self._projection_ckpt(),
+                              "device": "default"}},
+            "videovae": {"class": "videovae",
+                         "inputs": {"vae_name": self._video_vae_name()}},
             "pos": {"class": "pos",
-                    "inputs": {"text": positive, "clip": W("encoder", 0)}},
+                    "inputs": {"text": positive, "clip": W("te", 0)}},
             "neg": {"class": "neg",
-                    "inputs": {"text": negative, "clip": W("encoder", 0)}},
+                    "inputs": {"text": negative, "clip": W("te", 0)}},
             "latent": {"class": "latent",
                        "inputs": {"width": int(width), "height": int(height),
                                   "length": int(length), "batch_size": 1}},
@@ -656,34 +694,17 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                      "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
                                 "frame_rate": float(self.target_fps)}},
         }
-        # LK-1b: the distilled LoRA wires between the checkpoint and the
-        # sampler's MODEL input -- ONLY on a 22B-tier ckpt with the file
-        # verified on disk (_use_distilled_lora). The 2B default never
-        # wires it.
-        model_wire = W("checkpoint", 0)
-        if self._use_distilled_lora():
-            lora_name, lora_path = self._distilled_lora_file()
-            try:
-                lora_strength = float(os.environ.get(
-                    "OTR_LTX_DISTILLED_LORA_STRENGTH",
-                    str(_LTX_DISTILLED_LORA_STRENGTH)))
-            except (TypeError, ValueError):
-                lora_strength = _LTX_DISTILLED_LORA_STRENGTH
-            _LOG.warning("[eng_ltx_video] LK-1b: distilled LoRA wired: %s "
-                         "@ %.2f (%s)", lora_name, lora_strength, lora_path)
-            graph["lora"] = {"class": "lora",
-                             "inputs": {"lora_name": lora_name,
-                                        "strength_model": lora_strength,
-                                        "model": model_wire}}
-            model_wire = W("lora", 0)
+        # The LoRA-wrapped unet IS the model for the sampler/guider (NEVER the raw
+        # unet -- the LoRA patch must be in the forward).
+        model_wire = W("lora", 0)
         if mode == "distilled":
-            # The legacy OTR_BatchLTXRender sampling chain, verbatim:
-            # KSamplerSelect("euler") + RandomNoise(seed) + CFGGuider(1.0) +
-            # SamplerCustomAdvanced(LTX_DISTILLED_SIGMAS). 8 steps; the
-            # sigma schedule IS the step count (OTR_LTX_STEPS is a
-            # ksampler-mode knob only).
+            # The frozen mini sampling chain: KSamplerSelect(euler_cfg_pp) +
+            # ManualSigmas (the 9 LTX_DISTILLED_SIGMAS, via the in-adapter
+            # _SigmasFromValues injector) + RandomNoise(seed) + CFGGuider(1.0) +
+            # SamplerCustomAdvanced. 8 sampling steps (the sigma schedule IS the
+            # step count; OTR_LTX_STEPS is a ksampler-mode knob only).
             graph["samplersel"] = {"class": "samplersel",
-                                   "inputs": {"sampler_name": self._sampler_name()}}
+                                   "inputs": {"sampler_name": sampler_name}}
             graph["sigmas"] = {"class": "sigmas",
                                "inputs": {"values":
                                           list(LTX_DISTILLED_SIGMAS)}}
@@ -706,32 +727,31 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             graph["ksampler"] = {
                 "class": "ksampler",
                 "inputs": {"seed": seed, "steps": steps,
-                           "cfg": cfg, "sampler_name": self._sampler_name(),
+                           "cfg": cfg, "sampler_name": sampler_name,
                            "scheduler": "normal", "denoise": 1.0,
                            "model": model_wire,
                            "positive": W("cond", 0),
                            "negative": W("cond", 1),
                            "latent_image": W("latent", 0)}}
             samples = W("ksampler", 0)
+        # VAEDecodeTiled (the mini's 512/64/4096/8) on the video VAE.
         graph["vaedecode"] = {"class": "vaedecode",
                               "inputs": {"samples": samples,
-                                         "vae": W("checkpoint", 2)}}
+                                         "vae": W("videovae", 0),
+                                         "tile_size": 512, "overlap": 64,
+                                         "temporal_size": 4096,
+                                         "temporal_overlap": 8}}
         return graph
 
     # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
-        """Fail CLOSED until installed, then RESOLVE the installed LTX node classes
-        (fail-closed NAMED if absent). Weight load happens when the loader nodes
-        execute inside render_clip; the live VRAM<=14.5 GB peak + SageAttention-clean
-        determinism are the CW-6 GPU smoke (operator)."""
-        if not self._installed():
-            raise RuntimeError(
-                "ltx_video not installed: checkpoint missing at %s -- install the "
-                "LTX wrapper + ckpt, set OTR_ENABLE_LTX_VIDEO=1, and run the CW-6 "
-                "GPU smoke" % self._ckpt_path())
+        """Resolve the installed ComfyUI node classes for the ACTIVE sampling set
+        (the distilled GGUF chain by default), fail-closed NAMED (WrapperNodeMissing)
+        if any is absent. The heavy weight load happens when the loader nodes
+        execute in render_clip (ComfyUI's own model management); assert_usable
+        already gated the 5 weight files + floors. The live VRAM<=14.5 GB peak +
+        SageAttention-clean determinism are the GPU motion smoke (operator)."""
         from . import wrapper_bridge as _wb
-        # LK-1b: resolve the ACTIVE sampling set (distilled chain by
-        # default) so the cache matches what render_clip builds.
         self._classes = _wb.resolve_graph_classes(
             self._node_candidates_sampling())
         self._loaded = True
@@ -792,19 +812,21 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                                           image_name)
         else:
             graph = self._build_graph(plan, length, width, height)
-        # free_after_use (2026-06-09 capstone catch): the fp16 T5 encoder
-        # (~9.5 GB) must NOT stay co-resident with the LTX UNET through the
-        # sampler -- the first live clip breached the machine-wide 14.5 GB
-        # ceiling (15.5 GB incl. the desktop baseline). The bridge frees each
-        # intermediate (encoder/conds/latent) once its last consumer ran;
-        # "checkpoint" is kept for the V-4 patcher teardown, the terminal for
-        # the IMAGE read-out.
+        # free_after_use (2026-06-09 capstone catch + GGUF splice): the Gemma-3
+        # text encoder + the projection ckpt + the intermediates must NOT stay
+        # co-resident with the GGUF UNET through the sampler (the 16 GB ceiling).
+        # The bridge frees each intermediate (te/conds/latent) once its last
+        # consumer ran. KEEP both "unet" and "lora": the LoRA node returns a
+        # PATCHED reference to the base unet, so evicting "unet" under
+        # free_after_use would DANGLE the patcher (the sampler would have no
+        # weights). The terminal is kept for the IMAGE read-out.
         results = _wb.run_graph(graph, classes, free_after_use=True,
-                                keep={"checkpoint", self._TERMINAL})
-        images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
+                                keep={"unet", "lora", self._TERMINAL})
+        images = results[self._TERMINAL][0]                   # VAEDecodeTiled IMAGE batch
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers
-        model = results.get("checkpoint", (None,))[0]
+        # The LoRA-wrapped unet is the resident MODEL patcher (V-4 teardown).
+        model = results.get("lora", (None,))[0]
         if model is not None and callable(getattr(model, "detach", None)) \
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
