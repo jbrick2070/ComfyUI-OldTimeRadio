@@ -886,6 +886,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     "gear tokens scrubbed from the M4 prompt (announcer "
                     "stays radio-styled)", _beat_id_for_shot(shot))
                 text_prompt = _scrubbed
+        # 2026-06-16 framing fix (roundtable pass03): LTX character/person beats
+        # drift the subject's head out of frame over the clip. Append a POSITIVE
+        # composition clause -- "stable centered subject" penalizes X/Y drift but
+        # leaves the boomerang Z push-pull; NO "head"/"frame"/crop tokens (those
+        # PLANT the artifact in this stack -- the c01 lesson). Gated to LTX
+        # non-open person beats (announcer/music opens are radio-set objects, no
+        # person). The dominant lever is OTR_LTX_I2V_STRENGTH (0.75 -> ~0.85);
+        # this clause is the cheap, low-risk insurance alongside it.
+        if (str(shot.get("engine_id") or "").startswith("ltx")
+                and _shot_role not in ("announcer_visual", "music_visual")):
+            text_prompt = (text_prompt.rstrip().rstrip(",")
+                           + ", stable centered subject, full face clearly "
+                           "visible, generous headroom, comfortably composed")
         req["text_prompt"] = text_prompt
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),

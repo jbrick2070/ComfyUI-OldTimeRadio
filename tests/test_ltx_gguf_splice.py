@@ -94,11 +94,14 @@ def test_old_symbols_gone_from_engine_source():
 # --- distilled value pin = the mini (the #1 invariant; SPLICE_PLAN 12.6) --- #
 def test_distilled_pins_mini_values_ignoring_env(monkeypatch):
     monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)   # distilled default
-    # junk env knobs MUST be ignored in distilled mode -- the mini wins
+    # junk env knobs MUST be ignored in distilled mode -- the mini wins.
+    # EXCEPTION (2026-06-16 framing fix): OTR_LTX_I2V_STRENGTH is now honored in
+    # distilled too (default 0.75 = mini; the next test covers the override).
+    # Here it is UNSET so the default reproduces the mini exactly.
     monkeypatch.setenv("OTR_LTX_CFG", "9.0")
     monkeypatch.setenv("OTR_LTX_SAMPLER_NAME", "dpmpp_2m")
     monkeypatch.setenv("OTR_LTX_DISTILLED_LORA_STRENGTH", "0.1")
-    monkeypatch.setenv("OTR_LTX_I2V_STRENGTH", "0.2")
+    monkeypatch.delenv("OTR_LTX_I2V_STRENGTH", raising=False)
     eng = LtxVideoEngine()
     g = eng._build_graph(_plan(), 49, 832, 480)
     assert g["guider"]["inputs"]["cfg"] == 1.0                          # mini
@@ -106,7 +109,17 @@ def test_distilled_pins_mini_values_ignoring_env(monkeypatch):
     assert g["lora"]["inputs"]["strength_model"] == 0.7                 # mini
     assert g["sigmas"]["inputs"]["values"] == list(LTX_DISTILLED_SIGMAS)
     iv = eng._build_graph_i2v(_plan(), 49, 832, 480, "s.png")
-    assert iv["img2vid"]["inputs"]["strength"] == 0.75                  # mini i2v
+    assert iv["img2vid"]["inputs"]["strength"] == 0.75                  # mini i2v (env unset)
+
+
+def test_distilled_honors_i2v_strength_env(monkeypatch):
+    # 2026-06-16 framing fix: i2v strength is the ONE distilled value the env may
+    # override (default 0.75 = mini); raising it hugs the still harder to keep the
+    # subject framed. cfg / sampler / LoRA stay pinned (covered above).
+    monkeypatch.delenv("OTR_LTX_SAMPLER", raising=False)   # distilled default
+    monkeypatch.setenv("OTR_LTX_I2V_STRENGTH", "0.85")
+    iv = LtxVideoEngine()._build_graph_i2v(_plan(), 49, 832, 480, "s.png")
+    assert iv["img2vid"]["inputs"]["strength"] == 0.85
 
 
 def test_ksampler_honors_env_knobs(monkeypatch):

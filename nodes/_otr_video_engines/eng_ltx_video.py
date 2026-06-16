@@ -521,13 +521,17 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # GGUF splice: I2V strength 0.75 at native 832x480 (the mini's value).
         # DISTILLED mode HARDCODES it to the mini (#1 invariant -- env ignored);
         # ksampler/manual keeps the OTR_LTX_I2V_STRENGTH knob.
-        if self._sampler_mode() == "distilled":
+        # i2v conditioning strength. DEFAULT 0.75 = the frozen mini, so with the
+        # env UNSET the distilled path still reproduces the mini EXACTLY (#1
+        # invariant intact). 2026-06-16 operator framing fix (roundtable pass03):
+        # OTR_LTX_I2V_STRENGTH is now HONORED in distilled too (was ksampler-only)
+        # -- raising it (e.g. 0.85) makes the clip hug the well-framed still
+        # harder = less subject/head drift, the panel's PRIMARY lever for keeping
+        # the subject in frame. Opt-in only; the default is unchanged.
+        try:
+            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
+        except (TypeError, ValueError):
             cond_strength = 0.75
-        else:
-            try:
-                cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
-            except (TypeError, ValueError):
-                cond_strength = 0.75
         cond_strength = max(0.0, min(1.0, cond_strength))
         graph["img2vid"] = {
             "class": "img2vid",
