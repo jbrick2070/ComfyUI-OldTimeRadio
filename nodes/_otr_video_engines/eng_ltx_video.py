@@ -315,6 +315,19 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return os.environ.get("OTR_LTX_VIDEO_TEXT_ENCODER",
                               "gemma_3_12B_it_fp4_mixed.safetensors")
 
+    def _encoder_device(self):
+        """LTXAVTextEncoderLoader device for the Gemma-3 text encoder.
+        SPLICE_PLAN S9 perf mitigation (applied 2026-06-16): the full-episode
+        all-LTX soak measured the device='default' (GPU) path at a ~15.8 GB NVML
+        peak -- the ~11.2 GB Gemma encoder co-resident with the Q4_K_S 22B unet
+        blows the 14.5 GB cap on the 16 GB box. 'cpu' offloads the encoder (the
+        av-lane-proven pattern, eng_ltx_av.py: ~0 GB GPU for the encoder; the
+        text encode runs once per clip), dropping the GPU peak toward the
+        unet + tiled-decode footprint. Override with
+        OTR_LTX_VIDEO_ENCODER_DEVICE=default for the mini-exact GPU encode on a
+        larger-VRAM box."""
+        return os.environ.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "cpu")
+
     def _projection_ckpt(self):
         return os.environ.get("OTR_LTX_VIDEO_PROJECTION_CKPT",
                               "ltx-2.3-22b-dev.safetensors")
@@ -680,7 +693,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "te": {"class": "te",
                    "inputs": {"text_encoder": self._encoder_name(),
                               "ckpt_name": self._projection_ckpt(),
-                              "device": "default"}},
+                              "device": self._encoder_device()}},
             "videovae": {"class": "videovae",
                          "inputs": {"vae_name": self._video_vae_name()}},
             "pos": {"class": "pos",
