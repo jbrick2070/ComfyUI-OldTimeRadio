@@ -316,17 +316,19 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                               "gemma_3_12B_it_fp4_mixed.safetensors")
 
     def _encoder_device(self):
-        """LTXAVTextEncoderLoader device for the Gemma-3 text encoder.
-        SPLICE_PLAN S9 perf mitigation (applied 2026-06-16): the full-episode
-        all-LTX soak measured the device='default' (GPU) path at a ~15.8 GB NVML
-        peak -- the ~11.2 GB Gemma encoder co-resident with the Q4_K_S 22B unet
-        blows the 14.5 GB cap on the 16 GB box. 'cpu' offloads the encoder (the
-        av-lane-proven pattern, eng_ltx_av.py: ~0 GB GPU for the encoder; the
-        text encode runs once per clip), dropping the GPU peak toward the
-        unet + tiled-decode footprint. Override with
-        OTR_LTX_VIDEO_ENCODER_DEVICE=default for the mini-exact GPU encode on a
-        larger-VRAM box."""
-        return os.environ.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "cpu")
+        """LTXAVTextEncoderLoader device for the Gemma-3 text encoder. Default
+        'default' (GPU) = the frozen-mini recipe. The 2026-06-16 full-episode
+        all-LTX soak MEASURED device='cpu' vs 'default' and found the LTX-phase
+        NVML peak IDENTICAL (~15.85 GB both ways): ComfyUI's dynamic memory
+        manager already evicts the encoder before the unet + VAE-decode peak, so
+        the encoder device does NOT move the peak -- the ~15.8 GB is intrinsic to
+        the Q4_K_S 22B unet + tiled VAE decode at 832x480 (matches the LTX-AV M0
+        probe: Q4_K_S 15594 MB, Q3_K_M 13688 MB). 'cpu' only makes the text
+        encode run slowly ON the CPU for no VRAM gain, so 'default' stays the
+        default; the env knob remains for boxes that still want the encoder
+        off-GPU. Reaching the 14.5 GB cap needs the Q3_K_M quant -- an operator
+        decision, since it deviates from the frozen-mini Q4_K_S invariant."""
+        return os.environ.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "default")
 
     def _projection_ckpt(self):
         return os.environ.get("OTR_LTX_VIDEO_PROJECTION_CKPT",
