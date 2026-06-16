@@ -230,7 +230,7 @@
       "widgets_values": [
         832,
         480,
-        209,
+        105,
         1
       ]
     },
@@ -589,14 +589,14 @@
     },
     {
       "id": 15,
-      "type": "SaveWEBM",
+      "type": "VHS_VideoCombine",
       "pos": [
         2420,
-        300
+        280
       ],
       "size": [
-        340,
-        150
+        400,
+        320
       ],
       "flags": {},
       "order": 14,
@@ -608,15 +608,24 @@
           "link": 18
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "slot_index": 0,
+          "links": []
+        }
+      ],
       "properties": {
-        "Node name for S&R": "SaveWEBM"
+        "Node name for S&R": "VHS_VideoCombine"
       },
       "widgets_values": [
-        "otr_ltx_bookend_mini/repro_b001",
-        "vp9",
         25.0,
-        18.0
+        0,
+        "otr_ltx_bookend_mini/repro_b001",
+        "video/h264-mp4",
+        true,
+        true
       ]
     }
   ],

@@ -109,7 +109,7 @@ checks = {
     "clip_type(3)": (find(3).get("type"), "ltxv"),
     "latent_w(6)": (find(6).get("width"), 832),
     "latent_h(6)": (find(6).get("height"), 480),
-    "latent_len(6)": (find(6).get("length"), 209),
+    "latent_len(6)": (find(6).get("length"), 105),
     "strength(7)": (find(7).get("strength"), 0.75),
     "frame_rate(8)": (find(8).get("frame_rate"), 25.0),
     "sampler(9)": (find(9).get("sampler_name"), "euler_cfg_pp"),
@@ -119,8 +119,9 @@ checks = {
     "temporal(14)": (find(14).get("temporal_size"), 4096),
     "tile_overlap(14)": (find(14).get("overlap"), 64),
     "temporal_overlap(14)": (find(14).get("temporal_overlap"), 8),
-    "codec(15)": (find(15).get("codec"), "vp9"),
-    "fps(15)": (find(15).get("fps"), 25.0),
+    "vhs_fps(15)": (find(15).get("frame_rate"), 25.0),
+    "vhs_pingpong(15)": (find(15).get("pingpong"), True),
+    "vhs_format(15)": (find(15).get("format"), "video/h264-mp4"),
 }
 for k, (got, want) in checks.items():
     if got != want:

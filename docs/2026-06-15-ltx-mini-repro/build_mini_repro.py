@@ -9,10 +9,17 @@ Topology (mirrors the ledger-proven v0_9 engine path of b001/b005, commit c9af19
   EmptyLTXVLatentVideo(832x480x209) -> LTXVImgToVideoConditionOnly(strength 0.75)
   LTXVConditioning(frame_rate 25) -> CFGGuider(cfg 1.0)
   KSamplerSelect(euler_cfg_pp) + ManualSigmas(8-step distilled) + RandomNoise
-     -> SamplerCustomAdvanced -> VAEDecodeTiled(512/64/4096/8) -> SaveWEBM(vp9, 25fps)
+     -> SamplerCustomAdvanced -> VAEDecodeTiled(512/64/4096/8)
+     -> VHS_VideoCombine(pingpong boomerang, h264-mp4, 25fps)
 
-NO Flux, NO HuMo, NO upscale, NO audio, NO compositor. The boomerang ping-pong is
-an OPTIONAL ffmpeg post-step (loop_via_reverse) -- not in the graph; it only loops.
+NO Flux, NO HuMo, NO upscale, NO audio, NO compositor.
+
+CRITICAL (the 2026-06-15 mush fix): b001.mp4 is 209 frames, but the engine renders
+HALF -- 105 frames (8*13+1) -- then ffmpeg-boomerangs (2*105-1 = 209) to the full
+length (batch_ltx_render.py BUG-LOCAL-117d, chunk_render_dur_s = chunk_dur_s/2).
+Rendering 209 pure-forward frames lets the i2v anchor decay over the long sequence
+and BLOOMS into mush. So this graph renders 105 and boomerangs in-node via
+VHS_VideoCombine pingpong=True. Verified sharp on the live 5080, 2026-06-15.
 
 All recipe constants are the ledger-proven 6/6 values. Slot types/orders verified
 live against :8000 /object_info (ComfyUI 0.24.1). UTF-8, no BOM.
@@ -26,7 +33,10 @@ OUT = (r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
 STILL      = "radio_bookend_mimicry_b001.png"   # staged in ComfyUI\input
 LTX_CKPT   = "ltx-video-2b-v0.9.safetensors"
 T5         = "t5xxl_fp16.safetensors"
-WIDTH, HEIGHT, LENGTH = 832, 480, 209           # b001; use 233 for b005
+# LENGTH is the HALF render length (105 = 8*13+1). VHS pingpong doubles it to the
+# 209-frame b001 final. For b005 (241 final) use 121 (8*15+1). NEVER render the
+# full 209 in one forward pass -- it MUSHES (the 2026-06-15 bug).
+WIDTH, HEIGHT, LENGTH = 832, 480, 105
 STRENGTH   = 0.75
 SAMPLER    = "euler_cfg_pp"
 SIGMAS     = "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
@@ -79,9 +89,13 @@ node(13, "SamplerCustomAdvanced", [1660, 300], [320, 150], [],
      [("output", "LATENT"), ("denoised_output", "LATENT")])
 node(14, "VAEDecodeTiled", [2040, 300], [320, 130], [TILE, OVERLAP, TSIZE, TOVERLAP],
      [("samples", "LATENT"), ("vae", "VAE")], [("IMAGE", "IMAGE")])
-node(15, "SaveWEBM", [2420, 300], [340, 150],
-     ["otr_ltx_bookend_mini/repro_b001", "vp9", FRAME_RATE, 18.0],
-     [("images", "IMAGE")], [])
+# VHS_VideoCombine with pingpong=True = the in-graph boomerang (forward+reverse),
+# turning the sharp 105-frame render into the ~209-frame b001 loop in one Queue.
+# widgets order (required, non-link): frame_rate, loop_count, filename_prefix,
+# format, pingpong, save_output.
+node(15, "VHS_VideoCombine", [2420, 280], [400, 320],
+     [FRAME_RATE, 0, "otr_ltx_bookend_mini/repro_b001", "video/h264-mp4", True, True],
+     [("images", "IMAGE")], [("Filenames", "VHS_FILENAMES")])
 
 # ---- links: (src_node, src_slot, dst_node, dst_slot) -----------------------
 WIRES = [
