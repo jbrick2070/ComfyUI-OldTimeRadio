@@ -531,6 +531,21 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         return "music_inter"
     return ""
 
+
+def _motion_clause_override(shot):
+    """Opt-in per-beat motion clause text, or ``None`` (default OFF -> byte-identical).
+    See nodes/_otr_motion_clause + docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md."""
+    try:
+        from .._otr_motion_clause import (  # type: ignore
+            enabled as _mc_enabled, resolve_motion_clause_text as _mc_text)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_motion_clause import (  # type: ignore
+            enabled as _mc_enabled, resolve_motion_clause_text as _mc_text)
+    if not _mc_enabled():
+        return None
+    return _mc_text(shot)
+
+
 #: HuMo-seam ticket Part C (2026-06-11). Broadcast-gear scrub for CHARACTER
 #: face beats -- LOCAL mirror of nodes/otr_meta_brief_image_prompt._GEAR_WORDS
 #: (the node module registers classes at import; mirroring follows the
@@ -980,6 +995,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             if (_atmo and len(scene_prompt) + len(_atmo) + 7
                     <= _LTX_MOTION_PROMPT_MAX):
                 scene_prompt = f"{scene_prompt} {_atmo} mood."
+            _mc_override = _motion_clause_override(shot)
+            if _mc_override:
+                scene_prompt = _mc_override
             _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
                          "centric prompt (role=%s, %d chars): %.90s...",
                          _shot_role, shot.get("shot_id"), _motion_key,
@@ -1010,8 +1028,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _setting = _term_join("setting", 2)
                 core = ("cinematic establishing shot"
                         + (f", {_setting}" if _setting else ""))
-            clauses = list(_beat_clauses(line, shot.get("shot_id")))
-            clauses.extend(["slow cinematic camera drift", "no on-screen text"])
+            _mc_override = _motion_clause_override(shot)
+            if _mc_override:
+                clauses = [_mc_override]
+            else:
+                clauses = list(_beat_clauses(line, shot.get("shot_id")))
+                clauses.extend(["slow cinematic camera drift", "no on-screen text"])
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=188, style_tail=False, era_profile="still")

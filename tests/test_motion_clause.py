@@ -1,0 +1,168 @@
+r"""Tests for the per-beat LTX motion_clause module (spec v2)."""
+import importlib
+import os
+
+import pytest
+
+mc = importlib.import_module("nodes._otr_motion_clause")
+
+
+@pytest.fixture
+def flag_on():
+    prev = os.environ.get(mc.FLAG_ENV)
+    os.environ[mc.FLAG_ENV] = "1"
+    try:
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop(mc.FLAG_ENV, None)
+        else:
+            os.environ[mc.FLAG_ENV] = prev
+
+
+@pytest.fixture
+def flag_off():
+    prev = os.environ.get(mc.FLAG_ENV)
+    os.environ.pop(mc.FLAG_ENV, None)
+    try:
+        yield
+    finally:
+        if prev is not None:
+            os.environ[mc.FLAG_ENV] = prev
+
+
+# ---- validate_motion_clause -------------------------------------------------
+
+def test_validate_ok():
+    ok, reason = mc.validate_motion_clause("Mara leans in and talks", "Mara")
+    assert ok and reason == "ok"
+
+
+@pytest.mark.parametrize("text,subject,reason", [
+    ("", "Mara", "empty"),
+    ("Mara " + "x" * 80, "Mara", "over_budget"),
+    ("Mara stands up and gestures", "Mara", "banned_phrase"),
+    ("a person talks softly", "Mara", "generic_subject"),
+    ("He leans and talks", "Mara", "subject_missing"),
+    ("Mara waits in silence", "Mara", "no_allowed_phrase"),
+])
+def test_validate_rejections(text, subject, reason):
+    ok, got = mc.validate_motion_clause(text, subject)
+    assert not ok and got == reason
+
+
+# ---- compute_source_hash ----------------------------------------------------
+
+def test_source_hash_deterministic():
+    a = mc.compute_source_hash("c1", "b1", "We must hurry!")
+    b = mc.compute_source_hash("c1", "b1", "We  must   hurry!")  # ws-normalized
+    assert a == b
+
+
+def test_source_hash_changes_with_dialogue():
+    a = mc.compute_source_hash("c1", "b1", "We must hurry!")
+    b = mc.compute_source_hash("c1", "b1", "Stay calm.")
+    assert a != b
+
+
+# ---- resolve_motion_clause_text (read-side guard) ---------------------------
+
+def test_resolve_valid():
+    shot = {"motion_clause": {"text": "Mara nods"}}
+    assert mc.resolve_motion_clause_text(shot) == "Mara nods"
+
+
+@pytest.mark.parametrize("shot", [
+    {}, {"motion_clause": None}, {"motion_clause": {"text": ""}},
+    {"motion_clause": {"text": 123}}, {"motion_clause": {"text": "x" * 300}},
+    "not-a-dict",
+])
+def test_resolve_none(shot):
+    assert mc.resolve_motion_clause_text(shot) is None
+
+
+# ---- generate_motion_clauses (batch pass) -----------------------------------
+
+def _ledger():
+    return {
+        "video": {"shots": [
+            {"shot_id": "s1", "char_id": "c1", "source_line_ids": ["b1"]},
+            {"shot_id": "s2", "char_id": "", "source_line_ids": ["b2"]},
+        ]},
+        "lines": [{"line_id": "b1", "text": "We must hurry!"},
+                  {"line_id": "b2", "text": ""}],
+    }
+
+
+def _statics(shot):
+    return "STATIC[%s]" % shot.get("shot_id", "")
+
+
+def _names(cid):
+    return {"c1": "Mara"}.get(cid, cid)
+
+
+def test_generate_flag_off_all_fallback(flag_off):
+    led = _ledger()
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: "Mara talks",
+        name_resolver=_names, static_text_for_shot=_statics)
+    assert counts["fallback"] == 2 and counts["generated"] == 0
+    assert led["video"]["shots"][0]["motion_clause"]["text"] == "STATIC[s1]"
+    assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True
+
+
+def test_generate_flag_on_dialogue_beat(flag_on):
+    led = _ledger()
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: "Mara leans in and talks",
+        name_resolver=_names, static_text_for_shot=_statics)
+    assert counts["generated"] == 1  # s1 has char + dialogue
+    assert counts["fallback"] == 1   # s2 has neither
+    assert led["video"]["shots"][0]["motion_clause"]["text"] == "Mara leans in and talks"
+    assert led["video"]["shots"][0]["motion_clause"]["fallback"] is False
+
+
+def test_generate_invalid_output_falls_back(flag_on):
+    led = _ledger()
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: "Everyone stands up and runs away",
+        name_resolver=_names, static_text_for_shot=_statics)
+    assert counts["invalid"] == 1 and counts["generated"] == 0
+    assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True
+
+
+def test_generate_llm_error_never_raises(flag_on):
+    def _boom(*a, **k):
+        raise RuntimeError("llm down")
+    led = _ledger()
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=_boom, name_resolver=_names, static_text_for_shot=_statics)
+    assert counts["fallback"] == 2 and counts["invalid"] == 0
+
+
+def test_generate_reuse_on_matching_hash(flag_on):
+    led = _ledger()
+    mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: "Mara leans in and talks",
+        name_resolver=_names, static_text_for_shot=_statics)
+    # second pass: a generate_fn that would fail validation must NOT be used for s1
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: "garbage stands up",
+        name_resolver=_names, static_text_for_shot=_statics)
+    assert counts["reused"] == 1
+    assert led["video"]["shots"][0]["motion_clause"]["text"] == "Mara leans in and talks"
+
+
+# ---- render_driver hook is OFF by default (byte-identical) -------------------
+
+def test_render_hook_off_by_default(flag_off):
+    rd = importlib.import_module("nodes._otr_video_engines.render_driver")
+    shot = {"motion_clause": {"text": "Mara nods"}}
+    assert rd._motion_clause_override(shot) is None
+
+
+def test_render_hook_on_returns_text(flag_on):
+    rd = importlib.import_module("nodes._otr_video_engines.render_driver")
+    shot = {"motion_clause": {"text": "Mara nods"}}
+    assert rd._motion_clause_override(shot) == "Mara nods"
