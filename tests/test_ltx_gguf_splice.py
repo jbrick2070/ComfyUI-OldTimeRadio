@@ -133,7 +133,7 @@ def test_weight_paths_five_artifacts():
 
 def test_resolver_defaults_match_the_mini():
     eng = LtxVideoEngine()
-    assert eng._unet_name() == "ltx-2.3-22b-dev-Q4_K_S.gguf"
+    assert eng._unet_name() == "ltx-2.3-22b-dev-Q3_K_M.gguf"
     assert eng._encoder_name() == "gemma_3_12B_it_fp4_mixed.safetensors"
     assert eng._projection_ckpt() == "ltx-2.3-22b-dev.safetensors"
     assert eng._video_vae_name() == "ltx-2.3-22b-dev_video_vae.safetensors"

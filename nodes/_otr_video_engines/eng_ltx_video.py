@@ -25,7 +25,7 @@ checkpoints), ``OTR_LTX_VIDEO_VAE`` (video VAE in vae), ``OTR_LTX_DISTILLED_LORA
 (distilled LoRA in loras).
 
 Recipe = the frozen mini ``workflows/ltx_bookend_mini_repro_gguf_mit.json`` (the
-VERIFIED-WORKING path, reproduced EXACTLY): the 22B Q4_K_S GGUF unet + the
+VERIFIED-WORKING path, reproduced EXACTLY): the 22B Q3_K_M GGUF unet + the
 distilled LoRA @0.70 + the Gemma-3 text encoder + the distilled sampler chain
 (KSamplerSelect ``euler_cfg_pp`` + 8-step LTX_DISTILLED_SIGMAS + RandomNoise +
 CFGGuider cfg=1.0 + SamplerCustomAdvanced) + VAEDecodeTiled 512/64/4096/8 + i2v
@@ -72,8 +72,8 @@ def _resolve(folder, name):
 
 
 # Weight sanity floors (GiB) -- catch a truncated / wrong download, NOT exact
-# byte checks. Grounded vs the on-disk GGUF set (2026-06-15): Q4_K_S unet
-# ~12.2 GiB; Gemma-3 fp4 ~8.8 GiB; video VAE ~1.35 GiB; distilled LoRA ~7.1 GiB;
+# byte checks. Grounded vs the on-disk GGUF set: Q3_K_M unet ~10.0 GiB (the
+# 2026-06-16 default; Q4_K_S ~12.2); Gemma-3 fp4 ~8.8 GiB; video VAE ~1.35 GiB; distilled LoRA ~7.1 GiB;
 # projection ckpt ~43 GiB. Each floor sits well below the real size.
 # (eng_ltx_av.py:64-68 supplies the first three constants verbatim.)
 _GiB = 1024 ** 3
@@ -309,7 +309,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # LoRA keeps its own (name, path) tuple helper (_distilled_lora_file, below).
     def _unet_name(self):
         return os.environ.get("OTR_LTX_VIDEO_UNET",
-                              "ltx-2.3-22b-dev-Q4_K_S.gguf")
+                              "ltx-2.3-22b-dev-Q3_K_M.gguf")
 
     def _encoder_name(self):
         return os.environ.get("OTR_LTX_VIDEO_TEXT_ENCODER",
@@ -321,13 +321,13 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         all-LTX soak MEASURED device='cpu' vs 'default' and found the LTX-phase
         NVML peak IDENTICAL (~15.85 GB both ways): ComfyUI's dynamic memory
         manager already evicts the encoder before the unet + VAE-decode peak, so
-        the encoder device does NOT move the peak -- the ~15.8 GB is intrinsic to
-        the Q4_K_S 22B unet + tiled VAE decode at 832x480 (matches the LTX-AV M0
-        probe: Q4_K_S 15594 MB, Q3_K_M 13688 MB). 'cpu' only makes the text
-        encode run slowly ON the CPU for no VRAM gain, so 'default' stays the
-        default; the env knob remains for boxes that still want the encoder
-        off-GPU. Reaching the 14.5 GB cap needs the Q3_K_M quant -- an operator
-        decision, since it deviates from the frozen-mini Q4_K_S invariant."""
+        the encoder device does NOT move the peak. The 2026-06-16 battle adopted
+        Q3_K_M as the default unet (per-clip peak ~14804 MiB at the 14.5 GB cap,
+        2.2x faster than Q4_K_S with no decode offload, objective quality
+        comparable -- the operator's call); 'cpu' only makes the text encode run
+        slowly ON the CPU for no VRAM gain, so 'default' stays the default; the
+        env knob remains for boxes that want the encoder off-GPU. (M0 @512x288x97:
+        Q4_K_S 15594 MB, Q3_K_M 13688 MB.)"""
         return os.environ.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "default")
 
     def _projection_ckpt(self):

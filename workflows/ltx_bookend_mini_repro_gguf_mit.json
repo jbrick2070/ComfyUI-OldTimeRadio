@@ -31,7 +31,7 @@
         "Node name for S&R": "UnetLoaderGGUF"
       },
       "widgets_values": [
-        "ltx-2.3-22b-dev-Q4_K_S.gguf"
+        "ltx-2.3-22b-dev-Q3_K_M.gguf"
       ]
     },
     {

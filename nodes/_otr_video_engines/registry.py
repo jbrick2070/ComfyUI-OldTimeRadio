@@ -145,12 +145,12 @@ CAPABILITIES = {
     "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
                    "requires_sidecar": True, "cpu_ok": False,
                    "model_requirements": ["latentsync-1.5"]},
-    # GGUF splice (2026-06-15): the production LTX video recipe is now the frozen
-    # mini -- 22B Q4_K_S GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX
-    # video VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class; the
-    # motion smoke re-measures the live peak (mini ~13 GB <= the 14.5 GB ceiling;
-    # no audio VAE on this lane). commercial_clean (Apache GGUF + LTX-2 Community
-    # model) is set True on the engine.
+    # GGUF splice (2026-06-15): the production LTX video recipe is the frozen
+    # mini -- 22B GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX video
+    # VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class. The 2026-06-16
+    # battle adopted Q3_K_M as the default quant: measured per-clip peak ~14.8 GB
+    # (at the 14.5 GB ceiling, 2.2x faster, no decode offload); Q4_K_S was ~15.8 GB
+    # = over. commercial_clean (Apache GGUF + LTX-2 Community model) set True.
     "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["ltx-2.3-22b-dev-gguf",
