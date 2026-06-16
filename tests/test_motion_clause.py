@@ -94,10 +94,6 @@ def _ledger():
     }
 
 
-def _statics(shot):
-    return "STATIC[%s]" % shot.get("shot_id", "")
-
-
 def _names(cid):
     return {"c1": "Mara"}.get(cid, cid)
 
@@ -105,29 +101,32 @@ def _names(cid):
 def test_generate_flag_off_all_fallback(flag_off):
     led = _ledger()
     counts = mc.generate_motion_clauses(
-        led, generate_fn=lambda *a, **k: "Mara talks",
-        name_resolver=_names, static_text_for_shot=_statics)
+        led, generate_fn=lambda *a, **k: "Mara talks", name_resolver=_names)
     assert counts["fallback"] == 2 and counts["generated"] == 0
-    assert led["video"]["shots"][0]["motion_clause"]["text"] == "STATIC[s1]"
-    assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True
+    s0 = led["video"]["shots"][0]
+    assert s0["motion_clause"]["fallback"] is True
+    # fallback -> read side returns None -> render keeps its existing prompt
+    assert mc.resolve_motion_clause_text(s0) is None
 
 
 def test_generate_flag_on_dialogue_beat(flag_on):
     led = _ledger()
     counts = mc.generate_motion_clauses(
         led, generate_fn=lambda *a, **k: "Mara leans in and talks",
-        name_resolver=_names, static_text_for_shot=_statics)
+        name_resolver=_names)
     assert counts["generated"] == 1  # s1 has char + dialogue
     assert counts["fallback"] == 1   # s2 has neither
-    assert led["video"]["shots"][0]["motion_clause"]["text"] == "Mara leans in and talks"
-    assert led["video"]["shots"][0]["motion_clause"]["fallback"] is False
+    s0 = led["video"]["shots"][0]
+    assert s0["motion_clause"]["text"] == "Mara leans in and talks"
+    assert s0["motion_clause"]["fallback"] is False
+    assert mc.resolve_motion_clause_text(s0) == "Mara leans in and talks"
 
 
 def test_generate_invalid_output_falls_back(flag_on):
     led = _ledger()
     counts = mc.generate_motion_clauses(
         led, generate_fn=lambda *a, **k: "Everyone stands up and runs away",
-        name_resolver=_names, static_text_for_shot=_statics)
+        name_resolver=_names)
     assert counts["invalid"] == 1 and counts["generated"] == 0
     assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True
 
@@ -136,8 +135,7 @@ def test_generate_llm_error_never_raises(flag_on):
     def _boom(*a, **k):
         raise RuntimeError("llm down")
     led = _ledger()
-    counts = mc.generate_motion_clauses(
-        led, generate_fn=_boom, name_resolver=_names, static_text_for_shot=_statics)
+    counts = mc.generate_motion_clauses(led, generate_fn=_boom, name_resolver=_names)
     assert counts["fallback"] == 2 and counts["invalid"] == 0
 
 
@@ -145,13 +143,25 @@ def test_generate_reuse_on_matching_hash(flag_on):
     led = _ledger()
     mc.generate_motion_clauses(
         led, generate_fn=lambda *a, **k: "Mara leans in and talks",
-        name_resolver=_names, static_text_for_shot=_statics)
+        name_resolver=_names)
     # second pass: a generate_fn that would fail validation must NOT be used for s1
     counts = mc.generate_motion_clauses(
-        led, generate_fn=lambda *a, **k: "garbage stands up",
-        name_resolver=_names, static_text_for_shot=_statics)
+        led, generate_fn=lambda *a, **k: "garbage stands up", name_resolver=_names)
     assert counts["reused"] == 1
     assert led["video"]["shots"][0]["motion_clause"]["text"] == "Mara leans in and talks"
+
+
+def test_resolve_none_for_fallback():
+    shot = {"motion_clause": {"text": "Mara nods", "fallback": True}}
+    assert mc.resolve_motion_clause_text(shot) is None
+
+
+def test_make_name_resolver():
+    led = {"cast": [{"char_id": "c1", "name": "Mara"}, {"char_id": "c2"}]}
+    r = mc.make_name_resolver(led)
+    assert r("c1") == "Mara"
+    assert r("c2") == "c2"    # no name -> char_id
+    assert r("zzz") == "zzz"  # unknown -> char_id
 
 
 # ---- render_driver hook is OFF by default (byte-identical) -------------------

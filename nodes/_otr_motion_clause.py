@@ -125,6 +125,10 @@ def resolve_motion_clause_text(shot: Any) -> Optional[str]:
     mc = shot.get("motion_clause")
     if not isinstance(mc, dict):
         return None
+    if mc.get("fallback"):
+        # A fallback object means "no real clause" -> caller keeps its existing
+        # (static role map / brief-composed) prompt, so render is byte-identical.
+        return None
     text = mc.get("text")
     if not isinstance(text, str):
         return None
@@ -170,16 +174,14 @@ def _beat_id_for_shot(shot: Any) -> str:
 def generate_motion_clauses(ledger: Any, *,
                             generate_fn: Optional[Callable] = None,
                             name_resolver: Optional[Callable] = None,
-                            static_text_for_shot: Optional[Callable] = None,
                             scene_ctx: str = "") -> dict:
     """Post-brief BATCH pass: fill ``shots[i]['motion_clause']`` for EVERY shot.
 
     * ``generate_fn(messages, *, temperature, max_new_tokens, stop=None) -> str`` -- the
-      writer-slot LLM closure. When ``None`` or the flag is OFF, every shot gets a static
-      fallback object (so the composed prompt is unchanged).
+      writer-slot LLM closure. When ``None`` (or the flag is OFF), every shot gets a
+      ``fallback`` object; :func:`resolve_motion_clause_text` returns ``None`` for those,
+      so the render path keeps its existing prompt (byte-identical).
     * ``name_resolver(char_id) -> str`` -- display name for the subject; falls back to char_id.
-    * ``static_text_for_shot(shot) -> str`` -- the legacy static role motion text, stored as
-      the fallback ``text`` so the read path is byte-identical when no real clause exists.
 
     Returns disposition counts. Idempotent: a stored clause whose ``source_hash`` still
     matches is REUSED (deterministic re-render)."""
@@ -200,14 +202,6 @@ def generate_motion_clauses(ledger: Any, *,
                 return str(cid or "")
         return str(cid or "")
 
-    def _static(shot: Any) -> str:
-        if callable(static_text_for_shot):
-            try:
-                return str(static_text_for_shot(shot) or "")
-            except Exception:  # noqa: BLE001
-                return ""
-        return ""
-
     for shot in shots:
         if not isinstance(shot, dict):
             continue
@@ -227,7 +221,7 @@ def generate_motion_clauses(ledger: Any, *,
         # Console / no-dialogue / flag-off -> static fallback (byte-identical path).
         if not on or not dialogue.strip() or not char_id:
             shot["motion_clause"] = _clause_obj(
-                _static(shot), model=GENERATED_MODEL_UNSET, fallback=True,
+                "", model=GENERATED_MODEL_UNSET, fallback=True,
                 char_id=char_id, beat_id=beat_id, dialogue=dialogue)
             counts["fallback"] += 1
             continue
@@ -251,8 +245,49 @@ def generate_motion_clauses(ledger: Any, *,
             if text:
                 counts["invalid"] += 1
             shot["motion_clause"] = _clause_obj(
-                _static(shot), model=GENERATED_MODEL_UNSET, fallback=True,
+                "", model=GENERATED_MODEL_UNSET, fallback=True,
                 char_id=char_id, beat_id=beat_id, dialogue=dialogue)
             counts["fallback"] += 1
 
     return counts
+
+
+def make_name_resolver(ledger: Any) -> Callable:
+    """``char_id -> display name`` from ``ledger['cast']`` (falls back to char_id)."""
+    by_id = {}
+    for c in (ledger or {}).get("cast") or []:
+        if isinstance(c, dict):
+            cid = str(c.get("char_id") or "")
+            if cid:
+                by_id[cid] = str(c.get("name") or cid)
+
+    def _resolve(char_id):
+        return by_id.get(str(char_id or ""), str(char_id or ""))
+
+    return _resolve
+
+
+def make_writer_generate_fn(model_id: Optional[str] = None):
+    """Build a creative-slot writer ``generate_fn`` at RUNTIME (lazy; torch/model stack).
+
+    Returns ``None`` on ANY failure so the caller falls back to static (never breaks the
+    render). Reuses the proven script-writer primitives -- request_slot +
+    _build_truncating_generate_fn -- which handle the HF / Ollama / OpenRouter lanes."""
+    try:
+        try:
+            from . import _otr_model_loader as _ml  # type: ignore
+            from . import _otr_model_catalog as _cat  # type: ignore
+            from .OTR_LedgerScriptWriter import (  # type: ignore
+                _build_truncating_generate_fn)
+        except ImportError:  # pragma: no cover -- flat imports
+            import _otr_model_loader as _ml  # type: ignore
+            import _otr_model_catalog as _cat  # type: ignore
+            from OTR_LedgerScriptWriter import (  # type: ignore
+                _build_truncating_generate_fn)
+        mid = str(model_id or getattr(_cat, "DEFAULT_LLM", "") or "")
+        if not mid:
+            return None
+        entry = _ml.request_slot("creative", mid)  # LLM slot: creative
+        return _build_truncating_generate_fn(entry)
+    except Exception:  # noqa: BLE001 -- runtime model stack optional; fall back to static
+        return None

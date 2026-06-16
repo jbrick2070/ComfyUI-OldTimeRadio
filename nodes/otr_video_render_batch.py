@@ -155,6 +155,19 @@ class OTRVideoRenderBatch:
                     "", "node_episode_report.json")
         episode_id = str(ledger.get("episode_id")
                          or (ledger.get("meta") or {}).get("episode_id") or "")
+        # Per-beat motion clause (opt-in OTR_LTX_MOTION_CLAUSE=1; default OFF -> no-op,
+        # byte-identical). Pre-render pass: fills ledger['video']['shots'][i]
+        # ['motion_clause'] from each beat's dialogue + cast; render reads it read-only.
+        try:
+            from ._otr_motion_clause import (  # type: ignore
+                enabled as _mc_on, generate_motion_clauses as _mc_gen,
+                make_writer_generate_fn as _mc_fn, make_name_resolver as _mc_names)
+            if _mc_on():
+                _mc_counts = _mc_gen(ledger, generate_fn=_mc_fn(),
+                                     name_resolver=_mc_names(ledger))
+                log.warning("[OTR_VideoRenderBatch] motion_clause: %s", _mc_counts)
+        except Exception as exc:  # noqa: BLE001 -- never break the render
+            log.warning("[OTR_VideoRenderBatch] motion_clause skipped: %s", exc)
         ep = _rd.run_real_episode(ledger,
                                   master_audio_path=str(master_audio_path or ""))
         manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
