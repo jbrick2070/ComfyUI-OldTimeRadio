@@ -1,5 +1,21 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-16 ("BATTLE OF THE MINIS" -> Q3_K_M ADOPTED; VRAM GATE CLOSED; HEAD `d48f3ee` ==
+> origin):** With the soak proving the ~15.8 GB peak is INTRINSIC to Q4_K_S (not a regression), the operator
+> green-lit a head-to-head. Both minis rendered UNCHANGED on a clean box (832x480x105, seed 1): **Q4_K_S** peak
+> 15847 MiB (OVER the 14.5 GB cap; 192 s; 20.7 s/it avg with the decode partial-unload offload) vs **Q3_K_M**
+> peak **14804 MiB** (at the cap; **88 s = 2.2x FASTER**; 7.07 s/it STEADY, no offload), objective quality
+> comparable-or-better (Laplacian sharpness 670 vs 573, framediff 1.88 vs 1.69; the Q3 webm was even slightly
+> larger). **OPERATOR CHOSE Q3_K_M.** Commit `d48f3ee`: `_unet_name()` default + the frozen
+> `ltx_bookend_mini_repro_gguf_mit.json` node 1 re-pointed to `ltx-2.3-22b-dev-Q3_K_M.gguf` (the NEW
+> #1-invariant recipe); `OTR_LTX_VIDEO_UNET` env override kept for big-VRAM boxes; the 8 GiB unet floor still
+> clears the 10 GB Q3_K_M; `test_resolver_defaults_match_the_mini` + the eng/registry comments updated in
+> lockstep. Suite 4411 pass / 0 fail + Bug Bible 16/7/3; HEAD==origin, no BOM. **THE 14.5 GB VRAM GATE IS
+> CLOSED** -- the production LTX lane now fits the 16 GB board AND renders 2.2x faster; the earlier
+> "accept ~15.8 / Q3_K_M / smaller canvas" operator decision is RESOLVED. Roundtable + battle records under
+> `docs/2026-06-16-ltx-vram-mini-vs-prod/` (clips `battle_q4ks.webm` / `battle_q3km.webm`, panel $0.16). The
+> S3 forward order (Wan eyeball / 3D / distribution) is UNCHANGED.
+>
 > **LATEST SESSION -- 2026-06-16 overnight #2 (autonomous; LTX 22B-GGUF FULL-EPISODE SOAK + VRAM GATE MEASURED;
 > HEAD `1e5d66f` == origin):** Ran the operator-requested all-LTX full-episode soak (the open VRAM-gate item) on
 > the headless LTX lane. **RESULT 1 -- LTX FIRES end-to-end:** the spliced `ltx_video` engine renders real
