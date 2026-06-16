@@ -1,5 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-16 overnight #2 (autonomous; LTX 22B-GGUF FULL-EPISODE SOAK + VRAM GATE MEASURED;
+> HEAD `1e5d66f` == origin):** Ran the operator-requested all-LTX full-episode soak (the open VRAM-gate item) on
+> the headless LTX lane. **RESULT 1 -- LTX FIRES end-to-end:** the spliced `ltx_video` engine renders real
+> per-beat clips in the LIVE episode path (GGUF Q4_K unet load + 8-step `euler_cfg_pp` distilled chain + Gemma
+> encoder + tiled VAE decode, MULTIPLE beats, per-beat reload) -- the splice WORKS in production, not just the
+> mini smoke; the all-LTX forced profile resolves to ltx_video on announcer+music+character beats. **RESULT 2 --
+> VRAM GATE NOT MET (operator decision needed):** the LTX-phase NVML peak measured **15847 MiB (device=default)
+> and 15849 MiB (device=cpu) -- IDENTICAL, ~15.8 GB, ~1.3 GB OVER the 14.5 GB cap.** The SPLICE_PLAN S9
+> mitigation (Gemma `device=cpu`) is **INEFFECTIVE**: ComfyUI's dynamic memory manager already evicts the encoder
+> before the unet+VAE-decode peak, so the encoder device does NOT move the peak -- the ~15.8 GB is intrinsic to
+> the **Q4_K_S 22B unet + tiled VAE decode at 832x480** (matches the LTX-AV M0 probe: Q4_K_S 15594 MB, Q3_K_M
+> 13688 MB). `device=cpu` only runs the text encode slowly ON the CPU for no VRAM gain. **Commits:** `b0925c3`
+> added the `OTR_LTX_VIDEO_ENCODER_DEVICE` env knob (briefly defaulted cpu) -> `1e5d66f` reverted the default to
+> GPU (mini-exact + faster; the knob stays). Suite 4411 pass / 0 fail + Bug Bible 16/7/3 on both. **The render
+> SUCCEEDS at 15.8 GB on the 16 GB board (no OOM)** -- functional, just over the soft headroom target. **>>>
+> OPERATOR DECISION (the gate):** (a) ACCEPT ~15.8 GB (Q4_K_S renders fine on the 16 GB box, stays mini-exact),
+> OR (b) switch the unet to **Q3_K_M** (M0-proven 13688 MB <= cap) -- which DEVIATES from the frozen-mini Q4_K_S
+> #1 invariant, so it needs re-freezing the mini + a look-QA pass. I did NOT change the quant autonomously.
+> **Soak-harness gotcha (headless box):** indextts2 (the char_voice default) has NO Path-B sidecar venv under
+> `C:\Users\jeffr\ComfyUI-Installs\...\index-tts\.venv` -> it fail-LOUD-raises and crashes the AUDIO phase before
+> any video beat; the all-LTX soak now forces `OTR_SOAK_CHAR_VOICE=bark` (in-process, dep-free). Env gap, not an
+> engine bug. The S3 forward order (Wan eyeball / 3D / distribution) is UNCHANGED.
+>
 > **LATEST SESSION -- 2026-06-16 overnight (autonomous; LTX 22B-GGUF SPLICE SHIPPED + GPU-verified; HEAD `50347dd`
 > == origin):** The clean-break that replaces the buggy 2B `ltx_video` recipe with the VERIFIED frozen-mini GGUF
 > recipe is COMPLETE, GREEN, and PUSHED in two commits on `v2.0-alpha`. **PHASE 0 (`27e5637`) -- ripped `ltx_orbit`
