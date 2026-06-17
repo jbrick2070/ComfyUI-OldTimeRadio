@@ -469,8 +469,9 @@ class HuMo17BEngine(HuMoEngine):
     can't fit the 14B keeps a REAL audio-driven talking face. Config is isolated
     from the 14B env: its own UNET, NO LoRA (the lightx2v distill is 14B-shaped
     and shape-mismatches the 1.7B tier), and its own steps/cfg via OTR_HUMO_17B_*
-    (defaults: 20 steps / cfg 5.0 -- the distill shortcut is gone so it needs
-    more steps). Shares roles / required_inputs / requires_flag / the in-process
+    (defaults: 20 steps -- the distill shortcut is gone so it needs more steps --
+    and cfg 1.0, dropped from 5.0 which produced a blue colour cast, fixed
+    2026-06-17). Shares roles / required_inputs / requires_flag / the in-process
     graph topology with the 14B base; only the tier config differs. Degrades on
     to latentsync, then the still floor."""
 
@@ -504,7 +505,13 @@ class HuMo17BEngine(HuMoEngine):
         return int(os.environ.get("OTR_HUMO_17B_STEPS", "20"))
 
     def _cfg(self):
-        return float(os.environ.get("OTR_HUMO_17B_CFG", "5.0"))
+        # cfg 1.0 (was 5.0): the LoRA-free 1.7B tier at cfg 5.0 produced a strong
+        # BLUE colour cast -- red crushed, blue pushed (B-R measured +44.6 vs the
+        # source still's +25 on 2026-06-17) -- while cfg 1.0 is colour-balanced
+        # (B-R +2.8, red recovered) on the identical beat. HuMo's talking-face
+        # motion is driven by the AUDIO conditioning, not cfg, so the lip motion
+        # survives the drop. Tune via OTR_HUMO_17B_CFG.
+        return float(os.environ.get("OTR_HUMO_17B_CFG", "1.0"))
 
 
 @register
@@ -515,7 +522,8 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
     Same checkpoint / roles / required inputs / in-process graph as humo_1.7B;
     only the render aspect and the cfg default differ. The 16:9 cfg sweet spot
     measured 2026-06-16 (the cfg sweep) is 2.5, so this tier defaults there while
-    portrait humo_1.7B keeps its 5.0. A 16:9 character still (832x480) feeds it --
+    portrait humo_1.7B now uses cfg 1.0 (de-blued 2026-06-17, was 5.0). A 16:9
+    character still (832x480) feeds it --
     meta_brief mints the still to match the selected engine's aspect via the video
     policy, so ONE dropdown pick aligns dims, cfg, still and composite canvas.
     Not in the auto-fallback chain (it is a deliberate operator pick): a failure
@@ -530,4 +538,32 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
         return float(os.environ.get("OTR_HUMO_17B_169_CFG", "2.5"))
 
 
-__all__ = ["HuMoEngine", "HuMo17BEngine", "HuMo17BLandscapeEngine"]
+@register
+class HuMo14BLandscapeEngine(HuMoEngine):
+    """14B HuMo in 16:9 LANDSCAPE (832x480) -- the 2026-06-09 keystone quality
+    (the fast 14B Kijai + lightx2v 6-step distill) in the modern WIDE character-beat
+    aspect. The operator wants the 14B look in 16:9, NON-blue: the 1.7B downgrade
+    tier carries a color cast (red-crushed / blue-pushed, measured 2026-06-17),
+    but the 14B shares the same wan_2.1_vae and its latents MATCH it, so the 14B
+    output is colour-correct. Same 14B checkpoint / LoRA / steps / cfg / roles /
+    in-process graph as the humo base; ONLY the render aspect differs
+    (portrait 480x832 -> wide 832x480). Selectable in all three role dropdowns
+    alongside the portrait 14B and the 1.7B tiers. A 16:9 character still (832x480)
+    feeds it -- meta_brief mints the still to the selected engine's aspect via the
+    video policy, so one dropdown pick aligns dims, still and composite canvas.
+    Degrades like the 14B base (-> humo_1.7B -> latentsync -> still); a deliberate
+    operator pick, never a silent aspect swap."""
+
+    name = "humo_14B_169"
+    render_aspect = "wide"
+
+    def _cfg(self):
+        # Inherit the 14B distill cfg (1.0); a 16:9 tuning hook is available via
+        # OTR_HUMO_14B_169_CFG without disturbing the portrait 14B's OTR_HUMO_CFG.
+        return float(os.environ.get("OTR_HUMO_14B_169_CFG", str(super()._cfg())))
+
+
+__all__ = [
+    "HuMoEngine", "HuMo14BLandscapeEngine",
+    "HuMo17BEngine", "HuMo17BLandscapeEngine",
+]

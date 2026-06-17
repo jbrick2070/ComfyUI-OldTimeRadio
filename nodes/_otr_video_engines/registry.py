@@ -147,6 +147,13 @@ CAPABILITIES = {
     "humo_1.7B_169": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": False,
                       "model_requirements": ["HuMo-1.7B"]},
+    # Same 14B checkpoint as humo (the 2026-06-09 keystone), rendered 16:9 832x480
+    # (~ same pixel budget as the 480x832 portrait) -> identical heavy VRAM class.
+    # The 14B's latents match wan_2.1_vae so it is colour-correct -- the 1.7B blue
+    # cast does NOT apply -- giving the operator the 06-09 quality in the 16:9 look.
+    "humo_14B_169": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+                     "requires_sidecar": False, "cpu_ok": False,
+                     "model_requirements": ["HuMo-17B"]},
     "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
                    "requires_sidecar": True, "cpu_ok": False,
                    "model_requirements": ["latentsync-1.5"]},

@@ -221,7 +221,8 @@ OPT_IN_ENGINES = {
         "flag": "OTR_ENABLE_HUMO",
         "assumed_call": (
             "in-process: same HuMo ComfyUI wrapper node classes as the 14B tier "
-            "but the 1.7B UNET, LoRA-free, ~20 steps / cfg 5.0 (own "
+            "but the 1.7B UNET, LoRA-free, ~20 steps / cfg 1.0 (de-blued from 5.0 "
+            "which cast blue, 2026-06-17; own "
             "OTR_HUMO_17B_* knobs). The OOM/VRAM hard auto-downgrade lands here "
             "before latentsync/still so a heavy episode keeps a real face.  "
             "# TODO-for-GPU-smoke: confirm the 1.7B weight loads, fits a tighter "
@@ -242,6 +243,21 @@ OPT_IN_ENGINES = {
             "in the auto-downgrade chain.  # TODO-for-GPU-smoke: confirm the 16:9 "
             "forward holds the same VRAM budget as portrait 1.7B and render-twice "
             "determinism"
+        ),
+    },
+    "humo_14B_169": {
+        "lib_module": "humo",
+        "adapter_class": "HuMo14BLandscapeEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_HUMO",
+        "assumed_call": (
+            "in-process: the 14B keystone rendered at 16:9 LANDSCAPE 832x480 "
+            "(render_aspect='wide') instead of the 480x832 portrait, same 14B ckpt "
+            "+ lightx2v distill + 6 steps / cfg 1.0. The 14B latents match "
+            "wan_2.1_vae so it is colour-correct (no 1.7B blue cast) -- the 06-09 "
+            "quality in the 16:9 look. A deliberate operator dropdown pick, NOT in "
+            "the auto-downgrade chain.  # TODO-for-GPU-smoke: confirm the 16:9 "
+            "forward fits the 14.5 GB ceiling and render-twice determinism"
         ),
     },
     # W7-pre: the v1 NO-COMPILE character_3d lane (3D plan section 4).
