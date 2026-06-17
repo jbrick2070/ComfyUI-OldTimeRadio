@@ -89,10 +89,12 @@ def test_production_workflow_visual_structure_pinned():
     n87 = nodes[87]
     assert n87["type"] == "OTR_VideoDirector"
     wv87 = n87["widgets_values"]
-    assert wv87[0] == "ltx_video", (
-        "announcer_video_model regressed off the LTX radio open: %r" % wv87[0])
-    assert wv87[1] == "ltx_video", (
-        "music_video_model regressed off the LTX radio open: %r" % wv87[1])
+    # 2026-06-17 build-out: announcer + music default to the audio-reactive LTX
+    # audio-in lane (ltx_av_music), not the prompt-only ltx_video.
+    assert wv87[0] == "ltx_av_music", (
+        "announcer_video_model regressed off the LTX audio-in lane: %r" % wv87[0])
+    assert wv87[1] == "ltx_av_music", (
+        "music_video_model regressed off the LTX audio-in lane: %r" % wv87[1])
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

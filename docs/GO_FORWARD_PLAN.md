@@ -1,5 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-17 (LTX-AV SHARP RECIPE PROVEN ON GPU -> operator GO: make it the music/announcer
+> DEFAULT; full build-out plan written; NOTHING committed -- planner window):** Standalone GPU smokes (headless
+> :8000) proved the golden sharpness chain RUNS on the LTX-AV **A2V (audio-concat) graph WITHOUT crashing**:
+> distilled **LoRA @0.70** + `euler_cfg_pp` + 8-step **ManualSigmas** + **cfg 1.0** + i2v strength 0.75,
+> **BYPASSING `ModelSamplingLTXV`** (the double-shift the roundtable flagged). Sharpness jumps to the
+> distilled-sharp level -- Laplacian @832x480 talk 149 / bookend 458 / music 119 vs the no-LoRA AV (93.6 smooth /
+> 166 grainy) and sharp_c02 (144). All three subjects (face i2v, radio bookend still, music scene still) render
+> SHARP + audio-conditioned + muxed -- "the radio wiggles with the music." A 4-model roundtable
+> (GPT-5.5/Gemini-3.1-pro/Grok-4.3/DeepSeek-v4, ~$0.21, `docs/2026-06-17-ltx-av-settings/`) predicted the
+> LoRA-on-A2V was the real sharpness lever AND flagged it as the risky bet; the smoke CONFIRMED it transfers.
+> VRAM ~15.1-15.3 GB @832x480 on the resident base (over the 14.5 soft cap; 512x288 is the VRAM-safe AV canvas;
+> clean-box measure still TODO). **>>> OPERATOR GO: `music_visual` + `announcer_visual` DEFAULT to the new sharp
+> LTX-AV (`audio_conditioned_video`, no-face) path when the base workflow ships; BUILD OUT the LTX-AV input path
+> FULLY.** Build-out spec = **`docs/2026-06-17-ltx-av-settings/LTX_AV_BUILDOUT_PLAN.md`** (C1 sharp recipe in
+> `eng_ltx_av`; C2 `ltx_av_music` = music/announcer default + JSON wiring IN LOCKSTEP; C3 canvas/VRAM DECISION
+> 512x288 vs 832x480; C4 no-fallbacks; C5 talk lip-sync eyeball gate = OPEN; C6 soak). **Also GROUNDED:**
+> production `eng_ltx_video` (the NON-audio per-beat LTX) ALREADY defaults to the sharp_c02 recipe (the splice) --
+> nothing to change there; its render canvas is correctly 832x480 (1472x832 = mush, BUG-412) with RTXUpscale ->
+> 1920x1080 downstream, so **do NOT bump the LTX render res**. New scratch deliverables (uncommitted):
+> `workflows/ltx_av_{talk,music}_mini_repro_gguf_mit.json` + `LTX_AV_deblur_ROUNDTABLE.md`. Headless server may
+> still be UP on :8000 (RESET before other GPU work). The §3 forward order (Wan / 3D / distribution) is unchanged.
+>
 > **LATEST SESSION -- 2026-06-16/17 (operator pivot: NO FALLBACKS + HuMo 16:9 dual engines; 450w combo soak;
 > LTX-AV revive set as the next thread; HEAD `314dbf4` == origin):** Three pushed commits + a deferred plan, all
 > suite-GREEN (4452 pass / 0 fail, Bug Bible 16/7/3). **(1) HuMo dual-aspect engines `51c06cf`** -- HuMo is now

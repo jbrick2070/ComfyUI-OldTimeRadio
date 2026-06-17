@@ -17,9 +17,11 @@ def test_both_engines_registered():
     assert "ltx_av_music" in names
 
 
-def test_both_engines_dark_default_roles_empty():
+def test_default_roles_music_default_talk_optin():
+    # 2026-06-17 build-out: ltx_av_music DEFAULTS for music + announcer (the
+    # audio-reactive lane); talk stays NON-default (opt-in face).
     assert LtxAvTalkEngine.default_roles == ()
-    assert LtxAvMusicEngine.default_roles == ()
+    assert LtxAvMusicEngine.default_roles == ("music_visual", "announcer_visual")
     assert LtxAvTalkEngine.requires_flag == "OTR_ENABLE_LTX_AV"
     assert LtxAvMusicEngine.requires_flag == "OTR_ENABLE_LTX_AV"
 
@@ -61,16 +63,20 @@ def test_role_fit_talk():
     assert not role_compat.engine_fits_role(d, "music_visual")
 
 
-def test_role_fit_music_requires_audio_ref_supply():
+def test_role_fit_music_serves_music_and_announcer():
     d = _desc(LtxAvMusicEngine)
-    # music_visual now supplies audio_ref (M1 role_compat edit) so music fits
+    # ltx_av_music serves BOTH music_visual and announcer_visual (the audio-
+    # reactive default for both, 2026-06-17); both roles supply audio_ref.
     assert role_compat.engine_fits_role(d, "music_visual")
-    # and not the talk roles (membership gate)
-    assert not role_compat.engine_fits_role(d, "announcer_visual")
+    assert role_compat.engine_fits_role(d, "announcer_visual")
+    # still excluded from a role it does not declare
+    assert not role_compat.engine_fits_role(d, "character_video")
 
 
-def test_assert_usable_gated_by_flag(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_LTX_AV", raising=False)
+def test_assert_usable_opt_out_flag(monkeypatch):
+    # 2026-06-17: opt-OUT. The lane is default-ON; only OTR_ENABLE_LTX_AV=0
+    # disables it -> GATED_BY_FLAG (no flag set = enabled, proceeds past step 1).
+    monkeypatch.setenv("OTR_ENABLE_LTX_AV", "0")
     for cls in (LtxAvTalkEngine, LtxAvMusicEngine):
         with pytest.raises(EngineUnusable) as exc:
             cls().assert_usable(host_caps=None, profile=None)

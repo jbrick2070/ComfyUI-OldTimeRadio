@@ -219,15 +219,21 @@ CAPABILITIES = {
     # ceiling; the audio VAE adds ~340 MB at the floor. Q4_K_S (15594 MB) is OVER
     # and is a quality step-up only if the ceiling is relaxed / run solo. Both
     # engines run in-process and are DEFAULT-OFF / dark (OTR_ENABLE_LTX_AV).
+    # SHARP build-out (2026-06-17): the default recipe adds the distilled LoRA +
+    # the projection ckpt (LTXAVTextEncoderLoader reads it) -> listed here + gated
+    # in eng_ltx_av._weight_paths. Estimate stays 14000 (the free_after_use engine
+    # path frees the Gemma encoder before the unet+decode peak; verify on the soak).
     "ltx_av_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                     "required_toolchain": None, "requires_sidecar": False,
                     "cpu_ok": False,
                     "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
-                                           "ltx-2.3-audio-vae", "ltx-2.3-video-vae"]},
+                                           "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
+                                           "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
     "ltx_av_music": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                      "required_toolchain": None, "requires_sidecar": False,
                      "cpu_ok": False,
                      "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
-                                            "ltx-2.3-audio-vae", "ltx-2.3-video-vae"]},
+                                            "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
+                                            "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
 }
 __all__.append("CAPABILITIES")

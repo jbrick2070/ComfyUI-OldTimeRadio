@@ -346,7 +346,7 @@ def test_two_heavy_roles_still_validate():
     # Shipped defaults (CS-4 policy flip 2026-06-11, operator-directed): the
     # character tier defaults to humo_1.7B (BUG-265 Option C restored); the
     # 14B stays registered + selectable opt-in.
-    assert profile["role_overrides"]["announcer_visual"] == "ltx_video"   # heavy
+    assert profile["role_overrides"]["announcer_visual"] == "ltx_av_music"  # heavy (2026-06-17 audio-in default)
     assert profile["role_overrides"]["other_beats_visual"] == "humo_1.7B"
     # The two-heavy case stays a static-validation GREEN (single-heavy
     # residency is wrapper_bridge's RUNTIME invariant, never a static profile
@@ -354,6 +354,6 @@ def test_two_heavy_roles_still_validate():
     profile["role_overrides"]["other_beats_visual"] = "humo"             # heavy
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
-    assert "ltx_video" in enabled and "humo" in enabled
+    assert "ltx_av_music" in enabled and "humo" in enabled
     assert "humo_1.7B" in enabled       # the new default stays in the enable-set
     cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)

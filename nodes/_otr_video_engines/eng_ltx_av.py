@@ -47,8 +47,8 @@ from .registry import EngineUnusable, EngineUsabilityReason, register
 # --- frame + canvas grounding (LTX-AV lane only; snap UP, never copy Lane A) ---
 _LTX_AV_MIN_FRAMES = _AVD._LTX_MIN_FRAMES        # 9 (8n+1 floor)
 _LTX_AV_MAX_FRAMES = int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))  # M0 initial
-_LTX_AV_NATIVE_W = 1472
-_LTX_AV_NATIVE_H = 832
+_LTX_AV_NATIVE_W = 832
+_LTX_AV_NATIVE_H = 480
 # Default sampler recipe (the M0-proven 8-step distilled-ish base pass; cfg 3.0
 # matched the probe). All env-overridable; never shared with eng_ltx_video.
 _LTX_AV_STEPS = int(os.environ.get("OTR_LTX_AV_STEPS", "8"))
@@ -66,6 +66,51 @@ _FLOOR_UNET = 8 * _GiB
 _FLOOR_ENCODER = 6 * _GiB
 _FLOOR_VIDEO_VAE = 1 * _GiB
 _FLOOR_AUDIO_VAE = int(0.2 * _GiB)
+_FLOOR_LORA = 5 * _GiB
+_FLOOR_PROJECTION_CKPT = 30 * _GiB
+
+# --- SHARP mode: the GPU-proven distilled chain on the A2V graph (2026-06-17) ---
+# OTR_LTX_AV_SHARP (default ON) selects the distilled sharpness recipe -- the
+# distilled LoRA @0.70 + euler_cfg_pp + the 8-step LTX_DISTILLED_SIGMAS + cfg 1.0,
+# with ModelSamplingLTXV + LTXVScheduler DROPPED (the LoRA-wrapped unet feeds the
+# guider directly; the fixed sigmas already carry the shift, so ModelSamplingLTXV
+# would double-shift -> blur). This is a CONFIG mode chosen at graph-build, NEVER
+# an in-render fallback. =0 restores the M0 base pass. The recipe mirrors
+# eng_ltx_video's distilled chain; that module is FROZEN and never imported here,
+# so the tiny helpers below are DUPLICATED on purpose (V-12 cold-import).
+
+
+def _sharp_enabled():
+    """SHARP recipe on (default) vs the M0 base pass (OTR_LTX_AV_SHARP=0)."""
+    return os.environ.get("OTR_LTX_AV_SHARP", "1") != "0"
+
+
+#: Distilled sigma schedule (ComfyUI-Goofer, GPU-proven on the RTX 5080). 8 steps;
+#: last sigma 0.0 = full denoise. Duplicated from eng_ltx_video (frozen), V-12.
+LTX_DISTILLED_SIGMAS = (
+    1.0, 0.99375, 0.9875, 0.98125, 0.975,
+    0.909375, 0.725, 0.421875, 0.0,
+)
+_LTX_AV_SHARP_CFG = 1.0
+_LTX_AV_SHARP_SAMPLER = "euler_cfg_pp"
+_LTX_AV_SHARP_I2V_STRENGTH = 0.75
+#: The distilled LoRA (the same artifact eng_ltx_video wires @0.70 on the 22B GGUF).
+_LTX_AV_DISTILLED_LORA_DEFAULT = os.path.join(
+    "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
+_LTX_AV_DISTILLED_LORA_STRENGTH = 0.7
+
+
+class _SigmasFromValues:
+    """In-adapter SIGMAS-from-literal-values node (sharp mode). Duplicated from
+    eng_ltx_video (frozen) per V-12 so we never guess ManualSigmas' widget API.
+    Injected into the resolved-classes map by render_clip; lazy torch import."""
+
+    FUNCTION = "get"
+
+    def get(self, values):
+        import torch  # lazy -- only inside an actual GPU render
+        return (torch.tensor([float(v) for v in values],
+                             dtype=torch.float32),)
 
 
 def _resolve(folder, name):
@@ -95,8 +140,8 @@ class _LtxAvBase(_MC.MotionEngineBase):
     fallback_engine) and ``_is_talk``. The I2V-vs-t2v branch is INTERNAL to
     ``_build_graph`` so talk + music share one resident load path."""
 
-    default_roles = ()                  # dark: never a default for any role
-    commercial_clean = False            # license is profile data; verify-at-build
+    default_roles = ()                  # subclasses set their default roles
+    commercial_clean = True             # Apache GGUF + LTX-2 Community + distilled LoRA
     requires_flag = "OTR_ENABLE_LTX_AV"
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
@@ -124,15 +169,29 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return os.environ.get("OTR_LTX_AV_AUDIO_VAE",
                               "ltx-2.3-22b-dev_audio_vae.safetensors")
 
+    def _distilled_lora_name(self):
+        """The distilled LoRA filename (sharp mode); env-overridable. Resolution +
+        floor are handled by _resolve('loras', ...) like the other artifacts."""
+        return os.environ.get("OTR_LTX_AV_DISTILLED_LORA",
+                              _LTX_AV_DISTILLED_LORA_DEFAULT)
+
     def _weight_paths(self):
-        """(label, full_path, floor_bytes) for each required weight artifact."""
-        return [
+        """(label, full_path, floor_bytes) for each required weight artifact. The
+        projection ckpt is ALWAYS required (LTXAVTextEncoderLoader reads it); the
+        distilled LoRA is required only in SHARP mode."""
+        paths = [
             ("transformer GGUF", _resolve("unet", self._unet_name()), _FLOOR_UNET),
             ("Gemma-3 text encoder",
              _resolve("text_encoders", self._encoder_name()), _FLOOR_ENCODER),
+            ("projection ckpt",
+             _resolve("checkpoints", self._projection_ckpt()), _FLOOR_PROJECTION_CKPT),
             ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
             ("audio VAE", _resolve("vae", self._audio_vae_name()), _FLOOR_AUDIO_VAE),
         ]
+        if _sharp_enabled():
+            paths.append(("distilled LoRA",
+                          _resolve("loras", self._distilled_lora_name()), _FLOOR_LORA))
+        return paths
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -141,12 +200,12 @@ class _LtxAvBase(_MC.MotionEngineBase):
         closed so the ceiling guard never silently no-ops); 4 node gate (every
         required ComfyUI class resolves); 5 weight floors (realpath + size);
         6 av_dims on request_template.canvas (None tolerated)."""
-        # 1 -- opt-in flag
-        if os.getenv(self.requires_flag, "0") != "1":
+        # 1 -- opt-OUT flag (DEFAULT ON: ltx_av is the music/announcer default;
+        #      set OTR_ENABLE_LTX_AV=0 to disable the audio-in lane)
+        if os.getenv(self.requires_flag, "1") == "0":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "%s is opt-in; set %s=1 and install the LTX-2.3 GGUF + Gemma-3 "
-                "encoder + LTX VAEs" % (self.name, self.requires_flag),
+                "%s disabled by %s=0" % (self.name, self.requires_flag),
                 kind="video")
         # 2 -- BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
         _MC.assert_sage_not_patched(self.name, self.family)
@@ -212,7 +271,6 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "cond": ("LTXVConditioning",),
-            "modelsampling": ("ModelSamplingLTXV",),
             "videovae": ("VAELoader",),
             "audiovae": ("VAELoader",),
             "loadaudio": ("LoadAudio",),
@@ -220,17 +278,27 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "concat": ("LTXVConcatAVLatent",),
             "noise": ("RandomNoise",),
             "ksel": ("KSamplerSelect",),
-            "sched": ("LTXVScheduler",),
             "guider": ("CFGGuider",),
             "sampler": ("SamplerCustomAdvanced",),
             "separate": ("LTXVSeparateAVLatent",),
             "decode": ("VAEDecodeTiled",),
+            # i2v (scene still / face) AND t2v (empty latent) classes are BOTH
+            # resolved; _build_graph wires whichever the request needs -- i2v when
+            # an init image is present (always for the talk face; the scene still
+            # for music/announcer beats), else the empty-latent t2v path.
+            "loadimage": ("LoadImage",),
+            "i2v": ("LTXVImgToVideo",),
+            "emptylatent": ("EmptyLTXVLatentVideo",),
         }
-        if self._is_talk:
-            cands["loadimage"] = ("LoadImage",)
-            cands["i2v"] = ("LTXVImgToVideo",)
+        if _sharp_enabled():
+            # SHARP: the LoRA-wrapped unet feeds the guider; the fixed sigmas come
+            # from the in-adapter _SigmasFromValues injector -- ModelSamplingLTXV
+            # and LTXVScheduler are DROPPED (the LoRA + fixed shift replace them).
+            cands["lora"] = ("LoraLoaderModelOnly",)
         else:
-            cands["emptylatent"] = ("EmptyLTXVLatentVideo",)
+            # M0 base pass: ModelSamplingLTXV + LTXVScheduler (no LoRA).
+            cands["modelsampling"] = ("ModelSamplingLTXV",)
+            cands["sched"] = ("LTXVScheduler",)
         return cands
 
     def _build_graph(self, plan, length, width, height, audio_name, image_name):
@@ -245,21 +313,25 @@ class _LtxAvBase(_MC.MotionEngineBase):
         -> VAEDecodeTiled(video only; audio latent DROPPED, V-1)."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
+        sharp = _sharp_enabled()
         positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
+        cfg = _LTX_AV_SHARP_CFG if sharp else _LTX_AV_CFG
+        sampler_name = _LTX_AV_SHARP_SAMPLER if sharp else "euler"
+        i2v_strength = _LTX_AV_SHARP_I2V_STRENGTH if sharp else _LTX_AV_I2V_STRENGTH
+        use_i2v = bool(image_name)
         g = {
             "unet": {"class": "unet", "inputs": {"unet_name": self._unet_name()}},
             "te": {"class": "te", "inputs": {
                 "text_encoder": self._encoder_name(),
-                "ckpt_name": self._projection_ckpt(), "device": "cpu"}},
+                "ckpt_name": self._projection_ckpt(),
+                "device": os.environ.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
             "pos": {"class": "pos", "inputs": {"text": positive, "clip": W("te", 0)}},
             "neg": {"class": "neg", "inputs": {"text": negative, "clip": W("te", 0)}},
             "cond": {"class": "cond", "inputs": {
                 "positive": W("pos", 0), "negative": W("neg", 0),
                 "frame_rate": float(self.target_fps)}},
-            "modelsampling": {"class": "modelsampling", "inputs": {
-                "model": W("unet", 0), "max_shift": 2.05, "base_shift": 0.95}},
             "videovae": {"class": "videovae",
                          "inputs": {"vae_name": self._video_vae_name()}},
             "audiovae": {"class": "audiovae",
@@ -268,15 +340,30 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "audioenc": {"class": "audioenc", "inputs": {
                 "audio": W("loadaudio", 0), "audio_vae": W("audiovae", 0)}},
             "noise": {"class": "noise", "inputs": {"noise_seed": seed}},
-            "ksel": {"class": "ksel", "inputs": {"sampler_name": "euler"}},
+            "ksel": {"class": "ksel", "inputs": {"sampler_name": sampler_name}},
         }
-        if self._is_talk:
+        # SHARP: distilled LoRA-wrapped unet feeds the guider (NO ModelSamplingLTXV
+        # -- ManualSigmas carries the shift, so it would double-shift). M0: the
+        # ModelSamplingLTXV-shifted unet feeds the guider (no LoRA).
+        if sharp:
+            g["lora"] = {"class": "lora", "inputs": {
+                "model": W("unet", 0),
+                "lora_name": self._distilled_lora_name(),
+                "strength_model": _LTX_AV_DISTILLED_LORA_STRENGTH}}
+            model_wire = W("lora", 0)
+        else:
+            g["modelsampling"] = {"class": "modelsampling", "inputs": {
+                "model": W("unet", 0), "max_shift": 2.05, "base_shift": 0.95}}
+            model_wire = W("modelsampling", 0)
+        # i2v when an init image is present (the talk face ALWAYS; the scene still
+        # for music/announcer beats); else the empty-latent t2v path.
+        if use_i2v:
             g["loadimage"] = {"class": "loadimage", "inputs": {"image": image_name}}
             g["i2v"] = {"class": "i2v", "inputs": {
                 "positive": W("cond", 0), "negative": W("cond", 1),
                 "vae": W("videovae", 0), "image": W("loadimage", 0),
                 "width": int(width), "height": int(height), "length": int(length),
-                "batch_size": 1, "strength": _LTX_AV_I2V_STRENGTH}}
+                "batch_size": 1, "strength": i2v_strength}}
             video_latent = W("i2v", 2)
             guider_pos, guider_neg = W("i2v", 0), W("i2v", 1)
         else:
@@ -288,14 +375,22 @@ class _LtxAvBase(_MC.MotionEngineBase):
         g["concat"] = {"class": "concat", "inputs": {
             "video_latent": video_latent, "audio_latent": W("audioenc", 0)}}
         g["guider"] = {"class": "guider", "inputs": {
-            "model": W("modelsampling", 0), "positive": guider_pos,
-            "negative": guider_neg, "cfg": _LTX_AV_CFG}}
-        g["sched"] = {"class": "sched", "inputs": {
-            "steps": _LTX_AV_STEPS, "max_shift": 2.05, "base_shift": 0.95,
-            "stretch": True, "terminal": 0.1, "latent": W("concat", 0)}}
+            "model": model_wire, "positive": guider_pos,
+            "negative": guider_neg, "cfg": cfg}}
+        # SHARP: the fixed LTX_DISTILLED_SIGMAS via the in-adapter injector ("sigmas"
+        # is added to the resolved-class map by render_clip). M0: LTXVScheduler.
+        if sharp:
+            g["sigmas"] = {"class": "sigmas",
+                           "inputs": {"values": list(LTX_DISTILLED_SIGMAS)}}
+            sigmas_wire = W("sigmas", 0)
+        else:
+            g["sched"] = {"class": "sched", "inputs": {
+                "steps": _LTX_AV_STEPS, "max_shift": 2.05, "base_shift": 0.95,
+                "stretch": True, "terminal": 0.1, "latent": W("concat", 0)}}
+            sigmas_wire = W("sched", 0)
         g["sampler"] = {"class": "sampler", "inputs": {
             "noise": W("noise", 0), "guider": W("guider", 0),
-            "sampler": W("ksel", 0), "sigmas": W("sched", 0),
+            "sampler": W("ksel", 0), "sigmas": sigmas_wire,
             "latent_image": W("concat", 0)}}
         g["separate"] = {"class": "separate",
                          "inputs": {"av_latent": W("sampler", 0)}}
@@ -321,6 +416,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
         latent is dropped at LTXVSeparateAVLatent; only the mux adds audio)."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
+        sharp = _sharp_enabled()
         plan = self._build_render_request(request)
         if not plan["audio_path"]:
             raise _wb.GraphExecutionError(
@@ -329,11 +425,16 @@ class _LtxAvBase(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s (talk) requires init_image (got %r)"
                 % (self.name, plan["init_image"]))
-        classes = getattr(self, "_classes", None) \
-            or _wb.resolve_graph_classes(self._node_candidates())
+        classes = dict(getattr(self, "_classes", None)
+                       or _wb.resolve_graph_classes(self._node_candidates()))
+        if sharp:
+            # the SIGMAS source is in-adapter (not a registered node class);
+            # inject AFTER resolve so the resolver never sees it (mirrors eng_ltx_video)
+            classes.setdefault("sigmas", _SigmasFromValues)
         audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
+        # i2v on ANY init image (the talk face; the scene still for music/announcer)
         image_name = (_wb.stage_into_comfy_input(plan["init_image"])
-                      if self._is_talk and plan["init_image"] else "")
+                      if plan["init_image"] else "")
         width, height = self._render_dims(request)
         length = _AVD.next_8n1(plan["target_frame_count"] or self.target_fps)
         if length > _LTX_AV_MAX_FRAMES:
@@ -342,7 +443,13 @@ class _LtxAvBase(_MC.MotionEngineBase):
                 length = _LTX_AV_MAX_FRAMES
         _AVD.assert_ltx_dims(width, height, length)
         graph = self._build_graph(plan, length, width, height, audio_name, image_name)
-        results = _wb.run_graph(graph, classes)
+        # free_after_use (the eng_ltx_video pattern): evict the Gemma encoder +
+        # intermediates before the unet+VAE-decode peak so the GGUF unet (+ the LoRA
+        # patch in sharp mode) never co-resides with the encoder (the 14.5 GB
+        # ceiling). KEEP the unet + the model head (lora in sharp / modelsampling
+        # in M0) + the terminal so the patcher is never dangled.
+        keep = {"unet", self._TERMINAL, "lora" if sharp else "modelsampling"}
+        results = _wb.run_graph(graph, classes, free_after_use=True, keep=keep)
         images = results[self._TERMINAL][0]
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
@@ -365,7 +472,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers
         seen = {id(p) for p in bucket}
-        for nid in ("unet", "modelsampling"):
+        for nid in ("unet", "modelsampling", "lora"):
             out = results.get(nid)
             if not out:
                 continue
@@ -458,7 +565,7 @@ class LtxAvTalkEngine(_LtxAvBase):
     family = "audio_driven_face"
     roles = ("announcer_visual", "character_video")
     required_inputs = ("text_prompt", "audio_ref", "init_image")
-    fallback_engine = "humo"
+    fallback_engine = None              # NO FALLBACKS (547671d): fail LOUD
     _is_talk = True
 
 
@@ -470,9 +577,13 @@ class LtxAvMusicEngine(_LtxAvBase):
 
     name = "ltx_av_music"
     family = "audio_conditioned_video"
-    roles = ("music_visual",)
+    # announcer_visual ADDED (2026-06-17): the audio-reactive scene lane is the
+    # DEFAULT for both music + announcer (the radio b-roll reacts to the track /
+    # the announcer's voice). default_roles must be a subset of roles.
+    roles = ("music_visual", "announcer_visual")
+    default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref")
-    fallback_engine = "ltx_video"
+    fallback_engine = None              # NO FALLBACKS (547671d): fail LOUD
     _is_talk = False
 
 

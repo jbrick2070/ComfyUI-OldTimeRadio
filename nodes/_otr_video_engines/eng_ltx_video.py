@@ -268,11 +268,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # announcer slot.
     roles = ("scene_broll", "background_abstract", "music_visual",
              "announcer_visual")
-    # PRODUCTION DEFAULTS 2026-06-10: the shipped workflow routes the radio
-    # OPEN (announcer) + the theme-music visual through ltx_video, so those
-    # two roles are the engine's in-stack defaults (registry-usable with no
-    # env). scene_broll / background_abstract stay flag-gated extras.
-    default_roles = ("announcer_visual", "music_visual")
+    # 2026-06-17: announcer + music DEFAULT moved to the audio-reactive LTX
+    # audio-in lane (ltx_av_music). ltx_video stays SELECTABLE for these roles
+    # (still listed in `roles`) but is no longer the in-stack default for any
+    # role -- so default_engine_for_role(announcer/music) resolves to ltx_av_music.
+    default_roles = ()
     fallback_engine = "still_kenburns"
     required_inputs = ("text_prompt",)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)

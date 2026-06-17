@@ -994,8 +994,8 @@
         "Node name for S&R": "OTR_VideoDirector"
       },
       "widgets_values": [
-        "ltx_video",
-        "ltx_video",
+        "ltx_av_music",
+        "ltx_av_music",
         "humo_1.7B",
         "flux_gen1",
         "flux_gen1",

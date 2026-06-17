@@ -37,9 +37,10 @@ def test_ltx_video_registered_and_dark():
     eng = vreg.get_engine("ltx_video")
     assert isinstance(eng, LtxVideoEngine)
     assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
-    # PRODUCTION RESTORE 2026-06-10: no longer dark -- the announcer radio
-    # open + the theme-music visual are the engine's in-stack defaults.
-    assert eng.default_roles == ("announcer_visual", "music_visual")
+    # 2026-06-17: announcer + music DEFAULT moved to ltx_av_music (the audio-in
+    # lane). ltx_video keeps its roles (still SELECTABLE) but no longer claims a
+    # default role -- so it is registry-gated behind OTR_ENABLE_LTX_VIDEO.
+    assert eng.default_roles == ()
     assert eng.requires_flag == "OTR_ENABLE_LTX_VIDEO"
     assert eng.required_inputs == ("text_prompt",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
@@ -64,16 +65,14 @@ def test_wan_i2v_registered_and_dark():
 # Registry gating (dark until the opt-in flag) + role membership
 # --------------------------------------------------------------------------- #
 def test_registry_gates_ltx_until_flag(monkeypatch):
-    # PRODUCTION RESTORE 2026-06-10: announcer_visual + music_visual are the
-    # engine's DEFAULT roles (the LTX radio open + theme-music visual in the
-    # shipped workflow) -- registry-usable with NO env. scene_broll /
-    # background_abstract stay flag-gated extras (the generic registry gate).
+    # 2026-06-17: ltx_video no longer claims any DEFAULT role (announcer + music
+    # moved to ltx_av_music). With no env it is registry-gated for ALL its roles;
+    # with OTR_ENABLE_LTX_VIDEO=1 it is usable again -- still SELECTABLE, opt-in.
     monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
-    for role in ("announcer_visual", "music_visual"):
-        assert vreg.assert_usable("ltx_video", role) == "ltx_video"
-    for role in ("scene_broll", "background_abstract"):
+    for role in ("announcer_visual", "music_visual", "scene_broll",
+                 "background_abstract"):
         with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("ltx_video", role)          # gated extra
+            vreg.assert_usable("ltx_video", role)          # no longer default -> gated
     monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
     for role in ("scene_broll", "background_abstract", "music_visual",
                  "announcer_visual"):
