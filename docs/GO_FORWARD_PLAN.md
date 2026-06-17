@@ -1,5 +1,36 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-16/17 (operator pivot: NO FALLBACKS + HuMo 16:9 dual engines; 450w combo soak;
+> LTX-AV revive set as the next thread; HEAD `314dbf4` == origin):** Three pushed commits + a deferred plan, all
+> suite-GREEN (4452 pass / 0 fail, Bug Bible 16/7/3). **(1) HuMo dual-aspect engines `51c06cf`** -- HuMo is now
+> TWO registered engines, selectable in ALL THREE role dropdowns: `humo_1.7B` (portrait 480x832, cfg 5.0) +
+> `humo_1.7B_169` (16:9 832x480, cfg 2.5 = the 2026-06-16 cfg-sweep sweet spot). `render_aspect` is each engine's
+> identity; the FLUX character still AUTO-FOLLOWS via VideoDirector->ImageDirector->MetaBrief (`aspects` rides
+> image_policy_json; NO workflow-JSON edit). **This DELIVERS the section-5 "HuMo full-frame TEST" open ticket.**
+> **(2) NO-FALLBACKS render path `547671d`** (operator: "this is art, not a space shuttle; I dunno why the ai
+> coder added fallbacks") -- `render_shot` does a SINGLE attempt and RAISES `RenderError` on a hard failure: NO
+> engine swap, NO still-image floor. Signature kept stable so run_episode's degrade code is a no-op; 6 degrade
+> tests rewritten to assert the loud contract. **>>> THIS SUPERSEDES the section-2 HARD RULE "every in-render
+> fallback LOUD" -> there are now NO in-render fallbacks; a failed beat fails the EPISODE loud. The A-ship soak's
+> "OOM degrades to floor" invariant is now INVALID.** **(3) Chunk-2 teardown DEFERRED** (rip the now-dead
+> fallback machinery + delete the 14B `humo` + redefine the soak gate) -- full blast radius mapped in
+> `docs/2026-06-16-no-fallbacks/TEARDOWN_PLAN.md`, BLOCKED on ONE operator decision: **with no fallbacks, what
+> should the A-ship soak gate verify?** (recommended: N beats render + audio byte-identical + deterministic +
+> VRAM<=ceiling; drop the OOM/degrade asserts). **(4) 450-word COMBO SOAK** on the REAL JSON via the headless API
+> (`docs/2026-06-16-no-fallbacks/COMBO_SOAK_RESULTS.md`; harness `scripts/_otr_combo_soak.py` +
+> `_otr_combo_chain.ps1`): all-LTX FINISHED a full 450w episode in ~47 min (the LTX per-boot abort did NOT
+> trigger); both HuMo combos rendered correctly but TIMED OUT (HuMo @ 450w needs ~2.5-3h, > the 90-110m caps) --
+> NOT engine failures. No-fallbacks behaved exactly: LTX completed, HuMo timed out, NO silent degrade.
+> **>>> OPERATOR NEW DIRECTION (next active thread) = REVIVE THE LTX-AV (audio-in) lane** for LTX speed WITH
+> audio-driven mouth motion. **Handoff finding: the "duplicate LTX -> LTX-audio-in" work is ALREADY BUILT** --
+> M1 (`nodes/_otr_video_engines/eng_ltx_av.py`: `ltx_av_talk`=audio_driven_face + `ltx_av_music`=
+> audio_conditioned_video) + M3 (selectable + sliced into a real episode, `c4d7815` == origin) shipped in prior
+> sessions; the lane is functionally COMPLETE on the CPU side. The ONLY remaining piece is **M4 = the GPU smoke**
+> (forced ltx_av lane 30-50w + lip-sync-vs-HuMo A/B + N=3 no-OOM at `OTR_LTX_AV_RENDER_CANVAS` 512x288, Q3_K_M
+> unet 13688MB <= cap) + the small follow-on (g) announcer-portrait alias. ltx_av is moved OUT of section-8
+> PARKED. With no-fallbacks, ltx_av now FAILS LOUD if its A2V graph/audio is wrong (no degrade to humo) -- good
+> for the smoke. M4 is operator-present (box must be free).
+>
 > **LATEST SESSION -- 2026-06-16 ("BATTLE OF THE MINIS" -> Q3_K_M ADOPTED; VRAM GATE CLOSED; HEAD `d48f3ee` ==
 > origin):** With the soak proving the ~15.8 GB peak is INTRINSIC to Q4_K_S (not a regression), the operator
 > green-lit a head-to-head. Both minis rendered UNCHANGED on a clean box (832x480x105, seed 1): **Q4_K_S** peak
@@ -394,7 +425,28 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (2026-06-16) = LTX 22B-GGUF SPLICE SHIPPED (Phase 0 `27e5637` + Phase 1 `50347dd`, == origin); the ONE open item is the OPERATOR full-episode VRAM gate + LTX look-QA.**
+**>>> CURRENT STEP (2026-06-17, operator pivot) = REVIVE THE LTX-AV (audio-in) LANE -- verify its recipe vs the GOOD mini, align the sampler, then M4 GPU smoke (lip-sync-vs-HuMo A/B).**
+Goal: LTX speed WITH audio-driven mouth motion (the 450w combo soak: all-LTX finishes ~47m but has NO lip-sync;
+HuMo lip-syncs but needs ~2.5-3h). **The "duplicate LTX -> audio-in" work is ALREADY BUILT** -- M1
+`eng_ltx_av.py` + M3 selectable/sliced (`c4d7815`); CPU-complete. **Operator concern (grounded 2026-06-17): is
+LTX-AV stuck on the OLD/buggy LTX? -- mostly NO.** `eng_ltx_av._unet_name()` already defaults to
+`ltx-2.3-22b-dev-Q3_K_M.gguf` (the SAME good UNET production was spliced to in `d48f3ee`). **The GOOD mini =
+`workflows/ltx_bookend_mini_repro_gguf_mit.json` (Q3_K_M GGUF)** -- NOT `ltx_bookend_mini_repro_22b.json` (full
+fp8 ltx-2.3-22b-dev.safetensors, ~23GB, does not fit 16GB) and NOT `ltx_bookend_mini_repro_22b_gguf.json`
+(Q4_K_S, peaks 15.8GB > the 14.5 cap). **The REAL gap:** LTX-AV's SAMPLER is the older M0-probe pass
+(`OTR_LTX_AV_STEPS=8`, `OTR_LTX_AV_CFG=3.0`, plain LTXVScheduler/euler, NO distilled LoRA @0.70, NO
+LTX_DISTILLED_SIGMAS), whereas the verified production recipe is the distilled chain (LoRA @0.70 + euler_cfg_pp +
+LTX_DISTILLED_SIGMAS + cfg 1.0). BUT LTX-AV is AUDIO-conditioned (A2V graph: LTXVAudioVAEEncode /
+LTXVConcatAVLatent / LTXVSeparateAVLatent) -- a DIFFERENT graph than the t2v/i2v mini -- so the distilled LoRA
+may not transfer cleanly; that is exactly what M4 must verify on GPU. **STEP = (1) confirm Q3_K_M + align the
+LTX-AV sampler to the verified distilled recipe WHERE A2V-compatible (a roundtable on transfer-feasibility is
+warranted); (2) M4 GPU smoke** (forced ltx_av lane 30-50w at `OTR_LTX_AV_RENDER_CANVAS` 512x288, lip-sync-vs-HuMo
+A/B, N=3 no-OOM) + (g) announcer-portrait alias. **No-fallbacks (`547671d`):** LTX-AV now fails LOUD if its A2V
+graph/audio is wrong (no degrade to humo) -- good for the smoke. ltx_av is OUT of section-8 PARKED. The
+LTX-GGUF-splice step below is DONE (operator VRAM gate resolved at Q3_K_M `d48f3ee`); the Wan/3D/distribution
+forward order (section 3) is unchanged behind this operator-chosen thread.
+
+**>>> PRIOR STEP (2026-06-16) = LTX 22B-GGUF SPLICE SHIPPED (Phase 0 `27e5637` + Phase 1 `50347dd`, == origin); the ONE open item is the OPERATOR full-episode VRAM gate + LTX look-QA.**
 The production `ltx_video` engine now renders the VERIFIED frozen-mini GGUF recipe (full spec + the GPU motion-smoke
 result are in the latest-session block at the TOP of this file: i2v renders SHARP, t2v framediff 5.67 >= 2.0 = real
 motion). GREEN: suite 4411 / Bug Bible 16-7-3 / new `tests/test_ltx_gguf_splice.py` / workflow JSON untouched.
@@ -859,5 +911,8 @@ engine, one real episode) vs "B-parity ship" (>=2 engines bind at SHIP).
 
 ## 8. PARKED -- not now
 
-Story-spine; story-pipeline; broader audio stack; MuseTalk; RTXUpscale; LTX-AV audio-input lane (CONVERGED-REFRESH, build-ready PENDING M0 graph-spike: `docs/2026-06-15-ltx-av-alternative/roundtable/pass03_plan_FINAL.md` -- 3 live panel passes 2026-06-15 re-grounded the 6/10 spec vs HEAD; probe-or-park on the 5080; Lane A = today's shipped LTX motion IS prod);
+Story-spine; story-pipeline; broader audio stack; MuseTalk; RTXUpscale;
 switchable S3-S6 (closing phase, AFTER 3D); 3D GPU lanes until S-3D-0 + the operator green light.
+(**LTX-AV audio-input lane MOVED OUT of PARKED 2026-06-17** -- operator revived it as the CURRENT STEP
+(section 1): M1+M3 are shipped, the remaining work is recipe-align + M4 GPU smoke. It already uses the good
+Q3_K_M GGUF unet; do NOT rebuild from scratch.)
