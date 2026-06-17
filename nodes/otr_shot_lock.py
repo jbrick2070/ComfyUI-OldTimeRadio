@@ -113,13 +113,27 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
     # character_description added 2026-06-10 (operator look-QA): the writer's
     # RICH per-character physical description lives under that key on the
     # cast row; without it the M4 prompts lost the character grounding.
+    base = ""
     for key in ("portrait_prompt", "appearance", "description",
                 "character_description"):
         val = entry.get(key)
         if isinstance(val, str) and val.strip():
-            return val.strip()
-    name = entry.get("name")
-    return str(name) if name else ""
+            base = val.strip()
+            break
+    if not base:
+        name = entry.get("name")
+        base = str(name) if name else ""
+    # Outfit LOCK (opt-in OTR_OUTFIT_LOCK=1; default OFF -> base unchanged). The writer's
+    # description carries no clothing, so FLUX drifts the outfit per beat. When ON, the
+    # wardrobe is LLM-generated from the character + story brief and locked per character.
+    # Import is guarded (a missing module never breaks appearance), but a WardrobeError is
+    # allowed to propagate LOUD by design (operator: no silent generic fallback).
+    try:
+        from ._otr_wardrobe import apply_wardrobe
+    except Exception:  # noqa: BLE001 -- module absent -> no wardrobe, appearance unchanged
+        return base
+    base = apply_wardrobe(base, char_id, ledger)
+    return base
 
 
 def _content_hash(obj) -> str:
