@@ -229,6 +229,21 @@ OPT_IN_ENGINES = {
             "xformers/flash_attn/sageattention, and render-twice determinism"
         ),
     },
+    "humo_1.7B_169": {
+        "lib_module": "humo",
+        "adapter_class": "HuMo17BLandscapeEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_HUMO",
+        "assumed_call": (
+            "in-process: the humo_1.7B tier rendered at 16:9 LANDSCAPE 832x480 "
+            "(render_aspect='wide') instead of the 480x832 portrait, cfg 2.5 (the "
+            "16:9 sweet spot measured 2026-06-16; own OTR_HUMO_17B_169_CFG knob). "
+            "A deliberate operator dropdown pick alongside portrait humo_1.7B, NOT "
+            "in the auto-downgrade chain.  # TODO-for-GPU-smoke: confirm the 16:9 "
+            "forward holds the same VRAM budget as portrait 1.7B and render-twice "
+            "determinism"
+        ),
+    },
     # W7-pre: the v1 NO-COMPILE character_3d lane (3D plan section 4).
     # Prebuilt cu128 wheels + SDPA only (no source builds, no cu128 toolkit);
     # gated on the S-3D-0 sidecar probe + the T2b keystone.

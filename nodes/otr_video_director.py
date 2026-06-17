@@ -206,6 +206,11 @@ class OTRVideoDirector:
         policy = {
             "policy_version": 1,
             "video_models": resolved_video,
+            # Per-role still aspect, resolved from each slot's selected engine, so
+            # the image node mints character stills to MATCH the chosen video
+            # engine with ONE dropdown pick (portrait humo_1.7B vs wide
+            # humo_1.7B_169). Opaque to everyone who does not size stills.
+            "aspects": self._role_aspects(resolved_video),
             "image_models": {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
@@ -233,6 +238,28 @@ class OTRVideoDirector:
         except (ValueError, TypeError):
             warnings.append("custom_models_json is not valid JSON; ignored")
         return {}
+
+    @staticmethod
+    def _role_aspects(resolved_video):
+        """Map each still-bearing role to the SELECTED engine's ``render_aspect``
+        so character stills match their video engine: announcer_visual <-
+        announcer_video_model, character_video <- other_beats_video_model.
+        Unknown / custom / unresolved picks -> 'portrait' (the safe legacy look).
+        Pure: a registry read, no side effects."""
+        def _asp(slot):
+            eid = (resolved_video.get(slot) or {}).get("engine_id") or ""
+            try:
+                eng = _vreg.get_engine(eid)
+                if getattr(eng, "render_aspect", "portrait") == "wide":
+                    return "wide"
+            except Exception:  # noqa: BLE001 -- unknown engine -> portrait
+                pass
+            return "portrait"
+        return {
+            "announcer_visual": _asp("announcer_video_model"),
+            "music_visual": _asp("music_video_model"),
+            "character_video": _asp("other_beats_video_model"),
+        }
 
     @staticmethod
     def _resolve_and_validate(slot, picked, custom, descriptors, warnings):

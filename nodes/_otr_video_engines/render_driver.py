@@ -31,6 +31,7 @@ import tempfile
 import time
 
 from .._otr_shared import retry_taxonomy as _rt
+from .._otr_shared.aspect import is_wide as _aspect_is_wide
 from .._otr_shared.fallback import resolve_fallback_chain
 from .._otr_shared.resolver import prune_orphaned_groups
 from . import motion_common as _mc
@@ -836,7 +837,22 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # to a face. Both dims stay /32-friendly for the LTX latent grid; env-
     # overridable via OTR_VIDEO_LANDSCAPE_CANVAS.
     _canvas_fam = engine_family(str(shot.get("engine_id") or ""), "")
-    if _canvas_fam not in ("audio_driven_face", "lipsync_overlay", "character_3d"):
+    # audio_driven_face (HuMo) renders PORTRAIT by default -> keep the accepted
+    # pillarbox. The humo_1.7B_169 variant declares render_aspect='wide' (832x480
+    # 16:9), so it JOINS the landscape composite like LTX (the clip scales to
+    # fill, no pillarbox). The aspect is the SELECTED engine's identity, not a
+    # global toggle. lipsync_overlay / character_3d always align to a face.
+    _face_excl = {"audio_driven_face", "lipsync_overlay", "character_3d"}
+    if _canvas_fam == "audio_driven_face":
+        try:
+            _sel_eng = _vreg.get_engine(str(shot.get("engine_id") or ""))
+            _face_wide = _aspect_is_wide(
+                getattr(_sel_eng, "render_aspect", "portrait"))
+        except Exception:  # noqa: BLE001 -- unknown engine -> safe portrait
+            _face_wide = False
+        if _face_wide:
+            _face_excl.discard("audio_driven_face")
+    if _canvas_fam not in _face_excl:
         _lc = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
         try:
             _lw, _lh = (int(x) for x in _lc.lower().split("x", 1))

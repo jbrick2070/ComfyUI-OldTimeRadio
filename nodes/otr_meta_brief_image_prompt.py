@@ -130,6 +130,23 @@ def _landscape_still_dims():
     return max(32, (w // 32) * 32), max(32, (h // 32) * 32)
 
 
+def _still_aspects_from_policy(policy_json):
+    """role -> still aspect ('portrait'|'wide') from a director policy's
+    ``aspects`` map. OTR_VideoDirector resolves each per-role video engine to its
+    render_aspect, OTR_ImageDirector forwards that map into image_policy_json, and
+    MetaBrief reads it here. A missing / malformed policy yields an empty map, so
+    the caller defaults portrait and an unwired graph keeps the legacy look.
+    Pure."""
+    try:
+        pol = json.loads(policy_json or "{}")
+        asp = pol.get("aspects") if isinstance(pol, dict) else None
+        if isinstance(asp, dict):
+            return {str(k): str(v) for k, v in asp.items()}
+    except (ValueError, TypeError):
+        pass
+    return {}
+
+
 def _iter_beat_lines(lines):
     """(beat_id, line) pairs mirroring OTR_ShotLock's beat-id scheme exactly
     (line_id or beat_%04d over the NON-SKIPPED lines) so a still minted here
@@ -344,7 +361,7 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
                          consistency_gate_warn_only: bool = False, lines=None,
-                         fps: int = 25):
+                         fps: int = 25, still_aspects=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -483,14 +500,24 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         }
 
     # ---- assemble the ONE versioned object payload (pass-02 item 1) ----
+    # Character-still dims follow the SELECTED video engine's aspect: the operator
+    # picks humo_1.7B (portrait) vs humo_1.7B_169 (wide) in the role dropdown,
+    # OTR_VideoDirector resolves each role's aspect, and generate() passes that
+    # role->aspect map in as still_aspects. ONE pick aligns the still to the
+    # engine; no map (None) -> portrait (the legacy look, byte-identical).
+    from ._otr_shared.aspect import still_dims_for_aspect
+    _role_aspects = still_aspects or {}
     objects: list = []
     for cid, pinfo in out.items():
+        _role = pinfo.pop("_role", "character_video")
+        _pw, _ph = still_dims_for_aspect(
+            _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)
         objects.append({
             "object_id": cid,                 # portrait object_id == char_id
             "kind": "portrait",
-            "role": pinfo.pop("_role", "character_video"),
+            "role": _role,
             "char_id": cid,
-            "w": PORTRAIT_W, "h": PORTRAIT_H,
+            "w": _pw, "h": _ph,
             "prompt": pinfo["prompt"],
             "prompt_hash": pinfo["prompt_hash"],
             "source": pinfo["source"],
@@ -568,7 +595,7 @@ class OTRMetaBriefImagePromptGen:
             "optional": {
                 "image_policy_json": ("STRING", {
                     "multiline": True, "default": "{}", "forceInput": True,
-                    "tooltip": "OTR_ImageDirector policy (granularity/seed); opaque to prompt text.",
+                    "tooltip": "OTR_ImageDirector policy: granularity/seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).",
                 }),
                 "consistency_gate_warn_only": ("BOOLEAN", {"default": False}),
                 "gate_in": ("STRING", {
@@ -611,7 +638,8 @@ class OTRMetaBriefImagePromptGen:
             cast, meta, llm_fn=llm_fn,
             consistency_gate_warn_only=bool(consistency_gate_warn_only),
             lines=lines,
-        )
+            still_aspects=_still_aspects_from_policy(image_policy_json),
+        )  # aspects ride in image_policy_json (ImageDirector forwards them)
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []

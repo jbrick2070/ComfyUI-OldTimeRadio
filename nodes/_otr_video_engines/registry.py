@@ -142,6 +142,11 @@ CAPABILITIES = {
     "humo_1.7B": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["HuMo-1.7B"]},
+    # Same 1.7B checkpoint as humo_1.7B, just rendered 16:9 832x480 (~ same pixel
+    # budget as the 480x832 portrait) -> identical VRAM class / estimate.
+    "humo_1.7B_169": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+                      "requires_sidecar": False, "cpu_ok": False,
+                      "model_requirements": ["HuMo-1.7B"]},
     "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
                    "requires_sidecar": True, "cpu_ok": False,
                    "model_requirements": ["latentsync-1.5"]},

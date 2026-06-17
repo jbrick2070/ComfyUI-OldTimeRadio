@@ -51,8 +51,8 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # 2.1 VAE 4n+1 length rule is enforced via wrapper_bridge.quantize_frames_4n1.
 _HUMO_MIN_FRAMES = 33          # below this has hung this hardware (legacy floor)
 _HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp8
-_HUMO_NATIVE_W = 480
-_HUMO_NATIVE_H = 832
+# (HuMo render dims live in _otr_shared.aspect now -- portrait 480x832 / wide
+# 832x480 -- selected by each engine's render_aspect, so the constants moved out.)
 # An ASCII negative (CLAUDE.md: ASCII-only source). HuMo's best negative is the
 # ByteDance Chinese default; set OTR_HUMO_NEGATIVE to it on the box to match the
 # legacy template exactly.
@@ -78,11 +78,12 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     name = "humo"
     family = "audio_driven_face"
-    # Talking-head roles only: HuMo needs BOTH a portrait (init_image) AND a
-    # speech audio_ref, which only the announcer + character roles supply.
-    # role_compat excludes the audio-less roles (music / scene / background)
-    # fail-closed.
-    roles = ("announcer_visual", "character_video")
+    # HuMo needs BOTH an init_image (a face) AND an audio_ref. role_compat
+    # supplies both to announcer_visual, music_visual AND character_video, so the
+    # operator can pick HuMo (portrait OR 16:9) in ALL THREE role dropdowns
+    # (operator 2026-06-16). Only the truly audio-less roles (scene_broll /
+    # background_abstract) stay excluded fail-closed.
+    roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
     commercial_clean = False            # license is profile data; verify-at-build
@@ -90,6 +91,11 @@ class HuMoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
+    #: Render aspect == this engine's IDENTITY (the operator picks the look with
+    #: one dropdown choice): 'portrait' 480x832 (the classic pillarbox) here on
+    #: the base; the humo_1.7B_169 variant overrides to 'wide' 832x480. The
+    #: character still + composite canvas follow this (see _otr_shared.aspect).
+    render_aspect = "portrait"
     #: Family-degradation next hop. The 14B keystone degrades FIRST to the 1.7B
     #: HuMo tier -- a real talking face that fits a tighter VRAM budget -- on an
     #: OOM/VRAM (or any HARD) failure, ONLY then to latentsync and the still
@@ -194,11 +200,15 @@ class HuMoEngine(_MC.MotionEngineBase):
         }
 
     def _native_dims(self):
-        """HuMo's native render size (portrait 480x832; env-overridable). The
-        compositor pillarboxes the portrait into the 16:9 canvas (memory: keep
-        HuMo, accept the pillarbox) -- N9 no-stretch is preserved upstream."""
-        w = int(os.environ.get("OTR_HUMO_WIDTH", _HUMO_NATIVE_W))
-        h = int(os.environ.get("OTR_HUMO_HEIGHT", _HUMO_NATIVE_H))
+        """HuMo's render size from this engine's ``render_aspect``: 'portrait'
+        480x832 (the classic talking-head pillarbox, humo_1.7B) or 'wide' 832x480
+        (the 16:9 character beat, humo_1.7B_169). The aspect is the engine's
+        identity, so the operator picks the look with ONE dropdown choice.
+        Explicit OTR_HUMO_WIDTH/HEIGHT still win (manual override)."""
+        from .._otr_shared.aspect import humo_dims_for_aspect
+        _dw, _dh = humo_dims_for_aspect(self.render_aspect)
+        w = int(os.environ.get("OTR_HUMO_WIDTH", _dw))
+        h = int(os.environ.get("OTR_HUMO_HEIGHT", _dh))
         return w, h
 
     def _build_graph(self, image_name, audio_name, plan, length, width, height):
@@ -497,4 +507,27 @@ class HuMo17BEngine(HuMoEngine):
         return float(os.environ.get("OTR_HUMO_17B_CFG", "5.0"))
 
 
-__all__ = ["HuMoEngine", "HuMo17BEngine"]
+@register
+class HuMo17BLandscapeEngine(HuMo17BEngine):
+    """1.7B HuMo in 16:9 LANDSCAPE (832x480) -- the modern character-beat look,
+    selectable in the role dropdowns ALONGSIDE the portrait humo_1.7B (the
+    operator wants both: portrait for old-time radio, wide for the new standard).
+    Same checkpoint / roles / required inputs / in-process graph as humo_1.7B;
+    only the render aspect and the cfg default differ. The 16:9 cfg sweet spot
+    measured 2026-06-16 (the cfg sweep) is 2.5, so this tier defaults there while
+    portrait humo_1.7B keeps its 5.0. A 16:9 character still (832x480) feeds it --
+    meta_brief mints the still to match the selected engine's aspect via the video
+    policy, so ONE dropdown pick aligns dims, cfg, still and composite canvas.
+    Not in the auto-fallback chain (it is a deliberate operator pick): a failure
+    degrades like humo_1.7B (-> latentsync -> still floor), never a silent aspect
+    swap."""
+
+    name = "humo_1.7B_169"
+    render_aspect = "wide"
+
+    def _cfg(self):
+        # 16:9 sweet spot (cfg sweep 2026-06-16); override via OTR_HUMO_17B_169_CFG.
+        return float(os.environ.get("OTR_HUMO_17B_169_CFG", "2.5"))
+
+
+__all__ = ["HuMoEngine", "HuMo17BEngine", "HuMo17BLandscapeEngine"]

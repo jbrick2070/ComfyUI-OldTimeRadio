@@ -289,6 +289,11 @@ class OTRImageDirector:
             "image_models": resolved,
             "granularity": granularity,
             "locked_3d_slots": sorted(locked),
+            # Per-role still aspect, forwarded from OTR_VideoDirector so MetaBrief
+            # mints each character still to MATCH its selected video engine
+            # (portrait vs 16:9) with one dropdown pick. {} -> portrait (legacy).
+            "aspects": (video_policy.get("aspects")
+                        if isinstance(video_policy.get("aspects"), dict) else {}),
             "fresh_cap": cap,
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "warnings": warnings,

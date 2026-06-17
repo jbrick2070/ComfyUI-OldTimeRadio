@@ -42,7 +42,7 @@ def test_humo_registered_and_dark():
     assert eng.default_roles == ()                 # not a default -> dark
     assert eng.requires_flag == "OTR_ENABLE_HUMO"
     assert eng.required_inputs == ("audio_ref", "init_image")
-    assert eng.roles == ("announcer_visual", "character_video")
+    assert eng.roles == ("announcer_visual", "music_visual", "character_video")
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
     assert eng.fallback_engine == "humo_1.7B"      # 14B degrades to the 1.7B tier first
@@ -63,13 +63,13 @@ def test_humo_required_inputs_match_family_schema():
 # --------------------------------------------------------------------------- #
 def test_registry_gates_humo_until_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
-    for role in ("announcer_visual", "character_video"):
+    for role in ("announcer_visual", "music_visual", "character_video"):
         with pytest.raises(vreg.EngineUnusable):
             vreg.assert_usable("humo", role)               # dark -> GATED_BY_FLAG
     monkeypatch.setenv("OTR_ENABLE_HUMO", "1")
-    for role in ("announcer_visual", "character_video"):
+    for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"
-    for role in ("music_visual", "scene_broll", "background_abstract"):
+    for role in ("scene_broll", "background_abstract"):
         with pytest.raises(vreg.EngineUnusable):
             vreg.assert_usable("humo", role)               # role not served
 
@@ -81,14 +81,17 @@ def test_humo_role_fit_audio_driven_face():
     eng = vreg.get_engine("humo")
     desc = {"engine_id": "humo", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
-    for role in ("announcer_visual", "character_video"):
+    # announcer_visual, music_visual AND character_video all supply BOTH
+    # init_image and audio_ref, so HuMo fits all three (operator 2026-06-16:
+    # HuMo selectable in every role dropdown).
+    for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role) is True
-    # music_visual / scene_broll supply init_image but NOT audio_ref;
-    # background_abstract supplies only text -> all excluded fail-closed.
-    for role in ("music_visual", "scene_broll", "background_abstract"):
+    # scene_broll has no audio_ref; background_abstract supplies only text ->
+    # both excluded fail-closed.
+    for role in ("scene_broll", "background_abstract"):
         assert rc.engine_fits_role(desc, role) is False
     assert rc.filter_engines_for_role("character_video", [desc]) == ["humo"]
-    assert rc.filter_engines_for_role("music_visual", [desc]) == []
+    assert rc.filter_engines_for_role("music_visual", [desc]) == ["humo"]
 
 
 # --------------------------------------------------------------------------- #
