@@ -1,0 +1,2634 @@
+{
+  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
+  "revision": 0,
+  "last_node_id": 83,
+  "last_link_id": 245,
+  "nodes": [
+    {
+      "id": 63,
+      "type": "OTR_WorkflowValidator",
+      "pos": [
+        80.0,
+        470.0
+      ],
+      "size": [
+        400,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "validation_report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "label": "validation_report"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_WorkflowValidator",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        true,
+        true
+      ]
+    },
+    {
+      "id": 1,
+      "type": "OTR_LedgerScriptWriter",
+      "pos": [
+        80.0,
+        80.0
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "title": "1. Story Writer (LPL v2.0)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerScriptWriter"
+      },
+      "widgets_values": [
+        "",
+        350,
+        2,
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "",
+        true,
+        "auto",
+        "let the story decide",
+        "",
+        "balanced",
+        false,
+        0.05,
+        1.03,
+        200,
+        "roll (~11% chance)",
+        true,
+        true,
+        true,
+        "anthropic/claude-opus-4.8",
+        "deepseek/deepseek-v4-pro",
+        "anthropic/claude-opus-4.7",
+        "deepseek/deepseek-v4-pro"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [
+            106
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            230
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [
+            108
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [
+            109
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "links": [
+            115
+          ],
+          "slot_index": 4
+        }
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 3,
+      "type": "OTR_SceneSequencer",
+      "pos": [
+        1740.0,
+        80.0
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "title": "4. Scene Sequencer",
+      "properties": {
+        "Node name for S&R": "OTR_SceneSequencer"
+      },
+      "widgets_values": [
+        "[]",
+        0,
+        999,
+        "",
+        "bark",
+        0.0,
+        0.0
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 2,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "tts_audio_clips",
+          "type": "AUDIO",
+          "link": 239
+        },
+        {
+          "name": "announcer_audio_clips",
+          "type": "AUDIO",
+          "link": 240,
+          "shape": 7
+        },
+        {
+          "name": "sfx_audio_clips",
+          "type": "AUDIO",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 4,
+      "type": "OTR_AudioEnhance",
+      "pos": [
+        2280.0,
+        80.0
+      ],
+      "size": [
+        380,
+        340
+      ],
+      "title": "5. Audio Enhance",
+      "properties": {
+        "Node name for S&R": "OTR_AudioEnhance"
+      },
+      "widgets_values": [
+        48000,
+        0.3,
+        0.8,
+        0.15,
+        16000.0,
+        "subtle",
+        -1.0
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "enhanced_audio",
+          "type": "AUDIO",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 7,
+      "type": "OTR_EpisodeAssembler",
+      "pos": [
+        2800.0,
+        80.0
+      ],
+      "size": [
+        420,
+        350
+      ],
+      "title": "6. Episode Assembler",
+      "properties": {
+        "Node name for S&R": "OTR_EpisodeAssembler"
+      },
+      "widgets_values": [
+        "",
+        10.0,
+        8.0,
+        500
+      ],
+      "inputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "link": 6
+        },
+        {
+          "name": "opening_theme_audio",
+          "type": "AUDIO",
+          "link": 241
+        },
+        {
+          "name": "closing_theme_audio",
+          "type": "AUDIO",
+          "link": 242
+        }
+      ],
+      "outputs": [
+        {
+          "name": "episode_audio",
+          "type": "AUDIO",
+          "links": [
+            15,
+            78
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "output_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "episode_info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "audio_done",
+          "type": "STRING",
+          "links": [
+            209
+          ],
+          "shape": 3,
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
+    },
+    {
+      "id": 12,
+      "type": "OTR_SignalLostVideo",
+      "pos": [
+        3360.0,
+        80.0
+      ],
+      "size": [
+        400,
+        280
+      ],
+      "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
+      "properties": {
+        "Node name for S&R": "OTR_SignalLostVideo"
+      },
+      "widgets_values": [
+        "[]",
+        "[]",
+        24,
+        "1920x1080",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 15
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 16,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 110,
+          "widget": {
+            "name": "news_used"
+          }
+        },
+        {
+          "name": "closing_audio",
+          "type": "AUDIO",
+          "link": 243
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "links": [
+            80,
+            96
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
+    },
+    {
+      "id": 20,
+      "type": "OTR_VideoPlan",
+      "pos": [
+        1140.0,
+        1010.0
+      ],
+      "size": [
+        460,
+        400
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "title": "Video Plan (from FreezeCascade)",
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 113,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "freeze_done_gate",
+          "type": "STRING",
+          "link": 47,
+          "widget": {
+            "name": "freeze_done_gate"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pass1_char_prompts_json",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "pass2_scene_prompts_json",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "pass3_compose_prompts_json",
+          "type": "STRING",
+          "links": [
+            40
+          ],
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "pass3_prompt_count",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 3
+        },
+        {
+          "name": "debug_summary",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_VideoPlan"
+      },
+      "widgets_values": [
+        "{}",
+        "(all)",
+        4,
+        "cinematic, 35mm film look, subtle film grain, volumetric lighting",
+        true
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 21,
+      "type": "OTR_FixedShotDurationStub",
+      "pos": [
+        1740.0,
+        450.0
+      ],
+      "size": [
+        380,
+        260
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "title": "Shot Duration Calc (stub 8s each)",
+      "inputs": [
+        {
+          "name": "pass3_compose_prompts_json",
+          "type": "STRING",
+          "link": 40,
+          "widget": {
+            "name": "pass3_compose_prompts_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expanded_pass3_json",
+          "type": "STRING",
+          "links": [
+            41
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "total_clips",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "total_frames",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "debug_summary",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_FixedShotDurationStub"
+      },
+      "widgets_values": [
+        "",
+        "",
+        9.0,
+        10.0
+      ],
+      "color": "#3B6E3B",
+      "bgcolor": "#244524"
+    },
+    {
+      "id": 22,
+      "type": "OTR_DeferredCheckpointLoader",
+      "pos": [
+        3360.0,
+        430.0
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "title": "Load FLUX.1-dev-fp8 (deferred -- gate-bound)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 209
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            42
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            43
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            44
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_DeferredCheckpointLoader"
+      },
+      "widgets_values": [
+        "flux1-dev-fp8.safetensors"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "OTR_BatchFluxRender",
+      "pos": [
+        4380.0,
+        80.0
+      ],
+      "size": [
+        420,
+        540
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "title": "Batch FLUX Render (full pipeline)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 203
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 205
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 207
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 41,
+          "widget": {
+            "name": "script_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            101,
+            104
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchFluxRender"
+      },
+      "widgets_values": [
+        "",
+        16,
+        1,
+        "randomize",
+        20,
+        1.0,
+        "euler",
+        "simple",
+        1024,
+        1024,
+        3.5,
+        "cinematic 35mm film still, dim starship interior, red alert lighting, volumetric haze, shallow depth of field",
+        "cinematic, 35mm film, anamorphic lens, volumetric lighting, heavy vignette, muted color grade, sharp focus",
+        false,
+        true,
+        "",
+        4242,
+        true
+      ],
+      "color": "#5A2B5A",
+      "bgcolor": "#3A1D3A"
+    },
+    {
+      "id": 24,
+      "type": "OTR_UnloadAll",
+      "pos": [
+        5480.0,
+        80.0
+      ],
+      "size": [
+        280,
+        130
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "title": "Unload All (video branch)",
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            83,
+            200
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "unload_done",
+          "type": "STRING",
+          "links": [
+            210,
+            217
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_UnloadAll"
+      },
+      "widgets_values": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "id": 25,
+      "type": "OTR_SaveToEpisodeWorkspace",
+      "pos": [
+        4940.0,
+        80.0
+      ],
+      "size": [
+        320,
+        280
+      ],
+      "flags": {},
+      "order": 33,
+      "mode": 0,
+      "title": "Save FLUX environment stills (per-episode workspace)",
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 104
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "OTR_SaveToEpisodeWorkspace"
+      },
+      "widgets_values": [
+        "stills",
+        "full_env"
+      ]
+    },
+    {
+      "id": 51,
+      "type": "OTR_BatchHumoRender",
+      "pos": [
+        6480.0,
+        80.0
+      ],
+      "size": [
+        480,
+        460
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "title": "Batch HuMo Render (in-graph batch)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 211
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 212
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 213
+        },
+        {
+          "name": "audio_encoder",
+          "type": "AUDIO_ENCODER",
+          "link": 214
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 78
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 238,
+          "widget": {
+            "name": "ledger_json"
+          }
+        },
+        {
+          "name": "portraits_dir",
+          "type": "STRING",
+          "link": 116,
+          "widget": {
+            "name": "portraits_dir"
+          }
+        },
+        {
+          "name": "flux_done_gate",
+          "type": "IMAGE",
+          "link": 83,
+          "shape": 7
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "link": 215,
+          "widget": {
+            "name": "steps"
+          }
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "link": 216,
+          "widget": {
+            "name": "cfg"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "links": [
+            91
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip_count",
+          "type": "INT",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            86
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchHumoRender"
+      },
+      "widgets_values": [
+        "",
+        "",
+        7.0,
+        0,
+        7,
+        "fixed",
+        20,
+        5.0,
+        "uni_pc",
+        "simple",
+        480,
+        832,
+        200,
+        -28.0,
+        true,
+        0,
+        true,
+        false
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 52,
+      "type": "OTR_VideoComposite",
+      "pos": [
+        8720.0,
+        80.0
+      ],
+      "size": [
+        480,
+        360
+      ],
+      "flags": {},
+      "order": 30,
+      "mode": 0,
+      "title": "Video Composite (landscape 1472x832 layered, HuMo 512px pillar)",
+      "inputs": [
+        {
+          "name": "procgen_video_path",
+          "type": "STRING",
+          "link": 80,
+          "widget": {
+            "name": "procgen_video_path"
+          }
+        },
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "link": 92,
+          "widget": {
+            "name": "clips_dir"
+          }
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 82,
+          "widget": {
+            "name": "ledger_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [
+            93
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_VideoComposite"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        "lighten",
+        0.0,
+        1472,
+        832,
+        25,
+        832,
+        7.0,
+        "ffmpeg",
+        false,
+        "master_mix_per_clip_mux",
+        true,
+        512
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 54,
+      "type": "LowVRAMCheckpointLoader",
+      "pos": [
+        7100.0,
+        80.0
+      ],
+      "size": [
+        380,
+        100
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dependencies",
+          "type": "*",
+          "shape": 7,
+          "link": 86
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            87
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": []
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            89
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-ltxvideo",
+        "Node name for S&R": "LowVRAMCheckpointLoader"
+      },
+      "widgets_values": [
+        "ltx-2.3-22b-dev.safetensors"
+      ],
+      "_meta": {
+        "title": "Loader (LTX 2.3 22B-dev BF16)"
+      }
+    },
+    {
+      "id": 60,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        7620.0,
+        80.0
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 87
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            103
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core"
+      },
+      "title": "LTX 2.3 distilled LoRA @ 0.7",
+      "widgets_values": [
+        "ltxv\\ltx2\\ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+        0.7
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 55,
+      "type": "OTR_BatchLTXRender",
+      "pos": [
+        8160.0,
+        80.0
+      ],
+      "size": [
+        420,
+        240
+      ],
+      "flags": {},
+      "order": 29,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 103
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 201
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 89
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "widget": {
+            "name": "ledger_json"
+          },
+          "link": 90
+        },
+        {
+          "name": "humo_clips_dir",
+          "type": "STRING",
+          "shape": 7,
+          "widget": {
+            "name": "humo_clips_dir"
+          },
+          "link": 91
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "links": [
+            92
+          ]
+        },
+        {
+          "name": "clip_count",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_BatchLTXRender"
+      },
+      "widgets_values": [
+        "",
+        1,
+        "fixed",
+        "ffmpeg",
+        "",
+        22.0
+      ],
+      "_meta": {
+        "title": "Batch LTX Render (radio)"
+      }
+    },
+    {
+      "id": 56,
+      "type": "OTR_RTXUpscale",
+      "pos": [
+        9340.0,
+        80.0
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "widget": {
+            "name": "source_mp4_path"
+          },
+          "link": 93
+        }
+      ],
+      "outputs": [
+        {
+          "name": "upscaled_mp4_path",
+          "type": "STRING",
+          "links": [
+            95
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_RTXUpscale"
+      },
+      "widgets_values": [
+        "",
+        false,
+        1920,
+        1080,
+        "ULTRA",
+        64,
+        "ffmpeg"
+      ],
+      "_meta": {
+        "title": "RTX VSR Upscale (1080p)"
+      }
+    },
+    {
+      "id": 57,
+      "type": "OTR_DeferredLtxTextEncoderLoader",
+      "pos": [
+        5900.0,
+        510.0
+      ],
+      "size": [
+        400,
+        130
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "title": "Gemma encoder (LTX 2.3, deferred -- gate-bound)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 210
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            94
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_DeferredLtxTextEncoderLoader"
+      },
+      "widgets_values": [
+        "gemma_3_12B_it_fp4_mixed.safetensors",
+        "ltx-2.3-22b-dev.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 58,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        9860.0,
+        80.0
+      ],
+      "size": [
+        420,
+        260
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "title": "Post-Upscale Procgen Blend (final 1080p)",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 95,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 96,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "screen",
+        1.0,
+        "ffmpeg",
+        false,
+        "_procgen_blended",
+        18,
+        true,
+        true,
+        "sdh_standard"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 59,
+      "type": "OTR_BatchFluxPortraitRender",
+      "pos": [
+        4940.0,
+        430.0
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "title": "Batch FLUX Portrait Render (per-cast portraits)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 204
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 206
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 208
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 114,
+          "widget": {
+            "name": "ledger_json"
+          }
+        },
+        {
+          "name": "flux_done_gate",
+          "type": "IMAGE",
+          "link": 101
+        }
+      ],
+      "outputs": [
+        {
+          "name": "portrait_batch",
+          "type": "IMAGE",
+          "links": [
+            45
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "portraits_dir",
+          "type": "STRING",
+          "links": [
+            116
+          ],
+          "shape": 3,
+          "label": "portraits_dir"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchFluxPortraitRender"
+      },
+      "widgets_values": [
+        "",
+        "head-and-shoulders studio portrait, neutral lighting, cinematic",
+        1024,
+        1024,
+        20,
+        1.0,
+        3.5,
+        "euler",
+        "simple",
+        100,
+        "fixed",
+        true
+      ]
+    },
+    {
+      "id": 62,
+      "type": "OTR_LedgerFreezeCascade",
+      "pos": [
+        620.0,
+        80.0
+      ],
+      "size": [
+        380,
+        320
+      ],
+      "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerFreezeCascade"
+      },
+      "widgets_values": [
+        true,
+        true,
+        14.0,
+        "all",
+        6,
+        false,
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "link": 106
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 230
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 108
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "link": 109
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 115
+        }
+      ],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            2,
+            16,
+            47,
+            82,
+            90,
+            113,
+            114,
+            202,
+            231,
+            232,
+            233
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [
+            110
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "freeze_verdict",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        },
+        {
+          "name": "episode_seed",
+          "type": "INT",
+          "links": [],
+          "slot_index": 5
+        },
+        {
+          "name": "v2_ledger_json",
+          "type": "STRING",
+          "links": [
+            234
+          ],
+          "slot_index": 6
+        }
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 70,
+      "type": "OTR_LtxBranchGate",
+      "pos": [
+        6480.0,
+        610.0
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "title": "LTX Branch Gate (topology)",
+      "inputs": [
+        {
+          "name": "gate_image",
+          "type": "IMAGE",
+          "link": 200
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 94
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            201
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_LtxBranchGate"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 71,
+      "type": "OTR_FluxBranchGate",
+      "pos": [
+        3900.0,
+        80.0
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "title": "FLUX Branch Gate (topology)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 202,
+          "widget": {
+            "name": "gate_signal"
+          }
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 42
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 43
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            203,
+            204
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            205,
+            206
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            207,
+            208
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_FluxBranchGate"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 72,
+      "type": "OTR_HuMoTierLoader",
+      "pos": [
+        5900.0,
+        80.0
+      ],
+      "size": [
+        440,
+        360
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "title": "HuMo Tier Loader (1.7B default / 17B opt-in)",
+      "inputs": [
+        {
+          "name": "unload_gate",
+          "type": "STRING",
+          "link": 217
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            211
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            212
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            213
+          ],
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "audio_encoder",
+          "type": "AUDIO_ENCODER",
+          "links": [
+            214
+          ],
+          "shape": 3,
+          "slot_index": 3
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "links": [
+            215
+          ],
+          "shape": 3,
+          "slot_index": 4
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "links": [
+            216
+          ],
+          "shape": 3,
+          "slot_index": 5
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 6
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_HuMoTierLoader"
+      },
+      "widgets_values": [
+        "low_vram_default",
+        "humo_1.7B_fp16.safetensors",
+        "humo_17B_fp8_e4m3fn.safetensors",
+        "Wan2_1-HuMo-17B_Q5_K_M.gguf",
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan_2.1_vae.safetensors",
+        "whisper_large_v3_fp16.safetensors",
+        "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+        true,
+        10.0
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 80,
+      "type": "OTR_CastLock",
+      "pos": [
+        1060,
+        470
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "1c. Cast Lock (v2 ledger authority)",
+      "properties": {
+        "Node name for S&R": "OTR_CastLock"
+      },
+      "widgets_values": [
+        "default",
+        "auto_registry",
+        "neutral",
+        true
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 234
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "links": [
+            235,
+            236,
+            237,
+            238
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "cast_lock_revision",
+          "type": "INT",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "cast_report",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 40,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 81,
+      "type": "OTR_BatchCharacterVoices",
+      "pos": [
+        1140,
+        80
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3a. Character Voices (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_BatchCharacterVoices"
+      },
+      "widgets_values": [
+        "indextts2",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 231
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 235
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "character_audio",
+          "type": "AUDIO",
+          "links": [
+            239
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [
+            244
+          ],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 41,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    },
+    {
+      "id": 82,
+      "type": "OTR_AnnouncerVoice",
+      "pos": [
+        1140,
+        330
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3b. Announcer Voice (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_AnnouncerVoice"
+      },
+      "widgets_values": [
+        "kokoro",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 232
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 236
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 244
+        }
+      ],
+      "outputs": [
+        {
+          "name": "announcer_audio",
+          "type": "AUDIO",
+          "links": [
+            240
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [
+            245
+          ],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 42,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    },
+    {
+      "id": 83,
+      "type": "OTR_StableAudioTheme",
+      "pos": [
+        1140,
+        580
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "title": "3c. Theme Music (v2)",
+      "properties": {
+        "Node name for S&R": "OTR_StableAudioTheme"
+      },
+      "widgets_values": [
+        "stable_audio_3",
+        "mono_safe"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 233
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 237
+        },
+        {
+          "name": "gate_in",
+          "type": "STRING",
+          "link": 245
+        }
+      ],
+      "outputs": [
+        {
+          "name": "opening_theme_audio",
+          "type": "AUDIO",
+          "links": [
+            241
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "closing_theme_audio",
+          "type": "AUDIO",
+          "links": [
+            242,
+            243
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "interstitial_theme_audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "done",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "flags": {},
+      "order": 43,
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
+    }
+  ],
+  "links": [
+    [
+      2,
+      62,
+      1,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ],
+    [
+      15,
+      7,
+      0,
+      12,
+      0,
+      "AUDIO"
+    ],
+    [
+      16,
+      62,
+      1,
+      12,
+      1,
+      "STRING"
+    ],
+    [
+      40,
+      20,
+      2,
+      21,
+      0,
+      "STRING"
+    ],
+    [
+      41,
+      21,
+      0,
+      23,
+      3,
+      "STRING"
+    ],
+    [
+      42,
+      22,
+      0,
+      71,
+      1,
+      "MODEL"
+    ],
+    [
+      43,
+      22,
+      1,
+      71,
+      2,
+      "CLIP"
+    ],
+    [
+      44,
+      22,
+      2,
+      71,
+      3,
+      "VAE"
+    ],
+    [
+      45,
+      59,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      47,
+      62,
+      1,
+      20,
+      1,
+      "STRING"
+    ],
+    [
+      78,
+      7,
+      0,
+      51,
+      4,
+      "AUDIO"
+    ],
+    [
+      80,
+      12,
+      0,
+      52,
+      0,
+      "STRING"
+    ],
+    [
+      82,
+      62,
+      1,
+      52,
+      2,
+      "STRING"
+    ],
+    [
+      83,
+      24,
+      0,
+      51,
+      7,
+      "IMAGE"
+    ],
+    [
+      86,
+      51,
+      2,
+      54,
+      0,
+      "STRING"
+    ],
+    [
+      87,
+      54,
+      0,
+      60,
+      0,
+      "MODEL"
+    ],
+    [
+      103,
+      60,
+      0,
+      55,
+      0,
+      "MODEL"
+    ],
+    [
+      89,
+      54,
+      2,
+      55,
+      2,
+      "VAE"
+    ],
+    [
+      90,
+      62,
+      1,
+      55,
+      3,
+      "STRING"
+    ],
+    [
+      91,
+      51,
+      0,
+      55,
+      4,
+      "STRING"
+    ],
+    [
+      92,
+      55,
+      0,
+      52,
+      1,
+      "STRING"
+    ],
+    [
+      93,
+      52,
+      0,
+      56,
+      0,
+      "STRING"
+    ],
+    [
+      94,
+      57,
+      0,
+      70,
+      1,
+      "CLIP"
+    ],
+    [
+      95,
+      56,
+      0,
+      58,
+      0,
+      "STRING"
+    ],
+    [
+      96,
+      12,
+      0,
+      58,
+      1,
+      "STRING"
+    ],
+    [
+      101,
+      23,
+      0,
+      59,
+      4,
+      "IMAGE"
+    ],
+    [
+      104,
+      23,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      106,
+      1,
+      0,
+      62,
+      0,
+      "STRING"
+    ],
+    [
+      108,
+      1,
+      2,
+      62,
+      2,
+      "STRING"
+    ],
+    [
+      109,
+      1,
+      3,
+      62,
+      3,
+      "INT"
+    ],
+    [
+      110,
+      62,
+      2,
+      12,
+      2,
+      "STRING"
+    ],
+    [
+      113,
+      62,
+      1,
+      20,
+      0,
+      "STRING"
+    ],
+    [
+      114,
+      62,
+      1,
+      59,
+      3,
+      "STRING"
+    ],
+    [
+      115,
+      1,
+      4,
+      62,
+      4,
+      "STRING"
+    ],
+    [
+      116,
+      59,
+      2,
+      51,
+      6,
+      "STRING"
+    ],
+    [
+      200,
+      24,
+      0,
+      70,
+      0,
+      "IMAGE"
+    ],
+    [
+      201,
+      70,
+      0,
+      55,
+      1,
+      "CLIP"
+    ],
+    [
+      202,
+      62,
+      1,
+      71,
+      0,
+      "STRING"
+    ],
+    [
+      203,
+      71,
+      0,
+      23,
+      0,
+      "MODEL"
+    ],
+    [
+      204,
+      71,
+      0,
+      59,
+      0,
+      "MODEL"
+    ],
+    [
+      205,
+      71,
+      1,
+      23,
+      1,
+      "CLIP"
+    ],
+    [
+      206,
+      71,
+      1,
+      59,
+      1,
+      "CLIP"
+    ],
+    [
+      207,
+      71,
+      2,
+      23,
+      2,
+      "VAE"
+    ],
+    [
+      208,
+      71,
+      2,
+      59,
+      2,
+      "VAE"
+    ],
+    [
+      209,
+      7,
+      3,
+      22,
+      0,
+      "STRING"
+    ],
+    [
+      210,
+      24,
+      1,
+      57,
+      0,
+      "STRING"
+    ],
+    [
+      211,
+      72,
+      0,
+      51,
+      0,
+      "MODEL"
+    ],
+    [
+      212,
+      72,
+      1,
+      51,
+      1,
+      "CLIP"
+    ],
+    [
+      213,
+      72,
+      2,
+      51,
+      2,
+      "VAE"
+    ],
+    [
+      214,
+      72,
+      3,
+      51,
+      3,
+      "AUDIO_ENCODER"
+    ],
+    [
+      215,
+      72,
+      4,
+      51,
+      8,
+      "INT"
+    ],
+    [
+      216,
+      72,
+      5,
+      51,
+      9,
+      "FLOAT"
+    ],
+    [
+      217,
+      24,
+      1,
+      72,
+      0,
+      "STRING"
+    ],
+    [
+      230,
+      1,
+      1,
+      62,
+      1,
+      "STRING"
+    ],
+    [
+      231,
+      62,
+      1,
+      81,
+      0,
+      "STRING"
+    ],
+    [
+      232,
+      62,
+      1,
+      82,
+      0,
+      "STRING"
+    ],
+    [
+      233,
+      62,
+      1,
+      83,
+      0,
+      "STRING"
+    ],
+    [
+      234,
+      62,
+      6,
+      80,
+      0,
+      "STRING"
+    ],
+    [
+      235,
+      80,
+      0,
+      81,
+      1,
+      "STRING"
+    ],
+    [
+      236,
+      80,
+      0,
+      82,
+      1,
+      "STRING"
+    ],
+    [
+      237,
+      80,
+      0,
+      83,
+      1,
+      "STRING"
+    ],
+    [
+      238,
+      80,
+      0,
+      51,
+      5,
+      "STRING"
+    ],
+    [
+      239,
+      81,
+      0,
+      3,
+      1,
+      "AUDIO"
+    ],
+    [
+      240,
+      82,
+      0,
+      3,
+      2,
+      "AUDIO"
+    ],
+    [
+      241,
+      83,
+      0,
+      7,
+      1,
+      "AUDIO"
+    ],
+    [
+      242,
+      83,
+      1,
+      7,
+      2,
+      "AUDIO"
+    ],
+    [
+      243,
+      83,
+      1,
+      12,
+      3,
+      "AUDIO"
+    ],
+    [
+      244,
+      81,
+      2,
+      82,
+      2,
+      "STRING"
+    ],
+    [
+      245,
+      82,
+      2,
+      83,
+      2,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "info": {
+      "name": "Old-Time Radio Sci-Fi Anthology",
+      "author": "Jeffrey Brick",
+      "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine (FLUX -> HuMo -> LTX cascade).",
+      "version": "2.0-alpha"
+    }
+  },
+  "version": 0.4
+}
