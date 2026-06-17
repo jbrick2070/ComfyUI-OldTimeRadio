@@ -89,9 +89,26 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
 # recording studio" NEGATIONS are gone -- negative phrasing PLANTS the tokens
 # in the image embedding (the c01 giant-mic catch); gear words are instead
 # scrubbed from the OUTPUT (see _GEAR_WORDS) and banned in the instruction.
-STYLE_ANCHOR = ("in-character cinematic three-quarter portrait, face clearly "
-                "visible, period-accurate costume and environment, dramatic "
-                "film lighting")
+STYLE_ANCHOR = ("in-character cinematic three-quarter portrait, full head and face "
+                "clearly visible with natural headroom above the head (never crop "
+                "the top of the head), period-accurate costume and environment, "
+                "dramatic film lighting")
+
+#: WIDE (16:9) framing anchor. A three-quarter body shot cannot fit a short
+#: landscape still without cropping the head, so wide character stills use a
+#: head-and-shoulders MEDIUM shot, subject centred with headroom (operator framing
+#: catch 2026-06-17: the wide character beats were decapitating the subject).
+#: Portrait stills keep the three-quarter look (operator KEEPER 2026-06-10).
+STYLE_ANCHOR_WIDE = ("in-character cinematic medium shot, head and shoulders, face "
+                     "clearly visible, subject centred with natural headroom above "
+                     "the head (never crop the top of the head), period-accurate "
+                     "costume and environment, dramatic film lighting")
+
+
+def _style_anchor_for_aspect(aspect) -> str:
+    """Framing anchor for a still's aspect: head-and-shoulders for WIDE (16:9) so
+    the head is not cropped by the short frame, three-quarter for PORTRAIT."""
+    return STYLE_ANCHOR_WIDE if str(aspect).lower() == "wide" else STYLE_ANCHOR
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
 #: owns ``ledger['cast']``; the announcer is the station voice, never a cast
@@ -252,7 +269,7 @@ def announcer_line_char_ids(lines) -> list:
     return out
 
 
-def compose_image_prompt_fallback(meta: dict, char: dict) -> str:
+def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrait") -> str:
     """Deterministic brief-composed portrait prompt -- NEVER empty.
 
     ``"{appearance}, {setting} setting, {style anchor}"`` with empty parts
@@ -272,24 +289,37 @@ def compose_image_prompt_fallback(meta: dict, char: dict) -> str:
         parts.append(appearance)
     if setting:
         parts.append(f"{setting} setting")
-    parts.append(STYLE_ANCHOR)
+    parts.append(_style_anchor_for_aspect(aspect))
     return ", ".join(parts)
 
 
-def _build_char_prompt_request(char: dict, meta: dict, setting: str) -> str:
-    """The instruction handed to the writer LLM (temp=0) for one character."""
+def _build_char_prompt_request(char: dict, meta: dict, setting: str,
+                               aspect: str = "portrait") -> str:
+    """The instruction handed to the writer LLM (temp=0) for one character.
+
+    ``aspect`` ('wide'|'portrait') drives the framing clause so a 16:9 still asks
+    for a head-and-shoulders shot (the head fits the short frame) while a portrait
+    still keeps the three-quarter look -- both with explicit headroom so the top of
+    the head is never cropped (operator framing catch 2026-06-17)."""
     appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
+    framing = (
+        "head-and-shoulders medium framing, the subject centred with the FULL head "
+        "visible and headroom above the head so the top of the head is never cropped"
+        if str(aspect).lower() == "wide" else
+        "three-quarter framing showing the full head and upper body, with headroom "
+        "above the head so the top of the head is never cropped"
+    )
     return (
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
         "line, no preamble) for this character. The image MUST depict the "
         "CHARACTER THEMSELVES -- a person with a clearly visible face, "
-        "three-quarter framing showing head and upper body -- IN CHARACTER "
+        f"{framing} -- IN CHARACTER "
         "inside the story's world. NEVER an empty room, an object, or scenery "
         "alone. Ground it in the appearance and the story setting; keep it "
         "photographic and period-consistent.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
-        f"style_anchor: {STYLE_ANCHOR}\n"
+        f"style_anchor: {_style_anchor_for_aspect(aspect)}\n"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
@@ -402,10 +432,16 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         if not cid:
             continue
         appearance = _appearance_for_char([char], cid)
+        # Framing aspect: synthetic announcers follow announcer_visual, cast
+        # characters follow character_video -- so a WIDE video engine gets a
+        # head-and-shoulders still the wide render won't decapitate (2026-06-17).
+        _aspect = (still_aspects or {}).get(
+            "announcer_visual" if char.get("_synthetic_announcer")
+            else "character_video", "portrait")
         prompt = ""
         source = "template"
         if llm_fn is not None:
-            req = _build_char_prompt_request(char, meta, setting)
+            req = _build_char_prompt_request(char, meta, setting, _aspect)
             for attempt in range(max_reseed + 1):
                 try:
                     raw = llm_fn(req)
@@ -420,7 +456,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 if attempt < max_reseed:
                     warnings.append(f"empty image prompt for {cid}; reseed {attempt + 1}/{max_reseed}")
         if not prompt:
-            prompt = compose_image_prompt_fallback(meta, char)
+            prompt = compose_image_prompt_fallback(meta, char, _aspect)
             source = "template"
         # Story-consistency gate (schema assertion, v1). The synthetic
         # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM

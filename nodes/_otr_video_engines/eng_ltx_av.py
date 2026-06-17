@@ -146,6 +146,11 @@ class _LtxAvBase(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
+    # LTX-AV renders WIDE (832x480 native / 1472x832 canvas). Declaring the aspect
+    # makes OTR_VideoDirector mint a WIDE character still to match -- without it the
+    # director defaulted to a 832x1216 PORTRAIT still that the wide render then
+    # centre-cropped, lopping the subject's head off (operator catch 2026-06-17).
+    render_aspect = "wide"
     _is_talk = False
     _TERMINAL = "decode"
 
