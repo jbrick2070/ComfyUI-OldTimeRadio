@@ -119,6 +119,13 @@ class RenderFloorError(RuntimeError):
     (the soak's negative control; should never happen with a working ffmpeg)."""
 
 
+class RenderError(RuntimeError):
+    """A shot's selected engine failed to render. Fallbacks are DISABLED
+    (operator 2026-06-16, 'this is art, not a space shuttle'): a proven model
+    path must prove itself, so this is terminal -- the episode fails LOUD instead
+    of swapping engines or degrading to a still floor."""
+
+
 class FamilyInputGap(RuntimeError):
     """A fallback candidate's FAMILY requires request inputs this request
     cannot satisfy (p3 down-chain shape, 3D plan 7.0): e.g. ``lipsync_overlay``
@@ -1232,51 +1239,35 @@ def _provide_lipsync_base(engine_name, request):
         _LOG.warning("[OTR video] lipsync base ready: %s", path)
 
 
-def render_shot(shot, request, *, fallback_of, video_revision,
+def render_shot(shot, request, *, fallback_of=None, video_revision=1,
                 oom_engines=frozenset(), oom_shot_id=None):
-    """Render ONE shot through the fallback chain LOUDLY until a clip renders.
+    """Render ONE shot with its selected engine. NO FALLBACKS (operator
+    2026-06-16, 'this is art, not a space shuttle'): a HARD render failure RAISES
+    :class:`RenderError` LOUD -- there is NO engine swap and NO still-image floor,
+    so a proven model path must prove itself. ``fallback_of`` / ``video_revision``
+    are accepted but ignored (the degrade chain is gone); a forced soak OOM simply
+    raises loud like any other failure.
 
-    Returns ``(clip, restamped_shot, decisions, attempts, vram_used_mb)``. Each
-    HARD failure restamps the shot row + appends a runtime_fallback_decision at
-    the SAME revision and logs the LOUD swap. The floor always succeeds, so the
-    loop terminates with a clip (or raises RenderFloorError if the floor itself
-    cannot render -- the negative control)."""
+    Returns ``(clip, shot, [], [engine], vram_used_mb)`` -- the empty decisions
+    list + single-element attempts keep the run_episode trace/return shape
+    stable."""
     sid = shot["shot_id"]
-    bid = shot.get("beat_id", sid)
-    chain = resolve_fallback_chain(shot["engine_id"], fallback_of)
-    decisions = []
-    attempts = []
+    eng = shot["engine_id"]
     out_shot = dict(shot)
-    used_mb = None
-    for cand in chain:
-        force = (sid == oom_shot_id and cand in oom_engines)
-        attempts.append(cand)
-        try:
-            _provide_lipsync_base(cand, request)
-            clip = _render_one(cand, request, force_oom=force)
-            used_mb = _mc.vram_used_mb()
-            return clip, out_shot, decisions, attempts, used_mb
-        except Exception as exc:         # noqa: BLE001 - classified + LOUD swap
-            nxt = fallback_of(cand)
-            kind = _rt.FailureKind.OOM if force else classify_failure(exc)
-            if nxt is None:
-                raise RenderFloorError(
-                    "radio floor %r failed for shot %s: %s: %s"
-                    % (cand, sid, type(exc).__name__, exc))
-            _rt.classify(kind)           # validate the decision invariants
-            detail = ("forced soak OOM" if force
-                      else "%s: %s" % (type(exc).__name__,
-                                       str(exc).splitlines()[0]))[:200]
-            rec = _rt.build_fallback_decision(
-                shot_id=sid, beat_id=bid, from_engine=cand, to_engine=nxt,
-                kind=kind, video_revision=video_revision, detail=detail)
-            decisions.append(rec)
-            out_shot = _rt.restamp_shot_row(
-                out_shot, to_engine=nxt,
-                to_family=engine_family(nxt, out_shot.get("family")),
-                from_engine=cand, kind=kind)
-            _LOG.warning(_rt.format_swap_log(rec))
-    raise RenderFloorError("chain exhausted without a floor for shot %s" % sid)
+    force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
+    try:
+        _provide_lipsync_base(eng, request)
+        clip = _render_one(eng, request, force_oom=force)
+    except Exception as exc:              # noqa: BLE001 - no fallback: fail LOUD
+        kind = _rt.FailureKind.OOM if force else classify_failure(exc)
+        _LOG.error(
+            "[OTR video] render FAILED (no fallback) shot %s engine %s: %s: %s",
+            sid, eng, type(exc).__name__,
+            str(exc).splitlines()[0] if str(exc) else "")
+        raise RenderError(
+            "shot %s engine %r failed to render; fallbacks are disabled (%s) -- "
+            "fix the engine or its inputs: %s" % (sid, eng, kind, exc)) from exc
+    return clip, out_shot, [], [eng], _mc.vram_used_mb()
 
 
 def run_episode(ledger, *, fallback_of, oom_shot_id=None,
