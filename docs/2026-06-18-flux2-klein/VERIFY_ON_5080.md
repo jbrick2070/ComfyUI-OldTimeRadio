@@ -62,14 +62,39 @@ image=flux2_klein, 30w, bark) surfaced two real issues:
 2. OPEN -- the sampler raises `RuntimeError: mat1 and mat2 shapes cannot be
    multiplied (512x15360 and 7680x3072)` in SamplerCustomAdvanced/guider.sample.
    The TE output width (15360) is exactly 2x the klein-4B UNet's expected (7680).
-   ROOT CAUSE HYPOTHESIS: the GGUF klein **4B** is paired with the wrong text
-   encoder -- I reused flux2-**dev**'s `mistral_3_small_flux2_fp4_mixed` (full
-   Mistral-3). ComfyUI's `sd.py` distinguishes `MISTRAL3_24B` vs
-   `MISTRAL3_24B_PRUNED_FLUX2`; klein-4B likely needs the PRUNED TE (or its own
-   matched TE/quant). NEXT: read the unsloth/FLUX.2-klein-4B-GGUF + BFL klein-4B
-   model cards for the EXACT klein-4B TE + ComfyUI recipe (do NOT assume dev's
-   recipe transfers); the 4B is size-distilled and may not share dev's encoder
-   config. Then re-pair the TE and re-run this verify.
+   ROOT CAUSE (confirmed via the model cards 2026-06-18): the GGUF klein **4B** is
+   paired with the WRONG text encoder. I reused flux2-**dev**'s
+   `mistral_3_small_flux2_fp4_mixed`, whose conditioning width is 15360; klein-4B's
+   UNet input projection expects 7680 (EXACTLY HALF) -> the 512x15360 @ 7680x3072
+   matmul fails. klein-4B is a 4B *distilled* rectified-flow transformer and does
+   NOT share dev's full-size encoder config. The HF cards only document the
+   diffusers path (`Flux2KleinPipeline`, which bundles klein's own matched
+   encoder); they do not give the ComfyUI split-file TE.
+
+   NEXT SESSION (start here -- fresh context budget):
+   1. Find klein-4B's ComfyUI-matched text encoder. Check for a Comfy-Org klein
+      repackage (e.g. `Comfy-Org/flux2-klein` split_files/text_encoders/...) OR the
+      official ComfyUI klein workflow TEMPLATE (Comfy-Org/workflow_templates, an
+      `image_flux2_klein*.json`) and read which TE file its CLIPLoader names + the
+      `type`. Do NOT assume dev's `mistral_3_small_flux2*` transfers (it does not --
+      proven by the 2x dim mismatch). The right TE outputs the 7680-width
+      conditioning klein-4B expects (likely a smaller/klein-specific Mistral or a
+      klein-matched repackage).
+   2. Download that TE into `C:\ComfyUI-Models\text_encoders\` (NOT Documents --
+      the headless server scans C:\ComfyUI-Models via _otr_headless_model_paths.yaml).
+   3. Point `OTR_FLUX2_KLEIN_TE` at it (basename) in `_marathon_extra_env.cmd`.
+   4. Re-run the verify: the combo soak invocation is already captured below; the
+      diffusion GGUF (`C:\ComfyUI-Models\diffusion_models\flux-2-klein-4b-Q4_K_M.gguf`)
+      + VAE (`flux2-vae.safetensors`) are already in place + correct.
+   5. On a green `[OTR.image.flux2_klein] minted still` + status=success -> promote
+      (see "On GREEN -> promote" below).
+
+   VERIFY COMBO SOAK INVOCATION (proven to reach the image stage):
+     OTR_COMBO_ANNOUNCER=ltx_av_talk OTR_COMBO_MUSIC=ltx_av_music
+     OTR_COMBO_BEATS=ltx_av_talk OTR_COMBO_ANN_IMG/MUSIC_IMG/BEATS_IMG=flux2_klein
+     OTR_SOAK_TARGET_WORDS=30 OTR_SOAK_ACT_COUNT=1 OTR_COMBO_NCHARS=2
+     OTR_SOAK_CHAR_VOICE=bark OTR_ENABLE_FLUX2_KLEIN=1 + the 3 CKPT/TE/VAE envs.
+     (act_count MUST be 1 for 30 words -- the budget rule rejects 2.)
 
 ## Risks to watch (why this is a real verify, not a rubber-stamp)
 - fp4 (NVFP4) TE load on the torch 2.10 / cu130 / sm_120 stack -- if it does not
