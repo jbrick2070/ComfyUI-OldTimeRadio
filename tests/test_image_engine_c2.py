@@ -69,18 +69,36 @@ def test_z_image_role_filter_shared():
 
 def test_z_image_adapter_assert_usable_fail_closed(monkeypatch):
     """The adapter's OWN assert_usable fails closed (MISSING_MODEL) until the
-    cu128 sidecar venv exists -- ABSENT/greyed, never a stub (BUG-046)."""
-    monkeypatch.delenv(zit.SIDECAR_ENV, raising=False)
+    diffusion-model file is configured -- ABSENT/greyed, never a stub (BUG-046).
+    2026-06-18: in-process now (the stale cu128 sidecar was dropped), so the gate
+    is the WEIGHTS env (MODEL_ENV), mirroring lumina_image."""
+    monkeypatch.delenv(zit.MODEL_ENV, raising=False)
     eng = ireg.get_engine("z_image_turbo")
     with pytest.raises(ireg.EngineUnusable) as ei:
         eng.assert_usable({}, {"role": "character_video"})
     assert ei.value.reason is ireg.EngineUsabilityReason.MISSING_MODEL
 
 
-def test_z_image_render_is_operator_gpu_smoke():
+def test_z_image_graph_is_well_formed():
+    """In-process build (2026-06-18): _zimage_params resolves the low-VRAM
+    converged defaults and _build_zimage_graph emits the lumina-style split-file
+    AuraFlow graph. CPU-pure (no torch/comfy); the live render is the operator
+    GPU smoke."""
     eng = ireg.get_engine("z_image_turbo")
-    with pytest.raises(NotImplementedError):
-        eng.render_image({"prompt": "x"}, {})
+    params = eng._zimage_params({"prompt": "p", "seed": 7, "width": 832, "height": 1216})
+    assert params["steps"] == 8 and params["cfg"] == 2.0 and params["shift"] == 3.0
+    assert params["scheduler"] == "normal" and params["sampler_name"] == "euler"
+    assert params["negative"]                       # live negative default
+    assert params["width"] == 832 and params["height"] == 1216   # request dims honored
+
+    class _W:
+        def __init__(self, n, s): self.n, self.s = n, s
+
+    graph = eng._build_zimage_graph(params, _W)
+    assert set(graph) == {"unet", "clip", "vae", "sampling", "pos", "neg",
+                          "latent", "ksampler", "decode"}
+    assert graph["clip"]["inputs"]["type"] == params["clip_type"]
+    assert graph["ksampler"]["inputs"]["steps"] == 8
 
 
 def test_z_image_cold_import_clean():

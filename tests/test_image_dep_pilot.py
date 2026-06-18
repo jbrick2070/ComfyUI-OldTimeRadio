@@ -42,12 +42,11 @@ def test_isolation_classification():
     # Flux gen-1 = default (no flag, no sidecar, no model env gate)
     assert by_name["flux_gen1"]["isolation"] == "default"
     assert by_name["flux_gen1"]["enable_flag"] is None
-    # Z-Image (C2) = sidecar (exposes SIDECAR_ENV)
-    assert by_name["z_image_turbo"]["isolation"] == "sidecar"
-    assert by_name["z_image_turbo"]["gate_env"] == "OTR_ZIMAGE_SIDECAR"
-    # the GGUF/native peers = in-stack (expose MODEL_ENV)
-    for n in ("qwen_image", "hidream_i1", "chroma_hd", "lumina_image",
-              "sd35_large", "flux2_klein"):
+    # the GGUF/native peers = in-stack (expose MODEL_ENV). z_image_turbo joined
+    # this group 2026-06-18 when it was rebuilt in-process (the stale cu128
+    # sidecar stub was dropped; gate is now OTR_ZIMAGE_UNET).
+    for n in ("z_image_turbo", "qwen_image", "hidream_i1", "chroma_hd",
+              "lumina_image", "sd35_large", "flux2_klein"):
         assert by_name[n]["isolation"] == "in_stack", n
         assert by_name[n]["gate_env"], n
 
@@ -75,8 +74,10 @@ def test_snapshot_violations_pure_logic():
 def test_run_pilot_counts():
     report = pilot.run_pilot()
     assert report["engine_count"] == len(pilot.enumerate_engines())
-    assert report["sidecar_count"] >= 1          # at least Z-Image
-    assert report["in_stack_count"] >= 6         # the GGUF/native peers
+    # 2026-06-18: z_image_turbo was rebuilt in-process, so there are now NO
+    # sidecar image engines (every image peer runs in-stack via ComfyUI loaders).
+    assert report["sidecar_count"] == 0
+    assert report["in_stack_count"] >= 7         # the GGUF/native peers + z_image
     assert "sidecar_probe" not in report         # no probe unless --lib given
 
 

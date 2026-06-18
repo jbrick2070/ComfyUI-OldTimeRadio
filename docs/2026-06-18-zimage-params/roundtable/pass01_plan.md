@@ -103,12 +103,17 @@ sampling/prompting actually matches Flux. [CONFIRMED cut, all 3 models]
 
 ---
 
-## 5. TIER CAVEAT (CONFIRMED -- do not over-claim)
+## 5. TIER / QWEN3 DECISION (operator 2026-06-18: low-VRAM is the whole point)
 
-bf16 6B diffusion (~12 GB) + Qwen3-4B TE + VAE comfortably fits the **16 GB 5080** (our box) but is
-NOT a true sub-8GB footprint. For the genuine 8GB tier, a later step needs an **FP8/GGUF Z-Image +
-a quantized/offloaded Qwen3 TE**. The commercial-clean (Apache-2.0) win holds at every precision;
-the "fits 8GB" claim is precision-dependent and deferred to a quant pass.
+**Qwen3-4B is MANDATORY** -- it is Z-Image's native text encoder (the S3-DiT was trained on Qwen3
+embeddings; there is no CLIP-only Z-Image). It does NOT break the low-VRAM goal:
+- Use the **fp8** diffusion model + **fp8 (or GGUF) Qwen3-4B** TE (fp8 ~= half size, negligible
+  quality loss; GGUF smaller still). fp8 path targets ~8-10 GB; GGUF lower.
+- ComfyUI **evicts the TE before the diffusion sampling peak** (same offload that fits LTX-22B +
+  Gemma), so the resident peak is the diffusion model, not TE+diffusion co-resident.
+- LOW-VRAM DEFAULTS (this is the shipped config): `OTR_ZIMAGE_UNET=z_image_turbo_fp8_scaled.safetensors`,
+  `OTR_ZIMAGE_CLIP=qwen3_4b_fp8_scaled.safetensors`, `OTR_ZIMAGE_VAE=ae.safetensors`. Operator can
+  point these at bf16 / GGUF instead. Apache-2.0 commercial-clean at every precision.
 
 ---
 
