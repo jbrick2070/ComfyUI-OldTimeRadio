@@ -26,7 +26,7 @@ def _load():
 
 
 SMK = _load()
-_FLAGS = ["OTR_ENABLE_HUMO", "OTR_ENABLE_LATENTSYNC", "OTR_ENABLE_LTX_VIDEO",
+_FLAGS = ["OTR_ENABLE_HUMO", "OTR_ENABLE_LTX_VIDEO",
           "OTR_ENABLE_WAN_I2V"]
 
 
@@ -66,18 +66,18 @@ def test_assert_usable_advances_to_missing_model_with_flag_on(monkeypatch):
 def test_humo_fallback_chain_and_demo():
     r = SMK.run_smoke("humo")
     assert _check(r, "fallback_chain")["detail"] == \
-        "humo -> humo_1.7B -> latentsync -> still_kenburns"
+        "humo -> humo_1.7B -> still_kenburns"
     demo = r["fallback_demo"]
-    assert demo["chain"] == ["humo", "humo_1.7B", "latentsync", "still_kenburns"]
+    assert demo["chain"] == ["humo", "humo_1.7B", "still_kenburns"]
     assert demo["converges_to_floor"] is True
-    assert len(demo["decisions"]) == 3
+    assert len(demo["decisions"]) == 2
     assert all(d["block_class"] == "hard" and d["failure_kind"] == "oom"
                and d["video_revision"] == 1 for d in demo["decisions"])
     assert all("frozen audio untouched" in line for line in demo["logs"])
 
 
 def test_request_build_runs_for_each_engine():
-    for engine in ("humo", "latentsync", "ltx_video", "wan_i2v"):
+    for engine in ("humo", "ltx_video", "wan_i2v"):
         r = SMK.run_smoke(engine)
         assert _check(r, "request_build")["ok"] is True
 

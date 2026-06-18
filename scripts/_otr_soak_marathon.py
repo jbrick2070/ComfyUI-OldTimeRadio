@@ -4,8 +4,8 @@ testing all sorts of options: multi-LLM, multi-image, multi-video,
 multi-audio").
 
 A PLAYLIST of episodes rotates the real dropdown surface -- video engine
-(humo production / forced all-LTX / LTX-base + latentsync lipsync combo /
-procgen floor), char-voice engine (indextts2 / bark / dia), music engine
+(humo production / forced all-LTX / procgen floor), char-voice engine
+(indextts2 / bark / dia), music engine
 (stable_audio_3 / musicgen), writer LLM (mistral-nemo / gemma-4-12b local
 Ollama) and word count -- one FRESH headless server per episode (per-leg env
 via the launcher's _marathon_extra_env.cmd hook), every episode through the
@@ -59,23 +59,6 @@ MISTRAL = "mistralai/Mistral-Nemo-Instruct-2407"
 PLAYLIST = [
     dict(leg="ep01_all_ltx_120w", lane="LTX",
          env={"OTR_FORCE_ENGINE_MAP": "*=ltx_video"},
-         words=120, chars=2,
-         patches=[(N_CHARVOICE, "engine", "indextts2"),
-                  (N_MUSIC, "engine", "stable_audio_3")],
-         expect_engine=""),
-    dict(leg="ep02_ltx_latentsync_combo_120w", lane="LTX",
-         env={"OTR_FORCE_ENGINE_MAP":
-              ("character_video=latentsync,announcer_visual=latentsync,"
-               "scene_broll=ltx_video,music_visual=ltx_video,"
-               "background_abstract=ltx_video"),
-              "OTR_ENABLE_LATENTSYNC": "1",
-              "OTR_LSYNC_BASE_ENGINE": "ltx_video",
-              # The headless server resolves the Path-B defaults under the
-              # INSTALL root (junction) -- pin the real Documents install.
-              "OTR_LATENTSYNC_VENV":
-              r"C:\Users\jeffr\Documents\ComfyUI\latentsync\.venv\Scripts\python.exe",
-              "OTR_LATENTSYNC_REPO":
-              r"C:\Users\jeffr\Documents\ComfyUI\latentsync\repo"},
          words=120, chars=2,
          patches=[(N_CHARVOICE, "engine", "indextts2"),
                   (N_MUSIC, "engine", "stable_audio_3")],

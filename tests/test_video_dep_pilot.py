@@ -80,7 +80,7 @@ def test_probe_one_unknown_engine():
 
 
 def test_probe_one_no_import_reports_structure_only():
-    v = PILOT.probe_one("latentsync", do_import=False)
+    v = PILOT.probe_one("humo", do_import=False)
     assert v["status"] == "not_imported"
     assert v["adapter_registered"] is True
     assert v["forward_present"] is True
@@ -126,9 +126,7 @@ def test_new_source_is_ascii_no_em_dash():
     # the working tree; check them WHEN PRESENT but never fail a clean checkout.
     for src_path in (
         PILOT_SRC,
-        REPO_ROOT / "nodes" / "_otr_video_engines" / "eng_latentsync.py",
         REPO_ROOT / "nodes" / "_otr_shared" / "sidecar.py",
-        REPO_ROOT / "scripts" / "_otr_latentsync_worker.py",
     ):
         if not src_path.exists():
             continue

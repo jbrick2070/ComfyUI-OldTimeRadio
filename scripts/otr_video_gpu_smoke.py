@@ -1,4 +1,4 @@
-"""Operator GPU-smoke probe for the parked video engines (humo / latentsync /
+"""Operator GPU-smoke probe for the parked video engines (humo /
 ltx_video / wan_i2v) -- READY-to-run, never a fake pass.
 
 The heavy engines ship default-OFF / dark: their CPU adapters (assert_usable,
@@ -13,7 +13,7 @@ the real fallback chain, probes machine-wide NVML VRAM, and prints a READY /
 NOT-READY verdict with the exact next steps. ``--run-render`` additionally drives
 the adapter lifecycle and reports the real outcome (the GPU slice raises
 NotImplementedError until the operator wires it -- reported honestly, never a
-pass). For humo it also demonstrates the LOUD humo -> latentsync ->
+pass). For humo it also demonstrates the LOUD humo -> humo_1.7B ->
 still_kenburns fallback restamp on a simulated OOM.
 
 Run on the 5080 AFTER: install the wrapper + ckpts, set the engine's ckpt env,
@@ -38,7 +38,6 @@ from nodes._otr_video_engines import motion_common as _mc     # noqa: E402
 from nodes._otr_video_engines import registry as _vreg        # noqa: E402
 # Register every engine + the cheap-family radio floor.
 from nodes._otr_video_engines import eng_humo                 # noqa: E402,F401
-from nodes._otr_video_engines import eng_latentsync           # noqa: E402,F401
 from nodes._otr_video_engines import eng_ltx_video            # noqa: E402,F401
 from nodes._otr_video_engines import eng_wan_i2v              # noqa: E402,F401
 from nodes._otr_video_engines import cheap_families           # noqa: E402,F401
@@ -51,11 +50,6 @@ ENGINES = {
                    "whisper_large_v3 audio encoder, HuMo diffusion/LoRA); "
                    "set OTR_HUMO_CKPT",
         "sage": "tolerated (verify on GPU)", "has_fallback": True},
-    "latentsync": {
-        "flag": "OTR_ENABLE_LATENTSYNC", "kind": "cu128 py3.10 sidecar",
-        "install": "cu128 sidecar venv + bytedance/LatentSync repo + worker; "
-                   "set OTR_LATENTSYNC_VENV / _WORKER / _REPO",
-        "sage": "isolated in sidecar", "has_fallback": True},
     "ltx_video": {
         "flag": "OTR_ENABLE_LTX_VIDEO", "kind": "in-process",
         "install": "LTX-Video wrapper + ckpt; set OTR_LTX_VIDEO_CKPT",
@@ -98,7 +92,7 @@ def _registry_fallback_of(name):
 
 
 def demonstrate_humo_fallback():
-    """Walk + LOUD-restamp the real humo -> latentsync -> still_kenburns chain on
+    """Walk + LOUD-restamp the real humo -> humo_1.7B -> still_kenburns chain on
     a simulated OOM (CPU-real; proves the wiring the GPU OOM will trigger)."""
     chain = resolve_fallback_chain("humo", _registry_fallback_of)
     section = {"video_revision": 1, "shots": [], "runtime_fallback_decisions": []}
@@ -234,7 +228,7 @@ def _next_steps(engine):
         "GPU slice): load + render_clip on the 5080.",
         "5. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
         "twice for determinism%s."
-        % (" + exercise the humo -> latentsync -> still_kenburns fallback"
+        % (" + exercise the humo -> humo_1.7B -> still_kenburns fallback"
            if engine == "humo" else ""),
     ]
 

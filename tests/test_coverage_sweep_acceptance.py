@@ -174,10 +174,10 @@ def test_forbid_fallback_on_when_both():
 def test_strict_fallback_exit_needs_no_wan_engine():
     # strict-fallback uses non-acceptance exit semantics: a non-Wan all-PASS run
     # is GREEN (no wan_i2v/wan_ti2v required), an empty run is RED.
-    non_wan = [_leg("sweep_other_beats_visual_latentsync"),
+    non_wan = [_leg("sweep_other_beats_visual_still_parallax"),
                _leg("sweep_music_visual_visualizer")]
     assert sweep.sweep_exit_code(non_wan, acceptance=False) == 0
     assert sweep.sweep_exit_code([], acceptance=False) == 1
     # A silent fallback would surface as a SOAK_FAIL leg (M1 raised) -> RED.
-    fell = [_leg("sweep_other_beats_visual_latentsync", "SOAK_FAIL")]
+    fell = [_leg("sweep_other_beats_visual_still_parallax", "SOAK_FAIL")]
     assert sweep.sweep_exit_code(fell, acceptance=False) == 1

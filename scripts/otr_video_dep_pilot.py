@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-"""OTR video dependency-pilot harness (A-S4 -- the lipsync-sidecar unblock).
+"""OTR video dependency-pilot harness (A-S4 -- the opt-in-engine dep gate).
 
-The opt-in video engines that run in an ISOLATED cu128 sidecar venv (latentsync
-now; LTX / Wan / HuMo as they land) need Blackwell / cu128 dependency validation
+The opt-in video engines that run in an ISOLATED cu128 sidecar venv (the
+character_3d lanes; LTX / Wan / HuMo as they land) need Blackwell / cu128
+dependency validation
 on the operator's GPU box BEFORE a live render is trusted: importing the engine
 library must NOT swap the resident torch or drag in a determinism-breaking,
 sm_120-brittle dependency (xformers / flash_attn / sageattention -- BUG-070).
@@ -21,7 +22,8 @@ wiring must confirm.
 Isolation: each engine is probed in its OWN subprocess (``--probe-one``), so a
 polluted import never contaminates the parent. This is a diagnostic tool, never
 an import-time side effect: run it, read the verdict. Promotion (install the
-venv, flip OTR_ENABLE_LATENTSYNC, run the live GPU smoke) stays a human step.
+venv, flip the engine's OTR_ENABLE_* flag, run the live GPU smoke) stays a human
+step.
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -83,20 +85,6 @@ OPT_IN_ENGINES = {
             "concat -> LTXVSeparateAVLatent -> VAEDecodeTiled); GGUF Q3_K_M. "
             "# TODO-for-GPU-smoke: confirm the audio-reactive music forward holds "
             "<=14.5GB at the floor + the sync-loose look passes A/B (M4)"
-        ),
-    },
-    "latentsync": {
-        "lib_module": "latentsync",
-        "adapter_class": "LatentSyncEngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_LATENTSYNC",
-        "assumed_call": (
-            "python -m scripts.inference --unet_config_path "
-            "configs/unet/stage2_512.yaml --inference_ckpt_path "
-            "checkpoints/latentsync_unet.pt --video_path <base_clip> "
-            "--audio_path <audio> --video_out_path <out> --seed <int>  "
-            "# TODO-for-GPU-smoke: confirm the config/ckpt paths run headless on "
-            "sm_120; optimize to a preloaded LipsyncPipeline reused per request"
         ),
     },
     "ltx_video": {
@@ -212,7 +200,7 @@ OPT_IN_ENGINES = {
         ),
     },
     # The 1.7B HuMo downgrade tier (OOM/VRAM hard auto-downgrade target before
-    # latentsync/still). Same in-process HuMo wrapper + flag as the 14B keystone;
+    # the still floor). Same in-process HuMo wrapper + flag as the 14B keystone;
     # its own UNET, NO LoRA, more steps -- a lighter real talking face.
     "humo_1.7B": {
         "lib_module": "humo",
@@ -224,7 +212,7 @@ OPT_IN_ENGINES = {
             "but the 1.7B UNET, LoRA-free, ~20 steps / cfg 1.0 (de-blued from 5.0 "
             "which cast blue, 2026-06-17; own "
             "OTR_HUMO_17B_* knobs). The OOM/VRAM hard auto-downgrade lands here "
-            "before latentsync/still so a heavy episode keeps a real face.  "
+            "before the still floor so a heavy episode keeps a real face.  "
             "# TODO-for-GPU-smoke: confirm the 1.7B weight loads, fits a tighter "
             "VRAM budget than the 14B, does not swap torch or pull "
             "xformers/flash_attn/sageattention, and render-twice determinism"
@@ -535,9 +523,8 @@ def probe_one(engine_name, *, do_import=True):
     except ImportError:
         verdict["status"] = "lib_absent"
         verdict["note"] = (
-            f"{spec['lib_module']} not installed -- run "
-            f"scripts\\_otr_latentsync_install.ps1 in this engine's isolated "
-            f"venv and re-run on the GPU box to verify the import + render"
+            f"{spec['lib_module']} not installed -- install it in this engine's "
+            f"isolated venv and re-run on the GPU box to verify the import + render"
         )
         return verdict
     except Exception as exc:  # noqa: BLE001 -- a broken import is a real finding

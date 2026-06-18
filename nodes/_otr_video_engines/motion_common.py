@@ -3,7 +3,7 @@
 The motion video engines -- ltx_video (text->video), wan_i2v (image->video), and
 humo (A-S6) -- run IN-PROCESS in the main ComfyUI cu130 / torch-2.10 venv: they
 call the installed ComfyUI wrapper node classes directly (no GraphBuilder),
-unlike the Path-B latentsync subprocess sidecar. This module factors the pieces
+unlike a Path-B cu128 subprocess sidecar. This module factors the pieces
 those in-process motion adapters share, so each adapter file stays small and
 every guard is tested once:
 

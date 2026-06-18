@@ -23,19 +23,6 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# M2 / A-S4: register the latentsync lipsync-overlay sidecar adapter. It is
-# DEFAULT-OFF / dark -- registered so it shows in the static per-role dropdown
-# (V-6) but not a default for any role and gated behind OTR_ENABLE_LATENTSYNC;
-# it fails closed until the Path-B cu128 venv + worker are installed. Cold-import
-# clean (lazy diffusers/torch/ffmpeg inside the worker venv, never here), so this
-# import pulls in nothing heavy (invariant V-12, the cold-import test). Guarded so
-# a packaging quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_latentsync as _eng_latentsync  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-
 # M2 / A-S5: register the in-process motion engines -- ltx_video (text->video)
 # and wan_i2v (image->video). Both are DEFAULT-OFF / dark (empty default_roles +
 # gated behind OTR_ENABLE_LTX_VIDEO / OTR_ENABLE_WAN_I2V) so they show in the

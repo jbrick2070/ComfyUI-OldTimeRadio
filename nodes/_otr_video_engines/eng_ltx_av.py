@@ -564,7 +564,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
 class LtxAvTalkEngine(_LtxAvBase):
     """LTX-AV talk lane: lip-sync attempt from the FLUX still (I2V) + the audio
     slice. Reuses the ``audio_driven_face`` family; degrades to HuMo (then the
-    HuMo 1.7B tier -> latentsync -> still floor)."""
+    HuMo 1.7B tier -> still floor)."""
 
     name = "ltx_av_talk"
     family = "audio_driven_face"

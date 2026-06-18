@@ -1,7 +1,7 @@
 """Additive CPU coverage for the pluggable video-engine registry (AS-4).
 
 New, self-contained READ-ONLY assertions on the real video registry after the
-core adapters self-register on import (humo / latentsync / the cheap radio-floor
+core adapters self-register on import (humo / humo_1.7B / the cheap radio-floor
 families). It never clears or mutates the global registry. Pins: the registry is
 the shared AS-4 base instance, names are sorted + unique, engines_for_role is
 self-consistent (every returned engine lists the role), and assert_usable /
@@ -18,11 +18,10 @@ from nodes._otr_video_engines import registry as vreg
 # Importing the adapters self-registers the core engines (the same import the
 # retry-taxonomy test relies on); read-only -- we never clear/modify the global.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import eng_latentsync      # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 
-CORE_ENGINES = ("humo", "latentsync", "still_kenburns")
+CORE_ENGINES = ("humo", "humo_1.7B", "still_kenburns")
 
 
 def test_registry_is_the_shared_video_base_instance():

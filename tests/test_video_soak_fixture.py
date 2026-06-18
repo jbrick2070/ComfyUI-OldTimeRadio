@@ -4,7 +4,7 @@ The soak drives a synthetic 40-beat, all-roles / all-families episode through th
 shipped A-S7 decision machinery TWICE back-to-back, forcing a mid-episode OOM on
 the character_3d group. These tests pin: the fixture shape (all roles + families,
 one character_3d group), that every beat produces a clip, that the character_3d
-group converges triposg_talk -> humo -> humo_1.7B -> latentsync ->
+group converges triposg_talk -> humo -> humo_1.7B ->
 still_kenburns (W7-pre: triposg_talk is the v1 3D lane) to the radio floor with
 LOUD restamps at the SAME video_revision, that the frozen
 audio section is byte-identical after the run, that two runs are deterministic
@@ -43,7 +43,10 @@ def test_fixture_is_40_beats_all_roles_all_families():
     assert roles == {"announcer_visual", "music_visual", "character_video",
                      "scene_broll", "background_abstract"}
     families = {s["family"] for s in shots}
-    for fam in ("audio_driven_face", "lipsync_overlay", "image_to_video",
+    # lipsync_overlay is still a registered schema family but has NO engine after
+    # the latentsync cleanbreak (2026-06-17), so the soak rotation -- which is
+    # engine-backed -- no longer carries it.
+    for fam in ("audio_driven_face", "image_to_video",
                 "text_to_video", "static_image_gen", "static_motion",
                 "abstract", "character_3d"):
         assert fam in families
@@ -67,7 +70,7 @@ def test_two_episode_soak_passes_all_invariants():
     assert any("determinism" in c for c in checks)
 
 
-def test_character_3d_oom_converges_to_floor_with_four_restamps():
+def test_character_3d_oom_converges_to_floor_with_three_restamps():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
     sec = result["e1"]["ledger"]["video"]
     oom = {s["shot_id"]: s for s in sec["shots"]}[result["meta"]["oom_shot_id"]]
@@ -75,8 +78,8 @@ def test_character_3d_oom_converges_to_floor_with_four_restamps():
     assert oom["family"] == "static_motion"
     assert oom["degradation_trail"] == SOAK.EXPECTED_OOM_TRAIL
     decisions = sec["runtime_fallback_decisions"]
-    # 4 hops now: hunyuan3d_talk -> humo -> humo_1.7B -> latentsync -> still_kenburns
-    assert len(decisions) == 4
+    # 3 hops now: triposg_talk -> humo -> humo_1.7B -> still_kenburns
+    assert len(decisions) == 3
     assert all(d["failure_kind"] == "oom" and d["block_class"] == "hard"
                and d["video_revision"] == 1 for d in decisions)
 

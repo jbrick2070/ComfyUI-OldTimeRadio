@@ -30,7 +30,6 @@ from nodes._otr_shared.fallback import resolve_fallback_chain
 from nodes._otr_video_engines import registry as vreg
 # Register every engine so the real fallback graph can be walked.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import eng_latentsync      # noqa: F401
 from nodes._otr_video_engines import eng_ltx_video       # noqa: F401
 from nodes._otr_video_engines import eng_wan_i2v         # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
@@ -73,7 +72,7 @@ def test_no_ghost_fallback_engine_references():
 def test_fallback_chains_resolve_to_a_registered_radio_floor():
     def fallback_of(n):
         return getattr(vreg.get_engine(n), "fallback_engine", None)
-    for start in ("humo", "latentsync"):
+    for start in ("humo", "humo_1.7B"):
         chain = resolve_fallback_chain(start, fallback_of)
         floor = chain[-1]
         assert vreg.is_registered(floor)              # terminus is real

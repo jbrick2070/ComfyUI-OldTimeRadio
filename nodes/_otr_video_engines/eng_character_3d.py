@@ -24,7 +24,7 @@ ImageDirector granularity lock reads (3D plan section 3; never a hard-coded
 family check).
 
 Isolation: each runs in its OWN per-engine cu128 sidecar venv (NOT the ComfyUI
-cu130 venv; mirrors ``eng_latentsync`` Path-B isolation); the venv python paths
+cu130 venv; the Path-B sidecar isolation pattern); the venv python paths
 are ``OTR_TRIPOSG_SIDECAR_PYTHON`` / ``OTR_B_SIDECAR_PYTHON`` (hunyuan) /
 ``OTR_TRELLIS_SIDECAR_PYTHON`` (trellis).
 
@@ -51,7 +51,7 @@ string (no new enum value needed).
 ``render_clip()`` raises NAMED NotImplementedError (dark -- the W7 forward).
 
 Fallback chain: all three declare ``fallback_engine = "humo"`` so the chain
-``triposg_talk -> humo -> humo_1.7B -> latentsync -> still_kenburns`` matches
+``triposg_talk -> humo -> humo_1.7B -> still_kenburns`` matches
 the ``render_driver.SYNTH_FALLBACKS`` overlay WITHOUT requiring a soak re-cert
 now. Trellis-first (chain A: ``trellis_talk -> humo``) defers with its lane.
 

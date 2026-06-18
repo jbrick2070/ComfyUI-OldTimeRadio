@@ -43,7 +43,7 @@ TIERS = ("16gb_full", "8gb_lite", "cpu_floor")
 def _video_registry():
     from nodes._otr_video_engines import registry as vreg
     from nodes._otr_video_engines import (  # noqa: F401  (register adapters)
-        cheap_families, eng_character_3d, eng_humo, eng_latentsync,
+        cheap_families, eng_character_3d, eng_humo,
         eng_ltx_video, eng_wan_i2v, eng_wan_ti2v,
     )
     return vreg

@@ -489,14 +489,14 @@ def test_video_render_batch_mode_combo_offers_episode():
 
 # --------------------------------------------------------------------------- #
 # OTR_FORCE_ENGINE_MAP override + the lipsync base provider (2026-06-09,
-# operator experiment knob: the all-LTX / LTX+latentsync episodes)
+# operator experiment knob: the all-LTX / forced-engine episodes)
 # --------------------------------------------------------------------------- #
 def test_parse_engine_override_grammar():
     m = rd.parse_engine_override("*=ltx_video")
     assert m == {"*": "ltx_video"}
     m = rd.parse_engine_override(
-        "character_video=latentsync, scene_broll=ltx_video")
-    assert m == {"character_video": "latentsync", "scene_broll": "ltx_video"}
+        "character_video=humo, scene_broll=ltx_video")
+    assert m == {"character_video": "humo", "scene_broll": "ltx_video"}
     with pytest.raises(ValueError):
         rd.parse_engine_override("character_video")          # no '='
     with pytest.raises(ValueError):
@@ -669,11 +669,21 @@ def test_character_3d_request_missing_inputs_fails_closed():
 def test_family_input_gap_fails_loud(monkeypatch, stub_registry):
     """p3 down-chain shape: a lipsync_overlay engine whose base_clip_ref the
     request cannot supply now FAILS LOUD (no fallbacks, operator 2026-06-16) --
-    the wrong-shaped request raises RenderError instead of degrading."""
-    from nodes._otr_video_engines import eng_latentsync  # noqa: F401
+    the wrong-shaped request raises RenderError instead of degrading. Uses a
+    stub lipsync_overlay engine (latentsync removed 2026-06-17); the family-input
+    gap is the same regardless of which engine carries the family."""
+    class _StubLipsync(_StubBase):
+        name = "stub_lipsync"
+        family = "lipsync_overlay"
+        roles = ("announcer_visual", "character_video")
+
+        def render_clip(self, request, prepared):
+            return {"raw": True}
+
+    vreg.register(_StubLipsync())
     monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
     shot = {"shot_id": "shot_gap", "beat_id": "bg", "role": "character_video",
-            "engine_id": "latentsync", "family": "lipsync_overlay",
+            "engine_id": "stub_lipsync", "family": "lipsync_overlay",
             "group_id": "g", "target_frame_count": 25,
             "degradation_trail": []}
     req = rd.build_request(shot, {"init_image": "p.png", "audio_ref": "a.wav"},

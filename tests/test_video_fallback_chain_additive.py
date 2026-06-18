@@ -32,20 +32,20 @@ def test_single_terminal_returns_just_start():
 
 
 def test_linear_chain_resolves_in_order():
-    mapping = {"humo": "latentsync", "latentsync": "still_kenburns"}
+    mapping = {"humo": "humo_1.7B", "humo_1.7B": "still_kenburns"}
     assert resolve_fallback_chain("humo", _chain_map(mapping)) == [
         "humo",
-        "latentsync",
+        "humo_1.7B",
         "still_kenburns",
     ]
 
 
 def test_chain_terminates_at_floor_true_and_false():
-    mapping = {"humo": "latentsync", "latentsync": "still_kenburns"}
+    mapping = {"humo": "humo_1.7B", "humo_1.7B": "still_kenburns"}
     fb = _chain_map(mapping)
     assert chain_terminates_at_floor("humo", fb, {"still_kenburns"}) is True
-    # ends at latentsync, which is not a declared floor name
-    assert chain_terminates_at_floor("latentsync", fb, {"abstract"}) is False
+    # ends at humo_1.7B, which is not a declared floor name
+    assert chain_terminates_at_floor("humo_1.7B", fb, {"abstract"}) is False
 
 
 def test_cycle_raises_cycle_error():

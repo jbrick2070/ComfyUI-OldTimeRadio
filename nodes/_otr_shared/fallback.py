@@ -1,8 +1,8 @@
 """Pure fallback-CHAIN resolver (A-S6) -- shared, dependency-free.
 
 A video role can degrade at render time when its chosen engine is unusable (OOM,
-missing weights, a load failure): the ``audio_driven_face`` engine HuMo degrades
-to the ``lipsync_overlay`` engine latentsync, which in turn degrades to the
+missing weights, a load failure): the 14B ``audio_driven_face`` engine HuMo
+degrades to its lighter ``humo_1.7B`` tier, which in turn degrades to the
 in-process radio-floor ``still_kenburns``. Each engine declares a SINGLE next hop
 via a ``fallback_engine`` attribute (``None`` / absent = terminal radio floor);
 this module walks that single-linked chain to the floor.

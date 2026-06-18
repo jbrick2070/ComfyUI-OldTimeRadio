@@ -42,13 +42,14 @@ soak runs with OTR_SOAK_POLL_TIMEOUT_S=10800 so the real renders complete.
 
 ## Overnight soak run (ACTIVE)
 
-`python scripts\otr_coverage_sweep.py --strict-fallback --exclude latentsync --exclude triposg`
+`python scripts\otr_coverage_sweep.py --strict-fallback --exclude triposg`
 (server: full in-process enable-set -- HuMo + wan_i2v(14B) + wan_ti2v(5B GGUF) +
 ltx_video + ltx_orbit + still_parallax + mesh_stage; OTR_SOAK_POLL_TIMEOUT_S=10800;
 no C7). Started 05:35.
 
-Excluded: latentsync + triposg (sidecar venvs), hunyuan3d/trellis (cu128 toolchain
--- auto-skip).
+Excluded: triposg (sidecar venv), hunyuan3d/trellis (cu128 toolchain
+-- auto-skip). (The lipsync sidecar engine was later removed entirely,
+2026-06-17.)
 
 | # | Leg | Verdict | Elapsed | Notes |
 |---|-----|---------|---------|-------|

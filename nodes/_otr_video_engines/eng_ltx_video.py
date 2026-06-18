@@ -1,7 +1,7 @@
 """LTX-Video text->video motion adapter (A-S5 / CW-6) -- in-process, default-OFF.
 
 LTX-Video is a fast text-driven video generator (it can also act as a base-clip
-PROVIDER for a downstream consumer). Unlike the latentsync Path-B sidecar, LTX
+PROVIDER for a downstream consumer). Unlike a Path-B cu128 sidecar, LTX
 runs IN-PROCESS in the main ComfyUI cu130 venv: ``render_clip`` drives the
 installed LTX ComfyUI wrapper node classes directly. It is registered DEFAULT-OFF
 / dark (empty ``default_roles`` + gated behind ``OTR_ENABLE_LTX_VIDEO``) so it
@@ -425,7 +425,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     @staticmethod
     def _init_image_path(request) -> str:
         """The request's init image path (asset_refs still/init_image/image),
-        '' when none. Same key set the cheap families + latentsync read."""
+        '' when none. Same key set the cheap families read."""
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
         assets = get("asset_refs") or {}

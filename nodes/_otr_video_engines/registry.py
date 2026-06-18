@@ -154,9 +154,6 @@ CAPABILITIES = {
     "humo_14B_169": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": False,
                      "model_requirements": ["HuMo-17B"]},
-    "latentsync": {"vram_class": "medium", "vram_estimate_mb": 6500, "required_toolchain": None,
-                   "requires_sidecar": True, "cpu_ok": False,
-                   "model_requirements": ["latentsync-1.5"]},
     # GGUF splice (2026-06-15): the production LTX video recipe is the frozen
     # mini -- 22B GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX video
     # VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class. The 2026-06-16

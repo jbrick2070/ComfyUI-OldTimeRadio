@@ -13,7 +13,6 @@ import pytest
 
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register floor)
 from nodes._otr_video_engines import eng_humo         # noqa: F401 (register humo)
-from nodes._otr_video_engines import eng_latentsync    # noqa: F401 (register)
 from nodes._otr_video_engines import eng_ltx_video      # noqa: F401 (register)
 from nodes._otr_video_engines import eng_wan_i2v        # noqa: F401 (register)
 from nodes._otr_video_engines import render_driver as rd
@@ -26,11 +25,11 @@ def test_fallback_chain_character3d_converges_to_floor():
     # W7-pre: triposg_talk is the v1 character_3d lane.
     chain = resolve_fallback_chain("triposg_talk", fb)
     assert chain == ["triposg_talk", "humo", "humo_1.7B",
-                     "latentsync", "still_kenburns"]
+                     "still_kenburns"]
     # The deferred-toolkit engine keeps the same resolvable chain shape.
     chain = resolve_fallback_chain("hunyuan3d_talk", fb)
     assert chain == ["hunyuan3d_talk", "humo", "humo_1.7B",
-                     "latentsync", "still_kenburns"]
+                     "still_kenburns"]
 
 
 def test_fallback_dangling_engine_gets_universal_floor():
@@ -77,9 +76,7 @@ def _passing_episode(n, oom_sid):
         {"shot_id": oom_sid, "from_engine": "triposg_talk",
          "to_engine": "humo", "failure_kind": "oom", "block_class": "hard",
          "video_revision": 1},
-        {"shot_id": oom_sid, "from_engine": "humo", "to_engine": "latentsync",
-         "failure_kind": "oom", "block_class": "hard", "video_revision": 1},
-        {"shot_id": oom_sid, "from_engine": "latentsync",
+        {"shot_id": oom_sid, "from_engine": "humo_1.7B",
          "to_engine": "still_kenburns", "failure_kind": "oom",
          "block_class": "hard", "video_revision": 1},
     ]

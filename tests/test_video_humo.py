@@ -7,7 +7,7 @@ without the flag / install, tolerates SageAttention (unlike ltx_video -- HuMo's
 Sage stance is a GPU-smoke verify item, not a hard CPU gate), the portrait
 init_image aspect plan never stretches (480x832 native), the AS-3 lease is taken
 + released, the pure request / clip helpers are deterministic, and the declared
-fallback chain humo -> latentsync -> still_kenburns is acyclic and converges on
+fallback chain humo -> humo_1.7B -> still_kenburns is acyclic and converges on
 the radio floor. The live load + the VRAM<=14.5 GB boundary + render-twice pixels
 are the A-S6 GPU smoke (operator), NOT covered here.
 """
@@ -47,7 +47,9 @@ def test_humo_registered_and_dark():
     assert eng.binds_seed is True
     assert eng.fallback_engine == "humo_1.7B"      # 14B degrades to the 1.7B tier first
     assert "humo" in vreg.all_engine_names()       # in the full static dropdown
-    assert vreg.get_engine("humo_1.7B").fallback_engine == "latentsync"
+    # The 1.7B tier degrades straight to the zero-VRAM still floor (latentsync
+    # removed 2026-06-17).
+    assert vreg.get_engine("humo_1.7B").fallback_engine == "still_kenburns"
 
 
 def test_humo_required_inputs_match_family_schema():
@@ -200,7 +202,7 @@ def test_humo_canonicalize_silent_bt709():
 
 
 # --------------------------------------------------------------------------- #
-# Fallback chain: humo -> latentsync -> still_kenburns converges (A-S6 gate)
+# Fallback chain: humo -> humo_1.7B -> still_kenburns converges (A-S6 gate)
 # --------------------------------------------------------------------------- #
 def _registry_fallback_of(name):
     """Single-hop lookup over the live registry (None when terminal/unknown)."""
@@ -211,7 +213,7 @@ def _registry_fallback_of(name):
 
 def test_humo_fallback_chain_converges_on_radio_floor():
     chain = fb.resolve_fallback_chain("humo", _registry_fallback_of)
-    assert chain == ["humo", "humo_1.7B", "latentsync", "still_kenburns"]
+    assert chain == ["humo", "humo_1.7B", "still_kenburns"]
     # Terminus is the zero-VRAM radio floor: registered, static_motion, no flag.
     floor = vreg.get_engine("still_kenburns")
     assert floor.family == "static_motion"

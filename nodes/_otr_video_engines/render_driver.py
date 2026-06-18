@@ -65,7 +65,7 @@ ENGINE_FAMILY = {
     "triposg_talk": "character_3d",
     "hunyuan3d_talk": "character_3d", "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
-    "latentsync": "lipsync_overlay", "still_kenburns": "static_motion",
+    "still_kenburns": "static_motion",
     "still_parallax": "static_motion",
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
@@ -77,12 +77,11 @@ ENGINE_FAMILY = {
     "ltx_av_music": "audio_conditioned_video",
 }
 
-#: The (role, engine, family) rotation covering all 5 roles + the 7 non-3D
+#: The (role, engine, family) rotation covering all 5 roles + the non-3D
 #: families (kept identical to scripts/otr_video_soak so the GPU soak walks the
 #: same shape the shipped CPU harness proves).
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
-    ("announcer_visual", "latentsync", "lipsync_overlay"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
     ("scene_broll", "still_kenburns", "static_motion"),
@@ -94,19 +93,18 @@ _PROFILES = (
 _CHAR3D = ("character_video", "triposg_talk", "character_3d")
 #: The heavy engines the soak forces to OOM on the character_3d shot so the chain
 #: walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B", "latentsync"})
+OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: The expected character_3d degradation trail to the radio floor.
-#: SEMANTICS TO PRESERVE (3D plan 7.0, judge ruling): the TRAIL lists 4 hops
-#: while assert_soak_ok expects exactly 3 LOUD OOM *decisions* -- the
+#: SEMANTICS TO PRESERVE (3D plan 7.0, judge ruling): the TRAIL lists 3 hops
+#: while assert_soak_ok expects exactly 2 LOUD OOM *decisions* -- the
 #: humo->humo_1.7B hop is an INTRA-ENGINE tier swap, not a restamp decision.
 #: The soak is green with this shape; keep the two constants consistent under
 #: the triposg_talk name, never "fix" one without the other.
 EXPECTED_OOM_TRAIL = ["triposg_talk->humo (oom)", "humo->humo_1.7B (oom)",
-                      "humo_1.7B->latentsync (oom)",
-                      "latentsync->still_kenburns (oom)"]
+                      "humo_1.7B->still_kenburns (oom)"]
 
 
 class OomSignal(RuntimeError):
@@ -131,7 +129,7 @@ class FamilyInputGap(RuntimeError):
     cannot satisfy (p3 down-chain shape, 3D plan 7.0): e.g. ``lipsync_overlay``
     needs ``base_clip_ref`` that a ``character_3d`` request lacks. Classified
     DEPENDENCY_MISSING -- the chain SKIPS the candidate LOUDLY to a compatible
-    floor instead of feeding a 3D request to latentsync."""
+    floor instead of feeding a 3D request to a base-clip engine."""
 
 
 class SoakError(AssertionError):
@@ -1196,7 +1194,7 @@ _LSYNC_BASE_PROMPT = (
 
 
 def _provide_lipsync_base(engine_name, request):
-    """Provider seam (operator ask 2026-06-09, the LTX+latentsync combo): a
+    """Provider seam (operator ask 2026-06-09, the lipsync combo experiment): a
     ``lipsync_overlay`` engine needs a BASE clip; when the request has none and
     ``OTR_LSYNC_BASE_ENGINE`` names a provider (e.g. ``ltx_video``), render the
     base IN-LINE first and feed its path as ``base_clip_ref``. LOUD; additive;
@@ -1454,7 +1452,7 @@ def parse_engine_override(spec: str) -> dict:
     """Parse ``OTR_FORCE_ENGINE_MAP`` (pure). Grammar: comma-separated
     ``role=engine`` pairs; the role ``*`` means EVERY shot regardless of role.
     Examples: ``*=ltx_video`` (the all-LTX episode);
-    ``character_video=latentsync,announcer_visual=latentsync,scene_broll=ltx_video``.
+    ``character_video=wan_i2v,announcer_visual=humo,scene_broll=ltx_video``.
     Unknown engines raise at parse time (fail-closed, before any render)."""
     out = {}
     for pair in (spec or "").split(","):
@@ -1473,7 +1471,7 @@ def parse_engine_override(spec: str) -> dict:
 
 
 def apply_engine_override(ledger):
-    """Experiment knob (operator ask 2026-06-09: the all-LTX / LTX+latentsync
+    """Experiment knob (operator ask 2026-06-09: the all-LTX / forced-engine
     episodes): when ``OTR_FORCE_ENGINE_MAP`` is set, re-route each planned
     shot's ``engine_id``/``family`` by role BEFORE rendering, LOUDLY. The
     fallback chains stay intact (a forced engine that fails still degrades to
@@ -1773,8 +1771,8 @@ def assert_soak_ok(report):
                             % (tag, f["oom_trail"], EXPECTED_OOM_TRAIL))
         oom_decisions = [d for d in f["decisions"]
                          if d["shot_id"] == meta["oom_shot_id"]]
-        if len(oom_decisions) != 3:
-            raise SoakError("%s: expected 3 LOUD OOM decisions on the "
+        if len(oom_decisions) != 2:
+            raise SoakError("%s: expected 2 LOUD OOM decisions on the "
                             "character_3d shot, got %d"
                             % (tag, len(oom_decisions)))
         for d in oom_decisions:

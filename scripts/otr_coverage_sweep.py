@@ -75,7 +75,7 @@ from nodes._otr_shared.capability_profiles import (  # noqa: E402
 )
 from nodes._otr_video_engines import registry as vreg  # noqa: E402
 from nodes._otr_video_engines import (  # noqa: E402,F401  (register adapters)
-    cheap_families, eng_character_3d, eng_humo, eng_latentsync,
+    cheap_families, eng_character_3d, eng_humo,
     eng_ltx_video, eng_wan_i2v, eng_wan_ti2v,
 )
 

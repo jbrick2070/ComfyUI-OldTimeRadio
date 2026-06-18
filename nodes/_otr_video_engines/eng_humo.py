@@ -16,9 +16,10 @@ never a default and fails CLOSED until the operator enables it AND the HuMo
 wrapper + checkpoints are installed and verified on the GPU box (the A-S6 smoke).
 No model is "primary" -- HuMo is one peer adapter among the motion engines.
 
-Fallback: a render-time failure degrades HuMo to its ``fallback_engine``
-(``latentsync``), which degrades to the zero-VRAM ``still_kenburns`` radio floor;
-the chain ``humo -> latentsync -> still_kenburns`` is acyclic and terminates (see
+Fallback: a render-time failure degrades the 14B HuMo to its ``fallback_engine``
+(the lighter ``humo_1.7B`` tier), which degrades to the zero-VRAM
+``still_kenburns`` radio floor; the chain ``humo -> humo_1.7B -> still_kenburns``
+is acyclic and terminates (see
 ``nodes/_otr_shared/fallback.py``). The audio that drives HuMo is the FROZEN
 master; HuMo emits an ALWAYS-SILENT clip (``has_audio`` False) -- only
 ``OTR_MasterAudioMux`` ever adds audio (invariant V-1).
@@ -98,8 +99,8 @@ class HuMoEngine(_MC.MotionEngineBase):
     render_aspect = "portrait"
     #: Family-degradation next hop. The 14B keystone degrades FIRST to the 1.7B
     #: HuMo tier -- a real talking face that fits a tighter VRAM budget -- on an
-    #: OOM/VRAM (or any HARD) failure, ONLY then to latentsync and the still
-    #: floor: humo -> humo_1.7B -> latentsync -> still_kenburns (operator hard
+    #: OOM/VRAM (or any HARD) failure, ONLY then to the zero-VRAM still
+    #: floor: humo -> humo_1.7B -> still_kenburns (operator hard
     #: auto-downgrade rule 2026-06-09; see nodes/_otr_shared/fallback.py). One
     #: single-linked hop per engine; the LOUD restamp happens in the render node.
     fallback_engine = "humo_1.7B"
@@ -465,7 +466,7 @@ _HUMO_17B_UNET = "humo_1.7B_fp16.safetensors"
 @register
 class HuMo17BEngine(HuMoEngine):
     """The 1.7B HuMo downgrade tier. The OOM/VRAM hard auto-downgrade from the
-    14B keystone lands HERE before latentsync/still, so a heavy episode that
+    14B keystone lands HERE before the still floor, so a heavy episode that
     can't fit the 14B keeps a REAL audio-driven talking face. Config is isolated
     from the 14B env: its own UNET, NO LoRA (the lightx2v distill is 14B-shaped
     and shape-mismatches the 1.7B tier), and its own steps/cfg via OTR_HUMO_17B_*
@@ -473,11 +474,11 @@ class HuMo17BEngine(HuMoEngine):
     and cfg 1.0, dropped from 5.0 which produced a blue colour cast, fixed
     2026-06-17). Shares roles / required_inputs / requires_flag / the in-process
     graph topology with the 14B base; only the tier config differs. Degrades on
-    to latentsync, then the still floor."""
+    to the zero-VRAM still floor (humo -> humo_1.7B -> still_kenburns)."""
 
     name = "humo_1.7B"
     engine_version = "1"
-    fallback_engine = "latentsync"
+    fallback_engine = "still_kenburns"
 
     def _ckpt_path(self):
         env = os.environ.get("OTR_HUMO_17B_CKPT")
@@ -527,8 +528,7 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
     meta_brief mints the still to match the selected engine's aspect via the video
     policy, so ONE dropdown pick aligns dims, cfg, still and composite canvas.
     Not in the auto-fallback chain (it is a deliberate operator pick): a failure
-    degrades like humo_1.7B (-> latentsync -> still floor), never a silent aspect
-    swap."""
+    degrades like humo_1.7B (-> still floor), never a silent aspect swap."""
 
     name = "humo_1.7B_169"
     render_aspect = "wide"
@@ -551,7 +551,7 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     alongside the portrait 14B and the 1.7B tiers. A 16:9 character still (832x480)
     feeds it -- meta_brief mints the still to the selected engine's aspect via the
     video policy, so one dropdown pick aligns dims, still and composite canvas.
-    Degrades like the 14B base (-> humo_1.7B -> latentsync -> still); a deliberate
+    Degrades like the 14B base (-> humo_1.7B -> still); a deliberate
     operator pick, never a silent aspect swap."""
 
     name = "humo_14B_169"

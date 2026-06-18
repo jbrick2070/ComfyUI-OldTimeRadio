@@ -93,7 +93,7 @@ rem custom_nodes holds ONLY the OldTimeRadio junction -- the wrapper packs
 rem (ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...) live in
 rem Documents\ComfyUI\custom_nodes, mapped by the Desktop app's
 rem extra_models_config.yaml. Headless boots MUST pass a yaml or every
-rem ltx_video/latentsync render falls to the floor (WrapperNodeMissing:
+rem ltx_video render falls to the floor (WrapperNodeMissing:
 rem LTXVImgToVideoConditionOnly -- the 3D quick-smoke catch). We pass OUR
 rem headless copy (_otr_headless_model_paths.yaml) because the Desktop yaml's
 rem desktop_extensions entry points at the dead v1 install path and crashes

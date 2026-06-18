@@ -113,7 +113,7 @@ class _CheapFamilyBase:
         OTR_MasterAudioMux ever adds audio). This family's canonicalize() is
         identity, so the canonical clip is returned here directly. With valid
         inputs it ALWAYS succeeds -- the fallback-chain terminus the A-S6 chain
-        humo -> latentsync -> still_kenburns converges on."""
+        humo -> humo_1.7B -> still_kenburns converges on."""
         from . import wrapper_bridge as _wb       # lazy import: cold-import clean
         import os
         from ._tmp import otr_engine_tmp_mp4

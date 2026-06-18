@@ -2,7 +2,7 @@
 
 The cheap families are the always-succeeds radio floor: render_clip produces the
 platform's silent bt709 / yuv420p clip with ffmpeg (no heavy model). This is the
-fallback-chain terminus the A-S6 chain humo -> latentsync -> still_kenburns
+fallback-chain terminus the A-S6 chain humo -> humo_1.7B -> still_kenburns
 converges on and the M1 episode's CPU path, so it is proven end-to-end here on the
 build box (ffmpeg present); the ffmpeg-running tests skip cleanly without it.
 UTF-8, no BOM, ASCII-only source.

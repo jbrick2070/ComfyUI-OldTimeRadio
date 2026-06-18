@@ -23,10 +23,9 @@ from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_shared.fallback import resolve_fallback_chain
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
-# Importing the adapters registers humo / latentsync / still_kenburns so the
+# Importing the adapters registers humo / humo_1.7B / still_kenburns so the
 # real declared fallback chain can be walked below.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import eng_latentsync      # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -145,10 +144,10 @@ def test_assert_decision_invariants_rejects_a_bad_policy():
 def test_build_fallback_decision_pins_same_revision_and_class():
     rec = rt.build_fallback_decision(
         shot_id="shot_05", beat_id="b05", from_engine="humo",
-        to_engine="latentsync", kind=rt.FailureKind.OOM,
+        to_engine="humo_1.7B", kind=rt.FailureKind.OOM,
         video_revision=3, attempt=1, detail="cuda oom at flux->humo boundary")
     assert rec["video_revision"] == 3            # unchanged (within-revision)
-    assert rec["from_engine"] == "humo" and rec["to_engine"] == "latentsync"
+    assert rec["from_engine"] == "humo" and rec["to_engine"] == "humo_1.7B"
     assert rec["failure_kind"] == "oom" and rec["block_class"] == "hard"
     assert rec["shot_id"] == "shot_05" and rec["beat_id"] == "b05"
 
@@ -156,26 +155,26 @@ def test_build_fallback_decision_pins_same_revision_and_class():
 def test_restamp_shot_row_is_pure_and_chains_trail():
     row = {"shot_id": "shot_05", "engine_id": "humo",
            "family": "audio_driven_face", "degradation_trail": []}
-    out = rt.restamp_shot_row(row, to_engine="latentsync",
-                              to_family="lipsync_overlay", from_engine="humo",
+    out = rt.restamp_shot_row(row, to_engine="humo_1.7B",
+                              to_family="audio_driven_face", from_engine="humo",
                               kind=rt.FailureKind.OOM)
     assert out is not row and row["engine_id"] == "humo"      # input not mutated
-    assert out["engine_id"] == "latentsync"
-    assert out["family"] == "lipsync_overlay"
-    assert out["degradation_trail"] == ["humo->latentsync (oom)"]
+    assert out["engine_id"] == "humo_1.7B"
+    assert out["family"] == "audio_driven_face"
+    assert out["degradation_trail"] == ["humo->humo_1.7B (oom)"]
     out2 = rt.restamp_shot_row(out, to_engine="still_kenburns",
                                to_family="static_motion",
-                               from_engine="latentsync",
+                               from_engine="humo_1.7B",
                                kind=rt.FailureKind.OOM)
     assert out2["degradation_trail"] == [
-        "humo->latentsync (oom)", "latentsync->still_kenburns (oom)"]
+        "humo->humo_1.7B (oom)", "humo_1.7B->still_kenburns (oom)"]
     assert out2["engine_id"] == "still_kenburns"
 
 
 def test_append_runtime_fallback_decision_same_revision_fail_closed():
     section = {"video_revision": 2, "shots": []}
     rec = rt.build_fallback_decision(
-        shot_id="s1", beat_id="b1", from_engine="humo", to_engine="latentsync",
+        shot_id="s1", beat_id="b1", from_engine="humo", to_engine="humo_1.7B",
         kind=rt.FailureKind.OOM, video_revision=2)
     out = rt.append_runtime_fallback_decision(section, rec)
     assert out is not section
@@ -188,11 +187,11 @@ def test_append_runtime_fallback_decision_same_revision_fail_closed():
 
 def test_format_swap_log_is_loud_and_reaffirms_audio_safety():
     rec = rt.build_fallback_decision(
-        shot_id="s1", beat_id="b1", from_engine="humo", to_engine="latentsync",
+        shot_id="s1", beat_id="b1", from_engine="humo", to_engine="humo_1.7B",
         kind=rt.FailureKind.OOM, video_revision=1)
     line = rt.format_swap_log(rec)
     assert "LOUD FALLBACK" in line
-    assert "humo" in line and "latentsync" in line
+    assert "humo" in line and "humo_1.7B" in line
     assert "oom" in line and "frozen audio untouched" in line
 
 
@@ -202,13 +201,13 @@ def test_format_swap_log_is_loud_and_reaffirms_audio_safety():
 def test_restamp_roundtrips_through_video_schemas():
     row = sc.ShotRow(shot_id="shot_01", engine_id="humo",
                      family="audio_driven_face").model_dump()
-    restamped = rt.restamp_shot_row(row, to_engine="latentsync",
-                                    to_family="lipsync_overlay",
+    restamped = rt.restamp_shot_row(row, to_engine="humo_1.7B",
+                                    to_family="audio_driven_face",
                                     from_engine="humo", kind=rt.FailureKind.OOM)
     sc.ShotRow(**restamped)                       # still a valid ShotRow
     rec = rt.build_fallback_decision(
         shot_id="shot_01", beat_id="b01", from_engine="humo",
-        to_engine="latentsync", kind=rt.FailureKind.OOM, video_revision=1)
+        to_engine="humo_1.7B", kind=rt.FailureKind.OOM, video_revision=1)
     section = sc.VideoLedgerSection(
         video_revision=1, shots=[sc.ShotRow(**restamped)]).model_dump()
     section = rt.append_runtime_fallback_decision(section, rec)
@@ -221,9 +220,9 @@ def test_real_humo_chain_resolves_and_restamps_to_floor():
     def fallback_of(name):
         return getattr(vreg.get_engine(name), "fallback_engine", None)
     chain = resolve_fallback_chain("humo", fallback_of)
-    assert chain == ["humo", "humo_1.7B", "latentsync", "still_kenburns"]
+    assert chain == ["humo", "humo_1.7B", "still_kenburns"]
     fam = {"humo": "audio_driven_face", "humo_1.7B": "audio_driven_face",
-           "latentsync": "lipsync_overlay", "still_kenburns": "static_motion"}
+           "still_kenburns": "static_motion"}
     row = {"shot_id": "shot_09", "engine_id": "humo",
            "family": fam["humo"], "degradation_trail": []}
     for frm, to in zip(chain, chain[1:]):
@@ -232,8 +231,7 @@ def test_real_humo_chain_resolves_and_restamps_to_floor():
     assert row["engine_id"] == "still_kenburns"
     assert fallback_of("still_kenburns") is None  # radio floor terminates
     assert row["degradation_trail"] == [
-        "humo->humo_1.7B (oom)", "humo_1.7B->latentsync (oom)",
-        "latentsync->still_kenburns (oom)"]
+        "humo->humo_1.7B (oom)", "humo_1.7B->still_kenburns (oom)"]
 
 
 # --------------------------------------------------------------------------- #

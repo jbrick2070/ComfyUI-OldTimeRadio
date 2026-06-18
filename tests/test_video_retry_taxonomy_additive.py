@@ -100,18 +100,18 @@ def test_assert_decision_invariants_rejects_warn_without_keep_output():
 def test_build_fallback_decision_pins_revision_and_block_class():
     rec = rt.build_fallback_decision(
         shot_id="shot_0007", beat_id="b007", from_engine="humo",
-        to_engine="latentsync", kind=rt.FailureKind.OOM, video_revision=1)
+        to_engine="humo_1.7B", kind=rt.FailureKind.OOM, video_revision=1)
     assert rec["video_revision"] == 1
     assert rec["block_class"] == rt.BlockClass.HARD.value
     assert rec["failure_kind"] == "oom"
-    assert rec["from_engine"] == "humo" and rec["to_engine"] == "latentsync"
+    assert rec["from_engine"] == "humo" and rec["to_engine"] == "humo_1.7B"
     assert rec["attempt"] == 1
 
 
 def test_append_runtime_fallback_decision_is_pure_and_revision_locked():
     section = {"video_revision": 2, "runtime_fallback_decisions": []}
     rec = rt.build_fallback_decision(
-        shot_id="s", beat_id="b", from_engine="humo", to_engine="latentsync",
+        shot_id="s", beat_id="b", from_engine="humo", to_engine="humo_1.7B",
         kind=rt.FailureKind.OOM, video_revision=2)
     out = rt.append_runtime_fallback_decision(section, rec)
     assert out is not section                        # new dict
@@ -123,7 +123,7 @@ def test_append_runtime_fallback_decision_is_pure_and_revision_locked():
 def test_append_runtime_fallback_decision_rejects_revision_mismatch():
     section = {"video_revision": 2}
     rec = rt.build_fallback_decision(
-        shot_id="s", beat_id="b", from_engine="humo", to_engine="latentsync",
+        shot_id="s", beat_id="b", from_engine="humo", to_engine="humo_1.7B",
         kind=rt.FailureKind.OOM, video_revision=3)
     with pytest.raises(ValueError):
         rt.append_runtime_fallback_decision(section, rec)

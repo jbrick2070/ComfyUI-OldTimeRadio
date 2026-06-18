@@ -5,7 +5,7 @@ engine (one that pins its own torch / cu128 stack) in its OWN venv as a supervis
 subprocess worker driven over line-delimited JSON (invariant V-12). The proven
 shape for that worker lifecycle was first shipped for the Path-B AUDIO sidecars
 (``nodes/_otr_audio_engines/_otr_sidecar.py``); this module promotes the SAME
-helpers to the shared namespace so the video latentsync sidecar (A-S4) and the
+helpers to the shared namespace so the cu128-isolated video sidecars and the
 later C image + B 3D sidecars import ONE copy instead of each re-deriving it --
 exactly as ``gpu_residency`` (AS-3) was promoted out of A.
 
