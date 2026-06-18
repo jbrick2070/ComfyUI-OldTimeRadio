@@ -47,20 +47,27 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP = `wan_ti2v` forced-lane GPU smoke -> promote to `VALIDATED_ENGINES` (forward order S3 item 3).**
-- Two recent fix-its are DONE + PUSHED and off the critical path: still-aspect correctness + obvious HuMo dropdown
-  labels (`55d9dad`) and the Bark whiny-voice fix S1-S4 (`6a20c9f`). See the two session blocks at the top.
-- **NEXT (operator-present, box reset):** reset the box, run a forced-lane `wan_ti2v` GPU smoke (30-40w; confirm
-  i2v-holds-still + NVML peak <= 14.5 GB), then add `wan_ti2v` to `registry.VALIDATED_ENGINES` so it lists in the
-  tested-only dropdown. `eng_wan_ti2v` is already CODE-COMPLETE + bare-graph smoked (2026-06-14); search-first
-  confirmed Wan2.2 TI2V-5B is still the best low-VRAM (8GB-tier, Apache-2.0) pick. The recorded sub-8GB tier =
-  IMAGE `z_image_turbo` (shipped + validated, `dcf078c`) + VIDEO `wan_ti2v` + characters on HuMo-2D; 3D `triposr`
-  is dark/deferred (static prop meshes only, never characters).
-- **After Wan:** continue the S3 forward order -- 3D sprints (item 5) then switchable distribution (item 6). The
-  operator-gated GATE-A items (punch-list audit, latentsync demos, coverage sweep GREEN) run in parallel on look-QA.
+**>>> CURRENT STEP = plan per-segment LUFS/RMS voice normalization (operator-requested; FROZEN-SPINE change, needs a plan + re-baseline).**
+- **`wan_ti2v` PROMOTED 2026-06-18 (`ca3e06c`):** forced-lane GPU smoke PASSED on the 5080 via the real adapter
+  (render_single -> render_clip, executor thread) -- i2v rendered 33 frames from a 16:9 still at 832x480, engine
+  vram_used ~8.2 GB, independent NVML peak 13,078 MiB (< the 14.5 GB cap), twice. Added to
+  `registry.VALIDATED_ENGINES` (now lists in the tested-only dropdown). It's the low-VRAM tier filler for non-face
+  beats -- the weakest video engine on quality but the one that fits where 14B HuMo / 22B LTX won't; NO audio.
+  Same commit fixed `render_single` to render in each engine's native aspect (was always portrait -> wide engines
+  letterboxed a 16:9 still = the "postage stamp"). The recorded sub-8GB tier = IMAGE `z_image_turbo` (`dcf078c`) +
+  VIDEO `wan_ti2v` + characters on HuMo-2D; 3D `triposr` dark/deferred.
+- **NEXT = per-segment LUFS/RMS normalization (operator instinct 2026-06-18).** The "low/thin" Bark perception is
+  loudness, not peak; the assembler currently peak-normalizes each segment to 0.85 + a final -1.0 dBFS master
+  limiter (no Bark-side normalize -- correct). A per-segment LUFS/RMS target would even out perceived loudness.
+  **CAUTIONS (write the plan around these):** this is the FROZEN audio spine (`scene_sequencer.py`
+  EpisodeAssembler `_normalize_clip`), NOT upstream TTS -> it breaks `test_audio_byte_identical` (deliberate golden
+  re-baseline, operator-gated GPU render) and hits EVERY voice, not just Bark. Design = LUFS/RMS target WITH a
+  max-gain clamp + a noise-floor gate (do NOT fully flatten dynamics -> pumping). Deterministic (no RNG). Recommend
+  a roundtable before coding (frozen-spine + dynamics trade-off).
+- **After that:** the S3 forward order -- 3D sprints (item 5) then switchable distribution (item 6). Operator-gated
+  GATE-A items (punch-list audit, latentsync demos, coverage sweep GREEN) run in parallel on look-QA.
 - **Open operator eyeballs (carried):** the Bark "warmer / not-whiny" verdict (audition WAVs in
-  `%TEMP%\bark_audition\`, or render an episode with a character on Bark after a Desktop restart); the Wan
-  14B-vs-5B WEBM eyeball.
+  `%TEMP%\bark_audition\`); the wan_ti2v wide smoke clip (shared this session) + the Wan 14B-vs-5B WEBM eyeball.
 
 ---
 
