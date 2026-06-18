@@ -588,6 +588,10 @@ class LtxAvMusicEngine(_LtxAvBase):
     roles = ("music_visual", "announcer_visual")
     default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref")
+    #: Coverage arch opt-OUT: the audio-reactive music/announcer lane synthesizes
+    #: from the TRACK, not a still -> do NOT mint an init image for it (overrides the
+    #: MotionEngineBase default True). See docs/2026-06-18-coverage-arch-wiring/.
+    accepts_still = False
     fallback_engine = None              # NO FALLBACKS (547671d): fail LOUD
     _is_talk = False
 

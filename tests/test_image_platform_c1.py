@@ -491,6 +491,32 @@ def test_still_needed_for_role_fails_safe():
         "character_video") is True
 
 
+def test_still_needed_keys_on_accepts_still_capability():
+    # Coverage arch (2026-06-18): every real motion lane declares accepts_still=True
+    # (MotionEngineBase default), so a SILENT ltx_video clip now consumes the role's
+    # selected image -- this is the flux2/flux-on-LTX fix. The audio-reactive
+    # ltx_av_music lane opts OUT (accepts_still=False) and mints no still.
+    pol_ltx = {"video_models": {"music_video_model": {"engine_id": "ltx_video"}}}
+    pol_avm = {"video_models": {"music_video_model": {"engine_id": "ltx_av_music"}}}
+    assert disp._still_needed_for_role(pol_ltx, "music_visual") is True
+    assert disp._still_needed_for_role(pol_avm, "music_visual") is False
+
+
+def test_engine_consumes_still_capability_vs_dual_read():
+    import types
+    # explicit capability wins both ways
+    assert disp.engine_consumes_still(
+        types.SimpleNamespace(accepts_still=True, required_inputs=())) is True
+    assert disp.engine_consumes_still(
+        types.SimpleNamespace(accepts_still=False,
+                              required_inputs=("init_image",))) is False
+    # dual-read fallback: no flag declared -> legacy required_inputs check
+    assert disp.engine_consumes_still(
+        types.SimpleNamespace(required_inputs=("init_image",))) is True
+    assert disp.engine_consumes_still(
+        types.SimpleNamespace(required_inputs=("text_prompt",))) is False
+
+
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
     # All video roles = visualizer (no init_image) -> NO still generated, gen_fn
     # never called -> an all-procedural episode needs no image model at all.

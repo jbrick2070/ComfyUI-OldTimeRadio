@@ -10,11 +10,15 @@ The smallest comfy-compatible set for a 16 GB Blackwell laptop (the operator's
 
 * diffusion: ``flux-2-klein-4b-Q4_K_M.gguf`` (~2.6 GB) via ComfyUI-GGUF's
   ``UnetLoaderGGUF`` (already installed) -- small resident VRAM.
-* text encoder: ``mistral_3_small_flux2_fp4_mixed.safetensors`` (~12.3 GB, NVFP4)
-  via the stock ``CLIPLoader`` typed ``flux2``. The 24B-class Mistral-3 TE is the
-  real VRAM constraint; fp4_mixed is the smallest variant that fits 16 GB during
-  the encode pass AND is the RTX 50-series/Blackwell-native format. 63 GB system
-  RAM absorbs the offload.
+* text encoder: ``qwen_3_4b.safetensors`` (~8.0 GB) via the stock ``CLIPLoader``
+  typed ``flux2``. klein-4B is paired with the **Qwen-3-4B** encoder (7680-wide
+  conditioning), NOT flux2-dev's Mistral-3 (15360-wide) -- that exact 2x mismatch
+  caused the ``mat1/mat2 (512x15360 @ 7680x3072)`` sampler error. Verified against
+  the official ComfyUI ``image_flux2_klein_text_to_image`` template, whose
+  CLIPLoader loads ``qwen_3_4b.safetensors`` (type ``flux2``). Source repo:
+  ``Comfy-Org/flux2-klein`` (split_files/text_encoders). 63 GB system RAM absorbs
+  the offload; an fp4 variant (``qwen_3_4b_fp4_flux2.safetensors``, ~3.85 GB) is a
+  later Blackwell-native VRAM optimization.
 * VAE: ``flux2-vae.safetensors`` (~0.34 GB) via ``VAELoader``.
 
 FLUX.2's sampling path is the CUSTOM-sampler route (NOT plain KSampler), verified
@@ -57,14 +61,14 @@ ENABLE_FLAG = "OTR_ENABLE_FLUX2_KLEIN"
 #: its basename.
 MODEL_ENV = "OTR_FLUX2_KLEIN_CKPT"
 
-#: Split-file companions: the Mistral-3 flux2 text encoder (CLIPLoader type flux2)
-#: and the flux2 VAE. Default to the Comfy-Org repackaged filenames in the standard
-#: model dirs; the loaders resolve a basename via folder_paths, so either an
-#: absolute path or a bare filename works.
+#: Split-file companions: the Qwen-3-4B flux2 text encoder (CLIPLoader type flux2 --
+#: klein-4B's matched encoder, 7680-wide; NOT Mistral) and the flux2 VAE. Default to
+#: the Comfy-Org repackaged filenames in the standard model dirs; the loaders resolve
+#: a basename via folder_paths, so either an absolute path or a bare filename works.
 CLIP_ENV = "OTR_FLUX2_KLEIN_TE"
 VAE_ENV = "OTR_FLUX2_KLEIN_VAE"
 _DEFAULT_CKPT = "flux-2-klein-4b-Q4_K_M.gguf"
-_DEFAULT_CLIP = "mistral_3_small_flux2_fp4_mixed.safetensors"
+_DEFAULT_CLIP = "qwen_3_4b.safetensors"
 _DEFAULT_VAE = "flux2-vae.safetensors"
 
 
@@ -225,7 +229,7 @@ class Flux2KleinEngine:
                 EngineUsabilityReason.MISSING_MODEL,
                 f"flux2_klein diffusion GGUF not found; set {MODEL_ENV} to the "
                 f"downloaded flux-2-klein-4b-Q4_K_M.gguf path (and {CLIP_ENV}"
-                f"/{VAE_ENV} for the Mistral-3 flux2 TE + flux2 VAE) after enabling "
+                f"/{VAE_ENV} for the Qwen-3-4B flux2 TE + flux2 VAE) after enabling "
                 f"{ENABLE_FLAG}=1 (confirm SageAttention not patched -- BUG-070)",
                 kind="image",
             )

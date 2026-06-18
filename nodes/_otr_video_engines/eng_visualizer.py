@@ -43,6 +43,10 @@ class VisualizerEngine:
     requires_flag = "OTR_ENABLE_VISUALIZER"   # opt-OUT (default-ON): the accessible
                                               # CPU/ffmpeg floor; set =0 to disable
     required_inputs = ("audio_ref",)    # audio only; no init_image, no weights
+    #: Coverage arch opt-OUT (explicit): the CRT scope floor synthesizes from audio
+    #: and IGNORES a still -> mint NO image, so an all-visualizer episode needs no
+    #: image model at all (the accessible floor). See docs/2026-06-18-coverage-arch-wiring/.
+    accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch exists
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25                     # HARD-LOCK (matches the overlay + mux)

@@ -312,6 +312,16 @@ class MotionEngineBase:
     declared_isolation = ISOLATION_IN_PROCESS
     binds_seed = True
 
+    #: Coverage architecture (2026-06-18): EVERY in-process motion lane accepts the
+    #: role's SELECTED image (init still) by default -- the image dispatcher reads
+    #: this ONE capability to decide whether to mint the still, so a new video engine
+    #: gets the chosen image automatically with NO per-engine whitelist ("one and
+    #: done"). Audio-only lanes (ltx_av_music) override to False; the pure procedural
+    #: floors (visualizer / abstract) declare False too. ltx_video inherits True here,
+    #: which is what lets a flux2/flux still drive a silent LTX i2v clip. Plain attr
+    #: (cold-import clean). See docs/2026-06-18-coverage-arch-wiring/.
+    accepts_still = True
+
     def __init__(self):
         self._loaded = False
         self._patchers = []

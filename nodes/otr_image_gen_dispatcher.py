@@ -289,13 +289,34 @@ _ROLE_TO_VIDEO_SLOT = {
 }
 
 
+def engine_consumes_still(eng) -> bool:
+    """Coverage architecture (2026-06-18) -- the ONE capability the still dispatcher
+    keys on, so coverage (which image feeds which video) is decided in a single
+    place with NO per-(image,video) whitelist. A video/3D lane consumes the role's
+    SELECTED image still iff:
+      1. it explicitly declares ``accepts_still`` (the capability wins -- every real
+         motion lane inherits ``accepts_still=True`` from MotionEngineBase, so a new
+         engine accepts the chosen image automatically; floors / audio-only lanes
+         override to False), OR
+      2. (dual-read migration for engines that have not declared the flag yet) it
+         lists ``init_image`` in ``required_inputs`` -- required_inputs wins for the
+         existing names so humo / wan / ltx_av_talk / still_parallax / mesh_stage /
+         the 3D talkers keep working unchanged.
+    Pure attr read (cold-import clean)."""
+    cap = getattr(eng, "accepts_still", None)
+    if cap is not None:
+        return bool(cap)
+    return "init_image" in tuple(getattr(eng, "required_inputs", ()) or ())
+
+
 def _still_needed_for_role(image_policy: dict, role: str) -> bool:
-    """True if the SELECTED video engine for ``role`` consumes an ``init_image``
-    still. When the role's video engine IGNORES init_image (the visualizer /
-    abstract procedural floor), the still is never used -> skip generating it, so
-    an all-procedural episode invokes NO image model (accessible for users with no
-    image/video models). Fail SAFE: unknown engine / missing video_models / unknown
-    role -> True (keep the still, legacy behaviour). Pure registry read."""
+    """True if the SELECTED video engine for ``role`` consumes the role's still.
+    When the role's video engine IGNORES the still (the visualizer / abstract /
+    audio-only procedural floor -> ``accepts_still=False``), the still is never used
+    -> skip generating it, so an all-procedural episode invokes NO image model
+    (accessible for users with no image/video models). Fail SAFE: unknown engine /
+    missing video_models / unknown role -> True (keep the still, legacy behaviour).
+    Pure registry read; delegates the capability check to ``engine_consumes_still``."""
     vmodels = (image_policy or {}).get("video_models") or {}
     if not vmodels:
         return True                       # legacy policy: dispatch every still
@@ -310,9 +331,14 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     try:
         from ._otr_video_engines import registry as _vreg
         eng = _vreg.get_engine(eng_id)
-        return "init_image" in tuple(getattr(eng, "required_inputs", ()) or ())
-    except Exception:                     # noqa: BLE001 -- unknown engine: keep still
+    except Exception as exc:              # noqa: BLE001
+        # No silent fallback (LOUD): an unknown/unresolvable engine keeps the still
+        # (fail SAFE) but says so -- never a quiet force-True.
+        log.warning("[OTR_ImageGenDispatcher] _still_needed_for_role: cannot resolve "
+                    "video engine %r for role=%s (%s); keeping the still (fail-safe)",
+                    eng_id, role, exc)
         return True
+    return engine_consumes_still(eng)
 
 
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
