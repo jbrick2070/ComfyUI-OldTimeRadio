@@ -79,9 +79,14 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
     Raises:
         ValueError: if `phase` is not one of the four declared
             identifiers. Catches typos at the call site.
-        KeyError: if `repo_id` is not in CURATED_LLM_MODELS. The
-            writer always passes a curated repo_id, so this surfaces
-            schema drift, not a normal-path failure.
+
+    A repo_id that is NOT a curated local model -- a remote slot handle
+    (``openrouter:slot-a/b``, ``comfy:slot-a/b``) or any other non-curated id --
+    has no per-model ``prompt_profile``, so it resolves to the MODERN prompt
+    (the default). The period prompt (``otr_1940s_v1``) is an opt-in property of
+    specific CURATED local models only; it must never KeyError-crash an episode
+    just because the creative slot is a remote model (BUG: a remote creative
+    writer aborted the whole run here, 2026-06-18).
     """
     if phase not in _MODERN_BY_PHASE:
         raise ValueError(
@@ -89,8 +94,8 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
             f"{sorted(_MODERN_BY_PHASE)}"
         )
     rows = {m.repo_id: m for m in _otr_model_catalog.CURATED_LLM_MODELS}
-    row = rows[repo_id]
-    if row.prompt_profile == "otr_1940s_v1":
+    row = rows.get(repo_id)
+    if row is not None and row.prompt_profile == "otr_1940s_v1":
         return OTR_PERIOD_SYSTEM_PROMPT
     return _MODERN_BY_PHASE[phase]
 

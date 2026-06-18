@@ -85,6 +85,28 @@ def test_router_returns_modern_for_every_curated_row() -> None:
             )
 
 
+def test_router_returns_modern_for_remote_slot_handles() -> None:
+    """A remote creative writer (openrouter:slot-a/b, comfy:slot-a/b) is NOT a
+    curated local row, so it has no per-model prompt_profile -> the router must
+    return the MODERN phase prompt, NOT crash. Regression for the KeyError that
+    aborted a whole episode when the creative slot was an OpenRouter model
+    (2026-06-18).
+    """
+    expected_modern_by_phase = {
+        "outline":              _otr_outline._SYSTEM_PROMPT,
+        "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
+    }
+    for handle in ("openrouter:slot-a", "openrouter:slot-b",
+                   "comfy:slot-a", "comfy:slot-b", "some/uncurated-model"):
+        for phase in PHASES:
+            out = router.resolve_creative_system_prompt(handle, phase)
+            assert out is expected_modern_by_phase[phase], (
+                f"router({handle!r}, {phase!r}) must return the modern prompt "
+                f"for a non-curated/remote slot, never KeyError or the period "
+                f"prompt"
+            )
+
+
 def test_router_raises_on_unknown_phase() -> None:
     """Typo at a call site fails loud with ValueError naming the
     bad phase identifier.
