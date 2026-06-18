@@ -32,7 +32,14 @@ profiles:
     commercial_clean: false        # Suno Bark terms not confirmed for commercial use
     model_path: ""
     model_sha256: ""
-    default_params: {text_temp: 0.7, waveform_temp: 0.7}
+    # Per-stage temps (2026-06-17 whiny-voice fix): semantic stays warm (0.7) for
+    # content commitment; coarse/fine acoustics drop to 0.5 to firm up the thin/
+    # whiny timbre. text_temp/waveform_temp are kept as legacy ALIASES (semantic
+    # falls back to text_temp; coarse/fine fall back to waveform_temp). The
+    # explicit per-stage keys win when present. normalize_bark_output stays false:
+    # EpisodeAssembler already applies the final -1.0 dBFS pass post-crossfade, so
+    # a Bark-side peak normalize would double-hit (S4 decision; not implemented).
+    default_params: {semantic_temp: 0.7, coarse_temp: 0.5, fine_temp: 0.5, text_temp: 0.7, waveform_temp: 0.7, normalize_bark_output: false}
     allowed_voice_banks: [bark_legacy]
     engine_impl_version: "1"
     sample_rate: 24000

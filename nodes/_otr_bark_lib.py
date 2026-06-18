@@ -408,9 +408,42 @@ def _chunk_text_for_bark(text, max_len=180):
     return chunks if chunks else [text]
 
 
+def _stage_temps_for_line(temperature, semantic_temp, coarse_temp, fine_temp,
+                          voice_preset, is_first_line):
+    """Pure: resolve the (semantic, coarse, fine) Bark temps for one line.
+
+    CPU-testable -- no torch / model. Each stage that is ``None`` inherits the
+    legacy single ``temperature``. The international + first-line guards are CAPS
+    (``min``) applied to the SEMANTIC stage only (content commitment is a
+    semantic-stage decision); coarse/fine keep their profile values.
+    """
+    sem = float(semantic_temp if semantic_temp is not None else temperature)
+    crs = float(coarse_temp if coarse_temp is not None else temperature)
+    fin = float(fine_temp if fine_temp is not None else temperature)
+    is_intl = bool(voice_preset) and not str(voice_preset).startswith("v2/en_")
+    if is_intl:
+        sem = min(sem, 0.55)
+    if is_first_line:
+        sem = min(sem, 0.5 if is_intl else 0.6)
+    return sem, crs, fin
+
+
 def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
-                          is_first_line=False):
+                          is_first_line=False, *, semantic_temp=None,
+                          coarse_temp=None, fine_temp=None):
     """Generate TTS audio for one dialogue line. Returns (np_1d, sample_rate).
+
+    PER-STAGE TEMPERATURES (2026-06-17 whiny-voice fix): Bark is a three-stage
+    pipeline (semantic -> coarse acoustics -> fine acoustics). A single flat
+    ``temperature`` over-randomizes the acoustic stages, which is the main driver
+    of the thin/whiny timbre. ``semantic_temp`` / ``coarse_temp`` / ``fine_temp``
+    set each stage independently and are routed via the transformers
+    ``BarkModel.generate`` PREFIXED-kwargs contract (``semantic_temperature`` /
+    ``coarse_temperature`` / ``fine_temperature`` -- a prefixed kwarg goes to that
+    sub-model and has priority; nothing on the globally-cached model's
+    generation_config is mutated, so there is no cross-voice leak). Each stage that
+    is left ``None`` falls back to the legacy single ``temperature`` so existing
+    callers (the orchestrator health probe) keep their exact behavior.
 
     is_first_line=True activates two hallucination guards for the opening line
     of each voice preset:
@@ -422,30 +455,30 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
          autocomplete with phrases like "click the link in the description"
          instead of reading the actual script.
 
-      2. Temperature floor of 0.6 - reduces randomness on the first line so the
-         model commits to the text rather than hallucinating continuations.
-         Subsequent lines in the same preset keep the user-set temperature.
+      2. Temperature CAP on the SEMANTIC stage (0.6 en / 0.5 intl) - reduces
+         randomness on the first line so the model commits to the text rather than
+         hallucinating continuations. The cap is a CEILING (``min``), not a floor:
+         it only ever lowers the semantic temp, and only on the first line. The
+         coarse/fine stages keep their profile values (the cap is about content
+         commitment, which the semantic stage owns).
     """
     import torch
     text = _clean_text_for_bark(text)
     if not text:
         return np.zeros(2400, dtype=np.float32), 24000
 
-    # -- Language drift guard for international presets --------------------
-    # Foreign presets (de, fr, es, etc.) are probabilistically biased toward
-    # their native language. Cap temperature to 0.55 to keep Bark committed
-    # to the English text rather than drifting into the preset's language.
-    _is_intl = voice_preset and not voice_preset.startswith("v2/en_")
-    if _is_intl:
-        temperature = min(temperature, 0.55)
+    # Per-stage temps + the intl / first-line SEMANTIC caps (pure helper).
+    sem, crs, fin = _stage_temps_for_line(
+        temperature, semantic_temp, coarse_temp, fine_temp,
+        voice_preset, is_first_line)
 
     if is_first_line:
         # Anchor the model before the first dialogue line of each preset.
         # [clears throat] is in Bark's supported token whitelist - it renders
         # as a brief audible cue (~0.15s) and resets the generation context
-        # away from "podcast opener" toward "radio drama performance".
+        # away from "podcast opener" toward "radio drama performance". (The
+        # matching semantic-temp cap is applied in _stage_temps_for_line.)
         text = f"[clears throat] {text}"
-        temperature = min(temperature, 0.5 if _is_intl else 0.6)
 
     sample_rate = model.generation_config.sample_rate
     chunks = _chunk_text_for_bark(text)
@@ -483,10 +516,17 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
         torch.arange = _arange_cuda
         try:
             with torch.no_grad():
+                # Prefixed-kwargs route (transformers BarkModel.generate): each
+                # ``<stage>_temperature`` is forwarded to that sub-model only and
+                # takes priority over any unprefixed value. do_sample drives the
+                # semantic/coarse sampling; the fine stage reads its temperature
+                # directly. No generation_config is mutated -> no cross-voice leak.
                 output = model.generate(
                     **inputs,
                     do_sample=True,
-                    temperature=temperature,
+                    semantic_temperature=sem,
+                    coarse_temperature=crs,
+                    fine_temperature=fin,
                 )
         finally:
             torch.tensor = _orig_tensor
