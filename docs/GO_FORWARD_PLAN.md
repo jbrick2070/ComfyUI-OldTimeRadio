@@ -1,5 +1,20 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (IMAGE: dropdown authority + NO-FALLBACKS hard-fail; HEAD `1120b11` == origin;
+> suite 4430/0, Bug Bible 16/7/3):** Operator caught that picking an image model in OTR_VideoDirector did
+> NOTHING -- the render always used flux_gen1. ROOT CAUSE: OTR_VideoDirector emits its image picks in
+> `video_policy["image_models"]`, but OTR_ImageDirector IGNORED them and used its OWN `flux_gen1` widgets (node
+> 88). **FIX (`1120b11`): (1) DROPDOWN AUTHORITY** -- ImageDirector now sources per-role image engines from
+> `video_policy["image_models"]` (the VideoDirector dropdown = single source of truth); its own image widgets are
+> only the box-fresh fallback. NO hardcoded image model; the JSON was NOT edited. **(2) NO FALLBACKS (extends the
+> video rule to IMAGE)** -- the dispatcher now raises `ImageRenderError` when the REQUESTED engine is unusable
+> (flag off / weights absent) OR its render fails (OOM / missing node / lease+handoff timeout); was a
+> skip-to-radio-floor / no-silent-flux degrade. A failed requested image model HARD-FAILS the episode LOUD. Three
+> dispatcher tests flipped from "assert warn + skip" to "assert raises". **>>> OPERATOR ACTION: restart ComfyUI
+> Desktop** so it picks up the new code + the OTR_ZIMAGE_* env -- then z_image_turbo picked in the VideoDirector
+> dropdown actually renders (and hard-fails loud if its weights/flag are missing instead of silently using flux).
+>
+
 > **LATEST SESSION -- 2026-06-18 (TESTED-ONLY DROPDOWN GATE SHIPPED + LOW-VRAM SEARCH-FIRST; HEAD `3e0ecf4` ==
 > origin; suite 4423 pass / 32 skip, Bug Bible 16/7/3):** Did the operator's next active thread (A) then the
 > search half of (B). **(A) Tested-only dropdown gate `3e0ecf4`** -- `OTR_VideoDirector` / `OTR_ImageDirector`
