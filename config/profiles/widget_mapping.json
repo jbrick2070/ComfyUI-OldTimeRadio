@@ -16,15 +16,15 @@
     },
     "role_overrides.announcer_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "announcer_image_model"], ["OTR_ImageDirector", "announcer_image_model"]]
+      "targets": [["OTR_VideoDirector", "announcer_image_model"]]
     },
     "role_overrides.music_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "music_image_model"], ["OTR_ImageDirector", "music_image_model"]]
+      "targets": [["OTR_VideoDirector", "music_image_model"]]
     },
     "role_overrides.other_beats_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "other_beats_image_model"], ["OTR_ImageDirector", "other_beats_image_model"]]
+      "targets": [["OTR_VideoDirector", "other_beats_image_model"]]
     },
     "slot_overrides.char_voice_engine": {
       "registry": "audio",

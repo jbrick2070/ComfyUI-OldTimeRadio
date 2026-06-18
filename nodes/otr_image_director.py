@@ -1,15 +1,18 @@
-"""OTR_ImageDirector -- the per-role image-model selection UI (C1).
+"""OTR_ImageDirector -- per-role image granularity / fresh-cap / seed policy (C1).
 
-The image-side mirror of ``OTR_VideoDirector``, one level upstream: it captures
-POLICY only (V-6) -- per-role image engine + per-role granularity + the
-fresh-mode cap + seed mode -- and emits ONE ``image_policy_json`` STRING that
+Captures POLICY only (V-6) and emits ONE ``image_policy_json`` STRING that
 ``OTR_MetaBriefImagePromptGen`` + ``OTR_ImageGenDispatcher`` consume.
 
-Model-agnostic, no "primary": each per-role COMBO is the FULL static image
-registry + a ``+ Add Custom Model`` sentinel; role compatibility is filtered at
-execute time via the SHARED ``role_compat.py`` (AS-1) -- NEVER by mutating the
-COMBO, and NEVER a private copy of the filter. A pick that does not fit its role
-fails closed (named error), never a silent Flux swap.
+Image-MODEL selection lives in ONE place -- ``OTR_VideoDirector`` (operator
+2026-06-18: "only in one place not two"). This node no longer carries its own
+per-role image-model dropdowns; it reads the picks from the wired
+``video_policy_json["image_models"]`` and owns only the per-role granularity, the
+fresh-mode cap, and the seed mode. A slot absent from the policy defaults to the
+gen-1 engine (``flux_gen1``) with a LOUD warning.
+
+Role compatibility of each pick is still filtered at execute time via the SHARED
+``role_compat.py`` (AS-1) -- a pick that does not fit its role fails closed
+(named error), never a silent Flux swap.
 
 3D granularity LOCK (PASS-IMG MUST-FIX #2, hardened per 3D plan section 3): if
 a role's paired VIDEO engine declares ``requires_mesh_portrait`` (the REAL
@@ -172,7 +175,8 @@ def enforce_3d_granularity_lock(granularity_by_slot: dict, locked_slots: set,
 
 
 class OTRImageDirector:
-    """Registered as ``OTR_ImageDirector``. Per-role image-model + granularity policy."""
+    """Registered as ``OTR_ImageDirector``. Per-role granularity / fresh-cap / seed
+    policy; image-model picks come from OTR_VideoDirector via video_policy_json."""
 
     CATEGORY = "OldTimeRadio/v2/image"
     FUNCTION = "direct"
@@ -182,19 +186,14 @@ class OTRImageDirector:
 
     @classmethod
     def INPUT_TYPES(cls):
-        image = _image_model_combo()
         gran = list(GRANULARITY_MODES)
         return {
             "required": {
-                "announcer_image_model": (image, {
-                    "tooltip": "Image engine for the ANNOUNCER (feeds its video).",
-                }),
-                "music_image_model": (image, {
-                    "tooltip": "Image engine for MUSIC beats.",
-                }),
-                "other_beats_image_model": (image, {
-                    "tooltip": "Image engine for all OTHER beats (character / scene / bg).",
-                }),
+                # Image-MODEL selection lives in ONE place -- OTR_VideoDirector
+                # (operator 2026-06-18: "only in one place not two"). This node no
+                # longer has its own image-model dropdowns; it reads the per-role
+                # picks from the wired video_policy_json["image_models"] and owns
+                # only the granularity / fresh-cap / seed policy.
                 "announcer_granularity": (gran, {"default": "per_object"}),
                 "music_granularity": (gran, {"default": "per_object"}),
                 "other_beats_granularity": (gran, {
@@ -257,8 +256,7 @@ class OTRImageDirector:
         return True
 
     # ------------------------------------------------------------------ #
-    def direct(self, announcer_image_model, music_image_model,
-               other_beats_image_model, announcer_granularity,
+    def direct(self, announcer_granularity,
                music_granularity, other_beats_granularity, fresh_cap,
                seed_mode, request_seed, video_policy_json="",
                custom_models_json="{}", gate_in=""):
@@ -267,31 +265,26 @@ class OTRImageDirector:
         video_policy = self._parse_video_policy_required(video_policy_json)
         descriptors = _registry_descriptors()
 
-        # DROPDOWN AUTHORITY (operator 2026-06-18: "use whatever my dropdown is
-        # selected; no hardcoded image model"). The OTR_VideoDirector is the ONE
-        # place the operator picks models, and it ALREADY carries the per-role
-        # image-engine selections in video_policy["image_models"]. Honor those as
-        # the SOURCE OF TRUTH; this node's own image-model widgets are only the
-        # fallback for a box-fresh / unwired graph. No silent flux: whatever the
-        # VideoDirector dropdown says is exactly what renders (and the dispatcher
-        # hard-fails if that engine cannot run -- no substitution).
-        own = {
-            "announcer_image_model": announcer_image_model,
-            "music_image_model": music_image_model,
-            "other_beats_image_model": other_beats_image_model,
-        }
+        # SINGLE SOURCE OF TRUTH (operator 2026-06-18: "only in one place not two").
+        # Image-MODEL picks live ONLY in OTR_VideoDirector, carried per-role in
+        # video_policy["image_models"]. This node has no image-model widgets; it
+        # reads those picks verbatim. A slot absent from the policy defaults to the
+        # gen-1 engine (flux_gen1, always usable) with a LOUD warning -- never a
+        # silent crash on a box-fresh / partially-wired policy. No other swap: the
+        # dispatcher hard-fails if the picked engine cannot run.
         vp_images = video_policy.get("image_models")
+        vp_images = vp_images if isinstance(vp_images, dict) else {}
         picks = {}
-        for slot, own_pick in own.items():
-            vp_pick = vp_images.get(slot) if isinstance(vp_images, dict) else None
+        for slot in ("announcer_image_model", "music_image_model",
+                     "other_beats_image_model"):
+            vp_pick = vp_images.get(slot)
             if isinstance(vp_pick, str) and vp_pick.strip():
-                if vp_pick != own_pick:
-                    warnings.append(
-                        f"{slot}: using OTR_VideoDirector dropdown '{vp_pick}' "
-                        f"(authoritative) over this node's widget '{own_pick}'")
                 picks[slot] = vp_pick
             else:
-                picks[slot] = own_pick
+                warnings.append(
+                    f"{slot}: no pick in video_policy['image_models']; "
+                    f"defaulting to flux_gen1 (gen-1). Set it in OTR_VideoDirector.")
+                picks[slot] = "flux_gen1"
         resolved = {}
         for slot, picked in picks.items():
             resolved[slot] = self._resolve_and_validate(

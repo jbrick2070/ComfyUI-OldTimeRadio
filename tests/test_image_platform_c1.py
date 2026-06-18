@@ -167,13 +167,8 @@ _EMPTY_VIDEO_POLICY = json.dumps({"video_models": {}})
 def test_image_director_policy_json_and_seed(clean_image_registry):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    out = OTRImageDirector().direct(
-        announcer_image_model="flux_gen1", music_image_model="flux_gen1",
-        other_beats_image_model="flux_gen1", announcer_granularity="per_object",
-        music_granularity="per_object", other_beats_granularity="per_beat",
-        fresh_cap=15, seed_mode="request_hash", request_seed=7,
-        video_policy_json=_EMPTY_VIDEO_POLICY,
-    )
+    out = OTRImageDirector().direct(**_direct_kwargs(
+        other_beats_granularity="per_beat", request_seed=7))
     policy = json.loads(out[0])
     assert policy["image_models"]["music_image_model"]["engine_id"] == "flux_gen1"
     assert policy["seed"]["request_seed"] == 7
@@ -214,23 +209,36 @@ def test_image_director_fail_closed_incompatible_pick(clean_image_registry):
     ireg.register(_img_stub(name="bg_only", roles=("background_abstract",),
                             required_inputs=("text_prompt",)))
     with pytest.raises(ValueError):
-        OTRImageDirector().direct(
+        OTRImageDirector().direct(**_direct_kwargs(
             announcer_image_model="bg_only", music_image_model="bg_only",
-            other_beats_image_model="bg_only", announcer_granularity="per_object",
-            music_granularity="per_object", other_beats_granularity="per_object",
-            fresh_cap=15, seed_mode="request_hash", request_seed=0,
-            video_policy_json=_EMPTY_VIDEO_POLICY,
-        )
+            other_beats_image_model="bg_only"))
 
 
 def _direct_kwargs(**over):
-    """Baseline director kwargs (flux everywhere, per_object everywhere)."""
+    """Baseline director kwargs (per_object everywhere). Image-model picks now
+    live in the wired video_policy_json (OTR_VideoDirector is the single home),
+    so this helper FOLDS any image-model overrides into that policy's
+    ``image_models`` -- call sites read unchanged. A deliberately-malformed
+    video_policy_json (the fail-closed tests) passes through untouched."""
+    img = {
+        "announcer_image_model": over.pop("announcer_image_model", "flux_gen1"),
+        "music_image_model": over.pop("music_image_model", "flux_gen1"),
+        "other_beats_image_model": over.pop("other_beats_image_model", "flux_gen1"),
+    }
+    vp_raw = over.pop("video_policy_json", _EMPTY_VIDEO_POLICY)
+    try:
+        vp = json.loads(vp_raw)
+        if isinstance(vp, dict):
+            im = vp.get("image_models")
+            vp["image_models"] = {**(im if isinstance(im, dict) else {}), **img}
+            vp_raw = json.dumps(vp)
+    except (ValueError, TypeError):
+        pass  # malformed payload passes through for the fail-closed tests
     kw = dict(
-        announcer_image_model="flux_gen1", music_image_model="flux_gen1",
-        other_beats_image_model="flux_gen1", announcer_granularity="per_object",
+        announcer_granularity="per_object",
         music_granularity="per_object", other_beats_granularity="per_object",
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
-        video_policy_json=_EMPTY_VIDEO_POLICY,
+        video_policy_json=vp_raw,
     )
     kw.update(over)
     return kw
@@ -382,13 +390,15 @@ def test_dispatcher_halts_on_3d_per_beat_policy():
 
 
 def test_no_hardcoded_image_engine_name(clean_image_registry):
-    """M2 (behavioral): the per-role COMBO is sourced from the registry, not a
-    hardcoded list -- a brand-new engine name appears in the dropdown with NO
+    """M2 (behavioral): the per-role image COMBO is sourced from the registry, not
+    a hardcoded list -- a brand-new engine name appears in the dropdown with NO
     code edit, and with the registry cleared the 'flux_gen1' default is NOT baked
-    into the node. Proof that selection is model-agnostic."""
+    into the node. Proof that selection is model-agnostic. The image-model
+    dropdowns now live in OTR_VideoDirector (the single home, 2026-06-18)."""
+    from nodes.otr_video_director import OTRVideoDirector
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="z_image_custom"))
-    combo = OTRImageDirector.INPUT_TYPES()["required"]["music_image_model"][0]
+    combo = OTRVideoDirector.INPUT_TYPES()["required"]["music_image_model"][0]
     assert "z_image_custom" in combo
     assert ADD_CUSTOM in combo
     assert "flux_gen1" not in combo  # registry-sourced, not a baked-in default
