@@ -41,6 +41,7 @@ import os
 
 from . import motion_common as _MC
 from . import wan_shared as _WS
+from .._otr_shared.role_compat import ROLES
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import (
     _WAN_DEFAULT_NEGATIVE, ffprobe_clip_fields, validate_silent_clip_contract)
@@ -85,8 +86,13 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: Still-aspect identity (2026-06-17): Wan TI2V renders 16:9, so the director
     #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
-    # Same image-init roles as wan_i2v: scene b-roll, music visual, character.
-    roles = ("scene_broll", "music_visual", "character_video")
+    # FLEXIBLE (operator 2026-06-18): eligible for EVERY role -- role_compat is the
+    # real gate (it admits wan_ti2v only where the role supplies the required
+    # init_image: announcer/music/character/scene_broll do; the pure background_
+    # abstract floor does not, so it's correctly excluded there). Opening `roles`
+    # lets the operator pick wan_ti2v for the announcer slot (it animates that beat's
+    # selected still); the required_inputs check still prevents a truly broken pick.
+    roles = ROLES
     default_roles = ()
     required_inputs = ("init_image",)
     commercial_clean = True             # GGUF + VAE are Apache-2.0 (see MODEL_MANIFEST)

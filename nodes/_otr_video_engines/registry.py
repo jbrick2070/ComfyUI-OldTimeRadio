@@ -133,6 +133,8 @@ CAPABILITIES = {
                      "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "visualizer": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "flat_still": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "flux_still": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": False,
                    "model_requirements": ["flux.1-dev"]},
