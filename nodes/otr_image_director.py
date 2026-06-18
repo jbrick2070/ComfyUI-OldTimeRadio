@@ -267,11 +267,31 @@ class OTRImageDirector:
         video_policy = self._parse_video_policy_required(video_policy_json)
         descriptors = _registry_descriptors()
 
-        picks = {
+        # DROPDOWN AUTHORITY (operator 2026-06-18: "use whatever my dropdown is
+        # selected; no hardcoded image model"). The OTR_VideoDirector is the ONE
+        # place the operator picks models, and it ALREADY carries the per-role
+        # image-engine selections in video_policy["image_models"]. Honor those as
+        # the SOURCE OF TRUTH; this node's own image-model widgets are only the
+        # fallback for a box-fresh / unwired graph. No silent flux: whatever the
+        # VideoDirector dropdown says is exactly what renders (and the dispatcher
+        # hard-fails if that engine cannot run -- no substitution).
+        own = {
             "announcer_image_model": announcer_image_model,
             "music_image_model": music_image_model,
             "other_beats_image_model": other_beats_image_model,
         }
+        vp_images = video_policy.get("image_models")
+        picks = {}
+        for slot, own_pick in own.items():
+            vp_pick = vp_images.get(slot) if isinstance(vp_images, dict) else None
+            if isinstance(vp_pick, str) and vp_pick.strip():
+                if vp_pick != own_pick:
+                    warnings.append(
+                        f"{slot}: using OTR_VideoDirector dropdown '{vp_pick}' "
+                        f"(authoritative) over this node's widget '{own_pick}'")
+                picks[slot] = vp_pick
+            else:
+                picks[slot] = own_pick
         resolved = {}
         for slot, picked in picks.items():
             resolved[slot] = self._resolve_and_validate(

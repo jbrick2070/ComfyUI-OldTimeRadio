@@ -518,20 +518,20 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     assert len(hashes) == 2              # B's mesh cache would invalidate
 
 
-def test_dispatcher_fail_closed_unusable_engine(clean_image_registry, tmp_path):
-    """An unusable/absent engine -> that object simply has no image (warned),
-    never a silent wrong-engine render."""
+def test_dispatcher_hard_fails_on_unusable_engine(clean_image_registry, tmp_path):
+    """NO FALLBACKS (operator 2026-06-18): an unusable/absent REQUESTED engine
+    HARD-FAILS the episode (ImageRenderError), never skipped, never a silent
+    wrong-engine render."""
     clean_image_registry._registry.clear()  # nothing registered -> assert_usable fails
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"image_models": {"other_beats_image_model": {"engine_id": "ghost"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "x, y", "ph"))
-    led, done, _r, warns = disp.dispatch_images(
-        ledger, policy, prompts, gen_fn=lambda r: _np_pixels(5),
-        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
-    )
-    assert led["images"]["images"] == []
-    assert any("not usable" in w for w in warns)
+    with pytest.raises(disp.ImageRenderError):
+        disp.dispatch_images(
+            ledger, policy, prompts, gen_fn=lambda r: _np_pixels(5),
+            output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -649,9 +649,9 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     assert done.startswith("image:done:")
 
 
-def test_dispatcher_skips_truncated_handoff_fail_closed(clean_image_registry, tmp_path):
-    """A 0-byte sidecar handoff -> that object simply has no image (warned),
-    never a crash and never a silent bad render (PASS-PM C1, fail-closed)."""
+def test_dispatcher_hard_fails_on_truncated_handoff(clean_image_registry, tmp_path):
+    """NO FALLBACKS: a 0-byte sidecar handoff HARD-FAILS (ImageRenderError),
+    never a crash and never a silent skip (PASS-PM C1 fail-closed -> now loud)."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
@@ -661,13 +661,12 @@ def test_dispatcher_skips_truncated_handoff_fail_closed(clean_image_registry, tm
     empty = tmp_path / "truncated.png"
     empty.write_bytes(b"")
 
-    led, _done, _r, warns = disp.dispatch_images(
-        ledger, policy, prompts, gen_fn=lambda _req: str(empty),
-        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
-        handoff_wait_attempts=2, handoff_wait_sleep_s=0.0,
-    )
-    assert led["images"]["images"] == []
-    assert any("handoff not ready" in w for w in warns)
+    with pytest.raises(disp.ImageRenderError):
+        disp.dispatch_images(
+            ledger, policy, prompts, gen_fn=lambda _req: str(empty),
+            output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+            handoff_wait_attempts=2, handoff_wait_sleep_s=0.0,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -727,10 +726,10 @@ def test_flux_gen1_params_env_overridable(monkeypatch):
     assert params["guidance"] == 2.0   # BUG-411: env-overridable guidance
 
 
-def test_dispatcher_render_failure_degrades_to_floor(clean_image_registry, tmp_path):
-    """The image GATE never crashes the episode: a gen_fn that RAISES (no CUDA /
-    wrapper node missing / OOM) is fail-closed -> the object has no portrait
-    (warned LOUD) so HuMo degrades to the radio floor downstream."""
+def test_dispatcher_hard_fails_on_render_failure(clean_image_registry, tmp_path):
+    """NO FALLBACKS (operator 2026-06-18): a gen_fn that RAISES (no CUDA /
+    wrapper node missing / OOM) HARD-FAILS the episode (ImageRenderError) -- no
+    skip, no radio-floor degrade, no silent flux substitution."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
@@ -741,13 +740,11 @@ def test_dispatcher_render_failure_degrades_to_floor(clean_image_registry, tmp_p
     def boom(_req):
         raise RuntimeError("no CUDA / wrapper node missing on this box")
 
-    led, done, _r, warns = disp.dispatch_images(
-        ledger, policy, prompts, gen_fn=boom,
-        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
-    )
-    assert led["images"]["images"] == []
-    assert any("render failed" in w for w in warns)
-    assert done.startswith("image:done:")
+    with pytest.raises(disp.ImageRenderError):
+        disp.dispatch_images(
+            ledger, policy, prompts, gen_fn=boom,
+            output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+        )
 
 
 def test_inprocess_gen_fn_resolves_engine_from_registry(clean_image_registry):

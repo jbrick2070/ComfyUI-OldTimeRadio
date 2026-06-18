@@ -52,6 +52,18 @@ class ImageHandoffTimeout(RuntimeError):
     """
 
 
+class ImageRenderError(RuntimeError):
+    """The selected image engine could not produce the requested still.
+
+    NO FALLBACKS (operator 2026-06-18: "hard fail if it can't use the req
+    model"): a selected-but-unusable engine (opt-in flag off / weights absent /
+    unbuilt) OR a render failure (OOM / missing node / decode / lease/handoff
+    timeout) is TERMINAL -- the episode fails LOUD instead of skipping the object
+    or silently substituting flux / degrading to the radio floor. Mirrors the
+    video render_driver.RenderError contract.
+    """
+
+
 def wait_for_file_ready(path, min_bytes: int = _MIN_PNG_BYTES,
                         attempts: int = 40, sleep_s: float = 0.05) -> str:
     """Block until ``path`` exists, is ``>= min_bytes``, and its size is STABLE
@@ -424,17 +436,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         try:
             _ireg.assert_usable(engine_id, role)
         except Exception as exc:  # noqa: BLE001  (EngineUnusable et al.)
-            # BUG-LOCAL-405 fail-loud: a selected-but-unusable engine (opt-in
-            # flag off / weights absent / unbuilt stub) is SKIPPED -- the beat
-            # gets NO image and is NEVER silently substituted with flux. Say so
-            # explicitly so the operator enables+weights the engine or picks a
-            # usable one, rather than wondering why a still is missing.
-            warnings.append(
-                f"{oid}: selected image engine '{engine_id}' not usable for "
-                f"{role} ({exc}); SKIPPED -- no image minted, NOT silently "
-                f"substituted (enable the engine + provide its weights, or pick "
-                f"a usable engine).")
-            continue
+            # NO FALLBACKS (operator 2026-06-18): a selected-but-unusable engine
+            # (opt-in flag off / weights absent / unbuilt) HARD-FAILS the episode
+            # LOUD -- never skipped, never silently substituted with flux. Enable
+            # the engine + provide its weights, or pick a usable engine.
+            raise ImageRenderError(
+                f"{oid}: selected image engine '{engine_id}' is not usable for "
+                f"role '{role}' ({exc}). NO FALLBACK -- enable the engine "
+                f"(its flag) + provide its weights, or select a usable engine "
+                f"in the OTR_VideoDirector dropdown."
+            ) from exc
         if gen_fn is None:
             warnings.append(f"{oid}: no gen_fn (GPU render is the operator smoke); skipped on CPU")
             continue
@@ -464,19 +475,24 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 ledger, oid, pixels, output_dir=output_dir,
                 require_cast_entry=(kind == "portrait" and oid in cast_ids))
         except _lease.LeaseTimeout as exc:
-            warnings.append(f"{oid}: GPU lease timeout ({exc}); skipped")
-            continue
+            # NO FALLBACKS (operator 2026-06-18): hard-fail, never skip.
+            raise ImageRenderError(
+                f"{oid}: GPU lease timeout rendering '{engine_id}' ({exc}). "
+                f"NO FALLBACK.") from exc
         except ImageHandoffTimeout as exc:
-            warnings.append(f"{oid}: image handoff not ready ({exc}); skipped")
-            continue
-        except Exception as exc:  # noqa: BLE001 -- any render failure -> floor
-            # The image GATE never crashes the episode: a wrapper-node-missing /
-            # CUDA-OOM / decode failure means this object simply has no image,
-            # so the render path degrades to the radio floor LOUD downstream.
-            warnings.append(
-                f"{oid}: image render failed ({type(exc).__name__}: {exc}); "
-                "skipped (radio floor will be used)")
-            continue
+            raise ImageRenderError(
+                f"{oid}: image handoff from '{engine_id}' not ready ({exc}). "
+                f"NO FALLBACK.") from exc
+        except ImageRenderError:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- any render failure -> HARD FAIL
+            # NO FALLBACKS (operator 2026-06-18): a wrapper-node-missing /
+            # CUDA-OOM / decode failure HARD-FAILS the episode LOUD -- no skip,
+            # no radio-floor degrade, no silent flux substitution.
+            raise ImageRenderError(
+                f"{oid}: image render with '{engine_id}' failed "
+                f"({type(exc).__name__}: {exc}). NO FALLBACK -- fix the engine "
+                f"or select a usable one.") from exc
         finally:
             if lease is not None:
                 _lease.release(lease)
