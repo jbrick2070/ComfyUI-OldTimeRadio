@@ -157,6 +157,13 @@ VALIDATED_ENGINES = frozenset({
     # qwen3-4b fp8 TE + ae VAE; clean on-prompt filmic still at ~10 GB, 8 steps,
     # 12 s). The low-VRAM commercial-clean (Apache-2.0) image option.
     "z_image_turbo",
+    # flux2_klein: GPU-VERIFIED 2026-06-18 on the RTX 5080 (FLUX.2 [klein] 4B GGUF
+    # Q4_K_M + the klein-MATCHED qwen_3_4b TE [7680-wide; flux2-dev's Mistral was
+    # 15360 -> the mat1/mat2 error] + flux2-vae). In a full flux2->silent-LTX episode
+    # the dispatcher minted real stills end-to-end: "[OTR.image.flux2_klein] minted
+    # still 832x480 ... steps=20 guidance=4.00", TE staged 7671 MB, no dim error.
+    # Apache-2.0 (commercial-clean). Stays opt-in via OTR_ENABLE_FLUX2_KLEIN.
+    "flux2_klein",
 })
 __all__.append("VALIDATED_ENGINES")
 
