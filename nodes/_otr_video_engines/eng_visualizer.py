@@ -154,13 +154,14 @@ class VisualizerEngine:
         from .._otr_shared import scope_draw as _sd
 
         plan = self._build_render_request(request)
+        fps = int(self.target_fps)
+        # An accessible FLOOR must render EVERY beat. A degenerate beat with
+        # target_frame_count <= 0 (a zero-length beat in the ledger) defaults to
+        # one second, exactly like the cheap floor's _frame_count -- never a crash.
+        # (2026-06-18 soak: shot_b005 arrived with target_frame_count=0.)
         total = int(plan["target_frame_count"])
         if total <= 0:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "visualizer needs timing.target_frame_count > 0 (got %d)" % total,
-                kind="video")
-        fps = int(self.target_fps)
+            total = fps
         w, h = self._canvas_dims(request)
 
         # The visualizer is an accessible FLOOR forced on ALL roles, so it MUST

@@ -209,13 +209,19 @@ def test_render_clip_idle_scopes_when_audio_absent(monkeypatch):
     assert os.path.isfile(out["out_path"]) and os.path.getsize(out["out_path"]) > 0
 
 
-def test_render_clip_fails_loud_on_bad_frame_count(monkeypatch):
-    # total_frames <= 0 is a real config error -> still fails LOUD.
+@pytest.mark.skipif(not _have_render_deps(),
+                    reason="needs ffmpeg + soundfile for a real render")
+def test_render_clip_zero_frames_defaults_to_one_second(monkeypatch):
+    # A degenerate 0-length beat defaults to one second (fps frames), like the
+    # cheap floor -- the accessible floor renders every beat, never crashes.
+    # (2026-06-18 soak: shot_b005 had target_frame_count=0.)
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")
-    req = {"audio_ref": "", "timing": {"target_frame_count": 0},
-           "seed_bundle": {"request_seed": 1}}
-    with pytest.raises(EngineUnusable):
-        VisualizerEngine().render_clip(req, None)
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    req = {"audio_ref": "", "canvas": {"w": 320, "h": 192, "fps": 25},
+           "timing": {"target_frame_count": 0}, "seed_bundle": {"request_seed": 1}}
+    out = VisualizerEngine().render_clip(req, None)
+    assert out["frame_count"] == 25            # fps = 1 second floor
+    assert os.path.isfile(out["out_path"])
 
 
 # --------------------------------------------------------------------------- #
