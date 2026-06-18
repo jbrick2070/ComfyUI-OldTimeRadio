@@ -20,7 +20,10 @@
 > GGUF support; nothing newer has displaced it (Wan 1.3B / CogVideoX-2B trade too much quality). `eng_wan_ti2v` is
 > already CODE-COMPLETE + bare-graph smoked (2026-06-14). **NEXT (operator-present): box reset -> forced-lane
 > wan_ti2v GPU smoke (i2v-holds-still + NVML <=14.5GB) -> add `wan_ti2v` to `VALIDATED_ENGINES`.** The morning
-> EVENING block below is unchanged; the §3 forward order is unchanged.
+> EVENING block below is unchanged; the §3 forward order is unchanged. **SUB-8GB TIER VERDICT RECORDED (operator
+> request):** 8GB-tier picks = IMAGE `z_image_turbo` (Apache-2.0, ~4GB -- the RECORDED image pick; production
+> flux_gen1/FLUX.1-dev is ~12GB AND non-commercial) + VIDEO `wan_ti2v` (offload) + characters on HuMo-2D; 3D
+> OUT OF REACH for characters (TripoSR fits VRAM but only static meshes), stays DEFERRED. See §1 (B). 
 >
 > **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
 > latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
@@ -523,6 +526,22 @@ VIDEO MODEL -- search-first DONE (Wan2.2 TI2V-5B confirmed best pick); remaining
   UnetLoaderGGUF + Wan22ImageToVideoLatent + Wan2.2 VAE) and bare-graph 5B-smoked (2026-06-14, 25 frames / 35s /
   ~9GB). **NEXT (operator-present): reset the box, run a forced-lane wan_ti2v GPU smoke (30-40w, confirm
   i2v-holds-still + NVML peak <=14.5GB), then add `wan_ti2v` to `VALIDATED_ENGINES` so it lists in the dropdown.**
+- **SUB-8GB TIER VERDICT (2026-06-18 search-first, operator-recorded) -- the 8GB-tier model picks (all
+  commercial-clean, all already in the registry / half-wired):**
+  - **IMAGE = `z_image_turbo` (RECORDED PICK).** Z-Image-Turbo, ~4GB, Apache-2.0 -- the rare model that is BOTH
+    genuinely sub-8GB AND commercial-clean (the production `flux_gen1` = FLUX.1-dev is ~12GB AND non-commercial,
+    so a sub-8GB build must swap it). Runner-ups: FLUX.1-Schnell (Apache-2.0, Q4 GGUF at the 8GB line) /
+    `flux2_klein` (~8GB ceiling) / SDXL fallback. ACTION when the 8gb_lite tier is next touched: repoint its
+    image roles to `z_image_turbo`.
+  - **VIDEO = `wan_ti2v` (Wan2.2 TI2V-5B GGUF, Apache-2.0).** Fits sub-8GB with ComfyUI offload (slower); Wan
+    1.3B (~8.2GB) is the guaranteed-native-fit fallback at a quality cost.
+  - **3D = OUT OF REACH for characters.** TripoSR (MIT, 6-8GB) is the only credible sub-8GB image->mesh model but
+    it makes STATIC object meshes, not riggable talking-head characters; the quality leaders (TRELLIS.2-4B,
+    Hunyuan3D-2.1) want 16-24GB. Keep characters on HuMo-2D; 3D stays DEFERRED (only worth wiring TripoSR later
+    as an OPTIONAL static-prop/set-dressing mesher, never the character path). This matches the existing B-ship
+    rescope + the parked §5 character_3d.
+  - **8GB-tier reach = a 2-lane build: image (`z_image_turbo`) + video (`wan_ti2v`), characters on HuMo-2D, 3D
+    deferred.**
 
 **>>> PRIOR STEP (2026-06-17, operator pivot) = REVIVE THE LTX-AV (audio-in) LANE -- verify its recipe vs the GOOD mini, align the sampler, then M4 GPU smoke (lip-sync-vs-HuMo A/B). [SUPERSEDED -- LTX-AV build-out SHIPPED `5ace122`; see the top-of-file 2026-06-17 EVENING block.]**
 Goal: LTX speed WITH audio-driven mouth motion (the 450w combo soak: all-LTX finishes ~47m but has NO lip-sync;
