@@ -154,13 +154,17 @@
   per-model whitelist"): `accepts_still` on MotionEngineBase (default True) read centrally by
   `engine_consumes_still`; silent `ltx_video` now consumes the selected image. Design + roundtable:
   `docs/2026-06-18-coverage-arch-wiring/pass01_plan.md`.
-- **>>> NEXT = coverage-arch FOLLOW-UPS (deferred, additive):** (a) **IMAGE-PHASE still-object coverage for
-  `background_abstract` beats** &mdash; the verify episode proved `accepts_still` works (silent LTX consumed the
-  flux2 stills for b000/b001/b005 + the c01/c02/c03 portraits), BUT the image-prompt phase (`derive_image_prompts`)
-  emits NO still object for `background_abstract` dialogue beats (b002/b003/b004), so those LTX clips render
-  text-only and `render_driver` fires the LOUD `LTX-I2V MISSING-STILL` degrade. To get "flux2 on EVERY ltx beat"
-  the image phase must emit a scene-still object for background_abstract beats too (this is upstream of the
-  dispatcher; accepts_still is correct). (b) `optional_inputs` so role_compat sees an OPTIONAL init_image
+- **>>> NEXT = coverage-arch FOLLOW-UPS (deferred, additive):** (a) **IMAGE-PHASE still coverage -- DONE for
+  per-beat (`3d27bcf`):** `derive_scene_still_targets` now emits a scene_beat target for EVERY beat (was
+  announcer/music-only -> b002/b003/b004 hit LTX-I2V MISSING-STILL). REMAINING = the **pool_n_loop** build
+  (operator: "pool_n_loop -> only N stills; make pool_n_loop+N=4 the JSON default"). GROUNDED + ROUNDTABLE-CONVERGED
+  plan in `docs/2026-06-18-pool-loop-stills/pass01_judgment.md`: the still phase emits N generic pool stills
+  (`other_pool_0..N-1`); **ShotLock** stamps `other_pool_{i mod N}` on the {background_abstract, scene_broll}
+  shots (the SAME iteration as its clip budget) so M beats SHARE the N stills; render_driver prefers the stamped
+  pool key. KEEP generating scene stills for all accepts_still roles incl. HuMo (OOM-fallback to still_kenburns
+  needs one -- grounded vs EXPECTED_OOM_TRAIL); do NOT pool character_video. The `pool_n_loop`+4 default flip is
+  COUPLED to this build (flipping first over-generates). Touches the rendering-critical ShotLock + render_driver --
+  implement as a focused step. (b) `optional_inputs` so role_compat sees an OPTIONAL init_image
   (verify-at-build); (c) optionally `accepts_still=True` on the static-still cheap families
   (flux_still/station_card/still_kenburns); (d) full Decision-3/5 (central `image_engines.registry.usable()`,
   retire `requires_mesh_portrait` onto `still_kind`). THEN the carried step below (per-segment LUFS/RMS) + the S3
