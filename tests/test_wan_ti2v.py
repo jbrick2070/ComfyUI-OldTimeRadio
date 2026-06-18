@@ -76,11 +76,13 @@ def test_node_candidates_unet_switches_to_core_loader_on_safetensors(monkeypatch
     assert WanTi2vEngine()._node_candidates()["unet"] == ("UNETLoader",)
 
 
-def test_loader_names_default_to_umt5_and_wan22_vae(monkeypatch):
+def test_loader_names_default_to_gguf_umt5_and_wan22_vae(monkeypatch):
+    # 2026-06-18 roundtable: the floor CLIP default moved OFF fp8 (Mac MPS
+    # Float8_e4m3fn TypeError, ComfyUI #9255) to the GGUF umt5 encoder.
     for k in ("OTR_WAN_TI2V_CLIP_NAME", "OTR_WAN_TI2V_VAE_NAME"):
         monkeypatch.delenv(k, raising=False)
     names = WanTi2vEngine()._loader_names()
-    assert names["clip"] == "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+    assert names["clip"] == "umt5-xxl-encoder-Q5_K_M.gguf"
     assert names["vae"] == "wan2.2_vae.safetensors"
 
 
@@ -249,6 +251,80 @@ def test_non_numeric_cfg_fails_closed(monkeypatch):
     monkeypatch.setenv("OTR_WAN_TI2V_CFG", "high")
     with pytest.raises(EngineUnusable):
         WanTi2vEngine()._resolve_render_config()
+
+
+# --------------------------------------------------------------------------- #
+# CHUNK 2 -- CLIP off-fp8 (Mac-safe GGUF umt5) + tiled VAE (schema-verified)
+# --------------------------------------------------------------------------- #
+def _clear_clip_vae_env(monkeypatch):
+    for k in ("OTR_WAN_TI2V_CLIP_NAME", "OTR_WAN_TI2V_CLIP_LOADER",
+              "OTR_WAN_TI2V_TILED_VAE", "OTR_WAN_TI2V_LOADER",
+              "OTR_WAN_TI2V_UNET_NAME", "OTR_WAN_TI2V_CKPT"):
+        monkeypatch.delenv(k, raising=False)
+
+
+def test_clip_loader_mode_default_is_gguf(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    assert WanTi2vEngine()._clip_loader_mode() == "gguf"
+
+
+def test_clip_loader_mode_explicit_safetensors(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_CLIP_LOADER", "safetensors")
+    assert WanTi2vEngine()._clip_loader_mode() == "safetensors"
+
+
+def test_node_candidates_clip_is_gguf_loader_by_default(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    assert WanTi2vEngine()._node_candidates()["clip"] == ("CLIPLoaderGGUF",)
+
+
+def test_node_candidates_clip_core_loader_on_fp16(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_CLIP_NAME", "umt5_xxl_fp16.safetensors")
+    assert WanTi2vEngine()._node_candidates()["clip"] == ("CLIPLoader",)
+
+
+def test_graph_gguf_clip_has_no_device_arg(monkeypatch):
+    # CLIPLoaderGGUF takes clip_name + type only (no device), verified vs /object_info.
+    _clear_clip_vae_env(monkeypatch)
+    g = _graph(monkeypatch)
+    clip_in = g["clip"]["inputs"]
+    assert clip_in["type"] == "wan"
+    assert "device" not in clip_in
+
+
+def test_graph_safetensors_clip_keeps_device(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_CLIP_NAME", "umt5_xxl_fp16.safetensors")
+    g = _graph(monkeypatch)
+    assert g["clip"]["inputs"]["device"] == "default"
+
+
+def test_tiled_vae_default_on(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    eng = WanTi2vEngine()
+    assert eng._tiled_vae() is True
+    assert eng._node_candidates()["vaedecode"] == ("VAEDecodeTiled",)
+
+
+def test_tiled_vae_inputs_have_temporal_knobs(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    g = _graph(monkeypatch)
+    vd = g["vaedecode"]["inputs"]
+    assert vd["tile_size"] == 256
+    assert vd["temporal_size"] == 16          # the video-VAE peak lever
+    assert "temporal_overlap" in vd and "overlap" in vd
+
+
+def test_tiled_vae_can_be_disabled(monkeypatch):
+    _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
+    eng = WanTi2vEngine()
+    assert eng._tiled_vae() is False
+    assert eng._node_candidates()["vaedecode"] == ("VAEDecode",)
+    g = _graph(monkeypatch)
+    assert "tile_size" not in g["vaedecode"]["inputs"]
 
 
 # --------------------------------------------------------------------------- #

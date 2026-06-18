@@ -60,6 +60,11 @@ _WAN22_VAE_ALLOWED = frozenset({"wan2.2_vae.safetensors"})
 #: Default 8GB-tier GGUF (Q5_K_M; Apache-2.0). Resolved via folder_paths /
 #: OTR_WAN_TI2V_CKPT at runtime; this basename is the fallback the loader reads.
 _TI2V_DEFAULT_UNET = "Wan2.2-TI2V-5B-Q5_K_M.gguf"
+#: Floor default umt5 CLIP = the GGUF encoder (2026-06-18 roundtable). The official
+#: fp8 (umt5_xxl_fp8_e4m3fn_scaled.safetensors) throws Float8_e4m3fn on Mac MPS
+#: (ComfyUI #9255); GGUF dequantizes to fp16 -> the cross-platform 8GB path. Override
+#: with OTR_WAN_TI2V_CLIP_NAME (+ OTR_WAN_TI2V_CLIP_LOADER) for an fp16 safetensors.
+_TI2V_DEFAULT_CLIP = "umt5-xxl-encoder-Q5_K_M.gguf"
 # 8GB floor framing (2026-06-18 roundtable, converged 3 passes): 33f @ 832x480 hit
 # ~13 GB on a 5080 -> OOMs a real 8GB card. The floor renders 17 frames (4n+1) and
 # CLAMPS upstream requests to the floor max unless OTR_WAN_TI2V_MAX_FRAMES raises it
@@ -191,23 +196,46 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return ("gguf" if self._loader_names()["unet"].lower().endswith(".gguf")
                 else "safetensors")
 
+    def _clip_loader_mode(self):
+        """``gguf`` (``CLIPLoaderGGUF``) or ``safetensors`` (``CLIPLoader``) for the
+        umt5 encoder. Explicit via ``OTR_WAN_TI2V_CLIP_LOADER``; else inferred from
+        the clip extension (the floor default is the GGUF umt5 -- fp8 safetensors
+        throws Float8_e4m3fn on Mac MPS, ComfyUI #9255, 2026-06-18 roundtable)."""
+        mode = (os.environ.get("OTR_WAN_TI2V_CLIP_LOADER") or "").strip().lower()
+        if mode in ("gguf", "safetensors"):
+            return mode
+        return ("gguf" if self._loader_names()["clip"].lower().endswith(".gguf")
+                else "safetensors")
+
+    def _tiled_vae(self):
+        """Whether to decode through ``VAEDecodeTiled`` (the floor default ON: the
+        video-VAE decode is a top VRAM-peak driver at 8GB). ``OTR_WAN_TI2V_TILED_VAE``
+        falsey {0,false,no,off} forces the plain ``VAEDecode``."""
+        return (os.environ.get("OTR_WAN_TI2V_TILED_VAE", "1").strip().lower()
+                not in ("0", "false", "no", "off"))
+
     def _node_candidates(self):
         """Ordered ComfyUI node-class candidates per graph node (CORE Wan 2.2
-        TI2V-5B, captured from the live /object_info 2026-06-14). The 5B latent
-        node is ``Wan22ImageToVideoLatent`` (NOT ``WanImageToVideo``)."""
+        TI2V-5B + ComfyUI-GGUF, schema-verified vs the live /object_info 2026-06-18).
+        The 5B latent node is ``Wan22ImageToVideoLatent`` (NOT ``WanImageToVideo``).
+        The CLIP loader + the VAE-decode node switch per the floor knobs above."""
         unet_cls = (("UnetLoaderGGUF",) if self._loader_mode() == "gguf"
                     else ("UNETLoader",))
+        clip_cls = (("CLIPLoaderGGUF",) if self._clip_loader_mode() == "gguf"
+                    else ("CLIPLoader",))
+        vaedecode_cls = (("VAEDecodeTiled",) if self._tiled_vae()
+                         else ("VAEDecode",))
         return {
             "unet": unet_cls,
             "modelsampling": ("ModelSamplingSD3",),
-            "clip": ("CLIPLoader",),
+            "clip": clip_cls,
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "vae": ("VAELoader",),
             "loadimage": ("LoadImage",),
             "latent": ("Wan22ImageToVideoLatent",),
             "ksampler": ("KSampler",),
-            "vaedecode": ("VAEDecode",),
+            "vaedecode": vaedecode_cls,
         }
 
     def _loader_names(self):
@@ -217,7 +245,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "unet": os.environ.get("OTR_WAN_TI2V_UNET_NAME")
             or os.path.basename(self._ckpt_path()),
             "clip": os.environ.get(
-                "OTR_WAN_TI2V_CLIP_NAME", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+                "OTR_WAN_TI2V_CLIP_NAME", _TI2V_DEFAULT_CLIP),
             "vae": os.environ.get("OTR_WAN_TI2V_VAE_NAME", "wan2.2_vae.safetensors"),
         }
 
@@ -305,13 +333,18 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             unet_inputs = {"unet_name": names["unet"]}
         else:
             unet_inputs = {"unet_name": names["unet"], "weight_dtype": "default"}
+        # CLIPLoaderGGUF takes clip_name + type ONLY (no `device` arg, verified vs
+        # /object_info 2026-06-18); the core CLIPLoader also takes device.
+        if self._clip_loader_mode() == "gguf":
+            clip_inputs = {"clip_name": names["clip"], "type": "wan"}
+        else:
+            clip_inputs = {"clip_name": names["clip"], "type": "wan",
+                           "device": "default"}
         return {
             "unet": {"class": "unet", "inputs": unet_inputs},
             "modelsampling": {"class": "modelsampling",
                               "inputs": {"model": W("unet", 0), "shift": shift}},
-            "clip": {"class": "clip",
-                     "inputs": {"clip_name": names["clip"], "type": "wan",
-                                "device": "default"}},
+            "clip": {"class": "clip", "inputs": clip_inputs},
             "pos": {"class": "pos",
                     "inputs": {"text": positive, "clip": W("clip", 0)}},
             "neg": {"class": "neg",
@@ -332,8 +365,28 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                     "negative": W("neg", 0),
                                     "latent_image": W("latent", 0)}},
             "vaedecode": {"class": "vaedecode",
-                          "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}},
+                          "inputs": self._vaedecode_inputs(W)},
         }
+
+    def _vaedecode_inputs(self, W):
+        """VAEDecode inputs; the tiled path adds the schema-verified tile/temporal
+        knobs (8GB floor defaults; temporal_size = frames decoded at a time = the
+        big video-VAE peak lever). All env-overridable."""
+        base = {"samples": W("ksampler", 0), "vae": W("vae", 0)}
+        if not self._tiled_vae():
+            return base
+        def _i(env, dflt):
+            try:
+                return int(os.environ.get(env, str(dflt)))
+            except (TypeError, ValueError):
+                return dflt
+        base.update({
+            "tile_size": _i("OTR_WAN_TI2V_VAE_TILE", 256),
+            "overlap": _i("OTR_WAN_TI2V_VAE_OVERLAP", 64),
+            "temporal_size": _i("OTR_WAN_TI2V_VAE_TEMPORAL", 16),
+            "temporal_overlap": _i("OTR_WAN_TI2V_VAE_TEMPORAL_OVERLAP", 8),
+        })
+        return base
 
     # ---- residency ----
     def load(self):
