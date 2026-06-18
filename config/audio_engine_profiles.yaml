@@ -39,7 +39,12 @@ profiles:
     # explicit per-stage keys win when present. normalize_bark_output stays false:
     # EpisodeAssembler already applies the final -1.0 dBFS pass post-crossfade, so
     # a Bark-side peak normalize would double-hit (S4 decision; not implemented).
-    default_params: {semantic_temp: 0.7, coarse_temp: 0.5, fine_temp: 0.5, text_temp: 0.7, waveform_temp: 0.7, normalize_bark_output: false}
+    # recommended_speakers (S3 DATA only -- NO auto-filter consumer yet): the
+    # fullest / least-thin v2/en presets by RMS+LUFS from the 2026-06-17 audition
+    # (docs/2026-06-17-bark-voice/audition/preset_audition.csv) -- en_speaker_5
+    # (LUFS -14.3) + en_speaker_0 (-16.8) lead the pack by ~10 dB; en_speaker_6 is
+    # the next fullest. Casting enforcement is a FUTURE casting-layer sprint.
+    default_params: {semantic_temp: 0.7, coarse_temp: 0.5, fine_temp: 0.5, text_temp: 0.7, waveform_temp: 0.7, normalize_bark_output: false, recommended_speakers: [v2/en_speaker_5, v2/en_speaker_0, v2/en_speaker_6]}
     allowed_voice_banks: [bark_legacy]
     engine_impl_version: "1"
     sample_rate: 24000

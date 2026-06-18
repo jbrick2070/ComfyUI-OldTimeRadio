@@ -1,0 +1,25 @@
+{
+  "seed": 42,
+  "line": "This is the evening broadcast. Stay tuned for the next chapter of our story.",
+  "presets": [
+    "v2/en_speaker_0",
+    "v2/en_speaker_1",
+    "v2/en_speaker_2",
+    "v2/en_speaker_3",
+    "v2/en_speaker_4",
+    "v2/en_speaker_5",
+    "v2/en_speaker_6",
+    "v2/en_speaker_7",
+    "v2/en_speaker_8",
+    "v2/en_speaker_9"
+  ],
+  "stage_temps": {
+    "semantic": 0.7,
+    "coarse": 0.5,
+    "fine": 0.5
+  },
+  "transformers": "5.5.0",
+  "model_id": "suno/bark",
+  "gpu": "NVIDIA GeForce RTX 5080 Laptop GPU",
+  "wav_dir_local_only": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\bark_audition"
+}
