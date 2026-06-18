@@ -38,7 +38,23 @@ every beat edge), but because the long 120w writer pipeline is itself flaky run-
 (or a shorter 30-60w one to dodge the writer flake) to capture status=success, THEN
 promote `visualizer` -> VALIDATED_ENGINES (+ default-ON). High confidence it passes.
 
-## Promotion gate (visualizer -> VALIDATED_ENGINES)
+## GREEN + PROMOTED (`1cc6588`, 2026-06-18)
+A random-seed (1443856074) visualizer-all-roles 120w episode rendered END-TO-END:
+**status=success** (~15 min) -- writer -> bark audio -> all per-beat visualizer renders
+(ZERO failures) -> composite -> mux. `visualizer` added to VALIDATED_ENGINES + flipped
+default-ON (opt-OUT, like ltx_av). It now lists in the per-role dropdowns. The four
+soak-found robustness fixes held across a clean full episode.
+
+## FOLLOW-UP OPTIMIZATION (operator 2026-06-18): skip unused stills for procedural beats
+The all-visualizer episode still GENERATED a flux still per beat (the slow part of the
+soak) even though the visualizer ignores init_image. Proposed: in the image-gen target
+derivation, SKIP a beat's still when its SELECTED video engine does not consume
+init_image (required_inputs lacks "init_image": visualizer / abstract / station_card).
+Per-beat (mixed episodes keep stills for HuMo/LTX/Wan beats). Safe for byte-identical
+(the skipped still was unused; audio + video output unchanged). Big speedup + VRAM win
+for the accessible all-procedural floor. NOT a blocker; a clean separate task.
+
+## Promotion gate (visualizer -> VALIDATED_ENGINES) -- MET
 ADD `"visualizer"` to `registry.VALIDATED_ENGINES` (and decide default-ON for
 accessibility) once a full visualizer-all-roles episode returns status=success
 (the confirming soak). The engine + draw routines are unit-proven (18 tests incl. real
