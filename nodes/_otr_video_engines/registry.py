@@ -282,6 +282,12 @@ VALIDATED_ENGINES = frozenset({
     "humo_1.7B",
     "humo_1.7B_169",
     "humo_14B_169",
+    # wan_ti2v PROMOTED 2026-06-18: forced-lane GPU smoke PASSED on the 5080 via
+    # the real adapter (OTR_VideoRenderBatch mode=single, executor thread) -- i2v
+    # rendered 33 frames from a 16:9 still, engine vram_used ~8.1 GB, independent
+    # NVML peak 12,945 MiB (< the 14.5 GB cap). The 8GB-tier 5B motion engine
+    # (b-roll / scene / background; NO audio -> never the lip-sync path).
+    "wan_ti2v",
 })
 __all__.append("VALIDATED_ENGINES")
 

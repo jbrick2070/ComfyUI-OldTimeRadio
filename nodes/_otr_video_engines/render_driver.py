@@ -1849,6 +1849,25 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
             "engine_id": engine_name,
             "family": engine_family(engine_name, "audio_driven_face"),
             "target_frame_count": int(frame_count), "degradation_trail": []}
+    # build_request defaults to the HuMo PORTRAIT canvas (480x832). For a WIDE
+    # engine (render_aspect='wide': ltx_video, wan_*, the _169 HuMos, ...) that
+    # letterboxes a 16:9 init still into a tall frame ("postage stamp" with black
+    # bars). With no explicit canvas, derive it from the engine's render_aspect so
+    # the single-engine validation renders in the engine's NATIVE aspect: wide ->
+    # 832x480 (the VRAM-safe proven render canvas, env OTR_VIDEO_RENDER_CANVAS),
+    # else the portrait default.
+    if canvas is None:
+        try:
+            _eng = _vreg.get_engine(engine_name)
+            if getattr(_eng, "render_aspect", "portrait") == "wide":
+                _rc = os.environ.get("OTR_VIDEO_RENDER_CANVAS", "832x480")
+                try:
+                    _rw, _rh = (int(x) for x in _rc.lower().split("x", 1))
+                except (ValueError, AttributeError):
+                    _rw, _rh = 832, 480
+                canvas = (_rw, _rh)
+        except Exception:  # noqa: BLE001 -- unknown engine -> portrait default
+            pass
     request = build_request(shot, assets, frame_count, canvas)
     t0 = time.time()
     try:
