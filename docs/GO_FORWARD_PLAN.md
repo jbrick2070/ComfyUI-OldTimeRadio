@@ -154,11 +154,17 @@
   per-model whitelist"): `accepts_still` on MotionEngineBase (default True) read centrally by
   `engine_consumes_still`; silent `ltx_video` now consumes the selected image. Design + roundtable:
   `docs/2026-06-18-coverage-arch-wiring/pass01_plan.md`.
-- **>>> NEXT = coverage-arch FOLLOW-UPS (deferred, additive):** (a) `optional_inputs` so role_compat sees an
-  OPTIONAL init_image (verify-at-build); (b) optionally `accepts_still=True` on the static-still cheap families
-  (flux_still/station_card/still_kenburns) so they also show the SELECTED image; (c) full Decision-3/5 (central
-  `image_engines.registry.usable()`, retire `requires_mesh_portrait` onto `still_kind`). THEN the carried step
-  below (per-segment LUFS/RMS) + the S3 forward order (3D item 5, distribution item 6).
+- **>>> NEXT = coverage-arch FOLLOW-UPS (deferred, additive):** (a) **IMAGE-PHASE still-object coverage for
+  `background_abstract` beats** &mdash; the verify episode proved `accepts_still` works (silent LTX consumed the
+  flux2 stills for b000/b001/b005 + the c01/c02/c03 portraits), BUT the image-prompt phase (`derive_image_prompts`)
+  emits NO still object for `background_abstract` dialogue beats (b002/b003/b004), so those LTX clips render
+  text-only and `render_driver` fires the LOUD `LTX-I2V MISSING-STILL` degrade. To get "flux2 on EVERY ltx beat"
+  the image phase must emit a scene-still object for background_abstract beats too (this is upstream of the
+  dispatcher; accepts_still is correct). (b) `optional_inputs` so role_compat sees an OPTIONAL init_image
+  (verify-at-build); (c) optionally `accepts_still=True` on the static-still cheap families
+  (flux_still/station_card/still_kenburns); (d) full Decision-3/5 (central `image_engines.registry.usable()`,
+  retire `requires_mesh_portrait` onto `still_kind`). THEN the carried step below (per-segment LUFS/RMS) + the S3
+  forward order (3D item 5, distribution item 6).
 
 **>>> CARRIED STEP = plan per-segment LUFS/RMS voice normalization (operator-requested; FROZEN-SPINE change, needs a plan + re-baseline).**
 - **`wan_ti2v` PROMOTED 2026-06-18 (`ca3e06c`):** forced-lane GPU smoke PASSED on the 5080 via the real adapter
