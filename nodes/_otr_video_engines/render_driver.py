@@ -721,21 +721,25 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # engines; LOUD if absent (never a silent black). station_card (the other
     # static_image_gen family) is intentionally NOT included here -- its
     # announcer-card behavior is unchanged.
-    if str(shot.get("engine_id") or "") == "flux_still":
+    # flux_still (Ken Burns) + flat_still (static hold) are the static_image_gen
+    # "show the selected still" engines -- both condition on the beat's scene still
+    # so the operator's chosen image (e.g. flux2_klein) is what's displayed.
+    if str(shot.get("engine_id") or "") in ("flux_still", "flat_still"):
+        _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"
             _LOG.info(
-                "[OTR.render_driver] flux_still: beat %s conditioning on scene "
-                "still %s (BUG-403 opener fix)", _bid, os.path.basename(_still))
+                "[OTR.render_driver] %s: beat %s conditioning on scene "
+                "still %s", _eng, _bid, os.path.basename(_still))
         else:
             _LOG.warning(
-                "[OTR.render_driver] flux_still MISSING-STILL (LOUD): beat %s "
+                "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
                 "has NO scene still in the ledger -- the cheap family will "
                 "synthesize its dark floor for this beat; investigate the "
-                "image phase for beat %s.", _bid, _bid)
+                "image phase for beat %s.", _eng, _bid, _bid)
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --

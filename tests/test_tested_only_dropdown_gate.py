@@ -29,11 +29,12 @@ _HIDDEN_IMAGE = {
 
 def test_video_validated_set():
     # The GPU-validated video engines: the LTX lanes + the HuMo family +
-    # wan_ti2v (forced-lane smoke PASSED 2026-06-18, NVML peak 12.9 GB < cap).
+    # wan_ti2v (forced-lane smoke PASSED 2026-06-18, NVML peak 12.9 GB < cap) +
+    # visualizer + flat_still (CPU/ffmpeg-only stills -> trivially valid).
     assert vreg.VALIDATED_ENGINES == frozenset({
         "ltx_video", "ltx_av_music", "ltx_av_talk",
         "humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
-        "wan_ti2v", "visualizer",
+        "wan_ti2v", "visualizer", "flat_still",
     })
 
 

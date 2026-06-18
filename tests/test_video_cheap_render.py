@@ -25,7 +25,8 @@ _HAS_FFPROBE = shutil.which("ffprobe") is not None
 # 2026-06-18: "visualizer" graduated from a cheap floor stub to the real procedural
 # CRT engine (eng_visualizer.py) -- it is no longer a _CheapFamilyBase, so it is
 # dropped from the cheap-family render matrix (covered by test_video_visualizer.py).
-_FAMILIES = ("abstract", "still_kenburns", "station_card", "flux_still")
+_FAMILIES = ("abstract", "still_kenburns", "station_card", "flux_still",
+             "flat_still")
 
 
 def _req(frames=6, w=96, h=64, fps=25, **extra):
@@ -61,6 +62,41 @@ def test_floor_clip_contract_shape():
     assert clip["engine_id"] == "still_kenburns"
     assert clip["family"] == "static_motion"
     assert clip["frame_count"] == 30 and clip["fps"] == 25 and clip["clip_id"] == "s1"
+
+
+def test_flat_still_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
+    """flat_still holds the still FLAT (ffmpeg_still_static_cmd: fit+pad, no crop)
+    while still_kenburns pans it (ffmpeg_still_motion_cmd) -- the 'stills, no
+    motion, no face-crop' contract. Asserts WHICH command each engine selects, with
+    a real still present (no ffmpeg run -- the builders are stubbed)."""
+    from nodes._otr_video_engines import wrapper_bridge as wb
+    still = tmp_path / "s.png"
+    still.write_bytes(b"\x89PNG\r\n\x1a\n")          # presence is all _still_path checks
+    calls = {}
+    monkeypatch.setattr(wb, "ffmpeg_still_static_cmd",
+                        lambda *a, **k: calls.setdefault("static", a) or ["ffmpeg"])
+    monkeypatch.setattr(wb, "ffmpeg_still_motion_cmd",
+                        lambda *a, **k: calls.setdefault("motion", a) or ["ffmpeg"])
+    monkeypatch.setattr(wb, "run_ffmpeg", lambda cmd: None)
+    req = _req(asset_refs={"init_image": str(still)})
+
+    vreg.get_engine("flat_still").render_clip(req)
+    assert "static" in calls and "motion" not in calls   # flat = NO pan
+    calls.clear()
+    vreg.get_engine("still_kenburns").render_clip(req)
+    assert "motion" in calls and "static" not in calls   # ken burns = pan
+
+
+def test_flat_still_registered_validated_all_roles():
+    eng = vreg.get_engine("flat_still")
+    assert eng.family == "static_image_gen"
+    assert eng.commercial_clean is True
+    assert getattr(eng, "accepts_still", False) is True   # coverage gate mints its still
+    assert getattr(eng, "_still_motion", True) is False   # flat hold, not ken burns
+    for role in ("announcer_visual", "music_visual", "character_video",
+                 "scene_broll", "background_abstract"):
+        assert role in eng.roles
+    assert "flat_still" in vreg.VALIDATED_ENGINES         # shows in the dropdown
 
 
 def test_canvas_and_frame_defaults():

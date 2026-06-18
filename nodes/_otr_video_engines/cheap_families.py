@@ -126,7 +126,13 @@ class _CheapFamilyBase:
         out_path = otr_engine_tmp_mp4("otr_floor_%s_" % self.name)
         still = self._still_path(request) if self.uses_still else ""
         if still and os.path.exists(still):
-            cmd = _wb.ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)
+            # ``_still_motion`` chooses the Ken Burns pan (cover+crop, default) vs the
+            # FLAT hold (fit+pad, no crop -> a face is never cut) -- the flat_still
+            # 'just a still, no motion' contract.
+            if getattr(self, "_still_motion", True):
+                cmd = _wb.ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)
+            else:
+                cmd = _wb.ffmpeg_still_static_cmd(still, out_path, w, h, fps, n)
         else:
             cmd = _wb.ffmpeg_lavfi_floor_cmd(
                 out_path, w, h, fps, n, source=self._lavfi_source(w, h, fps))
@@ -209,7 +215,27 @@ class FluxStillFamily(_CheapFamilyBase):
     uses_still = True               # animate a provided flux still when present
 
 
+@register
+class FlatStillFamily(_CheapFamilyBase):
+    """A DEAD-FLAT still: the selected image held STATIC (no pan/zoom, fit+pad so a
+    face is NEVER cropped) for the beat -- the 'I want stills, not video' option
+    (operator 2026-06-18). Eligible in every role; CPU/ffmpeg-only, no weights, no
+    VRAM, always renders -> commercial-clean + validated. ``accepts_still`` so the
+    image dispatcher mints the role's selected still for it (the central coverage
+    gate); ``_still_motion=False`` selects the flat hold over the Ken Burns pan."""
+    name = "flat_still"
+    family = "static_image_gen"
+    roles = ("announcer_visual", "music_visual", "character_video",
+             "scene_broll", "background_abstract")
+    default_roles = ()              # selectable peer; not an auto-default
+    required_inputs = ("text_prompt",)
+    commercial_clean = True         # own ffmpeg + the chosen still; no model license
+    uses_still = True               # display the provided still...
+    _still_motion = False           # ...STATIC (flat hold, fit+pad, no crop)
+    accepts_still = True            # mint the selected still for it (coverage gate)
+
+
 __all__ = [
     "AbstractFamily", "StillKenBurnsFamily", "StationCardFamily",
-    "FluxStillFamily",
+    "FluxStillFamily", "FlatStillFamily",
 ]

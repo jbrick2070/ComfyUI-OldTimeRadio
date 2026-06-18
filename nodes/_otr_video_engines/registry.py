@@ -294,6 +294,11 @@ VALIDATED_ENGINES = frozenset({
     # fixes (assert_usable / b000 master-slice / idle-on-silence / 0-frame default).
     # The CPU/ffmpeg-only procedural CRT scope floor (near-zero GPU; default-ON).
     "visualizer",
+    # flat_still 2026-06-18: a DEAD-FLAT static still (the selected image held with
+    # NO pan/zoom, fit+pad so a face is never cropped) -- the "I want stills, not
+    # video" option (operator). CPU/ffmpeg-only, no weights, no VRAM, always renders
+    # -> commercial-clean + trivially valid; listed so end users can pick it.
+    "flat_still",
 })
 __all__.append("VALIDATED_ENGINES")
 
