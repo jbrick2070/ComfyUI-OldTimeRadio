@@ -1,5 +1,39 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
+> latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
+> 16/7/3):** The morning LTX-AV audio-in build-out is DONE + pushed, plus operator look-QA fixes and a clean-break.
+> **(1) C1+C2 `802ce48`** -- the sharp distilled recipe is now IN `eng_ltx_av` (LoRA@0.70 + euler_cfg_pp + 8-step
+> distilled sigmas + cfg 1.0, `ModelSamplingLTXV` dropped) and **`ltx_av_music` is the music/announcer DEFAULT**
+> (master JSON node 87 + `16gb_full` profile both repointed; `ltx_video` default_roles emptied). **(2) humo_14B_169
+> `fdb9328`** -- NEW 14B HuMo in 16:9 (the 2026-06-09 "fire" quality, colour-correct -- the 1.7B blue cast does NOT
+> apply since the 14B latents match wan_2.1_vae). **(3) humo_1.7B de-blue `fdb9328`** -- the blue cast was **CFG**,
+> not VAE: cfg 5.0 -> 1.0 (frame probe B-R +44.6 blue -> +2.8 balanced on the identical beat). **(4) framing
+> `c60f80e`** -- `eng_ltx_av` now declares `render_aspect="wide"` so the director mints a WIDE character still (was a
+> 832x1216 PORTRAIT that the wide 832x480 render centre-cropped -> decapitated heads), + aspect-aware still framing
+> (WIDE = head-and-shoulders + headroom; PORTRAIT keeps three-quarter). **(5) ending `f83ba78`** -- synthesized
+> end-title hero card (decode-reveal the EPISODE TITLE, animated like the open; the existing `close` window never
+> fired because the closing theme lives in the post-roll AFTER `total`) + stream-looped the credits tail (was a
+> `tpad`-clone static freeze; now `-stream_loop -1`). **(6) latentsync RIPPED OUT 100% `5ace122`** (operator
+> clean-break) -- deleted `eng_latentsync.py` + worker + installer + `test_video_latentsync.py`; fallback chain
+> repointed `humo -> humo_1.7B -> still_kenburns`; registry/pilot/__init__/docstrings/tests scrubbed; 37 files,
+> +144/-888; ripgrep latentsync = 0 in tracked source. **VALIDATED ON GPU (headless :8000, v0.25.1):** a full
+> humo_14B_169 episode (16:9, non-blue, NVML peak 14.4 GB < 14.5 cap, ~48 min) + two all-LTX episodes (~26-30 min)
+> rendered end-to-end, audio byte-identical, ZERO render errors. Captions confirmed good (operator: "captions are
+> perfect" -- do NOT touch). **>>> NEXT ACTIVE THREAD (operator chose, do these next):** **(A) dropdown
+> "tested-only" gate** -- only list VALIDATED engines in the three role dropdowns; add a `validated`/`tested` flag
+> the dropdown reads, and HIDE the untested ones (hunyuan3d_talk, mesh_stage, wan_i2v/wan_ti2v until tested,
+> abstract, untested image peers hidream_i1/lumina_image/qwen_image/sd35_large/z_image_turbo). Tested-working VIDEO
+> engines today = ltx_video, ltx_av_music, ltx_av_talk, humo, humo_1.7B, humo_14B_169 (+ humo_1.7B_169 functional).
+> **(B) low-VRAM video model** -- lead candidate **Wan2.2 TI2V-5B** (already HALF-WIRED: `OTR_ENABLE_WAN_TI2V` +
+> `Wan2.2-TI2V-5B-Q5_K_M.gguf` in the launcher); **search FIRST** to confirm it's still the best low-VRAM pick
+> (June 2026), then finish-wire + GPU-test + add to the tested-only dropdown. **Carry-over notes:** indextts2
+> char-voice sidecar is NOT installed in the headless install (`...\ComfyUI-Installs\...\index-tts\.venv` missing;
+> bark is the headless stand-in) -- production `16gb_full` still uses indextts2 and it works in Desktop ComfyUI;
+> the humo_1.7B_169 (16:9 fast tier) is still at cfg 2.5 (mildly cool, NOT de-blued -- de-blue it to 1.0 if it
+> becomes a listed fast 16:9 option). The §3 forward order (Wan / 3D / distribution) is otherwise unchanged. The
+> morning "LTX-AV SHARP RECIPE PROVEN" block below is now SUPERSEDED -- the build-out it called for SHIPPED.
+>
 > **LATEST SESSION -- 2026-06-17 (LTX-AV SHARP RECIPE PROVEN ON GPU -> operator GO: make it the music/announcer
 > DEFAULT; full build-out plan written; NOTHING committed -- planner window):** Standalone GPU smokes (headless
 > :8000) proved the golden sharpness chain RUNS on the LTX-AV **A2V (audio-concat) graph WITHOUT crashing**:
