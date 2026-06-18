@@ -167,6 +167,28 @@ OPT_IN_ENGINES = {
             "7000 MB), then one acceptance render per slot"
         ),
     },
+    # visualizer (2026-06-18): the low-VRAM ffmpeg-only procedural CRT scope engine.
+    # No heavy/contaminating lib -- ffmpeg is a spawned exe, soundfile is the only
+    # importable external dep (the floor audio path already uses it), PIL/numpy are
+    # core. Flag-gated (OTR_ENABLE_VISUALIZER) so the pilot covers it, but there is
+    # nothing GPU/sidecar to probe; it runs in-process on CPU.
+    "visualizer": {
+        "lib_module": "soundfile",
+        "lib_in_stack": True,        # soundfile is a spine dep (present); the real
+                                     # gate is ffmpeg + assert_usable, not a lib probe
+        "adapter_class": "VisualizerEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_VISUALIZER",
+        "assumed_call": (
+            "in-process CPU: soundfile-decode the per-beat audio -> mono -> "
+            "_analyze_audio_np + _dual_ema -> paint the full-16:9 CRT scope look "
+            "(ring / orbiting particles / grid / mirrored waveform / freq bars / "
+            "CRT post, COPIED torch-free into _otr_shared/scope_draw.py) -> one "
+            "silent mp4 via ffmpeg stdin. Near-zero GPU; no weights, no sidecar.  "
+            "# TODO-for-GPU-smoke: a full-episode run with visualizer on all three "
+            "roles, audio byte-identical, render time + the near-zero VRAM floor"
+        ),
+    },
     "wan_i2v": {
         "lib_module": "wan",
         "adapter_class": "WanI2VEngine",

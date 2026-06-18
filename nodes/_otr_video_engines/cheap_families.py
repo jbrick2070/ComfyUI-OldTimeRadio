@@ -184,13 +184,13 @@ class StationCardFamily(_CheapFamilyBase):
     uses_still = True               # show a provided card still when present
 
 
-@register
-class VisualizerFamily(_CheapFamilyBase):
-    name = "visualizer"
-    family = "abstract"
-    roles = ("music_visual", "background_abstract")
-    default_roles = ("music_visual",)
-    required_inputs = ()            # audio-reactive procedural
+# 2026-06-18: the cheap ``visualizer`` floor stub was SUPERSEDED by the real
+# procedural CRT scope engine (nodes/_otr_video_engines/eng_visualizer.py,
+# engine_id "visualizer"). The stub here was a minimal ffmpeg-floor family; the new
+# engine is the faithful full-colour resurrection (audio analysis + the ring /
+# particles / grid / waveform / bars / CRT-post look) and OWNS the "visualizer"
+# name now. Removed to avoid a duplicate registration (the scope-visualizer plan
+# wrongly assumed the name was unregistered).
 
 
 @register
@@ -211,5 +211,5 @@ class FluxStillFamily(_CheapFamilyBase):
 
 __all__ = [
     "AbstractFamily", "StillKenBurnsFamily", "StationCardFamily",
-    "VisualizerFamily", "FluxStillFamily",
+    "FluxStillFamily",
 ]

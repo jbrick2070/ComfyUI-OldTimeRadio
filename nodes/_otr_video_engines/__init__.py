@@ -136,3 +136,16 @@ try:  # pragma: no cover - trivial guard
     from . import eng_triposr as _eng_triposr  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# visualizer (2026-06-18): the LOW-VRAM ffmpeg-only procedural CRT scope engine --
+# audio-reactive scopes rendered AS the per-beat picture (the resurrected full-colour
+# video_engine look, via the COPIED torch-free routines in _otr_shared/scope_draw.py;
+# zero coupling to the floor node / the SceneAwareScopes overlay). DEFAULT-OFF / dark
+# (OTR_ENABLE_VISUALIZER) until a green end-to-end run promotes it into
+# registry.VALIDATED_ENGINES. Cold-import clean (V-12: soundfile/PIL lazy in
+# render_clip). Guarded so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_visualizer as _eng_visualizer  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

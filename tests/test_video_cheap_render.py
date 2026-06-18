@@ -22,7 +22,10 @@ from nodes._otr_video_engines import cheap_families  # noqa: F401  (registers fl
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 _HAS_FFPROBE = shutil.which("ffprobe") is not None
-_FAMILIES = ("abstract", "still_kenburns", "station_card", "visualizer", "flux_still")
+# 2026-06-18: "visualizer" graduated from a cheap floor stub to the real procedural
+# CRT engine (eng_visualizer.py) -- it is no longer a _CheapFamilyBase, so it is
+# dropped from the cheap-family render matrix (covered by test_video_visualizer.py).
+_FAMILIES = ("abstract", "still_kenburns", "station_card", "flux_still")
 
 
 def _req(frames=6, w=96, h=64, fps=25, **extra):
@@ -81,7 +84,6 @@ def test_uses_still_flags():
     assert vreg.get_engine("station_card").uses_still is True
     assert vreg.get_engine("flux_still").uses_still is True
     assert vreg.get_engine("abstract").uses_still is False
-    assert vreg.get_engine("visualizer").uses_still is False
 
 
 def test_flux_still_fits_all_roles_bug401():

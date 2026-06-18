@@ -39,9 +39,12 @@ from . import registry as _vreg
 
 _LOG = logging.getLogger("OTR.video.render_driver")
 
-#: The cheap radio-floor engine names (terminal; a chain ends here).
+#: The cheap radio-floor engine names (terminal; a chain ends here). NOTE
+#: (2026-06-18): "visualizer" was removed -- it graduated from a cheap floor stub
+#: to the real procedural CRT engine (eng_visualizer.py), which REQUIRES audio_ref
+#: + ffmpeg and so is NOT a guaranteed always-renders floor terminus.
 FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
-                         "visualizer", "flux_still"})
+                         "flux_still"})
 #: The universal floor terminus appended to any engine whose declared chain
 #: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
 #: -- every chain terminates at a registered radio floor that always renders).

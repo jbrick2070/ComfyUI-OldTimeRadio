@@ -186,7 +186,9 @@ def test_post_chain_zero_audio_then_mux_roundtrip(tmp_path):
 # --------------------------------------------------------------------------- #
 def test_cheap_families_registered():
     names = set(vreg.all_engine_names())
-    for fam in ("abstract", "still_kenburns", "station_card", "visualizer", "flux_still"):
+    # "visualizer" graduated to a real engine (eng_visualizer.py) 2026-06-18; it is
+    # no longer a cheap floor family.
+    for fam in ("abstract", "still_kenburns", "station_card", "flux_still"):
         assert fam in names, f"cheap family {fam} not registered in the video registry"
 
 
@@ -200,10 +202,10 @@ def test_cheap_family_usable_and_role_filtered():
         for n in vreg.all_engine_names()
     ]
     bg = rc.filter_engines_for_role("background_abstract", descs)
-    assert "abstract" in bg and "visualizer" in bg
-    # incompatible role fails closed
+    assert "abstract" in bg                       # "visualizer" no longer serves bg
+    # incompatible role fails closed (abstract does NOT serve character_video)
     with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("visualizer", "character_video")  # not in visualizer.roles
+        vreg.assert_usable("abstract", "character_video")
 
 
 def test_cheap_families_cold_import_clean():
