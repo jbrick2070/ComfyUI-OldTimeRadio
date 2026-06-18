@@ -183,6 +183,22 @@ class OpenRouterCallFailedError(OpenRouterError):
     aborts; there is no mid-episode fall-back to a local model."""
 
 
+class OpenRouterModelGoneError(OpenRouterCallFailedError):
+    """A DELETED model -- OpenRouter answered with a deletion-class 404
+    ("No endpoints found" / "not found" / "no allowed providers"). This is
+    a *renderability* failure, not a quality choice, so -- UNLIKE every other
+    failure -- the dispatch layer is permitted to fall over to the slot's
+    REMOTE fallback (env/recommended) exactly once, LOUDLY (2026-06-18,
+    ChatGPT-reviewed). It subclasses OpenRouterCallFailedError so any caller
+    that does not special-case it still aborts cleanly (C5). The fallback is
+    remote->remote ONLY: a deleted remote model never silently becomes a
+    LOCAL model (that stays the operator's explicit opt-in)."""
+
+    def __init__(self, message: str, *, slug: str = "") -> None:
+        super().__init__(message)
+        self.slug = slug
+
+
 # ---------------------------------------------------------------------------
 # Env helpers
 # ---------------------------------------------------------------------------
@@ -301,6 +317,60 @@ def resolve_slug(repo_id: str) -> str:
         f"openrouter_slot_{letter.lower()}_model widget, OPENROUTER_MODEL_{letter}, "
         f"or OTR_OPENROUTER_SLOT_{letter}_DEFAULT. See docs/openrouter-setup.md."
     )
+
+
+#: Substrings (lower-cased) that mark a DELETION-class 404 -- the model is GONE,
+#: not merely throttled/down. OpenRouter's wording varies (the documented
+#: fallback-classifier bug is that the 404 JSON text is inconsistent), so the
+#: match is deliberately tolerant. Kept tight enough that an outage 404 with a
+#: generic body does NOT match (a bare "404" with no gone-phrase still aborts).
+_MODEL_GONE_MARKERS: tuple = (
+    "no endpoints found",
+    "no allowed providers",
+    "not found",
+    "does not exist",
+    "no longer available",
+    "is not a valid model",
+)
+
+
+def is_model_gone_error(status: int, snippet: str) -> bool:
+    """True iff an HTTP error is the DELETION class (a permanently gone model),
+    distinct from a transient/auth failure. Only a 404 whose body carries a
+    gone-marker qualifies -- 401/403/422/429/5xx and a bodyless 404 do NOT, so
+    an outage surfaces (and aborts per C5) instead of being misread as deletion
+    and silently downgraded to the fallback."""
+    if int(status or 0) != 404:
+        return False
+    low = (snippet or "").lower()
+    return any(m in low for m in _MODEL_GONE_MARKERS)
+
+
+def _strip_route_suffix(slug: str) -> str:
+    base, sep, suffix = str(slug or "").rpartition(":")
+    if sep and base and suffix.lower() in ("nitro", "floor"):
+        return base
+    return str(slug or "")
+
+
+def fallback_slug_for_slot(letter: str, *, exclude: str = "") -> str | None:
+    """The REMOTE fallback slug for a slot when its chosen model was DELETED:
+    the same precedence as resolve_slug's unbound chain (per-slot default ->
+    OPENROUTER_MODEL_x env -> recommended default), but SKIPPING any candidate
+    equal to the dead slug (so we never retry straight back into the 404).
+    Returns None when no DISTINCT live-candidate slug exists (caller then aborts
+    cleanly: "all candidates deleted"). Remote->remote only -- never a local
+    model (C5)."""
+    dead = _strip_route_suffix(exclude).lower()
+    candidates = (
+        _env(f"OTR_OPENROUTER_SLOT_{letter}_DEFAULT"),
+        _env(f"OPENROUTER_MODEL_{letter}"),
+        recommended_slug_for_slot(letter),
+    )
+    for cand in candidates:
+        if cand and _strip_route_suffix(cand).lower() != dead:
+            return cand
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -879,9 +949,35 @@ class OpenRouterBackend:
         if provider_opts:
             payload["provider"] = provider_opts
 
-        text = self._post_with_retries(
-            base_url=base_url, api_key=api_key, payload=payload, slug=slug,
-        )
+        try:
+            text = self._post_with_retries(
+                base_url=base_url, api_key=api_key, payload=payload, slug=slug,
+            )
+        except OpenRouterModelGoneError as gone:
+            # The operator's chosen model was DELETED. If this call came through
+            # a slot handle, fall over to that slot's REMOTE fallback exactly
+            # once, LOUDLY -- a deletion is a renderability failure, not the
+            # quality swap C5 forbids. A directly-pinned slug (no slot) or an
+            # exhausted fallback chain still aborts cleanly.
+            model_id = cache_entry.get("model_id")
+            fb_slug = None
+            if is_openrouter_row_id(model_id):
+                letter = _slot_letter(model_id)
+                fb_slug = fallback_slug_for_slot(letter, exclude=gone.slug or slug)
+            if not fb_slug:
+                raise
+            log.warning(
+                "[OpenRouter] LOUD model-gone fallback: slot %s model %r was "
+                "DELETED (gone-404); falling over to the remote fallback %r for "
+                "this call. Update the openrouter_slot_%s_model widget. "
+                "Remote->remote only; never local (C5).",
+                model_id, gone.slug or slug, fb_slug, _slot_letter(model_id).lower(),
+            )
+            fb_clean, _fb_sort = _split_slug_suffix(fb_slug)
+            payload["model"] = fb_clean
+            text = self._post_with_retries(
+                base_url=base_url, api_key=api_key, payload=payload, slug=fb_clean,
+            )
 
         # Account actual spend (best-effort; falls back to the estimate).
         self._account_spend(est)
@@ -928,6 +1024,8 @@ class OpenRouterBackend:
         timeout_s = _int_env("OPENROUTER_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OPENROUTER_MAX_RETRIES", DEFAULT_MAX_RETRIES)
         last_err: str = ""
+        last_status: int = 0
+        last_snippet: str = ""
         for attempt in range(max_retries + 1):
             try:
                 result = _post_chat_completion(
@@ -936,6 +1034,7 @@ class OpenRouterBackend:
                 )
             except Exception as exc:  # noqa: BLE001 -- network/transport error
                 last_err = f"transport error: {type(exc).__name__}: {exc}"
+                last_status, last_snippet = 0, ""
                 log.warning(
                     "[OpenRouter] attempt %d/%d failed (%s)",
                     attempt + 1, max_retries + 1, last_err,
@@ -947,7 +1046,9 @@ class OpenRouterBackend:
             if status == 200:
                 return self._extract_text(result, slug=slug)
 
-            last_err = f"HTTP {status}: {self._error_snippet(result)}"
+            last_snippet = self._error_snippet(result)
+            last_status = status
+            last_err = f"HTTP {status}: {last_snippet}"
             if status in _RETRYABLE_STATUS and attempt < max_retries:
                 log.warning(
                     "[OpenRouter] attempt %d/%d retryable (%s)",
@@ -958,6 +1059,16 @@ class OpenRouterBackend:
             # Non-retryable (e.g. 400/401/403/404) -> abort now.
             break
 
+        # A DELETION-class 404 ("model gone") is a renderability failure, not a
+        # transient one: raise the distinct subclass so the dispatch layer can
+        # fall over to the slot's REMOTE fallback once (LOUD). Every other
+        # failure stays a plain abort (C5) -- including a bodyless 404.
+        if is_model_gone_error(last_status, last_snippet):
+            raise OpenRouterModelGoneError(
+                f"OpenRouter model {slug} is gone (HTTP {last_status}: "
+                f"{last_snippet}).",
+                slug=slug,
+            )
         raise OpenRouterCallFailedError(
             f"OpenRouter call to {slug} failed after {max_retries + 1} "
             f"attempt(s): {last_err}. Aborting the run (no mid-episode "
@@ -1174,6 +1285,9 @@ __all__ = [
     "OpenRouterConfigError",
     "OpenRouterCostCeilingError",
     "OpenRouterCallFailedError",
+    "OpenRouterModelGoneError",
+    "is_model_gone_error",
+    "fallback_slug_for_slot",
     "OPENROUTER_BACKEND_KEY",
     "PROVIDER",
     "SLOT_A_ID",
