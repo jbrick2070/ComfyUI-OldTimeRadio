@@ -288,6 +288,12 @@ VALIDATED_ENGINES = frozenset({
     # NVML peak 12,945 MiB (< the 14.5 GB cap). The 8GB-tier 5B motion engine
     # (b-roll / scene / background; NO audio -> never the lip-sync path).
     "wan_ti2v",
+    # visualizer PROMOTED 2026-06-18: a full visualizer-all-roles 120w episode
+    # rendered END-TO-END on the 5080 (random seed, via _otr_combo_soak -> the real
+    # OTR_VideoRenderBatch + mux) -> status=success after 4 soak-found robustness
+    # fixes (assert_usable / b000 master-slice / idle-on-silence / 0-frame default).
+    # The CPU/ffmpeg-only procedural CRT scope floor (near-zero GPU; default-ON).
+    "visualizer",
 })
 __all__.append("VALIDATED_ENGINES")
 

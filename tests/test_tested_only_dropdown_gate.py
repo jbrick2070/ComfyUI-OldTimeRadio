@@ -19,7 +19,7 @@ from nodes._otr_image_engines import registry as ireg
 _HIDDEN_VIDEO = {
     "abstract", "flux_still", "hunyuan3d_talk", "mesh_stage", "station_card",
     "still_kenburns", "still_parallax", "trellis_talk", "triposg_talk",
-    "triposr", "visualizer", "wan_i2v",
+    "triposr", "wan_i2v",
 }
 _HIDDEN_IMAGE = {
     "chroma_hd", "flux2_klein", "hidream_i1", "lumina_image", "qwen_image",
@@ -33,7 +33,7 @@ def test_video_validated_set():
     assert vreg.VALIDATED_ENGINES == frozenset({
         "ltx_video", "ltx_av_music", "ltx_av_talk",
         "humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
-        "wan_ti2v",
+        "wan_ti2v", "visualizer",
     })
 
 

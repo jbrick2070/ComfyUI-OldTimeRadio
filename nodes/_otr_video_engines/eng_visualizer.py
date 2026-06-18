@@ -40,7 +40,8 @@ class VisualizerEngine:
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()                  # never an auto-default; explicit pick only
     commercial_clean = True             # own code + ffmpeg encode only
-    requires_flag = "OTR_ENABLE_VISUALIZER"
+    requires_flag = "OTR_ENABLE_VISUALIZER"   # opt-OUT (default-ON): the accessible
+                                              # CPU/ffmpeg floor; set =0 to disable
     required_inputs = ("audio_ref",)    # audio only; no init_image, no weights
     render_aspect = "wide"              # 16:9; no portrait geometry branch exists
     declared_isolation = _MC.ISOLATION_IN_PROCESS
@@ -72,10 +73,10 @@ class VisualizerEngine:
 
     # ---- usability (fail LOUD; no NVML / weights / node gate) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        if os.getenv(self.requires_flag, "0") != "1":
+        if os.getenv(self.requires_flag, "1") == "0":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "visualizer is opt-in; set %s=1" % self.requires_flag, kind="video")
+                "visualizer disabled by %s=0" % self.requires_flag, kind="video")
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
             raise EngineUnusable(

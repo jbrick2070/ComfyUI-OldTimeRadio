@@ -47,11 +47,20 @@ def test_serves_all_three_visual_roles():
 # --------------------------------------------------------------------------- #
 # assert_usable -- LOUD, no fallback
 # --------------------------------------------------------------------------- #
-def test_assert_usable_gated_by_flag(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_VISUALIZER", raising=False)
+def test_assert_usable_disabled_by_flag(monkeypatch):
+    # Default-ON (opt-out) since promotion 2026-06-18 -- OTR_ENABLE_VISUALIZER=0
+    # disables; unset/anything-else enables the accessible floor.
+    monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "0")
     with pytest.raises(EngineUnusable) as exc:
         VisualizerEngine().assert_usable(host_caps={}, profile={})
     assert exc.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+
+
+def test_assert_usable_default_on_when_flag_unset(monkeypatch):
+    if not sd.find_ffmpeg("ffmpeg"):
+        pytest.skip("ffmpeg not on PATH")
+    monkeypatch.delenv("OTR_ENABLE_VISUALIZER", raising=False)
+    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "visualizer"
 
 
 def test_assert_usable_passes_with_flag_and_ffmpeg(monkeypatch):
