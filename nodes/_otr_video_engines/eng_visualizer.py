@@ -154,12 +154,6 @@ class VisualizerEngine:
         from .._otr_shared import scope_draw as _sd
 
         plan = self._build_render_request(request)
-        audio_path = plan["audio_path"]
-        if not audio_path or not os.path.exists(audio_path):
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "visualizer requires an existing audio_ref path (got %r)"
-                % audio_path, kind="video")
         total = int(plan["target_frame_count"])
         if total <= 0:
             raise EngineUnusable(
@@ -169,11 +163,26 @@ class VisualizerEngine:
         fps = int(self.target_fps)
         w, h = self._canvas_dims(request)
 
+        # The visualizer is an accessible FLOOR forced on ALL roles, so it MUST
+        # render every beat. A beat with audio paints reactive scopes; a beat with
+        # NO audio (a silent scene/b-roll beat, or a synthetic beat with no master
+        # slice) paints IDLE scopes from synthesized silence -- a silent beat is a
+        # silent scope, which is correct, NOT a fallback/degrade. (2026-06-18 soak:
+        # shot_b005 reached the visualizer with an empty audio_ref; idle-on-silence
+        # makes the floor robust to every beat type instead of crashing the episode.)
         import soundfile as sf
-        audio_np, sr = sf.read(audio_path, dtype="float32", always_2d=False)
-        audio_np = np.asarray(audio_np, dtype=np.float32)
-        if audio_np.ndim > 1:                      # mix stereo -> mono (gemini #2)
-            audio_np = audio_np.mean(axis=1)
+        audio_path = plan["audio_path"]
+        if audio_path and os.path.exists(audio_path):
+            audio_np, sr = sf.read(audio_path, dtype="float32", always_2d=False)
+            audio_np = np.asarray(audio_np, dtype=np.float32)
+            if audio_np.ndim > 1:                  # mix stereo -> mono (gemini #2)
+                audio_np = audio_np.mean(axis=1)
+        else:
+            sr = 24000
+            audio_np = np.zeros(int(sr * total / max(1, fps)) + sr, dtype=np.float32)
+            if not os.environ.get("OTR_TEST_MODE"):
+                _LOG.info("[OTR video] visualizer: beat has no audio_ref -> idle "
+                          "scopes from silence (%d frames)", total)
 
         volume, freqs, waves = _sd.analyze_audio_np(audio_np, int(sr), total, fps)
         signal, _trig, loss = _sd.dual_ema(volume)   # REQUIRED (draw reads signal)

@@ -195,10 +195,25 @@ def test_render_clip_produces_silent_16x9_mp4(tmp_path, monkeypatch):
 
 @pytest.mark.skipif(not _have_render_deps(),
                     reason="needs ffmpeg + soundfile for a real render")
-def test_render_clip_fails_loud_on_missing_audio(monkeypatch):
+def test_render_clip_idle_scopes_when_audio_absent(monkeypatch):
+    # The accessible floor renders EVERY beat: no audio_ref -> idle scopes from
+    # synthesized silence (a silent beat is a silent scope, not a crash). This is
+    # what makes it forced-on-all-roles safe (2026-06-18 soak: shot_b005 had none).
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")
-    req = {"audio_ref": "C:/nope/missing.wav",
-           "timing": {"target_frame_count": 8}, "seed_bundle": {"request_seed": 1}}
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    total = 8
+    req = {"audio_ref": "", "canvas": {"w": 320, "h": 192, "fps": 25},
+           "timing": {"target_frame_count": total}, "seed_bundle": {"request_seed": 1}}
+    out = VisualizerEngine().render_clip(req, None)
+    assert out["frame_count"] == total
+    assert os.path.isfile(out["out_path"]) and os.path.getsize(out["out_path"]) > 0
+
+
+def test_render_clip_fails_loud_on_bad_frame_count(monkeypatch):
+    # total_frames <= 0 is a real config error -> still fails LOUD.
+    monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")
+    req = {"audio_ref": "", "timing": {"target_frame_count": 0},
+           "seed_bundle": {"request_seed": 1}}
     with pytest.raises(EngineUnusable):
         VisualizerEngine().render_clip(req, None)
 
