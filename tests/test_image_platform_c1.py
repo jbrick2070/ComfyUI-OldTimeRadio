@@ -456,6 +456,81 @@ def _np_pixels(val):
     return np.full((8, 8, 3), int(val), dtype=np.uint8)
 
 
+# --------------------------------------------------------------------------- #
+# Skip unused stills for procedural-floor video engines (operator 2026-06-18):
+# an all-visualizer episode must invoke NO image model (accessible: works for
+# users with no image/video models).
+# --------------------------------------------------------------------------- #
+def test_still_needed_for_role_gates_on_video_engine_init_image():
+    # visualizer ignores init_image -> still NOT needed; wan_ti2v consumes
+    # init_image -> still needed.
+    pol_vis = {"video_models": {"other_beats_video_model": {"engine_id": "visualizer"}}}
+    pol_wan = {"video_models": {"other_beats_video_model": {"engine_id": "wan_ti2v"}}}
+    assert disp._still_needed_for_role(pol_vis, "character_video") is False
+    assert disp._still_needed_for_role(pol_wan, "character_video") is True
+
+
+def test_still_needed_for_role_fails_safe():
+    # no video_models / unknown role / unknown engine -> keep the still (legacy)
+    assert disp._still_needed_for_role({}, "character_video") is True
+    assert disp._still_needed_for_role(
+        {"video_models": {"other_beats_video_model": {"engine_id": "visualizer"}}},
+        "not_a_role") is True
+    assert disp._still_needed_for_role(
+        {"video_models": {"other_beats_video_model": {"engine_id": "nope_engine"}}},
+        "character_video") is True
+
+
+def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
+    # All video roles = visualizer (no init_image) -> NO still generated, gen_fn
+    # never called -> an all-procedural episode needs no image model at all.
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_vis", "cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {
+        "image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+        "video_models": {
+            "announcer_video_model": {"engine_id": "visualizer"},
+            "music_video_model": {"engine_id": "visualizer"},
+            "other_beats_video_model": {"engine_id": "visualizer"}},
+        "seed": {"request_seed": 0}, "granularity": {}}
+    prompts = _payload(
+        _pobj("c1", "a spacer, station", "ph1", role="character_video"),
+        {"object_id": "b000_music_open", "kind": "scene_open", "role": "music_visual",
+         "char_id": "", "w": 1472, "h": 832, "prompt": "open card", "prompt_hash": "ph2"})
+    lockdir = tmp_path / "lease.lockdir"
+
+    calls = {"n": 0}
+    def gen_fn(_req):
+        calls["n"] += 1
+        return _np_pixels(50)
+
+    led, _done, _report, _w = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=gen_fn, output_dir=str(tmp_path), lockdir=lockdir)
+    assert calls["n"] == 0                          # NO image model invoked
+    assert not (led.get("images", {}).get("images") or [])   # no stills produced
+
+
+def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_registry, tmp_path):
+    # other_beats video = wan_ti2v (consumes init_image) -> the still IS generated.
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_wan", "cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {
+        "image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+        "video_models": {"other_beats_video_model": {"engine_id": "wan_ti2v"}},
+        "seed": {"request_seed": 0}, "granularity": {}}
+    prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
+    lockdir = tmp_path / "lease.lockdir"
+    calls = {"n": 0}
+    def gen_fn(_req):
+        calls["n"] += 1
+        return _np_pixels(60)
+    disp.dispatch_images(ledger, policy, prompts, gen_fn=gen_fn,
+                         output_dir=str(tmp_path), lockdir=lockdir)
+    assert calls["n"] == 1                          # wan_ti2v needs the still
+
+
 def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_path):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))

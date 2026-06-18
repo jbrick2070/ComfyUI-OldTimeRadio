@@ -277,6 +277,44 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     return dst
 
 
+#: object role -> the OTR_VideoDirector video slot that owns it (mirrors
+#: otr_video_director.VIDEO_SLOT_ROLES). Used to look up the SELECTED video engine
+#: for a still's role so an unused still (procedural floor) can be skipped.
+_ROLE_TO_VIDEO_SLOT = {
+    "announcer_visual": "announcer_video_model",
+    "music_visual": "music_video_model",
+    "character_video": "other_beats_video_model",
+    "scene_broll": "other_beats_video_model",
+    "background_abstract": "other_beats_video_model",
+}
+
+
+def _still_needed_for_role(image_policy: dict, role: str) -> bool:
+    """True if the SELECTED video engine for ``role`` consumes an ``init_image``
+    still. When the role's video engine IGNORES init_image (the visualizer /
+    abstract procedural floor), the still is never used -> skip generating it, so
+    an all-procedural episode invokes NO image model (accessible for users with no
+    image/video models). Fail SAFE: unknown engine / missing video_models / unknown
+    role -> True (keep the still, legacy behaviour). Pure registry read."""
+    vmodels = (image_policy or {}).get("video_models") or {}
+    if not vmodels:
+        return True                       # legacy policy: dispatch every still
+    slot = _ROLE_TO_VIDEO_SLOT.get(str(role))
+    if not slot:
+        return True
+    entry = vmodels.get(slot) or {}
+    eng_id = (entry.get("engine_id") if isinstance(entry, dict)
+              else str(entry or ""))
+    if not eng_id:
+        return True
+    try:
+        from ._otr_video_engines import registry as _vreg
+        eng = _vreg.get_engine(eng_id)
+        return "init_image" in tuple(getattr(eng, "required_inputs", ()) or ())
+    except Exception:                     # noqa: BLE001 -- unknown engine: keep still
+        return True
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
@@ -361,6 +399,17 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         obj_w = int(obj.get("w") or 0)
         obj_h = int(obj.get("h") or 0)
         if not oid:
+            continue
+        # SKIP an unused still: when this role's SELECTED video engine ignores
+        # init_image (the visualizer / abstract procedural floor), the still is
+        # never consumed -> do not generate it. An all-procedural episode then
+        # invokes NO image model at all (accessible: works for users with no
+        # image/video models). Safe for byte-identical (the skipped still was
+        # unused; audio + video output unchanged). LOUD trace.
+        if not _still_needed_for_role(image_policy, role):
+            log.info("[OTR_ImageGenDispatcher] skip %s (role=%s): the selected "
+                     "video engine ignores init_image (procedural floor) -- no "
+                     "still generated", oid, role)
             continue
         # Slot resolution per OBJECT role (ST-3: the ImageDirector slots
         # finally honored); empty named slot -> other_beats fallback, LOUD.

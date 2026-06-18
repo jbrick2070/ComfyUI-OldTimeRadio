@@ -321,6 +321,14 @@ class OTRImageDirector:
             # (portrait vs 16:9) with one dropdown pick. {} -> portrait (legacy).
             "aspects": (video_policy.get("aspects")
                         if isinstance(video_policy.get("aspects"), dict) else {}),
+            # Per-role SELECTED video engine, forwarded so the image dispatcher can
+            # SKIP a still whose video engine does not consume init_image (the
+            # visualizer / abstract procedural floor). An all-procedural episode then
+            # invokes NO image model -- accessible for users with no image/video
+            # models. {} -> dispatch every still (legacy behaviour).
+            "video_models": (video_policy.get("video_models")
+                             if isinstance(video_policy.get("video_models"), dict)
+                             else {}),
             "fresh_cap": cap,
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "warnings": warnings,
