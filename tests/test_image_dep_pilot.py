@@ -56,7 +56,7 @@ def test_commercial_clean_reported_honestly():
     assert by_name["qwen_image"]["commercial_clean"] is True       # Apache
     assert by_name["hidream_i1"]["commercial_clean"] is True       # MIT
     assert by_name["sd35_large"]["commercial_clean"] is False      # Community (conditional)
-    assert by_name["flux2_klein"]["commercial_clean"] is False     # FLUX-family (verify)
+    assert by_name["flux2_klein"]["commercial_clean"] is True      # FLUX.2 klein 4B = Apache-2.0 (confirmed 2026-06-18)
 
 
 def test_snapshot_violations_pure_logic():

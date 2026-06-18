@@ -35,7 +35,9 @@ PEERS = [
     # it now has its own suite (test_lumina_image_engine.py), like flux_gen1, and
     # is no longer a NotImplementedError stub peer (so it leaves this matrix).
     ("sd35_large", "sd35_large", "OTR_ENABLE_SD35", "OTR_SD35_CKPT", False),
-    ("flux2_klein", "flux2_klein", "OTR_ENABLE_FLUX2_KLEIN", "OTR_FLUX2_KLEIN_CKPT", False),
+    # flux2_klein GRADUATED to a BUILT engine (real render_image) 2026-06-18 -- it
+    # now has its own suite (test_flux2_klein_engine.py), like lumina_image, and is
+    # no longer a NotImplementedError stub peer (so it leaves this matrix).
 ]
 
 PEER_IDS = [p[1] for p in PEERS]
