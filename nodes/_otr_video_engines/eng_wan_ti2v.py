@@ -66,6 +66,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     name = "wan_ti2v"
     family = "image_to_video"
+    #: Still-aspect identity (2026-06-17): Wan TI2V renders 16:9, so the director
+    #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
+    render_aspect = "wide"
     # Same image-init roles as wan_i2v: scene b-roll, music visual, character.
     roles = ("scene_broll", "music_visual", "character_video")
     default_roles = ()

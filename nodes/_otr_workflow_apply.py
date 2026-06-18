@@ -225,7 +225,13 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
         return True
     if widget_name in _VIDEO_DIRECTOR_WIDGETS:
         from ._otr_video_engines import registry as _vreg
-        return value in _vreg.all_engine_names()
+        # The video dropdown DISPLAYS aspect-labelled engines ("humo (portrait)",
+        # 2026-06-17), and that label is what a fresh save stores. Parse the bare
+        # engine id back out (token before the first " (") before the registry
+        # check, mirroring OTR_VideoDirector._engine_id_from_pick. A bare legacy
+        # value has no " (" and passes through unchanged.
+        bare = value.split(" (", 1)[0]
+        return bare in _vreg.all_engine_names()
     if widget_name in _IMAGE_DIRECTOR_WIDGETS:
         from ._otr_image_engines import registry as _ireg
         return value in _ireg.all_engine_names()

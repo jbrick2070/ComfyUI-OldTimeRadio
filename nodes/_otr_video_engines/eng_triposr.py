@@ -101,9 +101,14 @@ class TripoSREngine:
     """
 
     name = "triposr"
-    # STATIC mesher chain (portrait still -> mesh -> Blender turntable frames);
+    # STATIC mesher chain (init still -> mesh -> Blender turntable frames);
     # verified against schemas.FAMILIES at build, NOT character_3d (no audio).
     family = "image_to_video"
+    #: Still-aspect identity (2026-06-17): triposr meshes a static PROP/SCENE (not
+    #: a character), so it takes a WIDE 16:9 init still like the other non-HuMo
+    #: engines. It is NOT a requires_mesh_portrait character mesher (those are the
+    #: eng_character_3d talkers), so it does NOT get the portrait still-feed.
+    render_aspect = "wide"
     # Mirrors mesh_stage: a static mesher can fill the music/announcer/other-beats
     # visual slots (it needs only an init_image, supplied by every role).
     roles = ("music_visual", "announcer_visual", "character_video")

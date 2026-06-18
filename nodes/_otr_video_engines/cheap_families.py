@@ -32,6 +32,10 @@ class _CheapFamilyBase:
     name = "cheap"
     roles: tuple = ()
     default_roles: tuple = ()
+    #: Still-aspect identity (2026-06-17): every cheap floor / still family fills
+    #: the 16:9 canvas (BUG-407: PORTRAIT is HuMo-ONLY). Subclasses inherit this;
+    #: still_parallax / mesh_stage (which extend this base) are wide too.
+    render_aspect = "wide"
     commercial_clean = True
     requires_flag = None            # cheap families are always available (no opt-in)
     family = "abstract"

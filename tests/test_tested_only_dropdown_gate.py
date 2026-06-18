@@ -42,7 +42,9 @@ def test_image_validated_set():
 def test_video_combo_lists_only_validated_plus_sentinel():
     combo = vd._video_model_combo()
     assert combo[-1] == vd.ADD_CUSTOM
-    listed = set(combo) - {vd.ADD_CUSTOM}
+    # The video combo entries are aspect-LABELLED (e.g. "humo (portrait)"); parse
+    # each back to the bare engine id before comparing to the validated set.
+    listed = {vd._engine_id_from_pick(c) for c in combo} - {vd.ADD_CUSTOM}
     assert listed == set(vreg.VALIDATED_ENGINES)
     # the untested engines are HIDDEN from the dropdown
     assert listed.isdisjoint(_HIDDEN_VIDEO)

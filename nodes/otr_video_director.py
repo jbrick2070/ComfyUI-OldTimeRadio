@@ -37,6 +37,43 @@ ADD_CUSTOM = "+ Add Custom Model"
 #: (the spine's default image source); swapping it never touches video models.
 IMAGE_DEFAULTS = ("Flux (gen 1)",)
 
+#: render_aspect -> the human suffix shown after the engine id in the dropdown.
+#: The label is DERIVED from each engine's render_aspect, never a hand-maintained
+#: map -- it can never drift and it auto-labels every engine (portrait HuMo vs
+#: 16:9 HuMo at a glance). An engine with no/unknown render_aspect gets NO suffix
+#: (the bare id), so the saved value is unchanged.
+_ASPECT_SUFFIX = {"portrait": " (portrait)", "wide": " (16:9)"}
+
+
+def _aspect_suffix(engine_id) -> str:
+    """The display suffix for ``engine_id`` derived from its ``render_aspect``
+    (portrait -> ' (portrait)', wide -> ' (16:9)'). Unknown engine / unknown
+    aspect -> '' (bare id). Pure registry read, never raises."""
+    try:
+        eng = _vreg.get_engine(str(engine_id))
+        aspect = getattr(eng, "render_aspect", None)
+    except Exception:  # noqa: BLE001 -- unknown engine -> no suffix
+        aspect = None
+    return _ASPECT_SUFFIX.get(aspect, "")
+
+
+def _label_for(engine_id) -> str:
+    """The dropdown LABEL for an engine id: ``'<id><aspect suffix>'``."""
+    return "%s%s" % (engine_id, _aspect_suffix(engine_id))
+
+
+def _engine_id_from_pick(pick) -> str:
+    """Parse a dropdown pick back to the bare engine id (the saved/looked-up
+    VALUE). Take the token BEFORE the first ' (' so a suffixed label
+    (``'humo (portrait)'``) yields ``'humo'``; a bare legacy value with no
+    suffix (old saved graphs) passes through unchanged; the ADD_CUSTOM sentinel
+    (no ' (') is preserved so the custom path still triggers."""
+    s = str(pick or "")
+    if s == ADD_CUSTOM:
+        return s
+    idx = s.find(" (")
+    return s[:idx] if idx != -1 else s
+
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
 VIDEO_SLOT_ROLES = {
     "announcer_video_model": ("announcer_visual",),
@@ -58,9 +95,14 @@ def _video_model_combo() -> list:
     assert_usable / the force-map experiment knob still see the full set); this
     narrows the *display* list only. ``+ Add Custom Model`` stays the escape hatch
     for an explicitly-declared engine. Falls back to the full registry only if the
-    validated set is somehow empty, so a box-fresh graph still validates."""
+    validated set is somehow empty, so a box-fresh graph still validates.
+
+    Each entry is the engine's aspect-DERIVED label (``humo (portrait)`` vs
+    ``humo_1.7B_169 (16:9)``) so the two HuMo paths are obvious at a glance; the
+    SAVED value stays the bare engine id (``direct()`` parses the label back via
+    :func:`_engine_id_from_pick`, and a bare legacy value still resolves)."""
     names = list(_vreg.validated_engine_names()) or list(_vreg.all_engine_names())
-    return names + [ADD_CUSTOM]
+    return [_label_for(n) for n in names] + [ADD_CUSTOM]
 
 
 def _image_model_combo() -> list:
@@ -194,10 +236,14 @@ class OTRVideoDirector:
         custom = self._parse_custom(custom_models_json, warnings)
         descriptors = _registry_descriptors()
 
+        # Parse each dropdown pick (an aspect-labelled string like
+        # "humo (portrait)") back to its bare engine id BEFORE resolve/validate.
+        # A bare legacy value (old saved graph) and the ADD_CUSTOM sentinel pass
+        # through unchanged, so this is fully back-compatible.
         video_models = {
-            "announcer_video_model": announcer_video_model,
-            "music_video_model": music_video_model,
-            "other_beats_video_model": other_beats_video_model,
+            "announcer_video_model": _engine_id_from_pick(announcer_video_model),
+            "music_video_model": _engine_id_from_pick(music_video_model),
+            "other_beats_video_model": _engine_id_from_pick(other_beats_video_model),
         }
         resolved_video = {}
         for slot, picked in video_models.items():

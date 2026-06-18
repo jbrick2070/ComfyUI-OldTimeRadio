@@ -262,6 +262,10 @@ class TripoSGTalkEngine:
     #: 3D capability (plan section 3): consumes a clean front-facing MESH
     #: PORTRAIT; the ImageDirector granularity lock reads this field.
     requires_mesh_portrait = True
+    #: Still-aspect identity (2026-06-17): a mesh-portrait talker needs a PORTRAIT
+    #: still to feed the mesher even when the final video is 16:9 -- the one 3D
+    #: exception to the "non-HuMo = wide" rule.
+    render_aspect = "portrait"
 
     def assert_usable(self, host_caps, profile, request_template=None):
         _assert_usable_triposg(self.name)
@@ -327,6 +331,8 @@ class Hunyuan3DTalkEngine:
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
     #: 3D capability (plan section 3): consumes a mesh portrait.
     requires_mesh_portrait = True
+    #: Still-aspect identity (2026-06-17): mesh-portrait talker -> portrait still.
+    render_aspect = "portrait"
 
     def assert_usable(self, host_caps, profile, request_template=None):
         _assert_usable_3d(
@@ -397,6 +403,8 @@ class TrellisTalkEngine:
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
     #: 3D capability (plan section 3): consumes a mesh portrait.
     requires_mesh_portrait = True
+    #: Still-aspect identity (2026-06-17): mesh-portrait talker -> portrait still.
+    render_aspect = "portrait"
 
     def assert_usable(self, host_caps, profile, request_template=None):
         _assert_usable_3d(

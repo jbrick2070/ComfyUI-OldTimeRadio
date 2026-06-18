@@ -258,6 +258,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
 
     name = "ltx_video"
     family = "text_to_video"
+    #: Still-aspect identity (2026-06-17): ltx_video renders 16:9 832x480, so the
+    #: director must mint a WIDE init still (1472x832), NOT the portrait default --
+    #: a portrait still fed to the wide render decapitates heads. A class attribute
+    #: only (the sampler/sigma chain this file freezes is untouched).
+    render_aspect = "wide"
     # Generative motion b-roll / background / music visuals -- the roles whose
     # only required input is a text prompt. ``announcer_visual`` GRANTED
     # 2026-06-10 (production restore): the operator's radio OPEN renders the

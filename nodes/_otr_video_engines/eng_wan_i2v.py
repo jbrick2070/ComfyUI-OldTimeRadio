@@ -76,6 +76,9 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     name = "wan_i2v"
     family = "image_to_video"
+    #: Still-aspect identity (2026-06-17): Wan I2V renders 16:9, so the director
+    #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
+    render_aspect = "wide"
     # Animate a still into motion -- the roles that can supply an init image
     # (scene b-roll, music visual, character). background_abstract supplies only
     # text, so role_compat excludes it fail-closed.
