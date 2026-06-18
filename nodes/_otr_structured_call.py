@@ -295,12 +295,65 @@ def _parse_and_validate(
     and is allowed to propagate.
     """
     data = _otr_json.parse_first_json_object(raw or "")
-    instance = schema.model_validate(data)
+    try:
+        instance = schema.model_validate(data)
+    except ValidationError as ve:
+        # A verbose/weak model can overflow a short, capped tag field (e.g. the
+        # outline's `time_of_day`, max 40 chars: an 8B model wrote a whole
+        # sentence -> the whole episode aborted, 2026-06-18). Clamp ONLY the
+        # over-long string fields to their declared max_length and re-validate.
+        # This fires solely on a would-fail output -- a good model's result is
+        # never touched (byte-identical) -- and any OTHER validation error still
+        # propagates to the retry ladder. Tolerate imperfect structured output;
+        # never crash a render over a too-long label.
+        repaired = _clamp_overlong_strings(data, ve)
+        if repaired is None:
+            raise
+        repaired_data, clamped = repaired
+        instance = schema.model_validate(repaired_data)  # other errors propagate
+        log.warning(
+            "[OTR_StructuredCall] coerced %d over-long field(s) to the schema "
+            "max_length to avoid an abort: %s",
+            len(clamped), ", ".join(clamped),
+        )
     if post_validator is not None:
         content_error = post_validator(instance)
         if content_error is not None:
             raise PostValidationError(content_error)
     return instance
+
+
+def _clamp_overlong_strings(
+    data: object, ve: "ValidationError"
+) -> Optional[tuple[dict, list[str]]]:
+    """Given a ValidationError, clamp every top-level ``string_too_long`` field
+    in ``data`` to the ``max_length`` carried in that error's ``ctx`` (pydantic
+    supplies it), trimming at a word boundary where possible. Returns
+    ``(repaired_dict, clamped_field_names)`` or ``None`` when nothing is
+    clampable (so the caller re-raises the original error untouched)."""
+    if not isinstance(data, dict):
+        return None
+    out = dict(data)
+    clamped: list[str] = []
+    for err in ve.errors():
+        if err.get("type") != "string_too_long":
+            continue
+        loc = err.get("loc") or ()
+        if len(loc) != 1:  # top-level scalar fields only (covers the known cases)
+            continue
+        key = loc[0]
+        max_len = (err.get("ctx") or {}).get("max_length")
+        val = out.get(key)
+        if not isinstance(max_len, int) or not isinstance(val, str):
+            continue
+        if len(val) <= max_len:
+            continue
+        cut = val[:max_len].rstrip()
+        if " " in cut:  # prefer a clean word boundary over a mid-word chop
+            cut = cut.rsplit(" ", 1)[0].rstrip()
+        out[key] = cut or val[:max_len]
+        clamped.append(str(key))
+    return (out, clamped) if clamped else None
 
 
 # ---------------------------------------------------------------------------
