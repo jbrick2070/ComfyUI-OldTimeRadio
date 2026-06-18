@@ -23,7 +23,10 @@
 > EVENING block below is unchanged; the §3 forward order is unchanged. **SUB-8GB TIER VERDICT RECORDED (operator
 > request):** 8GB-tier picks = IMAGE `z_image_turbo` (Apache-2.0, ~4GB -- the RECORDED image pick; production
 > flux_gen1/FLUX.1-dev is ~12GB AND non-commercial) + VIDEO `wan_ti2v` (offload) + characters on HuMo-2D; 3D
-> OUT OF REACH for characters (TripoSR fits VRAM but only static meshes), stays DEFERRED. See §1 (B). 
+> OUT OF REACH for characters (TripoSR fits VRAM but only static meshes), stays DEFERRED. See §1 (B).
+> **`triposr` ADDED `e55d30a`** as the lower-tier MIT 3D mesher (dark/flag-gated `OTR_ENABLE_TRIPOSR`, static
+> image_to_video, hidden from the tested-only dropdown until GPU-validated); for static prop/scene meshes, NOT
+> characters. Suite 4430/0, Bug Bible 16/7/3, HEAD `e55d30a` == origin.
 >
 > **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
 > latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
@@ -535,11 +538,17 @@ VIDEO MODEL -- search-first DONE (Wan2.2 TI2V-5B confirmed best pick); remaining
     image roles to `z_image_turbo`.
   - **VIDEO = `wan_ti2v` (Wan2.2 TI2V-5B GGUF, Apache-2.0).** Fits sub-8GB with ComfyUI offload (slower); Wan
     1.3B (~8.2GB) is the guaranteed-native-fit fallback at a quality cost.
-  - **3D = OUT OF REACH for characters.** TripoSR (MIT, 6-8GB) is the only credible sub-8GB image->mesh model but
-    it makes STATIC object meshes, not riggable talking-head characters; the quality leaders (TRELLIS.2-4B,
-    Hunyuan3D-2.1) want 16-24GB. Keep characters on HuMo-2D; 3D stays DEFERRED (only worth wiring TripoSR later
-    as an OPTIONAL static-prop/set-dressing mesher, never the character path). This matches the existing B-ship
-    rescope + the parked §5 character_3d.
+  - **3D = `triposr` ADDED as the LOWER-TIER 3D mesher (operator directive 2026-06-18, `e55d30a`).** New
+    `nodes/_otr_video_engines/eng_triposr.py` -- TripoSR (MIT, ~7GB, family `image_to_video` STATIC mesher;
+    turntable motion only, NEVER lip-sync), the license-clean 8GB-tier sibling of `mesh_stage` (which uses the
+    Tencent-licensed hy3d-2mv). Registered DARK / flag-gated `OTR_ENABLE_TRIPOSR`, fails closed (flag -> weights
+    dir -> Blender exe), fallback chain `triposr -> still_parallax`; CAPABILITIES row + dep-pilot row + tests
+    (`test_video_triposr.py`). Kept OUT of `VALIDATED_ENGINES` (hidden from the tested-only dropdown) until the
+    operator installs a TripoSR ComfyUI node + MIT weights and GPU-validates the forward (VERIFY-AT-BUILD: capture
+    the node graph from a live /object_info first, like wan_ti2v). **3D for CHARACTERS stays OUT OF REACH** --
+    TripoSR makes STATIC object meshes, not riggable talking heads; the quality leaders (TRELLIS.2-4B,
+    Hunyuan3D-2.1) want 16-24GB. Characters stay on HuMo-2D; triposr is for static prop/set-dressing/scene meshes,
+    never the character path. Matches the B-ship rescope + the parked §5 character_3d.
   - **8GB-tier reach = a 2-lane build: image (`z_image_turbo`) + video (`wan_ti2v`), characters on HuMo-2D, 3D
     deferred.**
 
