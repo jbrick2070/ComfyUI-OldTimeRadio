@@ -233,15 +233,22 @@ class TestSceneStillObjects:
         assert opn["role"] == "music_visual"
         assert opn["source"] == "scene_timed"
 
-    def test_open_announcer_outro_targets_only(self):
+    def test_every_beat_gets_a_scene_still_target(self):
+        # operator 2026-06-18: EVERY beat carries its OWN scene still regardless of
+        # role/model -- the character/dialogue beat b002 (char_voice) used to be
+        # SKIPPED (announcer/music-only), which is what made silent LTX hit the
+        # LTX-I2V MISSING-STILL degrade. Now every beat gets a scene_beat target;
+        # the image dispatcher's accepts_still gate is the one place that decides
+        # whether the still is actually minted.
         from nodes import otr_meta_brief_image_prompt as mbp
         targets, _w = mbp.derive_scene_still_targets(_lines_timed())
         assert [t["beat_id"] for t in targets] == [
-            "b000_music_open", "b001", "b005"]
+            "b000_music_open", "b001", "b002", "b005"]
         assert [t["kind"] for t in targets] == [
-            "scene_open", "scene_beat", "scene_beat"]
+            "scene_open", "scene_beat", "scene_beat", "scene_beat"]
         assert targets[1]["role"] == "announcer_visual"
-        assert targets[2]["role"] == "music_visual"
+        assert targets[2]["role"] == "character_video"   # dialogue beat now covered
+        assert targets[3]["role"] == "music_visual"
 
     def test_pretiming_open_emitted_loud(self):
         """Pre-audio ledger (no start_s anywhere) still emits the open

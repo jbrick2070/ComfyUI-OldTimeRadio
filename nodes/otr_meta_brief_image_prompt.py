@@ -202,11 +202,11 @@ def derive_scene_still_targets(lines, fps: int = 25):
 
     try:  # lazy: one source of truth for the open beat + the role map
         from .otr_shot_lock import (
-            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
             derive_opening_music_beat)
     except ImportError:  # pragma: no cover -- flat test imports
         from otr_shot_lock import (  # type: ignore
-            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
             derive_opening_music_beat)
 
     live = [ln for _bid, ln in _iter_beat_lines(lines)]
@@ -225,20 +225,26 @@ def derive_scene_still_targets(lines, fps: int = 25):
         _add(OPENING_MUSIC_BEAT_ID, "scene_open", "music_visual",
              "scene_pretiming")
 
-    scene_roles = ("announcer_visual", "music_visual")
-    # EVERY i2v beat must carry its OWN scene still (operator 2026-06-12: "my
-    # stills ARE the look; every i2v beat must have its still"). The v1 panel
-    # cut (open + FIRST announcer + LAST scene only) left MIDDLE announcer/music
-    # beats (e.g. b003) with NO still -> a silent text-only LTX i2v fallback,
-    # which is exactly the flat/unanchored beat the operator caught. Cover ALL
-    # announcer/music beats now (the open b000 is already added above; _add
-    # dedupes via `seen`). The per-beat visual variety the motion-prompt design
-    # relies on comes from these per-beat stills.
+    # EVERY beat carries its OWN scene still, regardless of role/model (operator
+    # 2026-06-18: "per beat accept the stills regardless of model -- if the image
+    # model is usable the video model takes it by default"). The earlier
+    # announcer/music-only cut left the CHARACTER / background_abstract dialogue
+    # beats (b002/b003/b004) with NO scene still -> the LTX-I2V MISSING-STILL LOUD
+    # degrade (text-only). We now emit a scene_beat target for every beat, mapped
+    # to its video role (announcer/music/character) or the background_abstract
+    # default. The image dispatcher (engine_consumes_still / accepts_still) is the
+    # ONE place that decides whether the still is actually minted -- it is for a
+    # scene-consuming video engine (ltx_video / static_motion / image_to_video /
+    # flux_still) and skipped for a pure procedural floor (visualizer/abstract).
+    # audio_driven_face (HuMo) keeps its character PORTRAIT and ignores the scene
+    # still (render_driver family branch), so this never regresses face beats; an
+    # unused still is cheap, a missing still loses the look. (open b000 added
+    # above; _add dedupes via `seen`.)
     for bid, ln in _iter_beat_lines(lines):
         role = SPEAKER_TO_VIDEO_ROLE.get(
-            str(ln.get("speaker_role") or "").strip().lower(), "")
-        if role in scene_roles:
-            _add(bid, "scene_beat", role, "scene_role_map")
+            str(ln.get("speaker_role") or "").strip().lower(),
+            _DEFAULT_VIDEO_ROLE)
+        _add(bid, "scene_beat", role, "scene_role_map")
     return targets, warnings
 
 
