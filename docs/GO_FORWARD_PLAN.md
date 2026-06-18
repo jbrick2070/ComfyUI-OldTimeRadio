@@ -1,5 +1,29 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (CODER, autonomous overnight; HEAD `236db0e` == origin; suite 4496 pass / 33 skip,
+> Bug Bible 16/7/3):** A long multi-thread session, all committed + PUSHED to `v2.0-alpha`:
+> **(1) Still-aspect correctness + HuMo dropdown labels** (`55d9dad`). **(2) Bark whiny-voice fix S1-S4** + preset
+> audition (`215738c`,`6a20c9f`). **(3) wan_ti2v promotion + render_single aspect fix** (`ca3e06c`). **(4) wan_ti2v
+> 8GB-floor hardening, 3-pass roundtable-converged** (`00da690` Chunk1: 17-frame floor+clamp / euler-only sampler
+> whitelist / range-checked resolver / VAE allow-list / 0.1s probe; `1587c31` Chunk2: CLIP off fp8 -> GGUF umt5 [fp8
+> is Mac-MPS-broken, #9255] + tiled VAE; docs `d528084`). **(5) VISUALIZER ENGINE v1 SHIPPED** (`236db0e`, Task 1):
+> the resurrected full-colour procedural CRT scope engine (engine_id `visualizer`) -- low-VRAM ffmpeg-only per-beat
+> picture (ring/particles/grid/waveform/bars/CRT post), torch-free draw routines COPIED into
+> `nodes/_otr_shared/scope_draw.py` (zero coupling to the floor node / SceneAwareScopes overlay), adapter
+> `eng_visualizer.py` (family=abstract, has_audio=False, NO fallbacks). PLAN-PREMISE FIX: `visualizer` was already a
+> cheap floor stub (`VisualizerFamily`); the new engine SUPERSEDES it (stub deleted, removed from FLOOR_NAMES +
+> cheap-render tests, dep-pilot row added). 17 tests + a real CPU ffmpeg render.
+> **>>> NEXT = TASK 2 (operator-requested, GPU/overnight): the 120-word verified-model smoke sweep.** Enumerate the
+> validated VIDEO set (`registry.validated_engine_names()` = ltx_video, ltx_av_music, ltx_av_talk, humo, humo_1.7B,
+> humo_1.7B_169, humo_14B_169, wan_ti2v) + the validated IMAGE set (OTR_ImageDirector: flux_gen1, z_image_turbo)
+> PROGRAMMATICALLY; run a 120w full-pipeline smoke per engine on the REAL `otr_scifi_16gb_full.json` (random
+> OS-entropy seed), RESET the box before EACH (CLAUDE.md sec 4), INCLUDE one `visualizer`-all-roles run, verify
+> `test_audio_byte_identical`, write `docs/2026-06-17-scope-visualizer-engine/SMOKE_SWEEP_RESULTS.md` (engine,
+> pass/fail, time, VRAM peak vs ceiling). **THEN: if the visualizer all-roles E2E is green, ADD `"visualizer"` to
+> `registry.VALIDATED_ENGINES`** (+ decide default-ON) so it lists in the dropdowns. NOTE: wan_ti2v's recipe changed
+> in the floor hardening (euler/17-frame/GGUF-umt5/tiled) -- its sweep leg double-checks the hardened floor renders
+> + fits. Fail LOUD on any regression; reset per CLAUDE.md sec 4 between legs. Box currently free (GPU baseline).
+>
 > **LATEST SESSION -- 2026-06-18 (CODER; BARK WHINY-VOICE FIX S1-S4 SHIPPED; HEAD `6a20c9f`; NOT pushed yet;
 > suite 4462 pass / 33 skip, Bug Bible 16/7/3):** The sanctioned upstream-TTS audio work
 > (`docs/2026-06-17-bark-voice/BARK_VOICE_UPDATE_PLAN.md`) is DONE across two commits. **`215738c` (S1+S2+S4):**
