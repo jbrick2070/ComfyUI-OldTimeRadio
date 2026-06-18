@@ -1,5 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (TESTED-ONLY DROPDOWN GATE SHIPPED + LOW-VRAM SEARCH-FIRST; HEAD `3e0ecf4` ==
+> origin; suite 4423 pass / 32 skip, Bug Bible 16/7/3):** Did the operator's next active thread (A) then the
+> search half of (B). **(A) Tested-only dropdown gate `3e0ecf4`** -- `OTR_VideoDirector` / `OTR_ImageDirector`
+> per-role combos now list ONLY GPU-validated engines. New `registry.VALIDATED_ENGINES` frozenset +
+> `validated_engine_names()` in BOTH the video and image registries (a SEPARATE frozenset, NOT a CAPABILITIES row
+> key -- `capability_profiles.validate_declaration` rejects unknown keys). Video dropdown = the 7 validated
+> (ltx_video, ltx_av_music, ltx_av_talk, humo, humo_1.7B, humo_1.7B_169, humo_14B_169); image dropdown =
+> flux_gen1. HIDDEN: abstract / flux_still / station_card / still_kenburns / still_parallax / visualizer /
+> mesh_stage / hunyuan3d_talk / trellis_talk / triposg_talk / wan_i2v / wan_ti2v (video) + chroma_hd / flux2_klein
+> / hidream_i1 / lumina_image / qwen_image / sd35_large / z_image_turbo (image). **DISPLAY gate only** -- every
+> engine stays REGISTERED (V-6: `all_engine_names()` untouched, so role_compat / assert_usable / the force-map
+> knob still see the full set); `+ Add Custom Model` stays the escape hatch. The applier
+> (`_otr_workflow_apply._is_engine_director_admissible`) validates director widgets against the FULL registry so
+> the 8gb_lite floor tier (station_card/visualizer/still_kenburns/z_image_turbo) still applies (mirrors the
+> openrouter/comfy admissibility escapes). New `tests/test_tested_only_dropdown_gate.py` (6 tests). **(B) Low-VRAM
+> video model -- SEARCH-FIRST VERDICT: Wan2.2 TI2V-5B is STILL the best pick (June 2026)** -- leading low-VRAM
+> (8GB-tier) open model, Apache-2.0 commercial-clean, t2v+i2v in one 5B checkpoint, first-class ComfyUI-native +
+> GGUF support; nothing newer has displaced it (Wan 1.3B / CogVideoX-2B trade too much quality). `eng_wan_ti2v` is
+> already CODE-COMPLETE + bare-graph smoked (2026-06-14). **NEXT (operator-present): box reset -> forced-lane
+> wan_ti2v GPU smoke (i2v-holds-still + NVML <=14.5GB) -> add `wan_ti2v` to `VALIDATED_ENGINES`.** The morning
+> EVENING block below is unchanged; the §3 forward order is unchanged.
+>
 > **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
 > latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
 > 16/7/3):** The morning LTX-AV audio-in build-out is DONE + pushed, plus operator look-QA fixes and a clean-break.
@@ -481,7 +503,28 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (2026-06-17, operator pivot) = REVIVE THE LTX-AV (audio-in) LANE -- verify its recipe vs the GOOD mini, align the sampler, then M4 GPU smoke (lip-sync-vs-HuMo A/B).**
+**>>> CURRENT STEP (2026-06-18) = (A) TESTED-ONLY DROPDOWN GATE -- DONE + PUSHED (`3e0ecf4`). (B) LOW-VRAM
+VIDEO MODEL -- search-first DONE (Wan2.2 TI2V-5B confirmed best pick); remaining = forced-lane GPU smoke
+(operator-present, box reset) then promote `wan_ti2v` into `VALIDATED_ENGINES`.**
+- **(A) Tested-only gate (SHIPPED `3e0ecf4`):** `VideoDirector` / `ImageDirector` per-role combos now list ONLY
+  GPU-validated engines via a new `registry.VALIDATED_ENGINES` frozenset + `validated_engine_names()` (separate
+  frozenset, NOT a CAPABILITIES key -- validate_declaration rejects unknown keys). Video shown = the 7
+  (ltx_video, ltx_av_music, ltx_av_talk, humo, humo_1.7B, humo_1.7B_169, humo_14B_169); image shown = flux_gen1.
+  DISPLAY gate only -- every engine stays REGISTERED (V-6 intact); `+ Add Custom Model` escape hatch kept. The
+  applier (`_otr_workflow_apply._is_engine_director_admissible`) validates director widgets vs the FULL registry
+  so the 8gb_lite floor tier (station_card/visualizer/still_kenburns/z_image_turbo) still applies. Suite 4423/0,
+  Bug Bible 16/7/3, new `tests/test_tested_only_dropdown_gate.py`. To promote an engine: add its name to
+  `VALIDATED_ENGINES` after a green GPU validation.
+- **(B) Low-VRAM video model -- SEARCH-FIRST VERDICT (June 2026): Wan2.2 TI2V-5B is still the best pick.** It is
+  the leading low-VRAM (8GB-tier) open model with a commercial-clean Apache-2.0 license, does BOTH t2v + i2v in
+  one 5B checkpoint, and has first-class ComfyUI-native + GGUF support. No newer model has displaced it; lighter
+  options (Wan 1.3B ~8.2GB, CogVideoX-2B) trade too much quality. `eng_wan_ti2v` is already CODE-COMPLETE
+  (registered, gated `OTR_ENABLE_WAN_TI2V`, GGUF Q5_K_M `Wan2.2-TI2V-5B-Q5_K_M.gguf` default, render_clip via
+  UnetLoaderGGUF + Wan22ImageToVideoLatent + Wan2.2 VAE) and bare-graph 5B-smoked (2026-06-14, 25 frames / 35s /
+  ~9GB). **NEXT (operator-present): reset the box, run a forced-lane wan_ti2v GPU smoke (30-40w, confirm
+  i2v-holds-still + NVML peak <=14.5GB), then add `wan_ti2v` to `VALIDATED_ENGINES` so it lists in the dropdown.**
+
+**>>> PRIOR STEP (2026-06-17, operator pivot) = REVIVE THE LTX-AV (audio-in) LANE -- verify its recipe vs the GOOD mini, align the sampler, then M4 GPU smoke (lip-sync-vs-HuMo A/B). [SUPERSEDED -- LTX-AV build-out SHIPPED `5ace122`; see the top-of-file 2026-06-17 EVENING block.]**
 Goal: LTX speed WITH audio-driven mouth motion (the 450w combo soak: all-LTX finishes ~47m but has NO lip-sync;
 HuMo lip-syncs but needs ~2.5-3h). **The "duplicate LTX -> audio-in" work is ALREADY BUILT** -- M1
 `eng_ltx_av.py` + M3 selectable/sliced (`c4d7815`); CPU-complete. **Operator concern (grounded 2026-06-17): is
