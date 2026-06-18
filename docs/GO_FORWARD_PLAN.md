@@ -1,5 +1,30 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (CODER; flux2_klein BUILT + image-pick DEDUP + coverage-arch roundtable;
+> HEAD `c854406` == origin; suite green; Bug Bible 16/7/3). PRIORITY NEXT STEP = finish flux2_klein (klein-4B).**
+> Four committed + PUSHED to `v2.0-alpha`:
+> **(1) flux2_klein engine BUILT** (`36dc01a`): FLUX.2 [klein] 4B is a real image engine (official ComfyUI flux2
+> recipe -- UnetLoaderGGUF + CLIPLoader[type=flux2] + FluxGuidance->BasicGuider + Flux2Scheduler +
+> SamplerCustomAdvanced + VAEDecode). Apache-2.0 (commercial_clean=True). Graduated out of the stub PEERS matrix
+> into its own suite `tests/test_flux2_klein_engine.py`. Stays HIDDEN/opt-in until a green GPU render promotes it.
+> **(2) Image-MODEL selection collapsed to ONE place** (`b8bb388`, operator "only in one place not two"):
+> removed the 3 duplicate image dropdowns from OTR_ImageDirector; it now sources picks SOLELY from
+> `video_policy["image_models"]` (OTR_VideoDirector is the single home). Edited the real source-of-truth JSON node 88
+> in place + widget_mapping.json (image keys -> VideoDirector only). Added `OTR_COMBO_*_IMG` env to the soak harness.
+> **(3) Coverage-architecture roundtable** (`50200fd`, operator "all video accepts all images, approval in one
+> place"): grounded pass01 synthesis in `docs/2026-06-18-image-video-coverage-arch/` -- add `accepts_still`/
+> `still_kind` capability fields to video adapters (NOT a new type), ONE central `image_engines.registry.usable()`
+> approval surface the directors+dispatcher share, dual-read migration (required_inputs wins for existing names),
+> unify the 3D mesh-portrait lock onto `still_kind`. (4/6 panel models errored on token budget; gemini+grok gave
+> grounded critiques -- re-run with raised max-tokens for the rest.)
+> **(4) flux2_klein GPU VERIFY -- FAILED, diagnosed** (`c854406`): a full flux2+LTX episode (announcer/beats=
+> ltx_av_talk, music=ltx_av_music, all image=flux2_klein, 30w act=1, bark) found two issues: (a) FIXED -- weights
+> were in `Documents\ComfyUI\models` but the headless server scans `C:\ComfyUI-Models` (moved all 3 there);
+> (b) OPEN -- the sampler raises `mat1/mat2 (512x15360 @ 7680x3072)`: the klein-**4B** GGUF is paired with the WRONG
+> text encoder (I reused flux2-**dev**'s `mistral_3_small_flux2_fp4_mixed`, whose conditioning is 2x too wide for
+> the 4B UNet). klein-4B needs its OWN ComfyUI-matched encoder. FULL RESUME RECIPE +
+> the proven combo-soak invocation: `docs/2026-06-18-flux2-klein/VERIFY_ON_5080.md`. Box reset clean (GPU baseline).
+
 > **TASK 2 PROGRESS (`4a92ed6`; HEAD afa6bf1 code): visualizer-all-roles soak via `_otr_combo_soak.py` (forces bark,
 > clearing the headless-audio gap) found + fixed FOUR visualizer integration bugs -- all pushed + suite-green:
 > `d460797` assert_usable no longer pre-gates audio_ref; `bad1bba` render_driver feeds b000 the master-audio slice;
@@ -92,7 +117,26 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP = plan per-segment LUFS/RMS voice normalization (operator-requested; FROZEN-SPINE change, needs a plan + re-baseline).**
+**>>> CURRENT STEP (PRIORITY, operator 2026-06-18) = FINISH flux2_klein (klein-4B) -> green GPU render -> promote.**
+- The engine is BUILT + the dedup + the coverage-arch roundtable are shipped (`c854406`). The ONLY blocker is the
+  text-encoder mismatch: klein-4B's UNet wants a 7680-wide conditioning; flux2-dev's `mistral_3_small_flux2`
+  encoder emits 15360 (2x) -> `mat1/mat2 (512x15360 @ 7680x3072)` in SamplerCustomAdvanced.
+- **DO THIS FIRST (fresh budget):** find klein-4B's ComfyUI-matched text encoder -- check for a Comfy-Org klein
+  repackage (`Comfy-Org/flux2-klein...` split_files/text_encoders) OR the official ComfyUI klein workflow TEMPLATE
+  (Comfy-Org/workflow_templates `image_flux2_klein*.json`) and read its CLIPLoader filename + `type`. Do NOT assume
+  dev's encoder transfers (proven wrong by the 2x dim mismatch). Download it into `C:\ComfyUI-Models\text_encoders\`
+  (NOT Documents -- the headless server scans C:\ComfyUI-Models), point `OTR_FLUX2_KLEIN_TE` at it, re-run the
+  verify (the diffusion GGUF + flux2-vae are already correctly in `C:\ComfyUI-Models`). FULL recipe + the proven
+  combo-soak invocation: `docs/2026-06-18-flux2-klein/VERIFY_ON_5080.md`.
+- **ON GREEN** (`[OTR.image.flux2_klein] minted still` + status=success): add `"flux2_klein"` to
+  `_otr_image_engines/registry.VALIDATED_ENGINES`, remove it from `_HIDDEN_IMAGE` in
+  `tests/test_tested_only_dropdown_gate.py`, update `test_image_validated_set`, keep it opt-in (the flag) -- then it
+  lists in the OTR_VideoDirector image dropdown.
+- **AFTER klein-4B:** (a) build the coverage architecture (pass01 plan in
+  `docs/2026-06-18-image-video-coverage-arch/`); (b) the carried step below (per-segment LUFS/RMS); (c) the S3
+  forward order (3D item 5, distribution item 6).
+
+**>>> CARRIED STEP = plan per-segment LUFS/RMS voice normalization (operator-requested; FROZEN-SPINE change, needs a plan + re-baseline).**
 - **`wan_ti2v` PROMOTED 2026-06-18 (`ca3e06c`):** forced-lane GPU smoke PASSED on the 5080 via the real adapter
   (render_single -> render_clip, executor thread) -- i2v rendered 33 frames from a 16:9 still at 832x480, engine
   vram_used ~8.2 GB, independent NVML peak 13,078 MiB (< the 14.5 GB cap), twice. Added to
