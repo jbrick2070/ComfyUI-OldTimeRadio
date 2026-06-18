@@ -32,9 +32,16 @@
 > MANDATORY -- z-image's native encoder -- but offloaded before the diffusion peak), 8 steps / cfg 2.0 /
 > shift 3.0 / euler / normal, reuses compose_still_prompt + a live negative, file-gated fail-closed.
 > 4 env-overridable VERIFY-AT-BUILD node knobs (CLIPLoader type, latent node, AuraFlow shift, unet dtype).
-> Converged 3-model roundtable in docs/2026-06-18-zimage-params/. Still hidden from the tested-only
-> dropdown until the operator drops the 3 fp8 weights in + runs the GPU A/B look-match -> then promote to
-> VALIDATED_ENGINES. Suite 4430/0, Bug Bible 16/7/3, HEAD `8da723a` == origin.
+> Converged 3-model roundtable in docs/2026-06-18-zimage-params/.
+> **z_image_turbo GPU-VALIDATED + SHIPPED `dcf078c` (working low-VRAM image option):** downloaded the
+> Blackwell low-VRAM combo to C:\ComfyUI-Models (nvfp4 diffusion + qwen3-4b fp8 TE + ae VAE), booted
+> headless, and rendered a clean on-prompt filmic still (832x1216, 8 steps, 12s, ~10GB peak / nvfp4 steady
+> ~5GB, well under 14.5). Locked the 4 verify-at-build knobs: CLIPLoader type=**qwen_image** (the live
+> /object_info enum has no "z_image"), latent=**EmptySD3LatentImage**, ModelSamplingAuraFlow shift 3.0,
+> weight_dtype default. Promoted into image `VALIDATED_ENGINES` -> now lists in the dropdown. User env set
+> (OTR_ENABLE_ZIMAGE=1 + the 3 OTR_ZIMAGE_* paths + OTR_ZIMAGE_CLIP_TYPE=qwen_image) so Desktop uses it.
+> Evidence: docs/2026-06-18-zimage-params/zimage_smoke_nvfp4.png. Suite 4430/0, Bug Bible 16/7/3, HEAD
+> `dcf078c` == origin.
 >
 > **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
 > latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
