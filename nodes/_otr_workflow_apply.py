@@ -130,6 +130,19 @@ _COMFY_SLOT_WIDGETS = frozenset({
     "comfy_slot_a_model", "comfy_slot_b_model",
 })
 
+# OTR_VideoDirector / OTR_ImageDirector per-role engine COMBOs. As of 2026-06-17
+# these dropdowns DISPLAY only GPU-validated engines (the tested-only gate), but
+# the applier is a TRUSTED programmatic path -- a capability profile (e.g.
+# 8gb_lite) legitimately selects a CPU-floor / untested engine for its tier, so
+# the applier validates these widgets against the FULL registry, not the gated
+# display list. Mirrors the openrouter/comfy admissibility escapes above.
+_VIDEO_DIRECTOR_WIDGETS = frozenset({
+    "announcer_video_model", "music_video_model", "other_beats_video_model",
+})
+_IMAGE_DIRECTOR_WIDGETS = frozenset({
+    "announcer_image_model", "music_image_model", "other_beats_image_model",
+})
+
 
 def _is_widget_backed(spec: Any) -> bool:
     type_def = spec[0] if isinstance(spec, (list, tuple)) and len(spec) > 0 else spec
@@ -199,6 +212,26 @@ def _is_openrouter_admissible(widget_name: str, value: Any) -> bool:
     return value.startswith("openrouter:")
 
 
+def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
+    """A director engine COMBO accepts ANY registered engine (or the custom
+    sentinel), even one HIDDEN from the tested-only display dropdown.
+
+    The display gate (validated-only) is a UI concern; the applier validates a
+    trusted profile selection against the full registry so the 8GB / floor tiers
+    keep working. Registry imports are dep-free (cold-import safe)."""
+    if not isinstance(value, str) or not value:
+        return False
+    if value == "+ Add Custom Model":
+        return True
+    if widget_name in _VIDEO_DIRECTOR_WIDGETS:
+        from ._otr_video_engines import registry as _vreg
+        return value in _vreg.all_engine_names()
+    if widget_name in _IMAGE_DIRECTOR_WIDGETS:
+        from ._otr_image_engines import registry as _ireg
+        return value in _ireg.all_engine_names()
+    return False
+
+
 def _is_comfy_admissible(widget_name: str, value: Any) -> bool:
     if not isinstance(value, str) or not value:
         return False
@@ -217,6 +250,8 @@ def _validate_widget_value(node_type: str, widget_name: str, spec: Any, value: A
             if _is_openrouter_admissible(widget_name, value):
                 return
             if _is_comfy_admissible(widget_name, value):
+                return
+            if _is_engine_director_admissible(widget_name, value):
                 return
             raise ValueError(
                 f"widget {widget_name!r} on node_type {node_type!r} is a COMBO "

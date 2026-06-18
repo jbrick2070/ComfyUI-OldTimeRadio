@@ -241,3 +241,50 @@ CAPABILITIES = {
                                             "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
 }
 __all__.append("CAPABILITIES")
+
+
+# ---------------------------------------------------------------------------
+# TESTED-ONLY DROPDOWN GATE (2026-06-17 operator directive). The per-role video
+# COMBO in OTR_VideoDirector lists ONLY engines that have been VALIDATED on the
+# GPU end-to-end -- untested engines (3D talkers, wan_i2v/wan_ti2v until tested,
+# the abstract / CPU-floor families, etc.) are HIDDEN from the dropdown so the
+# operator cannot accidentally pick a non-working model. This is a DISPLAY gate
+# only: every engine stays REGISTERED (V-6 -- all_engine_names() is unchanged, so
+# role_compat / assert_usable / the force-map experiment knob still see the full
+# set), and the "+ Add Custom Model" sentinel remains the escape hatch for an
+# explicitly-declared custom engine.
+#
+# To promote an engine: add its name here AFTER a green GPU validation. This is a
+# SEPARATE frozenset (not a CAPABILITIES row key) on purpose -- capability_profiles
+# .validate_declaration rejects unknown CAPABILITIES keys, and "validated" is a
+# build-status fact, not a hardware-capability fact.
+#
+# Validated VIDEO engines as of 2026-06-17 (GPU-proven end-to-end, audio
+# byte-identical): the LTX lanes + the HuMo family. humo_1.7B_169 is functional
+# (still cfg 2.5 / mildly cool -- see GO_FORWARD_PLAN); it is listed because it
+# renders correctly, only its colour grade is unfinished.
+# ---------------------------------------------------------------------------
+VALIDATED_ENGINES = frozenset({
+    "ltx_video",
+    "ltx_av_music",
+    "ltx_av_talk",
+    "humo",
+    "humo_1.7B",
+    "humo_1.7B_169",
+    "humo_14B_169",
+})
+__all__.append("VALIDATED_ENGINES")
+
+
+def validated_engine_names() -> list:
+    """Registered engines that are VALIDATED (GPU-proven), sorted.
+
+    The intersection of the live registry with :data:`VALIDATED_ENGINES` -- the
+    tested-only source for the OTR_VideoDirector per-role dropdowns. Intersecting
+    with the registry (rather than returning the frozenset directly) keeps the
+    list honest if an engine is ever renamed or unregistered.
+    """
+    return sorted(set(_VIDEO_REGISTRY.all_engine_names()) & VALIDATED_ENGINES)
+
+
+__all__.append("validated_engine_names")

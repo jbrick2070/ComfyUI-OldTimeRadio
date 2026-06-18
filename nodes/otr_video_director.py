@@ -50,8 +50,17 @@ SEED_MODES = ("request_hash", "fixed")
 
 
 def _video_model_combo() -> list:
-    """Full static video registry + the custom sentinel (V-6)."""
-    return list(_vreg.all_engine_names()) + [ADD_CUSTOM]
+    """TESTED-ONLY video engines + the custom sentinel (2026-06-17 gate).
+
+    Lists only GPU-VALIDATED engines (``registry.validated_engine_names()``) so
+    the operator cannot pick an untested model from the UI. Every engine remains
+    REGISTERED (V-6: ``all_engine_names()`` is untouched, so role_compat /
+    assert_usable / the force-map experiment knob still see the full set); this
+    narrows the *display* list only. ``+ Add Custom Model`` stays the escape hatch
+    for an explicitly-declared engine. Falls back to the full registry only if the
+    validated set is somehow empty, so a box-fresh graph still validates."""
+    names = list(_vreg.validated_engine_names()) or list(_vreg.all_engine_names())
+    return names + [ADD_CUSTOM]
 
 
 def _image_model_combo() -> list:

@@ -131,3 +131,35 @@ CAPABILITIES = {
                       "model_requirements": ["z-image-turbo"]},
 }
 __all__.append("CAPABILITIES")
+
+
+# ---------------------------------------------------------------------------
+# TESTED-ONLY DROPDOWN GATE (2026-06-17 operator directive). The per-role image
+# COMBO in OTR_ImageDirector lists ONLY engines VALIDATED in production -- the
+# untested peers (hidream_i1, lumina_image, qwen_image, sd35_large, z_image_turbo,
+# chroma_hd, flux2_klein) are HIDDEN from the dropdown. Display gate only: every
+# engine stays REGISTERED (V-6 -- all_engine_names() unchanged), and the
+# "+ Add Custom Model" sentinel remains the escape hatch. Mirrors the video
+# registry's VALIDATED_ENGINES (a separate frozenset, NOT a CAPABILITIES key,
+# because validate_declaration rejects unknown CAPABILITIES keys).
+#
+# Validated IMAGE engine as of 2026-06-17: flux_gen1 only (the production default,
+# wired x3 in otr_scifi_16gb_full.json). lumina_image was GPU-smoked but is not
+# yet a production-validated default, so it stays hidden per the operator list.
+# ---------------------------------------------------------------------------
+VALIDATED_ENGINES = frozenset({
+    "flux_gen1",
+})
+__all__.append("VALIDATED_ENGINES")
+
+
+def validated_engine_names() -> list:
+    """Registered image engines that are VALIDATED, sorted.
+
+    The intersection of the live registry with :data:`VALIDATED_ENGINES` -- the
+    tested-only source for the OTR_ImageDirector per-role dropdowns.
+    """
+    return sorted(set(_IMAGE_REGISTRY.all_engine_names()) & VALIDATED_ENGINES)
+
+
+__all__.append("validated_engine_names")
