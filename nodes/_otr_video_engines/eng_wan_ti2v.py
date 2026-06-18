@@ -53,10 +53,21 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
 #: The 2.1 VAE basename the 5B must NOT use (M8): its latent compression differs.
 _WAN21_VAE_BASENAME = "wan_2.1_vae.safetensors"
+#: The APPROVED Wan2.2 VAE basenames (floor fail-closed whitelist, 2026-06-18
+#: roundtable): any other present-but-wrong VAE corrupts the 5B decode, so the
+#: guard accepts only these rather than merely rejecting empty / the 2.1 VAE.
+_WAN22_VAE_ALLOWED = frozenset({"wan2.2_vae.safetensors"})
 #: Default 8GB-tier GGUF (Q5_K_M; Apache-2.0). Resolved via folder_paths /
 #: OTR_WAN_TI2V_CKPT at runtime; this basename is the fallback the loader reads.
 _TI2V_DEFAULT_UNET = "Wan2.2-TI2V-5B-Q5_K_M.gguf"
-_TI2V_MIN_FRAMES = 33
+# 8GB floor framing (2026-06-18 roundtable, converged 3 passes): 33f @ 832x480 hit
+# ~13 GB on a 5080 -> OOMs a real 8GB card. The floor renders 17 frames (4n+1) and
+# CLAMPS upstream requests to the floor max unless OTR_WAN_TI2V_MAX_FRAMES raises it
+# (bigger cards opt up). _TI2V_DEFAULT_FRAMES is the real fallback -- the old code
+# misused target_fps (25 Hz) as a frame count, which quantized to 33 and OOM'd.
+_TI2V_MIN_FRAMES = 17
+_TI2V_DEFAULT_FRAMES = 17
+_TI2V_FLOOR_MAX_FRAMES = 17
 _TI2V_MAX_FRAMES = 177
 
 
@@ -78,6 +89,14 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_SIDECAR_OPTIONAL
     target_fps = 25
+    #: Floor sampler/scheduler whitelist (2026-06-18 roundtable): only core, rock-
+    #: solid CROSS-PLATFORM choices -- uni_pc/sa_solver/MoEKSampler are NVIDIA-leaning
+    #: / custom / NaN-prone on MPS. assert_usable fails closed on anything else; the
+    #: default below is IN the whitelist (so an unset env passes -- no self-reject).
+    _PORTABLE_SAMPLERS = frozenset({"euler"})
+    _PORTABLE_SCHEDULERS = frozenset({"simple", "beta", "normal"})
+    _DEFAULT_SAMPLER = "euler"
+    _DEFAULT_SCHEDULER = "simple"
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
@@ -121,24 +140,30 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
                 "wan_ti2v is opt-in; set %s=1 (core Comfy Wan 5B nodes, no KJ "
                 "wrapper)" % self.requires_flag, kind="video")
+        # Fail CLOSED on a bad/non-portable render knob (sampler whitelist + env
+        # range-checks) BEFORE any forward -- never a raw crash mid-render.
+        self._resolve_render_config()
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "wan_ti2v UNET not found at %s; fetch the Wan2.2 TI2V-5B GGUF and "
                 "set OTR_WAN_TI2V_CKPT (or drop it in models/diffusion_models)"
                 % self._ckpt_path(), kind="video")
-        # M8: the 5B REQUIRES the Wan2.2 VAE -- an empty name or the 2.1 VAE is a
-        # silent decode-corruption trap. Guard the NAME (config) before the
-        # file-presence check so a wrong-but-present 2.1 VAE fails LOUD here.
+        # M8: the 5B REQUIRES the Wan2.2 VAE -- an empty / 2.1 / any other
+        # wrong-but-present VAE silently corrupts the decode. Fail CLOSED unless the
+        # resolved basename is in the approved Wan2.2 whitelist (2026-06-18 roundtable
+        # tightened this from "not empty / not 2.1" to an explicit allow-list).
         vae_base = os.path.basename(self._loader_names()["vae"] or "").lower()
-        if not vae_base or vae_base == _WAN21_VAE_BASENAME:
+        if vae_base not in _WAN22_VAE_ALLOWED:
+            _why = ("the 2.1 VAE (latent compression differs)"
+                    if vae_base == _WAN21_VAE_BASENAME
+                    else "empty" if not vae_base else "not an approved Wan2.2 VAE")
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "wan_ti2v requires the Wan2.2 VAE; resolved VAE basename %r is "
-                "empty or the 2.1 VAE (%s) -- the 5B latent compression differs, "
-                "so the 2.1 VAE corrupts the decode (M8). Set OTR_WAN_TI2V_VAE_NAME"
-                "=wan2.2_vae.safetensors" % (vae_base, _WAN21_VAE_BASENAME),
-                kind="video")
+                "wan_ti2v requires the Wan2.2 VAE; resolved basename %r is %s -- the "
+                "5B decode needs one of %s (M8). Set OTR_WAN_TI2V_VAE_NAME"
+                "=wan2.2_vae.safetensors"
+                % (vae_base, _why, sorted(_WAN22_VAE_ALLOWED)), kind="video")
         missing = self._missing_loaders()
         if missing:
             raise EngineUnusable(
@@ -196,6 +221,67 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vae": os.environ.get("OTR_WAN_TI2V_VAE_NAME", "wan2.2_vae.safetensors"),
         }
 
+    def _resolve_render_config(self):
+        """Parse + RANGE-CHECK the render knobs ONCE (shared by assert_usable and
+        _build_graph, 2026-06-18 roundtable). A bad env value fails CLOSED here with
+        a named MALFORMED_CONFIG, never a raw int()/float() crash mid-render. The
+        sampler/scheduler are validated against the cross-platform floor whitelist."""
+        def _num(env, dflt, lo, hi, cast):
+            raw = os.environ.get(env)
+            if raw is None or raw == "":
+                return cast(dflt)
+            try:
+                val = cast(raw)
+            except (TypeError, ValueError):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s=%r is not a valid number" % (env, raw), kind="video")
+            if not (lo <= val <= hi):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s=%s out of range [%s, %s]" % (env, val, lo, hi), kind="video")
+            return val
+
+        sampler = (os.environ.get("OTR_WAN_TI2V_SAMPLER")
+                   or self._DEFAULT_SAMPLER).strip()
+        if sampler not in self._PORTABLE_SAMPLERS:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "OTR_WAN_TI2V_SAMPLER=%r is not in the cross-platform floor whitelist "
+                "%s -- wan_ti2v is the 8GB/Mac/AMD floor; uni_pc/sa_solver/MoEKSampler "
+                "are not portable. Use a heavier engine for those."
+                % (sampler, sorted(self._PORTABLE_SAMPLERS)), kind="video")
+        scheduler = (os.environ.get("OTR_WAN_TI2V_SCHEDULER")
+                     or self._DEFAULT_SCHEDULER).strip()
+        if scheduler not in self._PORTABLE_SCHEDULERS:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "OTR_WAN_TI2V_SCHEDULER=%r is not in the floor whitelist %s"
+                % (scheduler, sorted(self._PORTABLE_SCHEDULERS)), kind="video")
+        return {
+            "steps": _num("OTR_WAN_TI2V_STEPS", 30, 1, 100, int),
+            "cfg": _num("OTR_WAN_TI2V_CFG", 5.0, 0.0, 30.0, float),
+            "shift": _num("OTR_WAN_TI2V_SHIFT", 5.0, 0.1, 20.0, float),
+            "sampler": sampler,
+            "scheduler": scheduler,
+        }
+
+    def _floor_length(self, target_frame_count):
+        """The 8GB-floor effective clip length (4n+1). Fixes the old target_fps-as-
+        frame-count fallback AND clamps an upstream request to the floor max unless
+        OTR_WAN_TI2V_MAX_FRAMES raises it (bigger cards opt up)."""
+        from . import wrapper_bridge as _wb
+        try:
+            floor_max = int(os.environ.get(
+                "OTR_WAN_TI2V_MAX_FRAMES", str(_TI2V_FLOOR_MAX_FRAMES)))
+        except (TypeError, ValueError):
+            floor_max = _TI2V_FLOOR_MAX_FRAMES
+        floor_max = max(_TI2V_MIN_FRAMES, min(floor_max, _TI2V_MAX_FRAMES))
+        requested = int(target_frame_count or _TI2V_DEFAULT_FRAMES)
+        requested = min(requested, floor_max)
+        return _wb.quantize_frames_4n1(
+            requested, min_frames=_TI2V_MIN_FRAMES, max_frames=_TI2V_MAX_FRAMES)
+
     def _build_graph(self, request, image_name, plan, length, width, height):
         """The declarative Wan TI2V-5B graph (wrapper_bridge.run_graph format).
         ``Wan22ImageToVideoLatent`` builds the latent from the VAE + init image; the
@@ -207,11 +293,12 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         names = self._loader_names()
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
-        steps = int(os.environ.get("OTR_WAN_TI2V_STEPS", "30"))
-        cfg = float(os.environ.get("OTR_WAN_TI2V_CFG", "5.0"))
-        shift = float(os.environ.get("OTR_WAN_TI2V_SHIFT", "5.0"))
-        sampler = os.environ.get("OTR_WAN_TI2V_SAMPLER", "uni_pc")
-        scheduler = os.environ.get("OTR_WAN_TI2V_SCHEDULER", "simple")
+        cfg_knobs = self._resolve_render_config()        # range-checked, fail-closed
+        steps = cfg_knobs["steps"]
+        cfg = cfg_knobs["cfg"]
+        shift = cfg_knobs["shift"]
+        sampler = cfg_knobs["sampler"]
+        scheduler = cfg_knobs["scheduler"]
         positive = get("text_prompt") or "subtle natural motion"
         negative = os.environ.get("OTR_WAN_TI2V_NEGATIVE", _WAN_DEFAULT_NEGATIVE)
         if self._loader_mode() == "gguf":
@@ -278,15 +365,13 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         width, height = self._dims(request)
         image_name = self._materialize_init_image(
             request, plan["init_image"], width, height)
-        length = _wb.quantize_frames_4n1(
-            plan["target_frame_count"] or self.target_fps,
-            min_frames=_TI2V_MIN_FRAMES, max_frames=_TI2V_MAX_FRAMES)
+        length = self._floor_length(plan["target_frame_count"])
         graph = self._build_graph(request, image_name, plan, length, width, height)
         # free_after_use: the umt5 text-encode frees before the 5B UNET + the 2.2
         # VAE decode; "unet" kept for V-4 patcher teardown, "vae" for the decode,
         # the terminal for the IMAGE read-out. The NVML peak probe spans the whole
         # render window so the render-phase peak gates the ceiling.
-        probe = _MC.VramPeakProbe(interval_s=1.0).start()
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(graph, classes, free_after_use=True,
                                     keep={"unet", "vae", self._TERMINAL})

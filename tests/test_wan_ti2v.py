@@ -171,6 +171,86 @@ def test_m8_rejects_empty_vae_name(tmp_path, monkeypatch):
     assert "M8" in str(exc.value)
 
 
+def test_m8_rejects_a_wrong_but_present_vae(tmp_path, monkeypatch):
+    # 2026-06-18 roundtable: the guard is now an allow-list, so any non-approved
+    # VAE basename (not just empty / 2.1) fails closed.
+    eng = _stage_full_install(tmp_path, monkeypatch,
+                              vae_name="some_other_vae.safetensors")
+    with pytest.raises(EngineUnusable) as exc:
+        eng.assert_usable(host_caps={}, profile={})
+    assert exc.value.reason is EngineUsabilityReason.MISSING_MODEL
+
+
+# --------------------------------------------------------------------------- #
+# 8GB FLOOR HARDENING (2026-06-18 roundtable, converged 3 passes)
+# --------------------------------------------------------------------------- #
+def _clear_floor_env(monkeypatch):
+    for k in ("OTR_WAN_TI2V_SAMPLER", "OTR_WAN_TI2V_SCHEDULER", "OTR_WAN_TI2V_STEPS",
+              "OTR_WAN_TI2V_CFG", "OTR_WAN_TI2V_SHIFT", "OTR_WAN_TI2V_MAX_FRAMES"):
+        monkeypatch.delenv(k, raising=False)
+
+
+def test_floor_length_default_is_17_not_fps(monkeypatch):
+    # The old bug used target_fps (25) as the frame fallback -> quantized to 33 ->
+    # OOM'd 8GB. The fallback is now _TI2V_DEFAULT_FRAMES = 17.
+    _clear_floor_env(monkeypatch)
+    assert WanTi2vEngine()._floor_length(None) == 17
+    assert WanTi2vEngine()._floor_length(0) == 17
+
+
+def test_floor_length_clamps_upstream_request(monkeypatch):
+    # An upstream request for 33+ frames must be clamped to the floor max (17).
+    _clear_floor_env(monkeypatch)
+    assert WanTi2vEngine()._floor_length(33) == 17
+    assert WanTi2vEngine()._floor_length(177) == 17
+
+
+def test_floor_max_override_lets_bigger_cards_opt_up(monkeypatch):
+    _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "49")     # 49 = 4*12+1
+    assert WanTi2vEngine()._floor_length(49) == 49
+    assert WanTi2vEngine()._floor_length(177) == 49        # still clamped to the cap
+
+
+def test_default_sampler_is_portable_euler(monkeypatch):
+    _clear_floor_env(monkeypatch)
+    cfg = WanTi2vEngine()._resolve_render_config()
+    assert cfg["sampler"] == "euler"
+    assert cfg["scheduler"] == "simple"
+
+
+def test_graph_default_sampler_is_euler(monkeypatch):
+    _clear_floor_env(monkeypatch)
+    g = _graph(monkeypatch)
+    assert g["ksampler"]["inputs"]["sampler_name"] == "euler"
+
+
+def test_non_portable_sampler_fails_closed(monkeypatch):
+    # uni_pc/sa_solver/MoEKSampler are not cross-platform -> fail closed (the
+    # resolver runs before the install checks, so no staging needed).
+    _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_ENABLE_WAN_TI2V", "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_SAMPLER", "uni_pc")
+    with pytest.raises(EngineUnusable) as exc:
+        WanTi2vEngine().assert_usable(host_caps={}, profile={})
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+
+
+def test_out_of_range_steps_fails_closed(monkeypatch):
+    _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "999")
+    with pytest.raises(EngineUnusable) as exc:
+        WanTi2vEngine()._resolve_render_config()
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+
+
+def test_non_numeric_cfg_fails_closed(monkeypatch):
+    _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_CFG", "high")
+    with pytest.raises(EngineUnusable):
+        WanTi2vEngine()._resolve_render_config()
+
+
 # --------------------------------------------------------------------------- #
 # assert_usable fail-closed ladder
 # --------------------------------------------------------------------------- #
