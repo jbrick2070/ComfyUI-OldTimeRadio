@@ -145,6 +145,28 @@ OPT_IN_ENGINES = {
             "acceptance render per slot at 1472x832"
         ),
     },
+    # triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean
+    # 8GB sibling of mesh_stage. Same in-process pattern (the TripoSR node runs
+    # under the comfy host, absent in the pytest sandbox, present in production);
+    # Blender is a spawned exe (OTR_BLENDER_EXE gate), not an importable lib. MIT
+    # license (commercial-clean). VERIFY-AT-BUILD: the live graph is captured
+    # from /object_info before the forward is wired.
+    "triposr": {
+        "lib_module": "comfy",
+        "adapter_class": "TripoSREngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_TRIPOSR",
+        "assumed_call": (
+            "in-process TripoSR node: image -> TripoSR mesh -> cached GLB "
+            "(mesher id 'triposr', MIT weights, local_files_only); then the "
+            "BUG-291 reclaim barrier; then the SAME pinned portable Blender "
+            "turntable stage mesh_stage uses (WORKBENCH matcap, straight-alpha "
+            "PNG dir, atomic publish).  # TODO-for-GPU-smoke: install a TripoSR "
+            "ComfyUI node + MIT weights, capture its INPUT_TYPES + output socket "
+            "from a live /object_info, run the VRAM probe on the 5080 (DRAFT "
+            "7000 MB), then one acceptance render per slot"
+        ),
+    },
     "wan_i2v": {
         "lib_module": "wan",
         "adapter_class": "WanI2VEngine",

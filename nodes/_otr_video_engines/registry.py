@@ -211,6 +211,16 @@ CAPABILITIES = {
     "triposg_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                      "required_toolchain": None, "requires_sidecar": True,
                      "cpu_ok": False, "model_requirements": ["triposg"]},
+    # triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean,
+    # 8GB-tier sibling of mesh_stage (TripoSR single-image->mesh, ~6-8 GB,
+    # sub-second). Static mesher (image_to_video family; turntable motion only,
+    # NEVER lip-sync). MIT -> commercial_clean. No cu128 toolkit (prebuilt
+    # wheels / transformers), runs in-process, no sidecar. medium / ~7000 MB
+    # DRAFT -- tighten on the GPU probe. Registered DARK (OTR_ENABLE_TRIPOSR);
+    # kept OUT of VALIDATED_ENGINES until the forward is GPU-validated.
+    "triposr": {"vram_class": "medium", "vram_estimate_mb": 7000,
+                "required_toolchain": None, "requires_sidecar": False,
+                "cpu_ok": False, "model_requirements": ["triposr"]},
     "hunyuan3d_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
                        "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
                        "cpu_ok": False, "model_requirements": ["hunyuan3d-2"]},

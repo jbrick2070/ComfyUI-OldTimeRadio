@@ -19,7 +19,7 @@ from nodes._otr_image_engines import registry as ireg
 _HIDDEN_VIDEO = {
     "abstract", "flux_still", "hunyuan3d_talk", "mesh_stage", "station_card",
     "still_kenburns", "still_parallax", "trellis_talk", "triposg_talk",
-    "visualizer", "wan_i2v", "wan_ti2v",
+    "triposr", "visualizer", "wan_i2v", "wan_ti2v",
 }
 _HIDDEN_IMAGE = {
     "chroma_hd", "flux2_klein", "hidream_i1", "lumina_image", "qwen_image",

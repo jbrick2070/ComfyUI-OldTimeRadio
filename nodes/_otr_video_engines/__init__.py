@@ -122,3 +122,17 @@ try:  # pragma: no cover - trivial guard
     from . import eng_character_3d as _eng_character_3d  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean 8GB
+# sibling of mesh_stage (TripoSR image->mesh -> Blender turntable stage).
+# DEFAULT-OFF / dark (empty default_roles + OTR_ENABLE_TRIPOSR) so it shows in
+# the static per-role dropdown (V-6) but is never a default and fails closed
+# until the operator installs a TripoSR node + MIT weights and GPU-validates it
+# (then promote into registry.VALIDATED_ENGINES). Cold-import clean (V-12: lazy
+# everything inside load/render_clip). Guarded so a packaging quirk never breaks
+# the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_triposr as _eng_triposr  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
