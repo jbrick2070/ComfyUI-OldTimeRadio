@@ -106,6 +106,23 @@ _CHOOSER_MAX_TOKENS = 16
 # similar (mode collapse) and the inventor must re-roll.
 _MAX_SHARED_ROOTS = 1
 
+# Deterministic stock descriptors used to PAD a short inventor result up to
+# _REQUIRED_CANDIDATE_COUNT so a weak model that returns only 4-of-5 (or none)
+# never hard-aborts the episode (2026-06-18). Each is DESCRIPTOR_RE-valid and the
+# pool is pairwise distinct (every root unique), so padding always satisfies the
+# StylePick(min=max=5) + distinctness contract. Generic old-time-radio moods, so
+# a padded style still yields a watchable episode rather than a loud fail.
+_FALLBACK_DESCRIPTORS: tuple[str, ...] = (
+    "noir_radio_suspense",
+    "pulp_serial_cliffhanger",
+    "vintage_broadcast_mystery",
+    "eerie_signal_drift",
+    "midnight_transmission_dread",
+    "atomic_age_anxiety",
+    "lonely_frontier_vigil",
+    "cosmic_isolation_echo",
+)
+
 
 def _build_inventor_gbnf() -> str:
     """GBNF grammar constraining the inventor (Pass 1) to EXACTLY
@@ -436,25 +453,51 @@ def _parse_inventor_descriptors(raw: str) -> _InventorParse:
     distinct grammar-valid descriptors can be recovered (caller wraps
     in StyleGenerationFailedError after exhausting retries).
     """
+    if not (raw or "").strip():
+        raise ValueError("inventor returned empty output")
+    distinct, parsed_count, valid_count = _recover_distinct_descriptors(raw)
+
+    # Require at least _REQUIRED_CANDIDATE_COUNT distinct survivors. (The no-abort
+    # padding path lives in _run_inventor, which calls _recover_ + _pad_ directly
+    # so a weak model is never fatal; this strict parser keeps its contract so the
+    # retry ladder still re-rolls for a clean 5 and good models stay byte-identical.)
+    if len(distinct) < _REQUIRED_CANDIDATE_COUNT:
+        raise ValueError(
+            f"inventor recovered only {len(distinct)} distinct "
+            f"grammar-valid descriptor(s) (need {_REQUIRED_CANDIDATE_COUNT}) "
+            f"from {parsed_count} parseable line(s): {distinct!r}"
+        )
+
+    return _InventorParse(
+        candidates=distinct[:_REQUIRED_CANDIDATE_COUNT],
+        raw_count=parsed_count,
+        valid_count=valid_count,
+        distinct_count=len(distinct),
+        truncated_count=max(0, len(distinct) - _REQUIRED_CANDIDATE_COUNT),
+    )
+
+
+def _recover_distinct_descriptors(raw: str) -> tuple[list[str], int, int]:
+    """Recover the distinct grammar-valid descriptors from raw inventor output
+    WITHOUT raising. Returns ``(distinct, parsed_line_count, valid_count)``.
+    Shared by the strict parser and the no-abort padding path so both see the
+    exact same tokenize -> grammar-filter -> distinctness-dedupe pipeline."""
     text = (raw or "").strip()
     if not text:
-        raise ValueError("inventor returned empty output")
+        return [], 0, 0
 
     # 1. Tokenize lines, stripping common list decorations.
     parsed_lines: list[str] = []
     for raw_line in text.splitlines():
-        # Strip leading "- ", "* ", "1. ", "1) ", quotes, surrounding ws.
         stripped = raw_line.strip()
         if not stripped:
             continue
         for prefix in ("- ", "* ", "•"):
             if stripped.startswith(prefix):
                 stripped = stripped[len(prefix):].strip()
-        # Strip simple "N." or "N)" numbering at the head.
         m = re.match(r"^\d+[.)]\s*(.+)$", stripped)
         if m:
             stripped = m.group(1).strip()
-        # Strip surrounding quotes.
         stripped = stripped.strip("'\"`").strip()
         if stripped:
             parsed_lines.append(stripped.lower())
@@ -463,10 +506,6 @@ def _parse_inventor_descriptors(raw: str) -> _InventorParse:
     valid = [ln for ln in parsed_lines if DESCRIPTOR_RE.match(ln)]
 
     # 3. De-dupe in first-seen order, enforcing distinctness as a skip.
-    #    A candidate sharing more than _MAX_SHARED_ROOTS roots with any
-    #    already-accepted descriptor (exact dup or near-dup) is skipped.
-    #    No early stop: the full distinct set sizes the overgeneration
-    #    telemetry; the first 5 are the result either way.
     distinct: list[str] = []
     for cand in valid:
         roots = set(cand.split("_"))
@@ -477,21 +516,35 @@ def _parse_inventor_descriptors(raw: str) -> _InventorParse:
             continue
         distinct.append(cand)
 
-    # 4. Require at least _REQUIRED_CANDIDATE_COUNT distinct survivors.
-    if len(distinct) < _REQUIRED_CANDIDATE_COUNT:
-        raise ValueError(
-            f"inventor recovered only {len(distinct)} distinct "
-            f"grammar-valid descriptor(s) (need {_REQUIRED_CANDIDATE_COUNT}) "
-            f"from {len(parsed_lines)} parseable line(s): {distinct!r}"
-        )
+    return distinct, len(parsed_lines), len(valid)
 
-    return _InventorParse(
-        candidates=distinct[:_REQUIRED_CANDIDATE_COUNT],
-        raw_count=len(parsed_lines),
-        valid_count=len(valid),
-        distinct_count=len(distinct),
-        truncated_count=max(0, len(distinct) - _REQUIRED_CANDIDATE_COUNT),
-    )
+
+def _pad_descriptors_to_required(distinct: list[str]) -> tuple[list[str], int]:
+    """Deterministically pad a short distinct-descriptor list up to
+    _REQUIRED_CANDIDATE_COUNT using the stock _FALLBACK_DESCRIPTORS pool, honoring
+    the same distinctness rule. NEVER raises -- the pool is large + pairwise
+    distinct, so it always fills. Returns ``(list_of_exactly_5, num_padded)``.
+    This is the deterministic floor that turns a weak-model near-miss (4-of-5, or
+    even 0) into a valid result instead of a hard abort."""
+    out = list(distinct[:_REQUIRED_CANDIDATE_COUNT])
+    padded = 0
+    for fb in _FALLBACK_DESCRIPTORS:
+        if len(out) >= _REQUIRED_CANDIDATE_COUNT:
+            break
+        roots = set(fb.split("_"))
+        if any(len(roots & set(a.split("_"))) > _MAX_SHARED_ROOTS for a in out):
+            continue
+        out.append(fb)
+        padded += 1
+    # Belt-and-suspenders: if distinctness collisions left us short, append any
+    # remaining unused stock descriptors verbatim until we reach the count.
+    for fb in _FALLBACK_DESCRIPTORS:
+        if len(out) >= _REQUIRED_CANDIDATE_COUNT:
+            break
+        if fb not in out:
+            out.append(fb)
+            padded += 1
+    return out[:_REQUIRED_CANDIDATE_COUNT], padded
 
 
 def _parse_inventor_output(raw: str) -> list[str]:
@@ -567,6 +620,8 @@ def _run_inventor(
     ]
 
     attempt_errors: list[str] = []
+    best_distinct: list[str] = []
+    best_meta: tuple[int, int] = (0, 0)  # (parsed_line_count, valid_count)
     for attempt_idx in range(max_attempts):
         temp = _INVENTOR_TEMPERATURES[
             min(attempt_idx, len(_INVENTOR_TEMPERATURES) - 1)
@@ -606,6 +661,13 @@ def _run_inventor(
             log.warning("[OTR_StylePicker] inventor attempt %d: %s",
                         attempt_idx + 1, err)
             attempt_errors.append(err)
+            # Keep the richest partial across attempts for the no-abort pad.
+            try:
+                d, n_lines, n_valid = _recover_distinct_descriptors(raw)
+                if len(d) > len(best_distinct):
+                    best_distinct, best_meta = d, (n_lines, n_valid)
+            except Exception:  # noqa: BLE001 -- recovery is best-effort
+                pass
             continue
 
         log.info(
@@ -616,9 +678,29 @@ def _run_inventor(
         )
         return parse, attempt_idx + 1
 
-    raise StyleGenerationFailedError(
-        f"inventor failed after {max_attempts} attempts; errors: "
-        f"{attempt_errors!r}"
+    # No clean 5 after every attempt: PAD the richest partial up to the required
+    # count with deterministic stock descriptors and proceed -- a weak model is
+    # never a hard abort (operator directive 2026-06-18: "we need a fix so we
+    # don't get a loud fail"). Strong models return on a passing attempt above and
+    # never reach here, so their path is byte-identical.
+    padded, n_padded = _pad_descriptors_to_required(best_distinct)
+    parsed_count, valid_count = best_meta
+    log.warning(
+        "[OTR_StylePicker] inventor: no clean %d after %d attempt(s); padded %d "
+        "stock descriptor(s) onto %d recovered -> %r (deterministic floor, no "
+        "abort). errors=%r",
+        _REQUIRED_CANDIDATE_COUNT, max_attempts, n_padded, len(best_distinct),
+        padded, attempt_errors,
+    )
+    return (
+        _InventorParse(
+            candidates=padded,
+            raw_count=parsed_count,
+            valid_count=valid_count,
+            distinct_count=len(best_distinct),
+            truncated_count=0,
+        ),
+        max_attempts,
     )
 
 

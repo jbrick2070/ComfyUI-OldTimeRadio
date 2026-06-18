@@ -564,17 +564,48 @@ class TestPickStyle:
         assert pick.chosen == chosen
         assert pick.pass1_attempts == 2
 
-    def test_inventor_all_fail_raises(self):
-        bad = "only_one_line"
-        gen = _make_canned_generate_fn([bad, bad, bad])
-        with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(creative_fn=gen, technical_fn=gen,
-                article_text="Article that breaks the inventor.",
-                seed_pool=_TEN_PRESETS,
-                rng=random.Random("allfail"),
-                model_id="test-model",
-            )
-        assert "after 3 attempts" in str(exc_info.value)
+    def test_inventor_all_fail_pads_and_proceeds(self):
+        # Operator directive 2026-06-18 ("we need a fix so we don't get a loud
+        # fail"): when the inventor never reaches a clean 5, PAD the richest
+        # partial with deterministic stock descriptors instead of aborting. Here
+        # every attempt yields one valid descriptor ("only_one_line"); the chooser
+        # is offline (raises) so it falls back to the first candidate.
+        def _gen(messages, *, temperature, max_new_tokens, **_):
+            if temperature >= 0.5:      # inventor passes
+                return "only_one_line"
+            raise RuntimeError("chooser offline")  # -> chooser falls back
+
+        pick = _SP.pick_style(creative_fn=_gen, technical_fn=_gen,
+            article_text="Article that breaks the inventor.",
+            seed_pool=_TEN_PRESETS,
+            rng=random.Random("allfail"),
+            model_id="test-model",
+        )
+        # No abort: a valid 5-candidate pick is produced.
+        assert len(pick.candidates) == 5
+        assert "only_one_line" in pick.candidates
+        # The padding came from the deterministic stock pool.
+        assert any(c in _SP._FALLBACK_DESCRIPTORS for c in pick.candidates)
+        # Chooser fell back to the first (recovered) candidate.
+        assert pick.chosen == pick.candidates[0] == "only_one_line"
+
+
+    def test_pad_descriptors_fills_to_required_count(self):
+        out, n = _SP._pad_descriptors_to_required(["alpha_beta", "gamma_delta"])
+        assert len(out) == _SP._REQUIRED_CANDIDATE_COUNT
+        assert out[:2] == ["alpha_beta", "gamma_delta"]   # partial preserved, first
+        assert n == _SP._REQUIRED_CANDIDATE_COUNT - 2
+        # filled from the stock pool, all distinct + grammar-valid
+        assert len(set(out)) == len(out)
+        for c in out:
+            assert _SP.DESCRIPTOR_RE.match(c)
+
+
+    def test_pad_from_empty_is_all_stock(self):
+        out, n = _SP._pad_descriptors_to_required([])
+        assert len(out) == _SP._REQUIRED_CANDIDATE_COUNT
+        assert n == _SP._REQUIRED_CANDIDATE_COUNT
+        assert all(c in _SP._FALLBACK_DESCRIPTORS for c in out)
 
     def test_chooser_mismatch_falls_back(self):
         # BUG-LOCAL-295: a chooser pick outside the candidate pool must
