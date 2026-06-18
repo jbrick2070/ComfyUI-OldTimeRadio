@@ -54,6 +54,18 @@ Per-beat (mixed episodes keep stills for HuMo/LTX/Wan beats). Safe for byte-iden
 (the skipped still was unused; audio + video output unchanged). Big speedup + VRAM win
 for the accessible all-procedural floor. NOT a blocker; a clean separate task.
 
+### SHIPPED + LIVE-CONFIRMED (`b2f07e0`, 2026-06-18)
+`OTR_ImageDirector` forwards `video_models` into image_policy; `dispatch_images` skips a
+beat's still when its selected video engine's `required_inputs` lacks `init_image`
+(`_still_needed_for_role`). A confirming all-visualizer 120w soak (seed 1454194264,
+tag `visualizer_skip`) returned **status=success** (632s): the gate fired on EVERY
+beat/role -- "the selected video engine ignores init_image (procedural floor) -- no
+still generated" for c03, c04, announcer, b000, b001, b005, b009 -- ZERO flux stills
+diffused, then full visualizer renders -> composite -> mux (obs_publish OK). Empirically
+proves the accessibility requirement: a user with NO image/video models generates no
+unused stills. Suite 4502 pass / 33 skip; Bug Bible green; 4 new gate tests in
+test_image_platform_c1.py.
+
 ## Promotion gate (visualizer -> VALIDATED_ENGINES) -- MET
 ADD `"visualizer"` to `registry.VALIDATED_ENGINES` (and decide default-ON for
 accessibility) once a full visualizer-all-roles episode returns status=success
