@@ -283,6 +283,27 @@ def _resolve_title_timing(led, volume, fps, total_frames):
                 out["music_close_start_f"] = cstart
                 out["music_close_end_f"] = cend
 
+    # SYNTHESIZED end title (operator 2026-06-17: "flash a big title at the end
+    # just like the start -- animate gibberish -> the actual episode title").
+    # The closing theme lives in the credits post-roll (AFTER total), so a real
+    # music_close window almost never lands inside total and the close hero card
+    # never fired. Synthesize one in the last seconds of the MAIN video so the
+    # SAME _draw_title_card decode-reveals the EPISODE TITLE before the credits
+    # roll. Duration mirrors the open when known (else ~4s), clamped 2-6s and
+    # never overrunning the open window.
+    if "music_close_start_f" not in out and total > int(fps * 2):
+        open_end = int(out.get("music_open_end_f", 0))
+        if "music_open_start_f" in out:
+            close_dur = int(out["music_open_end_f"]) - int(out["music_open_start_f"])
+        else:
+            close_dur = int(fps * 4)
+        close_dur = max(int(fps * 2), min(int(fps * 6), close_dur))
+        cstart = max(open_end, total - close_dur)
+        if cstart < total:
+            out["music_close_start_f"] = cstart
+            out["music_close_end_f"] = total
+            out.setdefault("close_synthesized", True)
+
     if "music_open_start_f" in out or "music_close_start_f" in out:
         return out
     return {}

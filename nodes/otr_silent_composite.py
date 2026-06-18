@@ -199,13 +199,13 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     segments = []
     cursor = 0
 
-    def emit(source, path, n, src_start, shot_id=None, engine_id=None):
+    def emit(source, path, n, src_start, shot_id=None, engine_id=None, loop=False):
         if int(n) <= 0:
             return
         segments.append({
             "order": len(segments), "shot_id": shot_id, "source": source,
             "path": path or "", "src_start_frame": int(src_start),
-            "n_frames": int(n), "engine_id": engine_id})
+            "n_frames": int(n), "engine_id": engine_id, "loop": bool(loop)})
 
     def _floor_aligned(start_cursor, n):
         """Timeline-aligned floor slice start (production restore 2026-06-10):
@@ -262,8 +262,12 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         else:
             _last_clip = _clip_rows[-1] if _clip_rows else None
         if _last_clip is not None:
+            # LOOP the tail clip (operator 2026-06-17: "loop the ending video so
+            # it's not static") -- the short last drama clip REPEATS to fill the
+            # credits tail instead of tpad-cloning its final frame (the frozen
+            # image). The green rolling credits still ride on top.
             emit("clip", _last_clip.get("path"), tail_n, 0,
-                 _last_clip.get("shot_id"), _last_clip.get("engine_id"))
+                 _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True)
         else:
             emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
@@ -287,11 +291,18 @@ def _color_args(out_path):
             "-c:v", "libx264", "-crf", "18", "-preset", "fast", out_path]
 
 
-def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0):
+def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
+                    loop=False):
     """One canonical silent segment of EXACTLY ``n_frames`` from ``src`` (a clip,
     or the floor sliced at ``start_frame``): truncates a long source, holds the
-    last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error."""
-    cmd = [fb, "-y", "-loglevel", "error", "-i", src, "-an",
+    last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error.
+
+    ``loop=True`` stream-loops the input (-stream_loop -1) so a SHORT source
+    REPEATS to fill ``n_frames`` -- the credits-tail backdrop keeps moving
+    instead of freezing on the last frame (operator 2026-06-17). The tpad clone
+    in _seg_vf stays as a safety but never triggers under an infinite loop."""
+    loop_args = ["-stream_loop", "-1"] if loop else []
+    cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
            "-vf", _seg_vf(w, h, fps, start_frame),
            "-frames:v", str(int(n_frames))] + _color_args(seg_path)
     p = _run(cmd)
@@ -496,7 +507,8 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                     bg_start_frame=seg["src_start_frame"])
             elif kind == "clip":
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
-                                w=w, h=h, fps=fps, start_frame=0)
+                                w=w, h=h, fps=fps, start_frame=0,
+                                loop=bool(seg.get("loop")))
             elif kind == "floor":
                 _encode_segment(fb, base_video_path, seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=seg["src_start_frame"])
