@@ -665,6 +665,13 @@ def _slim_model(raw: dict) -> dict | None:
     sp = raw.get("supported_parameters")
     sp = [str(x) for x in sp] if isinstance(sp, list) else []
     pricing = raw.get("pricing") if isinstance(raw.get("pricing"), dict) else {}
+    # Output modality (OpenRouter `architecture.output_modalities`, e.g.
+    # ["text"] for an LLM, ["image"] for an image generator). Captured so the
+    # writer slot pickers can hide non-text models (an image model in the
+    # creative slot returns a monologue, never a usable line -- 2026-06-18).
+    arch = raw.get("architecture") if isinstance(raw.get("architecture"), dict) else {}
+    out_mods = arch.get("output_modalities")
+    out_mods = [str(x).lower() for x in out_mods] if isinstance(out_mods, list) else []
     return {
         "id": mid,
         "name": str(raw.get("name") or mid),
@@ -675,6 +682,7 @@ def _slim_model(raw: dict) -> dict | None:
                     "completion": pricing.get("completion")},
         "supported_parameters": sp,
         "supports_json": ("structured_outputs" in sp) or ("response_format" in sp),
+        "output_modalities": out_mods,
     }
 
 

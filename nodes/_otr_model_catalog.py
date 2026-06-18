@@ -609,9 +609,29 @@ def _slot_requires_json(slot: str) -> bool:
     return os.environ.get(var, "0") == "1"
 
 
+def _is_text_writer_model(m: dict) -> bool:
+    """True if a catalog row can serve a WRITER slot: it outputs text and is not
+    an image/audio/video generator. The A/B slots drive the LLM writer, so an
+    image model like ``google/gemini-3-pro-image`` (which emits a picture or a
+    planning monologue, never a usable line) must never appear there.
+
+    TOLERANT of an old cache: a row with no ``output_modalities`` (cached before
+    the modality field was captured) is KEPT, so an un-refreshed catalog still
+    shows every model rather than going empty. A row is hidden ONLY when we
+    positively know its output is non-text (text absent, or image present)."""
+    out = m.get("output_modalities")
+    if not isinstance(out, list) or not out:
+        return True  # unknown -> don't hide (re-run refresh_catalog_cache to populate)
+    mods = [str(x).lower() for x in out]
+    return ("text" in mods) and ("image" not in mods)
+
+
 def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     """Apply the slot-A/B catalog filters (filters, never a cage). Each is
     independent and unset == no-op:
+      * text-output only               -- writer slots hide image/audio/video
+                                          generators (OTR_OPENROUTER_ALLOW_NONTEXT=1
+                                          to disable); tolerant of an old cache
       * OTR_OPENROUTER_PROVIDER_FILTER -- provider-prefix allowlist (id before '/')
       * OTR_OPENROUTER_MODEL_ALLOWLIST -- exact-id allowlist
       * OTR_OPENROUTER_MODEL_DENYLIST  -- exact-id removal
@@ -621,10 +641,13 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     allow = set(_csv_env("OTR_OPENROUTER_MODEL_ALLOWLIST"))
     deny = set(_csv_env("OTR_OPENROUTER_MODEL_DENYLIST"))
     require_json = _slot_requires_json(slot)
+    text_only = os.environ.get("OTR_OPENROUTER_ALLOW_NONTEXT", "0") != "1"
     out: list[dict] = []
     for m in models:
         mid = m.get("id")
         if not isinstance(mid, str) or not mid:
+            continue
+        if text_only and not _is_text_writer_model(m):
             continue
         provider = m.get("provider") or (mid.split("/", 1)[0] if "/" in mid else "")
         if providers and provider not in providers:
