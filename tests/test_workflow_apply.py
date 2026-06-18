@@ -77,7 +77,7 @@ def _registry_engine_ids():
     )
     from nodes._otr_image_engines import registry as ireg
     from nodes._otr_image_engines import (  # noqa: F401
-        chroma_hd, flux2_klein, flux_gen1, hidream_i1, lumina_image,
+        flux2_klein, flux_gen1, hidream_i1, lumina_image,
         qwen_image, sd35_large, z_image_turbo,
     )
     return (set(vreg.all_engine_names()) | set(areg._REGISTRY)

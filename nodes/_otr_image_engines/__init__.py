@@ -52,16 +52,14 @@ except Exception:  # noqa: BLE001
 # C4-C6 (generic peers, default-OFF): more model-agnostic image engines from the
 # C2 dep/license matrix, each registering identically and greyed until its own
 # OTR_ENABLE_<X>=1 + weights exist. HiDream-I1 (GGUF/MIT, in-stack like Qwen);
-# Chroma1-HD (native FLUX-family/Apache-2.0); Lumina-Image 2.0 (native lightweight
-# /Apache-2.0). All commercial-clean (MIT/Apache). Each has its OWN guard so a
-# quirk in one never blocks the others -- and proves the "+ Add Custom Model"
-# open-set story: the registry grows by dropping in an adapter, no other edits.
+# Lumina-Image 2.0 (native lightweight/Apache-2.0). All commercial-clean
+# (MIT/Apache). Each has its OWN guard so a quirk in one never blocks the others
+# -- and proves the "+ Add Custom Model" open-set story: the registry grows by
+# dropping in an adapter, no other edits.
+# (Chroma1-HD was DROPPED 2026-06-18 by operator decision: it is a de-restricted
+# /uncensored FLUX finetune and OTR will not ship a path to that content.)
 try:  # pragma: no cover - trivial guard
     from . import hidream_i1 as _hidream_i1  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-try:  # pragma: no cover - trivial guard
-    from . import chroma_hd as _chroma_hd  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
 try:  # pragma: no cover - trivial guard

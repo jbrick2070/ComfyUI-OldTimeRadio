@@ -30,7 +30,8 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # Clean-license (MIT/Apache) -> True; conditional/unconfirmed license -> False.
 PEERS = [
     ("hidream_i1", "hidream_i1", "OTR_ENABLE_HIDREAM", "OTR_HIDREAM_GGUF", True),
-    ("chroma_hd", "chroma_hd", "OTR_ENABLE_CHROMA", "OTR_CHROMA_CKPT", True),
+    # chroma_hd DROPPED 2026-06-18 (operator: it is a de-restricted/uncensored
+    # FLUX finetune; OTR will not ship a path to that content).
     # lumina_image GRADUATED to a BUILT engine (real render_image) 2026-06-14 --
     # it now has its own suite (test_lumina_image_engine.py), like flux_gen1, and
     # is no longer a NotImplementedError stub peer (so it leaves this matrix).

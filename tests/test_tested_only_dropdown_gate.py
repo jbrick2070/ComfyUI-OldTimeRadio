@@ -22,7 +22,7 @@ _HIDDEN_VIDEO = {
     "triposr", "wan_i2v",
 }
 _HIDDEN_IMAGE = {
-    "chroma_hd", "hidream_i1", "lumina_image", "qwen_image",
+    "hidream_i1", "lumina_image", "qwen_image",
     "sd35_large",
 }
 
