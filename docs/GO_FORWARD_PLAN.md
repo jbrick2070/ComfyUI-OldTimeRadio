@@ -1,5 +1,31 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (CODER; flux2_klein VERIFIED + PROMOTED + coverage-arch accepts_still SHIPPED;
+> HEAD `64c14bb` == origin; suite 4500/33, Bug Bible 16/7/3). flux2_klein is DONE.**
+> Two commits pushed to `v2.0-alpha`:
+> **(1) `2cb25fb` coverage-arch + flux2_klein TE fix.** Root-caused the flux2_klein `mat1/mat2 (512x15360 @
+> 7680x3072)` error: klein-4B uses the **Qwen-3-4B** encoder (7680-wide), NOT flux2-dev's Mistral (15360, 2x).
+> Found the klein-matched TE via the official ComfyUI `image_flux2_klein_text_to_image` template; downloaded
+> `qwen_3_4b.safetensors` (8 GB, `Comfy-Org/flux2-klein`) into `C:\ComfyUI-Models\text_encoders`; engine default
+> TE -> qwen. Built the **coverage architecture** (operator: "all video/3D accept whatever image is selected, one
+> place, no per-model whitelist"): `accepts_still` capability -- `MotionEngineBase` default True (every motion lane
+> takes the selected still), `ltx_av_music`/`visualizer` opt-out False -- read centrally by `engine_consumes_still`
+> in the image dispatcher (dual-read fallback to init_image-in-required_inputs; bare except -> LOUD). This makes
+> silent `ltx_video` consume the flux2 still (it was skipped before). 2-model roundtable (gpt-4.1 + gemini-pro-latest
+> via DIRECT APIs -- OpenRouter launcher stalled; keys in HKCU User env), grounded in
+> `docs/2026-06-18-coverage-arch-wiring/`. **(2) `64c14bb` PROMOTION + creativity dial.** GPU-VERIFIED on the 5080:
+> a full flux2->silent-LTX episode (all image roles=flux2_klein, all video=ltx_video, 30w, **maximum-chaos**
+> creativity, bark) minted ALL 6 stills end-to-end -- `[OTR.image.flux2_klein] minted still 832x480/1472x832
+> steps=20 guidance=4.00`, qwen TE staged 7671 MB, NO dim error; the LTX clips then rendered FROM those flux2 stills
+> (the operator's "flux2 images on LTX"). Added `flux2_klein` to image `VALIDATED_ENGINES` (opt-in via
+> `OTR_ENABLE_FLUX2_KLEIN`), out of `_HIDDEN_IMAGE`. Added `creativity` to `CREATIVE_WHITELIST` so a soak can set the
+> writer dial. Box reset clean between runs.
+> **>>> NEXT = the coverage-arch FOLLOW-UPS (deferred, additive; docs/2026-06-18-coverage-arch-wiring/pass01_plan.md):**
+> optional_inputs for role_compat honesty (verify-at-build); optionally set accepts_still=True on the static-still
+> cheap families (flux_still/station_card/still_kenburns) so they also show the SELECTED image; full Decision-3/5
+> (central usable(), retire requires_mesh_portrait onto still_kind). THEN the S3 forward order (3D item 5,
+> distribution item 6) + the carried per-segment LUFS/RMS plan.
+
 > **LATEST SESSION -- 2026-06-18 (CODER; flux2_klein BUILT + image-pick DEDUP + coverage-arch roundtable;
 > HEAD `c854406` == origin; suite green; Bug Bible 16/7/3). PRIORITY NEXT STEP = finish flux2_klein (klein-4B).**
 > Four committed + PUSHED to `v2.0-alpha`:
@@ -117,24 +143,22 @@
 
 ## 1. CURRENT STEP
 
-**>>> CURRENT STEP (PRIORITY, operator 2026-06-18) = FINISH flux2_klein (klein-4B) -> green GPU render -> promote.**
-- The engine is BUILT + the dedup + the coverage-arch roundtable are shipped (`c854406`). The ONLY blocker is the
-  text-encoder mismatch: klein-4B's UNet wants a 7680-wide conditioning; flux2-dev's `mistral_3_small_flux2`
-  encoder emits 15360 (2x) -> `mat1/mat2 (512x15360 @ 7680x3072)` in SamplerCustomAdvanced.
-- **DO THIS FIRST (fresh budget):** find klein-4B's ComfyUI-matched text encoder -- check for a Comfy-Org klein
-  repackage (`Comfy-Org/flux2-klein...` split_files/text_encoders) OR the official ComfyUI klein workflow TEMPLATE
-  (Comfy-Org/workflow_templates `image_flux2_klein*.json`) and read its CLIPLoader filename + `type`. Do NOT assume
-  dev's encoder transfers (proven wrong by the 2x dim mismatch). Download it into `C:\ComfyUI-Models\text_encoders\`
-  (NOT Documents -- the headless server scans C:\ComfyUI-Models), point `OTR_FLUX2_KLEIN_TE` at it, re-run the
-  verify (the diffusion GGUF + flux2-vae are already correctly in `C:\ComfyUI-Models`). FULL recipe + the proven
-  combo-soak invocation: `docs/2026-06-18-flux2-klein/VERIFY_ON_5080.md`.
-- **ON GREEN** (`[OTR.image.flux2_klein] minted still` + status=success): add `"flux2_klein"` to
-  `_otr_image_engines/registry.VALIDATED_ENGINES`, remove it from `_HIDDEN_IMAGE` in
-  `tests/test_tested_only_dropdown_gate.py`, update `test_image_validated_set`, keep it opt-in (the flag) -- then it
-  lists in the OTR_VideoDirector image dropdown.
-- **AFTER klein-4B:** (a) build the coverage architecture (pass01 plan in
-  `docs/2026-06-18-image-video-coverage-arch/`); (b) the carried step below (per-segment LUFS/RMS); (c) the S3
-  forward order (3D item 5, distribution item 6).
+**>>> CURRENT STEP DONE (2026-06-18): flux2_klein VERIFIED + PROMOTED; coverage-arch accepts_still SHIPPED.**
+- The TE mismatch is FIXED: klein-4B uses the **Qwen-3-4B** encoder (7680-wide; `qwen_3_4b.safetensors` from
+  `Comfy-Org/flux2-klein`), NOT flux2-dev's Mistral (15360). The official ComfyUI `image_flux2_klein_text_to_image`
+  template was the ground truth (CLIPLoader = qwen_3_4b, type flux2). A full flux2->silent-LTX 30w episode minted
+  ALL 6 stills green (`minted still 832x480/1472x832`), no dim error; flux2_klein is now in image
+  `VALIDATED_ENGINES` (opt-in via OTR_ENABLE_FLUX2_KLEIN). See `docs/2026-06-18-flux2-klein/VERIFY_ON_5080.md` +
+  the LATEST SESSION block above.
+- The coverage architecture is LIVE (the operator's "all video/3D accept the selected image, one place, no
+  per-model whitelist"): `accepts_still` on MotionEngineBase (default True) read centrally by
+  `engine_consumes_still`; silent `ltx_video` now consumes the selected image. Design + roundtable:
+  `docs/2026-06-18-coverage-arch-wiring/pass01_plan.md`.
+- **>>> NEXT = coverage-arch FOLLOW-UPS (deferred, additive):** (a) `optional_inputs` so role_compat sees an
+  OPTIONAL init_image (verify-at-build); (b) optionally `accepts_still=True` on the static-still cheap families
+  (flux_still/station_card/still_kenburns) so they also show the SELECTED image; (c) full Decision-3/5 (central
+  `image_engines.registry.usable()`, retire `requires_mesh_portrait` onto `still_kind`). THEN the carried step
+  below (per-segment LUFS/RMS) + the S3 forward order (3D item 5, distribution item 6).
 
 **>>> CARRIED STEP = plan per-segment LUFS/RMS voice normalization (operator-requested; FROZEN-SPINE change, needs a plan + re-baseline).**
 - **`wan_ti2v` PROMOTED 2026-06-18 (`ca3e06c`):** forced-lane GPU smoke PASSED on the 5080 via the real adapter
