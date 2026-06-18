@@ -729,9 +729,23 @@ def build_execution_plan(beats, budget, creative, policy):
     } for role in roles_present]
     groups = _resolver.validate_execution_groups(groups)
 
+    # pool_n_loop: the OTHER-BEATS (background_abstract/scene_broll) SHARE N stills.
+    # Stamp still_pool_key=other_pool_{i mod N} over the SAME other-beats iteration
+    # the clip budget pooled (N = the capped other_beats_render_count) so the still
+    # a beat reuses == the clip it reuses; the still phase emitted other_pool_0..N-1
+    # and render_driver resolves the stamped key. unique_per_beat -> no stamp (the
+    # per-beat scene still is used).
+    _pool_N = (int(budget.get("other_beats_render_count") or 0)
+               if budget.get("clip_mode") == "pool_n_loop" else 0)
+    _OTHER_BEATS = (Role.BACKGROUND_ABSTRACT.value, Role.SCENE_BROLL.value)
+    _ob_i = 0
     shots = []
     for b in beats:
         cre = creative.get(b["beat_id"], {})
+        _still_pool_key = ""
+        if _pool_N and b["role"] in _OTHER_BEATS:
+            _still_pool_key = "other_pool_%d" % (_ob_i % _pool_N)
+            _ob_i += 1
         _timing = ({"start_s": b.get("_start_s", 0.0), "dur_s": b.get("dur_s")}
                    if b.get("_synthetic_open") else None)
         shots.append({
@@ -748,6 +762,10 @@ def build_execution_plan(beats, budget, creative, policy):
             # render driver's role-scoped behaviors (the LTX radio-open
             # prompt) read it; before this only group_id embedded the role.
             "role": b["role"],
+            # pool_n_loop: the shared pool still this other-beat reuses
+            # (other_pool_{i mod N}); render_driver prefers it over the per-beat
+            # scene still. Absent on unique_per_beat + non-other-beats (per-beat).
+            **({"still_pool_key": _still_pool_key} if _still_pool_key else {}),
             # Round 5 F5: the NORMALIZED char_id rides the shot row so the
             # render driver's portrait join never depends on the raw line
             # scheme (the announcer's 'announcer' -> cast row id case).

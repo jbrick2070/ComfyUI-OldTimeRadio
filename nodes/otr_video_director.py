@@ -164,16 +164,16 @@ class OTRVideoDirector:
                     "tooltip": "Image source for other beats.",
                 }),
                 "other_beats_clip_mode": (list(CLIP_MODES), {
-                    "default": CLIP_MODES[0],
+                    "default": "pool_n_loop",
                     "tooltip": (
                         "unique_per_beat: one clip per beat (real-time). "
-                        "pool_n_loop: render N unique clips, tile/loop them "
-                        "across the whole other-beats timeline (cheapest; N "
-                        "TOTAL renders, capped to the audio duration)."
+                        "pool_n_loop (DEFAULT): render N unique clips + N stills, "
+                        "tile/loop them across the whole other-beats timeline "
+                        "(cheapest; N TOTAL renders, capped to the audio duration)."
                     ),
                 }),
                 "other_beats_n": ("INT", {
-                    "default": 8, "min": 1, "max": 256,
+                    "default": 4, "min": 1, "max": 256,
                     "tooltip": (
                         "Pool size N for pool_n_loop (clamped to what the "
                         "other-beats span actually uses; over-set -> warn)."

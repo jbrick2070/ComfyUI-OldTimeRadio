@@ -250,6 +250,45 @@ class TestSceneStillObjects:
         assert targets[2]["role"] == "character_video"   # dialogue beat now covered
         assert targets[3]["role"] == "music_visual"
 
+    def test_pool_n_loop_pools_other_beats_stills(self):
+        # operator 2026-06-18: pool_n_loop -> the OTHER-BEATS (background_abstract/
+        # scene_broll) SHARE N pool stills (other_pool_0..N-1), NOT one per beat;
+        # announcer/music/character_video stay per-beat. 3 narration beats -> N=2.
+        from nodes import otr_meta_brief_image_prompt as mbp
+        lines = [
+            {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer",
+             "start_s": 8.4, "dur_s": 4.0},
+            {"line_id": "b002", "speaker_role": "narration", "start_s": 12.4, "dur_s": 3.0},
+            {"line_id": "b003", "speaker_role": "narration", "start_s": 15.4, "dur_s": 3.0},
+            {"line_id": "b004", "speaker_role": "narration", "start_s": 18.4, "dur_s": 3.0},
+            {"line_id": "b005", "speaker_role": "music_close", "char_id": "music_close",
+             "start_s": 21.4, "dur_s": 4.0},
+        ]
+        targets, _w = mbp.derive_scene_still_targets(
+            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 2})
+        bids = [t["beat_id"] for t in targets]
+        assert "b001" in bids and "b005" in bids          # announcer/music per-beat
+        for b in ("b002", "b003", "b004"):                # narration NOT per-beat
+            assert b not in bids
+        assert "other_pool_0" in bids and "other_pool_1" in bids
+        assert "other_pool_2" not in bids                 # capped at N=2
+
+    def test_pool_n_loop_clamps_and_zero(self):
+        from nodes import otr_meta_brief_image_prompt as mbp
+        lines = [{"line_id": "b00%d" % i, "speaker_role": "narration",
+                  "start_s": float(i), "dur_s": 1.0} for i in range(2)]
+        # pool_n > M -> clamp to M (2), no over-generation
+        t_big, w_big = mbp.derive_scene_still_targets(
+            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 9})
+        pool = [t["beat_id"] for t in t_big if t["beat_id"].startswith("other_pool_")]
+        assert pool == ["other_pool_0", "other_pool_1"]
+        assert any("exceeds" in w for w in w_big)
+        # pool_n <= 0 -> ZERO other-beats stills, LOUD
+        t_zero, w_zero = mbp.derive_scene_still_targets(
+            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 0})
+        assert not any(t["beat_id"].startswith("other_pool_") for t in t_zero)
+        assert any("ZERO" in w for w in w_zero)
+
     def test_pretiming_open_emitted_loud(self):
         """Pre-audio ledger (no start_s anywhere) still emits the open
         target -- LOUD -- so production never loses the 6/5 open still."""

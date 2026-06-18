@@ -702,7 +702,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # the portrait; text engines are unchanged (LTX text-only by design).
     if _family in _SCENE_INIT_FAMILIES:
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(_bid, "")
+        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"
@@ -723,7 +723,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # announcer-card behavior is unchanged.
     if str(shot.get("engine_id") or "") == "flux_still":
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(_bid, "")
+        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"
@@ -746,7 +746,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if (str(shot.get("engine_id") or "") == "ltx_video"
             and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(_bid, "")
+        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"

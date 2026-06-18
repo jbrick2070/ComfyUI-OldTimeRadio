@@ -322,6 +322,13 @@ class OTRImageDirector:
             "video_models": (video_policy.get("video_models")
                              if isinstance(video_policy.get("video_models"), dict)
                              else {}),
+            # Other-beats clip plan {clip_mode, pool_n}, forwarded from
+            # OTR_VideoDirector so the still phase pools the other-beats stills to
+            # match the VIDEO clip pool (pool_n_loop -> N shared stills, not one per
+            # beat). {} -> unique_per_beat (one still per beat, legacy).
+            "other_beats": (video_policy.get("other_beats")
+                            if isinstance(video_policy.get("other_beats"), dict)
+                            else {}),
             "fresh_cap": cap,
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "warnings": warnings,
