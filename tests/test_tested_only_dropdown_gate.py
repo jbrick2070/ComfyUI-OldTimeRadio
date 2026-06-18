@@ -23,7 +23,7 @@ _HIDDEN_VIDEO = {
 }
 _HIDDEN_IMAGE = {
     "chroma_hd", "flux2_klein", "hidream_i1", "lumina_image", "qwen_image",
-    "sd35_large", "z_image_turbo",
+    "sd35_large",
 }
 
 
@@ -34,8 +34,9 @@ def test_video_validated_set_is_the_seven():
     })
 
 
-def test_image_validated_set_is_flux_only():
-    assert ireg.VALIDATED_ENGINES == frozenset({"flux_gen1"})
+def test_image_validated_set():
+    # flux_gen1 (default) + z_image_turbo (GPU-validated low-VRAM option 2026-06-18).
+    assert ireg.VALIDATED_ENGINES == frozenset({"flux_gen1", "z_image_turbo"})
 
 
 def test_video_combo_lists_only_validated_plus_sentinel():

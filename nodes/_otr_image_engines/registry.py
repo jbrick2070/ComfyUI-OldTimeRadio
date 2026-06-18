@@ -126,7 +126,11 @@ CAPABILITIES = {
     "sd35_large": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": False,
                    "model_requirements": ["sd3.5-large"]},
-    "z_image_turbo": {"vram_class": "light", "vram_estimate_mb": 4000, "required_toolchain": None,
+    # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
+    # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
+    # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down. The
+    # policy estimate is the steady residency, which fits the 8GB tier budget.
+    "z_image_turbo": {"vram_class": "medium", "vram_estimate_mb": 5000, "required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": False,
                       "model_requirements": ["z-image-turbo"]},
 }
@@ -149,6 +153,10 @@ __all__.append("CAPABILITIES")
 # ---------------------------------------------------------------------------
 VALIDATED_ENGINES = frozenset({
     "flux_gen1",
+    # z_image_turbo: GPU-VERIFIED 2026-06-18 on the RTX 5080 (nvfp4 diffusion +
+    # qwen3-4b fp8 TE + ae VAE; clean on-prompt filmic still at ~10 GB, 8 steps,
+    # 12 s). The low-VRAM commercial-clean (Apache-2.0) image option.
+    "z_image_turbo",
 })
 __all__.append("VALIDATED_ENGINES")
 

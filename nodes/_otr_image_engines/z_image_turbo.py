@@ -62,13 +62,22 @@ ENABLE_FLAG = "OTR_ENABLE_ZIMAGE"
 MODEL_ENV = "OTR_ZIMAGE_UNET"
 CLIP_ENV = "OTR_ZIMAGE_CLIP"
 VAE_ENV = "OTR_ZIMAGE_VAE"
-_DEFAULT_UNET = "z_image_turbo_fp8_scaled.safetensors"
-_DEFAULT_CLIP = "qwen3_4b_fp8_scaled.safetensors"
+# Defaults = the OFFICIAL Comfy-Org/z_image_turbo split files. For LOW VRAM point
+# OTR_ZIMAGE_UNET at z_image_turbo_nvfp4.safetensors (Blackwell-native fp4) and
+# OTR_ZIMAGE_CLIP at qwen_3_4b_fp8_mixed.safetensors (fp8 TE); both are in the
+# same repo. The TE is offloaded before the diffusion peak either way.
+_DEFAULT_UNET = "z_image_turbo_bf16.safetensors"
+_DEFAULT_CLIP = "qwen_3_4b.safetensors"
 _DEFAULT_VAE = "ae.safetensors"
 
-#: VERIFY-AT-BUILD knobs (env-overridable; confirm against the installed node).
-_DEFAULT_CLIP_TYPE = "z_image"          # CLIPLoader type for the Qwen3-4B TE
-_DEFAULT_LATENT_NODE = "EmptySD3LatentImage"   # 16-ch (matches the Flux ae VAE)
+# GPU-VERIFIED 2026-06-18 on the RTX 5080 (headless :8000, nvfp4 + qwen3 fp8 TE):
+# the CLIPLoader type for Z-Image's Qwen3-4B encoder is "qwen_image" (the live
+# /object_info enum has no "z_image"; "qwen_image" renders a clean on-prompt
+# image), the latent node is EmptySD3LatentImage, ModelSamplingAuraFlow shift 3.0
+# works, and the per-clip peak was ~10 GB (well under the 14.5 GB ceiling). All
+# still env-overridable.
+_DEFAULT_CLIP_TYPE = "qwen_image"       # CLIPLoader type for the Qwen3-4B TE (verified)
+_DEFAULT_LATENT_NODE = "EmptySD3LatentImage"   # 16-ch (matches the Flux ae VAE; verified)
 
 
 def _role_of(profile) -> str:
