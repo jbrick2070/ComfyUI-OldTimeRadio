@@ -52,6 +52,25 @@ UnetLoaderGGUF(klein.gguf) -> CLIPLoader(mistral fp4, type=flux2) -> CLIPTextEnc
   (it needs ~15 GB of weights the floor user may not have) -- keep `requires_flag`.
 - re-run the affected suite + Bug Bible; commit + push.
 
+## VERIFY RUN 2026-06-18 -- FAILED (not yet promotable); two issues found
+The flux2 + LTX full episode (announcer/beats=ltx_av_talk, music=ltx_av_music, all
+image=flux2_klein, 30w, bark) surfaced two real issues:
+1. FIXED -- weights were downloaded to `C:\Users\jeffr\Documents\ComfyUI\models` but
+   the headless server loads from `C:\ComfyUI-Models` (via
+   `scripts/_otr_headless_model_paths.yaml`). Moved all 3 files there; the
+   CLIPLoader then found the TE. (Downloader should target C:\ComfyUI-Models.)
+2. OPEN -- the sampler raises `RuntimeError: mat1 and mat2 shapes cannot be
+   multiplied (512x15360 and 7680x3072)` in SamplerCustomAdvanced/guider.sample.
+   The TE output width (15360) is exactly 2x the klein-4B UNet's expected (7680).
+   ROOT CAUSE HYPOTHESIS: the GGUF klein **4B** is paired with the wrong text
+   encoder -- I reused flux2-**dev**'s `mistral_3_small_flux2_fp4_mixed` (full
+   Mistral-3). ComfyUI's `sd.py` distinguishes `MISTRAL3_24B` vs
+   `MISTRAL3_24B_PRUNED_FLUX2`; klein-4B likely needs the PRUNED TE (or its own
+   matched TE/quant). NEXT: read the unsloth/FLUX.2-klein-4B-GGUF + BFL klein-4B
+   model cards for the EXACT klein-4B TE + ComfyUI recipe (do NOT assume dev's
+   recipe transfers); the 4B is size-distilled and may not share dev's encoder
+   config. Then re-pair the TE and re-run this verify.
+
 ## Risks to watch (why this is a real verify, not a rubber-stamp)
 - fp4 (NVFP4) TE load on the torch 2.10 / cu130 / sm_120 stack -- if it does not
   load, fall back to the fp8 TE (18 GB; needs layerwise CPU offload to fit 16 GB) or
