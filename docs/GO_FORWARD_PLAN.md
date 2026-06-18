@@ -1,5 +1,15 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **TASK 2 UPDATE (`68b0e31`): full-episode GPU smoke sweep is BLOCKED on a headless-AUDIO env gap.** A
+> visualizer-all-roles attempt aborted in the AUDIO phase (`RuntimeError: IndexTTS2 Path B not installed` -- the
+> default char voice's isolated venv is absent on the ComfyUI-Installs box) BEFORE any video engine ran; this blocks
+> EVERY full-episode leg. `queue_smoke.py` renders the as-saved indextts2; only the SOAK HARNESS forces
+> `OTR_SOAK_CHAR_VOICE=bark`. UNBLOCK: (a) install indextts2 headless (`scripts\_otr_indextts2_install.ps1`) then
+> sweep via queue_smoke, OR (b) sweep via `scripts/_otr_combo_soak.py` (forces bark). Visualizer render path is
+> unit-proven (17 tests + a real ffmpeg render); promotion to VALIDATED_ENGINES stays gated on a green full-episode
+> E2E + audio byte-identical. Verified sets: VIDEO 8 + IMAGE 2 (see SMOKE_SWEEP_RESULTS.md). Box reset clean; the
+> temporary visualizer force-map `_marathon_extra_env.cmd` was DELETED so future boots are clean.
+>
 > **LATEST SESSION -- 2026-06-18 (CODER, autonomous overnight; HEAD `236db0e` == origin; suite 4496 pass / 33 skip,
 > Bug Bible 16/7/3):** A long multi-thread session, all committed + PUSHED to `v2.0-alpha`:
 > **(1) Still-aspect correctness + HuMo dropdown labels** (`55d9dad`). **(2) Bark whiny-voice fix S1-S4** + preset
