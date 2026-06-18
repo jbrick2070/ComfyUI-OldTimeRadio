@@ -27,6 +27,14 @@
 > **`triposr` ADDED `e55d30a`** as the lower-tier MIT 3D mesher (dark/flag-gated `OTR_ENABLE_TRIPOSR`, static
 > image_to_video, hidden from the tested-only dropdown until GPU-validated); for static prop/scene meshes, NOT
 > characters. Suite 4430/0, Bug Bible 16/7/3, HEAD `e55d30a` == origin.
+> **z_image_turbo REBUILT IN-PROCESS `8da723a`** as the low-VRAM image option (dropped the stale cu128
+> sidecar; now a lumina-style split-file AuraFlow engine). Low-VRAM fp8 defaults (Qwen3-4B fp8 TE is
+> MANDATORY -- z-image's native encoder -- but offloaded before the diffusion peak), 8 steps / cfg 2.0 /
+> shift 3.0 / euler / normal, reuses compose_still_prompt + a live negative, file-gated fail-closed.
+> 4 env-overridable VERIFY-AT-BUILD node knobs (CLIPLoader type, latent node, AuraFlow shift, unet dtype).
+> Converged 3-model roundtable in docs/2026-06-18-zimage-params/. Still hidden from the tested-only
+> dropdown until the operator drops the 3 fp8 weights in + runs the GPU A/B look-match -> then promote to
+> VALIDATED_ENGINES. Suite 4430/0, Bug Bible 16/7/3, HEAD `8da723a` == origin.
 >
 > **LATEST SESSION -- 2026-06-17 EVENING (LTX-AV BUILD-OUT SHIPPED + humo 16:9 / de-blue / ending polish /
 > latentsync RIPPED OUT 100%; on ComfyUI v0.25.1; HEAD `5ace122` == origin; suite 4417 pass / 32 skip, Bug Bible
