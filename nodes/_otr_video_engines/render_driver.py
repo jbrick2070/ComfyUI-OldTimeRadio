@@ -785,12 +785,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         start_s = line.get("start_s")
         dur_s = line.get("dur_s")
         # M3 delta (c): the SYNTHETIC opening-music beat (b000) has no ledger
-        # line, so the per-line start_s/dur_s are absent. ltx_av_music is an
-        # audio-reactive lane that needs the per-beat slice -- fall back to the
-        # SHOT row's start_s/dur_s for THIS engine only, so every other engine
-        # keeps the line-backed slice path byte-identical.
+        # line, so the per-line start_s/dur_s are absent. The audio-reactive lanes
+        # (ltx_av_music + the visualizer, which paints FROM the audio analysis)
+        # need the per-beat slice -- fall back to the SHOT row's start_s/dur_s for
+        # THOSE engines only, so every other engine keeps the line-backed slice
+        # path byte-identical. (2026-06-18 visualizer soak: b000_music_open reached
+        # the visualizer with an empty audio_ref and failed LOUD without this.)
         if (start_s is None or dur_s is None) and \
-                str(shot.get("engine_id") or "") == "ltx_av_music":
+                str(shot.get("engine_id") or "") in ("ltx_av_music", "visualizer"):
             if start_s is None:
                 start_s = shot.get("start_s")
             if dur_s is None:
