@@ -757,6 +757,7 @@ CREATIVE_WHITELIST = frozenset({
     "openrouter_slot_a_model", "openrouter_slot_b_model",
     "comfy_slot_a_model", "comfy_slot_b_model",
     "creative_writing_model", "technical_model",
+    "creativity",
 })
 
 
