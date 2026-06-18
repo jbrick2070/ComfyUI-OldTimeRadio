@@ -106,11 +106,19 @@ def _video_model_combo() -> list:
 
 
 def _image_model_combo() -> list:
-    """Image-source COMBO sourced from the C1 image registry (V-6: full static
-    list + the custom sentinel). 'Flux' is just gen 1 (engine ``flux_gen1``), no
-    longer a hardcoded string. Falls back to ``IMAGE_DEFAULTS`` only if the image
-    registry is somehow empty, so a box-fresh graph still validates."""
-    names = list(_ireg.all_engine_names()) or list(IMAGE_DEFAULTS)
+    """TESTED-ONLY image engines + the custom sentinel (operator 2026-06-18: "don't
+    show end users any model that isn't 100% wired and tested -- best experience").
+
+    Lists only GPU-VALIDATED image engines (``image_registry.validated_engine_names()``
+    = flux_gen1 / z_image_turbo / flux2_klein) so an end user cannot pick an untested
+    or unenabled model from the UI (exactly the gated_by_flag friction). Every engine
+    stays REGISTERED (V-6: ``all_engine_names()`` untouched, so role_compat /
+    assert_usable / the force-map knob still see the full set); this narrows the
+    *display* list only. ``+ Add Custom Model`` is the escape hatch. Falls back to the
+    full registry, then ``IMAGE_DEFAULTS``, only if the validated set is somehow empty
+    so a box-fresh graph still validates."""
+    names = (list(_ireg.validated_engine_names())
+             or list(_ireg.all_engine_names()) or list(IMAGE_DEFAULTS))
     return names + [ADD_CUSTOM]
 
 
