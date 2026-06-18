@@ -81,14 +81,13 @@ class VisualizerEngine:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "visualizer needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
-        # A non-empty audio_ref is required (the picture IS the audio analysis).
-        if request_template is not None:
-            get = request_template.get if isinstance(request_template, dict) else (
-                lambda k, d=None: getattr(request_template, k, d))
-            if not self._ref_path(get("audio_ref")):
-                raise EngineUnusable(
-                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "visualizer requires a non-empty audio_ref", kind="video")
+        # NOTE: audio_ref is NOT gated here. The per-beat audio is SLICED at
+        # render time, so the assert_usable request_template carries an empty
+        # audio_ref for music/announcer beats (mirrors eng_ltx_av, which also
+        # audio-conditions but does not gate audio_ref pre-render). render_clip is
+        # the LOUD audio gate -- a beat that truly has no audio fails the episode
+        # there (no fallbacks). (Fixed after the 2026-06-18 visualizer soak: the
+        # old check aborted shot_b000_music_open before render.)
         return self.name
 
     # ---- pure helpers (CPU-testable) ----
