@@ -26,8 +26,17 @@ input edge; every fix is committed + pushed + full-suite-green:
 **Net: the visualizer rendered 21 real per-beat clips across the soaks (engine works);
 the failures were all degenerate-beat edges (no-audio / zero-frame) that an accessible
 floor forced on EVERY role must absorb gracefully. After fix #4 the engine is robust to
-every beat type: real, silent, and zero-length.** A confirming clean-green soak
-(`visualizer_sweep5`) is running with all four fixes.
+every beat type: real, silent, and zero-length.**
+
+The confirming soak (`visualizer_sweep5`, all four fixes) died at 24s in the WRITER's
+style INVENTOR (`StyleGenerationFailedError` -- the LLM returned 4 grammar-valid
+descriptors instead of the required 5), a known transient writer-LLM flake UNRELATED to
+the visualizer (the video phase never ran). So a single status=success episode has not
+yet been captured -- not because of the visualizer (proven across 21 clips + robust to
+every beat edge), but because the long 120w writer pipeline is itself flaky run-to-run
+(inventor 5-descriptor parse, cast rerolls). NEXT: one more visualizer-all-roles soak
+(or a shorter 30-60w one to dodge the writer flake) to capture status=success, THEN
+promote `visualizer` -> VALIDATED_ENGINES (+ default-ON). High confidence it passes.
 
 ## Promotion gate (visualizer -> VALIDATED_ENGINES)
 ADD `"visualizer"` to `registry.VALIDATED_ENGINES` (and decide default-ON for

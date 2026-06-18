@@ -1,6 +1,17 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **TASK 2 UPDATE (`68b0e31`): full-episode GPU smoke sweep is BLOCKED on a headless-AUDIO env gap.** A
+> **TASK 2 PROGRESS (`4a92ed6`; HEAD afa6bf1 code): visualizer-all-roles soak via `_otr_combo_soak.py` (forces bark,
+> clearing the headless-audio gap) found + fixed FOUR visualizer integration bugs -- all pushed + suite-green:
+> `d460797` assert_usable no longer pre-gates audio_ref; `bad1bba` render_driver feeds b000 the master-audio slice;
+> `c5c14c9` idle scopes on silent beats; `afa6bf1` 0-frame beats default to 1s. The visualizer rendered 21 real
+> clips across the soaks and is now robust to every beat type (real / silent / zero-frame). A single status=success
+> episode is NOT yet captured -- the confirming soak died in the WRITER's style-inventor (a transient LLM flake,
+> UNRELATED to the visualizer). NEXT: one more visualizer-all-roles soak (try 30-60w to dodge the writer flake) ->
+> status=success -> ADD `"visualizer"` to `registry.VALIDATED_ENGINES` (+ default-ON). Then sweep the other 8 video
+> + 2 image validated engines via `_otr_combo_soak.py` (force bark). Full detail: SMOKE_SWEEP_RESULTS.md. Box reset
+> clean (GPU baseline; temp visualizer extra-env deleted).**
+>
+> **TASK 2 EARLIER (`68b0e31`): full-episode GPU smoke sweep is BLOCKED on a headless-AUDIO env gap.** A
 > visualizer-all-roles attempt aborted in the AUDIO phase (`RuntimeError: IndexTTS2 Path B not installed` -- the
 > default char voice's isolated venv is absent on the ComfyUI-Installs box) BEFORE any video engine ran; this blocks
 > EVERY full-episode leg. `queue_smoke.py` renders the as-saved indextts2; only the SOAK HARNESS forces
