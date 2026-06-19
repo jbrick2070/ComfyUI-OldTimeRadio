@@ -172,6 +172,28 @@ def _freq_bars_wide(draw, freq, x, y, w, h, vol):
         draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
 
 
+def freq_bars_green(draw, freq, x, y, w, h):
+    """GREEN-ONLY frequency-bar strip -- the bottom-bars overlay look.
+
+    Same bar geometry as :func:`_freq_bars_wide` but the palette is CRT_GREEN
+    scaled by per-bin magnitude (NO amber/red gradient), so it honors the
+    overlay's green-only invariant (OTR_SceneAwareScopes deliberately ships no
+    colored CRT constants). ``freq`` is one frame's 32-bin spectrum (0..1).
+    Geometry by params so the overlay node and the engine can both call it."""
+    n = min(32, len(freq))
+    if n < 1:
+        return
+    bw = max(1, w // n - 1)
+    for i in range(n):
+        mag = max(0.0, min(1.0, float(freq[i])))
+        bh = max(1, int(mag * h * 1.5))
+        bx = x + i * (bw + 1)
+        by = y + h - min(bh, h)
+        brightness = 0.25 + mag * 0.75
+        col = tuple(min(255, int(c * brightness)) for c in CRT_GREEN)
+        draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
+
+
 def paint_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
                 scanlines, vignette, rng_key="visualizer", font_small=None):
     """Paint ONE full-frame 16:9 CRT visualizer picture (sections 2-8 of the

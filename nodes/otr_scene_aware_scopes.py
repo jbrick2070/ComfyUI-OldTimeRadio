@@ -223,6 +223,23 @@ def _centre_geom(out_w, out_h):
     return cx, cy, r
 
 
+#: Caption safe-area = the lower fraction reserved for SDH subtitles; the bars
+#: strip stays ABOVE it so captions are never occluded (defense-in-depth on top of
+#: caption-layer-last ordering -- see CODER_KICKOFF_BARS_OVERLAY.md "Caption layering").
+_BARS_CAPTION_SAFE_FRAC = 0.15
+
+
+def _bars_geom(out_w, out_h):
+    """(x, y, w, h) for the landscape bottom-bars strip. A wide green frequency
+    strip seated just ABOVE the caption safe-area (the lower ~15%), with a small
+    side margin -- the "old-school bottom-of-screen" accent over real video."""
+    margin = int(out_w * 0.05)
+    strip_h = max(8, int(out_h * 0.10))
+    safe = int(out_h * _BARS_CAPTION_SAFE_FRAC)
+    y = out_h - safe - strip_h
+    return margin, y, out_w - 2 * margin, strip_h
+
+
 # --------------------------------------------------------------------------- #
 # Aspect probe (memoized; un-probeable -> suppress + log)
 # --------------------------------------------------------------------------- #
@@ -251,14 +268,25 @@ def _probe_is_portrait(path, ffprobe, cache):
 # --------------------------------------------------------------------------- #
 # Per-frame plan: classify each absolute frame range from the manifest segments
 # --------------------------------------------------------------------------- #
-def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe"):
+def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe",
+                      landscape_bars="off"):
     """Return (plan, total): plan[fi] is one of:
       ('gutters', left_cx, right_cx, cy, r)   -- clip + PORTRAIT
       ('centre',  cx, cy, r)                   -- head/inter gap (keep alive)
-      None                                     -- suppress (clip+landscape /
-                                                  tail-credits / un-probeable)
+      ('bars',    x, y, w, h)                  -- clip + LANDSCAPE when
+                                                  landscape_bars='bottom' (the
+                                                  optional green bottom-strip)
+      None                                     -- suppress (clip+landscape with
+                                                  bars OFF / tail-credits /
+                                                  un-probeable)
     Uses plan_timeline_segments for the frame-accurate beat ranges (no source
-    probe for frame counts -- only an aspect probe per clip path)."""
+    probe for frame counts -- only an aspect probe per clip path).
+
+    ``landscape_bars`` ('off' DEFAULT | 'bottom'): 'off' is byte-identical to the
+    pre-overlay behavior (landscape clips suppress); 'bottom' paints a green
+    frequency-bar strip over a REAL landscape clip (portrait is False, never an
+    un-probeable None). Portrait gutters, gap centres and the tail-credits
+    suppression are UNCHANGED in both modes."""
     try:
         from .otr_silent_composite import plan_timeline_segments  # type: ignore
     except ImportError:  # pragma: no cover -- flat test import
@@ -284,6 +312,8 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe"):
 
     gut = _gutter_geom(out_w, out_h)
     cen = _centre_geom(out_w, out_h)
+    bars = _bars_geom(out_w, out_h)
+    want_bars = str(landscape_bars or "off").lower() == "bottom"
     cache = {}
     plan = [None] * total
     for (start, end, seg) in ranges:
@@ -293,7 +323,11 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe"):
             portrait = _probe_is_portrait(seg.get("path"), ffprobe, cache)
             if portrait is True:
                 mode = ("gutters", gut[1], gut[2], gut[3], gut[4])
-            else:  # landscape OR un-probeable -> suppress
+            elif want_bars and portrait is False:
+                # REAL landscape clip + bars enabled -> the bottom green strip.
+                # Un-probeable (portrait is None) still suppresses (unchanged).
+                mode = ("bars", bars[0], bars[1], bars[2], bars[3])
+            else:  # landscape with bars OFF, OR un-probeable -> suppress
                 mode = None
         else:  # floor / black gap
             if start >= last_beat_end and last_beat_end > 0:
@@ -381,6 +415,15 @@ class SceneAwareScopes:
                 "out_w": ("INT", {"default": 1920, "min": 320, "max": 7680, "step": 2}),
                 "out_h": ("INT", {"default": 1080, "min": 240, "max": 4320, "step": 2}),
                 "ffmpeg": ("STRING", {"default": "ffmpeg", "multiline": False}),
+                # APPEND-ONLY (BUG-LOCAL-097 positional rule -- keep LAST). 'off'
+                # is byte-identical to today (landscape clips show nothing); 'bottom'
+                # paints a green audio-reactive frequency strip along the bottom of
+                # any LANDSCAPE clip (over any engine), above the caption safe-area.
+                "landscape_bars": (["off", "bottom"], {
+                    "default": "off",
+                    "tooltip": "Optional old-school green audio bars along the "
+                               "bottom of landscape video (any engine). off = "
+                               "unchanged; captions always stay on top."}),
             },
         }
 
@@ -389,7 +432,8 @@ class SceneAwareScopes:
         return _time.time()
 
     def render_scopes(self, clip_manifest_json, audio=None,
-                      out_w=1920, out_h=1080, ffmpeg="ffmpeg"):
+                      out_w=1920, out_h=1080, ffmpeg="ffmpeg",
+                      landscape_bars="off"):
         import json
         try:
             manifest = json.loads(clip_manifest_json) if clip_manifest_json else {}
@@ -409,7 +453,8 @@ class SceneAwareScopes:
                                 os.path.basename(probe).lower().replace("ffmpeg", "ffprobe"))
             probe = cand if os.path.isfile(cand) else "ffprobe"
 
-        plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe)
+        plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe,
+                                        landscape_bars=landscape_bars)
         key = str(manifest.get("episode_id") or "scopes")
 
         # -- audio analysis (optional; absent -> zero arrays, NOT _analyze) --
@@ -463,6 +508,15 @@ class SceneAwareScopes:
                     _, lcx, rcx, cy, r = mode
                     draw_fft_scope(draw, lcx, cy, r, fwin, env)
                     draw_scope(draw, rcx, cy, r, wwin, env)
+                elif mode[0] == "bars":
+                    # GREEN-ONLY bottom strip over a landscape clip (DRY: the
+                    # shared green freq-bar routine). Single-frame spectrum.
+                    try:
+                        from ._otr_shared.scope_draw import freq_bars_green
+                    except ImportError:  # pragma: no cover -- flat test import
+                        from _otr_shared.scope_draw import freq_bars_green
+                    _, bx, by, bw, bh = mode
+                    freq_bars_green(draw, freqs[fi], bx, by, bw, bh)
                 else:  # centre (gap): FFT outer + oscilloscope inner, concentric
                     _, cx, cy, r = mode
                     draw_fft_scope(draw, cx, cy, r, fwin, env)
