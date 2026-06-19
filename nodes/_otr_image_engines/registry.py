@@ -114,6 +114,11 @@ CAPABILITIES = {
     "hidream_i1": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": False,
                    "model_requirements": ["hidream-i1"]},
+    # MEASURED 2026-06-18 on the 5080: the lumina2 split-file recipe stages the
+    # Gemma-2 TE (4986 MB) then the 2.6B diffusion (4977 MB) sequentially; the
+    # steady diffusion+VAE residency is ~7 GB (TE offloads before sampling) and
+    # the render-window resident peak read ~12.2 GB, well under the 14.5 GB
+    # ceiling. The engine's render_image reclaims after decode (single-resident).
     "lumina_image": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": False,
                      "model_requirements": ["lumina-image-2"]},
@@ -137,16 +142,16 @@ __all__.append("CAPABILITIES")
 # ---------------------------------------------------------------------------
 # TESTED-ONLY DROPDOWN GATE (2026-06-17 operator directive). The per-role image
 # COMBO in OTR_ImageDirector lists ONLY engines VALIDATED in production -- the
-# untested peers (hidream_i1, lumina_image, qwen_image, sd35_large, z_image_turbo,
-# chroma_hd, flux2_klein) are HIDDEN from the dropdown. Display gate only: every
-# engine stays REGISTERED (V-6 -- all_engine_names() unchanged), and the
-# "+ Add Custom Model" sentinel remains the escape hatch. Mirrors the video
-# registry's VALIDATED_ENGINES (a separate frozenset, NOT a CAPABILITIES key,
-# because validate_declaration rejects unknown CAPABILITIES keys).
+# untested peers (hidream_i1, qwen_image, sd35_large) are HIDDEN from the
+# dropdown. Display gate only: every engine stays REGISTERED (V-6 --
+# all_engine_names() unchanged), and the "+ Add Custom Model" sentinel remains
+# the escape hatch. Mirrors the video registry's VALIDATED_ENGINES (a separate
+# frozenset, NOT a CAPABILITIES key, because validate_declaration rejects unknown
+# CAPABILITIES keys).
 #
-# Validated IMAGE engine as of 2026-06-17: flux_gen1 only (the production default,
-# wired x3 in otr_scifi_16gb_full.json). lumina_image was GPU-smoked but is not
-# yet a production-validated default, so it stays hidden per the operator list.
+# Validated IMAGE engines: flux_gen1 (production default, wired x3 in
+# otr_scifi_16gb_full.json), z_image_turbo + flux2_klein (2026-06-18), and
+# lumina_image (2026-06-18, the lightweight Apache-2.0 low-VRAM peer).
 # ---------------------------------------------------------------------------
 VALIDATED_ENGINES = frozenset({
     "flux_gen1",
@@ -161,6 +166,16 @@ VALIDATED_ENGINES = frozenset({
     # still 832x480 ... steps=20 guidance=4.00", TE staged 7671 MB, no dim error.
     # Apache-2.0 (commercial-clean). Stays opt-in via OTR_ENABLE_FLUX2_KLEIN.
     "flux2_klein",
+    # lumina_image: GPU-VERIFIED 2026-06-18 on the RTX 5080 (Lumina-Image 2.0,
+    # the native split-file flow recipe: UNETLoader lumina_2_model_bf16 +
+    # CLIPLoader[type=lumina2] gemma_2_2b TE + VAELoader lumina2_ae ->
+    # ModelSamplingAuraFlow -> KSampler -> VAEDecode). The exact engine recipe
+    # minted a real 1216x832 still in 23.5 s (model_type FLOW; TE 4986 MB +
+    # diffusion 4977 MB staged sequentially; resident peak ~12.2 GB << 14.5 GB
+    # ceiling -- and the engine's render_image reclaims after decode). Apache-2.0
+    # (commercial-clean). The lightweight low-VRAM peer; opt-in via
+    # OTR_ENABLE_LUMINA. Smoke: scripts/_otr_lumina_image_smoke.py.
+    "lumina_image",
 })
 __all__.append("VALIDATED_ENGINES")
 

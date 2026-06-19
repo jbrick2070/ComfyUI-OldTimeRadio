@@ -22,8 +22,7 @@ _HIDDEN_VIDEO = {
     "triposr", "wan_i2v",
 }
 _HIDDEN_IMAGE = {
-    "hidream_i1", "lumina_image", "qwen_image",
-    "sd35_large",
+    "hidream_i1", "qwen_image", "sd35_large",
 }
 
 
@@ -39,11 +38,12 @@ def test_video_validated_set():
 
 
 def test_image_validated_set():
-    # flux_gen1 (default) + z_image_turbo + flux2_klein (both GPU-validated on the
-    # RTX 5080 2026-06-18; flux2_klein minted real stills end-to-end in a flux2->LTX
-    # episode with the klein-matched qwen_3_4b TE).
+    # flux_gen1 (default) + z_image_turbo + flux2_klein + lumina_image (all
+    # GPU-validated on the RTX 5080 2026-06-18; lumina_image minted a real
+    # 1216x832 still in 23.5 s via its native lumina2 flow recipe, resident peak
+    # ~12.2 GB << 14.5 GB -- the lightweight Apache-2.0 low-VRAM peer).
     assert ireg.VALIDATED_ENGINES == frozenset(
-        {"flux_gen1", "z_image_turbo", "flux2_klein"})
+        {"flux_gen1", "z_image_turbo", "flux2_klein", "lumina_image"})
 
 
 def test_video_combo_lists_only_validated_plus_sentinel():
