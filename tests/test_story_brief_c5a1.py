@@ -849,25 +849,21 @@ class TestV2ProducerFields:
             responses=[bad_json, _valid_brief_json_v2()],
         )
         result = sb.run_story_brief_reflection(led=_mk_ledger(), technical_fn=spy)
-        # Either we recovered (ladder re-rolled successfully) and got
-        # the good v2 response on the retry, or the ladder exhausted
-        # and stamped the failure sentinel. Both are acceptable -- the
-        # important contract is that the OVER-LONG values never reach
-        # the meta delta.
-        if result["story_brief_status"] == "ok":
-            assert len(result["tempo_hint"]) <= sb._TEMPO_HINT_HARD_MAX_CHARS
-            assert (
-                len(result["atmosphere_line"])
-                <= sb._ATMOSPHERE_LINE_HARD_MAX_CHARS
-            )
-        else:
-            # Sentinel path -- v2 fields are safe-empty regardless.
-            assert result["tempo_hint"] == ""
-            assert result["atmosphere_line"] == ""
-        # Either way: ladder re-rolled at least once (the over-long
-        # response was rejected on schema length validation).
-        assert len(spy.calls) >= 2, (
-            "schema-side length cap did not trigger a structural retry"
+        # structured_call now CLAMPS an over-long capped field to its schema
+        # max_length IN PLACE (commit 4c0e943, the "no loud fail" graceful-
+        # degradation contract) rather than rejecting the response and re-rolling.
+        # So a single call recovers ("ok") with the OVER-LONG values truncated to
+        # the cap -- the important contract (over-long never reaches the meta
+        # delta) holds, now via coercion instead of a structural retry.
+        assert result["story_brief_status"] == "ok"
+        assert len(result["tempo_hint"]) == sb._TEMPO_HINT_HARD_MAX_CHARS
+        assert (
+            len(result["atmosphere_line"])
+            == sb._ATMOSPHERE_LINE_HARD_MAX_CHARS
+        )
+        # The clamp fixes the response in place -> NO structural retry needed.
+        assert len(spy.calls) == 1, (
+            "over-long capped fields should be coerced in place, not re-rolled"
         )
 
     def test_prompt_lists_all_nine_field_names(self):
