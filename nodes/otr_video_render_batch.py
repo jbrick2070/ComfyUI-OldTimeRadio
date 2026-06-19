@@ -170,6 +170,12 @@ class OTRVideoRenderBatch:
             log.warning("[OTR_VideoRenderBatch] motion_clause skipped: %s", exc)
         ep = _rd.run_real_episode(ledger,
                                   master_audio_path=str(master_audio_path or ""))
+        # CLIP-FILL Piece 4: move each rendered per-beat clip out of the
+        # janitor-swept _shared/tmp scratch tier into the durable
+        # episodes/<ep>/clips/ workspace BEFORE building the manifest, so the
+        # manifest (and the composite) reference stable paths the sweep won't
+        # delete. Best-effort + LOUD; never aborts the render.
+        _rd.persist_episode_clips(ep, episode_id)
         manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
         # Round 5 F2 (warn-only): the per-beat brief-composed prompts must
         # actually DIFFER -- an all-equal sha set means the beat clauses never

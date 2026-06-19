@@ -66,15 +66,23 @@ _TI2V_DEFAULT_UNET = "Wan2.2-TI2V-5B-Q5_K_M.gguf"
 #: (ComfyUI #9255); GGUF dequantizes to fp16 -> the cross-platform 8GB path. Override
 #: with OTR_WAN_TI2V_CLIP_NAME (+ OTR_WAN_TI2V_CLIP_LOADER) for an fp16 safetensors.
 _TI2V_DEFAULT_CLIP = "umt5-xxl-encoder-Q5_K_M.gguf"
-# 8GB floor framing (2026-06-18 roundtable, converged 3 passes): 33f @ 832x480 hit
-# ~13 GB on a 5080 -> OOMs a real 8GB card. The floor renders 17 frames (4n+1) and
-# CLAMPS upstream requests to the floor max unless OTR_WAN_TI2V_MAX_FRAMES raises it
-# (bigger cards opt up). _TI2V_DEFAULT_FRAMES is the real fallback -- the old code
-# misused target_fps (25 Hz) as a frame count, which quantized to 33 and OOM'd.
+# Frame budgeting (2026-06-18 CLIP-FILL roundtable, supersedes the static 8GB
+# floor): the old code hard-CLAMPED every clip to 17 frames (0.68s @ 25fps) so a
+# ~280-frame beat froze after 0.68s (the composite held the last frame). The fix
+# PREDICTS the VRAM-affordable length per beat via motion_common.
+# compute_real_frame_budget (a zero-cost mem_get_info read + a cost model -- never
+# react-to-OOM) bounded by the beat's audio-derived target, then the render
+# ping-pong-extends that short render up to the full target so the beat is FILLED
+# with motion. _TI2V_MIN_FRAMES is the motion floor (always >= this many 4n+1
+# frames of real motion); _TI2V_MAX_FRAMES is the absolute hard cap;
+# OTR_WAN_TI2V_MAX_FRAMES lets a tiny/8GB card pin a lower hard cap.
 _TI2V_MIN_FRAMES = 17
 _TI2V_DEFAULT_FRAMES = 17
-_TI2V_FLOOR_MAX_FRAMES = 17
 _TI2V_MAX_FRAMES = 177
+#: Reference render canvas used when _floor_length is called without explicit dims
+#: (matches OTR_VIDEO_LANDSCAPE_CANVAS / the cost-model telemetry reference).
+_TI2V_COST_REF_W = 1472
+_TI2V_COST_REF_H = 832
 
 
 @register
@@ -300,21 +308,32 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "scheduler": scheduler,
         }
 
-    def _floor_length(self, target_frame_count):
-        """The 8GB-floor effective clip length (4n+1). Fixes the old target_fps-as-
-        frame-count fallback AND clamps an upstream request to the floor max unless
-        OTR_WAN_TI2V_MAX_FRAMES raises it (bigger cards opt up)."""
+    def _floor_length(self, target_frame_count, width=None, height=None):
+        """The VRAM-PREDICTED render length (4n+1) for this beat (clip-fill fix).
+
+        REPLACES the old hard 17-frame "8GB floor" that froze every wan clip to
+        0.68s: ``motion_common.compute_real_frame_budget`` reads live free VRAM
+        (zero-cost ``mem_get_info``) + a cost model to PREDICT how many of the
+        beat's audio-derived ``target_frame_count`` frames fit under the ceiling --
+        never react-to-OOM. The render then ping-pong-extends this (possibly short)
+        render up to the full target so the beat is FILLED with motion. The motion
+        floor (17) always wins; ``OTR_WAN_TI2V_MAX_FRAMES`` pins an absolute hard
+        cap for a tiny/8GB card (default = the engine max, not 17)."""
         from . import wrapper_bridge as _wb
+        target = int(target_frame_count or _TI2V_DEFAULT_FRAMES)
         try:
-            floor_max = int(os.environ.get(
-                "OTR_WAN_TI2V_MAX_FRAMES", str(_TI2V_FLOOR_MAX_FRAMES)))
+            hard_cap = int(os.environ.get(
+                "OTR_WAN_TI2V_MAX_FRAMES", str(_TI2V_MAX_FRAMES)))
         except (TypeError, ValueError):
-            floor_max = _TI2V_FLOOR_MAX_FRAMES
-        floor_max = max(_TI2V_MIN_FRAMES, min(floor_max, _TI2V_MAX_FRAMES))
-        requested = int(target_frame_count or _TI2V_DEFAULT_FRAMES)
-        requested = min(requested, floor_max)
+            hard_cap = _TI2V_MAX_FRAMES
+        hard_cap = max(_TI2V_MIN_FRAMES, min(hard_cap, _TI2V_MAX_FRAMES))
+        target = max(1, min(target, hard_cap))
+        if width is None or height is None:
+            width, height = _TI2V_COST_REF_W, _TI2V_COST_REF_H
+        budget = _MC.compute_real_frame_budget(
+            _MC.free_vram_mb(), target, int(width), int(height), self.name)
         return _wb.quantize_frames_4n1(
-            requested, min_frames=_TI2V_MIN_FRAMES, max_frames=_TI2V_MAX_FRAMES)
+            budget, min_frames=_TI2V_MIN_FRAMES, max_frames=hard_cap)
 
     def _build_graph(self, request, image_name, plan, length, width, height):
         """The declarative Wan TI2V-5B graph (wrapper_bridge.run_graph format).
@@ -424,7 +443,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         width, height = self._dims(request)
         image_name = self._materialize_init_image(
             request, plan["init_image"], width, height)
-        length = self._floor_length(plan["target_frame_count"])
+        # CLIP-FILL: PREDICT the VRAM-affordable render length for THIS canvas
+        # (never react-to-OOM); the short render is ping-pong-extended to the beat
+        # target below so the composite never freeze-fills the beat.
+        length = self._floor_length(plan["target_frame_count"], width, height)
         graph = self._build_graph(request, image_name, plan, length, width, height)
         # free_after_use: the umt5 text-encode frees before the 5B UNET + the 2.2
         # VAE decode; "unet" kept for V-4 patcher teardown, "vae" for the decode,
@@ -444,6 +466,19 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
+        # CLIP-FILL: ping-pong-extend the VRAM-bounded short render up to the
+        # beat's audio-derived target so the composite fills the beat with motion
+        # instead of holding the last frame (the 0.68s-then-freeze bug). A no-op
+        # when the native render already meets the target (extend returns as-is).
+        target_frames = int(plan.get("target_frame_count") or 0)
+        n_native = len(frames)
+        if target_frames > n_native:
+            frames = _wb.extend_frames_to_target(frames, target_frames)
+            _LOG.warning(
+                "[OTR video] wan_ti2v CLIP-FILL: rendered %d frame(s) -> "
+                "ping-pong extended to %d (beat target %d) @ %dx%d so the beat "
+                "is FILLED with motion (no hold-last-frame freeze)",
+                n_native, len(frames), target_frames, width, height)
         out_path = otr_engine_tmp_mp4("otr_wan_ti2v_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.

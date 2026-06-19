@@ -345,6 +345,21 @@ def otr_videos_dir(episode_id: str) -> Path:
     return _validate_contract(otr_episodes_root() / eid / "videos")
 
 
+def otr_clips_dir(episode_id: str) -> Path:
+    """Per-episode DURABLE per-beat motion-clip dir:
+    ``<output>/otr/episodes/<episode_id>/clips/``.
+
+    The final per-beat silent clip each video engine renders lands here (moved
+    out of the janitor-swept ``episodes/_shared/tmp`` scratch tier -- operator
+    directive: every rendered asset lives under ``otr/episodes/<ep>/``, the final
+    episode only in ``otr/obs/``). The janitor sweeps ONLY ``_shared/tmp``, so
+    ``clips/`` is never touched. OTR_SilentComposite reads these stable paths via
+    the clip manifest. Distinct from ``videos/`` (the legacy per-line piece dir).
+    """
+    eid = _validate_episode_id(episode_id)
+    return _validate_contract(otr_episodes_root() / eid / "clips")
+
+
 def otr_composited_dir(episode_id: str) -> Path:
     """Per-episode VideoComposite intermediate dir:
     ``<output>/otr/episodes/<episode_id>/composited/``.
@@ -638,6 +653,7 @@ __all__ = [
     "otr_stills_dir",
     "otr_portraits_dir",
     "otr_videos_dir",
+    "otr_clips_dir",
     "otr_composited_dir",
     "otr_upscaled_dir",
     "otr_obs_dir",

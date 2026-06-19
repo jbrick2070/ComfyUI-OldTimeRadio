@@ -435,6 +435,37 @@ def images_to_uint8(images):
     return np.ascontiguousarray(arr)
 
 
+def extend_frames_to_target(frames, target_frame_count):
+    """PING-PONG / mirror-extend a short frame batch up to ``target_frame_count``.
+
+    The clip-fill companion to the dynamic-VRAM budget (GO_FORWARD 2026-06-18): an
+    engine that can only afford a SHORT render (e.g. wan_ti2v's VRAM-predicted
+    length) extends here so the beat is FILLED with continuous motion instead of
+    the composite holding the last frame (the 0.68s-then-freeze bug). Generalizes
+    LTX's one-shot boomerang into a tiled mirror cycle
+    (``[0,1,..,N-1,N-2,..,1]``, period ``2N-2``) tiled and trimmed to the target,
+    so the loop has NO hard seam (the cycle joins frame 1 -> 0 -> 1, symmetric).
+
+    Returns ``frames`` UNCHANGED when it already has >= target frames (or target
+    <= 0). A single frame cannot mirror into motion, so it is repeated (the caller
+    surfaces that LOUD). ``frames`` is the uint8 ``[N,H,W,C]`` array from
+    :func:`images_to_uint8`; numpy is imported lazily (cold-import V-12). Pure;
+    CPU-testable."""
+    import numpy as np
+    arr = np.asarray(frames)
+    n = int(arr.shape[0]) if arr.ndim else 0
+    target = int(target_frame_count or 0)
+    if n == 0 or target <= n:
+        return arr
+    if n < 2:                                   # no motion to mirror -> repeat
+        reps = (target + n - 1) // n
+        return np.ascontiguousarray(np.concatenate([arr] * reps, axis=0)[:target])
+    cycle = np.concatenate([arr, arr[-2:0:-1]], axis=0)   # period 2N-2, seamless
+    reps = (target + len(cycle) - 1) // len(cycle)
+    tiled = np.concatenate([cycle] * reps, axis=0)
+    return np.ascontiguousarray(tiled[:target])
+
+
 # --------------------------------------------------------------------------- #
 # ffmpeg command builders (pure) + runners (the ffmpeg leaf)
 # --------------------------------------------------------------------------- #
@@ -595,6 +626,7 @@ __all__ = [
     "Wire", "run_graph",
     "reclaim_idle_models",
     "quantize_frames_4n1", "even_dim", "images_to_uint8",
+    "extend_frames_to_target",
     "ffmpeg_silent_mp4_cmd", "ffmpeg_still_motion_cmd", "ffmpeg_lavfi_floor_cmd",
     "run_ffmpeg", "encode_frames_to_silent_mp4",
     "comfy_input_dir", "stage_into_comfy_input",

@@ -177,6 +177,38 @@ def _probe_audio_duration(path):
         return 0.0
 
 
+#: A real clip whose on-disk frames are below this fraction of its beat target is
+#: a gross underrun -- the composite would hold the last frame for most of the beat
+#: (the wan_ti2v 17/280 freeze). LOUD-warn so a future short-clip engine is caught,
+#: not silently frozen. Env OTR_CLIP_UNDERRUN_FRAC (0 disables).
+_CLIP_UNDERRUN_FRAC = 0.5
+
+
+def _warn_clip_underrun(row, target_n):
+    """LOUD-warn (never raise -- no-loud-fail rule) when a real clip row carries
+    far fewer on-disk frames than its beat target, so the composite will hold the
+    last frame for most of the beat. A loop-fill row is exempt (it repeats to fill
+    by design). Pure except for the warning; clip-fill Piece 5."""
+    try:
+        frac = float(os.environ.get("OTR_CLIP_UNDERRUN_FRAC",
+                                    _CLIP_UNDERRUN_FRAC))
+    except (TypeError, ValueError):
+        frac = _CLIP_UNDERRUN_FRAC
+    if frac <= 0 or (row or {}).get("loop"):
+        return
+    real = int((row or {}).get("frame_count") or 0)
+    tgt = int(target_n or 0)
+    if real > 0 and tgt > 0 and real < frac * tgt:
+        log.warning(
+            "[OTR.composite] CLIP UNDERRUN (LOUD): beat %s engine %r rendered "
+            "%d frame(s) for a %d-frame target (%.0f%%) -- the composite will "
+            "HOLD the last frame for the rest of the beat. A motion engine should "
+            "loop/ping-pong-extend to the target (clip-fill); investigate %r.",
+            (row or {}).get("shot_id") or (row or {}).get("beat_id"),
+            (row or {}).get("engine_id"), real, tgt,
+            100.0 * real / tgt, (row or {}).get("engine_id"))
+
+
 def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                            target_total_frames=None, fps=None):
     """Pure: the frame-accurate per-beat segment plan from a clip manifest.
@@ -230,6 +262,7 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 emit(gap_src, "", gap_n, _floor_aligned(cursor, gap_n))
                 cursor = start_frame
             if r.get("exists") and r.get("path"):
+                _warn_clip_underrun(r, n)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
             else:
                 emit(gap_src, "", n, _floor_aligned(cursor, n),
@@ -239,6 +272,7 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         for r in rows:
             n = int(r.get("target_frame_count") or 0)
             if r.get("exists") and r.get("path"):
+                _warn_clip_underrun(r, n)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
             elif floor_available:
                 start = min(cursor, max(0, ff - n)) if ff else cursor

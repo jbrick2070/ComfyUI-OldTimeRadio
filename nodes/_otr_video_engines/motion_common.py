@@ -296,6 +296,122 @@ def assert_peak_within_ceiling(peak_mb, label="render", ceiling_mb=None):
 
 
 # --------------------------------------------------------------------------- #
+# Dynamic-VRAM frame budget (2026-06-18 clip-fill roundtable: ChatGPT + Gemini +
+# DeepSeek, Claude judged + grounded). PREDICT how many real frames an engine can
+# render within the live VRAM budget from a ZERO-COST mem_get_info read + a cost
+# model -- NEVER react-to-OOM (a CUDA OOM inside ComfyUI's long-lived process
+# corrupts the caching allocator, so OOM is a bug to AVOID, never a control
+# signal). Replaces the wan_ti2v hard 17-frame "8GB floor" that froze every clip
+# to 0.68s. Pure given its inputs (free VRAM is read by the caller and passed in),
+# so the math is CPU-testable without a GPU.
+# --------------------------------------------------------------------------- #
+
+#: Telemetry reference resolution the per-frame cost is measured at (wan_ti2v
+#: render-phase peak 10277 MB @ 17 frames @ 1472x832 -> 7000 + 185*17 ~= 10145).
+_FRAME_COST_REF_PIXELS = 1472 * 832
+
+#: Per-engine VRAM cost model SEED: ``vram_mb ~= overhead_mb + per_frame_mb *
+#: frames`` at :data:`_FRAME_COST_REF_PIXELS`. ``overhead`` is the resident model
+#: + fixed buffers (held constant across resolutions -- conservative);
+#: ``per_frame`` is the activation/decode cost that scales with pixel area. Refine
+#: from observed peaks; a new engine without a row uses :data:`_DEFAULT_FRAME_COST`.
+#: Globally env-overridable via OTR_VIDEO_COST_OVERHEAD_MB / OTR_VIDEO_COST_PER_FRAME_MB.
+FRAME_COST_MODEL = {
+    "wan_ti2v": (7000.0, 185.0),
+}
+#: Fallback cost row for an engine not in :data:`FRAME_COST_MODEL` (use the wan
+#: 5B figure -- the conservative low-VRAM tier the budget mainly guards).
+_DEFAULT_FRAME_COST = (7000.0, 185.0)
+
+#: Per-engine MOTION floor (4n+1 minimum): a beat must carry at least this many
+#: frames of motion even when VRAM is tight -- the floor WINS over the budget (if
+#: the floor itself OOMs, the render-window NVML probe catches it LOUD). LTX has
+#: its own decode floor; the generic default is 1.
+FRAME_MOTION_FLOOR = {"wan_ti2v": 17}
+_DEFAULT_MOTION_FLOOR = 1
+
+#: Fraction of the usable VRAM the predictor may spend -- head-room for allocator
+#: fragmentation so the prediction never has to react-to-OOM. Env OTR_VIDEO_BUDGET_MARGIN.
+_BUDGET_MARGIN = 0.85
+
+
+def free_vram_mb():
+    """Machine-wide FREE VRAM (MB) via a ZERO-COST ``torch.cuda.mem_get_info``
+    read, or ``None`` when torch/CUDA is unavailable (the CPU box / unit tests).
+
+    This is the "probe" the dynamic frame budget uses: 0 bytes allocated, 0 GPU
+    time, no render. NEVER a render-probe (try-then-OOM corrupts the allocator).
+    Pure telemetry; never raises."""
+    try:
+        import torch  # type: ignore
+        if not torch.cuda.is_available():
+            return None
+        free_b, _total_b = torch.cuda.mem_get_info()
+        return float(free_b) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 -- no torch/CUDA -> caller trusts the target
+        return None
+
+
+def _cost_model_for(engine_name):
+    """(overhead_mb, per_frame_mb) for ``engine_name`` with global env overrides."""
+    overhead, per_frame = FRAME_COST_MODEL.get(engine_name, _DEFAULT_FRAME_COST)
+    raw_o = (os.environ.get("OTR_VIDEO_COST_OVERHEAD_MB") or "").strip()
+    raw_f = (os.environ.get("OTR_VIDEO_COST_PER_FRAME_MB") or "").strip()
+    try:
+        if raw_o:
+            overhead = float(raw_o)
+        if raw_f:
+            per_frame = float(raw_f)
+    except (TypeError, ValueError):
+        pass
+    return float(overhead), float(per_frame)
+
+
+def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
+                              canvas_w, canvas_h, engine_name, *,
+                              ceiling_mb=None):
+    """PREDICT the largest 4n+1 clip length an engine can render this beat without
+    over-committing VRAM -- the clip-fill fix (GO_FORWARD 2026-06-18).
+
+    Cost model: ``vram ~= overhead + per_frame_at_res * frames`` where
+    ``per_frame_at_res`` scales the telemetry per-frame cost by the canvas pixel
+    area vs the reference. ``budget = min(free, ceiling) * margin``; the affordable
+    frame count is capped at the beat's audio-derived ``target_frame_count``,
+    floored at the engine's motion floor, and snapped to a valid 4n+1.
+
+    ``free_vram_mb_value`` ``None`` / <= 0 (no NVML/torch -- the CPU box) -> trust
+    the target (the render-window NVML probe still gates the ceiling at render
+    time). The render then loop/ping-pong-extends this (possibly short) render up
+    to the full target, so a tight budget yields short MOTION, never a freeze.
+    Pure (no GPU read here -- the caller passes ``free_vram_mb()``); CPU-tested."""
+    from . import wrapper_bridge as _wb
+    target = max(1, int(target_frame_count or 1))
+    floor = int(FRAME_MOTION_FLOOR.get(engine_name, _DEFAULT_MOTION_FLOOR))
+    if ceiling_mb is None:
+        ceiling_mb = dynamic_vram_ceiling_mb()
+    # No live VRAM reading -> trust the audio-derived target (clamped to floor).
+    if free_vram_mb_value is None or float(free_vram_mb_value) <= 0:
+        return _wb.quantize_frames_4n1(target, min_frames=floor, max_frames=target)
+    overhead, per_frame = _cost_model_for(engine_name)
+    pixels = max(1, int(canvas_w) * int(canvas_h))
+    per_frame_at_res = per_frame * (pixels / float(_FRAME_COST_REF_PIXELS))
+    try:
+        margin = float(os.environ.get("OTR_VIDEO_BUDGET_MARGIN", _BUDGET_MARGIN))
+    except (TypeError, ValueError):
+        margin = _BUDGET_MARGIN
+    budget_mb = min(float(free_vram_mb_value), float(ceiling_mb)) * margin
+    if per_frame_at_res <= 0:
+        affordable = target
+    else:
+        affordable = int((budget_mb - overhead) / per_frame_at_res)
+    # Never exceed the beat target; the 4n+1 snap clamps below it. A budget that
+    # cannot even fit the motion floor still returns the floor (it WINS) -- a real
+    # over-budget at the floor surfaces LOUD at the render-window NVML probe.
+    predicted = max(1, min(target, affordable))
+    return _wb.quantize_frames_4n1(predicted, min_frames=floor, max_frames=target)
+
+
+# --------------------------------------------------------------------------- #
 # In-process motion-engine base (AS-3 lease + V-4 teardown)
 # --------------------------------------------------------------------------- #
 class MotionEngineBase:
@@ -311,6 +427,14 @@ class MotionEngineBase:
 
     declared_isolation = ISOLATION_IN_PROCESS
     binds_seed = True
+
+    #: Dynamic-VRAM frame budget, exposed on the base so every motion engine can
+    #: PREDICT (never react-to-OOM) how many of a beat's frames fit the live VRAM
+    #: budget, then loop/ping-pong-extend the short render to the full target.
+    #: Reads free VRAM via :func:`free_vram_mb` (zero-cost mem_get_info). Static so
+    #: the prediction math stays pure + CPU-testable.
+    compute_real_frame_budget = staticmethod(compute_real_frame_budget)
+    free_vram_mb = staticmethod(free_vram_mb)
 
     #: Coverage architecture (2026-06-18): EVERY in-process motion lane accepts the
     #: role's SELECTED image (init still) by default -- the image dispatcher reads
@@ -387,5 +511,6 @@ __all__ = [
     "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
     "assert_vram_within_ceiling", "VramPeakProbe", "assert_peak_within_ceiling",
-    "MotionEngineBase",
+    "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
+    "compute_real_frame_budget", "MotionEngineBase",
 ]

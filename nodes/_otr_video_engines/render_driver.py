@@ -1595,6 +1595,71 @@ def check_ltx_open_health(manifest, *, strict=None):
     return bad
 
 
+def _safe_clip_basename(text):
+    """Filesystem-safe slug for a persisted clip filename (ASCII, no path chars)."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", str(text or ""))[:80]
+
+
+def persist_episode_clips(result, episode_id):
+    """Move each rendered per-beat clip from the janitor-swept ``_shared/tmp``
+    scratch tier to the DURABLE ``episodes/<ep>/clips/`` workspace (clip-fill
+    Piece 4; operator directive: every rendered asset lives under
+    ``otr/episodes/<ep>/``). Rewrites ``clip['path']`` in place to the stable path
+    so :func:`build_clip_manifest` (and the composite) reference the persisted clip
+    instead of a path the janitor will delete.
+
+    Best-effort + LOUD: a missing episode_id, an unresolvable output tree, or a
+    per-clip move error is logged and skipped -- it NEVER aborts the render (the
+    clip still plays from tmp until the next sweep). Directory clips (3D frame
+    dirs) are left in place. Returns ``result`` (mutated in place)."""
+    clips = (result or {}).get("clips") or {}
+    if not episode_id or not clips:
+        return result
+    try:
+        from .._otr_paths import otr_clips_dir
+        dest_dir = str(otr_clips_dir(str(episode_id)))
+        os.makedirs(dest_dir, exist_ok=True)
+    except Exception as exc:              # noqa: BLE001 -- no output tree -> skip LOUD
+        _LOG.warning("[OTR video] persist_episode_clips: cannot resolve "
+                     "episodes/%s/clips/ (%s) -- clips stay in _shared/tmp "
+                     "(janitor-swept)", episode_id, exc)
+        return result
+    # shot_id -> (role, engine) for nice <beat>_<role>_<engine> filenames.
+    shot_meta = {}
+    for shot in (((result or {}).get("ledger") or {}).get("video") or {}).get("shots") or []:
+        if isinstance(shot, dict) and shot.get("shot_id"):
+            shot_meta[str(shot["shot_id"])] = (
+                str(shot.get("role") or ""), str(shot.get("engine_id") or ""))
+    import shutil
+    moved = 0
+    for sid, clip in clips.items():
+        if not isinstance(clip, dict):
+            continue
+        if str(clip.get("type") or "video") == "directory":
+            continue                     # 3D frame dir -- already a real dir asset
+        src = str(clip.get("path") or "")
+        if not src or not os.path.isfile(src):
+            continue
+        if os.path.dirname(os.path.abspath(src)) == os.path.abspath(dest_dir):
+            continue                     # already persisted (idempotent re-run)
+        role, eng = shot_meta.get(str(sid), ("", str(clip.get("engine_id") or "")))
+        stem = "_".join(p for p in (str(sid), role, eng) if p) or str(sid)
+        dst = os.path.join(dest_dir, _safe_clip_basename(stem) + ".mp4")
+        try:
+            if os.path.abspath(src) == os.path.abspath(dst):
+                continue
+            shutil.move(src, dst)
+            clip["path"] = dst
+            moved += 1
+        except Exception as exc:         # noqa: BLE001 -- one bad move never aborts
+            _LOG.warning("[OTR video] persist_episode_clips: move FAILED %s -> "
+                         "%s (%s) -- clip stays in tmp", src, dst, exc)
+    if moved:
+        _LOG.info("[OTR video] persisted %d clip(s) to episodes/%s/clips/",
+                  moved, episode_id)
+    return result
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -1902,7 +1967,7 @@ __all__ = [
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "SLICER_VERSION", "slice_cache_key", "curve_cache_key",
-    "run_real_episode", "build_clip_manifest",
+    "run_real_episode", "build_clip_manifest", "persist_episode_clips",
     "parse_engine_override", "apply_engine_override",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
     "run_gpu_soak", "render_single",

@@ -36,8 +36,12 @@ def test_registered_and_identity():
 
 
 def test_serves_the_image_init_roles():
+    # FLEXIBLE roles (2026-06-18, commit 1e0fe08): wan_ti2v is selectable for EVERY
+    # role -- role_compat is the real gate (it admits wan_ti2v only where the role
+    # supplies the required init_image). The engine declares the full ROLES tuple.
+    from nodes._otr_shared.role_compat import ROLES
     eng = WanTi2vEngine()
-    assert set(eng.roles) == {"scene_broll", "music_visual", "character_video"}
+    assert set(eng.roles) == set(ROLES)
 
 
 def test_distinct_from_wan_i2v_not_a_subclass():
@@ -184,34 +188,67 @@ def test_m8_rejects_a_wrong_but_present_vae(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 8GB FLOOR HARDENING (2026-06-18 roundtable, converged 3 passes)
+# CLIP-FILL frame budgeting (2026-06-18 -- supersedes the static 17-frame floor)
 # --------------------------------------------------------------------------- #
 def _clear_floor_env(monkeypatch):
     for k in ("OTR_WAN_TI2V_SAMPLER", "OTR_WAN_TI2V_SCHEDULER", "OTR_WAN_TI2V_STEPS",
-              "OTR_WAN_TI2V_CFG", "OTR_WAN_TI2V_SHIFT", "OTR_WAN_TI2V_MAX_FRAMES"):
+              "OTR_WAN_TI2V_CFG", "OTR_WAN_TI2V_SHIFT", "OTR_WAN_TI2V_MAX_FRAMES",
+              "OTR_VIDEO_COST_OVERHEAD_MB", "OTR_VIDEO_COST_PER_FRAME_MB",
+              "OTR_VIDEO_BUDGET_MARGIN"):
         monkeypatch.delenv(k, raising=False)
 
 
-def test_floor_length_default_is_17_not_fps(monkeypatch):
-    # The old bug used target_fps (25) as the frame fallback -> quantized to 33 ->
-    # OOM'd 8GB. The fallback is now _TI2V_DEFAULT_FRAMES = 17.
+def _no_vram_read(monkeypatch):
+    """Force free_vram_mb()->None so a test is deterministic regardless of whether
+    the box running it has a live GPU (the headless suite box DOES)."""
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "free_vram_mb", lambda: None)
+
+
+def test_floor_length_default_is_the_motion_floor(monkeypatch):
+    # No target + no live VRAM read -> the _TI2V_DEFAULT_FRAMES=17 motion floor.
+    # (The old target_fps-as-frame-count bug would have given 33.)
     _clear_floor_env(monkeypatch)
+    _no_vram_read(monkeypatch)
     assert WanTi2vEngine()._floor_length(None) == 17
     assert WanTi2vEngine()._floor_length(0) == 17
 
 
-def test_floor_length_clamps_upstream_request(monkeypatch):
-    # An upstream request for 33+ frames must be clamped to the floor max (17).
+def test_floor_length_honors_target_without_vram_read(monkeypatch):
+    # CLIP-FILL: with NO live VRAM read the beat's audio-derived target is HONORED
+    # (snapped to 4n+1 <= target), no longer clamped to 17 -- the freeze fix.
+    # A short beat (33) renders natively; a long beat (280) is capped to the engine
+    # NATIVE-render max _TI2V_MAX_FRAMES=177 (4n+1) -- the render then ping-pong-
+    # extends 177 -> 280 so the beat is still FILLED (no freeze).
     _clear_floor_env(monkeypatch)
-    assert WanTi2vEngine()._floor_length(33) == 17
-    assert WanTi2vEngine()._floor_length(177) == 17
+    _no_vram_read(monkeypatch)
+    assert WanTi2vEngine()._floor_length(33) == 33
+    assert WanTi2vEngine()._floor_length(280) == 177
 
 
-def test_floor_max_override_lets_bigger_cards_opt_up(monkeypatch):
+def test_floor_length_predicts_from_live_vram(monkeypatch):
+    # With a live free-VRAM read the predictor bounds the target by the budget:
+    # overhead 7000 + 185/frame @1472x832; budget = min(free,14500)*0.85.
     _clear_floor_env(monkeypatch)
+    from nodes._otr_video_engines import motion_common as mc
+    # ~5080 clean box: free ~14775 -> budget 12325 -> (12325-7000)/185 ~= 28 -> 29.
+    monkeypatch.setattr(mc, "free_vram_mb", lambda: 14775.0)
+    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 29
+    # Tight VRAM (8 GB free) cannot fit even one frame past overhead -> the motion
+    # floor (17) WINS (a beat always carries some motion; the render-window NVML
+    # probe is the real over-budget guard).
+    monkeypatch.setattr(mc, "free_vram_mb", lambda: 8000.0)
+    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 17
+
+
+def test_floor_max_override_is_an_absolute_hard_cap(monkeypatch):
+    # OTR_WAN_TI2V_MAX_FRAMES pins an absolute hard cap for a tiny/8GB card; with no
+    # VRAM read (isolating the cap logic) the target is clamped to it.
+    _clear_floor_env(monkeypatch)
+    _no_vram_read(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "49")     # 49 = 4*12+1
     assert WanTi2vEngine()._floor_length(49) == 49
-    assert WanTi2vEngine()._floor_length(177) == 49        # still clamped to the cap
+    assert WanTi2vEngine()._floor_length(177) == 49        # clamped to the cap
 
 
 def test_default_sampler_is_portable_euler(monkeypatch):
