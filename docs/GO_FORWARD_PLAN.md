@@ -1,7 +1,8 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
 > **LATEST SESSION -- 2026-06-18 LATE (CODER; VIDEO CLIP-FILL / DYNAMIC-VRAM SHIPPED + GPU-VERIFIED;
-> 2 commits on `v2.0-alpha`, NOT pushed (operator gates); suite 4547/0, Bug Bible 16/7/3).**
+> + the QUEUED green bottom-bars overlay SHIPPED; 4 commits on `v2.0-alpha`, NOT pushed (operator gates);
+> suite 4554/0, Bug Bible 16/7/3).**
 > The wan_ti2v static-episode bug is FIXED at root (no shims) -- spec was
 > `docs/2026-06-18-video-clip-fill/CLIP_FILL_HANDOFF.md`; results in `GPU_VERIFY_RESULTS.md`.
 > **Commit `c9bf0ab` (clip-fill, 5 pieces):** (1) `motion_common.compute_real_frame_budget` + `free_vram_mb`
@@ -20,9 +21,16 @@
 > with ADAPTIVE budgets (29->238, 25->290, ...; the budget shrank 29->25 across beats = live VRAM read working),
 > every render peak 8610-9988 MB << 14500 ceiling (no OOM), persisted 6 clips to `episodes/<ep>/clips/`, a beat clip
 > is 290 frames/11.6s with 3 distinct frames at t=2/3.5/5s (motion fills the beat, freeze GONE),
-> `audio_byte_identical OK`, obs_publish OK. **>>> NEXT = the QUEUED green bottom-bars visualizer overlay**
-> (operator-requested "after the gpu smoke"): spec `docs/2026-06-17-scope-visualizer-engine/CODER_KICKOFF_BARS_OVERLAY.md`.
-> Box reset clean (GPU baseline). Push is operator-gated.
+> `audio_byte_identical OK`, obs_publish OK.
+> **BARS OVERLAY ALSO SHIPPED (commit `13ceeae`):** the QUEUED optional green audio-reactive bottom-bars overlay
+> (operator-requested "after the gpu smoke") -- a composite-stage add to `OTR_SceneAwareScopes` (NOT a new engine):
+> new `landscape_bars` widget (off DEFAULT|bottom, appended last per BUG-LOCAL-097, wired into node 94 of the real
+> JSON same-commit); `bottom` paints a GREEN-ONLY freq strip (shared `scope_draw.freq_bars_green`) along the bottom
+> of any LANDSCAPE clip, ABOVE the lower-15% caption safe-area (captions never occluded); `off` = byte-identical.
+> Verified on the REAL persisted wan clips: off->all suppressed, bottom->all landscape clips get bars; strip ends at
+> y=918 = caption-safe-area top. 7 tests. **>>> NEXT = the S3 forward order** (3D item 5, distribution item 6) +
+> the carried per-segment LUFS/RMS normalization plan (frozen-spine, roundtable-first). Box reset clean (GPU baseline).
+> Push is operator-gated (4 commits: `8ce9004`+`c9bf0ab`+`11d0e9a`+`13ceeae`).
 
 > **LATEST SESSION -- 2026-06-18 EVENING (resilience + image curation; HEAD `3384418` == origin; suite green,
 > Bug Bible 16/7/3). ACTIVE NEXT STEP = the VIDEO CLIP-FILL / DYNAMIC-VRAM build (spec:
