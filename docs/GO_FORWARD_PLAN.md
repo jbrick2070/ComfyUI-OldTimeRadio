@@ -1,5 +1,29 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 LATE (CODER; VIDEO CLIP-FILL / DYNAMIC-VRAM SHIPPED + GPU-VERIFIED;
+> 2 commits on `v2.0-alpha`, NOT pushed (operator gates); suite 4547/0, Bug Bible 16/7/3).**
+> The wan_ti2v static-episode bug is FIXED at root (no shims) -- spec was
+> `docs/2026-06-18-video-clip-fill/CLIP_FILL_HANDOFF.md`; results in `GPU_VERIFY_RESULTS.md`.
+> **Commit `c9bf0ab` (clip-fill, 5 pieces):** (1) `motion_common.compute_real_frame_budget` + `free_vram_mb`
+> PREDICT the VRAM-affordable 4n+1 frame count from a zero-cost `torch.cuda.mem_get_info` read + a cost model
+> (wan seed 7000MB + 185MB/frame @1472x832, per-frame scales with pixel area; budget = min(free,ceiling)*0.85,
+> capped at the beat target, floored at the motion floor) -- NEVER react-to-OOM. (2) `eng_wan_ti2v._floor_length`
+> calls it (the hard 17-frame cap is gone; `OTR_WAN_TI2V_MAX_FRAMES` is now an absolute hard cap). (3)
+> `wrapper_bridge.extend_frames_to_target` seamless ping-pong-extends the short render to the beat target in
+> `render_clip` (LTX boomerang untouched -> byte-identical). (4) `render_driver.persist_episode_clips` +
+> `_otr_paths.otr_clips_dir` move final clips out of the swept `_shared/tmp` into durable `episodes/<ep>/clips/`
+> (wired in OTR_VideoRenderBatch before the manifest). (5) `otr_silent_composite._warn_clip_underrun` LOUD-warns
+> (never raises) when a real clip is far shorter than its target. **Commit `8ce9004` (pre-existing red fix):**
+> `test_story_brief_c5a1::test_schema_caps_string_v2_fields` still expected reject+retry; structured_call now
+> CLAMPS an over-long capped field in place (4c0e943) -- updated the assertion (this was failing at HEAD `4d8c2ba`,
+> unrelated to clip-fill). **GPU SMOKE (5080, all-roles wan_ti2v 60w act=1 bark): SUCCESS.** 6/6 beats clip-filled
+> with ADAPTIVE budgets (29->238, 25->290, ...; the budget shrank 29->25 across beats = live VRAM read working),
+> every render peak 8610-9988 MB << 14500 ceiling (no OOM), persisted 6 clips to `episodes/<ep>/clips/`, a beat clip
+> is 290 frames/11.6s with 3 distinct frames at t=2/3.5/5s (motion fills the beat, freeze GONE),
+> `audio_byte_identical OK`, obs_publish OK. **>>> NEXT = the QUEUED green bottom-bars visualizer overlay**
+> (operator-requested "after the gpu smoke"): spec `docs/2026-06-17-scope-visualizer-engine/CODER_KICKOFF_BARS_OVERLAY.md`.
+> Box reset clean (GPU baseline). Push is operator-gated.
+
 > **LATEST SESSION -- 2026-06-18 EVENING (resilience + image curation; HEAD `3384418` == origin; suite green,
 > Bug Bible 16/7/3). ACTIVE NEXT STEP = the VIDEO CLIP-FILL / DYNAMIC-VRAM build (spec:
 > `docs/2026-06-18-video-clip-fill/CLIP_FILL_HANDOFF.md`).**
