@@ -1,5 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 (CODER; LUMINA-IMAGE 2.0 PROMOTED TO A VALIDATED PEER IMAGE ENGINE,
+> GPU-VERIFIED; 2 commits on `v2.0-alpha`, PUSHED; HEAD `631d0b0` == origin; suite green [2 pre-existing
+> test_model_catalog_scan environmental reds unchanged], Bug Bible 16/7/3, audio byte-identical green).**
+> Operator ask: "code the luminous / low-VRAM image engine -- the scaffolding should already be there."
+> AUDIT FINDING: the scaffolding was MORE than there -- `lumina_image` was already a COMPLETE, registered,
+> cold-import-clean adapter (real `render_image`, fail-closed `assert_usable`, CAPABILITIES row, 7 CPU tests,
+> a dep-pilot row, weights on disk). The ONLY gap was the tested-only dropdown gate: it was hidden pending a
+> GPU smoke. So this was a verify-and-promote, not a build.
+> **GPU SMOKE (RTX 5080, fresh FLOOR-lane headless server):** the EXACT engine recipe (UNETLoader
+> lumina_2_model_bf16 + CLIPLoader[type=lumina2] gemma_2_2b TE + VAELoader lumina2_ae ->
+> ModelSamplingAuraFlow -> KSampler -> VAEDecode) minted a real 1216x832 still in 23.5 s -- `model_type FLOW`,
+> TE 4986 MB + diffusion 4977 MB staged SEQUENTIALLY, resident peak ~12.2 GB << 14.5 GB ceiling (and the
+> engine's `render_image` reclaims after decode). The minted PNG is a real varied image (std 40, not flat).
+> Box reset clean (GPU baseline 1.69 GB). **Commit `ed560a0`:** add `lumina_image` to `registry.VALIDATED_ENGINES`
+> (now lists in the OTR_ImageDirector per-role dropdown via `validated_engine_names`); measured-VRAM note on
+> the CAPABILITIES row; `test_tested_only_dropdown_gate` moves lumina out of `_HIDDEN_IMAGE` into the validated
+> set. **Commit `631d0b0`:** version `scripts/_otr_lumina_image_smoke.py` (the reusable image-engine GPU smoke
+> -- the counterpart to the video-only `_otr_single_engine_smoke.py`; routes the still through the `_otr_paths`
+> authority so the output-tree contract stays clean). The validated IMAGE set is now flux_gen1 (default) +
+> z_image_turbo + flux2_klein + lumina_image. **>>> NEXT = the S3 forward order** (3D item 5, distribution
+> item 6) + the carried per-segment LUFS/RMS normalization plan (frozen-spine, roundtable-first), UNCHANGED by
+> this image-lane add.
+
 > **LATEST SESSION -- 2026-06-18 LATE (CODER; VIDEO CLIP-FILL / DYNAMIC-VRAM SHIPPED + GPU-VERIFIED;
 > + the QUEUED green bottom-bars overlay SHIPPED; 4 commits on `v2.0-alpha`, NOT pushed (operator gates);
 > suite 4554/0, Bug Bible 16/7/3).**
@@ -51,6 +74,9 @@
 > FLUX.2-Klein=flux2_klein) are ALL already wired + validated. `lumina_image` is the easy SFW add NEXT -- code is
 > complete (real render_image) and all its files are ALREADY on disk (`lumina_2_model_bf16` + `gemma_2_2b_fp16` +
 > `lumina2_ae`), just needs `OTR_ENABLE_LUMINA=1` + a GPU smoke + promotion to `VALIDATED_ENGINES`.
+> [DONE 2026-06-18: `lumina_image` GPU-smoked + promoted to `VALIDATED_ENGINES` -- commits `ed560a0`/`631d0b0`;
+> see the LATEST SESSION block at the top. The validated IMAGE set is now flux_gen1 + z_image_turbo +
+> flux2_klein + lumina_image.]
 > **>>> ACTIVE NEXT = the video CLIP-FILL bug:** a wan_ti2v episode renders STATIC (only the procgen overlay moves).
 > Root cause (code-grounded): `eng_wan_ti2v._floor_length` clamps every clip to a hard 17-frame "8GB floor"
 > (`_TI2V_FLOOR_MAX_FRAMES=17`), ignoring the shot calculator's audio-derived per-beat `target_frame_count` (~280);
