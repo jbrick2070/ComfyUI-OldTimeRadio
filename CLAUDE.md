@@ -1,9 +1,13 @@
 # OTR -- Project Operating Rules (Claude in Cowork)
 
-Hard rules + the REAL Cowork operating model for this repo + hard-won gotchas. Operator directives
-here win over any handoff / doc / memory that disagrees.
+**Operator directives -- these win over any handoff, doc, or memory that disagrees.**
 
-Fix bugs in pure prbt manner not a shim and dont woiat for me to fix do a fix witout asking em its ok if it works ifi n doubt /routdtabel chat gpt and gemi and ore deek desk for convergcne
+- **Fix bugs properly, at the root cause -- never a shim or band-aid.** Don't wait for me to
+  fix anything: make the fix yourself, without asking. If it works, it's fine.
+- **When genuinely torn between approaches, run the roundtable LIVE for convergence
+  (ChatGPT + Gemini + DeepSeek).** Skip the dry-run / cost estimate -- just run it, pronto.
+  You are the judge. Escalate to me only if the panel still leaves it unresolved.
+- This file is hard rules + the real Cowork operating model for this repo + hard-won gotchas.
 
 ## 0. WORKFLOW SOURCE OF TRUTH (hard)
 
@@ -63,13 +67,14 @@ IS my workflow.
 - You can drive the 5080 GPU yourself -- spin up the headless ComfyUI API (port 8000) and run it; don't
   ask me. (Reset the box first -- section 4.)
 - If a senior pair-programmer would just do it, just do it. Stuck choosing between options? Roundtable
-  2-3 panels (GPT + Gemini + one other) for opinions BEFORE asking me -- you are the judge.
+  2-3 panels (GPT + Gemini + DeepSeek) for opinions BEFORE asking me -- run it LIVE (skip the dry-run),
+  you are the judge.
 
 ## 3. CODING DISCIPLINE
 
 - Keep coding until all sprints are done unless you genuinely need me.
 - Run the regression suite + the Bug Bible after EVERY code change (don't wait to be asked). Commit AND
-  push per green chunk (section 6).
+  push per green chunk (section 7).
 - Prefer editing the file you're already in; don't spray new throwaway files (and delete any temp probe
   scripts before committing). Keep handoff files current.
 - Names: never "dummy" -- use "placeholder", "stub", or a descriptive name ("dummy" makes me feel bad).
@@ -107,7 +112,26 @@ sits RESIDENT holding ~60% VRAM. Never assume a prior run cleaned up. Before lau
   two-quoted-token rule eats the outer quotes -> mangled path -> ZERO log output. Use
   `Start-Process -FilePath $LAUNCHCMD -ArgumentList "`"$LOG`""`.
 
-## 6. GIT POLICY (operator directive 2026-06-10 -- never lose work)
+## 6. OUTPUT / ASSET PATHS (hard)
+
+Rendered episode assets are deliverables -- they do NOT live in tmp/scratch, and they are NEVER left in a
+swept dir to be moved later.
+
+- Every rendered asset (audio, frames, intermediate video) -> `otr\episodes\<ep>\`. The final published
+  episode -> `otr\obs\` (what `obs_publish` targets; `obs_publish OK` in the log = it landed there).
+- Point the render at its canonical path the FIRST time. Never stage an asset in tmp "to move later" --
+  the move-later step is where work dies.
+- A temp probe/script in tmp is fine (throwaway, per section 3) -- but the ASSET it produces is written
+  STRAIGHT to its canonical path, never parked in tmp.
+- Output destination is workflow config: if a node writes to the wrong place, fix the path IN the
+  workflow JSON (section 0), in the SAME change as any code -- not with a post-hoc move.
+- After any render leg, confirm the asset exists at its canonical path (`Test-Path otr\episodes\<ep>\<file>`)
+  before continuing or declaring success. The file check -- NOT just VRAM -- is what distinguishes the
+  "finished but resident" server (section 5) from a real miss. Missing = STOP and report; do not continue.
+- Paths are relative to the repo root (`...\ComfyUI-OldTimeRadio\`). If `otr\` actually resolves to
+  ComfyUI's real `output\` base on disk, use that base -- but the episodes/obs split holds either way.
+
+## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
 
 - ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.

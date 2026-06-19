@@ -1,5 +1,41 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-18 EVENING (resilience + image curation; HEAD `3384418` == origin; suite green,
+> Bug Bible 16/7/3). ACTIVE NEXT STEP = the VIDEO CLIP-FILL / DYNAMIC-VRAM build (spec:
+> `docs/2026-06-18-video-clip-fill/CLIP_FILL_HANDOFF.md`).**
+> SHIPPED + PUSHED to `v2.0-alpha` this session (each suite-green): **(a)** OpenRouter resilience -- a DELETED model
+> (gone-404) now falls over to the slot's remote fallback ONCE, loudly, instead of aborting the episode
+> (`OpenRouterModelGoneError`); **(b)** fixed the `KeyError 'openrouter:slot-a'` that aborted a run when the CREATIVE
+> writer was a remote slot (creative_prompt_router `.get` -> modern default for non-curated ids); **(c)** OpenRouter
+> A/B writer slots now show TEXT-output models ONLY (cache captures `architecture.output_modalities`; image gens like
+> gemini-3-pro-image hidden); **(d)** structured_call CLAMPS an over-long capped field (e.g. outline `time_of_day`
+> max 40) to its max_length instead of aborting; **(e)** the style inventor PADS a weak-model near-miss (4-of-5
+> descriptors) up to 5 from a deterministic stock pool instead of aborting (operator: "no loud fail"); **(f)**
+> wan_ti2v is now eligible for ALL roles (incl. announcer) + fixed flat_still's missing CAPABILITIES row; **(g)**
+> DROPPED the chroma_hd image engine (`3384418`, operator values call: Chroma is a de-restricted/uncensored FLUX
+> finetune -- OTR will not ship that path). All graceful-degradation "floors" follow the 3-source roundtable
+> (do NOT use an LLM to repair LLM output; Python deterministic floor; LTX path byte-identical).
+> **IMAGE LANE:** the 3 most-downloaded 16GB ComfyUI image models (FLUX.1-dev=flux_gen1, Z-Image-Turbo=z_image_turbo,
+> FLUX.2-Klein=flux2_klein) are ALL already wired + validated. `lumina_image` is the easy SFW add NEXT -- code is
+> complete (real render_image) and all its files are ALREADY on disk (`lumina_2_model_bf16` + `gemma_2_2b_fp16` +
+> `lumina2_ae`), just needs `OTR_ENABLE_LUMINA=1` + a GPU smoke + promotion to `VALIDATED_ENGINES`.
+> **>>> ACTIVE NEXT = the video CLIP-FILL bug:** a wan_ti2v episode renders STATIC (only the procgen overlay moves).
+> Root cause (code-grounded): `eng_wan_ti2v._floor_length` clamps every clip to a hard 17-frame "8GB floor"
+> (`_TI2V_FLOOR_MAX_FRAMES=17`), ignoring the shot calculator's audio-derived per-beat `target_frame_count` (~280);
+> the composite then holds-last-frame -> 0.68s motion + ~9s freeze. ALSO clips write to swept `_shared/tmp` (no
+> persistent `clips/` folder). The roundtable-converged fix (5 pieces: dynamic-VRAM PREDICT frame budget on
+> MotionEngineBase, wan honors it, loop/ping-pong-extend to target, persist clips to `episodes/<ep>/clips/`, composite
+> LOUD underrun guard) is fully specified in `docs/2026-06-18-video-clip-fill/CLIP_FILL_HANDOFF.md`. BUILD THAT NEXT.
+> **QUEUED FOLLOW-UP (gated on the visualizer engine being committed + pushed green):** the optional GREEN
+> audio-reactive BARS overlay (old-school bottom-of-screen, over ANY engine's final video) -- a COMPOSITE-STAGE add
+> to `OTR_SceneAwareScopes` + `OTR_PostUpscaleProcgenBlend` (NOT a new engine). One new `landscape_bars =
+> off(DEFAULT)|bottom` widget (off = byte-identical; APPEND at end of widgets_values, BUG-LOCAL-097); landscape clips
+> return a new `("bars",x,y,w,h)` bottom-strip mode instead of None; paint green-only via the shared
+> `_otr_shared/scope_draw.py` (DRY); HARD: captions MUST layer ABOVE the bars (caption burn ~Node 58 is the LAST
+> composite step + keep bars below the lower ~12-15% caption safe-area + a test asserting caption-after-bars); wire
+> the widget into otr_scifi_16gb_full.json same-commit + re-validate. Full spec:
+> `docs/2026-06-17-scope-visualizer-engine/CODER_KICKOFF_BARS_OVERLAY.md`.
+
 > **LATEST SESSION -- 2026-06-18 (CODER; flux2_klein VERIFIED + PROMOTED + coverage-arch accepts_still SHIPPED;
 > HEAD `64c14bb` == origin; suite 4500/33, Bug Bible 16/7/3). flux2_klein is DONE.**
 > Two commits pushed to `v2.0-alpha`:
