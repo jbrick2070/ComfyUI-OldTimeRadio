@@ -28,7 +28,14 @@ import os
 
 log = logging.getLogger("OTR")
 
-_VOICE_BANKS = ("default", "bark_legacy", "kokoro_builtin")
+# Voice-bank ids the operator picks from the OTR_CastLock dropdown. The bank id
+# does NOT filter the per-ref bank (assign_voice_for_slot scores by gender/timbre/
+# role/age, engine-restricted); it gates which char ENGINE _resolve_char_engine
+# selects, via each engine profile's allowed_voice_banks. "default_clean" routes
+# the cast to the COMMERCIAL-CLEAN cloner (chatterbox MIT, then dia Apache) and
+# EXCLUDES the non-commercial indextts2 -- the release-safe cast (2026-06-18
+# voice-engine roundtable). "default" is unchanged (indextts2 first = quality).
+_VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin")
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 

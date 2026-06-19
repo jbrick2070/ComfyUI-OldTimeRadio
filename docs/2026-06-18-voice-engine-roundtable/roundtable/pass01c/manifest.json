@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-06-19T05:52:37.660731+00:00",
+  "doc": "docs\\2026-06-18-voice-engine-roundtable\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 15193,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 14765,
+      "completion_tokens": 4789,
+      "cost_usd": 0.06634625
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 16866,
+      "completion_tokens": 3778,
+      "cost_usd": 0.0588625
+    }
+  ],
+  "total_cost_usd": 0.1252
+}

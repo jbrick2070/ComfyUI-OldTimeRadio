@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-06-19T05:43:15.241816+00:00",
+  "doc": "docs\\2026-06-18-voice-engine-roundtable\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 13626,
+  "models": [
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort"
+    },
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-4.8-opus-20260528",
+      "ok": true,
+      "prompt_tokens": 21643,
+      "completion_tokens": 10164,
+      "cost_usd": 1.086945
+    }
+  ],
+  "total_cost_usd": 1.0869
+}

@@ -64,7 +64,10 @@ profiles:
     model_path: ""
     model_sha256: ""
     default_params: {exaggeration: 0.5, cfg_weight: 0.4, temperature: 0.6}
-    allowed_voice_banks: [default]
+    # default_clean = the commercial-clean cast bank (2026-06-18 voice roundtable):
+    # selecting it routes _resolve_char_engine to chatterbox (MIT) -- the release-
+    # safe char cloner -- because indextts2 is excluded from default_clean.
+    allowed_voice_banks: [default, default_clean]
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
@@ -102,7 +105,10 @@ profiles:
     model_path: ""
     model_sha256: ""
     default_params: {}
-    allowed_voice_banks: [default]
+    # default_clean: dia (Apache-2.0) is the clean-bank PEER of chatterbox; the
+    # legacy-first order (chatterbox before dia) means chatterbox wins, dia is the
+    # commercial-clean fallback if chatterbox has no usable ref.
+    allowed_voice_banks: [default, default_clean]
     engine_impl_version: "1"
     sample_rate: 44100             # Descript Audio Codec
     requires_hf_token: false        # nari-labs/Dia-1.6B-0626 weights are ungated
