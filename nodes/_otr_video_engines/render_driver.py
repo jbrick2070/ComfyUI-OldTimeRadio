@@ -728,26 +728,27 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
-        _spk = str(shot.get("shot_role") or line.get("speaker_role") or "")
-        # 2026-06-20: CHARACTER beats hold the character PORTRAIT (mirror the
-        # HuMo / audio-driven-face path) so still-only character shots SHOW the
-        # character -- not a pooled scene/radio still. Announcer / music / scene
-        # / b-roll beats keep the beat's scene still. Falls back to the scene
-        # still if a character somehow lacks a portrait.
-        if _spk == "character" and portrait:
-            init_image = portrait
-            init_source = "portrait"
-            _LOG.info(
-                "[OTR.render_driver] %s: beat %s (character) conditioning on "
-                "PORTRAIT %s (HuMo-style character shot)",
-                _eng, _bid, os.path.basename(portrait))
-        elif _still:
+        # BUG 1 (2026-06-20 operator directive): flux_still / flat_still are
+        # LANDSCAPE engines (render_aspect="wide") -- they NEVER condition on the
+        # 832x1216 VERTICAL portrait. The 8bc5381 "_spk==character -> portrait"
+        # branch pillarboxed the portrait in the 1472x832 frame and the procgen
+        # radio-booth floor filled the sides ("radio booth images"). CHARACTER
+        # beats now carry a per-beat 16:9 CHARACTER scene still
+        # (kind=scene_character, minted in the image phase) so conditioning on the
+        # scene still SHOWS the character full-frame. Only HuMo / audio_driven_face
+        # (+ the 3D lane) -- the render_aspect="portrait" engines -- use the
+        # vertical portrait. A missing still degrades to the cheap family's floor;
+        # init_image is cleared so the portrait can NEVER leak into a wide frame.
+        if _still:
             init_image = _still
             init_source = "scene_still"
             _LOG.info(
                 "[OTR.render_driver] %s: beat %s conditioning on scene "
-                "still %s", _eng, _bid, os.path.basename(_still))
+                "still %s (landscape; portrait never used)",
+                _eng, _bid, os.path.basename(_still))
         else:
+            init_image = ""
+            init_source = "missing_scene_still"
             _LOG.warning(
                 "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
                 "has NO scene still in the ledger -- the cheap family will "

@@ -149,12 +149,14 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (768, 432)
 
 
-def test_flat_still_character_beat_holds_portrait_not_scene():
-    """2026-06-20: still-only (flat_still / flux_still) CHARACTER beats hold the
-    character PORTRAIT (mirror the HuMo/audio-driven-face path) so a still-only
-    character shot SHOWS the character -- not a pooled scene/radio still. The
-    portrait is whatever IMAGE engine rendered it (z_image / flux2 / ...), so
-    this is image-model agnostic. Non-character beats keep the scene still."""
+def test_flat_still_character_beat_uses_landscape_scene_still_not_portrait():
+    """BUG 1 (2026-06-20 operator directive): still-only (flat_still / flux_still)
+    are LANDSCAPE engines -- a CHARACTER beat conditions on its per-beat 16:9
+    CHARACTER scene still (kind=scene_character, minted in the image phase),
+    NEVER the 832x1216 vertical portrait (which pillarboxed -> the radio-booth
+    floor filled the sides). Only HuMo / audio_driven_face use the portrait.
+    Image-model agnostic -- the scene still is whatever image engine rendered it.
+    Non-character beats keep their scene still."""
     ledger = {
         "video": {"video_revision": 1, "shots": []},
         "lines": [
@@ -165,7 +167,7 @@ def test_flat_still_character_beat_holds_portrait_not_scene():
         ],
         "images": {"images": [
             {"object_id": "c01", "kind": "portrait", "path": "portrait_c01.png"},
-            {"beat_id": "b002", "kind": "scene_default", "path": "scene_b002.png"},
+            {"beat_id": "b002", "kind": "scene_character", "path": "scene_b002.png"},
             {"beat_id": "b003", "kind": "scene_default", "path": "scene_b003.png"},
         ]},
     }
@@ -176,7 +178,32 @@ def test_flat_still_character_beat_holds_portrait_not_scene():
                 "target_frame_count": 50, "source_line_ids": [beat],
                 "char_id": cid, "creative": {}}
 
+    # CHARACTER beat: the 16:9 character scene still, NOT the vertical portrait.
     req_char = rd.build_request_from_shot(shot("b002", "c01"), ledger)
-    assert req_char["asset_refs"].get("init_image") == "portrait_c01.png"
+    assert req_char["asset_refs"].get("init_image") == "scene_b002.png"
+    assert req_char["asset_refs"].get("init_image") != "portrait_c01.png"
     req_music = rd.build_request_from_shot(shot("b003", ""), ledger)
     assert req_music["asset_refs"].get("init_image") == "scene_b003.png"
+
+
+def test_flat_still_character_beat_missing_still_clears_init_no_portrait_leak():
+    """BUG 1: when a CHARACTER beat has NO scene still, the landscape still engine
+    degrades to its dark floor (init_image cleared) -- the vertical portrait must
+    NEVER leak into the 1472x832 frame."""
+    ledger = {
+        "video": {"video_revision": 1, "shots": []},
+        "lines": [
+            {"line_id": "b002", "beat_id": "b002", "char_id": "c01",
+             "speaker_role": "character", "start_s": 0.0, "dur_s": 2.0},
+        ],
+        "images": {"images": [
+            {"object_id": "c01", "kind": "portrait", "path": "portrait_c01.png"},
+        ]},
+    }
+    shot = {"shot_id": "shot_b002", "beat_id": "b002",
+            "engine_id": "flat_still", "family": "static_image_gen",
+            "target_frame_count": 50, "source_line_ids": ["b002"],
+            "char_id": "c01", "creative": {}}
+    req = rd.build_request_from_shot(shot, ledger)
+    # No still -> empty init (cheap-family floor); the portrait does NOT leak.
+    assert req["asset_refs"].get("init_image", "") == ""

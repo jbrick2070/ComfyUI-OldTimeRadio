@@ -201,6 +201,41 @@ class TestComposeStillPrompt:
         assert helpers.RADIO_BROADCAST_TAIL not in p
         assert helpers.IMAGE_GRADE_TAIL not in p
 
+    def test_scene_character_leads_with_character_wide(self):
+        """BUG 1 (2026-06-20): a scene_character still leads with the CHARACTER's
+        appearance (like a portrait) but uses the WIDE 16:9 character framing --
+        a medium shot of the person in the scene, NOT a radio booth, NOT a tight
+        portrait. It keeps the cinematic grade + the no-text clause."""
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="scene_character", role="character_video",
+            beat_id="b002",
+            char_entry={"portrait_prompt": "a weathered engineer, kind eyes"})
+        assert p.startswith("a weathered engineer, kind eyes")
+        assert helpers.STILL_FRAMING_SCENE_CHARACTER in p
+        assert helpers.STILL_FRAMING_PORTRAIT not in p
+        assert p.endswith(helpers.NO_TEXT_CLAUSE)        # it IS a scene kind
+        assert helpers.IMAGE_GRADE_TAIL in p             # cinematic grade kept
+
+    def test_scene_character_is_not_a_radio_booth(self):
+        """BUG 1: the character SCENE still must NOT read as an on-air radio booth
+        -- the broadcast-distress / centered-radio tail is dropped, and the
+        generic radio-set subject never leads it."""
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="scene_character", role="character_video",
+            char_entry={"appearance": "a stocky miner in a dust coat"})
+        assert helpers.RADIO_BROADCAST_TAIL not in p
+        assert "vintage radio set" not in p
+
+    def test_scene_character_key_chain_and_fallback(self):
+        # leads with any of the three character keys; bare entry -> a person, never
+        # empty / never a radio set.
+        for key in ("portrait_prompt", "appearance", "character_description"):
+            p = helpers.compose_still_prompt(
+                _meta_ok(), kind="scene_character", char_entry={key: "marker-xyz"})
+            assert p.startswith("marker-xyz"), key
+        bare = helpers.compose_still_prompt(_meta_ok(), kind="scene_character")
+        assert bare and "character" in bare.lower()
+
 
 # ---------------------------------------------------------------------------
 # 4. ST-2: the versioned object payload (emission; W1 seam)
@@ -237,17 +272,20 @@ class TestSceneStillObjects:
         # operator 2026-06-18: EVERY beat carries its OWN scene still regardless of
         # role/model -- the character/dialogue beat b002 (char_voice) used to be
         # SKIPPED (announcer/music-only), which is what made silent LTX hit the
-        # LTX-I2V MISSING-STILL degrade. Now every beat gets a scene_beat target;
-        # the image dispatcher's accepts_still gate is the one place that decides
-        # whether the still is actually minted.
+        # LTX-I2V MISSING-STILL degrade. Now every beat gets a target; the image
+        # dispatcher's accepts_still gate is the one place that decides whether the
+        # still is actually minted.
+        # BUG 1 (2026-06-20): a CHARACTER beat gets kind=scene_character (a 16:9
+        # character shot) carrying its char_id, NOT a generic scene_beat radio still.
         from nodes import otr_meta_brief_image_prompt as mbp
         targets, _w = mbp.derive_scene_still_targets(_lines_timed())
         assert [t["beat_id"] for t in targets] == [
             "b000_music_open", "b001", "b002", "b005"]
         assert [t["kind"] for t in targets] == [
-            "scene_open", "scene_beat", "scene_beat", "scene_beat"]
+            "scene_open", "scene_beat", "scene_character", "scene_beat"]
         assert targets[1]["role"] == "announcer_visual"
         assert targets[2]["role"] == "character_video"   # dialogue beat now covered
+        assert targets[2]["char_id"] == "c01"            # carried for the wide shot
         assert targets[3]["role"] == "music_visual"
 
     def test_pool_n_loop_pools_other_beats_stills(self):
@@ -351,6 +389,27 @@ class TestSceneStillObjects:
             beat_id="b000_music_open")
         assert opn["prompt"] == expect
         assert opn["prompt_hash"] == mbp._content_hash(expect)
+
+    def test_character_beat_emits_wide_character_still_bug1(self):
+        """BUG 1 (2026-06-20): a CHARACTER beat (b002, char_voice c01) emits a
+        scene_character object that LEADS with c01's appearance, carries its
+        char_id, uses the WIDE 16:9 character framing, lands at landscape dims,
+        and is NOT a radio booth -- image-model agnostic (role=character_video)."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{"char_id": "c01", "name": "HAYES",
+                 "appearance": "a stocky mine foreman in a canvas coat"}]
+        payload, _w = mbp.derive_image_prompts(
+            cast, _meta_ok(), llm_fn=None, lines=_lines_timed())
+        objs = mbp.objects_by_id(payload)
+        sc = objs["still_b002"]
+        assert sc["kind"] == "scene_character"
+        assert sc["role"] == "character_video"
+        assert sc["char_id"] == "c01"
+        assert sc["prompt"].startswith("a stocky mine foreman in a canvas coat")
+        assert helpers.STILL_FRAMING_SCENE_CHARACTER in sc["prompt"]
+        assert helpers.RADIO_BROADCAST_TAIL not in sc["prompt"]
+        assert sc["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
+        assert sc["w"] > sc["h"] and sc["w"] % 32 == 0    # landscape 16:9
 
     def test_portrait_carries_cinematic_grade_bug411(self):
         """BUG-411 consistency (operator 2026-06-14): portraits now carry the

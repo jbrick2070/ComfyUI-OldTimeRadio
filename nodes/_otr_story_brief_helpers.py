@@ -373,6 +373,18 @@ STILL_FRAMING_PORTRAIT = ("three-quarter framing, full head and shoulders with "
 STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, people shown with "
                             "full heads and clear headroom inside frame, faces "
                             "unobstructed, balanced composition")
+#: Scene-CHARACTER framing (BUG 1, 2026-06-20 operator directive): the LANDSCAPE
+#: still-only character beat (flat_still / flux_still / ltx_video on a character
+#: line). Leads with the CHARACTER (compose_still_prompt subject = appearance) in
+#: a WIDE 16:9 environment shot -- a medium shot framing the person inside the
+#: scene, NEVER the vertical portrait (which pillarboxes -> the radio-booth floor
+#: fills the sides) and NEVER the generic radio-set scene subject. Positive-only
+#: (FLUX plants negated tokens). The radio broadcast tail is dropped for this kind
+#: so the frame reads as the character in their world, not an on-air booth.
+STILL_FRAMING_SCENE_CHARACTER = (
+    "cinematic medium shot, the character framed within a wide 16:9 environment, "
+    "full head and shoulders with clear headroom inside frame, face unobstructed, "
+    "balanced landscape composition")
 
 
 def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
@@ -384,13 +396,19 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
 
     ``kind``: ``"portrait"`` leads with the character's own description
     (``portrait_prompt`` -> ``appearance`` -> ``character_description`` on
-    ``char_entry``); every scene kind (``scene_open`` / ``scene_beat``)
+    ``char_entry``); ``"scene_character"`` (BUG 1, 2026-06-20) ALSO leads with
+    the character description but composes a WIDE 16:9 medium shot (the landscape
+    still-only character beat -- flat_still/flux_still/ltx_video) and DROPS the
+    radio-booth tail; every other scene kind (``scene_open`` / ``scene_beat``)
     leads with :func:`get_open_subject` (``synthetic`` = kind=="scene_open"
     -- the b000 opening-music beat is the synthetic open). Pure; never
     raises; never returns empty (the subject layer always exists).
     """
     is_portrait = (kind == "portrait")
-    if is_portrait:
+    is_char_scene = (kind == "scene_character")
+    if is_portrait or is_char_scene:
+        # Both lead with the CHARACTER's own description; scene_character just
+        # frames them in a wide environment instead of a tight portrait.
         ce = char_entry if isinstance(char_entry, dict) else {}
         subject = str(ce.get("portrait_prompt") or ce.get("appearance")
                       or ce.get("character_description") or "").strip()
@@ -406,6 +424,8 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
                          if str(t).strip()][:2])
     if is_portrait:
         framing = STILL_FRAMING_PORTRAIT
+    elif is_char_scene:
+        framing = STILL_FRAMING_SCENE_CHARACTER
     elif kind == "scene_beat":
         framing = STILL_FRAMING_SCENE_BEAT
     else:
@@ -424,7 +444,11 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         # order and the no-text contract are preserved. Portraits are unchanged
         # (they keep their three-quarter framing + the shared style tail).
         pieces.append(IMAGE_GRADE_TAIL)
-        pieces.append(RADIO_BROADCAST_TAIL)
+        # BUG 1 (2026-06-20): the character SCENE still is NOT a radio booth --
+        # it shows the character in their world, so the broadcast-booth tail
+        # ("centered composition", broadcast-distress) is dropped for this kind.
+        if not is_char_scene:
+            pieces.append(RADIO_BROADCAST_TAIL)
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"

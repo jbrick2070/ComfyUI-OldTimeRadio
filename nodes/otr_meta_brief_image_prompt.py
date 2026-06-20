@@ -227,20 +227,26 @@ def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
     targets: list = []
     seen: set = set()
 
-    def _add(beat_id, kind, role, source):
+    def _add(beat_id, kind, role, source, char_id=""):
         if beat_id and beat_id not in seen:
             seen.add(beat_id)
-            targets.append({"beat_id": beat_id, "kind": kind,
-                            "role": role, "source": source})
+            tgt = {"beat_id": beat_id, "kind": kind,
+                   "role": role, "source": source}
+            if char_id:
+                # BUG 1 (2026-06-20): a scene_character target carries the beat's
+                # char_id so derive_image_prompts can lead the WIDE still with that
+                # character's appearance (a 16:9 character shot, not a radio booth).
+                tgt["char_id"] = char_id
+            targets.append(tgt)
 
     try:  # lazy: one source of truth for the open beat + the role map
         from .otr_shot_lock import (
             OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
-            derive_opening_music_beat)
+            CHARACTER_BEARING_ROLES, derive_opening_music_beat)
     except ImportError:  # pragma: no cover -- flat test imports
         from otr_shot_lock import (  # type: ignore
             OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
-            derive_opening_music_beat)
+            CHARACTER_BEARING_ROLES, derive_opening_music_beat)
 
     live = [ln for _bid, ln in _iter_beat_lines(lines)]
     beat, _frames = derive_opening_music_beat({"lines": list(lines or [])},
@@ -278,6 +284,13 @@ def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
             _DEFAULT_VIDEO_ROLE)
         if pooling and role in _OTHER_BEATS_ROLES:
             other_lines.append((bid, role))     # pooled below, not per-beat
+        elif role in CHARACTER_BEARING_ROLES:
+            # BUG 1 (2026-06-20 operator directive): a CHARACTER beat gets a
+            # per-beat 16:9 CHARACTER still (kind=scene_character) leading with the
+            # character's appearance -- NOT a generic radio scene still and NOT the
+            # vertical portrait. Per-beat (never the pooled other_pool_x loop).
+            _add(bid, "scene_character", role, "scene_role_map",
+                 char_id=str(ln.get("char_id") or ""))
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
     if pooling and other_lines:
@@ -638,11 +651,20 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             from _otr_story_brief_helpers import (  # type: ignore
                 compose_still_prompt)
         sw, sh = _landscape_still_dims()
+        # BUG 1 (2026-06-20): cast-row lookup so a scene_character still leads with
+        # THAT character's appearance (image-model agnostic -- the engine that mints
+        # it is resolved by the character_video role downstream).
+        _cast_by_id = {str(c.get("char_id") or ""): c
+                       for c in roster if isinstance(c, dict)}
         for tgt in scene_targets:
+            _ce = None
+            _cid = str(tgt.get("char_id") or "")
+            if tgt["kind"] == "scene_character" and _cid:
+                _ce = _cast_by_id.get(_cid)
             sprompt = compose_still_prompt(
                 meta, kind=tgt["kind"], role=tgt["role"],
-                beat_id=tgt["beat_id"])
-            objects.append({
+                beat_id=tgt["beat_id"], char_entry=_ce)
+            _obj = {
                 "object_id": f"still_{tgt['beat_id']}",
                 "kind": tgt["kind"],
                 "role": tgt["role"],
@@ -651,7 +673,10 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "prompt": sprompt,
                 "prompt_hash": _content_hash(sprompt),
                 "source": tgt["source"],
-            })
+            }
+            if _cid:
+                _obj["char_id"] = _cid     # traceability; engine resolves by role
+            objects.append(_obj)
     return {"version": 1, "objects": objects}, warnings
 
 

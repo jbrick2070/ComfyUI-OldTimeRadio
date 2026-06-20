@@ -61,9 +61,24 @@
 > `docs/2026-06-21-allnight-864-frontier/`. **RISK: indextts2 is the headless-fragile sidecar -- a prior
 > leg crashed the server; the smoke-leg-first guard aborts cleanly if it fails -> FALLBACK = kokoro (now
 > a deep 28-voice pool).** Opus-tech `~latest` throws transient OpenRouterModelGoneError(404) -> the
-> writer gracefully SKIPS those slots (transport fail-soft), stories still write. **NEXT = (a) watch/
-> triage the soak, (b) BUILD the 3D PoC (operator-gated; pass03+pass04 + the PIN list), (c) the audio-bars
-> fix.** The S3 forward order (3D = item 5) is UNCHANGED -- this campaign IS item 5's detail spec.
+ writer gracefully SKIPS those slots (transport fail-soft), stories still write. **SOAK DONE -- 35 legs/8h
+> (results docs/2026-06-21-allnight-864-frontier/story_soak_results.csv); GPU now FREE.**
+> **>>> NEW OPERATOR DIRECTIVE + TOP-PRIORITY VISUAL FIXES (2026-06-20, docs/2026-06-20-visual-fixes/
+> VISUAL_FIXES_PLAN.md):** DIRECTIVE -- ONLY HuMo(portrait)+maybe 3D use the VERTICAL portrait; EVERY other
+> path uses LANDSCAPE 16:9. **BUG 1 (do FIRST):** character-beat stills look like bookends/scene shots, not
+> characters -- commit `8bc5381` wrongly conditions flat_still/landscape engines on the 832x1216 portrait
+> (pillarboxed -> radio-booth floor sides = the "radio booth images"). FIX = (a) render_driver: landscape
+> engines NEVER use the vertical portrait (gate on `render_aspect`, portrait ONLY for HuMo/3D); (b) image
+> phase MINTS a 16:9 CHARACTER shot for character beats (image-model agnostic) so the character shows
+> full-frame. **BUG 2 (verify-first):** the soak log shows rolling credits + procgen DID render
+> (`BUG-410 credits scroll restored 6441 frames`, PostUpscaleProcgenBlend ran) -- so verify the animated
+> START/END title card on a real obs render BEFORE changing; if missing/covered in still-only, make
+> titles+credits an ALWAYS-ON procgen overlay (engine-independent). **BUG 3:** burn the image/audio/LLM
+> model detail ONTO the rolling credits (the forensic detail I added is only in the _treatment.txt
+> sidecar). **BUG 4:** audio bars always-on overlay (docs/2026-06-20-audio-bars-fix/). BUGs 2/3/4 share the
+> always-on procgen-overlay layer. **NEXT = (a) the VISUAL FIXES above (BUG 1 first, GPU-verify each), (b)
+> BUILD the 3D PoC (pass03+pass04 + PIN list), (c) watch nothing -- soak is done.** S3 forward order (3D =
+> item 5) UNCHANGED.
 
 > **LATEST SESSION -- 2026-06-19 (CODER; STORY-QUALITY PHASE 1 BUILT + PUSHED + RE-SOAK PASS;
 > HEAD `ee83a88` == origin/v2.0-alpha; full suite 4600 passed/33 skipped, Bug Bible 16/7/3,
@@ -439,7 +454,30 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE SIDE-CAMPAIGN (operator, 2026-06-19 -- the NEXT window STARTS HERE, before the build step below):**
+**>>> ACTIVE STEP (operator, 2026-06-20 -- THIS is the current step): TOP-PRIORITY VISUAL FIXES.**
+Spec: `docs/2026-06-20-visual-fixes/VISUAL_FIXES_PLAN.md` + the 2026-06-20-NIGHT top block. HEAD `ce507e8` ==
+origin/v2.0-alpha; GPU FREE (35-leg 864 frontier soak done; 3D-PoC mesh_stage GPU smoke PASSED `60a2f4f`).
+DIRECTIVE (hard): ONLY HuMo (portrait) + maybe the 3D lane use the VERTICAL portrait; EVERY other path uses
+LANDSCAPE 16:9 images/video. Animated start/end procgen title cards + rolling credits are NON-NEGOTIABLE
+(engine-independent).
+- **#1 BUG 1 (DO FIRST):** character beats show bookend/radio-booth stills, not characters. Cause: commit
+  `8bc5381` conditions flat_still/landscape engines on the 832x1216 vertical portrait -> pillarboxed in 1472x832
+  -> the radio-booth procgen floor fills the sides. FIX (a) `render_driver.py`: landscape engines NEVER use the
+  vertical portrait -- gate on `render_aspect` (portrait ONLY for HuMo/audio_driven_face + 3D), DROP the `8bc5381`
+  `_spk=="character"->portrait` branch for landscape; (b) image phase: mint a 16:9 CHARACTER shot for character
+  beats (image-model AGNOSTIC via `resolve_engine_for_role`; medium/wide shot of the character in the scene) as
+  that beat's still. GPU-verify: a character beat shows the character full-frame 16:9, no pillarbox, no radio-booth
+  sides; HuMo still uses the portrait. Suite + Bug Bible green.
+- **#2 BUG 2 (verify-first):** eyeball a real obs final for the animated START/END title card BEFORE changing
+  (rolling credits + PostUpscaleProcgenBlend already render); only if missing/covered, make titles+credits an
+  ALWAYS-ON procgen overlay.
+- **#3 BUG 3:** burn the LLM/voice/image-model detail (from `_write_story_treatment`) ONTO the rolling credits.
+- **#4 BUG 4:** audio bars always-on overlay (`docs/2026-06-20-audio-bars-fix/`). #2/#3/#4 share one always-on
+  procgen-overlay layer.
+- **THEN:** the 3D PoC build (`docs/2026-06-20-mesh-stage-texturing/roundtable/pass03_plan.md` + `pass04_plan.md`
+  + the 4-item PIN list; chunks 6+7+3 + GPU smoke).
+
+**>>> SUPERSEDED 2026-06-20 (historical; the story-quality roundtable is PARKED, section 8) -- 2026-06-19 STORY-QUALITY side-campaign:**
 the STORY-QUALITY roundtable campaign. **R1 DONE 2026-06-19:** the grounded FIRST-PANELIST pass
 (`roundtable/pass01_opus-grounded.md`) + the 5 external panels (`docs/story_passes/pass_1/`) + the converged
 judge synthesis (`roundtable/pass01_architecture.md`) are written. The converged plan = 3 fix-moves
@@ -909,3 +947,11 @@ switchable S3-S6 (closing phase, AFTER 3D); 3D GPU lanes until S-3D-0 + the oper
 (**LTX-AV audio-input lane MOVED OUT of PARKED 2026-06-17** -- operator revived it as the CURRENT STEP
 (section 1): M1+M3 are shipped, the remaining work is recipe-align + M4 GPU smoke. It already uses the good
 Q3_K_M GGUF unet; do NOT rebuild from scratch.)
+
+(**STORY-ENGINE quality roundtable (2026-06-21) -- PARKED side campaign.** A 4-pass live roundtable converged a
+sprint-ready plan for 8 content-only story-engine fixes (length tail / costly-choice binding / ending-aware outro
+/ gender-pronouns / speech register / narration hygiene / arc-shape variety; F9 reorder + F10 anti-repeat list
+deferred). Docs: `docs/2026-06-21-allnight-864-frontier/` -- `SPRINT_READY_PLAN.md` + `STORY_ENGINE_KICKOFF.md` +
+`roundtable/pass0{1,2,3,4}_judgment.md`. All content-only inside the FIXED ledger, ZERO workflow-JSON edits
+(verified vs the real consumers). NOT active -- the visual fixes (section 1) + the forward order win. Resume only
+on an explicit operator green light.)
