@@ -156,10 +156,11 @@ workflows/*.json.bak
 !scripts/_otr_single_engine_smoke.py
 !scripts/_otr_soak_server_launch.cmd
 !scripts/_otr_soak_marathon.py
-# Per-image-engine live GPU smoke (the lumina_image promotion tool, 2026-06-18):
-# drives the engine recipe via /prompt; the reusable image counterpart to
-# _otr_single_engine_smoke.py (which is video-only).
+# Per-image-engine live GPU smoke tools (the image counterpart to the video-only
+# _otr_single_engine_smoke.py): drive the engine recipe via /prompt + measure the
+# resident peak. Keep versioned by exception.
 !scripts/_otr_lumina_image_smoke.py
+!scripts/_otr_qwen_image_smoke.py
 
 # --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
 # <output>/otr/state/ ---
