@@ -662,6 +662,52 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     return out
 
 
+# 2026-06-20: pruned + future-proof OpenRouter dropdown. The full catalog is
+# 300+ concrete slugs (a huge scroll that also dates fast). The dropdown now
+# leads with the `~author/family-latest` ROUTING ALIASES (dynamic newest per
+# family -- they never need updating when a new model ships) so the common
+# frontier picks need no scrolling. These are routing features and may not all
+# appear in /api/v1/models, so they are offered UNCONDITIONALLY (valid slugs
+# regardless of the cache). The full alphabetical catalog is opt-in via
+# OTR_OPENROUTER_FULL_CATALOG=1 for power users who need a specific concrete
+# slug. See reference_openrouter_latest_slugs (operator-supplied, doc-confirmed).
+OPENROUTER_FRONTIER_LATEST = (
+    "~anthropic/claude-opus-latest",
+    "~openai/gpt-latest",
+    "~google/gemini-pro-latest",
+    "~anthropic/claude-sonnet-latest",
+    "~anthropic/claude-haiku-latest",
+    "~anthropic/claude-fable-latest",
+    "~openai/gpt-mini-latest",
+    "~google/gemini-flash-latest",
+    "~moonshotai/kimi-latest",
+)
+
+# Providers that have NO `~latest` resolver today (so the dropdown adds their
+# single NEWEST concrete slug from the live catalog -- auto-updates as new
+# versions land, no hardcoded version to maintain).
+OPENROUTER_NO_LATEST_AUTHORS = ("x-ai",)
+
+
+def _newest_concrete_for_author(models: list[dict], author: str) -> str | None:
+    """The newest concrete slug for an author lacking a `~latest` alias (e.g.
+    x-ai/Grok). 'Newest' = highest `created`, then highest id (lexical) as a
+    tiebreak. Returns None if the author has no rows. Pure; never raises."""
+    try:
+        prefix = author.lower() + "/"
+        rows = [m for m in models if str(m.get("id", "")).lower().startswith(prefix)]
+        if not rows:
+            return None
+
+        def _key(m: dict):
+            c = m.get("created")
+            return (float(c) if isinstance(c, (int, float)) else 0.0, str(m.get("id", "")))
+
+        return sorted(rows, key=_key, reverse=True)[0]["id"]
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     """Slug-picker choices for openrouter_slot_<slot>_model (slot 'a' / 'b').
 
@@ -719,14 +765,36 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
         if fav in by_id:
             _add(fav)
 
+    # PRUNED + FUTURE-PROOF block (default view only): the `~latest` resolver
+    # aliases (dynamic newest, no scrolling, never need version bumps) + the
+    # newest concrete slug for providers lacking a `~latest` (e.g. x-ai/Grok).
+    # SKIPPED when the operator set an EXPLICIT allowlist / provider-filter --
+    # there they asked for an exact narrowed set, so we honour it verbatim.
+    allowlist = (os.environ.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
+    provider_filter = (os.environ.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
+    explicit_narrowing = bool(allowlist or provider_filter)
+    if not explicit_narrowing:
+        for mid in OPENROUTER_FRONTIER_LATEST:
+            _add(mid)
+        for author in OPENROUTER_NO_LATEST_AUTHORS:
+            newest = _newest_concrete_for_author(models, author)
+            if newest:
+                _add(newest)
+
     def _created(m: dict) -> float:
         c = m.get("created")
         return float(c) if isinstance(c, (int, float)) else 0.0
 
     for m in sorted(models, key=_created, reverse=True)[:_OPENROUTER_RECENT_COUNT]:
         _add(m["id"])
-    for m in sorted(models, key=lambda m: m["id"]):
-        _add(m["id"])
+    # The FULL alphabetical catalog (300+ slugs) is a long scroll that dates
+    # fast; in the default view it is OPT-IN (OTR_OPENROUTER_FULL_CATALOG=1) so
+    # the dropdown stays short. When the operator is explicitly narrowing
+    # (allowlist / provider-filter), show the full filtered set as before.
+    if explicit_narrowing or os.environ.get(
+            "OTR_OPENROUTER_FULL_CATALOG", "0").strip() == "1":
+        for m in sorted(models, key=lambda m: m["id"]):
+            _add(m["id"])
 
     if not models:
         # Cold / fully-filtered cache: keep the recommended default selectable

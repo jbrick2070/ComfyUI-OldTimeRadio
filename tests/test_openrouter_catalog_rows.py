@@ -324,12 +324,35 @@ def test_favorites_float_after_lead(enabled_cached, monkeypatch):
 
 
 def test_recent_tier_orders_by_created_desc(enabled_cached, monkeypatch):
-    """After the lead (opus, created 400 -> also newest), the remaining
-    models follow newest-first: deepseek(300), gpt-4o(200), grok(100)."""
+    """Default (no explicit filter) = PRUNED + future-proof view: sentinel,
+    lead, the curated ~latest resolver aliases, the newest concrete slug for a
+    no-latest provider (Grok), then the recent concretes newest-first. The full
+    alphabetical catalog is OPT-IN (not dumped) so the dropdown stays short."""
     a = cat.openrouter_catalog_dropdown_choices("a")
-    assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
-                 "anthropic/claude-opus-4.8", "deepseek/deepseek-v4-pro",
-                 "openai/gpt-4o", "x-ai/grok-2-mini"]
+    assert a[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT  # lead
+    # curated ~latest frontier resolvers are surfaced (no scrolling, future-proof)
+    assert "~anthropic/claude-opus-latest" in a
+    assert "~google/gemini-pro-latest" in a
+    assert "~openai/gpt-latest" in a
+    # newest concrete for the no-latest provider (Grok) is included
+    assert "x-ai/grok-2-mini" in a
+    # the recent CONCRETE tier stays created-desc: deepseek(300) before gpt-4o(200)
+    concretes = [x for x in a
+                 if not x.startswith("~") and x != cat.OPENROUTER_ENABLE_SENTINEL]
+    assert concretes.index("deepseek/deepseek-v4-pro") < concretes.index("openai/gpt-4o")
+
+
+def test_pruned_default_hides_full_catalog_optin_restores(enabled_cached, monkeypatch):
+    """The default view is pruned (curated ~latest + recent), and
+    OTR_OPENROUTER_FULL_CATALOG=1 restores the full alphabetical catalog."""
+    pruned = cat.openrouter_catalog_dropdown_choices("a")
+    assert "~anthropic/claude-opus-latest" in pruned   # curated present
+    monkeypatch.setenv("OTR_OPENROUTER_FULL_CATALOG", "1")
+    full = cat.openrouter_catalog_dropdown_choices("a")
+    # the full opt-in is a superset of the pruned view (still curated-led)
+    assert set(pruned).issubset(set(full))
+    assert "~anthropic/claude-opus-latest" in full
 
 
 # --- enabled but cold/empty cache ------------------------------------------
