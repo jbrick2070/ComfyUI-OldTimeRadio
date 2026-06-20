@@ -76,7 +76,8 @@
         "bbc"
       ],
       "roles": [
-        "announcer_voice"
+        "announcer_voice",
+        "char_voice"
       ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bm_george.pt",
@@ -1761,6 +1762,198 @@
       "age_band": "adult",
       "ref_path": "models/TTS/refs/indextts2/vz_bill_boerst.wav",
       "ref_sha256": "be4815e4fb760ba1b78117545a260cce4a4c124c7657bc5c6127a0fef8ba661f",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_heart",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "warm",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_heart.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_kore",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_kore.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_sarah",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "bright",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_sarah.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bf_lily",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "relaxed",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bf_lily.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_adam",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "steady",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_adam.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_echo",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "smooth",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_echo.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_eric",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "crisp",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_eric.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_fenrir",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "deep",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_fenrir.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_michael",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "warm",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_michael.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_onyx",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "rich",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_onyx.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bm_fable",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "relaxed",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bm_fable.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bm_lewis",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "measured",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bm_lewis.pt",
+      "ref_sha256": "pending",
       "commercial_clean": true
     }
   ]
