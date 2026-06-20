@@ -397,6 +397,37 @@ def run_post_script_spine(
                                            "error": type(exc).__name__}
             log.warning("[OTR_StorySpine] micro-repair failed: %r", exc)
 
+    # --- Stage 3.6: deterministic mechanical anti-loop / dedupe (A4) -----
+    # Story-quality Phase 1, UNCONDITIONAL repair-target source. The story
+    # critic returns StoryCriticReport.clean() identically whether it
+    # succeeded, found nothing, or silently failed, so a deterministic floor
+    # is the only thing that guarantees real loop/dup defects get repaired.
+    # CHARACTER near-duplicate + "What if...?" loop targets are recomposed
+    # here via the creative slot (the one repair owner); the announcer
+    # open/close taglines are EXEMPT and owned by the announcer composer
+    # (A6). Runs BEFORE the writer-LLM unload so the creative slot is still
+    # resident. No-LLM detection; recompose is the same fail-soft seam the
+    # editor uses (any error degrades to KEEP, never corrupts a beat).
+    try:
+        from . import _otr_anti_loop as _AL
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_anti_loop as _AL  # type: ignore
+    try:
+        _al_recompose = _make_recompose_fn(led, creative_generate_fn)
+        ctx = (
+            slot_scheduler.helper_context("anti_loop")
+            if slot_scheduler is not None
+            else _nullcontext()
+        )
+        with ctx:
+            _al_summary = _AL.repair_character_anti_loops(
+                led, _voiced_lines(led), _al_recompose,
+            )
+        meta["anti_loop_report"] = _al_summary
+    except Exception as exc:  # noqa: BLE001 -- anti-loop must never break a run
+        meta["anti_loop_report"] = {"status": f"ERROR:{type(exc).__name__}"}
+        log.warning("[OTR_StorySpine] anti-loop repair failed: %r", exc)
+
     # --- Writer-LLM unload (D8): after the LLM passes, before scrub -----
     _unload_writer_llm(meta)
 
