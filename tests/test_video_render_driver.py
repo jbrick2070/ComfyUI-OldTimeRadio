@@ -147,3 +147,36 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
     req2 = rd.build_request_from_shot(shot("ltx_video", "text_to_video"), ledger)
     assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (768, 432)
+
+
+def test_flat_still_character_beat_holds_portrait_not_scene():
+    """2026-06-20: still-only (flat_still / flux_still) CHARACTER beats hold the
+    character PORTRAIT (mirror the HuMo/audio-driven-face path) so a still-only
+    character shot SHOWS the character -- not a pooled scene/radio still. The
+    portrait is whatever IMAGE engine rendered it (z_image / flux2 / ...), so
+    this is image-model agnostic. Non-character beats keep the scene still."""
+    ledger = {
+        "video": {"video_revision": 1, "shots": []},
+        "lines": [
+            {"line_id": "b002", "beat_id": "b002", "char_id": "c01",
+             "speaker_role": "character", "start_s": 0.0, "dur_s": 2.0},
+            {"line_id": "b003", "beat_id": "b003", "char_id": "",
+             "speaker_role": "music", "start_s": 2.0, "dur_s": 2.0},
+        ],
+        "images": {"images": [
+            {"object_id": "c01", "kind": "portrait", "path": "portrait_c01.png"},
+            {"beat_id": "b002", "kind": "scene_default", "path": "scene_b002.png"},
+            {"beat_id": "b003", "kind": "scene_default", "path": "scene_b003.png"},
+        ]},
+    }
+
+    def shot(beat, cid):
+        return {"shot_id": "shot_" + beat, "beat_id": beat,
+                "engine_id": "flat_still", "family": "static_image_gen",
+                "target_frame_count": 50, "source_line_ids": [beat],
+                "char_id": cid, "creative": {}}
+
+    req_char = rd.build_request_from_shot(shot("b002", "c01"), ledger)
+    assert req_char["asset_refs"].get("init_image") == "portrait_c01.png"
+    req_music = rd.build_request_from_shot(shot("b003", ""), ledger)
+    assert req_music["asset_refs"].get("init_image") == "scene_b003.png"

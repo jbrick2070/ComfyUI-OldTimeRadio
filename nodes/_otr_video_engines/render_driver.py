@@ -728,7 +728,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
-        if _still:
+        _spk = str(shot.get("shot_role") or line.get("speaker_role") or "")
+        # 2026-06-20: CHARACTER beats hold the character PORTRAIT (mirror the
+        # HuMo / audio-driven-face path) so still-only character shots SHOW the
+        # character -- not a pooled scene/radio still. Announcer / music / scene
+        # / b-roll beats keep the beat's scene still. Falls back to the scene
+        # still if a character somehow lacks a portrait.
+        if _spk == "character" and portrait:
+            init_image = portrait
+            init_source = "portrait"
+            _LOG.info(
+                "[OTR.render_driver] %s: beat %s (character) conditioning on "
+                "PORTRAIT %s (HuMo-style character shot)",
+                _eng, _bid, os.path.basename(portrait))
+        elif _still:
             init_image = _still
             init_source = "scene_still"
             _LOG.info(
