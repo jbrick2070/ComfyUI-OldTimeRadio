@@ -231,13 +231,18 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     segments = []
     cursor = 0
 
-    def emit(source, path, n, src_start, shot_id=None, engine_id=None, loop=False):
+    def emit(source, path, n, src_start, shot_id=None, engine_id=None, loop=False,
+             bg_still_path=""):
         if int(n) <= 0:
             return
         segments.append({
             "order": len(segments), "shot_id": shot_id, "source": source,
             "path": path or "", "src_start_frame": int(src_start),
-            "n_frames": int(n), "engine_id": engine_id, "loop": bool(loop)})
+            "n_frames": int(n), "engine_id": engine_id, "loop": bool(loop),
+            # C1 (textured-hero 3D PoC): a per-clip generated background plate
+            # for a directory-alpha clip (mesh_stage). Empty for every other
+            # beat -> the legacy floor/black background is byte-identical.
+            "bg_still_path": str(bg_still_path or "")})
 
     def _floor_aligned(start_cursor, n):
         """Timeline-aligned floor slice start (production restore 2026-06-10):
@@ -263,7 +268,8 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 cursor = start_frame
             if r.get("exists") and r.get("path"):
                 _warn_clip_underrun(r, n)
-                emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
+                emit("clip", r.get("path"), n, 0, r.get("shot_id"),
+                     r.get("engine_id"), bg_still_path=r.get("bg_still_path"))
             else:
                 emit(gap_src, "", n, _floor_aligned(cursor, n),
                      r.get("shot_id"), r.get("engine_id"))
@@ -273,7 +279,8 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             n = int(r.get("target_frame_count") or 0)
             if r.get("exists") and r.get("path"):
                 _warn_clip_underrun(r, n)
-                emit("clip", r.get("path"), n, 0, r.get("shot_id"), r.get("engine_id"))
+                emit("clip", r.get("path"), n, 0, r.get("shot_id"),
+                     r.get("engine_id"), bg_still_path=r.get("bg_still_path"))
             elif floor_available:
                 start = min(cursor, max(0, ff - n)) if ff else cursor
                 emit("floor", "", n, start, r.get("shot_id"), r.get("engine_id"))
@@ -301,7 +308,8 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             # credits tail instead of tpad-cloning its final frame (the frozen
             # image). The green rolling credits still ride on top.
             emit("clip", _last_clip.get("path"), tail_n, 0,
-                 _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True)
+                 _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True,
+                 bg_still_path=_last_clip.get("bg_still_path"))
         else:
             emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
@@ -393,12 +401,17 @@ def _write_frames_concat(frames, listfile, fps):
 
 
 def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
-                             bg_path="", bg_start_frame=0):
+                             bg_path="", bg_start_frame=0, bg_is_still=False):
     """One canonical silent segment of EXACTLY ``n_frames`` from a straight-
     alpha frame DIRECTORY: frames sorted by name -> overlay (centered) on the
     background -> flatten yuv420p. FAIL CLOSED on a bad directory or ffmpeg
     error. ``bg_path`` (the floor) is sliced at ``bg_start_frame``; absent ->
-    black."""
+    black.
+
+    ``bg_is_still=True`` (the textured-hero 3D PoC, C1): ``bg_path`` is a single
+    STILL PLATE image, not a video -- it is looped (``-loop 1``) and held for the
+    full ``n_frames`` (the generated background behind the turntable mesh). The
+    slice ``bg_start_frame`` is irrelevant for a still and ignored."""
     try:
         from ._otr_video_engines.directory_clip import list_directory_frames
     except ImportError:  # pragma: no cover -- flat test imports
@@ -408,7 +421,14 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
     listfile = os.path.join(
         workdir, os.path.basename(seg_path) + ".frames.ffconcat")
     _write_frames_concat(frames, listfile, fps)
-    if bg_path and os.path.isfile(bg_path):
+    if bg_path and os.path.isfile(bg_path) and bg_is_still:
+        # A single still plate: loop it to fill the beat (no trim/tpad needed --
+        # the loop + the overlay eof_action=repeat hold it for every frame).
+        bg_in = ["-loop", "1", "-i", bg_path]
+        bg_filter = ("[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,"
+                     "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d[bg]"
+                     % (w, h, w, h, fps))
+    elif bg_path and os.path.isfile(bg_path):
         bg_in = ["-i", bg_path]
         trim = (("trim=start_frame=%d,setpts=PTS-STARTPTS,"
                  % int(bg_start_frame)) if int(bg_start_frame) > 0 else "")
@@ -534,11 +554,19 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                 elif not os.path.isfile(seg["path"]):
                     kind = "floor" if floor_ok else "black"   # vanished clip
             if kind == "dir_clip":
+                # C1 (textured-hero 3D PoC): a per-clip generated still plate is
+                # the background behind the turntable mesh when present; else the
+                # legacy floor slice / black (byte-identical for every non-3D
+                # directory clip).
+                plate = seg.get("bg_still_path") or ""
+                use_still = bool(plate) and os.path.isfile(plate)
                 _encode_segment_from_dir(
                     fb, seg["path"], seg["n_frames"], seg_path,
                     w=w, h=h, fps=fps,
-                    bg_path=base_video_path if floor_ok else "",
-                    bg_start_frame=seg["src_start_frame"])
+                    bg_path=(plate if use_still
+                             else (base_video_path if floor_ok else "")),
+                    bg_start_frame=seg["src_start_frame"],
+                    bg_is_still=use_still)
             elif kind == "clip":
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=0,

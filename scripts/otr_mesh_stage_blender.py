@@ -5,24 +5,35 @@ Runs INSIDE the pinned portable Blender's bundled python:
     blender --background --factory-startup --python-exit-code 1
             --python otr_mesh_stage_blender.py -- <args>
 
-ONE v1 camera preset (turntable orbit: fixed radius/elevation, one full
-revolution, LINEAR interpolation), ONE material mode (WORKBENCH matcap;
-Color Attribute when the mesh carries vertex colors), film transparent ->
-straight-alpha RGBA PNGs, EXACT ledger frame count (frame_start=1,
-frame_end=N inclusive, step=1), fixed thread count. EEVEE is BANNED v1
-headless (fail-closed). CYCLES is the v1.5 tier and carries the
-determinism pins (fixed seed = request seed, use_animated_seed=False,
-fixed samples, adaptive + denoise OFF).
+ONE v1 camera preset (a BOUNDED hero arc: fixed radius/elevation, a
+start angle + a small arc in degrees, LINEAR interpolation), ONE material
+mode (WORKBENCH matcap; Color Attribute when the mesh carries vertex
+colors), film transparent -> straight-alpha RGBA PNGs, EXACT ledger frame
+count (frame_start=1, frame_end=N inclusive, step=1), fixed thread count.
+EEVEE is BANNED v1 headless (fail-closed). CYCLES is the v1.5 tier and
+carries the determinism pins (fixed seed = request seed,
+use_animated_seed=False, fixed samples, adaptive + denoise OFF).
+
+SINGLE-VIEW VERTEX-COLOR PROJECTION (the textured-hero PoC, 2026-06-20):
+when a ``--portrait`` image is supplied the stage projects it onto a
+per-VERTEX (point-domain) color attribute ``otr_proj`` -- the hero front
+(the +X-facing camera-zero view) is painted from the still and rendered by
+WORKBENCH ``color_type='VERTEX'``. The GLB stays GEOMETRY-ONLY on disk (the
+mesher never writes color; MESHER_VERSION is NOT bumped) -- the projection
+is a per-render Blender step. The hero arc is bounded so the unpainted back
+never faces camera.
 
 Modes: ``render`` imports the --glb mesh; ``selftest`` (E-6 cube probe)
 builds a cube, exports it to GLB, re-imports that GLB (proving the GLB IO
-seam), and renders 3 frames -- the SAME stage path as production.
+seam), projects a deterministic in-memory portrait, and renders 3 frames --
+the SAME stage path as production. The selftest FAILS nonzero unless a
+NON-UNIFORM ``otr_proj`` color attribute exists after projection.
 
 The host (eng_mesh_stage) validates frame count + dims + RGBA AFTER this
 exits and publishes atomically; this script renders into the tmp dir it
 was given and exits nonzero on ANY exception (a partial render never
 publishes). Module scope imports NO bpy so the OTR test suite can import
-the pure arg parser. ASCII, UTF-8 no BOM.
+the pure arg parser + the pure projection math. ASCII, UTF-8 no BOM.
 """
 from __future__ import annotations
 
@@ -46,6 +57,14 @@ def parse_stage_args(argv):
     p.add_argument("--radius", type=float, default=2.5)
     p.add_argument("--elevation", type=float, default=0.35)
     p.add_argument("--threads", type=int, default=4)
+    #: The hero still projected onto the front-facing vertices (optional; the
+    #: GLB stays geometry-only, projection is per-render). Empty = flat matcap.
+    p.add_argument("--portrait", default="")
+    #: Bounded hero arc (degrees). start-angle is the camera azimuth at frame 1
+    #: (0 = the +X front the projection paints); arc-degrees is the sweep. The
+    #: arc is CLAMPED <= MAX_ARC_DEGREES so the unpainted back never shows.
+    p.add_argument("--start-angle", dest="start_angle", type=float, default=0.0)
+    p.add_argument("--arc-degrees", dest="arc_degrees", type=float, default=45.0)
     args = p.parse_args(argv)
     if args.frames < 1:
         p.error("--frames must be >= 1")
@@ -61,6 +80,89 @@ def _script_argv():
     if "--" in sys.argv:
         return sys.argv[sys.argv.index("--") + 1:]
     return []
+
+
+# --------------------------------------------------------------------------- #
+# Pure projection + arc math (CPU-tested; NO bpy).
+# --------------------------------------------------------------------------- #
+#: The hero arc never exceeds this (degrees) -- single-view projection only
+#: paints the +X front, so the camera must stay near it (no unpainted back).
+MAX_ARC_DEGREES = 45.0
+
+#: The color attribute the projection writes (per-vertex, point domain).
+PROJ_ATTR_NAME = "otr_proj"
+
+
+def clamp_arc_degrees(arc_degrees):
+    """Clamp the requested sweep into [-MAX_ARC_DEGREES, +MAX_ARC_DEGREES]
+    (pure). The single-view projection only covers the front hemisphere."""
+    a = float(arc_degrees)
+    if a > MAX_ARC_DEGREES:
+        return MAX_ARC_DEGREES
+    if a < -MAX_ARC_DEGREES:
+        return -MAX_ARC_DEGREES
+    return a
+
+
+def arc_keyframes(frames, start_angle, arc_degrees):
+    """Pure: the bounded hero-arc keyframes as ``[(frame, angle_radians), ...]``.
+    frames==1 -> ONE keyframe at frame 1 (a still hero shot, no fcurve).
+    frames>=2 -> a LINEAR sweep from start_angle to start_angle+arc over
+    frames 1..N inclusive. The arc is CLAMPED to +/-MAX_ARC_DEGREES first."""
+    n = int(frames)
+    if n < 1:
+        raise ValueError("arc_keyframes: frames must be >= 1, got %r" % (frames,))
+    start_rad = math.radians(float(start_angle))
+    sweep_rad = math.radians(clamp_arc_degrees(arc_degrees))
+    if n == 1:
+        return [(1, start_rad)]
+    out = []
+    for i in range(n):
+        t = i / (n - 1)
+        out.append((i + 1, start_rad + sweep_rad * t))
+    return out
+
+
+def project_uv(co_y, co_z):
+    """Pure single-view orthographic UV for a vertex at normalized object
+    coords (longest dim 1.0, centered at origin so coords ~[-0.5, 0.5]). The
+    front view looks down -X (camera at +X), so the image plane is (Y, Z):
+    u (left->right) from Y, t (top->bottom) from Z. Returns (u, t) clamped to
+    [0, 1]."""
+    u = 0.5 + float(co_y)
+    t = 0.5 - float(co_z)
+    if u < 0.0:
+        u = 0.0
+    elif u > 1.0:
+        u = 1.0
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    return u, t
+
+
+def sample_image(pixels, width, height, u, t):
+    """Pure nearest-neighbour sample of a Blender-style flat RGBA pixel buffer
+    (bottom-origin, row-major, length width*height*4). ``u`` is left->right and
+    ``t`` is top->bottom in [0, 1]. Returns (r, g, b) floats in [0, 1]."""
+    w = int(width)
+    h = int(height)
+    if w < 1 or h < 1:
+        return (0.5, 0.5, 0.5)
+    px = int(round(u * (w - 1)))
+    # t is top->bottom; Blender buffers are bottom-origin -> flip.
+    row_from_bottom = int(round((1.0 - t) * (h - 1)))
+    if px < 0:
+        px = 0
+    elif px > w - 1:
+        px = w - 1
+    if row_from_bottom < 0:
+        row_from_bottom = 0
+    elif row_from_bottom > h - 1:
+        row_from_bottom = h - 1
+    idx = (row_from_bottom * w + px) * 4
+    return (float(pixels[idx]), float(pixels[idx + 1]), float(pixels[idx + 2]))
 
 
 # --------------------------------------------------------------------------- #
@@ -110,10 +212,65 @@ def _has_vertex_colors(meshes):
     return False
 
 
-def _build_turntable(bpy, radius, elevation, frames):
+def _project_portrait_onto_meshes(bpy, meshes, image):
+    """Single-view vertex-color projection: create a per-VERTEX (point-domain)
+    ``otr_proj`` color attribute on EVERY imported mesh, set it active+render,
+    and paint each vertex from the portrait via the front (Y, Z) projection.
+    Returns the count of DISTINCT colors written across all meshes (the
+    selftest's non-uniformity gate). Guards zero-vert/zero-poly meshes."""
+    pixels = list(image.pixels)
+    w, h = int(image.size[0]), int(image.size[1])
+    seen = set()
+    for obj in meshes:
+        mesh = getattr(obj, "data", None)
+        if mesh is None:
+            continue
+        verts = getattr(mesh, "vertices", ())
+        if not len(verts):
+            continue                              # guard zero-vert meshes
+        ca = mesh.color_attributes.new(name=PROJ_ATTR_NAME, type="FLOAT_COLOR",
+                                       domain="POINT")
+        mw = obj.matrix_world
+        for i, v in enumerate(verts):
+            co = mw @ v.co                         # normalized, centered coords
+            u, t = project_uv(co.y, co.z)
+            r, g, b = sample_image(pixels, w, h, u, t)
+            ca.data[i].color = (r, g, b, 1.0)
+            seen.add((round(r, 4), round(g, 4), round(b, 4)))
+        # Make otr_proj the ACTIVE + RENDER color attribute (Workbench VERTEX
+        # shading draws the render color attribute).
+        try:
+            mesh.color_attributes.active_color = ca
+        except Exception:                          # noqa: BLE001 - API variance
+            pass
+        for attr in ("active_color_index", "render_color_index"):
+            try:
+                idx = list(mesh.color_attributes).index(ca)
+                setattr(mesh.color_attributes, attr, idx)
+            except Exception:                      # noqa: BLE001 - API variance
+                pass
+    return len(seen)
+
+
+def _make_selftest_portrait(bpy):
+    """A deterministic NON-UNIFORM in-memory portrait for the E-6 selftest (no
+    file IO, no PIL): an 8x8 RGBA image with a Y/Z gradient."""
+    w = h = 8
+    img = bpy.data.images.new("otr_selftest_portrait", width=w, height=h,
+                              alpha=True)
+    px = []
+    for row in range(h):
+        for col in range(w):
+            px.extend((col / (w - 1), row / (h - 1), 0.5, 1.0))
+    img.pixels = px
+    return img
+
+
+def _build_turntable(bpy, radius, elevation, frames, start_angle, arc_degrees):
     """The ONE v1 camera preset: a pivot empty at the origin, the camera
-    parented at (radius, elevation), tracking the origin; the pivot turns a
-    single full revolution over frames 1..N with LINEAR interpolation."""
+    parented at (radius, elevation), tracking the origin; the pivot sweeps a
+    BOUNDED hero arc (start_angle .. start_angle+arc) over frames 1..N with
+    LINEAR interpolation. frames==1 -> a single keyframe (no fcurve)."""
     scene = bpy.context.scene
     pivot = bpy.data.objects.new("otr_pivot", None)
     scene.collection.objects.link(pivot)
@@ -127,14 +284,14 @@ def _build_turntable(bpy, radius, elevation, frames):
     track.track_axis = "TRACK_NEGATIVE_Z"
     track.up_axis = "UP_Y"
     scene.camera = cam
-    pivot.rotation_euler = (0.0, 0.0, 0.0)
-    pivot.keyframe_insert(data_path="rotation_euler", frame=1)
-    pivot.rotation_euler = (0.0, 0.0, 2.0 * math.pi)
-    pivot.keyframe_insert(data_path="rotation_euler", frame=max(2, frames))
-    action = pivot.animation_data.action
-    for fcu in action.fcurves:
-        for kp in fcu.keyframe_points:
-            kp.interpolation = "LINEAR"
+    keys = arc_keyframes(frames, start_angle, arc_degrees)
+    for frame, angle in keys:
+        pivot.rotation_euler = (0.0, 0.0, angle)
+        pivot.keyframe_insert(data_path="rotation_euler", frame=frame)
+    if pivot.animation_data and pivot.animation_data.action:
+        for fcu in pivot.animation_data.action.fcurves:
+            for kp in fcu.keyframe_points:
+                kp.interpolation = "LINEAR"
     return cam
 
 
@@ -196,7 +353,21 @@ def main():
             glb = _selftest_glb(bpy, args.out)
         meshes = _import_glb(bpy, glb)
         _normalize_meshes(bpy, meshes)
-        _build_turntable(bpy, args.radius, args.elevation, args.frames)
+        # Projection: a file portrait in render mode, a deterministic in-memory
+        # gradient in selftest -- both paint the otr_proj vertex colors.
+        if args.mode == "selftest":
+            image = _make_selftest_portrait(bpy)
+            distinct = _project_portrait_onto_meshes(bpy, meshes, image)
+            if distinct < 2:
+                raise RuntimeError(
+                    "mesh_stage selftest: projection produced a UNIFORM color "
+                    "attribute (%d distinct) -- vertex-color projection is "
+                    "broken" % distinct)
+        elif args.portrait:
+            image = bpy.data.images.load(args.portrait)
+            _project_portrait_onto_meshes(bpy, meshes, image)
+        _build_turntable(bpy, args.radius, args.elevation, args.frames,
+                         args.start_angle, args.arc_degrees)
         _configure_render(bpy, args, _has_vertex_colors(meshes))
         bpy.ops.render.render(animation=True)
         if args.mode == "selftest":
@@ -205,8 +376,9 @@ def main():
                 os.remove(glb)                       # frames only in the dir
             except OSError:
                 pass
-        print("[otr_mesh_stage_blender] OK mode=%s frames=%d %dx%d"
-              % (args.mode, args.frames, args.width, args.height))
+        print("[otr_mesh_stage_blender] OK mode=%s frames=%d %dx%d portrait=%s"
+              % (args.mode, args.frames, args.width, args.height,
+                 "yes" if (args.mode == "selftest" or args.portrait) else "no"))
     except SystemExit:
         raise
     except BaseException:

@@ -228,5 +228,117 @@ def test_vanished_directory_clip_gap_fills_black(tmp_path):
     assert _px(buf, W // 2, H // 2) <= (12, 12, 12)      # black gap-fill
 
 
+# --------------------------------------------------------------------------- #
+# C1 -- the textured-hero 3D PoC per-clip still PLATE background
+# --------------------------------------------------------------------------- #
+def _green_plate(path, w=W, h=H):
+    """A solid GREEN still plate (the generated background behind the mesh)."""
+    Image.new("RGB", (w, h), (0, 255, 0)).save(path)
+    return str(path)
+
+
+def _manifest_with_plate(d, plate):
+    m = _manifest_with_dir_clip(d)
+    m["clips"][0]["bg_still_path"] = str(plate)
+    return m
+
+
+def test_build_clip_manifest_stamps_mesh_stage_plate(tmp_path):
+    """A mesh_stage directory clip gets its bg_still_path stamped from the
+    beat's scene still (ledger images), and ONLY when the plate file exists.
+    A non-mesh engine never gets the field (byte-identical)."""
+    d = tmp_path / "frames"
+    _write_frames(d)
+    plate = _green_plate(tmp_path / "scene_b001.png")
+    result = {
+        "ledger": {
+            "video": {
+                "video_revision": 1, "fps": FPS,
+                "canonical_canvas": {"w": W, "h": H},
+                "shots": [
+                    {"shot_id": "shot_b001", "source_line_ids": ["b001"],
+                     "engine_id": "mesh_stage", "family": "image_to_video",
+                     "target_frame_count": N_FRAMES},
+                ]},
+            "images": {"images": [
+                {"beat_id": "b001", "kind": "scene_beat", "path": str(plate)},
+            ]}},
+        "clips": {"shot_b001": dict(_dir_clip(d), engine_id="mesh_stage",
+                                    family="image_to_video")},
+    }
+    row = rd.build_clip_manifest(result, episode_id="ep_mesh")["clips"][0]
+    assert row["engine_id"] == "mesh_stage"
+    assert row["bg_still_path"] == str(plate)
+    # Plate file missing -> no bogus path on the manifest channel (LOUD warn).
+    result["ledger"]["images"]["images"][0]["path"] = str(tmp_path / "gone.png")
+    row2 = rd.build_clip_manifest(result, episode_id="ep_mesh")["clips"][0]
+    assert "bg_still_path" not in row2
+    # A non-mesh engine never carries the field (eid comes from the clip).
+    result["ledger"]["images"]["images"][0]["path"] = str(plate)   # restore
+    result["clips"]["shot_b001"] = dict(_dir_clip(d), engine_id="triposg_talk",
+                                        family="character_3d")
+    row3 = rd.build_clip_manifest(result, episode_id="ep_mesh")["clips"][0]
+    assert row3["engine_id"] == "triposg_talk"
+    assert "bg_still_path" not in row3
+
+
+def test_segment_carries_bg_still_path():
+    """The planner propagates a clip row's bg_still_path into its segment dict
+    (the field is dead-on-arrival without this); other beats carry ''."""
+    plate = "C:/plate.png"
+    m = {"fps": FPS, "total_target_frames": N_FRAMES, "clips": [{
+        "order": 0, "shot_id": "b001", "engine_id": "mesh_stage",
+        "path": "C:/frames", "target_frame_count": N_FRAMES,
+        "start_s": None, "exists": True, "bg_still_path": plate}]}
+    segs, _ = sc.plan_timeline_segments(m, target_total_frames=N_FRAMES, fps=FPS)
+    clip_segs = [s for s in segs if s["source"] == "clip"]
+    assert clip_segs and clip_segs[0]["bg_still_path"] == plate
+    # A plain beat with no plate -> empty string (legacy byte-identical).
+    m2 = {"fps": FPS, "total_target_frames": N_FRAMES, "clips": [{
+        "order": 0, "shot_id": "b001", "engine_id": "ltx_video",
+        "path": "C:/frames", "target_frame_count": N_FRAMES,
+        "start_s": None, "exists": True}]}
+    segs2, _ = sc.plan_timeline_segments(m2, target_total_frames=N_FRAMES, fps=FPS)
+    assert [s for s in segs2 if s["source"] == "clip"][0]["bg_still_path"] == ""
+
+
+def test_dir_clip_composites_over_still_plate(tmp_path):
+    """A directory clip with a per-clip still PLATE composites the half-alpha
+    red mesh frames OVER the generated background: the center is red+green
+    blend, the corner (outside the fg overlay) shows the PLATE green -- NOT
+    black. Proves the still-aware bg branch fills the beat from the plate."""
+    if not sc._ffmpeg_bin("ffmpeg"):
+        pytest.skip("ffmpeg not on PATH")
+    d = tmp_path / "frames"
+    _write_frames(d)
+    plate = _green_plate(tmp_path / "plate.png")
+    out = str(tmp_path / "plated.mp4")
+    silent, _ = sc.assemble_silent_timeline(
+        _manifest_with_plate(d, plate), "", out, w=W, h=H, fps=FPS)
+    assert sc.count_video_frames(out) == N_FRAMES          # exact budget
+    assert sc.count_audio_streams(out) == 0                # V-1 silent
+    buf = _decode_rgb_frame(out)
+    r, g, b = _px(buf, 4, 4)                                # outside the overlay
+    assert g >= 200 and r <= 60 and b <= 60, (r, g, b)     # the PLATE, not black
+    rc, gc, bc = _px(buf, W // 2, H // 2)                   # red over green plate
+    assert rc >= 90 and gc >= 90, (rc, gc, bc)             # blended, not pure
+
+
+def test_dir_clip_missing_plate_falls_back_to_black(tmp_path):
+    """A bg_still_path pointing at a NONEXISTENT plate does not crash the
+    composite -- with no floor it falls back to black (the still branch is
+    file-existence guarded)."""
+    if not sc._ffmpeg_bin("ffmpeg"):
+        pytest.skip("ffmpeg not on PATH")
+    d = tmp_path / "frames"
+    _write_frames(d)
+    m = _manifest_with_plate(d, tmp_path / "no_such_plate.png")
+    out = str(tmp_path / "noplate.mp4")
+    silent, _ = sc.assemble_silent_timeline(m, "", out, w=W, h=H, fps=FPS)
+    assert sc.count_video_frames(out) == N_FRAMES
+    buf = _decode_rgb_frame(out)
+    assert _px(buf, 4, 4) <= (12, 12, 12)                  # black gap-fill
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

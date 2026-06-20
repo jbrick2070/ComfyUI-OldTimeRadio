@@ -150,12 +150,18 @@ def write_manifest(manifest, path):
 # --------------------------------------------------------------------------- #
 def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
                       seed, *, mode="render", engine="WORKBENCH",
-                      stage_script=None):
+                      stage_script=None, portrait="", start_angle=None,
+                      arc_degrees=None):
     """The headless Blender invocation (E-3): ``--background
     --factory-startup --python-exit-code 1 --python stage.py -- <args>``.
     ``--python-exit-code 1`` makes ANY unhandled stage exception a nonzero
-    Blender exit (fail-closed: a partial render never publishes). Pure."""
-    return [
+    Blender exit (fail-closed: a partial render never publishes). Pure.
+
+    ``portrait`` (optional): the resolved hero still projected onto the
+    front-facing vertices (the textured-hero PoC). Appended only when set, so
+    the legacy flat-matcap invocation is byte-identical. ``start_angle`` /
+    ``arc_degrees`` (optional): the bounded hero arc, appended only when set."""
+    cmd = [
         str(blender_exe), "--background", "--factory-startup",
         "--python-exit-code", "1",
         "--python", str(stage_script or STAGE_SCRIPT), "--",
@@ -168,6 +174,13 @@ def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
         "--seed", str(int(seed or 0)),
         "--render-engine", str(engine),
     ]
+    if portrait:
+        cmd += ["--portrait", str(portrait)]
+    if start_angle is not None:
+        cmd += ["--start-angle", str(float(start_angle))]
+    if arc_degrees is not None:
+        cmd += ["--arc-degrees", str(float(arc_degrees))]
+    return cmd
 
 
 #: Env keys that must never leak from the ComfyUI venv into Blender's bundled
@@ -649,7 +662,15 @@ class MeshStageEngine(_CheapFamilyBase):
         os.makedirs(parent, exist_ok=True)
         cleanup_stale_tmp(parent)
         tmp_dir = tempfile.mkdtemp(prefix="otr_mesh_tmp_", dir=parent)
-        cmd = build_blender_cmd(blender, glb_path, tmp_dir, n, w, h, seed)
+        # Textured-hero PoC: project the RESOLVED portrait/still onto the front
+        # vertices (the GLB stays geometry-only). The bounded hero arc keeps the
+        # unpainted back off-camera; knobs are env-tunable, defaults in-script.
+        sa = os.environ.get("OTR_MESH_STAGE_START_ANGLE")
+        ad = os.environ.get("OTR_MESH_STAGE_ARC_DEGREES")
+        cmd = build_blender_cmd(
+            blender, glb_path, tmp_dir, n, w, h, seed, portrait=still,
+            start_angle=(float(sa) if sa else None),
+            arc_degrees=(float(ad) if ad else None))
         self._spawn_blender(cmd)
         validate_frame_dir(tmp_dir, n, w, h)
         final_dir = os.path.join(

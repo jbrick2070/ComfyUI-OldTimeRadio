@@ -1729,7 +1729,7 @@ def build_clip_manifest(result, *, episode_id=""):
         row_char = str(shot.get("char_id")
                        or lines.get(bid, {}).get("char_id") or "")
         trow = trace_by_shot.get(str(sid or ""), {})
-        rows.append({
+        row = {
             "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
             "role": str(shot.get("role") or ""),
@@ -1744,7 +1744,26 @@ def build_clip_manifest(result, *, episode_id=""):
             "init_source": str(trow.get("init_source") or ""),
             "init_image_used": str(trow.get("init_image") or ""),
             "exists": exists,
-        })
+        }
+        # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
+        # turntable mesh on a TRANSPARENT background -- it composites over a
+        # GENERATED scene PLATE (the per-beat scene-still coverage already mints
+        # one via the per-role image engine, so the plate is image-model
+        # AGNOSTIC). Stamp it ONLY when the file exists (os.path.isfile -> never
+        # a None/"null" path rides the manifest channel); a missing plate warns
+        # LOUD and the composite falls back to the floor/black (never silent).
+        # The field is OPTIONAL: every non-mesh row omits it -> byte-identical.
+        if exists and ctype == "directory" and str(eid) == "mesh_stage":
+            _plate = _still_index(led).get(bid, "")
+            if _plate and os.path.isfile(_plate):
+                row["bg_still_path"] = _plate
+            else:
+                _LOG.warning(
+                    "[OTR.render_driver] mesh_stage beat %s has NO scene plate "
+                    "(bg_still_path) -- the textured 3D hero composites over the "
+                    "floor/black fallback (LOUD; expected a per-beat scene still)",
+                    bid)
+        rows.append(row)
         if exists:
             hist[eid] = hist.get(eid, 0) + 1
     manifest = {

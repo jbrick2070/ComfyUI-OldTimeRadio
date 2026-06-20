@@ -352,6 +352,85 @@ def test_stage_script_parser_contract():
     assert sf.mode == "selftest" and sf.glb == ""
 
 
+def test_stage_script_parser_portrait_and_arc():
+    stage = _load_stage()
+    a = stage.parse_stage_args(
+        ["--mode", "render", "--glb", "C:/m.glb", "--out", "C:/o",
+         "--frames", "169", "--width", "1472", "--height", "832",
+         "--portrait", "C:/p.png", "--start-angle", "10", "--arc-degrees", "30"])
+    assert a.portrait == "C:/p.png"
+    assert a.start_angle == 10.0 and a.arc_degrees == 30.0
+    # Defaults: no portrait, the bounded-arc defaults.
+    b = stage.parse_stage_args(
+        ["--mode", "render", "--glb", "C:/m.glb", "--out", "C:/o",
+         "--frames", "3", "--width", "64", "--height", "64"])
+    assert b.portrait == "" and b.start_angle == 0.0 and b.arc_degrees == 45.0
+
+
+def test_arc_keyframes_single_and_bounded_sweep():
+    stage = _load_stage()
+    import math
+    # frames==1 -> ONE keyframe at frame 1 (a still hero shot, no fcurve).
+    assert stage.arc_keyframes(1, 0.0, 45.0) == [(1, 0.0)]
+    keys = stage.arc_keyframes(3, 0.0, 30.0)
+    assert [k[0] for k in keys] == [1, 2, 3]                # frames 1..N
+    assert keys[0][1] == 0.0                                # start
+    assert math.isclose(keys[-1][1], math.radians(30.0))    # start+arc
+    assert math.isclose(keys[1][1], math.radians(15.0))     # LINEAR midpoint
+    # The arc is CLAMPED to +/-MAX_ARC_DEGREES (the unpainted back never shows).
+    over = stage.arc_keyframes(2, 0.0, 90.0)
+    assert math.isclose(over[-1][1], math.radians(stage.MAX_ARC_DEGREES))
+    assert stage.clamp_arc_degrees(90.0) == stage.MAX_ARC_DEGREES
+    assert stage.clamp_arc_degrees(-90.0) == -stage.MAX_ARC_DEGREES
+    assert stage.clamp_arc_degrees(20.0) == 20.0
+
+
+def test_project_uv_front_view_mapping():
+    stage = _load_stage()
+    # origin -> image center.
+    assert stage.project_uv(0.0, 0.0) == (0.5, 0.5)
+    # +Y -> right; +Z -> up (t toward 0, the top).
+    u_right, _ = stage.project_uv(0.4, 0.0)
+    assert u_right > 0.5
+    _, t_top = stage.project_uv(0.0, 0.4)
+    assert t_top < 0.5
+    # Out-of-frame coords clamp into [0, 1].
+    assert stage.project_uv(5.0, -5.0) == (1.0, 1.0)
+    assert stage.project_uv(-5.0, 5.0) == (0.0, 0.0)
+
+
+def test_sample_image_nearest_and_flip():
+    stage = _load_stage()
+    # 2x2 RGBA, bottom-origin: bottom-left red, bottom-right green,
+    # top-left blue, top-right white.
+    px = [1, 0, 0, 1,   0, 1, 0, 1,    # bottom row (y=0)
+          0, 0, 1, 1,   1, 1, 1, 1]    # top row    (y=1)
+    # t=1 is the BOTTOM of the image (flip), u=0 -> bottom-left red.
+    assert stage.sample_image(px, 2, 2, 0.0, 1.0) == (1.0, 0.0, 0.0)
+    # t=0 is the TOP, u=0 -> top-left blue.
+    assert stage.sample_image(px, 2, 2, 0.0, 0.0) == (0.0, 0.0, 1.0)
+    # t=0 top, u=1 -> top-right white.
+    assert stage.sample_image(px, 2, 2, 1.0, 0.0) == (1.0, 1.0, 1.0)
+
+
+def test_build_blender_cmd_portrait_and_arc_appended():
+    # Legacy invocation (no portrait) is byte-identical -- no extra tokens.
+    base = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0)
+    assert "--portrait" not in base
+    assert "--start-angle" not in base and "--arc-degrees" not in base
+    # Portrait + bounded arc appended at the END (positional widgets untouched).
+    cmd = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0,
+                            portrait="C:/p.png", start_angle=10.0,
+                            arc_degrees=30.0)
+    assert cmd[cmd.index("--portrait") + 1] == "C:/p.png"
+    assert cmd[cmd.index("--start-angle") + 1] == "10.0"
+    assert cmd[cmd.index("--arc-degrees") + 1] == "30.0"
+    # The frozen positional tail is unchanged.
+    tail = cmd[cmd.index("--") + 1:]
+    assert tail[tail.index("--frames") + 1] == "3"
+    assert tail[tail.index("--render-engine") + 1] == "WORKBENCH"
+
+
 def test_stage_and_engine_sources_ascii_no_em_dash():
     for src_path in (STAGE_SRC,
                      REPO_ROOT / "nodes" / "_otr_video_engines"
