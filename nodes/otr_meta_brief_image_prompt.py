@@ -399,6 +399,109 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     )
 
 
+def _build_char_scene_request(char: dict, meta: dict, setting: str,
+                              line: dict) -> str:
+    """BUG 1 follow-up (2026-06-20 operator): the per-beat character still must be
+    SHOT/BEAT AWARE -- the character IN the moment of THIS beat -- regardless of
+    image model (the video lane conditions on the SAME still). Mirrors
+    :func:`_build_char_prompt_request` but WIDE 16:9 and grounded in the beat's
+    own ``beat_intent`` / ``traits`` / spoken ``text`` so each character beat
+    yields a DISTINCT still. Temp=0 like the portrait path -> deterministic."""
+    appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
+    ln = line if isinstance(line, dict) else {}
+    intent = str(ln.get("beat_intent") or "").strip()[:240]
+    mood = str(ln.get("traits") or "").strip()[:80]
+    said = str(ln.get("text") or "").strip()[:240]
+    return (
+        "Write ONE vivid cinematic STILL-image prompt (a single comma-separated "
+        "line, no preamble) for a 16:9 LANDSCAPE shot of this character at THIS "
+        "moment of the scene. The image MUST show the CHARACTER THEMSELVES -- a "
+        "person with a clearly visible face -- as the subject, a medium/wide shot "
+        "with the full head and headroom, framed inside the story's world; convey "
+        "the ACTION and EMOTION of this beat. Translate the beat into what is "
+        "VISIBLE (pose, expression, what they are doing) -- do NOT write the "
+        "character's name, dialogue, narration, or any on-screen text. NEVER an "
+        "empty room, an object, or scenery alone.\n"
+        f"character_appearance: {appearance or '(unspecified)'}\n"
+        f"beat_action: {intent or '(unspecified)'}\n"
+        f"emotion: {mood or '(unspecified)'}\n"
+        f"they_are_saying: {said or '(unspecified)'}\n"
+        f"story_setting: {setting or '(unspecified)'}\n"
+        f"style_anchor: {_style_anchor_for_aspect('wide')}\n"
+        "Do not include film-stock, film-grain, or lighting-style terms; "
+        "they are appended automatically later.\n"
+        "Do not mention radios, microphones, studios, or any broadcasting "
+        "equipment -- the character is a person in the STORY's world.\n"
+        "Return only the prompt line."
+    )
+
+
+def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
+                               warnings, cid, max_reseed=2):
+    """Beat-aware 16:9 character still prompt -> ``(prompt, source)``. LLM-refined
+    (the beat's action/emotion) when a writer LLM is available -- so each beat
+    differs -- else the deterministic per-character ``scene_character`` composer.
+    Always depicts the CHARACTER, never a radio booth. Guards + finishes exactly
+    like the portrait path (person guard, gear scrub, era+grade tail, no-text
+    clause)."""
+    ce = char_entry if isinstance(char_entry, dict) else {}
+    prompt = ""
+    source = "char_scene_template"
+    said = str((line or {}).get("text") or "").strip()
+    if llm_fn is not None and said:
+        req = _build_char_scene_request(ce, meta, setting, line)
+        for attempt in range(max_reseed + 1):
+            try:
+                raw = llm_fn(req)
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"char-scene llm_fn raised for {cid} ({exc}); "
+                                f"reseed {attempt}")
+                raw = ""
+            cand = _clean_llm_prompt(raw)
+            if cand:
+                prompt = cand
+                source = "char_scene_llm"
+                break
+    # Person guard + gear scrub (a beat still MUST show the character, never a
+    # radio booth) -- identical discipline to the portrait path.
+    if prompt and not _depicts_person(prompt):
+        warnings.append(f"char-scene prompt for {cid} depicts no PERSON; "
+                        f"fell back to the character template")
+        prompt = ""
+    if prompt:
+        scrubbed = _scrub_gear_words(prompt)
+        if scrubbed != prompt:
+            warnings.append(f"char-scene prompt for {cid}: broadcast-gear scrubbed")
+            prompt = scrubbed or ""
+    try:
+        from ._otr_story_brief_helpers import (  # type: ignore
+            compose_still_prompt)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            compose_still_prompt)
+    if not prompt:
+        # Deterministic fallback: a character (not a radio booth), wide framing.
+        return (compose_still_prompt(meta, kind="scene_character",
+                                     role="character_video", char_entry=ce),
+                source)
+    # FINISH like a scene still: era tail + cinematic grade + the no-text clause.
+    try:
+        try:
+            from ._otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
+        prompt = finish_visual_prompt(meta, prompt, era_profile="portrait")
+        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
+            prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
+        if not prompt.endswith(NO_TEXT_CLAUSE):
+            prompt = f"{prompt}, {NO_TEXT_CLAUSE}"
+    except Exception:  # noqa: BLE001
+        pass
+    return prompt, source
+
+
 #: Person-evidence vocabulary for the portrait guard: an accepted prompt that
 #: matches NONE of these almost certainly depicts scenery/objects (the
 #: "microphone, no person" live catch, look-QA round 4) -> template fallback.
@@ -651,19 +754,27 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             from _otr_story_brief_helpers import (  # type: ignore
                 compose_still_prompt)
         sw, sh = _landscape_still_dims()
-        # BUG 1 (2026-06-20): cast-row lookup so a scene_character still leads with
-        # THAT character's appearance (image-model agnostic -- the engine that mints
-        # it is resolved by the character_video role downstream).
+        # BUG 1 (2026-06-20): cast-row + per-beat line lookup so a scene_character
+        # still leads with THAT character's appearance AND is BEAT-AWARE (the
+        # character in the moment of THIS beat). Image-model agnostic -- the engine
+        # that mints it is resolved by the character_video role downstream, and the
+        # video lane conditions on the same still.
         _cast_by_id = {str(c.get("char_id") or ""): c
                        for c in roster if isinstance(c, dict)}
+        _line_by_beat = {bid: ln for bid, ln in _iter_beat_lines(lines)}
         for tgt in scene_targets:
-            _ce = None
             _cid = str(tgt.get("char_id") or "")
-            if tgt["kind"] == "scene_character" and _cid:
+            _src = tgt["source"]
+            if tgt["kind"] == "scene_character":
                 _ce = _cast_by_id.get(_cid)
-            sprompt = compose_still_prompt(
-                meta, kind=tgt["kind"], role=tgt["role"],
-                beat_id=tgt["beat_id"], char_entry=_ce)
+                _ln = _line_by_beat.get(tgt["beat_id"], {})
+                sprompt, _csrc = _compose_char_scene_prompt(
+                    meta, _ce, setting, _ln, llm_fn, warnings, _cid)
+                _src = _csrc
+            else:
+                sprompt = compose_still_prompt(
+                    meta, kind=tgt["kind"], role=tgt["role"],
+                    beat_id=tgt["beat_id"])
             _obj = {
                 "object_id": f"still_{tgt['beat_id']}",
                 "kind": tgt["kind"],
@@ -672,7 +783,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "w": sw, "h": sh,
                 "prompt": sprompt,
                 "prompt_hash": _content_hash(sprompt),
-                "source": tgt["source"],
+                "source": _src,
             }
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role

@@ -45,12 +45,19 @@ from ._otr_shared.role_compat import Role
 # ---------------------------------------------------------------------------
 
 #: ledger ``speaker_role`` -> video role.
+#: BUG 1 (2026-06-20): ``"character"`` is the CANONICAL writer speaker_role for a
+#: dialogue line (set in OTR_LedgerScriptWriter / _otr_outline, compared in
+#: _otr_anti_loop / _otr_ledger_reviewer). It was MISSING here, so character beats
+#: fell through to ``background_abstract`` -> got pooled as other-beats and never
+#: minted a character still (the deleted 8bc5381 render_driver branch masked it by
+#: keying on the raw "character" string). "char_voice"/"dialogue" stay as aliases.
 SPEAKER_TO_VIDEO_ROLE = {
     "announcer": Role.ANNOUNCER_VISUAL.value,
     "music": Role.MUSIC_VISUAL.value,
     "music_open": Role.MUSIC_VISUAL.value,
     "music_close": Role.MUSIC_VISUAL.value,
     "music_inter": Role.MUSIC_VISUAL.value,
+    "character": Role.CHARACTER_VIDEO.value,
     "char_voice": Role.CHARACTER_VIDEO.value,
     "dialogue": Role.CHARACTER_VIDEO.value,
 }

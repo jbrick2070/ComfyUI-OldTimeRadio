@@ -288,6 +288,31 @@ class TestSceneStillObjects:
         assert targets[2]["char_id"] == "c01"            # carried for the wide shot
         assert targets[3]["role"] == "music_visual"
 
+    def test_canonical_character_speaker_role_maps_to_scene_character(self):
+        """BUG 1 (2026-06-20): the writer's CANONICAL dialogue speaker_role is
+        'character' (not 'char_voice') -- it must resolve to character_video and
+        get a per-beat scene_character still, NOT fall through to a pooled
+        background_abstract other-beat. This was the live-render miss."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        from nodes.otr_shot_lock import SPEAKER_TO_VIDEO_ROLE
+        assert SPEAKER_TO_VIDEO_ROLE.get("character") == "character_video"
+        lines = [
+            {"line_id": "b001", "speaker_role": "announcer",
+             "char_id": "announcer", "start_s": 8.4, "dur_s": 4.0},
+            {"line_id": "b002", "speaker_role": "character",
+             "char_id": "c03", "start_s": 12.4, "dur_s": 6.0},
+            {"line_id": "b003", "speaker_role": "character",
+             "char_id": "c02", "start_s": 18.4, "dur_s": 6.0},
+        ]
+        targets, _w = mbp.derive_scene_still_targets(lines)
+        by_beat = {t["beat_id"]: t for t in targets}
+        assert by_beat["b002"]["kind"] == "scene_character"
+        assert by_beat["b002"]["role"] == "character_video"
+        assert by_beat["b002"]["char_id"] == "c03"
+        assert by_beat["b003"]["kind"] == "scene_character"
+        # NOT pooled into an other_pool_* loop target
+        assert not any(t["beat_id"].startswith("other_pool_") for t in targets)
+
     def test_pool_n_loop_pools_other_beats_stills(self):
         # operator 2026-06-18: pool_n_loop -> the OTHER-BEATS (background_abstract/
         # scene_broll) SHARE N pool stills (other_pool_0..N-1), NOT one per beat;
@@ -410,6 +435,56 @@ class TestSceneStillObjects:
         assert helpers.RADIO_BROADCAST_TAIL not in sc["prompt"]
         assert sc["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
         assert sc["w"] > sc["h"] and sc["w"] % 32 == 0    # landscape 16:9
+
+    def test_character_scene_still_is_beat_aware_via_llm(self):
+        """BUG 1 follow-up (2026-06-20 operator): per-beat character stills must be
+        SHOT/BEAT aware -- two beats of the SAME character get DISTINCT stills
+        derived from each beat's action/emotion (image-model agnostic; the video
+        lane conditions on the same still)."""
+        import re
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{"char_id": "c01", "name": "HAYES", "appearance": "a stocky foreman"}]
+        lines = [
+            {"line_id": "b002", "speaker_role": "character", "char_id": "c01",
+             "text": "The reactor is failing!", "traits": "Panicked",
+             "beat_intent": "lunging for the emergency lever",
+             "start_s": 1.0, "dur_s": 2.0},
+            {"line_id": "b003", "speaker_role": "character", "char_id": "c01",
+             "text": "We have to evacuate.", "traits": "Resolute",
+             "beat_intent": "turning to face the frightened crew",
+             "start_s": 3.0, "dur_s": 2.0},
+        ]
+
+        def fake_llm(req):
+            act = (re.search(r"beat_action: (.+)", req) or [None, "still"])[1]
+            return f"a stocky foreman, {act}, face clearly visible"
+
+        payload, _w = mbp.derive_image_prompts(
+            cast, _meta_ok(), llm_fn=fake_llm, lines=lines)
+        objs = mbp.objects_by_id(payload)
+        s2, s3 = objs["still_b002"], objs["still_b003"]
+        assert s2["kind"] == "scene_character" and s3["kind"] == "scene_character"
+        assert s2["source"] == "char_scene_llm"
+        assert s2["prompt"] != s3["prompt"]              # beat-aware: distinct
+        assert s2["prompt_hash"] != s3["prompt_hash"]
+        assert "lever" in s2["prompt"] and "crew" in s3["prompt"]
+        assert s2["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
+        assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
+
+    def test_character_scene_still_fallback_no_llm_is_character(self):
+        """No LLM -> the deterministic per-character scene_character composer
+        (char_scene_template). Still a CHARACTER, never a radio booth."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{"char_id": "c01", "appearance": "a stocky foreman"}]
+        lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c01",
+                  "text": "Hello", "start_s": 1.0, "dur_s": 2.0}]
+        payload, _w = mbp.derive_image_prompts(
+            cast, _meta_ok(), llm_fn=None, lines=lines)
+        s2 = mbp.objects_by_id(payload)["still_b002"]
+        assert s2["kind"] == "scene_character"
+        assert s2["source"] == "char_scene_template"
+        assert s2["prompt"].startswith("a stocky foreman")
+        assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
 
     def test_portrait_carries_cinematic_grade_bug411(self):
         """BUG-411 consistency (operator 2026-06-14): portraits now carry the
