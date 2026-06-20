@@ -1,5 +1,31 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-20 (CODER; BUG 1 SHIPPED + GPU-VERIFIED end-to-end; HEAD `9f03abd` ==
+> origin/v2.0-alpha; suite 4633 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** TOP-PRIORITY
+> VISUAL FIX **BUG 1 DONE** -- landscape character beats now show the CHARACTER full-frame 16:9, not the
+> radio booth. Two commits: **`7e765b7`** (a) render_driver: flat_still/flux_still are render_aspect=wide ->
+> REVERTED the `8bc5381` portrait-conditioning branch; they condition on the beat's scene still, never the
+> 832x1216 vertical portrait (missing-still clears init_image so it can't leak); (b) image phase mints a
+> per-beat `scene_character` still leading with the character, radio-booth tail dropped. **`9f03abd`** the
+> ROOT CAUSE the live render exposed: `"character"` (the CANONICAL writer speaker_role) was MISSING from
+> `SPEAKER_TO_VIDEO_ROLE` -> character beats fell through to `background_abstract` and got POOLED as
+> other-beats (the deleted 8bc5381 branch had masked it) -> added `"character"->CHARACTER_VIDEO`; PLUS
+> BEAT-AWARE stills (operator: per-shot/beat, regardless of image model, video lane too) -- each character
+> beat's still is LLM-composed from that beat's `beat_intent`/`traits`/`text` (temp=0, mirrors the portrait
+> path; person-guard + gear-scrub + era/grade tail + no-text clause; deterministic per-character fallback).
+> Content-only, ZERO workflow-JSON change. **GPU VERIFY (z_image_turbo, FLOOR lane, all-roles flat_still,
+> 60w/act1/2chars):** the 3 character beats b002/b003/b004 resolved `kind=scene_character role=character_video`
+> (NO other_pool), 3 DISTINCT prompt hashes `source=char_scene_llm`, render_driver conditioned each on its
+> scene_character still ("portrait never used"), `audio_byte_identical OK`, `obs_publish OK`. Frames pulled
+> from the FINAL obs mp4 at each beat timestamp show the CHARACTER full-frame 16:9 with the matching SDH
+> caption -> beat-synced end-to-end. Before/after + final-frame proofs in `docs/2026-06-20-visual-fixes/`.
+> GOTCHAS: (1) z_image_turbo needs `OTR_ENABLE_ZIMAGE=1` + `OTR_ZIMAGE_UNET=z_image_turbo_nvfp4.safetensors`
+> at server boot (only the nvfp4 quant is on disk, not the bf16 the engine defaults to). (2) the repeated
+> "GULLIVER REEVES" cast is the `OTR_C7=1` byte-identity mode pinning OTR_CAST_SEED/STYLE_SEED=42 (my verify
+> runs) -- production (no C7) rolls a fresh cast per episode. **NEXT = BUG 2 (verify-first: eyeball the
+> animated START/END title card on a real obs final BEFORE touching), then BUG 3 (model detail onto credits)
+> + BUG 4 (audio bars overlay) sharing one always-on procgen overlay, then the 3D PoC build.**
+
 > **LATEST SESSION -- 2026-06-20 NIGHT (CODER, autonomous "go all night"; HEAD `8de1057` == origin/v2.0-alpha;
 > suite 4625 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** BUILT + PUSHED the CORE of the
 > 3D textured-hero PoC (chunks 2+4+5 paired so producer+consumer land together -- no dead wiring), commit
@@ -460,14 +486,13 @@ origin/v2.0-alpha; GPU FREE (35-leg 864 frontier soak done; 3D-PoC mesh_stage GP
 DIRECTIVE (hard): ONLY HuMo (portrait) + maybe the 3D lane use the VERTICAL portrait; EVERY other path uses
 LANDSCAPE 16:9 images/video. Animated start/end procgen title cards + rolling credits are NON-NEGOTIABLE
 (engine-independent).
-- **#1 BUG 1 (DO FIRST):** character beats show bookend/radio-booth stills, not characters. Cause: commit
-  `8bc5381` conditions flat_still/landscape engines on the 832x1216 vertical portrait -> pillarboxed in 1472x832
-  -> the radio-booth procgen floor fills the sides. FIX (a) `render_driver.py`: landscape engines NEVER use the
-  vertical portrait -- gate on `render_aspect` (portrait ONLY for HuMo/audio_driven_face + 3D), DROP the `8bc5381`
-  `_spk=="character"->portrait` branch for landscape; (b) image phase: mint a 16:9 CHARACTER shot for character
-  beats (image-model AGNOSTIC via `resolve_engine_for_role`; medium/wide shot of the character in the scene) as
-  that beat's still. GPU-verify: a character beat shows the character full-frame 16:9, no pillarbox, no radio-booth
-  sides; HuMo still uses the portrait. Suite + Bug Bible green.
+- **#1 BUG 1 -- DONE 2026-06-20 (commits `7e765b7`+`9f03abd`, GPU-verified end-to-end with z_image_turbo).**
+  Character beats now show the CHARACTER full-frame 16:9 (beat-aware, per-beat, distinct), not the radio booth.
+  Root cause was deeper than the 8bc5381 branch: `"character"` (the canonical writer speaker_role) was missing
+  from `SPEAKER_TO_VIDEO_ROLE`, so character beats were pooled as background_abstract; added the mapping +
+  scene_character stills (LLM beat-aware) + render_driver gating on render_aspect. Final-obs frames show each
+  character beat's still synced to its SDH caption; audio byte-identical. See the LATEST SESSION block + the
+  proofs in `docs/2026-06-20-visual-fixes/`. (HuMo still uses the vertical portrait by design.)
 - **#2 BUG 2 (verify-first):** eyeball a real obs final for the animated START/END title card BEFORE changing
   (rolling credits + PostUpscaleProcgenBlend already render); only if missing/covered, make titles+credits an
   ALWAYS-ON procgen overlay.
