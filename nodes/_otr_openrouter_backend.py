@@ -470,12 +470,53 @@ def resolve_route(letter: str, slug: str) -> tuple[str, str | None]:
 def reset_run_budget() -> None:
     """Zero the per-run token accumulator. Called at the start of an
     episode so the per-run cost ceiling (C6) measures one run, not the
-    process lifetime."""
+    process lifetime. Also clears the per-run resolved-model ledger so the
+    treatment records THIS episode's `~latest` resolutions, not stale ones."""
     global _run_token_total
     _run_token_total = 0
+    _resolved_models.clear()
 
 
 _run_token_total = 0
+
+
+# ---------------------------------------------------------------------------
+# Per-run resolved-model ledger -- historical accuracy for the credits sheet.
+# A `~latest` alias resolves to a CONCRETE model SERVER-SIDE at call time; the
+# only place that truth surfaces is the response body's `model` field. We
+# accumulate {requested_slug: {resolved, calls, cost_usd}} per episode so the
+# episode treatment can record exactly which concrete model served the run.
+# ---------------------------------------------------------------------------
+_resolved_models: dict[str, dict] = {}
+
+
+def _record_resolved(requested_slug: str, body: dict) -> None:
+    """Record the concrete model + cost the upstream reported for a call.
+    Best-effort; never raises (provenance must not break a run, PD1)."""
+    try:
+        req = str(requested_slug or "").strip() or "(unknown)"
+        resolved = str((body or {}).get("model") or "").strip()
+        usage = (body or {}).get("usage") or {}
+        cost = usage.get("cost")
+        try:
+            cost = float(cost) if cost is not None else 0.0
+        except (TypeError, ValueError):
+            cost = 0.0
+        slot = _resolved_models.setdefault(
+            req, {"resolved": "", "calls": 0, "cost_usd": 0.0})
+        if resolved:
+            slot["resolved"] = resolved
+        slot["calls"] += 1
+        slot["cost_usd"] += cost
+    except Exception:  # noqa: BLE001 -- provenance is best-effort
+        pass
+
+
+def resolved_models_snapshot() -> dict:
+    """Return a deep-ish copy of the per-run resolved-model ledger:
+    ``{requested_slug: {"resolved": str, "calls": int, "cost_usd": float}}``.
+    Empty when no OpenRouter call was made this run."""
+    return {k: dict(v) for k, v in _resolved_models.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -1096,6 +1137,9 @@ class OpenRouterBackend:
         body = result.get("json") or {}
         if os.environ.get("OPENROUTER_DEBUG_RAW") == "1":
             log.info("[OpenRouter] raw %s response: %s", slug, json.dumps(body)[:1500])
+        # Record the concrete model the upstream actually served (a `~latest`
+        # alias resolves server-side) + its cost, for the episode credits sheet.
+        _record_resolved(slug, body)
         choices = body.get("choices") or []
         if not choices:
             raise OpenRouterCallFailedError(
@@ -1289,6 +1333,8 @@ __all__ = [
     "make_openrouter_generate_fn",
     "schema_to_response_format",
     "openrouter_meta_for",
+    "resolved_models_snapshot",
+    "reset_run_budget",
     "OpenRouterError",
     "OpenRouterConfigError",
     "OpenRouterCostCeilingError",

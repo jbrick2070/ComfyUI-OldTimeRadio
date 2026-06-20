@@ -1608,6 +1608,26 @@ def _write_story_treatment(out_path, episode_title, led,
            f"(char {_g(meta, 'character_word_count')} / "
            f"announcer {_g(meta, 'announcer_word_count')})")
         W_(f"  Characters         :  {_g(gp, 'num_characters')}")
+        # Resolved OpenRouter models -- the CONCRETE model each `~latest` alias
+        # actually resolved to server-side this run, with call count + USD cost.
+        # Historical accuracy: ~latest drifts, so record what truly served it.
+        try:
+            from ._otr_openrouter_backend import resolved_models_snapshot as _rms
+            _resolved = _rms()
+        except Exception:  # noqa: BLE001 -- backend optional / not loaded
+            _resolved = {}
+        if _resolved:
+            W_("  Resolved (OpenRouter):")
+            _total_cost = 0.0
+            for _slug in sorted(_resolved):
+                _info = _resolved[_slug] or {}
+                _rm = _info.get("resolved") or "(unreported)"
+                _calls = _info.get("calls") or 0
+                _cost = float(_info.get("cost_usd") or 0.0)
+                _total_cost += _cost
+                W_("    %s  ->  %s  (%d call(s), $%.4f)"
+                   % (_slug, _rm, _calls, _cost))
+            W_("    Total OpenRouter cost: $%.4f" % _total_cost)
         W_()
 
         # News seed - may arrive as a JSON list ["headline 1", "headline 2", ...]
