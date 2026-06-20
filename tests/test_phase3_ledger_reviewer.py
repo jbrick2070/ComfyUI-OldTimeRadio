@@ -386,6 +386,44 @@ class TestReviewLedgerDispositions:
         assert disp.verdict == "clean_no_edits"
         assert led.data["meta"]["reviewer_verdict"] == "clean_no_edits"
 
+    def test_transport_failure_ships_unreviewed_not_rerun(self, tmp_path):
+        """2026-06-20: a reviewer-LLM TRANSPORT failure (e.g. OpenRouter
+        ~latest alias momentarily 404 'no endpoints') must FAIL SOFT --
+        ship the writer's ledger unreviewed (clean_no_edits), NOT a terminal
+        needs_full_rerun that CastLock would refuse. A cloud hiccup is not a
+        story defect."""
+        from nodes._otr_openrouter_backend import OpenRouterModelGoneError
+
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "Hello there.", role="character"),
+            _line("b002", "c02", "Likewise.", role="character"),
+        ])
+
+        def _gone(*a, **k):
+            raise OpenRouterModelGoneError(
+                "OpenRouter model ~openai/gpt-latest is gone (HTTP 404: "
+                "No endpoints found)"
+            )
+
+        disp = review_ledger(_gone, led)
+        assert disp.verdict == "clean_no_edits"
+        assert led.data["meta"]["reviewer_verdict"] == "clean_no_edits"
+        assert "reviewer_transport_skip" in led.data["meta"]
+
+    def test_nontransport_llm_failure_still_rerun(self, tmp_path):
+        """A NON-transport reviewer failure (e.g. a raising slot fn that is not
+        an availability error) still maps to needs_full_rerun -- the fail-soft
+        path is transport-only."""
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "Hello there.", role="character"),
+        ])
+
+        def _boom(*a, **k):
+            raise ValueError("malformed model output")
+
+        disp = review_ledger(_boom, led)
+        assert disp.verdict == "needs_full_rerun"
+
     def test_improved(self, tmp_path):
         """All passes clean, doctor proposes one rewrite -> improved."""
         led = _build_ledger(tmp_path, [

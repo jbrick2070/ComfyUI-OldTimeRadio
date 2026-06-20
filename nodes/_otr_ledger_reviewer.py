@@ -181,6 +181,12 @@ class PreAuditReport(BaseModel):
     # needed beyond branching on these fields.
     audit_failed: bool = False
     audit_failure_reason: str = ""
+    # 2026-06-20: distinguish a TRANSPORT/availability failure (the reviewer
+    # LLM was unreachable -- e.g. an OpenRouter 404/timeout) from a genuine
+    # content failure. A transport failure is NOT evidence the story is broken,
+    # so the caller fails SOFT (proceeds unreviewed) instead of refusing a
+    # finished episode with needs_full_rerun.
+    audit_unavailable: bool = False
 
 
 def _audit_failed_sentinel(reason: str) -> "PreAuditReport":
@@ -204,6 +210,51 @@ def _audit_failed_sentinel(reason: str) -> "PreAuditReport":
         audit_failed=True,
         audit_failure_reason=reason,
     )
+
+
+def _audit_unavailable_sentinel(reason: str) -> "PreAuditReport":
+    """Synthetic PreAuditReport for a TRANSPORT/availability failure: the
+    reviewer LLM was unreachable (e.g. an OpenRouter ``~latest`` alias
+    momentarily returning HTTP 404 'no endpoints', a timeout, a network drop).
+
+    audit_failed=True (the audit did not produce a verdict) BUT
+    audit_unavailable=True so the caller fails SOFT -- it proceeds with the
+    writer's ledger UNREVIEWED rather than refusing a finished episode with
+    needs_full_rerun. A cloud hiccup is not evidence the story is broken."""
+    return PreAuditReport(
+        violations=[],
+        pass_clean=False,
+        audit_failed=True,
+        audit_failure_reason=reason,
+        audit_unavailable=True,
+    )
+
+
+def _is_transport_failure(exc: BaseException) -> bool:
+    """True iff ``exc`` is (or wraps) an OpenRouter/availability transport
+    failure -- model-gone/no-endpoints (404), cost/config aside, or a
+    StructuredCallFailedError whose last_error is one. Used to fail SOFT on a
+    cloud hiccup instead of refusing the episode. Never raises."""
+    try:
+        from ._otr_openrouter_backend import OpenRouterCallFailedError
+    except Exception:  # noqa: BLE001 - backend optional / standalone test
+        OpenRouterCallFailedError = ()  # type: ignore
+    try:
+        candidates = [exc]
+        inner = getattr(exc, "last_error", None)
+        if inner is not None:
+            candidates.append(inner)
+        for c in candidates:
+            if OpenRouterCallFailedError and isinstance(c, OpenRouterCallFailedError):
+                return True
+            name = type(c).__name__
+            if name in ("OpenRouterModelGoneError", "OpenRouterCallFailedError",
+                        "Timeout", "ConnectTimeout", "ReadTimeout",
+                        "ConnectionError"):
+                return True
+        return False
+    except Exception:  # noqa: BLE001
+        return False
 
 
 class ReviewerEdit(BaseModel):
@@ -691,6 +742,14 @@ def audit_cast_contract(
             helper_name=f"audit_cast_contract:{label}",
         )
     except StructuredCallFailedError as exc:
+        if _is_transport_failure(exc):
+            log.warning(
+                "[OTR_LedgerReviewer:%s] reviewer LLM UNAVAILABLE (transport: "
+                "%s); failing SOFT -- proceeding with the writer's ledger "
+                "unreviewed (a cloud hiccup is not a story defect).",
+                label, exc.last_error,
+            )
+            return _audit_unavailable_sentinel(f"transport: {exc.last_error}")
         log.warning(
             "[OTR_LedgerReviewer:%s] structured_call exhausted the retry "
             "ladder after %d attempt(s) (last error: %s); returning "
@@ -698,6 +757,15 @@ def audit_cast_contract(
         )
         return _audit_failed_sentinel(f"structured_call failed: {exc}")
     except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+        if _is_transport_failure(exc):
+            log.warning(
+                "[OTR_LedgerReviewer:%s] reviewer LLM UNAVAILABLE (transport: "
+                "%s: %s); failing SOFT -- proceeding with the writer's ledger "
+                "unreviewed.", label, type(exc).__name__, exc,
+            )
+            return _audit_unavailable_sentinel(
+                f"transport: {type(exc).__name__}: {exc}"
+            )
         log.warning(
             "[OTR_LedgerReviewer:%s] structured_call raised %s: %s; "
             "returning audit_failed sentinel",
@@ -1788,6 +1856,35 @@ def review_ledger(
     # returns audit_failed=True. Map to needs_full_rerun; do not run
     # the doctor on garbage data.
     if getattr(pre_audit, "audit_failed", False):
+        # TRANSPORT failure (reviewer LLM unreachable, e.g. a transient
+        # OpenRouter 404/no-endpoints or timeout): FAIL SOFT. The writer
+        # already produced a full ledger; a cloud hiccup is NOT evidence the
+        # story is structurally broken, so proceed UNREVIEWED rather than
+        # stamping a terminal needs_full_rerun that CastLock would refuse.
+        # The deterministic Python guards downstream still apply.
+        if getattr(pre_audit, "audit_unavailable", False):
+            meta_after = led.data.setdefault("meta", {})
+            meta_after["reviewer_verdict"] = "clean_no_edits"
+            meta_after["reviewer_transport_skip"] = getattr(
+                pre_audit, "audit_failure_reason", "transport",
+            )
+            log.warning(
+                "[OTR_LedgerReviewer] reviewer LLM unavailable -- shipping the "
+                "writer's ledger UNREVIEWED (clean_no_edits) rather than "
+                "refusing the episode.",
+            )
+            disp = ReviewerDisposition(
+                verdict="clean_no_edits",
+                pre_audit_violations=0,
+                pre_audit_repairs_applied=0,
+                doctor_edits_proposed=0,
+                doctor_edits_applied=0,
+                post_audit_violations=0,
+            )
+            meta_after["reviewer_disposition"] = disp.__dict__
+            _stamp_word_counts_safe(led)
+            led.save()
+            return disp
         led.data.clear()
         led.data.update(original_snapshot)
         meta_after = led.data.setdefault("meta", {})
