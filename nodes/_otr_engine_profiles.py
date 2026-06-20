@@ -43,7 +43,7 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # char_voice PROMOTED 2026-06-04: indextts2 (Path B oop_venv worker) is the
     # shipped default; chatterbox + dia (both Path B sidecars) + bark are
     # selectable. Index 0 stays indextts2 -> byte-identical default combo.
-    "char_voice": ("indextts2", "chatterbox", "dia", "bark"),
+    "char_voice": ("indextts2", "chatterbox", "dia", "bark", "kokoro"),
     "announcer_voice": ("kokoro", "chatterbox"),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.

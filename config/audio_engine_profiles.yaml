@@ -140,6 +140,29 @@ profiles:
     license_state: clean
     warn_text: ""
 
+  # --- character voice (opt-in 2026-06-19): kokoro as a FAST char voice. NOT the
+  # char default (indextts2/bark stay default -> byte-identical); selected only
+  # when char_voice_engine=kokoro (e.g. a fast soak lane). Preset voices via the
+  # kokoro_builtin bank, no reference clip. ---
+  - profile_id: char_kokoro_v1
+    role: char_voice
+    engine: kokoro
+    commercial_clean: true         # Apache-2.0
+    model_path: ""
+    model_sha256: ""
+    default_params: {speed: 0.95}
+    allowed_voice_banks: [kokoro_builtin]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+    rank: 60                        # opt-in; indextts2/bark rank ahead
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: false
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
+
   - profile_id: announcer_chatterbox_v1
     role: announcer_voice
     engine: chatterbox

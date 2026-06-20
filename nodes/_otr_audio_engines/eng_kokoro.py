@@ -58,7 +58,12 @@ def _pick_announcer_voice(episode_seed, voice_override="random") -> str:
 @register
 class KokoroEngine:
     name = "kokoro"
-    roles = ("announcer_voice",)
+    # char_voice added 2026-06-19 (opt-in): kokoro is a fast in-process per-line
+    # engine whose generate_voice already takes a per-character voice_ref, so it
+    # can serve character lines too. default_roles stays announcer-only -> the
+    # shipped char_voice default is UNCHANGED (byte-identical); kokoro is used for
+    # char only when explicitly selected (e.g. a fast soak voice lane).
+    roles = ("announcer_voice", "char_voice")
     default_roles = ("announcer_voice",)   # internal default until promotion (I)
     commercial_clean = True                # Apache-2.0
     requires_flag = None
