@@ -1955,6 +1955,246 @@
       "ref_path": "models/TTS/KokoroTTS/voices/bm_lewis.pt",
       "ref_sha256": "pending",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_alloy",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "smooth",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_alloy.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_aoede",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "melodic",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_aoede.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_bella",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "warm",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_bella.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_jessica",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "bright",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_jessica.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_nicole",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "soft",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_nicole.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_nova",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_nova.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_river",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "calm",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_river.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "af_sky",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "light",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/af_sky.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_liam",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "youthful",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_liam.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_puck",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "playful",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_puck.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "am_santa",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "jovial",
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/am_santa.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bf_alice",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "refined",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bf_alice.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bf_emma",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "authoritative",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bf_emma.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bf_isabella",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "elegant",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bf_isabella.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "bm_daniel",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "measured",
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/bm_daniel.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true
     }
   ]
 }
