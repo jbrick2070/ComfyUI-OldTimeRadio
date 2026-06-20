@@ -1,4 +1,4 @@
-"""_otr_qwen_image_smoke.py -- live GPU smoke for the Qwen-Image (GGUF) engine.
+r"""_otr_qwen_image_smoke.py -- live GPU smoke for the Qwen-Image (GGUF) engine.
 
 Submits the EXACT node recipe QwenImageEngine._build_qwen_graph emits
 (UnetLoaderGGUF + CLIPLoader[type=qwen_image] + VAELoader -> ModelSamplingAuraFlow
