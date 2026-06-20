@@ -1,5 +1,70 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-20 NIGHT (CODER, autonomous "go all night"; HEAD `8de1057` == origin/v2.0-alpha;
+> suite 4625 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** BUILT + PUSHED the CORE of the
+> 3D textured-hero PoC (chunks 2+4+5 paired so producer+consumer land together -- no dead wiring), commit
+> `8de1057`: **(2) single-view VERTEX-COLOR PROJECTION** in `scripts/otr_mesh_stage_blender.py` -- `--portrait`
+> via `bpy.data.images.load`, a per-vertex point-domain `otr_proj` color attribute painted from the front Y/Z
+> projection, set active+render so WORKBENCH `color_type='VERTEX'` draws it; GLB stays geometry-only
+> (MESHER_VERSION NOT bumped); bounded hero arc (`_build_turntable` start_angle+arc clamped to MAX_ARC=45deg,
+> `frames==1`->one keyframe); selftest projects a deterministic gradient + fails nonzero unless a NON-UNIFORM
+> attr exists; pure helpers (`arc_keyframes`/`project_uv`/`sample_image`/`clamp_arc_degrees`) CPU-tested.
+> `eng_mesh_stage.build_blender_cmd` plumbs `--portrait`/`--start-angle`/`--arc-degrees` (appended only when set
+> -> legacy invocation byte-identical); `render_clip` passes the resolved still. **(4) C1 STAMP**
+> (`render_driver.build_clip_manifest`): mesh_stage directory rows get `bg_still_path` from the per-beat scene
+> still (the existing per-beat coverage already mints one via the per-role image engine -> image-model AGNOSTIC),
+> fail-closed `os.path.isfile` + LOUD warn on absence. **(5) C1 COMPOSITE** (`otr_silent_composite.py`):
+> `bg_still_path` carried through `plan_timeline_segments` + a still-aware `-loop 1` bg branch in
+> `_encode_segment_from_dir`; ZERO new graph links/widgets (rides the existing 92->84 manifest channel); every
+> non-mesh beat omits the field -> floor/black bg byte-identical. +13 unit tests. **REAL-BLENDER VALIDATION
+> (CPU-only, did NOT touch the running soak's GPU):** the stage selftest ran through Blender 4.5.10
+> (`C:\ComfyUI-Models\tools\blender-4.5.10\blender.exe`) WORKBENCH -> exit 0, 3 RGBA frames of DIFFERING sizes
+> (47k/49k/50k = the arc moves + the projection is non-uniform); proof frame
+> `docs/2026-06-20-mesh-stage-texturing/selftest_proof_frame_0001.png` shows the cube TEXTURED with the gradient
+> (green/teal/blue/magenta), NOT flat gray -> projection works visually in real Blender. **DELIBERATELY NOT
+> LANDED BLIND tonight (need the GPU render loop the soak occupies):** Chunk 6 (costly_choice_beat trigger ->
+> route that beat to mesh_stage; the no-portrait->still_parallax fallback is ALREADY in place), Chunk 7 (JSON
+> wiring on node 87/88), Chunk 3 (2D-ellipse contact shadow, wants GPU-render tuning), and the GPU smoke
+> acceptance. Full detail: `docs/2026-06-20-mesh-stage-texturing/BUILD_RESULTS.md`. **SOAK (watched):** the
+> 864-word frontier all-night soak on :8011 is HEALTHY -- smoke_0001 PASSED (status=success, 480 words; indextts2
+> did NOT crash the server), now grinding the 48-leg matrix (leg_0002+). NEXT = (a) keep watching/triaging the
+> soak, (b) when it frees the GPU, run the mesh_stage GPU smoke then land chunks 6+7 (+3) VALIDATED.
+
+> **LATEST SESSION -- 2026-06-20 (CODER + 3D ROUNDTABLE CAMPAIGN; HEAD `f99af26` == origin/v2.0-alpha;
+> suite 4616 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** SHIPPED + PUSHED (each
+> suite+BugBible green): **forensic episode treatment** -- `_write_story_treatment` now emits a full
+> spec sheet (LLM config: both slot models + creativity/temp/words; STORY SPINE: news premise + opposed
+> wants; per-role RENDER ENGINES video+image; SYSTEM: CPU/RAM/GPU/CUDA/torch; new `nodes/_otr_sys_specs.py`)
+> (`e8f3094`); **resolved OpenRouter concrete-model + cost capture** per run for historical accuracy
+> (`f03db0a`, `_record_resolved`/`resolved_models_snapshot`, cleared per episode in reset_run_budget);
+> **Kokoro char-voice DEEP pool** -- the bank had ONE kokoro entry (announcer-only) so chars collapsed to
+> one voice; registered the full English Kokoro-82M set (DOWNLOADED the 15 missing -> 28 on disk, 15F/13M)
+> as char_voice entries so CastLock assigns DISTINCT gender-matched voices like Bark (`dee7d5a`+`f99af26`;
+> also fixes the missing `bf_emma` announcer voice). **3D ROUNDTABLE CAMPAIGN CONVERGED (docs only, NO 3D
+> code yet)** -- `docs/2026-06-20-mesh-stage-texturing/roundtable/`: the "plaster of paris" blob is NOT
+> WorldMirror (not wired into OTR at all) -- it's **`mesh_stage`** rendering a geometry-only Hunyuan3D-2mv
+> GLB through Blender WORKBENCH matcap (flat gray `(0.78,0.78,0.78)` when the mesh has no vertex colors).
+> R1 architecture -> R2 coding-plan (image-AGNOSTIC stills) -> R3 hardened+build-pin-list -> R4 wiring all
+> converged via the live panel (GPT-5.5+Gemini-3.1-pro+Grok-4.3, ~$0.41). **PoC = a single-view-TEXTURED
+> mesh_stage hero beat (vertex-color projection in Blender) over a GENERATED background, bounded camera
+> arc, ledger-driven (costly_choice_beat), no-portrait->still_parallax; CAMERA-ONLY motion (lip-sync/rig =
+> the deferred character_3d lane, OUT).** Wiring = C1 (per-clip `bg_still_path` in the manifest; ZERO new
+> links/widgets); the exact 3-function composite patch + a 4-item build-time PIN list are in
+> `pass03_plan.md` (build) + `pass04_plan.md` (wiring). Build is sprint-ready + OPERATOR-GATED.
+> **NEW OPEN TICKET -- audio-reactive bottom BARS don't show:** painted by OTR_SceneAwareScopes as the
+> FLOOR (under the clip) + suppressed for portrait/un-probeable/credits. Fix = a dedicated ALWAYS-ON bars
+> overlay at the POST stage, decoupled from scene-aware suppression, captions stay above. Plan:
+> `docs/2026-06-20-audio-bars-fix/BARS_FIX_PLAN.md`. **RUNNING NOW (next window WATCHES it):** an
+> ALL-NIGHT 864-word FRONTIER story soak on :8011 -- 4 frontier creative (Gemini/Grok/GPT/Opus) + Opus
+> tech, indextts2 voice, z_image character stills (flat_still), DIVERSE seeds (a different news story per
+> leg via the new `OTR_SOAK_DIVERSE_SEED=1` driver knob), 48 legs/8h cap; output
+> `docs/2026-06-21-allnight-864-frontier/`. **RISK: indextts2 is the headless-fragile sidecar -- a prior
+> leg crashed the server; the smoke-leg-first guard aborts cleanly if it fails -> FALLBACK = kokoro (now
+> a deep 28-voice pool).** Opus-tech `~latest` throws transient OpenRouterModelGoneError(404) -> the
+> writer gracefully SKIPS those slots (transport fail-soft), stories still write. **NEXT = (a) watch/
+> triage the soak, (b) BUILD the 3D PoC (operator-gated; pass03+pass04 + the PIN list), (c) the audio-bars
+> fix.** The S3 forward order (3D = item 5) is UNCHANGED -- this campaign IS item 5's detail spec.
+
 > **LATEST SESSION -- 2026-06-19 (CODER; STORY-QUALITY PHASE 1 BUILT + PUSHED + RE-SOAK PASS;
 > HEAD `ee83a88` == origin/v2.0-alpha; full suite 4600 passed/33 skipped, Bug Bible 16/7/3,
 > test_audio_byte_identical green).** Built the roundtable-converged Phase-1 plan
