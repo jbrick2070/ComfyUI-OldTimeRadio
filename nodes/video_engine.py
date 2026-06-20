@@ -1065,6 +1065,123 @@ def _get_latest_telemetry():
         
     return peak_gb, speed, model
 
+def _build_hud_dossier(led):
+    """BUG 3 (2026-06-20 operator): the forensic MODEL / ENGINE detail that
+    ``_write_story_treatment`` records, formatted as scrollable credit sections so
+    it shows ON-SCREEN in the rolling credits -- not only in the ``_treatment.txt``
+    sidecar. Mirrors the treatment's blocks, reading the SAME ``meta`` / ``led``
+    fields. Returns ``[{"header": str, "lines": [str, ...]}, ...]``. Best-effort;
+    never raises (a missing field prints "(not recorded)")."""
+    led = led if isinstance(led, dict) else {}
+    meta = led.get("meta") or {}
+    gp = meta.get("gen_params_initial") or {}
+    NR = "(not recorded)"
+
+    def g(d, k, default=NR):
+        v = (d or {}).get(k)
+        return v if (v is not None and v != "") else default
+
+    sections: list = []
+
+    # 1. WRITER / LLM CONFIG
+    wl = [
+        "Creative (A):  %s" % g(gp, "creative_writing_model",
+                                g(meta, "creative_writing_model")),
+        "Technical (B): %s" % g(gp, "technical_model",
+                                g(meta, "technical_model")),
+    ]
+    _tr = meta.get("slot_transitions")
+    if _tr is not None:
+        wl.append("Slot routing:  %s A<->B transition(s)" % _tr)
+    wl.append("Creativity:    %s" % g(gp, "creativity"))
+    wl.append("Temp / top_p:  %s / %s" % (g(gp, "temperature"), g(gp, "top_p")))
+    wl.append("Words:         target %s / actual %s (char %s / ann %s)" % (
+        g(gp, "target_words"), g(meta, "total_word_count"),
+        g(meta, "character_word_count"), g(meta, "announcer_word_count")))
+    sections.append({"header": "WRITER / LLM CONFIG", "lines": wl})
+
+    # 2. RESOLVED (OPENROUTER) -- the concrete model each ~latest alias served
+    try:
+        from ._otr_openrouter_backend import resolved_models_snapshot as _rms
+        resolved = _rms() or {}
+    except Exception:  # noqa: BLE001 -- backend optional / not loaded
+        resolved = {}
+    if resolved:
+        rl = []
+        total = 0.0
+        for slug in sorted(resolved):
+            info = resolved[slug] or {}
+            cost = float(info.get("cost_usd") or 0.0)
+            total += cost
+            rl.append("%s -> %s (%d call(s), $%.4f)" % (
+                slug, info.get("resolved") or "(unreported)",
+                int(info.get("calls") or 0), cost))
+        rl.append("Total OpenRouter cost: $%.4f" % total)
+        sections.append({"header": "RESOLVED (OPENROUTER)", "lines": rl})
+
+    # 3. STORY SPINE -- what the episode was ABOUT (news + opposed wants)
+    sl = []
+    news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
+    if news:
+        sl.append("Premise:   %s" % g(news, "script_brief"))
+        _kt = news.get("key_terms") or []
+        if _kt:
+            sl.append("Key terms: %s" % ", ".join(str(t) for t in _kt))
+    ds = (meta.get("dramatic_state")
+          if isinstance(meta.get("dramatic_state"), dict) else {})
+    if ds:
+        sl.append("Question:  %s" % g(ds, "dramatic_question"))
+        sl.append("A wants:   %s" % g(ds, "character_a_wants"))
+        sl.append("B wants:   %s" % g(ds, "character_b_wants"))
+        sl.append("Ending:    %s" % g(ds, "ending_change"))
+    if sl:
+        sections.append({"header": "STORY SPINE", "lines": sl})
+
+    # 4. RENDER ENGINES -- which engine rendered each role (video + image)
+    el = []
+    re_ = meta.get("render_engines") or {}
+    for role in sorted(re_.get("by_role") or {}):
+        engs = (re_.get("by_role") or {})[role] or {}
+        el.append("video  %-16s %s" % (role, ", ".join(
+            "%s x%d" % (e, n) for e, n in sorted(engs.items()))))
+    img_by_role: dict = {}
+    for r in ((led.get("images") or {}).get("images")) or []:
+        if not isinstance(r, dict):
+            continue
+        img_by_role.setdefault(str(r.get("role") or "?"), {})
+        _e = str(r.get("engine_id") or "?")
+        img_by_role[str(r.get("role") or "?")][_e] = \
+            img_by_role[str(r.get("role") or "?")].get(_e, 0) + 1
+    for role in sorted(img_by_role):
+        el.append("image  %-16s %s" % (role, ", ".join(
+            "%s x%d" % (e, n) for e, n in sorted(img_by_role[role].items()))))
+    if el:
+        sections.append({"header": "RENDER ENGINES", "lines": el})
+
+    # 5. SYSTEM -- techie-friendly host / CPU / RAM / GPU / VRAM / CUDA / torch
+    # (operator 2026-06-20). Same source as the treatment; any unprobeable field
+    # degrades to "(unknown)" rather than failing the credits.
+    try:
+        from ._otr_sys_specs import collect_system_specs as _css
+        sysd = _css() or {}
+    except Exception:  # noqa: BLE001 -- spec probe is best-effort
+        sysd = {}
+
+    def sg(k):
+        return sysd.get(k) or "(unknown)"
+
+    sections.append({"header": "SYSTEM", "lines": [
+        "Host:  %s    OS: %s" % (sg("hostname"), sg("os")),
+        "CPU:   %s  (%s)" % (sg("cpu"), sg("cpu_cores")),
+        "RAM:   %s  (peak %s)" % (sg("ram"), sg("ram_peak")),
+        "GPU:   %s  (%s VRAM)" % (sg("gpu"), sg("vram")),
+        "CUDA:  %s    torch %s    Python %s" % (
+            sg("cuda"), sg("torch"), sg("python")),
+    ]})
+
+    return sections
+
+
 def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
                     news_used, duration_s, W, H):
     """Return a clean data dict for *_TelemetryHUDRenderer*.
@@ -1185,6 +1302,8 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
         "news_seeds": news_seeds,
         "cast":       cast,
         "scenes":     scenes,
+        # BUG 3: the forensic model/engine dossier scrolls on the credits.
+        "dossier":    _build_hud_dossier(led),
         "telemetry":  {"peak": peak_gb, "speed": speed, "model": model}
     }
 
@@ -1384,12 +1503,35 @@ class _TelemetryHUDRenderer:
         P, RW = self.P, self.RIGHT_W
         scenes = self.data.get("scenes", [])
         n_items = sum(len(s.get("items", [])) for s in scenes)
-        est_h = self.h + (len(scenes) * 4 + n_items * 5) * self._lhB + self.h
+        # BUG 3: reserve canvas height for the production dossier too (each
+        # dossier line may wrap -> allow 3x for safety) so it never clips.
+        dossier = self.data.get("dossier", [])
+        n_dossier = sum(len(s.get("lines", [])) + 2 for s in dossier)
+        est_h = (self.h
+                 + (len(scenes) * 4 + n_items * 5) * self._lhB
+                 + n_dossier * 3 * self._lhB
+                 + self.h)
         est_h = max(est_h, self.h * 3)
 
         img = Image.new("RGB", (RW, est_h), CRT_BG)
         d   = ImageDraw.Draw(img)
         y   = self.h // 4   # breathing room above first line
+
+        # BUG 3 (2026-06-20): PRODUCTION DOSSIER -- the forensic model/engine/system
+        # detail scrolls on-screen ahead of the transcript (mirrors the
+        # _treatment.txt sidecar). Each section = amber header + white body lines;
+        # the transcript follows unchanged so it is never occluded.
+        for sec in (self.data.get("dossier") or []):
+            d.text((P, y), "[ %s ]" % sec.get("header", ""),
+                   fill=CRT_AMBER, font=self.f_label)
+            y += self._lhL + P // 2
+            for line in sec.get("lines", []):
+                y = _draw_wrapped(d, str(line), P * 2, y, RW - P * 3,
+                                  self.f_body, CRT_WHITE, self._lhB)
+            y += P * 2
+        if self.data.get("dossier"):
+            d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
+            y += P * 3
 
         # Transcript header
         d.text((P, y), "[ CLASSIFIED TRANSCRIPT ]", fill=CRT_GREEN, font=self.f_head)
