@@ -5,8 +5,14 @@ Carries the model-agnostic image registry from >=2 engines (C2) to an OPEN set o
 (C2) runs in a cu128 sidecar; Qwen-Image GGUF rides the in-stack ComfyUI-GGUF
 loader, so its fail-closed gate is the GGUF WEIGHTS file (OTR_QWEN_IMAGE_GGUF),
 not a sidecar venv. Flux stays gen 1; Qwen-Image is an opt-in peer, greyed until
-OTR_ENABLE_QWEN_IMAGE=1 AND its checkpoint exists. The live render is the operator
-GPU smoke -- NOT covered here.
+OTR_ENABLE_QWEN_IMAGE=1 AND its checkpoint exists.
+
+Qwen-Image GRADUATED from a NotImplementedError stub to a real, in-stack engine
+(2026-06-19) with an implemented ``render_image`` driving the native GGUF recipe
+(UnetLoaderGGUF + CLIPLoader[type=qwen_image] + VAELoader -> ModelSamplingAuraFlow
+-> KSampler -> VAEDecode). The graph-build is covered here on CPU (wrapper_bridge
+stubbed); the live render + the per-quant VRAM ceiling check is the operator GPU
+smoke, gated before promotion to VALIDATED_ENGINES.
 """
 from __future__ import annotations
 
@@ -98,10 +104,71 @@ def test_qwen_image_assert_usable_passes_when_ckpt_present(monkeypatch, tmp_path
     assert eng.assert_usable({}, {"role": "character_video"}) == "qwen_image"
 
 
-def test_qwen_image_render_is_operator_gpu_smoke():
+def test_qwen_image_env_constants_exported():
+    assert qwi.ENABLE_FLAG == "OTR_ENABLE_QWEN_IMAGE"
+    assert qwi.MODEL_ENV == "OTR_QWEN_IMAGE_GGUF"
+    assert qwi.CLIP_ENV == "OTR_QWEN_IMAGE_CLIP"
+    assert qwi.VAE_ENV == "OTR_QWEN_IMAGE_VAE"
+
+
+def test_qwen_image_params_honor_request_and_env(monkeypatch):
     eng = ireg.get_engine("qwen_image")
-    with pytest.raises(NotImplementedError):
-        eng.render_image({"prompt": "x"}, {})
+    monkeypatch.setenv("OTR_QWEN_IMAGE_STEPS", "24")
+    monkeypatch.setenv("OTR_QWEN_IMAGE_SHIFT", "3.2")
+    monkeypatch.setenv(qwi.MODEL_ENV, r"X:\m\qwen-image-Q4_K_S.gguf")
+    p = eng._qwen_params({"prompt": "a 1940s radio studio",
+                          "seed": 13, "w": 1216, "h": 832})
+    assert p["steps"] == 24 and p["shift"] == 3.2          # env overrides
+    assert p["seed"] == 13 and p["width"] == 1216 and p["height"] == 832
+    assert p["prompt"] == "a 1940s radio studio"
+    # the loader takes a basename even when the env is an absolute path
+    assert p["unet_name"] == "qwen-image-Q4_K_S.gguf"
+    assert p["clip_name"].endswith(".safetensors")
+    assert p["vae_name"].endswith(".safetensors")
+
+
+def test_qwen_image_render_builds_qwen_graph(monkeypatch):
+    """render_image drives wrapper_bridge with the native Qwen-Image GGUF graph --
+    UnetLoaderGGUF, the qwen_image CLIP type, the AuraFlow sampling node, an SD3
+    latent, terminal decode -- without a GPU (wrapper_bridge is stubbed)."""
+    import numpy as np
+    from nodes._otr_video_engines import wrapper_bridge as wb
+
+    eng = ireg.get_engine("qwen_image")
+    monkeypatch.setattr(eng, "_classes", None, raising=False)
+    captured = {}
+
+    def fake_run_graph(graph, classes, terminal=None):
+        captured["graph"] = graph
+        captured["terminal"] = terminal
+        return [object()]
+
+    monkeypatch.setattr(wb, "resolve_graph_classes", lambda cands: {k: k for k in cands})
+    monkeypatch.setattr(wb, "run_graph", fake_run_graph)
+    monkeypatch.setattr(wb, "images_to_uint8",
+                        lambda imgs: np.zeros((1, 8, 8, 3), dtype="uint8"))
+    monkeypatch.setattr(wb, "reclaim_idle_models", lambda **k: None)
+    monkeypatch.setattr(wb, "Wire", lambda node, slot: {"_w": [node, slot]})
+
+    out = eng.render_image({"prompt": "radio console", "seed": 7, "w": 1024, "h": 768})
+    assert out.shape == (8, 8, 3)
+    g = captured["graph"]
+    assert g["unet"]["class"] == "unet"                    # UnetLoaderGGUF diffusion
+    assert g["clip"]["inputs"]["type"] == "qwen_image"     # the qwen text path
+    assert g["sampling"]["class"] == "sampling"            # ModelSamplingAuraFlow
+    assert g["ksampler"]["inputs"]["model"] == {"_w": ["sampling", 0]}  # sampled model
+    assert g["latent"]["inputs"]["width"] == 1024
+    assert g["latent"]["inputs"]["height"] == 768
+    assert captured["terminal"] == "decode"
+
+
+def test_qwen_image_node_candidates_gguf_loader():
+    """The diffusion loader is the GGUF loader (in-stack, no sidecar)."""
+    eng = ireg.get_engine("qwen_image")
+    cands = eng._node_candidates()
+    assert cands["unet"] == ("UnetLoaderGGUF",)
+    assert cands["sampling"] == ("ModelSamplingAuraFlow",)
+    assert cands["latent"] == ("EmptySD3LatentImage",)
 
 
 def test_qwen_image_cold_import_clean():

@@ -1,5 +1,35 @@
 # Image-engine verify-and-promote -- qwen_image / hidream_i1 FINDINGS (2026-06-19)
 
+> **UPDATE 2026-06-19 (CPU build phase, operator directed the Phase-0 code edits):**
+> After the audit below, the operator directed the CPU-side code/registry/tests
+> edits now (GPU held by the still-only z_image soak). Ground-truth recipes were
+> captured from the INSTALLED ComfyUI templates (no /object_info needed; CPU-only):
+> `image_qwen_image_2512_with_2steps_lora.json` (Qwen) + `hidream_i1_fast.json`
+> (HiDream). Decisions:
+>
+> - **qwen_image: BUILT (CPU-complete, GPU-smoke-PENDING).** Real `render_image` +
+>   the native GGUF recipe (UnetLoaderGGUF + CLIPLoader[type=qwen_image] qwen-2.5-vl
+>   TE + VAELoader -> ModelSamplingAuraFlow -> KSampler -> VAEDecode) -- a near-twin
+>   of `lumina_image`. Graph-build CPU tests added; graduated from the stub matrix.
+>   STILL HIDDEN (not in VALIDATED_ENGINES) until a GPU smoke proves it renders AND
+>   measures the per-quant resident peak <= 14.5 GB. Single qwen-2.5-vl TE (~5 GB
+>   fp8) offloads before sampling -> the GGUF diffusion (Q3/Q4 ~8-11 GB) + VAE has a
+>   REAL chance of fitting. Worth the smoke.
+> - **hidream_i1: NOT BUILT -- high-confidence ceiling NO-GO (math below).** The
+>   official HiDream-Fast recipe needs a `QuadrupleCLIPLoader` = clip_l + clip_g +
+>   **t5xxl (~5 GB fp8) + llama-3.1-8B (~8 GB fp8)** ~= **~14 GB of text encoders
+>   ALONE**, before the HiDream UNet. Even with offload-before-sampling, the encode-
+>   phase transient almost certainly breaches the 14.5 GB single-resident ceiling.
+>   Speculatively building its full 4-encoder recipe (4 new TE env vars + plumbing)
+>   for a model that very likely CANNOT ship is the wrong call -- this is the "over
+>   ceiling -> log + skip" stop condition, predicted from the encoder math rather
+>   than measured. The grounded recipe is captured below for a future build IF the
+>   operator accepts a reduced-encoder config or a higher ceiling.
+>
+> Validated IMAGE set remains UNCHANGED + undisturbed (`flux_gen1` /
+> `z_image_turbo` / `flux2_klein` / `lumina_image`); no validated engine touched;
+> z_image left entirely alone during its soak.
+
 **Task:** verify-and-promote `qwen_image` and `hidream_i1` to `VALIDATED_ENGINES`
 using the exact playbook that landed `lumina_image` (commits `ed560a0`/`631d0b0`),
 *only if* they pass a GPU smoke under the 14.5 GB resident ceiling.
@@ -98,3 +128,34 @@ and hidream's 4-encoder stack are both genuinely tight, unlike Lumina's 2.6B).
 No edits to any validated engine (`flux_gen1`/`z_image_turbo`/`flux2_klein`/
 `lumina_image`), no registry promotion, no workflow-JSON change, no GPU server
 booted (zero contention with the story-quality soak on :8011). CPU audit only.
+
+---
+
+## Appendix: grounded recipes (captured from installed ComfyUI templates, 2026-06-19)
+
+CPU-verified node classes (installed): `UnetLoaderGGUF`, `CLIPLoaderGGUF`,
+`QuadrupleCLIPLoaderGGUF` (ComfyUI-GGUF); core `CLIPLoader` supports
+`type in {qwen_image, hidream, lumina2, ...}` (comfy/sd.py CLIPType).
+
+**qwen_image (BUILT)** -- from `image_qwen_image_2512_with_2steps_lora.json`
+(minus the 2-step turbo LoRA + ConditioningZeroOut; standard cfg path restored):
+- `UnetLoaderGGUF{unet_name}` -> MODEL  (OTR_QWEN_IMAGE_GGUF; 20B Q-quant)
+- `CLIPLoader{clip_name, type:"qwen_image"}` -> CLIP  (qwen_2.5_vl_7b_fp8_scaled; OTR_QWEN_IMAGE_CLIP)
+- `VAELoader{vae_name}` -> VAE  (qwen_image_vae; OTR_QWEN_IMAGE_VAE)
+- `ModelSamplingAuraFlow{model, shift:3.0}`
+- `CLIPTextEncode` pos/neg ; `EmptySD3LatentImage{w,h,1}`
+- `KSampler{steps:20, cfg:2.5, euler, simple, denoise:1}` ; `VAEDecode` -> still
+
+**hidream_i1 Fast (NOT built -- ceiling NO-GO; recipe for a future call)** -- from
+`hidream_i1_fast.json`:
+- `UNETLoader`/`UnetLoaderGGUF{unet_name}`  (hidream_i1_fast_fp8 / a GGUF quant)
+- `QuadrupleCLIPLoader{clip_l_hidream, clip_g_hidream, t5xxl_fp8_e4m3fn_scaled,
+  llama_3.1_8b_instruct_fp8_scaled}`  <- the ~14 GB encoder stack (the NO-GO driver)
+- `VAELoader{ae.safetensors}`  (the Flux ae VAE)
+- `ModelSamplingSD3{model, shift:3}`
+- `CLIPTextEncode` pos/neg ; `EmptySD3LatentImage{1024,1024,1}`
+- `KSampler{steps:16, cfg:1.0, lcm, normal, denoise:1}` ; `VAEDecode` -> still
+
+To make hidream viable under 14.5 GB the encoder stack must shrink (e.g. GGUF-quant
+t5xxl + llama, or a sequential-encode-then-fully-evict step before the UNet loads) --
+an operator/roundtable call, not a same-session build.
