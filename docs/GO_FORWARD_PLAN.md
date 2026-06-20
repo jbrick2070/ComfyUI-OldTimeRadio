@@ -1,5 +1,142 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-19 (CODER; STORY-QUALITY PHASE 1 BUILT + PUSHED + RE-SOAK PASS;
+> HEAD `ee83a88` == origin/v2.0-alpha; full suite 4600 passed/33 skipped, Bug Bible 16/7/3,
+> test_audio_byte_identical green).** Built the roundtable-converged Phase-1 plan
+> (`docs/2026-06-19-story-quality-analysis/roundtable/R2/pass02_plan.md`) -- the news->story fix
+> -- in 6 dependency-ordered chunks, each suite+BugBible+no-BOM+AST green, committed AND pushed
+> per chunk: **Chunk 1 A1** (`a1b05bb`, neutralize the dead `editor_constraints` diagnostic;
+> run_story_qa already gated-off); **Chunk 3 A4** (`96db9aa`, new pure `nodes/_otr_anti_loop.py`
+> -- deterministic near-dup + 'What if...?' loop detection over voiced lines, announcer taglines
+> exempt, wired into the spine as Stage 3.6 recomposing CHARACTER targets); **Chunk 2 A3/A2**
+> (`9a792b6`, run the mechanical floor UNCONDITIONALLY after the critic + UNION into
+> reroll_targets since run_story_critic returns clean() identically on failure; replace the
+> reroll-exhaustion needs_full_rerun terminal-skip with REPAIR-THEN-SHIP -- log residuals to
+> `meta.a2_ship_through`, fall through to the normal freeze, never refuse; cast_lock's structural
+> PD1 halt left intact); **Chunk 4 B1 THE SPINE** (`17d2e39`, new `nodes/_otr_dramatic_state_llm.py`
+> -- derive the opposed wants+question+ending from `meta["news"]` at the writer call site via
+> structured_call on the resident technical slot, post-validator requiring >=1 news term, a
+> deterministic news-templated fallback opposed BY CONSTRUCTION, and a turning-slot key_terms
+> floor; replaces the `_DEFAULT_A/B_WANTS` boilerplate; the pure `_otr_dramatic_state` stays
+> pure); **Chunk 5 A5** (`db710a0`, new pure `build_line_dramatic_fields` adapter maps the
+> news-driven slot contract -> the composer's beat_objective/obstacle/turn/subtext on the
+> compose_line path; the LIVE exchange composer already consumes the same contracts); **Chunk 6
+> A6** (`ee83a88`, new pure `nodes/_otr_line_hygiene.py` -- scrub parentheticals + self-vocative,
+> RECOMPOSE truncation: character->spine seam, announcer open/close->the dedicated announcer
+> composer; spine Stage 3.7). 36 new unit tests across the 6 chunks. **All content-only inside the
+> FIXED ledger {cast,lines,meta}; ZERO JSON edits (the prod workflow is unchanged -- the new code
+> runs inside the existing wired OTR_LedgerScriptWriter + OTR_LedgerFreezeCascade nodes).**
+> **RE-SOAK PASS** (headless :8011, real `otr_scifi_16gb_full.json`, bark, visualizer, bypass
+> OFF): leg-1 (mistral-nemo) `dramatic_state_source=llm`, wants genuinely OPPOSED and about the
+> news (UCLA academic integrity vs startup commercialization at LABEST 2026), **`_DEFAULT_*`
+> ABSENT**, `freeze_verdict=frozen_with_doctor_edits` (SHIPPED, no refuse), `a2_ship_through`
+> stamped (A2 proven). Details: `docs/2026-06-19-story-quality-analysis/RESOAK_RESULTS.md`.
+> **DEFERRED to Phase 2 (NOT done):** shape-follows-story; the use_exchange exchange composer
+> enhancements; reconstruction-test validator; best-of-N; physical deletion of the neutralized QA
+> modules. **NEXT:** Phase 2 (per pass02 scope) + the operator close-read of the remaining small-
+> local re-soak legs (gemma-2-2b/4-E2B/4-12b). The S3 build forward order (sections 1/3) is
+> UNCHANGED by this work.
+
+
+> **LATEST SESSION -- 2026-06-19 (STORY-QUALITY ROUNDTABLE R1 CONVERGED; docs only, NO code; HEAD `af26492`
+> == origin; build forward order sections 1/3 UNCHANGED).** Ran R1 of the story-quality campaign end to end.
+> (1) Acted as the FIRST PANELIST with a fresh head -> `roundtable/pass01_opus-grounded.md` (A-E), grounding
+> every claim against the REAL Windows code + the soak corpus (Desktop Commander, not the lagging mount).
+> CONFIRMED: critic anti-correlation (leg_0002 best -> `needs_full_rerun`; leg_0031 worst loop ->
+> `frozen_with_doctor_edits`); `_DEFAULT_A/B_WANTS` boilerplate (the news reaches only the *question*, not the
+> wants); uniform 18-line mold (`act_count="auto"` -> `default_act_count`=3 for ALL >=300w; ledger has NO act
+> field); lexical-only `post_assembly_keyterm_check`; ancient-DNA->aliens drift (leg_0013); 12B usable (leg_0011).
+> (2) Operator supplied 6 external panel replies (`docs/story_passes/pass_1/`: chatgpt/claude/gemini-deep/grok/
+> perplexity/deepseek) -- **the panels did NOT see the workflow JSON**. Read them + the private plan and synthesized
+> `roundtable/pass01_architecture.md` as the grounded judge (KEEP/CUT; hallucinations cut). **Operator steers
+> folded in: minimal-change/activate-not-overhaul; 'acts' are NOT a limiter; best story authentic to news; FIX
+> stories not FAIL them; model-agnostic story path (per-model only for technically-unique reqs); rip-out/repurpose
+> any QA-that-only-scores-or-fails (a grounded §5b inventory).** Grounded wiring the panels couldn't: story stage
+> = 2 nodes (`OTR_LedgerScriptWriter` + `OTR_LedgerFreezeCascade`), critic/spine/QA/contracts all INTERNAL to the
+> writer; saved `use_exchange=false` + `act_count="auto"`; `slot_drama_contract` already derives per-line
+> obligations (pulls news key_terms) but is unconsumed on the single-line path; the critic `clean()`-fallback
+> silently returns "strong"+no-targets = SKIPS repair (the "passes the worst" bug); `_otr_story_brief.py` is the
+> VISUAL reflection brief, NOT the news brief (corrects gemini/perplexity). CONVERGED PLAN = 3 fix-moves
+> (news-derived opposed wants at `derive_dramatic_state_from_meta` / call site :2780 -> deliver via the EXISTING
+> contract+composer path -> critic-as-repair-driver, never a gate) + bounded shape (secondary) + the §5b
+> rip-out/repurpose. **R2 DONE/CONVERGED (this session):** ran a live 2-pass roundtable on the coding plan
+> (Gemini-3.1-pro + GPT-5.5 + DeepSeek-v4-pro, grounded vs the real seams; ~$0.30 total) ->
+> `roundtable/R2/pass02_plan.md` is the build-ready Phase-1 plan (6 chunks A1-A6 + B1, all content-only,
+> zero-JSON-targeted, audio byte-identical). Key roundtable-grounded fixes: B1's LLM call goes at the WRITER
+> CALL SITE (the pure helper stays pure) + a post-validator (>=1 news term across wants/question/ending);
+> CUT `stake`/`hook` (DramaticState has neither); run A4 mechanical checks UNCONDITIONALLY + union (the critic
+> returns clean() identically on failure); inject the news-failure turning-slot detail INTO `key_terms`
+> (validate_contract needs it); repair-then-ship ordered selection (never refuse); announcer truncation ->
+> the dedicated announcer composer; neutralize the dead QA in Phase 1, defer physical deletion. **NEXT = R3
+> wiring/build (operator-gated) -> R4 Comfy -> R5 polish (campaign DONE only at polish).** Build forward order
+> (sections 1/3) UNCHANGED.
+
+> **LATEST SESSION -- 2026-06-19 (ANALYSIS window; story-quality SIDE analysis, NOT a build; HEAD `af26492`
+> == origin; docs only, NO code; build forward order sections 1/3 UNCHANGED).** Ran the operator-requested
+> story-quality analysis off the overnight soak. Fanned out 6 READ-ONLY subagents + an Opus close-read of
+> the corpus extremes, all grounded vs the REAL Windows files (Desktop Commander, not the lagging mount).
+> **FINDINGS:** (1) the craft architecture (opposed wants, per-slot turn contract, exchange composer, QA)
+> is BUILT but ships DORMANT -- production runs only format hygiene + a fixed 3-act/18-beat mold for any
+> episode >=300 words (`_otr_episode_budget.ACT_COUNT_CONFIG`); (2) the story critic is ~ANTI-correlated
+> with craft -- it gave the BEST leg (0002, blind 35/35) `needs_full_rerun` and "passed" the WORST (0031,
+> 7/35, a verbatim loop) `frozen_with_doctor_edits` (verified vs `_server8011.log`); (3) word-count
+> variance (34-287%) is a SYMPTOM of the fixed mold, NEVER a target; (4) 26% of legs wrote 0 words = a
+> throughput/harness failure, not craft; (5) **THE NEWS IS NOT THE CRUX** -- the news brief DOES run
+> (`news_briefs_required` default True, so premises are news-derived), but the news is demoted to soft
+> context: the central conflict (the opposed wants in `DramaticState`) is hardcoded `_DEFAULT_A/B_WANTS`
+> that IGNORE the news, the brief becomes a 15-word "theme is flavor, not structure" string, and the only
+> news check anywhere is a lexical ">=2 key-terms appeared" audit (`post_assembly_keyterm_check`).
+> **>>> NEW OPERATOR HARD CONSTRAINT (2026-06-19, NON-NEGOTIABLE): the news story MUST be the CRUX of the
+> drama** -- folded into the deliverables as constraint 4A (content-only; exact fix seam:
+> `derive_dramatic_state_from_meta` + call site `OTR_LedgerScriptWriter.py:2779`, drive the opposed wants
+> from `meta["news"]`; the ledger `{cast,lines,meta}` wire format stays FROZEN; audio spine byte-identical).
+> **DELIVERABLES (docs only, `docs/2026-06-19-story-quality-analysis/`):** `PROBLEM_STATEMENT.md` (code-
+> illustrated, story-quality framed, news-as-crux a hard constraint) + `roundtable/PANEL_PROMPT_R1.md`
+> (self-contained, paste-ready blind-panel prompt) + `_PRIVATE_OPUS_PLAN_DO_NOT_PASTE_TO_PANEL.md` (held OUT
+> of the panel) + `README.md`. **CAMPAIGN MECHANICS (operator-set):** the OPERATOR runs ALL panelists himself
+> (latest models, his pick; GPT-5.5 self-run) from the paste-ready file -- ZERO OpenRouter spend by Claude.
+> **>>> NEW OPERATOR DIRECTIVE (2026-06-19, "surprise") -- THE NEXT WINDOW STARTS HERE:** the fresh window
+> opens by acting as the **FIRST PANELIST** -- with a FRESH HEAD, read `roundtable/PANEL_PROMPT_R1.md` and
+> ground every claim against BOTH the REAL code AND the REAL soak corpus (the 20+ leg scripts in
+> `docs/2026-06-18-overnight-story-soak/scripts/`; it is the ONE reviewer that CAN check the repo + the data,
+> unlike the external blind models), and write its own grounded panelist answer to
+> `roundtable/pass01_opus-grounded.md` BEFORE opening the private plan or synthesizing. **GROUNDING BAR
+> (operator): the goal is a genuinely BETTER STORY -- do NOT propose rewrites for their own sake; a lever
+> ships ONLY if soak+code evidence shows it actually makes the STORY better. If it wouldn't improve the
+> story, don't propose it.** (This AMENDS the brief's "Opus is never a listed panelist" line -- operator
+> override.) THEN: operator runs the external blind panels -> Opus reads all + the private
+> plan and synthesizes `roundtable/pass01_architecture.md` -> Rounds 2 (coding) / 3 (wiring) / 4 (Comfy
+> workflow) / 5 (polish). The `/otr-handoff` for this analysis is DONE only at polish. The build forward
+> order (sections 1/3) is UNCHANGED and resumes after the campaign.
+
+> **LATEST SESSION -- 2026-06-19 (PLANNER/SOAK; HEAD `af26492` == origin; suite green, Bug Bible 16/7/3).
+> SHIPPED + PUSHED earlier this session (each suite-green): bark runaway-clip cap + trailing-pad trim
+> (`cc6bacc`, the caption-fit fix -- bark was over-generating ~12s for 16 words) + the `default_clean`
+> commercial-clean cast voice bank (`af26492`, routes the char engine to chatterbox/dia, excludes the
+> non-commercial indextts2). Also ran the voice-engine roundtable (converged) + banked the curated voice
+> cast. THEN ran a 10-HOUR OVERNIGHT STORY-QUALITY SOAK (operator-requested data-gathering run, NOT a
+> build): 35 legs, 13 writer LLMs (7 OpenRouter ~latest + 6 local), 320/400/500-word targets, news-driven
+> premises, all-visualizer, dedicated :8011 server. Output: `docs/2026-06-18-overnight-story-soak/`
+> (story_soak_results.csv/.json + 28 per-leg script .txt). Soak ended cleanly at the 10h cap.
+> **>>> THIS HAND-OFF OPENS A SIDE ANALYSIS WINDOW** (does NOT change the build forward order): a
+> STORY-QUALITY ANALYSIS that fans out read-only subagents over the soak corpus + the ledgers + the
+> story-gen architecture, forms its own judgment, and produces a PROBLEM STATEMENT for `/roundtable`.
+> **OBJECTIVE = STORY QUALITY (craft), NOT word count (operator 2026-06-19: "I don't want to chase word
+> count, I want to chase story quality -- hard for a computer to decide but do your best").** The analysis
+> LEADS with a qualitative close-read of the 28 scripts (+ an LLM-judge rubric + the pipeline critic).
+> Supporting signals (diagnostics, NOT targets): n_lines pinned at ~18 regardless of length = one-size
+> story SHAPE + the caption-fit root; story critic 0/19 clean; word-count adherence wild (34-287%).
+> Full brief + the subagent plan + the HARD ledger-intact constraint (the `{cast,lines,meta}` schema is
+> FROZEN downstream; audio is the first consumer):
+> `docs/2026-06-19-story-quality-analysis/STORY_QUALITY_ANALYSIS_BRIEF.md`.
+> **The handoff completes via a MULTI-ROUND ROUNDTABLE CAMPAIGN (operator design, brief section 5A):** a
+> broad, CODE-ILLUSTRATED problem statement -> exactly 3 TOP-TIER panelists judging architecture BLIND
+> (Opus holds its own best plan privately + is the sole judge/synthesizer), then a SEQUENCE of rounds --
+> R1 architecture/creative approach, then coding plan, wiring, Comfy workflow, polish. The `/otr-handoff`
+> is DONE only when the campaign runs through polish + the final converged plan is recorded. The S3 build
+> forward order
+> (3D item 5, distribution item 6) + the carried per-segment LUFS/RMS plan are UNCHANGED by this analysis.
+
 > **LATEST SESSION -- 2026-06-18 (CODER; LUMINA-IMAGE 2.0 PROMOTED TO A VALIDATED PEER IMAGE ENGINE,
 > GPU-VERIFIED; 2 commits on `v2.0-alpha`, PUSHED; HEAD `631d0b0` == origin; suite green [2 pre-existing
 > test_model_catalog_scan environmental reds unchanged], Bug Bible 16/7/3, audio byte-identical green).**
@@ -236,6 +373,24 @@
 > sanctioned upstream-TTS audio work). The S3 forward order (Wan smoke / 3D / distribution) is unchanged.
 
 ## 1. CURRENT STEP
+
+**>>> ACTIVE SIDE-CAMPAIGN (operator, 2026-06-19 -- the NEXT window STARTS HERE, before the build step below):**
+the STORY-QUALITY roundtable campaign. **R1 DONE 2026-06-19:** the grounded FIRST-PANELIST pass
+(`roundtable/pass01_opus-grounded.md`) + the 5 external panels (`docs/story_passes/pass_1/`) + the converged
+judge synthesis (`roundtable/pass01_architecture.md`) are written. The converged plan = 3 fix-moves
+(news-derived opposed wants at `derive_dramatic_state_from_meta`/:2780 -> deliver via the EXISTING
+contract+composer path -> critic-as-repair-driver, never a gate) + bounded shape (secondary) + a §5b
+rip-out/repurpose of QA-that-only-scores-or-fails; bar = a genuinely BETTER STORY, FIX-not-FAIL,
+model-agnostic, activate-not-overhaul, 'acts' are not a limiter. **R2 CONVERGED via a live 2-pass roundtable
+(roundtable/R2/pass02_plan.md = build-ready Phase-1 plan, A1-A6 + B1); NEXT = R3 wiring/build (operator-gated)**
+-> R4 Comfy -> R5 polish (campaign DONE only at polish). Materials:
+`docs/2026-06-19-story-quality-analysis/` -- START with
+`roundtable/PANEL_PROMPT_R1.md`; do NOT open `_PRIVATE_OPUS_PLAN_DO_NOT_PASTE_TO_PANEL.md` until AFTER the
+grounded panelist pass. Carried into every round: the story must be genuinely ABOUT the news + it must work on
+a SMALL LOCAL LLM + the ledger `{cast,lines,meta}` stays FIXED (content-only) + audio byte-identical + the bar
+is a genuinely BETTER STORY (no rewrite-for-its-own-sake). The news-SELECTION front-end (RSS -> brief) is a
+GIVEN INPUT, out of scope -- the work is everything AFTER the brief. The BUILD current-step below is UNCHANGED
+and resumes after the campaign.
 
 **>>> CURRENT STEP DONE (2026-06-18): flux2_klein VERIFIED + PROMOTED; coverage-arch accepts_still SHIPPED.**
 - The TE mismatch is FIXED: klein-4B uses the **Qwen-3-4B** encoder (7680-wide; `qwen_3_4b.safetensors` from
