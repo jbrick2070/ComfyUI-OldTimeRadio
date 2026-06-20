@@ -180,6 +180,51 @@ def _make_recompose_fn(led: Any, creative_generate_fn: Callable[..., str]):
     return _recompose
 
 
+def _recompose_announcer_tagline(
+    led: Any,
+    meta: dict,
+    creative_generate_fn: Callable[..., str],
+    resolved: Any,
+    *,
+    is_intro: bool,
+    intro_text: str = "",
+) -> str:
+    """Recompose a TRUNCATED announcer open/close tagline via the DEDICATED
+    announcer composer (A6), never the character reroll path -- the critic
+    excludes announcer lines as locked structural content, so a character
+    reroll cannot act on them. Returns the new text, or "" on any failure
+    (the caller keeps the original). Never raises."""
+    try:
+        try:
+            from . import _otr_line_composer as _LC
+        except ImportError:  # pragma: no cover - standalone / test load
+            import _otr_line_composer as _LC  # type: ignore
+        news = (meta.get("news") or {}) if isinstance(meta, dict) else {}
+        if not isinstance(news, dict):
+            news = {}
+        script_brief = str(news.get("script_brief") or "")
+        news_close_brief = str(news.get("news_close_brief") or "")
+        repo = resolved.get("creative_writing_model") if isinstance(resolved, dict) else None
+        if is_intro:
+            res = _LC.compose_announcer_intro(
+                creative_fn=creative_generate_fn,
+                script_brief=script_brief,
+                creative_repo_id=repo,
+            )
+        else:
+            res = _LC.compose_announcer_outro(
+                creative_fn=creative_generate_fn,
+                script_brief=script_brief,
+                news_close_brief=news_close_brief,
+                intro_text=intro_text,
+                creative_repo_id=repo,
+            )
+        text = getattr(res, "text", None)
+        return str(text) if (text and str(text).strip()) else ""
+    except Exception:  # noqa: BLE001 -- never corrupt the tagline
+        return ""
+
+
 def _map_arc_indices(outline: Any, led: Any):
     """Map the Stream A outline turning_point/button (indices into ALL
     outline beats) into the editor's voiced-view index space (by
@@ -427,6 +472,77 @@ def run_post_script_spine(
     except Exception as exc:  # noqa: BLE001 -- anti-loop must never break a run
         meta["anti_loop_report"] = {"status": f"ERROR:{type(exc).__name__}"}
         log.warning("[OTR_StorySpine] anti-loop repair failed: %r", exc)
+
+    # --- Stage 3.7: clean delivery -- scrub vs recompose (A6) -----------
+    # Story-quality Phase 1. DETERMINISTIC SCRUB of spoken CHARACTER lines
+    # (parenthetical stage-directions + the speaker's own-name vocative); and
+    # TRUNCATION REPAIR BY RECOMPOSE (never token-surgery): a truncated
+    # character line routes to the spine recompose seam, a truncated announcer
+    # OPEN/CLOSE tagline routes to the DEDICATED announcer composer (the critic
+    # excludes announcer lines, so a character reroll cannot act on them).
+    # Runs before the writer-LLM unload so the creative slot is resident.
+    # Fail-soft: any error degrades to KEEP, never corrupts a beat.
+    try:
+        from . import _otr_line_hygiene as _HY
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_line_hygiene as _HY  # type: ignore
+    try:
+        _hy_data = getattr(led, "data", led)
+        _hy_cast = _hy_data.get("cast") or []
+        _hy_voiced = _voiced_lines(led)
+        _hy_recompose = _make_recompose_fn(led, creative_generate_fn)
+        _hy_ann_idx = [i for i, ln in enumerate(_hy_voiced)
+                       if ln.get("speaker_role") == "announcer"]
+        _hy_first_ann = _hy_ann_idx[0] if _hy_ann_idx else -1
+        _hy_last_ann = _hy_ann_idx[-1] if _hy_ann_idx else -1
+        _hy_report = {"scrubbed": 0, "char_recomposed": 0,
+                      "announcer_recomposed": 0}
+        _hy_ctx = (
+            slot_scheduler.helper_context("delivery_hygiene")
+            if slot_scheduler is not None else _nullcontext()
+        )
+        with _hy_ctx:
+            for _hy_i, _hy_line in enumerate(_hy_voiced):
+                _hy_role = _hy_line.get("speaker_role")
+                _hy_orig = str(_hy_line.get("text") or "")
+                if _hy_role == "character":
+                    _hy_name = (_cast_name(_hy_cast, _hy_line.get("char_id"))
+                                or _hy_line.get("char_id") or "")
+                    _hy_clean = _HY.clean_spoken_character_line(
+                        _hy_orig, _hy_name)
+                    if _hy_clean != _hy_orig and _hy_clean.strip():
+                        _hy_line["text"] = _hy_clean
+                        _hy_report["scrubbed"] += 1
+                        _hy_orig = _hy_clean
+                    if _HY.is_truncated(_hy_orig):
+                        _hy_new = _hy_recompose(
+                            _hy_i, _hy_orig,
+                            "finish the sentence; do not cut off mid-thought "
+                            "or end on a dangling word",
+                        )
+                        if (_hy_new and str(_hy_new).strip()
+                                and str(_hy_new) != _hy_orig):
+                            _hy_line["text"] = str(_hy_new)
+                            _hy_report["char_recomposed"] += 1
+                elif _hy_role == "announcer" and _hy_i in (
+                        _hy_first_ann, _hy_last_ann):
+                    if _HY.is_truncated(_hy_orig):
+                        _hy_fixed = _recompose_announcer_tagline(
+                            led, meta, creative_generate_fn, resolved,
+                            is_intro=(_hy_i == _hy_first_ann),
+                            intro_text=str(
+                                _hy_voiced[_hy_first_ann].get("text") or "")
+                            if _hy_first_ann >= 0 else "",
+                        )
+                        if (_hy_fixed and _hy_fixed.strip()
+                                and _hy_fixed != _hy_orig):
+                            _hy_line["text"] = _hy_fixed
+                            _hy_report["announcer_recomposed"] += 1
+        meta["delivery_hygiene_report"] = _hy_report
+    except Exception as exc:  # noqa: BLE001 -- hygiene must never break a run
+        meta["delivery_hygiene_report"] = {
+            "status": f"ERROR:{type(exc).__name__}"}
+        log.warning("[OTR_StorySpine] delivery hygiene failed: %r", exc)
 
     # --- Writer-LLM unload (D8): after the LLM passes, before scrub -----
     _unload_writer_llm(meta)
