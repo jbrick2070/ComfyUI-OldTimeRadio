@@ -689,21 +689,38 @@ OPENROUTER_FRONTIER_LATEST = (
 OPENROUTER_NO_LATEST_AUTHORS = ("x-ai",)
 
 
+# Suffixes that mark a NON-frontier variant (dev builds, small/fast tiers, free
+# previews). Excluded when auto-picking an author's frontier model so the
+# dropdown keeps e.g. x-ai/grok-4.3, not x-ai/grok-build-0.1 / grok-mini.
+_NON_FRONTIER_MARKERS = (
+    "build", "mini", "nano", "lite", "fast", "code", "preview", "beta",
+    "draft", ":free", "-free", "instant",
+)
+
+
 def _newest_concrete_for_author(models: list[dict], author: str) -> str | None:
-    """The newest concrete slug for an author lacking a `~latest` alias (e.g.
-    x-ai/Grok). 'Newest' = highest `created`, then highest id (lexical) as a
-    tiebreak. Returns None if the author has no rows. Pure; never raises."""
+    """The newest FRONTIER concrete slug for an author lacking a `~latest` alias
+    (e.g. x-ai/Grok). Skips dev-build / mini / preview variants, then takes the
+    highest `created` (then highest id as a tiebreak). Falls back to the newest
+    of all rows if every row looks non-frontier. None if no rows. Pure; never
+    raises."""
     try:
         prefix = author.lower() + "/"
         rows = [m for m in models if str(m.get("id", "")).lower().startswith(prefix)]
         if not rows:
             return None
+        frontier = [
+            m for m in rows
+            if not any(mark in str(m.get("id", "")).lower()
+                       for mark in _NON_FRONTIER_MARKERS)
+        ]
+        pool = frontier or rows
 
         def _key(m: dict):
             c = m.get("created")
             return (float(c) if isinstance(c, (int, float)) else 0.0, str(m.get("id", "")))
 
-        return sorted(rows, key=_key, reverse=True)[0]["id"]
+        return sorted(pool, key=_key, reverse=True)[0]["id"]
     except Exception:  # noqa: BLE001
         return None
 
