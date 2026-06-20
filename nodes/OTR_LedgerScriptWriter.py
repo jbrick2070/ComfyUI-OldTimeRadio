@@ -3261,6 +3261,50 @@ class OTR_LedgerScriptWriter:
             except Exception:  # noqa: BLE001 -- never break audio
                 _next_turn_text = ""
 
+            # --- A5 (story-quality Phase 1): deliver the news-driven drama
+            # to the line writer. Map THIS slot's SlotDramaContract (Build 3,
+            # now news-derived via B1) onto the composer's per-line dramatic
+            # fields so the line PLAYS the objective / obstacle / turn /
+            # subtext instead of restating the theme. Single-line Path A
+            # (use_exchange OFF); we do NOT mutate locked cast rows --
+            # distinctness rides on these per-line fields. Fail-soft: any miss
+            # leaves the fields empty and the composer drops the empty blocks
+            # (legacy prompt byte-identical). Announcer slots are skipped (the
+            # dramatic frame + opposed-want framing is character-centric).
+            _a5_obj = _a5_obs = _a5_turn = _a5_sub = ""
+            if not is_announcer:
+                try:
+                    from ._otr_slot_drama_contract import (
+                        build_line_dramatic_fields as _a5_fields,
+                    )
+                    _a5_sid = str(
+                        getattr(beat, "dialogue_slot_id", "") or ""
+                    ).strip()
+                    _a5_contracts = meta.get("slot_drama_contracts") or {}
+                    _a5_contract = (
+                        _a5_contracts.get(_a5_sid)
+                        if isinstance(_a5_contracts, dict) else None
+                    )
+                    if _a5_contract:
+                        _a5_cast = led.data.get("cast") or cast_rows or []
+                        _a5_names = [
+                            str(r.get("name") or "").strip()
+                            for r in _a5_cast
+                            if isinstance(r, dict) and str(r.get("name") or "").strip()
+                        ]
+                        _a5_map = _a5_fields(
+                            _a5_contract, _ds_meta,
+                            speaker=speaker,
+                            a_name=_a5_names[0] if _a5_names else "",
+                            b_name=_a5_names[1] if len(_a5_names) > 1 else "",
+                        )
+                        _a5_obj = _a5_map.get("beat_objective", "")
+                        _a5_obs = _a5_map.get("beat_obstacle", "")
+                        _a5_turn = _a5_map.get("beat_turn", "")
+                        _a5_sub = _a5_map.get("beat_subtext", "")
+                except Exception:  # noqa: BLE001 -- never break audio
+                    _a5_obj = _a5_obs = _a5_turn = _a5_sub = ""
+
             return _OTRLC.LineRequest(
                 speaker=speaker,
                 intent=beat.intent,
@@ -3298,6 +3342,11 @@ class OTR_LedgerScriptWriter:
                 # Sprint 3.1 (2026-05-28) -- DRAMATIC FRAME fields.
                 dramatic_question=_dramatic_question,
                 next_turn=_next_turn_text,
+                # A5 (2026-06-19) -- the news-driven slot contract, delivered.
+                beat_objective=_a5_obj,
+                beat_obstacle=_a5_obs,
+                beat_turn=_a5_turn,
+                beat_subtext=_a5_sub,
             )
 
         # Sprint 10B Wave 1 Agent B (2026-05-27): build the in-loop

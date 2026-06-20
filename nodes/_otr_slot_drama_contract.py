@@ -676,3 +676,82 @@ def _as_dict(obj: Any) -> dict:
     if hasattr(obj, "__dict__"):
         return dict(obj.__dict__)
     raise ValueError(f"cannot coerce {type(obj).__name__} to dict for validation")
+
+
+# ---------------------------------------------------------------------------
+# A5 (story-quality Phase 1): deliver the contract drama to the line writer
+# ---------------------------------------------------------------------------
+
+
+def build_line_dramatic_fields(
+    contract: Any,
+    dramatic_state: Any,
+    *,
+    speaker: str = "",
+    a_name: str = "",
+    b_name: str = "",
+) -> dict:
+    """Map a SlotDramaContract (+ the episode DramaticState) onto the line
+    composer's per-line dramatic fields, so the line PLAYS its objective /
+    obstacle / turn / subtext instead of restating the theme (A5 delivery of
+    the news-driven drama from B1).
+
+    Returns ``{"beat_objective", "beat_obstacle", "beat_turn",
+    "beat_subtext"}`` (all strings; empty when not applicable -- the composer
+    drops empty blocks, keeping the legacy prompt byte-identical):
+      * beat_objective <- contract.line_job, with the concrete_detail_required
+        grounding folded in (there is no dedicated LineRequest detail slot);
+      * beat_subtext  <- contract.hidden_pressure;
+      * beat_turn     <- the state_before -> state_after shift, ONLY on the
+        must_turn (costly-choice) slot;
+      * beat_obstacle <- the OPPOSING lead's want (the speaker's counterpart),
+        so distinct leads pull against each other.
+
+    `contract` / `dramatic_state` may be dicts or model instances. Pure; never
+    raises (a bad input degrades to empty fields). The caller must NOT mutate
+    locked cast rows -- distinctness rides entirely on these per-line fields.
+    """
+    try:
+        line_job = str(_get(contract, "line_job", "") or "").strip()
+        hidden = str(_get(contract, "hidden_pressure", "") or "").strip()
+        must_turn = bool(_get(contract, "must_turn", False))
+        state_before = str(_get(contract, "state_before", "") or "").strip()
+        state_after = str(_get(contract, "state_after", "") or "").strip()
+        details = _get(contract, "concrete_detail_required", []) or []
+        a_wants = str(_get(dramatic_state, "character_a_wants", "") or "").strip()
+        b_wants = str(_get(dramatic_state, "character_b_wants", "") or "").strip()
+
+        det_list = [str(d).strip() for d in details if str(d).strip()]
+        objective = line_job
+        if objective and det_list:
+            objective = f"{objective} (ground it in: {', '.join(det_list)})"
+        elif not objective and det_list:
+            objective = f"ground the line in: {', '.join(det_list)}"
+
+        sp = (speaker or "").strip().lower()
+        if a_name and sp == a_name.strip().lower():
+            obstacle = b_wants
+        elif b_name and sp == b_name.strip().lower():
+            obstacle = a_wants
+        else:
+            # non-lead speaker: the antagonist pressure (B want) by default.
+            obstacle = b_wants or a_wants
+
+        turn = ""
+        if (must_turn and state_before and state_after
+                and not _eq_norm(state_before, state_after)):
+            turn = f"{state_before} -> {state_after}"
+
+        return {
+            "beat_objective": objective,
+            "beat_obstacle": obstacle,
+            "beat_turn": turn,
+            "beat_subtext": hidden,
+        }
+    except Exception:  # noqa: BLE001 -- adapter must never break audio
+        return {
+            "beat_objective": "",
+            "beat_obstacle": "",
+            "beat_turn": "",
+            "beat_subtext": "",
+        }
