@@ -43,7 +43,26 @@ This validates the projection + bounded arc + Workbench VERTEX render
 end-to-end. The only unvalidated piece left for the full GPU smoke is the hy3d
 mesher (GPU) + projecting a REAL portrait onto a REAL mesh.
 
-## REMAINING (operator-gated GPU smoke + the activation wiring)
+## GPU SMOKE -- PASSED (2026-06-20, box reset clean, FLOOR lane on :8000)
+After the 864-word soak hit its 8h cap and freed the GPU, reset the box (killed
+the two :8011 soak servers, port empty, GPU 1.8 GB baseline) and booted a fresh
+FLOOR-lane headless server with `OTR_ENABLE_MESH_STAGE=1`. Ran the
+single-engine smoke against a REAL FLUX portrait (`c02_portrait.png`):
+
+    python scripts/_otr_single_engine_smoke.py --engine mesh_stage --frames 25 \
+        --portrait <c02_portrait.png>
+
+Result: **`ok:true`**, elapsed 42.2 s, a 25-frame straight-alpha directory clip
+(5.9 MB, exists=true), **`vram_used_mb`: 2587 << 14500 ceiling**. The proof frame
+`gpu_smoke_meshstage_frame.png` (this dir) shows the hy3d mesh TEXTURED with the
+projected portrait (the face is clearly visible) on a transparent background --
+NOT the flat-gray "plaster of paris" blob. The untested GPU chain (portrait ->
+hy3d-2mv mesher -> vertex-color projection -> Blender turntable -> RGBA frames)
+works end to end. NOTE: the hy3d single-view mesh is irregular and the
+camera-arc framing wants tuning (a look-QA follow-up), but the PROJECTION is
+proven on a real mesh + real portrait.
+
+## REMAINING (the activation wiring -- now GPU-unblocked)
 These intentionally were NOT landed blind tonight -- they need the GPU render
 loop, which the all-night 864-word soak occupies until it finishes:
 
