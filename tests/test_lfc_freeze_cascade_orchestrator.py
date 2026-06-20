@@ -276,10 +276,13 @@ class TestFreezeBlockClassSplit:
         assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
         assert led.data["meta"]["freeze_block_class"] == "structural"
 
-    def test_reroll_exhaustion_is_quality(self):
-        """A critic-driven terminal (reroll exhaustion / arc escalation) is
-        reached only AFTER the reviewer cast audit passed, so the ledger is
-        renderable -> quality, not structural."""
+    def test_reroll_exhaustion_repairs_then_ships(self):
+        """A2 (story-quality Phase 1): a critic-driven terminal (reroll
+        exhaustion / arc escalation) is reached only AFTER the reviewer cast
+        audit passed, so the candidate is renderable. The cascade must
+        REPAIR-THEN-SHIP it through the normal freeze -- NEVER terminal-skip /
+        refuse. The bounded-loop result is recorded on meta.a2_ship_through and
+        the final freeze is a frozen_* verdict, not needs_full_rerun."""
         led = _ledger_obj(_clean_ledger_data())
 
         critic_stub = SimpleNamespace(
@@ -306,9 +309,14 @@ class TestFreezeBlockClassSplit:
                           side_effect=lambda *a, **k: reroll_stub):
             disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        assert disp.verdict == "needs_full_rerun"
-        assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
-        assert led.data["meta"]["freeze_block_class"] == "quality"
+        # Never refuses: the episode ships through the normal freeze.
+        assert disp.verdict != "needs_full_rerun"
+        assert disp.verdict.startswith("frozen")
+        assert led.data["meta"]["freeze_verdict"].startswith("frozen")
+        # The bounded repair-then-ship decision is recorded for the operator.
+        a2 = led.data["meta"]["a2_ship_through"]
+        assert a2["cycles_run"] == 2
+        assert "residual_structural_errors" in a2
 
 
 # ---------------------------------------------------------------------------

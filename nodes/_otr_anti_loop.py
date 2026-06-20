@@ -215,6 +215,46 @@ def find_anti_loop_targets(voiced: List[dict]) -> List[AntiLoopTarget]:
         return []
 
 
+def _ledger_voiced_lines(ledger_data: Any) -> List[dict]:
+    """The voiced view (character + announcer dicts, in order) straight off
+    a raw ledger_data dict -- the cascade form of the spine's _voiced_lines.
+    Never raises."""
+    try:
+        lines = (ledger_data or {}).get("lines") or []
+        return [l for l in lines
+                if isinstance(l, dict)
+                and l.get("speaker_role") in ("character", "announcer")]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def anti_loop_reroll_targets(ledger_data: Any) -> List[tuple]:
+    """CHARACTER-only (line_id, hint) pairs for the freeze-cascade critic
+    union (A3).
+
+    The reroll loop's `_line_index` resolves a target by line_id OR
+    beat_id, so the line's beat_id is a valid reroll key when no line_id is
+    present. Announcer targets are excluded -- the character reroll path
+    cannot act on announcer lines (the critic excludes them by design) and
+    the announcer taglines are exempt anyway. Pure; never raises.
+    """
+    try:
+        voiced = _ledger_voiced_lines(ledger_data)
+        out: List[tuple] = []
+        for t in find_anti_loop_targets(voiced):
+            if t.speaker_role != "character":
+                continue
+            line = voiced[t.voiced_index]
+            lid = str(line.get("line_id") or line.get("beat_id")
+                      or t.beat_id or "")
+            if lid:
+                out.append((lid, t.hint))
+        return out
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[OTR_AntiLoop] reroll-target mapping failed: %r", exc)
+        return []
+
+
 def repair_character_anti_loops(
     led: Any,
     voiced: List[dict],

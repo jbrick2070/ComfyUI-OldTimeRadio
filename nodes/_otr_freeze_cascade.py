@@ -768,6 +768,44 @@ def run_freeze_cascade(
         len(story_critic_report.render_priority),
     )
 
+    # ---- A3 (story-quality Phase 1): UNCONDITIONAL mechanical floor ----
+    # run_story_critic returns StoryCriticReport.clean() identically whether
+    # it succeeded, found nothing, or silently failed -- the caller cannot
+    # detect a failure. So a deterministic, no-LLM mechanical pass runs
+    # UNCONDITIONALLY here and its (line_id, hint) targets are UNIONED into
+    # the critic's reroll_targets. This guarantees real repair targets exist
+    # for the escalation + reroll loop below whenever the deterministic floor
+    # finds a near-duplicate / "What if...?" loop defect, EVEN on a silent
+    # critic failure (no failure flag, no clean() mutation, no critic-retry).
+    # Character-only: the reroll path cannot act on announcer lines and the
+    # announcer taglines are exempt by construction. Never raises.
+    try:
+        from . import _otr_anti_loop as _OTRAL  # type: ignore
+        _existing_ids = {
+            str(getattr(t, "line_id", ""))
+            for t in story_critic_report.reroll_targets
+        }
+        _mech_added = 0
+        for _lid, _hint in _OTRAL.anti_loop_reroll_targets(ledger_data):
+            if _lid in _existing_ids:
+                continue
+            story_critic_report.reroll_targets.append(
+                _OTRSC.RerollTarget(line_id=_lid, hint=_hint)
+            )
+            _existing_ids.add(_lid)
+            _mech_added += 1
+        if _mech_added:
+            meta["story_critic_report"] = story_critic_report.model_dump()
+            meta["anti_loop_mechanical_targets_added"] = _mech_added
+            log.info(
+                "[LFC] A3 mechanical floor: unioned %d deterministic "
+                "anti-loop target(s) into the critic reroll set "
+                "(total now %d).",
+                _mech_added, len(story_critic_report.reroll_targets),
+            )
+    except Exception as _a3_exc:  # noqa: BLE001 -- floor must never break freeze
+        log.warning("[LFC] A3 mechanical floor failed: %r", _a3_exc)
+
     # ---- Sprint 5C: targeted reroll loop ---------------------------
     # The Sprint 5B critic above stamped meta.story_critic_report but
     # changed no line text (advisory). Sprint 5C ACTS on it:
@@ -880,30 +918,51 @@ def run_freeze_cascade(
             reroll_disp.lines_rerolled,
         )
     if reroll_disp.verdict == "needs_full_rerun":
-        disp = _build_terminal_skip_disposition(
-            ledger_data,
-            verdict="needs_full_rerun",
-            reviewer_disp=reviewer_disp,
-            pre_report=pre_report,
-            # Reached only after the reviewer cast audit PASSED (this is the
-            # non-terminal path), so the cast is sound and the ledger is
-            # renderable. needs_full_rerun here is a SUBJECTIVE story-critic
-            # call (reroll exhaustion / arc escalation) -> "quality", not a
-            # renderability failure (BUG-LOCAL-300).
-            block_class="quality",
-        )
+        # ---- A2 (story-quality Phase 1): repair-then-ship, NEVER refuse ----
+        # The repair loop is BOUNDED (run_targeted_reroll caps at
+        # MAX_REROLL_CYCLES) and has already run; the critic still names
+        # subjective quality targets. We are on the NON-TERMINAL path -- the
+        # reviewer already passed the cast + structural audit, so the
+        # candidate (run_targeted_reroll restores the reviewed pre-reroll
+        # lines on exhaustion) PASSES the structural validators and is
+        # renderable. The old behaviour skipped Phase 7..10 and stamped a
+        # terminal needs_full_rerun, aborting a finished, renderable episode
+        # -- the documented "passes the worst, fails the best" bug. Instead
+        # we SHIP it: ordered selection prefers the structurally-valid
+        # candidate, we LOG the residual validator findings for the record,
+        # and we FALL THROUGH to the normal freeze (Phase 6 render plan +
+        # Phase 7/8/10 below). Phase 10's gap audit remains the final
+        # structural gate -- a genuinely unrenderable ledger still fails
+        # there (block_class=structural, the PD1 audio guard); a renderable-
+        # but-low-quality one now ships instead of aborting.
+        # BUG-LOCAL-273: refresh ledger_data + meta -- run_targeted_reroll may
+        # have called Ledger.save() (rebinding led.data) so the stamp lands on
+        # the live dict, not an orphan.
+        ledger_data = led.data
+        meta = ledger_data.setdefault("meta", {})
+        try:
+            _a2_resid = _LFC.run_gap_audit(ledger_data, label="a2_ship_through")
+            _a2_errs = list(_a2_resid.errors)
+            _a2_warns = list(_a2_resid.warnings)
+        except Exception as _a2_exc:  # noqa: BLE001 -- never break the ship
+            log.warning("[LFC] A2 ship-through gap audit failed: %r", _a2_exc)
+            _a2_errs, _a2_warns = [], []
+        meta["a2_ship_through"] = {
+            "reason": "reroll_exhausted_or_structural_escalation",
+            "cycles_run": int(getattr(reroll_disp, "cycles_run", 0) or 0),
+            "residual_structural_errors": _a2_errs,
+            "residual_warnings": _a2_warns,
+        }
         log.warning(
-            "[LFC] reroll loop exhausted %d cycle(s) with the critic "
-            "still flagging targets -- skipping Phase 7..10, freeze "
-            "verdict needs_full_rerun", reroll_disp.cycles_run,
+            "[LFC] A2 repair-then-ship: reroll bounded at %d cycle(s), "
+            "critic still flagging -- SHIPPING the best candidate through "
+            "the normal freeze (%d residual structural error(s), %d "
+            "warning(s) logged; never refusing).",
+            int(getattr(reroll_disp, "cycles_run", 0) or 0),
+            len(_a2_errs), len(_a2_warns),
         )
-        # BUG-LOCAL-278: persist cascade meta before the reroll-exhaustion
-        # terminal exit. This is the path that ships meta.story_critic_report
-        # + meta.freeze_verdict to disk so the Step 8 operator gate can
-        # verify the signal keys from the
-        # persisted .json after the run. See _persist_cascade_meta.
-        _persist_cascade_meta(led)
-        return disp
+        # No terminal-skip, no early return -- execution continues to the
+        # Phase 6 render plan + Phase 7/8/10 ship path below.
 
     # ---- Sprint 6: critic -> render coupling -----------------------
     # Compute the render plan AFTER the reroll completes (so the plan

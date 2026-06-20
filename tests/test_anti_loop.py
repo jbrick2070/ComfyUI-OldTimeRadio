@@ -132,6 +132,44 @@ def test_repair_never_touches_announcer_lines():
     assert summary["character_targets"] >= 1
 
 
+def test_reroll_targets_are_character_only_with_beat_id_keys():
+    # A3: the cascade-union form returns (line_id, hint) for CHARACTER
+    # targets only; line_id falls back to beat_id (the reroll's _line_index
+    # resolves line_id OR beat_id). Announcer dupes are excluded entirely.
+    tag = "You are tuned to the Old Time Radio science hour this evening."
+    ledger_data = {
+        "lines": [
+            {"speaker_role": "announcer", "text": tag, "beat_id": "a0"},
+            {"speaker_role": "character",
+             "text": "We have to reach the old reactor before midnight.",
+             "beat_id": "b1"},
+            {"speaker_role": "character",
+             "text": "We have to reach the old reactor before midnight.",
+             "beat_id": "b2"},
+            {"speaker_role": "announcer", "text": tag, "beat_id": "a1"},
+        ]
+    }
+    pairs = AL.anti_loop_reroll_targets(ledger_data)
+    assert ("b2", AL._DUP_HINT) in pairs
+    assert all(lid not in ("a0", "a1") for lid, _ in pairs), \
+        "announcer lines are never reroll targets"
+
+
+def test_reroll_targets_prefer_explicit_line_id():
+    ledger_data = {
+        "lines": [
+            {"speaker_role": "character", "line_id": "L1",
+             "text": "The signal repeats the same pattern over and over.",
+             "beat_id": "b1"},
+            {"speaker_role": "character", "line_id": "L2",
+             "text": "The signal repeats the same pattern over and over!",
+             "beat_id": "b2"},
+        ]
+    }
+    pairs = AL.anti_loop_reroll_targets(ledger_data)
+    assert any(lid == "L2" for lid, _ in pairs)
+
+
 def test_detection_is_deterministic():
     voiced = [
         _line("character", "We have to reach the old reactor before midnight.", "b1"),
