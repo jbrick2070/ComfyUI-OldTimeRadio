@@ -2811,33 +2811,17 @@ class OTR_LedgerScriptWriter:
                 type(_exc).__name__, str(_exc)[:200],
             )
 
-        # --- H.2. Sprint 5.1 (2026-05-28): constraint-editor diagnostic
-        # Runs check_constraints_from_ledger against the in-flight
-        # ledger and stamps the verdict on meta["editor_constraints"]
-        # as a diagnostic audit. The live editor cycle is unchanged
-        # -- this surface lets operators see the constraint signal
-        # in every soak ledger; a later sprint replaces the taste
-        # editor at max_editor_cycles=1.
-        try:
-            from ._otr_editor_constraints import (
-                check_constraints_from_ledger as _check_ec,
-            )
-            _ec_verdict = _check_ec(led.data)
-            meta["editor_constraints"] = _ec_verdict.to_dict()
-            led.save()
-            log.info(
-                "[OTR_LedgerScriptWriter] Sprint 5.1: editor_"
-                "constraints stamped (pass=%s, failing=%s).",
-                _ec_verdict.pass_decision,
-                _ec_verdict.failing_constraints,
-            )
-        except Exception as _exc:  # noqa: BLE001 -- never break audio
-            log.warning(
-                "[OTR_LedgerScriptWriter] Sprint 5.1: editor_"
-                "constraints check failed (%s: %s); meta entry "
-                "left absent.",
-                type(_exc).__name__, str(_exc)[:200],
-            )
+        # --- H.2. Story-quality Phase 1 (A1, 2026-06-19): NEUTRALIZED ------
+        # The Sprint 5.1 constraint-editor diagnostic that stamped
+        # meta["editor_constraints"] via check_constraints_from_ledger has
+        # been removed. It was a write-only diagnostic with ZERO consumers
+        # anywhere in the pipeline (a verify-at-build consumer grep confirmed
+        # no meta.get("editor_constraints")/string-key/getattr reader exists)
+        # -- pure scoring that never drove a decision. Dropping the call site
+        # removes the per-episode pass + a redundant led.save() with no
+        # behavioral change. The _otr_editor_constraints module + its unit
+        # tests stay in place (physical deletion deferred to a post-spine
+        # cleanup, per the Phase-1 plan) but are no longer wired in.
 
         # --- H.5. Sprint 5A: continuity ledger -------------------------
         # One structured LLM call that reads the finished outline + the
