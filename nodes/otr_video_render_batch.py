@@ -23,6 +23,33 @@ import logging
 log = logging.getLogger("OTR")
 
 
+def _stamp_render_engines_meta(manifest, vram_peak_mb):
+    """Stamp the per-role VIDEO engine map + engine histogram + VRAM peak into
+    the production-ledger meta so the episode treatment / credits sheet can
+    report exactly which engine rendered each role. Best-effort; never raises.
+
+    (The per-role IMAGE engine is already durable in ``ledger['images']`` --
+    each still row carries ``role`` + ``engine_id`` -- so only the VIDEO side
+    needs stamping here.)"""
+    by_role: dict[str, dict[str, int]] = {}
+    for clip in (manifest or {}).get("clips") or []:
+        role = str(clip.get("role") or "?")
+        eng = str(clip.get("engine_id") or "?")
+        by_role.setdefault(role, {})
+        by_role[role][eng] = by_role[role].get(eng, 0) + 1
+    payload = {
+        "histogram": (manifest or {}).get("engine_histogram") or {},
+        "video_revision": (manifest or {}).get("video_revision"),
+        "by_role": by_role,
+        "vram_peak_mb": vram_peak_mb,
+    }
+    from .production_ledger import get_ledger
+
+    led = get_ledger()
+    led.data.setdefault("meta", {})["render_engines"] = payload
+    led.save()
+
+
 class OTRVideoRenderBatch:
     """Registered as ``OTR_VideoRenderBatch``. Walks the model-agnostic render
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
@@ -194,6 +221,13 @@ class OTRVideoRenderBatch:
             "prompt_diversity": diversity,
             "vram_peak_mb": ep.get("vram_peak_mb"), "trace": ep.get("trace"),
         }
+        # Forensic: stamp the per-role render-engine map + VRAM peak into the
+        # production-ledger meta for the episode treatment / credits sheet.
+        try:
+            _stamp_render_engines_meta(manifest, ep.get("vram_peak_mb"))
+        except Exception as _eng_exc:  # noqa: BLE001 -- never break the render
+            log.warning("[OTR_VideoRenderBatch] render_engines stamp skipped: %s",
+                        _eng_exc)
         return (report, json.dumps(manifest, ensure_ascii=True, default=str),
                 "node_episode_report.json")
 

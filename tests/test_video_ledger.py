@@ -166,6 +166,91 @@ def test_video_treatment_writes_flat_list(tmp_path):
     )
 
 
+def test_video_treatment_forensic_sections(tmp_path):
+    """The expanded treatment embeds the full forensic spec sheet: WRITER /
+    LLM CONFIG (models, creativity, words, A/B routing), STORY SPINE (premise
+    + opposed wants), per-role RENDER ENGINES (video + image), cast voice
+    engine, VRAM peak, and a SYSTEM block."""
+    from nodes.video_engine import _write_story_treatment
+
+    led = make_stub_ledger()
+    led["meta"].update({
+        "gen_params_initial": {
+            "creative_writing_model": "openrouter:~anthropic/claude-opus-latest",
+            "technical_model": "openrouter:~anthropic/claude-opus-latest",
+            "creativity": 7,
+            "temperature": 0.85,
+            "top_p": 0.92,
+            "target_words": 863,
+            "num_characters": 3,
+            "optimization_profile": "Standard",
+            "seed_source": "env",
+        },
+        "total_word_count": 845,
+        "character_word_count": 700,
+        "announcer_word_count": 145,
+        "slot_transitions": 4,
+        "slot_calls_by_slot": {"creative": 18, "technical": 5},
+        "news": {
+            "script_brief": "A lighthouse keeper intercepts a derelict satellite signal.",
+            "key_terms": ["satellite", "signal", "derelict"],
+            "casting_brief": "Two operators on a night shift.",
+            "news_close_brief": "Stay tuned.",
+        },
+        "dramatic_state": {
+            "dramatic_question": "Will they answer the signal?",
+            "character_a_wants": "investigate the signal",
+            "character_b_wants": "ignore it and stay safe",
+            "ending_change": "they answer and learn the truth",
+            "costly_choice_beat": "b004",
+        },
+        "render_engines": {
+            "histogram": {"flat_still": 16, "ltx_av_music": 2},
+            "video_revision": 3,
+            "by_role": {"character_video": {"flat_still": 14},
+                        "music_visual": {"ltx_av_music": 2}},
+            "vram_peak_mb": 12900,
+        },
+    })
+    led["cast"][0]["voice_engine"] = "indextts2"
+    led["cast"][1]["voice_engine"] = "kokoro"
+    led["images"] = {"images": [
+        {"role": "character_video", "engine_id": "z_image_turbo"},
+        {"role": "announcer_visual", "engine_id": "z_image_turbo"},
+    ]}
+
+    out_path = tmp_path / "ForensicEp.mp4"
+    out_path.touch()
+    _write_story_treatment(
+        out_path=str(out_path), episode_title="Forensic Ep", led=led,
+        voice_assignments={}, style="noir", genre="",
+        news_used=json.dumps([{"headline": "Sat headline"}]),
+        duration=300.0, W=1280, H=720, fps=24, size_mb=22.2,
+    )
+    content = list(tmp_path.glob("*.txt"))[0].read_text(encoding="utf-8")
+
+    # WRITER / LLM CONFIG
+    assert "WRITER / LLM CONFIG" in content
+    assert "claude-opus-latest" in content
+    assert "863" in content and "845" in content
+    assert "A<->B transition" in content
+    # STORY SPINE
+    assert "STORY SPINE" in content
+    assert "lighthouse keeper" in content
+    assert "satellite" in content
+    assert "Will they answer the signal?" in content
+    # Cast voice engine tags
+    assert "indextts2" in content and "kokoro" in content
+    # RENDER ENGINES (video + image)
+    assert "RENDER ENGINES" in content
+    assert "ltx_av_music" in content
+    assert "z_image_turbo" in content
+    assert "12900" in content        # VRAM peak
+    # SYSTEM block
+    assert "SYSTEM" in content
+    assert "CPU" in content and "Python" in content
+
+
 # ---------------------------------------------------------------------------
 # Title chain test (helper-level via direct branch testing)
 # ---------------------------------------------------------------------------

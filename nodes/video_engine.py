@@ -1553,6 +1553,24 @@ def _write_story_treatment(out_path, episode_title, led,
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64
 
+        # --- Forensic data sources (all best-effort; missing -> "(not recorded)")
+        meta = led.get("meta") or {}
+        gp   = meta.get("gen_params_initial") or {}
+        NR   = "(not recorded)"
+
+        def _g(d, k, default=NR):
+            v = (d or {}).get(k)
+            return v if (v is not None and v != "") else default
+
+        def _engine_map_lines(by_role):
+            """Format {role: {engine: count}} into aligned 'role  eng xN' lines."""
+            lines = []
+            for role in sorted(by_role or {}):
+                engs = by_role[role] or {}
+                joined = ", ".join("%s x%d" % (e, n) for e, n in sorted(engs.items()))
+                lines.append("    %-20s %s" % (role, joined))
+            return lines
+
         out = []
         W_ = lambda s="": out.append(str(s))
 
@@ -1564,6 +1582,32 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f'  Title    :  "{episode_title}"')
         W_(f"  Style    :  {style}")
         W_(f"  Produced :  {ts}")
+        W_()
+
+        # WRITER / LLM CONFIG -- which model wrote this, at what settings.
+        # Slugs are kept verbatim so "openrouter:~anthropic/claude-opus-latest",
+        # "comfy:..." or a local repo id all read truthfully. slot_transitions
+        # > 0 proves the run actually split work across the A/B slots.
+        W_("WRITER / LLM CONFIG")
+        W_(BAR)
+        W_(f"  Creative slot (A)  :  {_g(gp, 'creative_writing_model', _g(meta, 'creative_writing_model'))}")
+        W_(f"  Technical slot (B) :  {_g(gp, 'technical_model', _g(meta, 'technical_model'))}")
+        _transitions = meta.get("slot_transitions")
+        if _transitions is not None:
+            W_(f"  Slot routing       :  {_transitions} A<->B transition(s)")
+        _calls = meta.get("slot_calls_by_slot") or {}
+        if _calls:
+            W_("  Calls by slot      :  "
+               + ", ".join("%s=%s" % (k, v) for k, v in sorted(_calls.items())))
+        W_(f"  Creativity         :  {_g(gp, 'creativity')}")
+        W_(f"  Temperature        :  {_g(gp, 'temperature')}    top_p: {_g(gp, 'top_p')}")
+        W_(f"  Optimization       :  {_g(gp, 'optimization_profile')}")
+        W_(f"  Seed source        :  {_g(gp, 'seed_source')}")
+        W_(f"  Target words       :  {_g(gp, 'target_words')}    "
+           f"Actual: {_g(meta, 'total_word_count')} "
+           f"(char {_g(meta, 'character_word_count')} / "
+           f"announcer {_g(meta, 'announcer_word_count')})")
+        W_(f"  Characters         :  {_g(gp, 'num_characters')}")
         W_()
 
         # News seed - may arrive as a JSON list ["headline 1", "headline 2", ...]
@@ -1584,6 +1628,30 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f"  {news_clean if news_clean else '(no news seed - custom premise used)'}")
         W_()
 
+        # STORY SPINE -- the actual premise + the opposed wants the writer
+        # derived from the news (B1 dramatic-state). This is what makes the
+        # episode legible years later: what the story was ABOUT.
+        W_("STORY SPINE")
+        W_(BAR)
+        _newsd = meta.get("news") if isinstance(meta.get("news"), dict) else {}
+        if _newsd:
+            W_(f"  Premise    :  {_g(_newsd, 'script_brief')}")
+            _kt = _newsd.get("key_terms") or []
+            if _kt:
+                W_("  Key terms  :  " + ", ".join(str(t) for t in _kt))
+            W_(f"  Casting    :  {_g(_newsd, 'casting_brief')}")
+            W_(f"  Sign-off   :  {_g(_newsd, 'news_close_brief')}")
+        else:
+            W_("  (custom premise -- no structured news brief recorded)")
+        _ds = meta.get("dramatic_state") if isinstance(meta.get("dramatic_state"), dict) else {}
+        if _ds:
+            W_(f"  Question   :  {_g(_ds, 'dramatic_question')}")
+            W_(f"  A wants    :  {_g(_ds, 'character_a_wants')}")
+            W_(f"  B wants    :  {_g(_ds, 'character_b_wants')}")
+            W_(f"  Ending     :  {_g(_ds, 'ending_change')}")
+            W_(f"  Costly beat:  {_g(_ds, 'costly_choice_beat')}")
+        W_()
+
         # Cast & voices: prefer led.cast (v2 ledger has name + voice_preset
         # per entry); fall back to production_plan.voice_assignments.
         W_("CAST & VOICES")
@@ -1596,16 +1664,57 @@ def _write_story_treatment(out_path, episode_title, led,
             preset = str(
                 entry.get("voice_preset") or voices.get(name, "")
             )
-            cast_rows.append((name, preset))
+            engine = str(entry.get("voice_engine") or "")
+            cast_rows.append((name, engine, preset))
         if not cast_rows and voices:
-            cast_rows = [(c, voices[c]) for c in sorted(voices.keys())]
+            cast_rows = [(c, "", voices[c]) for c in sorted(voices.keys())]
         if cast_rows:
-            pad_w = max((len(name) for name, _ in cast_rows), default=10)
-            for name, preset in cast_rows:
+            pad_w = max((len(name) for name, _, _ in cast_rows), default=10)
+            for name, engine, preset in cast_rows:
                 desc   = _PRESET_DESC.get(preset, preset)
-                W_(f"  {name:<{pad_w}}  \u2192  {preset:<24}  {desc}")
+                etag   = f"[{engine}] " if engine else ""
+                W_(f"  {name:<{pad_w}}  \u2192  {etag}{preset:<24}  {desc}")
         else:
             W_("  (no voice assignments recorded)")
+        W_()
+
+        # RENDER ENGINES -- which video engine rendered each role (stamped by
+        # the render batch into meta.render_engines) and which image engine
+        # produced the stills (from ledger['images'], each still carries its
+        # role + engine_id). Lets a viewer see e.g. character beats = z_image
+        # stills while the bookends = ltx_av_music audio-in video.
+        W_("RENDER ENGINES")
+        W_(BAR)
+        _re = meta.get("render_engines") or {}
+        _vid_lines = _engine_map_lines(_re.get("by_role") or {})
+        if _vid_lines:
+            W_("  Video (per role):")
+            for _l in _vid_lines:
+                W_(_l)
+        else:
+            W_("  Video (per role):  " + NR)
+        _img_rows = ((led.get("images") or {}).get("images")) or []
+        _img_by_role: dict = {}
+        for _r in _img_rows:
+            if not isinstance(_r, dict):
+                continue
+            _role = str(_r.get("role") or "?")
+            _eng = str(_r.get("engine_id") or "?")
+            _img_by_role.setdefault(_role, {})
+            _img_by_role[_role][_eng] = _img_by_role[_role].get(_eng, 0) + 1
+        _img_lines = _engine_map_lines(_img_by_role)
+        if _img_lines:
+            W_("  Image (per role):")
+            for _l in _img_lines:
+                W_(_l)
+        else:
+            W_("  Image (per role):  " + NR)
+        _hist = _re.get("histogram") or {}
+        if _hist:
+            W_("  Engine histogram:  "
+               + ", ".join("%s=%s" % (k, v) for k, v in sorted(_hist.items())))
+        if _re.get("video_revision") is not None:
+            W_(f"  Video revision  :  {_re.get('video_revision')}")
         W_()
 
         # Scene arc / FULL SCRIPT under v2 ledger schema:
@@ -1652,6 +1761,30 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f"  Resolution  :  {W}x{H} @ {fps} fps")
         W_(f"  File        :  {os.path.basename(out_path)}")
         W_(f"  Size        :  {size_mb:.1f} MB")
+        _vram_peak = (meta.get("render_engines") or {}).get("vram_peak_mb")
+        if _vram_peak:
+            W_(f"  VRAM peak   :  {_vram_peak} MB")
+        W_()
+
+        # SYSTEM -- the machine + software stack this episode was rendered on,
+        # so anyone can look back and see exactly what produced it. Best-effort:
+        # any unprobeable field degrades to "(unknown)" rather than failing.
+        W_("SYSTEM")
+        W_(BAR)
+        try:
+            from ._otr_sys_specs import collect_system_specs as _css
+            _sys = _css()
+        except Exception as _sys_exc:  # noqa: BLE001
+            _sys = {}
+            log.warning("[Video] system-spec collection skipped: %s", _sys_exc)
+        _sg = lambda k: _sys.get(k) or "(unknown)"
+        W_(f"  Host     :  {_sg('hostname')}")
+        W_(f"  OS       :  {_sg('os')}")
+        W_(f"  CPU      :  {_sg('cpu')}  ({_sg('cpu_cores')})")
+        W_(f"  RAM      :  {_sg('ram')}  (peak {_sg('ram_peak')})")
+        W_(f"  GPU      :  {_sg('gpu')}  ({_sg('vram')} VRAM)")
+        W_(f"  CUDA     :  {_sg('cuda')}    torch {_sg('torch')}")
+        W_(f"  Python   :  {_sg('python')}")
         W_()
         W_(DBAR)
         W_()
@@ -2088,6 +2221,24 @@ class SignalLostVideoRenderer:
         log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames total)",
                  out_path, size_mb, duration + (_hud_frames / fps), total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
+
+        # Forensic treatment enrichment: pull the per-role engine maps from the
+        # production-ledger singleton. The video engines are stamped into
+        # meta.render_engines by the render batch; the image engines live in
+        # ledger['images'] (each still row carries role + engine_id). The wire
+        # `led` here is the PRE-render freeze-cascade output, so these
+        # post-render facts are merged in for the credits sheet. Best-effort.
+        try:
+            from .production_ledger import get_ledger as _gl_treat
+            _sing_data = _gl_treat().data or {}
+            _sing_meta = _sing_data.get("meta") or {}
+            if _sing_meta.get("render_engines"):
+                led.setdefault("meta", {})["render_engines"] = \
+                    _sing_meta["render_engines"]
+            if _sing_data.get("images"):
+                led["images"] = _sing_data["images"]
+        except Exception as _enrich_exc:  # noqa: BLE001 -- never break the render
+            log.warning("[Video] treatment engine-enrich skipped: %s", _enrich_exc)
 
         # Write story treatment companion file. v2 ledger consumer:
         # pass parsed led + voice_assignments/style/genre (Sprint 6.3
