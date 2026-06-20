@@ -2766,39 +2766,49 @@ class OTR_LedgerScriptWriter:
             "%d line rows", len(led.data.get("lines", []) or []),
         )
 
-        # --- H.1. Sprint 2.1 (2026-05-28): stamp DramaticState ---------
-        # Cast + ledger lines exist now; the Sprint 1 keystone has
-        # already stamped dialogue_slot_id on voiced lines via
-        # init_lines_from_outline. Build a best-effort DramaticState
-        # from the news brief + cast + voice slot ids and stamp it on
-        # meta["dramatic_state"]. Sprint 4 selector + Sprint 5
-        # constraint checker + the Sprint 4.1 / 5.1 wire-ups read
-        # from here. Wrapped in try/except so any pydantic edge case
-        # logs + skips rather than crashing the writer (Prime
-        # Directive 1: never break audio).
+        # --- H.1. B1 (story-quality Phase 1, 2026-06-19): NEWS-DERIVED -----
+        # THE SPINE. Cast + ledger lines exist now; the Sprint 1 keystone has
+        # already stamped dialogue_slot_id on voiced lines. The opposed wants
+        # are now DERIVED FROM meta["news"] at this call site (which has meta
+        # + the resident technical generate_fn), replacing the hardcoded
+        # _DEFAULT_A/B_WANTS boilerplate that ignored the news (the leg_0013
+        # ancient-DNA -> aliens drift). A structured LLM call on the resident
+        # technical slot emits the four DramaticState-compatible strings, a
+        # post-validator requires >= 1 news key term across wants/question/
+        # ending, and any failure degrades to a deterministic news-templated
+        # fallback. The helper also guarantees >= 1 entry in
+        # meta["news"]["key_terms"] (the turning-slot detail floor for
+        # validate_contract). NEVER breaks audio (Prime Directive 1).
         try:
-            from ._otr_dramatic_state import (
-                derive_dramatic_state_from_meta as _derive_ds,
+            from ._otr_dramatic_state_llm import (
+                derive_news_dramatic_state as _derive_news_ds,
             )
             _voice_slot_ids: list[str] = [
                 str(ln.get("dialogue_slot_id") or "").strip()
                 for ln in (led.data.get("lines") or [])
                 if str(ln.get("dialogue_slot_id") or "").strip()
             ]
-            _sb = ""
-            _news = (meta.get("news") or {})
-            if isinstance(_news, dict):
-                _sb = str(_news.get("script_brief") or "")
-            _dramatic_state = _derive_ds(
-                script_brief=_sb,
-                cast_rows=led.data.get("cast") or cast_rows or [],
-                voice_slot_ids=_voice_slot_ids,
-            )
+            if slot_scheduler is not None:
+                with slot_scheduler.helper_context("dramatic_state"):
+                    _dramatic_state = _derive_news_ds(
+                        meta=meta,
+                        cast_rows=led.data.get("cast") or cast_rows or [],
+                        voice_slot_ids=_voice_slot_ids,
+                        slot_fn=technical_generate_fn,
+                    )
+            else:
+                _dramatic_state = _derive_news_ds(
+                    meta=meta,
+                    cast_rows=led.data.get("cast") or cast_rows or [],
+                    voice_slot_ids=_voice_slot_ids,
+                    slot_fn=technical_generate_fn,
+                )
             meta["dramatic_state"] = _dramatic_state.model_dump()
             led.save()
             log.info(
-                "[OTR_LedgerScriptWriter] Sprint 2.1: dramatic_state "
-                "stamped (costly_choice_beat=%s, voice_slots=%d).",
+                "[OTR_LedgerScriptWriter] B1: news-derived dramatic_state "
+                "stamped (source=%s, costly_choice_beat=%s, voice_slots=%d).",
+                meta.get("dramatic_state_source", "?"),
                 _dramatic_state.costly_choice_beat,
                 len(_voice_slot_ids),
             )
