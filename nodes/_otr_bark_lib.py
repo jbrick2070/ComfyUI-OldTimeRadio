@@ -268,8 +268,16 @@ def _unload_bark():
 # scene_sequencer._clean_text_for_bark (regex parity pinned by tests/test_core.py).
 # -----------------------------------------------------------------------------
 
-def _clean_text_for_bark(text):
+def _clean_text_for_bark(text, *, speech_only=False):
     """Clean and normalize dialogue text for Bark TTS.
+
+    speech_only (B1, 2026-06-22): when True, the HIGH-RISK non-speech tokens
+    that produce the high-pitched squeal/whine -- [music], [whistles],
+    [sneezes], [gasps] -- are DROPPED from the kept-token whitelist (and so
+    are the asterisk stage-directions that translate into them, since the
+    bracket filter re-runs over the asterisk output). The low-risk emotive
+    tokens [laughs]/[sighs] (and the rest) are kept. Default False preserves
+    the legacy whitelist exactly (parity with scene_sequencer + test_core).
 
     Bark accepts a specific set of non-speech tokens in square brackets.
     This function:
@@ -354,6 +362,14 @@ def _clean_text_for_bark(text):
         "[clears throat]", "[coughs]", "[pants]", "[sobs]", "[grunts]",
         "[groans]", "[whistles]", "[sneezes]",
     }
+    if speech_only:
+        # B1: never TELL bark to make the squeal/whine non-speech sounds for
+        # a dialogue line. Dropping these from the whitelist also strips the
+        # asterisk-derived ones (e.g. *gasps* -> [gasps] in step 3) because
+        # this filter runs AFTER the asterisk translation.
+        _BARK_VALID_TOKENS = _BARK_VALID_TOKENS - {
+            "[music]", "[whistles]", "[sneezes]", "[gasps]",
+        }
 
     def _filter_bracket_tag(m):
         # Normalize: lowercase + collapse any internal whitespace to single spaces so
@@ -451,6 +467,31 @@ def _resolve_min_eos_p():
         return _BARK_DEFAULT_MIN_EOS_P
 
 
+def _env_flag(name, default):
+    """Parse a boolean env flag. Empty/unset -> ``default``; otherwise
+    1/true/yes/on -> True, everything else -> False. Pure."""
+    raw = (os.environ.get(name) or "").strip().lower()
+    if raw == "":
+        return bool(default)
+    return raw in ("1", "true", "yes", "on")
+
+
+def _resolve_bark_speech_only(default=True):
+    """B1: whether a dialogue line renders in SPEECH-ONLY mode (drop the
+    high-risk squeal tokens). Driven by OTR_BARK_SPEECH_ONLY (default ON --
+    bark is the char_voice engine, so all its lines are dialogue). Pure."""
+    return _env_flag("OTR_BARK_SPEECH_ONLY", default)
+
+
+def _resolve_bark_inject_anchor(default_disabled=True):
+    """B1: whether to inject the first-line ``[clears throat]`` anchor.
+    Driven by OTR_BARK_DISABLE_THROAT_CLEAR (default ON -> anchor OFF for
+    dialogue, since the throat-clear is itself an audible artifact at the
+    clip head). Set OTR_BARK_DISABLE_THROAT_CLEAR=0 to restore the anchor.
+    Pure."""
+    return not _env_flag("OTR_BARK_DISABLE_THROAT_CLEAR", default_disabled)
+
+
 def _trim_trailing_silence(audio, sample_rate, *, thresh_rel=0.06,
                            min_keep_s=0.15, win_s=0.05):
     """Trim trailing near-silence from a bark clip so its duration reflects the
@@ -480,7 +521,8 @@ def _trim_trailing_silence(audio, sample_rate, *, thresh_rel=0.06,
 
 def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
                           is_first_line=False, *, semantic_temp=None,
-                          coarse_temp=None, fine_temp=None):
+                          coarse_temp=None, fine_temp=None,
+                          inject_first_line_anchor=True, speech_only=False):
     """Generate TTS audio for one dialogue line. Returns (np_1d, sample_rate).
 
     PER-STAGE TEMPERATURES (2026-06-17 whiny-voice fix): Bark is a three-stage
@@ -513,7 +555,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
          commitment, which the semantic stage owns).
     """
     import torch
-    text = _clean_text_for_bark(text)
+    text = _clean_text_for_bark(text, speech_only=speech_only)
     if not text:
         return np.zeros(2400, dtype=np.float32), 24000
 
@@ -522,12 +564,16 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
         temperature, semantic_temp, coarse_temp, fine_temp,
         voice_preset, is_first_line)
 
-    if is_first_line:
+    if is_first_line and inject_first_line_anchor:
         # Anchor the model before the first dialogue line of each preset.
         # [clears throat] is in Bark's supported token whitelist - it renders
         # as a brief audible cue (~0.15s) and resets the generation context
         # away from "podcast opener" toward "radio drama performance". (The
         # matching semantic-temp cap is applied in _stage_temps_for_line.)
+        # B1 (2026-06-22): the anchor is ITSELF an audible non-speech cue at
+        # the artifact-prone clip head, so dialogue defaults to OFF
+        # (inject_first_line_anchor=False via eng_bark). The semantic-temp cap
+        # (driven by is_first_line) stays regardless -- it is a separate guard.
         text = f"[clears throat] {text}"
 
     sample_rate = model.generation_config.sample_rate

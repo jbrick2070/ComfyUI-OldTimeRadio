@@ -115,7 +115,12 @@ class BarkEngine:
         import numpy as np
         import torch
 
-        from .._otr_bark_lib import _generate_single_line, _load_bark
+        from .._otr_bark_lib import (
+            _generate_single_line,
+            _load_bark,
+            _resolve_bark_inject_anchor,
+            _resolve_bark_speech_only,
+        )
         from .registry import EngineUnusable, EngineUsabilityReason
 
         if not voice_preset or not str(voice_preset).startswith("v2/"):
@@ -128,10 +133,19 @@ class BarkEngine:
         is_first = voice_preset not in self._presets_started
         self._presets_started.add(voice_preset)
         semantic_temp, coarse_temp, fine_temp = self._resolve_stage_temps()
+        # B1 (2026-06-22): bark is the char_voice engine -> every line is
+        # DIALOGUE, so render in speech-only mode (drop the squeal tokens) and
+        # skip the first-line [clears throat] anchor by default. Both are
+        # explicit kwargs resolved from env (OTR_BARK_SPEECH_ONLY=1 default,
+        # OTR_BARK_DISABLE_THROAT_CLEAR=1 default) -- no implicit defaults.
+        speech_only = _resolve_bark_speech_only()
+        inject_first_line_anchor = _resolve_bark_inject_anchor()
         audio_np, sr = _generate_single_line(
             text, voice_preset, model, processor, is_first_line=is_first,
             semantic_temp=semantic_temp, coarse_temp=coarse_temp,
             fine_temp=fine_temp,
+            inject_first_line_anchor=inject_first_line_anchor,
+            speech_only=speech_only,
         )
         wav = torch.from_numpy(
             np.asarray(audio_np, dtype=np.float32)
