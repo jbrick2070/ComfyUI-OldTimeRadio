@@ -443,9 +443,18 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
         bg_filter = "[0:v]null[bg]"
     fg_filter = ("[1:v]format=rgba,fps=%d,scale=%d:%d:"
                  "force_original_aspect_ratio=decrease[fg]" % (fps, w, h))
+    # 3D image streams chunk 7: DEFAULT = straight-alpha SOURCE-OVER at FULL
+    # opacity. Compositing in RGB (overlay format=rgb) makes an OPAQUE mesh pixel
+    # (alpha==255) fully REPLACE the plate -- no premultiplied-edge ghost, no
+    # double-exposure of the background plate through the mesh. The mesh already
+    # renders straight-alpha, so its own alpha is the matte. The prior auto-format
+    # look is preserved as the NAMED opt-in style OTR_MESH_COMPOSITE_STYLE=blend
+    # (never the default).
+    _style = os.environ.get("OTR_MESH_COMPOSITE_STYLE", "source_over").strip().lower()
+    _ov_format = "auto" if _style == "blend" else "rgb"
     graph = (bg_filter + ";" + fg_filter +
-             ";[bg][fg]overlay=(W-w)/2:(H-h)/2:eof_action=repeat:format=auto,"
-             "format=yuv420p")
+             ";[bg][fg]overlay=(W-w)/2:(H-h)/2:eof_action=repeat:format=%s,"
+             "format=yuv420p" % _ov_format)
     cmd = [fb, "-y", "-loglevel", "error"] + bg_in + [
         "-f", "concat", "-safe", "0", "-i", listfile, "-an",
         "-filter_complex", graph,

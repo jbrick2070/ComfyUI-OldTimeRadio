@@ -189,6 +189,42 @@ def test_fork_object_subject_id_matches_driver_convention():
     assert f0["mesh_subject_id"] == "obj_b007"
 
 
+# --------------------------------------------------------------------------- #
+# Chunk 7: opaque source-over composite (mesh over the background plate)
+# --------------------------------------------------------------------------- #
+def test_mesh_composite_is_opaque_source_over(tmp_path):
+    """An OPAQUE mesh pixel (alpha==255) fully REPLACES the background plate --
+    no double-exposure ghost. Real-ffmpeg proof: a solid-green opaque mesh clip
+    over a solid-RED still plate -> the output is GREEN, never a red/green blend."""
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        import pytest
+        pytest.skip("ffmpeg required for the composite proof")
+    from PIL import Image
+    from nodes import otr_silent_composite as sc
+    w = h = 64
+    n = 4
+    fdir = tmp_path / "mesh"
+    fdir.mkdir()
+    for i in range(n):
+        Image.new("RGBA", (w, h), (0, 255, 0, 255)).save(
+            fdir / ("frame_%04d.png" % i))
+    plate = tmp_path / "plate.png"
+    Image.new("RGB", (w, h), (255, 0, 0)).save(plate)
+    seg = tmp_path / "seg.mp4"
+    sc._encode_segment_from_dir("ffmpeg", str(fdir), n, str(seg),
+                                w=w, h=h, fps=5,
+                                bg_path=str(plate), bg_is_still=True)
+    assert seg.exists()
+    probe = tmp_path / "probe.png"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(seg),
+                    "-frames:v", "1", str(probe)], check=True)
+    r, g, b = Image.open(probe).convert("RGB").getpixel((w // 2, h // 2))
+    # opaque green mesh, NOT a blend with the red plate (a blend would give r~128).
+    assert g > 180 and r < 80 and b < 80, (r, g, b)
+
+
 def test_no_fork_without_mesh_fodder_roles():
     """Default (no fodder roles) keeps the legacy cinematic-scene-still look."""
     payload, _warn = mb.derive_image_prompts(_cast(), _meta(), lines=_lines())
