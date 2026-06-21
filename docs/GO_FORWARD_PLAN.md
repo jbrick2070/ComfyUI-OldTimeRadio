@@ -1,5 +1,36 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-21 (CODER; 3D IMAGE STREAMS -- ALL 7 CHUNKS SHIPPED + PUSHED + GPU-VERIFIED
+> END-TO-END; HEAD `555788e` == origin/v2.0-alpha; full suite 4733 pass/33 skip, Bug Bible 16/7/3, audio
+> byte-identical green per chunk).** The clay-blob root cause is FIXED: `mesh_stage` no longer meshes the
+> per-beat cinematic scene still (the whole environment) -- it now meshes a CLEAN isolated subject over a
+> generated background plate. Seven ordered green chunks, each suite+Bug-Bible -> commit AND push ->
+> HEAD==origin verified: **(1)** `b11759f` `requires_mesh_fodder=True` capability flag on MeshStageEngine
+> (routing gate; capability-not-engine-name). **(2)** `a5be9b3` `build_request_from_shot` routes fodder
+> engines to a clean `mesh_fodder` still BEFORE the `_SCENE_INIT_FAMILIES` override (skips it for fodder
+> engines; LOUD `missing_mesh_fodder`, never meshes the environment); engine map read post-`OTR_FORCE_ENGINE_MAP`.
+> **(3)** `af779bd` the prompt FORK -- `OTR_ImageDirector` forwards `mesh_fodder_roles` (per-role engine
+> capability), `OTR_MetaBriefImagePromptGen` mints `mesh_fodder` (isolated subject) + `scene_background_plate`
+> (subject-free world) with checked-in pos/neg scaffolds instead of one cinematic scene still. **(4)** `0ccb6ff`
+> kind-specific indices -- `_portrait_index` kind-filtered (fodder can't leak to HuMo), `_still_index`
+> prioritizes `scene_background_plate`, dispatcher carries `mesh_subject_id` onto the ledger row. **(5)** `84962bd`
+> mesh cache keys on `mesh_subject_id` (char_id|object_id), not the per-beat still hash; render_driver stamps it.
+> **(6)** `a2df9bf` announcer/music subject policy (announcer meshes the announcer via char_id; no-char beats
+> mesh a stable `obj_<beat>` object; LOUD on bare `uncast`). **(7)** `555788e` opaque straight-alpha source-over
+> composite (mesh over plate, `format=rgb`) -- kills the double-exposure ghost; blend kept as
+> `OTR_MESH_COMPOSITE_STYLE=blend` opt-in; real-ffmpeg opacity regression. All content-only / capability-gated;
+> ZERO workflow-JSON change; ledger schema `l3-2026-05-14` untouched. **GPU SMOKE (all-slots mesh_stage, 30w,
+> real `otr_scifi_16gb_full.json`, FLOOR lane, bark voice):** SUCCESS in 20:17. The dispatcher minted 5
+> `mesh_fodder` + 5 `scene_background_plate` objects (every beat -- music/announcer/character), NO cinematic
+> scene stills; render_driver logged `meshing CLEAN fodder ... scene still is background plate only` for all 5
+> beats; cache keys were the real subjects (`obj_b000_music_open`, `c01`, `c02`, `c03`) -- NEVER `uncast`; the
+> VRAM barrier fired before each Blender spawn; `obs_publish OK`. Final = `otr/obs/
+> signal_lost_colony_found_20260621_002009_silent_procgen_blended_final.mp4` (20.8 MB, 64.5s). Logs/proof in
+> `docs/2026-06-21-3d-image-streams/` (smoke_server.log + the obs mp4 copy). KNOWN COSMETIC NIT (non-blocking):
+> the render_driver "meshing CLEAN fodder" log prints `subject=?` for a no-char beat (the cache id is correct,
+> `obj_<beat>`); a one-line log polish if it bugs you. **NEXT = 3D v1.5 (DEFERRED, panel-agreed): Cycles +
+> 3-point lighting + multi-view texture bake** (the lit/textured tier, on top of clean fodder).
+
 > **LATEST SESSION -- 2026-06-20 (CODER; BUG 1 SHIPPED + GPU-VERIFIED end-to-end; HEAD `9f03abd` ==
 > origin/v2.0-alpha; suite 4633 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** TOP-PRIORITY
 > VISUAL FIX **BUG 1 DONE** -- landscape character beats now show the CHARACTER full-frame 16:9, not the
