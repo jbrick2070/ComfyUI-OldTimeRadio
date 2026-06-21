@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-06-21T06:19:51.140902+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-21-3d-image-streams\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 46485,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-4.8-opus-20260528",
+      "ok": true,
+      "prompt_tokens": 74588,
+      "completion_tokens": 9000,
+      "cost_usd": 1.7938199999999997
+    },
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort"
+    },
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 46093,
+      "completion_tokens": 4775,
+      "cost_usd": 0.10536625000000002
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 53595,
+      "completion_tokens": 7069,
+      "cost_usd": 0.13768375
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 45584,
+      "completion_tokens": 3259,
+      "cost_usd": 0.0651275
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 49626,
+      "completion_tokens": 7537,
+      "cost_usd": 0.0281445
+    }
+  ],
+  "total_cost_usd": 2.1301
+}
