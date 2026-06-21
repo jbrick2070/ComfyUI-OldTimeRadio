@@ -301,6 +301,15 @@ class MeshStageEngine(_CheapFamilyBase):
     commercial_clean = False            # Tencent community license (E-7 gate)
     engine_version = "1"
     uses_still = True
+    #: 3D-image-streams routing gate (2026-06-21): this engine meshes a SINGLE
+    #: isolated subject, so it must be fed a clean ``mesh_fodder`` still (one
+    #: centred subject, neutral bg) -- NOT the per-beat cinematic scene still
+    #: (which the _SCENE_INIT_FAMILIES override in render_driver would otherwise
+    #: hand it, meshing the whole environment -> the clay blob). ALL routing is
+    #: gated on THIS capability boolean -- never an engine-name/family check,
+    #: never required_inputs/uses_still (those also catch Wan/LTX/still engines).
+    #: Any future single-image-subject 3D mesher declares it too.
+    requires_mesh_fodder = True
     #: E-5 LOUD fallback chain: mesh_stage -> still_parallax -> still_kenburns
     #: (each hop restamps the ledger; the chain composes via fallback_engine).
     fallback_engine = "still_parallax"

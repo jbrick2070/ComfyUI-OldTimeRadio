@@ -72,6 +72,20 @@ def test_mesh_stage_registered_selectable_not_default():
         assert vreg.default_engine_for_role(role) != "mesh_stage"
 
 
+def test_mesh_stage_declares_requires_mesh_fodder():
+    """3D-image-streams routing gate (2026-06-21): mesh_stage must declare the
+    capability boolean so routing can feed it clean subject fodder instead of
+    the cinematic scene still. Gating is on THIS field, never an engine name /
+    family / uses_still (those also catch Wan/LTX/still engines)."""
+    eng = vreg.get_engine("mesh_stage")
+    assert getattr(eng, "requires_mesh_fodder", False) is True
+    # The capability must be specific to subject-meshers -- not leaked onto the
+    # cheap-family base or unrelated still engines.
+    from nodes._otr_video_engines import eng_still_parallax as sp
+    assert getattr(sp.StillParallaxEngine(), "requires_mesh_fodder", False) \
+        is False
+
+
 def test_mesh_stage_roles_exactly_the_three_e5_slots():
     eng = vreg.get_engine("mesh_stage")
     assert eng.roles == ("music_visual", "announcer_visual", "character_video")
