@@ -1239,14 +1239,18 @@ def _build_user_prompt(req: LineRequest) -> str:
     # spine invariant 6). `theme` / allowed_people / allowed_things on
     # the request carry the news material; the phantom + cast gates
     # still enforce entity discipline post-hoc, so this is a salience
-    # nudge, not the only guard. The ~20-30 word "one breath" clause is
-    # the source-side length lever -- Stream D owns the hard total-length
-    # ceiling; this does NOT touch _word_bands or the max_new_tokens cap.
+    # nudge, not the only guard.
+    # F1 (story-engine v1): DROP the literal "about 20-30 words" -- it
+    # hard-capped EVERY voiced line at one short breath regardless of the
+    # beat's allocated word band, which starved long episodes (the 0.70
+    # length_ratio). The per-line target is already stated above via
+    # "Word count target: {req.target_words}.", so the model still gets a
+    # concrete length; this rider keeps only the spoken-cadence guidance.
     parts.append(
         "Ground this line in the news facts and this scene's premise; "
         "do not invent people, places, or objects the news does not "
-        "imply. Keep it spoken-length -- one breath, about 20-30 words, "
-        "concrete, no nested clauses."
+        "imply. Keep it spoken-length -- one breath, concrete, no "
+        "nested clauses."
     )
     parts.append("Speak now.")
     return "\n".join(parts)
@@ -1678,8 +1682,17 @@ def compose_line_draft(
     # Attempt-1 max_new_tokens scaled to target line length; attempt 2
     # uses the full cap. ~4 tokens per English word is the textbook
     # transformers heuristic.
+    # F1 (story-engine v1): None/zero-safe beat target -> the full cap (no
+    # starvation) when the per-line target is missing; otherwise scale to
+    # the beat band, floored at 40 and capped at max_new_tokens_cap (200).
+    _beat_target_words = (
+        int(req.target_words)
+        if isinstance(req.target_words, (int, float)) and req.target_words
+        else None
+    )
     attempt_tokens = (
-        min(int(max_new_tokens_cap), max(40, int(req.target_words) * 4)),
+        int(max_new_tokens_cap) if _beat_target_words is None
+        else min(int(max_new_tokens_cap), max(40, _beat_target_words * 4)),
         int(max_new_tokens_cap),
     )
 
