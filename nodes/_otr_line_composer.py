@@ -1222,15 +1222,20 @@ def _build_user_prompt(req: LineRequest) -> str:
     # Sprint 3 dramatic field being set; legacy callers (Sprint 2
     # Optional fields all empty) skip the constraint and the prompt
     # is byte-identical to pre-Sprint-3.
-    if (
-        req.dramatic_question or req.beat_objective or req.beat_turn
-        or req.next_turn
-    ):
-        parts.append(
-            "Write 1 spoken line. Do not summarize the objective. "
-            "Do not explain the turn. Perform the objective indirectly. "
-            "The situation must be different after this line."
-        )
+    # F6 (story-engine v1, SPLIT): the indirect-performance rider is now
+    # UNCONDITIONAL on every character beat -- "perform the line, do not
+    # narrate or summarize it" is always-on craft, not a per-beat
+    # decoration, so it no longer hangs off the Sprint-3 dramatic fields.
+    # The situation-change clause stays GATED to turn/costly beats
+    # (req.beat_turn present) so ordinary lines are not pushed to over-act
+    # on every single beat (the over-acting risk the roundtable flagged).
+    indirect = (
+        "Write 1 spoken line. Do not summarize the objective. "
+        "Do not explain the turn. Perform the objective indirectly."
+    )
+    if req.beat_turn:
+        indirect += " The situation must be different after this line."
+    parts.append(indirect)
     # Story-spine Stream B1 (2026-05-31): universal news-grounding +
     # one-breath length rider. Lands at the WRITE LINE tail (just above
     # "Speak now.") so it is the model's last instruction, and applies

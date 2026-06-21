@@ -85,3 +85,29 @@ class TestF1LengthTail:
         # zero/falsy target -> full cap, never the 40 floor starving it
         compose_line_draft(creative_fn=mock_fn, req=_req(target_words=0))
         assert captured["mnt"] == 200
+
+
+# ===========================================================================
+# F6 -- split rider: indirect-performance unconditional, situation-change gated
+# ===========================================================================
+
+class TestF6SplitRider:
+
+    def test_indirect_rider_unconditional_on_plain_beat(self):
+        # no dramatic fields at all -> the indirect rider is STILL present
+        prompt = _build_user_prompt(_req())
+        assert "Do not summarize the objective" in prompt
+        assert "Perform the objective indirectly" in prompt
+
+    def test_situation_change_absent_on_plain_beat(self):
+        prompt = _build_user_prompt(_req())
+        assert "The situation must be different after this line." not in prompt
+
+    def test_situation_change_present_on_turn_beat(self):
+        prompt = _build_user_prompt(_req(beat_turn="she names the omission aloud"))
+        assert "Perform the objective indirectly" in prompt
+        assert "The situation must be different after this line." in prompt
+
+    def test_rider_lands_before_speak_now(self):
+        prompt = _build_user_prompt(_req(beat_turn="the lie collapses"))
+        assert prompt.index("Perform the objective indirectly") < prompt.index("Speak now.")

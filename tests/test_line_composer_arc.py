@@ -66,15 +66,22 @@ def _sprint3_request(**overrides) -> LineRequest:
 
 
 def test_legacy_request_has_no_dramatic_frame():
-    """When Sprint 3 fields are empty, the prompt must NOT mention
-    DRAMATIC QUESTION / THIS BEAT / NEXT BEAT MUST REVEAL or the
-    no-restate constraint."""
+    """When Sprint 3 fields are empty, the prompt must NOT mention the
+    DRAMATIC FRAME (DRAMATIC QUESTION / THIS BEAT / NEXT BEAT MUST REVEAL).
+
+    F6 (story-engine v1, SPLIT): the indirect-performance rider is now
+    UNCONDITIONAL, so it IS present even on a legacy beat -- but the
+    situation-change clause stays gated to turn beats (no beat_turn here).
+    """
     prompt = _build_user_prompt(_minimal_legacy_request())
     assert "DRAMATIC QUESTION" not in prompt
     assert "THIS BEAT:" not in prompt
     assert "NEXT BEAT MUST REVEAL" not in prompt
-    assert "Do not summarize the objective" not in prompt
-    assert "Perform the objective indirectly" not in prompt
+    # F6: indirect-performance rider is unconditional now.
+    assert "Do not summarize the objective" in prompt
+    assert "Perform the objective indirectly" in prompt
+    # ...but the situation-change clause only fires on turn/costly beats.
+    assert "The situation must be different after this line." not in prompt
 
 
 def test_legacy_request_still_carries_write_line_block():
