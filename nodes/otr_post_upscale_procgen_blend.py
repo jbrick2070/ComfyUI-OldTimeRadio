@@ -572,21 +572,39 @@ def _probe_fps(path: Path, ffmpeg: str) -> float:
         return 25.0
 
 
+def _find_master_audio(source_mp4: Path) -> Path:
+    """The master-mix audio for this episode. At the PostUpscaleProcgenBlend stage
+    the video is SILENT (audio is muxed LATER by OTR_MasterAudioMux), so the bars
+    must read the MASTER WAV from the episode's ``audio/`` dir (``*_master.wav``,
+    newest), NOT the silent source mp4. Falls back to the source mp4 itself when no
+    master wav is present (e.g. a source that already carries audio)."""
+    try:
+        adir = source_mp4.parent / "audio"
+        cands = sorted(adir.glob("*_master.wav"),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+        if cands:
+            return cands[0]
+    except Exception:  # noqa: BLE001
+        pass
+    return source_mp4
+
+
 def _load_master_audio_np(source_mp4: Path, ffmpeg: str):
-    """Decode the source mp4 audio to a mono float32 numpy array + sample rate via
-    ffmpeg -> a temp pcm_s16le wav -> stdlib ``wave`` (no soundfile dependency).
+    """Decode the episode MASTER audio to a mono float32 numpy array + sample rate
+    via ffmpeg -> a temp pcm_s16le wav -> stdlib ``wave`` (no soundfile dependency).
     Returns ``(audio_np, sr)`` or ``(None, 0)``. The master audio is only READ --
     never altered -- so audio byte-identity is untouched."""
     import tempfile
     import wave
     import numpy as np
     fb = str(ffmpeg or "ffmpeg")
+    audio_src = _find_master_audio(source_mp4)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp_path = tmp.name
     tmp.close()
     try:
         subprocess.run(
-            [fb, "-y", "-loglevel", "error", "-i", str(source_mp4),
+            [fb, "-y", "-loglevel", "error", "-i", str(audio_src),
              "-vn", "-ac", "1", "-ar", "22050", "-acodec", "pcm_s16le", tmp_path],
             check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         with wave.open(tmp_path, "rb") as wf:

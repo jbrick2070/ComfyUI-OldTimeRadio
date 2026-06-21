@@ -66,6 +66,23 @@ def test_build_bars_caption_cmd_captions_burn_after_bars():
     assert "[vpre]" in fc and fc.index("blend=all_mode=lighten") < fc.index("ass=")
 
 
+def test_find_master_audio_prefers_audio_dir_wav(tmp_path):
+    # At the blend stage the source video is SILENT (audio muxes later); the bars
+    # must read the MASTER WAV from the episode's audio/ dir, not the silent mp4.
+    ep = tmp_path / "signal_lost_demo"
+    (ep / "audio").mkdir(parents=True)
+    silent = ep / "signal_lost_demo_silent.mp4"
+    silent.write_bytes(b"\x00")
+    master = ep / "audio" / "pending_123_master.wav"
+    master.write_bytes(b"\x00")
+    assert pb._find_master_audio(silent) == master
+    # no master wav -> falls back to the source itself (back-compat)
+    lonely = tmp_path / "x" / "y_silent.mp4"
+    lonely.parent.mkdir(parents=True)
+    lonely.write_bytes(b"\x00")
+    assert pb._find_master_audio(lonely) == lonely
+
+
 @pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg unavailable")
 def test_bars_layer_paints_green_in_bottom_strip(tmp_path):
     ff = _ffmpeg()
