@@ -17,6 +17,12 @@ from nodes._otr_line_composer import (  # noqa: E402
     _build_user_prompt,
     compose_line_draft,
 )
+from nodes._otr_dramatic_state import pick_costly_choice_slot  # noqa: E402
+from nodes._otr_slot_drama_contract import (  # noqa: E402
+    SlotDramaContract,
+    derive_contract_skeleton,
+    validate_episode_contracts,
+)
 
 
 def _req(**over):
@@ -111,3 +117,78 @@ class TestF6SplitRider:
     def test_rider_lands_before_speak_now(self):
         prompt = _build_user_prompt(_req(beat_turn="the lie collapses"))
         assert prompt.index("Perform the objective indirectly") < prompt.index("Speak now.")
+
+
+# ===========================================================================
+# F2 -- costly-choice binding: must_turn only on a character slot, audit-safe
+# ===========================================================================
+
+_DS = {
+    "dramatic_question": "Will the vial be opened before the audit closes?",
+    "character_a_wants": "broadcast the strain to the whole network",
+    "character_b_wants": "keep the vial sealed and unrecorded",
+    "ending_change": "the vial is opened and the record cannot be undone",
+}
+
+
+def _skeleton(slot_id, speaker, slot_index, costly):
+    ds = dict(_DS)
+    ds["costly_choice_beat"] = costly
+    return derive_contract_skeleton(
+        slot_row={"dialogue_slot_id": slot_id, "speaker": speaker},
+        slot_index=slot_index,
+        dramatic_state=ds,
+        active_props=[],
+        key_terms=["the vial", "the audit"],
+    )
+
+
+def _full_contract(slot_id, speaker, slot_index, costly):
+    sk = _skeleton(slot_id, speaker, slot_index, costly)
+    sk["line_job"] = "press the point without naming it"
+    sk["hidden_pressure"] = "the audit clock is running out"
+    return SlotDramaContract.model_validate(sk)
+
+
+class TestF2CostlyBinding:
+
+    def test_pick_costly_from_character_only_returns_character_slot(self):
+        char_slots = ["d002", "d004", "d006"]
+        assert pick_costly_choice_slot(char_slots) in char_slots
+
+    def test_must_turn_lands_on_costly_character_slot(self):
+        # costly = d004 (a character slot) -> only d004 gets must_turn
+        s2 = _skeleton("d002", "EDNA", 0, "d004")
+        s4 = _skeleton("d004", "PETER", 1, "d004")
+        s5 = _skeleton("d005", "ANNOUNCER", 2, "d004")
+        assert s2["must_turn"] is False
+        assert s4["must_turn"] is True
+        assert s5["must_turn"] is False
+
+    def test_cleared_costly_yields_no_turn_and_invalid_audit(self):
+        # all-announcer / empty-cast path: costly cleared -> no must_turn
+        c1 = _full_contract("d001", "ANNOUNCER", 0, "")
+        c2 = _full_contract("d002", "ANNOUNCER", 1, "")
+        assert c1.must_turn is False and c2.must_turn is False
+        ok, reasons = validate_episode_contracts(
+            [c1, c2], [], ["the vial", "the audit"])
+        assert ok is False
+        assert any("no slot carries" in r for r in reasons)
+
+    def test_exactly_one_character_turn_passes_audit(self):
+        c_open = _full_contract("d001", "ANNOUNCER", 0, "d004")
+        c_mid = _full_contract("d002", "EDNA", 1, "d004")
+        c_turn = _full_contract("d004", "PETER", 2, "d004")
+        ok, reasons = validate_episode_contracts(
+            [c_open, c_mid, c_turn], [], ["the vial", "the audit"])
+        assert ok is True, reasons
+        turn_slots = [c.dialogue_slot_id for c in (c_open, c_mid, c_turn) if c.must_turn]
+        assert turn_slots == ["d004"]
+
+    def test_two_turns_fail_audit(self):
+        c_a = _full_contract("d002", "EDNA", 1, "d002")
+        c_b = _full_contract("d004", "PETER", 2, "d004")
+        ok, reasons = validate_episode_contracts(
+            [c_a, c_b], [], ["the vial", "the audit"])
+        assert ok is False
+        assert any("more than one" in r for r in reasons)

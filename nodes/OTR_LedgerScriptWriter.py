@@ -2783,11 +2783,25 @@ class OTR_LedgerScriptWriter:
             from ._otr_dramatic_state_llm import (
                 derive_news_dramatic_state as _derive_news_ds,
             )
-            _voice_slot_ids: list[str] = [
+            # F2 (story-engine v1): the costly choice must land on a
+            # CHARACTER beat, never the announcer/music. Build the costly-slot
+            # candidate list from CHARACTER voiced beats only so
+            # pick_costly_choice_slot can never point costly_choice_beat at an
+            # announcer slot (the root of the must_turn audit failures). Fall
+            # back to all voiced ids only if no character roles are stamped
+            # yet (the contract-build guard below is the authoritative one).
+            _all_voice_slot_ids: list[str] = [
                 str(ln.get("dialogue_slot_id") or "").strip()
                 for ln in (led.data.get("lines") or [])
                 if str(ln.get("dialogue_slot_id") or "").strip()
             ]
+            _char_voice_slot_ids: list[str] = [
+                str(ln.get("dialogue_slot_id") or "").strip()
+                for ln in (led.data.get("lines") or [])
+                if str(ln.get("dialogue_slot_id") or "").strip()
+                and str(ln.get("speaker_role") or "").strip().lower() == "character"
+            ]
+            _voice_slot_ids: list[str] = _char_voice_slot_ids or _all_voice_slot_ids
             if slot_scheduler is not None:
                 with slot_scheduler.helper_context("dramatic_state"):
                     _dramatic_state = _derive_news_ds(
@@ -2935,6 +2949,33 @@ class OTR_LedgerScriptWriter:
                 b for b in outline.beats
                 if str(getattr(b, "dialogue_slot_id", "") or "").strip()
             ]
+            # F2 (story-engine v1): must_turn may ONLY land on a CHARACTER
+            # voiced beat. Build the character-slot set from the SAME beat
+            # list the audit checks; if the dramatic_state's costly slot is
+            # not a character beat (the rare all-announcer / empty-cast case),
+            # clear it on a COPY so NO contract is marked must_turn -- the
+            # audit then reports the episode invalid (acceptable + rare)
+            # rather than pinning the turn on the announcer/music/sfx.
+            _sdc_char_slots = {
+                str(getattr(b, "dialogue_slot_id", "") or "").strip()
+                for b in _sdc_voiced_beats
+                if str(getattr(b, "speaker_role", "") or "").strip().lower()
+                == "character"
+                and str(getattr(b, "dialogue_slot_id", "") or "").strip()
+            }
+            if isinstance(_sdc_dramatic, dict):
+                _sdc_costly = str(
+                    _sdc_dramatic.get("costly_choice_beat") or ""
+                ).strip()
+                if _sdc_costly not in _sdc_char_slots:
+                    _sdc_dramatic = dict(_sdc_dramatic)
+                    _sdc_dramatic["costly_choice_beat"] = ""
+                    log.info(
+                        "[OTR_LedgerScriptWriter] F2: costly_choice_beat %r is "
+                        "not a character slot (%d character slots); clearing "
+                        "must_turn -- no announcer/music turn.",
+                        _sdc_costly, len(_sdc_char_slots),
+                    )
 
             _sdc_objs = []
             _sdc_contracts: dict = {}
