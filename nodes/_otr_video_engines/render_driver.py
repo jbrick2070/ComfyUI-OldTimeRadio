@@ -731,24 +731,37 @@ def _uses_ambient_master_audio(engine_id, family):
 
 
 def _cumulative_beat_start(ledger, shot, fps):
-    """Best-effort start (seconds) of this shot's beat in the master mix: the sum
-    of preceding shots' ``target_frame_count``/fps in ``video.shots`` order
-    (ShotRow carries target_frame_count; it has NO start_s/dur_s -- extra=forbid).
-    Bounded + deterministic; clamped >= 0. Returns 0.0 if the shot is not found
-    (slice the head -- still a BOUNDED, representative window, never the whole
-    master)."""
+    """The beat's start (seconds) in the MASTER mix, as BEAT-ACCURATE as possible
+    without per-line timing on the beat itself (operator 2026-06-22: ltx_av should
+    condition on the beat's OWN audio, like HuMo). Walk ``video.shots`` in order
+    tracking a running master clock: a preceding beat whose LINE carries a real
+    ``start_s``/``dur_s`` ANCHORS the clock to that TRUE master position (so the
+    opening-music offset + any gaps are respected, not just a raw frame-count sum);
+    a beat with no line timing advances the clock by its own duration
+    (``target_frame_count``/fps -- ShotRow has no start_s/dur_s, extra=forbid).
+    Returns the clock at THIS shot. Bounded + deterministic; clamped >= 0; 0.0 if
+    the shot is not found (slice the head -- still bounded, never the whole
+    master). NOTE: pooled/looped other-beats may not be exactly true to the beat
+    count -- accepted (operator's call)."""
     shots = ((ledger or {}).get("video") or {}).get("shots") or []
+    lines = _line_index(ledger)
     sid = str(shot.get("shot_id") or "")
-    acc = 0.0
     f = float(fps) if fps else 25.0
+    clock = 0.0
     for s in shots:
         if not isinstance(s, dict):
             continue
         if str(s.get("shot_id") or "") == sid:
-            return max(0.0, acc)
-        n = int(s.get("target_frame_count") or 0)
-        if n > 0 and f > 0:
-            acc += n / f
+            return max(0.0, clock)
+        ln = lines.get(_beat_id_for_shot(s), {}) if isinstance(lines, dict) else {}
+        _ls = ln.get("start_s") if isinstance(ln, dict) else None
+        _ld = ln.get("dur_s") if isinstance(ln, dict) else None
+        if _ls is not None and _ld is not None:
+            clock = float(_ls) + float(_ld)        # anchor to the TRUE master position
+        else:
+            n = int(s.get("target_frame_count") or 0)
+            if n > 0 and f > 0:
+                clock += n / f
     return 0.0
 
 

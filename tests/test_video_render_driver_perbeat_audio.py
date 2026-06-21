@@ -173,6 +173,22 @@ class TestAmbientAudioMusicBeatGap:
         # unknown shot -> head (0.0), still bounded, never the whole master
         assert rd._cumulative_beat_start(ledger, {"shot_id": "nope"}, 25) == 0.0
 
+    def test_cumulative_beat_start_anchors_on_real_line_timing(self):
+        # A preceding beat with REAL line start_s/dur_s anchors the clock to the
+        # TRUE master position (e.g. the +9.5s opening-music offset), so a
+        # following no-timing music beat is beat-accurate, not a raw frame sum.
+        ledger = {
+            "video": {"fps": 25, "shots": [
+                {"shot_id": "shot_a", "source_line_ids": ["la"],
+                 "target_frame_count": 25},        # has line timing below
+                {"shot_id": "shot_music", "target_frame_count": 50},  # no timing
+            ]},
+            "lines": [{"line_id": "la", "start_s": 9.5, "dur_s": 2.0}],
+        }
+        # shot_a's line anchors the clock to 9.5 + 2.0 = 11.5 -> the music beat
+        # starts there (NOT 1.0 from a raw frame-count sum).
+        assert rd._cumulative_beat_start(ledger, {"shot_id": "shot_music"}, 25) == 11.5
+
     def test_music_beat_no_timing_gets_bounded_slice(self, tmp_path):
         """A music beat (ambient lane) with NO per-line/shot timing synthesizes a
         BOUNDED master slice (dur = target_frame_count/fps), so audio_ref is
