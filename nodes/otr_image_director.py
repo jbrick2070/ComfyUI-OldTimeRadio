@@ -153,6 +153,49 @@ def three_d_locked_slots(video_policy: dict) -> set:
     return locked
 
 
+#: Image-prompt ROLE -> the video slot that renders it (the role->engine join the
+#: prompt fork needs). character_video + the other-beats roles all ride the
+#: other_beats_video_model (OTR_VideoDirector._aspects_from_policy:322-324).
+_ROLE_TO_VIDEO_SLOT = {
+    "announcer_visual": "announcer_video_model",
+    "music_visual": "music_video_model",
+    "character_video": "other_beats_video_model",
+    "background_abstract": "other_beats_video_model",
+    "scene_broll": "other_beats_video_model",
+}
+
+
+def _is_mesh_fodder_engine(engine_id: str) -> bool:
+    """True if ``engine_id`` is a registered VIDEO engine declaring the
+    ``requires_mesh_fodder`` capability (the 3D image-streams routing gate).
+
+    TOLERANT, unlike :func:`_is_3d_engine`: mesh-fodder routing is additive and
+    opt-in, so an empty / unregistered / custom engine is simply NOT-fodder
+    (False) -- it must never raise and block a normal episode. The capability
+    is read off the registered adapter, never an engine-name/family check."""
+    if not engine_id or not _vreg.is_registered(engine_id):
+        return False
+    return bool(getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder",
+                        False))
+
+
+def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
+    """The IMAGE-PROMPT roles whose paired VIDEO engine requires clean mesh
+    fodder (sorted, deterministic). OTR_MetaBriefImagePromptGen reads this off
+    the forwarded image policy and forks those beats to a mesh_fodder subject +
+    a scene_background_plate instead of one cinematic scene still. Pure over the
+    policy dict; tolerant (a non-fodder / unknown engine just drops out)."""
+    vm = (video_policy or {}).get("video_models") or {}
+    roles = set()
+    for role, vid_slot in _ROLE_TO_VIDEO_SLOT.items():
+        entry = vm.get(vid_slot)
+        engine_id = (entry.get("engine_id") if isinstance(entry, dict)
+                     else str(entry or ""))
+        if _is_mesh_fodder_engine(engine_id):
+            roles.add(role)
+    return sorted(roles)
+
+
 def enforce_3d_granularity_lock(granularity_by_slot: dict, locked_slots: set,
                                 warnings: list) -> dict:
     """FAIL CLOSED: every 3D-locked slot must already be ``per_object``;
@@ -329,6 +372,12 @@ class OTRImageDirector:
             "other_beats": (video_policy.get("other_beats")
                             if isinstance(video_policy.get("other_beats"), dict)
                             else {}),
+            # 3D image streams (2026-06-21): the IMAGE-prompt roles whose paired
+            # video engine requires_mesh_fodder. MetaBrief forks those beats to a
+            # clean mesh_fodder subject + a scene_background_plate (NOT one
+            # cinematic scene still) so Hunyuan3D meshes an isolated subject, not
+            # the whole environment (the clay blob). [] -> no fork (legacy look).
+            "mesh_fodder_roles": mesh_fodder_roles_from_video_policy(video_policy),
             "fresh_cap": cap,
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "warnings": warnings,

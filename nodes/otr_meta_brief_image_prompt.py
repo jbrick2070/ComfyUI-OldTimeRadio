@@ -181,6 +181,51 @@ def _other_beats_from_policy(policy_json):
     return {}
 
 
+#: 3D IMAGE STREAMS (2026-06-21) -- checked-in prompt scaffolds for the mesh
+#: fodder fork. The MESH FODDER still is what Hunyuan3D actually meshes, so it
+#: must be ONE isolated subject on a neutral plate (a cinematic scene still
+#: meshes the whole environment -> the clay blob). The positive scaffold carries
+#: the isolation discipline (the pipeline mints stills from the POSITIVE prompt;
+#: there is no per-object negative channel today). The negative scaffold is
+#: checked in for the engines/lanes that DO consume a negative and as the canon
+#: of what fodder must NOT contain.
+MESH_FODDER_POS_SCAFFOLD = (
+    "single centered subject, full unoccluded three-quarter view, entire head "
+    "and body clearly visible, plain seamless neutral mid-grey studio backdrop, "
+    "even soft diffuse frontal lighting, no hard shadows, no props, sharp focus, "
+    "full natural color"
+)
+MESH_FODDER_NEG_SCAFFOLD = (
+    "busy background, multiple subjects, occlusion, hands over face, hood, "
+    "dramatic shadow, cast shadow, cropped, scene, environment, props, text, "
+    "watermark"
+)
+#: The BACKGROUND PLATE is the subject-free world the mesh stands in front of.
+BACKGROUND_PLATE_POS_SCAFFOLD = (
+    "empty establishing environment, no people, no subject, no characters, "
+    "wide 16:9 cinematic scene, atmospheric depth, period-accurate set"
+)
+#: Mesh fodder is rendered near-square/portrait (Hunyuan wants an isolated,
+#: fully-in-frame subject), independent of the beat's final video aspect.
+MESH_FODDER_W = PORTRAIT_W
+MESH_FODDER_H = PORTRAIT_H
+
+
+def _mesh_fodder_roles_from_policy(policy_json):
+    """The set of image-prompt roles whose paired video engine requires clean
+    mesh fodder (OTR_ImageDirector.mesh_fodder_roles_from_video_policy forwards
+    the list). A missing/malformed policy yields an empty set -> NO fork (the
+    legacy cinematic-scene-still look). Pure, tolerant."""
+    try:
+        pol = json.loads(policy_json or "{}")
+        roles = pol.get("mesh_fodder_roles") if isinstance(pol, dict) else None
+        if isinstance(roles, list):
+            return {str(r) for r in roles if str(r)}
+    except (ValueError, TypeError):
+        pass
+    return set()
+
+
 def _iter_beat_lines(lines):
     """(beat_id, line) pairs mirroring OTR_ShotLock's beat-id scheme exactly
     (line_id or beat_%04d over the NON-SKIPPED lines) so a still minted here
@@ -502,6 +547,65 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     return prompt, source
 
 
+def _mesh_fodder_subject(meta, char_entry, line, setting, role) -> str:
+    """The SUBJECT phrase for a mesh_fodder still -> always a single, isolated
+    thing the mesher can carve cleanly. A character beat meshes the CHARACTER
+    (appearance); the announcer meshes the announcer figure (no studio gear, no
+    occlusion); a music/no-character beat meshes ONE emblematic story object.
+    Pure; never empty (a bare fallback keeps the mesher fed)."""
+    appearance = ""
+    if char_entry:
+        appearance = _appearance_for_char(
+            [char_entry], str((char_entry or {}).get("char_id") or ""))
+    if appearance:
+        return appearance
+    if str(role) == "announcer_visual":
+        # A clean isolated figure -- NOT the radio-booth announcer anchor (that
+        # carries a microphone + studio backdrop = occlusion + environment).
+        return "a vintage 1940s radio announcer in a tailored suit and tie"
+    # Music / no-character beat: a single emblematic OBJECT from the story world
+    # (chunk 6 refines the object_id policy; this keeps the mesher fed cleanly).
+    intent = str((line or {}).get("beat_intent") or "").strip()[:120]
+    base = intent or setting or "the story"
+    return "a single emblematic object representing %s" % base
+
+
+def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role) -> str:
+    """``"{subject}, {MESH_FODDER_POS_SCAFFOLD}"`` -- the isolated-subject still
+    Hunyuan3D meshes. Deterministic (no LLM): the subject identity comes from
+    the cast appearance / announcer figure / story object, and the checked-in
+    scaffold enforces the neutral-plate isolation. Never empty."""
+    subject = _mesh_fodder_subject(meta, char_entry, line, setting, role)
+    return "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
+
+
+def _compose_background_plate_prompt(meta, setting) -> str:
+    """The subject-free 16:9 world plate the mesh stands in front of. Leads with
+    the story setting, then the checked-in 'no subject' scaffold. Deterministic;
+    never empty."""
+    parts = []
+    if setting:
+        parts.append("%s setting" % setting)
+    parts.append(BACKGROUND_PLATE_POS_SCAFFOLD)
+    plate = ", ".join(parts)
+    # Era tail / grade (best-effort) so the plate matches the episode look.
+    try:
+        try:
+            from ._otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
+        plate = finish_visual_prompt(meta, plate, era_profile="still")
+        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in plate:
+            plate = "%s, %s" % (plate, IMAGE_GRADE_TAIL)
+        if not plate.endswith(NO_TEXT_CLAUSE):
+            plate = "%s, %s" % (plate, NO_TEXT_CLAUSE)
+    except Exception:  # noqa: BLE001
+        pass
+    return plate
+
+
 #: Person-evidence vocabulary for the portrait guard: an accepted prompt that
 #: matches NONE of these almost certainly depicts scenery/objects (the
 #: "microphone, no person" live catch, look-QA round 4) -> template fallback.
@@ -564,7 +668,8 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
                          consistency_gate_warn_only: bool = False, lines=None,
-                         fps: int = 25, still_aspects=None, other_beats=None):
+                         fps: int = 25, still_aspects=None, other_beats=None,
+                         mesh_fodder_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -762,9 +867,50 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _cast_by_id = {str(c.get("char_id") or ""): c
                        for c in roster if isinstance(c, dict)}
         _line_by_beat = {bid: ln for bid, ln in _iter_beat_lines(lines)}
+        _fodder_roles = set(mesh_fodder_roles or ())
         for tgt in scene_targets:
             _cid = str(tgt.get("char_id") or "")
             _src = tgt["source"]
+            _bid = tgt["beat_id"]
+            if str(tgt.get("role") or "") in _fodder_roles:
+                # 3D IMAGE STREAMS FORK (2026-06-21): this beat's video engine
+                # requires clean mesh fodder, so mint TWO objects instead of one
+                # cinematic scene still -- a mesh_fodder SUBJECT (what Hunyuan3D
+                # carves) + a subject-free scene_background_plate (the world the
+                # mesh stands in front of). NO generic scene_* still for this beat
+                # (else _still_index's last-write-wins could return the wrong row).
+                _ce = _cast_by_id.get(_cid)
+                _ln = _line_by_beat.get(_bid, {})
+                _subj_id = _cid or "obj_%s" % _bid
+                _fprompt = _compose_mesh_fodder_prompt(
+                    meta, _ce, _ln, setting, tgt["role"])
+                _fobj = {
+                    "object_id": "meshfodder_%s" % _bid,
+                    "kind": "mesh_fodder",
+                    "role": tgt["role"],
+                    "beat_id": _bid,
+                    "mesh_subject_id": _subj_id,
+                    "w": MESH_FODDER_W, "h": MESH_FODDER_H,
+                    "prompt": _fprompt,
+                    "negative_prompt": MESH_FODDER_NEG_SCAFFOLD,
+                    "prompt_hash": _content_hash(_fprompt),
+                    "source": "mesh_fodder",
+                }
+                if _cid:
+                    _fobj["char_id"] = _cid
+                objects.append(_fobj)
+                _pprompt = _compose_background_plate_prompt(meta, setting)
+                objects.append({
+                    "object_id": "plate_%s" % _bid,
+                    "kind": "scene_background_plate",
+                    "role": tgt["role"],
+                    "beat_id": _bid,
+                    "w": sw, "h": sh,
+                    "prompt": _pprompt,
+                    "prompt_hash": _content_hash(_pprompt),
+                    "source": "mesh_background_plate",
+                })
+                continue
             if tgt["kind"] == "scene_character":
                 _ce = _cast_by_id.get(_cid)
                 _ln = _line_by_beat.get(tgt["beat_id"], {})
@@ -869,7 +1015,8 @@ class OTRMetaBriefImagePromptGen:
             lines=lines,
             still_aspects=_still_aspects_from_policy(image_policy_json),
             other_beats=_other_beats_from_policy(image_policy_json),
-        )  # aspects + other-beats clip plan ride in image_policy_json (forwarded)
+            mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
+        )  # aspects + other-beats + mesh-fodder roles ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []
