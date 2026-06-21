@@ -1281,7 +1281,9 @@ def _build_user_prompt(req: LineRequest) -> str:
     # on every single beat (the over-acting risk the roundtable flagged).
     indirect = (
         "Write 1 spoken line. Do not summarize the objective. "
-        "Do not explain the turn. Perform the objective indirectly."
+        "Do not explain the turn. Perform the objective indirectly. "
+        "Speak in the first person; never narrate your own actions in "
+        "the third person and never say your own name."
     )
     if req.beat_turn:
         indirect += " The situation must be different after this line."

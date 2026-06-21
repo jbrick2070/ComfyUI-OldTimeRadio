@@ -496,7 +496,7 @@ def run_post_script_spine(
         _hy_first_ann = _hy_ann_idx[0] if _hy_ann_idx else -1
         _hy_last_ann = _hy_ann_idx[-1] if _hy_ann_idx else -1
         _hy_report = {"scrubbed": 0, "char_recomposed": 0,
-                      "announcer_recomposed": 0}
+                      "announcer_recomposed": 0, "narration_recomposed": 0}
         _hy_ctx = (
             slot_scheduler.helper_context("delivery_hygiene")
             if slot_scheduler is not None else _nullcontext()
@@ -524,6 +524,26 @@ def run_post_script_spine(
                                 and str(_hy_new) != _hy_orig):
                             _hy_line["text"] = str(_hy_new)
                             _hy_report["char_recomposed"] += 1
+                    # F7 (story-engine v1): narration / self-address repair.
+                    # One recompose attempt via the SAME seam; LOUD marker;
+                    # fallback to the original (no change) on empty/identical.
+                    _hy_cur = str(_hy_line.get("text") or "")
+                    if _HY.detect_narration_self_address(_hy_cur, _hy_name):
+                        log.info(
+                            "[OTR_StorySpine] F7 narration/self-address at "
+                            "line %d (%s); recomposing once.",
+                            _hy_i, _hy_name,
+                        )
+                        _hy_nn = _hy_recompose(
+                            _hy_i, _hy_cur,
+                            "speak this line in the first person as the "
+                            "character; do not narrate your own actions in "
+                            "the third person and do not say your own name",
+                        )
+                        if (_hy_nn and str(_hy_nn).strip()
+                                and str(_hy_nn) != _hy_cur):
+                            _hy_line["text"] = str(_hy_nn)
+                            _hy_report["narration_recomposed"] += 1
                 elif _hy_role == "announcer" and _hy_i in (
                         _hy_first_ann, _hy_last_ann):
                     if _HY.is_truncated(_hy_orig):

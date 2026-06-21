@@ -21,6 +21,7 @@ from nodes._otr_line_composer import (  # noqa: E402
     compose_line_draft,
 )
 from nodes._otr_casting import CastingResponse, DescriptionResponse  # noqa: E402
+from nodes._otr_line_hygiene import detect_narration_self_address  # noqa: E402
 from nodes._otr_dramatic_state import pick_costly_choice_slot  # noqa: E402
 from nodes._otr_slot_drama_contract import (  # noqa: E402
     SlotDramaContract,
@@ -345,3 +346,35 @@ class TestF5SpeechSignature:
         ]
         joined = "\n".join(build_voice_card(r) for r in rows)
         assert "speaks: clipped" in joined and "speaks: rambling" in joined
+
+
+# ===========================================================================
+# F7 -- narration / self-address hygiene
+# ===========================================================================
+
+class TestF7NarrationHygiene:
+
+    def test_first_person_allowed(self):
+        assert detect_narration_self_address("I cannot open it.", "EDNA") is False
+
+    def test_legit_third_person_reference_allowed(self):
+        # reference to OTHERS, no narration verb on a self lead
+        assert detect_narration_self_address("They know the code.", "EDNA") is False
+        assert detect_narration_self_address("He is lying about the vial.", "EDNA") is False
+
+    def test_speaker_name_substring_no_trigger(self):
+        # "Ednathon" must not match the speaker name "EDNA"
+        assert detect_narration_self_address("Ednathon guards the door.", "EDNA") is False
+
+    def test_true_self_narration_triggers(self):
+        assert detect_narration_self_address("She paces the dark lab slowly.", "EDNA") is True
+        assert detect_narration_self_address("Edna stares at the sealed vial.", "EDNA") is True
+
+    def test_empty_no_trigger(self):
+        assert detect_narration_self_address("", "EDNA") is False
+        assert detect_narration_self_address(None, "EDNA") is False
+
+    def test_output_constraint_in_prompt(self):
+        prompt = _build_user_prompt(_req())
+        assert "never narrate your own actions in the third person" in prompt
+        assert "never say your own name" in prompt

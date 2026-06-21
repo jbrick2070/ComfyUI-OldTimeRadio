@@ -98,6 +98,51 @@ def clean_spoken_character_line(text: Any, speaker_name: Any) -> str:
     return scrub_self_vocative(scrub_parentheticals(text), speaker_name)
 
 
+# F7 (story-engine v1): narration / self-address detector. Fires ONLY when a
+# spoken line narrates the SPEAKER's own physical action in third person, or
+# opens with the speaker's own name as a 3rd-person subject + a narration verb.
+# First-person lines and legitimate 3rd-person references to OTHERS ("They know
+# the code", "He is lying") are NOT flagged -- that is craft, not breakage. The
+# scan (scripts/story_quality_scan.py) imports THIS function so the engine and
+# the measurement agree. Deterministic; never raises.
+_NARRATION_VERBS = frozenset({
+    "paces", "pacing", "stops", "stopping", "gazes", "gazing", "stares",
+    "staring", "contemplates", "contemplating", "sighs", "sighing",
+    "nods", "nodding", "shrugs", "shrugging", "turns", "turning", "walks",
+    "walking", "leans", "leaning", "frowns", "frowning", "smiles",
+    "smiling", "glances", "glancing", "reaches", "reaching", "stands",
+    "standing", "sits", "sitting", "watches", "watching", "moves",
+    "moving", "steps", "stepping", "looks", "looking",
+})
+_THIRD_PERSON_LEAD = re.compile(r"^\s*(he|she|they)\b", re.IGNORECASE)
+
+
+def detect_narration_self_address(text: Any, speaker_name: Any = "") -> bool:
+    """True when a spoken line narrates the speaker's OWN action in third
+    person (or opens with the speaker's own name + a narration verb)."""
+    try:
+        s = " ".join(str(text or "").split())
+        if not s:
+            return False
+        low = s.lower()
+        words = re.findall(r"[a-z']+", low)
+        if not words:
+            return False
+        # 3rd-person pronoun lead + a narration verb in the opening = self-narration
+        if _THIRD_PERSON_LEAD.match(s):
+            if any(w in _NARRATION_VERBS for w in words[:4]):
+                return True
+        # the speaker's own name as a 3rd-person subject + a narration verb
+        name = str(speaker_name or "").strip().lower()
+        first = name.split()[0] if name.split() else ""
+        if first and len(first) > 1 and words and words[0] == first:
+            if any(w in _NARRATION_VERBS for w in words[1:4]):
+                return True
+        return False
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 
