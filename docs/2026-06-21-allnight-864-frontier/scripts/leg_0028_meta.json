@@ -1,0 +1,86 @@
+{
+ "leg": "leg_0028",
+ "news": {
+  "casting_brief": "Experimental physicists and materials scientists in a quantum lab; collaborators chasing a breakthrough; stakes tied to next-gen computing, communications, and sensors.",
+  "script_brief": "A team probes layered crystal sheets, twisting them to bend the light of embedded emitters. A small rotation yields outsized control--but can they tame it? Beats: the accidental tilt, the spectral shift, the doubt, the reproducible result, the leap toward real quantum hardware.",
+  "news_close_brief": "Researchers report that twisting layered sheets of hexagonal boron nitride can dramatically alter light from embedded quantum emitters, offering new control over components for future quantum computers, communications, and sensors.",
+  "key_terms": [
+   "hexagonal boron nitride",
+   "quantum emitters",
+   "quantum computers",
+   "communications systems",
+   "sensors",
+   "layered sheets"
+  ],
+  "source_hash": "4463ff36267402e70161db36d194e461b0ea8acc0f94c4b38ffe79e5e5ea4144",
+  "source_chars": 318,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can a tiny rotation of the layered sheets be tamed into reproducible control over the quantum emitters before it's declared a breakthrough?",
+  "character_a_wants": "Broadcast the twisted boron nitride emitters as finished quantum hardware now",
+  "character_b_wants": "Withhold the claim until the tilt's spectral shift proves reproducible",
+  "costly_choice_beat": "d015",
+  "ending_change": "The accidental tilt is verified reproducible, so the spectral shift becomes a controllable basis for real quantum hardware."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, a careless tilt of crystal upon crystal bends light no one expected to move-and the question lingers: can such delicate power ever truly be tamed?",
+  "Third pass tonight and they've crept off true again - I keep nudging them home and by morning they've wandered, like they don't want to be found.",
+  "The men with the checkbook stop by Friday, Jiro - straighten that leaning stack before you talk to me about wandering... no. Don't. Look at it. It just lit on its own.",
+  "Hold the meter where it is - don't breathe on it... that needle's sitting twice past where the chart says it can go, and it isn't drifting back. Either the gauge is lying to all three of us, or that glow's running on something it shouldn't have.",
+  "If it holds steady long enough to draw twice, you can stack it, print it, sell it by the rack to Pam's men with the checkbook... but I've been chasing these things home all night, Rod - let's learn to hold one before we promise anybody a thousand.",
+  "Musical interlude bridging setup into the next phase.",
+  "I haven't laid a hand on the tilt screws since midnight - see for yourself, my coffee's gone cold against them - and still the needle wandered a full degree while we stood here arguing over what to call it.",
+  "Friday became Thursday while you were chasing your degree, Jiro; the checkbook's already on a train. So whatever that glow decides to do at nine tomorrow morning, three grown men are going to be watching it do it.",
+  "Don't ask me for last night's settings - I needed the page, and last night's numbers are under this morning's, in the same hand, in the same margin... I thought we'd get it back by feel.",
+  "Then we sit here and bleed it back, you and your same hand, before the sun's up - what was the tilt at midnight, Rod, the number, not the feeling, because at nine I can't hand them a margin you wrote over.",
+  "Number won't keep, Pam - that frost on the gauge glass is thinning while you talk, the dewar's been sweating since three, and once these go warm there's no setting on God's earth that brings the glow back to argue about.",
+  "So we don't remember it - we walk the screws till the needle finds the same wander on its own, and if the stack cracks going cold to that, well, it cracks in front of the checkbook instead of behind it.",
+  "Musical interlude bridging complication into the next phase.",
+  "We didn't haul this dewar up four flights and wash three payrolls into it to stand here keeping our hands clean - walk the screws, Rod, slow, and I'll call the wander out as she drifts; we've come too far to die warm.",
+  "Glass is holding, the sweat's no worse than it was at three, and the needle's sitting quiet enough to chase - go on, Rod, find it, I'll keep my watch on the gauge and my mouth off your hands.",
+  "Quarter turn... half... there - see her lean? Same crook in the light she threw at three, and I never breathed on the wheel, Jiro, she walked herself right back into the bend.",
+  "Mark the screw where your thumb sits and don't you move it - that's not luck wearing a tuxedo, that's the same door twice, and a door you can open twice is a door you can build a thousand of.",
+  "And so tonight researchers turn hexagonal boron nitride upon itself, twisting light into something they can command-a small rotation, perhaps, that may yet steer the quantum machines of tomorrow."
+ ],
+ "news_terms_in_lines": [
+  "hexagonal boron nitride"
+ ],
+ "dramatic_want_words_in_lines": [
+  "boron",
+  "nitride",
+  "quantum"
+ ],
+ "news_reaches_lines": true
+}

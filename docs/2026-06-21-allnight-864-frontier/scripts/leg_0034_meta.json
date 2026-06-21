@@ -1,0 +1,90 @@
+{
+ "leg": "leg_0034",
+ "news": {
+  "casting_brief": "NASA astrophysics director, startup founder/engineers at Katalyst, mission planners; high-stakes dynamic between cautious agency and bold young company racing the clock.",
+  "script_brief": "A startup gets 10 months to build and launch a rescue craft to save a falling $500M telescope. Central tension: impossible deadline, tight budget, untested robotic-arm docking. Beats: the pitch, the contract, the build sprint, the chase, the latch-on, the orbital boost gamble.",
+  "news_close_brief": "With Swift's orbit decaying, Katalyst's Link spacecraft races to launch and rescue the $500 million mission. Whether three robotic arms can save it remains uncertain.",
+  "key_terms": [
+   "NASA",
+   "Katalyst Space Technologies",
+   "Swift",
+   "Link servicing spacecraft",
+   "Shawn Domagal-Goldman",
+   "Wallops Island, Virginia",
+   "three robotic arms"
+  ],
+  "source_hash": "0672ddeff1f8349aba383120951ba51bffda36096349b41e44685b31cdbe9529",
+  "source_chars": 1002,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can Faber's untested Link craft reach Swift, latch its three robotic arms, and boost the $500M telescope before it falls past saving?",
+  "character_a_wants": "To scrub the rushed mission and let Swift burn rather than gamble NASA's reputation on it",
+  "character_b_wants": "To launch Link in 10 months and latch its three robotic arms onto the falling Swift",
+  "costly_choice_beat": "d015",
+  "ending_change": "Link launches from Wallops Island and latches on; Swift gets its orbital boost, but only after Faber overrides the abort order."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight's story brings us a desperate startup with only months to launch an untested craft and snatch a half-billion-dollar telescope from its fatal fall.",
+  "That needle keeps climbing past the last mark we logged, and the board will want numbers inside ten months.",
+  "The schematics are still spread across the bench where we left them after the last short.",
+  "The founder's name was etched on that gauge before any of us ever touched the bench, and this run is the only one left that still answers to it.",
+  "He always expected the needle to keep climbing until the count was finished, so the question is whether the three of us finish it together.",
+  "Musical interlude bridging setup into the next phase.",
+  "The way that casing warped on the bench last night means the whole thrust curve's off by the end of the week.",
+  "The key's already in my pocket, and I'm not waiting for the count.",
+  "A call came through on the outside line while you two were talking, something about an unscheduled clearance.",
+  "The arm sequence is drifting from the patch we skipped on the way up.",
+  "This is on you if the count doesn't hold, pull it now.",
+  "That key stays in until we clear the tower.",
+  "Musical interlude bridging complication into the next phase.",
+  "The readout's flat across the board now. Keep that key seated or the lawyers will want every timestamp.",
+  "Hayes, your console's the one logging the override sequence.",
+  "We already lost three men on the bypass runs and another when the first override tripped, so you keep your hand on that key handle until it's done.",
+  "Then the tower's clear and there's no pulling it back now, not after what those men gave.",
+  "As Swift's orbit decays the fate of Katalyst's Link spacecraft and its three robotic arms stays uncertain."
+ ],
+ "news_terms_in_lines": [
+  "Swift",
+  "three robotic arms"
+ ],
+ "dramatic_want_words_in_lines": [
+  "launch",
+  "months",
+  "robotic",
+  "swift",
+  "three"
+ ],
+ "news_reaches_lines": true
+}

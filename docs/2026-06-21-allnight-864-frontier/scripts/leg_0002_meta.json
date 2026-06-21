@@ -1,0 +1,93 @@
+{
+ "leg": "leg_0002",
+ "news": {
+  "casting_brief": "Ancient hunter-gatherer communities near Lake Baikal; an Oxford ancient-DNA researcher and colleagues sequencing plague from teeth; victims, kin, and disease-evolution scientists.",
+  "script_brief": "5,500 years ago, plague sweeps Siberian hunter-gatherer bands, leaving dozens dead—Yersinia pestis trapped in their teeth. Millennia later, Macleod's team unearths the oldest strain ever sequenced, rewriting plague's origin. Tension: a lethal scourge predating farming towns and rats. Beats: four cemeteries, telltale DNA, shattered assumptions.",
+  "news_close_brief": "Researchers say teeth from four cemeteries near Lake Baikal hold the oldest Yersinia pestis ever sequenced, marking the earliest known plague outbreak and upending theories about how the disease began.",
+  "key_terms": [
+   "Yersinia pestis",
+   "Lake Baikal",
+   "Siberia",
+   "Ruairidh Macleod",
+   "University of Oxford",
+   "four ancient cemeteries"
+  ],
+  "source_hash": "38c64d077e57d9363669d79ff5496deb3329d3d00b394bd4dd1d04c270deb05a",
+  "source_chars": 1151,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will Macleod's team extract the 5,500-year-old Yersinia pestis from the teeth, or will the four cemeteries stay sealed and the story untold?",
+  "character_a_wants": "Broadcast the oldest Yersinia pestis strain pulled from Lake Baikal teeth, rewriting plague's origin.",
+  "character_b_wants": "Keep the four ancient Siberian cemeteries sealed, ancestors' teeth unsampled and undisturbed.",
+  "costly_choice_beat": "d015",
+  "ending_change": "A single tooth yields the oldest plague strain, shattering assumptions—while one Baikal cemetery is reburied, its DNA forever unread."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Deep in ancient Siberia, Macleod's team has found the oldest plague strain ever known, long before rats or towns.",
+  "The lab ran the cores from the lower graves this morning. Every marker lined up.",
+  "Better keep that cap seated until the others finish their shift.",
+  "The protocols call for torque checks on the cap every two hours once the thaw layer hits the markers.",
+  "And if the cap's already seated wrong from the morning shift?",
+  "The markers don't lie on the torque sheet. Those lower cores are running already.",
+  "We can still pull a lane from the first melt before the shift log goes out.",
+  "Hand me the sequencer. I'll crack the cap and load it now.",
+  "The sequencer's trace is already doubling on every pass. Touch the flap now and nothing in here stays put.",
+  "Peter reset the counters after the first run, same as last time the numbers jumped.",
+  "I slipped the live vial through the port myself to see what it would do on this air, and the override's already jammed.",
+  "The port took what you gave it and the flap stays flush against the housing.",
+  "It lay under the ice long enough to outlast every hull that ever sailed, and this one matches it now.",
+  "Edna, the pen still rests on the housing where you left it.",
+  "The flap keeps its line against the seal no matter how we list the counts now.",
+  "Those teeth from four cemeteries near Lake Baikal hold the oldest Yersinia pestis ever sequenced, marking the earliest known outbreak and upending how the plague began.",
+  "Musical interlude bridging setup into the next phase.",
+  "Musical interlude bridging complication into the next phase."
+ ],
+ "news_terms_in_lines": [
+  "Yersinia pestis",
+  "Lake Baikal",
+  "Siberia"
+ ],
+ "dramatic_want_words_in_lines": [
+  "ancient",
+  "baikal",
+  "cemeteries",
+  "oldest",
+  "pestis",
+  "strain",
+  "teeth",
+  "yersinia"
+ ],
+ "news_reaches_lines": true
+}

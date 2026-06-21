@@ -1,0 +1,93 @@
+{
+ "leg": "leg_0009",
+ "news": {
+  "casting_brief": "Ancient DNA researchers like Ruairidh Macleod, Oxford colleagues, alongside the long-dead hunter-gatherers of Lake Baikal whose teeth still whisper the oldest plague.",
+  "script_brief": "5,500 years ago, plague sweeps southeastern Siberian hunter-gatherer bands, felling dozens before any farming town exists. Researchers sequence the oldest Yersinia pestis strain from victims' teeth at four cemeteries—rewriting plague's birth. Tension: a 'weak' early strain still killed; the scourge predates rats and settled towns.",
+  "news_close_brief": "The teeth of the dead carry a warning across five and a half millennia: the plague walked among us long before our cities. Its oldest strain is sequenced; its origin story, rewritten.",
+  "key_terms": [
+   "Yersinia pestis",
+   "Ruairidh Macleod",
+   "University of Oxford",
+   "Lake Baikal",
+   "Siberia",
+   "hunter-gatherers"
+  ],
+  "source_hash": "38c64d077e57d9363669d79ff5496deb3329d3d00b394bd4dd1d04c270deb05a",
+  "source_chars": 1151,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will the world be told plague predates rats and farming towns before Rei can prove the weak Siberian strain truly killed those hunter-gatherers?",
+  "character_a_wants": "To broadcast NOW that the Lake Baikal teeth rewrite plague's birth before rats or towns",
+  "character_b_wants": "To prove the 'weak' early Yersinia pestis killed before any claim airs",
+  "costly_choice_beat": "d015",
+  "ending_change": "They air it together: the oldest Yersinia pestis sequence confirms a weak strain still felled Baikal bands 5,500 years ago."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight on Signal Lost, we journey to the ancient Siberian frost, where the silent graves of wandering hunters hold the terrifying, timeless genesis of Yersinia pestis.",
+  "Station Alpha transmitting on all open emergency frequencies. I am declaring a level four breach. The Siberian permafrost containment grid has suffered a catastrophic failure. The Yersinia pestis strain that slaughtered those hunter-gatherers near Lake Baikal... it survived the ice. And now it's out.",
+  "I have the telemetry. Inner seals failed three minutes ago. It just chewed through the secondary containment filters. Vector projections are tracking a southern spread at a rate I have never seen modeled. If it reaches the transit corridor, the first populated sectors fall by morning.",
+  "I'm dropping the physical blast doors and killing the cold-chain feeds, but that won't hold the Lake Baikal strain if it's already past secondary. Rei, get on that primary console and prep the global emergency broadcast right now. The satellite uplinks are starting to freeze out, and once this local grid completely collapses, we won't be able to push a warning through to anyone.",
+  "I'm patching the transmission through the last orbital relay. But Donna... if this strain slaughtered isolated hunter-gatherers long before the first farming town, what chance do our hyper-connected cities have? We aren't sending a warning. We're just broadcasting an obituary.",
+  "Musical interlude bridging setup into the next phase.",
+  "Stop staring at the transmitter. The telemetry just spiked-they tore right through the inner blast doors in sector four! I don't care about the ethics of triggering a panic. If this unmutated Yersinia pestis could slaughter isolated hunter-gatherers, it will butcher us in three minutes. Push the button!",
+  "The system is already overriding us! Sector four's breach just triggered the fail-safe. The master grid is dropping to deep-freeze to seal the vents, and it is taking the main broadcast power with it. We have twenty seconds before it severs that dish permanently!",
+  "I'm bypassing the master grid! Rerouting the signal through the old seismic telemetry cables. If this ancient Yersinia pestis wiped out scattered hunter-gatherers by Lake",
+  "Rei, stop tapping the glass and look down at the floorboards... the lockdown shears sliced the copper comms trunk clean in half.",
+  "The soles of my boots are already sticking to the grating, Kael. The vent fans just reversed to draft.",
+  "If we want to kill the furnace, the only",
+  "Musical interlude bridging complication into the next phase.",
+  "Hand me the iron spanner, Kael... the inside deadbolt won't turn on its own once the pressure drops.",
+  "The amber light just went solid on my board....I'll make sure they know you turned it.",
+  "The global broadcast switch is locked open to all stations....Does the deadbolt feel secure in the housing, Rei?",
+  "This spanner is getting too heavy to hold anyway....Just keep an eye on the frost creeping up the outer glass, Donna, make sure they don",
+  "The sequenced teeth of those early victims carry a profound warning across five millennia. We now know the plague walked among us long before our first cities were ever born."
+ ],
+ "news_terms_in_lines": [
+  "Yersinia pestis",
+  "Lake Baikal",
+  "Siberia",
+  "hunter-gatherers"
+ ],
+ "dramatic_want_words_in_lines": [
+  "baikal",
+  "before",
+  "broadcast",
+  "early",
+  "pestis",
+  "teeth",
+  "yersinia"
+ ],
+ "news_reaches_lines": true
+}

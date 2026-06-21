@@ -1,0 +1,86 @@
+{
+ "leg": "leg_0020",
+ "news": {
+  "casting_brief": "NASA division director, scrappy startup engineers, robotic-arm specialists, mission planners racing a deadline; stakes: a dying $500M observatory falling to Earth.",
+  "script_brief": "A startup wins a long-shot contract to build a rescue craft in under a year. Premise: chase a sinking satellite, latch on with three arms, boost it to safety. Tension: budget, deadline, and a maneuver nobody's done. Beats: the pitch, the contract, the build, the launch, the latch.",
+  "news_close_brief": "A young company races to save a half-billion-dollar observatory from a fiery fall, attempting a rescue never tried before. Whether the gamble pays off remains to be seen.",
+  "key_terms": [
+   "Katalyst Space Technologies",
+   "NASA",
+   "Swift",
+   "Link",
+   "Wallops Island",
+   "Shawn Domagal-Goldman",
+   "robotic arms"
+  ],
+  "source_hash": "0672ddeff1f8349aba383120951ba51bffda36096349b41e44685b31cdbe9529",
+  "source_chars": 1002,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can Katalyst's robotic arms latch onto the doomed Swift and boost it to safety inside the impossible year Shawn Domagal-Goldman bet on?",
+  "character_a_wants": "Launch Katalyst's Link craft now to chase the sinking Swift before it burns up",
+  "character_b_wants": "Delay launch to perfect the never-tried three-arm latch, even if Swift falls first",
+  "costly_choice_beat": "d015",
+  "ending_change": "The three arms close on a tumbling Swift over Wallops Island, proving a long-shot rescue maneuver no one had ever flown."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, a young company dares the impossible: chase a falling satellite, seize it with three steel arms, and lift it back from the dark.",
+  "Twelve months, then the lease on this building's somebody else's headache - so look at the bird on that screen and tell me she's worth our last paychecks, because she's all we've got tumbling out there.",
+  "I'm holding the third actuator right here in my palm, Rashida, and it's still warm from the bench test that failed... you want three arms to catch something that won't stop spinning, and I've got solder that holds for two.",
+  "Nobody funds the easy catch, Lemmy - put that warm actuator back on the bench, because two-second solder is exactly the man we are, and if her arms could already close we'd be late, somebody else's logo on the cover and our names nowhere near it.",
+  "Then close them by Thursday - full grab, no spin getting away, and you do it before the investors walk this floor Friday morning, or I start writing the addresses on those last envelopes myself.",
+  "Musical interlude bridging setup into the next phase.",
+  "Pull up the contractor's morning fax - they crossed out Thursday and penciled Tuesday under it like it's nothing, and now my own ink on those envelopes is already half a week wrong.",
+  "Funny you mention ink - the only shop that'll cut the third arm by Tuesday sent their number through this same machine, and it's the old number with a zero stapled on the end, so we buy the arm or we buy the lease, pick the envelope you'd rather lick.",
+  "Then don't buy the arm - set that warm actuator down for good and let her go up with two, because a thing that's already spinning doesn't know how many hands are reaching for it, and neither will they on Friday.",
+  "I ran the tumble forty times last night and forty times two hands let her wobble past the gimbal, and the strip out of the printer is still warm where the readout scorched it red - you want to set that down for good, you read the part where the frame folds in on itself.",
+  "I believe your red strip, every line of it - but the casting for that third arm clears customs a day after the window shuts, so you've handed me a catch I can't miss and a hand I can't grow.",
+  "There's a third arm sitting on the backup bird right now, bolted and blessed - I unscrew it tonight and we fly your forty catches, but then there's no second bird to come home to if the first one so much as sneezes.",
+  "Musical interlude bridging complication into the next phase.",
+  "Get the driver and start backing those bolts out now - put the empty bracket on my desk by morning so I'm looking at it when somebody asks who said go.",
+  "She's high and holding, drifting slow and easy where she's supposed to drift, and that bracket on your desk can stay empty - nobody's coming home that needed a second bird tonight.",
+  "Forty catches, and the coffee in this pot went cold around the second one - leave it cold, all of you, and go sleep like men who don't owe me anything till Tuesday.",
+  "That empty bracket comes off my desk in the morning, Lloyd, and there'll be a fuller one to fill - they've bought us the next bird, and the one after that.",
+  "And so a half-billion-dollar observatory hangs between rescue and ruin, three steel arms reaching where none have reached before; whether the gamble holds, only tomorrow will tell."
+ ],
+ "news_terms_in_lines": [],
+ "dramatic_want_words_in_lines": [
+  "before",
+  "chase",
+  "first",
+  "three"
+ ],
+ "news_reaches_lines": false
+}

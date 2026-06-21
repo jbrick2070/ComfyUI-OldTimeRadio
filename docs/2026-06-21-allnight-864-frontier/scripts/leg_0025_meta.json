@@ -1,0 +1,92 @@
+{
+ "leg": "leg_0025",
+ "news": {
+  "casting_brief": "Neuroscience researchers, pain-medicine specialists, lab technicians running mouse trials; dynamic between cautious skeptics and hopeful innovators; stakes: chronic-pain patients seeking",
+  "script_brief": "In a botanical pharmacology lab, researchers chase the aromatic terpenes behind cannabis scent, testing geraniol against fibromyalgia and post-surgical pain in mice. Central tension: can a compound ease suffering without THC's high? Beat hooks: a surprising aroma clue, a breakthrough mouse trial, the question of human translation.",
+  "news_close_brief": "Researchers report that cannabis-derived terpenes, especially geraniol, eased pain in mouse models without psychoactive effects, hinting at a possible alternative to THC for chronic pain.",
+  "key_terms": [
+   "cannabis",
+   "terpenes",
+   "geraniol",
+   "THC",
+   "fibromyalgia",
+   "post-surgical pain",
+   "mouse models"
+  ],
+  "source_hash": "db97a2116e76a1c874c593dff93bb7cee1854e158a59225774ae0cab6a7cd674",
+  "source_chars": 471,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will Ned let the geraniol terpene be sold as a THC-free pain breakthrough, or hold the line until mouse-trial data proves it works in people?",
+  "character_a_wants": "To broadcast geraniol as a proven THC-free cure for fibromyalgia today",
+  "character_b_wants": "To withhold the geraniol claim until mouse results translate to humans",
+  "costly_choice_beat": "d015",
+  "ending_change": "The aroma clue's mouse breakthrough goes public only as a hopeful human trial, not the cure the Announcer promised."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 1,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight on Signal Lost, we step inside a quiet botanical laboratory where the sweet scent of geraniol sparks a desperate race to conquer pain without the high of THC.",
+  "Look at her climbing the mesh, Vance-ninety beats a minute, muscle tone perfect... that synthetic geraniol dose flushed the fluid right out.",
+  "I'm pressing so hard on this triplicate form my pen is tearing the paper, Ned; the boys upstairs want three years of kidney sections before they let us even glance at a human patient.",
+  "People are screaming through the pain today, Vance, not three years from now. If that synthetic geraniol works perfectly on the mesh, we need to bypass the committee and demand a trial immediately.",
+  "Ayesha, listen to me. I read those same letters from patients, and the desperation breaks me. But this unrefined geraniol is still too volatile. If the binding process misfires in a human nervous system, we aren't curing their post-surgical pain. We are inducing a catastrophic neural collapse. We have to wait.",
+  "Musical interlude bridging setup into the next phase.",
+  "The red tags just came down the chute, Ayesha; maintenance is hauling every vial of the geraniol to the basement furnace at four o'clock.",
+  "The furnace burns hot, Vance, but I only need thirty seconds to roll up my sleeve and bleed the air out of that thick-gauge glass rig.",
+  "I'm locking both hands over the tray, doctor-you didn't check the morning cages... Number Four's spine just snapped in half overnight.",
+  "Number Four didn't have fibromyalgia chewing through her nerves every single second. A snapped spine is quick, Ned. What I have is a slow, agonizing death sentence. Get out of my way. Move your hands. I am taking that syringe now, before the rest of the geraniol goes to the furnace.",
+  "Let go of the glassware, Voss. Whatever you two are wrestling over ends right here. Step away from the bench or I pull your credentials permanently. The board's directive is absolute. Hand me that syringe. It's going into the transport lockbox with the rest of the geraniol samples right now.",
+  "Vance, don't touch the tray. The synthetic geraniol structure is rapidly destabilizing outside the incubator. The ambient temperature shift is causing immediate oxidation. If you snap it into that transport lockbox right now, the pressure differential will shatter the glass and aerosolize the entire compound. We just need a few minutes to neutralize the suspension before you can safely move it.",
+  "Musical interlude bridging complication into the next phase.",
+  "Look at the condensation already pooling under the stoppers, Mister Ming... you lift this tray off the cooling mat, the ambient heat separates the emulsion, and the resulting vapor clears out the entire floor.",
+  "The basement drafts alone would do it, Vance; a two-degree shift in humidity and that thick-gauge glass you're so eager to carry turns into shrapnel.",
+  "Fine. If the geraniol is that unstable, I'm not hauling it upstairs and risking a blowout. You two handle the incineration protocol down here. Just make sure those vials are ash before the board checks the logs in the morning. I'm done.",
+  "He is gone. The door is sealed. Look at your shoulders... the tension is just melting off. I haven't seen you take a full breath like that since we started the cannabis extractions. The geraniol is holding. Against all the telemetry... it actually worked.",
+  "As the laboratory lights dim, researchers report that cannabis terpenes like geraniol eased chronic pain in mice without psychoactive effects, hinting at a promising alternative to THC."
+ ],
+ "news_terms_in_lines": [
+  "cannabis",
+  "terpenes",
+  "geraniol",
+  "THC",
+  "fibromyalgia",
+  "post-surgical pain"
+ ],
+ "dramatic_want_words_in_lines": [
+  "fibromyalgia",
+  "geraniol",
+  "today"
+ ],
+ "news_reaches_lines": true
+}

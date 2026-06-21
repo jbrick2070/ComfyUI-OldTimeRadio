@@ -1,0 +1,85 @@
+{
+ "leg": "leg_0027",
+ "news": {
+  "casting_brief": "Field biologists and behavioral ecologists studying interspecies cooperation; animal subjects ranging from cleaner species to protected partners across diverse ecosystems.",
+  "script_brief": "Researchers uncover that animals of different species exchange flexible, evolved signals to find food, remove parasites, and gain protection. Tension: how deep does this 'secret language' run, and what does it reveal about nature's hidden alliances? Beats: a puzzling partnership, decoding the signals, the evolutionary revelation.",
+  "news_close_brief": "Researchers find that cooperation between species depends on flexible, evolved communication far more vital to life in nature than once believed. The conversations of the wild, it seems, are only beginning to be understood.",
+  "key_terms": [
+   "food",
+   "parasites",
+   "protection",
+   "interspecies",
+   "communication",
+   "species"
+  ],
+  "source_hash": "0483198078335f253d28d219d4848a6165f7c4519f55983543fb3aebbaf9959d",
+  "source_chars": 320,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will the secret interspecies language be exposed for science, or stay hidden to protect nature's fragile food-and-parasite alliances?",
+  "character_a_wants": "To decode and broadcast the secret interspecies signals for food and protection",
+  "character_b_wants": "To keep the cross-species language hidden so the alliances survive untouched",
+  "costly_choice_beat": "d015",
+  "ending_change": "The signals are decoded, but A learns broadcasting them would shatter the very interspecies protection it revealed."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, we tune our ears to the wild, where unlikely creatures trade whispers of food, safety, and secrets older than speech.",
+  "Listen past the rain, Doug... this canopy isn't scenery, it's a switchboard-and somebody just put a new call through.",
+  "Then we'd better stop admiring the operator; that same phrase is turning up in birds, frogs, even the macaques, all along the western corridor they're due to cut by morning.",
+  "Doug, if that phrase is being handed from throat to throat, it isn't noise-it's parley; this forest may be answering the axes as one living embassy, and I need you to tell me I'm wrong before we let them cut into a nation.",
+  "Morning's got a contract in its pocket, Alice... but fold that map smaller; we prove the call tonight, and we don't breathe a syllable to the men who'd bottle the switchboard and sell the wires.",
+  "Musical interlude bridging setup into the next phase.",
+  "Lemmy, take the north mic under the weather and don't let the station lamps see you; Alice, start the cylinder-wait... that red seal just woke up on the recorder. Our own box says we're trespassing.",
+  "It's not a seal, Doug, it's a mouth; it's telling the trustees every turn of the dial, and it's throwing the same tattletale pulse into the canopy-Lemmy, you can't keep both lines quiet.",
+  "Trustees can wait by their warm telephones; I gave the pulse to the trees... and they've answered-every throat just stopped. Doug, the station's been named as an intruder.",
+  "Embassy rules? This is a station, Alice, not a parlor call; I'll answer to the men who paid for copper before I bow to branches-there, I've turned the brass key, and let the canopy learn our name proper.",
+  "It learned it well enough to strike it out; listen-no shelter tone under the carrier, no return from Lemmy, and the red mouth is chewing only our side of the wire now.",
+  "Don't hang that on me; a locked door invites a harder knock, that's all-trustees, if you're riding the buried circuit, take the feed and pry this embassy open.",
+  "Musical interlude bridging complication into the next phase.",
+  "They've taken the trustees off the braid... no, not taken-walled us around them; every route I shove into comes back wearing my own call, and this brass key's getting hot under my thumb.",
+  "Then let go of it, Doug; a door that won't open for a crowbar may still open for a name spoken soft, and maybe the first clear message we've had is that we don't own the language.",
+  "Then mark me present at a distance: no more knocking, no borrowed throats, no clever hands in the braid; our instruments stay on the sill like witnesses, and if the forest has another word, it may choose the hour.",
+  "Final log... power falling to passive receive; I've lifted my thumb from the brass key, Alice-no flag planted, no specimen bagged, just one living embassy still standing in the dark.",
+  "And so the wild grows less silent, as science finds that life itself may depend on conversations we are only beginning to hear."
+ ],
+ "news_terms_in_lines": [
+  "food"
+ ],
+ "dramatic_want_words_in_lines": [
+  "language",
+  "secret"
+ ],
+ "news_reaches_lines": true
+}

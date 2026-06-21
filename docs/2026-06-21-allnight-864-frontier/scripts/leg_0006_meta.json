@@ -1,0 +1,87 @@
+{
+ "leg": "leg_0006",
+ "news": {
+  "casting_brief": "NASA astrophysics director, scrappy startup founders and engineers, mission controllers; high-stakes public-private gamble to save a dying mission.",
+  "script_brief": "NASA gives a young startup under a year to build a rescue satellite that will chase, grab with robotic arms, and reboost a failing $500M telescope before it falls. Tension: impossible deadline, tight budget, unproven feat. Hooks: the cold pitch, the green light, the launch, the latch attempt.",
+  "news_close_brief": "A startup raced to build a first-of-its-kind rescue craft to catch a falling astronomy satellite and lift it to safety. Whether the daring catch succeeds remains to be seen.",
+  "key_terms": [
+   "NASA",
+   "Katalyst Space Technologies",
+   "Swift",
+   "Link",
+   "Shawn Domagal-Goldman",
+   "Wallops Island, Virginia",
+   "three robotic arms"
+  ],
+  "source_hash": "0672ddeff1f8349aba383120951ba51bffda36096349b41e44685b31cdbe9529",
+  "source_chars": 1002,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can Katalyst's unproven satellite chase, grab, and reboost the failing $500M telescope before the deadline forces a launch the arms aren't ready for?",
+  "character_a_wants": "Launch Katalyst's rescue satellite on NASA's under-a-year deadline, no slips",
+  "character_b_wants": "Delay the Wallops Island launch until the three robotic arms can safely latch",
+  "costly_choice_beat": "d015",
+  "ending_change": "The satellite launches on time and its three robotic arms latch the telescope, proving the impossible feat and Domagal-Goldman's gamble."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "In the shadow of a dying telescope, NASA places its hopes on a young startup racing to launch an untested rescue before time runs out.",
+  "The knob won't lock in place no matter how I twist it.",
+  "We either get that bird up or the boys lose the truck keys for good.",
+  "The warehouse tab keeps climbing while we stand here -- give it one more turn.",
+  "The tape's showing the orbit dropping faster than we figured, it'll be now or nothing on that pass.",
+  "Musical interlude bridging setup into the next phase.",
+  "The tape's gone dark from that flare, so chasing the new line means burning what we can't spare.",
+  "If we figure the numbers right, there's no way both that and the dock come out even.",
+  "Then twist it hard and let the dial run out.",
+  "Scope on the chase track just cut to black, nothing left but the dial.",
+  "Half-turn on it now... the needle's running backward.",
+  "Keep the dial and light the burn.",
+  "Musical interlude bridging complication into the next phase.",
+  "Dial's already past the mark and spinning down to zero.",
+  "Telemetry's locked on the burn... window's closing whether we like it or not.",
+  "My hand comes away from the dial clean.",
+  "The scope sits steady past the mark.",
+  "The startup's first-of-its-kind craft now seeks to catch and lift the falling satellite, yet whether that grasp succeeds remains unknown."
+ ],
+ "news_terms_in_lines": [
+  "NASA"
+ ],
+ "dramatic_want_words_in_lines": [
+  "launch",
+  "rescue",
+  "satellite"
+ ],
+ "news_reaches_lines": true
+}

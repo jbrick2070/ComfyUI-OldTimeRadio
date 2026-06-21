@@ -1,0 +1,89 @@
+{
+ "leg": "leg_0004",
+ "news": {
+  "casting_brief": "Astrophysicists and neutrino observatory researchers; a lead scientist defending an unexpected finding against the black-hole consensus; stakes: rewriting cosmic neutrino origins.",
+  "script_brief": "Researchers chase the source of high-energy cosmic neutrinos, expecting a supermassive black hole in distant galaxy Shadow Blaster. Tension: data points instead to extreme star formation in dust-hidden starburst galaxies. Beats: anomaly detected, hypothesis overturned, implications that starbursts seed the Universe's neutrinos.",
+  "news_close_brief": "A galaxy nicknamed Shadow Blaster suggests dust-filled starburst galaxies, not black holes, may produce much of the Universe's high-energy neutrinos. Scientists say the finding could reshape how we trace these cosmic particles.",
+  "key_terms": [
+   "Shadow Blaster",
+   "cosmic neutrinos",
+   "supermassive black hole",
+   "starburst galaxies",
+   "star formation",
+   "high-energy neutrinos"
+  ],
+  "source_hash": "ee980a4aeb441fd1292ed23da8313c1e29636f76be07278dc48a661cfa98e00f",
+  "source_chars": 310,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will the high-energy neutrino trail crown Shadow Blaster's supermassive black hole, or reveal starburst star formation as the true cosmic source?",
+  "character_a_wants": "To crown Shadow Blaster's supermassive black hole as the cosmic neutrino source.",
+  "character_b_wants": "To prove dust-hidden starburst galaxies' star formation births the high-energy neutrinos.",
+  "costly_choice_beat": "d015",
+  "ending_change": "The black-hole hypothesis collapses; starburst galaxies are named the hidden seeders of the Universe's cosmic neutrinos."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, we follow ghostly messengers across the dark toward Shadow Blaster, where what we expect to find may not be what waits in the dust.",
+  "Log it for the record, Kelly - tonight we follow the neutrinos home, all the way down the throat of that thing chewing up a galaxy four billion years out. If the count holds past midnight, we've finally got our hands on the monster.",
+  "Funny... the tape's drawing me a heartbeat, not a death rattle. Steady pulse, every eleven seconds - your black hole doesn't keep time, Gulliver, and this one's keeping it like a metronome.",
+  "Eleven seconds. We staked three years and the whole grant on something that's supposed to swallow time, not tap its foot - and now Kelly's tape is counting to itself like it's waiting on somebody.",
+  "Put your coffee down, Ayo, you'll slosh it on the printout - and before either of you starts drafting a press release, we run the calibration twice and check the clock against Geneva, because the only thing worse than missing the monster is announcing the wrong one.",
+  "Musical interlude bridging setup into the next phase.",
+  "Check it against Geneva twice and you've burned the window - that pulse doesn't sit and wait for us the way you're asking it to, Gulliver, and we already gave away two nights to the storm in March.",
+  "And you put my name on a starburst that turns out to be a loose cable, and there's no window left at all - for either of us - just a very polite letter from the committee thanking us for our years of service.",
+  "Then sign the letter now, because I'm running the directional data against every starburst catalog we've got before sunrise - and when it holds, you'll wish you'd stopped reaching for your coffee long enough to look.",
+  "Every catalog deep enough to hold those source galaxies sits on Halloran's array - so the moment Kelly cross-matches, somebody at Halloran reads our log and knows exactly which patch of sky we're sweating over.",
+  "So we hand Halloran the map and the shovel and stand there asking please - and the day after, they publish the thing we haven't finished proving, with a footnote that we phoned ahead.",
+  "Then we never confirm a single galaxy, and the printout under your elbow stays a pretty graph nobody's allowed to believe - I'd rather lose the name and keep the finding than guard an empty room.",
+  "Musical interlude bridging complication into the next phase.",
+  "...Fine. Slide it out from under my elbow before I change my mind - and put my name second, so when they read it they know I wasn't the one too scared to pick up the phone.",
+  "It's going... there. Watch the bar crawl - every galaxy lighting up sits clean off the plane we always swore those neutrinos came from. We've been pointing the telescope at the wrong half of the sky for ten years, and now Halloran gets to point it back.",
+  "Ten years I had us chasing a black hole that never once asked us to - and now look at the bar, every light a furnace full of new stars, and I find I don't mind being wrong about that.",
+  "Then I'll write it down the way it lit up - not from anything collapsing, but from all that burning - date it tonight, sign under Kelly, and let the lamp run cold once the page is dry.",
+  "So tonight Shadow Blaster reminds us that the Universe hides its truths in dust, and that the ghostly messengers we chase may yet redraw the very maps we trusted to follow them home."
+ ],
+ "news_terms_in_lines": [
+  "Shadow Blaster"
+ ],
+ "dramatic_want_words_in_lines": [
+  "black",
+  "neutrino",
+  "neutrinos",
+  "shadow",
+  "source",
+  "starburst"
+ ],
+ "news_reaches_lines": true
+}

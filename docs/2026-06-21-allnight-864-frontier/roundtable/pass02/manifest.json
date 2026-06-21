@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-20T21:50:25.707232+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-21-allnight-864-frontier\\CODING_SPRINT_PLAN.md",
+  "prompt_tokens_est": 2747,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 2900,
+      "completion_tokens": 4110,
+      "cost_usd": 0.044725
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 3196,
+      "completion_tokens": 3360,
+      "cost_usd": 0.037594999999999996
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 2958,
+      "completion_tokens": 1622,
+      "cost_usd": 0.007752500000000001
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 3018,
+      "completion_tokens": 8523,
+      "cost_usd": 0.008727839999999999
+    }
+  ],
+  "total_cost_usd": 0.0988
+}

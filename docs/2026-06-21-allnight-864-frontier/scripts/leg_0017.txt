@@ -1,0 +1,21 @@
+# leg_0017
+# Spot-Welded Thruster Mounts
+
+Welcome back to SIGNAL LOST, where tonight a desperate NASA bets everything on a daring rescue ship named Link to catch the falling star they call Swift.
+Mali, look at the main tracking drum... the stylus is digging right through the graph paper, Vanguard is slipping past the eighty-mile mark.
+Fifty million dollars of government brass and heavy optics coming down over the eastern seaboard... they still haven't paid the premiums on the launch insurance.
+It won't hit the seaboard if Link catches it first. The thruster mounts are barely spot-welded, Mali, but it's the only thing sitting on the pad at Wallops Island that can reach Swift before drag rips the chassis apart.
+Spot-welded thruster mounts. If Link's telemetry is off by half a degree, Daniel, you won't just miss the grapple. You will shatter a half-billion-dollar asset into a high-speed debris cloud right in our primary orbital corridor.
+Musical interlude bridging setup into the next phase.
+Telemetry just dropped to garbage. Swift's reaction wheels seized up. It's tumbling on two axes now, picking up speed. The grapple software on Link was never built to chase a dead spin. We're flying blind into a blender.
+I am clocking four degrees per second on the lateral axis and it is accelerating. If Link attempts to lock onto Swift at that rotation rate, the kinetic shear will tear the grapple mechanism straight off its mounts and turn both spacecraft into a catastrophic debris cloud.
+We don't have the luxury of waiting it out. Look at the visual feed from Link. Swift's port solar array is already violently oscillating. The strut tension is deep in the red. It's buckling under the centrifugal force. We have maybe eighty seconds before those panels snap clean off and shred the main bus into shrapnel. We are out of time.
+Dump the braking sequence. Cancel the stabilization passes. We are out of time. Tell Link to burn hard and match that spin. We are going to grab Swift on the fly. Do not bleed our speed. Just drive straight into the pocket and fire the clamps on contact. Execute it now, before that array shears.
+Assessing Thruster IntegrityEvaluating Grapple ViabilityAssessing Thruster Integrity
+If we bypass the hard braking sequence to save the mounts, Link's relative velocity carries us right past Swift. We overshoot completely. The only way this works is if we burn past, flip the chassis one-eighty, and let Swift drift into the grapple while we match its tumble in reverse. We have one single shot to thread that needle before those arrays snap.
+Musical interlude bridging complication into the next phase.
+They can bill my widow for the premiums. Just snap the lead seal off the override box and hit the sequence.
+That seal's been sitting in my ashtray for ten minutes... burn is lit, grapple teeth are gro
+The telemetry needle just stopped rattling against the glass... you actually bolted this jalopy together well enough to hold a stable orbit.
+I've rubbed all the government stamping off this lead seal with my thumb... if the brass ever asks for another six-day miracle, tell them my phone line is dead, and grab your coat before they close the bar at O'Malley's.
+As Link rockets from Wallops Island to haul a plunging observatory back to safety, we must wait to see if such bold ambition can truly outrun the cold reality of orbital decay.

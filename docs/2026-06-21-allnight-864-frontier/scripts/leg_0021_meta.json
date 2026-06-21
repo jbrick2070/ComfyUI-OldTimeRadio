@@ -1,0 +1,88 @@
+{
+ "leg": "leg_0021",
+ "news": {
+  "casting_brief": "Federal science administrators, a ranking House Democrat, oceanographers and weather forecasters, fisheries managers, journalists chasing an unannounced shutdown reversal.",
+  "script_brief": "A $350M ocean sensor network is abruptly slated for dismantling without explanation; suspicion lands on climate-tracking motives. Forecasters, fishers, and lawmakers push back. Tension: will the reversal arrive before the grid goes dark, and how much was already broken in the silent month?",
+  "news_close_brief": "After mounting opposition, officials are set to reverse the shutdown of the ocean monitoring network. The lingering question: how much damage was done while the system sat in limbo.",
+  "key_terms": [
+   "Ocean Observatories Initiative",
+   "OOI",
+   "Zoe Lofgren",
+   "House Science Committee",
+   "The New York Times",
+   "Senate"
+  ],
+  "source_hash": "544328a4f9030e86a1000cd6f5b0b296e516273f9c90a2c1d39a4c3746891f9f",
+  "source_chars": 1006,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will the Senate's reversal reach the OOI grid before its last sensors go dark, and how much died in the silent month?",
+  "character_a_wants": "Finish the silent OOI shutdown on schedule, before any reversal lands.",
+  "character_b_wants": "Keep OOI sensors powered and force an explanation before the grid goes dark.",
+  "costly_choice_beat": "d015",
+  "ending_change": "Lofgren's House Science pressure forces a halt, but a month of lost OOI data means part of the climate-tracking grid stays dark."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 1,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Good evening, and welcome back to Signal Lost, where tonight we ask what dangerous currents could force a vast ocean network into a sudden, unexplained silence.",
+  "Look at this mess, Dmitri, sector four's telemetry is bleeding out again, and this damn brass toggle for the hydrophone array is jammed halfway open... I've been tapping it with my wrench for an hour just to keep the ghost-echoes from flooding the main reel.",
+  "Put the wrench down, Parry... the Admiralty just sent a wire down to the switchboard ordering the main cables to all the buoys severed at midnight.",
+  "Let me see that yellow slip... severed at midnight? It takes three weeks just to winch the copper out of the trench without ripping the anchor pins through the hull! Whose name is at the bottom of this?",
+  "Run your thumb over the ink, Mira-that's a raised Defense Department seal. The harbor master says three skiffs of scuttling crews are already past the breakers, loading thermite charges.",
+  "Musical interlude bridging setup into the next phase.",
+  "I'm not getting on that chopper. The Times isn't publishing a press release about maintenance issues. We need the raw OOI logs to prove what they're burying at the bottom of the grid. I'm sealing the main bulkhead. Hand me that cable-I'm running a hard scrape on the benthic line.",
+  "Drop the cable! You just tripped the OOI security failsafe. That manual scrape didn't bypass the system, it accelerated the entire scuttle sequence. We just lost half our time, and you broadcast our exact coordinates right to the strike team.",
+  "Two birds just broke the fog line. Look at the camera feed. They're already dropping fast-ropes onto the main deck. The scuttle timer just dropped to four minutes. We are completely boxed in.",
+  "I'm bypassing the network. Watch the progress bar. I just need ninety seconds to dump the deepest anomaly logs onto this physical drive. Find something heavy and block that door, Parry. Once they get past the exterior plating, we have maybe two minutes before the strike team is standing inside this",
+  "I'm shoving the secondary server rack against the frame. Give me a hand! Wait. Stop. Look at the upper hinge. The steel is already glowing white. The strike team isn't bothering with the lock",
+  "Step back from the bulkhead. I cannot stop the OOI shutdown sequence, but I can get us out of this room. There is an unpressurized maintenance hatch beneath these floor grates",
+  "Musical interlude bridging complication into the next phase.",
+  "The drive is sealed in my inner dry-suit pocket. If the Pacific stops my heart before Parry fishes me out of the swell, promise me you'll get this data to The New York Times. I'm not letting the Ocean Observatories Initiative die for a cover-up. Pop the hatch. I'm ready.",
+  "The Times will get every byte of it, Mira. I swear it. Now seal that mask and focus on your breathing. The pressure drop is going to hit hard. Releasing the primary latches. Three. Two. One. Godspeed.",
+  "Mira, I see the foam breaking off your hatch... pitch a flare up if you've still got breath in your lungs!",
+  "I'm here, Parry. The flare is lit, and the drive is dry. The deep grid is gone for good, but this anomaly data is right here in my hand. The whole world is going to see exactly what they tried to bury.",
+  "Officials have bowed to pressure and agreed to restore the monitoring grid. Yet one troubling mystery remains: just how much vital data was washed away during those quiet weeks in limbo."
+ ],
+ "news_terms_in_lines": [
+  "Ocean Observatories Initiative",
+  "OOI",
+  "The New York Times"
+ ],
+ "dramatic_want_words_in_lines": [
+  "before",
+  "force",
+  "shutdown"
+ ],
+ "news_reaches_lines": true
+}

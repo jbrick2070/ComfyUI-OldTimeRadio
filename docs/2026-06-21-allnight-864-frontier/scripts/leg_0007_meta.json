@@ -1,0 +1,87 @@
+{
+ "leg": "leg_0007",
+ "news": {
+  "casting_brief": "NASA astrophysics director, scrappy startup engineers, robotic-arm specialists, contract managers; underdog-vs-impossible-deadline dynamic; a $500M science mission at stake.",
+  "script_brief": "A 10-month sprint: NASA dares three companies to save a dying astronomy satellite. A 2020 startup wins with a 'plausible' pitch and a $30M contract. Tension: can robotic arms catch and reboost Swift before it falls? Beats: the dare, the bid, the build, the chase, the latch, the boost.",
+  "news_close_brief": "The race to build a rescue craft in under a year is on. Whether three robotic arms can catch a falling observatory and lift it back to safety remains to be seen.",
+  "key_terms": [
+   "NASA",
+   "Katalyst Space Technologies",
+   "Swift",
+   "Link",
+   "Shawn Domagal-Goldman",
+   "Wallops Island, Virginia"
+  ],
+  "source_hash": "0672ddeff1f8349aba383120951ba51bffda36096349b41e44685b31cdbe9529",
+  "source_chars": 1002,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can Katalyst's robotic arms catch and reboost Swift before it falls—or does the 10-month dare end with the satellite destroyed?",
+  "character_a_wants": "Broadcast a live, on-schedule triumph: Katalyst latches and reboosts Swift.",
+  "character_b_wants": "Abort the risky latch rather than knock dying Swift out of orbit.",
+  "costly_choice_beat": "d015",
+  "ending_change": "The arms latch over Wallops Island; Swift is reboosted, proving Domagal-Goldman's $30M gamble on a 2020 startup paid off."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, NASA wagers on daring hands of metal, racing to catch Swift before the faithful eye in the heavens goes dark.",
+  "Swift's old, Dale, but she still catches fire in the dark better than half the new glass we brag about; if we wait for the polite answer, she'll be gone, so NASA's listening to long shots with their hats in their hands.",
+  "Then we'll stop asking the model to sing for its supper and put metal on the table-capture, couple, boost-before that little clock of yours eats the last margin.",
+  "NASA isn't afraid you'll miss Swift, Gus; they're afraid you'll touch her-put a bright new hand on an old bird and leave fingerprints no apology can polish off.",
+  "Then we don't ask them for faith; we give them loads, tolerances, cold runs, failed runs, every scar before flight... and we do it while that clock on Dale's table keeps shaving us down.",
+  "Musical interlude bridging setup into the next phase.",
+  "The window just got meaner-Swift drops through Earth's shadow on the second pass, not the third, and NASA wants a live review board watching our capture proof by Friday; that little clock hand isn't moving now, it's twitching.",
+  "Friday's a fine day for coffee and funerals, Dale; what I haven't heard is whether that latch-and-lift knows the difference between a bird holding still for inspection and Swift coming in crooked with forty years of bad habits.",
+  "In the clean room she'll kiss the fixture like she was born to it... but Swift isn't a fixture, and if we don't say that out loud before NASA hears the motor hum, they'll think the silence was part of the design.",
+  "Call it candor if you like, Gus, but if we stroll into Friday saying our hands are clean and our latch is guessing, NASA won't hear engineering-they'll hear a calendar begging for a mercy killing; so either we tell them before they ask, or we show Swift can come in ugly and still be caught.",
+  "Then we make the clean room ugly by dawn; I'll put the review risk on my badge, run the latch off-nominal, let it scrape every assumption we've been polite about, and if it behaves, Friday still has a pulse.",
+  "Dale... that clock on your table just stopped sounding like a warning and started sounding like a judge; run it, but understand-if the latch blinks in there, our wager dies on the floor, not over Earth.",
+  "Musical interlude bridging complication into the next phase.",
+  "Gus, your line stays where you drew it; but the sim has already swallowed the crooked approach, the lag, the dead-band, and still found the throat-Dale, put the number on the table.",
+  "She came in twelve degrees off, the jaws took her on the first bite, held through the lift profile, and raised Swift clear; if Friday wants blood, it won't get it from the latch.",
+  "Twelve degrees off and she still found home... all right. Then this stops being my wager or Dale's badge; from here on, nobody spends courage faster than procedure can count it.",
+  "Turn that clock face-down, will you? Swift gets her ride, this room gets its answer, and Friday gets men and women careful enough to make a wild bet look earned.",
+  "And so NASA's clock is running, while Swift descends toward its appointment with three metal arms and an answer still hidden above."
+ ],
+ "news_terms_in_lines": [
+  "NASA",
+  "Swift",
+  "Link"
+ ],
+ "dramatic_want_words_in_lines": [
+  "latch",
+  "swift"
+ ],
+ "news_reaches_lines": true
+}

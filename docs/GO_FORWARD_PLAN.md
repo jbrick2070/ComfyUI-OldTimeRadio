@@ -487,7 +487,23 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP (operator, 2026-06-20 -- THIS is the current step): TOP-PRIORITY VISUAL FIXES.**
+**>>> ACTIVE STEP (operator, 2026-06-20 -- THIS is the current step): STORY-ENGINE IMPROVEMENTS v1 (un-PARKED).**
+The 2026-06-20 visual-fixes batch (BUG 1-4) is SHIPPED + GPU-verified (HEAD `8d7e660` == origin; suite 4647,
+Bug Bible 16/7/3). The operator has un-PARKED the story-engine sprint as the next build (re-sequenced AHEAD of
+the 3D PoC). It is CODE-READY: the FINAL converged plan (post 4 roundtables + 3 grounded code audits) is
+`docs/2026-06-21-allnight-864-frontier/SPRINT_READY_PLAN.md` (scope F1-F8; F9/F10 deferred), with
+`CODING_SPRINT_PLAN.md` + `WIRING_PLAN.md` + `roundtable/pass0{1,2,3,4}_judgment.md`. HARD invariants
+(verbatim in SPRINT_READY_PLAN): C2 ledger schema `l3-2026-05-14` unchanged (additive `meta.*`/`cast[].*` keys
+only, `lines[]` order preserved, audio byte-identical where text unchanged); C3 NO QA scoring/reject/reroll
+gate (only the existing single-line recompose seam, 1 attempt, LOUD marker, fallback); C4 NO arch change (all
+inside node 1 `OTR_LedgerScriptWriter` + its internal modules); freeze CRITICAL invariants intact; **ZERO
+`otr_scifi_16gb_full.json` edits in v1** (content-only). Sprint 0 builds `scripts/story_quality_scan.py` +
+the fixed 12-leg/864-word `SPRINT_BASELINE.md` (pins OTR_CAST_SEED+OTR_STYLE_SEED per leg); each `.py` task is
+its own green chunk -> suite + Bug Bible -> commit AND push to `v2.0-alpha`. START a FRESH coder window via
+`/otr-handoff` (it reads SPRINT_READY_PLAN.md). The 3D PoC (`docs/2026-06-20-mesh-stage-texturing/`) moves to
+AFTER this sprint.
+
+**>>> SUPERSEDED 2026-06-20 (DONE) -- TOP-PRIORITY VISUAL FIXES (all four shipped + GPU-verified):**
 Spec: `docs/2026-06-20-visual-fixes/VISUAL_FIXES_PLAN.md` + the 2026-06-20-NIGHT top block. HEAD `ce507e8` ==
 origin/v2.0-alpha; GPU FREE (35-leg 864 frontier soak done; 3D-PoC mesh_stage GPU smoke PASSED `60a2f4f`).
 DIRECTIVE (hard): ONLY HuMo (portrait) + maybe the 3D lane use the VERTICAL portrait; EVERY other path uses

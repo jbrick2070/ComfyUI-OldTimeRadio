@@ -1,0 +1,88 @@
+{
+ "leg": "leg_0014",
+ "news": {
+  "casting_brief": "NASA astrophysics director, startup founder/engineers at a space servicing company, mission scientists; high-stakes race-against-time dynamic between bureaucracy and scrappy innovators.",
+  "script_brief": "NASA gives three companies under a year to save a $500M astronomy satellite from crashing. A 2020 startup wins a $30M bet to chase, latch, and reboost the doomed spacecraft. Tension: impossible deadline, tight budget, robotic-arm capture never done before. Beats: the pitch, the contract, the launch, will it work?",
+  "news_close_brief": "With a satellite built in record time now racing to rescue a half-billion-dollar mission, the gamble's outcome remains uncertain. Whether the robotic arms can catch and reboost it is the question that lingers.",
+  "key_terms": [
+   "NASA",
+   "Katalyst Space Technologies",
+   "Swift",
+   "Link servicing spacecraft",
+   "Shawn Domagal-Goldman",
+   "Wallops Island, Virginia",
+   "three robotic arms"
+  ],
+  "source_hash": "0672ddeff1f8349aba383120951ba51bffda36096349b41e44685b31cdbe9529",
+  "source_chars": 1002,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Can Katalyst's Link spacecraft chase, latch, and reboost the doomed Swift on NASA's impossible deadline before the $500M satellite burns up?",
+  "character_a_wants": "Launch Link to latch Swift within NASA's under-a-year deadline, no slip.",
+  "character_b_wants": "Delay the launch until the three robotic arms can capture Swift without wrecking it.",
+  "costly_choice_beat": "d015",
+  "ending_change": "Link launches from Wallops Island and its three arms capture Swift, proving startup servicing works just before reentry."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "In the shadow of a failing satellite, one daring venture races against time and gravity to seize the impossible.",
+  "Every click of this switch pulls the window tighter.",
+  "Anton rigged the servos on that arm himself, so he'll see the jam before it locks.",
+  "That arm held the line through the last three test runs without a flicker, so you set the timing on the grab.",
+  "Two more clicks on the switch gets us aligned and the third seals it, unless the roster decides otherwise before Pinky weighs in.",
+  "The blackout starts before we reach the third click on that switch.",
+  "The untested relay keeps the signal through anyway.",
+  "It'll fry the arm's firmware the moment it kicks in.",
+  "The switch won't wait for any fixes we can't run in time.",
+  "Stop. We pull away from the panel until every line checks out.",
+  "Seal it and launch, there's no time left to argue over the sequence.",
+  "...Right. Your panel now.",
+  "Capture running. The seal held.",
+  "The seal held, but that clamp left a ridge no one can plane flat now.",
+  "Then we fly with the ridge.",
+  "Now a satellite built in haste speeds to rescue the half-billion-dollar mission, yet whether its robotic arms can catch and reboost the craft remains unknown.",
+  "Musical interlude bridging setup into the next phase.",
+  "Musical interlude bridging complication into the next phase."
+ ],
+ "news_terms_in_lines": [],
+ "dramatic_want_words_in_lines": [
+  "capture",
+  "launch",
+  "robotic",
+  "three",
+  "until",
+  "without"
+ ],
+ "news_reaches_lines": false
+}

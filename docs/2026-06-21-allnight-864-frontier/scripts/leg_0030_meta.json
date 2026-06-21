@@ -1,0 +1,89 @@
+{
+ "leg": "leg_0030",
+ "news": {
+  "casting_brief": "Field geochemists, river hydrologists, and climate modelers in remote permafrost terrain; mentor-skeptic dynamic; stakes are global carbon accounting.",
+  "script_brief": "Researchers chasing river greenhouse gas emissions from thawing permafrost stumble on a hidden ally: accelerated rock weathering pulling CO2 from the air. Tension builds as one team insists thaw means pure carbon loss while another proves uptake can fully offset—or surpass—emissions. Beat hooks: the surprise measurement, the regional reversal, the",
+  "news_close_brief": "Scientists report that thawing permafrost can spur rock weathering that absorbs atmospheric CO2, in some regions offsetting or exceeding river greenhouse gas emissions.",
+  "key_terms": [
+   "thawing permafrost",
+   "rock weathering",
+   "CO2",
+   "river greenhouse gas emissions",
+   "carbon emissions"
+  ],
+  "source_hash": "3d9d00abac153e9c34ada330dac088192d07716601dadcc24c6ffe2ad38da78a",
+  "source_chars": 257,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will Ned's surprise weathering measurement prove rock CO2 uptake can fully offset—or surpass—the thawing permafrost's river emissions?",
+  "character_a_wants": "To broadcast that thawing permafrost means pure CO2 loss, no exceptions",
+  "character_b_wants": "To prove accelerated rock weathering uptake offsets the river's carbon emissions",
+  "costly_choice_beat": "d015",
+  "ending_change": "The headline of pure carbon loss flips into a regional reversal as weathering uptake outpaces river CO2 emissions."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "As researchers track greenhouse gases escaping from thawing permafrost into the rivers, they encounter a hidden process that may change everything.",
+  "I turned that rock over twice this morning and the edges are already giving way, same as the readings from both crews upriver.",
+  "Those meters were set before the rains, and one outfit talks of turning the current higher while the rest say block it off at the source.",
+  "The upriver meters line up with the source team's last pass, Ned, same as when they blocked the headwater last month.",
+  "Then pull fresh samples now and test the rates on that rock before any crew moves.",
+  "Musical interlude bridging setup into the next phase.",
+  "The funding wires from the main office seem to land with the source team before any of us see the next set of numbers.",
+  "If you're that set against outside money you'd have said so before we turned that rock the first time.",
+  "She's had the same argument with their accountants twice already this year.",
+  "The assay marks stamped on that rock match the ones from your old crew's crates.",
+  "Then Djinn can decide what stays on the console once I've cleared the joint entries.",
+  "The home office already requested their duplicate set this morning.",
+  "Musical interlude bridging complication into the next phase.",
+  "The assay marks on that rock hold steady no matter how the joint entries scatter.",
+  "Then the river's rise won't matter to either of us now.",
+  "The duplicates went out this morning, so we might as well leave the rock where it sits.",
+  "Then there's no point clearing the rest of the entries tonight.",
+  "Yet the thaw itself may awaken rock weathering that draws carbon dioxide from the air, at times offsetting or even exceeding those river emissions."
+ ],
+ "news_terms_in_lines": [
+  "thawing permafrost",
+  "rock weathering"
+ ],
+ "dramatic_want_words_in_lines": [
+  "carbon",
+  "emissions",
+  "permafrost",
+  "river's",
+  "thawing",
+  "weathering"
+ ],
+ "news_reaches_lines": true
+}

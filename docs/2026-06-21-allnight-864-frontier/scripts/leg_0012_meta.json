@@ -1,0 +1,89 @@
+{
+ "leg": "leg_0012",
+ "news": {
+  "casting_brief": "Quantum computing researchers, hardware engineers building trapped ion processors, corporate spokespeople making bold benchmarks, skeptical traditional-algorithm specialists.",
+  "script_brief": "Summer brings surprise quantum announcements: a bold promise of useful error-corrected computing by 2028, far ahead of the field's five-to-ten-year consensus. Tension builds between hype and skepticism as logical qubits, trapped ion advances, and a walked-back supremacy claim collide. Beat hooks: the 2028 vow, redundant qubits, classical comeback.",
+  "news_close_brief": "Companies promise useful, error-corrected quantum computing as soon as 2028, while most in the field still expect a five-to-ten-year wait. Whether logical qubits arrive on schedule remains to be seen.",
+  "key_terms": [
+   "quantum error correction",
+   "logical qubit",
+   "trapped ion processor",
+   "quantum supremacy",
+   "2028",
+   "qubits"
+  ],
+  "source_hash": "3233c4774fe1e1f2439a986fa0f2bf879c10f529d76fc4b56fd77bdc092171c3",
+  "source_chars": 1267,
+  "prompt_version": "news_interpreter_v1",
+  "schema_version": "l3-2026-05-14",
+  "model_id": "openrouter:slot-b",
+  "decoder_profile": "default_v1",
+  "seed": 0,
+  "attempts": 1,
+  "attempt_failures": []
+ },
+ "dramatic_state": {
+  "dramatic_question": "Will the 2028 promise of useful error-corrected computing survive Lemmy's demand to walk it back like the supremacy claim?",
+  "character_a_wants": "To lock in the public vow of error-corrected logical qubits by 2028",
+  "character_b_wants": "To force a retraction proving trapped-ion supremacy is overhyped",
+  "costly_choice_beat": "d015",
+  "ending_change": "The 2028 vow is reframed as a redundant-qubit milestone, not supremacy, as a classical comeback humbles the hype."
+ },
+ "dramatic_state_source": "llm",
+ "freeze_verdict": "frozen_with_warns",
+ "a2_ship_through": null,
+ "anti_loop_report": {
+  "status": "ok",
+  "targets": 0,
+  "character_targets": 0,
+  "repaired": 0,
+  "kinds": {}
+ },
+ "anti_loop_mechanical_targets_added": null,
+ "delivery_hygiene_report": {
+  "scrubbed": 0,
+  "char_recomposed": 0,
+  "announcer_recomposed": 0
+ },
+ "story_critic_report": {
+  "continuity_issues": [],
+  "voice_drift": [],
+  "flat_lines": [],
+  "arc_verdict": "strong",
+  "reroll_targets": [],
+  "render_priority": []
+ },
+ "n_lines": 18,
+ "rendered_lines": [
+  "Tonight, a daring vow of error-corrected machines by two thousand and twenty-eight, where trapped ions whisper promise, redundant qubits hedge their bets, and old certainties stage a quiet comeback.",
+  "Mind the cables - that bundle there carries everything we're betting the year on. By 'twenty-eight we'll have a logical qubit that holds its breath longer than you or I can, and the men signing your paper know it.",
+  "Funny, the room's cold enough but your dates run warm. I don't sign breath, Doug - I sign error rates. Show me one qubit that stays correct past lunch, and we'll talk about what year it is.",
+  "Watch the third trace - see it hold flat while the others crawl? That's not lunch, Mister Corben, that's past lunch, and I've got it running clean since I came in this morning. Stay an hour and it won't blink.",
+  "Pretty curve. Pull the heat lamp closer, jog the cabinet, run it overnight on the day the air goes bad - then print me the ugly hour, not the morning. I sign what survives the room when nobody's standing here making it behave.",
+  "Musical interlude bridging setup into the next phase.",
+  "That binder under your arm - the one you've been tapping since I walked in. Give me the decoder dump from Tuesday's bad-air run, every shot, not the pages Lemmy starched this morning.",
+  "Tuesday was Tuesday - a compressor hiccup, one cycle out of forty thousand, and the model eats it for breakfast. You pull a thread like that out of any honest week and call it a stain. I'll get you the summaries by Friday, when they're collated proper.",
+  "Don't collate them - that's how a stain learns to sit still. Lay the raw syndromes on the bench and let me count for myself, because your one-in-forty-thousand keeps tapping out the same rhythm, Doug, and noise doesn't keep time.",
+  "I logged it three Tuesdays running, same two columns going dark together, and I... I put a sticky note on the cabinet door so I'd stop seeing it, and the note's still there. It's not the compressor. It's the same hands shaking on the same wire, every time.",
+  "That's a calibration shadow, Lemmy, we mapped it in the spring - peel back the note, you'll see my initials and a date, and a fix that's been holding since. We put a number on the world in 'twenty-eight and we stand on it. You don't unbuild a house because one floorboard sings.",
+  "Then walk me to the bench and inject it - drive both columns dark on purpose, right now, and let me watch the logical qubit climb back out of the hole. If your fix holds, it costs you ten minutes. If it doesn't, I'd rather hear the floorboard sing than read your initials over a grave.",
+  "Musical interlude bridging complication into the next phase.",
+  "Ten minutes - there's your stopwatch, Som, thumb on the crown. I'm clamping both columns dark... now. Counting the cycles aloud so you can't say I palmed a card - three, the syndrome's screaming, four, five - and there's the thread climbing back up its own ladder, clean, no hand on the wire but the math's. Read the trace yourself. It came home.",
+  "...You can let the crown go; it stopped meaning anything around cycle four. I'll sign it. The logical qubit held through the correlated dark, witnessed, and I'll put my name under yours on the certificate - and Lemmy, you can take the sticky note down now, but keep it somewhere I can find it.",
+  "I'm peeling it off the glass now - see how the corner's gone amber? That's six winters of us breathing on it. I'll fold it into the logbook, behind Doug's 'twenty-eight page, where you'll know to look.",
+  "Good. Put it where the next skeptic finds it before he finds me - because I came up here to bury something, and instead I'm signing my name to a thing that walked out of the dark on its own legs, and a man can only argue with that so long.",
+  "So we leave it tonight: a vow of error-corrected machines by two thousand and twenty-eight, while most still count on five to ten years, and whether those logical qubits arrive on schedule remains to be seen."
+ ],
+ "news_terms_in_lines": [
+  "logical qubit",
+  "qubits"
+ ],
+ "dramatic_want_words_in_lines": [
+  "corrected",
+  "error",
+  "logical",
+  "qubits",
+  "trapped"
+ ],
+ "news_reaches_lines": true
+}
