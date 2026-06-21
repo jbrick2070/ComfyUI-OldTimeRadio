@@ -176,8 +176,11 @@ def sample_image(pixels, width, height, u, t):
 #: Vertical sculpt-gradient endpoints (cool light over shadow). WORKBENCH VERTEX
 #: shading draws these per-vertex colours; per-poly smooth normals interpolate
 #: them into a soft ramp (the v1.1 "basic gradient" mesh texture).
-GRADIENT_TOP = (0.58, 0.64, 0.80)
-GRADIENT_BOTTOM = (0.09, 0.11, 0.20)
+#: v1.3 SATURATED duotone (teal -> navy). v1.2's blue-GREY (0.58,0.64,0.80)/(0.09,0.11,0.20) read as
+#: near-white under STUDIO -- the colour was the other half of the "still plaster" problem. Saturated
+#: endpoints read as actual COLOUR. Swap these two tuples for amber/green/bronze etc. (operator's call).
+GRADIENT_TOP = (0.20, 0.70, 0.78)      # lit top: teal
+GRADIENT_BOTTOM = (0.03, 0.08, 0.20)   # base: deep navy
 
 
 def gradient_color(co_z, top=GRADIENT_TOP, bottom=GRADIENT_BOTTOM):
@@ -405,11 +408,20 @@ def _configure_render(bpy, args, vertex_colors):
         shading.light = "STUDIO"
         shading.color_type = "VERTEX" if vertex_colors else "SINGLE"
         shading.single_color = (0.62, 0.64, 0.72)
+        # v1.3 fix: STUDIO keeps the DIFFUSE 3D form, but its SPECULAR highlight blew the lit side
+        # to white plaster (v1.2). Disable specular -> the colour ramp reads, the form still shades.
+        try:
+            shading.show_specular_highlight = False
+        except Exception:                          # noqa: BLE001 - API variance
+            pass
         # a touch of cavity shading sharpens the sculpted form (deterministic).
         try:
             shading.show_cavity = True
         except Exception:                          # noqa: BLE001 - API variance
             pass
+        print("[otr_mesh_stage_blender] WORKBENCH light=STUDIO specular=off cavity=on "
+              "color_type=%s gradient top=%s base=%s"
+              % (shading.color_type, GRADIENT_TOP, GRADIENT_BOTTOM))
     elif engine == "CYCLES":
         # v1.5 tier -- determinism pins (0-E spec).
         scene.render.engine = "CYCLES"

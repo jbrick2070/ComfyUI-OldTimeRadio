@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-06-21T22:35:19.062462+00:00",
+  "doc": "docs\\2026-06-22-mesh-color-gradient\\PROBLEM_STATEMENT.md",
+  "prompt_tokens_est": 6876,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "ok": false,
+      "error": "empty content (finish_reason=None); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 8051,
+      "completion_tokens": 2096,
+      "cost_usd": 0.031023750000000003
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 7192,
+      "completion_tokens": 2362,
+      "cost_usd": 0.014895
+    }
+  ],
+  "total_cost_usd": 0.0459
+}
