@@ -39,6 +39,7 @@ wire format is untouched; only `meta` sub-keys change. UTF-8 no BOM.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from typing import Any, List, Optional, Tuple
@@ -52,7 +53,41 @@ log = logging.getLogger("OTR_DramaticStateB1")
 __all__ = [
     "DramaticStateLLM",
     "derive_news_dramatic_state",
+    "ARC_SHAPES",
+    "pick_arc_shape",
 ]
+
+# F8 (story-engine v1): arc-shape variety. A seeded pre-step picks one of these
+# shapes per episode so every story is not the same setup->complication->
+# resolution mold. CONFRONTATION shapes turn on two opposed wants; the others
+# (investigation / slow_dread) are NOT a clash of wills, so the post-validator
+# relaxes the opposed-wants requirement for them (prevents a generation stall).
+ARC_SHAPES: Tuple[str, ...] = (
+    "setup_complication_resolution",
+    "investigation_without_answer",
+    "slow_dread",
+    "heist",
+    "betrayal",
+)
+_CONFRONTATION_SHAPES = frozenset({
+    "setup_complication_resolution", "heist", "betrayal",
+})
+
+
+def pick_arc_shape(seed: Any) -> str:
+    """Deterministically pick an arc_shape from a reproducibility seed.
+
+    Stable across processes (md5, not Python's salted hash) so a fixed
+    (seed, news) pair always yields the same shape. Empty seed -> the first
+    (default) shape. Never raises."""
+    try:
+        s = str(seed or "")
+        if not s:
+            return ARC_SHAPES[0]
+        h = hashlib.md5(s.encode("utf-8", "ignore")).hexdigest()
+        return ARC_SHAPES[int(h, 16) % len(ARC_SHAPES)]
+    except Exception:  # noqa: BLE001
+        return ARC_SHAPES[0]
 
 _WS = re.compile(r"\s+")
 _PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
@@ -169,22 +204,55 @@ _TEMPLATES: Tuple[Tuple[str, str, str, str], ...] = (
 )
 
 
-def _pick_templates(term: str) -> Tuple[str, str, str, str]:
-    idx = (sum(ord(c) for c in term) % len(_TEMPLATES)) if term else 0
-    a, b, q, e = _TEMPLATES[idx]
+# F8 (story-engine v1): shape-appropriate template sets for the NON-
+# confrontation arc shapes. The two wants are still DISTINCT (the DramaticState
+# floor forbids identical strings) but they are not a head-to-head clash --
+# investigation is seeker-vs-withheld-truth, slow_dread is hold-back-vs-the-
+# threat. Confrontation shapes fall through to the opposed _TEMPLATES default.
+_INVESTIGATION_TEMPLATES: Tuple[Tuple[str, str, str, str], ...] = (
+    ("piece together what really happened with {t}",
+     "keep the full story of {t} from ever surfacing",
+     "What truly happened with {t}, and will anyone ever know?",
+     "The inquiry into {t} closes with as many questions as it answered."),
+    ("follow {t} wherever the evidence leads",
+     "bury the loose ends around {t} before they are found",
+     "Can the truth about {t} be reconstructed before the trail goes cold?",
+     "They learn just enough about {t} to know how much stays unknown."),
+)
+_DREAD_TEMPLATES: Tuple[Tuple[str, str, str, str], ...] = (
+    ("hold the threat of {t} at bay a little longer",
+     "let {t} run its course, whatever it costs them",
+     "How long can they keep {t} from overtaking everything?",
+     "{t} closes in, and the quiet they knew is gone for good."),
+    ("warn the others about {t} before it is too late",
+     "stay silent about {t} and hope it passes",
+     "Will anyone act on {t} before it reaches them?",
+     "{t} arrives on its own schedule, indifferent to who was ready."),
+)
+_SHAPE_TEMPLATES = {
+    "investigation_without_answer": _INVESTIGATION_TEMPLATES,
+    "slow_dread": _DREAD_TEMPLATES,
+}
+
+
+def _pick_templates(term: str, arc_shape: str = "") -> Tuple[str, str, str, str]:
+    tmpls = _SHAPE_TEMPLATES.get(arc_shape, _TEMPLATES)
+    idx = (sum(ord(c) for c in term) % len(tmpls)) if term else 0
+    a, b, q, e = tmpls[idx]
     return (a.replace("{t}", term), b.replace("{t}", term),
             q.replace("{t}", term), e.replace("{t}", term))
 
 
-def _fallback_state(meta: Any, voice_slot_ids, costly_choice_beat: str) -> DramaticState:
-    """Deterministic news-templated opposed wants. NEVER the _DEFAULT_*
-    constant path. Guarantees the chosen term is in meta key_terms (the
-    turning-slot detail floor)."""
+def _fallback_state(meta: Any, voice_slot_ids, costly_choice_beat: str,
+                    arc_shape: str = "") -> DramaticState:
+    """Deterministic news-templated wants (shape-appropriate). NEVER the
+    _DEFAULT_* constant path. Guarantees the chosen term is in meta key_terms
+    (the turning-slot detail floor)."""
     key_terms = _key_terms(meta)
     term = key_terms[0] if key_terms else (
         _first_noun_phrase(_script_brief(meta)) or "the event")
     _inject_key_term(meta, term)
-    a, b, q, e = _pick_templates(term)
+    a, b, q, e = _pick_templates(term, arc_shape)
     return DramaticState(
         dramatic_question=_trunc(q, 240),
         character_a_wants=_trunc(a, 120),
@@ -194,17 +262,26 @@ def _fallback_state(meta: Any, voice_slot_ids, costly_choice_beat: str) -> Drama
     )
 
 
-def _make_post_validator(key_terms: List[str]):
+def _make_post_validator(key_terms: List[str], confrontation: bool = True):
     """The about-the-news guard. Returns an error string to REJECT (advancing
-    the structured_call ladder), None to ACCEPT."""
+    the structured_call ladder), None to ACCEPT. ``confrontation`` (F8) gates
+    whether the two wants must be OPPOSED or merely distinct + news-grounded."""
     norm_terms = [t for t in (_norm(x) for x in key_terms) if t]
 
     def _pv(ds: DramaticStateLLM) -> Optional[str]:
         a = _norm(ds.character_a_wants)
         b = _norm(ds.character_b_wants)
         if a == b:
-            return ("character_a_wants and character_b_wants are not opposed; "
-                    "make them genuinely conflict over the news event")
+            # F8: identical wants are bad for ANY shape, but only confrontation
+            # shapes are asked to be OPPOSED; non-confrontation shapes
+            # (investigation / slow_dread) just need distinct, news-grounded
+            # wants -- relaxing this prevents a generation stall on a shape
+            # that is not a clash of wills.
+            if confrontation:
+                return ("character_a_wants and character_b_wants are not "
+                        "opposed; make them genuinely conflict over the news")
+            return ("character_a_wants and character_b_wants are identical; "
+                    "make them distinct and grounded in the news event")
         if norm_terms:
             blob_words = set(" ".join([
                 a, b, _norm(ds.dramatic_question), _norm(ds.ending_change),
@@ -223,7 +300,22 @@ def _make_post_validator(key_terms: List[str]):
     return _pv
 
 
-def _build_prompt(meta: Any, cast_rows, key_terms: List[str]) -> str:
+_ARC_SHAPE_GUIDANCE = {
+    "setup_complication_resolution":
+        "a clear problem that complicates, then resolves",
+    "investigation_without_answer":
+        "a search for the truth that never fully arrives -- the wants pull "
+        "toward and away from an answer, not head-to-head",
+    "slow_dread":
+        "a creeping threat that closes in -- the wants are hold-it-back vs "
+        "let-it-come, not a clash of two equals",
+    "heist": "a risky plan to take or pull off something, under a clock",
+    "betrayal": "trust that turns -- an alliance that breaks by the end",
+}
+
+
+def _build_prompt(meta: Any, cast_rows, key_terms: List[str],
+                  arc_shape: str = "") -> str:
     script_brief = _script_brief(meta)
     names = []
     for row in (cast_rows or []):
@@ -236,16 +328,35 @@ def _build_prompt(meta: Any, cast_rows, key_terms: List[str]) -> str:
     a_name = names[0] if names else "the protagonist"
     b_name = names[1] if len(names) > 1 else "the antagonist"
     terms_line = ", ".join(key_terms) if key_terms else "(none provided)"
+    confrontation = (not arc_shape) or (arc_shape in _CONFRONTATION_SHAPES)
+    shape_line = ""
+    if arc_shape:
+        shape_line = (
+            f"ARC SHAPE: {arc_shape} -- "
+            f"{_ARC_SHAPE_GUIDANCE.get(arc_shape, '')}\n"
+        )
+    if confrontation:
+        wants_line = (
+            "Produce two OPPOSED wants -- A and B must want things that "
+            "cannot both be satisfied, and both wants must be rooted in the "
+            "news event. "
+        )
+    else:
+        wants_line = (
+            "Give A and B two DISTINCT wants that fit the arc shape above "
+            "(they need not be head-to-head opposed), both rooted in the "
+            "news event. "
+        )
     return (
         "You are the story architect for a short audio drama whose premise "
         "comes from a real news item. Define the CENTRAL CONFLICT so it is "
         "authentically ABOUT that news -- not a generic story that merely "
         "name-drops it.\n\n"
+        f"{shape_line}"
         f"NEWS KEY TERMS: {terms_line}\n"
         f"NEWS PREMISE: {script_brief or '(none)'}\n"
         f"LEAD CHARACTERS: {a_name} (A) and {b_name} (B)\n\n"
-        "Produce two OPPOSED wants -- A and B must want things that cannot "
-        "both be satisfied, and both wants must be rooted in the news event. "
+        f"{wants_line}"
         "Then a single dramatic question the audience holds the whole way, "
         "and the ending change (how the situation ends up different), both "
         "referencing the news. Use at least one of the news key terms in the "
@@ -268,10 +379,15 @@ def derive_news_dramatic_state(
     base_temperature: float = 0.5,
     structural_retry_temperature: float = 0.3,
     structured_call_fn=None,
+    arc_shape: str = "",
 ) -> DramaticState:
     """Construct a DramaticState whose conflict is authentically about the
     news, via the resident technical slot. NEVER raises -- any LLM /
     validation failure degrades to the deterministic news-templated fallback.
+
+    ``arc_shape`` (F8) steers the prompt + the post-validator + the fallback
+    templates toward the episode's chosen shape; CONFRONTATION shapes require
+    opposed wants, the others only distinct + news-grounded.
 
     Side effect (intended): guarantees >= 1 entry in
     ``meta['news']['key_terms']`` (the turning-slot detail floor) and stamps
@@ -281,12 +397,15 @@ def derive_news_dramatic_state(
     costly_choice_beat = pick_costly_choice_slot(voice_slot_ids)
     orig_key_terms = _key_terms(meta)
     script_brief = _script_brief(meta)
+    confrontation = (not arc_shape) or (arc_shape in _CONFRONTATION_SHAPES)
+    if arc_shape and isinstance(meta, dict):
+        meta["arc_shape"] = arc_shape
 
     # No usable news context at all -> deterministic fallback (no wasted LLM
     # call). _fallback_state still seeds meta key_terms ("the event") so the
     # turning-slot detail floor holds even with news=None.
     if not orig_key_terms and not script_brief:
-        state = _fallback_state(meta, voice_slot_ids, costly_choice_beat)
+        state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
         if isinstance(meta, dict):
             meta["dramatic_state_source"] = "fallback_no_news"
         return state
@@ -305,19 +424,19 @@ def derive_news_dramatic_state(
             from ._otr_structured_call import structured_call as sc  # type: ignore
         except Exception as exc:  # noqa: BLE001
             log.warning("[B1] structured_call import failed (%r); fallback", exc)
-            state = _fallback_state(meta, voice_slot_ids, costly_choice_beat)
+            state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
             if isinstance(meta, dict):
                 meta["dramatic_state_source"] = "fallback_import_error"
             return state
 
     try:
         llm = sc(
-            prompt=_build_prompt(meta, cast_rows, key_terms),
+            prompt=_build_prompt(meta, cast_rows, key_terms, arc_shape),
             schema=DramaticStateLLM,
             slot_fn=slot_fn,
             base_temperature=base_temperature,
             structural_retry_temperature=structural_retry_temperature,
-            post_validator=_make_post_validator(key_terms),
+            post_validator=_make_post_validator(key_terms, confrontation),
             helper_name="derive_dramatic_state",
         )
         state = DramaticState(
@@ -337,7 +456,7 @@ def derive_news_dramatic_state(
             "using the deterministic news-templated fallback.",
             type(exc).__name__, str(exc)[:200],
         )
-        state = _fallback_state(meta, voice_slot_ids, costly_choice_beat)
+        state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
         if isinstance(meta, dict):
             meta["dramatic_state_source"] = "fallback"
         return state

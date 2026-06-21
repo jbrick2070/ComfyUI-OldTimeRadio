@@ -2782,7 +2782,28 @@ class OTR_LedgerScriptWriter:
         try:
             from ._otr_dramatic_state_llm import (
                 derive_news_dramatic_state as _derive_news_ds,
+                pick_arc_shape as _pick_arc_shape,
             )
+            # F8 (story-engine v1): seeded arc-shape pick (variety). The seed
+            # combines the reproducibility style seed (so a pinned smoke is
+            # deterministic) with the news source hash (so different stories
+            # get different shapes -> the smoke distribution is not single-
+            # valued). Stamped on meta["arc_shape"] (additive) and passed into
+            # the dramatic-state derivation to steer prompt/validator/fallback.
+            try:
+                _arc_style_seed = os.environ.get("OTR_STYLE_SEED", "").strip()
+                _arc_news_hash = str(
+                    (meta.get("news") or {}).get("source_hash") or ""
+                )
+                _arc_seed = (
+                    _arc_style_seed + "|" + _arc_news_hash
+                    + "|" + str((meta.get("news") or {}).get("script_brief") or "")[:64]
+                )
+                _arc_shape = _pick_arc_shape(_arc_seed)
+            except Exception:  # noqa: BLE001 -- never break audio
+                _arc_shape = ""
+            if _arc_shape:
+                meta["arc_shape"] = _arc_shape
             # F2 (story-engine v1): the costly choice must land on a
             # CHARACTER beat, never the announcer/music. Build the costly-slot
             # candidate list from CHARACTER voiced beats only so
@@ -2809,6 +2830,7 @@ class OTR_LedgerScriptWriter:
                         cast_rows=led.data.get("cast") or cast_rows or [],
                         voice_slot_ids=_voice_slot_ids,
                         slot_fn=technical_generate_fn,
+                        arc_shape=_arc_shape,
                     )
             else:
                 _dramatic_state = _derive_news_ds(
@@ -2816,6 +2838,7 @@ class OTR_LedgerScriptWriter:
                     cast_rows=led.data.get("cast") or cast_rows or [],
                     voice_slot_ids=_voice_slot_ids,
                     slot_fn=technical_generate_fn,
+                    arc_shape=_arc_shape,
                 )
             meta["dramatic_state"] = _dramatic_state.model_dump()
             led.save()

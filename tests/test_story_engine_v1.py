@@ -22,6 +22,14 @@ from nodes._otr_line_composer import (  # noqa: E402
 )
 from nodes._otr_casting import CastingResponse, DescriptionResponse  # noqa: E402
 from nodes._otr_line_hygiene import detect_narration_self_address  # noqa: E402
+from nodes._otr_dramatic_state_llm import (  # noqa: E402
+    ARC_SHAPES,
+    DramaticStateLLM,
+    _make_post_validator,
+    _pick_templates,
+    derive_news_dramatic_state,
+    pick_arc_shape,
+)
 from nodes._otr_dramatic_state import pick_costly_choice_slot  # noqa: E402
 from nodes._otr_slot_drama_contract import (  # noqa: E402
     SlotDramaContract,
@@ -378,3 +386,67 @@ class TestF7NarrationHygiene:
         prompt = _build_user_prompt(_req())
         assert "never narrate your own actions in the third person" in prompt
         assert "never say your own name" in prompt
+
+
+# ===========================================================================
+# F8 -- arc-shape variety
+# ===========================================================================
+
+class TestF8ArcShape:
+
+    def test_pick_arc_shape_deterministic_and_valid(self):
+        assert pick_arc_shape("seed-123") in ARC_SHAPES
+        assert pick_arc_shape("seed-123") == pick_arc_shape("seed-123")
+
+    def test_pick_arc_shape_empty_is_default(self):
+        assert pick_arc_shape("") == ARC_SHAPES[0]
+        assert pick_arc_shape(None) == ARC_SHAPES[0]
+
+    def test_distribution_not_single_valued(self):
+        shapes = {pick_arc_shape(f"news-{i}") for i in range(60)}
+        assert len(shapes) > 1
+
+    def test_shape_templates_differ_from_default(self):
+        dread = _pick_templates("the vial", "slow_dread")
+        default = _pick_templates("the vial", "")
+        assert dread != default
+        blob = " ".join(dread).lower()
+        assert "the vial" in blob
+
+    def test_post_validator_branch_messages(self):
+        pv_c = _make_post_validator(["x"], confrontation=True)
+        pv_n = _make_post_validator(["x"], confrontation=False)
+        identical = DramaticStateLLM(
+            character_a_wants="same want x", character_b_wants="same want x",
+            dramatic_question="what happens to x next?",
+            ending_change="x changes for good")
+        assert "opposed" in pv_c(identical)
+        assert "identical" in pv_n(identical)
+
+    def test_post_validator_nonconfrontation_accepts_distinct(self):
+        pv_n = _make_post_validator(["x"], confrontation=False)
+        distinct = DramaticStateLLM(
+            character_a_wants="seek the truth about x",
+            character_b_wants="protect those x would expose",
+            dramatic_question="will the truth of x ever emerge?",
+            ending_change="x stays partly unknown")
+        assert pv_n(distinct) is None
+
+    def test_derive_fallback_uses_shape_and_stamps_meta(self):
+        meta = {"news": {"key_terms": ["the vial"],
+                         "script_brief": "a sealed vial holds a strain"}}
+
+        def boom(**kw):
+            raise RuntimeError("no llm in test")
+
+        ds = derive_news_dramatic_state(
+            meta=meta,
+            cast_rows=[{"name": "EDNA"}, {"name": "PETER"}],
+            voice_slot_ids=["d001", "d002", "d003", "d004"],
+            slot_fn=None, structured_call_fn=boom, arc_shape="slow_dread",
+        )
+        assert meta["arc_shape"] == "slow_dread"
+        assert meta["dramatic_state_source"] == "fallback"
+        blob = (ds.character_a_wants + ds.character_b_wants
+                + ds.dramatic_question + ds.ending_change).lower()
+        assert "the vial" in blob
