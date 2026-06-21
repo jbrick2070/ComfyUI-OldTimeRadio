@@ -444,8 +444,11 @@ def test_llm_write_description_output_has_no_gender_or_voice():
         prior_cast=[],
     )
     fields = set(type(r).model_fields.keys())
-    assert fields == {"character_description"}, \
-        f"DescriptionResponse must carry description only, got {fields!r}"
+    # F5 (story-engine v1): the description call now ALSO carries an optional
+    # speech_signature (a voice-register artifact, like the description).
+    # gender + voice_preset remain Python-owned and are NOT LLM fields.
+    assert fields == {"character_description", "speech_signature"}, \
+        f"DescriptionResponse must carry description + speech_signature, got {fields!r}"
     assert not hasattr(r, "gender")
     assert not hasattr(r, "voice_preset")
 

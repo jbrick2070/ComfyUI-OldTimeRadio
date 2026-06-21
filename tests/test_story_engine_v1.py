@@ -16,9 +16,11 @@ from nodes._otr_line_composer import (  # noqa: E402
     LineRequest,
     _build_user_prompt,
     _gender_to_pronouns,
+    build_voice_card,
     compose_announcer_outro,
     compose_line_draft,
 )
+from nodes._otr_casting import CastingResponse, DescriptionResponse  # noqa: E402
 from nodes._otr_dramatic_state import pick_costly_choice_slot  # noqa: E402
 from nodes._otr_slot_drama_contract import (  # noqa: E402
     SlotDramaContract,
@@ -297,3 +299,49 @@ class TestF4GenderPronouns:
         # name-independent: no PRONOUNS directive when gender is unset
         prompt = _build_user_prompt(_req(speaker="ALICE"))
         assert "pronouns for" not in prompt
+
+
+# ===========================================================================
+# F5 -- speech register (speech_signature) reaches the cast card
+# ===========================================================================
+
+class TestF5SpeechSignature:
+
+    def test_card_renders_signature_when_present(self):
+        card = build_voice_card({
+            "name": "EDNA", "gender": "female",
+            "character_description": "weary archivist",
+            "speech_signature": "clipped, formal",
+        })
+        assert "speaks: clipped, formal" in card
+
+    def test_card_backfills_empty_signature(self):
+        # key present but empty -> deterministic backfill
+        card = build_voice_card({
+            "name": "EDNA", "gender": "female", "speech_signature": "",
+        })
+        assert "speaks: plain spoken" in card
+
+    def test_legacy_card_without_key_unchanged(self):
+        # no speech_signature key at all -> byte-identical legacy card
+        card = build_voice_card({"name": "EDNA", "gender": "female"})
+        assert card == "EDNA (female)"
+        assert "speaks:" not in card
+
+    def test_casting_schemas_accept_optional_signature(self):
+        # default "" when omitted (legacy/weak model)
+        d = DescriptionResponse(character_description="a weary archivist here")
+        assert d.speech_signature == ""
+        c = CastingResponse(
+            character_description="a weary archivist here",
+            gender="female", speech_signature="blunt, profane",
+        )
+        assert c.speech_signature == "blunt, profane"
+
+    def test_all_voice_cards_join_includes_signature(self):
+        rows = [
+            {"name": "EDNA", "gender": "female", "speech_signature": "clipped"},
+            {"name": "PETER", "gender": "male", "speech_signature": "rambling"},
+        ]
+        joined = "\n".join(build_voice_card(r) for r in rows)
+        assert "speaks: clipped" in joined and "speaks: rambling" in joined

@@ -162,6 +162,11 @@ class DescriptionResponse(BaseModel):
     # so the stored length never touches prompt budget. Local Mistral's
     # short descriptions are unaffected.
     character_description: str = Field(..., min_length=10, max_length=1500)
+    # F5 (story-engine v1): a <=5-word speech register/signature ("clipped,
+    # formal", "warm, rambling") the line composer threads into the cast card
+    # so each character reads as a distinct voice. Optional (default "") so a
+    # model that omits it never fails the schema; backfilled downstream.
+    speech_signature: str = Field(default="", max_length=60)
 
     @field_validator("character_description")
     @classmethod
@@ -188,6 +193,9 @@ class CastingResponse(BaseModel):
 
     character_description: str = Field(..., min_length=10, max_length=1500)
     gender: str = Field(..., min_length=3, max_length=12)
+    # F5 (story-engine v1): speech register/signature, assembled from the
+    # description call. Optional (default "") -> backfilled to "plain spoken".
+    speech_signature: str = Field(default="", max_length=60)
     # Sprint 2 (a): voice_preset is no longer assigned by the writer -- OTR_CastLock
     # replays the picker and stamps it after the freeze. cast_one_character leaves
     # it EMPTY, so the field allows "" (was min_length=3). A non-empty value still
@@ -410,9 +418,17 @@ def _build_user_prompt(
         "- Avoid glamour, fashion-model, influencer, symmetrical "
         "stock-photo language."
     )
+    parts.append(
+        "- Also give a speech_signature: at most 5 words naming how this "
+        "character TALKS (e.g. 'clipped, formal', 'warm and rambling', "
+        "'blunt, profane'). Distinct from the other cast."
+    )
     parts.append("")
     parts.append("JSON only:")
-    parts.append('{"character_description":"<as above>"}')
+    parts.append(
+        '{"character_description":"<as above>",'
+        '"speech_signature":"<<=5 words>"}'
+    )
     return "\n".join(parts)
 
 
@@ -1042,6 +1058,9 @@ def cast_one_character(
         character_description=description.character_description,
         gender=slot.gender,
         voice_preset=voice_preset,
+        speech_signature=str(
+            getattr(description, "speech_signature", "") or ""
+        ).strip(),
     )
     log.info(
         "[OTR_Casting] cast %s -> voice=%s gender=%s (timbre=%s role=%s)",
@@ -1462,6 +1481,9 @@ def lock_cast(
             # bounded by VOICE_REGISTRY[tts_model]["params_spec"].
             "voice_params":          None,
             "character_description": response.character_description,
+            # F5 (story-engine v1): deterministic backfill so EVERY locked
+            # cast row carries a non-empty speech_signature for the composer.
+            "speech_signature":      (response.speech_signature or "plain spoken"),
         }
         cast.append(new_row)
         taken_voices.add(response.voice_preset)

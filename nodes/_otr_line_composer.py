@@ -882,12 +882,16 @@ def build_voice_card(cast_row) -> str:
         name = str(cast_row.get("name") or "").strip()
         gender = str(cast_row.get("gender") or "").strip()
         desc = str(cast_row.get("character_description") or "").strip()
+        has_sig = "speech_signature" in cast_row
+        sig = str(cast_row.get("speech_signature") or "").strip()
     else:
         # Best-effort attribute access for non-dict shapes (e.g.
         # CharacterEntry from _otr_cast_contract).
         name = str(getattr(cast_row, "name", "") or "").strip()
         gender = str(getattr(cast_row, "gender", "") or "").strip()
         desc = str(getattr(cast_row, "character_description", "") or "").strip()
+        has_sig = hasattr(cast_row, "speech_signature")
+        sig = str(getattr(cast_row, "speech_signature", "") or "").strip()
     if not name:
         return ""
     if name == "ANNOUNCER" and not desc:
@@ -897,6 +901,13 @@ def build_voice_card(cast_row) -> str:
         bits.append(gender)
     if desc:
         bits.append(desc)
+    # F5 (story-engine v1): speech register. Render a `speaks: <signature>`
+    # clause ONLY when the row carries a speech_signature field (production
+    # cast rows do, after the casting backfill); legacy rows that never had
+    # the key render byte-identically. Deterministic backfill so even a row
+    # whose model left it blank still pins a register.
+    if has_sig:
+        bits.append(f"speaks: {sig or 'plain spoken'}")
     if bits:
         return f"{name} ({', '.join(bits)})"
     return name
