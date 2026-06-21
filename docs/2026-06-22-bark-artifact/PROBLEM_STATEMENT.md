@@ -45,6 +45,27 @@ model's sampling. A prompt-only fix will not hold.
 - Model-agnostic-ish: the gate (#3) can also catch the rare kokoro/other glitch, but the trim/temp levers
   are Bark-specific.
 
+## >>> ROUNDTABLE FOCUS (operator 2026-06-22): can we prevent it ENTIRELY at the INPUT / PROMPT side?
+Before the post-trim/gate work, pressure-test the GENERATION INPUTS. The Bark lib (`_otr_bark_lib.py`)
+already exposes the relevant surface -- the question is whether tuning these prevents the high-pitched
+hallucination AT THE SOURCE:
+- `_clean_text_for_bark` (text prep): strips parens/asterisks/bracket tags, transliterates. Does any
+  residual token (a stray bracket tag, a trailing symbol, an empty/short string, a number, an ellipsis)
+  still trigger Bark's non-speech [music]/squeal? Should it be stricter / normalize differently?
+- `min_eos_p` (`OTR_BARK_MIN_EOS_P`, `_resolve_min_eos_p`): Bark continues generating until EOS; a LOW
+  min_eos_p lets it run PAST the speech into a hallucinated tail (the classic high whine). Is RAISING it
+  the entire-prevention lever? What value is safe (doesn't clip real speech)?
+- `_stage_temps_for_line` (semantic 0.7 / coarse 0.5 / fine 0.5 + first-line/intl caps): is the SEMANTIC
+  temperature the hallucination driver -- does a lower semantic temp (esp. first/short lines) prevent it
+  without flattening delivery?
+- `_chunk_text_for_bark` (max_len 180): do chunk boundaries / very short final chunks spawn the artifact?
+- Voice PRESET (history_prompt): do certain speaker presets hallucinate more? (the audition found
+  en_speaker_5/0/6 fullest -- is there an artifact-rate angle too?)
+- Is there a Bark gen arg we are NOT setting that suppresses non-speech (e.g. a stricter EOS, a
+  speech-only bias, a shorter max_length per the cleaned text length)?
+Goal: a SOURCE-side recipe (text-prep + min_eos_p + temps) that prevents the artifact, falling back to
+the post-trim/gate only for the residual. Panel = 2-3 frontier LLMs; Claude grounds vs `_otr_bark_lib.py`.
+
 ## Suggested sprint shape (when picked up)
 Problem statement (this) -> roundtable (panel + Claude grounding vs the Bark engine `eng_bark` /
 `_otr_bark*` + the per-line audio path) -> 1-3 green chunks (trim; high-band gate+reroll; optional temp
