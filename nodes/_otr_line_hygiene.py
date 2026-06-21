@@ -143,6 +143,162 @@ def detect_narration_self_address(text: Any, speaker_name: Any = "") -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Bare (undelimited) leading stage-direction scrub + detector
+# (2026-06-22, roundtable-converged: docs/2026-06-22-stage-direction-leak/).
+#
+# The writer LLM (esp. max-chaos) emits a BARE action clause as the leading part
+# of a character line -- "twirls his pen nervously Look, Pinky..." -- with NO
+# (), [], or ** delimiters, so every existing delimited scrub misses it and it
+# reaches the frozen ledger text (Bark speaks it, captions show it).
+#
+# Design (panel-converged): a NARROW, fully-guarded DESTRUCTIVE strip used as a
+# FREEZE-only floor + a slightly BROADER detector that drives a reroll. A naive
+# verb-list strip is unsafe (false positives like "looks can be deceiving,
+# John."), so the strip fires ONLY when a conjunction of guards all pass.
+# ---------------------------------------------------------------------------
+
+#: First word of a line whose SECOND token is one of these is a SUBJECT (real
+#: dialogue: "looks can...", "pauses are..."), never a stage-action verb.
+_COPULA_MODAL = frozenset({
+    "is", "are", "was", "were", "be", "been", "being", "am", "can", "could",
+    "will", "would", "shall", "should", "may", "might", "must", "has", "have",
+    "had", "do", "does", "did",
+})
+#: A lowercase lead containing any of these is dialogue, not stage business
+#: (kills "look, Pinky,...", "maybe we should ask John...").
+_DIALOGUE_STARTER = frozenset({
+    "yes", "no", "well", "oh", "maybe", "please", "now", "listen", "look",
+    "hey", "okay", "fine", "sure",
+})
+#: 1st/2nd-person pronoun ROOTS (matched before an apostrophe: we've/you'll/i'm).
+#: Their presence in the lead means it is dialogue, not an impersonal action.
+_PRONOUN_ROOTS = frozenset({"i", "we", "you", "me", "us", "my", "your", "our"})
+#: A capitalized token whose previous token is one of these is the OBJECT of the
+#: action (skip it as the dialogue boundary): "glances at Pinky We..." -> "We...".
+_OBJ_PREP = frozenset({
+    "at", "to", "toward", "towards", "with", "of", "for", "by", "from", "over",
+    "under", "through", "into", "onto", "upon", "on", "in", "inside", "behind",
+    "past", "out", "about", "around", "against",
+})
+_ARTICLE = frozenset({"the", "a", "an"})
+_POSS_ADJ = frozenset({"his", "her", "their", "my", "your", "our", "its"})
+#: A capitalized token preceded by a conjunction is part of a COMPOUND object
+#: chain ("looks at Pinky and Brain We...") -> too risky to parse -> ABORT (keep).
+_CONJ = frozenset({"and", "or"})
+#: A 1-word remainder is kept UNLESS it is one of these WITH terminal punctuation
+#: ("sighs No." -> "No."; "sighs No" -> kept).
+_SHORT_UTT = frozenset({
+    "yes", "no", "wait", "stop", "never", "fine", "right", "okay", "ok", "go",
+})
+
+MAX_STAGE_PREFIX_WORDS = 6        # destructive floor: lead must be <= this
+_DETECT_MAX_PREFIX_WORDS = 10     # detector is slightly broader (reroll is cheap)
+
+#: Set by the Chunk-2 precision gate. True = the freeze floor strips; False =
+#: detect-only (the floor reports but does not mutate). Default True; flip to
+#: False if the corpus scan shows any false-positive mutation.
+BARE_STAGE_FLOOR_ACTIVE = True
+
+#: reroll directive handed to the line composer on a detector hit.
+_BARE_STAGE_HINT = (
+    "write only the spoken words; do not prefix the line with an action "
+    "description (no stage directions)"
+)
+
+_LEAD_QUOTES = "\"'“”‘’"
+_TERMINAL_PUNCT = (".", "!", "?")
+
+
+def _norm_token(tok: str) -> str:
+    """Lowercase a token stripped of surrounding punctuation/quotes."""
+    return tok.strip(".,;:!?" + _LEAD_QUOTES).lower()
+
+
+def _leading_stage_strip(text: Any, max_words: int) -> str:
+    """Core: strip a BARE leading stage-direction clause iff ALL guards pass,
+    else return the input UNCHANGED. Pure, idempotent, never raises.
+
+    Guards (all must hold): the line starts lowercase (after an optional leading
+    quote); the second token is not a copula/modal; the lead carries no
+    1st/2nd-person pronoun or dialogue-starter; there is no terminal punctuation
+    in the lead; a dialogue boundary (first capitalized non-object token) exists;
+    the lead is <= ``max_words``; the remainder is >= 2 words OR a
+    terminal-punctuated short utterance. A capitalized object after a
+    preposition/article/possessive is skipped; one after a conjunction ABORTS.
+    """
+    try:
+        s = "" if text is None else str(text)
+        if not s.strip(" " + _LEAD_QUOTES):
+            return s
+        body = s.lstrip()
+        # optional single leading quote, then re-strip
+        if body[:1] in _LEAD_QUOTES:
+            body = body[1:].lstrip()
+        if not body or not body[0].islower():
+            return s
+        words = body.split()
+        if len(words) < 2:
+            return s
+        # second token a copula/modal -> first word is a subject -> dialogue
+        if _norm_token(words[1]) in _COPULA_MODAL:
+            return s
+        # find the dialogue boundary (first capitalized, non-object token)
+        boundary = None
+        for i in range(1, len(words)):
+            first_alpha = next((c for c in words[i] if c.isalpha()), "")
+            if not first_alpha or not first_alpha.isupper():
+                continue
+            prev = _norm_token(words[i - 1])
+            prev_raw = words[i - 1]
+            if prev in _CONJ:
+                return s  # compound-object chain -> too risky, keep
+            if (prev in _OBJ_PREP or prev in _ARTICLE or prev in _POSS_ADJ
+                    or prev_raw.endswith("'s") or prev_raw.endswith("’s")):
+                continue  # capitalized object of the action -> skip
+            boundary = i
+            break
+        if not boundary:
+            return s
+        lead = words[:boundary]
+        if len(lead) > max_words:
+            return s
+        # no terminal punctuation inside the lead (kills "looks like rain. We...")
+        if any(p in " ".join(lead) for p in _TERMINAL_PUNCT):
+            return s
+        # no pronoun root / dialogue-starter in the lead
+        for w in lead:
+            nw = _norm_token(w)
+            root = re.split(r"['’]", nw)[0]
+            if nw in _DIALOGUE_STARTER or nw in _PRONOUN_ROOTS or root in _PRONOUN_ROOTS:
+                return s
+        remainder = " ".join(words[boundary:]).strip()
+        if len(remainder.split()) < 2:
+            # allow a single-word terminal-punctuated short utterance
+            if remainder and remainder[-1] in _TERMINAL_PUNCT \
+                    and _norm_token(remainder) in _SHORT_UTT:
+                return remainder
+            return s
+        return remainder
+    except Exception:  # noqa: BLE001 -- never raise on a spoken line
+        return "" if text is None else str(text)
+
+
+def scrub_leading_stage_direction(text: Any) -> str:
+    """Destructive FREEZE-floor strip of a bare leading stage direction.
+    Returns the input unchanged unless the narrow guard conjunction fires."""
+    return _leading_stage_strip(text, MAX_STAGE_PREFIX_WORDS)
+
+
+def detect_leading_stage_business(text: Any) -> "tuple[bool, str]":
+    """Detector for the reroll gate (slightly broader than the destructive
+    floor -- a false positive only costs one recompose). Returns
+    ``(hit, reroll_hint)``; the hint is empty when no hit."""
+    s = "" if text is None else str(text)
+    hit = _leading_stage_strip(s, _DETECT_MAX_PREFIX_WORDS) != s
+    return (hit, _BARE_STAGE_HINT if hit else "")
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 
