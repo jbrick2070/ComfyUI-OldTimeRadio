@@ -611,7 +611,8 @@ and resumes after the campaign.
   max-gain clamp + a noise-floor gate (do NOT fully flatten dynamics -> pumping). Deterministic (no RNG). Recommend
   a roundtable before coding (frozen-spine + dynamics trade-off).
 - **After that:** the S3 forward order -- 3D sprints (item 5) then switchable distribution (item 6). Operator-gated
-  GATE-A items (punch-list audit, latentsync demos, coverage sweep GREEN) run in parallel on look-QA.
+  GATE-A items (punch-list audit [APPROVED 2026-06-21], coverage sweep GREEN) run in parallel on look-QA.
+  (latentsync demos REMOVED 2026-06-21 -- ripped out, no live engine.)
 - **Open operator eyeballs (carried):** the Bark "warmer / not-whiny" verdict (audition WAVs in
   `%TEMP%\bark_audition\`); the wan_ti2v wide smoke clip (shared this session) + the Wan 14B-vs-5B WEBM eyeball.
 
@@ -648,17 +649,20 @@ and resumes after the campaign.
 
 ## 3. FORWARD ORDER (do in sequence)
 
-> **Two tracks, parallel.** Items 1-2 (punch-list audit, latentsync demos) are OPERATOR-GATED
-> (look-QA / demo review -- section 5); the ENGINE track (items 3-4, Wan + sweep GREEN) proceeds
-> NOW. "In sequence" applies WITHIN a track, not across the operator gate.
+> **Two tracks, parallel.** Item 1 (punch-list audit) is OPERATOR-GATED (look-QA -- section 5); the
+> ENGINE track (items 3-4, Wan + sweep GREEN) proceeds NOW. "In sequence" applies WITHIN a track, not
+> across the operator gate.
 
-1. **Punch list (GATE A).** Captions DONE (node 86 `OTR_CaptionBurn` in `otr_scifi_16gb_full.json`,
-   profile resolves `burn_captions=True`). REMAINING: node-level audit of LTX radio-open + procgen
-   rolling credits -- baked into the headless path but maybe NOT into the saved JSON; prove a render
-   FROM the JSON has them, then operator look-QA.
-2. **latentsync-100% + demos (GATE A).** The `OTR_LSYNC_BASE_ENGINE=still_kenburns` fix + the two-demo
-   set + the mixed showcase episode.
-3. **Wan 2.2 video engine (section 4).** BOTH engines BUILT + validated live (2026-06-14, `bcbe05a`):
+1. **Punch list (GATE A) -- OPERATOR APPROVED 2026-06-21, proceed.** Captions DONE (node 86
+   `OTR_CaptionBurn` in `otr_scifi_16gb_full.json`, profile resolves `burn_captions=True`). REMAINING:
+   node-level audit of LTX radio-open + procgen rolling credits -- baked into the headless path but maybe
+   NOT into the saved JSON; prove a render FROM the JSON has them, then operator look-QA.
+2. **latentsync -- REMOVED 2026-06-21 (operator: "we ripped it out").** Verified: NO engine file under
+   `nodes/_otr_video_engines/`, 0 references in `otr_scifi_16gb_full.json`, only a few stray comment/env
+   strings remain (`OTR_LSYNC_BASE_ENGINE`). Not a live lane -- dropped from the forward order. (A trivial
+   code-comment scrub of the stray strings can ride any future cleanup; not a roadmap item.)
+3. **Wan 2.2 video engine (section 4) -- OPERATOR APPROVED 2026-06-21 ("100% approved"): proceed with the
+   eyeball + acceptance.** BOTH engines BUILT + validated live (2026-06-14, `bcbe05a`):
    wan_i2v (14B, post mixin-refactor) + the new wan_ti2v (5B/GGUF 8GB tier). REMAINING = the operator
    WEBM EYEBALL (14B vs 5B) + the optional formal full-episode `--acceptance` GREEN exit (slow
    wan-music-bed leg, run attended) + the M9 CS-3 instrumented proof. Code-complete; gates are the
@@ -979,8 +983,8 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 - **OH-4** -- the 14-entry / ~8.2 GB live->attic migration STAGED, awaits operator "go OH-4"
   (`docs/2026-06-11-output-tree-consolidation/OUTPUT_TREE_CONTRACT.md`).
 - **0-E Phase B** -- tickets E-1..E-7, gated on the sweep GO file; coder-window ready.
-- **Operator gates** -- ComfyUI Desktop relaunch (look-QA), fresh-render acceptance, latentsync demos +
-  mixed showcase, whiny-voice P0 matrix + reel, S-3D-0 green light, `v2.0-alpha-stable` tag decision.
+- **Operator gates** -- ComfyUI Desktop relaunch (look-QA), fresh-render acceptance, whiny-voice P0 matrix
+  + reel, S-3D-0 green light, `v2.0-alpha-stable` tag decision. (latentsync demos REMOVED 2026-06-21.)
 
 ---
 
