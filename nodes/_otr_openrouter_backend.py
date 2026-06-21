@@ -38,6 +38,9 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
+#: One-shot guard so the "reasoning_effort ACTIVE" evidence line logs once/process.
+_REASONING_EFFORT_LOGGED = False
+
 # ---------------------------------------------------------------------------
 # Reasoning-wrapper strip (BUG-306 / BUG-LOCAL-308 family)
 # ---------------------------------------------------------------------------
@@ -969,6 +972,17 @@ class OpenRouterBackend:
         reasoning_effort = _reasoning_effort_from_env()
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
+            # EVIDENT (operator 2026-06-22): log ONCE per process so any server
+            # log -- the soak's AND a manual workflow run -- visibly shows the
+            # reasoning lever is active (the fix for the finish_reason=length
+            # truncation epidemic on reasoning ~latest writers).
+            global _REASONING_EFFORT_LOGGED
+            if not _REASONING_EFFORT_LOGGED:
+                _REASONING_EFFORT_LOGGED = True
+                log.info("[OpenRouter] reasoning_effort=%s ACTIVE "
+                         "(OPENROUTER_REASONING_EFFORT) -- reasoning models emit "
+                         "the answer instead of burning the output budget on "
+                         "hidden reasoning", reasoning_effort)
         # Build ONE provider-routing object so the speed/cost sort and the
         # require_parameters guard coexist (a second `payload["provider"]`
         # assignment would clobber the first).
