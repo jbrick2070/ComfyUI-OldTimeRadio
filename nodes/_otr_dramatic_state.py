@@ -42,7 +42,68 @@ __all__ = [
     "DramaticState",
     "derive_dramatic_state_from_meta",
     "pick_costly_choice_slot",
+    "HEDGE_LIST",
+    "is_resolved_ending_change",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Story-quality v1 shared helpers (F3 ending-aware outro + the measurement
+# scan). ONE source of truth so the scan and the composer repair never
+# diverge (SPRINT_READY_PLAN measurement contract). PURE + deterministic.
+# ---------------------------------------------------------------------------
+
+# Hedge phrases an outro must NOT use when the dramatic question resolved.
+HEDGE_LIST: tuple[str, ...] = (
+    "remains to be seen",
+    "only tomorrow will tell",
+    "open question",
+    "remains unknown",
+    "time will tell",
+    "yet to be seen",
+)
+
+# Phrases that mark an UNRESOLVED / open ending. If the ending_change reads as
+# open-ended, the outro is allowed to hedge -- so the resolved check excludes it.
+_UNRESOLVED_MARKERS: tuple[str, ...] = (
+    "remains to be seen",
+    "remains unknown",
+    "remains unclear",
+    "still unknown",
+    "still unclear",
+    "yet to be seen",
+    "open question",
+    "unresolved",
+    "no one knows",
+    "time will tell",
+    "uncertain",
+    "may never",
+    "might never",
+    "forever unread",
+    "forever unknown",
+    "never be known",
+    "left unanswered",
+    "unanswered",
+)
+
+
+def is_resolved_ending_change(ending_change) -> bool:
+    """True when ``ending_change`` describes a RESOLVED / closed ending.
+
+    Deterministic keyword rule shared by the measurement scan and the F3
+    outro repair so both agree on what "resolved" means. An empty or missing
+    ending_change is treated as UNRESOLVED (returns False) -- the F3 repair
+    then skips (no claim of resolution to enforce). An ending that contains an
+    explicit open-ended marker is also UNRESOLVED; anything else (a concrete
+    statement of what changed) counts as resolved.
+    """
+    s = " ".join(str(ending_change or "").lower().split())
+    if len(s) < 4:
+        return False
+    for marker in _UNRESOLVED_MARKERS:
+        if marker in s:
+            return False
+    return True
 
 
 class DramaticState(BaseModel):
