@@ -582,6 +582,57 @@ def _trim_trailing_silence(audio, sample_rate, *, thresh_rel=0.06,
     return a[:max(1, min(n, keep))]
 
 
+#: Default flag threshold for the high-band edge artifact gate. From the
+#: B0 corpus scan, speech edges sit < ~0.15 (p90) while a squeal/whine
+#: window is > 0.9; 0.5 cleanly separates them.
+_HIGH_BAND_ARTIFACT_THRESHOLD = 0.5
+
+
+def high_band_edge_ratio(audio, sample_rate, *, edge_ms=150, hb_hz=4000.0):
+    """QA metric: high-band (> ``hb_hz``) energy fraction at the clip EDGES.
+
+    Returns the MAX over the first and last ``edge_ms`` of the clip of
+    (power above ``hb_hz``) / (total power). The high-pitched non-speech
+    squeal that B1 prevents (the [music]/[whistles]/throat-clear artifact)
+    concentrates almost all of its energy above 4 kHz and sits at the clip
+    head/tail; speech edges are low-band. Near-silent edges return 0.0 (a
+    quiet edge is not an artifact). Deterministic, numpy-only, CPU-testable."""
+    a = np.asarray(audio, dtype=np.float32)
+    if a.ndim > 1:
+        a = a.reshape(-1)
+    n = int(a.shape[0]) if a.ndim else 0
+    if n == 0 or sample_rate <= 0:
+        return 0.0
+    win = max(1, min(n, int(round((edge_ms / 1000.0) * sample_rate))))
+
+    def _ratio(seg):
+        seg = np.asarray(seg, dtype=np.float64)
+        if seg.size < 2:
+            return 0.0
+        if float(np.sqrt(np.mean(seg ** 2))) < 1e-4:
+            return 0.0  # near-silence is not an artifact
+        windowed = seg * np.hanning(seg.size)
+        power = np.abs(np.fft.rfft(windowed)) ** 2
+        freqs = np.fft.rfftfreq(seg.size, 1.0 / sample_rate)
+        total = float(power.sum())
+        if total <= 0.0:
+            return 0.0
+        return float(power[freqs > hb_hz].sum()) / total
+
+    head = _ratio(a[:win])
+    tail = _ratio(a[-win:])
+    return max(head, tail)
+
+
+def flag_high_band_artifact(audio, sample_rate, *,
+                            threshold=_HIGH_BAND_ARTIFACT_THRESHOLD,
+                            edge_ms=150, hb_hz=4000.0):
+    """(flagged, ratio): True when the clip's head/tail high-band ratio meets
+    ``threshold`` -- a likely squeal/whine artifact. Pure / CPU-testable."""
+    ratio = high_band_edge_ratio(audio, sample_rate, edge_ms=edge_ms, hb_hz=hb_hz)
+    return (ratio >= threshold, ratio)
+
+
 def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
                           is_first_line=False, *, semantic_temp=None,
                           coarse_temp=None, fine_temp=None,
