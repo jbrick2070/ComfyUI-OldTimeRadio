@@ -2274,6 +2274,30 @@ def fallback_announcer_outro(news_close_brief: str) -> str:
     )
 
 
+def _resolved_outro_fallback(ending_change: str, news_close_brief: str) -> str:
+    """Deterministic resolved-ending outro (F3, story-engine v1).
+
+    Used when the episode's dramatic question RESOLVED but the LLM keeps
+    hedging ("remains to be seen", ...). States the ``ending_change`` plainly
+    with NO hedge phrase. Belt-and-suspenders: if the assembled line would
+    still contain a hedge phrase, falls back to the plain close template.
+    Pure + deterministic; never raises.
+    """
+    ec = clean_one_line(ending_change or "", max_chars=240)
+    if not ec:
+        return fallback_announcer_outro(news_close_brief)
+    if ec[-1] not in ".!?":
+        ec += "."
+    text = f"This has been SIGNAL LOST. {ec} Good night."
+    try:
+        from ._otr_dramatic_state import HEDGE_LIST as _HL
+    except ImportError:  # bare-name import context (no parent package)
+        from _otr_dramatic_state import HEDGE_LIST as _HL  # type: ignore
+    if any(p in text.lower() for p in _HL):
+        return fallback_announcer_outro(news_close_brief)
+    return text
+
+
 def _announcer_generate(creative_fn, messages) -> Optional[str]:
     """Run one creative-slot LLM call for an announcer pass.
 
@@ -2382,6 +2406,8 @@ def compose_announcer_outro(
     news_close_brief: str,
     intro_text: str,
     creative_repo_id: str | None = None,
+    ending_change: str = "",
+    final_character_line: str = "",
 ) -> LineResult:
     """Compose the episode's closing announcer line.
 
@@ -2389,8 +2415,17 @@ def compose_announcer_outro(
     the intro line both exist. Context is `script_brief` +
     `news_close_brief` + `intro_text` only -- never the full script (a
     tight prompt yields a tight close, and it keeps the KV cache
-    small). Plain-text output, one LLM call, no reroll. On any failure
-    the deterministic `fallback_announcer_outro` fires.
+    small). Plain-text output, one LLM call. On any failure the
+    deterministic `fallback_announcer_outro` fires.
+
+    F3 (story-engine v1): when the episode's dramatic question RESOLVED,
+    the close must STATE the outcome, not hedge. ``ending_change`` (from
+    ``meta.dramatic_state``) and ``final_character_line`` (null-guarded --
+    "" when not available at outro-compose time) are threaded into the
+    prompt, and a deterministic post-check recomposes ONCE if the LLM
+    hedges on a resolved ending, then drops to a resolved fallback
+    template that states ``ending_change`` with no hedge phrase. Both new
+    params default "" so legacy callers/tests are byte-identical.
 
     `creative_repo_id` is accepted for call-signature parity with
     `compose_line` (see `compose_announcer_intro`).
@@ -2398,6 +2433,21 @@ def compose_announcer_outro(
     Returns a `LineResult`; `compose_flags` is ``("announcer_outro",)``
     on the LLM path or ``("announcer_outro_fallback",)`` on fallback.
     """
+    try:
+        from ._otr_dramatic_state import HEDGE_LIST, is_resolved_ending_change
+    except ImportError:  # bare-name import context (no parent package)
+        from _otr_dramatic_state import (  # type: ignore
+            HEDGE_LIST, is_resolved_ending_change,
+        )
+
+    def _hedges(t: str) -> bool:
+        low = (t or "").lower()
+        return any(p in low for p in HEDGE_LIST)
+
+    resolved = is_resolved_ending_change(ending_change)
+    ending = clean_one_line(ending_change or "", max_chars=240)
+    final_line = clean_one_line(final_character_line or "", max_chars=240)
+
     # LLM slot: creative -- announcer outro is a narrative framing
     # pass; routed through the writer's creative_writing_model slot.
     brief = clean_one_line(script_brief or "", max_chars=0)
@@ -2408,8 +2458,10 @@ def compose_announcer_outro(
             "[OTR_AnnouncerPass] outro: empty script_brief and "
             "news_close_brief; using deterministic fallback",
         )
+        fb = (_resolved_outro_fallback(ending_change, close)
+              if resolved else fallback_announcer_outro(close))
         return LineResult(
-            text=fallback_announcer_outro(close),
+            text=fb,
             compose_flags=("announcer_outro_fallback",),
         )
     user_parts: list[str] = []
@@ -2421,9 +2473,24 @@ def compose_announcer_outro(
         )
     if intro:
         user_parts.append(f"The announcer's opening line was:\n{intro}")
+    if final_line:
+        user_parts.append(f"The final character line was:\n{final_line}")
+    if resolved and ending:
+        user_parts.append(
+            "The dramatic question RESOLVED. The outcome: "
+            f"{ending}\nState this outcome plainly in the close. Do NOT "
+            "hedge -- do not say it 'remains to be seen' or 'time will tell'."
+        )
     user_parts.append("Write the announcer's closing line now.")
+    system_content = _ANNOUNCER_OUTRO_SYSTEM
+    if resolved and ending:
+        system_content = (
+            _ANNOUNCER_OUTRO_SYSTEM
+            + "\n- The story resolved tonight: state the outcome; never "
+              "hedge or defer it to the future."
+        )
     messages = [
-        {"role": "system", "content": _ANNOUNCER_OUTRO_SYSTEM},
+        {"role": "system", "content": system_content},
         {"role": "user", "content": "\n\n".join(user_parts)},
     ]
     raw = _announcer_generate(creative_fn, messages)
@@ -2434,6 +2501,47 @@ def compose_announcer_outro(
         max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
     )
     if ok:
+        # F3 post-check: a resolved episode whose close still hedges is a
+        # contradiction -- recompose ONCE with a stronger directive; if it
+        # STILL hedges, emit the deterministic resolved fallback.
+        if resolved and _hedges(validated):
+            log.info(
+                "[OTR_AnnouncerPass] outro hedged on a RESOLVED ending; "
+                "recomposing once (F3).",
+            )
+            redo_user = list(user_parts[:-1]) + [
+                "Your previous closing line hedged the outcome. The story "
+                f"RESOLVED: {ending or close}. Rewrite the close to STATE "
+                "the outcome plainly. Do not use 'remains to be seen', "
+                "'time will tell', 'open question', or any hedge.",
+                "Write the announcer's closing line now.",
+            ]
+            redo = _announcer_generate(creative_fn, [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": "\n\n".join(redo_user)},
+            ])
+            ok2, validated2 = validate_announcer_line(
+                strip_line_formatting(redo or ""),
+                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+            )
+            if ok2 and not _hedges(validated2):
+                log.info(
+                    "[OTR_AnnouncerPass] outro recompose ok (model=%s).",
+                    creative_repo_id,
+                )
+                return LineResult(
+                    text=validated2,
+                    compose_flags=("announcer_outro_resolved_recomposed",),
+                )
+            log.warning(
+                "[OTR_AnnouncerPass] outro still hedged after recompose; "
+                "using the deterministic resolved fallback (F3).",
+            )
+            return LineResult(
+                text=_resolved_outro_fallback(ending_change, close),
+                compose_flags=("announcer_outro_resolved_fallback",),
+            )
         log.info(
             "[OTR_AnnouncerPass] outro pass ok (model=%s, %d chars)",
             creative_repo_id, len(validated),
@@ -2446,8 +2554,10 @@ def compose_announcer_outro(
         "(model=%s, raw=%r); using deterministic fallback",
         creative_repo_id, raw,
     )
+    fb = (_resolved_outro_fallback(ending_change, close)
+          if resolved else fallback_announcer_outro(close))
     return LineResult(
-        text=fallback_announcer_outro(close),
+        text=fb,
         compose_flags=("announcer_outro_fallback",),
     )
 

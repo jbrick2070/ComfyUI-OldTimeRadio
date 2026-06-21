@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes._otr_line_composer import (  # noqa: E402
     LineRequest,
     _build_user_prompt,
+    compose_announcer_outro,
     compose_line_draft,
 )
 from nodes._otr_dramatic_state import pick_costly_choice_slot  # noqa: E402
@@ -192,3 +193,70 @@ class TestF2CostlyBinding:
             [c_a, c_b], [], ["the vial", "the audit"])
         assert ok is False
         assert any("more than one" in r for r in reasons)
+
+
+# ===========================================================================
+# F3 -- ending-aware outro: resolved ending must not hedge
+# ===========================================================================
+
+_RESOLVED = "the vial is opened and the record cannot be undone"
+_UNRESOLVED = "the truth remains unknown"
+
+
+def _outro(creative_fn, ending_change=""):
+    return compose_announcer_outro(
+        creative_fn=creative_fn,
+        script_brief="A sealed vial holds the oldest strain.",
+        news_close_brief="The vial is opened and recorded.",
+        intro_text="Tonight, a sealed vial.",
+        creative_repo_id="test",
+        ending_change=ending_change,
+    )
+
+
+class TestF3EndingAwareOutro:
+
+    def test_resolved_hedge_then_clean_recomposes(self):
+        calls = {"n": 0}
+
+        def mock(messages, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return "Whether she was right remains to be seen, friends."
+            return "And so the vial was opened, the record now stands. Good night."
+
+        res = _outro(mock, ending_change=_RESOLVED)
+        assert res.compose_flags == ("announcer_outro_resolved_recomposed",)
+        assert "remains to be seen" not in res.text.lower()
+
+    def test_resolved_persistent_hedge_falls_back(self):
+        def mock(messages, **kw):
+            return "Whether she was right remains to be seen tonight, friends."
+
+        res = _outro(mock, ending_change=_RESOLVED)
+        assert res.compose_flags == ("announcer_outro_resolved_fallback",)
+        assert "remains to be seen" not in res.text.lower()
+        assert "vial is opened" in res.text.lower()
+
+    def test_unresolved_hedge_is_allowed(self):
+        def mock(messages, **kw):
+            return "Whether she was right remains to be seen, friends."
+
+        res = _outro(mock, ending_change=_UNRESOLVED)
+        assert res.compose_flags == ("announcer_outro",)
+        assert "remains to be seen" in res.text.lower()
+
+    def test_missing_ending_change_no_crash(self):
+        def mock(messages, **kw):
+            return "And the signal fades into the night. Good night, listeners."
+
+        res = _outro(mock)  # ending_change="" default
+        assert res.compose_flags == ("announcer_outro",)
+        assert "signal fades" in res.text.lower()
+
+    def test_resolved_clean_first_pass_no_recompose(self):
+        def mock(messages, **kw):
+            return "And so the vial was opened, the record now stands. Good night."
+
+        res = _outro(mock, ending_change=_RESOLVED)
+        assert res.compose_flags == ("announcer_outro",)

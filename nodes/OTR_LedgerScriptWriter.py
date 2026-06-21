@@ -3726,6 +3726,21 @@ class OTR_LedgerScriptWriter:
             # LLM slot: creative -- dedicated announcer outro, a
             # narrative framing pass. Routed through the writer's
             # creative_writing_model slot; no widget.
+            # F3 (story-engine v1): thread the resolved ending + the final
+            # character line so the close STATES the outcome instead of
+            # hedging. Both null-guarded ("" when unavailable) -> the
+            # composer's post-check skips cleanly on an unresolved/missing
+            # ending.
+            _outro_ending_change = str(
+                (meta.get("dramatic_state") or {}).get("ending_change") or ""
+            )
+            _outro_final_char_line = ""
+            for _ln in reversed(led.data.get("lines") or []):
+                if str(_ln.get("speaker_role") or "").strip() == "character":
+                    _t = str(_ln.get("text") or "").strip()
+                    if _t:
+                        _outro_final_char_line = _t
+                        break
             with slot_scheduler.helper_context("compose_announcer_outro"):
                 outro_res = _OTRLC.compose_announcer_outro(
                     creative_fn=creative_generate_fn,
@@ -3733,6 +3748,8 @@ class OTR_LedgerScriptWriter:
                     news_close_brief=nc_brief,
                     intro_text=intro_text,
                     creative_repo_id=resolved["creative_writing_model"],
+                    ending_change=_outro_ending_change,
+                    final_character_line=_outro_final_char_line,
                 )
             # patch_line_text recomputes char_count + word_count in
             # lockstep; patch_line_fields stamps the outro compose_flags
