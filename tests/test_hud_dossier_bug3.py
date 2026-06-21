@@ -68,6 +68,36 @@ def test_dossier_has_render_engines_block_video_and_image():
     assert "z_image_turbo" in body               # image engine per role
 
 
+def test_dossier_image_engines_from_meta_primary():
+    # Credits fix 2026-06-21: the dispatcher stamps meta.image_engines.by_role
+    # (the ledger['images'] section is dropped before the credits read). The
+    # dossier must read meta FIRST so the per-slot image model shows.
+    led = _led()
+    led["images"] = {}                           # legacy section gone
+    led["meta"]["image_engines"] = {"by_role": {
+        "announcer_visual": {"flux_gen1": 2},
+        "music_visual": {"flux_gen1": 1},
+        "character_video": {"flux2_klein": 3},
+    }}
+    dossier = ve._build_hud_dossier(led)
+    body = "\n".join(
+        l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
+    assert "flux2_klein" in body                 # cast slot image model
+    assert "music_visual" in body                # music slot shows its model
+    assert "image" in body                       # image lines present
+
+
+def test_dossier_image_meta_takes_precedence_over_legacy():
+    led = _led()  # has legacy led['images'] with z_image_turbo
+    led["meta"]["image_engines"] = {"by_role": {
+        "character_video": {"flux2_klein": 3}}}
+    dossier = ve._build_hud_dossier(led)
+    body = "\n".join(
+        l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
+    assert "flux2_klein" in body                 # meta wins
+    assert "z_image_turbo" not in body           # legacy not used when meta present
+
+
 def test_dossier_has_system_block_techie_stats():
     # SYSTEM always present (techie-friendly); fields degrade to (unknown) but
     # the labels are always there.

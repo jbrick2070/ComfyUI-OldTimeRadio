@@ -1144,17 +1144,22 @@ def _build_hud_dossier(led):
         engs = (re_.get("by_role") or {})[role] or {}
         el.append("video  %-16s %s" % (role, ", ".join(
             "%s x%d" % (e, n) for e, n in sorted(engs.items()))))
-    img_by_role: dict = {}
-    for r in ((led.get("images") or {}).get("images")) or []:
-        if not isinstance(r, dict):
-            continue
-        img_by_role.setdefault(str(r.get("role") or "?"), {})
-        _e = str(r.get("engine_id") or "?")
-        img_by_role[str(r.get("role") or "?")][_e] = \
-            img_by_role[str(r.get("role") or "?")].get(_e, 0) + 1
+    # IMAGE model per slot. PRIMARY source is meta.image_engines.by_role
+    # (the dispatcher stamps it there because the ledger['images'] section is
+    # dropped before the credits read -- operator credits fix 2026-06-21);
+    # fall back to the legacy ledger['images'] rows when meta is absent.
+    img_by_role = dict((meta.get("image_engines") or {}).get("by_role") or {})
+    if not img_by_role:
+        for r in ((led.get("images") or {}).get("images")) or []:
+            if not isinstance(r, dict):
+                continue
+            _role = str(r.get("role") or "?")
+            _e = str(r.get("engine_id") or "?")
+            img_by_role.setdefault(_role, {})
+            img_by_role[_role][_e] = img_by_role[_role].get(_e, 0) + 1
     for role in sorted(img_by_role):
         el.append("image  %-16s %s" % (role, ", ".join(
-            "%s x%d" % (e, n) for e, n in sorted(img_by_role[role].items()))))
+            "%s x%d" % (e, n) for e, n in sorted((img_by_role[role] or {}).items()))))
     if el:
         sections.append({"header": "RENDER ENGINES", "lines": el})
 

@@ -382,6 +382,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     cache_index = dict(images_section.get("cache_index") or {})
     images = list(images_section.get("images") or [])
     seed_cfg = (image_policy or {}).get("seed") or {}
+    # Credits: per-role image-engine histogram (role -> {engine_id: count}),
+    # stamped into meta after the loop so the dossier can show image model per
+    # slot (the ledger['images'] section is dropped before the credits read).
+    img_hist: dict = {}
 
     # Episode keying (still-spine ST-3 / W3): every still materializes into
     # episodes/<ep>/stills/ so the episode folder is self-contained. The id
@@ -455,6 +459,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         if not engine_id:
             warnings.append(f"{oid}: no image engine selected; skipped (fail-closed)")
             continue
+        # Credits (operator 2026-06-21): the per-slot IMAGE model never reached
+        # the credits dossier because the ledger['images'] section does not
+        # survive to the on-disk ledger the HUD reads (only meta does). Mirror
+        # the VIDEO render_engines.by_role histogram into meta so the credits
+        # can show the image model used for each role (announcer/music/cast).
+        _ih_role = str(role or "?")
+        img_hist.setdefault(_ih_role, {})
+        img_hist[_ih_role][str(engine_id)] = (
+            img_hist[_ih_role].get(str(engine_id), 0) + 1)
         try:
             _assert_not_path(prompt)
         except ValueError as exc:
@@ -613,6 +626,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         "cache_index": cache_index,
         "warnings": warnings,
     }
+    # Credits: stamp the per-role image-engine histogram into meta (which DOES
+    # persist to the on-disk ledger the credits dossier reads) so the dossier
+    # shows the image model used for each slot. Additive; never overwrites.
+    _ie_meta = ledger.get("meta")
+    if not isinstance(_ie_meta, dict):
+        _ie_meta = {}
+        ledger["meta"] = _ie_meta
+    _ie_meta["image_engines"] = {"by_role": img_hist, "image_revision": rev}
     # stills_manifest.json beside the episode stills (ST-3/W3): the durable
     # per-episode index of every still this dispatch materialized. Fail-soft.
     if ep_rows:
