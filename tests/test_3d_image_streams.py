@@ -156,7 +156,37 @@ def test_build_request_stamps_mesh_subject_id_beat_when_no_char(tmp_path):
             "family": "image_to_video", "target_frame_count": 25,
             "source_line_ids": ["b001"], "char_id": "", "creative": {}}
     req = rd.build_request_from_shot(shot, led)
-    assert req["mesh_subject_id"] == "b001"
+    # matches the minted object's mesh_subject_id convention ("obj_<beat>").
+    assert req["mesh_subject_id"] == "obj_b001"
+
+
+def test_announcer_beat_meshes_announcer_not_uncast(tmp_path):
+    """Chunk 6: the announcer carries char_id 'announcer', so a 3D announcer
+    beat meshes the ANNOUNCER subject -- never 'uncast' on the environment."""
+    from nodes._otr_video_engines import render_driver as rd
+    led = _mesh_ledger(tmp_path, char_id="announcer")
+    shot = {"shot_id": "shot_b001", "beat_id": "b001", "engine_id": "mesh_stage",
+            "family": "image_to_video", "target_frame_count": 25,
+            "source_line_ids": ["b001"], "char_id": "announcer", "creative": {}}
+    req = rd.build_request_from_shot(shot, led)
+    assert req["mesh_subject_id"] == "announcer"
+
+
+def test_fork_object_subject_id_matches_driver_convention():
+    """Chunk 6: a no-character forked beat mints mesh_subject_id 'obj_<beat>',
+    the SAME id render_driver stamps -> the mesh cache + the minted fodder
+    agree on the subject."""
+    payload, _w = mb.derive_image_prompts(
+        [], _meta(),
+        lines=[{"line_id": "b007", "speaker_role": "", "text": "a sound",
+                "start_s": 1.0, "dur_s": 2.0}],
+        mesh_fodder_roles={"background_abstract"})
+    fodder = [o for o in payload["objects"]
+              if o["kind"] == "mesh_fodder" and o["beat_id"] == "b007"]
+    assert fodder, "no-character beat should mint object fodder"
+    f0 = fodder[0]
+    assert "char_id" not in f0
+    assert f0["mesh_subject_id"] == "obj_b007"
 
 
 def test_no_fork_without_mesh_fodder_roles():

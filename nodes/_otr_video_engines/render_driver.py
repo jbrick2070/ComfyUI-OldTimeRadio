@@ -761,9 +761,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _bid = _beat_id_for_shot(shot)
         _fidx = _mesh_fodder_index(ledger)
         _subj = char_id or str(shot.get("mesh_subject_id") or "")
-        # The cache subject id: the character/object id when known, else the
-        # beat id (a per-beat object) -- never the misleading "uncast".
-        _mesh_subject_id = _subj or _bid
+        # SUBJECT POLICY (chunk 6): (a) a beat with a char_id -- INCLUDING the
+        # announcer (char_id "announcer") -- meshes that character; (b) a beat
+        # with no char (e.g. the b000 music-open) meshes a per-beat story OBJECT
+        # under a STABLE "obj_<beat>" id that MATCHES the minted mesh_fodder
+        # object's mesh_subject_id; (c) if no fodder was minted at all, the
+        # missing-fodder branch below degrades LOUD (never meshes the
+        # environment as "uncast"). Mirror the prompt-gen id convention exactly.
+        _mesh_subject_id = _subj or ("obj_%s" % _bid)
         _fodder = (_fidx.get(_subj, "") if _subj else "") or _fidx.get(_bid, "")
         if _fodder:
             init_image = _fodder

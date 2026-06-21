@@ -662,6 +662,14 @@ class MeshStageEngine(_CheapFamilyBase):
         seed = int(s_get("request_seed", 0) or 0)
         # E-2: cache by SUBJECT (char_id|object_id) + CANONICAL fodder hash.
         subject_id = self._request_mesh_subject_id(request)
+        if subject_id == "uncast":
+            # SUBJECT POLICY (chunk 6): render_driver stamps a real subject id
+            # (char/object) on every 3D request. A bare "uncast" here means a
+            # mesh beat reached the engine with NO subject -- LOUD, never silent.
+            _LOG.warning(
+                "[eng_mesh_stage] LOUD: meshing with subject_id='uncast' -- no "
+                "char_id / mesh_subject_id on the request; the mesh cannot reuse "
+                "per-subject. Investigate the 3D subject policy for this beat.")
         key = mesh_cache_key(subject_id, portrait_content_hash(still))
         glb_path, manifest_path = self._cached_glb(key)
         if os.path.exists(glb_path):
