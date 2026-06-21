@@ -14,7 +14,7 @@ from nodes import otr_meta_brief_image_prompt as mb
 
 
 # --------------------------------------------------------------------------- #
-# Director: which roles are mesh-fodder (capability, not engine name)
+# OTR_ImageDirector: which roles are mesh-fodder (capability, not engine name)
 # --------------------------------------------------------------------------- #
 def test_mesh_fodder_roles_from_video_policy():
     vp = {"video_models": {
@@ -89,6 +89,35 @@ def test_fork_mints_fodder_and_plate_not_scene_still():
     p001 = next(o for o in plate if o["beat_id"] == "b001")
     assert "no people" in p001["prompt"] and "no subject" in p001["prompt"]
     assert p001["w"] >= p001["h"]
+
+
+# --------------------------------------------------------------------------- #
+# Chunk 4: kind-specific indices (render_driver)
+# --------------------------------------------------------------------------- #
+def test_portrait_index_ignores_mesh_fodder_rows():
+    from nodes._otr_video_engines import render_driver as rd
+    ledger = {"images": {"images": [
+        {"object_id": "c01", "kind": "portrait", "char_id": "c01",
+         "path": "portrait_c01.png"},
+        {"object_id": "meshfodder_b001", "kind": "mesh_fodder", "char_id": "c01",
+         "beat_id": "b001", "path": "fodder_c01.png"},
+        {"object_id": "still_b001", "kind": "scene_character", "char_id": "c01",
+         "beat_id": "b001", "path": "scene_c01.png"},
+    ]}}
+    # the HuMo portrait lookup sees ONLY the real portrait, never the fodder.
+    assert rd._portrait_index(ledger) == {"c01": "portrait_c01.png"}
+
+
+def test_still_index_prioritizes_background_plate():
+    from nodes._otr_video_engines import render_driver as rd
+    # plate appears BEFORE a stale scene_beat row -> plate still wins.
+    ledger = {"images": {"images": [
+        {"object_id": "plate_b002", "kind": "scene_background_plate",
+         "beat_id": "b002", "path": "plate_b002.png"},
+        {"object_id": "still_b002", "kind": "scene_beat",
+         "beat_id": "b002", "path": "scene_b002.png"},
+    ]}}
+    assert rd._still_index(ledger)["b002"] == "plate_b002.png"
 
 
 def test_no_fork_without_mesh_fodder_roles():

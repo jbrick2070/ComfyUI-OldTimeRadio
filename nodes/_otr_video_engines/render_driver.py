@@ -392,11 +392,20 @@ def _seed_from_hash(request_hash, shot_id):
 
 def _portrait_index(ledger):
     """``{char_id: portrait_path}`` from ``ledger['images']['images']`` (the
-    OTR_ImageGenDispatcher write-back; each entry is keyed by ``object_id``)."""
+    OTR_ImageGenDispatcher write-back; each entry is keyed by ``object_id``).
+
+    KIND-FILTERED (3D image streams, 2026-06-21): ONLY ``kind=="portrait"`` rows
+    (empty kind tolerated for legacy ledgers) feed the HuMo / portrait lookup.
+    Without this, a ``mesh_fodder`` row (which carries a ``char_id``) or a
+    ``scene_character`` row would leak into the portrait map and HuMo could pick
+    up the clean 3D fodder instead of the cinematic portrait."""
     out = {}
     imgs = ((ledger or {}).get("images") or {}).get("images") or []
     for im in imgs:
         if not isinstance(im, dict):
+            continue
+        _kind = str(im.get("kind") or "")
+        if _kind and _kind != "portrait":
             continue
         cid = str(im.get("object_id") or im.get("char_id") or "")
         path = str(im.get("path") or "")
@@ -411,16 +420,28 @@ def _still_index(ledger):
     row for a beat wins (a cache-hit materialization appends a fresh row whose
     path is the current episode's copy). Pure, tolerant."""
     out = {}
+    plate = {}
     imgs = ((ledger or {}).get("images") or {}).get("images") or []
     for im in imgs:
         if not isinstance(im, dict):
             continue
-        if not str(im.get("kind") or "").startswith("scene_"):
+        _kind = str(im.get("kind") or "")
+        if not _kind.startswith("scene_"):
             continue
         bid = str(im.get("beat_id") or "")
         path = str(im.get("path") or "")
-        if bid and path:
+        if not (bid and path):
+            continue
+        # 3D image streams (2026-06-21): the subject-free BACKGROUND PLATE wins
+        # over any co-existing cinematic scene_* still for the same beat (a 3D
+        # beat mints ONLY fodder+plate, but if a stale scene_* row co-exists the
+        # plate is the correct background for the mesh composite). Verify-at-
+        # build #3 -- priority, not last-write-wins.
+        if _kind == "scene_background_plate":
+            plate[bid] = path
+        else:
             out[bid] = path
+    out.update(plate)
     return out
 
 

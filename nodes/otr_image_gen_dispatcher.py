@@ -612,6 +612,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             row["char_id"] = char_id
         if beat_id:
             row["beat_id"] = beat_id
+        # 3D image streams (2026-06-21): carry the mesh subject identity onto the
+        # row (additive) so the mesh cache keys on a STABLE per-subject id (the
+        # mesh_fodder file), not the per-beat still hash. Absent on non-3D rows.
+        _msid = str(obj.get("mesh_subject_id") or "")
+        if _msid:
+            row["mesh_subject_id"] = _msid
         images.append(row)
         ep_rows.append(row)
         cache_index[key] = image_id
