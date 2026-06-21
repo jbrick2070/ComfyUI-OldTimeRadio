@@ -487,7 +487,43 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP (2026-06-21): STORY-ENGINE IMPROVEMENTS v1 -- ALL CODE SHIPPED + PUSHED (HEAD `d9b25a0` ==
+**>>> ACTIVE STEP (operator, 2026-06-21 -- BUILD THIS NEXT): 3D IMAGE STREAMS (clean mesh fodder + background
+plate + opaque composite).** HEAD `19bd75e` == origin/v2.0-alpha; full suite 4719 pass/33 skip, Bug Bible 16/7/3.
+The design is ROUNDTABLE-HARDENED + code-grounded and BUILD-READY:
+`docs/2026-06-21-3d-image-streams/roundtable/pass01_plan.md` (+ `pass01_judgment.md`; raw panel reviews in
+`pass01/`). **Root cause (3-model panel + Claude-verified in code):** `mesh_stage` is fed the per-beat SCENE
+STILL, not a portrait -- `MeshStageEngine.family="image_to_video"` hits the `_SCENE_INIT_FAMILIES` override in
+`render_driver.build_request_from_shot` (~:703-708), so Hunyuan3D meshes the whole environment -> the clay
+blob. **Build (7 ordered green chunks, each suite+Bug-Bible -> commit AND push):** (1) add
+`requires_mesh_fodder=True` to `MeshStageEngine` (the routing gate; `requires_mesh_portrait` does NOT exist on
+it); (2) branch `build_request_from_shot` to feed mesh engines a clean `mesh_fodder` still BEFORE the scene
+override (resolve the engine map AFTER `OTR_FORCE_ENGINE_MAP`); (3) fork the image prompts in
+`OTR_MetaBriefImagePromptGen` -> `mesh_fodder` (isolated subject -- character OR story object -- neutral bg,
+even light, full unoccluded) + `scene_background_plate` (subject-free world; `scene_` prefix so `_still_index`
+sees it) + checked-in positive/negative scaffolds; (4) ledger taxonomy + kind-specific indices (kind-filter
+`_portrait_index` so fodder doesn't leak to HuMo); (5) generalize the MESH cache to `mesh_subject_id`
+(char_id|object_id -- today it cache-misses every beat on the scene-still hash, writes "uncast"); (6) subject
+policy for announcer/music (no char_id -> story object or reroute, never `uncast`-on-environment); (7) opaque
+source-over composite (kills the ghost double-exposure; keep blend as opt-in style) + regression check.
+VERIFY-AT-BUILD: capability reaches the prompt-gen seam; final engine map resolvable before prompt mint;
+`_still_index` priority when a `scene_*` still + a `scene_background_plate` co-exist. DEFERRED to a 3D v1.5
+sprint (panel-agreed): Cycles + 3-point lighting + multi-view texture bake (clean fodder is higher-leverage).
+HARD: ledger schema `l3-2026-05-14` additive-only; audio byte-identical (image-only); capability-gated (no
+engine-name checks); deterministic seed-keyed; LOUD fallbacks; UTF-8 no BOM; SFW.
+
+**>>> SHIPPED THIS SESSION (2026-06-21, all pushed, suite+Bug-Bible green per chunk):**
+- **STORY-ENGINE v1 (F1-F8) + Sprint-0 harness** -- the whole story-quality sprint (`ecd0cde`..`d9b25a0`);
+  see the block below. DONE.
+- **3D `mesh_stage` promoted to all 3 slots** (`6b4fd97`) -- added to `VALIDATED_ENGINES`, selectable
+  (announcer/music/cast), verified live; a 30w all-slots-3D episode rendered end-to-end (6 beats mesh_stage,
+  2.76 GB peak). [This is what exposed the scene-still-fodder bug above.]
+- **Credits: per-slot IMAGE model** (`8a7f06b`) -- dispatcher stamps `meta.image_engines.by_role`; the credits
+  dossier RENDER ENGINES section now shows video AND image engine per slot. (Treatment-card `FLUX ???` is a
+  separate surface, not yet wired -- optional follow-up.)
+- **latentsync REMOVED from the forward order** (`156d573`) -- ripped out, no engine/JSON refs; punch-list +
+  Wan 2.2 marked operator-APPROVED.
+
+**>>> (HISTORY) STORY-ENGINE IMPROVEMENTS v1 -- ALL CODE SHIPPED + PUSHED (HEAD `d9b25a0` ==
 origin/v2.0-alpha; full suite 4717 pass/33 skip, Bug Bible 16/7/3). NEXT = the GPU MEASUREMENT + SOAK, then
 the 3D PoC.** Every feature F1-F8 + the Sprint-0 harness landed as its own green chunk, each suite+Bug-Bible
 green, committed AND pushed (HEAD==origin verified per chunk; no 0-byte, no BOM, AST-parse):
