@@ -404,8 +404,63 @@ def _clean_text_for_bark(text, *, speech_only=False):
     return text
 
 
+def _pack_words(text, max_len):
+    """Greedy word-pack ``text`` into chunks of at most ``max_len`` chars.
+
+    Splits ONLY on whitespace -- never mid-word. A single word longer than
+    ``max_len`` is kept whole (the last resort: a word is never cut). Pure."""
+    words = text.split()
+    out = []
+    cur = ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_len:
+            out.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}" if cur else w
+    if cur:
+        out.append(cur)
+    return out or ([text.strip()] if text.strip() else [])
+
+
+def _split_long_sentence(sentence, max_len):
+    """B3 (2026-06-22): split ONE overlong sentence without breaking words.
+
+    Fallback ladder: clause delimiters (``, ; :``) FIRST, then whitespace
+    word-packing as the last resort. The delimiter stays attached to the
+    clause that precedes it. Returns a list whose parts are each <= max_len
+    except an unavoidable single over-long word. Pure / CPU-testable."""
+    import re
+    s = sentence.strip()
+    if len(s) <= max_len:
+        return [s] if s else []
+    parts = re.split(r'(?<=[,;:])\s+', s)
+    out = []
+    cur = ""
+    for part in parts:
+        if len(part) > max_len:
+            # A clause longer than the budget -> word-pack it.
+            if cur.strip():
+                out.append(cur.strip())
+                cur = ""
+            out.extend(_pack_words(part, max_len))
+            continue
+        if cur and len(cur) + 1 + len(part) > max_len:
+            out.append(cur.strip())
+            cur = part
+        else:
+            cur = f"{cur} {part}" if cur else part
+    if cur.strip():
+        out.append(cur.strip())
+    return out or [s]
+
+
 def _chunk_text_for_bark(text, max_len=180):
-    """Split text into Bark-friendly chunks at sentence boundaries."""
+    """Split text into Bark-friendly chunks at sentence boundaries.
+
+    B3: a SINGLE sentence longer than ``max_len`` is no longer returned whole
+    (which let bark over-generate on a runaway clause). It is split on clause
+    punctuation first, then on whitespace -- never mid-word."""
     import re
     if len(text) <= max_len:
         return [text]
@@ -414,6 +469,14 @@ def _chunk_text_for_bark(text, max_len=180):
     sentences = re.split(r'(?<=[.!?])\s+', text)
     current = ""
     for sentence in sentences:
+        # B3: an overlong single sentence cannot be packed as one chunk --
+        # flush the buffer and split the sentence on clauses/words.
+        if len(sentence) > max_len:
+            if current.strip():
+                chunks.append(current.strip())
+                current = ""
+            chunks.extend(_split_long_sentence(sentence, max_len))
+            continue
         if len(current) + len(sentence) + 1 > max_len and current:
             chunks.append(current.strip())
             current = sentence
