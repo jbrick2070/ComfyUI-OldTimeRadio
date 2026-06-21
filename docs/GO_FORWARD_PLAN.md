@@ -487,21 +487,35 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP (operator, 2026-06-20 -- THIS is the current step): STORY-ENGINE IMPROVEMENTS v1 (un-PARKED).**
-The 2026-06-20 visual-fixes batch (BUG 1-4) is SHIPPED + GPU-verified (HEAD `8d7e660` == origin; suite 4647,
-Bug Bible 16/7/3). The operator has un-PARKED the story-engine sprint as the next build (re-sequenced AHEAD of
-the 3D PoC). It is CODE-READY: the FINAL converged plan (post 4 roundtables + 3 grounded code audits) is
-`docs/2026-06-21-allnight-864-frontier/SPRINT_READY_PLAN.md` (scope F1-F8; F9/F10 deferred), with
-`CODING_SPRINT_PLAN.md` + `WIRING_PLAN.md` + `roundtable/pass0{1,2,3,4}_judgment.md`. HARD invariants
-(verbatim in SPRINT_READY_PLAN): C2 ledger schema `l3-2026-05-14` unchanged (additive `meta.*`/`cast[].*` keys
-only, `lines[]` order preserved, audio byte-identical where text unchanged); C3 NO QA scoring/reject/reroll
-gate (only the existing single-line recompose seam, 1 attempt, LOUD marker, fallback); C4 NO arch change (all
-inside node 1 `OTR_LedgerScriptWriter` + its internal modules); freeze CRITICAL invariants intact; **ZERO
-`otr_scifi_16gb_full.json` edits in v1** (content-only). Sprint 0 builds `scripts/story_quality_scan.py` +
-the fixed 12-leg/864-word `SPRINT_BASELINE.md` (pins OTR_CAST_SEED+OTR_STYLE_SEED per leg); each `.py` task is
-its own green chunk -> suite + Bug Bible -> commit AND push to `v2.0-alpha`. START a FRESH coder window via
-`/otr-handoff` (it reads SPRINT_READY_PLAN.md). The 3D PoC (`docs/2026-06-20-mesh-stage-texturing/`) moves to
-AFTER this sprint.
+**>>> ACTIVE STEP (2026-06-21): STORY-ENGINE IMPROVEMENTS v1 -- ALL CODE SHIPPED + PUSHED (HEAD `d9b25a0` ==
+origin/v2.0-alpha; full suite 4717 pass/33 skip, Bug Bible 16/7/3). NEXT = the GPU MEASUREMENT + SOAK, then
+the 3D PoC.** Every feature F1-F8 + the Sprint-0 harness landed as its own green chunk, each suite+Bug-Bible
+green, committed AND pushed (HEAD==origin verified per chunk; no 0-byte, no BOM, AST-parse):
+- **Sprint 0** (`ecd0cde`): `scripts/story_quality_scan.py` (length_ratio / length_pass_fired / episode_valid /
+  outro_hedge_vs_resolved / narration_self_address; reads the on-disk `*_ledger.json`) + the SHARED
+  `is_resolved_ending_change` + `HEDGE_LIST` in `_otr_dramatic_state` (one source of truth with the F3 repair).
+- **T1.1 F1** (`bdeccb6`): dropped the literal "about 20-30 words" hard-cap from the line rider (the 0.70
+  length_ratio root cause); None/zero-safe per-line token budget.
+- **T1.4 F6** (`bf5d71a`): split the rider -- indirect-performance UNCONDITIONAL on character beats,
+  situation-change GATED to turn beats.
+- **T1.2 F2** (`44aecd3`): costly choice bound to a CHARACTER beat (character-only candidate list +
+  contract-build guard so `must_turn` never lands on announcer/music -- fixes the slot-drama audit).
+- **T1.3 F3** (`f703ea4`): ending-aware outro -- threads `dramatic_state.ending_change` + the final character
+  line; recompose ONCE on a resolved-then-hedged close; deterministic resolved fallback (no hedge).
+- **T2.1 F4** (`79c0040`): pins speaker gender/pronouns in the line prompt from `cast[].gender` (no schema change).
+- **T2.2 F5** (`feb6fa8`): `speech_signature` -- the description LLM emits a <=5-word register, backfilled to
+  "plain spoken", rendered in the voice card.
+- **T2.3 F7** (`958f331`): narration/self-address detector in `_otr_line_hygiene` (shared with the scan) +
+  spine recompose seam (1 attempt, LOUD, fallback) + output-format constraint.
+- **T3.1 F8** (`d9b25a0`): seeded `meta.arc_shape` variety (additive) + shape templates + shape-branched
+  post-validator so non-confrontation shapes (investigation / slow_dread) no longer stall.
+All content-only inside node 1 `OTR_LedgerScriptWriter` + its internal modules; ZERO `otr_scifi_16gb_full.json`
+edits; ledger schema `l3-2026-05-14` untouched; node imports verified clean in the venv. **REMAINING (GPU):**
+(1) the 12-leg/864-word measurement (baseline + after via `story_quality_scan.py`, write `SPRINT_BASELINE.md`);
+(2) the operator-requested 500-word soak (indextts2 voice, LTX-audio bookends, flux2_klein char-beat stills,
+max creativity, cheap OpenRouter frontier writer). KNOWN SMALL GAP: F8's macro-prompt arc_shape context was
+deferred (the dramatic-state path carries arc_shape + the meta stamp -- acceptance "distribution not
+single-valued / no rejections" is met). The 3D PoC (`docs/2026-06-20-mesh-stage-texturing/`) is AFTER the soak.
 
 **>>> SUPERSEDED 2026-06-20 (DONE) -- TOP-PRIORITY VISUAL FIXES (all four shipped + GPU-verified):**
 Spec: `docs/2026-06-20-visual-fixes/VISUAL_FIXES_PLAN.md` + the 2026-06-20-NIGHT top block. HEAD `ce507e8` ==
