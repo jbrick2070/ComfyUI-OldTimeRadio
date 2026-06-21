@@ -720,6 +720,38 @@ def ltx_prompt_diversity_status(trace):
             "ok": (len(shas) < 2) or distinct > 1, "sha8s": shas}
 
 
+def _uses_ambient_master_audio(engine_id, family):
+    """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
+    ``audio_conditioned_video`` family (ltx_av_music -- which HARD-requires
+    audio_ref) + the visualizer scopes. These get a bounded master slice when a
+    beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk) is
+    EXCLUDED: it needs the character's OWN voice, so a master-mix slice would make
+    it lip-sync to the wrong audio -- it keeps its no-audio degrade instead."""
+    return str(family) == "audio_conditioned_video" or str(engine_id) == "visualizer"
+
+
+def _cumulative_beat_start(ledger, shot, fps):
+    """Best-effort start (seconds) of this shot's beat in the master mix: the sum
+    of preceding shots' ``target_frame_count``/fps in ``video.shots`` order
+    (ShotRow carries target_frame_count; it has NO start_s/dur_s -- extra=forbid).
+    Bounded + deterministic; clamped >= 0. Returns 0.0 if the shot is not found
+    (slice the head -- still a BOUNDED, representative window, never the whole
+    master)."""
+    shots = ((ledger or {}).get("video") or {}).get("shots") or []
+    sid = str(shot.get("shot_id") or "")
+    acc = 0.0
+    f = float(fps) if fps else 25.0
+    for s in shots:
+        if not isinstance(s, dict):
+            continue
+        if str(s.get("shot_id") or "") == sid:
+            return max(0.0, acc)
+        n = int(s.get("target_frame_count") or 0)
+        if n > 0 and f > 0:
+            acc += n / f
+    return 0.0
+
+
 def build_request_from_shot(shot, ledger, *, canvas=None,
                             master_audio_path=""):
     """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
@@ -906,12 +938,28 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # THOSE engines only, so every other engine keeps the line-backed slice
         # path byte-identical. (2026-06-18 visualizer soak: b000_music_open reached
         # the visualizer with an empty audio_ref and failed LOUD without this.)
-        if (start_s is None or dur_s is None) and \
-                str(shot.get("engine_id") or "") in ("ltx_av_music", "visualizer"):
-            if start_s is None:
-                start_s = shot.get("start_s")
+        # AMBIENT-AUDIO lanes (ltx_av_music's audio_conditioned_video family + the
+        # visualizer) condition on the master MIX, and ltx_av_music HARD-REQUIRES
+        # audio_ref -- without it _assert_family_inputs_satisfiable raises
+        # FamilyInputGap and the no-fallbacks rule CRASHES the episode (the
+        # 2026-06-22 music-beat bug: b006/b013 inter-music beats have no per-line
+        # timing). ShotRow is extra=forbid with NO start_s/dur_s, so the old
+        # shot.get('start_s') fallback was ALWAYS None. Synthesize a BOUNDED window
+        # from the beat's target_frame_count (its audio-derived length) at its
+        # cumulative timeline position -- NEVER the whole master (an episode-length
+        # WAV would blow up the audio encoder).
+        if ((start_s is None or dur_s is None)
+                and _uses_ambient_master_audio(shot.get("engine_id"), _family)):
+            _afps = int(((ledger or {}).get("video") or {}).get("fps") or 25) or 25
+            _an = int(shot.get("target_frame_count") or 0)
             if dur_s is None:
-                dur_s = shot.get("dur_s")
+                dur_s = (_an / float(_afps)) if (_an > 0 and _afps > 0) else 4.0
+            if start_s is None:
+                start_s = _cumulative_beat_start(ledger, shot, _afps)
+            _LOG.info("[OTR.render_driver] ambient-audio %s beat %s: synthesized "
+                      "BOUNDED master window @%.2f+%.2fs (no per-line timing; "
+                      "ShotRow carries none) so audio_ref is satisfied",
+                      _eng_id, bid, float(start_s), float(dur_s))
         if (start_s is not None and dur_s is not None
                 and float(dur_s) > 0):
             # 7.3 slice key: the master CONTENT hash is the cache identity

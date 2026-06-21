@@ -149,6 +149,74 @@ class TestSliceMasterAudio:
 
 
 # --------------------------------------------------------------------------- #
+# 2026-06-22: ambient-audio (ltx_av_music / visualizer) no-timing music-beat gap
+# --------------------------------------------------------------------------- #
+class TestAmbientAudioMusicBeatGap:
+    def test_uses_ambient_master_audio_scope(self):
+        # ltx_av_music's family + the visualizer engine = ambient master lanes.
+        assert rd._uses_ambient_master_audio("ltx_av_music", "audio_conditioned_video") is True
+        assert rd._uses_ambient_master_audio("visualizer", "abstract") is True
+        # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
+        # never a master-mix slice (would lip-sync to the wrong audio).
+        assert rd._uses_ambient_master_audio("humo", "audio_driven_face") is False
+        assert rd._uses_ambient_master_audio("ltx_video", "text_to_video") is False
+
+    def test_cumulative_beat_start_sums_preceding(self):
+        ledger = {"video": {"fps": 25, "shots": [
+            {"shot_id": "shot_a", "target_frame_count": 25},   # 1.0s
+            {"shot_id": "shot_b", "target_frame_count": 50},   # 2.0s
+            {"shot_id": "shot_c", "target_frame_count": 99},
+        ]}}
+        assert rd._cumulative_beat_start(ledger, {"shot_id": "shot_a"}, 25) == 0.0
+        assert rd._cumulative_beat_start(ledger, {"shot_id": "shot_b"}, 25) == 1.0
+        assert rd._cumulative_beat_start(ledger, {"shot_id": "shot_c"}, 25) == 3.0
+        # unknown shot -> head (0.0), still bounded, never the whole master
+        assert rd._cumulative_beat_start(ledger, {"shot_id": "nope"}, 25) == 0.0
+
+    def test_music_beat_no_timing_gets_bounded_slice(self, tmp_path):
+        """A music beat (ambient lane) with NO per-line/shot timing synthesizes a
+        BOUNDED master slice (dur = target_frame_count/fps), so audio_ref is
+        satisfied instead of FamilyInputGap-crashing. Never the whole master."""
+        master = tmp_path / "master.mp4"
+        master.write_bytes(b"fake-master")
+        # a music line with NO start_s/dur_s (the inter-music-beat case)
+        ledger = {
+            "audio": {"master_audio_sha256": "deadbeef"},
+            "video": {"fps": 25, "shots": [
+                {"shot_id": "shot_pre", "target_frame_count": 25},   # 1.0s before
+                {"shot_id": "shot_b006", "target_frame_count": 50},  # this beat, 2.0s
+            ]},
+            "lines": [{"line_id": "b006"}],   # no start_s / dur_s
+            "images": {"images": []},
+        }
+        shot = {"shot_id": "shot_b006", "beat_id": "b006",
+                "engine_id": "visualizer", "family": "abstract",
+                "target_frame_count": 50, "source_line_ids": ["b006"],
+                "creative": {"text_prompt": "scope", "request_hash": "h"}}
+        captured = {}
+        slice_path = str(tmp_path / "synth_slice.wav")
+
+        def _fake_slice(path, start, dur, master_hash=""):
+            captured["start"] = start
+            captured["dur"] = dur
+            with open(slice_path, "wb") as f:        # must EXIST (build_request filters)
+                f.write(b"RIFF fake wav")
+            return slice_path
+
+        with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
+            req = rd.build_request_from_shot(shot, ledger, master_audio_path=str(master))
+        # audio_ref satisfied (would otherwise FamilyInputGap-crash ltx_av_music):
+        # build_request puts it at the top-level req["audio_ref"], and
+        # _present_request_tokens then reports "audio_ref" -> the family gate passes.
+        assert (req.get("audio_ref") or {}).get("path") == slice_path
+        assert "audio_ref" in rd._present_request_tokens(req)
+        # BOUNDED: dur == the beat's own length (50/25 = 2.0s), NOT the whole master
+        assert captured["dur"] == pytest.approx(2.0)
+        # start == cumulative position of preceding beats (1.0s)
+        assert captured["start"] == pytest.approx(1.0)
+
+
+# --------------------------------------------------------------------------- #
 # 7.3 slice/curve cache-key SPLIT (3D plan; don't over-key the cheap WAV)
 # --------------------------------------------------------------------------- #
 
