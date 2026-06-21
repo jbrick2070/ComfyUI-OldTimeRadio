@@ -1,5 +1,43 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER, very long session; HEAD `90ddfca` == origin/v2.0-alpha; full suite
+> 4740 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green). HANDOFF FOR A FRESH CODER WINDOW: the
+> NEW CURRENT STEP is the STORY-QUALITY R2 coding sprint -- build-ready in `docs/2026-06-22-story-quality-r2/
+> SPRINT_PLAN.md` (see CURRENT STEP, section 1).** SHIPPED + PUSHED this session, each suite+Bug-Bible green:
+> - **3D image streams (all 7 chunks)** done + GPU-verified end-to-end earlier in the session (clay-blob fixed;
+>   the block below). Then **mesh-quality v1.1+v1.2**: tighter fodder (`ea03203`), gradient sculpt surface
+>   (`f8a48b9`), and the lighting fix `e485258` -- the meshes were WHITE MARBLE because WORKBENCH MATCAP
+>   ignores the vertex albedo; switched to STUDIO lighting so the gradient + 3D form render (CPU-Blender
+>   verified). Both 30w all-3D GPU smokes published to obs.
+> - **OpenRouter writer fix** (`d249743`): the nightly frontier writers were 0-lining via `finish_reason=length`
+>   (reasoning `~latest` models burning the output budget). Fix = `OPENROUTER_REASONING_EFFORT=none` (set in the
+>   server boot + the User env for manual runs) + a one-line "reasoning_effort ACTIVE" log so it's EVIDENT on any
+>   run. Roundtable-converged. Confirmed live (remote preflight wrote a full story; near-every leg now writes).
+> - **ltx_av_music render crash** (`fadbe60`) + **beat-accurate audio** (`90ddfca`): a music beat with no
+>   per-line timing FamilyInputGap-crashed ltx_av_music (ShotRow has no start_s/dur_s). Fix = synthesize a
+>   BOUNDED master slice (target_frame_count/fps at the beat's cumulative position, anchored on preceding beats'
+>   real line timing -> respects the opening-music offset); audio_driven_face excluded. Roundtable-converged,
+>   +4 tests. NOTE: both render_driver fixes are IN-PROCESS -> live on the NEXT server boot, not the still-
+>   running soak.
+> - **Nightly 10h anthology soak** (local tooling `scripts/_otr_nightly_anthology_soak.py` +
+>   `_otr_nightly_soak_boot_launch.ps1`, gitignored): 384w max-creativity, rotating frontier OpenRouter writers,
+>   mixed video/3D bookends, rotating approved image models on character beats, rotating voices, dynamic news,
+>   720w visualizer story-tests every 4th leg; smoke-first + remote preflight + soak-only local fallback. RAN
+>   ~13h, feeding `otr/obs` for the operator's OBS->YouTube broadcast loop.
+> - **STORY-QUALITY R2 CAMPAIGN -- CONVERGED, BUILD-READY (the NEXT step).** Grounded in the 13h soak's REAL
+>   stories (opus = genuinely good; weak/local = generic + cliche + stage-business + music/non-dialogue text
+>   bleeding into the caption track). 3 roundtable passes (pass01 structural + pass02 coding) + Claude's own
+>   creative pass (pass01b) + seam-location -> `SPRINT_PLAN.md`: 8 ordered green chunks (S1 music/non-dialogue
+>   caption suppression; S2 announcer-close final-image; S3 cliche/stage-business reject gate; C0 non-default
+>   wants + action-verb in outline Stage 3; C1 specificity anchors; C2 central story-object; C3 contrasting
+>   voice signatures; C4+C5 escalation+subtext). HARD: ledger schema FIXED (new fields ride free-form `meta`,
+>   NO Pydantic fields), NO workflow-JSON change, reuse the EXISTING Sprint-5C `reroll_hint` loop +
+>   `speech_signature` (already wired in `_otr_line_composer.compose_line_draft`), model-agnostic (every gate is
+>   one opus passes -> lifts the weak end, never rewrites opus), craft-ONLY (no word/beat count). Located seams +
+>   judgments in `docs/2026-06-22-story-quality-r2/`. >>> THE CODER WINDOW BUILDS SPRINT_PLAN.md, S1 FIRST.
+> - OPEN (operator call): restart the soak so the ltx_av + reasoning fixes go live now, vs let it ride to the
+>   10h cap and they apply next boot.
+
 > **LATEST SESSION -- 2026-06-21 (CODER; 3D IMAGE STREAMS -- ALL 7 CHUNKS SHIPPED + PUSHED + GPU-VERIFIED
 > END-TO-END; HEAD `555788e` == origin/v2.0-alpha; full suite 4733 pass/33 skip, Bug Bible 16/7/3, audio
 > byte-identical green per chunk).** The clay-blob root cause is FIXED: `mesh_stage` no longer meshes the
@@ -518,29 +556,36 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP (operator, 2026-06-21 -- BUILD THIS NEXT): 3D IMAGE STREAMS (clean mesh fodder + background
-plate + opaque composite).** HEAD `19bd75e` == origin/v2.0-alpha; full suite 4719 pass/33 skip, Bug Bible 16/7/3.
-The design is ROUNDTABLE-HARDENED + code-grounded and BUILD-READY:
-`docs/2026-06-21-3d-image-streams/roundtable/pass01_plan.md` (+ `pass01_judgment.md`; raw panel reviews in
-`pass01/`). **Root cause (3-model panel + Claude-verified in code):** `mesh_stage` is fed the per-beat SCENE
-STILL, not a portrait -- `MeshStageEngine.family="image_to_video"` hits the `_SCENE_INIT_FAMILIES` override in
-`render_driver.build_request_from_shot` (~:703-708), so Hunyuan3D meshes the whole environment -> the clay
-blob. **Build (7 ordered green chunks, each suite+Bug-Bible -> commit AND push):** (1) add
-`requires_mesh_fodder=True` to `MeshStageEngine` (the routing gate; `requires_mesh_portrait` does NOT exist on
-it); (2) branch `build_request_from_shot` to feed mesh engines a clean `mesh_fodder` still BEFORE the scene
-override (resolve the engine map AFTER `OTR_FORCE_ENGINE_MAP`); (3) fork the image prompts in
-`OTR_MetaBriefImagePromptGen` -> `mesh_fodder` (isolated subject -- character OR story object -- neutral bg,
-even light, full unoccluded) + `scene_background_plate` (subject-free world; `scene_` prefix so `_still_index`
-sees it) + checked-in positive/negative scaffolds; (4) ledger taxonomy + kind-specific indices (kind-filter
-`_portrait_index` so fodder doesn't leak to HuMo); (5) generalize the MESH cache to `mesh_subject_id`
-(char_id|object_id -- today it cache-misses every beat on the scene-still hash, writes "uncast"); (6) subject
-policy for announcer/music (no char_id -> story object or reroute, never `uncast`-on-environment); (7) opaque
-source-over composite (kills the ghost double-exposure; keep blend as opt-in style) + regression check.
-VERIFY-AT-BUILD: capability reaches the prompt-gen seam; final engine map resolvable before prompt mint;
-`_still_index` priority when a `scene_*` still + a `scene_background_plate` co-exist. DEFERRED to a 3D v1.5
-sprint (panel-agreed): Cycles + 3-point lighting + multi-view texture bake (clean fodder is higher-leverage).
-HARD: ledger schema `l3-2026-05-14` additive-only; audio byte-identical (image-only); capability-gated (no
-engine-name checks); deterministic seed-keyed; LOUD fallbacks; UTF-8 no BOM; SFW.
+**>>> ACTIVE STEP (operator, 2026-06-22 -- BUILD THIS NEXT in a FRESH CODER WINDOW): STORY-QUALITY R2 --
+craft lift, grounded in the 13h soak's REAL stories.** HEAD `90ddfca` == origin/v2.0-alpha; suite 4740
+pass/33 skip, Bug Bible 16/7/3. The plan is ROUNDTABLE-HARDENED (3 passes) + Claude-creative-pass + seams
+LOCATED and BUILD-READY: **`docs/2026-06-22-story-quality-r2/SPRINT_PLAN.md`** (+ `pass01_judgment.md` /
+`pass01b_creative_levers.md` / `pass02_coding_judgment.md`; raw panel reviews in `roundtable/`). Goal = a
+genuinely BETTER STORY (operator: NOT word count). Grounded findings: opus is genuinely good; the weak/local
+end is generic + cliche + meandering stage-business + the music/non-dialogue beats BLEED their placeholder
+into the spoken/caption track ("Musical interlude bridging..." in every episode). **Build = 8 ordered green
+chunks, each suite+Bug-Bible -> commit AND push:** S1 suppress music/non-dialogue beats from the
+spoken/caption track (`_otr_ledger_scrub._SPOKEN_ROLES` + the text-materialization point; neutralize the
+`_otr_outline._assemble_outline` music_inter intent); S2 announcer-close = concrete FINAL IMAGE not thesis
+(close intent + a shared banned-thesis regex scan -> reroll via the announcer composer); S3 cliche +
+stage-business reject gate in `_otr_line_hygiene` (FLAGS ONLY) feeding the EXISTING Sprint-5C `reroll_hint`
+loop in `_otr_line_composer.compose_line_draft`; C0 non-default-wants classifier in `_otr_dramatic_state` +
+ACTION-VERB-under-pressure in the OUTLINE Stage-3 beat prompt (`_build_beat_user_prompt`, NOT the line
+composer -- intents are written there); C1 specificity anchors -> `meta["specificity_anchors"]` + a
+generic-line gate; C2 central story-object -> `meta["central_object"]` (derive BEFORE the S2 close); C3
+CONTRASTING `speech_signature`s at CastLock (`_otr_casting`) + promote the already-wired signature clause to
+a HARD per-line constraint; C4+C5 per-act escalation contract + a turn-beat subtext nudge. HARD (panel,
+code-verified): ledger schema `l3-2026-05-14` FIXED -> new fields ride FREE-FORM `meta`, NEVER new Pydantic
+fields; NO workflow-JSON / node / widget change; reuse the EXISTING reroll_hint loop + speech_signature (no
+new reroll infra); MODEL-AGNOSTIC (every gate is one opus PASSES -> lifts the weak end, never rewrites opus);
+craft-ONLY (no word/beat/budget change); audio byte-identical; UTF-8 no BOM; SFW. FINAL QA = extend
+`scripts/story_quality_scan.py` (4 structural counts + craft signals) + a small re-soak (2-3 weak-local + 1
+frontier leg) with the opus-no-regress gate. START WITH S1 (kills the universal music-bleed wart).
+
+**>>> (DONE 2026-06-22) 3D IMAGE STREAMS -- all 7 chunks shipped + GPU-verified; mesh-quality v1.1/v1.2
+(STUDIO-lighting gradient, not white marble) shipped + CPU-verified.** Spec was
+`docs/2026-06-21-3d-image-streams/roundtable/pass01_plan.md`; results in the LATEST SESSION blocks above.
+DEFERRED to 3D v1.5: Cycles + 3-point lighting + multi-view texture bake.
 
 **>>> SHIPPED THIS SESSION (2026-06-21, all pushed, suite+Bug-Bible green per chunk):**
 - **STORY-ENGINE v1 (F1-F8) + Sprint-0 harness** -- the whole story-quality sprint (`ecd0cde`..`d9b25a0`);

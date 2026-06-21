@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-21T21:46:42.695654+00:00",
+  "doc": "docs\\2026-06-22-story-quality-r2\\BUILD_PLAN_DRAFT.md",
+  "prompt_tokens_est": 33309,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 31344,
+      "completion_tokens": 3500,
+      "cost_usd": 0.07418
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 36007,
+      "completion_tokens": 3496,
+      "cost_usd": 0.07996875
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 31007,
+      "completion_tokens": 1813,
+      "cost_usd": 0.04329125
+    }
+  ],
+  "total_cost_usd": 0.1974
+}
