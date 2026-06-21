@@ -96,6 +96,7 @@ __all__ = [
     "ScrubFinding",
     "NeedsEditorRepair",
     "scrub_ledger",
+    "is_spoken_role",
 ]
 
 
@@ -115,6 +116,18 @@ _TOTAL_WORDS_HARD_CEILING: int = 1200  # whole-episode spoken-word runaway guard
 # music / sfx rows are render contracts, not speech -- the scrub never
 # touches them (it never sees them as "spoken").
 _SPOKEN_ROLES: frozenset[str] = frozenset({"character", "announcer"})
+
+
+def is_spoken_role(role: Any) -> bool:
+    """True when a ledger row's speaker_role is a voiced/dialogue role.
+
+    Canonical single source of truth for "does this row's `text` ride the
+    TTS + caption track". Character / announcer rows are voiced; music_open /
+    music_inter / music_close / sfx rows are render contracts (S1: their
+    `text` must never carry generic beat intent into the spoken/caption
+    track). Defensive against None / non-str input.
+    """
+    return str(role or "") in _SPOKEN_ROLES
 
 # Stage-direction shapes the scrub strips from a spoken field when they are
 # clearly leaked cues rather than dialogue. Mirrors the composer's

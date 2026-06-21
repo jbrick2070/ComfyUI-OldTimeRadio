@@ -556,9 +556,21 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP (operator, 2026-06-22 -- BUILD THIS NEXT in a FRESH CODER WINDOW): STORY-QUALITY R2 --
-craft lift, grounded in the 13h soak's REAL stories.** HEAD `90ddfca` == origin/v2.0-alpha; suite 4740
-pass/33 skip, Bug Bible 16/7/3. The plan is ROUNDTABLE-HARDENED (3 passes) + Claude-creative-pass + seams
+**>>> ACTIVE STEP: STORY-QUALITY R2 -- craft lift. S1 SHIPPED (2026-06-22); NEXT = S2 (announcer-close =
+concrete final image, not thesis).** Latest green: full suite 4749 pass/33 skip, Bug Bible 16/7/3, audio
+byte-identical 9/0. **S1 DONE** (commit pending push to v2.0-alpha): music/non-dialogue beats no longer
+bleed their placeholder intent into the spoken/caption transcript. Root cause was
+`production_ledger.init_lines_from_outline` stamping a non-voiced row's `text` from `sfx_cue OR intent` ->
+music_inter (no cue) leaked "Musical interlude bridging <phase>..." into the writer's `script_text`
+(`assemble_script_text_from_ledger` -> `[SFX: ...]`). Fix: (a) new canonical `is_spoken_role()` in
+`_otr_ledger_scrub`; (b) non-voiced rows take ONLY a genuine `sfx_cue` as text (intent fallback dropped --
+music rows -> `text=""`; real sfx cues preserved; `beat_intent` still carries the intent for visual/music
+consumers); (c) neutralized the `_otr_outline._assemble_outline` music_inter intent. SDH captions already
+filtered non-speech roles, so this closes the transcript path. +9 tests (`tests/test_s1_music_suppression.py`
++ updated `test_phase2b_progressive_ledger.py`). Content-only; ZERO workflow-JSON change; ledger schema
+`l3-2026-05-14` untouched. **>>> NEXT = S2.** (Below: the original full-sprint brief, S2-C5 unchanged.)
+
+HEAD baseline at sprint start `90ddfca` == origin/v2.0-alpha; suite 4740 pass/33 skip, Bug Bible 16/7/3. The plan is ROUNDTABLE-HARDENED (3 passes) + Claude-creative-pass + seams
 LOCATED and BUILD-READY: **`docs/2026-06-22-story-quality-r2/SPRINT_PLAN.md`** (+ `pass01_judgment.md` /
 `pass01b_creative_levers.md` / `pass02_coding_judgment.md`; raw panel reviews in `roundtable/`). Goal = a
 genuinely BETTER STORY (operator: NOT word count). Grounded findings: opus is genuinely good; the weak/local

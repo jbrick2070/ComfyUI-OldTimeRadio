@@ -122,10 +122,30 @@ class TestInitLinesFromOutline:
         assert rows["b002"]["text"] == ""
         assert rows["b003"]["text"] == ""
         assert rows["b004"]["text"] == ""
-        # Non-voiced rows stamped from intent at init time.
-        assert "cold open" in rows["b001"]["text"]
-        assert "transition" in rows["b005"]["text"]
-        assert "fade" in rows["b008"]["text"]
+        # S1 (2026-06-22): non-voiced rows with NO sfx_cue start text=""
+        # too -- the generic beat intent ("cold open"/"transition"/"fade")
+        # MUST NOT bleed into the line text / script transcript. The intent
+        # is preserved separately in beat_intent.
+        assert rows["b001"]["text"] == ""
+        assert rows["b005"]["text"] == ""
+        assert rows["b008"]["text"] == ""
+        assert rows["b001"]["beat_intent"] == "cold open"
+        assert rows["b005"]["beat_intent"] == "transition"
+
+    def test_non_voiced_row_keeps_real_sfx_cue(self, fresh_ledger):
+        # S1: a genuine sfx_cue IS a render contract and stays as text
+        # (only the generic intent fallback is dropped).
+        outline = FakeOutline(beats=[
+            FakeBeat("b001", "NARRATOR", "sfx", "door slams", 0, "tense",
+                     sfx_cue="a heavy steel door slams shut"),
+            FakeBeat("b002", "NARRATOR", "music_inter", "transition", 5,
+                     "bold"),
+        ])
+        fresh_ledger.init_lines_from_outline(outline)
+        rows = {r["beat_id"]: r for r in fresh_ledger.data["lines"]}
+        assert rows["b001"]["text"] == "a heavy steel door slams shut"
+        # music row with no cue -> suppressed.
+        assert rows["b002"]["text"] == ""
 
     def test_speaker_role_and_arc_phase_stamped(self, fresh_ledger,
                                                  fake_outline_3acts):
@@ -254,8 +274,10 @@ class TestProgressiveCrashRecovery:
         assert rows["b004"]["text"] == "Composed line two."
         # Uncomposed character beat still has empty placeholder.
         assert rows["b006"]["text"] == ""
-        # Non-voiced beats stamped at init still carry their cues.
-        assert "cold open" in rows["b001"]["text"]
+        # S1: non-voiced music beats (no sfx_cue) survive with text=""
+        # and the intent preserved in beat_intent.
+        assert rows["b001"]["text"] == ""
+        assert rows["b001"]["beat_intent"] == "cold open"
 
 
 # ---------------------------------------------------------------------------

@@ -62,6 +62,14 @@ from typing import Any, Dict, Iterable, List, Optional
 
 log = logging.getLogger("OTR.production_ledger")
 
+# Canonical spoken-role test (S1). _otr_ledger_scrub is a leaf module
+# (stdlib-only, import-safe), so this never forms an import cycle. Dual
+# import keeps the module loadable both as a package node and standalone.
+try:  # pragma: no cover - exercised by both import styles
+    from ._otr_ledger_scrub import is_spoken_role
+except ImportError:  # pragma: no cover
+    from _otr_ledger_scrub import is_spoken_role  # type: ignore
+
 _LEDGER_LOCK = threading.Lock()
 _CURRENT: Optional["Ledger"] = None
 _GIT_HEAD_CACHE: Optional[str] = None
@@ -756,10 +764,20 @@ class Ledger:
                 cid = "announcer"
             else:
                 cid = role
-            if role in ("character", "announcer"):
+            if is_spoken_role(role):
                 text = ""    # composer fills via update_line_text
             else:
-                text = (sfx_cue or intent or "").strip()
+                # S1 (2026-06-22): non-spoken render-contract rows
+                # (music_open / music_inter / music_close / sfx) carry
+                # ONLY a genuine sfx_cue as text -- never the generic beat
+                # `intent`. The intent fallback was stamping filler like
+                # "Musical interlude bridging <phase>..." into the line
+                # text, which bled into the script transcript
+                # (assemble_script_text_from_ledger -> [SFX: ...]). The
+                # beat intent is still preserved separately in `beat_intent`
+                # below for any visual/music-prompt consumer. Music rows
+                # (no cue) become text="" ; real sfx cues are kept intact.
+                text = (sfx_cue or "").strip()
             rows.append({
                 "line_id":       beat_id,
                 "shot_id":       None,

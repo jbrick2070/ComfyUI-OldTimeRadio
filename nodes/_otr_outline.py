@@ -1508,10 +1508,12 @@ def _assemble_outline(
                 beat_id=_next_bid(),
                 speaker="NARRATOR",
                 speaker_role="music_inter",
-                intent=(
-                    f"Musical interlude bridging {phase_name} "
-                    f"into the next phase."
-                ),
+                # S1 (2026-06-22): neutral, non-narrated intent. This row is
+                # a music render contract, never spoken/captioned; the text
+                # is suppressed at materialization (production_ledger
+                # init_lines_from_outline). The old "Musical interlude
+                # bridging <phase>..." string leaked into the transcript.
+                intent="Bridge to the next phase with music only.",
                 target_words=5,
                 mood="transitional",
                 sfx_cue=None,
