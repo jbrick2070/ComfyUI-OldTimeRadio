@@ -3097,6 +3097,14 @@ class OTR_LedgerScriptWriter:
             for row in cast_rows
             if row.get("name")
         }
+        # F4 (story-engine v1): name -> gender index from the SAME cast rows,
+        # so the line composer can pin the speaker's pronouns (no schema
+        # change -- cast[].gender already exists).
+        gender_by_name: dict[str, str] = {
+            row.get("name", ""): str(row.get("gender", "") or "").strip()
+            for row in cast_rows
+            if row.get("name")
+        }
         # Fallback ANNOUNCER card if for some reason the cast row's
         # voice_card came out empty (e.g. unset description).
         if not voice_card_by_name.get("ANNOUNCER"):
@@ -3388,6 +3396,8 @@ class OTR_LedgerScriptWriter:
                 beat_obstacle=_a5_obs,
                 beat_turn=_a5_turn,
                 beat_subtext=_a5_sub,
+                # F4 (story-engine v1) -- speaker gender/pronouns.
+                speaker_gender=gender_by_name.get(speaker, ""),
             )
 
         # Sprint 10B Wave 1 Agent B (2026-05-27): build the in-loop

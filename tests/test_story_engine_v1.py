@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes._otr_line_composer import (  # noqa: E402
     LineRequest,
     _build_user_prompt,
+    _gender_to_pronouns,
     compose_announcer_outro,
     compose_line_draft,
 )
@@ -260,3 +261,39 @@ class TestF3EndingAwareOutro:
 
         res = _outro(mock, ending_change=_RESOLVED)
         assert res.compose_flags == ("announcer_outro",)
+
+
+# ===========================================================================
+# F4 -- speaker gender/pronouns reach the line composer
+# ===========================================================================
+
+class TestF4GenderPronouns:
+
+    @pytest.mark.parametrize("gender,subj,obj", [
+        ("male", "he", "him"),
+        ("female", "she", "her"),
+        ("man", "he", "him"),
+        ("woman", "she", "her"),
+        ("nonbinary", "they", "them"),
+        ("agender", "they", "them"),
+    ])
+    def test_gender_to_pronouns(self, gender, subj, obj):
+        pr = _gender_to_pronouns(gender)
+        assert pr[0] == subj and pr[1] == obj
+
+    def test_empty_gender_no_pronouns(self):
+        assert _gender_to_pronouns("") is None
+        assert _gender_to_pronouns(None) is None
+
+    def test_female_directive_in_prompt(self):
+        prompt = _build_user_prompt(_req(speaker="MAEVE", speaker_gender="female"))
+        assert "MAEVE is female; use she/her pronouns for MAEVE" in prompt
+
+    def test_male_directive_in_prompt(self):
+        prompt = _build_user_prompt(_req(speaker="PETER", speaker_gender="male"))
+        assert "use he/him pronouns for PETER" in prompt
+
+    def test_no_gender_no_directive(self):
+        # name-independent: no PRONOUNS directive when gender is unset
+        prompt = _build_user_prompt(_req(speaker="ALICE"))
+        assert "pronouns for" not in prompt

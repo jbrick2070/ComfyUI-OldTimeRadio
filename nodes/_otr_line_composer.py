@@ -699,6 +699,11 @@ class LineRequest:
     beat_subtext: str = ""
     beat_tension: int = 0     # 0 = unset; renders only when 1..5
     next_turn: str = ""
+    # F4 (story-engine v1) -- speaker gender/pronouns. The writer threads
+    # the speaker's `cast[].gender` here so the WRITE LINE block can pin the
+    # correct pronouns/title (kills the "Mister <female>"-class mismatch).
+    # Empty string -> no PRONOUNS directive (legacy callers unaffected).
+    speaker_gender: str = ""
 
 
 @dataclass(frozen=True)
@@ -981,6 +986,31 @@ def _format_last_lines(last_lines: list[tuple[str, str]]) -> str:
     return "\n".join(rows)
 
 
+# F4 (story-engine v1): map a cast gender string to (subject, object,
+# possessive) pronouns. Empty/missing gender -> None (no PRONOUNS directive);
+# any non-empty gender that is not a recognized male/female synonym defaults
+# to they/them so non-binary / unspecified casts are still pinned.
+_PRONOUN_MAP = {
+    "male": ("he", "him", "his"),
+    "man": ("he", "him", "his"),
+    "m": ("he", "him", "his"),
+    "boy": ("he", "him", "his"),
+    "female": ("she", "her", "her"),
+    "woman": ("she", "her", "her"),
+    "f": ("she", "her", "her"),
+    "girl": ("she", "her", "her"),
+}
+
+
+def _gender_to_pronouns(gender):
+    """Return (subject, object, possessive) pronouns for a cast gender, or
+    None when no gender is supplied. Deterministic; never raises."""
+    g = str(gender or "").strip().lower()
+    if not g:
+        return None
+    return _PRONOUN_MAP.get(g, ("they", "them", "their"))
+
+
 def _build_user_prompt(req: LineRequest) -> str:
     """Render the per-beat user prompt for the composer.
 
@@ -1196,6 +1226,15 @@ def _build_user_prompt(req: LineRequest) -> str:
         parts.append(
             f"Here, you are now {req.speaker}. Produce one "
             f"line/section of dialogue for {req.speaker}."
+        )
+    # F4 (story-engine v1): pin the speaker's gender/pronouns so the line
+    # (and any in-line reference) never mis-genders or mis-titles them.
+    _pron = _gender_to_pronouns(req.speaker_gender)
+    if _pron:
+        parts.append(
+            f"{req.speaker} is {req.speaker_gender}; use "
+            f"{_pron[0]}/{_pron[1]} pronouns for {req.speaker}. Do not "
+            f"mis-gender or mis-title {req.speaker}."
         )
     parts.append(f"Mood: {req.mood}.")
     parts.append(f"Beat: {req.intent}.")
