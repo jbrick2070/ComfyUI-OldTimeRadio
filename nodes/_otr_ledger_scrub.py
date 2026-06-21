@@ -91,6 +91,20 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+# Bare leading stage-direction floor (2026-06-22). _otr_line_hygiene is a
+# stdlib-only leaf (imports only `re`) -> no import cycle. Dual import keeps the
+# module loadable both as a package node and standalone.
+try:  # pragma: no cover - exercised by both import styles
+    from ._otr_line_hygiene import (
+        BARE_STAGE_FLOOR_ACTIVE,
+        scrub_leading_stage_direction,
+    )
+except ImportError:  # pragma: no cover
+    from _otr_line_hygiene import (  # type: ignore
+        BARE_STAGE_FLOOR_ACTIVE,
+        scrub_leading_stage_direction,
+    )
+
 __all__ = [
     "ScrubResult",
     "ScrubFinding",
@@ -386,6 +400,15 @@ def _strip_stage_directions(text: str) -> Tuple[str, bool]:
         else:
             out = rx.sub("", out)
     out = _WS_RUN_RE.sub(" ", out).strip()
+    # BARE (undelimited) leading stage direction -- the FREEZE-only floor
+    # (2026-06-22). Runs AFTER the delimited strips on the already-cleaned text;
+    # narrow + guarded (see _otr_line_hygiene.scrub_leading_stage_direction).
+    # Gated on the precision-validated flag so the contract stays a no-op when
+    # disabled. The Tuple[str,bool] return is preserved (callers unpack it).
+    if BARE_STAGE_FLOOR_ACTIVE:
+        bare = scrub_leading_stage_direction(out)
+        if bare != out:
+            out = _WS_RUN_RE.sub(" ", bare).strip()
     return out, (out != original)
 
 
@@ -741,6 +764,12 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
 
         if cleaned != raw_text:
             row["text"] = cleaned
+            # Restamp the length fields so a bare/delimited strip does not leave
+            # a stale word_count for downstream consumers (caption/timing).
+            if "word_count" in row:
+                row["word_count"] = len(cleaned.split())
+            if "char_count" in row:
+                row["char_count"] = len(cleaned)
             normalized_any = True
             findings.append(ScrubFinding(
                 code=CODE_LINE_NORMALIZED, where=f"lines[{i}]",
