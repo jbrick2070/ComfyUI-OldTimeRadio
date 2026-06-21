@@ -22,9 +22,11 @@
 > GOTCHAS: (1) z_image_turbo needs `OTR_ENABLE_ZIMAGE=1` + `OTR_ZIMAGE_UNET=z_image_turbo_nvfp4.safetensors`
 > at server boot (only the nvfp4 quant is on disk, not the bf16 the engine defaults to). (2) the repeated
 > "GULLIVER REEVES" cast is the `OTR_C7=1` byte-identity mode pinning OTR_CAST_SEED/STYLE_SEED=42 (my verify
-> runs) -- production (no C7) rolls a fresh cast per episode. **NEXT = BUG 2 (verify-first: eyeball the
-> animated START/END title card on a real obs final BEFORE touching), then BUG 3 (model detail onto credits)
-> + BUG 4 (audio bars overlay) sharing one always-on procgen overlay, then the 3D PoC build.**
+> runs) -- production (no C7) rolls a fresh cast per episode. **ALSO THIS SESSION: BUG 2 DONE (verify-first,
+> no change -- the animated title card + rolling credits already work) + BUG 3 DONE (commit `9f76937`: the
+> forensic model/engine/SYSTEM dossier now scrolls on the credits via `_build_hud_dossier`; content-only, no
+> JSON; +7 tests; HEAD `9f76937` == origin, suite 4640 pass, Bug Bible 16/7/3). NEXT = BUG 4 (audio bars
+> always-on overlay, `docs/2026-06-20-audio-bars-fix/`), then the 3D PoC build.**
 
 > **LATEST SESSION -- 2026-06-20 NIGHT (CODER, autonomous "go all night"; HEAD `8de1057` == origin/v2.0-alpha;
 > suite 4625 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** BUILT + PUSHED the CORE of the
@@ -493,12 +495,17 @@ LANDSCAPE 16:9 images/video. Animated start/end procgen title cards + rolling cr
   scene_character stills (LLM beat-aware) + render_driver gating on render_aspect. Final-obs frames show each
   character beat's still synced to its SDH caption; audio byte-identical. See the LATEST SESSION block + the
   proofs in `docs/2026-06-20-visual-fixes/`. (HuMo still uses the vertical portrait by design.)
-- **#2 BUG 2 (verify-first):** eyeball a real obs final for the animated START/END title card BEFORE changing
-  (rolling credits + PostUpscaleProcgenBlend already render); only if missing/covered, make titles+credits an
-  ALWAYS-ON procgen overlay.
-- **#3 BUG 3:** burn the LLM/voice/image-model detail (from `_write_story_treatment`) ONTO the rolling credits.
-- **#4 BUG 4:** audio bars always-on overlay (`docs/2026-06-20-audio-bars-fix/`). #2/#3/#4 share one always-on
-  procgen-overlay layer.
+- **#2 BUG 2 -- DONE 2026-06-20 (verify-first, NO change needed).** Eyeballed a real obs final: the animated
+  START title card resolves the episode title via a signal-decode glitch (scramble@0.3s -> "GLIMPSE THROUGH
+  GLASS"@4s) and the END rolling credits render the whole post-roll. Working as designed -> no code/JSON change.
+  Proofs `docs/2026-06-20-visual-fixes/B2_*.png`.
+- **#3 BUG 3 -- DONE 2026-06-20 (commit `9f76937`).** The forensic model/engine/system dossier now SCROLLS on the
+  rolling credits (not just the `_treatment.txt` sidecar): new `_build_hud_dossier(led)` -> 5 sections
+  (WRITER/LLM CONFIG, RESOLVED OPENROUTER, STORY SPINE, RENDER ENGINES, SYSTEM = CPU/RAM/GPU/VRAM/CUDA/torch),
+  drawn at the top of the HUD scroll ahead of the transcript. Content-only, NO JSON change; +7 tests; verified by
+  an offline pure-PIL HUD frame (`docs/2026-06-20-visual-fixes/BUG3_credits_dossier.png`).
+- **#4 BUG 4 (NEXT):** audio bars always-on overlay (`docs/2026-06-20-audio-bars-fix/`) -- the always-on
+  procgen-overlay layer so the bottom audio-reactive bars aren't suppressed by SceneAwareScopes.
 - **THEN:** the 3D PoC build (`docs/2026-06-20-mesh-stage-texturing/roundtable/pass03_plan.md` + `pass04_plan.md`
   + the 4-item PIN list; chunks 6+7+3 + GPU smoke).
 
