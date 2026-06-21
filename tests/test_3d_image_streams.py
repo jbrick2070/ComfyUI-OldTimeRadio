@@ -120,6 +120,45 @@ def test_still_index_prioritizes_background_plate():
     assert rd._still_index(ledger)["b002"] == "plate_b002.png"
 
 
+# --------------------------------------------------------------------------- #
+# Chunk 5: render_driver stamps the mesh subject id onto the request
+# --------------------------------------------------------------------------- #
+def _mesh_ledger(tmp_path, char_id=""):
+    fodder = tmp_path / "fodder.png"
+    fodder.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+    row = {"kind": "mesh_fodder", "beat_id": "b001", "path": str(fodder)}
+    if char_id:
+        row["char_id"] = char_id
+        row["mesh_subject_id"] = char_id
+    return {
+        "video": {"video_revision": 1, "shots": []},
+        "lines": [{"line_id": "b001", "char_id": char_id,
+                   "start_s": 1.0, "dur_s": 2.0}],
+        "images": {"images": [row]},
+    }
+
+
+def test_build_request_stamps_mesh_subject_id_char(tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    led = _mesh_ledger(tmp_path, char_id="c01")
+    shot = {"shot_id": "shot_b001", "beat_id": "b001", "engine_id": "mesh_stage",
+            "family": "image_to_video", "target_frame_count": 25,
+            "source_line_ids": ["b001"], "char_id": "c01", "creative": {}}
+    req = rd.build_request_from_shot(shot, led)
+    assert req["mesh_subject_id"] == "c01"
+
+
+def test_build_request_stamps_mesh_subject_id_beat_when_no_char(tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    led = _mesh_ledger(tmp_path, char_id="")        # announcer/music object beat
+    # the fodder row has no char id, so it resolves by beat_id; subject = beat id.
+    shot = {"shot_id": "shot_b001", "beat_id": "b001", "engine_id": "mesh_stage",
+            "family": "image_to_video", "target_frame_count": 25,
+            "source_line_ids": ["b001"], "char_id": "", "creative": {}}
+    req = rd.build_request_from_shot(shot, led)
+    assert req["mesh_subject_id"] == "b001"
+
+
 def test_no_fork_without_mesh_fodder_roles():
     """Default (no fodder roles) keeps the legacy cinematic-scene-still look."""
     payload, _warn = mb.derive_image_prompts(_cast(), _meta(), lines=_lines())

@@ -756,10 +756,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _eng_id and _vreg.is_registered(_eng_id)
         and getattr(_vreg.get_engine(_eng_id), "requires_mesh_fodder", False))
     _mesh_fodder_missing = False
+    _mesh_subject_id = ""
     if _requires_fodder:
         _bid = _beat_id_for_shot(shot)
         _fidx = _mesh_fodder_index(ledger)
         _subj = char_id or str(shot.get("mesh_subject_id") or "")
+        # The cache subject id: the character/object id when known, else the
+        # beat id (a per-beat object) -- never the misleading "uncast".
+        _mesh_subject_id = _subj or _bid
         _fodder = (_fidx.get(_subj, "") if _subj else "") or _fidx.get(_bid, "")
         if _fodder:
             init_image = _fodder
@@ -928,6 +932,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
+    # 3D image streams (chunk 5): hand the mesher the STABLE subject id so its
+    # GLB cache keys on the subject (char/object), not the per-beat still hash.
+    if _requires_fodder and _mesh_subject_id:
+        req["mesh_subject_id"] = _mesh_subject_id
     # ST-4 / pass-02 Gem-3: init observability stamped on the REQUEST's
     # observability dict (the round-5 pattern, schema-real since the W7-pre
     # builder migration); run_episode copies them to trace rows so the W7

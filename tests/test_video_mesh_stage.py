@@ -86,6 +86,20 @@ def test_mesh_stage_declares_requires_mesh_fodder():
         is False
 
 
+def test_request_mesh_subject_id_subject_then_char_then_uncast():
+    """3D-image-streams chunk 5: the mesh cache keys on a STABLE subject id --
+    mesh_subject_id wins, then char_id (conditioning_refs or top-level), then
+    'uncast' (never the misleading shared id for a real subject)."""
+    eng = MeshStageEngine()
+    assert eng._request_mesh_subject_id({"mesh_subject_id": "obj_b002"}) == "obj_b002"
+    assert eng._request_mesh_subject_id(
+        {"conditioning_refs": {"mesh_subject_id": "c09"}}) == "c09"
+    assert eng._request_mesh_subject_id(
+        {"conditioning_refs": {"char_id": "c01"}}) == "c01"
+    assert eng._request_mesh_subject_id({"char_id": "c02"}) == "c02"
+    assert eng._request_mesh_subject_id({}) == "uncast"
+
+
 def test_mesh_stage_roles_exactly_the_three_e5_slots():
     eng = vreg.get_engine("mesh_stage")
     assert eng.roles == ("music_visual", "announcer_visual", "character_video")

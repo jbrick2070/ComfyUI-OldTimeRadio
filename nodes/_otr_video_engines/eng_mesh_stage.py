@@ -541,12 +541,23 @@ class MeshStageEngine(_CheapFamilyBase):
                       "run concurrently)")
 
     # ---- E-2: cache lookup / fill ----
-    def _request_character_id(self, request):
+    def _request_mesh_subject_id(self, request):
+        """The STABLE per-subject id the mesh cache keys on: ``mesh_subject_id``
+        (``char_id`` for characters, ``object_id`` for story artifacts) from the
+        request, falling back to ``char_id``, then ``"uncast"``.
+
+        3D image streams (2026-06-21): generalizes the old ``char_id``-only
+        lookup so a non-character (announcer/music story-object) beat caches
+        under its OWN id instead of the misleading shared ``"uncast"``. The init
+        image is now the STABLE per-subject mesh_fodder still (render_driver
+        chunk 2), so this id + the fodder content-hash give per-subject reuse."""
         get = self._get(request)
         cond = get("conditioning_refs") or {}
         c_get = cond.get if isinstance(cond, dict) else (
             lambda k, d=None: getattr(cond, k, d))
-        return str(c_get("char_id", "") or get("char_id") or "uncast")
+        return str(
+            c_get("mesh_subject_id", "") or get("mesh_subject_id")
+            or c_get("char_id", "") or get("char_id") or "uncast")
 
     def _cached_glb(self, key):
         root = self._cache_root()
@@ -649,9 +660,9 @@ class MeshStageEngine(_CheapFamilyBase):
         s_get = seeds.get if isinstance(seeds, dict) else (
             lambda k, d=None: getattr(seeds, k, d))
         seed = int(s_get("request_seed", 0) or 0)
-        # E-2: cache by character + CANONICAL portrait content hash.
-        char_id = self._request_character_id(request)
-        key = mesh_cache_key(char_id, portrait_content_hash(still))
+        # E-2: cache by SUBJECT (char_id|object_id) + CANONICAL fodder hash.
+        subject_id = self._request_mesh_subject_id(request)
+        key = mesh_cache_key(subject_id, portrait_content_hash(still))
         glb_path, manifest_path = self._cached_glb(key)
         if os.path.exists(glb_path):
             _LOG.info("[eng_mesh_stage] mesh cache HIT %s (no mesher run)",
@@ -659,7 +670,7 @@ class MeshStageEngine(_CheapFamilyBase):
         else:
             _LOG.info("[eng_mesh_stage] mesh cache MISS %s -- running the "
                       "hy3d-2mv mesher", key)
-            manifest = build_mesh_manifest(char_id,
+            manifest = build_mesh_manifest(subject_id,
                                            portrait_content_hash(still), seed)
             self._generate_mesh(still, seed, glb_path, manifest)
         # E-1: the lease seam -- torch is FULLY reclaimed before Blender.
