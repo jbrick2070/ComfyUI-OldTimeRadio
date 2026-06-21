@@ -522,7 +522,8 @@ def _trim_trailing_silence(audio, sample_rate, *, thresh_rel=0.06,
 def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
                           is_first_line=False, *, semantic_temp=None,
                           coarse_temp=None, fine_temp=None,
-                          inject_first_line_anchor=True, speech_only=False):
+                          inject_first_line_anchor=True, speech_only=False,
+                          seed=None):
     """Generate TTS audio for one dialogue line. Returns (np_1d, sample_rate).
 
     PER-STAGE TEMPERATURES (2026-06-17 whiny-voice fix): Bark is a three-stage
@@ -580,6 +581,19 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     chunks = _chunk_text_for_bark(text)
     all_audio = []
     silence_pad = np.zeros(int(sample_rate * 0.08), dtype=np.float32)
+
+    # B2 (2026-06-22): Bark.generate samples (do_sample=True) and binds NO
+    # external Generator (eng_bark.supports_external_generator=False), so the
+    # ONLY way to make a line reproducible is to seed the global torch RNG
+    # before model.generate consumes it. Seed ONCE before the chunk loop so a
+    # multi-chunk line generates a single deterministic sequence. The caller
+    # (story orchestrator) already runs inside deterministic_inference, so no
+    # manual RNG save/restore is needed here. seed=None keeps the legacy
+    # unseeded (stochastic) behavior for callers that pass no seed.
+    if seed is not None:
+        torch.manual_seed(int(seed))
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(int(seed))
 
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)

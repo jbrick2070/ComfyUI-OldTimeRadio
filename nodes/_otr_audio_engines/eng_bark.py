@@ -146,6 +146,9 @@ class BarkEngine:
             fine_temp=fine_temp,
             inject_first_line_anchor=inject_first_line_anchor,
             speech_only=speech_only,
+            # B2: thread the EXISTING per-line seed (was dropped before) so the
+            # clip is reproducible (Bark.generate is unseeded otherwise).
+            seed=seed,
         )
         wav = torch.from_numpy(
             np.asarray(audio_np, dtype=np.float32)
