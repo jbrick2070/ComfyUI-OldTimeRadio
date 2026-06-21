@@ -951,6 +951,9 @@ OUTPUT FORMAT - strict:
 - Only the words the character speaks out loud.
 - No character name, no colon, no quotation marks.
 - No stage directions. No actions in parentheses or brackets.
+- NEVER prefix the line with an action description. Do NOT begin with words
+  like "twirls his pen", "clenches jaw", "pauses, sets pen down". Start the
+  output directly with the first spoken word.
 - No "he said" / "she added" / narration of any kind.
 - Output the single line and stop. Nothing before it, nothing after.
 

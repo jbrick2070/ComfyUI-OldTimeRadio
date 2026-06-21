@@ -3678,7 +3678,13 @@ class OTR_LedgerScriptWriter:
                     "music_open", "music_inter", "music_close",
                 }:
                     last_lines.clear()
-                cleaned = (beat.sfx_cue or beat.intent or "").strip()
+                # S1 follow-up (2026-06-22): a non-voiced row's text takes ONLY a
+                # genuine sfx_cue, never the generic beat intent. The intent
+                # fallback was re-stamping music rows with their intent text here
+                # (overwriting the init_lines_from_outline S1 fix) -> it bled into
+                # the ledger + the [SFX: ...] transcript. music_inter (no cue) ->
+                # "" ; a real sfx_cue is preserved (render-contract desc).
+                cleaned = (beat.sfx_cue or "").strip()
                 cid = beat.speaker_role
                 token = f"[SFX: {cleaned}]"
 
