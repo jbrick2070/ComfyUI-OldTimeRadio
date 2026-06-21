@@ -301,6 +301,15 @@ VALIDATED_ENGINES = frozenset({
     # video" option (operator). CPU/ffmpeg-only, no weights, no VRAM, always renders
     # -> commercial-clean + trivially valid; listed so end users can pick it.
     "flat_still",
+    # mesh_stage PROMOTED 2026-06-21 (operator: "at least one 3D model ready
+    # for all 3 slots"): the textured-hero PoC GPU smoke PASSED on the 5080
+    # 2026-06-20 (portrait -> Hunyuan3D-2mv mesh -> Blender WORKBENCH turntable
+    # -> RGBA frame directory -> directory-clip composite). family
+    # image_to_video, default_roles=() so it is SELECTABLE-NOT-DEFAULT for
+    # every role; gated behind OTR_ENABLE_MESH_STAGE + OTR_BLENDER_EXE.
+    # NOTE: commercial_clean=False (Tencent Hunyuan community license -- the
+    # E-7 license-record gate still applies before any default-on / ship).
+    "mesh_stage",
 })
 __all__.append("VALIDATED_ENGINES")
 

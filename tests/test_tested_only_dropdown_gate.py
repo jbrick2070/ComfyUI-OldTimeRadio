@@ -17,7 +17,7 @@ from nodes._otr_image_engines import registry as ireg
 
 # Engines that exist in the registry but are NOT validated -> must be HIDDEN.
 _HIDDEN_VIDEO = {
-    "abstract", "flux_still", "hunyuan3d_talk", "mesh_stage", "station_card",
+    "abstract", "flux_still", "hunyuan3d_talk", "station_card",
     "still_kenburns", "still_parallax", "trellis_talk", "triposg_talk",
     "triposr", "wan_i2v",
 }
@@ -34,6 +34,9 @@ def test_video_validated_set():
         "ltx_video", "ltx_av_music", "ltx_av_talk",
         "humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
         "wan_ti2v", "visualizer", "flat_still",
+        # mesh_stage PROMOTED 2026-06-21 (operator: 3D ready for all 3 slots);
+        # GPU smoke PASSED 2026-06-20. Selectable-not-default (default_roles=()).
+        "mesh_stage",
     })
 
 
