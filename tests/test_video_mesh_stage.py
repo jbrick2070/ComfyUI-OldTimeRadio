@@ -395,6 +395,42 @@ def test_stage_script_parser_portrait_and_arc():
     assert b.portrait == "" and b.start_angle == 0.0 and b.arc_degrees == 45.0
 
 
+def test_stage_script_surface_arg():
+    """v1.1: --surface defaults flat (legacy), accepts gradient/portrait, and
+    LOUD-errors on portrait surface without --portrait in render mode."""
+    stage = _load_stage()
+    base = ["--mode", "render", "--glb", "C:/m.glb", "--out", "C:/o",
+            "--frames", "3", "--width", "64", "--height", "64"]
+    assert stage.parse_stage_args(base).surface == "flat"        # omitted = legacy
+    assert stage.parse_stage_args(base + ["--surface", "gradient"]).surface == "gradient"
+    with pytest.raises(SystemExit):                              # invalid choice
+        stage.parse_stage_args(base + ["--surface", "shiny"])
+    with pytest.raises(SystemExit):                              # portrait needs --portrait
+        stage.parse_stage_args(base + ["--surface", "portrait"])
+    ok = stage.parse_stage_args(base + ["--surface", "portrait", "--portrait", "C:/p.png"])
+    assert ok.surface == "portrait" and ok.portrait == "C:/p.png"
+
+
+def test_gradient_color_vertical_ramp():
+    """Pure sculpt gradient: bottom->top lerp, clamped, in [0,1], deterministic."""
+    stage = _load_stage()
+    bottom = stage.gradient_color(-0.5)
+    top = stage.gradient_color(0.5)
+    mid = stage.gradient_color(0.0)
+    # endpoints match the configured constants
+    assert bottom == pytest.approx(stage.GRADIENT_BOTTOM)
+    assert top == pytest.approx(stage.GRADIENT_TOP)
+    # monotone lighter toward the top on every channel
+    for c in range(3):
+        assert bottom[c] < mid[c] < top[c]
+        assert 0.0 <= bottom[c] <= 1.0 and 0.0 <= top[c] <= 1.0
+    # CLAMP: out-of-range z saturates to the endpoints (no overshoot)
+    assert stage.gradient_color(-5.0) == pytest.approx(bottom)
+    assert stage.gradient_color(5.0) == pytest.approx(top)
+    # deterministic
+    assert stage.gradient_color(0.123) == stage.gradient_color(0.123)
+
+
 def test_arc_keyframes_single_and_bounded_sweep():
     stage = _load_stage()
     import math
@@ -457,6 +493,22 @@ def test_build_blender_cmd_portrait_and_arc_appended():
     tail = cmd[cmd.index("--") + 1:]
     assert tail[tail.index("--frames") + 1] == "3"
     assert tail[tail.index("--render-engine") + 1] == "WORKBENCH"
+
+
+def test_build_blender_cmd_surface_appended():
+    """v1.1: --surface appended only when set (omitted = byte-identical legacy)."""
+    base = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0)
+    assert "--surface" not in base
+    # gradient default (no portrait) -- the engine's new default invocation.
+    grad = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0,
+                             surface="gradient")
+    assert grad[grad.index("--surface") + 1] == "gradient"
+    assert "--portrait" not in grad
+    # opt-in portrait decal: --surface portrait + --portrait <still>.
+    port = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0,
+                             surface="portrait", portrait="C:/p.png")
+    assert port[port.index("--surface") + 1] == "portrait"
+    assert port[port.index("--portrait") + 1] == "C:/p.png"
 
 
 def test_stage_and_engine_sources_ascii_no_em_dash():

@@ -60,6 +60,12 @@ def parse_stage_args(argv):
     #: The hero still projected onto the front-facing vertices (optional; the
     #: GLB stays geometry-only, projection is per-render). Empty = flat matcap.
     p.add_argument("--portrait", default="")
+    #: v1.1 surface look. DEFAULT "flat" so an OMITTED --surface preserves the
+    #: legacy render behavior (flat gray matcap, or project when --portrait is
+    #: also passed -- the legacy decal path). "gradient" = the sculpt gradient;
+    #: "portrait" = the front-projected still (requires --portrait).
+    p.add_argument("--surface", choices=("flat", "gradient", "portrait"),
+                   default="flat")
     #: Bounded hero arc (degrees). start-angle is the camera azimuth at frame 1
     #: (0 = the +X front the projection paints); arc-degrees is the sweep. The
     #: arc is CLAMPED <= MAX_ARC_DEGREES so the unpainted back never shows.
@@ -72,6 +78,8 @@ def parse_stage_args(argv):
         p.error("--width/--height must be >= 8")
     if args.mode == "render" and not args.glb:
         p.error("--glb is required in render mode")
+    if args.mode == "render" and args.surface == "portrait" and not args.portrait:
+        p.error("--surface portrait requires --portrait in render mode")
     return args
 
 
@@ -165,6 +173,32 @@ def sample_image(pixels, width, height, u, t):
     return (float(pixels[idx]), float(pixels[idx + 1]), float(pixels[idx + 2]))
 
 
+#: Vertical sculpt-gradient endpoints (cool light over shadow). WORKBENCH VERTEX
+#: shading draws these per-vertex colours; per-poly smooth normals interpolate
+#: them into a soft ramp (the v1.1 "basic gradient" mesh texture).
+GRADIENT_TOP = (0.86, 0.87, 0.92)
+GRADIENT_BOTTOM = (0.30, 0.31, 0.38)
+
+
+def gradient_color(co_z, top=GRADIENT_TOP, bottom=GRADIENT_BOTTOM):
+    """Pure vertical sculpt gradient for a vertex at normalized, CENTERED world
+    z (the ``_normalize_meshes`` longest-dim-1.0, origin-centered space, so
+    ~[-0.5, 0.5]). ``co_z`` is CLAMPED to [-0.5, 0.5] first (the range is an
+    assumption, not a guarantee for every mesh), then lerped bottom->top so the
+    top of the form is lighter than the base. Returns (r, g, b) in [0, 1]."""
+    z = float(co_z)
+    if z < -0.5:
+        z = -0.5
+    elif z > 0.5:
+        z = 0.5
+    s = z + 0.5                                   # [0,1]: 0=bottom, 1=top
+    return (
+        bottom[0] + (top[0] - bottom[0]) * s,
+        bottom[1] + (top[1] - bottom[1]) * s,
+        bottom[2] + (top[2] - bottom[2]) * s,
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Everything below runs inside Blender only (bpy imported lazily).
 # --------------------------------------------------------------------------- #
@@ -212,6 +246,35 @@ def _has_vertex_colors(meshes):
     return False
 
 
+def _new_proj_attr(mesh):
+    """Create the per-VERTEX (POINT-domain) ``otr_proj`` FLOAT_COLOR attribute,
+    REMOVING any pre-existing one of the same name first (re-entrancy guard: a
+    re-imported GLB is fresh per process today, but never collide on the name)."""
+    for ca0 in list(getattr(mesh, "color_attributes", ())):
+        if getattr(ca0, "name", "") == PROJ_ATTR_NAME:
+            try:
+                mesh.color_attributes.remove(ca0)
+            except Exception:                      # noqa: BLE001 - API variance
+                pass
+    return mesh.color_attributes.new(name=PROJ_ATTR_NAME, type="FLOAT_COLOR",
+                                     domain="POINT")
+
+
+def _activate_render_color(mesh, ca):
+    """Make ``ca`` the ACTIVE + RENDER colour attribute (WORKBENCH VERTEX shading
+    draws the render colour attribute). Tolerant of Blender API variance."""
+    try:
+        mesh.color_attributes.active_color = ca
+    except Exception:                              # noqa: BLE001 - API variance
+        pass
+    for attr in ("active_color_index", "render_color_index"):
+        try:
+            idx = list(mesh.color_attributes).index(ca)
+            setattr(mesh.color_attributes, attr, idx)
+        except Exception:                          # noqa: BLE001 - API variance
+            pass
+
+
 def _project_portrait_onto_meshes(bpy, meshes, image):
     """Single-view vertex-color projection: create a per-VERTEX (point-domain)
     ``otr_proj`` color attribute on EVERY imported mesh, set it active+render,
@@ -228,8 +291,7 @@ def _project_portrait_onto_meshes(bpy, meshes, image):
         verts = getattr(mesh, "vertices", ())
         if not len(verts):
             continue                              # guard zero-vert meshes
-        ca = mesh.color_attributes.new(name=PROJ_ATTR_NAME, type="FLOAT_COLOR",
-                                       domain="POINT")
+        ca = _new_proj_attr(mesh)
         mw = obj.matrix_world
         for i, v in enumerate(verts):
             co = mw @ v.co                         # normalized, centered coords
@@ -237,19 +299,51 @@ def _project_portrait_onto_meshes(bpy, meshes, image):
             r, g, b = sample_image(pixels, w, h, u, t)
             ca.data[i].color = (r, g, b, 1.0)
             seen.add((round(r, 4), round(g, 4), round(b, 4)))
-        # Make otr_proj the ACTIVE + RENDER color attribute (Workbench VERTEX
-        # shading draws the render color attribute).
+        _activate_render_color(mesh, ca)
+    return len(seen)
+
+
+def _paint_gradient_onto_meshes(bpy, meshes):
+    """The v1.1 SCULPT GRADIENT: paint a per-VERTEX ``otr_proj`` colour from
+    :func:`gradient_color` over the WORLD-space centered height (``matrix_world
+    @ v.co`` -- ``_normalize_meshes`` rewrote object loc/scale, so local
+    ``v.co.z`` is NOT the centered height). Same vertex-colour mechanism the
+    projection uses, so WORKBENCH VERTEX draws it. Returns the distinct-colour
+    count. Replaces the flat photo decal as the default surface."""
+    seen = set()
+    for obj in meshes:
+        mesh = getattr(obj, "data", None)
+        if mesh is None:
+            continue
+        verts = getattr(mesh, "vertices", ())
+        if not len(verts):
+            continue
+        ca = _new_proj_attr(mesh)
+        mw = obj.matrix_world
+        for i, v in enumerate(verts):
+            co = mw @ v.co
+            r, g, b = gradient_color(co.z)
+            ca.data[i].color = (r, g, b, 1.0)
+            seen.add((round(r, 4), round(g, 4), round(b, 4)))
+        _activate_render_color(mesh, ca)
+    return len(seen)
+
+
+def _smooth_mesh_normals(meshes):
+    """Smooth shading via mesh DATA (``poly.use_smooth = True``) -- NO
+    ``bpy.ops`` (so it needs no active-object/selection context; headless
+    ``--background`` safe). Melts the faceted matcap look with ZERO geometry
+    change. ``mesh.update()`` makes headless WORKBENCH pick up the smoothing."""
+    for obj in meshes:
+        mesh = getattr(obj, "data", None)
+        if mesh is None:
+            continue
+        for poly in getattr(mesh, "polygons", ()):
+            poly.use_smooth = True
         try:
-            mesh.color_attributes.active_color = ca
+            mesh.update()
         except Exception:                          # noqa: BLE001 - API variance
             pass
-        for attr in ("active_color_index", "render_color_index"):
-            try:
-                idx = list(mesh.color_attributes).index(ca)
-                setattr(mesh.color_attributes, attr, idx)
-            except Exception:                      # noqa: BLE001 - API variance
-                pass
-    return len(seen)
 
 
 def _make_selftest_portrait(bpy):
@@ -353,8 +447,12 @@ def main():
             glb = _selftest_glb(bpy, args.out)
         meshes = _import_glb(bpy, glb)
         _normalize_meshes(bpy, meshes)
-        # Projection: a file portrait in render mode, a deterministic in-memory
-        # gradient in selftest -- both paint the otr_proj vertex colors.
+        # Surface look. selftest FIRST (unchanged: projects its in-memory
+        # portrait + the non-uniformity gate). Render mode is a state machine:
+        #   gradient -> sculpt gradient (ignore a stray --portrait, LOUD);
+        #   portrait OR (flat + --portrait) -> project the still (the second arm
+        #     preserves the legacy omitted-`--surface` + `--portrait` decal);
+        #   flat with no portrait -> paint nothing (gray matcap).
         if args.mode == "selftest":
             image = _make_selftest_portrait(bpy)
             distinct = _project_portrait_onto_meshes(bpy, meshes, image)
@@ -363,9 +461,17 @@ def main():
                     "mesh_stage selftest: projection produced a UNIFORM color "
                     "attribute (%d distinct) -- vertex-color projection is "
                     "broken" % distinct)
-        elif args.portrait:
+        elif args.surface == "gradient":
+            if args.portrait:
+                print("[otr_mesh_stage_blender] WARN: --portrait ignored under "
+                      "--surface gradient")
+            _paint_gradient_onto_meshes(bpy, meshes)
+        elif args.surface == "portrait" or args.portrait:
             image = bpy.data.images.load(args.portrait)
             _project_portrait_onto_meshes(bpy, meshes, image)
+        # else: surface=flat with no portrait -> gray matcap (no vertex colors)
+        if args.mode != "selftest":
+            _smooth_mesh_normals(meshes)
         _build_turntable(bpy, args.radius, args.elevation, args.frames,
                          args.start_angle, args.arc_degrees)
         _configure_render(bpy, args, _has_vertex_colors(meshes))

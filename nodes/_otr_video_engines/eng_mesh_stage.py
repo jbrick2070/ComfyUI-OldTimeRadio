@@ -151,7 +151,7 @@ def write_manifest(manifest, path):
 def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
                       seed, *, mode="render", engine="WORKBENCH",
                       stage_script=None, portrait="", start_angle=None,
-                      arc_degrees=None):
+                      arc_degrees=None, surface=""):
     """The headless Blender invocation (E-3): ``--background
     --factory-startup --python-exit-code 1 --python stage.py -- <args>``.
     ``--python-exit-code 1`` makes ANY unhandled stage exception a nonzero
@@ -174,6 +174,8 @@ def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
         "--seed", str(int(seed or 0)),
         "--render-engine", str(engine),
     ]
+    if surface:
+        cmd += ["--surface", str(surface)]
     if portrait:
         cmd += ["--portrait", str(portrait)]
     if start_angle is not None:
@@ -690,13 +692,17 @@ class MeshStageEngine(_CheapFamilyBase):
         os.makedirs(parent, exist_ok=True)
         cleanup_stale_tmp(parent)
         tmp_dir = tempfile.mkdtemp(prefix="otr_mesh_tmp_", dir=parent)
-        # Textured-hero PoC: project the RESOLVED portrait/still onto the front
-        # vertices (the GLB stays geometry-only). The bounded hero arc keeps the
-        # unpainted back off-camera; knobs are env-tunable, defaults in-script.
+        # v1.1 surface look: the DEFAULT is the sculpt GRADIENT (a clean, simple
+        # mesh texture; the GLB stays geometry-only). OTR_MESH_PROJECT_PORTRAIT=1
+        # restores the legacy front-projected still decal (opt-in). The bounded
+        # hero arc keeps the unpainted back off-camera; knobs are env-tunable.
         sa = os.environ.get("OTR_MESH_STAGE_START_ANGLE")
         ad = os.environ.get("OTR_MESH_STAGE_ARC_DEGREES")
+        project = os.environ.get("OTR_MESH_PROJECT_PORTRAIT", "0") == "1"
         cmd = build_blender_cmd(
-            blender, glb_path, tmp_dir, n, w, h, seed, portrait=still,
+            blender, glb_path, tmp_dir, n, w, h, seed,
+            surface=("portrait" if project else "gradient"),
+            portrait=(still if project else ""),
             start_angle=(float(sa) if sa else None),
             arc_degrees=(float(ad) if ad else None))
         self._spawn_blender(cmd)
