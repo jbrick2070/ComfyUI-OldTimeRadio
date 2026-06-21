@@ -176,8 +176,8 @@ def sample_image(pixels, width, height, u, t):
 #: Vertical sculpt-gradient endpoints (cool light over shadow). WORKBENCH VERTEX
 #: shading draws these per-vertex colours; per-poly smooth normals interpolate
 #: them into a soft ramp (the v1.1 "basic gradient" mesh texture).
-GRADIENT_TOP = (0.86, 0.87, 0.92)
-GRADIENT_BOTTOM = (0.30, 0.31, 0.38)
+GRADIENT_TOP = (0.58, 0.64, 0.80)
+GRADIENT_BOTTOM = (0.09, 0.11, 0.20)
 
 
 def gradient_color(co_z, top=GRADIENT_TOP, bottom=GRADIENT_BOTTOM):
@@ -395,9 +395,21 @@ def _configure_render(bpy, args, vertex_colors):
     if engine == "WORKBENCH":
         scene.render.engine = "BLENDER_WORKBENCH"
         shading = scene.display.shading
-        shading.light = "MATCAP"
+        # v1.2 fix: STUDIO, not MATCAP. A MATCAP renders its own baked clay
+        # material and IGNORES the per-vertex albedo -> every mesh came out a
+        # uniform white-marble blob regardless of the painted gradient. STUDIO
+        # lighting shades the ACTUAL albedo (the vertex-colour gradient / single
+        # colour), so the gradient reads AND the smooth 3D form gets real
+        # light-to-shadow depth. (Deterministic: the factory-startup studio light
+        # is fixed; no per-render variance.)
+        shading.light = "STUDIO"
         shading.color_type = "VERTEX" if vertex_colors else "SINGLE"
-        shading.single_color = (0.78, 0.78, 0.78)
+        shading.single_color = (0.62, 0.64, 0.72)
+        # a touch of cavity shading sharpens the sculpted form (deterministic).
+        try:
+            shading.show_cavity = True
+        except Exception:                          # noqa: BLE001 - API variance
+            pass
     elif engine == "CYCLES":
         # v1.5 tier -- determinism pins (0-E spec).
         scene.render.engine = "CYCLES"
