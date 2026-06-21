@@ -1,0 +1,10 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: no. The plan has unresolved wiring/open questions and contradicts its own HARD deterministic/local/byte-identical constraints.
+
+MUST-FIX BEFORE BUILD:
+1. [HARD + B3 + eng_bark.py] Determinism is stated as HARD, but B3 is OPTIONAL and the grounded `BarkEngine.generate_voice(..., seed)` receives `seed` and never uses it; `_generate_single_line` calls `model.generate(... do_sample=True ...)` without seeding. Concrete fix: make deterministic seed plumbing mandatory for this sprint or remove “deterministic / seed-keyed” from HARD. Route `seed` from `generate_voice` into `_generate_single_line`, save/restore torch CPU and CUDA RNG state around `model.generate`, and add the same-seed / different-attempt tests. Verify whether installed `BarkModel.generate` accepts a generator before choosing generator vs `torch.manual_seed`.
+
+2. [B1 + WIRING + Q1] The core feature depends on an unresolved seam: “default for character/announcer DIALOGUE” and “genuinely an intro” are not available in the shown Bark call path. Grounding shows `BarkEngine.generate_voice(text, voice_preset, delivery_vector, seed)` only derives `is_first` from `voice_preset not in self._presets_started`; there is no shown dialogue/intro flag. Concrete fix: define the exact source of `speech_only` and `inject_first_line_anchor` before coding. Smallest safe fix: for `BarkEngine.roles == ("char_voice",)`, pass `speech_only=True` and `inject_first_line_anchor=False` by default; only support an intro exception if a concrete metadata field is identified and tested. Add explicit kwargs to `_clean_text_for_bark` and `_generate_single_line`; do not rely on implicit defaults.
+
+3. [B1 + Q2] The speech-only token policy is incomplete and partly inconsistent with the grounded code. `_BARK_VALID_TOKENS
