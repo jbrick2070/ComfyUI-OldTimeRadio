@@ -25,8 +25,13 @@
 > runs) -- production (no C7) rolls a fresh cast per episode. **ALSO THIS SESSION: BUG 2 DONE (verify-first,
 > no change -- the animated title card + rolling credits already work) + BUG 3 DONE (commit `9f76937`: the
 > forensic model/engine/SYSTEM dossier now scrolls on the credits via `_build_hud_dossier`; content-only, no
-> JSON; +7 tests; HEAD `9f76937` == origin, suite 4640 pass, Bug Bible 16/7/3). NEXT = BUG 4 (audio bars
-> always-on overlay, `docs/2026-06-20-audio-bars-fix/`), then the 3D PoC build.**
+> JSON; +7 tests). ALSO BUG 4 DONE (commit `13017ec`: the ALWAYS-ON audio bars are a SEPARATE overlay layer,
+> default ON, decoupled from the scene-aware floor -- new `audio_bars` widget wired IN the workflow JSON
+> same-commit [node 93], a separate bars pass lighten-blends the green strip at 0.60 with captions ON TOP;
+> +6 tests). HEAD `13017ec` == origin, suite 4646 pass, Bug Bible 16/7/3, JSON intact+extended. The 2026-06-20
+> ALL FOUR visual fixes (character aspect / title card / credits dossier / audio bars) are SHIPPED. **NEXT =
+> the 3D PoC build (`docs/2026-06-20-mesh-stage-texturing/` pass03+pass04 + the 4-item PIN list; chunks
+> 6+7+3 + GPU smoke).**
 
 > **LATEST SESSION -- 2026-06-20 NIGHT (CODER, autonomous "go all night"; HEAD `8de1057` == origin/v2.0-alpha;
 > suite 4625 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green).** BUILT + PUSHED the CORE of the
@@ -504,8 +509,15 @@ LANDSCAPE 16:9 images/video. Animated start/end procgen title cards + rolling cr
   (WRITER/LLM CONFIG, RESOLVED OPENROUTER, STORY SPINE, RENDER ENGINES, SYSTEM = CPU/RAM/GPU/VRAM/CUDA/torch),
   drawn at the top of the HUD scroll ahead of the transcript. Content-only, NO JSON change; +7 tests; verified by
   an offline pure-PIL HUD frame (`docs/2026-06-20-visual-fixes/BUG3_credits_dossier.png`).
-- **#4 BUG 4 (NEXT):** audio bars always-on overlay (`docs/2026-06-20-audio-bars-fix/`) -- the always-on
-  procgen-overlay layer so the bottom audio-reactive bars aren't suppressed by SceneAwareScopes.
+- **#4 BUG 4 -- DONE 2026-06-20 (commit `13017ec`).** The ALWAYS-ON audio-reactive bottom bars are now a
+  SEPARATE overlay layer (DEFAULT ON; manual `off`), decoupled from the scene-aware floor so they show no
+  matter what clip is above/below (landscape AND portrait). New `audio_bars` widget on
+  OTR_PostUpscaleProcgenBlend (appended LAST, BUG-LOCAL-097) wired IN `otr_scifi_16gb_full.json` SAME-commit
+  (node 93 +1 value, validated). Implemented as a SEPARATE second pass (the fragile procgen/scopes blend
+  untouched): main blend defers captions -> a bars pass PIL-renders the green `freq_bars_green` strip above
+  the caption safe-area, lighten-blends at 0.60, then burns captions ON TOP. `off` = byte-identical;
+  audio `-c:a copy` throughout. +6 tests (incl. a real-ffmpeg green-paint proof); verified on a real obs
+  final (green bars react in the bottom strip, captions above).
 - **THEN:** the 3D PoC build (`docs/2026-06-20-mesh-stage-texturing/roundtable/pass03_plan.md` + `pass04_plan.md`
   + the 4-item PIN list; chunks 6+7+3 + GPU smoke).
 
