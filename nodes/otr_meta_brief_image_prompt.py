@@ -190,15 +190,18 @@ def _other_beats_from_policy(policy_json):
 #: checked in for the engines/lanes that DO consume a negative and as the canon
 #: of what fodder must NOT contain.
 MESH_FODDER_POS_SCAFFOLD = (
-    "single centered subject, full unoccluded three-quarter view, entire head "
+    "single centered subject, simple clean unbroken silhouette, smooth solid "
+    "form, plain matte solid-colour clothing, short tight neat hair, neutral "
+    "symmetrical forward stance, full unoccluded three-quarter view, entire head "
     "and body clearly visible, plain seamless neutral mid-grey studio backdrop, "
     "even soft diffuse frontal lighting, no hard shadows, no props, sharp focus, "
     "full natural color"
 )
 MESH_FODDER_NEG_SCAFFOLD = (
     "busy background, multiple subjects, occlusion, hands over face, hood, "
-    "dramatic shadow, cast shadow, cropped, scene, environment, props, text, "
-    "watermark"
+    "loose flowing hair, hair wisps, fine surface detail, intricate texture, "
+    "frills, thin protrusions, jewellery, dramatic shadow, cast shadow, cropped, "
+    "scene, environment, props, text, watermark"
 )
 #: The BACKGROUND PLATE is the subject-free world the mesh stands in front of.
 BACKGROUND_PLATE_POS_SCAFFOLD = (

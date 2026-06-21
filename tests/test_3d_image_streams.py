@@ -83,6 +83,8 @@ def test_fork_mints_fodder_and_plate_not_scene_still():
     f001 = next(o for o in fodder if o["beat_id"] == "b001")
     assert f001["char_id"] == "c01" and f001["mesh_subject_id"] == "c01"
     assert "oilskin" in f001["prompt"] and "neutral mid-grey" in f001["prompt"]
+    # mesh-friendly scaffold (v1.1): the subject is forced clean/smooth for the mesher
+    assert "smooth solid form" in f001["prompt"]
     assert f001["w"] == mb.MESH_FODDER_W and f001["h"] == mb.MESH_FODDER_H
     assert f001["negative_prompt"] == mb.MESH_FODDER_NEG_SCAFFOLD
     # the plate is subject-free (the scaffold says so) and 16:9-ish (wide).
