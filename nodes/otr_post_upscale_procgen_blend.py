@@ -526,6 +526,167 @@ def _build_blend_cmd(
     ]
 
 
+# --------------------------------------------------------------------------- #
+# BUG 4 (2026-06-20 operator): ALWAYS-ON audio-reactive bottom bars overlay.
+# A SEPARATE, unique overlay layer -- decoupled from OTR_SceneAwareScopes'
+# scene-aware floor (which gets covered by full-frame clips and suppressed for
+# portrait/un-probeable/credits frames). Default ON (`audio_bars='bottom'`); a
+# manual `off` switch makes it byte-identical to today. The bars are PIL-rendered
+# with the SAME `scope_draw.freq_bars_green` look, seated just ABOVE the lower-15%
+# caption safe-area (captions stay ABOVE the bars), and lighten-blended onto the
+# final at a partial opacity so they read as an accent, not a full-green wash.
+# --------------------------------------------------------------------------- #
+
+#: Bars lighten-blend opacity (operator: "ok if it's 60% not a full green").
+_BARS_OPACITY = 0.6
+#: Bars strip seats above the lower-15% caption safe-area (mirrors
+#: otr_scene_aware_scopes._BARS_CAPTION_SAFE_FRAC so captions never collide).
+_BARS_CAPTION_SAFE_FRAC = 0.15
+
+
+def _bars_strip_geom(w: int, h: int) -> "tuple[int, int, int, int]":
+    """(x, y, w, h) for the bottom bars strip -- a wide green frequency strip with
+    a 5% side margin, ~10% tall, seated just above the caption safe-area. Mirrors
+    otr_scene_aware_scopes._bars_geom so the look/placement is identical."""
+    margin = int(w * 0.05)
+    strip_h = max(8, int(h * 0.10))
+    safe = int(h * _BARS_CAPTION_SAFE_FRAC)
+    y = h - safe - strip_h
+    return margin, y, w - 2 * margin, strip_h
+
+
+def _probe_fps(path: Path, ffmpeg: str) -> float:
+    """Source video fps via ffprobe (r_frame_rate). Defaults to 25.0 (the OTR
+    canonical) on any failure so the bars layer always has a sane rate."""
+    probe = str(ffmpeg or "ffmpeg").replace("ffmpeg", "ffprobe")
+    try:
+        out = subprocess.run(
+            [probe, "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", str(path)],
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ).stdout.decode("utf-8", "replace").strip()
+        num, _, den = out.partition("/")
+        fps = float(num) / float(den) if den and float(den) else float(num)
+        return fps if fps and fps > 0 else 25.0
+    except Exception:  # noqa: BLE001
+        return 25.0
+
+
+def _load_master_audio_np(source_mp4: Path, ffmpeg: str):
+    """Decode the source mp4 audio to a mono float32 numpy array + sample rate via
+    ffmpeg -> a temp pcm_s16le wav -> stdlib ``wave`` (no soundfile dependency).
+    Returns ``(audio_np, sr)`` or ``(None, 0)``. The master audio is only READ --
+    never altered -- so audio byte-identity is untouched."""
+    import tempfile
+    import wave
+    import numpy as np
+    fb = str(ffmpeg or "ffmpeg")
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    try:
+        subprocess.run(
+            [fb, "-y", "-loglevel", "error", "-i", str(source_mp4),
+             "-vn", "-ac", "1", "-ar", "22050", "-acodec", "pcm_s16le", tmp_path],
+            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        with wave.open(tmp_path, "rb") as wf:
+            sr = wf.getframerate()
+            raw = wf.readframes(wf.getnframes())
+        a = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        return (a if a.size else None), int(sr)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[PostUpscaleProcgenBlend] audio_bars: master-audio decode "
+                    "failed (%s); bars layer skipped this run", exc)
+        return None, 0
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _render_bars_only_mp4(source_mp4: Path, bars_out: Path, w: int, h: int,
+                          fps: float, ffmpeg: str):
+    """Render the SEPARATE bars-only layer: black frames with the green
+    `freq_bars_green` strip painted in the bottom band, driven by the master
+    audio envelope. Returns the path or None (LOUD) on any failure so the caller
+    degrades to the normal captioned blend."""
+    try:
+        try:
+            from _otr_shared.scope_draw import (  # type: ignore
+                analyze_audio_np, encode_silent_mp4, freq_bars_green)
+        except Exception:  # pragma: no cover -- packaged import
+            from nodes._otr_shared.scope_draw import (  # type: ignore
+                analyze_audio_np, encode_silent_mp4, freq_bars_green)
+        import numpy as np
+        from PIL import Image, ImageDraw
+        a, sr = _load_master_audio_np(source_mp4, ffmpeg)
+        if a is None or sr <= 0:
+            return None
+        total = int(np.ceil(len(a) / float(sr) * float(fps)))
+        if total <= 0:
+            return None
+        _vol, freqs, _wav = analyze_audio_np(a, sr, total, int(round(fps)))
+        mx, by, bw, bh = _bars_strip_geom(int(w), int(h))
+
+        def _frames():
+            for i in range(total):
+                img = Image.new("RGB", (int(w), int(h)), (0, 0, 0))
+                freq_bars_green(ImageDraw.Draw(img), freqs[i], mx, by, bw, bh)
+                yield np.asarray(img, dtype=np.uint8)
+
+        encode_silent_mp4(_frames(), total, str(bars_out),
+                          int(w), int(h), int(round(fps)), ffmpeg)
+        return bars_out if bars_out.is_file() else None
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[PostUpscaleProcgenBlend] audio_bars: bars-layer render "
+                    "failed (%s); falling back to the no-bars captioned blend", exc)
+        return None
+
+
+def _build_bars_caption_cmd(composite_mp4: Path, bars_mp4: Path, out_mp4: Path,
+                            opacity: float, ffmpeg: str,
+                            captions_ass_path: Optional[str],
+                            source_dims: "Optional[tuple]") -> list[str]:
+    """The SECOND, isolated pass: lighten the green-only bars layer onto the
+    composite at ``opacity``, THEN burn captions (so captions stay ABOVE the
+    bars). gbrp + colorchannelmixer(zero R+B) mirrors the proven green-only path;
+    tpad black past the bars end so a shorter bars track never clamps the credits
+    post-roll (BUG-410 pattern). Audio is ``-c:a copy`` (byte-identical)."""
+    if source_dims:
+        sw, sh = int(source_dims[0]), int(source_dims[1])
+        conform = f"scale={sw}:{sh}"
+    else:
+        conform = "scale=-2:ih:force_original_aspect_ratio=decrease,crop=iw:ih"
+    blend_label = "[vpre]" if captions_ass_path else "[v]"
+    fc = (
+        f"[0:v]format=gbrp[main];"
+        f"[1:v]{conform},setpts=PTS-STARTPTS,setsar=1,"
+        f"colorchannelmixer=rr=0:rg=0:rb=0:gr=0:gg=1:gb=0:br=0:bg=0:bb=0,"
+        f"format=gbrp,tpad=stop_mode=add:color=black:stop_duration=3600[bars];"
+        f"[main][bars]blend=all_mode=lighten:all_opacity={opacity:.3f}:shortest=1,"
+        f"format=yuv420p{blend_label}"
+    )
+    if captions_ass_path:
+        ass_name, _cwd = _ass_filter_arg(captions_ass_path)
+        fc += f";[vpre]ass={ass_name}[v]"
+    return [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-i", str(composite_mp4),
+        "-i", str(bars_mp4),
+        "-filter_complex", fc,
+        "-filter_complex_threads", "2",
+        "-filter_threads", "2",
+        "-threads", "4",
+        "-max_muxing_queue_size", "1024",
+        "-map", "[v]",
+        "-map", "0:a?",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        "-c:a", "copy",
+        str(out_mp4),
+    ]
+
+
 class PostUpscaleProcgenBlend:
     """BUG-LOCAL-030 Phase B: post-RTXUpscale procgen visual blend.
 
@@ -681,6 +842,24 @@ class PostUpscaleProcgenBlend:
                         "Empty -> the standard single-procgen blend (unchanged)."
                     ),
                 }),
+                # BUG 4 (2026-06-20 operator): the ALWAYS-ON audio-reactive bottom
+                # bars overlay -- a SEPARATE layer, NOT the scene-aware floor.
+                # APPENDED LAST per BUG-LOCAL-097 (widgets_values is positional --
+                # only ever append; the JSON node 94->93 widgets_values gets one new
+                # 'bottom' value at the end, same commit).
+                "audio_bars": (["bottom", "off"], {
+                    "default": "bottom",
+                    "tooltip": (
+                        "ALWAYS-ON bottom audio-reactive green bars overlay, "
+                        "DEFAULT ON. 'bottom' paints a green frequency strip along "
+                        "the bottom of EVERY frame (landscape AND portrait), driven "
+                        "by the master audio, lighten-blended at 60%, seated above "
+                        "the caption safe-area so captions stay ON TOP -- decoupled "
+                        "from the scene-aware floor so it shows no matter what clip "
+                        "is above/below. 'off' = byte-identical video to the "
+                        "pre-overlay path. Audio is never touched (byte-identical)."
+                    ),
+                }),
             },
         }
 
@@ -704,6 +883,7 @@ class PostUpscaleProcgenBlend:
         burn_captions: bool = True,
         caption_style: str = _DEFAULT_CAPTION_STYLE,
         scopes_mp4_path: str = "",
+        audio_bars: str = "bottom",
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
@@ -803,25 +983,38 @@ class PostUpscaleProcgenBlend:
         if src_dims:
             report_lines.append("conform: procgen scaled to source %dx%d"
                                 % src_dims)
-        cmd = _build_blend_cmd(
-            source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,
-            blend_mode=blend_mode, blend_opacity=float(blend_opacity),
-            ffmpeg=ffmpeg,
-            shadow_crush_threshold=int(shadow_crush_threshold),
-            green_only_overlay=bool(green_only_overlay),
-            captions_ass_path=captions_ass_path,
-            source_dims=src_dims,
-            scopes_mp4=scp,
-        )
         if scp is not None:
             report_lines.append(f"scopes: 3-input blend (+{scp.name})")
-        # Run with cwd = the .ass folder so the libass filter resolves the
-        # subtitle by basename (sidesteps Windows drive-colon filtergraph
-        # escaping). All input/output paths in cmd are absolute.
+
+        # BUG 4: the ALWAYS-ON audio bars are a SEPARATE second pass so the
+        # (historically fragile) procgen/scopes blend is untouched. When ON the
+        # main blend produces an UN-captioned composite, then a second pass
+        # lighten-blends the bars layer and burns captions ON TOP (captions stay
+        # above the bars). 'off' -> the legacy single-pass blend (captions in the
+        # main pass), byte-identical to today.
+        want_bars = (str(audio_bars or "off").lower() == "bottom"
+                     and pgn is not None)
         run_cwd = str(Path(captions_ass_path).parent) if captions_ass_path else None
+        _main_captions = None if want_bars else captions_ass_path
+        _main_out = (
+            output_path.with_name(output_path.stem + "__nobars_tmp" + output_path.suffix)
+            if want_bars else output_path)
+
+        def _run_blend(out_mp4, caps):
+            _cmd = _build_blend_cmd(
+                source_mp4=src, procgen_mp4=pgn, out_mp4=out_mp4,
+                blend_mode=blend_mode, blend_opacity=float(blend_opacity),
+                ffmpeg=ffmpeg,
+                shadow_crush_threshold=int(shadow_crush_threshold),
+                green_only_overlay=bool(green_only_overlay),
+                captions_ass_path=caps, source_dims=src_dims, scopes_mp4=scp)
+            subprocess.run(_cmd, check=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           cwd=(str(Path(caps).parent) if caps else None))
+
+        # -- main blend (procgen [+ scopes]); captions deferred when bars are on --
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           cwd=run_cwd)
+            _run_blend(_main_out, _main_captions)
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
             msg = (
@@ -835,6 +1028,50 @@ class PostUpscaleProcgenBlend:
                 return (str(output_path), msg + f"; copied source -> {output_path.name}")
             except Exception as copy_exc:  # noqa: BLE001
                 return ("", msg + f"; copy fallback also failed: {copy_exc}")
+
+        # -- BUG 4 second pass: bars layer (lighten @60%) then captions on top --
+        if want_bars:
+            _bw, _bh = (src_dims if src_dims else (1920, 1080))
+            _fps = _probe_fps(src, ffmpeg)
+            bars_tmp = output_path.with_name(
+                output_path.stem + "__bars_tmp" + output_path.suffix)
+            bars_path = _render_bars_only_mp4(src, bars_tmp, _bw, _bh, _fps, ffmpeg)
+            _bars_ok = False
+            if bars_path is not None:
+                try:
+                    subprocess.run(
+                        _build_bars_caption_cmd(
+                            _main_out, bars_path, output_path, _BARS_OPACITY,
+                            ffmpeg, captions_ass_path, src_dims),
+                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        cwd=run_cwd)
+                    _bars_ok = True
+                    report_lines.append(
+                        "audio_bars: bottom overlay (lighten @%.2f, captions above)"
+                        % _BARS_OPACITY)
+                except subprocess.CalledProcessError as exc:
+                    _se = exc.stderr.decode("utf-8", "replace") if exc.stderr else ""
+                    log.warning("[PostUpscaleProcgenBlend] audio_bars: overlay pass "
+                                "failed (%s); re-running the normal captioned blend",
+                                _se[:200])
+            if not _bars_ok:
+                # LOUD degrade: ship the NORMAL captioned blend so the deliverable
+                # still has its captions (never silently drop them).
+                try:
+                    _run_blend(output_path, captions_ass_path)
+                    report_lines.append("audio_bars: SKIPPED (bars layer "
+                                        "unavailable); shipped normal captioned blend")
+                except subprocess.CalledProcessError:
+                    try:
+                        shutil.copy2(src, output_path)
+                    except Exception:  # noqa: BLE001
+                        pass
+            for _t in (_main_out, bars_tmp):
+                try:
+                    if Path(_t) != output_path and Path(_t).is_file():
+                        os.remove(_t)
+                except OSError:
+                    pass
 
         report_lines.append(
             f"PostUpscaleProcgenBlend: blended {src.name} + {pgn.name} -> "

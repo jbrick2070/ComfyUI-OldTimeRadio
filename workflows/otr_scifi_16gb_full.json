@@ -1421,7 +1421,8 @@
         true,
         true,
         "sdh_standard",
-        ""
+        "",
+        "bottom"
       ]
     },
     {
