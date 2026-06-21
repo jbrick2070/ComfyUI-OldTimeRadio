@@ -711,6 +711,51 @@ class TestDispatcherStillSpine:
         assert req["observability"]["init_source"] == "portrait"   # fell back, stamped truthfully
         assert req["asset_refs"]["init_image"] == str(portrait)
 
+    def test_mesh_fodder_routing_skips_scene_still(self, tmp_path):
+        """3D-image-streams chunk 2: a requires_mesh_fodder engine (mesh_stage,
+        family=image_to_video) is fed the clean mesh_fodder still, NOT the scene
+        still -- the _SCENE_INIT_FAMILIES override is SKIPPED for it (without the
+        guard, image_to_video would clobber fodder with the scene still and
+        re-introduce the clay blob)."""
+        from nodes._otr_video_engines import render_driver as rd
+        from nodes._otr_video_engines import eng_mesh_stage  # noqa: F401 (register)
+        fodder = tmp_path / "fodder_c01.png"
+        fodder.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        scene = tmp_path / "scene_b007.png"
+        scene.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        ledger = {
+            "video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b007", "char_id": "c01",
+                       "start_s": 1.0, "dur_s": 2.0}],
+            "images": {"images": [
+                {"object_id": "still_b007", "kind": "scene_beat",
+                 "beat_id": "b007", "path": str(scene)},
+                {"kind": "mesh_fodder", "mesh_subject_id": "c01",
+                 "char_id": "c01", "beat_id": "b007", "path": str(fodder)},
+            ]},
+        }
+        assert rd._mesh_fodder_index(ledger)["c01"] == str(fodder)
+        shot = {"shot_id": "shot_b007", "beat_id": "b007",
+                "engine_id": "mesh_stage", "family": "image_to_video",
+                "target_frame_count": 25, "source_line_ids": ["b007"],
+                "char_id": "c01", "creative": {}}
+        req = rd.build_request_from_shot(shot, ledger)
+        assert req["observability"]["init_source"] == "mesh_fodder"
+        assert req["asset_refs"]["init_image"] == str(fodder)
+
+        # No fodder minted -> LOUD missing, and NOT the scene still (the override
+        # is skipped, so the environment is never meshed).
+        ledger2 = {k: (dict(v) if isinstance(v, dict) else v)
+                   for k, v in ledger.items()}
+        ledger2["images"] = {"images": [
+            {"object_id": "still_b007", "kind": "scene_beat",
+             "beat_id": "b007", "path": str(scene)}]}
+        req2 = rd.build_request_from_shot(shot, ledger2)
+        assert req2["observability"]["init_source"] == "missing_mesh_fodder"
+        assert req2["observability"]["mesh_fodder_missing"] is True
+        # never the scene still (asset_refs omits an empty init_image key)
+        assert req2["asset_refs"].get("init_image", "") != str(scene)
+
     def test_st5_kenburns_reads_driver_built_request(self, tmp_path):
         """ST-5/W6 pin: the request the DRIVER builds for a static_motion
         shot is readable by still_kenburns' own _still_path (the ST-0 probe,

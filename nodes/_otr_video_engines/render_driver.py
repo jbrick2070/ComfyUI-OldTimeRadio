@@ -424,6 +424,33 @@ def _still_index(ledger):
     return out
 
 
+def _mesh_fodder_index(ledger):
+    """``{subject_id: fodder_still_path}`` over ``ledger['images']['images']``
+    rows with ``kind=='mesh_fodder'`` (the 3D-image-streams clean-subject mint).
+    Keyed by ``mesh_subject_id`` (``char_id`` | ``object_id``) PLUS ``beat_id``
+    as a secondary key, so a beat-scoped object fodder is resolvable when no
+    subject id is known. Any ``requires_mesh_fodder`` engine consumes THIS --
+    NEVER the cinematic scene still (which would mesh the whole environment ->
+    the clay blob). Pure, tolerant; the NEWEST row per key wins (mirrors
+    :func:`_still_index` so a cache-hit materialization's fresh row is used)."""
+    out = {}
+    imgs = ((ledger or {}).get("images") or {}).get("images") or []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        if str(im.get("kind") or "") != "mesh_fodder":
+            continue
+        path = str(im.get("path") or "")
+        if not path:
+            continue
+        for key in (im.get("mesh_subject_id"), im.get("object_id"),
+                    im.get("char_id"), im.get("beat_id")):
+            k = str(key or "")
+            if k:
+                out[k] = path
+    return out
+
+
 #: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine
 #: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_kenburns) take
 #: asset_refs.init_image from the beat's scene still; audio_driven_face keeps
@@ -691,16 +718,56 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
     # raw line value for pre-round-5 planned ledgers.
     char_id = str(shot.get("char_id") or line.get("char_id") or "")
-    _family = engine_family(str(shot.get("engine_id") or ""), "")
+    _eng_id = str(shot.get("engine_id") or "")
+    _family = engine_family(_eng_id, "")
     portrait = _portrait_index(ledger).get(char_id, "")
     init_image = portrait
     init_source = "portrait" if portrait else "none"
+    # 3D-image-streams (2026-06-21): a requires_mesh_fodder engine (mesh_stage)
+    # meshes a SINGLE isolated subject, so it must be fed the clean mesh_fodder
+    # still -- NOT the cinematic scene still. The engine_id on the shot is the
+    # FINAL routed engine (apply_engine_override / OTR_FORCE_ENGINE_MAP already
+    # rewrote it before this builder runs), so reading the capability here is
+    # post-override-correct. Resolve fodder by subject (char_id), then beat_id;
+    # the scene still becomes the BACKGROUND plate only (consumed downstream),
+    # so we MUST skip the _SCENE_INIT_FAMILIES override below for these engines.
+    _requires_fodder = bool(
+        _eng_id and _vreg.is_registered(_eng_id)
+        and getattr(_vreg.get_engine(_eng_id), "requires_mesh_fodder", False))
+    _mesh_fodder_missing = False
+    if _requires_fodder:
+        _bid = _beat_id_for_shot(shot)
+        _fidx = _mesh_fodder_index(ledger)
+        _subj = char_id or str(shot.get("mesh_subject_id") or "")
+        _fodder = (_fidx.get(_subj, "") if _subj else "") or _fidx.get(_bid, "")
+        if _fodder:
+            init_image = _fodder
+            init_source = "mesh_fodder"
+            _LOG.info(
+                "[OTR.render_driver] %s: beat %s meshing CLEAN fodder %s "
+                "(subject=%s; scene still is background plate only)",
+                _eng_id, _bid, os.path.basename(_fodder), _subj or "?")
+        else:
+            # LOUD: no clean fodder minted -> do NOT silently mesh the scene
+            # still (the clay-blob bug). Keep the portrait/none init; the engine
+            # fallback chain (mesh_stage -> still_parallax) degrades cleanly.
+            init_source = "missing_mesh_fodder"
+            _mesh_fodder_missing = True
+            _LOG.warning(
+                "[OTR.render_driver] %s MISSING-FODDER (LOUD): beat %s subject "
+                "%r has NO mesh_fodder still in the ledger -- NOT meshing the "
+                "scene still (would mesh the environment); init stays %r. "
+                "Investigate the image phase fork for this beat.",
+                _eng_id, _bid, _subj or char_id, init_image and "portrait" or "none")
     # Family-based init selection (still-spine ST-4 / W6): static_motion +
     # image_to_video shots drift/animate the beat's SCENE STILL (the 6/5
     # look); a missing still falls back to today's behavior LOUD -- never a
     # silent empty init into a fail-closed engine. audio_driven_face keeps
     # the portrait; text engines are unchanged (LTX text-only by design).
-    if _family in _SCENE_INIT_FAMILIES:
+    if _family in _SCENE_INIT_FAMILIES and not _requires_fodder:
+        # NB: mesh_stage is family=image_to_video (IN _SCENE_INIT_FAMILIES), so
+        # without the not-_requires_fodder guard this override would clobber the
+        # clean fodder with the scene still and re-introduce the clay blob.
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
         if _still:
@@ -848,6 +915,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # LOUD trace degrade: an i2v beat that rendered with no scene still.
         req["observability"]["init_source"] = "missing_scene_still"
         req["observability"]["i2v_still_missing"] = True
+    elif _mesh_fodder_missing:
+        # LOUD trace degrade: a 3D mesh beat with no clean fodder minted -- the
+        # default "none" stamp (init_image is empty) would HIDE that we refused
+        # to mesh the scene still; surface it explicitly (mirrors i2v above).
+        req["observability"]["init_source"] = "missing_mesh_fodder"
+        req["observability"]["mesh_fodder_missing"] = True
     else:
         req["observability"]["init_source"] = (init_source if init_image
                                                else "none")
