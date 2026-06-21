@@ -556,7 +556,21 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE STEP: STORY-QUALITY R2 -- craft lift. S1 SHIPPED (2026-06-22); NEXT = S2 (announcer-close =
+**>>> BARK ARTIFACT SPRINT -- COMPLETE (2026-06-22). All chunks shipped + pushed to v2.0-alpha; cleaned-bark
+re-soak GPU-verified end-to-end + published to obs.** B0 (fixture+spine verify, `ffe5e82`) -> B1 (speech-only
+dialogue mode + first-line [clears throat] gate, `467fb05`) -> B2 (thread the dropped per-line seed ->
+determinism, `9e68ad5`) -> B3 (chunk-split hardening, `e1b8196`) -> QA (deterministic >4kHz high-band edge
+metric + scan tool, `e93b54e`). Upstream-TTS only; audio spine FROZEN (byte-identical baseline is indextts2,
+not bark -- verified); min_eos_p kept at 0.1; no per-chunk trim / no FFT reroll loop (panel cut); NO
+workflow-JSON change. Suite 4782 pass/34 skip, Bug Bible 16/7/3. **Re-soak (operator config: cleaned bark +
+mesh_stage 3D bookends + z_image_turbo char stills, real otr_scifi_16gb_full.json):** rendered "Spinning
+Contamination" end-to-end in 21:13 -> `otr/obs/...spinning_contamination..._final.mp4` (20.3 MB). Metric
+before/after on real bark lines: BEFORE (pre-B1) 1/14 char lines flagged (max 0.694); AFTER (cleaned) 0/6
+flagged, all edges <= 0.055. Details: `docs/2026-06-22-bark-artifact/{B0_FIXTURE,QA_RESULTS}.md`. Box reset
+clean. **>>> RESUMES: STORY-QUALITY R2 -- S1 SHIPPED (`5396c05`); NEXT = S2 (announcer-close = concrete final
+image, not thesis).** (Bark sprint was a sanctioned interleave; R2 S2-C5 remain.)
+
+**>>> STORY-QUALITY R2 -- craft lift. S1 SHIPPED (2026-06-22); NEXT = S2 (announcer-close =
 concrete final image, not thesis).** Latest green: full suite 4749 pass/33 skip, Bug Bible 16/7/3, audio
 byte-identical 9/0. **S1 DONE** (commit pending push to v2.0-alpha): music/non-dialogue beats no longer
 bleed their placeholder intent into the spoken/caption transcript. Root cause was
