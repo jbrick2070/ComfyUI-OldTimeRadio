@@ -34,6 +34,13 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Iterable, Optional
 
+# Bare leading stage-direction detector (2026-06-22). _otr_line_hygiene is a
+# stdlib-only leaf -> no import cycle. Dual import (package / standalone).
+try:  # pragma: no cover - exercised by both import styles
+    from ._otr_line_hygiene import detect_leading_stage_business
+except ImportError:  # pragma: no cover
+    from _otr_line_hygiene import detect_leading_stage_business  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -1931,6 +1938,7 @@ def compose_line(
     stage3_beat=None,           # Optional[Stage1Beat]
     stage3_banned_phrases=None,  # Optional[List[str]]
     _stage3_repair_attempted: bool = False,  # recursion guard
+    _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1983,6 +1991,44 @@ def compose_line(
     word_count = len(cleaned.split())
     word_cap, min_words, max_words = _word_bands(req.target_words)
 
+    # Bare leading stage-direction -> ONE reroll (2026-06-22, roundtable). The
+    # bare direction ("twirls his pen nervously Look,...") survives format-strip
+    # and the Stage-3 strips, so detect on the post-draft text and REGENERATE a
+    # clean line rather than truncate it. One level only via the guard; the
+    # freeze floor (_otr_ledger_scrub) is the deterministic backstop if the
+    # reroll still leaks (a weak model) or its draft attempts exhaust.
+    if not _stage_dir_repair_attempted:
+        _sd_hit, _sd_hint = detect_leading_stage_business(cleaned)
+        if _sd_hit:
+            _existing = getattr(req, "reroll_hint", "") or ""
+            _sd_combined = f"{_existing}; {_sd_hint}" if _existing else _sd_hint
+            log.warning(
+                "[OTR_LineComposer] bare stage direction in draft for %s -- "
+                "one reroll", req.speaker,
+            )
+            try:
+                return compose_line(
+                    creative_fn=creative_fn,
+                    req=req,
+                    max_attempts=max_attempts,
+                    base_temperature=base_temperature,
+                    max_new_tokens_cap=max_new_tokens_cap,
+                    stop_strings=stop_strings,
+                    creative_repo_id=creative_repo_id,
+                    reroll_hint=_sd_combined,
+                    enable_stage3_validators=enable_stage3_validators,
+                    stage3_plan=stage3_plan,
+                    stage3_beat=stage3_beat,
+                    stage3_banned_phrases=stage3_banned_phrases,
+                    _stage3_repair_attempted=_stage3_repair_attempted,
+                    _stage_dir_repair_attempted=True,
+                )
+            except LineCompositionFailedError:
+                log.warning(
+                    "[OTR_LineComposer] stage-direction reroll exhausted for "
+                    "%s -- keeping draft; freeze floor is the backstop",
+                    req.speaker,
+                )
 
     # Stage 3 -- deterministic strip pipeline. Every strip below runs
     # before this function returns, so the caller appends the corrected
