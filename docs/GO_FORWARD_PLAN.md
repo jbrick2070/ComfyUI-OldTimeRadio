@@ -556,6 +556,23 @@
 
 ## 1. CURRENT STEP
 
+**>>> STORY-QUALITY R2 -- COMPLETE (2026-06-22). All 8 craft levers + the Final-QA scan shipped + pushed
+to v2.0-alpha, each suite+Bug-Bible green; suite 4934 pass/34 skip.** S1 music-text suppression (`5396c05`)
+-> S2 announcer-close = concrete final image, not thesis (`118088f`) -> S3 cliche + flat stage-business
+reroll gate (`1887803`) -> C0 action-verb beat intents + wants_are_default classifier (`687f766`) -> C3
+contrasting speech_signatures at CastLock (`981db60`) -> C4+C5 per-act escalation + on-the-nose reroll
+(`3e19906`) -> C1+C2 specificity anchors + central story-object, 3-pass roundtable-converged (`38c2c10`) ->
+Final QA: `scripts/story_quality_scan.py` extended with the lever metrics (thesis/cliche/stage-business/
+on-the-nose/leading-direction counts + wants_default + anchors/central-object presence + voice distinctness).
+HARD held throughout: ledger schema `l3-2026-05-14` FIXED (new values ride free-form `meta`), content-only,
+NO workflow-JSON change, model-agnostic (every gate is one a strong/opus line passes -> lifts the weak end),
+reuse the existing reroll loop. The whole craft lift is in `_otr_line_hygiene` / `_otr_line_composer` /
+`_otr_outline` / `_otr_casting` / `_otr_dramatic_state` / `_otr_specificity` + the writer wiring -- no node/
+JSON change. Campaign docs in `docs/2026-06-22-story-quality-r2/` + `docs/2026-06-22-story-quality-c1c2/`.
+OPERATOR VERIFY-AT-BUILD: the live `test_audio_byte_identical` baseline (indextts2) may need recapture since
+the prompt levers intentionally change generated dialogue -- the clean fixture is a no-op, but a fixed-seed
+baseline close that newly trips a gate would change; run the live gate + re-soak read at your convenience.
+
 **>>> STAGE-DIRECTION LEAK SPRINT -- COMPLETE (2026-06-22). All 5 chunks shipped + pushed to v2.0-alpha;
 3-pass roundtable-converged (architecture/coding/wiring, ~$0.51).** Bare undelimited stage directions
 ("twirls his pen nervously Look, Pinky...") were leaking into the frozen ledger text -> Bark spoke them +

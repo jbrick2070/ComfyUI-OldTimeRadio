@@ -65,6 +65,29 @@ except Exception:  # noqa: BLE001 -- keep the scan runnable in isolation
 
 # F7 narration detector -- prefer the engine's (shared); fall back to a
 # vendored copy so the baseline runs before F7 lands. T2.3 mirrors this exactly.
+# R2 craft-lever helpers (S2/S3/C0/C1/C2/C5). Guarded so the baseline still runs
+# if the helpers are absent (they no-op to "clean").
+try:
+    from nodes._otr_line_hygiene import (  # type: ignore
+        detect_leading_stage_business, flag_cliche, flag_on_the_nose,
+        flag_stage_business, flag_thesis_close,
+    )
+    from nodes._otr_dramatic_state import wants_are_default  # type: ignore
+    _HAS_R2_HELPERS = True
+except Exception:  # noqa: BLE001
+    _HAS_R2_HELPERS = False
+
+    def _r2_false(*_a, **_k):  # type: ignore
+        return (False, "")
+
+    flag_cliche = flag_on_the_nose = flag_stage_business = flag_thesis_close = _r2_false  # type: ignore
+
+    def detect_leading_stage_business(_t):  # type: ignore
+        return (False, "")
+
+    def wants_are_default(_s):  # type: ignore
+        return False
+
 try:
     from nodes._otr_line_hygiene import detect_narration_self_address  # type: ignore
     _HAS_ENGINE_DETECTOR = True
@@ -240,6 +263,53 @@ def narration_self_address_lines(ledger: Dict[str, Any]) -> int:
     return n
 
 
+def r2_lever_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
+    """Story-Quality R2 craft-lever counts over a frozen ledger (read-only).
+
+    Per-line flag counts (the weak end should DROP after the levers ship) + the
+    structural signals: a thesis close, default boilerplate wants, whether the
+    specificity anchors / central object were derived, and voice distinctness.
+    """
+    m = _meta(ledger)
+    char = [ln for ln in _lines(ledger)
+            if str(ln.get("speaker_role") or "").strip() == "character"]
+    cliche = sum(1 for ln in char if flag_cliche(ln.get("text"))[0])
+    nose = sum(1 for ln in char if flag_on_the_nose(ln.get("text"))[0])
+    biz = sum(1 for ln in char if flag_stage_business(ln.get("text"))[0])
+    lead_sd = sum(1 for ln in char if detect_leading_stage_business(ln.get("text"))[0])
+
+    # default-wants classifier over meta.dramatic_state (shim a state object)
+    ds = m.get("dramatic_state")
+    wants_default = None
+    if isinstance(ds, dict):
+        from types import SimpleNamespace
+        wants_default = bool(wants_are_default(SimpleNamespace(
+            character_a_wants=ds.get("character_a_wants", ""),
+            character_b_wants=ds.get("character_b_wants", ""))))
+
+    # voice distinctness: distinct speech registers / number of character voices
+    sigs = []
+    for c in (ledger.get("cast") or []):
+        if isinstance(c, dict) and str(c.get("name") or "").upper() != "ANNOUNCER":
+            sigs.append(" ".join(str(c.get("speech_signature") or "").lower().split()))
+    sigs = [s for s in sigs if s]
+    voice_distinct = (round(len(set(sigs)) / len(sigs), 3) if sigs else None)
+
+    anchors = m.get("specificity_anchors")
+    return {
+        "thesis_close": bool(flag_thesis_close(find_outro_text(ledger))[0]),
+        "cliche_lines": cliche,
+        "on_the_nose_lines": nose,
+        "stage_business_lines": biz,
+        "leading_stage_dir_lines": lead_sd,
+        "wants_default": wants_default,
+        "has_specificity_anchors": bool(anchors),
+        "n_specificity_anchors": len(anchors) if isinstance(anchors, list) else 0,
+        "has_central_object": bool(m.get("central_object")),
+        "voice_distinct_ratio": voice_distinct,
+    }
+
+
 def scan_ledger(path: str, target_override: Optional[int]) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         ledger = json.load(f)
@@ -262,6 +332,7 @@ def scan_ledger(path: str, target_override: Optional[int]) -> Dict[str, Any]:
         "arc_shape": str(m.get("arc_shape") or ""),
         "outro_hedge_vs_resolved": outro_hedge_vs_resolved(ledger),
         "narration_self_address_lines": narration_self_address_lines(ledger),
+        **r2_lever_metrics(ledger),
     }
 
 
