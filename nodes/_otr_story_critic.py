@@ -162,6 +162,26 @@ class FlatLine(BaseModel):
     reason: str
 
 
+# STEP 5 (2026-06-22 story+cast fix, roundtable-converged): the named flatness
+# dimension a reroll target failed -- the operational vocabulary the critic and
+# composer now share. The five craft dimensions a live line should do >=1 of, plus
+# `tension` (failed to meet its per-beat target intensity) and `unspecified` (the
+# safe default). OPTIONAL with a default so older stored
+# `meta.story_critic_report` dicts + `StoryCriticReport.clean()` still validate
+# (no new required field). It is telemetry + an optional hint prefix -- NOT a
+# deterministic re-craft mapper (the critic's `hint` is already actionable and is
+# threaded verbatim to the composer).
+FailedDimension = Literal[
+    "knowledge",     # change what a character/the audience knows
+    "pressure",      # shift the pressure on a character
+    "relationship",  # move a relationship
+    "decision",      # force or avoid a decision
+    "obstacle",      # raise or clear an obstacle
+    "tension",       # failed to meet the beat's target intensity
+    "unspecified",
+]
+
+
 class RerollTarget(BaseModel):
     """One rubric §5 finding: a line the critic asks Sprint 5C to reroll.
 
@@ -170,9 +190,14 @@ class RerollTarget(BaseModel):
     It must tell the composer what to change, not merely that something is
     wrong (e.g. "give Edna a sharper retort that lands the betrayal" --
     not "this line is weak").
+
+    `failed_dimension` (STEP 5) names which shared craft dimension the line
+    missed -- for telemetry and an optional hint prefix. Optional/defaulted for
+    back-compat.
     """
     line_id: str
     hint: str
+    failed_dimension: FailedDimension = "unspecified"
 
 
 # The four arc verdicts. `strong` is the all-clear; `uneven` flags a
@@ -249,10 +274,26 @@ Flag any character whose dialogue stops sounding like that character --
 register, vocabulary, attitude all matter. Emit a voice_drift entry
 {char_id, note} for each affected character. A well-cast script has none.
 
-SECTION 3 -- FLAT LINES. Flag lines that are dramatically inert: a fact
-delivered instead of a moment played, exposition with no life. Emit a
-flat_lines entry {line_id, reason} for each. Be sparing -- most lines in a
-competent script are fine; do not invent flatness to look thorough.
+SECTION 3 -- FLAT LINES. A character line is ALIVE when it does at least
+ONE of these five things AND advances its beat_intent:
+  - knowledge:    changes what a character or the audience knows
+  - pressure:     shifts the pressure on a character
+  - relationship: moves a relationship between characters
+  - decision:     forces or avoids a decision
+  - obstacle:     raises a new obstacle or clears an existing one
+A line is FLAT only when it does NONE of the five AND fails to advance its
+beat_intent. Be sparing -- most lines in a competent script are alive; do
+not invent flatness to look thorough.
+
+TENSION FIT: each line may carry a `target_tension=N/5` (1 = orientation /
+unease, 3 = active pressure / a choice, 5 = an irreversible decision, reveal,
+or cost). Judge a line against its OWN target -- a calm setup line at target 1
+is NOT flat for failing to be explosive; a line at target 5 that merely
+restates is flat. When a line clearly fails to reach its target intensity,
+that is the `tension` dimension.
+
+Emit a flat_lines entry {line_id, reason} for each flat line, where `reason`
+names the missing dimension in plain words.
 
 SECTION 4 -- ARC VERDICT. Judge the whole episode's dramatic arc as ONE
 of:
@@ -263,10 +304,16 @@ of:
                   the middle.
 
 SECTION 5 -- REROLL TARGETS. From the lines you flagged above, pick the
-ones most worth re-composing. For each, emit a reroll_targets entry
-{line_id, hint} where `hint` is CONCRETE, ACTIONABLE feedback the line
-composer can act on directly -- tell it what to change, not merely that
-the line is weak. Only name lines that genuinely need it.
+ones most worth re-composing. Emit a reroll_targets entry ONLY for a line
+that fails BOTH to advance its beat_intent AND at least one named dimension
+-- that double test keeps the reroll list short. For each, emit
+{line_id, hint, failed_dimension} where:
+  - `hint` is CONCRETE, ACTIONABLE feedback the line composer can act on
+    directly -- tell it WHAT to change, not merely that the line is weak.
+  - `failed_dimension` is the single most important dimension the line
+    missed, one of: knowledge, pressure, relationship, decision, obstacle,
+    tension. (Use `tension` when the line failed to meet its target
+    intensity.) If you cannot name one, use "unspecified".
 
 SECTION 6 -- RENDER PRIORITY. Order EVERY line_id you were shown into a
 single list, dramatic peaks FIRST -- the moments that carry the episode at
@@ -279,7 +326,7 @@ Return EXACTLY one JSON object matching this schema:
   "voice_drift": [{"char_id": "...", "note": "..."}, ...],
   "flat_lines": [{"line_id": "...", "reason": "..."}, ...],
   "arc_verdict": "strong" | "uneven" | "flat" | "mid_collapse",
-  "reroll_targets": [{"line_id": "...", "hint": "..."}, ...],
+  "reroll_targets": [{"line_id": "...", "hint": "...", "failed_dimension": "knowledge|pressure|relationship|decision|obstacle|tension|unspecified"}, ...],
   "render_priority": ["line_id", "line_id", ...]
 }
 

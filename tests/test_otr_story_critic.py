@@ -74,6 +74,49 @@ def test_scope_character_lines_empty_scope_returns_none_lines():
 
 
 # ---------------------------------------------------------------------------
+# STEP 5 (2026-06-22): failed_dimension on RerollTarget -- optional, enum,
+# back-compat with stored reports + clean().
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_target_failed_dimension_defaults_unspecified():
+    t = RerollTarget(line_id="l001", hint="sharpen it")
+    assert t.failed_dimension == "unspecified"
+
+
+def test_reroll_target_failed_dimension_accepts_enum():
+    for dim in ("knowledge", "pressure", "relationship", "decision",
+                "obstacle", "tension", "unspecified"):
+        assert RerollTarget(line_id="l", hint="h",
+                            failed_dimension=dim).failed_dimension == dim
+
+
+def test_reroll_target_failed_dimension_rejects_unknown():
+    import pytest as _pytest
+    from pydantic import ValidationError
+    with _pytest.raises(ValidationError):
+        RerollTarget(line_id="l", hint="h", failed_dimension="vibes")
+
+
+def test_old_report_without_failed_dimension_still_validates():
+    """Back-compat: a stored meta.story_critic_report whose reroll_targets
+    predate failed_dimension parses, defaulting to 'unspecified' (no new
+    REQUIRED field)."""
+    old = {
+        "continuity_issues": [],
+        "voice_drift": [],
+        "flat_lines": [],
+        "arc_verdict": "uneven",
+        "reroll_targets": [{"line_id": "l001", "hint": "sharpen"}],
+        "render_priority": [],
+    }
+    rep = StoryCriticReport(**old)
+    assert rep.reroll_targets[0].failed_dimension == "unspecified"
+    # clean() is still valid with no new required fields.
+    assert StoryCriticReport.clean().reroll_targets == []
+
+
+# ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
 

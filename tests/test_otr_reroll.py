@@ -612,6 +612,47 @@ def test_reroll_diverges_on_outstanding_count_increase():
 
 
 # ---------------------------------------------------------------------------
+# STEP 5 (2026-06-22): failed_dimension prefixes the reroll hint (no re-craft).
+# ---------------------------------------------------------------------------
+
+
+def _report_with_dim(line_id="l001", hint="sharpen", dim="knowledge"):
+    return json.dumps({
+        "continuity_issues": [], "voice_drift": [], "flat_lines": [],
+        "arc_verdict": "uneven",
+        "reroll_targets": [{"line_id": line_id, "hint": hint,
+                            "failed_dimension": dim}],
+        "render_priority": ["l001", "l002"],
+    })
+
+
+def test_failed_dimension_prefixes_reroll_hint():
+    data = _ledger_data(story_critic_report=json.loads(_report_with_dim()))
+    led = _FakeLedger(data)
+    # Cycle 1 re-run clean -> converges; the history records the prefixed hint.
+    fn = _mk_reroll_generate_fn([_clean_report()])
+
+    run_targeted_reroll(fn, led)
+
+    rerolled = [h for h in data["meta"]["reroll_history"]
+                if h.get("status") == "rerolled"]
+    assert rerolled and rerolled[0]["hint"].startswith("[knowledge] ")
+
+
+def test_unspecified_dimension_adds_no_prefix():
+    data = _ledger_data(
+        story_critic_report=json.loads(_report_with_dim(dim="unspecified")))
+    led = _FakeLedger(data)
+    fn = _mk_reroll_generate_fn([_clean_report()])
+
+    run_targeted_reroll(fn, led)
+
+    rerolled = [h for h in data["meta"]["reroll_history"]
+                if h.get("status") == "rerolled"]
+    assert rerolled and not rerolled[0]["hint"].startswith("[")
+
+
+# ---------------------------------------------------------------------------
 # 7. never raises on a raising generate_fn
 # ---------------------------------------------------------------------------
 

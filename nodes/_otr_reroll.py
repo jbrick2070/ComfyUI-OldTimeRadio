@@ -583,7 +583,18 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
             lid = str(t.line_id or "").strip()
             if lid:
                 ids.add(lid)
-                hints[lid] = str(t.hint or "").strip()
+                hint = str(t.hint or "").strip()
+                # STEP 5 (2026-06-22): fold the named flatness dimension in as a
+                # lightweight PREFIX so the composer's REVISE carries it -- NOT a
+                # deterministic re-craft (the critic's hint is already
+                # actionable). "unspecified" / missing -> no prefix (back-compat).
+                dim = str(getattr(t, "failed_dimension", "") or "").strip()
+                if dim and dim != "unspecified":
+                    hint = (
+                        f"[{dim}] {hint}" if hint
+                        else f"make this beat earn its {dim}"
+                    )
+                hints[lid] = hint
         return ids, hints
 
     scope, hint_by_id = _scope_and_hints(report)
