@@ -1,5 +1,54 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (PLANNER+CODER+ROUNDTABLE, marathon; HEAD `358accd` == origin/v2.0-alpha
+> after the indextts2 realpath fix; the night-soak driver + roundtable docs are LOCAL/uncommitted).**
+> **>>> NEW CURRENT STEP (build): the STORY + CAST FIX -- `docs/2026-06-22-story-cast-roundtable/roundtable/
+> pass04_plan_FINAL.md`. Build STEPs 1-4 FIRST (small, contained, test-backed), re-soak the minimal matrix,
+> THEN ground STEP 6.** A 4-round live roundtable (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude
+> code-grounded judge, ~$0.15) hardened it; the judge+grounding caught that THREE panel "fixes" were ALREADY
+> implemented (prose/metadata decouple; the reroll `hint`; targeted patching), so the build targets the 6 REAL
+> defects, sequenced:
+>   1. **role_mismatch = ONE line** -- `nodes/_otr_ledger_reviewer.py:500` `role = row.get("speaker_role") or
+>      row.get("tts_model")` reads the TTS engine name as a role -> drop the `tts_model` fallback + guarantee
+>      speaker_role is set per row.
+>   2. **migrate cast schema BEFORE validating** (legacy music/sfx role values -> `cue_type`; archetype in its
+>      own field; speaker_role only for spoken rows).
+>   3. **voice fail-closed at OTR_CastLock (node 80) OUTPUT** -- no `voice_preset=None` reaches TTS 81/82
+>      (`cast_lock.py:272` silent cast_seed=None skip + unmatched char_id are the sources).
+>   4. **whack-a-mole critic** -- `run_story_critic` re-scores the WHOLE episode each reroll
+>      (`_otr_freeze_cascade.py:754` whole-episode; `_otr_reroll.py:621` reroll-loop) -> add
+>      `scope_line_ids` + the CORRECTED convergence invariant (targeted ids must CLEAR; newly-failed neighbors
+>      join next scope; halt only on cycle-cap OR GLOBAL-count increase -- NOT "strict decrease", which
+>      false-halts when fixing N surfaces N+1).
+>   5. **flat rubric** -- shared 5-dimension definition in the critic PROMPT + a `failed_dimension` enum;
+>      critic-output + the `_otr_reroll.py` hint parser updated TOGETHER. Rubric-guided LLM judgment, NOT a
+>      deterministic code test.
+>   6. **the arc lever is BEAT-PLANNING, not line-writing** -- `LineRequest` ALREADY carries
+>      beat_objective/obstacle/turn/beat_tension/next_turn/outline_spine, so do NOT add a SceneArcContext;
+>      GROUND-FIRST: read the beat/outline planner + check whether beat_tension escalates, THEN decide.
+>   ALL fixes are INTERNAL node code -- ZERO workflow-JSON change (add a no-drift regression check). Acceptance:
+>   >=70% frozen_clean on the minimal matrix (1 small + 1 frontier, 1 tier), 0 cast violations, no
+>   voice_preset=None, and REMOVE the `OTR_BYPASS_FREEZE_HALT` stopgap once STEP 4 converges. Full plan + all 4
+>   passes / anchors / judgments / raw panel reviews: `docs/2026-06-22-story-cast-roundtable/roundtable/`.
+> **ALSO THIS SESSION (after the capability-routing block below):**
+> - **indextts2/chatterbox/dia realpath fix SHIPPED+PUSHED (`358accd`):** under the Desktop-v2 junction install,
+>   `abspath(__file__)` pointed `_COMFY_ROOT` at the install root so the Path-B sidecar venv/weights "weren't
+>   found" -> indextts2 dead headless. Fixed with `realpath` (resolves the junction; no-op on a non-junction
+>   checkout; env overrides still win). Suite 4957/34 + Bug Bible 16/7/3 green.
+> - **NIGHT BROADCAST SOAK (ran ~overnight):** new `scripts/_otr_night_soak.py` (LOCAL) -- 10h, alternating full
+>   / visualizer-only, rotating writers (mistral/gemma-12b local + grok-4.3/gpt-5.5-pro/deepseek-v4-pro frontier
+>   via OpenRouter slot-a, technical=local mistral -- the operator's cost-smart split), word tiers
+>   420/560/700/864, indextts2 voice + kokoro announcer, ltx_av_music bookends + z_image_turbo flat_still char
+>   beats, fresh cast/news. **17 episodes published to obs.** REQUIRED the `OTR_BYPASS_FREEZE_HALT=1` server-boot
+>   STOPGAP (the story-critic freeze gate -- the exact thing the STORY+CAST FIX repairs) + `act_count='auto'`
+>   (the workflow enforces a word-scaled act minimum; act=1 is rejected). Boot = FLOOR lane + OTR_ENABLE_ZIMAGE +
+>   OTR_ZIMAGE_UNET=z_image_turbo_nvfp4.safetensors + OTR_ENABLE_LTX_AV + OTR_ENABLE_OPENROUTER + OPENROUTER_MODEL_A.
+> - **WAN 14B REMOVE (morning task, NOT done):** operator REVERSED the wan promotion -- the wan2.2 i2v 14B fp8
+>   thrashes on 16GB (re-stages 13.6GB per chunk via the OTR VRAM wrapper) + a `b000_music_open` frame-count
+>   explosion hung a 100%-wan eyeball ~40min on ONE beat. Plan: clean NATIVE image->video wan smoke (no OTR VRAM
+>   wrapper) -> source/confirm a <14GB Wan 2.2 (5B `wan_ti2v` exists) -> remove the 14B as a selectable engine
+>   from `workflows/otr_scifi_16gb_full.json`. The capability-routing fix (`cf5fbb3`) is engine-agnostic + STAYS.
+
 > **UPDATE 2026-06-22 (capability-routing SHIPPED, `cf5fbb3`):** the capability-routing campaign (R1-R3)
 > is now BUILT + PUSHED + GREEN, not just converged. `nodes/_otr_shared/role_compat.py::engine_fits_role`
 > DROPS the per-engine `roles` whitelist gate -> eligibility is PURELY capability
