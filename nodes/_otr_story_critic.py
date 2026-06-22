@@ -304,9 +304,44 @@ def _critic_character_lines(candidate_ledger: dict) -> list[dict]:
     ]
 
 
+def _scope_character_lines(
+    character_lines: list[dict],
+    scope_line_ids,
+) -> list[dict]:
+    """STEP 4 (2026-06-22 story+cast fix): restrict the critic's judging
+    surface to the targeted ``line_ids`` PLUS their immediate continuity
+    neighbors (the prev/next CHARACTER line in canonical order).
+
+    ``scope_line_ids is None`` -> the whole-episode pass (unchanged; the
+    freeze-cascade initial critic + every legacy caller). When the reroll
+    loop passes the patched target set, the critic re-scores ONLY that
+    window -- the fix for the whack-a-mole re-scoring that never converged
+    (each whole-episode re-run re-surfaced lines the loop never touched).
+    Neighbors are included so a continuity break a reroll INTRODUCES at the
+    seam is still caught and folded into the next cycle's scope.
+
+    Missing/duplicate ids are ignored (de-duped via the index); the reroll
+    loop only ever passes ids it just patched, so this is defensive.
+    """
+    if scope_line_ids is None:
+        return character_lines
+    wanted = {str(x) for x in scope_line_ids if x is not None}
+    if not wanted:
+        return []
+    keep: set = set()
+    n = len(character_lines)
+    for i, ln in enumerate(character_lines):
+        if str(ln.get("line_id")) in wanted:
+            for j in (i - 1, i, i + 1):
+                if 0 <= j < n:
+                    keep.add(j)
+    return [ln for k, ln in enumerate(character_lines) if k in keep]
+
+
 def _render_critic_user_prompt(
     candidate_ledger: dict,
     cast_rows: list[dict],
+    scope_line_ids=None,
 ) -> str:
     """Build the story critic's user prompt.
 
@@ -316,9 +351,15 @@ def _render_critic_user_prompt(
     `_render_lines_for_doctor` -- the critic needs `arc_phase`,
     `beat_intent`, `mood`, and word counts to judge arc and flatness with
     real per-line context.
+
+    ``scope_line_ids`` (STEP 4): when set, the body is restricted to the
+    targeted lines + continuity neighbors (see `_scope_character_lines`);
+    None judges the whole episode.
     """
     parts = _render_doctor_episode_context(candidate_ledger, cast_rows)
-    character_lines = _critic_character_lines(candidate_ledger)
+    character_lines = _scope_character_lines(
+        _critic_character_lines(candidate_ledger), scope_line_ids,
+    )
     parts.append(
         "EPISODE SCRIPT (CHARACTER DIALOGUE BEATS ONLY -- "
         "post-script-doctor, ready for the story-quality critic):"
@@ -406,6 +447,7 @@ def run_story_critic(
     generate_fn,
     candidate_ledger: dict,
     cast_rows: list[dict],
+    scope_line_ids=None,
 ) -> StoryCriticReport:
     """Run the Sprint 5B whole-script story-quality critic.
 
@@ -434,11 +476,16 @@ def run_story_critic(
     `StoryCriticReport.clean()` is returned (all sections empty,
     `arc_verdict="strong"`): the pipeline is left exactly as it was found.
     """
-    user_prompt = _render_critic_user_prompt(candidate_ledger, cast_rows)
+    user_prompt = _render_critic_user_prompt(
+        candidate_ledger, cast_rows, scope_line_ids,
+    )
     messages = [
         {"role": "system", "content": _CRITIC_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
+    # post_validator keeps the WHOLE-ledger valid id set even when scoped, so a
+    # neighbor reference the critic emits is never falsely rejected; the loop
+    # only acts on ids it can find anyway.
     post_validator = _make_critic_post_validator(candidate_ledger)
 
     # The single critic call routes through the shared structured_call

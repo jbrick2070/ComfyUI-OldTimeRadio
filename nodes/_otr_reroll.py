@@ -7,12 +7,15 @@ that report was purely ADVISORY -- it named lines worth re-composing in
 
 This module is Sprint 5C: it ACTS on `reroll_targets`. It re-composes
 each flagged line with the critic's concrete `hint` threaded in as a hard
-REVISE instruction, then re-runs the critic on the mutated script. The
-loop is capped at MAX_REROLL_CYCLES critic->reroll cycles; if the critic
-still wants rerolls after the cap, the episode is stamped
-`needs_full_rerun` (the existing terminal freeze verdict) and the ledger
-lines are restored to their pre-reroll state -- the same verdict-stamp
-pattern `review_ledger` uses for its own terminal exits.
+REVISE instruction, then re-SCORES the critic SCOPED to the patched lines
++ their continuity neighbors (STEP 4, 2026-06-22). The loop converges when
+the targeted ids clear; a newly-failed neighbor joins the next cycle's
+scope; it HALTS (to repair-then-ship) only on the MAX_REROLL_CYCLES cap OR
+a rise in the outstanding flag count (divergence). On a halt the re-composed
+lines are KEPT (repair-then-ship, never a pre-reroll restore) and the
+episode is stamped `needs_full_rerun`, which the freeze cascade's A2 path
+ships through the normal freeze (Phase 10's gap audit is the structural
+backstop).
 
 ARCHITECTURE -- Sprint 5C fork, Option A (technical slot, in-cascade).
 The reroll runs INSIDE `OTR_LedgerFreezeCascade`, which keeps only the
@@ -43,7 +46,6 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
-import copy
 import logging
 from dataclasses import dataclass
 
@@ -134,10 +136,13 @@ class RerollDisposition:
                          reroll_targets -- the loop never ran.
       "reroll_resolved"  at least one cycle ran and the final critic
                          re-run named no further reroll_targets.
-      "needs_full_rerun" the cap (MAX_REROLL_CYCLES) was reached and the
-                         critic STILL wants rerolls -- terminal. The
-                         ledger lines were restored to their pre-reroll
-                         state; the cascade skips Phase 7 / 8 / 10.
+      "needs_full_rerun" the cap (MAX_REROLL_CYCLES) was reached or the
+                         loop diverged and the critic STILL wants rerolls.
+                         STEP 4 repair-then-ship: the re-composed lines are
+                         KEPT (no pre-reroll restore) and the freeze
+                         cascade's A2 path ships the candidate through the
+                         normal freeze; Phase 10's gap audit is the
+                         structural backstop.
       "reroll_error"     an unexpected error degraded the pass -- the
                          cascade proceeds to freeze with whatever lines
                          exist (PD1: never abort a run).
@@ -514,27 +519,49 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
         )
         return disp
 
-    # Snapshot the lines so the needs_full_rerun terminal path can restore
-    # the pre-reroll state (the review_ledger verdict-stamp pattern: a
-    # terminal exit leaves the ledger as it was found).
-    snapshot = copy.deepcopy(ledger_data.get("lines", []) or [])
-
+    # STEP 4 (2026-06-22 story+cast fix): SCOPED convergence loop. The initial
+    # `report` is the freeze-cascade WHOLE-EPISODE pass. Each cycle rerolls ONLY
+    # the lines in `scope`, then re-scores the critic SCOPED to scope+neighbors
+    # (run_story_critic(scope_line_ids=scope)). This replaces the whack-a-mole
+    # whole-episode re-run that re-surfaced untouched lines and never converged.
+    #
+    # CONVERGENCE INVARIANT: the targeted ids must CLEAR; any newly-failed
+    # continuity neighbor JOINS the next cycle's scope. HALT (to repair-then-
+    # ship) only when cycle_count reaches MAX_REROLL_CYCLES OR the outstanding
+    # flag count INCREASES vs the previous cycle (divergence) -- NOT on a mere
+    # failure-to-strictly-decrease (fixing N that surfaces N is a plateau, not a
+    # regression, and must keep iterating within the cap).
+    #
+    # Repair-then-ship: we KEEP every re-composed line (no pre-reroll restore).
+    # The freeze cascade's A2 path ships a residual needs_full_rerun through the
+    # normal freeze, and Phase 10's gap audit is the structural backstop.
     history: list = []
     cycles_run = 0
     total_rerolled = 0
 
-    while report.reroll_targets and cycles_run < MAX_REROLL_CYCLES:
+    def _scope_and_hints(rep):
+        ids: set = set()
+        hints: dict = {}
+        for t in rep.reroll_targets:
+            lid = str(t.line_id or "").strip()
+            if lid:
+                ids.add(lid)
+                hints[lid] = str(t.hint or "").strip()
+        return ids, hints
+
+    scope, hint_by_id = _scope_and_hints(report)
+    prev_outstanding = len(scope)
+    diverged = False
+
+    while scope and cycles_run < MAX_REROLL_CYCLES:
         cycles_run += 1
         cycle_rerolled = 0
         log.info(
-            "[OTR_Reroll] cycle %d/%d: %d reroll target(s)",
-            cycles_run, MAX_REROLL_CYCLES, len(report.reroll_targets),
+            "[OTR_Reroll] cycle %d/%d: %d target(s) in scope",
+            cycles_run, MAX_REROLL_CYCLES, len(scope),
         )
-        for target in report.reroll_targets:
-            line_id = str(target.line_id or "").strip()
-            hint = str(target.hint or "").strip()
-            if not line_id:
-                continue
+        for line_id in sorted(scope):
+            hint = hint_by_id.get(line_id, "")
             row = _find_line_row(ledger_data, line_id)
             if row is None:
                 history.append({
@@ -609,43 +636,64 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
                 "status": "rerolled",
                 "compose_flags": list(result.compose_flags),
             })
+        # LLM slot: technical -- SCOPED critic re-run (STEP 4). Only the
+        # patched lines + their continuity neighbors are re-scored, so the
+        # loop converges on the lines it actually touched instead of chasing
+        # untouched lines a whole-episode re-run keeps re-surfacing.
+        # run_story_critic NEVER raises (clean() on any failure).
         log.info(
-            "[OTR_Reroll] cycle %d re-composed %d line(s); re-running "
-            "the story critic", cycles_run, cycle_rerolled,
+            "[OTR_Reroll] cycle %d re-composed %d line(s); re-scoring the "
+            "critic on %d scoped line(s)+neighbors",
+            cycles_run, cycle_rerolled, len(scope),
         )
-        # LLM slot: technical -- the whole-script critic re-run. The same
-        # technical-slot structured pass as Sprint 5B; run_story_critic
-        # owns the `# LLM slot: technical` tag at its structured_call
-        # site. run_story_critic NEVER raises (returns clean() on any
-        # failure), so a critic re-run failure simply ends the loop.
-        report = run_story_critic(generate_fn, ledger_data, cast_rows)
+        report = run_story_critic(
+            generate_fn, ledger_data, cast_rows, scope_line_ids=scope,
+        )
+        flagged, hint_by_id = _scope_and_hints(report)
+        next_scope = flagged  # targeted-still-failing + newly-flagged neighbors
+        if not next_scope:
+            scope = set()  # CONVERGED: every targeted id cleared, no new neighbor
+            break
+        if len(next_scope) > prev_outstanding:
+            # Outstanding flag count INCREASED -- divergence. Stop and ship
+            # what we have rather than loop toward a worse script.
+            diverged = True
+            scope = next_scope
+            break
+        prev_outstanding = len(next_scope)
+        scope = next_scope
 
     meta["cycle_count"] = cycles_run
     meta["reroll_history"] = history
-    meta["story_critic_report"] = report.model_dump()
 
-    if report.reroll_targets:
-        # The cap was reached and the critic STILL names targets -- a 3rd
-        # cycle would be needed. Terminal: restore the pre-reroll lines
-        # and stamp needs_full_rerun (mirrors review_ledger's terminal
-        # verdict-stamp pattern). The reroll_history audit stays on meta.
-        ledger_data["lines"] = snapshot
-        if hasattr(led, "_recompute_totals"):
-            try:
-                led._recompute_totals()
-            except Exception:  # noqa: BLE001
-                pass
+    # Refresh the FINAL critic report with a WHOLE-EPISODE pass so the Sprint 6
+    # render-coupling stage (render_priority / flat_lines / arc_verdict) sees
+    # the true end state -- the loop's last report is only the scoped window.
+    final_report = run_story_critic(generate_fn, ledger_data, cast_rows)
+    meta["story_critic_report"] = final_report.model_dump()
+    meta["reroll_outstanding"] = sorted(scope)
+    meta["reroll_diverged"] = bool(diverged)
+
+    if final_report.reroll_targets:
+        # Repair-then-ship: the bounded loop hit the cap or diverged and the
+        # whole-episode critic still names targets. We KEEP the re-composed
+        # lines (an improvement pass, never a regression to the pre-reroll
+        # text) and stamp needs_full_rerun so the freeze cascade's A2 path
+        # ships the candidate through the normal freeze (Phase 10's gap audit
+        # remains the structural backstop). No pre-reroll restore.
         disp = RerollDisposition(
-            "needs_full_rerun", cycles_run, total_rerolled, report,
+            "needs_full_rerun", cycles_run, total_rerolled, final_report,
         )
         log.warning(
-            "[OTR_Reroll] critic still names %d reroll target(s) after "
-            "%d cycle(s) -- restoring pre-reroll lines and stamping "
-            "needs_full_rerun", len(report.reroll_targets), cycles_run,
+            "[OTR_Reroll] critic still names %d target(s) after %d cycle(s) "
+            "(diverged=%s) -- repair-then-ship: KEEPING the %d re-composed "
+            "line(s), stamping needs_full_rerun for the cascade A2 "
+            "ship-through", len(final_report.reroll_targets), cycles_run,
+            diverged, total_rerolled,
         )
     else:
         disp = RerollDisposition(
-            "reroll_resolved", cycles_run, total_rerolled, report,
+            "reroll_resolved", cycles_run, total_rerolled, final_report,
         )
         log.info(
             "[OTR_Reroll] reroll resolved after %d cycle(s): %d line(s) "

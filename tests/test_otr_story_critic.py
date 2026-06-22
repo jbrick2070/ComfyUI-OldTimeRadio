@@ -34,8 +34,43 @@ from nodes._otr_story_critic import (  # noqa: E402
     RerollTarget,
     StoryCriticReport,
     VoiceDriftNote,
+    _scope_character_lines,
     run_story_critic,
 )
+
+
+# ---------------------------------------------------------------------------
+# STEP 4 (2026-06-22 story+cast fix): scope helper -- the critic re-scores
+# only the targeted lines + their continuity neighbors.
+# ---------------------------------------------------------------------------
+
+
+def _char_line(line_id):
+    return {"line_id": line_id, "speaker_role": "character", "text": "x"}
+
+
+def test_scope_character_lines_none_returns_all():
+    lines = [_char_line(f"l{i:03d}") for i in range(1, 6)]
+    assert _scope_character_lines(lines, None) == lines
+
+
+def test_scope_character_lines_includes_immediate_neighbors():
+    lines = [_char_line(f"l{i:03d}") for i in range(1, 6)]  # l001..l005
+    scoped = _scope_character_lines(lines, {"l003"})
+    ids = [ln["line_id"] for ln in scoped]
+    assert ids == ["l002", "l003", "l004"]   # target + prev/next neighbor
+
+
+def test_scope_character_lines_edges_and_missing_ids():
+    lines = [_char_line(f"l{i:03d}") for i in range(1, 6)]
+    # l001 at the start -> only itself + l002; a missing id is ignored.
+    scoped = _scope_character_lines(lines, {"l001", "l999"})
+    assert [ln["line_id"] for ln in scoped] == ["l001", "l002"]
+
+
+def test_scope_character_lines_empty_scope_returns_none_lines():
+    lines = [_char_line("l001")]
+    assert _scope_character_lines(lines, set()) == []
 
 
 # ---------------------------------------------------------------------------

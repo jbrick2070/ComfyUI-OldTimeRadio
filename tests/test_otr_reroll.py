@@ -465,28 +465,102 @@ def test_reroll_resolved_updates_line_and_stamps_meta():
 
 
 # ---------------------------------------------------------------------------
-# 6. reroll exhausts the cap -> needs_full_rerun + restore
+# 6. reroll exhausts the cap -> needs_full_rerun, KEEPS repairs (STEP 4
+#    repair-then-ship -- no pre-reroll restore)
 # ---------------------------------------------------------------------------
 
 
-def test_reroll_exhaustion_restores_lines_and_flags_full_rerun():
+def test_reroll_exhaustion_keeps_repairs_and_flags_full_rerun():
     data = _ledger_data(story_critic_report=json.loads(_report_with_target()))
     led = _FakeLedger(data)
     original = data["lines"][0]["text"]
-    # The critic keeps flagging l001 on every re-run.
+    # The critic keeps flagging l001 on every re-run (scoped re-runs + the
+    # final whole-episode pass all return the last reply when exhausted).
     fn = _mk_reroll_generate_fn([_report_with_target(), _report_with_target()])
 
     disp = run_targeted_reroll(fn, led)
 
     assert disp.verdict == "needs_full_rerun"
     assert disp.cycles_run == MAX_REROLL_CYCLES
-    # the pre-reroll lines were restored.
-    assert data["lines"][0]["text"] == original
+    # STEP 4 repair-then-ship: the re-composed line is KEPT, not restored.
+    assert data["lines"][0]["text"] != original
+    assert data["lines"][0]["text"].strip() != ""
     assert data["meta"]["cycle_count"] == MAX_REROLL_CYCLES
     assert data["meta"]["reroll_verdict"] == "needs_full_rerun"
-    # the reroll_history audit survives the restore.
+    # hit the cap, did not diverge.
+    assert data["meta"]["reroll_diverged"] is False
     assert len(data["meta"]["reroll_history"]) >= 1
-    assert led.recompute_calls >= 1
+
+
+# ---------------------------------------------------------------------------
+# 6b. STEP 4 convergence: a reroll that surfaces a NEIGHBOR issue folds the
+#     neighbor into the next cycle and converges (does not false-halt).
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_neighbor_joins_next_scope_and_converges():
+    data = _ledger_data(story_critic_report=json.loads(_report_with_target()))
+    led = _FakeLedger(data)
+    l001_original = data["lines"][0]["text"]
+    l002_original = data["lines"][1]["text"]
+    # Cycle 1 scoped re-run: l001 cleared but neighbor l002 newly flagged.
+    # Cycle 2 scoped re-run: clean. Final whole-episode pass: clean.
+    fn = _mk_reroll_generate_fn([
+        _report_with_target(line_id="l002", hint="give l002 a real turn"),
+        _clean_report(),
+        _clean_report(),
+    ])
+
+    disp = run_targeted_reroll(fn, led)
+
+    assert disp.verdict == "reroll_resolved"
+    assert disp.cycles_run == 2
+    assert disp.lines_rerolled == 2          # l001 then the neighbor l002
+    assert data["lines"][0]["text"] != l001_original
+    assert data["lines"][1]["text"] != l002_original
+    rerolled_ids = {
+        h["line_id"] for h in data["meta"]["reroll_history"]
+        if h.get("status") == "rerolled"
+    }
+    assert rerolled_ids == {"l001", "l002"}
+    assert data["meta"]["reroll_diverged"] is False
+
+
+# ---------------------------------------------------------------------------
+# 6c. STEP 4 divergence: when a cycle INCREASES the outstanding flag count,
+#     the loop halts to repair-then-ship (keeps repairs, flags full rerun).
+# ---------------------------------------------------------------------------
+
+
+def _report_two_targets(a="l001", b="l002"):
+    return json.dumps({
+        "continuity_issues": [],
+        "voice_drift": [],
+        "flat_lines": [],
+        "arc_verdict": "uneven",
+        "reroll_targets": [
+            {"line_id": a, "hint": "sharpen"},
+            {"line_id": b, "hint": "sharpen"},
+        ],
+        "render_priority": ["l001", "l002"],
+    })
+
+
+def test_reroll_diverges_on_outstanding_count_increase():
+    data = _ledger_data(story_critic_report=json.loads(_report_with_target()))
+    led = _FakeLedger(data)
+    l001_original = data["lines"][0]["text"]
+    # Cycle 1 scoped re-run flags BOTH l001 (still) and l002 (new) -> count
+    # rises 1 -> 2 -> divergence halt. Final whole-episode pass still flags.
+    fn = _mk_reroll_generate_fn([_report_two_targets(), _report_two_targets()])
+
+    disp = run_targeted_reroll(fn, led)
+
+    assert disp.verdict == "needs_full_rerun"
+    assert disp.cycles_run == 1               # halted after one cycle
+    assert data["meta"]["reroll_diverged"] is True
+    # repair-then-ship: l001's re-composed text is KEPT.
+    assert data["lines"][0]["text"] != l001_original
 
 
 # ---------------------------------------------------------------------------
