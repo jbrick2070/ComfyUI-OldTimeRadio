@@ -27,6 +27,20 @@ def test_prepare_text_idempotent(raw, _expected):
     assert prepare_text(once) == once
 
 
+@pytest.mark.parametrize("raw", [
+    "(pauses, then flips the launch sequencer switch, ignoring Stone)",
+    "(beat)",
+    "(softly)",
+])
+def test_stage_direction_only_line_cleans_to_empty(raw):
+    """STEP 3 follow-up (2026-06-22): a stage-direction-only character line
+    cleans to EMPTY spoken text. The shared per-line voice render
+    (_otr_voice_node_common._render_per_line) keys its silence guard on exactly
+    this -- an empty `prepared` -> emit silence + skip the worker, so IndexTTS2
+    (torch.cat over zero chunks) and peers never crash the render."""
+    assert prepare_text(raw).strip() == ""
+
+
 def test_prepare_text_keeps_sentence_punctuation():
     assert prepare_text("Yes, I see. Do you?") == "Yes, I see. Do you?"
 

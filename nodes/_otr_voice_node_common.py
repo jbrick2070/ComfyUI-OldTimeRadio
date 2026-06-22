@@ -418,6 +418,28 @@ class OTRVoiceNodeBase:
                     log.debug("[OTR] delivery derive failed: %s", _e)
                     delivery_vector, _dv_source = None, "error"
             prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
+            # PD1 robustness (2026-06-22): a beat with NO spoken content -- e.g. a
+            # stage-direction-only line like "(pauses, then flips the switch)" --
+            # cleans to empty `prepared` text. Handing a per-line voice worker
+            # empty text crashes some engines (IndexTTS2: torch.cat() over zero
+            # audio chunks -> the whole render dies before publish) and yields
+            # garbage in others. Emit a short SILENCE for this beat and skip the
+            # engine call -- engine-agnostic, so it future-proofs every approved
+            # model. The stage direction was never dialogue; the beat keeps its
+            # slot and the episode ships.
+            if not str(prepared or "").strip():
+                _sil_msg = (
+                    f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} "
+                    f"has no spoken content (stage-direction-only?) -> emitting "
+                    f"silence, skipping the voice worker"
+                )
+                log_lines.append(_sil_msg)
+                log.warning("[OTR voice P-OBS] %s", _sil_msg)
+                import torch as _torch
+                _n = max(1, int(sr * 0.30))
+                clips.append({"waveform": _torch.zeros(1, _n),
+                              "sample_rate": int(sr)})
+                continue
             request = build_resolved_request(
                 role=self.ROLE,
                 engine_name=engine,
