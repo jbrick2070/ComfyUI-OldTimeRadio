@@ -1,5 +1,35 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE; STORY+CAST FIX STEPs 1-4 SHIPPED, committed local
+> NOT pushed -- operator gates the push. HEAD `736d0d6`, 4 commits ahead of origin/v2.0-alpha `a55da87`.
+> Full suite 4973 passed/34 skipped; Bug Bible 16/7/3; ZERO workflow-JSON change across all four steps.)**
+> Built `docs/2026-06-22-story-cast-roundtable/roundtable/pass04_plan_FINAL.md` STEPs 1-4, each chunk
+> suite+Bug-Bible green then commit:
+>   1. **STEP 1 `3be38e1`** -- role_mismatch: dropped the `or row.get("tts_model")` fallback in
+>      `_render_cast_contract_table` (engine name read as a role) + guaranteed `set_lines` stamps an explicit
+>      speaker_role (the streaming partial-ledger path left it empty). speaker_role is the ONLY role source.
+>   2. **STEP 2 `3992b68`** -- the literal "migrate music/sfx -> new cue_type + add archetype field" was a
+>      schema-breaking miss (those fields exist NOWHERE; music/sfx are load-bearing line-row speaker_roles on
+>      the FROZEN schema). A focused R1 roundtable (GPT-5.5+Gemini-3.1-pro+DeepSeek-v4-pro+Claude judge, ~$0.33,
+>      `docs/2026-06-22-story-cast-step2-schema/`) UNANIMOUSLY adopted Option A (prompt-boundary only): derive a
+>      real cast role (announcer/character) for the auditor instead of '', and audit only spoken rows.
+>   3. **STEP 3 `0fa014e`** -- voice fail-closed gate at OTR_CastLock (node-80) OUTPUT: no character line reaches
+>      node 81 with voice_preset=None (line-driven, engine-agnostic, NAMED raise; announcer/cue excluded).
+>      cast_seed canonical-key VERIFIED (writer meta.cast_contract.cast_seed == CastLock read).
+>   4. **STEP 4 `736d0d6`** -- scoped critic + correct reroll convergence: run_story_critic gains scope_line_ids
+>      (None=whole-episode); the reroll loop re-scores SCOPED to patched+neighbor lines, converges on the
+>      invariant (targeted clear; neighbors join next scope; halt only on cycle-cap OR outstanding-count
+>      INCREASE -- not strict-decrease) and KEEPS repairs (repair-then-ship; the freeze cascade A2 path ships
+>      residual needs_full_rerun). A final whole-episode pass refreshes meta.story_critic_report for render
+>      coupling. +9 tests.
+> **>>> NEXT (CURRENT STEP) = RE-SOAK the minimal matrix** (1 small e.g. gemma-12b + 1 frontier e.g. grok,
+> ONE word tier) on the REAL `otr_scifi_16gb_full.json`, **OTR_BYPASS_FREEZE_HALT OFF**, after a box reset
+> (CLAUDE.md S4 -- the night-soak server may still hold :8000 with the bypass on; resetting interrupts the
+> live OBS broadcast, so OPERATOR-GATED). Acceptance: >=70% frozen_clean, 0 cast-contract violations, no
+> voice_preset=None. Then REMOVE the OTR_BYPASS_FREEZE_HALT stopgap once STEP 4 converges; THEN ground STEP 6
+> (read the beat/outline planner; do NOT add SceneArcContext -- LineRequest already carries the arc fields).
+> STEP 5 (flat rubric + failed_dimension) pairs with STEP 6.
+
 > **LATEST SESSION -- 2026-06-22 (PLANNER+CODER+ROUNDTABLE, marathon; HEAD `358accd` == origin/v2.0-alpha
 > after the indextts2 realpath fix; the night-soak driver + roundtable docs are LOCAL/uncommitted).**
 > **>>> NEW CURRENT STEP (build): the STORY + CAST FIX -- `docs/2026-06-22-story-cast-roundtable/roundtable/
