@@ -556,6 +556,25 @@
 
 ## 1. CURRENT STEP
 
+**>>> STAGE-DIRECTION LEAK SPRINT -- COMPLETE (2026-06-22). All 5 chunks shipped + pushed to v2.0-alpha;
+3-pass roundtable-converged (architecture/coding/wiring, ~$0.51).** Bare undelimited stage directions
+("twirls his pen nervously Look, Pinky...") were leaking into the frozen ledger text -> Bark spoke them +
+SDH captions showed them (every existing scrub is delimited-only). Fix = a fallback ladder, all
+content-only (ledger schema frozen, audio byte-identical, no workflow-JSON, model-agnostic): Chunk 1
+`8c40182` pure `scrub_leading_stage_direction` + `detect_leading_stage_business` in `_otr_line_hygiene`
+(narrow conjunction-of-guards; +62-case corpus) -> Chunk 2 `e2dd95a` `scripts/stage_direction_scan.py` +
+PRECISION GATE (489 ledgers; 20 would_mutate, ALL true positives, 0 false positives) -> Chunk 4 `2278bd2`
+the FREEZE floor in `_otr_ledger_scrub._strip_stage_directions` (the deterministic guarantee; preserves the
+Tuple[str,bool] contract, emits CODE_STAGE_DIRECTION, restamps word_count) -> Chunk 5 `9142b2f` composer
+prompt hardening + the S1 music patch (`OTR_LedgerScriptWriter` 3681: `(beat.sfx_cue or beat.intent or "")`
+-> `(beat.sfx_cue or "")`, which had been silently undoing S1) -> Chunk 3 `6ce724d` the PRIMARY reroll wiring
+in `_otr_line_composer.compose_line` (detect on the raw draft -> one reroll via the existing recursive-repair
+pattern, hint concatenated, guard-capped, freeze floor as backstop). FINAL QA: the fixed freeze strips the
+exact screenshot lines (b004/b006/b007); a fresh max-chaos render shipped a CLEAN ledger (0 leaks); suite
+4861 pass/34 skip, audio byte-identical 9/0, Bug Bible 16/7/3. Campaign + judgments in
+`docs/2026-06-22-stage-direction-leak/`. **>>> RESUMES: STORY-QUALITY R2 -- S1 SHIPPED (`5396c05`); NEXT =
+S2 (announcer-close = concrete final image, not thesis).**
+
 **>>> BARK ARTIFACT SPRINT -- COMPLETE (2026-06-22). All chunks shipped + pushed to v2.0-alpha; cleaned-bark
 re-soak GPU-verified end-to-end + published to obs.** B0 (fixture+spine verify, `ffe5e82`) -> B1 (speech-only
 dialogue mode + first-line [clears throat] gate, `467fb05`) -> B2 (thread the dropped per-line seed ->
