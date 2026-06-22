@@ -97,7 +97,7 @@ def _normalize_clip(clip_np, target_peak=0.85):
     This brings every dialogue clip to a consistent level so the Commander
     doesn't whisper while the Pilot screams.
 
-    Uses peak normalization (not RMS) to preserve dynamics within each clip
+    Uses sample-peak normalization (not RMS) to preserve dynamics within each clip
     while matching overall loudness across clips.
     """
     peak = np.abs(clip_np).max()
@@ -143,6 +143,125 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None):
         if float(peak2) > 1e-8:
             waveform = waveform * (ceiling / peak2)
     return waveform, makeup_db
+
+
+# ---------------------------------------------------------------------------
+# Per-segment loudness normalization. RMS leveling is the BAKED-IN DEFAULT
+# (evens PERCEIVED dialogue loudness shot-to-shot); OTR_SEGMENT_LOUDNORM=peak
+# is an escape hatch to the legacy sample-peak path. The episode master is
+# left UNCHANGED (makeup 4.0), and the target sits at ~ the level peak-norm
+# already produced, so overall loudness is preserved -- only the per-line
+# balance evens out. CPU/numpy-only, deterministic. Roundtable-converged
+# 2026-06-22 + operator "bake it in" (docs/2026-06-22-loudness-normalization).
+# ---------------------------------------------------------------------------
+
+_LOUDNORM_PREFLIGHT_LOGGED = False
+
+
+def _segment_loudnorm_mode():
+    """Per-segment loudness mode. Default 'rms' (baked in); 'peak' = legacy escape hatch."""
+    return os.environ.get("OTR_SEGMENT_LOUDNORM", "rms").strip().lower()
+
+
+def _env_float(name, default, lo=None, hi=None):
+    """Parse an env float; empty/junk/non-finite -> default; optional clamp.
+
+    Read per call (no cache) so tests can monkeypatch and operators can set
+    the value at server boot without a stale module-level snapshot.
+    """
+    raw = os.environ.get(name, "").strip()
+    try:
+        v = float(raw) if raw else float(default)
+    except (TypeError, ValueError):
+        v = float(default)
+    if not math.isfinite(v):
+        v = float(default)
+    if lo is not None:
+        v = max(v, lo)
+    if hi is not None:
+        v = min(v, hi)
+    return v
+
+
+def _rms(x):
+    """Root-mean-square of a signal in float64; empty/non-finite -> 0.0."""
+    x = np.asarray(x, dtype=np.float64)
+    if x.size == 0 or not np.all(np.isfinite(x)):
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(x))))
+
+
+def _loudness_normalize_clip(clip_np, target_rms_dbfs, max_boost_db,
+                             max_cut_db, gate_dbfs, peak_ceiling):
+    """Level a dialogue clip toward a target RMS loudness, peak-safe.
+
+    Applies a single gain (no compression -> intra-clip dynamics preserved):
+    measure active-sample RMS, compute the dB gain toward ``target_rms_dbfs``
+    clamped to [``max_cut_db``, ``max_boost_db``], convert to linear, then cap
+    by ``peak_ceiling``. The peak-safety cap may attenuate BELOW max_cut to
+    avoid clipping -- that is intentional. Deterministic, CPU/numpy-only.
+    All non-finite / empty / silent / room-tone paths return float32 unchanged.
+    """
+    x = np.asarray(clip_np)
+    if x.size == 0 or not np.all(np.isfinite(x)):
+        return np.asarray(clip_np, dtype=np.float32)
+    peak = float(np.abs(x).max())
+    if peak < 1e-6:
+        return np.asarray(clip_np, dtype=np.float32)  # digital silence
+    gate_amp = 10.0 ** (gate_dbfs / 20.0)
+    active = x[np.abs(x) >= gate_amp]
+    rms = _rms(active if active.size else x)
+    if rms <= 0.0:
+        return np.asarray(clip_np, dtype=np.float32)
+    rms_dbfs = 20.0 * math.log10(max(rms, 1e-10))
+    if rms_dbfs <= gate_dbfs:
+        return np.asarray(clip_np, dtype=np.float32)  # room tone -> no gain
+    gain_db = min(max(target_rms_dbfs - rms_dbfs, max_cut_db), max_boost_db)
+    gain_lin = 10.0 ** (gain_db / 20.0)               # dB -> linear
+    gain_lin = min(gain_lin, peak_ceiling / peak)     # peak-safety cap
+    return (x * gain_lin).astype(np.float32)
+
+
+def _loudnorm_params():
+    """Resolve the rms-mode parameters from the environment (read per call)."""
+    return dict(
+        target_rms_dbfs=_env_float("OTR_SEGMENT_TARGET_RMS_DBFS", -16.0, -60.0, 0.0),
+        max_boost_db=max(_env_float("OTR_SEGMENT_MAX_BOOST_DB", 9.0), 0.0),
+        max_cut_db=min(_env_float("OTR_SEGMENT_MAX_CUT_DB", -12.0), 0.0),
+        gate_dbfs=_env_float("OTR_SEGMENT_GATE_DBFS", -50.0),
+        peak_ceiling=_env_float("OTR_SEGMENT_PEAK_CEILING", 0.95, 0.0, 1.0),
+    )
+
+
+def _log_loudnorm_preflight(params):
+    """Log the effective loudness mode + params once per process."""
+    global _LOUDNORM_PREFLIGHT_LOGGED
+    if _LOUDNORM_PREFLIGHT_LOGGED:
+        return
+    _LOUDNORM_PREFLIGHT_LOGGED = True
+    if params is not None:
+        log.info(
+            "[loudnorm] per-segment RMS leveling ON (default) -- target=%.1f dBFS "
+            "boost<=%.1f cut>=%.1f gate=%.1f ceiling=%.2f",
+            params["target_rms_dbfs"], params["max_boost_db"],
+            params["max_cut_db"], params["gate_dbfs"], params["peak_ceiling"],
+        )
+    else:
+        log.info("[loudnorm] OTR_SEGMENT_LOUDNORM=peak override -- legacy sample-peak leveling")
+
+
+def _level_dialogue_clip(clip_np):
+    """Route a DIALOGUE clip through the active loudness mode.
+
+    Default 'rms' -> perceived-loudness leveling (baked in). 'peak' escape
+    hatch -> legacy sample-peak. SFX never calls this (peak by construction).
+    """
+    if _segment_loudnorm_mode() != "peak":
+        params = _loudnorm_params()
+        _log_loudnorm_preflight(params)
+        return _loudness_normalize_clip(clip_np, **params)
+    _log_loudnorm_preflight(None)
+    return _normalize_clip(clip_np)
 
 
 def _resample_audio(clip_np, src_rate, dst_rate):
@@ -744,13 +863,13 @@ class SceneSequencer:
                     # Dedicated Kokoro announcer bus - clean, no Bark filler sounds.
                     clip_np, clip_sr = announcer_clips[announcer_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
-                    segment_np = _normalize_clip(segment_np)
+                    segment_np = _level_dialogue_clip(segment_np)
                     announcer_clip_idx += 1
                     render_log.append(f"[{global_idx}] ANNOUNCER (Kokoro): {line[:40]}...")
                 elif tts_clip_idx < len(tts_clips):
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
-                    segment_np = _normalize_clip(segment_np)
+                    segment_np = _level_dialogue_clip(segment_np)
                     tts_clip_idx += 1
                     render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
                 else:
@@ -772,7 +891,7 @@ class SceneSequencer:
                     log.info(f"[SceneSequencer] Inline Bark [{global_idx}] {character_name}")
                     bark_np, bark_sr = _generate_bark_for_line(line, preset)
                     segment_np = _resample_audio(bark_np, bark_sr, sample_rate)
-                    segment_np = _normalize_clip(segment_np)
+                    segment_np = _level_dialogue_clip(segment_np)
                     render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
 
                 current_character_name = character_name

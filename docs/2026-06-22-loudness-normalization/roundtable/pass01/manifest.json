@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-06-22T01:56:48.627803+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-22-loudness-normalization\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 2491,
+  "models": [
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 2705,
+      "completion_tokens": 6128,
+      "cost_usd": 0.0065080350000000006
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 2660,
+      "completion_tokens": 890,
+      "cost_usd": 0.00555
+    }
+  ],
+  "total_cost_usd": 0.0121
+}

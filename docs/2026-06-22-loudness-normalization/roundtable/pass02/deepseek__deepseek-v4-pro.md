@@ -1,0 +1,36 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: build-ready as-is? no. The plan has a critical sequencing gap and an incorrect assumption about the master loudness function that will cause a double-gain bug at runtime.
+
+MUST-FIX BEFORE BUILD:
+1. [New functions / _level_dialogue_clip] The `_level_dialogue_clip` function reads `mode = os.environ.get("OTR_SEGMENT_LOUDNORM", "peak").lower()` but the plan does not specify WHERE this function is called relative to the env read. The three call sites at :747, :753, :775 currently call `_normalize_clip` directly. If `_level_dialogue_clip` reads the env on every call, it works but is wasteful (3 identical env reads per segment). If it reads once at module load, it breaks the mode-gating (env changes after import won't take effect). Fix: specify that `_level_dialogue_clip` reads the env on each call OR cache it at first call with a comment explaining the tradeoff. Either is fine, but the plan must pick one.
+
+2. [Edits / _master_loudness default] The plan states: "when `OTR_SEGMENT_LOUDNORM=='rms'` AND `OTR_MASTER_MAKEUP_DB` is UNSET, default makeup to 0.0". However, the `_master_loudness` function at :109 does NOT have access to `OTR_SEGMENT_LOUDNORM` — it only sees `makeup_db` and `ceiling_dbfs`. The plan must specify HOW `_master_loudness` learns about the RMS mode. Options: (a) pass a new parameter `segment_loudnorm_mode` to `_master_loudness`, (b) have `_master_loudness` read `OTR_SEGMENT_LOUDNORM` from the environment itself, or (c) have the caller at :1122 decide the default and pass it explicitly. The plan is silent on this mechanism. Fix: specify the mechanism. Recommended: option (c) — at :1122, before calling `_master_loudness`, compute `default_makeup = 0.0 if os.environ.get("OTR_SEGMENT_LOUDNORM") == "rms" and "OTR_MASTER_MAKEUP_DB" not in os.environ else None`, then pass `makeup_db=default_makeup` to `_master_loudness`. This keeps `_master_loudness` unchanged and avoids coupling.
+
+3. [New functions / _loudness_normalize_clip] The peak-safety line `g = min(g, peak_ceiling / peak)` is applied AFTER the gain `g` is computed from the desired dB change. This is correct for preventing clipping, BUT the plan does not specify whether `peak_ceiling` is in linear amplitude (0.95) or dBFS. The `_normalize_clip` legacy function uses linear `target_peak=0.85`. The plan says `peak_ceiling=0.95` in the function signature. This is consistent (linear). However, the env override `OTR_SEGMENT_PEAK_CEILING` is not specified as linear or dB — if an operator sets it to `-0.5` thinking dBFS, it will be interpreted as linear 0.5, which is wrong. Fix: document in the plan that all peak values are linear amplitude (0.0–1.0) and the env var `OTR_SEGMENT_PEAK_CEILING` expects a linear value. Or, accept dBFS and convert. The plan must choose.
+
+4. [Edits / call site replacement] The plan says to replace `_normalize_clip(segment_np)` with `_level_dialogue_clip(segment_np)` at :747, :753, :775. But at :747, the announcer call is `_normalize_clip(segment_np)` (no `target_peak` argument, so it defaults to 0.85). At :753 and :775, same. The replacement is straightforward. However, the plan does not address the `target_peak=0.85` argument at :726 (SFX) — it says "STAYS peak, UNCHANGED", which is correct. No fix needed here, but verify: the SFX call uses `target_peak=0.85` explicitly; the dialogue calls use the default 0.85. The new `_level_dialogue_clip` must NOT accidentally pass `target_peak` to the legacy path when mode=peak. The plan says "anything else -> `_normalize_clip(clip_np)` (legacy)" — this is fine because `_normalize_clip` defaults to 0.85. Confirm: the legacy path in `_level_dialogue_clip` calls `_normalize_clip(clip_np)` without arguments, matching the current dialogue calls. This is correct.
+
+5. [Tests / _master_loudness default] The test plan says: "rms+unset makeup -> 0.0; explicit makeup honored; peak mode -> 4.0 (legacy)". This is correct IF the mechanism from point 2 is implemented. Without it, `_master_loudness` will always default to 4.0 when unset, regardless of mode. Fix: tie this test to the mechanism chosen in point 2.
+
+SHOULD-FIX:
+1. [New functions / _rms] The plan defines `_rms(clip_np) -> float` as `sqrt(mean(clip**2))`. This is correct for a 1-D array. However, the plan does not specify handling of the `mean` of an empty array (which would be NaN). The empty/non-finite guard in `_loudness_normalize_clip` returns early before calling `_rms`, so this is safe. But if `_rms` is ever called independently, it could return NaN. Fix: add a guard in `_rms` itself: `if clip_np.size == 0: return 0.0`. Defensive and cheap.
+
+2. [New functions / _loudness_normalize_clip] The gate check `if rms_dbfs < gate_dbfs` uses a strict less-than. If `rms_dbfs` is exactly -50.0 (equal to the default gate), the clip will be processed (gain applied). This is probably fine, but the plan should clarify the intended behavior at exactly the gate threshold. Typically, gating uses `<=` to treat gate-level signals as silence. Not a bug, but a spec ambiguity.
+
+3. [Open / calibrate target_rms_dbfs] The plan acknowledges the -20 dBFS placeholder needs calibration. This is a pre-flight task, not a code defect, but it MUST be done before flipping the mode to `rms` in production. The plan should state this explicitly as a gate: "Do not set OTR_SEGMENT_LOUDNORM=rms in production until target_rms_dbfs is calibrated against a real episode mix."
+
+4. [Edits / docstring fix] The plan says: "Fix the `_normalize_clip` docstring: it is SAMPLE-peak; describe the real behavior." The current docstring already says "Uses peak normalization (not RMS)" — this is accurate. The plan might mean "update the docstring to clarify it's sample-peak, not true-peak." Clarify what "real behavior" means. If the fix is just adding the word "sample" before "peak", that's trivial. If it's more, specify.
+
+OPTIONAL / NICE-TO-HAVE:
+- The `_level_dialogue_clip` function could log which mode it's using (peak vs rms) at DEBUG level, to aid operator debugging. Not required.
+- The env var names are long but clear. Consider documenting them in a comment block at the top of `_level_dialogue_clip` for discoverability.
+
+CUT THESE (over-engineering):
+- None. The plan is minimal: three new functions, one routing function, three call-site replacements, and one master-default tweak. No fat.
+
+[ASSUMPTION] The plan assumes `_master_loudness` can be made aware of `OTR_SEGMENT_LOUDNORM` without changing its signature. The grounding shows it currently takes `(waveform, ceiling_dbfs, makeup_db)`. The plan must specify how this awareness is injected (see MUST-FIX #2).
+
+[ASSUMPTION] The plan assumes the three dialogue call sites at :747, :753, :775 are the ONLY callers of `_normalize_clip` for dialogue. The grounding confirms this. Verify: no other callers exist elsewhere in the file or in other modules. The plan's "Open" section asks to reconfirm this — do that before build.
+
+[ASSUMPTION] The plan assumes `_resample_audio` returns a 1-D float32 numpy array. The grounding shows `.squeeze()` at :567, confirming mono. The `_normalize_clip` docstring says "1-D float32 clip". Consistent.

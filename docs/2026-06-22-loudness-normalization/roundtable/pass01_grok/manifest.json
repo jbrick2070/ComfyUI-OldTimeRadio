@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-06-22T01:54:33.738750+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-22-loudness-normalization\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 2491,
+  "models": [
+    {
+      "requested_model": "~x-ai/grok-4.3",
+      "ok": false,
+      "error": "HTTP 400: {\"error\":{\"message\":\"~x-ai/grok-4.3 is not a valid model ID\",\"code\":400},\"user_id\":\"user_3EUAk31TIz34BYYay9kiUjgsoKv\"}"
+    }
+  ],
+  "total_cost_usd": null
+}
