@@ -26,8 +26,11 @@ for p in (_REPO_ROOT, _NODES_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-import _otr_voice_bank as VB  # noqa: E402
-from _otr_casting import CastingResponse  # noqa: E402
+# Import via the `nodes` package (matches conftest) so the relative imports
+# inside cast_lock (`from ._otr_voice_bank import ...`) resolve and the bank
+# path is genuinely exercised, not silently swallowed by a fail-soft except.
+from nodes import _otr_voice_bank as VB  # noqa: E402
+from nodes._otr_casting import CastingResponse  # noqa: E402
 
 
 def _entry(vrid, engine="indextts2", gender="male", tier="", roles=("char_voice",)):
@@ -120,7 +123,7 @@ def test_casting_response_accepts_verbose_voice_preset():
 # CastLock STEP-3 two-lane refine
 # --------------------------------------------------------------------------- #
 def test_castlock_two_lane_stamps_clone_id_on_repaired_row():
-    from cast_lock import CastLock
+    from nodes.cast_lock import CastLock
 
     # A character row missing voice_preset -> the repair fires.
     cast = [
@@ -132,16 +135,15 @@ def test_castlock_two_lane_stamps_clone_id_on_repaired_row():
     alice = cast[1]
     # Bark fallback identity always stamped.
     assert str(alice.get("voice_preset") or "").startswith("v2/en_speaker_")
-    # When the real bank + resolver yield a cloner engine, a same-gender
-    # voice_ref_id is stamped too. (Fail-soft: if no engine resolves, the row
-    # still has its bark preset -- assert that invariant unconditionally.)
-    if alice.get("voice_ref_id"):
-        assert alice.get("voice_engine")
-        assert any("two-lane" in n for n in notes)
+    # The real bank + resolver yield a cloner engine ("default" -> indextts2),
+    # so a same-gender clone identity is stamped too.
+    assert alice.get("voice_ref_id"), "two-lane clone identity not stamped"
+    assert alice.get("voice_engine")
+    assert any("two-lane" in n for n in notes)
 
 
 def test_castlock_two_lane_leaves_voiced_rows_untouched():
-    from cast_lock import CastLock
+    from nodes.cast_lock import CastLock
 
     cast = [
         {"char_id": "c01", "name": "ANNOUNCER", "voice_preset": "bf_emma"},

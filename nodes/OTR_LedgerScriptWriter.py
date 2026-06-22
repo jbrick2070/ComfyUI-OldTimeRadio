@@ -2557,6 +2557,11 @@ class OTR_LedgerScriptWriter:
             "cast_seed":              int(cast_seed),
             "cast_seed_source":       str(cast_seed_source),
         }
+        # VC chunk 3 (2026-06-22): carry the per-character voice-fit slots
+        # (gender/timbre/role/age_band/speech_signature/description_digest) into
+        # the frozen ledger meta so OTR_CastLock's bank caster can match on
+        # timbre/age, not just gender. Free-form meta -> ledger schema unchanged.
+        meta["cast_voice_slots"] = cast_meta.get("cast_voice_slots") or {}
         log.info(
             "[OTR_LedgerScriptWriter] cast locked: %d rows "
             "(announcer + %d characters, lemmy_hit=%s)",

@@ -56,6 +56,7 @@ cross-model safety net. See
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
 import re
@@ -527,7 +528,7 @@ _FACE_PRESSURE_BY_ROLE: dict[str, str] = {
 @dataclass(frozen=True)
 class EnsembleSlot:
     """One open slot after Stage 1. Python has fixed gender / timbre /
-    role; the LLM writes the description, Python assigns the voice.
+    role / age_band; the LLM writes the description, Python assigns the voice.
     """
 
     char_id: str
@@ -535,6 +536,13 @@ class EnsembleSlot:
     gender: str   # one of _VALID_GENDERS
     timbre: str   # one of _TIMBRE_VOCAB
     role: str     # one of _ROLE_VOCAB
+    # VC chunk 3 (2026-06-22): age_band carried on the slot so the cast_voice_slots
+    # stamp (and CastLock's bank caster) can match on age, not just gender. Pool
+    # mode has no finer age signal than "adult" (radio leads are adults; the bank
+    # is adult-dominant), so the default keeps the ensemble honest + deterministic.
+    # This does NOT touch python_assign_voice_preset's pool-mode call (that still
+    # receives age_band=None), so the bark replay stays byte-identical.
+    age_band: str = "adult"   # child / young_adult / adult / elder
 
 
 def _plan_gender_distribution(
@@ -1583,11 +1591,44 @@ def lock_cast(
     # TITLE / NOTE / TARGET / STYLE.
     _assert_no_structural_tokens_in_cast(cast)
 
+    # VC chunk 3 (2026-06-22): stamp meta.cast_voice_slots so OTR_CastLock can
+    # match a bank voice on timbre / age_band (not just gender). The cast ROW
+    # schema is frozen and carries no timbre/role/age, so these ride free-form
+    # meta. The voice-fit facts come from the Python-decided ensemble slots
+    # (timbre/role/age_band); gender + speech_signature come off the locked row;
+    # description_digest is a short, PII-free sha1 of the prose (lets CastLock /
+    # the hybrid caster key on description identity without storing the text).
+    ens_by_id = {e.char_id: e for e in ensemble_slots}
+    cast_voice_slots: dict = {}
+    for row in cast:
+        if not isinstance(row, dict):
+            continue
+        cid = str(row.get("char_id") or "")
+        if not cid:
+            continue
+        ens = ens_by_id.get(cid)
+        desc = str(row.get("character_description") or "")
+        digest = (
+            hashlib.sha1(desc.encode("utf-8")).hexdigest()[:12] if desc else ""
+        )
+        cast_voice_slots[cid] = {
+            "gender":             str(row.get("gender") or ""),
+            # timbre is a LIST so it feeds the bank caster's set-intersection
+            # match (one Python-decided timbre word per open slot; empty for the
+            # pre-locked announcer / LEMMY rows which have no ensemble slot).
+            "timbre":             [ens.timbre] if ens else [],
+            "role":              (ens.role if ens else ""),
+            "age_band":          (ens.age_band if ens else ""),
+            "speech_signature":   str(row.get("speech_signature") or ""),
+            "description_digest": digest,
+        }
+
     meta.update({
         "lemmy_hit":              lemmy_hit,
         "casting_attempts":       casting_attempts,
         "num_characters_request": num_characters,
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
+        "cast_voice_slots":       cast_voice_slots,
     })
     return cast, meta
 

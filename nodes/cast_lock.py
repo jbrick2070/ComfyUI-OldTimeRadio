@@ -517,6 +517,11 @@ class CastLock:
         bank_entries, _bank_sha = load_voice_bank()
         meta = led.get("meta") or {}
         episode_seed = coerce_int_seed(meta.get("episode_seed"))
+        # VC chunk 3 (2026-06-22): the writer stamps per-character voice-fit
+        # facts (timbre/age_band) the frozen cast ROW schema cannot carry. Match
+        # the bank on those, not just gender. Legacy ledgers without the stamp
+        # fall back to the (empty) entry-level fields -> behavior unchanged.
+        voice_slots = meta.get("cast_voice_slots") or {}
         target_engine = self._resolve_char_engine(voice_bank, bank_entries)
         announcer_engine = _DEFAULT_ANNOUNCER_ENGINE
 
@@ -552,14 +557,19 @@ class CastLock:
             if not gender:
                 report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
                 continue
+            # Prefer the writer's voice-fit slot (timbre/age_band); fall back to
+            # any entry-level fields for legacy ledgers without the stamp.
+            slot = voice_slots.get(char_id) or {}
+            slot_timbre = slot.get("timbre") or entry.get("timbre") or ()
+            slot_age = str(slot.get("age_band") or entry.get("age_band") or "")
             try:
                 ref = assign_voice_for_slot(
                     role="char_voice",
                     engine=target_engine,
                     char_id=char_id,
                     gender=gender,
-                    timbre=tuple(entry.get("timbre") or ()),
-                    age_band=str(entry.get("age_band") or ""),
+                    timbre=tuple(slot_timbre),
+                    age_band=slot_age,
                     episode_seed=episode_seed,
                     casting_policy_version=CASTING_POLICY_VERSION,
                     allow_voice_reuse=allow_voice_reuse,
