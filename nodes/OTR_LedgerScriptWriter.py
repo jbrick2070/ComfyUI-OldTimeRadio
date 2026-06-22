@@ -2746,6 +2746,34 @@ class OTR_LedgerScriptWriter:
         canon_header = canon_header.replace(
             "TITLE: TBD", "EPISODE_TITLE: TBD", 1,
         )
+        # C1 + C2 (story-quality R2): derive specificity anchors + the central
+        # story-object DETERMINISTICALLY from the curated news key_terms (no LLM
+        # call), excluding cast names. Inject the anchors into the per-line
+        # canon_header (injection-only, no gate); central_object is consumed at
+        # the announcer-close. Idempotent: derive only when absent, inject once
+        # via a meta flag (so a resume/retry never duplicates the block).
+        try:
+            from . import _otr_specificity as _OTRSPEC
+        except ImportError:  # pragma: no cover
+            import _otr_specificity as _OTRSPEC  # type: ignore
+        _spec_kts = (meta.get("news") or {}).get("key_terms") or ()
+        if "specificity_anchors" not in meta:
+            meta["specificity_anchors"] = _OTRSPEC.derive_specificity_anchors(
+                _spec_kts, character_cast)
+        if "central_object" not in meta:
+            meta["central_object"] = _OTRSPEC.derive_central_object(
+                _spec_kts, character_cast)
+        if (not meta.get("_specificity_anchors_injected")
+                and meta.get("specificity_anchors")):
+            canon_header = _OTRSPEC.inject_anchors_into_header(
+                canon_header, meta["specificity_anchors"])
+            meta["_specificity_anchors_injected"] = True
+            log.info(
+                "[OTR_LedgerScriptWriter] C1: injected %d specificity anchor(s)"
+                " into canon_header; C2 central_object=%r",
+                len(meta["specificity_anchors"]),
+                (meta.get("central_object") or "")[:40],
+            )
         log.info(
             "[OTR_LedgerScriptWriter] episode_canon built; composition "
             "header carries EPISODE_TITLE: TBD (late title binding, "
@@ -3278,6 +3306,12 @@ class OTR_LedgerScriptWriter:
         nc_brief = str(
             (meta.get("news") or {}).get("news_close_brief") or ""
         ).strip()
+        # C2 (story-quality R2): thread the central story-object into the close
+        # brief so the S2 "use the central object if set" close lands on a
+        # concrete final image. Unchanged when central_object is "". _OTRSPEC was
+        # imported above at the C1 anchor-derivation site (same execute scope).
+        nc_brief = _OTRSPEC.inject_central_object_into_brief(
+            nc_brief, meta.get("central_object") or "")
 
         # Tier 3 fix #19 (2026-05-11): single LineRequest construction
         # site for both character and announcer beats. Pre-Tier-3 the
