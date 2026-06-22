@@ -2195,6 +2195,192 @@
       "ref_path": "models/TTS/KokoroTTS/voices/bm_daniel.pt",
       "ref_sha256": "pending",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_pd_ljspeech_linda_johnson",
+      "engine": "indextts2",
+      "gender": "female",
+      "timbre": [
+        "neutral"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_ljspeech_linda_johnson.wav",
+      "ref_sha256": "5565adb18a88919da5c56fde21f2dfd057683dbaa80e22abc288c3554e253104",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cb_pd_ljspeech_linda_johnson",
+      "engine": "chatterbox",
+      "gender": "female",
+      "timbre": [
+        "neutral"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_ljspeech_linda_johnson.wav",
+      "ref_sha256": "5565adb18a88919da5c56fde21f2dfd057683dbaa80e22abc288c3554e253104",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_pd_ljspeech_linda_johnson",
+      "engine": "dia",
+      "gender": "female",
+      "timbre": [
+        "neutral"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_ljspeech_linda_johnson.wav",
+      "ref_sha256": "5565adb18a88919da5c56fde21f2dfd057683dbaa80e22abc288c3554e253104",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_pd_librivox_mark_f_smith",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith.wav",
+      "ref_sha256": "359b967dbadca14e03b54d758d140a56c6252449398102f9dbb2d9a87c32e2a4",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cb_pd_librivox_mark_f_smith",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": [
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith.wav",
+      "ref_sha256": "359b967dbadca14e03b54d758d140a56c6252449398102f9dbb2d9a87c32e2a4",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_pd_librivox_mark_f_smith",
+      "engine": "dia",
+      "gender": "male",
+      "timbre": [
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith.wav",
+      "ref_sha256": "359b967dbadca14e03b54d758d140a56c6252449398102f9dbb2d9a87c32e2a4",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_pd_librivox_mark_f_smith_elder",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "warm",
+        "resonant"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "elder",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith_elder.wav",
+      "ref_sha256": "4ca2513f359b33b69ebf3a5124542c8a5fe514689a307b5407621e856f00127a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cb_pd_librivox_mark_f_smith_elder",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": [
+        "warm",
+        "resonant"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "elder",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith_elder.wav",
+      "ref_sha256": "4ca2513f359b33b69ebf3a5124542c8a5fe514689a307b5407621e856f00127a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_pd_librivox_mark_f_smith_elder",
+      "engine": "dia",
+      "gender": "male",
+      "timbre": [
+        "warm",
+        "resonant"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "elder",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith_elder.wav",
+      "ref_sha256": "4ca2513f359b33b69ebf3a5124542c8a5fe514689a307b5407621e856f00127a",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "vz_pd_librivox_phil_chenevert",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "crisp",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_phil_chenevert.wav",
+      "ref_sha256": "53ebacd17becad2558407d18a6209f87b433a9ccec3a97d21e2e94cd5ba78ed8",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cb_pd_librivox_phil_chenevert",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": [
+        "crisp",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_phil_chenevert.wav",
+      "ref_sha256": "53ebacd17becad2558407d18a6209f87b433a9ccec3a97d21e2e94cd5ba78ed8",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_pd_librivox_phil_chenevert",
+      "engine": "dia",
+      "gender": "male",
+      "timbre": [
+        "crisp",
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_phil_chenevert.wav",
+      "ref_sha256": "53ebacd17becad2558407d18a6209f87b433a9ccec3a97d21e2e94cd5ba78ed8",
+      "commercial_clean": true
     }
   ]
 }

@@ -130,8 +130,10 @@ def test_bank_has_chatterbox_and_dia_pools():
     bank, _ = load_voice_bank()
     cbx = [e for e in bank if e.engine == "chatterbox" and "char_voice" in e.roles]
     dia = [e for e in bank if e.engine == "dia"]
-    assert len(cbx) == 36
-    assert len(dia) == 36
+    # FLOOR, not an exact count: the bank GROWS as public-domain voices are added
+    # (scripts/otr_ingest_pd_voices.py). The original mirrored pools were 36 each.
+    assert len(cbx) >= 36
+    assert len(dia) >= 36
     assert all(e.roles == ("char_voice",) for e in dia)
 
 
