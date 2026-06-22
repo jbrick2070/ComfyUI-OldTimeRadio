@@ -101,15 +101,21 @@ def test_preserve_ledger_is_byte_safe_and_increments_revision():
 
 
 # ----------------------------------------------------------------------------
-# STEP 3 (2026-06-22 story+cast fix): node-80 OUTPUT voice fail-closed gate.
-# No character line may reach OTR_BatchCharacterVoices with voice_preset=None.
+# STEP 3 (2026-06-22, revised per operator): node-80 OUTPUT voice resolution is
+# FAIL-SOFT -- never abort the episode; resolve a voice relative to the selected
+# model, re-route mis-stamped announcer lines, reassign true orphans. Engine-
+# agnostic + future-proof for all approved voice models.
 # ----------------------------------------------------------------------------
 def _ledger_with_lines(cast, lines, meta=None):
     return json.dumps({"meta": meta or {"episode_seed": 42}, "cast": cast,
                        "lines": lines})
 
 
-def test_voice_gate_passes_when_character_lines_have_presets():
+def _last_ledger(out):
+    return json.loads(out[0])
+
+
+def test_voice_passes_when_character_lines_have_presets():
     from nodes.cast_lock import CastLock
 
     lines = [
@@ -120,13 +126,13 @@ def test_voice_gate_passes_when_character_lines_have_presets():
     ]
     out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
                           cast_voice_policy="preserve_ledger")
-    assert out[1] == 1  # locked, no raise
+    assert out[1] == 1  # locked, no repair needed
 
 
-def test_voice_gate_raises_on_seedless_missing_preset():
-    """A character line whose cast row has no voice_preset (seedless ledger,
-    no replay) must FAIL CLOSED at the node-80 output -- never a silent None
-    to TTS."""
+def test_seedless_missing_preset_gets_fallback_not_crash():
+    """A character cast row with no voice_preset (seedless ledger) is REPAIRED
+    with a deterministic engine-agnostic fallback identity -- never a crash
+    (PD1)."""
     from nodes.cast_lock import CastLock
 
     cast = [
@@ -137,15 +143,17 @@ def test_voice_gate_raises_on_seedless_missing_preset():
         {"line_id": "l001", "speaker_role": "character", "char_id": "c1",
          "text": "We move at dawn."},
     ]
-    with pytest.raises(ValueError, match="voice fail-closed gate"):
-        CastLock().lock(script_json=_ledger_with_lines(cast, lines),
-                        cast_voice_policy="preserve_ledger")
+    out = CastLock().lock(script_json=_ledger_with_lines(cast, lines),
+                          cast_voice_policy="preserve_ledger")
+    assert out[1] == 1  # locked, no crash
+    led = _last_ledger(out)
+    c1 = next(r for r in led["cast"] if r["char_id"] == "c1")
+    assert c1["voice_preset"] and str(c1["voice_preset"]).startswith("v2/")
 
 
-def test_voice_gate_excludes_announcer_and_cue_rows():
+def test_announcer_lines_and_cue_rows_untouched():
     """Announcer lines (engine-resolved at node 82) and music/sfx cue rows
-    never need a cast-row voice_preset, so they must NOT trip the gate even
-    when no preset is present."""
+    never need a cast-row voice_preset and are left untouched."""
     from nodes.cast_lock import CastLock
 
     cast = [
@@ -161,21 +169,51 @@ def test_voice_gate_excludes_announcer_and_cue_rows():
     ]
     out = CastLock().lock(script_json=_ledger_with_lines(cast, lines),
                           cast_voice_policy="preserve_ledger")
-    assert out[1] == 1  # locked, no raise
+    assert out[1] == 1  # locked, no repair
 
 
-def test_voice_gate_raises_on_orphan_character_line():
-    """A character line whose char_id matches no cast row also fails closed
-    (its preset can never resolve)."""
+def test_misstamped_announcer_line_reroutes_to_announcer():
+    """The live-crash case (b018): a speaker_role='character' line whose char_id
+    is the announcer marker is a MIS-STAMPED announcer line -> re-routed to
+    speaker_role='announcer' (no crash, voiced by the announcer model)."""
+    from nodes.cast_lock import CastLock
+
+    lines = [
+        {"line_id": "b018", "speaker_role": "character", "char_id": "announcer",
+         "text": "As the dust settles, the colony endures."},
+    ]
+    out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                          cast_voice_policy="preserve_ledger")
+    assert out[1] == 1  # locked, no crash
+    led = _last_ledger(out)
+    b018 = next(ln for ln in led["lines"] if ln["line_id"] == "b018")
+    assert b018["speaker_role"] == "announcer"   # re-routed
+
+
+def test_orphan_character_line_reassigned_to_voiced_character():
+    """A character line whose char_id matches no cast row inherits a
+    deterministic voiced character -- no crash."""
     from nodes.cast_lock import CastLock
 
     lines = [
         {"line_id": "l009", "speaker_role": "character", "char_id": "c99",
          "text": "Who am I?"},
     ]
-    with pytest.raises(ValueError, match="voice fail-closed gate"):
-        CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
-                        cast_voice_policy="preserve_ledger")
+    out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                          cast_voice_policy="preserve_ledger")
+    assert out[1] == 1  # locked, no crash
+    led = _last_ledger(out)
+    l009 = next(ln for ln in led["lines"] if ln["line_id"] == "l009")
+    assert l009["char_id"] in ("c1", "c2")       # a voiced character
+    assert l009["speaker_role"] == "character"
+
+
+def test_fallback_voice_identity_is_deterministic():
+    """Same char_id -> same fallback identity (determinism invariant)."""
+    from nodes.cast_lock import CastLock
+    a = CastLock._fallback_voice_identity("c42", set())
+    b = CastLock._fallback_voice_identity("c42", set())
+    assert a == b and a.startswith("v2/en_speaker_")
 
 
 def test_revision_increments_from_existing_meta():
