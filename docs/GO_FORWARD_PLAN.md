@@ -1,5 +1,30 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE; STORY+CAST FIX **STEPs 5+6 SHIPPED + LIVE-SMOKED**,
+> committed local NOT pushed. HEAD `165fbec`, 8 commits ahead of origin/v2.0-alpha `da98144`.) The
+> STORY+CAST FIX is now COMPLETE (all 6 steps). Suite 4990 passed/34 skipped; Bug Bible 16/7/3; ZERO
+> workflow-JSON change across all six steps -- every fix is unconditional internal node code, DEFAULT-ON in
+> the canonical otr_scifi_16gb_full.json (nothing to enable).**
+>   - **STEP 6 `7b27bd2`** -- escalating beat_tension: `compute_beat_tension_ramp` (ordinal ramp over
+>     character beats, peak at the final beat) + the writer stamps a per-line dramatic frame on
+>     `meta.line_dramatic_frame` (objective/obstacle/turn/subtext/tension/dramatic_question/next_turn). One
+>     stamp serves three things: delivers tension to the composer, makes the target visible to the critic
+>     (`_render_lines_for_doctor` renders `target_tension=N/5`), AND fixes the grounded reroll-reconstruction
+>     gap (`build_reroll_line_request` rebuilt only arc_phase, losing the frame). +11 tests.
+>   - **STEP 5 `165fbec`** -- flat rubric + failed_dimension: critic SECTION 3 now uses the 5-dimension
+>     rubric (judged against beat_intent + appropriateness to target_tension, "be sparing"); SECTION 5 emits
+>     only when a line fails BOTH advancement AND a dimension; `RerollTarget.failed_dimension` (optional enum,
+>     back-compat default), folded into the reroll hint as a lightweight prefix (no re-craft mapper). +6 tests.
+>   - **Roundtable R1 (~$0.21)** converged the design (`docs/2026-06-22-story-tension-rubric/`); GPT-5.5
+>     surfaced the reroll-reconstruction gap. STEP6_GROUNDING.md proved beat_tension was UNWIRED.
+>   - **LIVE SMOKE (canonical JSON, default settings, bypass OFF):** the ledger
+>     `pending_20260622_100116` carries `line_dramatic_frame` (14 entries) with tensions escalating
+>     1->1->2->2->2->3->3->3->3->4->4->4->5->5; the critic emitted `reroll_targets` with `failed_dimension`
+>     (b005=pressure, b010=obstacle, b017=decision); `freeze_verdict=frozen_with_doctor_edits` (SHIPPED, no
+>     bypass), reroll_diverged=True, cycle_count=2. ALL six steps are default-ON end to end.
+> **>>> NEXT:** push the 8 commits (operator gate) + an optional broader re-soak read; then the S3 forward
+> order (3D item 5 / distribution item 6) resumes -- all PARKED + untouched by this fix.
+
 > **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE; STORY+CAST FIX STEPs 1-4 SHIPPED, committed local
 > NOT pushed -- operator gates the push. HEAD `736d0d6`, 4 commits ahead of origin/v2.0-alpha `a55da87`.
 > Full suite 4973 passed/34 skipped; Bug Bible 16/7/3; ZERO workflow-JSON change across all four steps.)**
