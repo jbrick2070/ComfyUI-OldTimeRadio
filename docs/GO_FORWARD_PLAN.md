@@ -1,5 +1,35 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE, very long; PER-SEGMENT RMS LOUDNESS LEVELING SHIPPED +
+> PUSHED + EAR-VALIDATED; CAPABILITY-ROUTING roundtable R1 CONVERGED, not built).**
+> **(1) AUDIO LEVELING (baked-in default):** even out shot-to-shot dialogue levels. 4-round live roundtable
+> (gpt-5.5+gemini-3.1-pro+deepseek-v4-pro+grok-4.3 + Claude judge, ~$0.52) -> implemented in
+> `nodes/scene_sequencer.py`: per-dialogue-clip RMS leveling (`_level_dialogue_clip` -> `_loudness_normalize_clip`,
+> target -16 dBFS, peak-safe cap + noise gate + float64 RMS; the 3 dialogue call sites :747/:753/:775; SFX
+> :726 stays peak). **RMS is the BAKED-IN DEFAULT** (`OTR_SEGMENT_LOUDNORM` defaults `rms`; `=peak` escape
+> hatch) per operator "don't hide behind a switch." Episode master UNCHANGED (makeup +4 dB) + target ~= what
+> peak-norm produced, so the per-line BALANCE evens WITHOUT shifting overall loudness. **Voice-MODEL-AGNOSTIC**
+> (downstream of TTS; leveled bark chars + Kokoro announcer in one render). Commits `82fbd4e` (CLAUDE.md S8
+> roundtable defaults) + `8ea03e9` (leveling) PUSHED to v2.0-alpha; full suite **4947 pass/34 skip** + Bug Bible
+> 16/7/3 green; proven LIVE (`[loudnorm]` preflight, target -16) + operator EAR-VALIDATED ("swift sounds ok").
+> Docs `docs/2026-06-22-loudness-normalization/` (FINAL_PLAN + pass00-04 + OPERATOR_NOTES +
+> `tools/measure_dialogue_rms.py`; old-path dialogue measured -13..-24 dBFS, mean -17.3). **UNCOMMITTED:**
+> `tests/_run_baseline.py` workflow-path bug fix (two-`..`->one; had silently broken the gated
+> `OTR_REGRESSION_RUNTIME` audio capture). **Byte-identical GOLDEN re-baseline DEFERRED** (default-peak keeps the
+> suite green; the rms golden is a future headless capture -- must force bark, indextts2 isn't headless-installed).
+> **(2) CAPABILITY-ROUTING (NEW; roundtable R1 CONVERGED; NOT built):** live wall during a 100%-Wan eyeball --
+> `wan_i2v` rejected from the announcer slot by the `roles` whitelist DESPITE being input-compatible (the
+> announcer supplies `init_image`). Operator directive: declare capabilities ONCE per model, model-agnostic
+> downstream (HuMo/LTX-AV = audio-in specials, the rest = still+prompt -> all slots); **HARD: strict SUPERSET,
+> do NOT break working models.** R1 CONVERGED (`docs/2026-06-22-capability-routing/roundtable/pass01_plan.md`):
+> make `roles` an OPTIONAL override (empty -> pure capability so wan unblocks; set -> enforced, no over-match) +
+> decouple `default_roles` from eligibility + confirm the descriptor `roles` source in `otr_video_director.py` +
+> handle ASPECT (wide vs portrait) + unify the render-gate source (FAMILY_REQUIRED_INPUTS <- required_inputs) + a
+> GENERATED before/after eligibility test + eligibility != auto-selection + VIDEO-only v1 (defer image).
+> **NEXT = capability-routing R2 (coding) -> R3 (wiring) -> R4 + build; the audio leveling is DONE.** (Wan
+> roadmap item 3: wan_i2v fits b-roll music/beats, not the audio announcer -- the no-silent-swap safety fired
+> correctly; the capability fix makes wan a b-roll announcer.)
+
 > **LATEST SESSION -- 2026-06-22 (CODER, marathon; HEAD `08010ec` == origin/v2.0-alpha; full suite 4934
 > pass/34 skip, Bug Bible 16/7/3, audio byte-identical 9/0). THREE sprints SHIPPED + PUSHED end to end, each
 > chunk suite+Bug-Bible green -> commit+push to v2.0-alpha:**
