@@ -1231,7 +1231,17 @@ def _build_beat_user_prompt(
         "describes. RAISE THE STAKE: this beat's pressure must be higher "
         "than the previous beat's -- escalate, never tread water. It "
         "should follow on from the previous beat and set up the next "
-        "where those are given. Return only the JSON object.",
+        "where those are given. "
+        # D2 (2026-06-22, story-quality lift): antagonist-stance consistency.
+        # The weak-end failure (b-Chandra's Echo) was the antagonist reversing
+        # his stance toward the protagonist with no turn beat. JSON-free,
+        # no cross-run state -- a best-effort generation nudge.
+        "KEEP STANCE CONSISTENT: each character's stance toward the "
+        "protagonist and the central conflict must stay true to the want "
+        "they have shown so far. A reversal -- an adversary relenting, an "
+        "ally turning on them -- is allowed ONLY as a deliberate turn this "
+        "beat earns and shows, never an unmotivated flip from the previous "
+        "beat. Return only the JSON object.",
     ])
     return "\n".join(parts)
 

@@ -58,6 +58,7 @@ __all__ = [
     "VoiceDriftNote",
     "FlatLine",
     "RerollTarget",
+    "StanceIssue",
     "StoryCriticReport",
     "run_story_critic",
 ]
@@ -200,6 +201,35 @@ class RerollTarget(BaseModel):
     failed_dimension: FailedDimension = "unspecified"
 
 
+class StanceIssue(BaseModel):
+    """D2 (2026-06-22, story-quality lift) -- TELEMETRY ONLY.
+
+    A character whose stance toward the protagonist / central object REVERSES
+    across the episode with no turn beat that earns it (the "Chandra's Echo"
+    antagonist who flip-flops). This is a pure observation surfaced on
+    `meta.story_critic_report`; it is DELIBERATELY NOT wired to a `RerollTarget`,
+    a `FailedDimension`, a freeze gate, or `needs_full_rerun` -- R3 grounding
+    proved no cross-run repair channel survives a JSON-frozen rerun, so any such
+    wiring would be a silent dead-end repair path. Every field defaults so a
+    partial response still validates.
+
+      character_id     the character whose stance reversed.
+      target           who/what the stance is toward (FREE-FORM string).
+      prior_stance     the stance established earlier.
+      new_stance       the contradicting stance.
+      missing_turn_beat a beat_id OR a plain reason there is no earned turn.
+      line_ids         the lines that evidence the reversal.
+      severity         the critic's free-form severity label.
+    """
+    character_id: str = ""
+    target: str = ""
+    prior_stance: str = ""
+    new_stance: str = ""
+    missing_turn_beat: str = ""
+    line_ids: list[str] = Field(default_factory=list)
+    severity: str = ""
+
+
 # The four arc verdicts. `strong` is the all-clear; `uneven` flags a
 # script whose arc has soft patches; `flat` flags an arc with no real
 # rise or fall; `mid_collapse` flags the specific failure where the
@@ -231,6 +261,10 @@ class StoryCriticReport(BaseModel):
     arc_verdict: ArcVerdict = "strong"
     reroll_targets: list[RerollTarget] = Field(default_factory=list)
     render_priority: list[str] = Field(default_factory=list)
+    # D2 (2026-06-22, story-quality lift) -- TELEMETRY ONLY. Defaulted empty so
+    # older stored reports + clean() still validate. NEVER read by the reroll /
+    # freeze path (see StanceIssue docstring).
+    stance_issues: list[StanceIssue] = Field(default_factory=list)
 
     @classmethod
     def clean(cls) -> "StoryCriticReport":
@@ -320,6 +354,15 @@ single list, dramatic peaks FIRST -- the moments that carry the episode at
 the top, the quiet connective lines at the bottom. The render stage uses
 this order to budget effort.
 
+SECTION 7 -- STANCE CONSISTENCY (observation only). Consider each character's
+stance toward the protagonist and toward the central conflict across all their
+lines. Flag a character whose stance REVERSES with no turn beat that earns it
+-- an adversary who suddenly relents, an ally who suddenly turns, with nothing
+shown to motivate the change. Emit a stance_issues entry
+{character_id, target, prior_stance, new_stance, missing_turn_beat, line_ids,
+severity} for each. This is an OBSERVATION for the record only -- it does NOT
+ask for a reroll and does NOT change any verdict. A coherent script has none.
+
 Return EXACTLY one JSON object matching this schema:
 {
   "continuity_issues": [{"line_id": "...", "issue": "..."}, ...],
@@ -327,7 +370,8 @@ Return EXACTLY one JSON object matching this schema:
   "flat_lines": [{"line_id": "...", "reason": "..."}, ...],
   "arc_verdict": "strong" | "uneven" | "flat" | "mid_collapse",
   "reroll_targets": [{"line_id": "...", "hint": "...", "failed_dimension": "knowledge|pressure|relationship|decision|obstacle|tension|unspecified"}, ...],
-  "render_priority": ["line_id", "line_id", ...]
+  "render_priority": ["line_id", "line_id", ...],
+  "stance_issues": [{"character_id": "...", "target": "...", "prior_stance": "...", "new_stance": "...", "missing_turn_beat": "...", "line_ids": ["..."], "severity": "..."}, ...]
 }
 
 Every list may be empty. No prose before or after the JSON. No markdown
