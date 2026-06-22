@@ -1,7 +1,7 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **HANDOFF -- 2026-06-22 (CODER; VC chunks 2-4 SHIPPED + LIVE-SMOKE VERIFIED. HEAD `eb43856` (code,
-> 3 ahead of origin/v2.0-alpha `620bdd7`) + `5a90a1c` (GO_FORWARD doc). NOT pushed -- operator push gate.)**
+> **HANDOFF -- 2026-06-22 (CODER; VC chunks 2-4 SHIPPED + LIVE-SMOKE VERIFIED + PUSHED. origin/v2.0-alpha
+> HEAD `4e3c691` == local -- operator cleared the push gate; chunks 2-4 + smoke docs are on origin.)**
 > Built + green chunks 2-4 (details in the block below), then ran a LIVE headless smoke of the canonical
 > `otr_scifi_16gb_full.json` (FLOOR/all-visualizer, local mistral-nemo, 320 words, 3 chars, indextts2,
 > OTR_BYPASS_FREEZE_HALT=1) -> episode "Chandra's Echo". **VC VERIFIED LIVE:** `meta.cast_voice_slots`
@@ -16,9 +16,9 @@
 > Extend the detector + freeze floor + compose-line reroll to this post-quote pattern. Then re-smoke WITHOUT
 > the bypass (the STORY+CAST FIX STEPs 1-6 shipped today were meant to make the freeze gate trustworthy) to
 > see the critic actually gate/reroll. Secondary: incoherent antagonist arc (Manfred flip-flops), a b011
-> character-line mis-stamped `announcer`, abrupt UN escalation. **STILL OPEN (separate, operator-gated):**
-> push `995206e..eb43856` to origin/v2.0-alpha + the cloner golden-recapture decision (Chunk 3 timbre-matching
-> + hybrid voice-fit re-baseline the indextts2 audio golden); VC build-item 5 (robustness acceptance test).
+> character-line mis-stamped `announcer`, abrupt UN escalation. **STILL OPEN (separate):** the cloner
+> golden-recapture decision (Chunk 3 timbre-matching + hybrid voice-fit re-baseline the indextts2 audio
+> golden -- operator gates the recapture); VC build-item 5 (robustness acceptance test + diagnostic count).
 > **BOX STATE:** a FLOOR smoke server (my new code + OTR_BYPASS_FREEZE_HALT=1) is RESIDENT on :8000 -- the
 > next headless run RESETS first (CLAUDE.md S4, selective CIM kill).
 
