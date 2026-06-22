@@ -942,6 +942,14 @@ def apply_deterministic_cast_repairs(
         _cid = (row.get("char_id") or "").casefold()
         if _cid:
             cast_row_by_id[_cid] = row
+    # D3 (2026-06-22, story-quality lift): the set of real cast char_ids (minus
+    # announcer/music sentinels) so the role_mismatch repair can REJECT an LLM
+    # expected="announcer" on a cast character row (the b011 culprit).
+    try:
+        from . import production_ledger as _PL  # type: ignore
+    except ImportError:  # pragma: no cover - standalone / test load
+        import production_ledger as _PL  # type: ignore
+    _d3_cast_ids = _PL.cast_ids_from_ledger(candidate_ledger)
     repaired = 0
     lines_by_id: dict[str, dict] = {
         ln.get("line_id", ""): ln
@@ -1059,6 +1067,22 @@ def apply_deterministic_cast_repairs(
             # membership is the only deterministic check -- there is
             # nothing for Levenshtein to resolve here.
             expected_role = (v.expected or "").strip()
+            # D3 (2026-06-22): never honour expected="announcer" on a row whose
+            # char_id is a real cast id (b011 "Chandra's Echo": c02 cast char
+            # stamped announcer). Coerce it back to "character" instead.
+            _row_cid = str(line.get("char_id") or "").strip()
+            if expected_role == "announcer" and _row_cid in _d3_cast_ids:
+                _, _coerced = _PL.coerce_speaker_role_for_char_id(
+                    line, _d3_cast_ids, source="reviewer_role_mismatch",
+                )
+                if _coerced:
+                    repaired += 1
+                log.warning(
+                    "[OTR_LedgerReviewer] role_mismatch on line_id=%s: REJECTED "
+                    "expected='announcer' for cast char_id=%s; coerced to "
+                    "character (D3).", v.line_id, _row_cid,
+                )
+                continue
             if expected_role in _ALLOWED_SPEAKER_ROLES:
                 line["speaker_role"] = expected_role
                 repaired += 1

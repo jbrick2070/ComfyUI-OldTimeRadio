@@ -76,6 +76,75 @@ _GIT_HEAD_CACHE: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
+# D3 (2026-06-22, story-quality lift) -- speaker_role <-> char_id coercion.
+#
+# A character line whose char_id is a real CAST id must carry
+# speaker_role="character". The b011 "Chandra's Echo" defect: the reviewer's
+# role_mismatch repair honoured an LLM expected="announcer" on a c02 (cast) row,
+# so a cast character was routed as the announcer. These helpers force the
+# correct role at the repair guard, in set_lines, and (mandatory) in a pre-freeze
+# sweep -- COERCE-NEVER-CRASH; non-cast / announcer / music-sentinel rows are
+# left untouched so the legitimate announcer re-stamp is never fought.
+# ---------------------------------------------------------------------------
+
+#: char_id values that are NOT cast characters (the announcer + music/sfx render
+#: contracts). A row carrying one of these is never coerced to "character".
+_NON_CHARACTER_CHAR_ID_SENTINELS: frozenset = frozenset({
+    "announcer", "music", "music_open", "music_close", "music_inter", "sfx",
+})
+
+
+def cast_ids_from_ledger(ledger_data: Any) -> "set[str]":
+    """Return the set of real CAST char_ids from a ledger dict's `cast` table,
+    MINUS the announcer / music / sfx sentinels. Defensive; never raises."""
+    ids: "set[str]" = set()
+    try:
+        for row in (ledger_data or {}).get("cast", []) or []:
+            if not isinstance(row, dict):
+                continue
+            cid = str(row.get("char_id") or "").strip()
+            if cid and cid.lower() not in _NON_CHARACTER_CHAR_ID_SENTINELS:
+                ids.add(cid)
+    except Exception:  # noqa: BLE001 -- a malformed ledger is never fatal here
+        return set()
+    return ids
+
+
+def coerce_speaker_role_for_char_id(
+    line: Any, cast_ids: "set[str]", source: str = "",
+) -> "tuple[Any, bool]":
+    """If ``line.char_id`` is a real cast id, force ``speaker_role="character"``.
+
+    Returns ``(line, changed)``. Mutates ``line`` IN PLACE when it coerces and
+    stamps a per-line ``compose_flags`` breadcrumb (the ledger ROW schema is
+    FIXED -- there is NO per-line meta dict). No-op (changed=False) when: the row
+    is not a dict; char_id is empty / None / an announcer / music / sfx
+    sentinel; char_id is not in ``cast_ids``; or the role is already
+    "character". COERCE-NEVER-CRASH: any error -> (line, False)."""
+    try:
+        if not isinstance(line, dict):
+            return line, False
+        cid = str(line.get("char_id") or "").strip()
+        if not cid or cid.lower() in _NON_CHARACTER_CHAR_ID_SENTINELS:
+            return line, False
+        if cid not in (cast_ids or set()):
+            return line, False
+        prev = str(line.get("speaker_role") or "")
+        if prev == "character":
+            return line, False
+        line["speaker_role"] = "character"
+        flags = list(line.get("compose_flags") or [])
+        flags.append(
+            f"role_coerce:prev={prev or 'none'},new=character,"
+            f"reason=cast_char_id,src={source or 'unknown'}"
+        )
+        line["compose_flags"] = flags
+        return line, True
+    except Exception:  # noqa: BLE001
+        return line, False
+
+
+# ---------------------------------------------------------------------------
 # Module helpers
 # ---------------------------------------------------------------------------
 
@@ -901,6 +970,14 @@ class Ledger:
                 "target_words":     target_words,
                 "dialogue_slot_id": dialogue_slot_id,
             })
+        # D3 (2026-06-22): coerce speaker_role for any row whose char_id is a
+        # real cast id (cast table read at this call site; if the cast is not
+        # yet populated this is a no-op and the mandatory pre-freeze sweep is the
+        # backstop). Never raises.
+        _cast_ids = cast_ids_from_ledger(self.data)
+        if _cast_ids:
+            for _r in rows:
+                coerce_speaker_role_for_char_id(_r, _cast_ids, source="set_lines")
         self.data["lines"] = rows
         self._recompute_totals()
         return self

@@ -1021,6 +1021,65 @@ def run_freeze_cascade(
                     _save_exc,
                 )
 
+    # ---- D3 (2026-06-22, story-quality lift): MANDATORY pre-freeze role sweep
+    # The FINAL mutation step before the freeze hash + role-dependent routing
+    # (Phase 7 audio readiness / scrub / TTS). The reviewer's role_mismatch
+    # repair can leave a cast character stamped speaker_role="announcer" (b011
+    # "Chandra's Echo": char_id=c02, role=announcer). Force speaker_role=
+    # "character" on every line whose char_id is a real cast id. Audit rides
+    # meta["role_coercions"] + per-line compose_flags. COERCE-NEVER-CRASH (any
+    # failure leaves the ledger untouched -- the freeze never breaks, PD1).
+    try:
+        from . import production_ledger as _PL  # type: ignore
+        ledger_data = led.data
+        meta = ledger_data.setdefault("meta", {})
+        _d3_cast_ids = _PL.cast_ids_from_ledger(ledger_data)
+        _d3_coerced: list[str] = []
+        if _d3_cast_ids:
+            for _row in ledger_data.get("lines", []) or []:
+                _, _ch = _PL.coerce_speaker_role_for_char_id(
+                    _row, _d3_cast_ids, source="pre_freeze_sweep",
+                )
+                if _ch:
+                    _d3_coerced.append(str(_row.get("line_id") or ""))
+        if _d3_coerced:
+            meta["role_coercions"] = {
+                "count": len(_d3_coerced), "line_ids": _d3_coerced,
+            }
+            log.warning(
+                "[LFC] D3 pre-freeze role sweep coerced %d row(s) to "
+                "character (char_id is a cast id): %s",
+                len(_d3_coerced), _d3_coerced,
+            )
+    except Exception as _d3_exc:  # noqa: BLE001 -- sweep must never break freeze
+        log.warning("[LFC] D3 pre-freeze role sweep failed: %r", _d3_exc)
+
+    # D3 CI-only invariant (gated on OTR_TEST_MODE so production never crashes --
+    # COERCE-NEVER-CRASH). NOT inside the sweep try/except above (that would
+    # swallow the AssertionError). Music/sfx rows are separate (not asserted).
+    import os as _os_d3
+    if _os_d3.environ.get("OTR_TEST_MODE"):
+        try:
+            _ci_cast_ids = _PL.cast_ids_from_ledger(led.data)
+        except Exception:  # noqa: BLE001
+            _ci_cast_ids = set()
+        for _row in led.data.get("lines", []) or []:
+            if not isinstance(_row, dict):
+                continue
+            _cid = str(_row.get("char_id") or "").strip()
+            _role = str(_row.get("speaker_role") or "")
+            if _cid in _ci_cast_ids:
+                assert _role == "character", (
+                    f"D3 invariant: cast char_id {_cid!r} must be role "
+                    f"'character', got {_role!r} (line_id="
+                    f"{_row.get('line_id')!r})"
+                )
+            if _role == "announcer":
+                assert _cid not in _ci_cast_ids, (
+                    f"D3 invariant: announcer role on cast char_id {_cid!r} "
+                    f"(line_id={_row.get('line_id')!r})"
+                )
+
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
     # OTR_LFCPhase4Scene / 5Voice / 6Arc node classes were orphaned
