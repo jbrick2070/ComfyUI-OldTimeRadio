@@ -1,7 +1,8 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
 > **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE; STORY+CAST FIX **STEPs 5+6 SHIPPED + LIVE-SMOKED**,
-> committed local NOT pushed. HEAD `165fbec`, 8 commits ahead of origin/v2.0-alpha `da98144`.) The
+> committed local NOT pushed. HEAD `f8a8645`, 4 commits ahead of origin/v2.0-alpha `da98144` (STEPs 1-4
+> already pushed at da98144).) The
 > STORY+CAST FIX is now COMPLETE (all 6 steps). Suite 4990 passed/34 skipped; Bug Bible 16/7/3; ZERO
 > workflow-JSON change across all six steps -- every fix is unconditional internal node code, DEFAULT-ON in
 > the canonical otr_scifi_16gb_full.json (nothing to enable).**
