@@ -502,9 +502,24 @@ def _render_cast_contract_table(cast_rows: list[dict]) -> str:
         # the TTS engine name (e.g. 'kokoro') as the cast member's role
         # whenever speaker_role was empty, so the auditor compared a line's
         # real speaker_role against an engine name and emitted a spurious
-        # role_mismatch (the night soak's freeze churn). Engine name is not
-        # a role; render it empty and let the contract speak for itself.
-        role = row.get("speaker_role") or ""
+        # role_mismatch (the night soak's freeze churn).
+        #
+        # STEP 2 (roundtable-converged Option A, R1 unanimous -- see
+        # docs/2026-06-22-story-cast-step2-schema/): cast rows built by
+        # OTR_LedgerScriptWriter._build_cast_rows carry NO speaker_role, so a
+        # bare `speaker_role or ""` rendered role='' for every member and the
+        # auditor had no real contract role to compare a line's speaker_role
+        # against (-> spurious role_mismatch on character lines). A cast
+        # member structurally IS a spoken role: ANNOUNCER by name, else a
+        # character. Derive that canonical role (an explicit speaker_role, if
+        # ever present, wins). Cue roles (music_*/sfx) are line-level render
+        # contracts, never cast members, so they never appear here -- the
+        # literal "migrate music/sfx to cue_type" was cut as schema-breaking.
+        role = row.get("speaker_role") or (
+            "announcer"
+            if str(name).strip().upper() == "ANNOUNCER"
+            else "character"
+        )
         desc = row.get("character_description") or ""
         lines.append(
             f"- char_id={char_id} canonical_name={name!r} "
@@ -519,11 +534,25 @@ def _render_lines_for_audit(lines: list[dict]) -> str:
     The auditor judges cast-contract drift, not pacing or arc, so it
     only needs the speaker identity fields. The Script Doctor uses the
     richer `_render_lines_for_doctor` renderer instead (Sprint 3C).
+
+    STEP 2 (2026-06-22 story+cast fix, roundtable Option A): list ONLY
+    spoken rows (character/announcer). The cast contract governs spoken
+    speakers; music_*/sfx cue rows are line-level render contracts with no
+    cast entry, so feeding them to the cast auditor only invites spurious
+    speaker_unknown / role_mismatch flags. `is_spoken_role` is the same
+    canonical predicate the writer + ledger scrub use, so this drops no
+    real audit target.
     """
     if not lines:
         return "(no lines in ledger)"
+    spoken = [
+        ln for ln in lines
+        if is_spoken_role(ln.get("speaker_role"))
+    ]
+    if not spoken:
+        return "(no spoken lines in ledger)"
     out = []
-    for ln in lines:
+    for ln in spoken:
         out.append(
             f"- line_id={ln.get('line_id','')} "
             f"speaker_role={ln.get('speaker_role','')} "
@@ -658,6 +687,16 @@ try:
     from . import _otr_json
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
+
+# STEP 2 (2026-06-22 story+cast fix, roundtable Option A): the canonical
+# spoken-vs-cue predicate. The cast auditor judges only spoken rows
+# (character/announcer) against the locked cast contract; music_*/sfx cue
+# rows are line-level render contracts with no cast entry and must not be
+# audited (they would emit spurious speaker_unknown/role_mismatch).
+try:
+    from ._otr_ledger_scrub import is_spoken_role
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_ledger_scrub import is_spoken_role  # type: ignore
 
 # Sprint 2A: the shared structured-JSON retry ladder. Both LLM passes
 # in this module (audit_cast_contract, run_script_doctor) route through

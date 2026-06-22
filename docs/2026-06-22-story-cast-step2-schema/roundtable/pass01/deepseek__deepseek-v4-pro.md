@@ -1,0 +1,8 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: build-ready as-is? **no**. The literal STEP2 plan (Option B) is grounded in false premises about the schema and contradicts the frozen‑ledger invariant; it must be replaced by Option A.
+
+MUST-FIX BEFORE BUILD:
+1. **[STEP 2 as literally written / Option B]** The plan assumes `music_*`/`sfx` are cast values and that cast rows carry a `speaker_role` field. Grounded facts show they are **line‑row** values and cast rows have no role field at all. The entire migration logic is inapplicable. **Fix:** discard Option B; adopt Option A, which works entirely within the existing `speaker_role` taxonomy and requires no schema change.
+2. **[STEP 2 as literally written / Option B]** The plan proposes adding `cue_type` and `archetype` fields that exist nowhere in the codebase, have no producers or consumers, and would break the frozen `{cast,lines,meta}` schema. **Fix:** cut these fields (as Option A does). They are speculative scope with zero current need.
+3. **[Option C risk]** Skipping STEP 2 (Option C) leaves the STEP‑1 interaction unaddressed: `_render_cast_contract_table` now renders `role=''` for every cast member, which can cause spurious `role_mismatch` flags. The acceptance criterion “0 cast‑contract violations” cannot be met without fixing this. **Fix:** implement Option A’s prompt‑boundary changes (derive a real

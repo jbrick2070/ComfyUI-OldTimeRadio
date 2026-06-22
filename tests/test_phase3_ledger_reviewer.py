@@ -92,23 +92,67 @@ def _line(line_id, char_id, text, role="character", arc_phase=None):
 
 
 def test_cast_contract_table_never_renders_engine_name_as_role():
-    """STEP 1 (2026-06-22 story+cast fix): the cast-contract table the
+    """STEP 1+2 (2026-06-22 story+cast fix): the cast-contract table the
     auditor sees must NOT read the TTS engine name as the cast member's
-    role. A row with an empty speaker_role and a tts_model engine name
-    renders role='' -- previously it rendered role='kokoro', so the
-    auditor compared a line's real speaker_role against an engine name
-    and emitted a spurious role_mismatch (the night-soak freeze churn).
+    role (STEP 1), and must give the auditor a REAL contract role instead
+    of '' (STEP 2 / roundtable Option A). Cast rows carry no speaker_role,
+    so the role is derived: ANNOUNCER by name, else character. Cue roles
+    (music_*/sfx) never appear here -- they are not cast members.
     """
     table = _render_cast_contract_table([
         {"char_id": "c01", "name": "ANNOUNCER",
          "speaker_role": "", "tts_model": "kokoro"},
         {"char_id": "c02", "name": "ALICE",
-         "speaker_role": "character", "tts_model": "bark"},
+         "tts_model": "bark"},  # no speaker_role at all (real cast row shape)
     ])
     assert "kokoro" not in table
     assert "bark" not in table
-    assert "role=''" in table            # empty speaker_role -> empty role
-    assert "role='character'" in table   # supplied speaker_role preserved
+    assert "role='announcer'" in table   # derived from ANNOUNCER name
+    assert "role='character'" in table   # derived default for a cast member
+    assert "role=''" not in table        # never the empty/engine-name role
+
+
+def test_cast_contract_table_explicit_speaker_role_wins():
+    """An explicit speaker_role on a cast row (future) wins over the
+    name-derived default."""
+    table = _render_cast_contract_table([
+        {"char_id": "c01", "name": "MONTY", "speaker_role": "announcer"},
+    ])
+    assert "role='announcer'" in table
+
+
+def test_lines_for_audit_lists_only_spoken_rows():
+    """STEP 2 (roundtable Option A): the cast auditor sees ONLY spoken
+    rows. music_*/sfx cue rows are line-level render contracts with no
+    cast entry; auditing them invites spurious speaker_unknown /
+    role_mismatch. The existing is_spoken_role predicate is the filter."""
+    from nodes._otr_ledger_reviewer import _render_lines_for_audit
+    rendered = _render_lines_for_audit([
+        {"line_id": "l001", "speaker_role": "music_open", "char_id": "music_open",
+         "text": ""},
+        {"line_id": "l002", "speaker_role": "character", "char_id": "c01",
+         "text": "We have to move."},
+        {"line_id": "l003", "speaker_role": "announcer", "char_id": "announcer",
+         "text": "Tonight on..."},
+        {"line_id": "l004", "speaker_role": "sfx", "char_id": "sfx",
+         "text": "door slams"},
+    ])
+    assert "l002" in rendered
+    assert "l003" in rendered          # announcer is spoken
+    assert "l001" not in rendered      # music cue excluded
+    assert "l004" not in rendered      # sfx cue excluded
+
+
+def test_lines_for_audit_all_cue_rows_yields_placeholder():
+    """A ledger of only cue rows renders the no-spoken-lines placeholder,
+    never an empty audit body."""
+    from nodes._otr_ledger_reviewer import _render_lines_for_audit
+    rendered = _render_lines_for_audit([
+        {"line_id": "l001", "speaker_role": "music_open", "text": ""},
+        {"line_id": "l002", "speaker_role": "sfx", "text": "thud"},
+    ])
+    assert "no spoken lines" in rendered
+    assert "l001" not in rendered
 
 
 def _mk_generate_fn(*replies):
