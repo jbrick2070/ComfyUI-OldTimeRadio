@@ -1,5 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-22 (CODER; VC chunks 2-4 SHIPPED + LIVE-SMOKE VERIFIED. HEAD `eb43856` (code,
+> 3 ahead of origin/v2.0-alpha `620bdd7`) + `5a90a1c` (GO_FORWARD doc). NOT pushed -- operator push gate.)**
+> Built + green chunks 2-4 (details in the block below), then ran a LIVE headless smoke of the canonical
+> `otr_scifi_16gb_full.json` (FLOOR/all-visualizer, local mistral-nemo, 320 words, 3 chars, indextts2,
+> OTR_BYPASS_FREEZE_HALT=1) -> episode "Chandra's Echo". **VC VERIFIED LIVE:** `meta.cast_voice_slots`
+> stamped (timbre/age/role); the hybrid voice-fit PROPOSED + ACCEPTED real voice_ref_ids (c03 vz_donor_glenn,
+> c04 vz_donor_marshal_indian; c02 gender=other fell closed `no_cards`); indextts2 rendered all lines, no
+> crash, deterministic. Audio master 135.5s OK. **STORY GRADE = C+ (~6/10)** (floor for local mistral +
+> bypass, not the ceiling).
+> **>>> NEW CURRENT STEP (operator-directed): STORY-QUALITY LIFT -- get the C+ up, driven by the live-smoke
+> evidence in `docs/2026-06-22-voice-casting-arch/SMOKE_CHANDRAS_ECHO_FINDINGS.md`.** TOP FIX = the
+> stage-direction LEAK into spoken text (trailing/embedded directions AFTER a closing quote survive the
+> pre-freeze scrub -> indextts2 SPEAKS them; concrete lines b005/b010/b012/b015/b017 captured as the corpus).
+> Extend the detector + freeze floor + compose-line reroll to this post-quote pattern. Then re-smoke WITHOUT
+> the bypass (the STORY+CAST FIX STEPs 1-6 shipped today were meant to make the freeze gate trustworthy) to
+> see the critic actually gate/reroll. Secondary: incoherent antagonist arc (Manfred flip-flops), a b011
+> character-line mis-stamped `announcer`, abrupt UN escalation. **STILL OPEN (separate, operator-gated):**
+> push `995206e..eb43856` to origin/v2.0-alpha + the cloner golden-recapture decision (Chunk 3 timbre-matching
+> + hybrid voice-fit re-baseline the indextts2 audio golden); VC build-item 5 (robustness acceptance test).
+> **BOX STATE:** a FLOOR smoke server (my new code + OTR_BYPASS_FREEZE_HALT=1) is RESIDENT on :8000 -- the
+> next headless run RESETS first (CLAUDE.md S4, selective CIM kill).
+
 > **LATEST SESSION -- 2026-06-22 (CODER; VC CHUNKS 2-4 SHIPPED -- committed LOCAL, NOT pushed
 > (operator gates the push). HEAD `eb43856`, 3 commits ahead of origin/v2.0-alpha `620bdd7`. Full suite
 > 5029 passed/34 skipped (was 5001/34; +28 new tests), Bug Bible 16/7/3, audio-byte-identical structural
