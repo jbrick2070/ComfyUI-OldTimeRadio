@@ -1224,11 +1224,35 @@ def _build_beat_user_prompt(
     parts.extend([
         "",
         "Task: write the intent (one sentence, NOT dialogue) and a "
-        "mood descriptor for this beat. The intent should follow on "
-        "from the previous beat and set up the next where those are "
-        "given. Return only the JSON object.",
+        "mood descriptor for this beat. The intent MUST be an ACTION "
+        "UNDER PRESSURE -- the speaker DOES something with stakes "
+        "(reveal, refuse, demand, bargain, accuse, conceal, choose, "
+        "threaten, confess), not merely discusses, reflects, or "
+        "describes. It should follow on from the previous beat and set "
+        "up the next where those are given. Return only the JSON object.",
     ])
     return "\n".join(parts)
+
+
+# C0 (story-quality R2): an action-under-pressure beat intent leads with (or
+# contains) a stakes verb. Used as a measurement signal by the story-quality
+# scan; NOT a hard outline-failing gate (a strict structured_call post_validator
+# would flake outlines on weak models -- the prompt constraint is the lever).
+_ACTION_PRESSURE_RE = re.compile(
+    r"\b(reveal|refus|deny|denies|denied|demand|bargain|accus|conceal|hid|"
+    r"hides|choos|chose|chooses|threaten|confess|betray|expos|defy|defies|"
+    r"defied|insist|warn|confront|sacrific|risk|gambl|force)\w*",
+    re.IGNORECASE,
+)
+
+
+def intent_is_action_under_pressure(intent) -> bool:
+    """True when a beat intent reads as an action under pressure (carries a
+    stakes verb). Pure; never raises."""
+    try:
+        return bool(_ACTION_PRESSURE_RE.search(str(intent or "")))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _allocate_phase_target_words(

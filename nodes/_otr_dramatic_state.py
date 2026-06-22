@@ -225,6 +225,20 @@ _DEFAULT_ENDING = (
 )
 
 
+def wants_are_default(state) -> bool:
+    """True when the opposed wants are the deterministic _DEFAULT templates
+    (the news-derived classifier did NOT run / fell back). Used by the
+    story-quality scan to report how often boilerplate wants ship. Tolerant of
+    the leading 'NAME: ' prefix + truncation; pure, never raises. (C0,
+    story-quality R2.)"""
+    try:
+        a = str(getattr(state, "character_a_wants", "") or "")
+        b = str(getattr(state, "character_b_wants", "") or "")
+        return (_DEFAULT_A_WANTS in a) and (_DEFAULT_B_WANTS in b)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _first_two_cast_names(cast_rows) -> tuple[str, str]:
     """Return (A, B) names from the cast roster. Falls back to
     PROTAGONIST / ANTAGONIST when fewer than two cast rows exist."""
