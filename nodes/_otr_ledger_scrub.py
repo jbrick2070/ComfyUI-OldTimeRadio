@@ -98,11 +98,13 @@ try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         BARE_STAGE_FLOOR_ACTIVE,
         scrub_leading_stage_direction,
+        strip_quote_anchored_stage_direction,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         BARE_STAGE_FLOOR_ACTIVE,
         scrub_leading_stage_direction,
+        strip_quote_anchored_stage_direction,
     )
 
 __all__ = [
@@ -378,13 +380,23 @@ def _normalize_whitespace_and_quotes(text: str) -> str:
     return s.strip()
 
 
-def _strip_stage_directions(text: str) -> Tuple[str, bool]:
+def _strip_stage_directions(
+    text: str, reasons: Optional[List[str]] = None,
+) -> Tuple[str, bool]:
     """Remove leaked stage-direction shapes from a spoken field.
 
     Returns (cleaned_text, stripped_any). Brackets / asterisk-actions are
     always cut; parenthetical groups are cut only when they read like a cue
     verb (so a genuine aside survives). NORMALIZER, not a retry: a line that
     is nothing but a cue collapses to empty and is handled downstream.
+
+    D1 (2026-06-22, story-quality lift): the order is delimited scrub ->
+    quote-anchored bare scrub (the balanced-quote class b005/b010/b012, where a
+    3rd-person action clause TRAILS a closing quote) -> leading bare floor.
+    Optional ``reasons`` is an out-list: when provided, each tier that fires
+    appends a short reason code (for the per-line ``compose_flags`` breadcrumb).
+    The ``Tuple[str, bool]`` return is preserved (callers unpack two values).
+    Idempotent.
     """
     if not text:
         return "", False
@@ -399,16 +411,31 @@ def _strip_stage_directions(text: str) -> Tuple[str, bool]:
             out = rx.sub(_maybe, out)
         else:
             out = rx.sub("", out)
-    out = _WS_RUN_RE.sub(" ", out).strip()
-    # BARE (undelimited) leading stage direction -- the FREEZE-only floor
-    # (2026-06-22). Runs AFTER the delimited strips on the already-cleaned text;
-    # narrow + guarded (see _otr_line_hygiene.scrub_leading_stage_direction).
+    _after_delim = _WS_RUN_RE.sub(" ", out).strip()
+    if reasons is not None and _after_delim != out.strip():
+        reasons.append("delimited")
+    out = _after_delim
+    # BARE stage directions -- the FREEZE-only floor (2026-06-22). Both run on the
+    # already-delimited-cleaned text; narrow + guarded (see _otr_line_hygiene).
     # Gated on the precision-validated flag so the contract stays a no-op when
-    # disabled. The Tuple[str,bool] return is preserved (callers unpack it).
+    # disabled.
     if BARE_STAGE_FLOOR_ACTIVE:
+        # D1: quote-anchored trailing/leading-after-quote bare direction (the
+        # balanced-quote class). Cannot route back to a reroll (downstream of the
+        # composer); aborts on any malformed result.
+        anchored, anchored_changed, anchored_reason = (
+            strip_quote_anchored_stage_direction(out)
+        )
+        if anchored_changed:
+            out = _WS_RUN_RE.sub(" ", anchored).strip()
+            if reasons is not None:
+                reasons.append(anchored_reason or "quote_anchored")
+        # existing leading bare-prefix floor (no-quote leading clause).
         bare = scrub_leading_stage_direction(out)
         if bare != out:
             out = _WS_RUN_RE.sub(" ", bare).strip()
+            if reasons is not None:
+                reasons.append("leading_bare")
     return out, (out != original)
 
 
@@ -752,13 +779,23 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
         # 3a. composer format strip (leaked prefixes / brackets / md / quotes).
         cleaned = lc.strip_line_formatting(raw_text)
         # 3b. leaked stage directions.
-        cleaned, stage_stripped = _strip_stage_directions(cleaned)
+        _stage_reasons: List[str] = []
+        cleaned, stage_stripped = _strip_stage_directions(cleaned, _stage_reasons)
         if stage_stripped:
             findings.append(ScrubFinding(
                 code=CODE_STAGE_DIRECTION, where=f"lines[{i}]",
                 detail="stripped leaked stage direction from spoken field",
                 line_id=line_id,
             ))
+            # D1: per-line breadcrumb rides compose_flags (the ledger ROW schema
+            # is FIXED -- there is NO per-line meta dict). Stamp the reason
+            # code(s) so a downstream audit can see WHICH tier fired.
+            _reason_tag = "stage_dir_stripped:" + ",".join(
+                _stage_reasons or ["bare"]
+            )
+            _cf = list(row.get("compose_flags") or [])
+            _cf.append(_reason_tag)
+            row["compose_flags"] = _cf
         # 3c. whitespace / smart-quote / punctuation normalization.
         cleaned = _normalize_whitespace_and_quotes(cleaned)
 

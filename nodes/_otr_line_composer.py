@@ -38,7 +38,7 @@ from typing import Iterable, Optional
 # stdlib-only leaf -> no import cycle. Dual import (package / standalone).
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
-        detect_leading_stage_business,
+        detect_stage_business_for_reroll,
         flag_cliche,
         flag_on_the_nose,
         flag_stage_business,
@@ -46,7 +46,7 @@ try:  # pragma: no cover - exercised by both import styles
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
-        detect_leading_stage_business,
+        detect_stage_business_for_reroll,
         flag_cliche,
         flag_on_the_nose,
         flag_stage_business,
@@ -1308,7 +1308,12 @@ def _build_user_prompt(req: LineRequest) -> str:
         "Write 1 spoken line. Do not summarize the objective. "
         "Do not explain the turn. Perform the objective indirectly. "
         "Speak in the first person; never narrate your own actions in "
-        "the third person and never say your own name."
+        "the third person and never say your own name. "
+        # D1 (2026-06-22, story-quality lift): the leak persists AFTER a closing "
+        # quote ("...this." adjusts the dials) and mid-line. Forbid every shape.
+        "Output ONLY the words the character says aloud -- no stage directions "
+        "anywhere: not before, not after, and not between quotation marks "
+        "(no \"adjusts the dial\", \"clutches her ring\", \"taps his cane\")."
     )
     if req.beat_turn:
         indirect += " The situation must be different after this line."
@@ -1696,6 +1701,7 @@ def compose_line_draft(
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,
     reroll_hint: str | None = None,  # Sprint 5C
+    _stage_dir_repair_attempted: bool = False,  # D1 Tier-2 reroll guard
 ) -> str:
     """Run the creative retry ladder and return ONE draft dialogue line.
 
@@ -1753,11 +1759,16 @@ def compose_line_draft(
         system = resolve_creative_system_prompt(
             creative_repo_id, phase="line_composer_system",
         )
-    user = _build_user_prompt(req)
+    # D1 Tier-2: the user prompt is rebuilt from `current_req` so a bare
+    # stage-direction reroll can overlay a hint mid-loop. With no hit this is
+    # byte-identical to the old single build (current_req IS req).
+    current_req = req
+    user = _build_user_prompt(current_req)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
+    _sd_reroll_done = bool(_stage_dir_repair_attempted)
 
     attempts: list[tuple[str, str]] = []
     word_cap, min_words, max_words = _word_bands(req.target_words)
@@ -1816,6 +1827,36 @@ def compose_line_draft(
             log.warning("[OTR_LineComposer] %s", err_msg)
             attempts.append(("", err_msg))
             continue
+
+        # D1 Tier-2 (2026-06-22, story-quality lift): the SINGLE bare
+        # stage-direction reroll guard, moved here from the too-late
+        # `compose_line` site so it acts at compose time (the only tier that can
+        # reroll). Detect on the RAW draft BEFORE format-strip/normalization
+        # (so a trailing/embedded/undelimited direction is still intact), and
+        # owns the malformed cases (b015/b017). At most ONE reroll per line.
+        if not _sd_reroll_done:
+            _sd_hit, _sd_hint, _sd_reason = detect_stage_business_for_reroll(
+                raw or "", req.speaker,
+            )
+            if _sd_hit:
+                _sd_reroll_done = True
+                _existing = getattr(current_req, "reroll_hint", "") or ""
+                _combined = (
+                    f"{_existing}; {_sd_hint}" if _existing else _sd_hint
+                )
+                current_req = replace(current_req, reroll_hint=_combined)
+                user = _build_user_prompt(current_req)
+                messages = [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ]
+                err_msg = f"bare stage-direction reroll ({_sd_reason})"
+                log.warning(
+                    "[OTR_LineComposer] attempt %d reroll: %s (raw=%r)",
+                    attempt_idx + 1, err_msg, raw,
+                )
+                attempts.append((raw or "", err_msg))
+                continue
 
         cleaned = strip_line_formatting(raw or "")
 
@@ -2002,28 +2043,28 @@ def compose_line(
         max_new_tokens_cap=max_new_tokens_cap,
         stop_strings=stop_strings,
         creative_repo_id=creative_repo_id,
+        # D1: the bare stage-direction reroll now lives INSIDE the draft (the
+        # only tier that can reroll). Thread the guard so a recursive repair
+        # cannot trigger a second stage-direction reroll.
+        _stage_dir_repair_attempted=_stage_dir_repair_attempted,
     )
     word_count = len(cleaned.split())
     word_cap, min_words, max_words = _word_bands(req.target_words)
 
-    # Bare leading stage-direction -> ONE reroll (2026-06-22, roundtable). The
-    # bare direction ("twirls his pen nervously Look,...") survives format-strip
-    # and the Stage-3 strips, so detect on the post-draft text and REGENERATE a
-    # clean line rather than truncate it. One level only via the guard; the
-    # freeze floor (_otr_ledger_scrub) is the deterministic backstop if the
-    # reroll still leaks (a weak model) or its draft attempts exhaust.
+    # Post-draft QUALITY reroll (S3: cliche + flat stage-business + on-the-nose).
+    # The bare stage-direction reroll moved into compose_line_draft (D1,
+    # 2026-06-22) -- detected on the RAW draft before format-strip, where the
+    # malformed/undelimited shapes are still intact; the freeze floor is the
+    # deterministic backstop. These remaining S3 craft gates still recompose via
+    # the existing recursive-repair pattern; the guard caps it at one level.
     if not _stage_dir_repair_attempted:
-        # Post-draft quality flags -> ONE reroll (the bare stage-direction
-        # detector + S3 cliche + S3 flat stage-business). Any hit recomposes via
-        # the existing recursive-repair pattern; the guard caps it at one level.
-        _sd_hit, _sd_hint = detect_leading_stage_business(cleaned)
         _cl_hit, _cl_reason = flag_cliche(cleaned)
         _sb_hit, _sb_reason = flag_stage_business(cleaned)
         _nose_hit, _nose_reason = flag_on_the_nose(cleaned)  # C5
-        if _sd_hit or _cl_hit or _sb_hit or _nose_hit:
+        if _cl_hit or _sb_hit or _nose_hit:
             _reasons = [
                 r for h, r in (
-                    (_sd_hit, _sd_hint), (_cl_hit, _cl_reason),
+                    (_cl_hit, _cl_reason),
                     (_sb_hit, _sb_reason), (_nose_hit, _nose_reason),
                 ) if h
             ]

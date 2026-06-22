@@ -1,0 +1,19 @@
+{
+  "schema": "l3-2026-05-14",
+  "cast": [
+    {"char_id": "c01", "name": "MALI"},
+    {"char_id": "c02", "name": "MANFRED"},
+    {"char_id": "c03", "name": "ELENA"}
+  ],
+  "lines": [
+    {"line_id": "b001", "beat_id": "b001", "char_id": "announcer", "speaker_role": "announcer", "text": "Gather round, listeners; the observatory's dish has caught something the night sky was not meant to give up.", "word_count": 19, "char_count": 108},
+    {"line_id": "b002", "beat_id": "b002", "char_id": "c01", "speaker_role": "character", "text": "I have isolated the frequency, and it is pulsing like something that does not want to be heard.", "word_count": 18, "char_count": 95},
+    {"line_id": "b003", "beat_id": "b003", "char_id": "c02", "speaker_role": "character", "text": "You have a leak, Elena. Your numbers are already halfway across the web.", "word_count": 13, "char_count": 71},
+    {"line_id": "b004", "beat_id": "b004", "char_id": "c03", "speaker_role": "character", "text": "He walks those corridors every night, and every night he learns a little more than we tell him.", "word_count": 18, "char_count": 95},
+    {"line_id": "b005", "beat_id": "b005", "char_id": "c01", "speaker_role": "character", "text": "Not before I amplify it. The world deserves to hear this.", "word_count": 11, "char_count": 57},
+    {"line_id": "b006", "beat_id": "b006", "char_id": "music_inter", "speaker_role": "music_inter", "text": "", "word_count": 0, "char_count": 0},
+    {"line_id": "b007", "beat_id": "b007", "char_id": "c02", "speaker_role": "character", "text": "They were very interested in your 'alive' frequency, and they pay well for a story that sings.", "word_count": 17, "char_count": 92},
+    {"line_id": "b008", "beat_id": "b008", "char_id": "announcer", "speaker_role": "announcer", "text": "As the dish turns away, the galactic center keeps its secret one more restless night.", "word_count": 15, "char_count": 84}
+  ],
+  "meta": {}
+}

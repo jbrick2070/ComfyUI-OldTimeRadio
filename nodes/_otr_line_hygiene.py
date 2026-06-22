@@ -141,6 +141,11 @@ _NARRATION_VERBS = frozenset({
     "smiling", "glances", "glancing", "reaches", "reaching", "stands",
     "standing", "sits", "sitting", "watches", "watching", "moves",
     "moving", "steps", "stepping", "looks", "looking",
+    # D1 (2026-06-22, story-quality lift): EXPLICIT closed list grounded on the
+    # "Chandra's Echo" leak corpus (b005/b010/b012/b015/b017). No "obvious
+    # neighbours" -- only the verbs the real frozen ledger leaked.
+    "adjusts", "clutches", "taps", "tightens", "overrides", "dances",
+    "dancing",
 })
 _THIRD_PERSON_LEAD = re.compile(r"^\s*(he|she|they)\b", re.IGNORECASE)
 
@@ -325,6 +330,199 @@ def detect_leading_stage_business(text: Any) -> "tuple[bool, str]":
     s = "" if text is None else str(text)
     hit = _leading_stage_strip(s, _DETECT_MAX_PREFIX_WORDS) != s
     return (hit, _BARE_STAGE_HINT if hit else "")
+
+
+# ---------------------------------------------------------------------------
+# D1 (2026-06-22, story-quality lift -- docs/2026-06-22-story-quality-lift/) --
+# bare stage-direction leak AFTER / BETWEEN / WITHOUT quotes.
+#
+# The leading-only scrub above misses a stage direction that TRAILS a closing
+# quote (b005 `"...this." adjusts dials on the console`), sits BETWEEN quotes on
+# a malformed line (b015), or runs UNDELIMITED mid-line (b017). indextts2 then
+# SPEAKS the direction. These helpers add: a shared double-quote segmenter (one
+# source of truth so the composer reroll [Tier 2] and the freeze floor [Tier 3]
+# parse identically, no drift), a third-person-action-clause classifier, a
+# broad Tier-2 detector, and a narrow quote-anchored Tier-3 floor strip.
+# ---------------------------------------------------------------------------
+
+#: Curly -> straight double-quote normalization, applied BEFORE counting/splitting
+#: so the freeze floor (which runs upstream of the scrub's smart-quote pass) and
+#: the composer reroll segment identical input. Single quotes / apostrophes
+#: ('The Chronicle', contractions, 'alive') are deliberately IGNORED.
+_CURLY_DQUOTE = {"“": '"', "”": '"'}
+_CURLY_DQUOTE_RE = re.compile("[“”]")
+
+#: Word-count ceiling for a third-person action clause (a real stage direction is
+#: short; a long 3rd-person sentence about OTHERS is dialogue, not a direction).
+_ACTION_CLAUSE_MAX_WORDS = 12
+
+#: Clause boundaries for the undelimited (no-quote) Tier-2 scan.
+_CLAUSE_SPLIT_RE = re.compile(r"[.!?,;:]+")
+
+
+def segment_double_quotes(text: Any) -> "tuple[str, list[tuple[str, bool]]]":
+    """Shared SINGLE-SOURCE double-quote segmenter (Tier 2 + Tier 3 use it
+    identically, no parse drift). Returns ``(normalized_text, segments)`` where
+    ``normalized_text`` has curly double quotes folded to straight ``"`` and
+    ``segments`` is an ordered list of ``(span_text, in_quote)`` tuples. With an
+    EVEN number of ``"`` the spans alternate outside/in-quote starting OUTSIDE;
+    an ODD count is unbalanced -- the caller checks
+    ``normalized_text.count('"') % 2`` and treats odd as malformed. Single
+    quotes/apostrophes are never counted. Pure; never raises."""
+    try:
+        s = "" if text is None else str(text)
+        norm = _CURLY_DQUOTE_RE.sub(lambda m: _CURLY_DQUOTE[m.group(0)], s)
+        parts = norm.split('"')
+        segments = [(p, (idx % 2 == 1)) for idx, p in enumerate(parts)]
+        return norm, segments
+    except Exception:  # noqa: BLE001 -- never raise on a spoken line
+        s = "" if text is None else str(text)
+        return s, [(s, False)]
+
+
+def is_third_person_action_clause(
+    span: Any, max_words: int = _ACTION_CLAUSE_MAX_WORDS,
+) -> bool:
+    """True iff ``span`` reads as a THIRD-person stage-action clause (a leaked
+    direction), not dialogue. Requires: (a) NO first/second-person pronoun --
+    third-person (he/she/his/her/they) is PERMITTED, it is the subject of a
+    direction; (b) the LEAD token is an extended ``_NARRATION_VERBS`` verb
+    (directions are verb-led: "adjusts dials", "clutches her ring"); (c) the
+    lead is not a ``_DIALOGUE_STARTER``; (d) word-count <= ``max_words``.
+    Locked: "clutches her wedding ring tightly" -> True; "taps his cane
+    impatiently" -> True; "I adjust the dial as I speak" -> False. Pure; never
+    raises."""
+    try:
+        s = " ".join(str(span or "").split())
+        if not s:
+            return False
+        words = re.findall(r"[a-z']+", s.lower())
+        if not words or len(words) > max_words:
+            return False
+        # (a) no 1st/2nd-person pronoun anywhere in the clause
+        for w in words:
+            root = re.split(r"['’]", w)[0]
+            if w in _PRONOUN_ROOTS or root in _PRONOUN_ROOTS:
+                return False
+        lead = words[0]
+        # (c) lead not a dialogue starter
+        if lead in _DIALOGUE_STARTER:
+            return False
+        # (b) lead is a narration verb (directions are verb-led)
+        if lead not in _NARRATION_VERBS:
+            return False
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _contains_undelimited_action_clause(text: str) -> bool:
+    """True when a no-quote / unbalanced line carries a 3rd-person action clause
+    as one of its punctuation-delimited chunks (b017
+    "...at once! overrides systems, fingers dancing on the console ...")."""
+    for chunk in _CLAUSE_SPLIT_RE.split(text):
+        if is_third_person_action_clause(chunk.strip()):
+            return True
+    return False
+
+
+def detect_stage_business_for_reroll(
+    text: Any, speaker_name: str = "",
+) -> "tuple[bool, str, str]":
+    """Tier-2 (composer reroll) detector -- BROAD on purpose (a false positive
+    only costs one recompose). Returns ``(hit, hint, reason_code)`` with
+    ``reason_code`` in {"leading", "trailing_after_quote",
+    "embedded_between_quotes", "undelimited_action_clause"}; ``("", "")`` parts
+    when no hit. Owns the malformed/undelimited cases (b015, b017) the freeze
+    floor deliberately leaves alone. Pure; never raises."""
+    try:
+        s = "" if text is None else str(text)
+        if not s.strip():
+            return (False, "", "")
+        # 1. bare LEADING direction (existing leading-only detector)
+        lead_hit, _ = detect_leading_stage_business(s)
+        if lead_hit:
+            return (True, _BARE_STAGE_HINT, "leading")
+        norm, segments = segment_double_quotes(s)
+        nq = norm.count('"')
+        if nq and nq % 2 == 0:
+            # balanced quotes: an OUTSIDE-quote action span is a leaked direction
+            for idx, (span, in_quote) in enumerate(segments):
+                if in_quote:
+                    continue
+                if is_third_person_action_clause(span.strip(" ,;:-")):
+                    reason = "leading" if idx == 0 else "trailing_after_quote"
+                    return (True, _BARE_STAGE_HINT, reason)
+            # malformed (b015): dialogue sits OUTSIDE, the direction got quoted
+            for span, in_quote in segments:
+                if not in_quote:
+                    continue
+                if is_third_person_action_clause(span.strip(" ,;:-")):
+                    return (True, _BARE_STAGE_HINT, "embedded_between_quotes")
+            return (False, "", "")
+        # unbalanced or no quotes (b017): undelimited action clause anywhere
+        if _contains_undelimited_action_clause(norm):
+            return (True, _BARE_STAGE_HINT, "undelimited_action_clause")
+        return (False, "", "")
+    except Exception:  # noqa: BLE001
+        return (False, "", "")
+
+
+def _floor_well_formed(text: str) -> bool:
+    """A floor-stripped line is well-formed iff (after trimming trailing
+    separators) the last SPOKEN char -- ignoring one optional trailing closing
+    structural ``"`` -- is terminal punctuation, the line is non-empty, and its
+    double quotes are balanced. Else the floor ABORTS the strip."""
+    candidate = (text or "").strip().strip(" ,;-")
+    if not candidate:
+        return False
+    if candidate.count('"') % 2 != 0:
+        return False
+    core = candidate[:-1].rstrip() if candidate.endswith('"') else candidate
+    if not core:
+        return False
+    return core[-1] in _TERMINAL_PUNCT
+
+
+def strip_quote_anchored_stage_direction(text: Any) -> "tuple[str, bool, str]":
+    """Tier-3 deterministic FREEZE floor for the BALANCED-QUOTE class only
+    (b005/b010/b012 trailing-after-quote). Returns ``(text, changed, reason)``.
+
+    Conservative + cannot route back to a reroll (it is downstream of the
+    composer): an ODD ``"`` count -> ``(text, False, "")`` (leave unscrubbed; an
+    odd-quote line that reaches the floor ships LOUD / CI-fails). With balanced
+    quotes it removes an OUTSIDE-quote span that ``is_third_person_action_clause``
+    and keeps the strip ONLY if the result is well-formed; otherwise it aborts
+    and returns the original. No-quote (undelimited) lines are EXCLUDED -- those
+    are Tier-2's job. Idempotent; pure; never raises."""
+    try:
+        s = "" if text is None else str(text)
+        norm, segments = segment_double_quotes(s)
+        nq = norm.count('"')
+        if nq == 0 or nq % 2 != 0:
+            return (s, False, "")
+        changed = False
+        reason = ""
+        rebuilt: list[str] = []
+        for idx, (span, in_quote) in enumerate(segments):
+            if in_quote:
+                rebuilt.append(span)
+                continue
+            if is_third_person_action_clause(span.strip(" ,;:-")):
+                changed = True
+                reason = "leading" if idx == 0 else "trailing_after_quote"
+                rebuilt.append("")
+            else:
+                rebuilt.append(span)
+        if not changed:
+            return (s, False, "")
+        out = '"'.join(rebuilt)
+        out = _WS.sub(" ", out).strip()
+        if not _floor_well_formed(out):
+            return (s, False, "")  # ABORT -- never ship a malformed strip
+        return (out, True, reason)
+    except Exception:  # noqa: BLE001
+        return ("" if text is None else str(text), False, "")
 
 
 # ---------------------------------------------------------------------------
