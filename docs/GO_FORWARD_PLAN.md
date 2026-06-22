@@ -1,5 +1,17 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **UPDATE 2026-06-22 (capability-routing SHIPPED, `cf5fbb3`):** the capability-routing campaign (R1-R3)
+> is now BUILT + PUSHED + GREEN, not just converged. `nodes/_otr_shared/role_compat.py::engine_fits_role`
+> DROPS the per-engine `roles` whitelist gate -> eligibility is PURELY capability
+> (`required_inputs <= role_available_inputs`); the `roles` attrs are now dead (deferred cleanup). wan_i2v
+> now drives the announcer (and any b-roll engine fits any role whose inputs it satisfies); HuMo/LTX-AV
+> stay audio-gated BY CAPABILITY. PROVABLY non-regressive SUPERSET (`tests/test_capability_routing.py`
+> 10-case matrix + 6 existing role-fit tests updated to capability-only). Aspect = self-consistent per
+> pick (`otr_video_director._role_aspects` derives the still aspect from the selected engine's
+> render_aspect). Suite 4957/34 + Bug Bible 16/7/3. NEXT (operator eyeball): re-render the 100% Wan to SEE
+> wan drive the announcer end-to-end; optional dead-`roles`-attr cleanup.
+> `docs/2026-06-22-capability-routing/FINAL_PLAN.md`.
+
 > **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE, very long; PER-SEGMENT RMS LOUDNESS LEVELING SHIPPED +
 > PUSHED + EAR-VALIDATED; CAPABILITY-ROUTING roundtable R1 CONVERGED, not built).**
 > **(1) AUDIO LEVELING (baked-in default):** even out shot-to-shot dialogue levels. 4-round live roundtable
