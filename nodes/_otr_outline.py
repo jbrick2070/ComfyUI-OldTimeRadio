@@ -1525,7 +1525,10 @@ def _assemble_outline(
         beat_id=_next_bid(),
         speaker="ANNOUNCER",
         speaker_role="announcer",
-        intent="Close the episode and tag the broadcast.",
+        # S2 (story-quality R2): close on a concrete final image, not a thesis.
+        intent=("Close on a concrete final image showing what changed (use "
+                "the central object if set); no moral, thesis, or "
+                "news-summary tag."),
         target_words=15,
         mood="reflective",
         sfx_cue=None,

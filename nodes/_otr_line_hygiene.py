@@ -299,6 +299,39 @@ def detect_leading_stage_business(text: Any) -> "tuple[bool, str]":
     return (hit, _BARE_STAGE_HINT if hit else "")
 
 
+# ---------------------------------------------------------------------------
+# S2 (story-quality R2) -- announcer close reads as a thesis/moral, not an image
+# ---------------------------------------------------------------------------
+
+#: Phrases that mark a close as a stated moral / lesson / news-summary instead
+#: of a concrete final image. Case-insensitive, straight + curly apostrophe.
+_BANNED_THESIS_RES = tuple(
+    re.compile(p, re.IGNORECASE) for p in (
+        r"tonight['’]s revelation",
+        r"\bthe lesson is\b",
+        r"\breminding us\b",
+        r"\bproving \w+ right\b",
+        r"\b\w+ is now shared\b",
+        r"\bthis shows\b",
+    )
+)
+
+
+def flag_thesis_close(text: Any) -> "tuple[bool, str]":
+    """(flagged, reason): the announcer close states a moral / lesson /
+    news-summary rather than showing a concrete final image. Pure; never
+    raises."""
+    try:
+        s = str(text or "")
+        for rx in _BANNED_THESIS_RES:
+            m = rx.search(s)
+            if m:
+                return True, f"thesis/moral phrase {m.group(0)!r}"
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 

@@ -37,9 +37,15 @@ from typing import Iterable, Optional
 # Bare leading stage-direction detector (2026-06-22). _otr_line_hygiene is a
 # stdlib-only leaf -> no import cycle. Dual import (package / standalone).
 try:  # pragma: no cover - exercised by both import styles
-    from ._otr_line_hygiene import detect_leading_stage_business
+    from ._otr_line_hygiene import (
+        detect_leading_stage_business,
+        flag_thesis_close,
+    )
 except ImportError:  # pragma: no cover
-    from _otr_line_hygiene import detect_leading_stage_business  # type: ignore
+    from _otr_line_hygiene import (  # type: ignore
+        detect_leading_stage_business,
+        flag_thesis_close,
+    )
 
 log = logging.getLogger("OTR")
 
@@ -2277,6 +2283,9 @@ VOICE:
 - Land the journalistic note from the closing brief.
 - Lightly echo the opening line's tone; do not repeat its words.
 - Use only proper names that appear in the briefs. Invent none.
+- CLOSE ON A CONCRETE FINAL IMAGE: show what physically changed -- a person,
+  an object, a place. Do NOT state a moral, lesson, or news-summary ("the
+  lesson is", "reminding us", "tonight's revelation", "this shows").
 """
 
 
@@ -2642,6 +2651,48 @@ def compose_announcer_outro(
             return LineResult(
                 text=_resolved_outro_fallback(ending_change, close),
                 compose_flags=("announcer_outro_resolved_fallback",),
+            )
+        # S2 (story-quality R2): a close that STATES a moral / lesson /
+        # news-summary instead of showing a concrete final image is flat.
+        # Recompose ONCE for an image (mirrors the F3 hedge recompose). If it
+        # still reads as thesis, keep the validated close (best-effort nudge --
+        # no deterministic image template exists).
+        _thesis_hit, _thesis_reason = flag_thesis_close(validated)
+        if _thesis_hit:
+            log.info(
+                "[OTR_AnnouncerPass] outro reads as thesis/moral (%s); "
+                "recomposing once for a concrete final image (S2).",
+                _thesis_reason,
+            )
+            image_user = list(user_parts[:-1]) + [
+                "Your previous closing line stated a moral, lesson, or "
+                "news-summary. Replace it with ONE concrete final image: show "
+                "what physically changed -- a person, an object, or a place -- "
+                "not what it means. Do not say 'the lesson is', 'reminding "
+                "us', \"tonight's revelation\", or 'this shows'.",
+                "Write the announcer's closing line now.",
+            ]
+            redo2 = _announcer_generate(creative_fn, [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": "\n\n".join(image_user)},
+            ])
+            ok3, validated3 = validate_announcer_line(
+                strip_line_formatting(redo2 or ""),
+                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+            )
+            if ok3 and not flag_thesis_close(validated3)[0]:
+                log.info(
+                    "[OTR_AnnouncerPass] outro image-recompose ok (model=%s).",
+                    creative_repo_id,
+                )
+                return LineResult(
+                    text=validated3,
+                    compose_flags=("announcer_outro_image_recomposed",),
+                )
+            log.warning(
+                "[OTR_AnnouncerPass] outro still thesis after recompose; "
+                "keeping the validated close (S2).",
             )
         log.info(
             "[OTR_AnnouncerPass] outro pass ok (model=%s, %d chars)",
