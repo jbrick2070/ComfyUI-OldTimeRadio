@@ -1228,8 +1228,10 @@ def _build_beat_user_prompt(
         "UNDER PRESSURE -- the speaker DOES something with stakes "
         "(reveal, refuse, demand, bargain, accuse, conceal, choose, "
         "threaten, confess), not merely discusses, reflects, or "
-        "describes. It should follow on from the previous beat and set "
-        "up the next where those are given. Return only the JSON object.",
+        "describes. RAISE THE STAKE: this beat's pressure must be higher "
+        "than the previous beat's -- escalate, never tread water. It "
+        "should follow on from the previous beat and set up the next "
+        "where those are given. Return only the JSON object.",
     ])
     return "\n".join(parts)
 

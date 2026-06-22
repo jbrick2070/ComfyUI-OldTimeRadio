@@ -40,6 +40,7 @@ try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         detect_leading_stage_business,
         flag_cliche,
+        flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
     )
@@ -47,6 +48,7 @@ except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         detect_leading_stage_business,
         flag_cliche,
+        flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
     )
@@ -2017,11 +2019,12 @@ def compose_line(
         _sd_hit, _sd_hint = detect_leading_stage_business(cleaned)
         _cl_hit, _cl_reason = flag_cliche(cleaned)
         _sb_hit, _sb_reason = flag_stage_business(cleaned)
-        if _sd_hit or _cl_hit or _sb_hit:
+        _nose_hit, _nose_reason = flag_on_the_nose(cleaned)  # C5
+        if _sd_hit or _cl_hit or _sb_hit or _nose_hit:
             _reasons = [
                 r for h, r in (
                     (_sd_hit, _sd_hint), (_cl_hit, _cl_reason),
-                    (_sb_hit, _sb_reason),
+                    (_sb_hit, _sb_reason), (_nose_hit, _nose_reason),
                 ) if h
             ]
             _flag_hint = "; ".join(_reasons)

@@ -373,6 +373,32 @@ def flag_cliche(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
+#: C5 (story-quality R2) -- on-the-nose emotion: a character NAMING their feeling
+#: or the stakes flatly ("I'm scared", "this is dangerous") instead of implying
+#: it. A strong writer shows; this gate rerolls the weak end.
+_ON_THE_NOSE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
+    r"\bI['’]?m (?:so |really |very )?(?:scared|afraid|terrified|worried|nervous)\b",
+    r"\bI am (?:so |really |very )?(?:scared|afraid|terrified|worried|nervous)\b",
+    r"\bI feel (?:so |really |very )?(?:scared|afraid|terrified)\b",
+    r"\bthis is (?:so |really |very )?(?:dangerous|terrifying|scary|serious)\b",
+    r"\bI['’]?m feeling (?:scared|afraid|terrified)\b",
+))
+
+
+def flag_on_the_nose(text: Any) -> "tuple[bool, str]":
+    """(flagged, reason): the line NAMES an emotion / the stakes on the nose
+    instead of implying them. Pure; never raises."""
+    try:
+        s = str(text or "")
+        for rx in _ON_THE_NOSE_RES:
+            m = rx.search(s)
+            if m:
+                return True, f"on-the-nose emotion {m.group(0)!r}"
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def flag_stage_business(text: Any) -> "tuple[bool, str]":
     """(flagged, reason): the line is flat action-announce filler (an errand,
     not a beat with stakes). Pure; never raises."""
