@@ -98,6 +98,34 @@ def clean_spoken_character_line(text: Any, speaker_name: Any) -> str:
     return scrub_self_vocative(scrub_parentheticals(text), speaker_name)
 
 
+def is_stage_direction_only(text: Any) -> bool:
+    """True when a spoken line has NO pronounceable content -- it is ENTIRELY a
+    stage direction / cue (e.g. "(pauses, then flips the switch)", "(beat)").
+
+    Root-cause detector (2026-06-22): `scrub_parentheticals` /
+    `clean_spoken_character_line` deliberately KEEP such a line (they return the
+    original rather than empty it, to avoid an empty character line), so the
+    parenthetical would otherwise leak all the way to the voice worker -- where
+    the TTS-side clean (`_otr_script_prep.clean_spoken_text`) empties it and the
+    engine crashes / emits silence. This flags exactly those lines so the spine
+    can RECOMPOSE them into real dialogue (a stage direction is not a line).
+
+    Uses the SAME clean the voice path uses, so the writer-side detector and the
+    TTS-side reality agree. Deterministic; never raises (a bad input -> False).
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        return False  # an already-empty line is a separate (mechanical) defect
+    try:
+        try:
+            from ._otr_script_prep import clean_spoken_text
+        except ImportError:  # pragma: no cover - standalone / test load
+            from _otr_script_prep import clean_spoken_text  # type: ignore
+        return not str(clean_spoken_text(raw) or "").strip()
+    except Exception:  # noqa: BLE001 -- detector must never raise on a line
+        return False
+
+
 # F7 (story-engine v1): narration / self-address detector. Fires ONLY when a
 # spoken line narrates the SPEAKER's own physical action in third person, or
 # opens with the speaker's own name as a 3rd-person subject + a narration verb.

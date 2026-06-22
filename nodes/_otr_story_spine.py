@@ -496,7 +496,8 @@ def run_post_script_spine(
         _hy_first_ann = _hy_ann_idx[0] if _hy_ann_idx else -1
         _hy_last_ann = _hy_ann_idx[-1] if _hy_ann_idx else -1
         _hy_report = {"scrubbed": 0, "char_recomposed": 0,
-                      "announcer_recomposed": 0, "narration_recomposed": 0}
+                      "announcer_recomposed": 0, "narration_recomposed": 0,
+                      "stage_direction_recomposed": 0}
         _hy_ctx = (
             slot_scheduler.helper_context("delivery_hygiene")
             if slot_scheduler is not None else _nullcontext()
@@ -514,6 +515,32 @@ def run_post_script_spine(
                         _hy_line["text"] = _hy_clean
                         _hy_report["scrubbed"] += 1
                         _hy_orig = _hy_clean
+                    # ROOT-CAUSE repair (2026-06-22): a character beat with NO
+                    # spoken content -- entirely a stage direction like
+                    # "(pauses, then flips the switch)" -- is KEPT by the scrub
+                    # (it would otherwise empty the line), so it would leak to
+                    # the voice worker and crash/silence it. RECOMPOSE it into
+                    # real dialogue via the same seam truncation uses. Fail-soft:
+                    # if the recompose still has no spoken content, keep the
+                    # original (the per-line voice silence guard is the net).
+                    if _HY.is_stage_direction_only(_hy_orig):
+                        log.info(
+                            "[OTR_StorySpine] stage-direction-only line %d "
+                            "(%s); recomposing into spoken dialogue.",
+                            _hy_i, _hy_name,
+                        )
+                        _hy_sd = _hy_recompose(
+                            _hy_i, _hy_orig,
+                            "this beat has NO spoken dialogue -- it is only a "
+                            "stage direction; write the actual words the "
+                            "character SAYS OUT LOUD here, with no parentheses "
+                            "and no action description",
+                        )
+                        if (_hy_sd and str(_hy_sd).strip()
+                                and not _HY.is_stage_direction_only(str(_hy_sd))):
+                            _hy_line["text"] = str(_hy_sd)
+                            _hy_orig = str(_hy_sd)
+                            _hy_report["stage_direction_recomposed"] += 1
                     if _HY.is_truncated(_hy_orig):
                         _hy_new = _hy_recompose(
                             _hy_i, _hy_orig,

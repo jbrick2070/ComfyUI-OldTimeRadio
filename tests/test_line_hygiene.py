@@ -22,6 +22,31 @@ def test_scrub_parenthetical_keeps_line_if_emptied():
         "(only a stage direction)"
 
 
+# ---------------------------------------------------------------------------
+# is_stage_direction_only (2026-06-22 root-cause repair): a character line with
+# NO spoken content -- entirely a stage direction -- is detected so the spine
+# RECOMPOSES it into real dialogue (the scrub keeps it; TTS would empty it).
+# ---------------------------------------------------------------------------
+def test_stage_direction_only_flags_parenthetical_only():
+    assert HY.is_stage_direction_only(
+        "(pauses, then flips the launch sequencer switch, ignoring Stone)")
+    assert HY.is_stage_direction_only("(beat)")
+    assert HY.is_stage_direction_only("(softly)")
+
+
+def test_stage_direction_only_false_for_real_dialogue():
+    assert not HY.is_stage_direction_only("Lockdown, now! No one in or out.")
+    # a line with a stage direction PLUS real words is not stage-direction-only
+    assert not HY.is_stage_direction_only("(softly) We have to move.")
+
+
+def test_stage_direction_only_false_for_empty():
+    # an already-empty line is a different (mechanical) defect, not this one
+    assert not HY.is_stage_direction_only("")
+    assert not HY.is_stage_direction_only("   ")
+    assert not HY.is_stage_direction_only(None)
+
+
 def test_scrub_self_vocative_leading_and_trailing():
     assert HY.scrub_self_vocative("Edna, we have to leave now.", "EDNA") == \
         "we have to leave now."
