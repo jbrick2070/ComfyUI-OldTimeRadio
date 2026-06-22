@@ -175,6 +175,15 @@ class CastLock:
         meta["delivery_profile_version"] = DELIVERY_PROFILE_VERSION
         meta["voice_bank_id"] = voice_bank
 
+        # STEP 3 (2026-06-22 story+cast fix): node-80 OUTPUT fail-closed voice
+        # gate. The cast presets have now been assigned (replay + optional
+        # auto_registry); enforce -- BEFORE the ledger leaves CastLock for the
+        # TTS nodes -- that no character line can reach node 81
+        # (OTR_BatchCharacterVoices) with a None/empty voice_preset on its cast
+        # row. Runs UNCONDITIONALLY, independent of cast_seed (the existing
+        # Gate 1 is skipped on the cast_seed=None early return).
+        self._assert_voice_fail_closed(cast, led.get("lines") or [])
+
         report.insert(0, f"cast_lock_revision={revision} policy={cast_voice_policy}")
         ledger_json = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         done = f"cast_lock:done:rev={revision}:policy={cast_voice_policy}"
@@ -297,6 +306,64 @@ class CastLock:
         # now carries a v2/* voice_preset, and no two bark rows share a voice.
         _OTRCAST._assert_unique_bark_voices(cast)
         _OTRCAST._assert_voice_preset_invariant(cast)
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _assert_voice_fail_closed(cast, lines) -> None:
+        """STEP 3 (2026-06-22 story+cast fix): node-80 OUTPUT voice gate.
+
+        No ``speaker_role == "character"`` line may leave CastLock for
+        OTR_BatchCharacterVoices (node 81) with a None/empty ``voice_preset``
+        on its cast row. The relocated Gate 1
+        (``_otr_casting._assert_voice_preset_invariant``) only runs INSIDE
+        ``_assign_bark_voices`` AFTER a successful seed replay, so the
+        ``cast_seed is None`` early-return -- and an unmatched ``char_id``
+        even with a seed -- could let an empty preset propagate to TTS
+        (grounding_r2 #4). This backstop runs UNCONDITIONALLY and is
+        engine-agnostic (requires a non-empty preset, not specifically a
+        ``v2/*`` bark id, since the character engine may be indextts2 /
+        chatterbox / bark).
+
+        Announcer lines route to node 82 (OTR_AnnouncerVoice), which resolves
+        its engine directly (kokoro) and never reads a cast-row preset, so the
+        announcer is intentionally excluded -- matching Gate 1. Cue rows
+        (music_*/sfx) never reach character/announcer TTS.
+
+        The deterministic picker is upstream (``replay_voice_assignment``,
+        keyed on ``meta.cast_contract.cast_seed``); this gate does not
+        fabricate a voice (that would risk the determinism / uniqueness
+        contract). A genuine gap is a NAMED, fail-closed ``ValueError`` --
+        never a silent None to TTS. A seedless production ledger with voiced
+        character lines therefore raises here, by design.
+        """
+        preset_by_id: dict = {}
+        for row in cast or []:
+            if isinstance(row, dict):
+                preset_by_id[str(row.get("char_id") or "")] = row.get("voice_preset")
+        missing: list = []
+        for ln in lines or []:
+            if not isinstance(ln, dict):
+                continue
+            if str(ln.get("speaker_role") or "").strip().lower() != "character":
+                continue
+            cid = str(ln.get("char_id") or "")
+            preset = preset_by_id.get(cid)
+            if not (isinstance(preset, str) and preset.strip()):
+                missing.append((ln.get("line_id"), cid))
+        if missing:
+            detail = ", ".join(
+                f"line_id={lid!r} char_id={cid!r}" for lid, cid in missing
+            )
+            raise ValueError(
+                "OTR_CastLock: voice fail-closed gate (node-80 output) -- "
+                f"{len(missing)} character line(s) would reach "
+                "OTR_BatchCharacterVoices with no voice_preset on the cast row: "
+                f"{detail}. The deterministic picker (replay_voice_assignment, "
+                "keyed on meta.cast_contract.cast_seed) did not stamp a voice "
+                "for them -- a seedless ledger or an unmatched char_id. Refusing "
+                "to route a None voice to TTS; re-run the writer so cast_seed and "
+                "the character cast rows are consistent."
+            )
 
     # ------------------------------------------------------------------ #
     @staticmethod

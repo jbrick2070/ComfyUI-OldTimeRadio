@@ -100,6 +100,84 @@ def test_preserve_ledger_is_byte_safe_and_increments_revision():
     assert done.startswith("cast_lock:done")
 
 
+# ----------------------------------------------------------------------------
+# STEP 3 (2026-06-22 story+cast fix): node-80 OUTPUT voice fail-closed gate.
+# No character line may reach OTR_BatchCharacterVoices with voice_preset=None.
+# ----------------------------------------------------------------------------
+def _ledger_with_lines(cast, lines, meta=None):
+    return json.dumps({"meta": meta or {"episode_seed": 42}, "cast": cast,
+                       "lines": lines})
+
+
+def test_voice_gate_passes_when_character_lines_have_presets():
+    from nodes.cast_lock import CastLock
+
+    lines = [
+        {"line_id": "l001", "speaker_role": "character", "char_id": "c1",
+         "text": "We move at dawn."},
+        {"line_id": "l002", "speaker_role": "character", "char_id": "c2",
+         "text": "Not without proof."},
+    ]
+    out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                          cast_voice_policy="preserve_ledger")
+    assert out[1] == 1  # locked, no raise
+
+
+def test_voice_gate_raises_on_seedless_missing_preset():
+    """A character line whose cast row has no voice_preset (seedless ledger,
+    no replay) must FAIL CLOSED at the node-80 output -- never a silent None
+    to TTS."""
+    from nodes.cast_lock import CastLock
+
+    cast = [
+        {"char_id": "c1", "name": "MONTY", "gender": "male"},  # no voice_preset
+        {"char_id": "a1", "name": "ANNOUNCER", "gender": "male"},
+    ]
+    lines = [
+        {"line_id": "l001", "speaker_role": "character", "char_id": "c1",
+         "text": "We move at dawn."},
+    ]
+    with pytest.raises(ValueError, match="voice fail-closed gate"):
+        CastLock().lock(script_json=_ledger_with_lines(cast, lines),
+                        cast_voice_policy="preserve_ledger")
+
+
+def test_voice_gate_excludes_announcer_and_cue_rows():
+    """Announcer lines (engine-resolved at node 82) and music/sfx cue rows
+    never need a cast-row voice_preset, so they must NOT trip the gate even
+    when no preset is present."""
+    from nodes.cast_lock import CastLock
+
+    cast = [
+        {"char_id": "a1", "name": "ANNOUNCER", "gender": "male"},  # no preset
+    ]
+    lines = [
+        {"line_id": "l001", "speaker_role": "announcer", "char_id": "announcer",
+         "text": "Tonight, on..."},
+        {"line_id": "l002", "speaker_role": "music_open", "char_id": "music_open",
+         "text": ""},
+        {"line_id": "l003", "speaker_role": "sfx", "char_id": "sfx",
+         "text": "door slams"},
+    ]
+    out = CastLock().lock(script_json=_ledger_with_lines(cast, lines),
+                          cast_voice_policy="preserve_ledger")
+    assert out[1] == 1  # locked, no raise
+
+
+def test_voice_gate_raises_on_orphan_character_line():
+    """A character line whose char_id matches no cast row also fails closed
+    (its preset can never resolve)."""
+    from nodes.cast_lock import CastLock
+
+    lines = [
+        {"line_id": "l009", "speaker_role": "character", "char_id": "c99",
+         "text": "Who am I?"},
+    ]
+    with pytest.raises(ValueError, match="voice fail-closed gate"):
+        CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                        cast_voice_policy="preserve_ledger")
+
+
 def test_revision_increments_from_existing_meta():
     from nodes.cast_lock import CastLock
 
