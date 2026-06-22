@@ -39,11 +39,15 @@ from typing import Iterable, Optional
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         detect_leading_stage_business,
+        flag_cliche,
+        flag_stage_business,
         flag_thesis_close,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         detect_leading_stage_business,
+        flag_cliche,
+        flag_stage_business,
         flag_thesis_close,
     )
 
@@ -2004,13 +2008,26 @@ def compose_line(
     # freeze floor (_otr_ledger_scrub) is the deterministic backstop if the
     # reroll still leaks (a weak model) or its draft attempts exhaust.
     if not _stage_dir_repair_attempted:
+        # Post-draft quality flags -> ONE reroll (the bare stage-direction
+        # detector + S3 cliche + S3 flat stage-business). Any hit recomposes via
+        # the existing recursive-repair pattern; the guard caps it at one level.
         _sd_hit, _sd_hint = detect_leading_stage_business(cleaned)
-        if _sd_hit:
+        _cl_hit, _cl_reason = flag_cliche(cleaned)
+        _sb_hit, _sb_reason = flag_stage_business(cleaned)
+        if _sd_hit or _cl_hit or _sb_hit:
+            _reasons = [
+                r for h, r in (
+                    (_sd_hit, _sd_hint), (_cl_hit, _cl_reason),
+                    (_sb_hit, _sb_reason),
+                ) if h
+            ]
+            _flag_hint = "; ".join(_reasons)
             _existing = getattr(req, "reroll_hint", "") or ""
-            _sd_combined = f"{_existing}; {_sd_hint}" if _existing else _sd_hint
+            _sd_combined = (
+                f"{_existing}; {_flag_hint}" if _existing else _flag_hint)
             log.warning(
-                "[OTR_LineComposer] bare stage direction in draft for %s -- "
-                "one reroll", req.speaker,
+                "[OTR_LineComposer] draft quality flag for %s (%s) -- "
+                "one reroll", req.speaker, _flag_hint,
             )
             try:
                 return compose_line(

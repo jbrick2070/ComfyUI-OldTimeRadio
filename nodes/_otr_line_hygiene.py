@@ -332,6 +332,61 @@ def flag_thesis_close(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
+# ---------------------------------------------------------------------------
+# S3 (story-quality R2) -- cliche + flat stage-business reject gates (FLAGS ONLY)
+# A flagged VOICED line sets reroll_hint -> the existing compose_line reroll
+# recomposes it. Lists are small + grounded; every phrase is one a strong (opus)
+# writer would not produce, so the gate only ever lifts the weak end.
+# ---------------------------------------------------------------------------
+
+_CLICHE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
+    r"\byou['’]re playing with fire\b",
+    r"\bthis changes everything\b",
+    r"\bwe['’]re not leaving anything to chance\b",
+    r"\bleaving nothing to chance\b",
+    r"\bthere['’]s no turning back\b",
+    r"\bagainst all odds\b",
+))
+
+#: FLAT action-announce filler ("I'll go check") -- a character narrating an
+#: errand instead of saying something with stakes. Distinct from the LEADING
+#: stage-direction scrub (scrub_leading_stage_direction).
+_STAGE_BUSINESS_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
+    r"\bI['’]ll go check\b",
+    r"\bI['’]ll double[ -]check\b",
+    r"\bI['’]ll lock (?:it |everything |the \w+ )?down\b",
+    r"\bI['’]ve got this,? no need\b",
+    r"\blet me handle (?:it|this)\b",
+))
+
+
+def flag_cliche(text: Any) -> "tuple[bool, str]":
+    """(flagged, reason): the line leans on a worn cliche. Pure; never raises."""
+    try:
+        s = str(text or "")
+        for rx in _CLICHE_RES:
+            m = rx.search(s)
+            if m:
+                return True, f"cliche {m.group(0)!r}"
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
+def flag_stage_business(text: Any) -> "tuple[bool, str]":
+    """(flagged, reason): the line is flat action-announce filler (an errand,
+    not a beat with stakes). Pure; never raises."""
+    try:
+        s = str(text or "")
+        for rx in _STAGE_BUSINESS_RES:
+            m = rx.search(s)
+            if m:
+                return True, f"flat stage-business {m.group(0)!r}"
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 
