@@ -1,6 +1,35 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **LATEST SESSION -- 2026-06-22 (CODER, very long session; HEAD `90ddfca` == origin/v2.0-alpha; full suite
+> **LATEST SESSION -- 2026-06-22 (CODER, marathon; HEAD `08010ec` == origin/v2.0-alpha; full suite 4934
+> pass/34 skip, Bug Bible 16/7/3, audio byte-identical 9/0). THREE sprints SHIPPED + PUSHED end to end, each
+> chunk suite+Bug-Bible green -> commit+push to v2.0-alpha:**
+> 1. **BARK ARTIFACT (upstream-TTS only, spine frozen):** B0 fixture+spine-verify `ffe5e82` -> B1 speech-only
+>    dialogue mode + first-line [clears throat] gate `467fb05` -> B2 thread the dropped per-line seed
+>    (determinism) `9e68ad5` -> B3 chunk-split hardening `e1b8196` -> QA >4kHz high-band edge metric + scan
+>    `e93b54e`. Cleaned-bark re-soak (mesh 3D bookends + z_image_turbo char stills) rendered "Spinning
+>    Contamination" to obs; metric before/after = pre-B1 1/14 flagged vs cleaned 0/6. min_eos_p kept 0.1;
+>    panel-cut the per-chunk trim + FFT reroll loop.
+> 2. **STAGE-DIRECTION LEAK (3-pass roundtable, ~$0.51):** bare undelimited stage directions ("twirls his pen
+>    nervously Look...") were leaking into the frozen ledger text -> bark spoke them + captions showed them.
+>    Chunk 1 pure scrub+detector+62-case corpus `8c40182` -> Chunk 2 scan + PRECISION GATE (489 ledgers, 20
+>    would-mutate, 0 false positives) `e2dd95a` -> Chunk 4 freeze floor in `_strip_stage_directions` `2278bd2`
+>    -> Chunk 5 prompt + the S1 music-3681 patch `9142b2f` -> Chunk 3 reroll in compose_line `6ce724d`. Fresh
+>    render shipped a CLEAN ledger; the fixed freeze strips the exact screenshot lines.
+> 3. **STORY-QUALITY R2 -- ALL 8 LEVERS + Final-QA scan (the operator-requested craft lift):** S1 `5396c05`
+>    (music-text suppression) -> S2 `118088f` (announcer close = concrete image, not thesis) -> S3 `1887803`
+>    (cliche + flat stage-business reroll) -> C0 `687f766` (action-verb beat intents + wants_are_default) ->
+>    C3 `981db60` (contrasting speech_signatures) -> C4+C5 `3e19906` (escalation prompt + on-the-nose reroll)
+>    -> C1+C2 `38c2c10` (specificity anchors + central object, 3-pass roundtable-converged ~$0.25) -> Final QA
+>    `08010ec` (story_quality_scan extended with the lever metrics). ALL content-only, ledger schema FIXED
+>    (free-form meta), NO workflow-JSON change, model-agnostic, deterministic.
+> **OPERATOR VERIFY-AT-BUILD (carries forward):** the live `test_audio_byte_identical` baseline (indextts2)
+> may need RECAPTURE -- the R2 prompt levers intentionally change generated dialogue (the clean fixture is a
+> no-op, but a fixed-seed baseline close that newly trips a gate would shift); run the live gate + a re-soak
+> read at leisure. **NEXT = OPERATOR DECISION (no sprint started this hand-off): pick the next forward-order
+> item** (the S3 forward order -- 3D item 5, distribution item 6 -- + the carried per-segment LUFS/RMS plan
+> are all still PARKED + untouched).
+
+> **PRIOR SESSION -- 2026-06-22 (CODER, very long session; HEAD `90ddfca` == origin/v2.0-alpha; full suite
 > 4740 pass/33 skip, Bug Bible 16/7/3, audio byte-identical green). HANDOFF FOR A FRESH CODER WINDOW: the
 > NEW CURRENT STEP is the STORY-QUALITY R2 coding sprint -- build-ready in `docs/2026-06-22-story-quality-r2/
 > SPRINT_PLAN.md` (see CURRENT STEP, section 1).** SHIPPED + PUSHED this session, each suite+Bug-Bible green:
@@ -555,6 +584,14 @@
 > sanctioned upstream-TTS audio work). The S3 forward order (Wan smoke / 3D / distribution) is unchanged.
 
 ## 1. CURRENT STEP
+
+**>>> NO ACTIVE SPRINT (2026-06-22 hand-off). The bark-artifact, stage-direction-leak, and Story-Quality R2
+sprints are ALL COMPLETE + pushed (HEAD `08010ec`); suite 4934 pass/34 skip, Bug Bible 16/7/3. NEXT = the
+OPERATOR picks the next forward-order item -- the S3 forward order is UNCHANGED: 3D (item 5, detail spec
+`docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md`; 3D v1.5 lit/textured tier was deferred), distribution
+(item 6), + the carried per-segment LUFS/RMS normalization plan -- all PARKED + untouched. One carried
+verify item: the live `test_audio_byte_identical` baseline may need recapture (R2 prompt levers intentionally
+change generated dialogue; the clean indextts2 fixture is a no-op). Do NOT auto-start a sprint -- wait for GO.**
 
 **>>> STORY-QUALITY R2 -- COMPLETE (2026-06-22). All 8 craft levers + the Final-QA scan shipped + pushed
 to v2.0-alpha, each suite+Bug-Bible green; suite 4934 pass/34 skip.** S1 music-text suppression (`5396c05`)
