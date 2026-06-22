@@ -434,6 +434,71 @@ def filter_by_quality_tier(entries, *, lead: bool = False):
     return pool
 
 
+# --------------------------------------------------------------------------- #
+# VC chunk 2 (2026-06-22) -- two-lane identity: deterministic bark v2/* preset
+# <-> same-gender clone voice_ref_id map.
+#
+# voice_preset (bark v2/en_speaker_*) is the UNIVERSAL fallback identity; a
+# cloner engine (indextts2 / chatterbox / dia / kokoro) wants a real bank
+# voice_ref_id. This map lets a bark-cast identity resolve to a SAME-GENDER
+# clone reference at the contract level so the fallback never silently degrades
+# a cloner render to bark. Pure + fail-soft (no bank / unknown preset -> "").
+# --------------------------------------------------------------------------- #
+def bark_preset_gender(preset: str) -> str:
+    """Gender of a bark ``v2/en_speaker_*`` preset, read from
+    ``config/cast_pools.VOICE_PROFILES`` (the single source of truth -- never a
+    hand-kept copy). Returns 'male' / 'female', or '' when the preset is unknown
+    or cast_pools is unavailable. Pure; never raises."""
+    p = str(preset or "").strip()
+    if not p:
+        return ""
+    try:
+        try:
+            from ..config import cast_pools as _POOLS  # type: ignore
+        except (ImportError, ValueError):
+            import sys
+            here = os.path.dirname(os.path.abspath(__file__))
+            repo_root = os.path.dirname(here)
+            if repo_root not in sys.path:
+                sys.path.insert(0, repo_root)
+            from config import cast_pools as _POOLS  # type: ignore
+        for entry in getattr(_POOLS, "VOICE_PROFILES", ()):
+            # entry: (preset, gender, lang_code, quality_tags)
+            if entry and str(entry[0]).strip() == p:
+                return str(entry[1]).strip().lower()
+    except Exception:  # noqa: BLE001 -- cast_pools optional; fail-soft
+        return ""
+    return ""
+
+
+def same_gender_voice_ref_for_preset(
+    preset: str,
+    engine: str,
+    *,
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+    gender_hint: str = "",
+) -> str:
+    """Deterministic ``v2/en_speaker_* -> same-gender voice_ref_id`` for
+    ``engine``. Returns the LOWEST ``voice_ref_id`` among the engine's
+    same-gender, non-reject references (stable -> C7), or '' when no such ref
+    exists. ``gender_hint`` overrides the preset-derived gender (use the cast
+    row's gender when known). Pure + fail-soft; never raises."""
+    gender = (gender_hint or bark_preset_gender(preset) or "").strip().lower()
+    if not gender or not engine:
+        return ""
+    try:
+        entries = bank if bank is not None else load_voice_bank()[0]
+    except Exception:  # noqa: BLE001 -- no/broken bank -> bark stays the identity
+        return ""
+    cands = sorted(
+        (e for e in entries
+         if e.engine == engine and e.gender == gender
+         and getattr(e, "quality_tier", "") != "reject"),
+        key=lambda e: e.voice_ref_id,
+    )
+    return cands[0].voice_ref_id if cands else ""
+
+
 def announcer_voice_ref(
     engine: str, bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
 ) -> VoiceBankEntry:

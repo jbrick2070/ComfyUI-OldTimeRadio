@@ -198,9 +198,12 @@ class CastingResponse(BaseModel):
     speech_signature: str = Field(default="", max_length=60)
     # Sprint 2 (a): voice_preset is no longer assigned by the writer -- OTR_CastLock
     # replays the picker and stamps it after the freeze. cast_one_character leaves
-    # it EMPTY, so the field allows "" (was min_length=3). A non-empty value still
-    # caps at 80 chars.
-    voice_preset: str = Field(default="", max_length=80)
+    # it EMPTY, so the field allows "" (was min_length=3).
+    # VC chunk 2 (2026-06-22): cap 80 -> 255. The two-lane identity contract lets
+    # this field carry a verbose voice_ref_id (cloner id) in addition to a short
+    # bark v2/* preset; a deeply-named clone reference can exceed 80 chars. The cap
+    # is a runaway guard, not a content target.
+    voice_preset: str = Field(default="", max_length=255)
 
     @field_validator("gender")
     @classmethod

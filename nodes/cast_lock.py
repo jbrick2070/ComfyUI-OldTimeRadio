@@ -185,7 +185,7 @@ class CastLock:
         # (engine-agnostic identity), re-route mis-stamped announcer lines, and
         # reassign true orphans. Runs UNCONDITIONALLY, independent of cast_seed.
         for _note in self._resolve_character_voices_fail_soft(
-            cast, led.get("lines") or []
+            cast, led.get("lines") or [], voice_bank=voice_bank
         ):
             log.warning("[CastLock] voice routing repair: %s", _note)
             report.append(f"voice routing repair: {_note}")
@@ -346,7 +346,22 @@ class CastLock:
             i += 1
 
     @staticmethod
-    def _resolve_character_voices_fail_soft(cast, lines) -> list:
+    def _resolve_two_lane_engine(voice_bank):
+        """VC chunk 2: resolve (char_engine, bank_entries) for the two-lane
+        refine, fail-soft. Returns (None, None) when no bank-backed cloner engine
+        applies (e.g. bark_legacy / kokoro_builtin, or a missing bank) so the
+        repaired row keeps only its bark voice_preset identity."""
+        try:
+            from ._otr_voice_bank import load_voice_bank
+
+            bank_entries, _sha = load_voice_bank()
+            engine = CastLock._resolve_char_engine(voice_bank, bank_entries)
+            return engine, bank_entries
+        except Exception:  # noqa: BLE001 -- no/broken bank -> bark stays identity
+            return None, None
+
+    @staticmethod
+    def _resolve_character_voices_fail_soft(cast, lines, voice_bank="default") -> list:
         """STEP 3 (revised per operator 2026-06-22): NEVER abort the episode on a
         missing character voice -- RESOLVE one relative to the selected model
         (PD1: audio is king). Future-proofed for ALL approved voice engines:
@@ -385,6 +400,15 @@ class CastLock:
 
         notes: list = []
 
+        # VC chunk 2 (two-lane identity): the repaired row below gets a bark
+        # voice_preset (universal fallback identity); ALSO give it a real
+        # same-gender voice_ref_id from the active cloner engine's bank so a
+        # cloner render does not silently degrade to bark. Resolved once,
+        # fail-soft. Scoped to the repair path only (rows missing a preset), so
+        # normal cloner-cast rows -- which already carry voice_ref_id -- are
+        # untouched (byte-safe for the golden).
+        char_engine, bank_entries = CastLock._resolve_two_lane_engine(voice_bank)
+
         # (1) every character cast row carries a voice IDENTITY.
         used = {
             str(r.get("voice_preset")) for r in char_rows
@@ -403,6 +427,25 @@ class CastLock:
                 f"cast {cid!r} had no voice_preset -> deterministic fallback "
                 f"identity {fb!r} (engine-agnostic; resolved per selected model)"
             )
+            # Two-lane refine: stamp a same-gender clone identity too (only when
+            # the row lacks one and a cloner engine + bank are available).
+            if char_engine and not str(row.get("voice_ref_id") or "").strip():
+                try:
+                    from ._otr_voice_bank import same_gender_voice_ref_for_preset
+
+                    vrid = same_gender_voice_ref_for_preset(
+                        fb, char_engine, bank=bank_entries,
+                        gender_hint=str(row.get("gender") or ""),
+                    )
+                except Exception:  # noqa: BLE001 -- bark identity already stamped
+                    vrid = ""
+                if vrid:
+                    row["voice_ref_id"] = vrid
+                    row["voice_engine"] = char_engine
+                    notes.append(
+                        f"cast {cid!r} two-lane -> clone identity "
+                        f"{vrid!r} ({char_engine}, same-gender bank ref)"
+                    )
 
         voiced_char_ids = sorted(
             str(r.get("char_id") or "") for r in char_rows
