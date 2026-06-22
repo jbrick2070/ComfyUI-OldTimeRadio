@@ -2562,6 +2562,11 @@ class OTR_LedgerScriptWriter:
         # the frozen ledger meta so OTR_CastLock's bank caster can match on
         # timbre/age, not just gender. Free-form meta -> ledger schema unchanged.
         meta["cast_voice_slots"] = cast_meta.get("cast_voice_slots") or {}
+        # VC chunk 4 (2026-06-22): carry the HYBRID LLM voice-fit decision
+        # (proposed/accepted voice_ref_id + reproducibility keys) into the frozen
+        # ledger meta so OTR_CastLock can honour the accepted proposal (and fall
+        # closed to the deterministic scorer otherwise). Free-form meta.
+        meta["voice_cast_decision"] = cast_meta.get("voice_cast_decision") or {}
         log.info(
             "[OTR_LedgerScriptWriter] cast locked: %d rows "
             "(announcer + %d characters, lemmy_hit=%s)",

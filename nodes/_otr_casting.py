@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import random
 import re
 from dataclasses import dataclass, replace
@@ -821,6 +822,81 @@ def llm_write_description(
         ) from exc
 
     return response
+
+
+# ---------------------------------------------------------------------------
+# VC chunk 4 (2026-06-22) -- HYBRID LLM voice-fit: the LLM PROPOSES a
+# voice_ref_id from the engine's gender-slot cards; Python validates + falls
+# closed. This is a SEPARATE bounded call (NOT folded into
+# llm_write_description) on purpose: character_description feeds the line
+# composer's voice card -> the dialogue -> the AUDIO, so perturbing that
+# prompt would re-baseline dialogue audio as collateral. Isolating the
+# voice-fit keeps character_description / dialogue byte-identical; only the
+# voice_ref_id (the operator's intended lever) changes. Identity = voice_ref_id
+# (I-9): the prompt carries gender/timbre/role/age + the cards, NEVER the
+# character name. Gated by OTR_HYBRID_VOICE_FIT (default on; =0 -> no call,
+# byte-identical to pre-chunk-4).
+# ---------------------------------------------------------------------------
+
+
+def hybrid_voice_fit_enabled() -> bool:
+    """True unless OTR_HYBRID_VOICE_FIT=0. Default-on per the converged plan;
+    =0 is the byte-identical A/B escape (no extra LLM call)."""
+    return os.environ.get("OTR_HYBRID_VOICE_FIT", "1") != "0"
+
+
+def _build_voice_fit_prompt(slot: "EnsembleSlot", cards: List[dict]) -> str:
+    """Lean, name-free voice-fit prompt (I-9: no character name). The LLM ranks
+    the engine's same-gender cards and returns ONE voice_ref_id."""
+    lines = [
+        "Pick the single best-fitting voice for a radio-drama character.",
+        f"Character: gender={slot.gender}, voice timbre={slot.timbre}, "
+        f"role={slot.role}, age={slot.age_band}.",
+        "",
+        "Voices (id: description):",
+    ]
+    for c in cards:
+        lines.append(f"- {c.get('voice_ref_id')}: {c.get('descriptor') or ''}")
+    lines += [
+        "",
+        "Return ONLY JSON with the chosen id from the list above:",
+        '{"voice_ref_id":"<one id>"}',
+    ]
+    return "\n".join(lines)
+
+
+def llm_propose_voice_ref(
+    generate_fn: Callable[..., str],
+    *,
+    slot: "EnsembleSlot",
+    cards: List[dict],
+    max_new_tokens: int = 60,
+    temperature: float = 0.2,
+) -> str:
+    """Ask the LLM for a best-fit voice_ref_id from ``cards``. Returns the RAW
+    proposed id (UNvalidated -- the caller validates + falls closed) or '' on any
+    failure / empty cards. Bounded + fail-soft; NEVER raises (audio is king)."""
+    if not cards:
+        return ""
+    prompt = _build_voice_fit_prompt(slot, cards)
+    # LLM slot: creative -- voice-fit is a casting/creative judgment (ranking
+    # voices to a character), so it rides the writer's creative_fn, same plane as
+    # llm_write_description. No new model_id widget (PD6); fail-soft.
+    try:
+        raw = generate_fn(
+            [{"role": "user", "content": prompt}],
+            temperature=float(temperature),
+            max_new_tokens=int(max_new_tokens),
+        )
+    except Exception:  # noqa: BLE001 -- loader/LLM varies; fall closed
+        return ""
+    try:
+        obj = _otr_json.parse_first_json_object(raw)
+        if isinstance(obj, dict):
+            return str(obj.get("voice_ref_id") or "").strip()
+    except Exception:  # noqa: BLE001 -- unparseable -> fall closed
+        return ""
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -1591,6 +1667,59 @@ def lock_cast(
     # TITLE / NOTE / TARGET / STYLE.
     _assert_no_structural_tokens_in_cast(cast)
 
+    # VC chunk 4 (2026-06-22): HYBRID LLM voice-fit. Per open character, the LLM
+    # PROPOSES a voice_ref_id from the default cloner engine's same-gender cards;
+    # Python VALIDATES it (in-library + engine + gender + no-collision) and the
+    # decision (proposed/accepted/fallback_reason + reproducibility keys) rides
+    # meta.voice_cast_decision. CastLock consumes the accepted_id when its
+    # resolved engine matches; otherwise it falls closed to the deterministic
+    # scorer. SEPARATE bounded call -> character_description / dialogue stay
+    # byte-identical (see hybrid_voice_fit_enabled). Uses generate_fn, NOT the
+    # cast rng, so the bark replay sequence is unperturbed (replay-parity holds).
+    voice_cast_decision: dict = {}
+    if hybrid_voice_fit_enabled():
+        try:
+            from ._otr_voice_bank import (
+                VOICE_FIT_POLICY_VERSION, build_voice_cards,
+                default_char_engine, load_voice_bank, validate_voice_proposal,
+            )
+
+            vf_bank, vf_sha = load_voice_bank()
+            vf_engine = default_char_engine(vf_bank)
+        except Exception as exc:  # noqa: BLE001 -- no bank -> skip hybrid
+            log.warning("[OTR_Casting] hybrid voice-fit unavailable: %r", exc)
+            vf_engine = ""
+            vf_bank, vf_sha = (), ""
+        if vf_engine:
+            used_ref_ids: set = set()
+            for ens in ensemble_slots:
+                cards = build_voice_cards(vf_engine, ens.gender, bank=vf_bank)
+                proposed = llm_propose_voice_ref(
+                    generate_fn, slot=ens, cards=cards,
+                ) if cards else ""
+                accepted = validate_voice_proposal(
+                    proposed, vf_engine, ens.gender,
+                    bank=vf_bank, used_ids=used_ref_ids,
+                )
+                if accepted:
+                    used_ref_ids.add(accepted)
+                    reason = ""
+                elif not proposed:
+                    reason = "no_proposal" if cards else "no_cards"
+                else:
+                    reason = "invalid_or_collision"
+                voice_cast_decision[ens.char_id] = {
+                    "policy_version":  VOICE_FIT_POLICY_VERSION,
+                    "bank_sha":        vf_sha,
+                    "engine":          vf_engine,
+                    "prompt_version":  "voicefit-v1",
+                    "seed":            (int(cast_seed) if cast_seed is not None else None),
+                    "candidate_ids":   [c["voice_ref_id"] for c in cards],
+                    "proposed_id":     proposed,
+                    "accepted_id":     accepted,
+                    "fallback_reason": reason,
+                }
+
     # VC chunk 3 (2026-06-22): stamp meta.cast_voice_slots so OTR_CastLock can
     # match a bank voice on timbre / age_band (not just gender). The cast ROW
     # schema is frozen and carries no timbre/role/age, so these ride free-form
@@ -1629,6 +1758,7 @@ def lock_cast(
         "num_characters_request": num_characters,
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
         "cast_voice_slots":       cast_voice_slots,
+        "voice_cast_decision":    voice_cast_decision,
     })
     return cast, meta
 

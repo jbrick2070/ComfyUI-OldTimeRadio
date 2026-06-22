@@ -522,6 +522,11 @@ class CastLock:
         # the bank on those, not just gender. Legacy ledgers without the stamp
         # fall back to the (empty) entry-level fields -> behavior unchanged.
         voice_slots = meta.get("cast_voice_slots") or {}
+        # VC chunk 4 (2026-06-22): the HYBRID LLM voice-fit decision (the writer
+        # proposed a voice_ref_id; Python validated it). Honour the accepted id
+        # when this CastLock resolved the SAME engine and it still validates +
+        # does not collide; otherwise fall closed to the deterministic scorer.
+        voice_decisions = meta.get("voice_cast_decision") or {}
         target_engine = self._resolve_char_engine(voice_bank, bank_entries)
         announcer_engine = _DEFAULT_ANNOUNCER_ENGINE
 
@@ -557,6 +562,31 @@ class CastLock:
             if not gender:
                 report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
                 continue
+            # VC chunk 4: honour the HYBRID LLM voice-fit when this engine matches
+            # the one the proposal was built for AND it re-validates (no stale
+            # bank / no collision). Else fall closed to the deterministic scorer.
+            decision = voice_decisions.get(char_id) or {}
+            accepted = str(decision.get("accepted_id") or "").strip()
+            if accepted and decision.get("engine") == target_engine:
+                from ._otr_voice_bank import (
+                    validate_voice_proposal, voice_ref_entry,
+                )
+                if validate_voice_proposal(
+                    accepted, target_engine, gender,
+                    bank=bank_entries, used_ids=used,
+                ):
+                    hybrid_ref = voice_ref_entry(accepted, target_engine, bank_entries)
+                    if hybrid_ref is not None:
+                        self._stamp(entry, hybrid_ref)
+                        used.add(hybrid_ref.voice_ref_id)
+                        gated += 0 if hybrid_ref.commercial_clean else 1
+                        report.append(
+                            f"  {char_id}: {hybrid_ref.voice_ref_id} "
+                            f"({hybrid_ref.engine}, hybrid LLM voice-fit, "
+                            f"clean={hybrid_ref.commercial_clean})"
+                        )
+                        continue
+
             # Prefer the writer's voice-fit slot (timbre/age_band); fall back to
             # any entry-level fields for legacy ledgers without the stamp.
             slot = voice_slots.get(char_id) or {}

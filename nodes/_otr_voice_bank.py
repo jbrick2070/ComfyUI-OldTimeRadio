@@ -40,6 +40,11 @@ log = logging.getLogger("OTR")
 # OTR_CAST_WEIGHTED=0 restores the uniform v1 draw for A/B comparison.
 CASTING_POLICY_VERSION = "2"
 VOICE_BANK_SCHEMA_VERSION = "1"
+# VC chunk 4 (2026-06-22): the HYBRID LLM voice-fit. The LLM PROPOSES a
+# voice_ref_id from the engine's gender-slot cards; Python VALIDATES it and
+# falls closed to the deterministic assign_voice_for_slot scorer. Version-bump
+# this when the card schema or validation contract changes (re-baseline trigger).
+VOICE_FIT_POLICY_VERSION = "1"
 
 _BANK_FILENAME = "voice_reference_bank.json"
 _SCHEMA_FILENAME = "voice_bank_entry_schema.json"
@@ -432,6 +437,118 @@ def filter_by_quality_tier(entries, *, lead: bool = False):
         lead_safe = [e for e in tier_a if "lead_safe" in getattr(e, "style_tags", ())]
         return lead_safe or tier_a
     return pool
+
+
+# --------------------------------------------------------------------------- #
+# VC chunk 4 (2026-06-22) -- HYBRID LLM voice-fit support: build the engine's
+# gender-slot voice CARDS for the LLM, validate its proposal, look an entry up.
+# All pure + fail-soft. Identity is voice_ref_id (I-9); cards carry NO ref_path
+# and NO character name.
+# --------------------------------------------------------------------------- #
+def build_voice_cards(
+    engine: str,
+    gender: str,
+    *,
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+    max_cards: int = 12,
+) -> List[dict]:
+    """The voice CARDS the LLM picks from for one character's PRECOMPUTED gender
+    slot. Deterministically ordered (by ``voice_ref_id``), reject-filtered,
+    capped at ``max_cards``. Each card: ``voice_ref_id`` / ``age_band`` /
+    ``timbre`` / ``roles`` / ``style_tags`` / ``commercial_clean`` + a compact
+    human-readable ``descriptor`` (the bank has no curated prose field, so it is
+    synthesized from age/timbre/style). NO ref_path, NO character name (I-9)."""
+    gnorm = (gender or "").strip().lower()
+    if not engine or not gnorm:
+        return []
+    try:
+        entries = bank if bank is not None else load_voice_bank()[0]
+    except Exception:  # noqa: BLE001 -- no bank -> no cards -> caller falls closed
+        return []
+    pool = sorted(
+        (e for e in entries
+         if e.engine == engine and e.gender == gnorm
+         and getattr(e, "quality_tier", "") != "reject"),
+        key=lambda e: e.voice_ref_id,
+    )[: max(0, int(max_cards))]
+    cards: List[dict] = []
+    for e in pool:
+        descriptor = ", ".join(
+            x for x in ([e.age_band] + list(e.timbre) + list(e.style_tags)) if x
+        )
+        cards.append({
+            "voice_ref_id": e.voice_ref_id,
+            "age_band": e.age_band,
+            "timbre": list(e.timbre),
+            "roles": list(e.roles),
+            "style_tags": list(e.style_tags),
+            "commercial_clean": bool(e.commercial_clean),
+            "descriptor": descriptor,
+        })
+    return cards
+
+
+def default_char_engine(
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+) -> str:
+    """The default bank-backed char_voice engine (the ``APPROVED_VOICE_ENGINES``
+    legacy-first order, first one with char_voice refs). Matches what CastLock
+    resolves for the canonical ``default`` voice_bank; '' when none. The writer
+    builds voice cards against this; a CastLock voice_bank that resolves a
+    DIFFERENT engine just makes the proposal fail validation -> fall closed."""
+    try:
+        entries = bank if bank is not None else load_voice_bank()[0]
+    except Exception:  # noqa: BLE001
+        return ""
+    with_refs = {e.engine for e in entries if "char_voice" in e.roles}
+    for eng in APPROVED_VOICE_ENGINES:
+        if eng in with_refs:
+            return eng
+    return ""
+
+
+def voice_ref_entry(
+    voice_ref_id: str, engine: str,
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+) -> Optional[VoiceBankEntry]:
+    """The bank entry for (voice_ref_id, engine), or None. Pure + fail-soft."""
+    if not voice_ref_id or not engine:
+        return None
+    try:
+        entries = bank if bank is not None else load_voice_bank()[0]
+    except Exception:  # noqa: BLE001
+        return None
+    return next(
+        (e for e in entries
+         if e.voice_ref_id == voice_ref_id and e.engine == engine), None
+    )
+
+
+def validate_voice_proposal(
+    proposed_id: str,
+    engine: str,
+    gender: str,
+    *,
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+    used_ids=(),
+) -> str:
+    """Validate an LLM-proposed ``voice_ref_id`` for one slot. Returns the id iff
+    it is in-library + engine-correct + gender-consistent + not a reject + not
+    already used (no-collision); else '' (the caller falls closed to the
+    deterministic scorer). Pure; never raises."""
+    pid = str(proposed_id or "").strip()
+    gnorm = (gender or "").strip().lower()
+    if not pid or not engine or not gnorm:
+        return ""
+    used = set(used_ids or ())
+    if pid in used:
+        return ""
+    entry = voice_ref_entry(pid, engine, bank)
+    if entry is None:
+        return ""
+    if entry.gender != gnorm or getattr(entry, "quality_tier", "") == "reject":
+        return ""
+    return pid
 
 
 # --------------------------------------------------------------------------- #
