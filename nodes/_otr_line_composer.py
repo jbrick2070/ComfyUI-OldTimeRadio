@@ -979,6 +979,9 @@ CRAFT:
 - Push the scene forward by one small step.
 - Follow naturally from the last thing said.
 - Stay in the speaker's voice - their job, their pressure, their habits.
+- Match the speaker's stated speech register (the "speaks:" note) exactly -- a
+  clipped speaker stays clipped, an ornate one stays ornate; never blur two
+  characters into the same voice.
 - Inhabit the mood without naming it.
 - Use only proper nouns listed under NAMED ENTITIES. Generic roles
   ("the tech", "the lab", "mission control") are fine.

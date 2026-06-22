@@ -1299,6 +1299,63 @@ def _apply_llm_slot_fill(
 
 
 # ---------------------------------------------------------------------------
+# C3 (story-quality R2) -- contrasting speech signatures
+# ---------------------------------------------------------------------------
+
+#: Deterministic pool of CONTRASTING speech registers. Used to replace an
+#: empty / default / duplicate signature so no two characters share a voice.
+_SPEECH_REGISTER_POOL = (
+    "clipped and terse",
+    "warm and rambling",
+    "formal and precise",
+    "blunt, plain-spoken",
+    "wry and indirect",
+    "gruff, few words",
+    "earnest, over-explaining",
+    "dry and sardonic",
+)
+
+
+def _norm_sig(s) -> str:
+    return " ".join(str(s or "").lower().split()).strip(" .")
+
+
+def diversify_speech_signatures(cast, seed: int = 0):
+    """Ensure each cast row's speech_signature is DISTINCT (C3). A non-colliding
+    LLM signature is KEPT; an empty / 'plain spoken' default / duplicate one is
+    reassigned from a deterministic contrasting pool (rotated by `seed` for
+    C7 reproducibility) so two characters never share a register. Mutates rows
+    in place; never raises."""
+    try:
+        n = len(_SPEECH_REGISTER_POOL)
+        start = (int(seed) % n) if n else 0
+        pool = [_SPEECH_REGISTER_POOL[(start + i) % n] for i in range(n)]
+        used: set = set()
+        default_norm = _norm_sig("plain spoken")
+        pool_idx = 0
+        for row in cast:
+            if not isinstance(row, dict):
+                continue
+            sig = str(row.get("speech_signature") or "").strip()
+            norm = _norm_sig(sig)
+            if (not sig) or norm == default_norm or norm in used:
+                while (pool_idx < len(pool)
+                       and _norm_sig(pool[pool_idx]) in used):
+                    pool_idx += 1
+                if pool_idx < len(pool):
+                    row["speech_signature"] = pool[pool_idx]
+                    used.add(_norm_sig(pool[pool_idx]))
+                    pool_idx += 1
+                else:
+                    used.add(norm)  # more chars than pool (>8) -- leave as-is
+            else:
+                used.add(norm)
+        return cast
+    except Exception:  # noqa: BLE001
+        return cast
+
+
+# ---------------------------------------------------------------------------
 # Top-level: lock_cast -- runs the LLM call per open slot, returns
 # the full locked cast.
 # ---------------------------------------------------------------------------
@@ -1495,6 +1552,11 @@ def lock_cast(
         # cast_one_character if granular telemetry is needed. For now
         # just stamp 1 -- a successful call returned without raising.
         casting_attempts.append(1)
+
+    # C3 (story-quality R2): make the speech registers CONTRAST so two
+    # characters never share a voice (empty/default/duplicate signatures get a
+    # distinct pool register; deterministic by cast_seed for C7).
+    diversify_speech_signatures(cast, seed=cast_seed)
 
     meta: dict = {}
     # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the finished,
