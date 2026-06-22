@@ -1,5 +1,29 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER; PD VOICE-LIBRARY INGESTION -- shipped + PUSHED. origin/v2.0-alpha
+> HEAD `3cc8de6` == local. Suite 5001/34, Bug Bible 16/7/3.)** Continues VC Chunk 1's remediation ("each
+> approved voice model needs a SOLID library"). Built `scripts/otr_ingest_pd_voices.py` -- ingests
+> public-domain voice refs as ONE distinct voice per SPEAKER (download -> ffmpeg normalize mono/24k +
+> band-pass + loudnorm -> concat+cap 25s -> sha256 -> mirror across the cloner engines vz_/cb_/dia_ -> merge
+> + re-validate the bank; idempotent; one bad URL never stops the run). **Bank 137 -> 149 (+4 distinct PD
+> voices x 3 engines):** Linda Johnson (F adult, LJSpeech), Mark F. Smith (M adult, Around-the-World; M
+> elder, Mysterious Island), Phil Chenevert (M adult, Search the Sky). The ref WAVs live at
+> `C:\ComfyUI-Models\TTS\refs\indextts2\` (model assets, NOT git). **Phil's operator-supplied URLs 404'd**
+> (`search_the_sky_01_pohl_kornbluth.mp3` doesn't exist); fixed by reading the archive.org item metadata API
+> -> the real files are `searchthesky_NN_pohl.mp3` (read by Phil Chenevert, PD mark 1.0). Also fixed a brittle
+> test: `test_tts_engine_sidecars` asserted the pool count `== 36` -> `>= 36` (the bank grows as PD voices are
+> added). Commit `3cc8de6` (tool + bank + test). Coverage now indextts2 M=15/F=23, chatterbox M=16/F=23, dia
+> M=15/F=23, kokoro M=13/F=15 -- all four engines clear the >=5-adult/gender floor. **GAPS STILL OPEN
+> (operator: supply PD LibriVox titles + I'll ingest): female-elder = 0, no child/teen, no androgynous/other,
+> still male-light.** ZERO workflow-JSON change.
+> **>>> NEXT (CURRENT STEP) UNCHANGED = VC Chunks 2-4** (the build plan in
+> `docs/2026-06-22-voice-casting-arch/roundtable/pass01_plan.md`): these touch the VOICE-ASSIGNMENT
+> DETERMINISM path (audio byte-identity-sensitive) -- build them with the byte-identical golden front-of-mind.
+> Chunk 2 = two-lane identity refine + v2<->ref map; Chunk 3 = `meta.cast_voice_slots` stamp (so CastLock
+> matches on timbre/age, not just gender -- note `EnsembleSlot` has timbre/role but NO age_band yet); Chunk 4 =
+> the HYBRID LLM voice-fit (operator's core ask) folded into `llm_write_description` + the validator +
+> `meta.voice_cast_decision`, $0 deterministic seeded fallback.
+
 > **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE marathon; everything PUSHED. origin/v2.0-alpha HEAD
 > `deb4e01`.) Two workstreams this session, both green per chunk (suite 5001/34, Bug Bible 16/7/3):**
 >
@@ -764,13 +788,29 @@
 
 ## 1. CURRENT STEP
 
-**>>> NO ACTIVE SPRINT (2026-06-22 hand-off). The bark-artifact, stage-direction-leak, and Story-Quality R2
-sprints are ALL COMPLETE + pushed (HEAD `08010ec`); suite 4934 pass/34 skip, Bug Bible 16/7/3. NEXT = the
-OPERATOR picks the next forward-order item -- the S3 forward order is UNCHANGED: 3D (item 5, detail spec
-`docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md`; 3D v1.5 lit/textured tier was deferred), distribution
-(item 6), + the carried per-segment LUFS/RMS normalization plan -- all PARKED + untouched. One carried
-verify item: the live `test_audio_byte_identical` baseline may need recapture (R2 prompt levers intentionally
-change generated dialogue; the clean indextts2 fixture is a no-op). Do NOT auto-start a sprint -- wait for GO.**
+**>>> ACTIVE = VOICE-CASTING ARCHITECTURE, VC Chunks 2-4 (2026-06-22; HEAD `3cc8de6`). Roundtable R1
+CONVERGED + Chunk 1 (library coverage gate) + the PD voice-library ingestion (bank 137 -> 149, 4 distinct PD
+voices) are SHIPPED + pushed; suite 5001/34, Bug Bible 16/7/3.** Build plan:
+`docs/2026-06-22-voice-casting-arch/roundtable/pass01_plan.md`. The remaining chunks touch the
+VOICE-ASSIGNMENT DETERMINISM path (audio byte-identity-sensitive) -- build with the byte-identical golden
+front-of-mind, default-on, $0 deterministic seeded fallback:
+  - **Chunk 2** -- two-lane identity refine (`voice_ref_id` cloners / `voice_preset` bark) + the v2<->ref map.
+  - **Chunk 3** -- stamp `meta.cast_voice_slots` so CastLock's `_auto_registry` matches on timbre/age, not just
+    gender (NOTE: `EnsembleSlot` has timbre/role but NO age_band yet -- add it or carry age in the stamp).
+  - **Chunk 4** (operator's CORE ask) -- the HYBRID LLM voice-fit: the LLM proposes a `voice_ref_id` from the
+    selected engine's voice cards; Python VALIDATES (gender/engine/exists) + falls CLOSED to the seeded
+    `assign_voice_for_slot` scorer; stamp `meta.voice_cast_decision`. Acceptance: same cast => same voices
+    (deterministic), no `voice_preset=None`, byte-identical golden holds (or recapture deliberately).
+  OPEN remediation (operator supplies PD LibriVox titles -> I ingest via `scripts/otr_ingest_pd_voices.py`):
+  female-elder = 0, no child/teen, no androgynous/other, cloners still male-light. Acceptance per chunk: full
+  suite + Bug Bible green, ZERO workflow-JSON change. Do NOT auto-start -- wait for GO.
+
+**>>> SUPERSEDED (kept for history): "NO ACTIVE SPRINT (2026-06-22 hand-off)" @ `08010ec` -- the STORY+CAST
+FIX and the voice-casting workstream were started after it.** Carried verify item still open: the live
+`test_audio_byte_identical` baseline (indextts2) may need recapture (the R2/story levers intentionally change
+generated dialogue; the clean fixture is a no-op). The S3 forward order is UNCHANGED + PARKED behind the
+voice-casting work: 3D (item 5, `docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md`), distribution (item 6), the
+carried per-segment LUFS/RMS plan, and the Wan-14B remove.
 
 **>>> STORY-QUALITY R2 -- COMPLETE (2026-06-22). All 8 craft levers + the Final-QA scan shipped + pushed
 to v2.0-alpha, each suite+Bug-Bible green; suite 4934 pass/34 skip.** S1 music-text suppression (`5396c05`)
