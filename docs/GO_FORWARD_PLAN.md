@@ -1,5 +1,47 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-22 (CODER; STORY-QUALITY LIFT D1 + D3 + D2 ALL SHIPPED + PUSHED. origin/v2.0-alpha
+> HEAD `a37cc2d` == local.) Built `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md` in
+> dependency order; each chunk full suite + Bug Bible green, then commit AND push. ZERO workflow-JSON change
+> across all three (hash-verified each commit); ledger schema `l3-2026-05-14` FIXED (per-line signals ride
+> `compose_flags`); audio byte-identical (no in-scope audio change); UTF-8 no BOM; AST-parsed; HEAD==origin
+> each push.**
+> - **D1 `6031b97` -- bare stage-direction leak (after/between/without quotes).** `_otr_line_hygiene`:
+>   shared `segment_double_quotes` (curly->straight normalize, odd-count = unbalanced), `is_third_person_action_clause`
+>   (rejects ONLY 1st/2nd-person; verb-led), extended `_NARRATION_VERBS` (adjusts/clutches/taps/tightens/
+>   overrides/dances/dancing), `detect_stage_business_for_reroll` (Tier-2, reason codes), `strip_quote_anchored_stage_direction`
+>   (Tier-3 floor, balanced-quote class only, aborts on malformed). Tier-1 prompt strengthen at
+>   `_otr_line_composer._build_user_prompt`; Tier-2 reroll moved INTO `compose_line_draft` (ONE guard, <=1
+>   reroll/line) -- old `compose_line` bare-stage block now S3-only; Tier-3 floor wired in
+>   `_otr_ledger_scrub._strip_stage_directions` (order: delimited -> quote-anchored -> leading-bare) + per-line
+>   `compose_flags` breadcrumb `stage_dir_stripped:<reason>` + byte-identical GOLDEN no-op gate over a new
+>   `tests/fixtures/clean_strong_ledger.json`. Corpus VERIFIED: b005/b010/b012 floor-stripped well-formed +
+>   idempotent; b015/b017 left for Tier-2 (detector flags them); zero false positives on the negatives. +22 tests.
+> - **D3 `2e8597f` -- b011 role mis-stamp coercion.** `production_ledger.coerce_speaker_role_for_char_id` +
+>   `cast_ids_from_ledger` (cast ids minus announcer/music/sfx sentinels). Applied at (a) the reviewer
+>   `role_mismatch` repair guard `_otr_ledger_reviewer.py` (REJECT expected="announcer" on a cast char_id --
+>   the culprit), (b) `set_lines`, (c) the MANDATORY pre-freeze SWEEP in `run_freeze_cascade` (final mutation
+>   step, after the reviewer/reroll/render-plan, BEFORE Phase 7 role-dependent readiness + Phase 10 freeze --
+>   note: CastLock runs DOWNSTREAM of the freeze, so there is no cast_lock call IN the cascade; the reviewer is
+>   the real mutation phase, per VERIFY item 1). Audit: `compose_flags` breadcrumb + `meta["role_coercions"]`;
+>   CI invariant gated `OTR_TEST_MODE` (char_id in cast_ids => character; announcer role never on a cast id).
+>   COERCE-NEVER-CRASH. +12 tests.
+> - **D2 `a37cc2d` -- antagonist stance (generation lever + telemetry, auto-repair CUT).** R3 grounding
+>   confirmed the DramaticState is derived AFTER the outline (writer L2865 vs outline L2684), so the lever is a
+>   JSON-free stance-consistency rider in `_otr_outline._build_beat_user_prompt` (no OutlineRequest field -> no
+>   dead code, no risky reorder). `StanceIssue` added to the critic report as TELEMETRY ONLY (defaulted, round-
+>   trips; NOT in `FailedDimension`, NOT a `RerollTarget`, no freeze gate) + critic system-prompt SECTION 7.
+>   Telemetry-does-not-gate proven via a cascade test (verdict + reroll unchanged vs clean). +8 tests.
+> **D4 (abrupt UN escalation) = OUT OF SCOPE (R1 unanimous cut). Full suite 5071 passed/34 skipped; Bug Bible
+> 16/7/3.**
+> **>>> NEXT (CURRENT STEP) -- OPERATOR-GATED END-TO-END VALIDATION:** run the manual no-bypass BASELINE
+> re-smoke on the REAL `otr_scifi_16gb_full.json` WITHOUT `OTR_BYPASS_FREEZE_HALT` (it resets the resident
+> FLOOR smoke server on :8000 / interrupts OBS, so the OPERATOR triggers it -- CLAUDE.md S4 reset first). Watch
+> for: zero stage-direction leak in spoken text (the freeze floor + Tier-2 reroll), zero `announcer`-on-cast-
+> char-id rows (the coercion sweep), and `meta.stance_issues` populated when the antagonist flip-flops. Still
+> open (separate, unchanged): the cloner golden-recapture decision + VC build-item 5 (robustness acceptance
+> test). prod/main + any tag GATED.
+
 > **ROUNDTABLE -- 2026-06-22 (PLANNER; STORY-QUALITY LIFT 4-round roundtable CONVERGED; docs only, NOT
 > pushed -- operator gates). Panel = GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude code-grounded
 > anchor/judge; ~$0.48 total. BUILD-READY coder kickoff: `docs/2026-06-22-story-quality-lift/roundtable/
