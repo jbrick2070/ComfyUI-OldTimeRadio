@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-06-22T16:39:22.550860+00:00",
+  "doc": "docs\\2026-06-22-story-tension-rubric\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 48140,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 46705,
+      "completion_tokens": 3616,
+      "cost_usd": 0.09454125
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 49540,
+      "completion_tokens": 3542,
+      "cost_usd": 0.02463144
+    }
+  ],
+  "total_cost_usd": 0.1192
+}
