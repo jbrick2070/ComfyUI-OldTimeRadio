@@ -1,5 +1,41 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER; VC CHUNKS 2-4 SHIPPED -- committed LOCAL, NOT pushed
+> (operator gates the push). HEAD `eb43856`, 3 commits ahead of origin/v2.0-alpha `620bdd7`. Full suite
+> 5029 passed/34 skipped (was 5001/34; +28 new tests), Bug Bible 16/7/3, audio-byte-identical structural
+> green (runtime gate is operator-gated). ZERO workflow-JSON change across all three chunks.)** The
+> voice-casting architecture is now BUILT end to end (pass01_plan.md build-order items 1/2/4):
+>   - **Chunk 2 `995206e` -- two-lane identity.** `_otr_voice_bank.bark_preset_gender` +
+>     `same_gender_voice_ref_for_preset` (deterministic `v2/en_speaker_* -> same-gender clone
+>     voice_ref_id`, gender read from cast_pools.VOICE_PROFILES). STEP-3 fail-soft repair now also stamps
+>     a same-gender clone identity on a REPAIRED character row (scoped to the repair path -> normal golden
+>     untouched). `CastingResponse.voice_preset` cap 80 -> 255 for verbose two-lane ids. +12 tests.
+>   - **Chunk 3 `d6aa9ea` -- meta.cast_voice_slots.** `EnsembleSlot` gains `age_band` (default "adult").
+>     `lock_cast` stamps `meta.cast_voice_slots[char_id]={gender,timbre[list],role,age_band,
+>     speech_signature,description_digest(sha1[:12])}`; the writer carries it into the frozen ledger;
+>     `CastLock._auto_registry` reads timbre/age FROM the slot (not just gender) into `assign_voice_for_slot`.
+>     **BYTE-IDENTITY NOTE:** the canonical workflow runs CastLock at `auto_registry`, so feeding real
+>     timbre into the scorer is a DETERMINISTIC re-baseline of the cloner (indextts2) audio golden ->
+>     operator golden recapture needed (already flagged). Bark replay path is UNCHANGED (replay-parity test
+>     green; pool-mode `python_assign_voice_preset` still gets age_band=None). +10 tests.
+>   - **Chunk 4 `eb43856` -- HYBRID LLM voice-fit (the operator's CORE ask).** The LLM PROPOSES a
+>     voice_ref_id from the engine's same-gender cards; Python VALIDATES (in-library + engine + gender +
+>     no-collision) and FALLS CLOSED to the deterministic scorer. Decision rides
+>     `meta.voice_cast_decision[char_id]` (policy_version/bank_sha/engine/prompt_version/seed/candidate_ids/
+>     proposed_id/accepted_id/fallback_reason). CastLock honours the accepted id when its resolved engine
+>     matches. **DELIBERATE DIVERGENCE FROM pass01_plan.md "fold into llm_write_description, NO new call":**
+>     grounding found `character_description` feeds the line composer's voice card -> the dialogue -> the
+>     AUDIO, so reusing that call would re-baseline dialogue audio as collateral. Implemented as a SEPARATE
+>     bounded voice-fit call (`llm_propose_voice_ref`) that outputs ONLY a voice_ref_id, isolating the change
+>     to the operator's intended lever. Default-ON; `OTR_HYBRID_VOICE_FIT=0` is the byte-identical escape (no
+>     extra call; a no-LLM/failure run is byte-identical to pre-chunk-4). +11 tests.
+> **>>> NEXT (CURRENT STEP):** (a) OPERATOR push gate for `995206e..eb43856` to origin/v2.0-alpha + golden
+> recapture decision (the cloner audio re-baselines with timbre-matching + hybrid voice-fit ON); (b) build-
+> order item 5 = the robustness ACCEPTANCE test + non-blocking stage-direction-only diagnostic count (the
+> last VC item); (c) operator may also supply PD LibriVox titles for the still-open bank gaps (female-elder,
+> child/teen, other/androgynous, male-light) for `scripts/otr_ingest_pd_voices.py`. Plan +
+> grounding-corrected build placement: `docs/2026-06-22-voice-casting-arch/`.
+
 > **LATEST SESSION -- 2026-06-22 (CODER; PD VOICE-LIBRARY INGESTION -- shipped + PUSHED. origin/v2.0-alpha
 > HEAD `3cc8de6` == local. Suite 5001/34, Bug Bible 16/7/3.)** Continues VC Chunk 1's remediation ("each
 > approved voice model needs a SOLID library"). Built `scripts/otr_ingest_pd_voices.py` -- ingests
