@@ -30,7 +30,12 @@ import tempfile
 from . import _otr_sidecar as _SC
 from .registry import register
 
-_THIS = os.path.abspath(__file__)
+# realpath (NOT abspath): the custom node is reached through a directory junction
+# under the Desktop-v2 install, so abspath(__file__) would point _COMFY_ROOT at the
+# install root instead of the REAL ComfyUI tree where the chatterbox box-default
+# venv/weights live. realpath resolves the junction; no-op on a non-junction
+# checkout; env overrides still win. (Same junction fix as eng_indextts2.)
+_THIS = os.path.realpath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))   # ...\ComfyUI-OldTimeRadio
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))              # ...\ComfyUI
 

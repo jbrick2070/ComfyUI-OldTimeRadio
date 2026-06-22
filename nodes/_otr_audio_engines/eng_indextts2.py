@@ -30,7 +30,15 @@ import tempfile
 
 from .registry import register
 
-_THIS = os.path.abspath(__file__)
+# realpath (NOT abspath): under the Desktop-v2 install the OldTimeRadio custom
+# node is reached through a directory junction, so abspath(__file__) keeps the
+# install-root path and _COMFY_ROOT resolves to the WRONG tree -- index-tts is
+# installed in the REAL ComfyUI tree the junction targets (the documented box
+# default "ComfyUI/index-tts"). realpath resolves the junction to that real tree;
+# it is a no-op on a non-junction checkout and env overrides still win. (Without
+# this, a headless render fails closed: "IndexTTS2 Path B not installed: isolated
+# venv python missing at <install-root>\index-tts\.venv\...".)
+_THIS = os.path.realpath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))   # ...\ComfyUI-OldTimeRadio
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))              # ...\ComfyUI
 
