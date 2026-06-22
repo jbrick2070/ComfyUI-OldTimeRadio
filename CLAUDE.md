@@ -140,3 +140,26 @@ swept dir to be moved later.
 - This SUPERSEDES any "do not push until the eyeball passes" line written before 2026-06-10 evening.
 - A stable branch only exists if the operator explicitly declares one.
 - After every push verify: HEAD == origin, no 0-byte files, no BOM, AST parse on touched .py files.
+
+## 8. ROUNDTABLE DEFAULTS (operator directive 2026-06-22)
+
+Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's stock
+"Claude is judge-only / panel only critiques" and "dry-run estimate first" defaults.
+
+- **Panel = 2-3 FRONTIER models per round** (GPT + Gemini + DeepSeek/Grok class; `~latest`
+  aliases, record the resolved model in the manifest). Lean panel of genuinely different
+  families beats many near-duplicates -- diversity is the point, correctness comes from the
+  grounding step.
+- **Cowork (Claude) is ALWAYS a code-aware grounded PANELIST *and* the sole judge.** Write your
+  own grounded review FIRST (every claim checked against the real Windows files via Desktop
+  Commander, never the lagging Linux mount), THEN ground the panel's reviews, discard the
+  misreads, and synthesize. The panel proposes; Claude disposes -- never outsource synthesis.
+- **Four-round campaign, in order:** R1 high-level arc / creative approach -> R2 coding plan ->
+  R3 wiring (workflow JSON / nodes / widgets + any re-baseline procedure) -> R4 final
+  convergence (confirm no new must-fix). Re-loop a round only if it surfaces new material; stop
+  at convergence (don't grind passes to hear "looks good" in more accents).
+- **Never dry-run, never pre-compute the cost -- just spend and run it LIVE,** then state the
+  actual spend after. (Only backstop = the global >= $20-or-irreversible gate, which roundtable
+  passes never reach in practice.)
+- Artifacts under `docs/<YYYY-MM-DD>-<topic>/roundtable/` (pass00..passNN_plan.md +
+  passNN_judgment.md), UTF-8 no BOM, ASCII where practical.
