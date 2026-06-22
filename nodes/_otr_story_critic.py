@@ -360,11 +360,23 @@ def _render_critic_user_prompt(
     character_lines = _scope_character_lines(
         _critic_character_lines(candidate_ledger), scope_line_ids,
     )
+    # STEP 6 (2026-06-22 story+cast fix): surface each beat's target intensity to
+    # the critic so SECTION 3 can judge a line AGAINST its target_tension (a calm
+    # setup beat at target 1 is not flagged for failing to be explosive). The map
+    # is stamped by the writer on meta.line_dramatic_frame[line_id].tension.
+    _frames = (candidate_ledger.get("meta") or {}).get("line_dramatic_frame")
+    tension_by_id = {}
+    if isinstance(_frames, dict):
+        for _lid, _fr in _frames.items():
+            if isinstance(_fr, dict):
+                _t = _fr.get("tension")
+                if isinstance(_t, int) and 1 <= _t <= 5:
+                    tension_by_id[str(_lid)] = _t
     parts.append(
         "EPISODE SCRIPT (CHARACTER DIALOGUE BEATS ONLY -- "
         "post-script-doctor, ready for the story-quality critic):"
     )
-    parts.append(_render_lines_for_doctor(character_lines))
+    parts.append(_render_lines_for_doctor(character_lines, tension_by_id))
     parts.append("")
     parts.append(
         "You are seeing ONLY character dialogue beats -- announcer, music, "

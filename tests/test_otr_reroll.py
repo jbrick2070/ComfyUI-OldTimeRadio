@@ -228,6 +228,54 @@ def test_build_reroll_line_request_target_words_fallback():
     assert req2.target_words == 30  # _FALLBACK_TARGET_WORDS
 
 
+def test_build_reroll_line_request_reconstructs_dramatic_frame():
+    """STEP 6 (2026-06-22): a reroll reconstructs the per-line dramatic frame
+    the writer stamped on meta.line_dramatic_frame -- objective / obstacle /
+    turn / subtext / tension / dramatic_question / next_turn. Before this,
+    build_reroll_line_request rebuilt only arc_phase, so a rerolled line was
+    composed blind to the frame (and tension) it was meant to repair against."""
+    data = _ledger_data()
+    data["meta"]["line_dramatic_frame"] = {
+        "l002": {
+            "objective": "press the witness to crack",
+            "obstacle": "she will lose her job if she talks",
+            "turn": "guarded -> confessing",
+            "subtext": "he already knows she lied",
+            "tension": 4,
+            "dramatic_question": "Who opened the safe?",
+            "next_turn": "the confession lands",
+        }
+    }
+    row = data["lines"][1]  # l002
+    req = build_reroll_line_request(data, row, data["cast"])
+    assert req.beat_objective == "press the witness to crack"
+    assert req.beat_obstacle == "she will lose her job if she talks"
+    assert req.beat_turn == "guarded -> confessing"
+    assert req.beat_subtext == "he already knows she lied"
+    assert req.beat_tension == 4
+    assert req.dramatic_question == "Who opened the safe?"
+    assert req.next_turn == "the confession lands"
+
+
+def test_build_reroll_line_request_no_frame_is_empty_defaults():
+    """No meta.line_dramatic_frame -> the reroll frame fields default empty /
+    tension 0 (PD1: never raise; legacy ledgers reroll unchanged)."""
+    data = _ledger_data()
+    row = data["lines"][1]
+    req = build_reroll_line_request(data, row, data["cast"])
+    assert req.beat_objective == ""
+    assert req.beat_turn == ""
+    assert req.beat_tension == 0
+
+
+def test_build_reroll_line_request_rejects_out_of_range_tension():
+    """A malformed tension on the frame coerces to 0 (unset), never renders."""
+    data = _ledger_data()
+    data["meta"]["line_dramatic_frame"] = {"l002": {"tension": 9}}
+    req = build_reroll_line_request(data, data["lines"][1], data["cast"])
+    assert req.beat_tension == 0
+
+
 # ---------------------------------------------------------------------------
 # 1b. continuity_slice rebuild on reroll (v2 follow-up, 2026-05-25)
 # ---------------------------------------------------------------------------

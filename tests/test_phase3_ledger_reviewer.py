@@ -1138,6 +1138,23 @@ class TestEnrichedDoctorRows:
         assert "arc_phase" not in audit_rendered
         assert "speaker_role" in audit_rendered
 
+    def test_doctor_renderer_target_tension_optional(self):
+        """STEP 6 (2026-06-22): _render_lines_for_doctor renders
+        target_tension=N/5 ONLY when a tension map is supplied (the critic
+        path); with no map (the Script Doctor path) it is byte-identical."""
+        from nodes._otr_ledger_reviewer import _render_lines_for_doctor
+        lines = [_doctor_line("b001", "c01", "Hello."),
+                 _doctor_line("b002", "c02", "Hi.")]
+        # no map -> no tension column (Doctor path unchanged)
+        assert "target_tension" not in _render_lines_for_doctor(lines)
+        # with a map -> the column appears for the mapped line only
+        rendered = _render_lines_for_doctor(lines, {"b001": 4})
+        assert "target_tension=4/5" in rendered
+        assert rendered.count("target_tension") == 1   # b002 had no target
+        # out-of-range / non-int targets are ignored
+        assert "target_tension" not in _render_lines_for_doctor(
+            lines, {"b001": 9, "b002": "x"})
+
 
 class TestScriptDoctorDiagnosisPass:
     """run_script_doctor_diagnosis NAMES the per-line failure."""

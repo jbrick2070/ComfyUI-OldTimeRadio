@@ -586,16 +586,23 @@ def _render_lines_for_audit(lines: list[dict]) -> str:
 # value was genuinely unavailable) is rendered without it rather than
 # with a fabricated value. With this in place the Doctor rows carry the
 # full 7-field context (was 5/7 at the Sprint 3C report).
-def _render_lines_for_doctor(lines: list[dict]) -> str:
+def _render_lines_for_doctor(lines: list[dict], tension_by_id=None) -> str:
     """One enriched row per line for the SCRIPT DOCTOR prompt.
 
     Carries the per-line narrative context the Doctor needs to judge
     pacing / voice / flat exposition / arc. Every field is read from
     ledger per-line state already available to `review_ledger`; absent
     fields are rendered as a neutral placeholder, never fabricated.
+
+    STEP 6 (2026-06-22 story+cast fix): when ``tension_by_id`` (a
+    ``{line_id: 1..5}`` map, sourced from ``meta.line_dramatic_frame`` by the
+    story critic) is supplied, each line also renders ``target_tension=N/5`` so
+    the critic can judge a line's intensity against its per-beat target. Default
+    None -> the Script Doctor path is byte-identical (no tension column).
     """
     if not lines:
         return "(no lines in ledger)"
+    tension_by_id = tension_by_id if isinstance(tension_by_id, dict) else {}
     out = []
     for ln in lines:
         # `traits` is where the writer stamps the beat's mood.
@@ -619,6 +626,11 @@ def _render_lines_for_doctor(lines: list[dict]) -> str:
         target_words = ln.get("target_words")
         if target_words is not None:
             parts.append(f"target_words={target_words}")
+        # STEP 6: the per-beat target intensity (1..5), when the critic supplied
+        # the map. Rendered only for character lines that have a target.
+        _tt = tension_by_id.get(str(ln.get("line_id") or ""))
+        if isinstance(_tt, int) and 1 <= _tt <= 5:
+            parts.append(f"target_tension={_tt}/5")
         parts.append(f"actual_words={actual_words}")
         parts.append(f"text={(ln.get('text') or '')[:200]!r}")
         out.append(" ".join(parts))

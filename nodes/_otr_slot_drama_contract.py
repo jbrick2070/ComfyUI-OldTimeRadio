@@ -66,6 +66,8 @@ __all__ = [
     "build_minimal_contract",
     "validate_contract",
     "validate_episode_contracts",
+    "build_line_dramatic_fields",
+    "compute_beat_tension_ramp",
 ]
 
 
@@ -755,3 +757,36 @@ def build_line_dramatic_fields(
             "beat_turn": "",
             "beat_subtext": "",
         }
+
+
+def compute_beat_tension_ramp(character_beat_ids: list) -> dict:
+    """STEP 6 (2026-06-22 story+cast fix, roundtable-converged): a deterministic
+    escalating intensity signal (1..5) over the CHARACTER beats of an episode.
+
+    The outline's arc_phase already escalates monotonically (setup ->
+    complication -> resolution, validated), but `beat_tension` -- the composer's
+    "Tension: N/5" cue -- was never assigned a value, so the line writer saw no
+    per-beat intensity gradient. This wires one.
+
+    Curve (roundtable R1, GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude
+    judge): an ordinal ramp over the character-beat ordinal `i` (0-based), peak
+    at the FINAL character beat, no easing (a synthetic falling action would
+    contradict "escalating" and the budget has no falling phase):
+        n <= 1  -> 3   (a lone beat sits mid-scale)
+        else    -> clamp(round(1 + 4*i/(n-1)), 1, 5)
+    Announcer / music / sfx are excluded by the caller (character beats only).
+
+    Pure + deterministic (no RNG, no clock): same beat list -> same map. Returns
+    ``{beat_id: tension}``; an empty / malformed input returns ``{}``.
+    """
+    ids = [str(b).strip() for b in (character_beat_ids or []) if str(b).strip()]
+    n = len(ids)
+    if n == 0:
+        return {}
+    if n == 1:
+        return {ids[0]: 3}
+    out: dict = {}
+    for i, bid in enumerate(ids):
+        t = int(round(1 + 4 * i / (n - 1)))
+        out[bid] = max(1, min(5, t))
+    return out

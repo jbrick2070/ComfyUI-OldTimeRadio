@@ -3313,6 +3313,25 @@ class OTR_LedgerScriptWriter:
         nc_brief = _OTRSPEC.inject_central_object_into_brief(
             nc_brief, meta.get("central_object") or "")
 
+        # STEP 6 (2026-06-22 story+cast fix, roundtable-converged): a
+        # deterministic escalating beat_tension (1..5) over the CHARACTER beats.
+        # arc_phase already escalates; beat_tension was never assigned, so the
+        # composer's "Tension: N/5" cue never rendered. Compute the ramp ONCE
+        # here (character beats only, in outline order) and look it up per beat
+        # in the closure below; also stamp the per-line dramatic frame onto meta
+        # so the critic can SEE the target and the reroll can RECONSTRUCT it.
+        try:
+            from ._otr_slot_drama_contract import (
+                compute_beat_tension_ramp as _otr_tension_ramp,
+            )
+            _otr_char_beat_ids = [
+                b.beat_id for b in (getattr(outline, "beats", []) or [])
+                if getattr(b, "speaker_role", "") == "character"
+            ]
+            _otr_tension_by_beat = _otr_tension_ramp(_otr_char_beat_ids)
+        except Exception:  # noqa: BLE001 -- never break audio
+            _otr_tension_by_beat = {}
+
         # Tier 3 fix #19 (2026-05-11): single LineRequest construction
         # site for both character and announcer beats. Pre-Tier-3 the
         # body was duplicated twice across ~25 fields each; adding a
@@ -3411,6 +3430,32 @@ class OTR_LedgerScriptWriter:
                 except Exception:  # noqa: BLE001 -- never break audio
                     _a5_obj = _a5_obs = _a5_turn = _a5_sub = ""
 
+            # STEP 6: derive this character beat's tension (0 for announcer --
+            # announcer lines are excluded from the curve) and STAMP the per-line
+            # dramatic frame onto meta. The frame is the single source the critic
+            # reads (target_tension) and the reroll reconstructs (objective /
+            # obstacle / turn / subtext / tension / dramatic_question / next_turn)
+            # -- build_reroll_line_request otherwise loses all of it. META ONLY:
+            # the ledger {cast,lines,meta} wire format stays frozen.
+            _a5_tension = (
+                int(_otr_tension_by_beat.get(beat.beat_id, 0))
+                if not is_announcer else 0
+            )
+            if not is_announcer:
+                try:
+                    _otr_frames = meta.setdefault("line_dramatic_frame", {})
+                    _otr_frames[str(beat.beat_id)] = {
+                        "objective": _a5_obj,
+                        "obstacle": _a5_obs,
+                        "turn": _a5_turn,
+                        "subtext": _a5_sub,
+                        "tension": _a5_tension,
+                        "dramatic_question": _dramatic_question,
+                        "next_turn": _next_turn_text,
+                    }
+                except Exception:  # noqa: BLE001 -- never break audio
+                    pass
+
             return _OTRLC.LineRequest(
                 speaker=speaker,
                 intent=beat.intent,
@@ -3453,6 +3498,8 @@ class OTR_LedgerScriptWriter:
                 beat_obstacle=_a5_obs,
                 beat_turn=_a5_turn,
                 beat_subtext=_a5_sub,
+                # STEP 6 (2026-06-22) -- the escalating per-beat intensity cue.
+                beat_tension=_a5_tension,
                 # F4 (story-engine v1) -- speaker gender/pronouns.
                 speaker_gender=gender_by_name.get(speaker, ""),
             )

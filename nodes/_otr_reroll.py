@@ -282,6 +282,13 @@ def build_reroll_line_request(
     A missing or malformed ``meta["continuity"]`` renders empty (Prime
     Directive 1).
 
+    The per-line DRAMATIC FRAME (STEP 6, 2026-06-22) is reconstructed from
+    ``meta["line_dramatic_frame"][line_id]`` (beat_objective / beat_obstacle /
+    beat_turn / beat_subtext / beat_tension / dramatic_question / next_turn) so
+    the rerolled line composes against the SAME frame + tension target the
+    first-pass line had -- before this it rebuilt only arc_phase and lost the
+    frame. A missing frame -> empty defaults (PD1).
+
     `position`, `sfx_cue`, `current_beat_block` remain at their empty
     defaults: those blocks would only be approximate reconstructions and
     the critic's `hint` (threaded separately as `reroll_hint`) already
@@ -336,6 +343,26 @@ def build_reroll_line_request(
         meta, speaker, line_index if line_index >= 0 else 0,
     )
 
+    # STEP 6 (2026-06-22 story+cast fix): reconstruct the per-line DRAMATIC FRAME
+    # the first-pass compose received. The writer stamps it on
+    # meta["line_dramatic_frame"][line_id] (objective/obstacle/turn/subtext/
+    # tension/dramatic_question/next_turn); before this, build_reroll_line_request
+    # rebuilt only arc_phase, so a rerolled line lost the entire dramatic frame
+    # (and its tension target) the original line had -- the reroll composed blind
+    # to the very signal it was meant to repair against. A missing frame -> empty
+    # defaults (PD1: never raise).
+    _line_key = str(line_row.get("line_id") or line_row.get("beat_id") or "")
+    _frames = meta.get("line_dramatic_frame")
+    _frame = _frames.get(_line_key) if isinstance(_frames, dict) else None
+    _frame = _frame if isinstance(_frame, dict) else {}
+
+    def _coerce_tension(value) -> int:
+        try:
+            t = int(value)
+        except (TypeError, ValueError):
+            return 0
+        return t if 1 <= t <= 5 else 0
+
     return LineRequest(
         speaker=speaker,
         intent=intent,
@@ -354,6 +381,14 @@ def build_reroll_line_request(
         all_voice_cards=all_voice_cards,
         speaker_role="character",
         continuity_slice=continuity_slice,
+        # STEP 6 -- the reconstructed dramatic frame.
+        dramatic_question=str(_frame.get("dramatic_question") or ""),
+        next_turn=str(_frame.get("next_turn") or ""),
+        beat_objective=str(_frame.get("objective") or ""),
+        beat_obstacle=str(_frame.get("obstacle") or ""),
+        beat_turn=str(_frame.get("turn") or ""),
+        beat_subtext=str(_frame.get("subtext") or ""),
+        beat_tension=_coerce_tension(_frame.get("tension")),
     )
 
 
@@ -454,11 +489,13 @@ def run_targeted_reroll(generate_fn, led) -> RerollDisposition:
     Reads `meta.story_critic_report` (stamped by the Sprint 5B critic in
     the freeze cascade). For each `RerollTarget`, re-composes the flagged
     line with the critic's `hint` as a hard REVISE instruction, writes the
-    new text back in place via `Ledger.update_line_text`, then re-runs the
-    critic on the mutated script. Capped at MAX_REROLL_CYCLES cycles; if
-    the critic still wants rerolls after the cap, the ledger lines are
-    restored to their pre-reroll state and the disposition verdict is
-    `needs_full_rerun`.
+    new text back in place via `Ledger.update_line_text`, then re-SCORES the
+    critic SCOPED to the patched lines + neighbors (STEP 4). Capped at
+    MAX_REROLL_CYCLES cycles; the loop halts on the cap OR a rise in the
+    outstanding flag count (divergence). On a halt the re-composed lines are
+    KEPT (STEP 4 repair-then-ship -- NO pre-reroll restore) and the verdict is
+    `needs_full_rerun`, which the freeze cascade's A2 path ships through the
+    normal freeze (Phase 10's gap audit is the structural backstop).
 
     Parameters:
       generate_fn
