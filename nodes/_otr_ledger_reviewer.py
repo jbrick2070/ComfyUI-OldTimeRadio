@@ -497,7 +497,14 @@ def _render_cast_contract_table(cast_rows: list[dict]) -> str:
     for row in cast_rows:
         char_id = row.get("char_id", "")
         name = row.get("name", "")
-        role = row.get("speaker_role") or row.get("tts_model") or ""
+        # STEP 1 (2026-06-22 story+cast fix): speaker_role is the ONLY
+        # role source. The retired `or row.get("tts_model")` fallback read
+        # the TTS engine name (e.g. 'kokoro') as the cast member's role
+        # whenever speaker_role was empty, so the auditor compared a line's
+        # real speaker_role against an engine name and emitted a spurious
+        # role_mismatch (the night soak's freeze churn). Engine name is not
+        # a role; render it empty and let the contract speak for itself.
+        role = row.get("speaker_role") or ""
         desc = row.get("character_description") or ""
         lines.append(
             f"- char_id={char_id} canonical_name={name!r} "

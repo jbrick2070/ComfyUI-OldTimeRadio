@@ -36,6 +36,7 @@ from nodes._otr_ledger_reviewer import (  # noqa: E402
     ReviewerEdit,
     ScriptDoctorDiagnosis,
     ScriptDoctorReport,
+    _render_cast_contract_table,
     _render_lines_for_doctor,
     _resolve_cast_member,
     apply_deterministic_cast_repairs,
@@ -88,6 +89,26 @@ def _line(line_id, char_id, text, role="character", arc_phase=None):
         "dur_s": None,
         "arc_phase": arc_phase,
     }
+
+
+def test_cast_contract_table_never_renders_engine_name_as_role():
+    """STEP 1 (2026-06-22 story+cast fix): the cast-contract table the
+    auditor sees must NOT read the TTS engine name as the cast member's
+    role. A row with an empty speaker_role and a tts_model engine name
+    renders role='' -- previously it rendered role='kokoro', so the
+    auditor compared a line's real speaker_role against an engine name
+    and emitted a spurious role_mismatch (the night-soak freeze churn).
+    """
+    table = _render_cast_contract_table([
+        {"char_id": "c01", "name": "ANNOUNCER",
+         "speaker_role": "", "tts_model": "kokoro"},
+        {"char_id": "c02", "name": "ALICE",
+         "speaker_role": "character", "tts_model": "bark"},
+    ])
+    assert "kokoro" not in table
+    assert "bark" not in table
+    assert "role=''" in table            # empty speaker_role -> empty role
+    assert "role='character'" in table   # supplied speaker_role preserved
 
 
 def _mk_generate_fn(*replies):

@@ -873,6 +873,16 @@ class Ledger:
             dialogue_slot_id = (
                 _safe_str(_dsi_raw) or None if _dsi_raw is not None else None
             )
+            # STEP 1 (2026-06-22 story+cast fix): guarantee every line row
+            # is born with an explicit speaker_role. set_lines previously
+            # DROPPED the field entirely (unlike init_lines_from_outline,
+            # which stamps `role or "character"`), so rows minted on the
+            # streaming partial-ledger path (story_orchestrator
+            # ._emit_partial_ledger) reached the reviewer with NO
+            # speaker_role -> an undefined role comparison in the cast
+            # auditor. Preserve a supplied role; default missing to
+            # "character" exactly as init_lines_from_outline does.
+            speaker_role = _safe_str(r.get("speaker_role")) or "character"
             rows.append({
                 "line_id":          _safe_str(r.get("line_id")),
                 "shot_id":          _safe_str(r.get("shot_id")) or None,
@@ -886,6 +896,7 @@ class Ledger:
                 "bark_wav_path":    _safe_str(r.get("bark_wav_path")) or None,
                 "start_s":          _safe_float(r.get("start_s")),
                 "dur_s":            _safe_float(r.get("dur_s")),
+                "speaker_role":     speaker_role,
                 "beat_intent":      beat_intent,
                 "target_words":     target_words,
                 "dialogue_slot_id": dialogue_slot_id,

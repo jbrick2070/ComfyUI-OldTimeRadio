@@ -143,6 +143,32 @@ class TestLedgerBeats:
         assert row["beat_id"] is None
         assert row["boundary"] is None
 
+    def test_set_lines_defaults_speaker_role_to_character(self, tmp_out):
+        """STEP 1 (2026-06-22 story+cast fix): every line row is born with
+        an explicit speaker_role. set_lines used to DROP the field, so the
+        streaming partial-ledger path produced rows with no speaker_role
+        that reached the cast auditor with an undefined role. A row that
+        omits speaker_role now defaults to 'character' (matching
+        init_lines_from_outline)."""
+        led = Ledger("test_role_default", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "char_id": "c01", "text": "Hello"},
+        ])
+        row = led.data["lines"][0]
+        assert row["speaker_role"] == "character"
+
+    def test_set_lines_preserves_supplied_speaker_role(self, tmp_out):
+        """A supplied speaker_role rides through set_lines unchanged."""
+        led = Ledger("test_role_keep", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "char_id": "announcer",
+             "speaker_role": "announcer", "text": "Tonight..."},
+            {"line_id": "l002", "speaker_role": "music_open", "text": ""},
+        ])
+        rows = led.data["lines"]
+        assert rows[0]["speaker_role"] == "announcer"
+        assert rows[1]["speaker_role"] == "music_open"
+
     def test_path_follows_episode_id(self, tmp_out):
         led = Ledger("signal_lost_BLACK SPHERE_20260424", str(tmp_out))
         assert led.path.endswith("signal_lost_black_sphere_20260424_ledger.json")
