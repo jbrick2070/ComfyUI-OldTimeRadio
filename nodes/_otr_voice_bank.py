@@ -206,6 +206,64 @@ def get_all_registered_voices(bank: Optional[Tuple[VoiceBankEntry, ...]] = None)
     return sorted(entries, key=lambda e: e.voice_ref_id)
 
 
+# Bank-backed voice engines (bark uses v2/en_speaker_* presets, not bank refs);
+# the library-coverage gate over config/voice_reference_bank.json applies to these.
+APPROVED_VOICE_ENGINES: Tuple[str, ...] = ("indextts2", "chatterbox", "dia", "kokoro")
+
+
+def compute_bank_coverage(
+    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+    *,
+    approved_engines: Tuple[str, ...] = APPROVED_VOICE_ENGINES,
+    cast_size: int = 5,
+) -> dict:
+    """Voice-casting goal (B): each approved engine has a SOLID library. PURE.
+
+    Returns ``{engine: {total, by_gender, by_gender_age, adult_male, adult_female,
+    meets_floor, gaps}}``.
+
+    ``meets_floor`` is the HARD bar a test asserts: an engine must have at least
+    ``cast_size`` ADULT voices for EACH of male/female, so a worst-case same-gender
+    ``cast_size``-character cast can be cast with NO reuse. ``gaps`` lists
+    aspirational thin spots (male-light count, no non-adult coverage, no female
+    elder, no `other`/androgynous voices) for operator remediation -- surfaced, not
+    failed (the library is solid for the common case but should grow).
+    """
+    if bank is None:
+        bank, _ = load_voice_bank()
+    out: dict = {}
+    for eng in approved_engines:
+        rows = [e for e in bank if e.engine == eng]
+        by_g: dict = {}
+        by_ga: dict = {}
+        for e in rows:
+            by_g[e.gender] = by_g.get(e.gender, 0) + 1
+            by_ga[(e.gender, e.age_band)] = by_ga.get((e.gender, e.age_band), 0) + 1
+        adult_m = by_ga.get(("male", "adult"), 0)
+        adult_f = by_ga.get(("female", "adult"), 0)
+        gaps: List[str] = []
+        if adult_m < adult_f:
+            gaps.append(
+                f"male-light: {adult_m} adult male vs {adult_f} adult female")
+        if not any(ab != "adult" for (_g, ab) in by_ga):
+            gaps.append("no non-adult age coverage (no child/teen/elder mix)")
+        if (by_ga.get(("female", "elder"), 0) == 0
+                and by_ga.get(("male", "elder"), 0) > 0):
+            gaps.append("elder coverage is male-only (no female elder)")
+        if by_g.get("other", 0) == 0:
+            gaps.append("no 'other'/androgynous voices")
+        out[eng] = {
+            "total": len(rows),
+            "by_gender": dict(by_g),
+            "by_gender_age": {f"{g}/{a}": n for (g, a), n in sorted(by_ga.items())},
+            "adult_male": adult_m,
+            "adult_female": adult_f,
+            "meets_floor": adult_m >= cast_size and adult_f >= cast_size,
+            "gaps": gaps,
+        }
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Deterministic caster (E.2) -- disjoint RNG from the legacy caster (I-4)
 # --------------------------------------------------------------------------- #
