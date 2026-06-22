@@ -137,24 +137,27 @@ def test_role_compat_filter_shared():
         {"engine_id": "ltx", "roles": ("scene_broll", "background_abstract"),
          "required_inputs": ("text_prompt",)},
     ]
+    # Capability-only (operator 2026-06-22): the per-engine `roles` list is NOT a
+    # gate -- an engine fits every role whose inputs satisfy its required_inputs.
     assert rc.filter_engines_for_role("background_abstract", descs) == ["abstract", "ltx"]
-    assert rc.filter_engines_for_role("character_video", descs) == ["humo"]
-    assert rc.filter_engines_for_role("music_visual", descs) == ["abstract"]
+    assert rc.filter_engines_for_role("character_video", descs) == ["abstract", "humo", "ltx"]
+    assert rc.filter_engines_for_role("music_visual", descs) == ["abstract", "humo", "ltx"]
     with pytest.raises(rc.RoleCompatError):
         rc.filter_engines_for_role("not_a_role", descs)
 
 
 def test_role_compat_fail_closed_on_malformed():
-    """A descriptor missing keys / declaring an unknown token is EXCLUDED, not
-    raised (fail-closed)."""
+    """A descriptor declaring an unknown token or missing its engine_id is
+    EXCLUDED, not raised (fail-closed). A missing `roles` key is NO LONGER a
+    failure -- eligibility is capability, not the whitelist (2026-06-22)."""
     descs = [
         {"engine_id": "ok", "roles": ("background_abstract",), "required_inputs": ()},
         {"engine_id": "bad_token", "roles": ("background_abstract",),
-         "required_inputs": ("nonsense",)},
-        {"engine_id": "no_roles", "required_inputs": ()},
-        {"roles": ("background_abstract",), "required_inputs": ()},  # no engine_id
+         "required_inputs": ("nonsense",)},  # unknown token -> excluded
+        {"engine_id": "no_roles", "required_inputs": ()},  # no `roles` key is fine now
+        {"roles": ("background_abstract",), "required_inputs": ()},  # no engine_id -> skipped
     ]
-    assert rc.filter_engines_for_role("background_abstract", descs) == ["ok"]
+    assert rc.filter_engines_for_role("background_abstract", descs) == ["ok", "no_roles"]
 
 
 # ---------------------------------------------------------------------------
@@ -308,15 +311,17 @@ def test_director_policy_json_and_clamp(clean_video_registry):
 
 
 def test_director_fail_closed_incompatible_pick(clean_video_registry):
-    """A registered engine that fits NONE of a slot's roles fails closed."""
+    """A registered engine that fits NONE of a slot's roles BY CAPABILITY fails
+    closed (no silent swap). Under capability-only routing the genuine
+    incompatibility is a required input NO role can supply (an unknown token)."""
     vreg.register(_stub_engine(
-        name="audioface", roles=("character_video",), default_roles=(),
-        required_inputs=("audio_ref", "init_image"),
+        name="needs_unknown", roles=("character_video",), default_roles=(),
+        required_inputs=("depth_map",),  # unknown token -> fits NO role
     ))
     with pytest.raises(ValueError):
         OTRVideoDirector().direct(
-            announcer_video_model="audioface",  # needs audio_ref+init_image; A has them... use music
-            music_video_model="audioface",      # music_visual cannot supply audio_ref -> fail
+            announcer_video_model="needs_unknown",  # requires an input no role supplies
+            music_video_model="needs_unknown",
             other_beats_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
             music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
             other_beats_clip_mode="unique_per_beat", other_beats_n=8, fps=25,

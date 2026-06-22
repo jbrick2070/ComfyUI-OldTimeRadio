@@ -57,10 +57,14 @@ def _desc(engine_cls):
 
 def test_role_fit_talk():
     d = _desc(LtxAvTalkEngine)
+    # text+audio+init -> fits every role that supplies all three (capability-only,
+    # operator 2026-06-22; the per-engine roles whitelist is no longer a gate).
     assert role_compat.engine_fits_role(d, "announcer_visual")
     assert role_compat.engine_fits_role(d, "character_video")
-    # talk is not offered for music_visual (role membership gate)
-    assert not role_compat.engine_fits_role(d, "music_visual")
+    assert role_compat.engine_fits_role(d, "music_visual")
+    # scene_broll / background_abstract do not supply audio -> excluded by capability.
+    assert not role_compat.engine_fits_role(d, "scene_broll")
+    assert not role_compat.engine_fits_role(d, "background_abstract")
 
 
 def test_role_fit_music_serves_music_and_announcer():
@@ -69,8 +73,11 @@ def test_role_fit_music_serves_music_and_announcer():
     # reactive default for both, 2026-06-17); both roles supply audio_ref.
     assert role_compat.engine_fits_role(d, "music_visual")
     assert role_compat.engine_fits_role(d, "announcer_visual")
-    # still excluded from a role it does not declare
-    assert not role_compat.engine_fits_role(d, "character_video")
+    # text+audio -> also fits character_video (it supplies audio) under capability-only.
+    assert role_compat.engine_fits_role(d, "character_video")
+    # scene_broll / background_abstract do not supply audio -> excluded.
+    assert not role_compat.engine_fits_role(d, "scene_broll")
+    assert not role_compat.engine_fits_role(d, "background_abstract")
 
 
 def test_assert_usable_opt_out_flag(monkeypatch):

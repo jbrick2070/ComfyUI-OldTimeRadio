@@ -201,17 +201,14 @@ def test_image_director_emits_distinct_per_role_picks_bug405(clean_image_registr
 
 def test_image_director_fail_closed_incompatible_pick(clean_image_registry):
     clean_image_registry._registry.clear()
-    # an engine that lists ONLY background_abstract cannot serve the announcer /
-    # music image slots (role-membership gate) -> fail closed, no silent swap.
-    # (Input-based fail-close on music is moot now that music_visual supplies the
-    # full token set for the LTX-AV ltx_av_music lane; the membership gate is the
-    # live fail-closed path.)
-    ireg.register(_img_stub(name="bg_only", roles=("background_abstract",),
-                            required_inputs=("text_prompt",)))
+    # capability-only (2026-06-22): a genuine incompatibility is a required input
+    # NO role supplies (an unknown token) -> fits no role -> fail closed, no swap.
+    ireg.register(_img_stub(name="needs_unknown", roles=("background_abstract",),
+                            required_inputs=("depth_map",)))
     with pytest.raises(ValueError):
         OTRImageDirector().direct(**_direct_kwargs(
-            announcer_image_model="bg_only", music_image_model="bg_only",
-            other_beats_image_model="bg_only"))
+            announcer_image_model="needs_unknown", music_image_model="needs_unknown",
+            other_beats_image_model="needs_unknown"))
 
 
 def _direct_kwargs(**over):

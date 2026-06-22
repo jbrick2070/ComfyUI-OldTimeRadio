@@ -105,22 +105,23 @@ def role_available_inputs(role: str) -> frozenset:
 
 
 def engine_fits_role(descriptor, role: str) -> bool:
-    """True iff ``descriptor`` can serve ``role`` (fail-closed).
+    """True iff ``descriptor`` can serve ``role`` (fail-closed, capability-only).
 
-    Requires (1) ``role`` is in the engine's ``roles`` and (2) every token in
-    the engine's ``required_inputs`` is available in the role. A descriptor
-    missing ``roles`` / ``required_inputs``, or declaring an unknown input
-    token, is treated as NOT fitting (excluded) rather than raising -- when
-    unsure, do not offer it.
+    Eligibility is PURELY capability: every token in the engine's
+    ``required_inputs`` must be available in the role
+    (``required_inputs <= role_available_inputs``). The legacy per-engine
+    ``roles`` whitelist is NO LONGER a gate (operator 2026-06-22, model-agnostic
+    routing): an engine fits any role whose inputs satisfy it -- audio-driven
+    engines stay limited to audio-supplying roles BY CAPABILITY, while b-roll
+    (text/still) engines fit every role. A descriptor missing ``required_inputs``
+    or declaring an unknown input token is excluded fail-closed. ``default_roles``
+    (the auto-default pick) is a separate concern and is unaffected.
     """
     available = role_available_inputs(role)  # raises on unknown role
     if not isinstance(descriptor, dict):
         return False
-    roles = descriptor.get("roles")
     required = descriptor.get("required_inputs")
-    if roles is None or required is None:
-        return False
-    if role not in tuple(roles):
+    if required is None:
         return False
     required_set = set(required)
     # An engine that declares an input token outside the known vocabulary is

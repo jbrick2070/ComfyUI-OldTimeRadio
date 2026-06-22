@@ -60,13 +60,16 @@ def test_audio_engine_offered_only_where_audio_is_available():
     assert rc.engine_fits_role(AUDIO_FACE, rc.Role.MUSIC_VISUAL.value) is True
 
 
-def test_engine_excluded_when_role_not_listed():
+def test_roles_whitelist_no_longer_gates():
+    # Capability-only routing (operator 2026-06-22): the per-engine `roles` list
+    # is NO LONGER a gate. An engine whose `roles` omit a role STILL fits it when
+    # the role supplies its required inputs (model-agnostic).
     eng = {
         "engine_id": "x",
-        "roles": (rc.Role.MUSIC_VISUAL.value,),
+        "roles": (rc.Role.MUSIC_VISUAL.value,),   # omits background_abstract
         "required_inputs": ("text_prompt",),
     }
-    assert rc.engine_fits_role(eng, rc.Role.BACKGROUND_ABSTRACT.value) is False
+    assert rc.engine_fits_role(eng, rc.Role.BACKGROUND_ABSTRACT.value) is True
 
 
 def test_text_only_engine_fits_every_listed_role():
@@ -84,11 +87,14 @@ def test_unknown_input_token_is_failed_closed():
 
 
 def test_missing_keys_and_non_dict_excluded_not_raised():
+    # Missing required_inputs -> fail-closed (excluded, not raised).
     assert rc.engine_fits_role(
         {"engine_id": "a"}, rc.Role.SCENE_BROLL.value
     ) is False
+    # A genuine capability mismatch is still excluded (scene_broll has no audio_ref).
     assert rc.engine_fits_role(
-        {"roles": (), "required_inputs": ()}, rc.Role.SCENE_BROLL.value
+        {"engine_id": "b", "required_inputs": ("audio_ref",)},
+        rc.Role.SCENE_BROLL.value,
     ) is False
     assert rc.engine_fits_role("not_a_dict", rc.Role.SCENE_BROLL.value) is False
 

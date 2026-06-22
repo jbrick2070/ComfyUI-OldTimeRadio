@@ -1,5 +1,21 @@
 # R1 CONVERGED -- capability-based routing (refined, NON-REGRESSIVE)
 
+> **>>> OPERATOR CORRECTION (2026-06-22 -- SUPERSEDES any audio-gating framing below):** audio-in is
+> NOT a role requirement. It is an OPTIONAL capability that ONLY the audio-driven specials (HuMo,
+> LTX-AV) consume. A b-roll video/still model (wan_i2v, ltx_video, flux stills) needs only a
+> **text_prompt** -- the still is ALWAYS DERIVED from that prompt per beat and consumed OPTIONALLY -- so
+> it fits EVERY role (music + announcer included), exactly like ltx_video. Operator: "audio-in is not
+> required for a video or still model; wan for the music role can just use a text prompt just like ltx
+> (the non-audio-in version)."
+> **=> CODE IMPLICATION (the real fix):** a b-roll engine declares `required_inputs=("text_prompt",)` +
+> `optional_inputs=("init_image",)` -- NOT init_image-REQUIRED. wan_i2v's current `required_inputs =
+> ("init_image",)` is the mis-declaration; align it to ltx_video's `("text_prompt",)` with the still
+> optional. Then role-fit = `required_inputs <= role_available_inputs` makes EVERY b-roll engine fit
+> EVERY role, and ONLY HuMo/LTX-AV (audio_ref-required) stay limited to audio-supplying roles -- BY
+> CAPABILITY. The hardcoded `roles` whitelist then mostly DISAPPEARS (the "optional override" in the
+> design below is a fallback for any genuine creative restriction, not the primary mechanism). This is
+> the cleanest "declare capabilities once, model-agnostic downstream." R2 builds THIS.
+
 Panel: gpt-5.5 + gemini-3.1-pro + deepseek-v4-pro + grok-4.3 + Claude grounded. The DIRECTION
 (capability routing) is endorsed; the NAIVE "drop the whitelist, pure input-subset" is REJECTED
 (over-matches + ignores aspect). Converged on a refined, strictly-additive design:

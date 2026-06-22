@@ -98,12 +98,10 @@ def test_ltx_role_fit_text_to_video():
     eng = vreg.get_engine("ltx_video")
     desc = {"engine_id": "ltx_video", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
-    # announcer_visual GRANTED 2026-06-10 (the non-lipsync LTX radio open);
-    # character_video stays excluded (a talking face needs lipsync).
-    for role in ("scene_broll", "background_abstract", "music_visual",
-                 "announcer_visual"):
+    # capability-only (2026-06-22): ltx_video needs only text_prompt, which EVERY
+    # role supplies -> it fits ALL roles (the roles whitelist is no longer a gate).
+    for role in rc.ROLES:
         assert rc.engine_fits_role(desc, role) is True
-    assert rc.engine_fits_role(desc, "character_video") is False
     assert "ltx_video" in rc.filter_engines_for_role("background_abstract", [desc])
     assert rc.filter_engines_for_role("announcer_visual", [desc]) == ["ltx_video"]
 
