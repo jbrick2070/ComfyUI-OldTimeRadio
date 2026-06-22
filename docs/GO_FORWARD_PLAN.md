@@ -1,5 +1,33 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **ROUNDTABLE -- 2026-06-22 (PLANNER; STORY-QUALITY LIFT 4-round roundtable CONVERGED; docs only, NOT
+> pushed -- operator gates). Panel = GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude code-grounded
+> anchor/judge; ~$0.48 total. BUILD-READY coder kickoff: `docs/2026-06-22-story-quality-lift/roundtable/
+> pass04_plan_FINAL.md` (R1 arc -> R2 coding -> R3 wiring -> R4 spec-lock; pass0N_judgment.md trail; raw
+> reviews in pass0N/).** Grounded against the real "Chandra's Echo" frozen ledger + code seams -> THREE
+> buildable defects + one cut, ZERO workflow-JSON change, schema FIXED (per-line signals ride
+> `compose_flags` -- there is NO per-line meta dict), audio byte-identical, CI asserts gated OTR_TEST_MODE:
+> - **D1 (TOP) bare stage-direction leak** (b005/b010/b012 trailing-after-quote, b015 embedded-malformed,
+>   b017 undelimited): shared double-quote helper (normalize curly->straight, odd-count abort) + extended
+>   `_NARRATION_VERBS` (adjusts/clutches/taps/tightens/overrides/dances) + `is_third_person_action_clause`
+>   (rejects ONLY 1st/2nd-person; 3rd-person permitted) wired Tier1 STRENGTHEN (`_otr_line_composer._build_user_prompt`
+>   1307-1315) / Tier2 reroll IN `compose_line_draft` (not the too-late compose_line site) / Tier3
+>   deterministic floor (`_otr_ledger_scrub._strip_stage_directions`, balanced-quote class only; floor cannot
+>   route back to reroll) + a byte-identical golden no-op gate.
+> - **D3 b011 role mis-stamp** (char_id=c02 cast char + speaker_role=announcer): `coerce_speaker_role_for_char_id`
+>   at the role_mismatch repair guard (the culprit) + set_lines + a MANDATORY pre-freeze sweep (final cascade
+>   mutation step, after cast_lock, before freeze hash; cast_ids = ledger.cast.keys() - announcer/music
+>   sentinels); audit via compose_flags + meta["role_coercions"]. NOT at init (char_id derived FROM role there).
+> - **D2 antagonist stance** (c02 Manfred reverses w/o a turn): GENERATION lever in `_otr_outline._build_beat_user_prompt`
+>   (reference the pinned `DramaticState.character_b_wants`) + critic `StanceIssue` TELEMETRY ONLY. Auto-repair
+>   via needs_full_rerun CUT -- R3 PROVED no cross-run channel survives a rerun with JSON frozen (writer is
+>   upstream + ignores the verdict; new_ledger wipes meta; regeneration_hint read by nobody).
+> - **D4 abrupt UN escalation = OUT OF SCOPE** (R1 unanimous cut; symptom of D2 + weak model).
+> **>>> NEXT = operator GO to BUILD in a SEPARATE coder window: order = manual no-bypass baseline re-smoke ->
+> D1 -> D3 -> D2; then re-smoke WITHOUT OTR_BYPASS_FREEZE_HALT.** No production code written this session
+> (planner window). HEAD unchanged `223877a`; box still has the FLOOR smoke server resident on :8000 (reset
+> per CLAUDE.md S4 before any headless run).
+
 > **HANDOFF -- 2026-06-22 (CODER; VC chunks 2-4 SHIPPED + LIVE-SMOKE VERIFIED + PUSHED. origin/v2.0-alpha
 > HEAD `4e3c691` == local -- operator cleared the push gate; chunks 2-4 + smoke docs are on origin.)**
 > Built + green chunks 2-4 (details in the block below), then ran a LIVE headless smoke of the canonical
@@ -846,7 +874,12 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE = VOICE-CASTING ARCHITECTURE, VC Chunks 2-4 (2026-06-22; HEAD `3cc8de6`). Roundtable R1
+**>>> ACTIVE (2026-06-22, PLANNER) = STORY-QUALITY LIFT -- the 4-round roundtable CONVERGED; build-ready
+coder kickoff `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md`. NEXT = operator GO to
+BUILD in a coder window: manual no-bypass baseline re-smoke -> D1 leak -> D3 role -> D2 stance; D4
+escalation OUT OF SCOPE. Full defect->fix map + spend in the ROUNDTABLE block at the very top of this file.**
+
+**>>> SUPERSEDED (history): VOICE-CASTING ARCHITECTURE, VC Chunks 2-4 (2026-06-22; HEAD `3cc8de6`). Roundtable R1
 CONVERGED + Chunk 1 (library coverage gate) + the PD voice-library ingestion (bank 137 -> 149, 4 distinct PD
 voices) are SHIPPED + pushed; suite 5001/34, Bug Bible 16/7/3.** Build plan:
 `docs/2026-06-22-voice-casting-arch/roundtable/pass01_plan.md`. The remaining chunks touch the

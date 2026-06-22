@@ -1,0 +1,28 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: yes-with-fixes. The plan is nearly build-ready but has two must-fix defects that would cause build failure or production misbehavior, plus one should-fix that risks silent corruption.
+
+MUST-FIX BEFORE BUILD:
+1. [Sec 2, Tier 3] The shared double-quote segmentation helper specification is ambiguous and will cause parse drift. The plan says "structural double quotes only (`"`+curly U+201C/U+201D); IGNORE single quotes/apostrophes" but does not specify whether the helper normalizes curly quotes to straight before counting, or counts them separately. A reasonable implementor could: (a) count only straight `"` and treat curly quotes as non-quote characters (making b005/b010/b012 all odd-quote and thus unscrubbed), or (b) normalize all three to a canonical form and count them together. These produce incompatible outputs. FIX: specify "normalize U+201C and U+201D to straight double-quote before counting; the count is of normalized double-quote characters." Also specify that the helper returns the normalized text (or the count + normalized text) so Tier 2 and Tier 3 receive identical input — the plan says "single source, no parse drift" but does not mandate the helper return the normalized string, only that it's "used by BOTH."
+2. [Sec 3, coercion sweep] The plan says the pre-freeze sweep must sit AFTER cast_lock in the cascade phase order, but cast_lock (node 80) runs INSIDE the freeze cascade (node 62), not before it. The plan's instruction "placed inside the freeze cascade AFTER all line-role mutations (incl cast_lock-class) and BEFORE the freeze/hash" is correct in intent but the verify-at-build item #1 is underspecified — it asks to "confirm the sweep sits after cast_lock in the actual phase order" but does not say WHERE in the cascade to insert it. A reasonable implementor could insert it: (a) as a new step at the end of the cascade's mutation phase, or (b) as a separate node between cast_lock and the freeze step, or (c) inline after the cast_lock call inside the cascade. These have different failure modes if future mutations are added. FIX: specify "insert the sweep as the final step of `OTR_LedgerFreezeCascade`'s mutation phase, immediately after the cast_lock call returns and before the freeze hash is computed. If the cascade has a `_mutate_ledger` or equivalent method, place it as the last call in that method." The verify-at-build item should then confirm the exact line position.
+
+SHOULD-FIX:
+3. [Sec 2, Tier 2] `detect_stage_business_for_reroll` returns `Tuple[bool, str, str]` but the plan does not specify what `hint` contains or how it's fed into the reroll prompt. The existing reroll mechanism in `compose_line` (2015-2060) concatenates `reroll_hint` from `detect_leading_stage_business` + other detectors. The new function returns a `hint` string — the plan must specify that this hint is appended to the existing `reroll_hint` in `compose_line_draft` (since the reroll call is being moved there from `compose_line`). Without this, the reroll has no guidance on what to fix. FIX: add "the returned hint string is appended to the reroll prompt's existing hint concatenation in `compose_line_draft`, using the same format as the existing `_BARE_STAGE_HINT`."
+
+OPTIONAL / NICE-TO-HAVE:
+- [Sec 4, Defect 2 detection] The `StanceIssue.target` field is specified as "pass cast/protagonist/central-object context into the critic prompt, or relax target to a free-form string validated in tests." Relaxing to free-form is simpler and sufficient for telemetry. Recommend committing to free-form to avoid scope creep on the critic prompt builder.
+- [Sec 2, Tier 3] The `_NARRATION_VERBS` extension list "adjusts/clutches/taps/tightens/overrides/dances/dancing (+ obvious neighbors)" is open-ended. Specify a closed list or a rule for what constitutes an "obvious neighbor" to prevent unbounded scope during implementation.
+
+CUT THESE:
+- None. The plan is already lean; the Defect 4 cut is correctly scoped.
+
+VERIFY-AT-BUILD checklist (from earlier UNVERIFIABLE flags):
+1. [Sec 3] Confirm the pre-freeze sweep insertion point: open `OTR_LedgerFreezeCascade.py`, find the cast_lock call, verify the sweep is placed after it and before the freeze hash computation. Record the line number.
+2. [Sec 6] Confirm `compose_flags` has no strict format validation downstream: grep for any code that parses or validates the format of `compose_flags` entries beyond simple string matching. If found, the "kind:detail" format must be compatible.
+3. [Sec 4] Confirm the critic report model accepts `StanceIssue`: write a test that constructs a `StoryCriticReport` with a `StanceIssue` in the issues list and assert it round-trips through `model_dump` / `model_validate`. If the model uses `extra='forbid'`, confirm `StanceIssue` is in the field definitions.
+4. [Sec 6] Confirm `OTR_TEST_MODE` is the correct gate: check `conftest.py` for the fixture that sets `OTR_TEST_MODE` and verify it's set before any CI-only asserts run. If the env var is set at import time, confirm the assert modules are imported after the fixture.
+
+ASSUMPTIONS:
+- [ASSUMPTION] The `compose_line_draft` function (1689-1928) has access to the same `reroll_hint` concatenation logic as `compose_line` (2015-2060), or can be refactored to include it without breaking the existing repair flow.
+- [ASSUMPTION] The freeze cascade's internal mutation phase is a linear sequence of calls, not a dynamic dispatch or plugin system, so inserting a sweep as the last call is deterministic.
+- [ASSUMPTION] `cast_ids` in the coercion helper can be derived from `production_ledger.py`'s cast data at the sweep site without an additional DB/API call.
