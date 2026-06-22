@@ -1,5 +1,37 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE marathon; everything PUSHED. origin/v2.0-alpha HEAD
+> `deb4e01`.) Two workstreams this session, both green per chunk (suite 5001/34, Bug Bible 16/7/3):**
+>
+> **(1) STORY+CAST FIX -- COMPLETE (STEPs 1-6 + 3 follow-up fixes), all PUSHED.** STEP 1 role source /
+> STEP 2 cast-audit scope (roundtable Option A) / STEP 3 voice fail-soft / STEP 4 scoped reroll
+> convergence + repair-then-ship / STEP 5 flat rubric + failed_dimension / STEP 6 escalating beat_tension
+> + per-line dramatic-frame meta stamp. Then 3 LIVE-SMOKE-driven fixes: **STEP 3 voice gate is FAIL-SOFT**
+> (never crash; resolve a voice per selected model -- `ff2c0c3`), **per-line SILENCE guard** for a
+> stage-direction-only line (IndexTTS2 torch.cat crash -- `9a4f0a7`), and the **ROOT-CAUSE recompose** of a
+> stage-direction-only character line into real dialogue (`e62081f`). All DEFAULT-ON, ZERO workflow-JSON
+> change. Live smoke proved the tension ramp 1..5 + failed_dimension + frozen_with_doctor_edits WITHOUT the
+> bypass; the crash was a separate pre-existing TTS bug, now fixed + a green re-smoke shipped.
+>
+> **(2) VOICE-CASTING ARCHITECTURE -- roundtable R1 CONVERGED + Chunk 1 shipped.** Operator opened a NEW
+> workstream: every approved voice model needs a SOLID library + the LLM should make the best gender/voice
+> casting call. R1 (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude judge, ~$0.21,
+> `docs/2026-06-22-voice-casting-arch/`) converged on a HYBRID (LLM proposes a voice_ref_id from the
+> engine's voice cards; Python validates + falls closed to the seeded scorer), a TWO-LANE identity
+> (voice_ref_id for cloners / voice_preset for bark), a library coverage bar, and a non-blocking robustness
+> diagnostic. The panel CORRECTED two of my groundings: gender+voice are PURE PYTHON today (Sprint 3D, not
+> LLM), and the STEP-3 v2/* fallback is fine (cloners resolve via `_resolve_clone_ref_path` gender/any-ref).
+> **Chunk 1 SHIPPED (`deb4e01`):** `_otr_voice_bank.compute_bank_coverage` + a floor test -- each approved
+> engine has >=5 adult voices/gender (passes); the report SURFACES the gaps: cloners are MALE-LIGHT (~13-14 M
+> vs 22 F), bank is adult-only (3 elder, all male), NO `other`/androgynous voices, NO announcer refs in the
+> bank (announcer uses kokoro presets). **Operator remediation: add male + elder-female + other refs.**
+> **>>> NEXT (CURRENT STEP) = VC Chunks 2-4 (the build plan in pass01_plan.md), a FOCUSED next push --
+> these touch the VOICE-ASSIGNMENT DETERMINISM path (audio byte-identity-sensitive), so build them with the
+> byte-identical golden front-of-mind:** Chunk 2 two-lane identity refine + v2<->ref map; Chunk 3
+> `meta.cast_voice_slots` stamp (so CastLock's `_auto_registry` matches on timbre/age, not just gender --
+> note `EnsembleSlot` has timbre/role but NO age_band yet); Chunk 4 the HYBRID LLM voice-fit folded into
+> `llm_write_description` + the validator + `meta.voice_cast_decision`. Default-on, $0 deterministic fallback.
+
 > **LATEST SESSION -- 2026-06-22 (CODER+ROUNDTABLE; STORY+CAST FIX **STEPs 5+6 SHIPPED + LIVE-SMOKED**,
 > committed local NOT pushed. HEAD `f8a8645`, 4 commits ahead of origin/v2.0-alpha `da98144` (STEPs 1-4
 > already pushed at da98144).) The
