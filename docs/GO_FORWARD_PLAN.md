@@ -1,5 +1,129 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-23 (PLANNER/SCOPING; STORY-QUALITY QUALITY-REVIEW done + a 5-pass live roundtable
+> CONVERGED. Docs only, NOT pushed -- operator gates. HEAD unchanged `550679d`.)** Reviewed all 18 R3 flag-ON
+> soak episodes (`docs/2026-06-23-story-quality-review/STORY_REVIEW.md`) + ran two live roundtables
+> (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Grok-4.3, Claude code-grounded judge, ~$0.43): roundtable A =
+> panel critique of the stories (`roundtable/passA_STORY_CRITIQUE_SYNTHESIS.md`); roundtable B = R1->R4
+> improvement campaign, CONVERGED at R4 (`roundtable/pass04_plan_FINAL.md`). **VERDICT:** the defect is
+> CROSS-EPISODE SAMENESS -- every premise collapses into the same "console standoff" (people fight over a
+> lever/key/console while a gauge climbs + a countdown runs; the climax happens OFF-stage and the announcer
+> narrates the news outcome). ALL FOUR models, independently + cold, put the ROOT CAUSE in the BEAT PLANNER
+> (NOT the writer model, NOT the line composer) and ALL independently said a flag-and-reroll QA gate WON'T work
+> -- the strongest confirmation of the operator's instinct. Local gemma-12b OUT-WROTE frontier grok (candidate
+> (c) contradicted). **CONVERGED LEVER (build-ready, NO QA gate):** L1+L2 UPSTREAM structural core, ship together
+> (Python-chosen premise-specific `conflict_object`/`conflict_type` + deterministic crisis-noun substitution;
+> phase = dramatic FUNCTION via a `beat_role` sequence with an ON-STAGE climax beat) + L3 composer `ACTION:`-marker
+> strip + L4 regex sanitizer + L5a-FIRST (fix the edit-cap that silently terminates+never-grades the BEST writer's
+> dense prose, + the telemetry undercount). DEFERRED (operator call): L5b gemma-12b default (bake-off), L6
+> best-of-N (CUT from v0 -- a select-gate that can't fix structural sameness). Operator answer =
+> `docs/2026-06-23-story-quality-review/SCOPING_VERDICT.md`. **>>> NEW CURRENT STEP = operator GO to BUILD
+> `pass04_plan_FINAL.md` in a coder window** (order: L5a -> L1/L2 scaffolding flag-OFF byte-identical -> render-ON
+> + small re-soak to measure sameness -> L3/L4 golden re-baseline). R3 spine stays shipped + DEFAULT-ON. NO
+> production code written this window. prod/main + tags GATED.
+>
+> **HANDOFF -- 2026-06-23 (CODER; R3 spine flipped DEFAULT-ON + soak harvested. origin/v2.0-alpha
+> HEAD `550679d` == local.)** After the build (full trail in the block below), the operator read the
+> overnight soak (16 episodes -> `otr/obs`, all flag-ON, written by mistral/gemma12b/grok @ 883w) and
+> **chose to leave the spine ON**: `STORY_QUALITY_V2_DEFAULT` flipped to True (`550679d`); the writer now
+> honors the default when `OTR_STORY_QUALITY_V2` is unset, and `OTR_STORY_QUALITY_V2=0` is the kill-switch.
+> Suite 5109/34, Bug Bible 16/7/3, zero workflow-JSON change. **Honest verdict from the soak: the spine is
+> STABLE + HARMLESS but NOT a measurable quality lift on weak local writers** -- L1+L7 fired 0x across all
+> 17 scanned ledgers; L2 was eligible everywhere (40/40 high-tension beats had subtext) and DEMONSTRABLY
+> rewrote the prompt (verified live: objective withheld + deflection injected) yet the 12B/grok writers
+> IGNORED it and still produced imperative command-shouting ("Do it now!", "Initiate worldwide comms
+> silence"); arc verdicts (uneven/mid_collapse/flat) match the flag-OFF baseline. Root cause = weak-writer
+> prompt-adherence, NOT a wiring bug. The soak server is KILLED, :8000 FREE.
+> **>>> NEW CURRENT STEP = QUALITY-REVIEW WINDOW (operator-requested): review the 16 soak episodes in
+> `otr/obs` for craft, then SCOPE the REAL story-quality lever.** Stop-and-orient first (no code until GO).
+> The data says the next lever must NOT be another instruction-gate the weak model can ignore -- candidates:
+> (a) a **bare-imperative-flatness reroll gate** (line is a bald command with no subtext -> reroll, a HARD
+> deterministic catch, not lexical-objective overlap like L1), (b) **L4 best-of-N** (generate N candidates,
+> score flatness, keep the least-flat -- model-agnostic, no compliance needed), (c) lean on a **stronger
+> frontier writer** for the prose (grok reasoning-low already helps; try a bigger model). Telemetry
+> (`meta.story_quality`) + the obs episodes are the corpus. The R3 code stays shipped + ON. DEFERRED (R1):
+> L3 oblique-premise. prod/main + tags GATED.
+
+> **HANDOFF -- 2026-06-22 (CODER; STORY-QUALITY R3 SPINE BUILT + SHIPPED + PUSHED, then an 883-word
+> OVERNIGHT SOAK launched. origin/v2.0-alpha HEAD `096ef64` == local.)** Built `pass04_plan_FINAL.md`
+> in order, each chunk full-suite + Bug-Bible green then commit+push, ZERO `otr_scifi_16gb_full.json`
+> change (no-drift verified every commit), flag default-OFF => byte-identical:
+> - **C0 `67e229e`** -- ledger plumbing: `set_lines` preserves `compose_flags`+`arc_phase` (were
+>   silently dropped); `update_line_text(compose_flags_append=)` + reroll persists minted flags; shared
+>   `append_compose_flag` in `_otr_ledger_scrub`; new `_otr_config.py` (`STORY_QUALITY_V2_DEFAULT=False`,
+>   `OBJECTIVE_DEFLECTION_TENSION_MIN=4`, `story_quality_v2_enabled` reader). +7 tests.
+> - **L2 `30516f8`** -- authoring contract: under `meta.story_quality_v2_enabled`, a character beat with
+>   `beat_tension>=4` AND subtext WITHHOLDS its literal Objective + injects the deflection directive;
+>   `LineRequest.story_quality_v2_enabled`; writer stamps meta from `OTR_STORY_QUALITY_V2` env ONLY when
+>   enabled (no new key when off); reroll rebuilder threads it. +13 tests.
+> - **L1 `b11321f`** -- objective-literal floor: `flag_objective_literal` (NARROW content-word overlap on a
+>   SHORT line) wired in `compose_line` alongside cliche/on-the-nose (composer's own <=1 reroll, NOT the
+>   critic loop); stamps `objective_literal_retry`. +14 tests.
+> - **L7 `302e8ca`** -- dialogue|action split (subsumes L6): `split_stage_business` extracts a leaked
+>   verb-led action (balanced-quote class, dialogue guaranteed well-formed); `scrub_ledger` records
+>   `action_split:{json}` on `compose_flags` + STILL runs the strip (AUGMENT, the judge-flagged risk);
+>   `get_line_action` reader; idempotent; LOUD. +19 tests.
+> - **telemetry + L5 `bd2a0d3`** -- `meta.story_quality {l1_rerolls,l7_splits,l7_split_failures}` (gated,
+>   aggregated from compose_flags); OpenRouter frontier default `reasoning_effort=low` (re-measure HALVED
+>   flatness) + `DEFAULT_OUTPUT_TOKENS_CAP` 8192->16384 as the 0-line guard; explicit env still wins. +4 tests.
+> - **`096ef64`** -- fix: the L2/L7 writer meta-stamp hit `UnboundLocalError` (run() has a LOCAL `import os`
+>   -> `os` is function-local; the stamp used it before that import) -- crashed EVERY episode at execution
+>   (the suite doesn't run the heavy node). Fixed with a local import at the stamp. Suite 5109/34, Bug Bible 16/7/3.
+> **>>> NEW CURRENT STEP = read the OVERNIGHT SOAK results (operator-launched 2026-06-22 ~23:01, 9h).** A
+> `scripts/_otr_r3_overnight_launch.ps1` (gitignored) booted a headless :8000 server and `_otr_night_soak.py`
+> with: **883-word episodes** (new `OTR_NIGHT_WORDS` knob), writer mix **mistral/gemma12b/grok** (new
+> `OTR_NIGHT_WRITERS` knob -- gpt/deepseek slugs were `value_not_in_list` on this box), creativity tiers,
+> **LTX-AV bookends + z-image-turbo character stills**, **OTR_STORY_QUALITY_V2=1** (all R3 levers ON),
+> **OPENROUTER_REASONING_EFFORT=low** (grok), bark voice, bypass-freeze ON for unattended reliability. Logs:
+> `docs/2026-06-22-story-quality-r3/overnight/`. Episode #0 confirmed composing clean (18-beat outline, zero
+> errors). **DECISION (2026-06-23, soak read, 17 flag-ON episodes): DO NOT promote `OTR_STORY_QUALITY_V2` --
+> keep it OFF (as shipped).** Evidence: L1+L7 fired 0x across all 17 eps; L2 was eligible everywhere (40/40
+> high-tension beats had subtext) yet the high-tension lines are STILL imperative-flat ("Do it now!",
+> "Initiate worldwide comms silence", "Locking out the self-destruct"); arc verdicts (uneven/mid_collapse/
+> flat) match the flag-OFF baseline. The spine is STABLE + SAFE (15+ clean eps, 0 crashes, telemetry +
+> plumbing work, byte-identical off) but inert as a quality lift. Root cause: the weakness is
+> imperative-flatness / prompt-adherence -- NOT lexical-objective echo (L1's narrow matcher misses it) and
+> NOT a quoted-trailing-action shape (L7 has nothing to split); L2's soft directive doesn't move a 12B
+> local model off command-shouting. **NEXT (real lever, next sprint): a bare-imperative-flatness reroll gate
+> (command with no subtext -> reroll, NOT lexical overlap) and/or L4 best-of-N with a flatness scorer; or
+> lean on stronger frontier writers.** R3 code stays shipped (default-off). DEFERRED (R1): L3 oblique-premise,
+> L4 best-of-N. prod/main + tags GATED.
+
+> **HANDOFF -- 2026-06-22 (PLANNER; STORY-QUALITY R3 arc-spine->dialogue -- 4-ROUND ROUNDTABLE CONVERGED
+> + reasoning-ON re-measure. Docs only, NOT pushed -- operator gates. HEAD unchanged `d8978da`.)**
+> Drove the operator's R3 ask ("improve the LLMs that make the story") two ways at once.
+> **(1) reasoning-ON re-measure (LOCAL harness `_tmp_reasoning_remeasure.py`, untracked):** the prior soak
+> ran grok with `reasoning_effort=none` (the 0-line workaround) and grok was the FLATTEST (14/18). Re-ran
+> grok-4.3 `reasoning_effort=low` + output cap 8192->16384 (so reasoning doesn't starve the story), 2 legs,
+> no-bypass FLOOR. RESULT: flatness HALVED + CONSISTENT -- leg1 8/18 (arc uneven, 256w), leg2 6/18 (175w).
+> Reasoning-on is a real near-free WIN; NOT a silver bullet (still uneven + compressed). -> land
+> `OPENROUTER_REASONING_EFFORT=low` as a frontier-writer config default (with the cap bump as the 0-line guard).
+> **(2) 4-round roundtable (Claude code-grounded judge + GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, ~$0.534):**
+> hardened a model-agnostic dialogue-craft spine. Artifacts `docs/2026-06-22-story-quality-r3/roundtable/`
+> (pass00..pass04 + pass0N_judgment + per-model reviews). The judge code-VERIFIED two silent data-loss bugs the
+> panel found (`set_lines` drops `compose_flags`/`arc_phase` 967-984; `update_line_text` no-flag-path 892-918 ->
+> targeted-reroll drops row flags) and corrected a corrupting pass03 design (L7 must AUGMENT the scrub, not
+> REPLACE it).
+> **>>> NEW CURRENT STEP = BUILD `docs/2026-06-22-story-quality-r3/roundtable/pass04_plan_FINAL.md` in a SEPARATE
+> coder window.** 3-lever spine behind a default-OFF `meta.story_quality_v2_enabled` (flag off = byte-identical):
+>   - **C0 plumbing (gates all):** `set_lines` preserve `compose_flags`+`arc_phase`; `update_line_text(...,
+>     compose_flags_append=)`; reroll passes the appended flags; shared `_append_compose_flag`.
+>   - **L2 authoring contract:** in `_otr_line_composer._build_user_prompt`, gate (character AND beat_tension>=4
+>     AND beat_subtext) -> SUPPRESS the `Objective:` emit + inject "the line is the deflection; say what they say
+>     INSTEAD" (same gate in `build_reroll_line_request`).
+>   - **L1 objective-literal gate:** `flag_objective_literal` at composer 2061-2063 (Tier-2, <=1 recompose, NOT
+>     the critic loop); append `objective_literal_retry` to `LineResult.compose_flags` (composer is a pure leaf).
+>   - **L7 dialogue|action split (operator's idea; subsumes L6):** in `scrub_ledger` (raw dict; read flag from
+>     `led.meta`), run `split_stage_business(text)->(dialogue,action,reason)` BEFORE the existing strip, store
+>     `action_split:{json}` on the row `compose_flags`, then STILL run the strip + preserve its accounting. New
+>     episodes only via the flag; `get_line_action` reader; LOUD on failure.
+>   - **telemetry** (gated, aggregate-from-flags) + **post-build LIVE craft smoke** (flag-on vs off on local
+>     mistral: L2 indirection must NOT raise the critic's incoherence count -- the one risk tests can't catch).
+> Build order C0 -> L2 -> L1 -> L7 -> telemetry, suite+Bug-Bible+push per chunk; ZERO `otr_scifi_16gb_full.json`
+> change (no-drift assert). DEFERRED (R1): L3 oblique-premise (operator creative call), L4 best-of-N (needs a
+> trusted flatness scorer). **BOX:** a reasoning-low FLOOR server is RESIDENT on :8000 (re-measure leg-2
+> finishing) -- reset per CLAUDE.md S4 before any headless build run. prod/main + any tag GATED.
+>
 > **HANDOFF -- 2026-06-22 (CODER; STORY-QUALITY LIFT D1+D3+D2 SHIPPED + LIVE-VALIDATED + DIAGNOSTIC SOAK
 > ANALYZED. origin/v2.0-alpha HEAD `e052812` for code/docs; soak driver is LOCAL/untracked.)**
 > THIS SESSION, in order: built D1+D3+D2 (`6031b97`/`2e8597f`/`a37cc2d`), live no-bypass re-smoke caught +
