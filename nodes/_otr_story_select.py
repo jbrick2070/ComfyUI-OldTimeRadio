@@ -65,6 +65,35 @@ def _is_voiced(role: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Refine loop (v1, 2026-06-23) -- critique normalization
+# ---------------------------------------------------------------------------
+# A grader's biggest_weakness is LLM-generated free text fed back INTO the next
+# refine pass's outline prompt (as OutlineRequest.prior_critique). Sanitize it
+# to a single bounded line and reject prompt-injection-shaped instructions.
+# Empty / malformed / injection => "" (preserves the byte-identical path).
+_CRITIQUE_INJECTION_RE = re.compile(
+    r"ignore\s+(all\s+)?(previous|system|developer)\s+"
+    r"(instructions|messages|prompt)",
+    re.IGNORECASE,
+)
+
+
+def critique_to_hint(biggest_weakness: Any) -> str:
+    """Normalize a grader weakness into a single-line, <=200-char, injection-safe
+    structural hint for the next refine pass. Returns "" on empty / malformed /
+    injection so the next pass's prompt stays byte-identical."""
+    s = str(biggest_weakness or "")
+    s = s.replace("```", " ").replace("`", " ")     # code fences / backticks
+    s = re.sub(r"[\x00-\x1f\x7f]", " ", s)           # control chars incl \n \t
+    s = re.sub(r"\s+", " ", s).strip()               # collapse -> single line
+    if not s or _CRITIQUE_INJECTION_RE.search(s):
+        return ""
+    if len(s) > 200:
+        s = s[:200].rsplit(" ", 1)[0].strip()        # trim at a word boundary
+    return s
+
+
+# ---------------------------------------------------------------------------
 # Chunk 2 -- pure structural scorer
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)

@@ -420,6 +420,21 @@ class OutlineRequest:
                              # non-selector call) => byte-identical prompt to
                              # the pre-selector pipeline. A prompt overlay
                              # only -- NOT in-place beat surgery.
+    prior_critique: str = ""
+                             # OPTIONAL (refine loop v1, 2026-06-23). A short,
+                             # normalized STRUCTURAL weakness from the prior
+                             # refine pass's grader (sanitized via
+                             # _otr_story_select.critique_to_hint), rendered into
+                             # the MACRO + BEAT Path C prompts to steer a
+                             # REVISION of the prior story. SEPARATE from
+                             # diversity_hint (that stays v0 best-of-N steering).
+                             # Empty (default) => byte-identical prompt.
+    prior_macro: str = ""
+                             # OPTIONAL (refine loop v1). A digest of the PRIOR
+                             # winner's macro shape (Title/Premise/Setting + raw
+                             # beat intents) so the MACRO prompt REVISES the
+                             # existing spine instead of starting from scratch.
+                             # Empty (default) => byte-identical prompt.
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -1146,6 +1161,22 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
             f"the premise angle, the central stake, and who drives the turn): "
             f"{_dh}"
         )
+    # Refine loop (v1, 2026-06-23): REVISE the prior story's spine rather than
+    # start from scratch. Empty prior_macro => byte-identical.
+    _pm = req.prior_macro.strip()
+    if _pm:
+        _pc = req.prior_critique.strip()
+        if _pc:
+            parts.append(
+                "Current premise/arc to REVISE (keep what works; change the "
+                "premise/arc only if the weakness is structural):\n"
+                f"{_pm}\nBiggest weakness to fix: {_pc}"
+            )
+        else:
+            parts.append(
+                "Current premise/arc to REVISE (improve the structure while "
+                f"preserving the prior spine):\n{_pm}"
+            )
     parts.extend([
         "",
         f"Task: {verb}. Return only the JSON object.",
@@ -1266,6 +1297,11 @@ def _build_beat_user_prompt(
     _dh = req.diversity_hint.strip()
     if _dh:
         parts.append(f"Structural variation: {_dh}")
+    # Refine loop (v1): steer this beat to address the prior pass's weakness.
+    # Empty prior_critique => byte-identical.
+    _pc = req.prior_critique.strip()
+    if _pc:
+        parts.append(f"Address this weakness: {_pc}")
     parts.extend([
         "",
         "Task: write the intent (one sentence, NOT dialogue) and a "
