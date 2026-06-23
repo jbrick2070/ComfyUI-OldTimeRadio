@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-23T17:59:30.765650+00:00",
+  "doc": "docs\\2026-06-23-multipass-refine\\roundtable\\pass01_plan.md",
+  "prompt_tokens_est": 57555,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 54724,
+      "completion_tokens": 2000,
+      "cost_usd": 0.088405
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 63225,
+      "completion_tokens": 1996,
+      "cost_usd": 0.09899125
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 58008,
+      "completion_tokens": 6027,
+      "cost_usd": 0.030476970000000003
+    }
+  ],
+  "total_cost_usd": 0.2179
+}

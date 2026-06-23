@@ -1,0 +1,40 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: yes-with-fixes — small but real build-blocking ambiguities remain in PREREQUISITE and v0 selector/scorer specs; fix those before handing to builder.
+
+MUST-FIX BEFORE BUILD:
+1. [PREREQUISITE] Go/no-go gate is under-specified. “Build only on measurable residual sameness” gives no threshold, so two implementors/operators can validly decide opposite outcomes from the same soak. Concrete fix: add explicit proceed/cut criteria, e.g. “Proceed only if L1/L2 ON still has `meta.story_quality.ungrounded_crisis` density >= X or distinct conflict object/type counts <= Y over M episodes; otherwise CUT.” If thresholds are intentionally human-judged, state “operator makes explicit written go/no-go after reviewing soak table” and require that artifact before build.
+2. [v0 / Selector step 1] Candidate 0 cannot be “exact current production outline” while also reseeding RNG immediately before generation. Grounding shows current `run()` calls `_OTRO.generate_outline(...)` directly with no pre-outline `torch.manual_seed` / `random.seed`; seeding candidate 0 changes the sampling stream. Concrete fix: either delete the “candidate 0 == exact current production outline” claim and say only “candidate 0 uses the byte-identical prompt,” or do not reseed candidate 0 and explicitly give up deterministic candidate-0 reproduction. Prefer deleting the claim to preserve deterministic best-of-N.
+3. [v0 / Selector signature] `select_best_outline(generate_fn, outline_req, *, cast_seed, n, meta)` is ambiguous and conflicts with current code naming: grounding already has `creative_generate_fn` as the low-level LLM callable, while selector needs an outline-producing callable that preserves `creative_repo_id=resolved["creative_writing_model"]`. Concrete fix: rename/signature to `select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta, roster)`, where `generate_outline_fn(req)` wraps `_OTRO.generate_outline(creative_generate_fn, req, creative_repo_id=resolved["creative_writing_model"])`.
+4. [v0 / Scorer] `score_outline(outline, meta, roster)` requires `roster`, but selector signature does not pass it. Concrete fix: pass `roster=character_cast` or derive it explicitly from `outline_req.character_cast`; document which one is canonical.
+5. [v0 / Scorer] “distinct premise-grounded content nouns” is not implementable as one right algorithm. There is no POS/noun extractor in the grounding; `_otr_story_quality_l12.premise_noun_palette` only returns grounded tokens. Concrete fix: define the metric mechanically, e.g. “tokenize voiced beat intents with the same `[A-Za-z][A-Za-z'-]{2,}` rule used by `_otr_story_quality_l12`; casefold; count distinct tokens that are in `premise_noun_palette(roster, outline.premise, *_OTRSQL12.premise_texts(meta))`, excluding stopwords already excluded by the palette.” Do not use the word “nouns” unless a noun tagger is specified.
+6. [v0 / Telemetry] The literal `sq["best_of_n"] = {n, winner_index, scores: ...}` is not a valid dict shape and leaves key names ambiguous. Concrete fix: specify exact JSON shape, e.g. `{"requested_n": requested_n, "effective_n": n, "winner_index": winner_index, "scores": [...], "winner_grade": winner_grade, "clamp_reason": clamp_reason}`.
+7. [v0 / Local-only gate + fallback] After local-gate clamps paid lanes to `N=1`, the plan must not enter selector logic that can do candidate-0 plus fallback, causing two paid outline calls if candidate 0 fails. Concrete fix: after flag parsing and local clamp, call selector only when `effective_n >= 2`; otherwise execute the existing single `_OTRO.generate_outline(...)` path exactly once.
+8. [v0 / Flag parsing] Invalid env values are unspecified. `OTR_STORY_BEST_OF_N=abc`, negative, float, or whitespace could either crash, disable, or clamp depending on builder. Concrete fix: define parse rule: unset/blank/non-int/<=1 => disabled with LOUD warning for non-int; int >=2 => min(value, 6).
+
+SHOULD-FIX:
+1. [v0 / Telemetry scores] “scores: [plain-dict per candidate]” does not say whether failed candidates appear. Concrete fix: require `scores` length equals attempted `n`, with each entry including `candidate_index`, `ok`, and either metric fields or `error_type/error_message`. This keeps `winner_index` auditable.
+2. [v0 / Fallback] “fall through to ONE normal `generate_outline`” is ambiguous after selector has changed global RNG state. Concrete fix: define fallback as either seeded deterministic fallback (`sha256(f"{cast_seed}:outline:fallback")`) or true current-path fallback after restoring captured Python/torch RNG state. Prefer deterministic seeded fallback and stop calling it “normal.”
+3. [v0 / Grade] “Map to a legible grade; >= B is informational” has no thresholds. Since grade is not used by comparator, either cut it or specify exact thresholds. Smallest fix: cut `winner_grade` and “>= B” from v0 telemetry.
+4. [v0 / Scorer imports] The plan references `count_ungrounded_crisis`, `premise_noun_palette`, and `premise_texts` but only grounding shows them in `_otr_story_quality_l12.py`. Concrete fix: state scorer imports these from `_otr_story_quality_l12` and does not use private helpers unless explicitly allowed.
+5. [Build order step 4] “full suite + Bug Bible” is not a concrete build action. Concrete fix: name the expected test files or at least “run existing full test suite plus new tests listed under v0.”
+
+OPTIONAL / NICE-TO-HAVE:
+- Add one soak report template row: baseline density, L1/L2 density, best-of-3 density, distinct conflict objects/types, average outline calls, and wall-clock multiplier.
+- Add a single log line for winner rationale: candidate index and comparator tuple.
+
+CUT THESE:
+1. [v0 / Grade] Cut `winner_grade` and “>= B informational.” It does not affect selection and introduces threshold bikeshedding.
+2. [v1] Cut the detailed v1 B+ loop description from the build-ready v0 handoff, or move it to a “future” appendix. It is explicitly deferred and not needed by the builder.
+3. [Roundtable preamble] Cut model names/spend/artifact narrative from the implementation plan. Safe because it does not affect behavior, tests, or build order.
+4. [v0 / Telemetry] Cut `clamp_reason` from selector telemetry if effective `N < 2` bypasses selector and only a LOUD log is required. Safe if paid-lane clamp is covered by a test/log assertion.
+
+VERIFY-AT-BUILD checklist:
+1. [R3 UNVERIFIABLE] Confirm `torch.manual_seed(...)` / `random.seed(...)` actually affects each local outline generation call through the current `_build_truncating_generate_fn` / HF `model.generate` path; verify no per-call generator object or backend-specific RNG bypasses the global seeds.
+2. [v0 / Scorer] Confirm `count_ungrounded_crisis` on RAW outline intents is non-zero on at least one real baseline outline; otherwise this metric cannot discriminate.
+3. [v0 / Flag-off invariant] With `OTR_STORY_BEST_OF_N` unset/0/1: exactly one `_OTRO.generate_outline` call, no `meta.story_quality.best_of_n` key, and `_otr_outline._build_user_prompt` output byte-identical to pre-change.
+4. [v0 / L1/L2 interaction] With best-of-N enabled and L1/L2 enabled, confirm `build_sq_data` runs exactly once and only on the winning outline; confirm `_enrich_intent` does not double-append.
+5. [v0 / Local gate] With `creative_writing_model` resolved to `openrouter:*` and `comfy:*`, confirm effective N becomes 1 before any candidate loop and only one outline call is made.
+6. [v0 / Diversity hook] Confirm `OutlineRequest(diversity_hint="")` renders no extra prompt bytes; non-empty renders exactly one structural-variation block.
+7. [v0 / Candidate validation] Confirm every returned candidate has `dialogue_slot_id` on voiced beats and satisfies existing budget validation from `generate_outline`; selector must not call `build_sq_data` or mutate candidate intents during scoring.
+8. [ASSUMPTION] Earlier rounds had only the RNG-seeding item explicitly marked UNVERIFIABLE; if R1/R2 had additional UNVERIFIABLE flags not included in this document, add them here before lock.
