@@ -1,5 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **NO-BYPASS RE-SMOKE VALIDATION -- 2026-06-22 (CODER, headless, operator-authorized). origin/v2.0-alpha
+> HEAD `ffe2324`.** Reset box (S4) -> booted a FRESH FLOOR server WITHOUT `OTR_BYPASS_FREEZE_HALT` -> ran
+> `_otr_combo_soak.py` on the REAL `otr_scifi_16gb_full.json` (FLOOR visualizers, 3 chars, bark char-voice).
+> **The no-bypass freeze gate ran for real and FROZE** (critic + scoped reroll loop executed; verdict
+> `frozen_with_doctor_edits`, `cleanup_locked=True` -- no false halt). RESULTS:
+> - **D3 PROVEN LIVE + a real bug caught & fixed.** Run 1 surfaced a D3 over-coercion: the announcer is often
+>   stored as an ordinary cast slot (`char_id=c01, name=ANNOUNCER, kokoro`), not the `"announcer"` sentinel, so
+>   `cast_ids_from_ledger` wrongly counted it -> the pre-freeze sweep re-roled the announcer intro to character
+>   -> routed to the bark char engine -> `EngineUnusable` crash. FIXED at root (`ffe2324`): exclude any cast
+>   row whose name is ANNOUNCER (mirrors the reviewer roster convention) + 2 regression tests. Run 2 (fixed):
+>   the announcer intro/outro stayed `announcer` (kokoro), AND a genuinely mis-stamped character (`b004` c02
+>   flagged expected=announcer) was correctly REJECTED + coerced to character by the reviewer guard. Zero
+>   announcer-on-a-non-announcer-cast-id rows; zero announcer wrongly coerced.
+> - **D1 PROVEN:** every spoken line in both episodes was clean -- no trailing/embedded/undelimited stage
+>   direction reached the frozen ledger text; the floor left legitimate narration alone.
+> - **D2 PROVEN:** `meta.dramatic_state.character_b_wants` populated; `StanceIssue` telemetry field present +
+>   empty on a coherent short arc (correct); the beat-prompt stance rider is live.
+> - **Audio rendered cleanly** in run 2 (bark chars got valid `v2/*` presets; no crash); episode
+>   `signal_lost_experiment_in_unity_20260622_171830` rendered to a 67 MB mp4 + finished its visualizer pass.
+> Full suite **5073 pass/34 skip**, Bug Bible 16/7/3. **BOX STATE: a fresh no-bypass FLOOR server is RESIDENT
+> on :8000 finishing the validation episode -> obs (reset per S4 before the next headless run).** Logs:
+> `docs/2026-06-22-story-quality-lift/nobypass_server.log` + `nobypass_smoke2.log`.
+
 > **HANDOFF -- 2026-06-22 (CODER; STORY-QUALITY LIFT D1 + D3 + D2 ALL SHIPPED + PUSHED. origin/v2.0-alpha
 > HEAD `a37cc2d` == local.) Built `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md` in
 > dependency order; each chunk full suite + Bug Bible green, then commit AND push. ZERO workflow-JSON change
