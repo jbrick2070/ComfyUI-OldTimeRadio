@@ -40,6 +40,7 @@ try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         detect_stage_business_for_reroll,
         flag_cliche,
+        flag_objective_literal,
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
@@ -48,6 +49,7 @@ except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         detect_stage_business_for_reroll,
         flag_cliche,
+        flag_objective_literal,
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
@@ -2091,15 +2093,37 @@ def compose_line(
     # malformed/undelimited shapes are still intact; the freeze floor is the
     # deterministic backstop. These remaining S3 craft gates still recompose via
     # the existing recursive-repair pattern; the guard caps it at one level.
+    # L1 (story-quality v2, R3 2026-06-22) -- objective-literal floor. Declared
+    # in outer scope so the exhaustion fall-through can still stamp the retry
+    # breadcrumb. Default False keeps the flag-OFF path byte-identical.
+    _ol_hit = False
+    _ol_reason = ""
     if not _stage_dir_repair_attempted:
         _cl_hit, _cl_reason = flag_cliche(cleaned)
         _sb_hit, _sb_reason = flag_stage_business(cleaned)
         _nose_hit, _nose_reason = flag_on_the_nose(cleaned)  # C5
-        if _cl_hit or _sb_hit or _nose_hit:
+        # L1 gate: only under the story-quality-v2 flag, only a character beat.
+        # A bald restatement of the beat objective recomposes ONCE through the
+        # SAME <=1-reroll pattern as the S3 gates (NOT run_targeted_reroll /
+        # MAX_REROLL_CYCLES). Missing objective frame -> skip (one warning when
+        # the beat is at real tension, so a mis-wired frame is visible).
+        if req.story_quality_v2_enabled and req.speaker_role == "character":
+            if (req.beat_objective or "").strip():
+                _ol_hit, _ol_reason = flag_objective_literal(
+                    cleaned, req.beat_objective,
+                )
+            elif 1 <= req.beat_tension <= 5:
+                log.warning(
+                    "[OTR_LineComposer] L1 objective-literal gate skipped for "
+                    "%s -- character beat at tension %d carries no "
+                    "beat_objective frame", req.speaker, req.beat_tension,
+                )
+        if _cl_hit or _sb_hit or _nose_hit or _ol_hit:
             _reasons = [
                 r for h, r in (
                     (_cl_hit, _cl_reason),
                     (_sb_hit, _sb_reason), (_nose_hit, _nose_reason),
+                    (_ol_hit, _ol_reason),
                 ) if h
             ]
             _flag_hint = "; ".join(_reasons)
@@ -2111,7 +2135,7 @@ def compose_line(
                 "one reroll", req.speaker, _flag_hint,
             )
             try:
-                return compose_line(
+                _rr = compose_line(
                     creative_fn=creative_fn,
                     req=req,
                     max_attempts=max_attempts,
@@ -2127,6 +2151,16 @@ def compose_line(
                     _stage3_repair_attempted=_stage3_repair_attempted,
                     _stage_dir_repair_attempted=True,
                 )
+                # L1: stamp the retry breadcrumb on the recomposed result so the
+                # telemetry pass can aggregate objective_literal_retry counts
+                # (the composer is a pure leaf -- it never touches led["meta"]).
+                if _ol_hit:
+                    _rr = replace(
+                        _rr,
+                        compose_flags=_rr.compose_flags
+                        + ("objective_literal_retry",),
+                    )
+                return _rr
             except LineCompositionFailedError:
                 log.warning(
                     "[OTR_LineComposer] stage-direction reroll exhausted for "
@@ -2137,7 +2171,12 @@ def compose_line(
     # Stage 3 -- deterministic strip pipeline. Every strip below runs
     # before this function returns, so the caller appends the corrected
     # line (not a raw hallucination) to its rolling window.
-    compose_flags: tuple[str, ...] = ()
+    # L1: seed with the retry breadcrumb when the gate fired but the reroll
+    # exhausted (fell through to keep the draft) -- () when the flag is off so
+    # the flag-OFF path is byte-identical.
+    compose_flags: tuple[str, ...] = (
+        ("objective_literal_retry",) if _ol_hit else ()
+    )
 
     # 3a. cast_strip -- remap near-miss phantom names to the locked
     # cast spelling (Levenshtein via auto_remap_phantom). Runs before

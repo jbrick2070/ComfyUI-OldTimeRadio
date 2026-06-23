@@ -639,6 +639,85 @@ def flag_stage_business(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
+# ---------------------------------------------------------------------------
+# L1 (story-quality v2, R3 2026-06-22) -- objective-literal floor (FLAG ONLY).
+#
+# The universal weak-writer failure under pressure is a short, bald line that
+# RESTATES the beat objective outright ("Marlowe, confess that you leaked the
+# codes!") instead of playing it through action/subtext. This is a NARROW
+# deterministic matcher: it fires ONLY when a SHORT line reuses most of the
+# objective's distinctive content words. Tuned to favour false NEGATIVES over
+# false positives -- a long, elaborated line that happens to contain the
+# objective words is NOT a bald restatement and must not be flagged. Gated at
+# the composer behind the story-quality-v2 flag; off by default.
+# ---------------------------------------------------------------------------
+
+#: Common words excluded from the objective<->line content-word overlap so the
+#: ratio is driven by distinctive nouns/verbs, not function words.
+_OBJLIT_STOPWORDS: frozenset = frozenset({
+    "the", "and", "that", "this", "with", "from", "into", "your", "yours",
+    "their", "them", "they", "have", "has", "had", "will", "would", "could",
+    "should", "about", "what", "when", "where", "which", "while", "before",
+    "after", "than", "then", "there", "here", "been", "being", "were", "was",
+    "are", "for", "but", "not", "you", "him", "her", "his", "she", "out",
+    "get", "got", "make", "made", "want", "wants", "wanted", "need", "needs",
+    "tell", "tells", "told", "say", "says", "said", "ask", "asks", "asked",
+    "let", "lets", "him", "all", "any", "can", "cant", "off", "over", "down",
+    "back", "just", "more", "some", "such", "very", "onto", "upon", "amid",
+})
+
+#: A bald restatement is short. A long line has room to play the objective
+#: indirectly, so it is NEVER flagged (false-positive guard).
+_OBJLIT_MAX_LINE_WORDS: int = 18
+#: Need at least this many distinctive objective words present AND this fraction
+#: of the objective's content words, for a NARROW high-confidence match.
+_OBJLIT_MIN_OVERLAP: int = 2
+_OBJLIT_MIN_RATIO: float = 0.6
+
+_OBJLIT_WORD_RE = re.compile(r"[A-Za-z][A-Za-z']{3,}")
+
+
+def _objlit_content_words(s: str) -> "set[str]":
+    return {
+        w for w in (m.lower() for m in _OBJLIT_WORD_RE.findall(s or ""))
+        if w not in _OBJLIT_STOPWORDS
+    }
+
+
+def flag_objective_literal(text: Any, beat_objective: Any) -> "tuple[bool, str]":
+    """(flagged, hint): the spoken line baldly RESTATES the beat objective.
+
+    NARROW + deterministic + pure (never raises). Fires only when ALL hold:
+      * the objective carries >= ``_OBJLIT_MIN_OVERLAP`` distinctive content
+        words (too thin to judge otherwise -> no flag);
+      * the line is short (<= ``_OBJLIT_MAX_LINE_WORDS`` words -- a long line
+        has room to imply the goal and is never flagged);
+      * the line reuses >= ``_OBJLIT_MIN_OVERLAP`` of those words AND >=
+        ``_OBJLIT_MIN_RATIO`` of the objective's content words.
+
+    The hint is the actionable reroll instruction (imply the goal, don't state
+    it). An empty objective / empty line -> (False, "")."""
+    try:
+        obj_words = _objlit_content_words(str(beat_objective or ""))
+        if len(obj_words) < _OBJLIT_MIN_OVERLAP:
+            return False, ""
+        line = str(text or "")
+        if len(re.findall(r"[A-Za-z']+", line)) > _OBJLIT_MAX_LINE_WORDS:
+            return False, ""
+        line_words = _objlit_content_words(line)
+        overlap = obj_words & line_words
+        if (len(overlap) >= _OBJLIT_MIN_OVERLAP
+                and (len(overlap) / len(obj_words)) >= _OBJLIT_MIN_RATIO):
+            return True, (
+                "objective-literal: the line states the beat goal outright "
+                f"({sorted(overlap)}) -- imply it through what the character "
+                "DOES or deflects to, do not name the objective"
+            )
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 
