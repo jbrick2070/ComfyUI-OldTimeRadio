@@ -1,5 +1,23 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-23 (PLANNER/ROUNDTABLE; v1 ITERATIVE STORY-REVISION LOOP -- 4-ROUND ROUNDTABLE
+> CONVERGED, BUILD-READY PLAN. Docs only, NOT code -- await operator GO. HEAD unchanged `e2425b8`.)**
+> Operator asked for a recursive story-refine loop ("keep improving until B+/B, never stops"). Ran a LIVE
+> 4-round roundtable (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, Claude grounded judge+panelist, ~$0.52,
+> R4 DeepSeek errored on reasoning-token exhaustion -- GPT+Gemini converged). CONVERGED on a DETERMINISTIC,
+> local-only, default-OFF ITERATIVE REVISION loop inside `OTR_LedgerScriptWriter.run()` -- NOT best-of-N;
+> NOT write-from-scratch: it REVISES the existing story (spine only when needed, seeded by the prior story +
+> a graded weakness) until a target grade OR a hard cap (5), then ships keep-best. Operator LOCKED: target =
+> a node dropdown Off/C+/B/B+/A (default Off, B recommended); always a REWRITE not a from-scratch regen.
+> **ROUNDTABLE CAUGHT A SHIPPED v0 BUG: best-of-N `diversity_hint` is DEAD -- rendered only in
+> `_build_user_prompt` (back-compat/test-only); production is Path C (`_build_macro/beat_user_prompt`), so v0
+> candidates vary only by RNG seed (why the 30-word smoke tied all 3 candidates). best-of-N still functions
+> mechanically; the structural STEERING is inert.** Build-ready plan (6 chunks 0-5; chunk 0 = the v0
+> diversity_hint Path-C wiring fix): `docs/2026-06-23-refine-loop/roundtable/pass04_plan_FINAL.md` (+ pass00-03
+> plans/judgments + OPERATOR_INPUTS.md). **NEW CURRENT STEP = operator GO to BUILD the v1 refine loop** (or do
+> the standalone v0 `diversity_hint` fix first -- low-risk, makes shipped best-of-N actually steer). v1 ships
+> default-OFF; an L1/L2-style grade-lift soak is post-build validation. prod/main + tags GATED.
+>
 > **HANDOFF -- 2026-06-23 (CODER; BEST-OF-N STRUCTURAL STORY-REFINE SELECTOR -- v0 LOCAL + OPTIONAL REMOTE,
 > ALL 4 CHUNKS BUILT + SHIPPED + PUSHED. origin/v2.0-alpha HEAD `4593bc5` == local.)** Built
 > `docs/2026-06-23-multipass-refine/roundtable/pass04_plan_FINAL.md` in order; each chunk full-suite + Bug-Bible

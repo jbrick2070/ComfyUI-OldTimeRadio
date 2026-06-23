@@ -1,0 +1,24 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: build-ready as-is? no. The design contains critical unresolved integration points (grader-to-hint conversion, pass-level interaction with v0 best-of-N, grader sourcing) that would leave the builder without a concrete spec. These must be decided before code is written.
+
+MUST-FIX BEFORE BUILD:
+1. [Design – Grader-to-Hint Conversion] The plan does not specify how the grader's "biggest_weakness" string is transformed into a `diversity_hint` that the outline generator can use. The v0 diversity hints are short, standalone instructions; a raw weakness like "antagonist motivation unclear" may be too vague or long. Fix: define a canonical conversion: prefix with `IMPROVEMENT HINT: `, trim to a maximum of 200 characters, and confirm that `_build_user_prompt` can render it exactly as it does existing hints (no extra formatting). Otherwise the loop's steering is ill‑defined.
+2. [Design – Pass‑Level Best‑of‑N Interaction] The plan states the outline build "MAY itself be the v0 best‑of‑N selector" but leaves the choice unresolved. This creates ambiguity about whether each pass will generate N outlines (multiplying cost by N×passes) or just one. Fix: decide that the refine loop will always generate exactly one outline per pass, ignoring any `OTR_STORY_BEST_OF_N` flag when `OTR_STORY_REFINE_PASSES >= 2`. If the operator wants structural pre‑selection, they can run best‑of‑N on a single pass. This simplifies the design and prevents cost explosion.
+3. [Design – Grader Implementation] The plan suggests reusing the `_otr_story_critic` from the freeze cascade, which runs downstream and likely does not return a holistic 0‑100 score. Attempting to import it inside the compose loop risks a circular dependency. Fix: specify a new, standalone `grade_story(composed_lines, premise, meta) -> StoryGrade` function that calls a local rubric prompt (modeled on the existing `run_story_brief_reflection` pattern). It must produce a numeric score and a `biggest_weakness` string. This ensures independence and testability.
+4. [Design – Remote Provider Clamp] The flag‑resolution logic (`resolve_refine_passes`) must include the same provider gate as v0: if `creative_writing_model` starts with `openrouter:` or `comfy:`, force `effective_passes = 1` and log a warning, regardless of the environment variable. Without this, a misconfiguration could trigger paid remote calls. Add this to the spec now.
+
+SHOULD-FIX:
+1. [Loop Early‑Termination Fallback] Add a rule: if the grader score does not improve (or stays flat) for two consecutive passes, break the loop early to save compute. This mitigates the risk that the local model cannot effectively steer itself from the critique.
+2. [Fallback Seed Determinism] The never‑fail fallback (all passes raised) uses the i=0 seed with an empty diversity_hint. Clarify that this seed is derived as `sha256(f"{cast_seed}:refine:0")`, not the original single‑pass seed, to avoid contaminating deterministic guarantees.
+3. [Post‑Build Validation Gate] The plan correctly defers validation, but it must explicitly state that the loop will remain default‑OFF until a go/no‑go soak (measuring grade lift and sameness metrics) is completed and the operator approves. This is a process requirement, not code, but should be noted here.
+
+OPTIONAL / NICE-TO-HAVE:
+- Provide an optional wall‑clock budget (e.g., `MAX_REFINE_SECONDS`) as an alternative stop condition.
+- Record the full grader critique (not just biggest_weakness) in telemetry for debugging.
+
+CUT THESE (scope / over‑engineering):
+1. Remove the option to run the v0 best‑of‑N selector inside each refine pass. The loop should rely on the critique‑driven diversity hint for improvement; structural pre‑filtering is orthogonal and only multiplies cost. (If the operator wants both, they can stack the two flags, but the loop must not mandate it.)
+2. Do not reuse `_otr_story_critic` from the freeze cascade. Build the grader as a new, lightweight rubric call, as specified in MUST‑FIX #3. This avoids coupling and circular import risks.
+
+[ASSUMPTION] The local model can produce a diversity‑hint‑shaped improvement suggestion that, when fed into the outline prompt, yields a better outline (not a rephrase of the same beats). The design implicitly assumes this; if it fails, the loop degrades to best‑of‑N composed keep‑best. [ASSUMPTION] The grader’s 0‑100 score is sufficiently reliable to drive early‑stop and keep‑best decisions; a weak local model may be lenient/noisy, as acknowledged in open question B. [ASSUMPTION] Running up to 5 full story compositions in‑process is acceptable for an opt‑in feature on the operator’s GPU. [ASSUMPTION] The `cast_seed` value is available inside the loop (it is used to derive per‑pass seeds) and is the same `cast_seed` passed to the writer’s outer logic. Verify this before building.
