@@ -87,9 +87,12 @@ inside functions). Deterministic: same ledger in -> same ScrubResult out.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+log = logging.getLogger("OTR.ledger_scrub")
 
 # Bare leading stage-direction floor (2026-06-22). _otr_line_hygiene is a
 # stdlib-only leaf (imports only `re`) -> no import cycle. Dual import keeps the
@@ -98,12 +101,14 @@ try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         BARE_STAGE_FLOOR_ACTIVE,
         scrub_leading_stage_direction,
+        split_stage_business,
         strip_quote_anchored_stage_direction,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         BARE_STAGE_FLOOR_ACTIVE,
         scrub_leading_stage_direction,
+        split_stage_business,
         strip_quote_anchored_stage_direction,
     )
 
@@ -114,7 +119,34 @@ __all__ = [
     "scrub_ledger",
     "is_spoken_role",
     "append_compose_flag",
+    "get_line_action",
 ]
+
+
+def get_line_action(line: Any) -> str:
+    """Read the L7 dialogue|action split off a ledger row's ``compose_flags``.
+
+    Scans for the exact prefix ``action_split:`` (the JSON the L7 split stamps),
+    JSON-parses it, and returns the ``action`` string. The LATEST valid entry
+    wins (a re-scrub appends a fresh one); malformed entries are ignored.
+    Returns ``""`` when the row carries no recorded action. Never raises -- the
+    idempotency guard in scrub_ledger relies on this being safe on any row."""
+    action = ""
+    try:
+        if not isinstance(line, dict):
+            return ""
+        for flag in line.get("compose_flags") or []:
+            if not isinstance(flag, str) or not flag.startswith("action_split:"):
+                continue
+            try:
+                obj = json.loads(flag[len("action_split:"):])
+            except Exception:  # noqa: BLE001 -- ignore a malformed entry
+                continue
+            if isinstance(obj, dict) and obj.get("action"):
+                action = str(obj["action"])  # latest valid wins
+    except Exception:  # noqa: BLE001
+        return ""
+    return action
 
 
 def append_compose_flag(row: Any, flag: str) -> None:
@@ -785,6 +817,12 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
     sfw_violations: List[Tuple[str, str]] = []
     seen_spoken: Dict[str, str] = {}   # normalized-text -> first line_id
 
+    # L7 (story-quality v2, R3): the dialogue|action split runs only under the
+    # per-episode flag (read once from meta -- the row schema is FIXED, there is
+    # no per-line meta dict). Flag OFF -> the whole L7 branch below is skipped and
+    # the per-line loop is byte-identical to pre-R3.
+    _sqv2_on = bool((led.get("meta") or {}).get("story_quality_v2_enabled"))
+
     # ---- 3. per spoken line --------------------------------------------
     for i, row in enumerate(lines):
         if not isinstance(row, dict):
@@ -801,6 +839,45 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
             speaker = name_by_cid.get(cid) or str(row.get("speaker") or "")
         raw_text = row.get("text")
         raw_text = raw_text if isinstance(raw_text, str) else ""
+
+        # L7 dialogue|action split -- AUGMENT, BEFORE the lossy strip chain.
+        # Capture a leaked trailing/leading 3rd-person action onto the row's
+        # compose_flags and keep ONLY the spoken dialogue; then STILL run the
+        # strip chain below (a no-op on already-clean dialogue) so its existing
+        # accounting (stage_stripped / normalized_any / findings) is preserved.
+        # Idempotent (skip if an action was already recorded). LOUD on failure.
+        if _sqv2_on:
+            try:
+                if not get_line_action(row):
+                    _dlg, _action, _split_reason = split_stage_business(raw_text)
+                    if _action:
+                        row["text"] = _dlg
+                        if "word_count" in row:
+                            row["word_count"] = len(_dlg.split())
+                        if "char_count" in row:
+                            row["char_count"] = len(_dlg)
+                        raw_text = _dlg
+                        append_compose_flag(
+                            row,
+                            "action_split:" + json.dumps(
+                                {"action": _action, "reason": _split_reason},
+                                ensure_ascii=False, separators=(",", ":"),
+                            ),
+                        )
+                        findings.append(ScrubFinding(
+                            code=CODE_STAGE_DIRECTION, where=f"lines[{i}]",
+                            detail="split leaked action from spoken field (L7)",
+                            line_id=line_id,
+                        ))
+            except Exception as exc:  # noqa: BLE001 -- never break the scrub
+                append_compose_flag(
+                    row, f"action_split_failed:{type(exc).__name__}",
+                )
+                log.warning(
+                    "[OTR_LedgerScrub] L7 dialogue|action split failed for %s "
+                    "(%s) -- leaving the row to the normal strip chain",
+                    line_id, exc,
+                )
 
         # 3a. composer format strip (leaked prefixes / brackets / md / quotes).
         cleaned = lc.strip_line_formatting(raw_text)

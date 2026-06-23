@@ -526,6 +526,65 @@ def strip_quote_anchored_stage_direction(text: Any) -> "tuple[str, bool, str]":
 
 
 # ---------------------------------------------------------------------------
+# L7 (story-quality v2, R3 2026-06-22) -- dialogue|action SPLIT.
+#
+# The operator's idea (subsumes L6): instead of only STRIPPING a leaked stage
+# direction, SPLIT a line into spoken dialogue + the extracted action so the
+# action can be RECORDED (on the row's compose_flags) while the spoken text is
+# kept clean. Scope: the BALANCED-QUOTE outside-span class (b005/b010/b012
+# "<quoted dialogue>" <trailing 3rd-person action>) -- the same class the Tier-3
+# freeze floor removes, so the dialogue this produces is byte-for-byte what the
+# floor would leave (the strip that still runs after is then a no-op, never a
+# double-strip). Leading-bare + undelimited classes stay the existing strip
+# chain's job (unchanged -- no regression, no corruption). Reuses
+# segment_double_quotes + is_third_person_action_clause (no regex dup).
+# ---------------------------------------------------------------------------
+
+
+def split_stage_business(text: Any) -> "tuple[str, str, str]":
+    """Split a spoken line into ``(dialogue, action, reason)``.
+
+    Returns ``action`` NON-EMPTY only on a confident extraction, and then
+    ``dialogue`` is guaranteed non-empty + well-formed (``_floor_well_formed``).
+    Nothing to split / not confident -> ``(normalized_text, "", "")`` -- the
+    caller leaves the row to the normal strip chain. ``reason`` is one of
+    ``"leading"`` / ``"trailing_after_quote"`` (matching the floor's reason
+    codes). Conservative: ONLY the balanced-quote outside-span class; never
+    corrupts the spoken text. Pure; never raises (the caller still wraps it and
+    records ``action_split_failed`` on any unexpected error)."""
+    try:
+        s = "" if text is None else str(text)
+        norm, segments = segment_double_quotes(s)
+        nq = norm.count('"')
+        if not nq or nq % 2 != 0:
+            return (norm, "", "")
+        actions: list[str] = []
+        reason = ""
+        rebuilt: list[str] = []
+        for idx, (span, in_quote) in enumerate(segments):
+            if in_quote:
+                rebuilt.append(span)
+                continue
+            core = span.strip(" ,;:-")
+            if core and is_third_person_action_clause(core):
+                actions.append(core)
+                reason = "leading" if idx == 0 else "trailing_after_quote"
+                rebuilt.append("")
+            else:
+                rebuilt.append(span)
+        if not actions:
+            return (norm, "", "")
+        dialogue = _WS.sub(" ", '"'.join(rebuilt)).strip()
+        if dialogue and _floor_well_formed(dialogue):
+            return (dialogue, " ".join(actions), reason)
+        # extraction would corrupt the spoken text -> no split (keep it whole;
+        # the normal strip chain / freeze floor still guards the row).
+        return (norm, "", "")
+    except Exception:  # noqa: BLE001 -- never raise on a spoken line
+        return ("" if text is None else str(text), "", "")
+
+
+# ---------------------------------------------------------------------------
 # S2 (story-quality R2) -- announcer close reads as a thesis/moral, not an image
 # ---------------------------------------------------------------------------
 
