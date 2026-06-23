@@ -1,5 +1,31 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-22 (CODER; STORY-QUALITY LIFT D1+D3+D2 SHIPPED + LIVE-VALIDATED + DIAGNOSTIC SOAK
+> ANALYZED. origin/v2.0-alpha HEAD `e052812` for code/docs; soak driver is LOCAL/untracked.)**
+> THIS SESSION, in order: built D1+D3+D2 (`6031b97`/`2e8597f`/`a37cc2d`), live no-bypass re-smoke caught +
+> fixed a D3 over-coercion (`ffe2324`: announcer stored as a cast slot `name=ANNOUNCER` must be excluded
+> from cast_ids), then ran a 3h NO-BYPASS writer-rotation DIAGNOSTIC SOAK (620w, all-visualizer FLOOR,
+> indextts2) on the canonical JSON, rotating mistral / gemma-4-E2B / E4B / 12b / grok (technical=local
+> mistral). **RESULT: D1/D3/D2 hold on EVERY writer -- 0 stage-direction leaks, 0 role coercions, 0
+> bad-role rows, 0 critic stance issues; freeze gate shipped every completed episode no-bypass.** Full
+> analysis: `docs/2026-06-22-story-quality-lift/SOAK_STORY_ANALYSIS.md` (12 episodes, ground-truth
+> per-writer attribution from each ledger's meta).
+> **>>> NEW CURRENT STEP = STORY-QUALITY R3 (writer CRAFT, the operator's next ask -- "improve the LLMs
+> that make the story").** The soak's #1 universal weakness: EVERY writer collapses to terse
+> imperative command-shouting under pressure ("Override the protocols!", "Lockdown now!", "Transmit the
+> coordinates!") -- that is what the critic flat_lines flag (grok 14/18, mistral 7/18). Proposed levers
+> (build-ready detail in SOAK_STORY_ANALYSIS.md sec D): (1) **imperative-flatness reroll gate** (bare
+> command w/ no subtext -> reroll "play the pressure indirectly"; pairs with the existing on-the-nose/
+> cliche gates; model-agnostic, lifts only the weak end -- E2B's lone `strong` arc proves good lines
+> survive); (2) **extend D1 to narrative-sentence-in-dialogue** (gemma-12b leaked full 3rd-person
+> narration into character lines -- "a jagged cry tears from her throat as she claws..." -- a class
+> distinct from the verb-led-after-quote D1 already covers); (3) **length adherence** (writers compress
+> to 61-344w vs the 620 target); (4) **grok reasoning tuning** (try `reasoning_effort=low` vs none;
+> no-reasoning may be flattening it); (5) **E4B robustness** (one `dramatic_state_source=fallback` + a
+> caps cast-name leaked mid-dialogue). RECOMMEND a roundtable to converge R3 before building (per CLAUDE.md).
+> **BOX:** soak STOPPED, :8000 free. Soak harness `_tmp_gemma_diag_loop.py` (LOCAL, untracked; 75-min
+> wall + queue-idle serialization) is reusable for the R3 re-measure. prod/main + any tag GATED.
+
 > **NO-BYPASS RE-SMOKE VALIDATION -- 2026-06-22 (CODER, headless, operator-authorized). origin/v2.0-alpha
 > HEAD `ffe2324`.** Reset box (S4) -> booted a FRESH FLOOR server WITHOUT `OTR_BYPASS_FREEZE_HALT` -> ran
 > `_otr_combo_soak.py` on the REAL `otr_scifi_16gb_full.json` (FLOOR visualizers, 3 chars, bark char-voice).
