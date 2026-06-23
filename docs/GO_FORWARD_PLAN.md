@@ -1,5 +1,46 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-23 (CODER; STORY-QUALITY LIFT L5a + L1/L2 + L3 + L4 ALL BUILT + SHIPPED + PUSHED.
+> origin/v2.0-alpha HEAD `41aed49` == local.)** Built `pass04_plan_FINAL.md` in order, each chunk full-suite +
+> Bug-Bible green then commit AND push, ZERO `otr_scifi_16gb_full.json` change (verified each commit), all SQ
+> flags DEFAULT-OFF => byte-identical:
+> - **L5a `9fd4de6`** -- trustworthy measurement: `compute_edit_cap -> max(3,min(12,ceil(voiced_beats*0.6)))`
+>   (6->4, 18->11, 19->12) so dense gemma-12b prose is no longer `too_many_edits`-halted BEFORE the critic;
+>   scrub telemetry now MERGES into `meta.story_quality` (setdefault/update, counts from the SAVED rows) instead
+>   of a blind overwrite; downstream already tolerates a missing `story_critic_report` on terminal verdicts.
+> - **L1+L2 scaffolding `6174bf8`** -- new stdlib leaf `nodes/_otr_story_quality_l12.py`: `select_domain`
+>   keyword map + 13-domain conflict palette, seed-keyed `conflict_object`/`type`, whole-token crisis-noun
+>   grounding (mutates `beat.intent` ONLY), `beat_role` dramatic-function sequence
+>   (setup/pressure/personal_stake/irreversible_choice-LAST/consequence) + validator, deterministic fallback
+>   content, `build_sq_data` entrypoint. `OTR_STORY_QUALITY_L12` env flag (default OFF). `LineRequest` gains
+>   `beat_role`/`conflict_object`/`conflict_type=""`; composer DRAMATIC FRAME renders them ONLY when non-empty.
+>   Writer builds the writer-side `dict[beat_id]` after the outline (never raises into the writer) + threads the
+>   3 fields. Flag OFF => empty dict, no intent mutation, byte-identical prompt (asserted).
+> - **L1+L2 render-on telemetry `201e080`** -- writer stamps `meta.story_quality {l12_domain, conflict_objects[],
+>   conflict_types[]}` (the cross-episode SAMENESS measure); scrub stamps `ungrounded_crisis={matches,total}` over
+>   the SHIPPED spoken text (gated on `meta.story_quality_l12_enabled`).
+> - **L3 + L4 `41aed49`** -- L3 `OTR_COMPOSER_ACTION_STRIP`: `strip_action_marker` removes model-marked
+>   `ACTION: ...` from the shipped line right after compose/polish + records a SEPARATE `action_strip:` flag;
+>   gated prompt instruction added. L4 `OTR_TRANSCRIPT_SANITIZER`: `sanitize_transcript_text` strips
+>   prompt-leak/director-note + balances a stray wrapper quote on FINAL text in the scrub before freeze/TTS/hash;
+>   `detect_mojibake` is VERIFY-ONLY. Both audio-affecting, DEFAULT-OFF => `test_audio_byte_identical` GREEN, no
+>   golden re-baseline needed yet. Suite 5155/34, Bug Bible 16/7/3.
+> **LIVE 30-WORD FULL RENDER (FLOOR lane, canonical `otr_scifi_16gb_full.json`, prompt `b7e5eda3`):** the
+> STORY+AUDIO path -- everything the LIFT touches -- ran CLEAN end to end with the new code: outline -> compose ->
+> critic (`arc_verdict=uneven`, GRADED not halted) -> reroll -> scrub -> freeze (`frozen_with_doctor_edits`,
+> reviewer=improved; the L5a edit-cap is live) -> audio master 45.16s -> episode mp4 59.2 MB
+> (`signal_lost_lunar_shadows_20260623_103340`, story "Lunar Shadows", a lunar-mission premise). The OBS
+> broadcast-finalization pass then raised `RenderError: shot shot_b002 engine 'humo_1.7B' ... gated_by_flag`
+> (HuMo is OFF under the FLOOR boot lane + the 2026-06-16 no-fallbacks rule raises LOUD) -- ORTHOGONAL to the
+> story-quality work; the obs blended_final did not land. L12/L3/L4 were OFF for this run (byte-identical
+> baseline). Box reset, :8000 FREE.
+> **>>> NEW CURRENT STEP = operator MEASUREMENT soak + golden re-baseline (GPU-gated):** (1) re-soak a small
+> matrix with `OTR_STORY_QUALITY_L12=1` to measure cross-episode sameness (`meta.story_quality.ungrounded_crisis`
+> + distinct `conflict_object`/`type` counts) vs the R3 baseline; (2) enable L3/L4 (`OTR_COMPOSER_ACTION_STRIP`,
+> `OTR_TRANSCRIPT_SANITIZER`) WITH a deliberate `test_audio_byte_identical` golden re-baseline each; (3) to get a
+> clean OBS final under a quick smoke, boot the DEFAULT (HuMo) lane, not FLOOR. DEFERRED (operator call): L5b
+> gemma-12b default (bake-off), L6 best-of-N (CUT from v0). prod/main + tags GATED.
+>
 > **HANDOFF -- 2026-06-23 (PLANNER/SCOPING; STORY-QUALITY QUALITY-REVIEW done + a 5-pass live roundtable
 > CONVERGED. Docs only, NOT pushed -- operator gates. HEAD unchanged `550679d`.)** Reviewed all 18 R3 flag-ON
 > soak episodes (`docs/2026-06-23-story-quality-review/STORY_REVIEW.md`) + ran two live roundtables
