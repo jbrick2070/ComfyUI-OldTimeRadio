@@ -2721,12 +2721,30 @@ class OTR_LedgerScriptWriter:
             _OTRSEL.resolve_best_of_n(resolved)
         )
         if _bon_effective_n >= 2:
+            _bon_model = str(resolved["creative_writing_model"])
+            _bon_is_remote = _bon_model.startswith(("openrouter:", "comfy:"))
+
             def _gen_outline(_req):
                 return _OTRO.generate_outline(
                     creative_generate_fn,
                     _req,
                     creative_repo_id=resolved["creative_writing_model"],
                 )
+
+            def _bon_cost_probe():
+                # Cumulative remote spend so far (USD) from the OpenRouter
+                # backend's per-run accounting; the selector records the
+                # per-candidate delta. Best-effort; never raises.
+                try:
+                    from . import _otr_openrouter_backend as _OROB
+                    snap = _OROB.resolved_models_snapshot()
+                    return float(sum(
+                        float((v or {}).get("cost_usd", 0.0) or 0.0)
+                        for v in snap.values()
+                    ))
+                except Exception:  # noqa: BLE001
+                    return 0.0
+
             with slot_scheduler.helper_context("generate_outline"):
                 outline = _OTRSEL.select_best_outline(
                     _gen_outline,
@@ -2735,22 +2753,25 @@ class OTR_LedgerScriptWriter:
                     n=_bon_effective_n,
                     meta=meta,
                     roster=outline_req.character_cast,
+                    cost_probe=_bon_cost_probe if _bon_is_remote else None,
                 )
-            # Stamp the gate-derived telemetry the selector cannot know
-            # (requested_n + clamp_reason); merge, never replace.
+            # Stamp the telemetry the selector cannot know: requested_n +
+            # clamp_reason (gate) + provider (resolved model). Merge, never
+            # replace.
             _bon_sq = meta.setdefault("story_quality", {})
             if isinstance(_bon_sq, dict) and isinstance(
                 _bon_sq.get("best_of_n"), dict
             ):
                 _bon_sq["best_of_n"]["requested_n"] = _bon_requested_n
                 _bon_sq["best_of_n"]["clamp_reason"] = _bon_clamp_reason
+                _bon_sq["best_of_n"]["provider"] = _bon_model
             log.info(
                 "[OTR_LedgerScriptWriter] best-of-N ON: requested=%d "
-                "effective=%d winner_index=%s clamp=%r",
+                "effective=%d winner_index=%s clamp=%r provider=%r",
                 _bon_requested_n, _bon_effective_n,
                 (_bon_sq.get("best_of_n", {}) or {}).get("winner_index")
                 if isinstance(_bon_sq, dict) else None,
-                _bon_clamp_reason,
+                _bon_clamp_reason, _bon_model,
             )
         else:
             # Disabled / clamped-to-1: the existing single path runs EXACTLY

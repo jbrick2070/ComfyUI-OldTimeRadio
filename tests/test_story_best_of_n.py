@@ -366,3 +366,110 @@ class TestSelectBestOutline:
         )
         assert meta["story_quality"]["l12_domain"] == "energy"
         assert "best_of_n" in meta["story_quality"]
+
+
+# ---------------------------------------------------------------------------
+# Chunk 4 -- optional remote best-of-N + fail-closed cost guard
+# ---------------------------------------------------------------------------
+class TestRemoteCostGuard:
+    def test_estimate_is_positive_and_scales(self):
+        t1, u1 = SEL.estimate_remote_cost(1)
+        t3, u3 = SEL.estimate_remote_cost(3)
+        assert t3 == 3 * t1
+        assert u3 == pytest.approx(3 * u1)
+        assert u1 > 0.0
+
+    def test_guard_ok_within_budget(self):
+        allowed, reason, est = SEL.remote_cost_guard(3)
+        assert allowed == 3
+        assert reason == "remote_ok"
+        assert est > 0.0
+
+    def test_guard_clamps_on_per_run_token_breach(self):
+        allowed, reason, _est = SEL.remote_cost_guard(
+            3, per_outline_tokens=10_000_000,
+        )
+        assert allowed == 1
+        assert reason == "cost_guard_per_run_budget"
+
+    def test_guard_clamps_on_autonomy_ceiling(self):
+        # Expensive price trips guard (b) without breaching the token guard (a).
+        allowed, reason, est = SEL.remote_cost_guard(3, price_per_1k=10.0)
+        assert allowed == 1
+        assert reason == "cost_guard_autonomy_ceiling"
+        assert est >= SEL._AUTONOMY_CEILING_USD
+
+    def test_guard_token_checked_before_usd(self):
+        _allowed, reason, _est = SEL.remote_cost_guard(
+            3, per_outline_tokens=10_000_000, price_per_1k=10.0,
+        )
+        assert reason == "cost_guard_per_run_budget"
+
+
+class TestResolveRemote:
+    REMOTE = {"creative_writing_model": "openrouter:meta-llama/llama-3.1-70b"}
+    LOCAL = {"creative_writing_model": "mistral-nemo"}
+
+    def test_remote_default_off_clamps_to_1(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        monkeypatch.delenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", raising=False)
+        assert SEL.resolve_best_of_n(self.REMOTE) == (3, 1, "remote_provider_local_only")
+
+    def test_remote_opt_in_runs(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", "1")
+        assert SEL.resolve_best_of_n(self.REMOTE) == (3, 3, "remote_ok")
+
+    def test_remote_opt_in_capped_to_3(self, monkeypatch):
+        # requested 9 -> local-clamp 6 -> remote-cap 3.
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "9")
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", "1")
+        assert SEL.resolve_best_of_n(self.REMOTE) == (9, 3, "remote_max_3")
+
+    def test_remote_opt_in_truthy_variants(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "2")
+        for v in ("1", "true", "YES", "on"):
+            monkeypatch.setenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", v)
+            req, eff, _reason = SEL.resolve_best_of_n(self.REMOTE)
+            assert (req, eff) == (2, 2)
+
+    def test_local_ignores_allow_remote_flag(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", "1")
+        assert SEL.resolve_best_of_n(self.LOCAL) == (3, 3, "")
+
+    def test_remote_cost_guard_fails_closed_in_resolve(self, monkeypatch):
+        # Shrink the per-outline estimate's ceiling headroom so the guard clamps.
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", "1")
+        monkeypatch.setattr(SEL, "_REMOTE_OUTLINE_TOKENS_EST", 10_000_000)
+        req, eff, reason = SEL.resolve_best_of_n(self.REMOTE)
+        assert eff == 1
+        assert reason == "cost_guard_per_run_budget"
+
+
+class TestCostProbeTelemetry:
+    def test_per_candidate_cost_recorded(self):
+        state = {"cum": 0.0}
+        def gen(req):
+            state["cum"] += 1.5          # each candidate "costs" $1.50
+            return _grounded_outline()
+        def probe():
+            return state["cum"]
+        meta = {}
+        SEL.select_best_outline(
+            gen, _req(), cast_seed=1, n=2, meta=meta, roster=_ROSTER,
+            cost_probe=probe,
+        )
+        for s in meta["story_quality"]["best_of_n"]["scores"]:
+            assert s["cost_usd"] == pytest.approx(1.5)
+
+    def test_cost_usd_none_without_probe(self):
+        def gen(req):
+            return _grounded_outline()
+        meta = {}
+        SEL.select_best_outline(
+            gen, _req(), cast_seed=1, n=2, meta=meta, roster=_ROSTER,
+        )
+        for s in meta["story_quality"]["best_of_n"]["scores"]:
+            assert s["cost_usd"] is None

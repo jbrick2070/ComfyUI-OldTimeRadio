@@ -139,8 +139,25 @@ def score_outline(outline: Any, meta: Any, roster: Any) -> StoryScore:
 # Chunk 3 -- flag parse + provider gate + the selector
 # ---------------------------------------------------------------------------
 # Local writers run free (no paid call), so a generous cap. The tighter remote
-# cap (REMOTE_BEST_OF_N_MAX = 3) + the fail-closed cost guard live in chunk 4.
+# cap (_REMOTE_BEST_OF_N_MAX = 3) + the fail-closed cost guard live in chunk 4.
 _LOCAL_BEST_OF_N_MAX = 6
+
+# Remote best-of-N (chunk 4, OPT-IN). N candidates == N x a PAID call, so the
+# remote cap is tighter and the cost guard below is fail-closed.
+_REMOTE_BEST_OF_N_MAX = 3
+# Operator's global spend / irreversible-action gate (CLAUDE.md). A worst-case
+# estimate AT OR ABOVE this REFUSES remote best-of-N (clamps to N=1, LOUD).
+_AUTONOMY_CEILING_USD = 20.0
+# Conservative per-outline UPPER bounds (over-estimate bias, matching the
+# backend's _estimate_request_tokens philosophy). One outline is a TREE of
+# small stage calls; this generously bounds the whole tree.
+_REMOTE_OUTLINE_TOKENS_EST = 40_000
+# A frontier-model upper-bound price (~$60 / 1M tokens) so the USD estimate is
+# never an under-count. Real per-candidate cost is recorded post-hoc from the
+# backend (cost_usd) when the backend returns it.
+_REMOTE_PRICE_PER_1K_TOKENS_USD = 0.06
+# Fallback per-run token ceiling when the backend constant can't be imported.
+_REMOTE_PER_RUN_TOKEN_CEILING = 300_000
 
 # Deterministic, index-keyed STRUCTURAL-variation instructions (candidate i>=1).
 # Each pushes the outline away from the "console standoff" sameness toward a
@@ -189,15 +206,17 @@ def _parse_best_of_n_flag(raw: Any):
     return requested_n, effective_n, clamp_reason
 
 
-def resolve_best_of_n(resolved: Any, *, allow_remote: bool = False):
+def resolve_best_of_n(resolved: Any):
     """Resolve the effective candidate count -> (requested_n, effective_n,
     clamp_reason). Reads OTR_STORY_BEST_OF_N, then applies the provider gate.
 
-    Provider gate: a REMOTE creative writer (``openrouter:`` / ``comfy:``) clamps
-    to N=1 by default (local-only); the operator opts in via chunk 4's
-    allow_remote (which then applies the tighter remote cap + cost guard). When
-    ``effective_n < 2`` the writer runs the existing single path -- no selector,
-    no telemetry key (the byte-identical path)."""
+    Provider gate: a LOCAL creative writer runs best-of-N freely (no paid call).
+    A REMOTE writer (``openrouter:`` / ``comfy:``) clamps to N=1 UNLESS the
+    operator opts in via OTR_STORY_BEST_OF_N_ALLOW_REMOTE (default OFF); on
+    opt-in it applies the tighter remote cap (_REMOTE_BEST_OF_N_MAX) and the
+    fail-closed cost guard BEFORE any paid call. When ``effective_n < 2`` the
+    writer runs the existing single path -- no selector, no telemetry key (the
+    byte-identical path)."""
     import os
     raw = os.environ.get("OTR_STORY_BEST_OF_N", "0")
     requested_n, effective_n, clamp_reason = _parse_best_of_n_flag(raw)
@@ -205,17 +224,26 @@ def resolve_best_of_n(resolved: Any, *, allow_remote: bool = False):
         return requested_n, effective_n, clamp_reason
 
     model = str((resolved or {}).get("creative_writing_model", "") or "")
-    is_remote = model.startswith(("openrouter:", "comfy:"))
-    if is_remote and not allow_remote:
+    if not model.startswith(("openrouter:", "comfy:")):
+        return requested_n, effective_n, clamp_reason  # local writer -- free
+
+    # Remote writer -- opt-in only.
+    if not _env_truthy(os.environ.get("OTR_STORY_BEST_OF_N_ALLOW_REMOTE", "")):
         log.warning(
             "[best_of_n] remote creative writer %r -> best-of-N clamped to N=1 "
             "(local-only by default; set OTR_STORY_BEST_OF_N_ALLOW_REMOTE=1 to "
             "opt in)", model,
         )
         return requested_n, 1, "remote_provider_local_only"
-    # NOTE (chunk 4): the allow_remote=True branch (tighter cap + fail-closed
-    # cost guard) is inserted here; chunk 3 leaves remote => N=1.
-    return requested_n, effective_n, clamp_reason
+
+    # Remote opt-in: tighter cap, THEN the fail-closed cost guard (checked
+    # BEFORE the first paid call).
+    remote_n = min(effective_n, _REMOTE_BEST_OF_N_MAX)
+    guard_n, guard_reason, _est_usd = remote_cost_guard(remote_n)
+    if guard_n < 2:
+        return requested_n, 1, guard_reason
+    reason = "remote_max_3" if effective_n > _REMOTE_BEST_OF_N_MAX else "remote_ok"
+    return requested_n, guard_n, reason
 
 
 @dataclass
@@ -225,6 +253,7 @@ class _Candidate:
     score: Any        # StoryScore on success, None on generation failure.
     ok: bool
     error_type: Any   # str on failure, None on success.
+    cost_usd: Any = None  # per-candidate remote spend (USD) when measured, else None.
 
 
 def _merge_best_of_n_telemetry(meta: Any, effective_n: int, winner_index: int,
@@ -245,12 +274,14 @@ def _merge_best_of_n_telemetry(meta: Any, effective_n: int, winner_index: int,
                 "ungrounded_crisis_density": c.score.ungrounded_crisis_density,
                 "distinct_conflict_nouns": c.score.distinct_conflict_nouns,
                 "premise_grounding": c.score.premise_grounding,
+                "cost_usd": c.cost_usd,
             })
         else:
             scores.append({
                 "candidate_index": c.index,
                 "ok": False,
                 "error_type": c.error_type,
+                "cost_usd": c.cost_usd,
             })
     sq = meta.setdefault("story_quality", {})
     if isinstance(sq, dict):
@@ -264,7 +295,7 @@ def _merge_best_of_n_telemetry(meta: Any, effective_n: int, winner_index: int,
 
 
 def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
-                        roster):
+                        roster, cost_probe=None):
     """Generate ``n`` candidate outlines under cast_seed-keyed seeds + structural
     diversity_hints, score each with the PURE scorer, and return the best.
 
@@ -276,7 +307,9 @@ def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
     premise_grounding desc, candidate index asc). Never-fail: if every candidate
     raised, run ONE deterministic fallback at the i=0 seed + hint=""; if THAT
     raises too, fail LOUD. build_sq_data is NOT called here (runs once
-    downstream on the winner). Telemetry is merged into meta.story_quality."""
+    downstream on the winner). Telemetry is merged into meta.story_quality.
+    ``cost_probe`` (optional, remote only) returns cumulative remote spend in
+    USD; when given, per-candidate cost_usd deltas are recorded in telemetry."""
     import hashlib
     import random
     import dataclasses
@@ -302,18 +335,21 @@ def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
         hint = "" if i == 0 else _diversity_hint_for(i)
         req_i = dataclasses.replace(outline_req, diversity_hint=hint)
         _seed_rngs(i)
+        cost_before = cost_probe() if cost_probe else None
         try:
             outline_i = generate_outline_fn(req_i)
         except OutlineFailedError as exc:
+            cost_i = _cost_delta(cost_probe, cost_before)
             log.warning(
                 "[best_of_n] candidate %d/%d FAILED to generate (%s); "
                 "skipping", i, n, type(exc).__name__,
             )
             candidates.append(_Candidate(i, None, None, False,
-                                         type(exc).__name__))
+                                         type(exc).__name__, cost_i))
             continue
+        cost_i = _cost_delta(cost_probe, cost_before)
         score_i = score_outline(outline_i, meta, roster)
-        candidates.append(_Candidate(i, outline_i, score_i, True, None))
+        candidates.append(_Candidate(i, outline_i, score_i, True, None, cost_i))
         log.info(
             "[best_of_n] candidate %d/%d scored: density=%.4f distinct=%d "
             "grounding=%.3f", i, n, score_i.ungrounded_crisis_density,
@@ -350,3 +386,89 @@ def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
     outline0 = generate_outline_fn(req0)  # may raise OutlineFailedError -> LOUD
     _merge_best_of_n_telemetry(meta, n, 0, candidates)
     return outline0
+
+
+# ---------------------------------------------------------------------------
+# Chunk 4 -- optional remote best-of-N + fail-closed cost guard
+# ---------------------------------------------------------------------------
+def _env_truthy(val: Any) -> bool:
+    return str(val if val is not None else "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _cost_delta(cost_probe, before):
+    """Per-candidate spend = cumulative-after minus cumulative-before. Returns
+    None when no probe is wired (local writers). Best-effort; never raises."""
+    if cost_probe is None or before is None:
+        return None
+    try:
+        return float(cost_probe()) - float(before)
+    except Exception:  # noqa: BLE001 -- cost accounting must never break a run
+        return None
+
+
+def _per_run_token_ceiling() -> int:
+    """The OpenRouter backend's per-run token ceiling when importable, else the
+    local fallback constant -- so guard (a) reuses the writer's real budget."""
+    try:
+        from ._otr_openrouter_backend import DEFAULT_MAX_TOKENS_PER_RUN as _C
+        return int(_C)
+    except Exception:  # noqa: BLE001
+        try:
+            from _otr_openrouter_backend import (  # type: ignore
+                DEFAULT_MAX_TOKENS_PER_RUN as _C,
+            )
+            return int(_C)
+        except Exception:  # noqa: BLE001
+            return _REMOTE_PER_RUN_TOKEN_CEILING
+
+
+def estimate_remote_cost(effective_n, *, per_outline_tokens=None,
+                         price_per_1k=None):
+    """Conservative worst-case (tokens, usd) for ``effective_n`` remote outline
+    generations. Over-estimate bias so the guard errs toward refusing."""
+    pot = (_REMOTE_OUTLINE_TOKENS_EST if per_outline_tokens is None
+           else per_outline_tokens)
+    ppk = (_REMOTE_PRICE_PER_1K_TOKENS_USD if price_per_1k is None
+           else price_per_1k)
+    worst_tokens = int(effective_n) * int(pot)
+    worst_usd = (worst_tokens / 1000.0) * float(ppk)
+    return worst_tokens, worst_usd
+
+
+def remote_cost_guard(effective_n, *, per_outline_tokens=None, price_per_1k=None,
+                      per_run_ceiling=None, autonomy_ceiling=None):
+    """Fail-closed cost guard, checked BEFORE the first paid call. Returns
+    ``(allowed_n, reason, est_usd)``:
+      (a) worst-case tokens > the per-run token ceiling  -> clamp to N=1;
+      (b) worst-case USD >= the $20 autonomy ceiling      -> clamp to N=1;
+      (c) otherwise LOUD-log the estimate + proceed at ``effective_n``."""
+    ceiling_tokens = (_per_run_token_ceiling() if per_run_ceiling is None
+                      else per_run_ceiling)
+    ceiling_usd = (_AUTONOMY_CEILING_USD if autonomy_ceiling is None
+                   else autonomy_ceiling)
+    worst_tokens, worst_usd = estimate_remote_cost(
+        effective_n,
+        per_outline_tokens=per_outline_tokens,
+        price_per_1k=price_per_1k,
+    )
+    if worst_tokens > ceiling_tokens:
+        log.warning(
+            "[best_of_n] remote worst-case ~%d tokens for N=%d exceeds the "
+            "per-run token ceiling %d; clamping to N=1",
+            worst_tokens, effective_n, ceiling_tokens,
+        )
+        return 1, "cost_guard_per_run_budget", worst_usd
+    if worst_usd >= ceiling_usd:
+        log.warning(
+            "[best_of_n] remote worst-case ~$%.2f for N=%d >= the $%.0f "
+            "autonomy ceiling; REFUSING remote best-of-N, clamping to N=1",
+            worst_usd, effective_n, ceiling_usd,
+        )
+        return 1, "cost_guard_autonomy_ceiling", worst_usd
+    log.warning(
+        "[best_of_n] remote best-of-N: estimated worst-case spend ~$%.2f for "
+        "N=%d outline generation(s); proceeding", worst_usd, effective_n,
+    )
+    return effective_n, "remote_ok", worst_usd
