@@ -21,6 +21,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_outline as OUT  # noqa: E402
+from nodes import _otr_story_select as SEL  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -85,3 +86,114 @@ class TestDiversityHint:
         a = OUT._build_user_prompt(_req("open on the turn"))
         b = OUT._build_user_prompt(_req("open on the consequence"))
         assert a != b
+
+
+# ---------------------------------------------------------------------------
+# Chunk 2 -- score_outline pure scorer
+# ---------------------------------------------------------------------------
+from dataclasses import dataclass as _dc  # noqa: E402
+
+
+@_dc
+class _FakeBeat:
+    speaker_role: str
+    intent: str = ""
+
+
+@_dc
+class _FakeOutline:
+    premise: str
+    beats: list
+
+
+_ROSTER = ("MALI", "MANFRED")
+
+
+def _generic_outline():
+    # A "console standoff": intents stuffed with GENERIC crisis nouns that are
+    # NOT in the premise palette; nothing references the premise.
+    return _FakeOutline(
+        premise="Two engineers stand in a control room.",
+        beats=[
+            _FakeBeat("music_open", "theme plays"),
+            _FakeBeat("character", "the reactor console overloads as the countdown begins"),
+            _FakeBeat("character", "they grab the lever and the failsafe switch"),
+            _FakeBeat("character", "the gauge climbs toward meltdown"),
+            _FakeBeat("music_close", "theme fades"),
+        ],
+    )
+
+
+def _grounded_outline():
+    # Premise-anchored: intents reference premise/roster nouns; no generic
+    # crisis nouns at all.
+    return _FakeOutline(
+        premise="A district adopts a tutoring algorithm whose grading weights are disputed.",
+        beats=[
+            _FakeBeat("music_open", "theme plays"),
+            _FakeBeat("character", "Mali questions the tutoring algorithm grading weights"),
+            _FakeBeat("character", "Manfred defends the district adoption decision"),
+            _FakeBeat("character", "the disputed weights reshape a flagged transcript"),
+            _FakeBeat("music_close", "theme fades"),
+        ],
+    )
+
+
+class TestScoreOutline:
+    def test_returns_storyscore(self):
+        s = SEL.score_outline(_generic_outline(), {}, _ROSTER)
+        assert isinstance(s, SEL.StoryScore)
+
+    def test_deterministic(self):
+        o = _grounded_outline()
+        assert SEL.score_outline(o, {}, _ROSTER) == SEL.score_outline(o, {}, _ROSTER)
+
+    def test_ungrounded_crisis_nonzero_on_raw_intents(self):
+        # Verify-at-build #2: the metric MUST discriminate on raw intents.
+        s = SEL.score_outline(_generic_outline(), {}, _ROSTER)
+        assert s.ungrounded_crisis_density > 0.0
+
+    def test_grounded_beats_generic_on_every_axis(self):
+        g = SEL.score_outline(_generic_outline(), {}, _ROSTER)
+        p = SEL.score_outline(_grounded_outline(), {}, _ROSTER)
+        assert p.ungrounded_crisis_density < g.ungrounded_crisis_density
+        assert p.premise_grounding > g.premise_grounding
+        assert p.distinct_conflict_nouns > g.distinct_conflict_nouns
+
+    def test_grounded_outline_density_zero_grounding_full(self):
+        p = SEL.score_outline(_grounded_outline(), {}, _ROSTER)
+        assert p.ungrounded_crisis_density == 0.0
+        assert p.premise_grounding == pytest.approx(1.0)
+
+    def test_announcer_counts_as_voiced(self):
+        # An announcer beat with a generic crisis noun must contribute (proves
+        # _is_voiced includes announcer, mirroring build_sq_data's scope).
+        o = _FakeOutline(
+            premise="A quiet town.",
+            beats=[_FakeBeat("announcer", "a reactor meltdown looms")],
+        )
+        s = SEL.score_outline(o, {}, ())
+        assert s.ungrounded_crisis_density > 0.0
+
+    def test_no_voiced_beats_is_zero_not_crash(self):
+        # Division-by-zero guards: only non-voiced beats => clean zeros.
+        o = _FakeOutline(
+            premise="A countdown reactor meltdown lever.",
+            beats=[_FakeBeat("music_open", "x"), _FakeBeat("sfx", "y")],
+        )
+        s = SEL.score_outline(o, {}, ())
+        assert s.ungrounded_crisis_density == 0.0
+        assert s.premise_grounding == 0.0
+        assert s.distinct_conflict_nouns == 0
+
+    def test_pure_no_mutation_of_intents(self):
+        o = _generic_outline()
+        before = [b.intent for b in o.beats]
+        SEL.score_outline(o, {}, _ROSTER)
+        assert [b.intent for b in o.beats] == before
+
+    def test_empty_outline_no_crash(self):
+        s = SEL.score_outline(_FakeOutline(premise="", beats=[]), {}, ())
+        assert s.ungrounded_crisis_density == 0.0
+        assert s.distinct_conflict_nouns == 0
+        assert s.premise_grounding == 0.0
