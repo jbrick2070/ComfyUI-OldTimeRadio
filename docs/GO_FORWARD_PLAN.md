@@ -33,7 +33,20 @@
 > broadcast-finalization pass then raised `RenderError: shot shot_b002 engine 'humo_1.7B' ... gated_by_flag`
 > (HuMo is OFF under the FLOOR boot lane + the 2026-06-16 no-fallbacks rule raises LOUD) -- ORTHOGONAL to the
 > story-quality work; the obs blended_final did not land. L12/L3/L4 were OFF for this run (byte-identical
-> baseline). Box reset, :8000 FREE.
+> baseline). **RE-RAN on the DEFAULT (HuMo) lane (prompt `acd1d99f`): full success end-to-end -- story
+> "Lunar Descent", froze `frozen_with_doctor_edits`, audio 52.98s, episode mp4 66.4 MB, and the OBS final
+> LANDED: `otr/obs/signal_lost_lunar_descent_20260623_105311_silent_procgen_blended_final.mp4` (49 MB),
+> "Prompt executed in 29:01", no traceback.** Confirms the FLOOR/HuMo gate was the boot lane, not a code bug.
+> Box reset, :8000 FREE.
+> **ALSO THIS SESSION (operator follow-up): a 4-round LIVE roundtable on a NEW idea CONVERGED ($1.21,
+> docs only, NOT pushed as code).** Operator floated a never-hard-fail story-refine loop ("is this a good
+> story, 10th-grade B+? how to improve?" -> rewrite spine in line with the seed -> re-slug -> loop) run ONLY
+> on local writers (free passes). GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude grounded judge hardened
+> it; R3 caught real design bugs (scoring via `build_sq_data` zeroes the metric; no `episode_seed` exists; the
+> RNG was never wired to the LLM). CONVERGED to a DETERMINISTIC, local-only, structural **best-of-N OUTLINE
+> selector** (NOT a QA-reroll gate), explicitly GATED behind the L1/L2 measurement prerequisite that can still
+> CUT it; v1 holistic post-compose "B+" loop DEFERRED. Build-ready plan:
+> `docs/2026-06-23-multipass-refine/roundtable/pass04_plan_FINAL.md`.
 > **>>> NEW CURRENT STEP = operator MEASUREMENT soak + golden re-baseline (GPU-gated):** (1) re-soak a small
 > matrix with `OTR_STORY_QUALITY_L12=1` to measure cross-episode sameness (`meta.story_quality.ungrounded_crisis`
 > + distinct `conflict_object`/`type` counts) vs the R3 baseline; (2) enable L3/L4 (`OTR_COMPOSER_ACTION_STRIP`,
