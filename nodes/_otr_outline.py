@@ -408,6 +408,18 @@ class OutlineRequest:
                              #
                              # Wired by OTR_LedgerScriptWriter D.5
                              # post-cast-lock (2026-05-10 follow-up).
+    diversity_hint: str = ""
+                             # OPTIONAL (best-of-N selector, 2026-06-23). A
+                             # short STRUCTURAL-variation instruction the
+                             # best-of-N selector sets per candidate (i>=1) to
+                             # steer the outline toward a different dramatic
+                             # approach (e.g. "open on the personal stake, not
+                             # the institutional threat"). Rendered by
+                             # _build_user_prompt ONLY when non-empty; empty
+                             # (the default, and candidate 0 / every
+                             # non-selector call) => byte-identical prompt to
+                             # the pre-selector pipeline. A prompt overlay
+                             # only -- NOT in-place beat surgery.
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -584,6 +596,19 @@ def _build_user_prompt(req: OutlineRequest) -> str:
         f"(sum of per-beat target_words should land near this number).",
         "",
     ])
+    # Best-of-N selector (2026-06-23): an optional structural-variation
+    # overlay. The selector sets req.diversity_hint per candidate (i>=1) to
+    # push each outline toward a different dramatic approach; candidate 0 and
+    # every non-selector call leave it "" so the prompt is byte-identical to
+    # the pre-selector pipeline. Rendered ONLY when non-empty.
+    diversity_hint = req.diversity_hint.strip()
+    if diversity_hint:
+        parts.extend([
+            f"Structural variation (take a different dramatic approach from "
+            f"the other candidates -- vary which stake opens the story, who "
+            f"drives the turn, and where the pressure lands): {diversity_hint}",
+            "",
+        ])
     head = "\n".join(parts)
     return (
         f"{head}\n"
