@@ -197,3 +197,172 @@ class TestScoreOutline:
         assert s.ungrounded_crisis_density == 0.0
         assert s.distinct_conflict_nouns == 0
         assert s.premise_grounding == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Chunk 3 -- flag parse + provider gate + selector
+#
+# The writer-level flag-OFF invariant (exactly one generate_outline call + no
+# meta.story_quality.best_of_n key) is guaranteed structurally: run() calls the
+# selector ONLY when resolve_best_of_n returns effective_n >= 2, and it is
+# covered end-to-end by the existing writer suite (flag unset by default).
+# TestResolveBestOfN below proves the gate returns effective_n < 2 for every
+# disabled / remote-clamped case, so the byte-identical path is taken.
+# ---------------------------------------------------------------------------
+from nodes._otr_outline import OutlineFailedError  # noqa: E402
+
+
+def _fail(req):
+    raise OutlineFailedError(attempts=[("raw", "boom")], request=req)
+
+
+class TestResolveBestOfN:
+    LOCAL = {"creative_writing_model": "mistral-nemo"}
+    REMOTE_OR = {"creative_writing_model": "openrouter:meta-llama/llama-3.1-70b"}
+    REMOTE_CF = {"creative_writing_model": "comfy:some-model"}
+
+    def test_unset_is_disabled(self, monkeypatch):
+        monkeypatch.delenv("OTR_STORY_BEST_OF_N", raising=False)
+        assert SEL.resolve_best_of_n(self.LOCAL) == (1, 1, "")
+
+    def test_zero_and_one_disabled(self, monkeypatch):
+        for v in ("0", "1"):
+            monkeypatch.setenv("OTR_STORY_BEST_OF_N", v)
+            assert SEL.resolve_best_of_n(self.LOCAL) == (1, 1, "")
+
+    def test_blank_disabled(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "   ")
+        assert SEL.resolve_best_of_n(self.LOCAL) == (1, 1, "")
+
+    def test_non_int_disabled(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "abc")
+        assert SEL.resolve_best_of_n(self.LOCAL) == (1, 1, "non_int_flag")
+
+    def test_local_n3(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        assert SEL.resolve_best_of_n(self.LOCAL) == (3, 3, "")
+
+    def test_local_clamped_to_6(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "9")
+        assert SEL.resolve_best_of_n(self.LOCAL) == (9, 6, "max_local_6")
+
+    def test_remote_openrouter_clamps_to_1(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        assert SEL.resolve_best_of_n(self.REMOTE_OR) == (3, 1, "remote_provider_local_only")
+
+    def test_remote_comfy_clamps_to_1(self, monkeypatch):
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "3")
+        assert SEL.resolve_best_of_n(self.REMOTE_CF) == (3, 1, "remote_provider_local_only")
+
+    def test_remote_off_stays_off(self, monkeypatch):
+        # Provider gate is consulted only when the flag is >= 2.
+        monkeypatch.setenv("OTR_STORY_BEST_OF_N", "0")
+        assert SEL.resolve_best_of_n(self.REMOTE_OR) == (1, 1, "")
+
+
+class TestSelectBestOutline:
+    def _base_req(self):
+        return _req()  # real, valid OutlineRequest (diversity_hint defaults "")
+
+    def test_picks_lowest_density_winner(self):
+        # candidate 0 (hint="") -> generic (bad); i>=1 (hint set) -> grounded.
+        def gen(req):
+            return _generic_outline() if req.diversity_hint == "" else _grounded_outline()
+        meta = {}
+        out = SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=42, n=2, meta=meta, roster=_ROSTER,
+        )
+        assert out is not None
+        bon = meta["story_quality"]["best_of_n"]
+        assert bon["winner_index"] == 1
+        assert bon["effective_n"] == 2
+        assert len(bon["scores"]) == 2
+
+    def test_candidate_0_uses_empty_hint(self):
+        seen = []
+        def gen(req):
+            seen.append(req.diversity_hint)
+            return _grounded_outline()
+        SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=7, n=3, meta={}, roster=_ROSTER,
+        )
+        assert seen[0] == ""
+        assert all(h != "" for h in seen[1:])  # i>=1 carry a structural hint
+
+    def test_deterministic_across_runs(self):
+        hints = []
+        def gen(req):
+            hints.append(req.diversity_hint)
+            return _generic_outline() if req.diversity_hint == "" else _grounded_outline()
+        m1, m2 = {}, {}
+        SEL.select_best_outline(gen, self._base_req(), cast_seed=99, n=3, meta=m1, roster=_ROSTER)
+        run1 = list(hints); hints.clear()
+        SEL.select_best_outline(gen, self._base_req(), cast_seed=99, n=3, meta=m2, roster=_ROSTER)
+        run2 = list(hints)
+        assert run1 == run2
+        assert (m1["story_quality"]["best_of_n"]["winner_index"]
+                == m2["story_quality"]["best_of_n"]["winner_index"])
+
+    def test_failed_candidate_recorded_and_skipped(self):
+        def gen(req):
+            if req.diversity_hint != "":
+                _fail(req)
+            return _grounded_outline()
+        meta = {}
+        SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=1, n=2, meta=meta, roster=_ROSTER,
+        )
+        bon = meta["story_quality"]["best_of_n"]
+        assert bon["winner_index"] == 0
+        by_idx = {s["candidate_index"]: s for s in bon["scores"]}
+        assert by_idx[0]["ok"] is True
+        assert by_idx[1]["ok"] is False
+        assert by_idx[1]["error_type"] == "OutlineFailedError"
+
+    def test_never_fail_deterministic_fallback(self):
+        calls = {"n": 0}
+        def gen(req):
+            calls["n"] += 1
+            if calls["n"] <= 3:          # the 3 candidates all fail
+                _fail(req)
+            return _grounded_outline()   # the deterministic fallback succeeds
+        meta = {}
+        out = SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=5, n=3, meta=meta, roster=_ROSTER,
+        )
+        assert out is not None
+        bon = meta["story_quality"]["best_of_n"]
+        assert bon["winner_index"] == 0
+        assert all(s["ok"] is False for s in bon["scores"])
+        assert calls["n"] == 4           # 3 candidates + 1 fallback
+
+    def test_never_fail_loud_when_fallback_also_fails(self):
+        def gen(req):
+            _fail(req)
+        with pytest.raises(OutlineFailedError):
+            SEL.select_best_outline(
+                gen, self._base_req(), cast_seed=5, n=2, meta={}, roster=_ROSTER,
+            )
+
+    def test_telemetry_score_fields(self):
+        def gen(req):
+            return _grounded_outline()
+        meta = {}
+        SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=3, n=2, meta=meta, roster=_ROSTER,
+        )
+        for s in meta["story_quality"]["best_of_n"]["scores"]:
+            assert s["ok"] is True
+            assert "ungrounded_crisis_density" in s
+            assert "distinct_conflict_nouns" in s
+            assert "premise_grounding" in s
+
+    def test_telemetry_merges_not_replaces(self):
+        meta = {"story_quality": {"l12_domain": "energy"}}
+        def gen(req):
+            return _grounded_outline()
+        SEL.select_best_outline(
+            gen, self._base_req(), cast_seed=3, n=2, meta=meta, roster=_ROSTER,
+        )
+        assert meta["story_quality"]["l12_domain"] == "energy"
+        assert "best_of_n" in meta["story_quality"]

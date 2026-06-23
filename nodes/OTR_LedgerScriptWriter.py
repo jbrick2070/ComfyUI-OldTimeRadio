@@ -2202,6 +2202,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_legacy_to_stage1_adapter as _OTRL2S1
         from . import _otr_config as _OTRCFG
         from . import _otr_story_quality_l12 as _OTRSQL12
+        from . import _otr_story_select as _OTRSEL
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -2705,12 +2706,62 @@ class OTR_LedgerScriptWriter:
         # config (Mistral-Nemo) the resolver returns _SYSTEM_PROMPT
         # by object identity so audio C7 holds.
         # Sprint 0 (v4 plan): helper_context attribution.
-        with slot_scheduler.helper_context("generate_outline"):
-            outline = _OTRO.generate_outline(
-                creative_generate_fn,
-                outline_req,
-                creative_repo_id=resolved["creative_writing_model"],
+        #
+        # Best-of-N structural story-refine selector (2026-06-23). Default OFF:
+        # OTR_STORY_BEST_OF_N unset/0/1 => one generate_outline call,
+        # byte-identical to the pre-selector pipeline (no selector entry, no
+        # meta.story_quality.best_of_n key). When >= 2 AND the creative writer
+        # is local, generate N candidate outlines under cast_seed-keyed seeds +
+        # structural diversity_hints, score each with the PURE scorer (raw
+        # intents, no build_sq_data), and keep the best. Remote writers clamp to
+        # N=1 unless the operator opts in (OTR_STORY_BEST_OF_N_ALLOW_REMOTE).
+        # build_sq_data still runs exactly ONCE downstream (F2 block) on the
+        # winning outline -- the selector never calls it.
+        _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
+            _OTRSEL.resolve_best_of_n(resolved)
+        )
+        if _bon_effective_n >= 2:
+            def _gen_outline(_req):
+                return _OTRO.generate_outline(
+                    creative_generate_fn,
+                    _req,
+                    creative_repo_id=resolved["creative_writing_model"],
+                )
+            with slot_scheduler.helper_context("generate_outline"):
+                outline = _OTRSEL.select_best_outline(
+                    _gen_outline,
+                    outline_req,
+                    cast_seed=cast_seed,
+                    n=_bon_effective_n,
+                    meta=meta,
+                    roster=outline_req.character_cast,
+                )
+            # Stamp the gate-derived telemetry the selector cannot know
+            # (requested_n + clamp_reason); merge, never replace.
+            _bon_sq = meta.setdefault("story_quality", {})
+            if isinstance(_bon_sq, dict) and isinstance(
+                _bon_sq.get("best_of_n"), dict
+            ):
+                _bon_sq["best_of_n"]["requested_n"] = _bon_requested_n
+                _bon_sq["best_of_n"]["clamp_reason"] = _bon_clamp_reason
+            log.info(
+                "[OTR_LedgerScriptWriter] best-of-N ON: requested=%d "
+                "effective=%d winner_index=%s clamp=%r",
+                _bon_requested_n, _bon_effective_n,
+                (_bon_sq.get("best_of_n", {}) or {}).get("winner_index")
+                if isinstance(_bon_sq, dict) else None,
+                _bon_clamp_reason,
             )
+        else:
+            # Disabled / clamped-to-1: the existing single path runs EXACTLY
+            # once. THIS is the byte-identical path -- no selector entry, no
+            # meta.story_quality.best_of_n key.
+            with slot_scheduler.helper_context("generate_outline"):
+                outline = _OTRO.generate_outline(
+                    creative_generate_fn,
+                    outline_req,
+                    creative_repo_id=resolved["creative_writing_model"],
+                )
 
         # --- E. Word-budget integration check (WARN, do not fail) -----
         # Sum VOICED (character) beats only. `resolved["target_words"]`
