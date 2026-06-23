@@ -119,7 +119,10 @@ class _FakeLedger:
         self.data = data
         self.recompute_calls = 0
 
-    def update_line_text(self, beat_id, text) -> bool:
+    def update_line_text(self, beat_id, text, compose_flags_append=None) -> bool:
+        # Mirror Ledger.update_line_text (C0 2026-06-22): accept + apply
+        # compose_flags_append with the same safe-list append semantics so the
+        # reroll path under test exercises the real signature.
         safe = text or ""
         for row in self.data.get("lines", []):
             if (row.get("beat_id") == beat_id
@@ -127,6 +130,13 @@ class _FakeLedger:
                 row["text"] = safe
                 row["word_count"] = len(safe.split())
                 row["char_count"] = len(safe)
+                if compose_flags_append:
+                    existing = row.get("compose_flags")
+                    if not isinstance(existing, list):
+                        existing = []
+                    for _f in compose_flags_append:
+                        existing.append(_f)
+                    row["compose_flags"] = existing
                 return True
         return False
 

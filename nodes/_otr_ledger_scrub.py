@@ -113,7 +113,33 @@ __all__ = [
     "NeedsEditorRepair",
     "scrub_ledger",
     "is_spoken_role",
+    "append_compose_flag",
 ]
+
+
+def append_compose_flag(row: Any, flag: str) -> None:
+    """Append ``flag`` to ``row["compose_flags"]`` with safe list semantics.
+
+    The ledger ROW schema is FIXED -- per-line signals ride the free-form
+    ``compose_flags`` LIST (there is NO per-line meta dict). This is the SINGLE
+    shared mutator so list semantics never drift across set_lines /
+    update_line_text / the scrub:
+
+      * a missing / None / non-list ``compose_flags`` is coerced to ``[]``;
+      * the flag is APPENDED in order (duplicates are preserved -- a count of
+        the same flag is meaningful telemetry);
+      * mutates ``row`` IN PLACE; never raises (a non-dict row is a no-op).
+    """
+    try:
+        if not isinstance(row, dict):
+            return
+        existing = row.get("compose_flags")
+        if not isinstance(existing, list):
+            existing = []
+        existing.append(flag)
+        row["compose_flags"] = existing
+    except Exception:  # noqa: BLE001 -- a flag breadcrumb is never fatal
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -793,9 +819,7 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
             _reason_tag = "stage_dir_stripped:" + ",".join(
                 _stage_reasons or ["bare"]
             )
-            _cf = list(row.get("compose_flags") or [])
-            _cf.append(_reason_tag)
-            row["compose_flags"] = _cf
+            append_compose_flag(row, _reason_tag)
         # 3c. whitespace / smart-quote / punctuation normalization.
         cleaned = _normalize_whitespace_and_quotes(cleaned)
 

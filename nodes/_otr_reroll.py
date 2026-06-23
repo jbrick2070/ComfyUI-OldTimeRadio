@@ -675,7 +675,14 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
                     "hint": hint, "status": "empty_result",
                 })
                 continue
-            led.update_line_text(line_id, new_text)
+            # C0 (2026-06-22 story-quality R3): persist any flags the reroll
+            # minted onto the ROW (not only meta["reroll_history"]). Verified
+            # dropped before this -- an L1 objective_literal_retry flag born in
+            # a reroll never reached the row's compose_flags.
+            led.update_line_text(
+                line_id, new_text,
+                compose_flags_append=list(result.compose_flags),
+            )
             total_rerolled += 1
             cycle_rerolled += 1
             history.append({

@@ -66,9 +66,9 @@ log = logging.getLogger("OTR.production_ledger")
 # (stdlib-only, import-safe), so this never forms an import cycle. Dual
 # import keeps the module loadable both as a package node and standalone.
 try:  # pragma: no cover - exercised by both import styles
-    from ._otr_ledger_scrub import is_spoken_role
+    from ._otr_ledger_scrub import is_spoken_role, append_compose_flag
 except ImportError:  # pragma: no cover
-    from _otr_ledger_scrub import is_spoken_role  # type: ignore
+    from _otr_ledger_scrub import is_spoken_role, append_compose_flag  # type: ignore
 
 _LEDGER_LOCK = threading.Lock()
 _CURRENT: Optional["Ledger"] = None
@@ -145,12 +145,11 @@ def coerce_speaker_role_for_char_id(
         if prev == "character":
             return line, False
         line["speaker_role"] = "character"
-        flags = list(line.get("compose_flags") or [])
-        flags.append(
+        append_compose_flag(
+            line,
             f"role_coerce:prev={prev or 'none'},new=character,"
-            f"reason=cast_char_id,src={source or 'unknown'}"
+            f"reason=cast_char_id,src={source or 'unknown'}",
         )
-        line["compose_flags"] = flags
         return line, True
     except Exception:  # noqa: BLE001
         return line, False
@@ -893,6 +892,7 @@ class Ledger:
         self,
         beat_id: str,
         text: str,
+        compose_flags_append: Optional[Iterable[str]] = None,
     ) -> bool:
         """Phase 2B: in-place text update on one existing line row.
 
@@ -900,6 +900,14 @@ class Ledger:
         equals `beat_id`. Recomputes char_count + word_count in
         lockstep so downstream consumers comparing budget vs actual
         word counts see fresh numbers.
+
+        C0 (2026-06-22 story-quality R3): when ``compose_flags_append`` is
+        given, each flag is appended (in order, duplicates preserved) to the
+        row's ``compose_flags`` LIST via the shared ``append_compose_flag``
+        mutator -- so flags minted during a targeted reroll land on the ROW,
+        not only in ``meta["reroll_history"]`` (verified dropped before this).
+        A missing / non-list ``compose_flags`` is coerced to ``[]``. The text +
+        length + flag mutations happen in ONE row mutation.
 
         Returns True if a row was updated, False if no matching row.
         Does NOT save -- the writer calls `.save()` after the update
@@ -913,6 +921,9 @@ class Ledger:
                 row["text"] = safe_text
                 row["char_count"] = _char_count(safe_text)
                 row["word_count"] = _word_count(safe_text)
+                if compose_flags_append:
+                    for _flag in compose_flags_append:
+                        append_compose_flag(row, _flag)
                 self._recompute_totals()
                 return True
         return False
@@ -964,6 +975,17 @@ class Ledger:
             # auditor. Preserve a supplied role; default missing to
             # "character" exactly as init_lines_from_outline does.
             speaker_role = _safe_str(r.get("speaker_role")) or "character"
+            # C0 (2026-06-22 story-quality R3): preserve the per-line
+            # compose_flags LIST + arc_phase. set_lines previously DROPPED both
+            # (verified) -- every targeted-reroll / partial-ledger rebuild that
+            # round-trips through set_lines silently lost the row's flags
+            # (role_coerce / stage_dir_stripped / objective_literal_retry /
+            # action_split). Same class as the STEP-1 speaker_role fix. Coerce a
+            # missing/non-list compose_flags to []; pass arc_phase through
+            # unchanged (None when absent).
+            _cf_raw = r.get("compose_flags")
+            compose_flags = list(_cf_raw) if isinstance(_cf_raw, list) else []
+            arc_phase = _safe_str(r.get("arc_phase")) or None
             rows.append({
                 "line_id":          _safe_str(r.get("line_id")),
                 "shot_id":          _safe_str(r.get("shot_id")) or None,
@@ -978,6 +1000,8 @@ class Ledger:
                 "start_s":          _safe_float(r.get("start_s")),
                 "dur_s":            _safe_float(r.get("dur_s")),
                 "speaker_role":     speaker_role,
+                "arc_phase":        arc_phase,
+                "compose_flags":    compose_flags,
                 "beat_intent":      beat_intent,
                 "target_words":     target_words,
                 "dialogue_slot_id": dialogue_slot_id,

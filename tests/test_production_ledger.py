@@ -559,3 +559,95 @@ class TestSingletonAccessors:
         # be overkill; just confirm get_ledger never returns None.
         led = get_ledger()
         assert led is not None
+
+
+# ---------------------------------------------------------------------------
+# C0 (2026-06-22 story-quality R3) -- compose_flags + arc_phase plumbing
+# ---------------------------------------------------------------------------
+
+class TestComposeFlagsPlumbing:
+    def test_set_lines_preserves_compose_flags_and_arc_phase(self, tmp_out):
+        """set_lines used to DROP compose_flags + arc_phase entirely. A row
+        carrying them must round-trip through set_lines unchanged."""
+        led = Ledger("test_cf_preserve", str(tmp_out))
+        led.set_lines([
+            {"line_id": "b001", "char_id": "c01", "text": "Hi",
+             "compose_flags": ["role_coerce:x", "stage_dir_stripped:bare"],
+             "arc_phase": "rising"},
+        ])
+        row = led.data["lines"][0]
+        assert row["compose_flags"] == ["role_coerce:x", "stage_dir_stripped:bare"]
+        assert row["arc_phase"] == "rising"
+
+    def test_set_lines_defaults_compose_flags_to_empty_list(self, tmp_out):
+        """A row omitting compose_flags / arc_phase gets [] / None (not a
+        missing key) so downstream readers never KeyError."""
+        led = Ledger("test_cf_default", str(tmp_out))
+        led.set_lines([{"line_id": "b001", "char_id": "c01", "text": "Hi"}])
+        row = led.data["lines"][0]
+        assert row["compose_flags"] == []
+        assert row["arc_phase"] is None
+
+    def test_set_lines_coerces_non_list_compose_flags(self, tmp_out):
+        """A malformed (non-list) compose_flags is coerced to [] -- never
+        propagated as a string/None into the schema."""
+        led = Ledger("test_cf_coerce", str(tmp_out))
+        led.set_lines([
+            {"line_id": "b001", "char_id": "c01", "text": "Hi",
+             "compose_flags": "oops"},
+        ])
+        assert led.data["lines"][0]["compose_flags"] == []
+
+    def test_update_line_text_appends_compose_flags(self, tmp_out):
+        led = Ledger("test_cf_append", str(tmp_out))
+        led.set_lines([
+            {"line_id": "b001", "char_id": "c01", "text": "old",
+             "compose_flags": ["pre_existing"]},
+        ])
+        ok = led.update_line_text(
+            "b001", "new line", compose_flags_append=["objective_literal_retry"],
+        )
+        assert ok is True
+        row = led.data["lines"][0]
+        assert row["text"] == "new line"
+        assert row["compose_flags"] == ["pre_existing", "objective_literal_retry"]
+        assert row["word_count"] == 2
+
+    def test_update_line_text_append_coerces_missing_flags(self, tmp_out):
+        """update_line_text(append) on a row with no compose_flags coerces to
+        [] before appending."""
+        led = Ledger("test_cf_append2", str(tmp_out))
+        led.set_lines([{"line_id": "b001", "char_id": "c01", "text": "old"}])
+        led.data["lines"][0].pop("compose_flags", None)
+        led.update_line_text("b001", "x", compose_flags_append=["f1", "f1"])
+        # duplicates preserved -- a count of the same flag is meaningful.
+        assert led.data["lines"][0]["compose_flags"] == ["f1", "f1"]
+
+    def test_update_line_text_no_flags_is_unchanged_behaviour(self, tmp_out):
+        """Calling without compose_flags_append leaves an existing flags list
+        untouched (byte-identical to pre-C0 behaviour)."""
+        led = Ledger("test_cf_noop", str(tmp_out))
+        led.set_lines([
+            {"line_id": "b001", "char_id": "c01", "text": "old",
+             "compose_flags": ["keep"]},
+        ])
+        led.update_line_text("b001", "new")
+        assert led.data["lines"][0]["compose_flags"] == ["keep"]
+
+    def test_compose_flags_survive_full_round_trip(self, tmp_out):
+        """The plan's regression: init/set -> update_line_text(append) ->
+        set_lines -> save -> reload -> flags still present."""
+        led = Ledger("test_cf_roundtrip", str(tmp_out))
+        led.set_lines([
+            {"line_id": "b001", "char_id": "c01", "text": "old",
+             "arc_phase": "climax"},
+        ])
+        led.update_line_text("b001", "mid", compose_flags_append=["minted_in_reroll"])
+        # round-trip the rows back through set_lines (the path that dropped them)
+        led.set_lines(led.data["lines"])
+        led.save()
+        with open(led.path, "r", encoding="utf-8") as fh:
+            reloaded = json.load(fh)
+        row = reloaded["lines"][0]
+        assert "minted_in_reroll" in row["compose_flags"]
+        assert row["arc_phase"] == "climax"
