@@ -53,6 +53,13 @@ except ImportError:  # pragma: no cover
         flag_thesis_close,
     )
 
+# Story-quality v2 (R3) tunables. _otr_config is a stdlib-only leaf -> safe to
+# import at module load (keeps the composer's import surface stdlib-only).
+try:  # pragma: no cover - exercised by both import styles
+    from ._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN
+except ImportError:  # pragma: no cover
+    from _otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -723,6 +730,12 @@ class LineRequest:
     # correct pronouns/title (kills the "Mister <female>"-class mismatch).
     # Empty string -> no PRONOUNS directive (legacy callers unaffected).
     speaker_gender: str = ""
+    # Story-quality v2 (R3, 2026-06-22) -- the per-episode feature flag,
+    # threaded from meta["story_quality_v2_enabled"] by the writer + the reroll
+    # rebuilder. Default False => the L2 authoring contract (objective
+    # withholding) is dormant and _build_user_prompt renders the pre-R3 prompt
+    # byte-for-byte. NEVER inferred from text.
+    story_quality_v2_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -1201,8 +1214,23 @@ def _build_user_prompt(req: LineRequest) -> str:
         _dramatic_lines.append(
             f"DRAMATIC QUESTION: {req.dramatic_question}"
         )
+    # L2 authoring contract (story-quality v2, R3 2026-06-22). Under the flag,
+    # for a high-tension character beat that already carries subtext, WITHHOLD
+    # the literal Objective and ask for the deflection instead -- the universal
+    # weak-writer failure was collapsing to terse imperative command-shouting
+    # ("Override the protocols!") that states the goal outright. The gate is a
+    # conjunction of DETERMINISTIC inputs (the flag + speaker_role + the pinned
+    # beat_tension + whether the beat HAS subtext) -- never inferred from
+    # generated text. Flag OFF (default) => the whole branch is dead and the
+    # block below renders the pre-R3 prompt byte-for-byte.
+    _sqv2_deflect = (
+        req.story_quality_v2_enabled
+        and req.speaker_role == "character"
+        and req.beat_tension >= OBJECTIVE_DEFLECTION_TENSION_MIN
+        and bool((req.beat_subtext or "").strip())
+    )
     _this_beat_lines: list[str] = []
-    if req.beat_objective:
+    if req.beat_objective and not _sqv2_deflect:
         _this_beat_lines.append(f"  Objective: {req.beat_objective}")
     if req.beat_obstacle:
         _this_beat_lines.append(f"  Obstacle:  {req.beat_obstacle}")
@@ -1212,6 +1240,12 @@ def _build_user_prompt(req: LineRequest) -> str:
         _this_beat_lines.append(f"  Subtext:   {req.beat_subtext}")
     if 1 <= req.beat_tension <= 5:
         _this_beat_lines.append(f"  Tension:   {req.beat_tension}/5")
+    if _sqv2_deflect:
+        _this_beat_lines.append(
+            "  Play it indirectly: this line IS the deflection -- do NOT state "
+            "the objective outright or bark a command. Write what the character "
+            "SAYS INSTEAD to get what they want, and let the subtext carry it."
+        )
     if _this_beat_lines:
         _dramatic_lines.append("THIS BEAT:")
         _dramatic_lines.extend(_this_beat_lines)

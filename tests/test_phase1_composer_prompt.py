@@ -1070,3 +1070,80 @@ class TestSlidingWindowConstant:
         composer's context window."""
         from nodes import OTR_LedgerScriptWriter as W  # noqa: N812
         assert W.LAST_LINES_WINDOW == 5
+
+
+# ---------------------------------------------------------------------------
+# L2 authoring contract (story-quality v2, R3 2026-06-22)
+# ---------------------------------------------------------------------------
+
+def _l2_req(**over):
+    """A high-tension character LineRequest carrying an objective + subtext --
+    the shape the L2 deflection gate targets. Override any field via kwargs."""
+    base = dict(
+        speaker="EDNA", intent="confront", mood="tense", target_words=20,
+        canon_header="SETTING: a bunker.", last_lines=[],
+        speaker_role="character",
+        beat_objective="get Marlowe to confess he leaked the codes",
+        beat_obstacle="he outranks her",
+        beat_subtext="she is terrified he will deny it",
+        beat_tension=5,
+    )
+    base.update(over)
+    return LineRequest(**base)
+
+
+class TestL2AuthoringContract:
+    _OBJ = "Objective: get Marlowe to confess"
+    _DEFLECT = "this line IS the deflection"
+
+    def test_flag_off_emits_objective_byte_identical(self):
+        """Default (flag off): the Objective is emitted and no deflection
+        directive appears -- pre-R3 prompt unchanged."""
+        p = _build_user_prompt(_l2_req(story_quality_v2_enabled=False))
+        assert "Objective: get Marlowe to confess" in p
+        assert self._DEFLECT not in p
+
+    def test_flag_on_high_tension_withholds_objective_and_injects(self):
+        p = _build_user_prompt(_l2_req(story_quality_v2_enabled=True))
+        assert "Objective: get Marlowe to confess" not in p
+        assert self._DEFLECT in p
+        # the dramatic content the model still needs is retained
+        assert "Subtext:" in p
+        assert "Obstacle:" in p
+
+    def test_flag_on_low_tension_keeps_objective(self):
+        """Below OBJECTIVE_DEFLECTION_TENSION_MIN the gate does not fire."""
+        p = _build_user_prompt(
+            _l2_req(story_quality_v2_enabled=True, beat_tension=3)
+        )
+        assert "Objective: get Marlowe to confess" in p
+        assert self._DEFLECT not in p
+
+    def test_flag_on_no_subtext_keeps_objective(self):
+        p = _build_user_prompt(
+            _l2_req(story_quality_v2_enabled=True, beat_subtext="")
+        )
+        assert "Objective: get Marlowe to confess" in p
+        assert self._DEFLECT not in p
+
+    def test_flag_on_announcer_role_keeps_objective(self):
+        """Only character beats deflect -- an announcer-role beat is untouched
+        even under the flag at high tension."""
+        p = _build_user_prompt(
+            _l2_req(story_quality_v2_enabled=True, speaker_role="announcer")
+        )
+        assert "Objective: get Marlowe to confess" in p
+        assert self._DEFLECT not in p
+
+    def test_threshold_matches_config_constant(self):
+        from nodes._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN as MIN
+        # exactly at the threshold the gate fires
+        p = _build_user_prompt(
+            _l2_req(story_quality_v2_enabled=True, beat_tension=MIN)
+        )
+        assert self._DEFLECT in p
+        # one below it does not
+        p2 = _build_user_prompt(
+            _l2_req(story_quality_v2_enabled=True, beat_tension=MIN - 1)
+        )
+        assert self._DEFLECT not in p2

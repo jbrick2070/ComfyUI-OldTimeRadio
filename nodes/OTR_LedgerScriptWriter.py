@@ -2264,6 +2264,17 @@ class OTR_LedgerScriptWriter:
         meta = led.data.setdefault("meta", {})
         meta["cast_status"] = "building"
         meta["requested_num_characters"] = resolved["num_characters"]
+        # L2/L7 (story-quality v2, R3 2026-06-22): stamp the per-episode feature
+        # flag from the OTR_STORY_QUALITY_V2 env lever (ZERO workflow-JSON
+        # change). The key is stamped ONLY when enabled -> when OFF (default) the
+        # meta dict carries NO new key and the episode is byte-identical to
+        # pre-R3 (the whole spine -- objective withholding, objective-literal
+        # gate, dialogue|action split, telemetry -- stays dormant). The reader
+        # treats an absent key as False. "1"/"true"/"yes"/"on" (case-insensitive)
+        # enable it.
+        if (os.environ.get("OTR_STORY_QUALITY_V2", "").strip().lower()
+                in ("1", "true", "yes", "on")):
+            meta["story_quality_v2_enabled"] = True
 
         # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
         # disk NOW, before the style-picker / news-interpreter / cast /
@@ -3512,6 +3523,12 @@ class OTR_LedgerScriptWriter:
                 beat_tension=_a5_tension,
                 # F4 (story-engine v1) -- speaker gender/pronouns.
                 speaker_gender=gender_by_name.get(speaker, ""),
+                # L2 (story-quality v2, R3 2026-06-22) -- thread the per-episode
+                # flag from meta so the composer's authoring contract can gate.
+                # Default False (meta key absent) => byte-identical pre-R3 prompt.
+                story_quality_v2_enabled=bool(
+                    meta.get("story_quality_v2_enabled", False)
+                ),
             )
 
         # Sprint 10B Wave 1 Agent B (2026-05-27): build the in-loop

@@ -389,6 +389,10 @@ def build_reroll_line_request(
         beat_turn=str(_frame.get("turn") or ""),
         beat_subtext=str(_frame.get("subtext") or ""),
         beat_tension=_coerce_tension(_frame.get("tension")),
+        # L2 (story-quality v2, R3 2026-06-22): thread the per-episode flag so a
+        # reroll composes under the SAME authoring contract the first pass did.
+        # Default False (key absent) => byte-identical to a pre-R3 reroll.
+        story_quality_v2_enabled=bool(meta.get("story_quality_v2_enabled", False)),
     )
 
 

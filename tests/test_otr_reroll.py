@@ -225,6 +225,23 @@ def test_build_reroll_line_request_pulls_meta_and_row_context():
     assert "MARLOWE" in req.character_voice_card
 
 
+def test_build_reroll_line_request_threads_story_quality_flag():
+    """L2 (R3): build_reroll_line_request threads meta.story_quality_v2_enabled
+    so a reroll composes under the SAME authoring contract the first pass did.
+    Absent key => False (byte-identical pre-R3 reroll)."""
+    data = _ledger_data()
+    row = data["lines"][1]
+    # absent -> False
+    assert build_reroll_line_request(
+        data, row, data["cast"]
+    ).story_quality_v2_enabled is False
+    # explicit True -> True
+    data["meta"]["story_quality_v2_enabled"] = True
+    assert build_reroll_line_request(
+        data, row, data["cast"]
+    ).story_quality_v2_enabled is True
+
+
 def test_build_reroll_line_request_target_words_fallback():
     """A row missing target_words falls back to word_count, then a const."""
     data = _ledger_data()
