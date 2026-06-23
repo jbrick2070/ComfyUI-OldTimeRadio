@@ -808,3 +808,111 @@ def is_truncated(text: Any) -> bool:
         return False
     except Exception:  # noqa: BLE001
         return False
+
+
+# ---------------------------------------------------------------------------
+# L3 (story-quality LIFT, 2026-06-23): ACTION-marker strip
+# ---------------------------------------------------------------------------
+# When OTR_COMPOSER_ACTION_STRIP is on, the composer prompt asks the model to
+# put any non-spoken stage action on its OWN segment with a leading "ACTION:".
+# This deterministically removes any such segment from the SHIPPED text (right
+# after compose/polish, before persistence). Strips only what the model marked;
+# L4 catches the rest. NEVER token-surgers dialogue: an ACTION: run goes from
+# the marker to end-of-line / end-of-string, anywhere in the text.
+_ACTION_MARKER_RE = re.compile(r"(?im)(?:^|(?<=[.!?\"'\)\]\s]))ACTION:\s*[^\n]*")
+
+
+def strip_action_marker(text: Any) -> "tuple[str, str, int]":
+    """Remove ACTION:-marked stage business. Returns (clean, action, n).
+
+    ``clean`` is the spoken text with every ``ACTION: ...`` run removed and
+    whitespace re-collapsed; ``action`` is the concatenated removed text (for
+    audit, NOT persisted); ``n`` is how many markers were removed. Idempotent;
+    never raises. A line that is ENTIRELY an ACTION: marker collapses to ""
+    (the caller decides whether to keep the strip)."""
+    try:
+        s = str(text or "")
+        if "action:" not in s.casefold():
+            return s, "", 0
+        removed: list[str] = []
+
+        def _grab(m: "re.Match") -> str:
+            removed.append(m.group(0))
+            return " "
+
+        clean = _ACTION_MARKER_RE.sub(_grab, s)
+        clean = _WS.sub(" ", clean).strip()
+        # tidy a space left before terminal punctuation
+        clean = re.sub(r"\s+([.,!?;:])", r"\1", clean)
+        return clean, " ".join(r.strip() for r in removed).strip(), len(removed)
+    except Exception:  # noqa: BLE001
+        return str(text or ""), "", 0
+
+
+# ---------------------------------------------------------------------------
+# L4 (story-quality LIFT, 2026-06-23): minimal transcript sanitizer
+# ---------------------------------------------------------------------------
+# Final line TEXT only, run after text is final + before freeze/TTS/hash. Strips
+# prompt-leak / director-note patterns and balances a stray wrapper quote.
+# CONSERVATIVE: never touches apostrophes, measurements, or identity fields, and
+# never repairs mojibake (that is a verify-only build artifact -- see
+# detect_mojibake). Returns (clean, reasons).
+_PROMPTLEAK_PATTERNS = (
+    re.compile(r"(?im)(?:^|(?<=[.!?]\s))(?:note|director|stage|voice|delivery|tone)\s*:\s*[^.!?\n]*[.!?]?"),
+    re.compile(r"(?im)\b(?:the\s+)?voice\s+should\s+[^.!?\n]*[.!?]?"),
+    re.compile(r"(?im)\bas\s+(?:the\s+)?ai[,]?\s+[^.!?\n]*[.!?]?"),
+    re.compile(r"(?im)\(\s*(?:director|note|stage|voice)\b[^)]*\)"),
+)
+# Mojibake signatures (verify-only; NEVER mutated in v0).
+_MOJIBAKE_RE = re.compile(r"[ÃÂâ€][\x80-\xBF–—‘-‟]")
+
+
+def detect_mojibake(text: Any) -> bool:
+    """True iff the text shows common UTF-8/cp1252 mojibake. VERIFY-ONLY --
+    callers log/measure; v0 does NOT repair encoding."""
+    try:
+        return bool(_MOJIBAKE_RE.search(str(text or "")))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _balance_wrapper_quotes(s: str) -> "tuple[str, bool]":
+    """Drop a single dangling wrapper double-quote (odd count). Conservative:
+    only acts when there is exactly one straight double-quote at an edge."""
+    if s.count('"') % 2 == 0:
+        return s, False
+    stripped = s
+    changed = False
+    if stripped.startswith('"') and stripped.count('"') % 2 == 1:
+        stripped = stripped[1:].lstrip()
+        changed = True
+    elif stripped.endswith('"') and stripped.count('"') % 2 == 1:
+        stripped = stripped[:-1].rstrip()
+        changed = True
+    return stripped, changed
+
+
+def sanitize_transcript_text(text: Any) -> "tuple[str, list]":
+    """Strip prompt-leak / director-note patterns + balance a stray wrapper
+    quote. Returns (clean, reasons). Conservative + idempotent; never raises.
+    Does NOT touch speaker labels or identity fields (caller passes TEXT only)
+    and never repairs mojibake."""
+    try:
+        s = str(text or "")
+        reasons: list[str] = []
+        for rx in _PROMPTLEAK_PATTERNS:
+            new = rx.sub(" ", s)
+            if new != s:
+                reasons.append(f"prompt_leak:{rx.pattern[:18]}")
+                s = new
+        s = _WS.sub(" ", s).strip()
+        s = re.sub(r"\s+([.,!?;:])", r"\1", s)
+        s, q = _balance_wrapper_quotes(s)
+        if q:
+            reasons.append("wrapper_quote_balanced")
+            s = s.strip()
+        if detect_mojibake(s):
+            reasons.append("mojibake_detected")   # verify-only, no mutation
+        return s, reasons
+    except Exception:  # noqa: BLE001
+        return str(text or ""), []

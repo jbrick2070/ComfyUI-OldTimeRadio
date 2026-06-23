@@ -54,6 +54,30 @@ def story_quality_l12_enabled() -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+def composer_action_strip_enabled() -> bool:
+    """Return True iff L3 (composer ACTION-marker strip) is on.
+
+    Story-Quality LIFT (2026-06-23). Env-gated via ``OTR_COMPOSER_ACTION_STRIP``;
+    DEFAULT OFF. AUDIO-AFFECTING (it can change shipped line text), so it ships
+    dark and a golden re-baseline is required before it is enabled in a render.
+    """
+    import os
+    raw = (os.environ.get("OTR_COMPOSER_ACTION_STRIP") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def transcript_sanitizer_enabled() -> bool:
+    """Return True iff L4 (minimal transcript sanitizer) is on.
+
+    Story-Quality LIFT (2026-06-23). Env-gated via ``OTR_TRANSCRIPT_SANITIZER``;
+    DEFAULT OFF. AUDIO-AFFECTING (final-text hygiene), so it ships dark and a
+    golden re-baseline is required before it is enabled in a render.
+    """
+    import os
+    raw = (os.environ.get("OTR_TRANSCRIPT_SANITIZER") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 def story_quality_v2_enabled(meta: Any) -> bool:
     """Return True iff the story-quality-v2 spine is enabled for this episode.
 

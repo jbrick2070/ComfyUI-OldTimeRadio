@@ -100,17 +100,21 @@ log = logging.getLogger("OTR.ledger_scrub")
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         BARE_STAGE_FLOOR_ACTIVE,
+        sanitize_transcript_text,
         scrub_leading_stage_direction,
         split_stage_business,
         strip_quote_anchored_stage_direction,
     )
+    from ._otr_config import transcript_sanitizer_enabled
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         BARE_STAGE_FLOOR_ACTIVE,
+        sanitize_transcript_text,
         scrub_leading_stage_direction,
         split_stage_business,
         strip_quote_anchored_stage_direction,
     )
+    from _otr_config import transcript_sanitizer_enabled  # type: ignore
 
 __all__ = [
     "ScrubResult",
@@ -822,6 +826,9 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
     # no per-line meta dict). Flag OFF -> the whole L7 branch below is skipped and
     # the per-line loop is byte-identical to pre-R3.
     _sqv2_on = bool((led.get("meta") or {}).get("story_quality_v2_enabled"))
+    # L4 (story-quality LIFT, 2026-06-23): minimal transcript sanitizer, env-
+    # gated + AUDIO-AFFECTING -> default OFF => byte-identical. Read once.
+    _transcript_sanitizer_on = transcript_sanitizer_enabled()
 
     # ---- 3. per spoken line --------------------------------------------
     for i, row in enumerate(lines):
@@ -899,6 +906,21 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
             append_compose_flag(row, _reason_tag)
         # 3c. whitespace / smart-quote / punctuation normalization.
         cleaned = _normalize_whitespace_and_quotes(cleaned)
+
+        # 3c-L4 (story-quality LIFT, 2026-06-23): minimal transcript sanitizer.
+        # Final TEXT only, before the persist/freeze/TTS/hash. Strips prompt-leak
+        # / director-note patterns + balances a stray wrapper quote; mojibake is
+        # DETECTED only (verify-only, never repaired in v0). Records a
+        # transcript_sanitized:<reasons> breadcrumb. Flag OFF => skipped =>
+        # byte-identical.
+        if _transcript_sanitizer_on:
+            _san_text, _san_reasons = sanitize_transcript_text(cleaned)
+            if _san_reasons:
+                append_compose_flag(
+                    row, "transcript_sanitized:" + ",".join(_san_reasons),
+                )
+            if _san_text != cleaned and _san_text.strip():
+                cleaned = _san_text
 
         if cleaned != raw_text:
             row["text"] = cleaned

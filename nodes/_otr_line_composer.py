@@ -44,6 +44,7 @@ try:  # pragma: no cover - exercised by both import styles
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
+        strip_action_marker,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
@@ -53,14 +54,21 @@ except ImportError:  # pragma: no cover
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
+        strip_action_marker,
     )
 
 # Story-quality v2 (R3) tunables. _otr_config is a stdlib-only leaf -> safe to
 # import at module load (keeps the composer's import surface stdlib-only).
 try:  # pragma: no cover - exercised by both import styles
-    from ._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN
+    from ._otr_config import (
+        OBJECTIVE_DEFLECTION_TENSION_MIN,
+        composer_action_strip_enabled,
+    )
 except ImportError:  # pragma: no cover
-    from _otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN  # type: ignore
+    from _otr_config import (  # type: ignore
+        OBJECTIVE_DEFLECTION_TENSION_MIN,
+        composer_action_strip_enabled,
+    )
 
 log = logging.getLogger("OTR")
 
@@ -1419,6 +1427,16 @@ def _build_user_prompt(req: LineRequest) -> str:
         "imply. Keep it spoken-length -- one breath, concrete, no "
         "nested clauses."
     )
+    # L3 (story-quality LIFT, 2026-06-23): give the model an explicit place to
+    # put non-spoken stage action so the deterministic post-strip removes it
+    # cleanly instead of letting it leak into the spoken text. Gated on
+    # OTR_COMPOSER_ACTION_STRIP; OFF (default) => no extra line => byte-identical.
+    if composer_action_strip_enabled():
+        parts.append(
+            "If any non-spoken stage action is unavoidable, put it on its own "
+            "line beginning with 'ACTION:' -- it will be removed and never "
+            "spoken. The spoken line itself must contain no stage directions."
+        )
     parts.append("Speak now.")
     return "\n".join(parts)
 
@@ -2379,6 +2397,18 @@ def compose_line(
                 "line %r: errors=%d warns=%d",
                 req.speaker, stage3_beat.beat_id, _n_err, _n_warn,
             )
+
+    # L3 (story-quality LIFT, 2026-06-23): ACTION-marker strip -- right after
+    # compose/polish, before persistence. When OTR_COMPOSER_ACTION_STRIP is on,
+    # remove any model-marked "ACTION: ..." stage business from the shipped
+    # text + record a SEPARATE action_strip counter (never reuses l7_splits).
+    # internal_action is NEVER persisted. Flag OFF => no-op, byte-identical.
+    if composer_action_strip_enabled():
+        _as_clean, _as_action, _as_n = strip_action_marker(cleaned)
+        if _as_n and _as_clean.strip():
+            cleaned = _as_clean
+            compose_flags = compose_flags + (f"action_strip:{_as_n}",)
+            word_count = len(cleaned.split())
 
     log.info(
         "[OTR_LineComposer] composed line for %s: %d words (flags=%d)",
