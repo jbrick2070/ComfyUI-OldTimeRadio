@@ -23,9 +23,13 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-# Default state of the story-quality-v2 spine. FALSE => the new craft levers
-# are dormant and the pipeline is byte-identical to pre-R3.
-STORY_QUALITY_V2_DEFAULT: bool = False
+# Default state of the story-quality-v2 spine.
+# 2026-06-23 (operator): flipped to TRUE -- the R3 soak proved the spine is
+# stable + harmless (15+ clean episodes, continuity issues ~0, no test/golden
+# impact) even though it is not a measurable quality LIFT on weak local writers.
+# Left ON so L1/L7 stay armed as a defect safety-net + telemetry keeps
+# accruing; OTR_STORY_QUALITY_V2=0 (or false/no/off) is the kill-switch.
+STORY_QUALITY_V2_DEFAULT: bool = True
 
 # L2 authoring contract: the minimum beat_tension (1..5) at which a character
 # line withholds its literal Objective and is asked to play the deflection.
