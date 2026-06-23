@@ -738,6 +738,16 @@ class LineRequest:
     # withholding) is dormant and _build_user_prompt renders the pre-R3 prompt
     # byte-for-byte. NEVER inferred from text.
     story_quality_v2_enabled: bool = False
+    # Story-quality LIFT L1/L2 (2026-06-23) -- deterministic upstream beat
+    # shaping. beat_role = the dramatic FUNCTION of this beat (setup / pressure
+    # / personal_stake / irreversible_choice / consequence); conflict_object +
+    # conflict_type = the premise-anchored, Python-chosen specifics that replace
+    # the generic "console/lever" standoff. Populated ONLY when
+    # OTR_STORY_QUALITY_L12 is on (writer-side sq dict). Empty default => the
+    # DRAMATIC FRAME render below is byte-identical to the pre-LIFT prompt.
+    beat_role: str = ""
+    conflict_object: str = ""
+    conflict_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -1242,6 +1252,40 @@ def _build_user_prompt(req: LineRequest) -> str:
         _this_beat_lines.append(f"  Subtext:   {req.beat_subtext}")
     if 1 <= req.beat_tension <= 5:
         _this_beat_lines.append(f"  Tension:   {req.beat_tension}/5")
+    # Story-quality LIFT L1/L2 (2026-06-23). Premise-anchored conflict + the
+    # beat's dramatic FUNCTION, rendered ONLY when populated (the writer fills
+    # these from the sq dict iff OTR_STORY_QUALITY_L12 is on) -- so the block is
+    # byte-identical to the pre-LIFT prompt whenever the lever is off.
+    if req.conflict_object:
+        _co_line = f"  Conflict over: {req.conflict_object}"
+        if req.conflict_type:
+            _co_line += f" -- {req.conflict_type}"
+        _this_beat_lines.append(_co_line)
+    if req.beat_role == "irreversible_choice":
+        _this_beat_lines.append(
+            "  Beat function: the IRREVERSIBLE CHOICE -- the decisive moment "
+            "happens HERE, on-stage, in this line. Do NOT defer it to a later "
+            "beat or let it be narrated after the fact."
+        )
+    elif req.beat_role == "personal_stake":
+        _this_beat_lines.append(
+            "  Beat function: PERSONAL STAKE -- make what this costs THIS "
+            "character concrete and personal, not abstract or procedural."
+        )
+    elif req.beat_role == "setup":
+        _this_beat_lines.append(
+            "  Beat function: SETUP -- establish the specific situation; do "
+            "not jump to threats or countdowns."
+        )
+    elif req.beat_role == "pressure":
+        _this_beat_lines.append(
+            "  Beat function: PRESSURE -- raise the stake through the specific "
+            "conflict above, not through a generic alarm or timer."
+        )
+    elif req.beat_role == "consequence":
+        _this_beat_lines.append(
+            "  Beat function: CONSEQUENCE -- show what the choice changed."
+        )
     if _sqv2_deflect:
         _this_beat_lines.append(
             "  Play it indirectly: this line IS the deflection -- do NOT state "

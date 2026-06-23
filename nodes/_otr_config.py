@@ -37,6 +37,23 @@ STORY_QUALITY_V2_DEFAULT: bool = True
 OBJECTIVE_DEFLECTION_TENSION_MIN: int = 4
 
 
+def story_quality_l12_enabled() -> bool:
+    """Return True iff the L1/L2 deterministic beat-shaping lever is on.
+
+    Story-Quality LIFT (2026-06-23). SEPARATE from the ``story_quality_v2``
+    meta spine: L12 reshapes the BEAT PLAN upstream (premise-anchored
+    conflict objects/types + dramatic beat_role sequence + crisis-noun
+    grounding), so the weak local writer cannot collapse every premise into
+    the same "console standoff". Env-gated via ``OTR_STORY_QUALITY_L12``;
+    DEFAULT OFF (1/true/yes/on => on). When OFF, no SQ field is populated,
+    no ``meta.story_quality`` key is written, and the prompt is byte-
+    identical to the pre-LIFT pipeline.
+    """
+    import os
+    raw = (os.environ.get("OTR_STORY_QUALITY_L12") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 def story_quality_v2_enabled(meta: Any) -> bool:
     """Return True iff the story-quality-v2 spine is enabled for this episode.
 

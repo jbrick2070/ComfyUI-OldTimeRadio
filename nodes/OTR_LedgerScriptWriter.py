@@ -2200,6 +2200,8 @@ class OTR_LedgerScriptWriter:
         # validators path imports here. Pure module; no LLM, no model
         # loads at import time.
         from . import _otr_legacy_to_stage1_adapter as _OTRL2S1
+        from . import _otr_config as _OTRCFG
+        from . import _otr_story_quality_l12 as _OTRSQL12
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -2732,6 +2734,44 @@ class OTR_LedgerScriptWriter:
                 "proceeding anyway",
                 beat_word_sum, resolved["target_words"], ratio,
             )
+
+        # --- F2. Story-Quality LIFT L1/L2 (2026-06-23) -- deterministic,
+        # UPSTREAM beat-plan shaping. OFF by default (env OTR_STORY_QUALITY_L12).
+        # When ON: build the writer-side sq dict[beat_id -> {beat_role,
+        # conflict_object, conflict_type, ...}] and ground the GENERIC crisis
+        # nouns in each beat.intent (intent ONLY) so the weak local writer cannot
+        # collapse every premise into the same "console standoff". The composer
+        # threads beat_role/conflict_object/conflict_type into LineRequest. Flag
+        # OFF => empty dict, no intent mutation, no field populated => the prompt
+        # is byte-identical to the pre-LIFT pipeline. NEVER raises into the
+        # writer (the LIFT must never break audio).
+        _sq_by_beat: dict = {}
+        try:
+            if _OTRCFG.story_quality_l12_enabled():
+                _l12_roster = [
+                    str(r.get("name") or "")
+                    for r in (led.data.get("cast") or [])
+                    if isinstance(r, dict) and r.get("name")
+                ]
+                _sq_by_beat = _OTRSQL12.build_sq_data(
+                    list(outline.beats),
+                    meta,
+                    str(getattr(outline, "premise", "") or ""),
+                    cast_seed,
+                    roster=_l12_roster,
+                )
+                meta["story_quality_l12_enabled"] = True
+                log.info(
+                    "[OTR_LedgerScriptWriter] story-quality L1/L2 ON: shaped "
+                    "%d voiced beat(s) (premise-anchored conflict + beat_role)",
+                    len(_sq_by_beat),
+                )
+        except Exception as exc:  # noqa: BLE001 -- the LIFT must never break audio
+            log.warning(
+                "[OTR_LedgerScriptWriter] story-quality L1/L2 skipped (%s); "
+                "proceeding with the unshaped outline", exc,
+            )
+            _sq_by_beat = {}
 
         # --- G. Build episode_canon (write deferred to section J.5) ----
         # Disk write moved out so the post-composition title regen
@@ -3540,6 +3580,18 @@ class OTR_LedgerScriptWriter:
                 # Default False (meta key absent) => byte-identical pre-R3 prompt.
                 story_quality_v2_enabled=bool(
                     meta.get("story_quality_v2_enabled", False)
+                ),
+                # Story-quality LIFT L1/L2 (2026-06-23) -- threaded from the
+                # writer-side sq dict. Empty unless OTR_STORY_QUALITY_L12 is on
+                # (then build_sq_data populated it) => "" => byte-identical.
+                beat_role=str(
+                    (_sq_by_beat.get(beat.beat_id) or {}).get("beat_role", "")
+                ),
+                conflict_object=str(
+                    (_sq_by_beat.get(beat.beat_id) or {}).get("conflict_object", "")
+                ),
+                conflict_type=str(
+                    (_sq_by_beat.get(beat.beat_id) or {}).get("conflict_type", "")
                 ),
             )
 
