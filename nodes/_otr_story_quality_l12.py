@@ -605,7 +605,7 @@ def build_sq_data(
     grounded = premise_noun_palette(
         roster,
         premise,
-        *_meta_texts(meta),
+        *premise_texts(meta),
     )
 
     ordered_char_ids: List[str] = [
@@ -661,7 +661,7 @@ def build_sq_data(
     return sq
 
 
-def _meta_texts(meta: Any) -> Tuple[str, ...]:
+def premise_texts(meta: Any) -> Tuple[str, ...]:
     out: List[str] = []
     if isinstance(meta, Mapping):
         news = meta.get("news") if isinstance(meta.get("news"), Mapping) else {}

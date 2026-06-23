@@ -2761,10 +2761,33 @@ class OTR_LedgerScriptWriter:
                     roster=_l12_roster,
                 )
                 meta["story_quality_l12_enabled"] = True
+                # Telemetry (MERGE -- the scrub's L5a setdefault/update keeps
+                # these): the per-episode distinct conflict slots are the
+                # cross-episode SAMENESS measure (compare distinct object/type
+                # counts across a soak). ungrounded_crisis (shipped-text density)
+                # is stamped later by the scrub over the final spoken lines.
+                _l12_objs = sorted({
+                    str(v.get("conflict_object", ""))
+                    for v in _sq_by_beat.values() if v.get("conflict_object")
+                })
+                _l12_types = sorted({
+                    str(v.get("conflict_type", ""))
+                    for v in _sq_by_beat.values() if v.get("conflict_type")
+                })
+                _l12_sq = meta.setdefault("story_quality", {})
+                if isinstance(_l12_sq, dict):
+                    _l12_sq.update({
+                        "l12_domain": _OTRSQL12.select_domain(
+                            meta, str(getattr(outline, "premise", "") or "")
+                        ),
+                        "conflict_objects": _l12_objs,
+                        "conflict_types": _l12_types,
+                    })
                 log.info(
                     "[OTR_LedgerScriptWriter] story-quality L1/L2 ON: shaped "
-                    "%d voiced beat(s) (premise-anchored conflict + beat_role)",
-                    len(_sq_by_beat),
+                    "%d voiced beat(s) (domain=%s, %d distinct conflict objects)",
+                    len(_sq_by_beat), _l12_sq.get("l12_domain")
+                    if isinstance(_l12_sq, dict) else "?", len(_l12_objs),
                 )
         except Exception as exc:  # noqa: BLE001 -- the LIFT must never break audio
             log.warning(

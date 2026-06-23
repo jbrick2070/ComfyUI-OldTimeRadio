@@ -15,6 +15,7 @@ import pytest
 
 from nodes import _otr_story_quality_l12 as L12
 from nodes import _otr_line_composer as LC
+from nodes._otr_ledger_scrub import scrub_ledger
 
 
 # ---------------------------------------------------------------------------
@@ -255,3 +256,47 @@ class TestComposerRenderGate:
             beat_role="", conflict_object="", conflict_type="",
         ))
         assert a == b
+
+
+# ---------------------------------------------------------------------------
+# scrub-side ungrounded_crisis telemetry (chunk 3, shipped-text density)
+# ---------------------------------------------------------------------------
+class TestScrubUngroundedCrisis:
+    def _ledger(self, l12_on: bool) -> dict:
+        meta = {"news": {"premise": "a quiet town meeting"}}
+        if l12_on:
+            meta["story_quality_l12_enabled"] = True
+        return {
+            "schema_version": "l3", "episode_id": "uc", "meta": meta,
+            "cast": [
+                {"char_id": "c01", "name": "DANA", "gender": "female",
+                 "tts_model": "bark", "voice_preset": "v2/en_speaker_4"},
+            ],
+            "lines": [
+                {"line_id": "b001", "beat_id": "b001", "char_id": "c01",
+                 "speaker_role": "character",
+                 "text": "Pull the lever and trip the console now.",
+                 "word_count": 8, "char_count": 39},
+                {"line_id": "b002", "beat_id": "b002", "char_id": "c01",
+                 "speaker_role": "character",
+                 "text": "We talked it through at the meeting.",
+                 "word_count": 7, "char_count": 35},
+            ],
+        }
+
+    def test_flag_on_counts_shipped_text(self):
+        led = self._ledger(l12_on=True)
+        scrub_ledger(led, repair_available=True)
+        uc = led["meta"]["story_quality"]["ungrounded_crisis"]
+        # "lever" + "console" are ungrounded generic crisis nouns; "meeting"
+        # is in the premise (grounded) -> not counted.
+        assert uc["matches"] == 2
+        assert uc["total"] == 15
+
+    def test_flag_off_no_ungrounded_key(self):
+        led = self._ledger(l12_on=False)
+        scrub_ledger(led, repair_available=True)
+        # L12 off AND v2 off here (no v2 flag) -> no story_quality key at all.
+        assert "ungrounded_crisis" not in (
+            led.get("meta", {}).get("story_quality", {}) or {}
+        )

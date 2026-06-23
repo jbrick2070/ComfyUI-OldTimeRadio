@@ -1022,6 +1022,44 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
             "l7_split_failures": _l7_split_failures,
         })
 
+    # ---- 4c. story-quality L12 telemetry (gated, 2026-06-23) -----------
+    # The L1/L2 LIFT measures cross-episode "console standoff" sameness on the
+    # SHIPPED text: count whole-token GENERIC crisis nouns that are NOT grounded
+    # in the premise/roster, over every spoken line. density = matches /
+    # total_voiced_words (computed downstream from this pair). MERGED into
+    # meta.story_quality so it sits alongside the writer's conflict-slot stamps
+    # and the v2 counts. Gated on the writer's meta flag; OFF => no key.
+    if bool((led.get("meta") or {}).get("story_quality_l12_enabled")):
+        try:
+            from . import _otr_story_quality_l12 as _SQL12
+        except ImportError:  # pragma: no cover
+            import _otr_story_quality_l12 as _SQL12  # type: ignore
+        _grounded = _SQL12.premise_noun_palette(
+            [str(r.get("name") or "") for r in cast_rows if isinstance(r, dict)],
+            *_SQL12.premise_texts(led.get("meta") or {}),
+        )
+        _uc_matches = 0
+        _uc_total = 0
+        for r in lines:
+            if not isinstance(r, dict):
+                continue
+            if str(r.get("speaker_role") or "character") not in _SPOKEN_ROLES:
+                continue
+            _t = str(r.get("text") or "")
+            _uc_total += len(_t.split())
+            _uc_matches += _SQL12.count_ungrounded_crisis(_t, _grounded)
+        _meta_l12 = led.get("meta")
+        if not isinstance(_meta_l12, dict):
+            _meta_l12 = {}
+            led["meta"] = _meta_l12
+        _sq_l12 = _meta_l12.setdefault("story_quality", {})
+        if not isinstance(_sq_l12, dict):
+            _sq_l12 = {}
+            _meta_l12["story_quality"] = _sq_l12
+        _sq_l12["ungrounded_crisis"] = {
+            "matches": _uc_matches, "total": _uc_total,
+        }
+
     # ---- 5. whole-episode spoken-word ceiling ---------------------------
     total_words = sum(
         len(str(r.get("text") or "").split())
