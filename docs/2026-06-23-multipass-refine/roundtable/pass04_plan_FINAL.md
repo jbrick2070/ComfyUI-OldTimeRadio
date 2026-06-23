@@ -14,10 +14,11 @@ independently converged the idea into something sound AND caught real bugs in th
 key determinism on; the RNG was never wired into the LLM). The result is a deterministic, local-only,
 structural **best-of-N OUTLINE selector** -- not a QA-reroll gate.
 
-## PREREQUISITE (gates the whole build)
-Run the L1/L2 ON-vs-OFF measurement soak (already deferred to the operator). Quantify residual
-cross-episode sameness (`meta.story_quality.ungrounded_crisis` density + distinct conflict counts). **If
-L1/L2 already collapses the sameness, this is CUT.** Build only on measurable residual sameness.
+## Measurement (operator chose CODE-FIRST 2026-06-23 -- this is validation, not a pre-gate)
+The L1/L2 ON-vs-OFF soak (quantify residual cross-episode sameness via `meta.story_quality.ungrounded_crisis`
+density + distinct conflict counts) now runs AFTER the build, as step 5 -- it validates the selector
+actually drops sameness rather than gating whether to build it. (If a later soak shows L1/L2 alone already
+collapses the sameness, the selector can be left default-OFF -- it costs nothing dark.)
 
 ## v0 -- outline-level best-of-N (the build target)
 Wrap the single `generate_outline` call in `OTR_LedgerScriptWriter.run()` (~L2707) in a selector; flag
@@ -26,8 +27,11 @@ default-OFF; local-writer-only. Everything downstream runs UNCHANGED on the winn
 **Flag.** `OTR_STORY_BEST_OF_N`: unset/0/1 => DISABLED (one call, byte-identical); integer >=2 => N,
 clamped to a max of 6. Read once at the top of `run()`.
 
-**Local-only gate.** If `resolved["creative_writing_model"].startswith(("openrouter:", "comfy:"))` -> force
-N=1 (both paid lanes). LOUD one-line log of the clamp + the resolved handle.
+**Provider gate (local by DEFAULT; remote is OPT-IN).** Default behaviour: if
+`resolved["creative_writing_model"].startswith(("openrouter:", "comfy:"))` -> force N=1 (both paid lanes),
+LOUD one-line log of the clamp + the resolved handle. The remote lanes are allowed ONLY when the operator
+opts in via `OTR_STORY_BEST_OF_N_ALLOW_REMOTE` (default OFF) -- see "Optional remote best-of-N" below, which
+adds a hard COST GUARD so N paid outline calls can never run away.
 
 **Selector** `select_best_outline(generate_fn, outline_req, *, cast_seed, n, meta) -> Outline`:
 1. For `i in range(n)`: derive `h = sha256(f"{cast_seed}:outline:{i}").hexdigest()`; seed the LLM RNG
@@ -63,6 +67,34 @@ the `story_quality` dict (consistent with the L5a setdefault/update rule).
 **Do NOT re-validate** candidates -- `generate_outline` already runs `validate_outline_against_budget` +
 `stamp_dialogue_slot_ids`; just assert each returned candidate has slot ids + passes budget (test).
 
+## Optional remote best-of-N (OPT-IN, default OFF -- operator add 2026-06-23)
+Lets the best-of-N selector run on a paid/remote writer (OpenRouter / Comfy Credits) when the operator
+wants frontier-quality candidates. SAME selector + scorer + comparator -- the ONLY differences are the gate
+and a hard cost guard. Default OFF => the provider gate above stands (remote => N=1, unchanged).
+
+- **Flag:** `OTR_STORY_BEST_OF_N_ALLOW_REMOTE` -- unset/0/false => OFF (remote clamps to N=1, today's
+  behaviour). 1/true/yes/on => remote best-of-N permitted, subject to the cost guard.
+- **Remote N cap is tighter:** on a remote writer, clamp `effective_n = min(requested_n,
+  REMOTE_BEST_OF_N_MAX)` with `REMOTE_BEST_OF_N_MAX = 3` (local keeps its max of 6). Outline generations
+  are small but they are N x a paid call.
+- **Hard COST GUARD (fail-closed), checked BEFORE the first candidate call:** estimate worst-case spend =
+  `effective_n * per_outline_cost_estimate` (per-call estimate from the resolved model's price hint x the
+  outline prompt+completion token budget; reuse the writer's existing per-run budget/accounting if present).
+  Then: (a) if the estimate would breach the existing per-run budget gate -> clamp to N=1 + LOUD; (b) if the
+  worst-case estimate >= the operator's $20 autonomy ceiling (the global irreversible/spend gate) -> REFUSE
+  remote best-of-N, clamp to N=1, LOUD (never silently multiply paid calls); (c) otherwise LOUD-log the
+  estimated worst-case spend + effective_n BEFORE running.
+- **Determinism caveat (remote):** remote backends may ignore process-local `torch`/`random` seeds, so on
+  remote the `diversity_hint` prompt overlay is the PRIMARY diversity lever (the seed is best-effort +
+  tie-break only). Record `provider` + per-candidate `cost_usd` (when the backend returns it) in the
+  `best_of_n.scores[]` telemetry so a remote run is cost-auditable.
+- **Everything else identical:** pure scorer on RAW intents, keep-best comparator, `build_sq_data` once on
+  the winner, never-fail fallback (deterministic i=0), telemetry merged. Audio still frozen; flag-stack OFF
+  => byte-identical.
+- **Build note:** this rides on top of the local v0 -- build the local selector FIRST (steps 1-4 below),
+  then add the remote opt-in + cost guard as a final, isolated chunk so the local path is provable in
+  isolation.
+
 ## v1 -- the operator's holistic "B+ until good" loop (DEFERRED, separate project)
 Post-compose, a LOCAL LLM grades the composed story; if below bar, regenerate a fresh outline (same
 premise/cast_seed-keyed) + recompose; HARD CAP + keep-best; local-only so passes are free; never-fail = ship
@@ -80,18 +112,26 @@ call-failed) STILL fail LOUD. The cap bounds runtime; keep-best guarantees a shi
 - Audio spine frozen (`test_audio_byte_identical`); flag default-OFF => byte-identical (assert: exactly one
   `generate_outline` call + no `best_of_n` key when disabled); golden re-baseline only if a future change
   alters shipped text.
-- 100% local for the loop (disabled on openrouter:/comfy:); determinism (cast_seed-keyed; pure scorer);
-  LOUD on real errors; keep-best + hard cap; UTF-8 no BOM; SFW.
+- Local by DEFAULT (remote clamps to N=1 unless `OTR_STORY_BEST_OF_N_ALLOW_REMOTE` is on, and then only
+  under the fail-closed cost guard -- worst-case >= $20 or over the per-run budget => clamp to N=1 LOUD);
+  determinism (cast_seed-keyed; pure scorer); LOUD on real errors; keep-best + hard cap; UTF-8 no BOM; SFW.
 - Zero `otr_scifi_16gb_full.json` change: v0 is internal to the writer node. (If a future version exposes N
   as a widget, it goes IN the JSON in the same change.)
 
-## Build order
-1. PREREQUISITE measurement soak (operator GPU) -- decide go/no-go.
-2. `diversity_hint` on OutlineRequest + `_build_user_prompt` render (flag-off byte-identical test).
-3. `score_outline` pure scorer + `StoryScore` + tests (raw-intent metrics, no mutation).
-4. `select_best_outline` selector + the `run()` wrapper + local-gate + flag parsing + telemetry +
-   never-fail fallthrough; flag-off call-count==1 + no-key tests; full suite + Bug Bible; commit+push.
-5. Small local re-soak with `OTR_STORY_BEST_OF_N=3` -> measure sameness drop vs baseline.
+## Build order (operator 2026-06-23: CODE FIRST, soak after -- the soak is validation, not a pre-gate)
+1. `diversity_hint` on OutlineRequest + `_build_user_prompt` render (flag-off byte-identical test).
+2. `score_outline` pure scorer + `StoryScore` + tests (raw-intent metrics, no mutation; division-by-zero
+   guards).
+3. `select_best_outline` selector (local TORCH local-import) + the `run()` wrapper + provider gate + flag
+   parsing + telemetry (merged) + deterministic never-fail fallthrough; flag-off call-count==1 + no-key +
+   byte-identical-prompt tests; full suite + Bug Bible; commit+push.
+4. **Optional remote chunk:** `OTR_STORY_BEST_OF_N_ALLOW_REMOTE` (default OFF) + `REMOTE_BEST_OF_N_MAX=3` +
+   the fail-closed COST GUARD (clamp to N=1 on per-run-budget breach OR worst-case >= $20) + provider/cost
+   telemetry; tests prove remote-default-OFF clamps to N=1 and the cost guard fails closed; full suite +
+   Bug Bible; commit+push. Build this AFTER step 3 so the local path is provable in isolation.
+5. VALIDATION soak (operator GPU, AFTER the build): local `OTR_STORY_BEST_OF_N=3` -> measure sameness drop
+   vs baseline (`ungrounded_crisis` density + distinct conflict counts). If the outline-layer metric does
+   not discriminate, escalate to the v1 post-compose grade.
 6. (DEFERRED, operator) v1 B+ loop.
 
 ## Verify-at-build checklist
