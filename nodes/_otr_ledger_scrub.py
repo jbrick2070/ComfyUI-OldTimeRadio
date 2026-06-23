@@ -1003,11 +1003,24 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
         if not isinstance(_meta, dict):
             _meta = {}
             led["meta"] = _meta
-        _meta["story_quality"] = {
+        # L5a (2026-06-23): MERGE, never blind-overwrite. Other SQ levers
+        # (L1/L2 render-on) stamp keys like `ungrounded_crisis` into
+        # meta.story_quality upstream of the scrub; a blind `=` here wiped
+        # them (the telemetry undercount). setdefault+update preserves any
+        # sibling keys while refreshing the scrub's own counts. The counts
+        # are aggregated from the SAVED rows (`lines` is led["lines"]; the
+        # cascade restore runs before the scrub, and the L7 split above
+        # mutates these same row dicts in place), so they reflect the
+        # persisted ledger, not a discarded reroll attempt.
+        _sq = _meta.setdefault("story_quality", {})
+        if not isinstance(_sq, dict):
+            _sq = {}
+            _meta["story_quality"] = _sq
+        _sq.update({
             "l1_rerolls": _l1_rerolls,
             "l7_splits": _l7_splits,
             "l7_split_failures": _l7_split_failures,
-        }
+        })
 
     # ---- 5. whole-episode spoken-word ceiling ---------------------------
     total_words = sum(

@@ -248,14 +248,14 @@ class TestComputeEditCap:
 
     @pytest.mark.parametrize("voiced,expected", [
         (0,   3),    # floor 3
-        (6,   3),
-        (9,   3),
-        (12,  4),
-        (15,  5),
-        (18,  6),
-        (19,  6),
-        (24,  8),    # ceiling 8
-        (50,  8),    # ceiling holds
+        (6,   4),    # L5a: ceil(3.6)=4
+        (9,   6),    # ceil(5.4)=6
+        (12,  8),    # ceil(7.2)=8
+        (15,  9),    # ceil(9.0)=9
+        (18,  11),   # ceil(10.8)=11
+        (19,  12),   # ceil(11.4)=12
+        (24,  12),   # ceiling 12 (ceil(14.4)=15 -> clamp)
+        (50,  12),   # ceiling holds
     ])
     def test_scale_with_voiced_beats(self, voiced, expected):
         assert compute_edit_cap(voiced) == expected
@@ -525,7 +525,8 @@ class TestReviewLedgerDispositions:
 
     def test_too_many_edits(self, tmp_path):
         """Doctor proposes > edit_cap edits -> too_many_edits."""
-        # 6 voiced beats -> edit_cap = max(3, 6//3) = 3
+        # 6 voiced beats -> edit_cap = max(3, min(12, ceil(6*0.6))) = 4 (L5a);
+        # the doctor proposes 5 edits (> 4) so the cap still trips.
         lines = [
             _line(f"b{i:03d}", "c01", f"line {i}", role="character")
             for i in range(1, 7)

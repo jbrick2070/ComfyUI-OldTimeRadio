@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Optional
@@ -1134,13 +1135,22 @@ def apply_deterministic_cast_repairs(
 
 
 def compute_edit_cap(voiced_beats: int) -> int:
-    """edit_cap = min(8, max(3, voiced_beats // 3)).
+    """edit_cap = max(3, min(12, ceil(voiced_beats * 0.6))).
 
-    Per §3 Phase 3 -- scales with episode size so a 19-beat 7-act
-    episode can accommodate ~6 plausible rewrites without flipping
-    `too_many_edits`, while a 6-beat 1-act episode caps at 3.
+    Story-Quality L5a (2026-06-23): the old `min(8, max(3, voiced_beats
+    // 3))` capped a 18-beat episode at 6 edits. Dense, well-written
+    prose (gemma-12b) routinely trips >6 plausible doctor edits, which
+    flips `too_many_edits` and HALTS the cascade BEFORE the story critic
+    (`_otr_freeze_cascade.py` terminal-skip at the reviewer composite) --
+    so the BEST writer's episodes were never arc-graded (verdict "?").
+    Scaling the cap to ~0.6 edits per voiced beat lets a dense episode
+    absorb its rewrites and still reach the critic, while a short
+    episode keeps a tight floor of 3.
+
+    Pinned values: 6 beats -> 4, 18 -> 11, 19 -> 12 (the 12 ceiling
+    holds for any larger episode).
     """
-    return min(8, max(3, voiced_beats // 3))
+    return max(3, min(12, math.ceil(voiced_beats * 0.6)))
 
 
 # ---------------------------------------------------------------------------

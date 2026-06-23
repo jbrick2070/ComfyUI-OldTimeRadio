@@ -170,3 +170,20 @@ class TestTelemetry:
         led = self._ledger_with_flags(flag_on=False)
         scrub_ledger(led, repair_available=True)
         assert "story_quality" not in led.get("meta", {})
+
+    def test_merge_preserves_sibling_keys(self):
+        """L5a: the scrub MERGES into meta.story_quality -- a key stamped
+        upstream (L1/L2 render-on, e.g. ungrounded_crisis) must survive the
+        scrub's count refresh instead of being blind-overwritten."""
+        led = self._ledger_with_flags(flag_on=True)
+        led["meta"]["story_quality"] = {
+            "ungrounded_crisis": {"matches": 2, "total": 30},
+        }
+        scrub_ledger(led, repair_available=True)
+        sq = led["meta"]["story_quality"]
+        # sibling key preserved
+        assert sq["ungrounded_crisis"] == {"matches": 2, "total": 30}
+        # scrub's own counts still refreshed
+        assert sq["l1_rerolls"] == 1
+        assert sq["l7_splits"] == 1
+        assert sq["l7_split_failures"] == 1
