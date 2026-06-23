@@ -1,5 +1,34 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-23 (CODER; BEST-OF-N STRUCTURAL STORY-REFINE SELECTOR -- v0 LOCAL + OPTIONAL REMOTE,
+> ALL 4 CHUNKS BUILT + SHIPPED + PUSHED. origin/v2.0-alpha HEAD `4593bc5` == local.)** Built
+> `docs/2026-06-23-multipass-refine/roundtable/pass04_plan_FINAL.md` in order; each chunk full-suite + Bug-Bible
+> green, ZERO `otr_scifi_16gb_full.json` change (verified), flag DEFAULT-OFF => byte-identical (single
+> `generate_outline` call + no `meta.story_quality.best_of_n` key asserted):
+> - **C1 `4dc631a`** -- `OutlineRequest.diversity_hint: str = ""`; `_otr_outline._build_user_prompt` renders a
+>   structural-variation overlay ONLY when non-empty (empty => byte-identical prompt, asserted). Suite 5161/34.
+> - **C2 `0473f67`** -- new `nodes/_otr_story_select.py`: `StoryScore` + PURE `score_outline(outline, meta, roster)`
+>   on the RAW beat intents (NO `build_sq_data` -- that mutates intent + swaps the generic crisis nouns and would
+>   ZERO `ungrounded_crisis_density`, the R3 catch). Metrics `ungrounded_crisis_density` / `distinct_conflict_nouns`
+>   / `premise_grounding`, reusing public `count_ungrounded_crisis`/`premise_noun_palette`/`premise_texts`. 5170/34.
+> - **C3 `43c7143`** -- `select_best_outline(...)` (LOCAL torch import; `sha256("{cast_seed}:outline:{i}")`-keyed
+>   per-candidate seed + structural `diversity_hint` for i>=1; per-candidate try/except `OutlineFailedError`
+>   LOUD+continue; keep-best `min(density asc, -distinct, -grounding, index)`; deterministic never-fail i=0
+>   fallback then LOUD-fail) + `resolve_best_of_n` (flag parse + provider gate) wired into writer `run()`.
+>   `OTR_STORY_BEST_OF_N` unset/0/1=off, >=2 => local max 6; remote (`openrouter:`/`comfy:`) => N=1. Selector
+>   called ONLY when effective_n>=2 (else the byte-identical single path). `build_sq_data` still runs EXACTLY ONCE
+>   downstream on the winner. Telemetry MERGED into `meta.story_quality.best_of_n`. Suite 5187/34.
+> - **C4 `4593bc5`** -- opt-in remote best-of-N: `OTR_STORY_BEST_OF_N_ALLOW_REMOTE` (default OFF) +
+>   `_REMOTE_BEST_OF_N_MAX=3` + fail-closed `remote_cost_guard` checked BEFORE the first paid call (clamp to N=1
+>   on per-run token-budget breach OR worst-case >= the $20 autonomy ceiling, LOUD) + provider/per-candidate
+>   `cost_usd` telemetry (OpenRouter `resolved_models_snapshot` probe). Suite 5200/34; Bug Bible 16/7/3 each chunk.
+> **>>> NEW CURRENT STEP = step 5 VALIDATION soak (operator GPU, AFTER the build):** run local
+> `OTR_STORY_BEST_OF_N=3` vs baseline over M episodes and measure the cross-episode SAMENESS drop
+> (`meta.story_quality.ungrounded_crisis` density + distinct `conflict_object`/`type` counts). The PREREQUISITE
+> go/no-go is operator-judged + WRITTEN after reviewing the soak table (no implicit threshold). If the
+> outline-layer metric does NOT discriminate, escalate to the v1 post-compose "B+" grade (DEFERRED, separate
+> project). Remote best-of-N stays opt-in + cost-guarded. prod/main + tags GATED.
+>
 > **HANDOFF -- 2026-06-23 (CODER; STORY-QUALITY LIFT L5a + L1/L2 + L3 + L4 ALL BUILT + SHIPPED + PUSHED.
 > origin/v2.0-alpha HEAD `41aed49` == local.)** Built `pass04_plan_FINAL.md` in order, each chunk full-suite +
 > Bug-Bible green then commit AND push, ZERO `otr_scifi_16gb_full.json` change (verified each commit), all SQ
