@@ -634,3 +634,66 @@ class TestCritiqueToHint:
         out = SEL.critique_to_hint("weakness " * 50)
         assert len(out) <= 200
         assert not out.endswith(" ")
+
+
+# ---------------------------------------------------------------------------
+# v1 chunk 2 -- grade_story + StoryGrade + extract_spoken_text_for_grade
+# ---------------------------------------------------------------------------
+class TestGrader:
+    def test_storygrade_frozen_defaults(self):
+        import dataclasses
+        g = SEL.StoryGrade(score_0_100=82, biggest_weakness="flat arc")
+        assert g.score_0_100 == 82 and g.error_type is None
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            g.score_0_100 = 1
+
+    def test_extract_voiced_only_speaker_prefixed(self):
+        led = {"lines": [
+            {"speaker_role": "music_open", "speaker": "", "text": "theme"},
+            {"speaker_role": "character", "speaker": "MALI", "text": "We have to decide."},
+            {"speaker_role": "announcer", "speaker": "ANNOUNCER", "text": "Meanwhile..."},
+            {"speaker_role": "sfx", "speaker": "", "text": "boom"},
+            {"speaker_role": "character", "speaker": "MANFRED", "text": "Not yet."},
+        ]}
+        out = SEL.extract_spoken_text_for_grade(led)
+        assert "MALI: We have to decide." in out
+        assert "ANNOUNCER: Meanwhile..." in out
+        assert "MANFRED: Not yet." in out
+        assert "theme" not in out and "boom" not in out
+
+    def test_extract_reads_ledger_object_data(self):
+        class _Led:
+            data = {"lines": [{"speaker_role": "character", "speaker": "X", "text": "hi"}]}
+        assert "X: hi" in SEL.extract_spoken_text_for_grade(_Led())
+
+    def test_extract_caps_length(self):
+        rows = [{"speaker_role": "character", "speaker": "X", "text": "a" * 100}
+                for _ in range(200)]
+        out = SEL.extract_spoken_text_for_grade({"lines": rows}, max_chars=4000)
+        assert len(out) <= 4000 + 6
+        assert "\n...\n" in out
+
+    def test_extract_empty(self):
+        assert SEL.extract_spoken_text_for_grade({"lines": []}) == ""
+        assert SEL.extract_spoken_text_for_grade(None) == ""
+
+    def test_grade_story_parses(self):
+        def gen(messages, *, temperature, max_new_tokens, stop=None):
+            return '{"score": 82, "biggest_weakness": "the stakes never rise"}'
+        g = SEL.grade_story("MALI: We must choose.", "a buried signal", generate_fn=gen)
+        assert g.score_0_100 == 82
+        assert g.biggest_weakness == "the stakes never rise"
+        assert g.error_type is None
+
+    def test_grade_story_out_of_range_stays_safe(self):
+        def gen(messages, *, temperature, max_new_tokens, stop=None):
+            return '{"score": 250, "biggest_weakness": "x"}'
+        g = SEL.grade_story("x", "y", generate_fn=gen)
+        assert 0 <= g.score_0_100 <= 100
+
+    def test_grade_story_floor_on_garbage(self):
+        def gen(messages, *, temperature, max_new_tokens, stop=None):
+            return "not json at all, just prose"
+        g = SEL.grade_story("x", "y", generate_fn=gen)
+        assert g.score_0_100 == 0
+        assert g.error_type == "grader_unparseable"

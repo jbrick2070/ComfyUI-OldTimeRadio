@@ -94,6 +94,115 @@ def critique_to_hint(biggest_weakness: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Refine loop (v1) -- holistic story grader (read-only; never breaks the writer)
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class StoryGrade:
+    """A holistic 0-100 STRUCTURAL grade for ONE composed story + the single
+    biggest structural weakness to fix. error_type is None on success and
+    "grader_unparseable" when the grader call/parse failed (=> floor grade)."""
+
+    score_0_100: int
+    biggest_weakness: str
+    error_type: Any = None
+
+
+def extract_spoken_text_for_grade(ledger: Any, *, max_chars: int = 4000) -> str:
+    """Pull the SPOKEN dialogue from a composed ledger as "SPEAKER: line" rows
+    (voiced = character + announcer; music/sfx excluded) so the grader can judge
+    character consistency. Caps at max_chars (head + "\\n...\\n" + tail). Accepts
+    a Ledger object (reads ``.data["lines"]``) or a raw dict / list of rows."""
+    data = getattr(ledger, "data", ledger)
+    if isinstance(data, dict):
+        rows = data.get("lines", []) or []
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+    parts: List[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("speaker_role", "") or "") not in _VOICED_ROLES:
+            continue
+        text = str(row.get("text", "") or "").strip()
+        if not text:
+            continue
+        speaker = str(row.get("speaker", "") or "").strip() or "?"
+        parts.append(f"{speaker}: {text}")
+    joined = "\n".join(parts)
+    if len(joined) > max_chars:
+        half = max_chars // 2
+        joined = joined[:half] + "\n...\n" + joined[-half:]
+    return joined
+
+
+def grade_story(composed_text: Any, premise: Any, *, generate_fn) -> "StoryGrade":
+    """Grade a composed story 0-100 on STRUCTURE (arc / rising stakes / premise
+    grounding / character want) via the existing ``structured_call`` ladder at
+    LOW temperature (base 0.1 / structural-retry 0.0 -- structured_call requires
+    the retry to be strictly lower than the base; determinism per pass comes from
+    the caller seeding the RNG before the grade call). Read-only; NEVER raises
+    into the writer -- any failure returns a floor grade
+    (error_type="grader_unparseable")."""
+    try:
+        from ._otr_structured_call import structured_call
+        from ._otr_repair_prompts import make_dispatching_repair_factory
+    except ImportError:  # pragma: no cover - standalone / test load
+        from _otr_structured_call import structured_call  # type: ignore
+        from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+    from pydantic import BaseModel, Field
+
+    class _StoryGradeSchema(BaseModel):
+        score: int = Field(..., ge=0, le=100)
+        biggest_weakness: str = Field("", max_length=200)
+
+    system = (
+        "You are a tough story editor grading a short science-fiction audio "
+        "drama on a 0-100 scale (A~=90, B+~=80, B~=75, C+~=68). Judge STRUCTURE "
+        "only -- dramatic arc, rising stakes, premise grounding, clear character "
+        "wants -- not prose polish. Return ONE JSON object "
+        "{\"score\": int 0-100, \"biggest_weakness\": str} where "
+        "biggest_weakness names the SINGLE biggest STRUCTURAL flaw to fix (an "
+        "arc / stakes / grounding / character problem), NOT a line edit. No "
+        "prose, no fences."
+    )
+    user = (
+        f"Premise: {str(premise or '').strip()}\n\n"
+        f"Script:\n{str(composed_text or '').strip()}\n\n"
+        "Grade it. Return only the JSON object."
+    )
+    try:
+        # LLM slot: creative -- the holistic story grade (refine loop) reuses
+        # the writer's creative generate_fn (the model that wrote the story).
+        res = structured_call(
+            prompt=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            schema=_StoryGradeSchema,
+            slot_fn=generate_fn,
+            base_temperature=0.1,
+            structural_retry_temperature=0.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=128,
+            max_attempts=2,
+            helper_name="OTR_StoryGrade",
+        )
+        score = max(0, min(100, int(res.score)))
+        weakness = str(getattr(res, "biggest_weakness", "") or "").strip()
+        return StoryGrade(score_0_100=score, biggest_weakness=weakness,
+                          error_type=None)
+    except Exception as exc:  # noqa: BLE001 -- the grader must NEVER break the writer
+        log.warning(
+            "[refine] grade_story failed (%s); using floor grade",
+            type(exc).__name__,
+        )
+        return StoryGrade(score_0_100=0, biggest_weakness="grader_unparseable",
+                          error_type="grader_unparseable")
+
+
+# ---------------------------------------------------------------------------
 # Chunk 2 -- pure structural scorer
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
