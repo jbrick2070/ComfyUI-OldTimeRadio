@@ -353,9 +353,9 @@ def test_generate_sends_reasoning_effort_when_env_set(enabled_env, monkeypatch):
     assert seen["payload"]["reasoning_effort"] == "none"
 
 
-def test_generate_omits_reasoning_effort_when_env_unset(enabled_env, monkeypatch):
-    # Default: no reasoning-control field, so non-thinking models and
-    # OpenRouter-proper payloads stay byte-identical.
+def test_generate_uses_low_reasoning_effort_when_env_unset(enabled_env, monkeypatch):
+    # R3 (2026-06-22): the frontier-writer DEFAULT is reasoning_effort="low"
+    # (the live re-measure HALVED critic flatness). UNSET env -> "low".
     monkeypatch.delenv("OPENROUTER_REASONING_EFFORT", raising=False)
     seen = {}
     monkeypatch.setattr(
@@ -366,7 +366,8 @@ def test_generate_omits_reasoning_effort_when_env_unset(enabled_env, monkeypatch
     entry = backend.load(orb.SLOT_A_ID, _row())
     backend.generate(entry, [{"role": "user", "content": "x"}],
                      temperature=0.5, max_new_tokens=64)
-    assert "reasoning_effort" not in seen["payload"]
+    assert seen["payload"]["reasoning_effort"] == orb.DEFAULT_REASONING_EFFORT
+    assert seen["payload"]["reasoning_effort"] == "low"
 
 
 # ---------------------------------------------------------------------------

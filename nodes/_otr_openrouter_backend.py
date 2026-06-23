@@ -144,7 +144,13 @@ OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "deepseek/deepseek-v4-pro"
 # Defect C fix: the COST per-call ceiling must sit ABOVE the OUTPUT cap, or a
 # reply near the output cap (+ the prompt added by the estimate) spuriously
 # trips OpenRouterCostCeilingError. So they are two separate numbers.
-DEFAULT_OUTPUT_TOKENS_CAP = 8192      # ceiling on OUTPUT tokens (max_tokens) per call
+DEFAULT_OUTPUT_TOKENS_CAP = 16384     # ceiling on OUTPUT tokens (max_tokens) per call
+# R3 (2026-06-22): bumped 8192 -> 16384 as the 0-line GUARD for the frontier
+# reasoning-effort default (below). A reasoning model spends part of the output
+# budget on hidden reasoning; at the old 8192 ceiling a low-effort run could
+# starve the story body (finish_reason=length -> empty/truncated -> 0-line).
+# Still well under the per-call cost ceiling. Override per slot via
+# OPENROUTER_<A|B>_MAXTOK.
 DEFAULT_MAX_TOKENS_PER_CALL = 32768   # COST per-call ceiling (prompt+output estimate)
 DEFAULT_MAX_TOKENS_PER_RUN = 300_000
 DEFAULT_TIMEOUT_S = 120
@@ -232,20 +238,30 @@ def _float_env(name: str) -> float | None:
         return None
 
 
+#: R3 frontier-writer config default (2026-06-22). The live re-measure showed
+#: grok-4.3 at reasoning_effort=low HALVED the critic flatness score (14/18 ->
+#: 8/18) vs reasoning OFF -- a real near-free craft win for the frontier writers.
+#: So the OpenRouter default is now "low" (paired with the bumped output cap as
+#: the 0-line guard). Set OPENROUTER_REASONING_EFFORT explicitly to override --
+#: "none" restores the no-reasoning behaviour (the gemma-via-/v1 lane) and any
+#: high|medium|low tunes it.
+DEFAULT_REASONING_EFFORT = "low"
+
+
 def _reasoning_effort_from_env() -> str | None:
-    """Read OPENROUTER_REASONING_EFFORT, the OpenAI-standard reasoning control
-    (high|medium|low|none). Ollama's OpenAI-compatible /v1 honours it to bound
-    or DISABLE a thinking model's <think> preamble: the gemma-4 lane sets
-    'none' so the model emits the structured answer directly instead of
-    spending the output budget on reasoning (-> finish_reason=length -> an
-    empty/truncated body the JSON passes cannot parse). Native `think:false`
-    and `chat_template_kwargs` are NOT honoured on /v1 (ollama#14820 / #16240),
-    so reasoning_effort is the portable lever. Unset/empty -> None (the field
-    is omitted, so non-thinking models and OpenRouter-proper are unaffected)."""
+    """Resolve the OpenAI-standard reasoning control (high|medium|low|none).
+
+    Reads OPENROUTER_REASONING_EFFORT; UNSET/empty -> ``DEFAULT_REASONING_EFFORT``
+    ("low", the R3 frontier-writer default). An explicit value always wins --
+    set "none" to suppress reasoning (the gemma-4 /v1 lane: emit the structured
+    answer directly instead of spending the output budget on a <think> preamble
+    -> finish_reason=length -> unparseable JSON). reasoning_effort is the
+    portable lever (native `think:false` / `chat_template_kwargs` are NOT
+    honoured on Ollama /v1, ollama#14820 / #16240)."""
     raw = _env("OPENROUTER_REASONING_EFFORT")
-    if not raw:
-        return None
-    return raw.strip().lower() or None
+    if raw is None or not raw.strip():
+        return DEFAULT_REASONING_EFFORT
+    return raw.strip().lower() or DEFAULT_REASONING_EFFORT
 
 
 def openrouter_enabled() -> bool:

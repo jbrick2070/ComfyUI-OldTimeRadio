@@ -130,3 +130,43 @@ class TestScrubIntegration:
         ]
         assert len(splits) == 1                       # only one record
         assert row["text"] == text_after_first        # stable
+
+
+class TestTelemetry:
+    def _ledger_with_flags(self, flag_on: bool) -> dict:
+        meta = {"story_quality_v2_enabled": True} if flag_on else {}
+        return {
+            "schema_version": "l3", "episode_id": "tel", "meta": meta,
+            "cast": [
+                {"char_id": "c02", "name": "EDNA REEVES", "gender": "female",
+                 "tts_model": "bark", "voice_preset": "v2/en_speaker_4"},
+            ],
+            "lines": [
+                {"line_id": "b001", "beat_id": "b001", "char_id": "c02",
+                 "speaker_role": "character",
+                 "compose_flags": ["objective_literal_retry"],
+                 "text": "The relay is dead.",
+                 "word_count": 4, "char_count": 18},
+                {"line_id": "b002", "beat_id": "b002", "char_id": "c02",
+                 "speaker_role": "character",
+                 "compose_flags": [
+                     'action_split:{"action":"taps","reason":"x"}',
+                     "action_split_failed:ValueError",
+                 ],
+                 "text": "We have minutes.",
+                 "word_count": 3, "char_count": 16},
+            ],
+        }
+
+    def test_flag_on_aggregates_counts(self):
+        led = self._ledger_with_flags(flag_on=True)
+        scrub_ledger(led, repair_available=True)
+        sq = led["meta"]["story_quality"]
+        assert sq["l1_rerolls"] == 1
+        assert sq["l7_splits"] == 1
+        assert sq["l7_split_failures"] == 1
+
+    def test_flag_off_writes_no_summary(self):
+        led = self._ledger_with_flags(flag_on=False)
+        scrub_ledger(led, repair_available=True)
+        assert "story_quality" not in led.get("meta", {})

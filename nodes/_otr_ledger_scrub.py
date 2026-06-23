@@ -978,6 +978,37 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
         else:
             seen_spoken[key] = line_id
 
+    # ---- 4b. story-quality-v2 telemetry (gated) -------------------------
+    # Aggregate the per-line breadcrumbs into a meta summary, ONLY when the flag
+    # is on (never written when off -> the flag-off ledger carries no new meta
+    # key). Counts ride the row compose_flags (the FIXED schema); the scrub is
+    # the natural aggregation point -- it has just recorded the L7 splits and
+    # sees the L1 objective_literal_retry flags carried up from compose (C0
+    # preserves them through set_lines / reroll).
+    if _sqv2_on:
+        _l1_rerolls = _l7_splits = _l7_split_failures = 0
+        for r in lines:
+            if not isinstance(r, dict):
+                continue
+            for _f in r.get("compose_flags") or []:
+                if not isinstance(_f, str):
+                    continue
+                if _f == "objective_literal_retry":
+                    _l1_rerolls += 1
+                elif _f.startswith("action_split:"):
+                    _l7_splits += 1
+                elif _f.startswith("action_split_failed:"):
+                    _l7_split_failures += 1
+        _meta = led.get("meta")
+        if not isinstance(_meta, dict):
+            _meta = {}
+            led["meta"] = _meta
+        _meta["story_quality"] = {
+            "l1_rerolls": _l1_rerolls,
+            "l7_splits": _l7_splits,
+            "l7_split_failures": _l7_split_failures,
+        }
+
     # ---- 5. whole-episode spoken-word ceiling ---------------------------
     total_words = sum(
         len(str(r.get("text") or "").split())
