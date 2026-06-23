@@ -2271,8 +2271,11 @@ class OTR_LedgerScriptWriter:
         # pre-R3 (the whole spine -- objective withholding, objective-literal
         # gate, dialogue|action split, telemetry -- stays dormant). The reader
         # treats an absent key as False. "1"/"true"/"yes"/"on" (case-insensitive)
-        # enable it.
-        if (os.environ.get("OTR_STORY_QUALITY_V2", "").strip().lower()
+        # enable it. NOTE: `run()` does a LOCAL `import os` further down (this
+        # file's convention), which makes `os` function-local -- so it must be
+        # imported HERE before this first use, or it UnboundLocalErrors.
+        import os as _os_sqv2
+        if (_os_sqv2.environ.get("OTR_STORY_QUALITY_V2", "").strip().lower()
                 in ("1", "true", "yes", "on")):
             meta["story_quality_v2_enabled"] = True
 
