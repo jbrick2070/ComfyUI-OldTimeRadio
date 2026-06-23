@@ -203,6 +203,87 @@ def grade_story(composed_text: Any, premise: Any, *, generate_fn) -> "StoryGrade
 
 
 # ---------------------------------------------------------------------------
+# Refine loop (v1) -- flag / widget / provider gate
+# ---------------------------------------------------------------------------
+_REFINE_MAX_PASSES = 5
+# Node dropdown labels -> target grade bar (0-100). "Off" / unknown => 0 (off).
+_REFINE_GRADE_MAP = {"off": 0, "c+": 68, "b": 75, "b+": 80, "a": 90}
+
+
+@dataclass
+class RefineConfig:
+    requested_passes: int
+    effective_passes: int   # TOTAL candidate count incl. the mandatory pass 0
+    max_passes: int
+    bar: int
+    target_grade: str
+    provider: str
+    clamp_reason: str
+    override_source: str
+
+
+def _parse_refine_bar(widget_target: Any, env) -> tuple:
+    """Resolve the target-grade bar (0-100). Env OTR_STORY_REFINE_BAR overrides
+    the widget. Returns (bar, target_grade_label, override_source)."""
+    raw_env = str(env.get("OTR_STORY_REFINE_BAR", "") or "").strip()
+    if raw_env:
+        try:
+            return max(0, min(100, int(raw_env))), raw_env, "env_bar"
+        except ValueError:
+            log.warning(
+                "[refine] OTR_STORY_REFINE_BAR=%r is not an int; using the "
+                "widget", raw_env,
+            )
+    label = str(widget_target or "Off").strip()
+    return _REFINE_GRADE_MAP.get(label.lower(), 0), label, "widget"
+
+
+def resolve_refine_passes(creative_writing_model: Any, *, widget_target="Off",
+                          env=None) -> "RefineConfig":
+    """Resolve the refine config. ``effective_passes`` is the TOTAL candidate
+    count INCLUDING the mandatory pass 0. Disabled (Off / passes<2 / remote
+    writer) => effective_passes=1 (the byte-identical single path; the loop
+    short-circuits and the writer runs once)."""
+    import os
+    if env is None:
+        env = os.environ
+    bar, target_grade, override_source = _parse_refine_bar(widget_target, env)
+    model = str(creative_writing_model or "")
+
+    raw_passes = str(env.get("OTR_STORY_REFINE_PASSES", "") or "").strip()
+    if raw_passes:
+        try:
+            requested = int(raw_passes)
+        except ValueError:
+            log.warning(
+                "[refine] OTR_STORY_REFINE_PASSES=%r is not an int; refine "
+                "disabled", raw_passes,
+            )
+            requested = 1
+    else:
+        # Widget-driven: a real target grade keeps trying up to the cap.
+        requested = _REFINE_MAX_PASSES if bar > 0 else 1
+
+    if bar <= 0:   # Off / no target grade => disabled
+        return RefineConfig(1, 1, _REFINE_MAX_PASSES, 0, target_grade, model,
+                            "disabled", override_source)
+    effective = max(1, min(requested, _REFINE_MAX_PASSES))
+    clamp_reason = "max_5" if requested > _REFINE_MAX_PASSES else ""
+    if effective < 2:
+        return RefineConfig(requested, 1, _REFINE_MAX_PASSES, bar, target_grade,
+                            model, "passes_lt_2", override_source)
+    if model.startswith(("openrouter:", "comfy:")):
+        log.warning(
+            "[refine] remote creative writer %r -> refine clamped to 1 pass "
+            "(local-only)", model,
+        )
+        return RefineConfig(requested, 1, _REFINE_MAX_PASSES, bar, target_grade,
+                            model, "remote_provider_local_only", override_source)
+    return RefineConfig(requested, effective, _REFINE_MAX_PASSES, bar,
+                        target_grade, model, clamp_reason, override_source)
+
+
+# ---------------------------------------------------------------------------
 # Chunk 2 -- pure structural scorer
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)

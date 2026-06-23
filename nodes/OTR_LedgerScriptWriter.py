@@ -2027,6 +2027,149 @@ class OTR_LedgerScriptWriter:
     # FUNCTION method
     # ------------------------------------------------------------------
 
+    def _refine_loop(self, _rcfg, _core_kwargs):
+        """Iterative story-REVISION loop (v1, 2026-06-23). Called by run() ONLY
+        when refine is enabled (effective_passes >= 2). Re-runs the writer body
+        (self.run with _refine_active=True) up to N times sharing ONE cast seed;
+        grades each pass and, below the target, REVISES (prior_macro + critique)
+        and retries. Keep-best by grade; commit the winner; clean up losers."""
+        import os
+        from . import _otr_story_select as _OTRSEL
+        import hashlib
+        import random as _rnd
+        import shutil
+        try:
+            import torch as _torch
+        except Exception:  # noqa: BLE001
+            _torch = None
+
+        def _seed(ns):
+            h = int(hashlib.sha256(ns.encode("utf-8")).hexdigest(), 16)
+            if _torch is not None:
+                _torch.manual_seed(h % (2 ** 64))
+            _rnd.seed(h % (2 ** 32))
+
+        def _build_prior_macro(_outline):
+            if _outline is None:
+                return ""
+            try:
+                _beats = getattr(_outline, "beats", []) or []
+                _intents = [
+                    str(getattr(b, "intent", "") or "")
+                    for b in _beats
+                    if str(getattr(b, "speaker_role", "") or "")
+                    in ("character", "announcer")
+                ]
+                _bs = "; ".join(f"{j + 1}. {t}" for j, t in enumerate(_intents))
+                return (
+                    f"Title: {getattr(_outline, 'title', '')}\n"
+                    f"Premise: {getattr(_outline, 'premise', '')}\n"
+                    f"Setting: {getattr(_outline, 'setting', '')}\n"
+                    f"Beats: {_bs[:600]}"
+                )
+            except Exception:  # noqa: BLE001
+                return ""
+
+        forced_seed = _resolve_cast_rng_seed()[0]   # ONE cast seed for all passes
+        log.info(
+            "[refine] ON: target=%s bar=%d max_passes=%d cast_seed=%d",
+            _rcfg.target_grade, _rcfg.bar, _rcfg.effective_passes, forced_seed,
+        )
+        candidates = []
+        prior_macro, prior_critique = "", ""
+        winner = None
+        for i in range(_rcfg.effective_passes):
+            _seed(f"{forced_seed}:refine:{i}")
+            try:
+                out = self.run(
+                    **_core_kwargs,
+                    _refine_active=True,
+                    _refine_prior_macro=prior_macro,
+                    _refine_prior_critique=prior_critique,
+                    _refine_forced_cast_seed=forced_seed,
+                )
+            except Exception:  # noqa: BLE001
+                if i == 0:
+                    raise   # pass-0 failure == the existing LOUD writer failure
+                log.warning("[refine] pass %d compose failed; skipping", i)
+                continue
+            last = getattr(self, "_refine_last", {}) or {}
+            _seed(f"{forced_seed}:refine:{i}:grade")
+            grade = _OTRSEL.grade_story(
+                out[0], last.get("premise", ""),
+                generate_fn=last.get("creative_fn"),
+            )
+            log.info(
+                "[refine] pass %d/%d grade=%d (target=%d) weakness=%r",
+                i, _rcfg.effective_passes, grade.score_0_100, _rcfg.bar,
+                str(grade.biggest_weakness)[:80],
+            )
+            cand = {"i": i, "grade": grade, "out": out, "last": last}
+            candidates.append(cand)
+            if grade.score_0_100 >= _rcfg.bar:
+                winner = cand
+                break
+            prior_macro = _build_prior_macro(last.get("outline"))
+            prior_critique = (
+                "" if grade.error_type
+                else _OTRSEL.critique_to_hint(grade.biggest_weakness)
+            )
+        if winner is None:
+            winner = max(candidates, key=lambda c: (c["grade"].score_0_100, -c["i"]))
+        _reached = winner["grade"].score_0_100 >= _rcfg.bar
+        _stop = "bar_reached" if _reached else "cap_reached_below_bar"
+        if not _reached:
+            log.warning(
+                "[refine] cap reached BELOW bar: best grade=%d < target=%d (%s); "
+                "shipping keep-best -- consider a lower target grade",
+                winner["grade"].score_0_100, _rcfg.bar, _rcfg.target_grade,
+            )
+        # Clean up loser episode dirs (best-effort; the winner's stays).
+        _winroot = str((winner["last"] or {}).get("episode_root") or "")
+        for c in candidates:
+            if c is winner:
+                continue
+            _root = str((c["last"] or {}).get("episode_root") or "")
+            if _root and _root != _winroot and os.path.isdir(_root):
+                shutil.rmtree(_root, ignore_errors=True)
+        # Stamp refine telemetry on the WINNER's ledger (merged) + re-save.
+        try:
+            _wled = (winner["last"] or {}).get("led")
+            if _wled is not None and isinstance(getattr(_wled, "data", None), dict):
+                _sq = _wled.data.setdefault("meta", {}).setdefault("story_quality", {})
+                if isinstance(_sq, dict):
+                    _sq["refine_loop"] = {
+                        "requested_passes": _rcfg.requested_passes,
+                        "effective_passes": _rcfg.effective_passes,
+                        "max_passes": _rcfg.max_passes,
+                        "bar": _rcfg.bar,
+                        "target_grade": _rcfg.target_grade,
+                        "override_source": _rcfg.override_source,
+                        "winner_pass": winner["i"],
+                        "winner_grade": winner["grade"].score_0_100,
+                        "stop_reason": _stop,
+                        "target_reached": bool(_reached),
+                        "provider": _rcfg.provider,
+                        "clamp_reason": _rcfg.clamp_reason,
+                        "passes": [
+                            {
+                                "pass_index": c["i"],
+                                "score_0_100": c["grade"].score_0_100,
+                                "grade_error_type": c["grade"].error_type,
+                                "grade_delta": (
+                                    None if c["i"] == 0
+                                    else c["grade"].score_0_100
+                                    - candidates[0]["grade"].score_0_100
+                                ),
+                            }
+                            for c in candidates
+                        ],
+                    }
+                    _wled.save()
+        except Exception:  # noqa: BLE001 -- telemetry must never break the run
+            log.warning("[refine] telemetry stamp failed")
+        return winner["out"]
+
     def run(
         self,
         episode_title="",
@@ -2085,8 +2228,36 @@ class OTR_LedgerScriptWriter:
         # operator is not logged in / the Comfy Credits lane is unused.
         auth_token_comfy_org=None,
         api_key_comfy_org=None,
+        refine_target_grade="Off",
+        # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
+        # _refine_loop when a refine pass re-enters this body. All default to the
+        # no-op so a normal (non-refine) call is byte-identical.
+        *,
+        _refine_active=False,
+        _refine_prior_macro="",
+        _refine_prior_critique="",
+        _refine_forced_cast_seed=None,
     ):
-        """Generate a v2.0 LPL script. See module docstring for pipeline."""
+        """Generate a v2.0 LPL script. See the module docstring for the pipeline.
+
+        The optional default-OFF iterative story-REVISION loop (v1, 2026-06-23)
+        is delegated to ``_refine_loop`` on the INITIAL call; each refine pass
+        re-enters this body with ``_refine_active=True`` and runs it directly."""
+        if not _refine_active:
+            from . import _otr_story_select as _OTRSEL_GATE
+            _rcfg = _OTRSEL_GATE.resolve_refine_passes(
+                creative_writing_model, widget_target=refine_target_grade,
+            )
+            if _rcfg.effective_passes >= 2:
+                _core = {
+                    k: v for k, v in locals().items()
+                    if k not in (
+                        "self", "refine_target_grade", "_refine_active",
+                        "_refine_prior_macro", "_refine_prior_critique",
+                        "_refine_forced_cast_seed", "_OTRSEL_GATE", "_rcfg",
+                    )
+                }
+                return self._refine_loop(_rcfg, _core)
 
         # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-RUN cost
         # budget at the top of every episode. The budget is a module-level
@@ -2537,7 +2708,13 @@ class OTR_LedgerScriptWriter:
         # it drove no per-episode variety once the cast (here), the
         # style picker (BUG-LOCAL-270), and the LEMMY cameo
         # (BUG-LOCAL-260) were each decoupled from it.
-        cast_seed, cast_seed_source = _resolve_cast_rng_seed()
+        if _refine_forced_cast_seed is not None:
+            # Refine loop: all passes share ONE cast seed so the cast (and the
+            # cast-keyed determinism) stays stable while the outline is revised.
+            cast_seed = int(_refine_forced_cast_seed)
+            cast_seed_source = "refine_forced"
+        else:
+            cast_seed, cast_seed_source = _resolve_cast_rng_seed()
         cast_rng = _random.Random(cast_seed)
         log.info(
             "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast "
@@ -2698,6 +2875,8 @@ class OTR_LedgerScriptWriter:
             cast_descriptions=cast_descriptions,
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,
+            prior_macro=_refine_prior_macro,
+            prior_critique=_refine_prior_critique,
         )
         # LLM slot: creative -- outline drives the episode narrative
         # arc (beats, characters, structure). Single creative pass.
@@ -2717,9 +2896,16 @@ class OTR_LedgerScriptWriter:
         # N=1 unless the operator opts in (OTR_STORY_BEST_OF_N_ALLOW_REMOTE).
         # build_sq_data still runs exactly ONCE downstream (F2 block) on the
         # winning outline -- the selector never calls it.
-        _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
-            _OTRSEL.resolve_best_of_n(resolved)
-        )
+        if _refine_active:
+            # Refine loop owns outline variety via prior_macro/prior_critique;
+            # bypass best-of-N entirely (exactly one outline per refine pass).
+            _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
+                1, 1, "refine_bypass",
+            )
+        else:
+            _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
+                _OTRSEL.resolve_best_of_n(resolved)
+            )
         if _bon_effective_n >= 2:
             _bon_model = str(resolved["creative_writing_model"])
             _bon_is_remote = _bon_model.startswith(("openrouter:", "comfy:"))
@@ -4671,6 +4857,20 @@ class OTR_LedgerScriptWriter:
         # output sockets. Labels stripped (resolved["creative_writing_model"]
         # / ["technical_model"] are already _strip_label_suffix-normalized).
         # B3 wires `technical_model` into the cascade.
+        if _refine_active:
+            # Stash what the refine loop in run() needs: the grader fn + premise
+            # to grade THIS pass; the outline + cast_seed to build the next
+            # REVISE overlay; episode_root for loser cleanup; led to stamp the
+            # refine telemetry on the winner.
+            self._refine_last = {
+                "outline": outline,
+                "premise": str(getattr(outline, "premise", "") or ""),
+                "creative_fn": creative_generate_fn,
+                "cast_seed": cast_seed,
+                "episode_root": episode_root,
+                "led": led,
+                "script_text": script_text,
+            }
         return (
             script_text,
             script_json,

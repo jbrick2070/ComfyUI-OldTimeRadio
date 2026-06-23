@@ -697,3 +697,52 @@ class TestGrader:
         g = SEL.grade_story("x", "y", generate_fn=gen)
         assert g.score_0_100 == 0
         assert g.error_type == "grader_unparseable"
+
+
+# ---------------------------------------------------------------------------
+# v1 chunk 3/4 -- resolve_refine_passes (flag/widget/provider gate)
+# ---------------------------------------------------------------------------
+class TestResolveRefinePasses:
+    LOCAL = "mistralai/Mistral-Nemo-Instruct-2407"
+    REMOTE = "openrouter:meta-llama/llama-3.1-70b"
+
+    def test_off_disabled(self):
+        c = SEL.resolve_refine_passes(self.LOCAL, widget_target="Off", env={})
+        assert c.effective_passes == 1 and c.bar == 0 and c.clamp_reason == "disabled"
+
+    def test_b_enables_up_to_cap(self):
+        c = SEL.resolve_refine_passes(self.LOCAL, widget_target="B", env={})
+        assert c.bar == 75 and c.effective_passes == 5  # widget-driven => cap
+
+    def test_grade_map(self):
+        for g, b in [("C+", 68), ("B", 75), ("B+", 80), ("A", 90)]:
+            assert SEL.resolve_refine_passes(self.LOCAL, widget_target=g, env={}).bar == b
+
+    def test_env_passes_override(self):
+        c = SEL.resolve_refine_passes(
+            self.LOCAL, widget_target="B", env={"OTR_STORY_REFINE_PASSES": "3"},
+        )
+        assert c.effective_passes == 3 and c.requested_passes == 3
+
+    def test_env_passes_clamped_to_5(self):
+        c = SEL.resolve_refine_passes(
+            self.LOCAL, widget_target="B", env={"OTR_STORY_REFINE_PASSES": "9"},
+        )
+        assert c.effective_passes == 5 and c.clamp_reason == "max_5"
+
+    def test_env_bar_enables_even_with_widget_off(self):
+        c = SEL.resolve_refine_passes(
+            self.LOCAL, widget_target="Off",
+            env={"OTR_STORY_REFINE_BAR": "82", "OTR_STORY_REFINE_PASSES": "3"},
+        )
+        assert c.bar == 82 and c.effective_passes == 3
+
+    def test_remote_clamps_to_1(self):
+        c = SEL.resolve_refine_passes(self.REMOTE, widget_target="B", env={})
+        assert c.effective_passes == 1 and c.clamp_reason == "remote_provider_local_only"
+
+    def test_passes_1_disabled(self):
+        c = SEL.resolve_refine_passes(
+            self.LOCAL, widget_target="B", env={"OTR_STORY_REFINE_PASSES": "1"},
+        )
+        assert c.effective_passes == 1
