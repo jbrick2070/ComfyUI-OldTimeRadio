@@ -1133,9 +1133,23 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
         "",
         source_line,
         f"Style: {req.style}",
+    ]
+    # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
+    # REAL Path C macro prompt. The legacy _build_user_prompt (where the hint was
+    # first wired) is back-compat/test-only and never runs in production, so the
+    # hint was DEAD until now -- best-of-N candidates varied only by RNG seed.
+    # Empty hint => byte-identical to the pre-steer prompt.
+    _dh = req.diversity_hint.strip()
+    if _dh:
+        parts.append(
+            f"Structural variation (take a different dramatic approach -- vary "
+            f"the premise angle, the central stake, and who drives the turn): "
+            f"{_dh}"
+        )
+    parts.extend([
         "",
         f"Task: {verb}. Return only the JSON object.",
-    ]
+    ])
     return "\n".join(parts)
 
 
@@ -1246,6 +1260,12 @@ def _build_beat_user_prompt(
         parts.append(f"Previous beat intent: {previous_beat_intent}")
     if next_beat_speaker:
         parts.append(f"Next beat is spoken by: {next_beat_speaker}")
+    # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
+    # REAL Path C beat prompt (legacy _build_user_prompt is test-only). Empty =>
+    # byte-identical.
+    _dh = req.diversity_hint.strip()
+    if _dh:
+        parts.append(f"Structural variation: {_dh}")
     parts.extend([
         "",
         "Task: write the intent (one sentence, NOT dialogue) and a "

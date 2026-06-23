@@ -473,3 +473,62 @@ class TestCostProbeTelemetry:
         )
         for s in meta["story_quality"]["best_of_n"]["scores"]:
             assert s["cost_usd"] is None
+
+
+# ---------------------------------------------------------------------------
+# v1 chunk 0 -- wire diversity_hint into the REAL Path C builders (fix the
+# shipped v0 dead-code bug: the hint was rendered only in the test-only
+# _build_user_prompt, so best-of-N candidates varied only by RNG seed).
+# ---------------------------------------------------------------------------
+class TestPathCDiversityHint:
+    def _macro(self):
+        return OUT._MacroShape(
+            title="Chandra's Echo",
+            premise="An observatory catches a signal someone wants buried.",
+            setting="A mountaintop radio observatory",
+            time_of_day="night",
+        )
+
+    # --- macro (Stage 1) ---
+    def test_macro_empty_hint_no_render(self):
+        assert "Structural variation" not in OUT._build_macro_user_prompt(_req(""))
+
+    def test_macro_empty_is_byte_identical_to_default(self):
+        assert OUT._build_macro_user_prompt(_req()) == OUT._build_macro_user_prompt(_req(""))
+
+    def test_macro_renders_hint(self):
+        hint = "open on the personal stake, not the institutional threat"
+        p = OUT._build_macro_user_prompt(_req(hint))
+        assert "Structural variation" in p
+        assert hint in p
+
+    # --- beat (Stage 3) ---
+    def test_beat_empty_hint_no_render(self):
+        p = OUT._build_beat_user_prompt(
+            _req(""), self._macro(), "rising_action", "MANFRED", (1, 4),
+        )
+        assert "Structural variation" not in p
+
+    def test_beat_empty_is_byte_identical_to_default(self):
+        a = OUT._build_beat_user_prompt(
+            _req(), self._macro(), "rising_action", "MANFRED", (1, 4),
+        )
+        b = OUT._build_beat_user_prompt(
+            _req(""), self._macro(), "rising_action", "MANFRED", (1, 4),
+        )
+        assert a == b
+
+    def test_beat_renders_hint(self):
+        hint = "make the conflict interpersonal, not a countdown"
+        p = OUT._build_beat_user_prompt(
+            _req(hint), self._macro(), "rising_action", "MANFRED", (1, 4),
+        )
+        assert "Structural variation" in p
+        assert hint in p
+
+    def test_different_hints_diverge_the_macro_prompt(self):
+        # The point of the fix: a different hint => a different production prompt
+        # (=> genuinely different candidates, not RNG-only variation).
+        a = OUT._build_macro_user_prompt(_req("open on the turn"))
+        b = OUT._build_macro_user_prompt(_req("open on the consequence"))
+        assert a != b
