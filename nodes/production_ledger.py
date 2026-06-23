@@ -96,15 +96,27 @@ _NON_CHARACTER_CHAR_ID_SENTINELS: frozenset = frozenset({
 
 def cast_ids_from_ledger(ledger_data: Any) -> "set[str]":
     """Return the set of real CAST char_ids from a ledger dict's `cast` table,
-    MINUS the announcer / music / sfx sentinels. Defensive; never raises."""
+    MINUS the announcer / music / sfx sentinels. Defensive; never raises.
+
+    The announcer is NOT always keyed by the literal "announcer" char_id -- a
+    real episode often stores it as an ordinary cast slot (e.g. char_id="c01",
+    name="ANNOUNCER", tts_model="kokoro"). Mirror the reviewer's existing roster
+    convention (`name != "ANNOUNCER"`) and exclude any row whose NAME is the
+    announcer marker, so D3 never coerces a legitimate announcer-intro line to
+    "character" (live-smoke 2026-06-22: c01=ANNOUNCER intro was wrongly
+    re-roled, then routed to the character TTS engine and crashed)."""
     ids: "set[str]" = set()
     try:
         for row in (ledger_data or {}).get("cast", []) or []:
             if not isinstance(row, dict):
                 continue
             cid = str(row.get("char_id") or "").strip()
-            if cid and cid.lower() not in _NON_CHARACTER_CHAR_ID_SENTINELS:
-                ids.add(cid)
+            if not cid or cid.lower() in _NON_CHARACTER_CHAR_ID_SENTINELS:
+                continue
+            name = str(row.get("name") or "").strip().upper()
+            if name == "ANNOUNCER":
+                continue  # the announcer occupying a cast slot is NOT a character
+            ids.add(cid)
     except Exception:  # noqa: BLE001 -- a malformed ledger is never fatal here
         return set()
     return ids

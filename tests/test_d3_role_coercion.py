@@ -45,6 +45,29 @@ class TestCastIdsFromLedger:
         assert PL.cast_ids_from_ledger({}) == set()
         assert PL.cast_ids_from_ledger(None) == set()
 
+    def test_announcer_in_cast_slot_excluded(self):
+        # live-smoke 2026-06-22: the announcer is often stored as an ordinary
+        # cast slot (char_id=c01, name=ANNOUNCER) rather than the "announcer"
+        # sentinel. It must NOT count as a coercible character.
+        led = {"cast": [
+            {"char_id": "c01", "name": "ANNOUNCER", "tts_model": "kokoro"},
+            {"char_id": "c02", "name": "NORA ECKELS", "tts_model": "bark"},
+        ]}
+        assert PL.cast_ids_from_ledger(led) == {"c02"}
+
+    def test_announcer_intro_cast_slot_not_coerced(self):
+        # the announcer's intro line carries its cast char_id (c01) -> must stay
+        # whatever role it has, never forced to "character".
+        line = {"line_id": "b001", "char_id": "c01", "speaker_role": "announcer",
+                "compose_flags": ["announcer_intro"]}
+        cast_ids = PL.cast_ids_from_ledger({"cast": [
+            {"char_id": "c01", "name": "ANNOUNCER", "tts_model": "kokoro"},
+            {"char_id": "c02", "name": "NORA ECKELS", "tts_model": "bark"},
+        ]})
+        _out, changed = PL.coerce_speaker_role_for_char_id(line, cast_ids, "test")
+        assert changed is False
+        assert line["speaker_role"] == "announcer"
+
 
 class TestCoerceHelper:
     def test_cast_charid_announcer_role_coerced(self):
