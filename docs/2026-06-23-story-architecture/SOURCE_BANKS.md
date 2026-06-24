@@ -50,10 +50,27 @@ first three engines.
 
 ## The three interpreter tiers (ordered cheapest -> richest; build in this order)
 
-### Tier 1 -- `news` (EXISTING, keep)
+### Tier 0 -- `science_explainer` -- the STEM WIN (LIGHTEST engine; strong candidate for engine #1)
+- **The reframe that wins:** the existing `news_interpreter` already pulls SCIENCE news; today it
+  "extrapolates to dramatic extremes" (-> the console-standoff collapse). Swap that ONE interpreter's
+  intent from *"invent a drama from this item"* to *"explain this real science clearly + vividly"* --
+  a prompt/logic swap on a path that already runs. No new ingest, no PD text, no pitch room.
+- **Why it sidesteps the whole problem:** the bar changes from "is this a great STORY?" (lose) to "is
+  this accurate, clear, engaging SCIENCE?" (win). Lackluster-as-drama is the CORRECT register for an
+  explainer -- it was never trying to be a thriller -- so the "meaningless story -> pooh-poohed" risk
+  evaporates. Shareable on its own terms (Radiolab / Kurzgesagt / NotebookLM register); the spotlight
+  lands on the genuinely impressive automated production, not on the writing.
+- **The bar SHIFTS, not disappears:** the gate becomes FACTUAL FIDELITY + clarity, not dramatic arc.
+  Add an accuracy check (don't hallucinate the science; cite the source item) -- a more achievable +
+  VERIFIABLE bar than "write a good story". Tone = an engaging two-voice explainer, not a drama.
+- **Effort:** lightest of all engines. Possibly the FIRST thing to ship -- a sharable, un-pooh-pooh-able
+  output from a single interpreter change, before pd_adapt or the pitch room.
+
+### Tier 1 -- `news` (EXISTING dramatize path, keep)
 Science/news RSS -> "extract real fact + human question -> INVENT a premise" (the current
 `news_interpreter` "extrapolate to dramatic extremes" logic). Subject to the local-model ceiling +
-the beat-planner sameness -- the known weakness.
+the beat-planner sameness -- the known weakness. (The `science_explainer` above is the SAME feed with
+the drama-invention swapped for explanation.)
 
 ### Tier 2 -- `archive_seed` -- the FRANKENSTEIN HYBRID (~free; do FIRST as an experiment)
 - **Build = a feed swap.** Point the EXISTING interpreter at the media-archive RSS (LOC / NFPF / ACE
