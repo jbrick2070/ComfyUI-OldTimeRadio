@@ -1992,6 +1992,26 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Refine loop (v1, 2026-06-23) -- APPENDED at the END of optional
+                # (the next widgets_values index) so existing widget indices are
+                # untouched (BUG-LOCAL-097). The iterative story-REVISION loop.
+                "refine_target_grade": (
+                    ["Off", "C+", "B", "B+", "A"],
+                    {
+                        "default": "Off",
+                        "tooltip": (
+                            "Iterative story-REVISION loop (v1): keep REWRITING "
+                            "the story (revising the existing draft) until it "
+                            "reaches this grade, then ship -- or stop at a hard "
+                            "cap of 5 passes. Off = disabled (single pass, the "
+                            "default, byte-identical). B (~75) is a reachable "
+                            "target for a local model; A (~90) may never be hit "
+                            "(it then ships the last revision). Local-only. The "
+                            "env vars OTR_STORY_REFINE_BAR / OTR_STORY_REFINE_"
+                            "PASSES override this widget for headless runs."
+                        ),
+                    },
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).

@@ -58,7 +58,8 @@ def test_widget_order_appends_slots_at_end():
     assert order[20] == "openrouter_slot_b_model"
     assert order[21] == "comfy_slot_a_model"
     assert order[22] == "comfy_slot_b_model"
-    assert len(order) == 23
+    assert order[23] == "refine_target_grade"   # refine loop v1 (2026-06-23)
+    assert len(order) == 24
 
 
 # --- conditional creative default; technical never flips --------------------

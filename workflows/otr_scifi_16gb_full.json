@@ -81,7 +81,8 @@
         "(enable OpenRouter)",
         "(enable OpenRouter)",
         "(enable Comfy Credits)",
-        "(enable Comfy Credits)"
+        "(enable Comfy Credits)",
+        "Off"
       ],
       "inputs": [],
       "outputs": [
