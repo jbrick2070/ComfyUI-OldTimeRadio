@@ -1,5 +1,42 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **>>> CURRENT STEP -- 2026-06-23 night (OPERATOR-DIRECTED; STORY-ARCHITECTURE INCREMENT-1 SPRINT,
+> code-ready, hand off to a fresh OVERNIGHT CODER window). HEAD `ece57e8` == origin/v2.0-alpha.**
+> Operator pivoted to an A+-story push: a fresh window ran a LIVE 4-round roundtable (GPT-5.5 +
+> Gemini-3.1-pro + DeepSeek-v4-pro, Claude grounded judge, ~$0.29) that CONVERGED. The quality
+> apparatus already exists + is wired (critic 5B / targeted reroll 5C / structural escalation /
+> grouped-exchange / best-of-N outline / keep-best refine) -- it REMOVES flaws but cannot MANUFACTURE a
+> good story because it never varies the PREMISE. Root cause (triangulated): beat-planner / premise
+> sameness ("every premise = a console standoff, climax off-stage"). **Detail spec =
+> `docs/2026-06-23-story-architecture/SUBAGENT_SPRINT.md`** (built from `SPEC.md`). Increment-1 tickets,
+> all DEFAULT-OFF / byte-identical when off: **T0 ceiling-probe (GATE, GPU -> writes CEILING_PROBE.md,
+> operator decides frontier-vs-accept-B; do NOT auto-enable frontier) -> T3 flip use_exchange (GPU N=3,
+> independent) -> T4 staging penalty (`_otr_staging_penalty`, `score_outline` optional `penalty=None`
+> byte-identical) -> T1 pitch-room+greenlight (`_otr_pitch_room.py`, the PRIMARY lever, gated behind
+> `OTR_ENABLE_PITCH_ROOM`, `dataclasses.replace(outline_req, script_brief=...)`) -> T2 critic-axes drive
+> the refine loop**. GROUNDING CATCHES baked into the sprint: conflict palette symbol = `DOMAIN_PALETTE`
+> (NOT the SPEC's assumed `load_conflict_palette()`); `BEAT_ROLE_IRREVERSIBLE_CHOICE` confirmed for T4;
+> **`StoryCriticReport` exposes `arc_verdict`/`reroll_targets`/`flat_lines`/`continuity_issues`/
+> `render_priority`, NOT `failing_axes`/`regeneration_hint` -- T2 MUST build an adapter.** Increment 2
+> (premise re-pitch / `EscalationScope.PREMISE`) + the prose->ledger parser are DEFERRED. Every ticket:
+> edit the canonical JSON in the same commit, suite + Bug Bible green, commit+push per green chunk,
+> default-OFF byte-identical; operator flips flags + eyeballs an N=3 re-soak in the morning. prod/main GATED.
+>
+> **WHERE WE ARE (this session, 2026-06-23 night):** (1) v1 refine loop SHIPPED + made **keep-best**
+> (`fedbce0`) -- ships the highest-grade pass, not the last (gemma pass1=72 was being thrown away for
+> pass4=65); telemetry re-saves the winner ledger LAST so the downstream latest-ledger handoff ships it.
+> (2) `refine_target_grade` dropdown shipped (`a0ab962`) + CREATIVE_WHITELIST fix (`9f2bd56`). (3)
+> Canonical workflow is now **HuMo-free** (`267a53e`): operator UI-save promoted -- `other_beats_video_model`
+> humo_1.7B -> `visualizer (16:9)`, bookends -> `ltx_av_talk (16:9)`, `unique_per_beat`; fixes the
+> no-fallbacks crash on gated HuMo so OBS publishes (106 workflow guards green, writer keeps 24 widgets).
+> (4) A grade-lift validation **soak is RUNNING** (gemma+mistral rotation, refine bar=B, 200-320w,
+> HuMo-free render + OBS); driver `scripts/_otr_refine_soak.py` (throwaway; monotonic timer + /history
+> completion + OBS-set diff). **Auto-summary scheduled 12:20 AM** (`otr-refine-soak-summary`) reads
+> `docs/2026-06-23-refine-loop/grade_lift_soak_summary.json` + resets the box. EARLY data: grades 42-72,
+> mostly < B(75), revision non-monotonic -- consistent with the model-ceiling read (why T0 is the gate).
+> (5) Story-arch SPEC + sprint + roundtable artifacts committed (`ece57e8`). Suite 5238/34 + Bug Bible
+> green throughout. OPEN: the soak's morning summary; the overnight Increment-1 sprint.
+>
 > **HANDOFF -- 2026-06-23 (CODER; v1 ITERATIVE STORY-REVISION LOOP -- ALL CHUNKS 0-4 BUILT + SHIPPED +
 > PUSHED + LIVE-PROVEN. origin/v2.0-alpha HEAD `a0ab962` == local.)** Built the BUILD-READY plan below
 > (`docs/2026-06-23-refine-loop/roundtable/pass04_plan_FINAL.md` + the C3/C4 staging kickoff). Each chunk
