@@ -758,6 +758,9 @@ CREATIVE_WHITELIST = frozenset({
     "comfy_slot_a_model", "comfy_slot_b_model",
     "creative_writing_model", "technical_model",
     "creativity",
+    # refine_target_grade (v1 story-refine loop dropdown) -- a pure creative dial,
+    # mirror of the package whitelist (parity-pinned by test_workflow_apply.py).
+    "refine_target_grade",
 })
 
 

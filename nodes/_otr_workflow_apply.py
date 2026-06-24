@@ -496,6 +496,10 @@ CREATIVE_WHITELIST = frozenset({
     # engine/feature widget -- safe to set directly from a soak (apply_profile never
     # manages it). Lets OTR_COMBO_CREATIVITY=maximum chaos reach the writer.
     "creativity",
+    # refine_target_grade (v1 story-refine loop dropdown Off/C+/B/B+/A) is a pure
+    # CREATIVE dial on node 1, not an engine/feature widget -- apply_profile never
+    # manages it, so a headless soak may set the grade bar directly.
+    "refine_target_grade",
 })
 
 
