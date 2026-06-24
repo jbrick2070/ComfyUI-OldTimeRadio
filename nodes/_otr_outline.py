@@ -1644,13 +1644,15 @@ def _assemble_outline(
     # climax from the characters' final beat). The close is NEVER removed -- it
     # stays an announcer beat (budget validator #7 counts announcer beats) and
     # keeps target_words/mood/arc_phase intact; only the intent prose changes.
-    # Read the env flag DIRECTLY here (the close intent is fixed at assembly time,
-    # upstream of the writer's style-grammar block). OFF => the exact pre-grammar
-    # string => byte-identical.
-    import os
-    if (os.environ.get("OTR_ENABLE_STYLE_GRAMMAR") or "").strip().lower() in (
-        "1", "true", "yes", "on"
-    ):
+    # Use the shared config reader so the announcer-close gate honors the SAME
+    # default as the writer's style-grammar block (DEFAULT ON as of 2026-06-24;
+    # OTR_ENABLE_STYLE_GRAMMAR=0 is the kill-switch => the exact pre-grammar
+    # string => byte-identical). _otr_config is a stdlib-only leaf, no cycle.
+    try:
+        from . import _otr_config as _CFG
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_config as _CFG  # type: ignore
+    if _CFG.style_grammar_enabled():
         # Kept <= Beat.intent's 200-char cap.
         _close_intent = (
             "Sign off on a single concrete final image or sound. Do NOT state, "

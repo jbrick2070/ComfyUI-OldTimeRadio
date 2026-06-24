@@ -128,17 +128,22 @@ class TestBuildSqClimaxRole:
 # config -- the lever defaults OFF
 # ---------------------------------------------------------------------------
 class TestStyleGrammarConfig:
-    def test_default_off(self, monkeypatch):
+    def test_default_on_when_unset(self, monkeypatch):
+        # 2026-06-24 operator flip: the lever is DEFAULT ON.
         monkeypatch.delenv("OTR_ENABLE_STYLE_GRAMMAR", raising=False)
-        assert CFG.style_grammar_enabled() is False
+        assert CFG.style_grammar_enabled() is True
+
+    def test_empty_string_is_default_on(self, monkeypatch):
+        monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", "")
+        assert CFG.style_grammar_enabled() is True
 
     @pytest.mark.parametrize("val", ["1", "true", "yes", "on", "ON", "True"])
     def test_truthy_values_enable(self, monkeypatch, val):
         monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", val)
         assert CFG.style_grammar_enabled() is True
 
-    @pytest.mark.parametrize("val", ["0", "false", "no", "off", ""])
-    def test_falsey_values_stay_off(self, monkeypatch, val):
+    @pytest.mark.parametrize("val", ["0", "false", "no", "off", "OFF"])
+    def test_killswitch_values_disable(self, monkeypatch, val):
         monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", val)
         assert CFG.style_grammar_enabled() is False
 
@@ -217,12 +222,20 @@ def _announcer_close(outline):
 
 
 class TestAnnouncerCloseGate:
-    def test_off_is_exact_pre_grammar_string(self, monkeypatch):
-        monkeypatch.delenv("OTR_ENABLE_STYLE_GRAMMAR", raising=False)
+    def test_killswitch_is_exact_pre_grammar_string(self, monkeypatch):
+        # OTR_ENABLE_STYLE_GRAMMAR=0 restores the exact pre-grammar close.
+        monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", "0")
         outline = generate_outline(_gen, _request())
         ann = _announcer_close(outline)
         assert len(ann) == 2  # open + close (budget validator #7)
         assert ann[-1].intent == _OFF_CLOSE
+
+    def test_default_unset_is_non_outcome(self, monkeypatch):
+        # 2026-06-24: DEFAULT ON -- an unset env now gives the non-outcome close.
+        monkeypatch.delenv("OTR_ENABLE_STYLE_GRAMMAR", raising=False)
+        close = _announcer_close(generate_outline(_gen, _request()))[-1]
+        assert close.intent != _OFF_CLOSE
+        assert "outcome" in close.intent.lower()
 
     def test_on_is_non_outcome_and_close_not_removed(self, monkeypatch):
         monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", "1")
@@ -240,7 +253,7 @@ class TestAnnouncerCloseGate:
 
     def test_on_close_keeps_beat_shape(self, monkeypatch):
         # target_words / mood / arc_phase are unchanged -- only the prose differs
-        monkeypatch.delenv("OTR_ENABLE_STYLE_GRAMMAR", raising=False)
+        monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", "0")
         off = _announcer_close(generate_outline(_gen, _request()))[-1]
         monkeypatch.setenv("OTR_ENABLE_STYLE_GRAMMAR", "1")
         on = _announcer_close(generate_outline(_gen, _request()))[-1]

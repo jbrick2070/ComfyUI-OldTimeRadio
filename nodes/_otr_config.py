@@ -54,6 +54,16 @@ def story_quality_l12_enabled() -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+# Default state of the style-grammar lever.
+# 2026-06-24 (operator): flipped to TRUE -- the live A/B proved it improves the
+# endings (the announcer stops narrating the news outcome; the climax leaves the
+# console standoff and lands the injected ending in dialogue). The operator's
+# directive: if it makes a better story, it should be the DEFAULT, not a lever
+# users have to find and flip. ``OTR_ENABLE_STYLE_GRAMMAR=0`` (or false/no/off)
+# is the kill-switch. See docs/2026-06-24-ending-mode/LIVE_AB_RESULTS.md.
+STYLE_GRAMMAR_DEFAULT: bool = True
+
+
 def style_grammar_enabled() -> bool:
     """Return True iff the STYLE-GRAMMAR lever (climax SHAPE selection) is on.
 
@@ -63,16 +73,18 @@ def style_grammar_enabled() -> bool:
     style's ending taxonomy class as the climax ROLE -- demoting the forced
     ``irreversible_choice`` console standoff to one class among a closed set --
     plus injects the matching final-beat ending template at the climax beat and
-    steers the announcer close off the news-outcome. Env-gated via
-    ``OTR_ENABLE_STYLE_GRAMMAR``; DEFAULT OFF (1/true/yes/on => on). When OFF,
-    no style is selected, the climax stays ``irreversible_choice``, the ending
-    template is empty, the announcer close keeps its exact pre-grammar string,
-    and every render is byte-identical. Bundled with ``OTR_STORY_QUALITY_L12``
-    (the grammar runs the L1/L2 build path so the climax role can flow through
-    ``build_sq_data``).
+    steers the announcer close off the news-outcome. Bundled with
+    ``OTR_STORY_QUALITY_L12`` (the grammar runs the L1/L2 build path so the
+    climax role can flow through ``build_sq_data``).
+
+    DEFAULT ON (``STYLE_GRAMMAR_DEFAULT``) as of 2026-06-24: an UNSET (or empty)
+    ``OTR_ENABLE_STYLE_GRAMMAR`` enables it; ``OTR_ENABLE_STYLE_GRAMMAR=0`` (or
+    false/no/off) is the kill-switch that restores the exact pre-grammar render.
     """
     import os
     raw = (os.environ.get("OTR_ENABLE_STYLE_GRAMMAR") or "").strip().lower()
+    if raw == "":
+        return STYLE_GRAMMAR_DEFAULT
     return raw in ("1", "true", "yes", "on")
 
 
