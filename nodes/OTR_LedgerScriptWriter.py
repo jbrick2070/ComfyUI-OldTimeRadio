@@ -2033,11 +2033,9 @@ class OTR_LedgerScriptWriter:
         (self.run with _refine_active=True) up to N times sharing ONE cast seed;
         grades each pass and, below the target, REVISES (prior_macro + critique)
         and retries. Keep-best by grade; commit the winner; clean up losers."""
-        import os
         from . import _otr_story_select as _OTRSEL
         import hashlib
         import random as _rnd
-        import shutil
         try:
             import torch as _torch
         except Exception:  # noqa: BLE001
@@ -2077,7 +2075,6 @@ class OTR_LedgerScriptWriter:
         )
         candidates = []
         prior_macro, prior_critique = "", ""
-        winner = None
         for i in range(_rcfg.effective_passes):
             _seed(f"{forced_seed}:refine:{i}")
             try:
@@ -2107,31 +2104,28 @@ class OTR_LedgerScriptWriter:
             cand = {"i": i, "grade": grade, "out": out, "last": last}
             candidates.append(cand)
             if grade.score_0_100 >= _rcfg.bar:
-                winner = cand
-                break
+                break   # early-stop: this pass hit the target; it is the last
             prior_macro = _build_prior_macro(last.get("outline"))
             prior_critique = (
                 "" if grade.error_type
                 else _OTRSEL.critique_to_hint(grade.biggest_weakness)
             )
-        if winner is None:
-            winner = max(candidates, key=lambda c: (c["grade"].score_0_100, -c["i"]))
+        # The downstream pipeline ships the LAST-composed (latest) ledger, so the
+        # shipped story IS the final pass -- the early-stop pass (bar reached) or
+        # the capped last revision. v1 ships-last; true keep-best across passes
+        # would need the downstream to honor the writer's selection (deferred). We
+        # do NOT delete earlier-pass dirs: the freeze/audio resolve the latest
+        # ledger and deleting an earlier dir raced the freeze (the PendingSweep /
+        # operator reclaims them).
+        winner = candidates[-1]
         _reached = winner["grade"].score_0_100 >= _rcfg.bar
         _stop = "bar_reached" if _reached else "cap_reached_below_bar"
         if not _reached:
             log.warning(
-                "[refine] cap reached BELOW bar: best grade=%d < target=%d (%s); "
-                "shipping keep-best -- consider a lower target grade",
+                "[refine] cap reached BELOW bar: final grade=%d < target=%d (%s); "
+                "shipping the last revision -- consider a lower target grade",
                 winner["grade"].score_0_100, _rcfg.bar, _rcfg.target_grade,
             )
-        # Clean up loser episode dirs (best-effort; the winner's stays).
-        _winroot = str((winner["last"] or {}).get("episode_root") or "")
-        for c in candidates:
-            if c is winner:
-                continue
-            _root = str((c["last"] or {}).get("episode_root") or "")
-            if _root and _root != _winroot and os.path.isdir(_root):
-                shutil.rmtree(_root, ignore_errors=True)
         # Stamp refine telemetry on the WINNER's ledger (merged) + re-save.
         try:
             _wled = (winner["last"] or {}).get("led")
