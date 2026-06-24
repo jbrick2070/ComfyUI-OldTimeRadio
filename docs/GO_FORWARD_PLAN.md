@@ -40,10 +40,20 @@
 > premises; the discriminators are the close + the final-beat SHAPE, not crisis count). (5) NO render bugs --
 > full workflow ran clean OFF (LTX-AV bookends) and ON (visualizer -> OBS final `signal_lost_ink_stir`), zero
 > tracebacks. Workflow JSON UNCHANGED (env-only).
-> **>>> NEW CURRENT STEP = operator reads the ON endings in LIVE_AB_RESULTS.md + decides the DEFAULT FLIP.** The
-> bet leans YES (close-gate solid; climax leaves the console standoff; archetype crisp on mistral, loose on
-> gemma). Optional before flipping: a WIDER overnight N (more episodes/writers) to harden it, and/or strengthen
-> the final-beat ending instruction for the weak writer. Default-OFF ships byte-identical; prod/main + tags GATED.
+> **>>> DEFAULT FLIPPED ON 2026-06-24 (operator: "if it makes a better story, default it on -- I don't want a
+> lever people have to find and flip"). `57279156`.** `STYLE_GRAMMAR_DEFAULT=True` in `_otr_config`
+> (`style_grammar_enabled()` returns the default when `OTR_ENABLE_STYLE_GRAMMAR` is unset/empty;
+> `OTR_ENABLE_STYLE_GRAMMAR=0`/false/no/off is the kill-switch -> exact pre-grammar byte-identical). The outline
+> announcer-close gate now reads the shared config reader (same default). Bundled L12 build runs via the writer's
+> `l12_enabled() OR style_grammar_on` condition. Tests updated for default-ON + the `=0` kill-switch byte-identity.
+> Suite green vs the 5 pre-existing `267a53e` fails; Bug Bible 16/7/3. **Every episode now ships with the style
+> grammar (varied climax class off the console standoff + non-outcome announcer close).**
+> **>>> NEW CURRENT STEP (open follow-ups):** (1) **audio-byte-identity baseline re-capture** -- the GPU-gated
+> `test_audio_byte_identical` (OTR_REGRESSION_RUNTIME=1, skipped in CI) was captured pre-grammar; either
+> re-capture it on the new default OR boot the regression server with `OTR_ENABLE_STYLE_GRAMMAR=0` to match the
+> stored SHA. (2) Optional **wider overnight N** to harden the read (N=2/leg this session). (3) Optional:
+> **strengthen the final-beat ending instruction** for the weak writer (gemma landed reconciliation loosely).
+> prod/main + tags GATED.
 >
 > **>>> PRIOR STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
 > origin/v2.0-alpha HEAD `bbd0943f` == local; one code commit on top of the operator's 3 docs commits.)**
