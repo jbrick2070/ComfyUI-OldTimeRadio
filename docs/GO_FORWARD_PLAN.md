@@ -1,6 +1,46 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
+> **>>> CURRENT STEP -- 2026-06-24 (STORY-GRAMMAR build: chunks 1-3 SHIPPED, chunks 4-6 are the
+> NEXT WINDOW's job. origin/v2.0-alpha HEAD `19e29254` == local. Box reset, :8000 FREE.)**
+> Operator directive (overrides the panel's "keep irreversible_choice" compromise): the forced
+> `irreversible_choice` climax on EVERY episode is a STRUCTURAL sameness bug -- demote it to ONE climax
+> class among a closed ending taxonomy; the final on-stage character beat stays the climax, but its TYPE
+> is style-selected. Proven root cause: premise (pitch room) + style label (auto picker) both vary, yet
+> the local model collapses every climax into the console/kill-switch button (live ledgers: a genetics
+> premise -> "touch that lever and the vats release neurotoxin"). The 4-round ending-mode roundtable
+> (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude judge, ~$0.66) converged; final plan
+> `docs/2026-06-24-ending-mode/roundtable/pass04_plan.md` (NOTE: its "keep irreversible_choice / reframe"
+> line is SUPERSEDED by the operator's replace-the-role directive below).
+> **DONE (chunks 1-3, `19e29254`, dark / default-OFF / byte-identical, +29 tests, suite green vs the 5
+> pre-existing 267a53e fails, Bug Bible 16/7/3):**
+> - C1 `_otr_story_quality_l12`: 8 ending-archetype roles + `CLIMAX_CLASS_ROLES` (9); `assign_beat_roles`
+>   gains `climax_role=` (default irreversible_choice => unkeyed call byte-identical); `validate_beat_roles`
+>   -> "exactly one CLIMAX-CLASS role, last" (was irreversible_choice-specific).
+> - C2 `_otr_style_catalog`: `ENDING_TEMPLATES` (9 concrete on-mic final-beat instructions, all steer off
+>   machinery) + `ending_tag` on all 100 styles (irreversible_choice 6/100, all 9 used) + `validate_catalog`
+>   + `ending_template_for`; `ending_mode` prose preserved.
+> - C3 `_otr_style_catalog`: deterministic `select_style(premise, meta, cast_seed)` -- non-emergency pool
+>   unless disaster keywords, sha256(cast_seed) tie-break, no LLM / no paid call. All inert (nothing wires it).
+> **NEXT WINDOW (chunks 4-6, the WIRING -- this is where it goes live, still default-OFF):**
+> - C4 `_otr_line_composer`: inject `ENDING_TEMPLATES[tag]` into the FINAL character beat's dialogue
+>   request, gated, empty => byte-identical (golden). The single behavioral injection.
+> - C5 `_otr_outline._assemble_outline`: gate the announcer-close INTENT via a DIRECT
+>   `os.environ.get("OTR_ENABLE_STYLE_GRAMMAR")` read (OFF=exact string, ON=non-outcome) -- do NOT remove
+>   the close (budget validator #7). Writer (`OTR_LedgerScriptWriter`): when the flag is on, AFTER
+>   `generate_outline` returns, `slug = select_style(outline.premise, meta, cast_seed)`; thread the style's
+>   `ending_tag` as `climax_role` into `build_sq_data`'s `assign_beat_roles` call; pass
+>   `ending_template_for(slug)` + the final-character-beat id (the climax-class beat from `roles_by_beat`)
+>   to the line composer; stamp `meta.story_quality {style_slug, ending_tag, final-beat crisis-noun count}`.
+>   Bundle with `OTR_STORY_QUALITY_L12` (grammar = climax SHAPE, L1 = trope VOCABULARY).
+> - C6: tests (default-OFF byte-identity golden; flag-ON final-beat template present + announcer non-outcome;
+>   C7 audio byte-identical OFF) + full suite + Bug Bible + a LIVE A/B soak (baseline vs lever-on; measure
+>   crisis-noun density at the final beat -> ~0, ending_tag distribution >= 80% non-doomsday, critic arc mix).
+> WIRING GROUNDING (verified): `build_sq_data` calls `assign_beat_roles` (thread climax_role THERE, in the
+> writer, after generate_outline -- premise = outline.premise); the line composer is `_otr_line_composer`
+> (confirm the request/prompt shape when building). env-only gate => NO workflow JSON change. 100% local;
+> deterministic; UTF-8 no BOM; SFW; commit+push per green chunk; prod/main GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
 > origin/v2.0-alpha HEAD `bbd0943f` == local; one code commit on top of the operator's 3 docs commits.)**
 > Built the three CPU tickets, all DEFAULT-OFF / byte-identical, +58 tests, then proved them LIVE:
 > - **T4 staging penalty** (`bbd0943f`, `_otr_story_select`): `_otr_staging_penalty` + `score_outline`/
