@@ -764,6 +764,13 @@ class LineRequest:
     # render below is dropped => byte-identical to the pre-grammar prompt. This
     # is the single behavioral injection of the style grammar.
     ending_template: str = ""
+    # Story-engine assumption-audit KILL 1 (2026-06-24) -- the grounded premise
+    # noun palette (roster names + premise / title / logline nouns) for THIS
+    # episode. Carried so a freeze-cascade reroll rebuild keeps the same
+    # grounding the writer's in-loop BODY-OUTPUT gate validated against; the
+    # composer itself does not render it (the gate is writer-side). Empty
+    # default => no effect => byte-identical.
+    grounded_nouns: frozenset = field(default_factory=frozenset)
 
 
 @dataclass(frozen=True)
@@ -1158,10 +1165,25 @@ def _build_user_prompt(req: LineRequest) -> str:
                 "  Places, agencies, things: "
                 + ", ".join(sorted(req.allowed_things))
             )
-        parts.append(
-            'Generic roles ("the tech", "the lab", "mission control") '
-            "are fine. Do not invent any other proper name."
-        )
+        # KILL 1 (2026-06-24 assumption-audit): when this beat carries a
+        # premise-anchored conflict_object (the grounding lever is on), DROP the
+        # "generic control-room roles are fine" license -- it actively invited
+        # the "mission control / the console" sameness. Steer to the named
+        # entities + this scene's conflict instead. conflict_object is empty
+        # whenever the lever is off => the original license renders => byte-
+        # identical.
+        if req.conflict_object:
+            parts.append(
+                "Use only the named entities above and this scene's specific "
+                "conflict; do not invent any other proper name, and do not "
+                'retreat to generic control-room roles ("the tech", "the lab", '
+                '"mission control").'
+            )
+        else:
+            parts.append(
+                'Generic roles ("the tech", "the lab", "mission control") '
+                "are fine. Do not invent any other proper name."
+            )
 
     # CAST replaces single-speaker CHARACTER when all_voice_cards is
     # threaded. Falls back to the speaker-only voice card on legacy
@@ -1438,12 +1460,28 @@ def _build_user_prompt(req: LineRequest) -> str:
     # length_ratio). The per-line target is already stated above via
     # "Word count target: {req.target_words}.", so the model still gets a
     # concrete length; this rider keeps only the spoken-cadence guidance.
-    parts.append(
-        "Ground this line in the news facts and this scene's premise; "
-        "do not invent people, places, or objects the news does not "
-        "imply. Keep it spoken-length -- one breath, concrete, no "
-        "nested clauses."
-    )
+    # KILL 1 (2026-06-24 assumption-audit): "ground in the news facts" nudged
+    # the weak model toward generic mission/console machinery on space premises.
+    # When the grounding lever is on (this beat has a premise-anchored
+    # conflict_object), ground in the PREMISE + that conflict and explicitly
+    # forbid retreating to control-room machinery. conflict_object is empty
+    # whenever the lever is off => the original rider renders => byte-identical.
+    if req.conflict_object:
+        parts.append(
+            "Ground this line in this scene's premise and the specific "
+            f"conflict over {req.conflict_object}; do not invent people, "
+            "places, or objects the premise does not imply, and do not "
+            "retreat to generic control-room machinery (consoles, levers, "
+            "fuel cells, reactors). Keep it spoken-length -- one breath, "
+            "concrete, no nested clauses."
+        )
+    else:
+        parts.append(
+            "Ground this line in the news facts and this scene's premise; "
+            "do not invent people, places, or objects the news does not "
+            "imply. Keep it spoken-length -- one breath, concrete, no "
+            "nested clauses."
+        )
     # L3 (story-quality LIFT, 2026-06-23): give the model an explicit place to
     # put non-spoken stage action so the deterministic post-strip removes it
     # cleanly instead of letting it leak into the spoken text. Gated on

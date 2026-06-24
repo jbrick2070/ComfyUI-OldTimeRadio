@@ -441,15 +441,23 @@ def premise_noun_palette(roster: Any, *texts: str) -> frozenset:
     return frozenset(allowed)
 
 
-def count_ungrounded_crisis(intent: str, grounded: frozenset) -> int:
-    """Count whole-token GENERIC crisis nouns in ``intent`` that are NOT in the
-    grounded premise palette (the sameness signal)."""
-    n = 0
+def ungrounded_crisis_tokens(intent: str, grounded: frozenset) -> List[str]:
+    """Return the whole-token GENERIC crisis nouns in ``intent`` that are NOT in
+    the grounded premise palette -- casefolded, in order of appearance (the
+    sameness signal, itemised so a reroll hint can name the offenders). Pure +
+    deterministic."""
+    out: List[str] = []
     for tok in _TOKEN_RE.findall(str(intent or "")):
         low = tok.casefold()
         if low in GENERIC_CRISIS_NOUNS and low not in grounded:
-            n += 1
-    return n
+            out.append(low)
+    return out
+
+
+def count_ungrounded_crisis(intent: str, grounded: frozenset) -> int:
+    """Count whole-token GENERIC crisis nouns in ``intent`` that are NOT in the
+    grounded premise palette (the sameness signal)."""
+    return len(ungrounded_crisis_tokens(intent, grounded))
 
 
 def ground_crisis_nouns(
@@ -474,6 +482,93 @@ def ground_crisis_nouns(
 
     new_intent = _TOKEN_RE.sub(_sub, str(intent or ""))
     return new_intent, n[0]
+
+
+# ---------------------------------------------------------------------------
+# KILL 1 (2026-06-24 assumption-audit) -- the deterministic BODY-OUTPUT gate.
+# The L1 grounding above only edits ``beat.intent``; the SHIPPED dialogue was
+# ungated, so the weak local writer still collapsed every premise into the same
+# "console standoff" (proven live: "press this red lever", "blowing the fuel
+# cells"). These validators run on the COMPOSED line text in the writer loop:
+# it must not lean on ungrounded generic crisis machinery, and a climax-class /
+# pressure beat must REFERENCE its premise-anchored ``conflict_object``. Pure
+# leaf; never raises.
+# ---------------------------------------------------------------------------
+def _strip_possessive(tok: str) -> str:
+    """Casefold ``tok`` and drop a trailing possessive (``Ward's`` -> ``ward``).
+
+    ``_TOKEN_RE`` only admits the ASCII apostrophe, so the curly U+2019 variant
+    never reaches a token (the regex stops at it, yielding the bare stem)."""
+    t = tok.casefold()
+    for suf in ("'s", "'"):
+        if t.endswith(suf):
+            return t[: -len(suf)]
+    return t
+
+
+def _content_tokens(text: str) -> frozenset:
+    """Casefolded, possessive-stripped content tokens of ``text`` minus stopwords."""
+    out: set = set()
+    for tok in _TOKEN_RE.findall(str(text or "")):
+        low = _strip_possessive(tok)
+        if low and low not in _STOPWORDS:
+            out.add(low)
+    return frozenset(out)
+
+
+def line_references_object(text: str, conflict_object: str) -> bool:
+    """True iff ``text`` overlaps the conflict object on any content token
+    (head-noun / ``_TOKEN_RE`` token overlap, casefold, possessive-stripped). An
+    empty object is vacuously satisfied (nothing to require)."""
+    obj_tokens = _content_tokens(conflict_object)
+    if not obj_tokens:
+        return True
+    return bool(obj_tokens & _content_tokens(text))
+
+
+def validate_composed_grounding(
+    text: str,
+    sq_entry: Optional[Mapping[str, Any]],
+    grounded: frozenset,
+    *,
+    max_ungrounded: int = 0,
+    require_conflict_object_on_roles: frozenset = frozenset(),
+) -> Tuple[bool, List[str]]:
+    """Validate a SHIPPED character line against the deterministic grounding.
+
+    Two checks on the composed dialogue ``text`` (NOT ``beat.intent``):
+      1. ungrounded_crisis -- generic crisis nouns not in the grounded premise
+         palette (reuses ``ungrounded_crisis_tokens`` /
+         ``count_ungrounded_crisis``); fails when the count exceeds
+         ``max_ungrounded``.
+      2. missing_conflict_object -- when this beat's ``beat_role`` is in
+         ``require_conflict_object_on_roles`` AND it carries a
+         ``conflict_object``, the line must reference that object (token
+         overlap).
+
+    Returns ``(ok, reasons)`` where each reason is a machine hint the writer
+    SPLITS into a targeted reroll instruction:
+      ``"ungrounded_crisis:<tok>,<tok>"`` -- the offending tokens (de-duped), and
+      ``"missing_conflict_object:<object>"`` -- the grounded object to inject.
+    Pure + deterministic; never raises."""
+    reasons: List[str] = []
+    toks = ungrounded_crisis_tokens(text, grounded)
+    if len(toks) > max_ungrounded:
+        seen: List[str] = []
+        for t in toks:
+            if t not in seen:
+                seen.append(t)
+        reasons.append("ungrounded_crisis:" + ",".join(seen))
+    entry = sq_entry if isinstance(sq_entry, Mapping) else {}
+    role = str(entry.get("beat_role", "") or "")
+    conflict_object = str(entry.get("conflict_object", "") or "")
+    if (
+        role in require_conflict_object_on_roles
+        and conflict_object
+        and not line_references_object(text, conflict_object)
+    ):
+        reasons.append("missing_conflict_object:" + conflict_object)
+    return (not reasons), reasons
 
 
 # ---------------------------------------------------------------------------

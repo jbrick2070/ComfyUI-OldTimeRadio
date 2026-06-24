@@ -1506,6 +1506,39 @@ def _build_news_payload(outline, news_seed: str, seed_source: str) -> str:
     return json.dumps(news, indent=2, ensure_ascii=False)
 
 
+def _otr_body_gate_hint(reasons, sq_entry) -> str:
+    """Turn KILL-1 body-gate validation reasons into ONE concrete reroll note.
+
+    SPLITS the machine reasons from ``validate_composed_grounding``:
+      ``ungrounded_crisis:<toks>``  -> name the offending generic words to drop;
+      ``missing_conflict_object:<obj>`` -> name the premise object to ground in.
+    Falls back to the beat's ``conflict_object`` when reasons carry no object.
+    Deterministic, ASCII, SFW; never raises."""
+    parts: list[str] = []
+    for r in reasons or ():
+        r = str(r)
+        if r.startswith("ungrounded_crisis:"):
+            toks = [t for t in r.split(":", 1)[1].split(",") if t]
+            if toks:
+                parts.append(
+                    "Do not lean on generic crisis machinery ("
+                    + ", ".join(toks)
+                    + "); say what is actually happening in this scene's "
+                    "own terms."
+                )
+        elif r.startswith("missing_conflict_object:"):
+            obj = r.split(":", 1)[1].strip()
+            if obj:
+                parts.append(
+                    "Ground the line in the actual conflict over " + obj + "."
+                )
+    if not parts and isinstance(sq_entry, dict):
+        obj = str(sq_entry.get("conflict_object", "") or "").strip()
+        if obj:
+            parts.append("Ground the line in the conflict over " + obj + ".")
+    return " ".join(parts).strip()
+
+
 # ---------------------------------------------------------------------------
 # Class
 # ---------------------------------------------------------------------------
@@ -3085,6 +3118,11 @@ class OTR_LedgerScriptWriter:
         # is byte-identical to the pre-LIFT pipeline. NEVER raises into the
         # writer (the LIFT must never break audio).
         _sq_by_beat: dict = {}
+        # KILL 1 (2026-06-24 assumption-audit) -- the grounded premise noun
+        # palette for the in-loop BODY-OUTPUT gate. Populated below ONLY when the
+        # grounding build runs (lever on); stays empty when off, so the gate is
+        # skipped and the render is byte-identical.
+        _grounded_nouns: frozenset = frozenset()
         # Story-grammar build (2026-06-24, C5) -- the per-beat ending injection.
         # _ending_template is the climax beat's on-mic ending instruction;
         # _climax_beat_id is the beat that receives it (section I). Both stay ""
@@ -3136,6 +3174,18 @@ class OTR_LedgerScriptWriter:
                     climax_role=_climax_role,
                 )
                 meta["story_quality_l12_enabled"] = True
+                # KILL 1 (2026-06-24): the grounded premise palette the in-loop
+                # BODY-OUTPUT gate validates the SHIPPED line against -- roster
+                # names + news_seed + premise + title/logline nouns. Stamped on
+                # meta so a freeze-cascade reroll rebuild (build_reroll_line_
+                # request) composes against the SAME grounding.
+                _grounded_nouns = _OTRSQL12.premise_noun_palette(
+                    _l12_roster,
+                    str(resolved.get("news_seed", "") or ""),
+                    str(getattr(outline, "premise", "") or ""),
+                    *_OTRSQL12.premise_texts(meta),
+                )
+                meta["grounded_nouns"] = sorted(_grounded_nouns)
                 # The climax-class beat (exactly one, the last voiced character
                 # beat) is the one that receives the ending template.
                 if _style_grammar_on:
@@ -3211,6 +3261,7 @@ class OTR_LedgerScriptWriter:
                 "proceeding with the unshaped outline", exc,
             )
             _sq_by_beat = {}
+            _grounded_nouns = frozenset()
             _ending_template = ""
             _climax_beat_id = ""
 
@@ -4043,6 +4094,10 @@ class OTR_LedgerScriptWriter:
                     if (_ending_template and beat.beat_id == _climax_beat_id)
                     else ""
                 ),
+                # KILL 1 (2026-06-24) -- the grounded premise palette, carried so
+                # a freeze-cascade reroll rebuild keeps the same grounding the
+                # in-loop body gate used. Empty when the lever is off.
+                grounded_nouns=_grounded_nouns,
             )
 
         # Sprint 10B Wave 1 Agent B (2026-05-27): build the in-loop
@@ -4216,6 +4271,94 @@ class OTR_LedgerScriptWriter:
                         )[beat.beat_id] = list(
                             line_res.validation_findings,
                         )
+                # --- KILL 1 (2026-06-24 assumption-audit): deterministic
+                # BODY-OUTPUT gate. Validate the SHIPPED character line (NOT
+                # beat.intent) against the grounded premise palette -- it must
+                # not lean on ungrounded generic crisis machinery, and a
+                # climax-class / pressure beat must REFERENCE its premise-
+                # anchored conflict_object. ONE guarded reroll with a split,
+                # targeted hint; ship the reroll ONLY if it validates, else keep
+                # the original (deterministic). Runs after BOTH the exchange
+                # (cleaned=_ex_text) and the per-beat composer (cleaned=
+                # line_res.text) paths, so the use_exchange bypass is covered.
+                # Active only when the grounding build ran (palette + sq dict
+                # populated) => byte-identical when the lever is off.
+                if _grounded_nouns and _sq_by_beat:
+                    _bg_entry = _sq_by_beat.get(beat.beat_id) or {}
+                    _bg_roles = (
+                        _OTRSQL12.CLIMAX_CLASS_ROLES
+                        | {_OTRSQL12.BEAT_ROLE_PRESSURE}
+                    )
+                    _bg_ok, _bg_reasons = _OTRSQL12.validate_composed_grounding(
+                        cleaned, _bg_entry, _grounded_nouns,
+                        max_ungrounded=0,
+                        require_conflict_object_on_roles=_bg_roles,
+                    )
+                    _bg_sq = meta.setdefault("story_quality", {})
+                    if not _bg_ok:
+                        _bg_hint = _otr_body_gate_hint(_bg_reasons, _bg_entry)
+                        try:
+                            with slot_scheduler.helper_context("compose_line"):
+                                _bg_res = _OTRLC.compose_line(
+                                    creative_fn=creative_generate_fn,
+                                    req=line_req,
+                                    base_temperature=base_temp,
+                                    max_new_tokens_cap=resolved[
+                                        "max_new_tokens_cap"
+                                    ],
+                                    creative_repo_id=resolved[
+                                        "creative_writing_model"
+                                    ],
+                                    reroll_hint=_bg_hint,
+                                )
+                            _bg_res_ok, _ = _OTRSQL12.validate_composed_grounding(
+                                _bg_res.text, _bg_entry, _grounded_nouns,
+                                max_ungrounded=0,
+                                require_conflict_object_on_roles=_bg_roles,
+                            )
+                            if _bg_res_ok and _bg_res.text.strip():
+                                cleaned = _bg_res.text
+                                beat_compose_flags = (
+                                    tuple(_bg_res.compose_flags)
+                                    + ("body_gate_reroll",)
+                                )
+                                if isinstance(_bg_sq, dict):
+                                    _bg_sq["body_gate_rerolls"] = int(
+                                        _bg_sq.get("body_gate_rerolls", 0)
+                                    ) + 1
+                            else:
+                                if isinstance(_bg_sq, dict):
+                                    _bg_sq["body_gate_failed"] = int(
+                                        _bg_sq.get("body_gate_failed", 0)
+                                    ) + 1
+                                log.info(
+                                    "[OTR_LedgerScriptWriter] body-gate reroll "
+                                    "did not validate for beat %s; keeping "
+                                    "original (%s)",
+                                    beat.beat_id, ",".join(_bg_reasons)[:160],
+                                )
+                        except Exception as _bg_exc:  # noqa: BLE001 -- never break audio
+                            if isinstance(_bg_sq, dict):
+                                _bg_sq["body_gate_failed"] = int(
+                                    _bg_sq.get("body_gate_failed", 0)
+                                ) + 1
+                                _bg_sq["grounding_reroll_failed"] = True
+                            log.warning(
+                                "[OTR_LedgerScriptWriter] body-gate reroll raised "
+                                "(%s: %s) for beat %s; keeping original",
+                                type(_bg_exc).__name__, str(_bg_exc)[:160],
+                                beat.beat_id,
+                            )
+                    # Telemetry: the SHIPPED-text ungrounded-crisis density,
+                    # accumulated across body beats (final `cleaned`, post-reroll)
+                    # -- the soak target vs the flag-off baseline.
+                    if isinstance(_bg_sq, dict):
+                        _bg_sq["body_gate_ungrounded_crisis"] = int(
+                            _bg_sq.get("body_gate_ungrounded_crisis", 0)
+                        ) + len(_OTRSQL12.ungrounded_crisis_tokens(
+                            cleaned, _grounded_nouns,
+                        ))
+
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
 

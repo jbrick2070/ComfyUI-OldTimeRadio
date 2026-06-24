@@ -393,6 +393,13 @@ def build_reroll_line_request(
         # reroll composes under the SAME authoring contract the first pass did.
         # Default False (key absent) => byte-identical to a pre-R3 reroll.
         story_quality_v2_enabled=bool(meta.get("story_quality_v2_enabled", False)),
+        # KILL 1 (2026-06-24 assumption-audit): carry the grounded premise
+        # palette the writer stamped on meta so a freeze-cascade reroll composes
+        # against the SAME grounding the in-loop body-output gate validated.
+        # Absent key => empty frozenset => byte-identical to a pre-KILL-1 reroll.
+        grounded_nouns=frozenset(
+            str(t) for t in (meta.get("grounded_nouns") or []) if str(t).strip()
+        ),
     )
 
 
