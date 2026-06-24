@@ -2130,21 +2130,23 @@ class OTR_LedgerScriptWriter:
                 "" if grade.error_type
                 else _OTRSEL.critique_to_hint(grade.biggest_weakness)
             )
-        # The downstream pipeline ships the LAST-composed (latest) ledger, so the
-        # shipped story IS the final pass -- the early-stop pass (bar reached) or
-        # the capped last revision. v1 ships-last; true keep-best across passes
-        # would need the downstream to honor the writer's selection (deferred). We
-        # do NOT delete earlier-pass dirs: the freeze/audio resolve the latest
-        # ledger and deleting an earlier dir raced the freeze (the PendingSweep /
-        # operator reclaims them).
-        winner = candidates[-1]
+        # Keep-BEST across passes (operator 2026-06-23). Revision is NOT monotonic
+        # -- the cap case can leave an EARLIER pass scoring higher than the last
+        # (a live gemma episode saw pass1=72 then drift to pass4=65). Ship the
+        # HIGHEST-grade pass, not the last; tie -> the earliest pass (cleaner draft,
+        # fewer edits). The telemetry block below re-saves the WINNER's ledger LAST,
+        # so the downstream latest-ledger handoff ships THIS pass even when it is
+        # not the final one composed. Earlier-pass dirs are NOT deleted (deleting
+        # raced the freeze -- the PendingSweep / operator reclaims them).
+        winner = max(candidates, key=lambda c: (c["grade"].score_0_100, -c["i"]))
         _reached = winner["grade"].score_0_100 >= _rcfg.bar
         _stop = "bar_reached" if _reached else "cap_reached_below_bar"
         if not _reached:
             log.warning(
-                "[refine] cap reached BELOW bar: final grade=%d < target=%d (%s); "
-                "shipping the last revision -- consider a lower target grade",
+                "[refine] cap reached BELOW bar: BEST grade=%d < target=%d (%s); "
+                "shipping the best of %d passes -- consider a lower target grade",
                 winner["grade"].score_0_100, _rcfg.bar, _rcfg.target_grade,
+                len(candidates),
             )
         # Stamp refine telemetry on the WINNER's ledger (merged) + re-save.
         try:
