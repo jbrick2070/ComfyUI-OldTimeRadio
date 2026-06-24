@@ -1,0 +1,33 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: **no**. The plan lacks concrete, checkable definitions for the style-catalog data shape, the deterministic selector's domain→style mapping, and the flag/seed injection points — none of which can be inferred from the grounding alone. Without those, the implementer will be coding blind.
+
+MUST-FIX BEFORE BUILD:
+1. [Section 1, Section 3] Missing catalog data contract. The plan says “Add a field `ending_tag` to every `_otr_style_catalog.py` entry” but does not state the Python shape of an entry (dict, dataclass, NamedTuple?), what other fields exist (slug, emergency, domain, template), or how they are accessed. The selector also references `non_emergency_slugs()` and “emergency-tagged style” without any schema. **Concrete fix**: publish the catalog entry schema (e.g., `TypedDict` with `slug`, `style_string`, `ending_tag`, `ending_template`, `domain`, `emergency`), and provide the static definition of `non_emergency_slugs()`. Without this, the code that reads the catalog to extract `ending_tag` for the selected style cannot be written.
+
+2. [Section 3] Underspecified selector algorithm. The plan says “keyword-classify … to a domain, then pick the best-fit style from the catalog” but does not explain how a domain maps to a set of candidate styles. Does every style carry a `domain` field? Does “best-fit” mean the first style in the domain whose `ending_tag` is non-emergency, or a weighted choice? The deterministic tie-break keyed on ”existing cast/style seed” is mentioned but the grounding shows no such seed in the outline pipeline — the only seed-like inputs are `diversity_hint` and `prior_critique`. **Concrete fix**: specify the mapping from `select_domain` result → list of catalog style slugs; specify the deterministic tie-breaking function and its input key (e.g., `sha256(cast:style:domain)`). Provide the key source.
+
+3. [Section 5] Flag not plumbed to outline generation. The proposal gates behavior on `OTR_ENABLE_STYLE_GRAMMAR` but the grounding shows `generate_outline` receives only `OutlineRequest` — which has no boolean for this flag. The flag is described as “env + optional widget” but the outline module does not read environment variables. **Concrete fix**: add `enable_style_grammar: bool = False` to `OutlineRequest` and pass the ending selection result (selected slug, `ending_tag`, template) via the request or as a new parameter to `generate_outline`. Without this, the prompt injection code cannot be conditioned on the flag, breaking the byte-identity guarantee when OFF.
+
+4. [Section 2] Ambiguous prompt injection signature. The plan says “the beat/line prompt for the last voiced character beat (`_otr_outline._build_beat_user_prompt` and/or the line composer's final-beat request)”. `_build_beat_user_prompt` currently accepts `req, macro, phase_name, beat_speaker, beat_position, previous_beat_intent, next_beat_speaker, phase_summary` — none related to `ending_tag`. **Concrete fix**: decide whether to add `ending_tag` and `ending_template` parameters to that function, or to handle the injection in a separate call wrapper. Also specify how the line composer (not in the grounding) receives the same ending context so the final line matches the beat intent. The reference to “line composer's final-beat request” implies a second injection point that must be coordinated.
+
+5. [Section 2] Announcer-outro fix gating unclear. The plan says “the announcer close … must stay generic (no outcome narration).” The current announcer close intent in `_assemble_outline` is already generic. The fix is presumably to ensure the line composer does NOT receive ending-specific instructions for the announcer. **Concrete fix**: state whether the `flag` will suppress any extra composer prompts for the announcer close, and add a test verifying that the announcer close text remains unchanged when the flag is ON.
+
+6. [Section 7] Validation metrics depend on runtime functions not yet instrumented. The plan proposes to measure `crisis-noun density` at the final beat and `distribution of distinct ending_tag`. The function `count_ungrounded_crisis` exists, but there is no code to collect the `ending_tag` used in each run. **Concrete fix**: define a telemetry collector (e.g., in `generate_outline`) that records the selected `ending_tag` and the number of crisis-noun substitutions, accessible to soak tests. Without it, the distribution target (“>= 80% non-doomsday”) cannot be measured.
+
+SHOULD-FIX:
+7. [Section 1] No fallback for unknown/missing ending tag. If the catalog lookup fails or the style is missing the field, the code should default to a safe tag (e.g., `revelation`) rather than raise. The plan is silent on error recovery. **Fix**: add a default ending tag and template mapping, and log a warning.
+
+8. [Section 3] `select_domain` is re-used but the existing `select_domain` in `_otr_story_quality_l12.py` returns e.g., "education". A deterministic selector that uses this domain to filter styles must have a domain-to-style list. The catalog may not have the same domain granularity. **Fix**: either add a `domain` field to every catalog entry, or define a separate mapping from the 11 domains to the 100 style slugs.
+
+9. [Section 2] The final-beat prompt injection should not mutate the original `beat.intent` before the beat role assignment, because L2 assigns `irreversible_choice` to that beat and enriches intent. The ordering must be: assign roles, ground crisis nouns, then (if flag ON) prepend/append the ending template. The plan does not define this order. **Fix**: specify the exact step in the combine pipeline (before `stamp_dialogue_slot_ids`) where the ending injection happens.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add a small self-test in `_otr_outline.py` that exercises the flag‑off byte‑identity guarantee (generate with flag OFF produces the same JSON as current).
+
+CUT THESE (over-engineering):
+- Nothing identified.
+
+[ASSUMPTION] The file `_otr_style_catalog.py` exists and defines a list of styles; its exact structure is unknown but required for implementation.  
+[ASSUMPTION] The existing LLM style picker (Pass-1/Pass-2) is not shown; the deterministic selector will replace its output.  
+[ASSUMPTION] The “existing cast/style seed” refers to a seed string available in the writer pipeline (e.g., `_otr_casting` seed) that can be forwarded to the selector.
