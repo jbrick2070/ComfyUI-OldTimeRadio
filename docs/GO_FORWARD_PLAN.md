@@ -21,6 +21,13 @@
 > (premise re-pitch / `EscalationScope.PREMISE`) + the prose->ledger parser are DEFERRED. Every ticket:
 > edit the canonical JSON in the same commit, suite + Bug Bible green, commit+push per green chunk,
 > default-OFF byte-identical; operator flips flags + eyeballs an N=3 re-soak in the morning. prod/main GATED.
+> **FORWARD PLAN (operator 2026-06-23 night):** a couple more nights of sci-fi (original-fiction)
+> Increment-1 polish, THEN pivot to the **open WRITER-ENGINE / multi-source platform** as the next MAJOR
+> sprint -- seed doc `docs/2026-06-23-story-architecture/SOURCE_BANKS.md` (mirrors the video platform;
+> Outline=`Beat[]` is the universal seam; 5 engines: `science_explainer` do-first [the STEM win, lightest
+> -- one prompt swap; sidesteps the story-quality bar], `news`, `archive_seed`, `pd_adapt` [Poe-class PD
+> adaptation -- the ceiling-buster], `frontier`/`human`). Reframes the goal from "make the original-drama
+> engine A+" to "swap to engines that never had the problem"; deserves its OWN roundtable -> SPEC -> sprint.
 >
 > **WHERE WE ARE (this session, 2026-06-23 night):** (1) v1 refine loop SHIPPED + made **keep-best**
 > (`fedbce0`) -- ships the highest-grade pass, not the last (gemma pass1=72 was being thrown away for
