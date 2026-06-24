@@ -1638,14 +1638,37 @@ def _assemble_outline(
             ))
 
     # Announcer close.
+    # Story-grammar build (2026-06-24, C5): when OTR_ENABLE_STYLE_GRAMMAR is on,
+    # steer the announcer close OFF the news-OUTCOME (the "console standoff"
+    # sameness has the announcer narrate who won / what blew up, stealing the
+    # climax from the characters' final beat). The close is NEVER removed -- it
+    # stays an announcer beat (budget validator #7 counts announcer beats) and
+    # keeps target_words/mood/arc_phase intact; only the intent prose changes.
+    # Read the env flag DIRECTLY here (the close intent is fixed at assembly time,
+    # upstream of the writer's style-grammar block). OFF => the exact pre-grammar
+    # string => byte-identical.
+    import os
+    if (os.environ.get("OTR_ENABLE_STYLE_GRAMMAR") or "").strip().lower() in (
+        "1", "true", "yes", "on"
+    ):
+        # Kept <= Beat.intent's 200-char cap.
+        _close_intent = (
+            "Sign off on a single concrete final image or sound. Do NOT state, "
+            "summarize, or resolve the outcome -- not who won or what was "
+            "decided. The resolution belongs to the final beat."
+        )
+    else:
+        # S2 (story-quality R2): close on a concrete final image, not a thesis.
+        _close_intent = (
+            "Close on a concrete final image showing what changed (use "
+            "the central object if set); no moral, thesis, or "
+            "news-summary tag."
+        )
     beats.append(Beat(
         beat_id=_next_bid(),
         speaker="ANNOUNCER",
         speaker_role="announcer",
-        # S2 (story-quality R2): close on a concrete final image, not a thesis.
-        intent=("Close on a concrete final image showing what changed (use "
-                "the central object if set); no moral, thesis, or "
-                "news-summary tag."),
+        intent=_close_intent,
         target_words=15,
         mood="reflective",
         sfx_cue=None,

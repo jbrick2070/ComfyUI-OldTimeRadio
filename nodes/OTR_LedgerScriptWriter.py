@@ -3085,8 +3085,43 @@ class OTR_LedgerScriptWriter:
         # is byte-identical to the pre-LIFT pipeline. NEVER raises into the
         # writer (the LIFT must never break audio).
         _sq_by_beat: dict = {}
+        # Story-grammar build (2026-06-24, C5) -- the per-beat ending injection.
+        # _ending_template is the climax beat's on-mic ending instruction;
+        # _climax_beat_id is the beat that receives it (section I). Both stay ""
+        # whenever the style-grammar lever is off => no LineRequest carries an
+        # ending_template => byte-identical.
+        _ending_template: str = ""
+        _climax_beat_id: str = ""
+        # The style-grammar lever (climax SHAPE selection) is BUNDLED with L1/L2:
+        # when on, it deterministically picks a radio-drama style per episode and
+        # feeds that style's ending-taxonomy class as the climax ROLE, runs the
+        # L12 build path so the role flows through build_sq_data, and injects the
+        # matching final-beat ending template at the climax beat. OFF => no style,
+        # climax stays irreversible_choice (the build_sq_data default).
+        _style_grammar_on = _OTRCFG.style_grammar_enabled()
+        _climax_role = _OTRSQL12.BEAT_ROLE_IRREVERSIBLE_CHOICE
+        _style_slug = ""
+        _ending_tag = ""
+        if _style_grammar_on:
+            try:
+                from . import _otr_style_catalog as _OTRSTYLE
+                _premise_str = str(getattr(outline, "premise", "") or "")
+                _style_slug = _OTRSTYLE.select_style(_premise_str, meta, cast_seed)
+                _ending_tag = str(
+                    (_OTRSTYLE.get_style(_style_slug) or {}).get("ending_tag", "")
+                )
+                if _ending_tag in _OTRSQL12.CLIMAX_CLASS_ROLES:
+                    _climax_role = _ending_tag
+                _ending_template = _OTRSTYLE.ending_template_for(_style_slug)
+            except Exception as exc:  # noqa: BLE001 -- grammar must never break audio
+                log.warning(
+                    "[OTR_LedgerScriptWriter] style-grammar select skipped (%s); "
+                    "climax stays irreversible_choice", exc,
+                )
+                _style_grammar_on = False
+                _ending_template = ""
         try:
-            if _OTRCFG.story_quality_l12_enabled():
+            if _OTRCFG.story_quality_l12_enabled() or _style_grammar_on:
                 _l12_roster = [
                     str(r.get("name") or "")
                     for r in (led.data.get("cast") or [])
@@ -3098,8 +3133,20 @@ class OTR_LedgerScriptWriter:
                     str(getattr(outline, "premise", "") or ""),
                     cast_seed,
                     roster=_l12_roster,
+                    climax_role=_climax_role,
                 )
                 meta["story_quality_l12_enabled"] = True
+                # The climax-class beat (exactly one, the last voiced character
+                # beat) is the one that receives the ending template.
+                if _style_grammar_on:
+                    for _bid, _ent in _sq_by_beat.items():
+                        if _ent.get("beat_role") in _OTRSQL12.CLIMAX_CLASS_ROLES:
+                            _climax_beat_id = str(_bid)
+                            break
+                    if not _climax_beat_id:
+                        # No climax beat resolved (e.g. zero character beats) ->
+                        # nothing to inject; keep the render byte-clean.
+                        _ending_template = ""
                 # Telemetry (MERGE -- the scrub's L5a setdefault/update keeps
                 # these): the per-episode distinct conflict slots are the
                 # cross-episode SAMENESS measure (compare distinct object/type
@@ -3122,6 +3169,36 @@ class OTR_LedgerScriptWriter:
                         "conflict_objects": _l12_objs,
                         "conflict_types": _l12_types,
                     })
+                # Story-grammar telemetry: which style + climax class was chosen,
+                # and the crisis-noun count on the (grounded) final beat -- the
+                # soak target is ~0 (the climax is no longer a console standoff).
+                if _style_grammar_on and isinstance(_l12_sq, dict):
+                    _final_crisis = -1
+                    try:
+                        _grounded = _OTRSQL12.premise_noun_palette(
+                            _l12_roster,
+                            str(getattr(outline, "premise", "") or ""),
+                            *_OTRSQL12.premise_texts(meta),
+                        )
+                        for _b in outline.beats:
+                            if str(getattr(_b, "beat_id", "")) == _climax_beat_id:
+                                _final_crisis = _OTRSQL12.count_ungrounded_crisis(
+                                    str(getattr(_b, "intent", "") or ""), _grounded,
+                                )
+                                break
+                    except Exception:  # noqa: BLE001 -- telemetry never breaks audio
+                        _final_crisis = -1
+                    _l12_sq.update({
+                        "style_slug": _style_slug,
+                        "ending_tag": _ending_tag,
+                        "final_beat_crisis_nouns": _final_crisis,
+                    })
+                    meta["story_quality_grammar_enabled"] = True
+                    log.info(
+                        "[OTR_LedgerScriptWriter] story-grammar ON: style=%s "
+                        "ending_tag=%s climax_beat=%s final_beat_crisis=%d",
+                        _style_slug, _ending_tag, _climax_beat_id, _final_crisis,
+                    )
                 log.info(
                     "[OTR_LedgerScriptWriter] story-quality L1/L2 ON: shaped "
                     "%d voiced beat(s) (domain=%s, %d distinct conflict objects)",
@@ -3134,6 +3211,8 @@ class OTR_LedgerScriptWriter:
                 "proceeding with the unshaped outline", exc,
             )
             _sq_by_beat = {}
+            _ending_template = ""
+            _climax_beat_id = ""
 
         # --- G. Build episode_canon (write deferred to section J.5) ----
         # Disk write moved out so the post-composition title regen
@@ -3954,6 +4033,15 @@ class OTR_LedgerScriptWriter:
                 ),
                 conflict_type=str(
                     (_sq_by_beat.get(beat.beat_id) or {}).get("conflict_type", "")
+                ),
+                # Story-grammar build (2026-06-24, C4): the style-selected ending
+                # instruction, injected ONLY on the climax-class (final character)
+                # beat when OTR_ENABLE_STYLE_GRAMMAR is on. "" on every other beat
+                # and whenever the lever is off => byte-identical.
+                ending_template=(
+                    _ending_template
+                    if (_ending_template and beat.beat_id == _climax_beat_id)
+                    else ""
                 ),
             )
 
