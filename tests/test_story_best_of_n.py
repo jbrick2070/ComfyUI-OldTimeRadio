@@ -746,3 +746,148 @@ class TestResolveRefinePasses:
             self.LOCAL, widget_target="B", env={"OTR_STORY_REFINE_PASSES": "1"},
         )
         assert c.effective_passes == 1
+
+
+# ---------------------------------------------------------------------------
+# T4 (2026-06-23) -- deterministic staging penalty (climax on-mic)
+# ---------------------------------------------------------------------------
+def _onmic_grounded():
+    # Climax (the last CHARACTER beat) IS the final voiced beat -- on-mic.
+    return _FakeOutline(
+        premise="A district adopts a tutoring algorithm whose grading weights are disputed.",
+        beats=[
+            _FakeBeat("music_open", "theme"),
+            _FakeBeat("character", "Mali questions the tutoring algorithm grading weights"),
+            _FakeBeat("character", "Manfred defends the district adoption decision"),
+            _FakeBeat("character", "Mali makes the disputed weights choice that reshapes the transcript"),
+            _FakeBeat("music_close", "theme"),
+        ],
+    )
+
+
+def _offmic_grounded():
+    # Same character spine, but an ANNOUNCER outro narrates the outcome AFTER
+    # the climax -> the climax is no longer the final voiced beat (off-mic).
+    return _FakeOutline(
+        premise="A district adopts a tutoring algorithm whose grading weights are disputed.",
+        beats=[
+            _FakeBeat("music_open", "theme"),
+            _FakeBeat("character", "Mali questions the tutoring algorithm grading weights"),
+            _FakeBeat("character", "Manfred defends the district adoption decision"),
+            _FakeBeat("character", "Mali makes the disputed weights choice that reshapes the transcript"),
+            _FakeBeat("announcer", "and so the district adoption decision settled the disputed weights"),
+            _FakeBeat("music_close", "theme"),
+        ],
+    )
+
+
+class TestStagingPenalty:
+    def test_onmic_climax_no_penalty(self):
+        assert SEL._otr_staging_penalty(_onmic_grounded()) == 0.0
+
+    def test_offmic_announcer_outro_penalized(self):
+        assert SEL._otr_staging_penalty(_offmic_grounded()) == 50.0
+
+    def test_empty_climax_intent_penalized(self):
+        o = _FakeOutline(
+            premise="p",
+            beats=[
+                _FakeBeat("character", "setup the situation"),
+                _FakeBeat("character", "   "),  # climax beat has no real intent
+            ],
+        )
+        assert SEL._otr_staging_penalty(o) == 50.0
+
+    def test_no_character_beats_penalized(self):
+        o = _FakeOutline(premise="p", beats=[_FakeBeat("announcer", "narration only")])
+        assert SEL._otr_staging_penalty(o) == 50.0
+
+    def test_custom_weight_passed_through(self):
+        assert SEL._otr_staging_penalty(_offmic_grounded(), penalty=12.5) == 12.5
+
+    def test_malformed_outline_degrades_to_zero(self):
+        class _Bad:
+            beats = 123  # not iterable
+        assert SEL._otr_staging_penalty(_Bad()) == 0.0
+
+    def test_pure_no_mutation(self):
+        o = _offmic_grounded()
+        before = [b.intent for b in o.beats]
+        SEL._otr_staging_penalty(o)
+        assert [b.intent for b in o.beats] == before
+
+
+class TestScoreOutlinePenalty:
+    def test_penalty_none_is_zero_and_byte_identical(self):
+        # The default (penalty=None) must leave staging_penalty 0.0 AND keep the
+        # score equal to the no-kwarg call (the byte-identical guarantee).
+        o = _grounded_outline()
+        a = SEL.score_outline(o, {}, _ROSTER)
+        b = SEL.score_outline(o, {}, _ROSTER, penalty=None)
+        assert a == b
+        assert a.staging_penalty == 0.0
+
+    def test_penalty_value_stored(self):
+        s = SEL.score_outline(_grounded_outline(), {}, _ROSTER, penalty=50.0)
+        assert s.staging_penalty == 50.0
+
+
+class TestResolveStagingPenalty:
+    def test_unset_is_none(self):
+        assert SEL.resolve_staging_penalty(env={}) is None
+
+    def test_off_values_none(self):
+        for v in ("0", "false", "no", "off", ""):
+            assert SEL.resolve_staging_penalty(env={"OTR_ENABLE_STAGING_PENALTY": v}) is None
+
+    def test_on_values_default_weight(self):
+        for v in ("1", "true", "YES", "on"):
+            assert SEL.resolve_staging_penalty(
+                env={"OTR_ENABLE_STAGING_PENALTY": v}) == SEL._STAGING_PENALTY_WEIGHT
+
+    def test_numeric_override(self):
+        assert SEL.resolve_staging_penalty(env={"OTR_ENABLE_STAGING_PENALTY": "25"}) == 25.0
+
+    def test_garbage_is_none(self):
+        assert SEL.resolve_staging_penalty(env={"OTR_ENABLE_STAGING_PENALTY": "banana"}) is None
+
+
+class TestSelectBestStagingPenalty:
+    def _base_req(self):
+        return _req()
+
+    def _gen(self, req):
+        # candidate 0 (hint="") -> off-mic climax; i>=1 -> on-mic climax. Both
+        # premise-grounded so density ties and the staging penalty is the
+        # deciding factor.
+        return _offmic_grounded() if req.diversity_hint == "" else _onmic_grounded()
+
+    def test_penalty_none_byte_identical_winner(self):
+        # No penalty: densities tie -> tie-break falls to candidate index 0.
+        meta = {}
+        SEL.select_best_outline(
+            self._gen, self._base_req(), cast_seed=42, n=2, meta=meta,
+            roster=_ROSTER, penalty=None,
+        )
+        assert meta["story_quality"]["best_of_n"]["winner_index"] == 0
+
+    def test_penalty_steers_to_onmic_candidate(self):
+        # With the penalty ON, candidate 0 (off-mic) gets +50 and loses to the
+        # on-mic candidate 1 despite the index tie-break.
+        meta = {}
+        SEL.select_best_outline(
+            self._gen, self._base_req(), cast_seed=42, n=2, meta=meta,
+            roster=_ROSTER, penalty=50.0,
+        )
+        assert meta["story_quality"]["best_of_n"]["winner_index"] == 1
+
+    def test_penalty_does_not_change_telemetry_keys(self):
+        # Telemetry shape is unchanged by the penalty (staging_penalty is NOT
+        # serialized into the best_of_n scores).
+        meta = {}
+        SEL.select_best_outline(
+            self._gen, self._base_req(), cast_seed=42, n=2, meta=meta,
+            roster=_ROSTER, penalty=50.0,
+        )
+        for s in meta["story_quality"]["best_of_n"]["scores"]:
+            assert "staging_penalty" not in s

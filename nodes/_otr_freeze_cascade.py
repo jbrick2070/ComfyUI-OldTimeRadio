@@ -852,7 +852,10 @@ def run_freeze_cascade(
     # never stamped a verdict in production, so this signal was always empty.
     # The escalation engine decides from the legacy story-critic targets alone
     # (empty Stage-7 signal -> LINE when targets pending, else NONE).
-    _w0f_s7 = {}
+    # T2 (2026-06-23): OTR_ENABLE_CRITIC_ESCALATION gates whether the 5B critic's
+    # arc_verdict drives structural escalation. Default OFF => {} (byte-identical).
+    from . import _otr_story_select as _OTRSEL_ESC
+    _w0f_s7 = _OTRSEL_ESC.build_escalation_signal(story_critic_report, meta)
     _w1c_escalation = _OTRRE.decide_escalation_scope(
         _w0f_s7,
         story_critic_targets=(

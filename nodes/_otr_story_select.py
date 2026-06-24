@@ -35,12 +35,16 @@ from typing import Any, List
 # production; flat import when loaded standalone / under test.
 try:
     from ._otr_story_quality_l12 import (
+        BEAT_ROLE_IRREVERSIBLE_CHOICE,
+        assign_beat_roles,
         count_ungrounded_crisis,
         premise_noun_palette,
         premise_texts,
     )
 except ImportError:  # pragma: no cover - standalone / test load
     from _otr_story_quality_l12 import (  # type: ignore
+        BEAT_ROLE_IRREVERSIBLE_CHOICE,
+        assign_beat_roles,
         count_ungrounded_crisis,
         premise_noun_palette,
         premise_texts,
@@ -284,6 +288,120 @@ def resolve_refine_passes(creative_writing_model: Any, *, widget_target="Off",
 
 
 # ---------------------------------------------------------------------------
+# T2 (2026-06-23) -- critic-axes adapter + keep-best + escalation gate
+# ---------------------------------------------------------------------------
+# THE grounding catch: StoryCriticReport exposes arc_verdict / reroll_targets /
+# flat_lines / continuity_issues / render_priority -- NOT failing_axes /
+# regeneration_hint (which _otr_reroll_escalation.decide_escalation_scope
+# consumes). This adapter bridges the two so the 5B critic the pipeline already
+# runs can actually buy a structural re-plan instead of the refine loop revising
+# against only grade_story.biggest_weakness.
+#
+# arc_verdict -> structural failing axes (a subset of the escalation router's
+# STRUCTURAL_AXES = {premise_clarity, continuity, resolution, emotional_arc}).
+# A 'strong' arc is no failure; the others map to arc/resolution failures.
+_ARC_VERDICT_AXES = {
+    "strong": (),
+    "uneven": ("emotional_arc",),
+    "flat": ("emotional_arc",),
+    "mid_collapse": ("resolution", "emotional_arc"),
+}
+
+
+def _target_hint(t: Any) -> str:
+    h = getattr(t, "hint", None)
+    if h is None and isinstance(t, dict):
+        h = t.get("hint")
+    return str(h or "").strip()
+
+
+def critic_report_to_refine_signals(report: Any) -> tuple:
+    """ADAPTER (T2): map a StoryCriticReport -> ``(failing_axes, regeneration_hint)``.
+
+    failing_axes  <- arc_verdict (via _ARC_VERDICT_AXES) + 'continuity' when the
+                     report names continuity_issues.
+    regeneration_hint <- the distinct ``reroll_targets[].hint`` set (bounded),
+                     else an arc-verdict summary (else "").
+    PURE; never raises -- degrades to ``([], "")`` so it can never break the
+    cascade or the refine loop."""
+    try:
+        arc = str(getattr(report, "arc_verdict", "") or "").strip().lower()
+        axes: List[str] = list(_ARC_VERDICT_AXES.get(arc, ()))
+        if (getattr(report, "continuity_issues", None) or []) and \
+                "continuity" not in axes:
+            axes.append("continuity")
+        hints: List[str] = []
+        for t in (getattr(report, "reroll_targets", None) or []):
+            h = _target_hint(t)
+            if h and h not in hints:
+                hints.append(h)
+        if hints:
+            regen = "; ".join(hints)
+        elif arc and arc != "strong":
+            regen = (
+                f"the dramatic arc verdict is '{arc}'; strengthen the rising "
+                f"stakes and land a decisive on-stage resolution"
+            )
+        else:
+            regen = ""
+        if len(regen) > 400:
+            regen = regen[:400].rsplit(" ", 1)[0]
+        return axes, regen
+    except Exception:  # noqa: BLE001 -- the adapter must never break a run
+        return [], ""
+
+
+def critic_escalation_enabled(env=None) -> bool:
+    """True when OTR_ENABLE_CRITIC_ESCALATION is truthy. Default OFF => the
+    freeze cascade passes the empty Stage-7 signal exactly as today
+    (byte-identical). ON => the 5B critic's arc_verdict drives structural
+    escalation via the adapter above."""
+    import os
+    if env is None:
+        env = os.environ
+    return _env_truthy(env.get("OTR_ENABLE_CRITIC_ESCALATION", ""))
+
+
+def build_escalation_signal(story_critic_report: Any, meta: Any, *, env=None) -> dict:
+    """T2 freeze-cascade helper. Returns the critic_result dict to feed
+    ``decide_escalation_scope``. Default OFF (OTR_ENABLE_CRITIC_ESCALATION) =>
+    ``{}`` (byte-identical: the cascade falls to LINE/NONE from legacy targets).
+    ON => the adapter maps the 5B critic's arc_verdict into a STRUCTURAL signal
+    (a non-strong arc -> EPISODE regenerate) and stamps
+    meta.story_quality.critic_*. NEVER raises -> degrades to ``{}``."""
+    try:
+        if not critic_escalation_enabled(env):
+            return {}
+        axes, hint = critic_report_to_refine_signals(story_critic_report)
+        if isinstance(meta, dict):
+            sq = meta.setdefault("story_quality", {})
+            if isinstance(sq, dict):
+                sq["critic_failing_axes"] = list(axes)
+                sq["critic_regeneration_hint"] = hint
+        return {
+            "verdict": "discard" if axes else "ship",
+            "failing_axes": list(axes),
+            "regeneration_hint": hint,
+        }
+    except Exception:  # noqa: BLE001 -- the gate must never break the freeze
+        return {}
+
+
+def keep_best_index(scores: List[int]) -> int:
+    """Index of the HIGHEST score; ties resolve to the EARLIEST pass. Mirrors the
+    refine loop's keep-best comparator (max grade, then -pass_index). Empty =>
+    0. The refine loop is non-monotonic by design (a live gemma pass went
+    72 -> 65), so keep-best must NOT drift to the last pass."""
+    if not scores:
+        return 0
+    best_i = 0
+    for i in range(1, len(scores)):
+        if scores[i] > scores[best_i]:
+            best_i = i
+    return best_i
+
+
+# ---------------------------------------------------------------------------
 # Chunk 2 -- pure structural scorer
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -299,9 +417,97 @@ class StoryScore:
     ungrounded_crisis_density: float
     distinct_conflict_nouns: int
     premise_grounding: float
+    # T4 (2026-06-23) deterministic staging penalty. 0.0 by DEFAULT so an
+    # existing StoryScore built the old way is unchanged + still compares equal
+    # (the field defaults, positional construction unaffected). Non-zero ONLY
+    # when select_best_outline runs with a non-None ``penalty`` weight; folded
+    # into the selection comparator (NOT into telemetry) -- adding 0.0 keeps the
+    # penalty-None path byte-identical.
+    staging_penalty: float = 0.0
 
 
-def score_outline(outline: Any, meta: Any, roster: Any) -> StoryScore:
+# ---------------------------------------------------------------------------
+# T4 (2026-06-23) -- deterministic staging penalty (climax on-mic)
+# ---------------------------------------------------------------------------
+# The cross-episode "console standoff" anti-pattern lands the climax OFF-stage:
+# the decisive character beat is followed by an announcer outro that narrates
+# the outcome. The dramatic-function spine (_otr_story_quality_l12) already
+# guarantees the climax beat = the LAST voiced CHARACTER beat
+# (BEAT_ROLE_IRREVERSIBLE_CHOICE). This penalty fires when that climax is NOT
+# the final VOICED beat overall (an announcer beat trails it) OR has no intent,
+# steering select_best_outline toward outlines whose climax lands on-mic.
+_STAGING_PENALTY_WEIGHT = 50.0
+
+
+def _otr_staging_penalty(outline: Any, *, penalty: float = _STAGING_PENALTY_WEIGHT) -> float:
+    """Return ``penalty`` when the climax (the irreversible_choice character
+    beat) is NOT the final voiced beat OR has an empty intent; else 0.0. PURE +
+    deterministic; never mutates the outline. ``penalty`` is the violation
+    weight (default 50.0). On any malformed input degrades to 0.0 (no penalty)
+    so it never makes a candidate spuriously lose."""
+    try:
+        beats = list(getattr(outline, "beats", None) or [])
+    except TypeError:  # pragma: no cover -- non-iterable beats
+        return 0.0
+
+    voiced: List[Any] = []
+    char_ids: List[str] = []
+    id_to_beat: dict = {}
+    for i, b in enumerate(beats):
+        role = str(getattr(b, "speaker_role", "") or "")
+        if not _is_voiced(role):
+            continue
+        voiced.append(b)
+        if role == "character":
+            bid = str(getattr(b, "beat_id", "") or "") or f"_idx{i}"
+            char_ids.append(bid)
+            id_to_beat[bid] = b
+
+    if not char_ids or not voiced:
+        # No on-stage climax at all -> the worst staging outcome.
+        return float(penalty)
+
+    roles = assign_beat_roles(char_ids)
+    climax_ids = [bid for bid in char_ids
+                  if roles.get(bid) == BEAT_ROLE_IRREVERSIBLE_CHOICE]
+    if not climax_ids:  # pragma: no cover -- assign_beat_roles always tags one
+        return float(penalty)
+    climax_beat = id_to_beat.get(climax_ids[-1])
+
+    # On-mic == the climax character beat is the LAST voiced beat overall (no
+    # announcer outro narrating the outcome after it).
+    if voiced[-1] is not climax_beat:
+        return float(penalty)
+    if not str(getattr(climax_beat, "intent", "") or "").strip():
+        return float(penalty)
+    return 0.0
+
+
+def resolve_staging_penalty(env=None):
+    """Resolve the staging-penalty weight from OTR_ENABLE_STAGING_PENALTY.
+
+    Unset / 0 / false => ``None`` (the byte-identical OFF path). 1/true/on =>
+    the default weight; a bare number => that weight. Ships DARK (default OFF)."""
+    import os
+    if env is None:
+        env = os.environ
+    raw = str(env.get("OTR_ENABLE_STAGING_PENALTY", "") or "").strip().lower()
+    if raw in ("", "0", "false", "no", "off"):
+        return None
+    if raw in ("1", "true", "yes", "on"):
+        return _STAGING_PENALTY_WEIGHT
+    try:
+        return float(raw)
+    except ValueError:
+        log.warning(
+            "[staging_penalty] OTR_ENABLE_STAGING_PENALTY=%r is not a number; "
+            "staging penalty OFF", raw,
+        )
+        return None
+
+
+def score_outline(outline: Any, meta: Any, roster: Any, *,
+                  penalty: float | None = None) -> StoryScore:
     """Score a candidate ``outline`` structurally. PURE -- never mutates the
     outline / beats, never calls build_sq_data.
 
@@ -351,6 +557,10 @@ def score_outline(outline: Any, meta: Any, roster: Any) -> StoryScore:
         ungrounded_crisis_density=density,
         distinct_conflict_nouns=len(distinct_grounded),
         premise_grounding=grounding,
+        # ``penalty`` is the PRE-COMPUTED staging penalty for THIS outline
+        # (_otr_staging_penalty), passed in by select_best_outline. None (the
+        # default, and every existing caller) => 0.0 => byte-identical.
+        staging_penalty=0.0 if penalty is None else float(penalty),
     )
 
 
@@ -514,7 +724,7 @@ def _merge_best_of_n_telemetry(meta: Any, effective_n: int, winner_index: int,
 
 
 def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
-                        roster, cost_probe=None):
+                        roster, cost_probe=None, penalty: float | None = None):
     """Generate ``n`` candidate outlines under cast_seed-keyed seeds + structural
     diversity_hints, score each with the PURE scorer, and return the best.
 
@@ -567,7 +777,15 @@ def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
                                          type(exc).__name__, cost_i))
             continue
         cost_i = _cost_delta(cost_probe, cost_before)
-        score_i = score_outline(outline_i, meta, roster)
+        # T4 staging penalty: None => byte-identical (no penalty computed, 0.0
+        # folded into the comparator below). Non-None => deterministic on-mic
+        # climax steering computed INSIDE this best-of-N loop (post-outline,
+        # pre-composition) so it steers selection.
+        if penalty is None:
+            score_i = score_outline(outline_i, meta, roster)
+        else:
+            _sp = _otr_staging_penalty(outline_i, penalty=penalty)
+            score_i = score_outline(outline_i, meta, roster, penalty=_sp)
         candidates.append(_Candidate(i, outline_i, score_i, True, None, cost_i))
         log.info(
             "[best_of_n] candidate %d/%d scored: density=%.4f distinct=%d "
@@ -577,8 +795,14 @@ def select_best_outline(generate_outline_fn, outline_req, *, cast_seed, n, meta,
 
     ok = [c for c in candidates if c.ok]
     if ok:
+        # Primary key folds the T4 staging penalty INTO the density score
+        # ("subtract from the final score"; lower-is-better so we ADD it). The
+        # penalty (0 or the weight, e.g. 50) dominates the small density float,
+        # so a compliant on-mic climax beats an off-mic one. staging_penalty is
+        # 0.0 on the penalty-None path => this is byte-identical to the
+        # pre-T4 comparator.
         winner = min(ok, key=lambda c: (
-            c.score.ungrounded_crisis_density,
+            c.score.ungrounded_crisis_density + c.score.staging_penalty,
             -c.score.distinct_conflict_nouns,
             -c.score.premise_grounding,
             c.index,

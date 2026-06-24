@@ -2126,10 +2126,42 @@ class OTR_LedgerScriptWriter:
             if grade.score_0_100 >= _rcfg.bar:
                 break   # early-stop: this pass hit the target; it is the last
             prior_macro = _build_prior_macro(last.get("outline"))
-            prior_critique = (
-                "" if grade.error_type
-                else _OTRSEL.critique_to_hint(grade.biggest_weakness)
-            )
+            # T2 (2026-06-23): when the per-pass result exposes the 5B critic's
+            # StoryCriticReport, build the next-pass critique from the critic
+            # ADAPTER (arc_verdict -> failing_axes + reroll-target hints) so the
+            # re-plan is steered by the structural critic, not only by
+            # grade_story.biggest_weakness. The writer's compose body does NOT
+            # currently stash a report (the 5B critic runs DOWNSTREAM in the
+            # freeze cascade), so today this falls back to the grader weakness
+            # -- byte-identical to the pre-T2 refine loop. The plumbing is ready
+            # for a future increment that runs the critic in-pass.
+            _critic_report = last.get("story_critic_report")
+            _critic_hint = ""
+            if _critic_report is not None:
+                _faxes, _regen = _OTRSEL.critic_report_to_refine_signals(
+                    _critic_report
+                )
+                _critic_hint = _OTRSEL.critique_to_hint(_regen)
+                try:
+                    _cled = (last or {}).get("led")
+                    if _cled is not None and isinstance(
+                        getattr(_cled, "data", None), dict
+                    ):
+                        _csq = _cled.data.setdefault("meta", {}).setdefault(
+                            "story_quality", {}
+                        )
+                        if isinstance(_csq, dict):
+                            _csq["critic_failing_axes"] = list(_faxes)
+                            _csq["critic_regeneration_hint"] = _regen
+                except Exception:  # noqa: BLE001 -- telemetry never breaks the run
+                    pass
+            if _critic_hint:
+                prior_critique = _critic_hint
+            else:
+                prior_critique = (
+                    "" if grade.error_type
+                    else _OTRSEL.critique_to_hint(grade.biggest_weakness)
+                )
         # Keep-BEST across passes (operator 2026-06-23). Revision is NOT monotonic
         # -- the cap case can leave an EARLIER pass scoring higher than the last
         # (a live gemma episode saw pass1=72 then drift to pass4=65). Ship the
@@ -2138,7 +2170,12 @@ class OTR_LedgerScriptWriter:
         # so the downstream latest-ledger handoff ships THIS pass even when it is
         # not the final one composed. Earlier-pass dirs are NOT deleted (deleting
         # raced the freeze -- the PendingSweep / operator reclaims them).
-        winner = max(candidates, key=lambda c: (c["grade"].score_0_100, -c["i"]))
+        # Keep-best via the shared pure helper (T2): highest grade, ties -> the
+        # earliest pass (candidates are in append/pass order). Identical result
+        # to the prior max(grade, -i) comparator.
+        winner = candidates[_OTRSEL.keep_best_index(
+            [c["grade"].score_0_100 for c in candidates]
+        )]
         _reached = winner["grade"].score_0_100 >= _rcfg.bar
         _stop = "bar_reached" if _reached else "cap_reached_below_bar"
         if not _reached:
@@ -2390,6 +2427,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_config as _OTRCFG
         from . import _otr_story_quality_l12 as _OTRSQL12
         from . import _otr_story_select as _OTRSEL
+        from . import _otr_pitch_room as _OTRPR
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -2894,6 +2932,29 @@ class OTR_LedgerScriptWriter:
             prior_macro=_refine_prior_macro,
             prior_critique=_refine_prior_critique,
         )
+        # T1 PITCH ROOM (2026-06-23) -- THE primary story-architecture lever.
+        # Default OFF (OTR_ENABLE_PITCH_ROOM). When ON (and NOT a refine sub-pass
+        # -- the refine loop owns premise stability via prior_macro/prior_critique),
+        # generate 3 forcibly-divergent premises, taste-select one, and REPLACE
+        # script_brief with the winner's distilled brief before the outline is
+        # generated. OFF => no pitch call, no meta.story_quality.pitch key =>
+        # byte-identical. run_pitch_room never raises (internal fallback), but the
+        # gate import + call are wrapped defensively per CLAUDE.md.
+        if not _refine_active and _OTRPR.pitch_room_enabled():
+            try:
+                outline_req, _pitch_meta = _OTRPR.run_pitch_room(
+                    outline_req,
+                    generate_fn=creative_generate_fn,
+                    local_model=resolved["creative_writing_model"],
+                    frontier_cfg=None,
+                    seed_context=cast_seed,
+                    meta=meta,
+                )
+            except Exception as _pitch_exc:  # noqa: BLE001 -- never break the writer
+                log.warning(
+                    "[OTR_LedgerScriptWriter] pitch room skipped (%s); using the "
+                    "original brief", _pitch_exc,
+                )
         # LLM slot: creative -- outline drives the episode narrative
         # arc (beats, characters, structure). Single creative pass.
         # Sprint D D2b: thread creative_repo_id so the outline phase
@@ -2956,6 +3017,10 @@ class OTR_LedgerScriptWriter:
                     meta=meta,
                     roster=outline_req.character_cast,
                     cost_probe=_bon_cost_probe if _bon_is_remote else None,
+                    # T4 (2026-06-23): deterministic on-mic-climax staging
+                    # penalty. Env-gated (OTR_ENABLE_STAGING_PENALTY); default
+                    # OFF => None => byte-identical selection.
+                    penalty=_OTRSEL.resolve_staging_penalty(),
                 )
             # Stamp the telemetry the selector cannot know: requested_n +
             # clamp_reason (gate) + provider (resolved model). Merge, never
