@@ -54,6 +54,28 @@ def story_quality_l12_enabled() -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+def style_grammar_enabled() -> bool:
+    """Return True iff the STYLE-GRAMMAR lever (climax SHAPE selection) is on.
+
+    Story-grammar build (2026-06-24). SEPARATE axis from L1/L2 (which shape the
+    trope VOCABULARY): the style grammar deterministically picks a radio-drama
+    style per episode (``_otr_style_catalog.select_style``) and feeds that
+    style's ending taxonomy class as the climax ROLE -- demoting the forced
+    ``irreversible_choice`` console standoff to one class among a closed set --
+    plus injects the matching final-beat ending template at the climax beat and
+    steers the announcer close off the news-outcome. Env-gated via
+    ``OTR_ENABLE_STYLE_GRAMMAR``; DEFAULT OFF (1/true/yes/on => on). When OFF,
+    no style is selected, the climax stays ``irreversible_choice``, the ending
+    template is empty, the announcer close keeps its exact pre-grammar string,
+    and every render is byte-identical. Bundled with ``OTR_STORY_QUALITY_L12``
+    (the grammar runs the L1/L2 build path so the climax role can flow through
+    ``build_sq_data``).
+    """
+    import os
+    raw = (os.environ.get("OTR_ENABLE_STYLE_GRAMMAR") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 def composer_action_strip_enabled() -> bool:
     """Return True iff L3 (composer ACTION-marker strip) is on.
 

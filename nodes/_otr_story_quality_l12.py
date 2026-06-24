@@ -631,6 +631,8 @@ def build_sq_data(
     premise: str,
     seed: Any,
     roster: Any = (),
+    *,
+    climax_role: str = BEAT_ROLE_IRREVERSIBLE_CHOICE,
 ) -> Dict[str, Dict[str, Any]]:
     """Build the writer-side ``dict[beat_id -> sq]`` and ground beat intents.
 
@@ -660,7 +662,11 @@ def build_sq_data(
         and str(getattr(b, "speaker_role", "")) == "character"
         and getattr(b, "beat_id", "")
     ]
-    roles_by_beat = assign_beat_roles(ordered_char_ids)
+    # The climax's TYPE is style-selected (climax_role) when the style-grammar
+    # lever is on, and defaults to irreversible_choice (so an unkeyed call is
+    # byte-identical to the pre-2026-06-24 behavior). assign_beat_roles fails
+    # soft on an unknown role -> irreversible_choice, so this never raises.
+    roles_by_beat = assign_beat_roles(ordered_char_ids, climax_role=climax_role)
     validate_beat_roles(roles_by_beat, ordered_char_ids)
 
     sq: Dict[str, Dict[str, Any]] = {}

@@ -756,6 +756,14 @@ class LineRequest:
     beat_role: str = ""
     conflict_object: str = ""
     conflict_type: str = ""
+    # Story-grammar build (2026-06-24, C4) -- the concrete final-beat ENDING
+    # instruction for this episode's style climax class (revelation / reversal /
+    # confession / quiet_acceptance / ...). Set by the writer ONLY on the
+    # climax-class (final character) beat when OTR_ENABLE_STYLE_GRAMMAR is on;
+    # empty on every other beat and whenever the lever is off => the ENDING
+    # render below is dropped => byte-identical to the pre-grammar prompt. This
+    # is the single behavioral injection of the style grammar.
+    ending_template: str = ""
 
 
 @dataclass(frozen=True)
@@ -1294,6 +1302,15 @@ def _build_user_prompt(req: LineRequest) -> str:
         _this_beat_lines.append(
             "  Beat function: CONSEQUENCE -- show what the choice changed."
         )
+    # Story-grammar build (2026-06-24, C4) -- the style-selected ENDING shape for
+    # the climax (final character) beat. Rendered ONLY when the writer populated
+    # it (OTR_ENABLE_STYLE_GRAMMAR on, and only on the climax beat), so the block
+    # is byte-identical to the pre-grammar prompt whenever the lever is off. This
+    # carries the on-mic ending instruction for the non-irreversible climax
+    # classes (revelation / reversal / confession / quiet_acceptance / ...), which
+    # the beat_role chain above deliberately does not render a function line for.
+    if req.ending_template:
+        _this_beat_lines.append(f"  Ending: {req.ending_template}")
     if _sqv2_deflect:
         _this_beat_lines.append(
             "  Play it indirectly: this line IS the deflection -- do NOT state "
