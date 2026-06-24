@@ -1,5 +1,38 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
+> **HANDOFF -- 2026-06-23 (CODER; v1 ITERATIVE STORY-REVISION LOOP -- ALL CHUNKS 0-4 BUILT + SHIPPED +
+> PUSHED + LIVE-PROVEN. origin/v2.0-alpha HEAD `a0ab962` == local.)** Built the BUILD-READY plan below
+> (`docs/2026-06-23-refine-loop/roundtable/pass04_plan_FINAL.md` + the C3/C4 staging kickoff). Each chunk
+> full-suite + Bug-Bible green; DEFAULT-OFF => byte-identical (single compose call, no `refine_loop` key, no
+> best-of-N suppression when off). Suite 5238/34, Bug Bible 16/7/3.
+> - **Chunk 0** -- fixed the SHIPPED v0 `diversity_hint` DEAD-code: Path C now renders the structural-variation
+>   overlay in `_build_macro_user_prompt` + `_build_beat_user_prompt` (was only in test-only `_build_user_prompt`).
+> - **Chunk 1** -- `OutlineRequest.prior_critique`/`prior_macro` + MACRO/BEAT **REVISE** overlays (revise the prior
+>   story, don't regen from scratch) + `critique_to_hint` (sanitized, injection-guarded, <=200 words).
+> - **Chunk 2** -- `grade_story`/`StoryGrade`/`extract_spoken_text_for_grade` (low-temp 0.1/0.0 structured grade
+>   0-100 of the COMPOSED spoken text vs premise; floor-fallback never-fail).
+> - **Chunks 3-4** -- the loop. `run()` stays the compose BODY (AST-guard-safe) + a GATE at top: when
+>   `resolve_refine_passes(...).effective_passes >= 2` it delegates to `_refine_loop`, which RE-INVOKES
+>   `self.run(_refine_active=True, _refine_prior_macro=..., _refine_prior_critique=..., _refine_forced_cast_seed=...)`
+>   N times (best-of-N bypassed inside; cast_seed forced so only the STORY varies), grades each pass, and ships the
+>   **LAST** revision (winner = `candidates[-1]`) -- which aligns with the downstream latest-ledger handoff (the
+>   freeze/audio/video resolve the last-saved ledger, NOT the writer return). Merged `meta.story_quality.refine_loop`
+>   telemetry. `resolve_refine_passes`: widget map `{C+:68,B:75,B+:80,A:90}`, env `OTR_STORY_REFINE_BAR`/`_PASSES`
+>   override, remote provider => 1 pass, hard cap `_REFINE_MAX_PASSES=5`.
+> - **WIDGET** -- `refine_target_grade` dropdown (Off/C+/B/B+/A, default **Off**) appended to writer INPUT_TYPES +
+>   slot 23 of `workflows/otr_scifi_16gb_full.json` (BUG-LOCAL-097, same commit `a0ab962`); the 4 widget-layout
+>   guards updated 23->24 (migration / order / round-trip schema + node fixtures).
+> **LIVE-PROVEN (65-word FLOOR smoke, `OTR_STORY_REFINE_BAR=90 PASSES=2`):** pass0 grade=65 -> REVISE -> pass1
+> grade=65 -> `cap_reached_below_bar` -> shipped the last revision -> freeze landed `frozen_with_doctor_edits`,
+> ledger saved clean (NO save-failures) -> episode `signal_lost_seize_the_signal_*.mp4` (69.1 MB, 75.9 s) +
+> `refine_loop` telemetry in the shipped ledger. **Build fix:** ship-last + dropped the loser-dir cleanup that
+> RACED the freeze cascade (`[Ledger] save failed ...tmp` warnings). **HONEST-FLOOR NOTE:** the weak local model
+> (mistral-nemo) did NOT lift the grade on revision in the smoke (65->65) -- the loop MECHANICS are proven;
+> grade-LIFT is model/target-dependent (B ~75 reachable per the plan, A ~90 may never hit -> ships last revision).
+> **>>> NEW CURRENT STEP = operator GRADE-LIFT validation soak (GPU):** run `OTR_STORY_REFINE_BAR=B` (or via the
+> dropdown) over M episodes and measure the grade delta pass0->final + the cap-reached rate; operator-judged
+> go/no-go (no implicit threshold). Default-OFF ships byte-identical; prod/main + tags GATED.
+>
 > **HANDOFF -- 2026-06-23 (PLANNER/ROUNDTABLE; v1 ITERATIVE STORY-REVISION LOOP -- 4-ROUND ROUNDTABLE
 > CONVERGED, BUILD-READY PLAN. Docs only, NOT code -- await operator GO. HEAD unchanged `e2425b8`.)**
 > Operator asked for a recursive story-refine loop ("keep improving until B+/B, never stops"). Ran a LIVE
