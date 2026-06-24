@@ -1,0 +1,27 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: no. The plan describes a high-level experiment and strategy, not a codable specification. Multiple critical components lack function signatures, prompt designs, data schemas, and control-flow details necessary to write even a first draft without guessing at interfaces and breaking existing modules.
+
+MUST-FIX BEFORE BUILD:
+1. [CANDIDATE-0/CANDIDATE-1] "Pitch-room" generation: no function signature, no prompt, no mechanics for forcing divergence using the `_otr_story_quality_l12` palette. The probe (Candidate 0) and the primary candidate both require a working pitch generator, but it is unspecified. **Fix:** Provide `generate_pitches(campaign_context, model_provider, n=3) -> List[PitchCandidate]` with concrete fields and diversity-seeding algorithm (conflict type, protagonist archetype, setting class). Include the exact LLM prompt template(s).
+
+2. [CANDIDATE-1] Greenlight step: missing implementation for frontier-model invocation, evaluation rubric, and handoff. How is a *separate* frontier model selected when the drafter stays local? The plan says "defaults to the FRONTIER lane" but the existing codebase has a single creative_writing_model. **Fix:** Define a `greenlight_candidates(pitches, frontier_provider) -> GreenlightDecision` function. Specify how the frontier provider is resolved (e.g., new `OTR_GREENLIGHT_MODEL` env var) and how it interacts with the OpenRouter cost guard. Provide the full prompt for scoring along the described axes, the structured output schema, and the transformation from the selected `PitchCandidate` + greenlight decision into the `script_brief` that feeds `_otr_outline.py`.
+
+3. [CANDIDATE-1 / VERIFY-AT-BUILD] Outline schema compatibility: the plan states "No change to the outline schema" but the grounding only shows `diversity_hint` in `OutlineRequest`. The `script_brief` field is not visible. **Fix:** Confirm or define the `OutlineRequest` dataclass attributes. The handoff requires a field (e.g., `script_brief`) that the existing `dataclasses.replace` will carry. Document the mapping from `PitchCandidate` fields to the `OutlineRequest` input. Without this, code will break at the first call to `generate_outline_fn`.
+
+4. [CANDIDATE-2] New escalation scopes and re-plan routing: the plan splits the EPISODE regenerate into "re-outline on same premise" (Tier 1) and "back to pitch room" (Tier 2). The current `EscalationScope` enum (grounding: `_otr_reroll_escalation.py`) has no `REOUTLINE` or `PITCH_ROOM` values, and the downstream handler (`_otr_freeze_cascade.py`, not provided but referenced) would not know what to do with them. **Fix:** Extend `EscalationScope` with `REOUTLINE` and `PITCH_ROOM`. Specify the axis-to-tier mapping (e.g., `premise_clarity` -> `PITCH_ROOM`; `resolution` plus a new `staging` axis -> `REOUTLINE`). Provide the orchestration logic: for `REOUTLINE`, how to re-invoke `select_best_outline` with a "penalty" for the failing axis (define the penalty term); for `PITCH_ROOM`, how to restart the entire pipeline with the critic report as input and `failed_premise_fingerprints` excluded.
+
+5. [CANDIDATE-4] Outline staging critic: described as a "outline-critic" that checks beat turns and on-mic climax. It is unclear whether this is a deterministic rule or an LLM call. The current `score_outline` is a pure deterministic scorer; adding an LLM call would break that contract and require cost management. **Fix:** Decide: if it's deterministic, provide the algorithms (e.g., flagging beats where speaker_role is not character/announcer for the climax). If LLM-based, define a separate `stage_critic(outline, ...) -> staging_penalty` and how it integrates into the best-of-N keep-best logic without polluting the deterministic scorer. Provide its function signature and model usage (local/remote, temperature, etc.).
+
+SHOULD-FIX:
+6. [CANDIDATE-0 vs CANDIDATE-1 ordering] Candidate 0 requires a working pitch-room to generate and evaluate candidates. Simultaneously, Candidate 1 is the primary build containing that pitch-room. This circular dependency will waste time. **Fix:** Either (a) implement the pitch generator as part of Candidate 0 first, then use it for the probe, then extend for Candidate 1; or (b) clearly state that Candidate 0 will use a temporary, hardcoded manual experiment, not requiring code from Candidate 1. The current wording ("Run ~10 pitch-room sets...") implies automation that doesn't exist yet.
+
+7. [GENERAL] The "RENAME success criteria away from 'A+'" statement has no target location. The codebase likely has A+ thresholds in `grade_story`/`score_outline` callbacks or UI widgets. Without explicit file and constant names, the rename will be missed. **Fix:** Identify where grade-level labels are mapped (likely in `RefineConfig` bar mapping and any UI dropdowns) and specify the new labels.
+
+OPTIONAL / NICE-TO-HAVE:
+- Candidate 3 is process-only; no code changes needed.
+- Consider decoupling the pitch-room from the greenlight so the greenlight call can be reused by Candidate 2’s Tier 2 re-entry without code duplication.
+
+CUT THESE (over-engineering): none apparent; all candidates are minimal attacks on specific root causes.
+
+[ASSUMPTION] `_otr_freeze_cascade.py` and the main story loop can be extended to handle new `EscalationScope` values. The plan gives no evidence that these call sites are prepared; the missing grounding means implementors must reverse-engineer the hooking.
