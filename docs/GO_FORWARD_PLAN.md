@@ -25,14 +25,25 @@
 > >=80%), all 9 ending classes used, 98/100 styles, even spread (revelation 19% / reversal 15% / unresolved 13%
 > / reconciliation 13% / bittersweet 12% / quiet_acceptance 11% / confession 9% / ironic 7%). The climax SHAPE
 > is no longer uniform. select_style is sha256(cast_seed)-keyed (C7-safe).
-> **>>> NEW CURRENT STEP = operator LIVE LLM behavioral A/B soak (GPU-gated).** Measures whether the local
-> writer OBEYS the ending template at the final beat (behavioral lift, beyond the structural spread above) +
-> the shipped-text final-beat crisis-noun density (`meta.story_quality.final_beat_crisis_nouns` + the scrub's
-> `ungrounded_crisis` -> ~0). NOT run this session: `:8000` was the operator's INTERACTIVE Comfy Desktop (not a
-> headless leftover; CLAUDE.md says it can't be relaunched from the DC shell), so I did not reset it or contend
-> for the active GPU; Ollama is up on :11434 (writer lane ready). Runbook in STORY_GRAMMAR_C456_RESULTS.md:
-> reset box (S4 selective CIM kill) -> fresh headless server -> N=3 baseline vs N=3 `OTR_ENABLE_STYLE_GRAMMAR=1
-> OTR_STORY_QUALITY_L12=1` on the canonical JSON. Default-OFF ships byte-identical; prod/main + tags GATED.
+> **>>> LIVE LLM A/B -- RUN 2026-06-24 (operator freed :8000; box reset S4 before+after). Results:
+> `docs/2026-06-24-ending-mode/LIVE_AB_RESULTS.md`.** Full canonical JSON, 320w, N=2/leg (mistral+gemma);
+> OFF=clean vs ON=`OTR_ENABLE_STYLE_GRAMMAR=1`+`OTR_STORY_QUALITY_L12=1`. (Reduced from N=6: full episodes run
+> ~16-20 min each here -- writer/critic/reroll + per-line indextts2 + per-beat flux portraits dominate; the box
+> can't do 12 full episodes in one sitting.) FINDINGS: (1) WIRING proven live end-to-end on BOTH writers
+> (`story-grammar ON: style=... ending_tag=... climax_beat=b017` logs + ledger `meta.story_quality` stamp);
+> OFF ledgers carry only base keys (inert). (2) ANNOUNCER CLOSE = clear win: OFF states the news outcome ("Puma
+> safely in orbit / new era", "splashes down safely / new era for SpaceX") -> ON non-outcome image ("satellite
+> stood tall, truth took flight"; "lights dim over the galactic bulge"). (3) FINAL BEAT: writer obeys to model
+> strength -- mistral landed the REVERSAL crisply ("I've already taken steps, Rick. The truth has its own
+> jammer."), gemma went oblique on RECONCILIATION (machinery-free but loose). (4) crisis-noun density did NOT
+> discriminate (0 both legs -- the writers never reached for console/lever vocab even OFF on these space
+> premises; the discriminators are the close + the final-beat SHAPE, not crisis count). (5) NO render bugs --
+> full workflow ran clean OFF (LTX-AV bookends) and ON (visualizer -> OBS final `signal_lost_ink_stir`), zero
+> tracebacks. Workflow JSON UNCHANGED (env-only).
+> **>>> NEW CURRENT STEP = operator reads the ON endings in LIVE_AB_RESULTS.md + decides the DEFAULT FLIP.** The
+> bet leans YES (close-gate solid; climax leaves the console standoff; archetype crisp on mistral, loose on
+> gemma). Optional before flipping: a WIDER overnight N (more episodes/writers) to harden it, and/or strengthen
+> the final-beat ending instruction for the weak writer. Default-OFF ships byte-identical; prod/main + tags GATED.
 >
 > **>>> PRIOR STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
 > origin/v2.0-alpha HEAD `bbd0943f` == local; one code commit on top of the operator's 3 docs commits.)**
