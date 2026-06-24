@@ -1,0 +1,109 @@
+{
+  "pid": "75686430-38b6-47ad-9eaf-82dc53bd2242",
+  "verdict": "success",
+  "elapsed_sec": 1349.1,
+  "words": 280,
+  "writer": "mistralai/Mistral-Nemo-Instruct-2407",
+  "ledger": "signal_lost_akiras_resolution_20260623_225458_ledger.json",
+  "pitch": {
+    "status": "greenlit",
+    "seed_context": 3017276184,
+    "domain": "space",
+    "genres": [
+      "sci-fi",
+      "thriller",
+      "noir"
+    ],
+    "archetypes": [
+      "naive idealist",
+      "reluctant hero",
+      "anti-hero"
+    ],
+    "selected_id": 1,
+    "ranking": [
+      1,
+      2,
+      3
+    ],
+    "greenlight_source": "local:llm",
+    "rationale": "Pitch 1 offers a clear human want (exploring the formation), a direct conflict (against mission control's timeline), and a surprising stand against authority, with the lowest console standoff risk.",
+    "brief": "A passionate geologist must rally her crew against mission control's rigid timeline to explore a potentially game-changing Martian formation. Protagonist: Dr. Elara Hart, a naive idealist and passionate geologist. Conflict: Person vs. Society, Isolated Mars landscape. Emotional core: Determination vs. Fear. Final 20s: Elara stands defiantly at the rover's controls, staring down Director's live video feed. 'We're not leaving until we've explored this formation. That's an order.' She engages the rover's engines, the hum echoing as the countdown to mission abort ticks away..",
+    "candidates": [
+      {
+        "id": 1,
+        "logline": "A passionate geologist must rally her crew against mission control's rigid timeline to explore a potentially game-changing Martian formation.",
+        "protagonist": "Dr. Elara Hart, a naive idealist and passionate geologist",
+        "antagonist_or_pressure": "Mission Control's Director, who prioritizes schedule over risk",
+        "genre_mode": "Sci-Fi (Hard)",
+        "emotional_core": "Determination vs. Fear",
+        "theme_sentence": "Sometimes progress requires taking calculated risks.",
+        "final_20_seconds": "Elara stands defiantly at the rover's controls, staring down Director's live video feed. 'We're not leaving until we've explored this formation. That's an order.' She engages the rover's engines, the hum echoing as the countdown to mission abort ticks away.",
+        "conflict_type": "Person vs. Society",
+        "setting_class": "Isolated Mars landscape",
+        "surprise": 4,
+        "human_want": 5,
+        "stageability": 4,
+        "console_standoff_risk": 2,
+        "why_different": "Focuses on the passion for discovery vs. bureaucracy, unlike the other pitches."
+      },
+      {
+        "id": 2,
+        "logline": "When a mysterious signal threatens their mission, a reluctant engineer must confront his team's differing views on when to abort.",
+        "protagonist": "Eli Turner, a reluctant hero and mission engineer",
+        "antagonist_or_pressure": "The mysterious signal and the team's differing interpretations of abort criteria",
+        "genre_mode": "Sci-Fi Thriller",
+        "emotional_core": "Trust vs. Suspicion",
+        "theme_sentence": "In the face of uncertainty, trust and communication are our most valuable tools.",
+        "final_20_seconds": "Eli stands between his divided team, the rover's lights flickering ominously. 'We stay together, no matter what the signal means. We're explorers, not deserters.' He slams his fist on the console, overriding the abort sequence.",
+        "conflict_type": "Person vs. Person",
+        "setting_class": "Tense, claustrophobic Mars habitat",
+        "surprise": 5,
+        "human_want": 4,
+        "stageability": 3,
+        "console_standoff_risk": 3,
+        "why_different": "Introduces a supernatural element and focuses on interpersonal conflict, unlike the others."
+      },
+      {
+        "id": 3,
+        "logline": "A morally ambiguous geologist races against time to prove his risky theory about Mars' formations, as his team's lives hang in the balance.",
+        "protagonist": "Victor Kane, an anti-hero geologist with a spotty past",
+        "antagonist_or_pressure": "The volatile Martian terrain and Victor's own questionable ethics",
+        "genre_mode": "Sci-Fi Noir",
+        "emotional_core": "Ambition vs. Redemption",
+        "theme_sentence": "Sometimes the truth is worth more than our own integrity.",
+        "final_20_seconds": "Victor stands alone in the Martian dust, staring at his fallen colleagues. He activates the rover's drill, ready to risk everything for his theory. 'I won't let their sacrifice be for nothing. Not again.'",
+        "conflict_type": "Person vs. Nature",
+        "setting_class": "Desolate, unforgiving Mars surface",
+        "surprise": 3,
+        "human_want": 3,
+        "stageability": 2,
+        "console_standoff_risk": 1,
+        "why_different": "Focuses on a morally ambiguous protagonist and the ethical implications of exploration."
+      }
+    ],
+    "fail_reason": ""
+  },
+  "critic_failing_axes": [
+    "emotional_arc"
+  ],
+  "critic_regeneration_hint": "Show Akira's determination through action, not just words.; Reveal new information about the crater to justify Akira's risk.; Akira should face consequences or obstacles for defying mission control.",
+  "reroll_escalation": {
+    "scope": "episode",
+    "reason": "Stage 7 critic verdict='discard' with structural failing_axes=['emotional_arc'] -- the problem is the arc, not the lines. Whole-episode regenerate.",
+    "target_beat_ids": [],
+    "regeneration_hint": "Show Akira's determination through action, not just words.; Reveal new information about the crater to justify Akira's risk.; Akira should face consequences or obstacles for defying mission control."
+  },
+  "freeze_verdict": "frozen_with_doctor_edits",
+  "episode_title": "Akira's Resolution",
+  "voiced_line_count": 8,
+  "first_lines": [
+    "None: Tune in, as curiosity piqued on Mars ignites a debate that could redefine our understandin",
+    "None: You know, Parry, I've been studying this crater's scans all night. It's... insistent.",
+    "None: I've reassigned some drones to your position, Akira. Should give you more eyes down there.",
+    "None: Alright, let's see what you've been hiding, little crater."
+  ],
+  "obs_final": "signal_lost_akiras_resolution_20260623_225458_silent_procgen_blended_final.mp4",
+  "obs_published": true,
+  "obs_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_akiras_resolution_20260623_225458_silent_procgen_blended_final.mp4",
+  "obs_size_mb": 48.6
+}

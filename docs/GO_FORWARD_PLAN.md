@@ -1,6 +1,41 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-23 night (OPERATOR-DIRECTED; STORY-ARCHITECTURE INCREMENT-1 SPRINT,
+> **>>> CURRENT STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
+> origin/v2.0-alpha HEAD `bbd0943f` == local; one code commit on top of the operator's 3 docs commits.)**
+> Built the three CPU tickets, all DEFAULT-OFF / byte-identical, +58 tests, then proved them LIVE:
+> - **T4 staging penalty** (`bbd0943f`, `_otr_story_select`): `_otr_staging_penalty` + `score_outline`/
+>   `select_best_outline` optional `penalty=None` (None => byte-identical, audited all callers); env gate
+>   `OTR_ENABLE_STAGING_PENALTY`; folds an on-mic-climax penalty into the best-of-N comparator.
+> - **T1 pitch room** (`_otr_pitch_room.py` NEW, the PRIMARY lever): `run_pitch_room` -> 3 forcibly-divergent
+>   premises (DOMAIN_PALETTE + genre + archetype seeds, seeded shuffle) -> local greenlight (frontier opt-in,
+>   fail-closed) -> `dataclasses.replace(outline_req, script_brief=...)`. Gated `OTR_ENABLE_PITCH_ROOM`
+>   (default OFF), wired AFTER news briefs / BEFORE generate_outline, skipped on refine sub-passes.
+> - **T2 critic adapter + escalation** (`_otr_story_select` + `_otr_freeze_cascade`):
+>   `critic_report_to_refine_signals` (arc_verdict/reroll_targets -> failing_axes/regeneration_hint; the
+>   StoryCriticReport has NO failing_axes -- the grounding catch), `build_escalation_signal` gated
+>   `OTR_ENABLE_CRITIC_ESCALATION` (default OFF => `{}` byte-identical), refine loop prefers the critic
+>   adapter when a report is present (falls back to grade weakness today => byte-identical), `keep_best_index`.
+>   GROUNDING CATCH: `enable_critic_escalation` was never a wired widget (Stage-7 shadow critic removed
+>   2026-05-29) -> implemented as an ENV flag, no JSON change.
+> **LIVE SMOKE PASS** (`docs/2026-06-23-story-architecture/SMOKE_RESULTS.md`): one episode on the REAL
+> canonical JSON, LTX/HuMo-free, levers ON (`OTR_ENABLE_PITCH_ROOM=1` + `OTR_ENABLE_CRITIC_ESCALATION=1` +
+> bypass). Pitch room greenlit a divergent Mars-geologist premise (3 distinct conflict types); critic
+> `arc_verdict=uneven` -> adapter `failing_axes=['emotional_arc']` -> escalation `scope=episode`; full pipeline
+> composed -> graded -> rendered -> **OBS final published** (`signal_lost_akiras_resolution_..._blended_final.mp4`,
+> 48.6 MB), no crash. **T0 CEILING** (`docs/2026-06-23-story-architecture/CEILING_PROBE.md`): real grades from
+> the live refine soak -- gemma-4-12b ~65, mistral-nemo ~42, **NONE reach B(75)**, refine lift 0. Pitch room
+> fixes SAMENESS, not the prose grade. Recommendation = accept-B-relabel for the local lane + offer
+> frontier-greenlight (cheap, env `OTR_ENABLE_FRONTIER_GREENLIGHT` + `OTR_GREENLIGHT_MODEL`) + frontier-writer
+> only if A+ prose is paid for. **Did NOT auto-enable frontier.**
+> **OPEN for the operator (morning):** flip the Increment-1 flags ON for an N=3 sameness/grade eyeball re-soak,
+> then promote defaults if it looks good; **T0 frontier decision**; **T3 use_exchange** = DEFERRED (a writer
+> BOOLEAN widget, not on CREATIVE_WHITELIST so headless can't patch it -- needs a dedicated single-variable
+> N=3 GPU run asserting VRAM<=14.5 + zero slot drift, then a config-only JSON flip). **5 pre-existing suite
+> failures** (16gb-profile / workflow-structure / audio-wiring pins) are from the 2026-06-23 HuMo-free UI-save
+> `267a53e` -- verified pre-existing (stash + rerun), NOT this sprint; they need a profile/fixture re-pin
+> (operator's workflow domain). Suite otherwise green; Bug Bible 16/7/3. Box reset, :8000 FREE. prod/main GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-23 night (OPERATOR-DIRECTED; STORY-ARCHITECTURE INCREMENT-1 SPRINT,
 > code-ready, hand off to a fresh OVERNIGHT CODER window). HEAD `ece57e8` == origin/v2.0-alpha.**
 > Operator pivoted to an A+-story push: a fresh window ran a LIVE 4-round roundtable (GPT-5.5 +
 > Gemini-3.1-pro + DeepSeek-v4-pro, Claude grounded judge, ~$0.29) that CONVERGED. The quality
