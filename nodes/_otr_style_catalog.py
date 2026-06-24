@@ -20,7 +20,7 @@ UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Each entry: slug (snake_case id), label (human), sound_world, story_engine,
 # ending_mode. tags help the picker bias away from the over-used emergency
@@ -442,6 +442,201 @@ STYLE_CATALOG: List[Dict[str, str]] = [
 
 
 # ---------------------------------------------------------------------------
+# Ending taxonomy (2026-06-24) -- the CLIMAX-CLASS tag per style + its template
+# ---------------------------------------------------------------------------
+# The climax's TYPE is one of the climax-class roles (CLIMAX_CLASS_ROLES in
+# _otr_story_quality_l12). `irreversible_choice` is no longer the universal
+# climax -- it is just ONE class, used only where a story genuinely earns a
+# decisive choice. Each style maps to exactly one ending_tag; the writer feeds
+# that tag as the climax role + injects the matching ENDING_TEMPLATES instruction
+# at the final character beat. Every template steers AWAY from machinery
+# (console / countdown / self-destruct / kill-switch) and TOWARD a human, on-mic
+# ending.
+try:
+    from ._otr_story_quality_l12 import CLIMAX_CLASS_ROLES, premise_texts
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_story_quality_l12 import CLIMAX_CLASS_ROLES, premise_texts  # type: ignore
+
+ENDING_TEMPLATES: Dict[str, str] = {
+    "irreversible_choice":
+        "The final beat is a decisive, irreversible CHOICE made on-mic between "
+        "the characters -- a human decision they must live with, about people and "
+        "stakes. NOT a machine action: no countdown, no self-destruct, no "
+        "console, no kill-switch.",
+    "revelation":
+        "The final beat lands a REVELATION -- a truth that reframes everything, "
+        "spoken or realized on-mic. End on the moment of understanding, not on "
+        "any device.",
+    "reversal":
+        "The final beat is a REVERSAL -- who holds the power, or who to trust, "
+        "flips. End on the turn itself, in dialogue, not on machinery.",
+    "unresolved_final_sound":
+        "Do NOT resolve. End on ONE telling sound and a line that leaves the "
+        "question open. No explanation, no device, no outcome stated.",
+    "reconciliation":
+        "The final beat is a RECONCILIATION -- two people close a distance "
+        "between them. End on the small human gesture (a word, a touch, a shared "
+        "silence), not on any action or machine.",
+    "bittersweet_parting":
+        "The final beat is a BITTERSWEET PARTING -- a goodbye, a torch passed, a "
+        "thing left behind. End on the quiet cost, not on a crisis or device.",
+    "ironic_twist":
+        "The final beat is an IRONIC TWIST -- the outcome curdles or rebounds in "
+        "a way the characters didn't intend. End on the irony, lightly, not on "
+        "machinery.",
+    "quiet_acceptance":
+        "The final beat is a QUIET ACCEPTANCE -- a character stops fighting and "
+        "makes peace with what is. A small, human decision. No machinery, no "
+        "countdown, no blowing anything up.",
+    "confession":
+        "The final beat is a CONFESSION -- a character finally admits the thing "
+        "they've hidden. End on the admission itself, on-mic, not on any action "
+        "or device.",
+}
+
+ENDING_TAGS: tuple = tuple(ENDING_TEMPLATES.keys())
+_DEFAULT_ENDING_TAG = "revelation"
+
+# Per-style climax class. Deliberately VARIED so the climax stops being the same
+# shape every episode; `irreversible_choice` is now ~6% of the pool (only the
+# stories that genuinely earn a decisive choice), not 100%.
+_ENDING_TAG_BY_SLUG: Dict[str, str] = {
+    "locked_room_suspense": "reversal",
+    "detective_case_file_reconstruction": "revelation",
+    "pulp_serial_cliffhanger": "unresolved_final_sound",
+    "mission_control_procedural": "irreversible_choice",
+    "deep_space_distress_transmission": "unresolved_final_sound",
+    "noir_interrogation_chamber": "confession",
+    "small_town_uncanny_mystery": "revelation",
+    "newsroom_emergency_bulletin": "irreversible_choice",
+    "haunted_broadcast_signal": "unresolved_final_sound",
+    "laboratory_containment_breach": "irreversible_choice",
+    "isolated_lighthouse_confession": "confession",
+    "courtroom_testimony_thriller": "reversal",
+    "missing_person_audio_diary": "unresolved_final_sound",
+    "submarine_pressure_crisis": "irreversible_choice",
+    "train_car_murder_mystery": "revelation",
+    "stormbound_inn_conspiracy": "reversal",
+    "expedition_camp_radio_log": "bittersweet_parting",
+    "wartime_code_room_drama": "bittersweet_parting",
+    "emergency_dispatch_night_shift": "quiet_acceptance",
+    "psychiatric_ward_interview": "revelation",
+    "lost_expedition_recordings": "unresolved_final_sound",
+    "arctic_outpost_survival": "quiet_acceptance",
+    "desert_station_signal_hunt": "unresolved_final_sound",
+    "mountain_rescue_countdown": "bittersweet_parting",
+    "plague_town_quarantine_drama": "bittersweet_parting",
+    "museum_after_hours_haunting": "unresolved_final_sound",
+    "factory_floor_sabotage_mystery": "revelation",
+    "hotel_switchboard_thriller": "reversal",
+    "space_station_systems_failure": "confession",
+    "underwater_research_panic": "quiet_acceptance",
+    "private_eye_street_noir": "reversal",
+    "corrupt_city_political_wiretap": "ironic_twist",
+    "blackmail_phone_call_thriller": "reversal",
+    "ransom_negotiation_countdown": "quiet_acceptance",
+    "witness_protection_confession": "confession",
+    "fugitive_safehouse_drama": "bittersweet_parting",
+    "border_crossing_identity_mystery": "revelation",
+    "prison_cell_psychological_duel": "reversal",
+    "interrogation_under_blackout": "confession",
+    "informant_dead_drop_suspense": "unresolved_final_sound",
+    "rural_folklore_investigation": "revelation",
+    "carnival_after_midnight_uncanny": "unresolved_final_sound",
+    "roadside_diner_mystery": "revelation",
+    "abandoned_motel_transmission": "unresolved_final_sound",
+    "ghost_town_field_recording": "unresolved_final_sound",
+    "cursed_object_inventory": "ironic_twist",
+    "family_attic_revelation": "revelation",
+    "seance_room_audio_anomaly": "unresolved_final_sound",
+    "funeral_home_midnight_call": "revelation",
+    "old_theater_phantom_rehearsal": "bittersweet_parting",
+    "scientific_ethics_chamber_drama": "irreversible_choice",
+    "artificial_mind_awakening_interview": "revelation",
+    "failed_experiment_countdown": "quiet_acceptance",
+    "time_loop_command_log": "reversal",
+    "alternate_history_news_bulletin": "revelation",
+    "memory_erasure_clinic_session": "bittersweet_parting",
+    "cryogenic_revival_confusion": "quiet_acceptance",
+    "alien_contact_translation_room": "revelation",
+    "robot_witness_testimony": "reversal",
+    "simulated_world_glitch_mystery": "revelation",
+    "courtroom_of_the_future_trial": "reversal",
+    "planetary_colony_town_meeting": "reconciliation",
+    "terraforming_disaster_broadcast": "quiet_acceptance",
+    "generation_ship_succession_crisis": "bittersweet_parting",
+    "asteroid_mining_labor_dispute": "reconciliation",
+    "orbital_rescue_relay": "bittersweet_parting",
+    "first_contact_diplomatic_standoff": "reconciliation",
+    "forbidden_zone_survey_log": "quiet_acceptance",
+    "lost_satellite_recovery_mission": "bittersweet_parting",
+    "evacuation_order_moral_dilemma": "irreversible_choice",
+    "family_dinner_secret_eruption": "confession",
+    "inheritance_tape_revelation": "reconciliation",
+    "marriage_under_surveillance_drama": "reconciliation",
+    "sibling_rivalry_confession_room": "confession",
+    "old_friendship_betrayal_call": "reconciliation",
+    "neighborhood_watch_paranoia": "bittersweet_parting",
+    "landlord_tenant_hidden_room_mystery": "revelation",
+    "retirement_home_ghost_story": "bittersweet_parting",
+    "school_reunion_accusation": "confession",
+    "hospital_waiting_room_vigil": "quiet_acceptance",
+    "live_variety_show_disaster": "ironic_twist",
+    "radio_play_within_a_radio_play": "ironic_twist",
+    "fake_advertisement_dystopia": "ironic_twist",
+    "propaganda_station_moral_collapse": "reversal",
+    "pirate_radio_resistance_drama": "bittersweet_parting",
+    "public_service_announcement_nightmare": "ironic_twist",
+    "call_in_show_confession_spiral": "confession",
+    "childrens_program_turns_sinister": "unresolved_final_sound",
+    "overnight_jazz_host_mystery": "revelation",
+    "numbers_station_spy_thriller": "reversal",
+    "archaeological_dig_curse_log": "unresolved_final_sound",
+    "jungle_temple_expedition": "quiet_acceptance",
+    "island_evacuation_suspense": "bittersweet_parting",
+    "sinking_ship_wireless_drama": "bittersweet_parting",
+    "airship_storm_emergency": "reconciliation",
+    "frontier_trading_post_siege": "reconciliation",
+    "traveling_preacher_scandal": "confession",
+    "gold_rush_camp_murder": "revelation",
+    "circus_train_disaster": "revelation",
+    "final_message_before_silence": "quiet_acceptance",
+}
+
+# Attach the ending_tag to each entry at module load (keep the `ending_mode`
+# prose unchanged -- render_style_grammar reads it).
+for _s in STYLE_CATALOG:
+    _s["ending_tag"] = _ENDING_TAG_BY_SLUG.get(_s["slug"], _DEFAULT_ENDING_TAG)
+
+
+def ending_template_for(slug: str) -> str:
+    """The concrete final-beat instruction for a style's climax class. Falls back
+    to the default tag's template for an unknown slug (never raises)."""
+    s = get_style(slug)
+    tag = (s or {}).get("ending_tag", _DEFAULT_ENDING_TAG)
+    return ENDING_TEMPLATES.get(tag, ENDING_TEMPLATES[_DEFAULT_ENDING_TAG])
+
+
+def validate_catalog() -> None:
+    """Self-check (run in a test): every entry has a valid ending_tag that is a
+    real climax-class role with a template, plus the core grammar fields. LOUD on
+    any gap."""
+    for s in STYLE_CATALOG:
+        slug = s.get("slug", "?")
+        tag = s.get("ending_tag", "")
+        if tag not in ENDING_TAGS:
+            raise ValueError(f"style {slug!r} has invalid ending_tag {tag!r}")
+        if tag not in CLIMAX_CLASS_ROLES:
+            raise ValueError(
+                f"style {slug!r} ending_tag {tag!r} is not a climax-class role")
+        if tag not in ENDING_TEMPLATES:
+            raise ValueError(f"style {slug!r} ending_tag {tag!r} has no template")
+        for fld in ("label", "sound_world", "story_engine", "ending_mode"):
+            if not str(s.get(fld, "")).strip():
+                raise ValueError(f"style {slug!r} missing {fld}")
+
+
+# ---------------------------------------------------------------------------
 # Helpers (pure)
 # ---------------------------------------------------------------------------
 _BY_SLUG: Dict[str, Dict[str, str]] = {s["slug"]: s for s in STYLE_CATALOG}
@@ -492,3 +687,47 @@ def render_style_grammar(slug: str) -> str:
         f"Story engine: {s['story_engine']}.\n"
         f"Ending mode: {s['ending_mode']}."
     )
+
+
+# ---------------------------------------------------------------------------
+# Deterministic style selector (replaces the LLM inventor when the lever is on)
+# ---------------------------------------------------------------------------
+# An article only earns an emergency-register style when it is genuinely about a
+# disaster / rescue; otherwise the selector draws from the 90 non-emergency
+# styles so the catalog's center of gravity stays off the console standoff.
+_DISASTER_KEYWORDS: tuple = (
+    "disaster", "rescue", "evacuat", "explos", "meltdown", "crash", "sinking",
+    "wildfire", "quarantine", "outbreak", "epidemic", "pandemic", "collapse",
+    "distress", "catastroph", "hurricane", "earthquake", "tsunami", "flood",
+    "wreck", "siege", "containment", "breach", "mayday", "emergency",
+)
+
+
+def premise_wants_emergency(premise: Any, meta: Any) -> bool:
+    """True when the premise / news meta carry explicit disaster-or-rescue
+    language -- the only case where an emergency-register style is eligible."""
+    parts = [str(premise or "")]
+    try:
+        parts.extend(premise_texts(meta))
+    except Exception:  # noqa: BLE001 -- never break selection on a meta shape
+        pass
+    hay = " ".join(parts).casefold()
+    return any(k in hay for k in _DISASTER_KEYWORDS)
+
+
+def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
+    """Deterministically pick a style slug for an episode. No LLM, no paid call.
+
+    Pool = the 90 non-emergency styles, UNLESS the premise/meta carry explicit
+    disaster/rescue language (then the full 100 are eligible). The pick is a
+    sha256(cast_seed)-keyed index into the sorted pool, so the same episode seed
+    always yields the same style (C7-safe) while different episodes vary."""
+    import hashlib
+    emergency = premise_wants_emergency(premise, meta)
+    pool = sorted(all_slugs() if emergency else non_emergency_slugs())
+    if not pool:  # pragma: no cover -- defensive
+        pool = sorted(all_slugs())
+    h = int(hashlib.sha256(
+        f"{cast_seed}:style:{int(emergency)}".encode("utf-8")
+    ).hexdigest(), 16)
+    return pool[h % len(pool)]

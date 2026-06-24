@@ -45,14 +45,41 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 # ---------------------------------------------------------------------------
 # beat_role -- the dramatic FUNCTION sequence (L2)
 # ---------------------------------------------------------------------------
-# The climax IS ``irreversible_choice`` (the last voiced character beat) -- there
-# is no separate "climax" token, which is exactly what keeps the decisive moment
-# ON-stage instead of narrated after the fact.
+# The CLIMAX lands on the last voiced character beat (on-stage, never narrated
+# after the fact). Its TYPE is a CLIMAX-CLASS role (2026-06-24, operator
+# directive): `irreversible_choice` is no longer the universal climax -- it is
+# ONE climax class among the ending taxonomy. The structural invariant is
+# "exactly one climax-class beat, and it is LAST"; WHICH climax class is
+# style-selected (from `_otr_style_catalog` ending_tags) when the style-grammar
+# lever is on, and defaults to `irreversible_choice` when off (byte-identical).
 BEAT_ROLE_SETUP = "setup"
 BEAT_ROLE_PRESSURE = "pressure"
 BEAT_ROLE_PERSONAL_STAKE = "personal_stake"
-BEAT_ROLE_IRREVERSIBLE_CHOICE = "irreversible_choice"
 BEAT_ROLE_CONSEQUENCE = "consequence"
+
+# Climax-class roles (the ending taxonomy). irreversible_choice is the default;
+# the other 8 are the non-doomsday endings the style grammar selects from.
+BEAT_ROLE_IRREVERSIBLE_CHOICE = "irreversible_choice"
+BEAT_ROLE_REVELATION = "revelation"
+BEAT_ROLE_REVERSAL = "reversal"
+BEAT_ROLE_UNRESOLVED_FINAL_SOUND = "unresolved_final_sound"
+BEAT_ROLE_RECONCILIATION = "reconciliation"
+BEAT_ROLE_BITTERSWEET_PARTING = "bittersweet_parting"
+BEAT_ROLE_IRONIC_TWIST = "ironic_twist"
+BEAT_ROLE_QUIET_ACCEPTANCE = "quiet_acceptance"
+BEAT_ROLE_CONFESSION = "confession"
+
+CLIMAX_CLASS_ROLES = frozenset({
+    BEAT_ROLE_IRREVERSIBLE_CHOICE,
+    BEAT_ROLE_REVELATION,
+    BEAT_ROLE_REVERSAL,
+    BEAT_ROLE_UNRESOLVED_FINAL_SOUND,
+    BEAT_ROLE_RECONCILIATION,
+    BEAT_ROLE_BITTERSWEET_PARTING,
+    BEAT_ROLE_IRONIC_TWIST,
+    BEAT_ROLE_QUIET_ACCEPTANCE,
+    BEAT_ROLE_CONFESSION,
+})
 
 BEAT_ROLES = (
     BEAT_ROLE_SETUP,
@@ -60,6 +87,14 @@ BEAT_ROLES = (
     BEAT_ROLE_PERSONAL_STAKE,
     BEAT_ROLE_IRREVERSIBLE_CHOICE,
     BEAT_ROLE_CONSEQUENCE,
+    BEAT_ROLE_REVELATION,
+    BEAT_ROLE_REVERSAL,
+    BEAT_ROLE_UNRESOLVED_FINAL_SOUND,
+    BEAT_ROLE_RECONCILIATION,
+    BEAT_ROLE_BITTERSWEET_PARTING,
+    BEAT_ROLE_IRONIC_TWIST,
+    BEAT_ROLE_QUIET_ACCEPTANCE,
+    BEAT_ROLE_CONFESSION,
 )
 
 # ---------------------------------------------------------------------------
@@ -444,31 +479,40 @@ def ground_crisis_nouns(
 # ---------------------------------------------------------------------------
 # L2 -- beat_role assignment + validator
 # ---------------------------------------------------------------------------
-def assign_beat_roles(ordered_char_beat_ids: List[str]) -> Dict[str, str]:
+def assign_beat_roles(
+    ordered_char_beat_ids: List[str],
+    *,
+    climax_role: str = BEAT_ROLE_IRREVERSIBLE_CHOICE,
+) -> Dict[str, str]:
     """Assign a dramatic-function role to each voiced CHARACTER beat, in order.
 
-    Sequence guarantees the climax (``irreversible_choice``) is the LAST voiced
-    character beat (on-stage) and exactly one ``personal_stake`` precedes it:
-      n==1: [irreversible_choice]
-      n==2: [setup, irreversible_choice]   (no room for personal_stake)
-      n>=3: [setup, pressure*, personal_stake, irreversible_choice]
-    Pure + deterministic."""
+    Sequence guarantees the CLIMAX is the LAST voiced character beat (on-stage)
+    and exactly one ``personal_stake`` precedes it:
+      n==1: [<climax>]
+      n==2: [setup, <climax>]   (no room for personal_stake)
+      n>=3: [setup, pressure*, personal_stake, <climax>]
+    The climax's TYPE is ``climax_role`` -- one of CLIMAX_CLASS_ROLES; defaults to
+    ``irreversible_choice`` (so an unkeyed call is byte-identical to the pre-2026-
+    06-24 behavior). An invalid climax_role falls back to irreversible_choice
+    (fail-soft, never raises). Pure + deterministic."""
+    if climax_role not in CLIMAX_CLASS_ROLES:
+        climax_role = BEAT_ROLE_IRREVERSIBLE_CHOICE
     n = len(ordered_char_beat_ids)
     roles: Dict[str, str] = {}
     if n == 0:
         return roles
     if n == 1:
-        roles[ordered_char_beat_ids[0]] = BEAT_ROLE_IRREVERSIBLE_CHOICE
+        roles[ordered_char_beat_ids[0]] = climax_role
         return roles
     if n == 2:
         roles[ordered_char_beat_ids[0]] = BEAT_ROLE_SETUP
-        roles[ordered_char_beat_ids[1]] = BEAT_ROLE_IRREVERSIBLE_CHOICE
+        roles[ordered_char_beat_ids[1]] = climax_role
         return roles
     for i, bid in enumerate(ordered_char_beat_ids):
         if i == 0:
             roles[bid] = BEAT_ROLE_SETUP
         elif i == n - 1:
-            roles[bid] = BEAT_ROLE_IRREVERSIBLE_CHOICE
+            roles[bid] = climax_role
         elif i == n - 2:
             roles[bid] = BEAT_ROLE_PERSONAL_STAKE
         else:
@@ -489,9 +533,10 @@ def validate_beat_roles(
 
     Contract (n = number of voiced character beats):
       * every role is a known BEAT_ROLE;
-      * exactly one ``irreversible_choice`` and it is the LAST voiced beat;
-      * for n >= 3, exactly one ``personal_stake`` and it precedes the
-        irreversible_choice (tiny n<3 episodes have no room and are exempt).
+      * exactly one CLIMAX-CLASS role (CLIMAX_CLASS_ROLES -- irreversible_choice
+        OR one of the 8 ending archetypes) and it is the LAST voiced beat;
+      * for n >= 3, exactly one ``personal_stake`` and it precedes the climax
+        (tiny n<3 episodes have no room and are exempt).
     Raises BeatRoleViolation on the FIRST breach."""
     n = len(ordered_char_beat_ids)
     if n == 0:
@@ -502,18 +547,18 @@ def validate_beat_roles(
             raise BeatRoleViolation(
                 f"beat {bid} has beat_role={role!r}; not in {BEAT_ROLES!r}"
             )
-    ic_indices = [
+    climax_indices = [
         i for i, bid in enumerate(ordered_char_beat_ids)
-        if roles_by_beat.get(bid) == BEAT_ROLE_IRREVERSIBLE_CHOICE
+        if roles_by_beat.get(bid) in CLIMAX_CLASS_ROLES
     ]
-    if len(ic_indices) != 1:
+    if len(climax_indices) != 1:
         raise BeatRoleViolation(
-            f"expected exactly one irreversible_choice beat, found {len(ic_indices)}"
+            f"expected exactly one climax-class beat, found {len(climax_indices)}"
         )
-    if ic_indices[0] != n - 1:
+    if climax_indices[0] != n - 1:
         raise BeatRoleViolation(
-            "the irreversible_choice (climax) must be the LAST voiced beat "
-            f"(found at index {ic_indices[0]} of {n})"
+            "the climax-class beat must be the LAST voiced beat "
+            f"(found at index {climax_indices[0]} of {n})"
         )
     if n >= 3:
         ps_indices = [
@@ -524,9 +569,9 @@ def validate_beat_roles(
             raise BeatRoleViolation(
                 f"expected exactly one personal_stake beat, found {len(ps_indices)}"
             )
-        if ps_indices[0] >= ic_indices[0]:
+        if ps_indices[0] >= climax_indices[0]:
             raise BeatRoleViolation(
-                "the personal_stake beat must precede the irreversible_choice"
+                "the personal_stake beat must precede the climax-class beat"
             )
 
 
