@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-24T22:29:38.761591+00:00",
+  "doc": "docs\\2026-06-24-assumption-audit\\roundtable\\pass03_plan.md",
+  "prompt_tokens_est": 127200,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 119743,
+      "completion_tokens": 5806,
+      "cost_usd": 0.20773875
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 138029,
+      "completion_tokens": 5540,
+      "cost_usd": 0.22793625
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 127649,
+      "completion_tokens": 10706,
+      "cost_usd": 0.064841535
+    }
+  ],
+  "total_cost_usd": 0.5005
+}

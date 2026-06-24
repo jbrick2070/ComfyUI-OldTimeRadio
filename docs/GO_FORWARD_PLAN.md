@@ -1,6 +1,51 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (STORY-GRAMMAR build: chunks 1-6 ALL SHIPPED + PUSHED. The ONLY thing
+> **>>> CURRENT STEP -- 2026-06-24 (STORY-ENGINE ASSUMPTION-AUDIT CONVERGED -> BUILD the fixes in a fresh
+> CODER window. Plan is grounded + build-ready; NOTHING from it is coded yet. origin/v2.0-alpha HEAD
+> `0c8bd191` == local.)**
+> Two live story-engine runs proved the style grammar fixes the CLIMAX + announcer CLOSE but NOT the body:
+> gemma collapsed into the exact console standoff (red levers / blowing fuel cells) it targets, and the
+> style label was ignored (memory-erasure-clinic style -> NASA story). A 4-round LIVE assumption-attack
+> roundtable (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude grounded judge, ~$2.29, CONVERGED) found
+> the two root seams + a self-correction, all grounded to file:line. **BUILD-READY plan:
+> `docs/2026-06-24-assumption-audit/roundtable/pass04_plan.md`** (R1->R4 trail + judgments alongside).
+> **THE BUILD (in order; all behind the existing story-quality flag => byte-identical when off; NO workflow
+> JSON change):**
+> - **KILL 1 (do FIRST -- the load-bearing fix): deterministic body-output gate.** Validate the SHIPPED
+>   character line, not just `beat.intent`. IN-LOOP, after the common `cleaned` assignment (writer 4163
+>   exchange / 4206 compose) and BEFORE `last_lines.append` (4222) -- covers the use_exchange bypass. New
+>   `_otr_story_quality_l12.validate_composed_grounding(text, sq_entry, grounded, max_ungrounded=0,
+>   require_conflict_object_on_roles=CLIMAX_CLASS_ROLES|{BEAT_ROLE_PRESSURE})` (object match by head-noun /
+>   `_TOKEN_RE` token overlap, casefold, strip possessive). Add `grounded_nouns` to `LineRequest`, computed
+>   once from `premise_noun_palette(roster, news_seed, outline.premise, *premise_texts(meta))` + thread thru
+>   `_otr_reroll.build_reroll_line_request`. ONE guarded reroll; SPLIT hints (ungrounded_crisis -> offending
+>   tokens only; missing_conflict_object -> the grounded conflict_object); ship-reroll-if-valid-else-original
+>   deterministically; stamp `meta.story_quality.{body_gate_rerolls,body_gate_failed,body_gate_ungrounded_
+>   crisis}`. De-license composer line 1162 ("mission control...fine") + 1442 ("Ground...in the news facts")
+>   by style. **This is the change that stops gemma's standoff -- ship it alone first + re-soak.**
+> - **KILL 2: one StoryContract, selected pre-outline, injected into the whole body.** `render_style_grammar`
+>   has ZERO callers today (style never injected -> only ending_tag survives). New frozen `StoryContract` +
+>   `build_story_contract` in `_otr_style_catalog`; build ONCE after cast-lock (`cast_seed` as seed) + news
+>   interpretation, BEFORE `OutlineRequest`, from `script_brief or news_seed`; REUSE in F2 (delete the late
+>   `select_style(outline.premise,...)`). Add style fields to `OutlineRequest` + render in
+>   `_build_macro/phase/beat_user_prompt`; add to `LineRequest` + render for EVERY character beat (not just
+>   climax). ADD `meta.story_contract`; DO NOT overwrite `resolved["style"]`/`meta.style`/`visual_plan.style`
+>   (they feed build_news_briefs + cast) -- defer the collapse.
+> - **KILL 4 + KILL 5: un-starve the body + fix the close.** build_sq_data enrich is gated to PERSONAL_STAKE/
+>   IRREVERSIBLE_CHOICE (~694) -> role-keyed map for setup/pressure/personal_stake + every CLIMAX_CLASS_ROLES
+>   member (CUT consequence -- unreachable); fix the 200-char truncation order. Announcer close: my C5 gate is
+>   MOOT -- `compose_announcer_outro` (writer 4230) overwrites it with an F3 "State this outcome plainly"
+>   branch (composer 2819); add `ending_tag` param, force resolved=False + non-resolving fallback for
+>   {unresolved_final_sound,revelation,quiet_acceptance}.
+> - **DEFERRED: KILL 3 climax POSITION** (breaks validator + ending_template target + outro last-line
+>   assumption -- its own build after KILL 1/2), model-capability gate, render profiles, _PERSONAL_COST rows.
+> ACCEPTANCE: per-chunk full suite + Bug Bible green vs the 5 pre-existing 267a53e fails; byte-identical when
+> the story-quality flag is off (new fields default empty, no meta.story_contract); then a LIVE re-soak
+> (gemma + mistral, 320w) confirming the body no longer collapses to machinery (crisis-noun density in the
+> SHIPPED body lines, not just intent). 13-item verify-at-build checklist in pass04_plan.md. commit+push per
+> green chunk; prod/main GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-24 (STORY-GRAMMAR build: chunks 1-6 ALL SHIPPED + PUSHED. The ONLY thing
 > left is the operator-gated LIVE LLM behavioral A/B soak. origin/v2.0-alpha HEAD `4c9793b2` == local.)**
 > Chunks 4-6 (the WIRING) are DONE -- the style grammar is live behind `OTR_ENABLE_STYLE_GRAMMAR` (env-only,
 > DEFAULT OFF, byte-identical when off, NO workflow-JSON change; bundled with `OTR_STORY_QUALITY_L12`).
