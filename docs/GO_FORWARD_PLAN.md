@@ -1,44 +1,38 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (STORY-GRAMMAR build: chunks 1-3 SHIPPED, chunks 4-6 are the
-> NEXT WINDOW's job. origin/v2.0-alpha HEAD `19e29254` == local. Box reset, :8000 FREE.)**
-> Operator directive (overrides the panel's "keep irreversible_choice" compromise): the forced
-> `irreversible_choice` climax on EVERY episode is a STRUCTURAL sameness bug -- demote it to ONE climax
-> class among a closed ending taxonomy; the final on-stage character beat stays the climax, but its TYPE
-> is style-selected. Proven root cause: premise (pitch room) + style label (auto picker) both vary, yet
-> the local model collapses every climax into the console/kill-switch button (live ledgers: a genetics
-> premise -> "touch that lever and the vats release neurotoxin"). The 4-round ending-mode roundtable
-> (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro + Claude judge, ~$0.66) converged; final plan
-> `docs/2026-06-24-ending-mode/roundtable/pass04_plan.md` (NOTE: its "keep irreversible_choice / reframe"
-> line is SUPERSEDED by the operator's replace-the-role directive below).
-> **DONE (chunks 1-3, `19e29254`, dark / default-OFF / byte-identical, +29 tests, suite green vs the 5
-> pre-existing 267a53e fails, Bug Bible 16/7/3):**
-> - C1 `_otr_story_quality_l12`: 8 ending-archetype roles + `CLIMAX_CLASS_ROLES` (9); `assign_beat_roles`
->   gains `climax_role=` (default irreversible_choice => unkeyed call byte-identical); `validate_beat_roles`
->   -> "exactly one CLIMAX-CLASS role, last" (was irreversible_choice-specific).
-> - C2 `_otr_style_catalog`: `ENDING_TEMPLATES` (9 concrete on-mic final-beat instructions, all steer off
->   machinery) + `ending_tag` on all 100 styles (irreversible_choice 6/100, all 9 used) + `validate_catalog`
->   + `ending_template_for`; `ending_mode` prose preserved.
-> - C3 `_otr_style_catalog`: deterministic `select_style(premise, meta, cast_seed)` -- non-emergency pool
->   unless disaster keywords, sha256(cast_seed) tie-break, no LLM / no paid call. All inert (nothing wires it).
-> **NEXT WINDOW (chunks 4-6, the WIRING -- this is where it goes live, still default-OFF):**
-> - C4 `_otr_line_composer`: inject `ENDING_TEMPLATES[tag]` into the FINAL character beat's dialogue
->   request, gated, empty => byte-identical (golden). The single behavioral injection.
-> - C5 `_otr_outline._assemble_outline`: gate the announcer-close INTENT via a DIRECT
->   `os.environ.get("OTR_ENABLE_STYLE_GRAMMAR")` read (OFF=exact string, ON=non-outcome) -- do NOT remove
->   the close (budget validator #7). Writer (`OTR_LedgerScriptWriter`): when the flag is on, AFTER
->   `generate_outline` returns, `slug = select_style(outline.premise, meta, cast_seed)`; thread the style's
->   `ending_tag` as `climax_role` into `build_sq_data`'s `assign_beat_roles` call; pass
->   `ending_template_for(slug)` + the final-character-beat id (the climax-class beat from `roles_by_beat`)
->   to the line composer; stamp `meta.story_quality {style_slug, ending_tag, final-beat crisis-noun count}`.
->   Bundle with `OTR_STORY_QUALITY_L12` (grammar = climax SHAPE, L1 = trope VOCABULARY).
-> - C6: tests (default-OFF byte-identity golden; flag-ON final-beat template present + announcer non-outcome;
->   C7 audio byte-identical OFF) + full suite + Bug Bible + a LIVE A/B soak (baseline vs lever-on; measure
->   crisis-noun density at the final beat -> ~0, ending_tag distribution >= 80% non-doomsday, critic arc mix).
-> WIRING GROUNDING (verified): `build_sq_data` calls `assign_beat_roles` (thread climax_role THERE, in the
-> writer, after generate_outline -- premise = outline.premise); the line composer is `_otr_line_composer`
-> (confirm the request/prompt shape when building). env-only gate => NO workflow JSON change. 100% local;
-> deterministic; UTF-8 no BOM; SFW; commit+push per green chunk; prod/main GATED.
+> **>>> CURRENT STEP -- 2026-06-24 (STORY-GRAMMAR build: chunks 1-6 ALL SHIPPED + PUSHED. The ONLY thing
+> left is the operator-gated LIVE LLM behavioral A/B soak. origin/v2.0-alpha HEAD `4c9793b2` == local.)**
+> Chunks 4-6 (the WIRING) are DONE -- the style grammar is live behind `OTR_ENABLE_STYLE_GRAMMAR` (env-only,
+> DEFAULT OFF, byte-identical when off, NO workflow-JSON change; bundled with `OTR_STORY_QUALITY_L12`).
+> 3 commits `762b20d7` (C4) -> `e86adb59` (C5) -> `4c9793b2` (C6), +26 tests; full suite green vs the 5
+> pre-existing `267a53e` workflow-pin fails (verified pre-existing by stash+rerun -- this sprint touches ZERO
+> workflow JSON); `test_audio_byte_identical` GREEN; Bug Bible 16/7/3. Results doc:
+> `docs/2026-06-24-ending-mode/STORY_GRAMMAR_C456_RESULTS.md`.
+> - C4 `762b20d7` `_otr_line_composer`: `LineRequest.ending_template` field + `Ending:` render (only when
+>   populated; empty => byte-identical golden); `build_sq_data(climax_role=)` threaded into
+>   `assign_beat_roles`; `_otr_config.style_grammar_enabled()`. Inert at this commit.
+> - C5 `e86adb59` WIRING live: `_otr_outline._assemble_outline` announcer close gated via a DIRECT
+>   `os.environ.get("OTR_ENABLE_STYLE_GRAMMAR")` read (OFF=exact pre-grammar string; ON=non-outcome close,
+>   <=200 chars, NEVER removed -> validator #7 safe). `OTR_LedgerScriptWriter` F2: when on, after
+>   `generate_outline`, `slug = select_style(outline.premise, meta, cast_seed)` -> ending_tag = climax_role
+>   -> `build_sq_data` (bundled w/ L12) -> climax-class beat id + `ending_template_for(slug)` -> the
+>   LineRequest for THAT beat only -> `meta.story_quality {style_slug, ending_tag, final_beat_crisis_nouns}`.
+>   Fails soft (climax falls back to irreversible_choice, ending template dropped; never breaks audio).
+> - C6 `4c9793b2` `tests/test_story_grammar_wiring.py` (26): default-OFF byte-identity, flag-ON ending render,
+>   announcer non-outcome + close-not-removed, climax_role threading, selector determinism.
+> **DETERMINISTIC A/B PROVEN (no GPU; 12 premises x 250 seeds = 3000 eps):** lever OFF = irreversible_choice
+> 100% (the forced console standoff); lever ON = irreversible_choice **2.1%**, **97.9% non-doomsday** (target
+> >=80%), all 9 ending classes used, 98/100 styles, even spread (revelation 19% / reversal 15% / unresolved 13%
+> / reconciliation 13% / bittersweet 12% / quiet_acceptance 11% / confession 9% / ironic 7%). The climax SHAPE
+> is no longer uniform. select_style is sha256(cast_seed)-keyed (C7-safe).
+> **>>> NEW CURRENT STEP = operator LIVE LLM behavioral A/B soak (GPU-gated).** Measures whether the local
+> writer OBEYS the ending template at the final beat (behavioral lift, beyond the structural spread above) +
+> the shipped-text final-beat crisis-noun density (`meta.story_quality.final_beat_crisis_nouns` + the scrub's
+> `ungrounded_crisis` -> ~0). NOT run this session: `:8000` was the operator's INTERACTIVE Comfy Desktop (not a
+> headless leftover; CLAUDE.md says it can't be relaunched from the DC shell), so I did not reset it or contend
+> for the active GPU; Ollama is up on :11434 (writer lane ready). Runbook in STORY_GRAMMAR_C456_RESULTS.md:
+> reset box (S4 selective CIM kill) -> fresh headless server -> N=3 baseline vs N=3 `OTR_ENABLE_STYLE_GRAMMAR=1
+> OTR_STORY_QUALITY_L12=1` on the canonical JSON. Default-OFF ships byte-identical; prod/main + tags GATED.
 >
 > **>>> PRIOR STEP -- 2026-06-24 (OVERNIGHT CODER; STORY-ARCHITECTURE INCREMENT-1 BUILT + SMOKED.
 > origin/v2.0-alpha HEAD `bbd0943f` == local; one code commit on top of the operator's 3 docs commits.)**
