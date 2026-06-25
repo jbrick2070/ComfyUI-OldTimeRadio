@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-25T21:39:24.330302+00:00",
+  "doc": "docs\\2026-06-25-schema-adherence\\c4-scope\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 7248,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 6596,
+      "completion_tokens": 4163,
+      "cost_usd": 0.049875
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 7377,
+      "completion_tokens": 3085,
+      "cost_usd": 0.04007125
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 7085,
+      "completion_tokens": 5179,
+      "cost_usd": 0.007587705
+    }
+  ],
+  "total_cost_usd": 0.0975
+}

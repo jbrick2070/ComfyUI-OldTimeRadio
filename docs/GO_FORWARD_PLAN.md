@@ -1,6 +1,41 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE BUILD HANDOFF -> a fresh CODER window. Docs only this
+> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE LEVER-1 LOAD-BEARING SHIPPED + PUSHED; C4 DEFERRED per a
+> best-practice roundtable. origin/v2.0-alpha HEAD `d4ca6cd4` == local. NEXT = G1, the offline abstain-residual count.)**
+> A coder session built the model-agnostic tolerance from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`,
+> REFINED by two LIVE grounding roundtables whose converged resolutions are the actual build spec (pass04's literal
+> C1/C4 were SUPERSEDED where grounding contradicted them -- the operator chose "roundtable the fork" both times):
+> - **NESTED-ALIAS FORK** (`docs/2026-06-25-schema-adherence/nested-fork/`, GPT-5.5+Gemini-3.1+DeepSeek-v4, ~$0.13,
+>   CONVERGED): the proven Opus `normalize_length` failure is a NESTED `BeatEdit` (action emitted under `lever`),
+>   but pass04 C1's `_normalize_field_keys` was TOP-LEVEL-ONLY -> could not reach it. Resolution: a shared
+>   `apply_field_aliases` helper keyed on a `__otr_field_aliases__` ClassVar, run via each schema's own
+>   `mode="before"` validator (pydantic recursion reaches nested models), byte-identical on canonical input.
+>   This SUPERSEDES the separate except-arm normalizer.
+> - **C4-SCOPE FORK** (`docs/2026-06-25-schema-adherence/c4-scope/`, same panel, ~$0.10, CONVERGED): C4's "schema
+>   REQUIRED -> edit all 15 callers across 9 modules" is CUT (unanimous). The proven failure is already fixed by
+>   C0/C1, so the repair turn is dead code -> C4 (schema-in-repair) DEFERRED with a ready recipe (an OPTIONAL
+>   `_build_schema_snippet` shim INSIDE `structured_call`, which already holds the schema; wire from a REAL captured
+>   failure, never speculatively).
+> **SHIPPED -- 2 green chunks, each: full suite green vs the 5 pre-existing `267a53e` workflow-pin fails + Bug Bible
+> 16/7/3 + AST/no-BOM + commit AND push to v2.0-alpha:**
+> - `516644eb` (C0+C1+C2+C5+C6): `apply_field_aliases` + `validate_tolerant_data`/`parse_validate_tolerant` shared
+>   core in `_otr_structured_call.py`; `BeatEdit.__otr_field_aliases__` {beat_index<-index, merge_with_index<-merge_with,
+>   action<-lever} via the shared before-validator (replaces the bespoke BUG-LOCAL-303 remap); +16 conformance tests.
+>   The proven nested failure now validates on attempt 1; canonical happy path byte-identical.
+> - `d4ca6cd4` (C3 ladder): structural rung is JSON-syntax-only (a `ValidationError`/`PostValidationError` skips
+>   straight to typed repair -- the Opus ~90k-token burn fix); except arms narrowed to `(JSONDecodeError,
+>   ValidationError, PostValidationError)` so a plain `ValueError` propagates; dynamic attempt counter; 4->3-attempt
+>   docs; 5 ladder tests updated to the new contract + 3 conformance ladder tests.
+> NO workflow-JSON / node / widget change (env+code only -- the schema is internal pydantic, not a node widget).
+> The whole sprint touched ONLY `_otr_structured_call.py` + `_otr_radio_editor.py`'s schema + tests. prod/main +
+> tags GATED.
+> **>>> NEXT = G1 (offline, no-GPU): MEASURE the abstain residual** -- what fraction of action/dialogue SPANS the
+> existing two-tier deterministic detectors (`split_stage_business` + `detect_stage_business_for_reroll`) do NOT
+> already handle. If ~0, DROP the binary dialogue/stage-direction lane (`docs/2026-06-25-schema-adherence/binary/
+> pass01_plan.md`); if non-trivial, build it in SHADOW MODE gated on G2 (byte-identity of abstain). Operator-gated
+> before building the lane. C4 reopens only on a real captured non-alias schema drift.
+>
+> **>>> PRIOR STEP (the planner handoff that kicked off this build) -- 2026-06-25 (SCHEMA-ADHERENCE BUILD HANDOFF -> a fresh CODER window. Docs only this
 > session; design roundtable CONVERGED, NOTHING coded yet. origin/v2.0-alpha HEAD `89e9f8bf` == local.)**
 > Operator constraint that drove this: *"I don't control what model people run; I don't want to force people
 > into local vs remote -- it's their choice."* So `structured_call` must parse what ANY user-chosen model
@@ -1606,15 +1641,17 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE (2026-06-25, PLANNER->CODER HANDOFF) = SCHEMA-ADHERENCE MODEL-AGNOSTIC ROBUSTNESS. The full
-build narrative is in the CURRENT STEP block at the very top of this file. TL;DR: two converged levers from
-the 2026-06-25 roundtable campaign (~$0.79) -- (1) TOLERANCE, build-ready, `docs/2026-06-25-schema-adherence/
-roundtable/pass04_plan.md` C0-C6, strict-first so the local happy path stays byte-identical, touches the
-`structured_call` core; (2) BINARY decomposition, converged but GATED, `docs/2026-06-25-schema-adherence/
-binary/pass01_plan.md`, a dialogue/stage-direction span classifier built ONLY after G1 (offline abstain-
-residual count) clears. ORDER: build Lever-1 first, then G1, then the binary lane if warranted. NO
-workflow-JSON change. Each chunk suite + Bug Bible green vs the 5 pre-existing `267a53e` fails; commit+push
-per green chunk; prod/main + tags GATED. Do NOT auto-start -- wait for operator GO.**
+**>>> ACTIVE (2026-06-25, CODER) = SCHEMA-ADHERENCE -- LEVER-1 LOAD-BEARING SHIPPED (`516644eb`, `d4ca6cd4`);
+C4 DEFERRED; NEXT = G1. The full build narrative is in the CURRENT STEP block at the very top of this file.
+TL;DR: Lever 1 = TOLERANCE built from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`, refined by
+two live grounding roundtables (nested-fork/ + c4-scope/). C0+C1+C2+C5+C6 (`516644eb`) + C3 ladder (`d4ca6cd4`)
+SHIPPED + pushed: the proven nested Opus `normalize_length` failure validates on attempt 1 via the shared
+`apply_field_aliases`/`__otr_field_aliases__` before-validator; structural rung is JSON-syntax-only (token-burn
+fix); canonical happy path byte-identical; NO workflow-JSON change. C4 (schema-in-repair) DEFERRED -- the proven
+failure is fixed so it would test dead code; recipe ready in c4-scope/. Lever 2 = BINARY decomposition still
+GATED on **G1** (offline abstain-residual count) + G2. Each chunk shipped suite-green vs the 5 pre-existing
+`267a53e` fails + Bug Bible 16/7/3. **NEXT = run G1 (offline, no-GPU); build the binary lane ONLY if a
+non-trivial residual + operator GO. prod/main + tags GATED.**
 
 **>>> SUPERSEDED (2026-06-22, PLANNER) = STORY-QUALITY LIFT -- the 4-round roundtable CONVERGED; build-ready
 coder kickoff `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md`. NEXT = operator GO to
@@ -2121,13 +2158,15 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
-- **SCHEMA-ADHERENCE (NEW 2026-06-25 -- build-ready, awaiting operator GO; see the CURRENT STEP block at the
-  top of this file):** LEVER 1 tolerance `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md` C0-C6
-  (strict-first, touches the `structured_call` core -> dedicated coder session). LEVER 2 binary lane
-  `docs/2026-06-25-schema-adherence/binary/pass01_plan.md` GATED on **G1** (offline abstain-residual count --
-  the cheap first move; may DROP the lane) + **G2** (byte-identity of abstain). Motivated by the Opus
-  frontier probe tripping `normalize_length` (operator wants ANY user-chosen model -- local or remote -- to
-  work). NO workflow-JSON change.
+- **SCHEMA-ADHERENCE (2026-06-25 -- LEVER-1 LOAD-BEARING SHIPPED; see the CURRENT STEP block at the top):**
+  LEVER 1 tolerance (`pass04_plan.md` C0-C6, refined by the nested-fork + c4-scope roundtables) SHIPPED in 2
+  green chunks `516644eb` (C0+C1+C2+C5+C6: `apply_field_aliases`/`__otr_field_aliases__` before-validator +
+  `validate_tolerant_data` core; proven nested Opus `normalize_length` failure fixed) + `d4ca6cd4` (C3:
+  JSON-syntax-only structural rung). C4 (schema-in-repair) DEFERRED -- proven failure already fixed, would test
+  dead code; OPTIONAL `_build_schema_snippet`-shim recipe ready in c4-scope/, reopen on a real captured drift.
+  LEVER 2 binary lane `docs/2026-06-25-schema-adherence/binary/pass01_plan.md` still GATED on **G1** (offline
+  abstain-residual count -- the cheap first move; may DROP the lane) + **G2** (byte-identity of abstain).
+  **NEXT = G1.** NO workflow-JSON change.
 - **LOOK-QA BUGS (NEW 2026-06-14 eve — operator look-QA pass; all in `BUG_LOG_2026-06.md`):**
   - **BUG-408 default MUSIC sounds non-musical (SA3).** **IMPLEMENTED 2026-06-14 (`3a4f71d`).** Path B:
     SA3-shaped prompt + real negative + per-cue `seconds_start` within a 30s `seconds_total` context (latent
