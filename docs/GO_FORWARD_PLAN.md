@@ -1,7 +1,53 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 (ANNOUNCER REDESIGN + KILL 2 + KILL 4 ALL BUILT + SHIPPED + PUSHED +
-> LIVE RE-SOAK PASSED ON BOTH LOCAL WRITERS. origin/v2.0-alpha HEAD `b7bf7fc3` == local.)**
+> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE BUILD HANDOFF -> a fresh CODER window. Docs only this
+> session; design roundtable CONVERGED, NOTHING coded yet. origin/v2.0-alpha HEAD `89e9f8bf` == local.)**
+> Operator constraint that drove this: *"I don't control what model people run; I don't want to force people
+> into local vs remote -- it's their choice."* So `structured_call` must parse what ANY user-chosen model
+> (local Ollama OR remote OpenRouter) emits, without breaking the byte-identical local happy path.
+> MOTIVATING EVIDENCE (this session): a frontier-writer probe (Claude Opus via OpenRouter) DECISIVELY broke
+> the local prose ceiling (real noir medical-ethics drama vs the local console-standoff), but tripped the
+> `normalize_length` structured schema -- the model emitted a `lever` field + omitted a required field ->
+> exhausted the retry ladder -> soft-failed + burned ~90k tokens. That friction hits ANY arbitrary model, so
+> a model-agnostic robustness pass is the unlock for letting people pick their own writer.
+> **A LIVE 2026-06-25 roundtable campaign CONVERGED two complementary, model-agnostic levers (total ~$0.79):**
+> - **LEVER 1 = TOLERANCE -- BUILD-READY (the main ticket).** `docs/2026-06-25-schema-adherence/roundtable/
+>   pass04_plan.md` (4 rounds R1 arc -> R2 coding -> R3 wiring -> R4 convergence; GPT-5.5 + Gemini-3.1-pro +
+>   DeepSeek-v4-pro panel, Claude grounded judge+panelist; ~$0.66; pass00->pass04 trail + judgments
+>   alongside). C0-C6, all with a **STRICT-FIRST INVARIANT** (try the exact current parse first; tolerance
+>   fires ONLY on failure => the local happy path stays byte-identical): deterministic key-normalizer for
+>   alias drift; SKIP the structural retry on a pydantic `ValidationError` (it never helps, it just burns
+>   tokens -- the Opus failure mode); CALL-SITE-WIRED schema repair (the repair factory is injected at the
+>   call site, NOT imported into the core -> avoids the circular import); a shared `validate_tolerant_data`
+>   core reused by both `structured_call` and the binary lane; incremental per-pass opt-in via a ClassVar so
+>   you harden one schema at a time, never a big-bang flip. Touches the `structured_call` CORE
+>   (`_otr_structured_call.py`) -> a careful dedicated coder session, NOT auto-built. Problem framing:
+>   `docs/2026-06-25-schema-adherence/PROBLEM_STATEMENT.md`.
+> - **LEVER 2 = BINARY DECOMPOSITION -- CONVERGED but GATED (a thin lane on top of Lever 1).** Operator
+>   instinct ("LLMs are reliable at binary decisions like split A dialogue | B stage-direction -- can we use
+>   that to keep the ledger intact?") is SOUND; a 1-round addendum (anchor + all 3 panel converged, ~$0.13)
+>   pruned + sharpened it: `docs/2026-06-25-schema-adherence/binary/pass01_plan.md` (+ `pass01_judgment.md`).
+>   SCOPE = ONE classifier only (dialogue vs stage-direction); CUT the other 3 ideas (edit/no-op,
+>   speaker-membership, normalize_length -- already handled / wrong domain / O(N) latency trap). Reframes:
+>   per-SPAN not per-line (mixed lines can't be whole-line classified); a NEW explicit `HIT|CLEAN|ABSTAIN`
+>   tri-state in the PURE `_otr_line_hygiene` layer (today's `False`/empty conflates clean vs uncertain);
+>   `binary_decide` lives in the LLM layer (NOT pure hygiene) as a thin wrapper over the Lever-1 core with a
+>   1-field `Literal["A","B"]` schema (A/B not yes/no -> refusal-safe); strict single-decisive-token parse ->
+>   else None -> exact deterministic fallback; SHADOW-MODE first (log verdict vs deterministic outcome,
+>   mutate nothing) until an offline fixture suite proves accuracy across local + >=1 remote.
+>   **BUILD GATES before writing the lane: G1 = MEASURE the abstain residual** (an offline, no-GPU count --
+>   what fraction of spans the existing two-tier deterministic detector `split_stage_business` +
+>   `detect_stage_business_for_reroll` already handles; if ~0, the lane is unnecessary -> DROP it);
+>   **G2 = byte-identity of abstain** (`segment_double_quotes` folds curly->straight, so "unchanged" isn't
+>   literally byte-identical -- retain the original string + golden test). G1 is the cheap first move.
+> **ORDER FOR THE CODER:** build Lever-1 pass04 C0-C6 first (each chunk: full suite + Bug Bible green vs the
+> 5 pre-existing `267a53e` workflow-pin fails; strict-first byte-identity golden on the local happy path;
+> `test_audio_byte_identical` green; commit AND push per green chunk). THEN run G1; build the binary lane
+> ONLY if G1 shows a non-trivial residual, gated on G2. NO workflow-JSON change (env/code only). prod/main +
+> tags GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-25 (ANNOUNCER REDESIGN + KILL 2 + KILL 4 ALL BUILT + SHIPPED + PUSHED +
+> LIVE RE-SOAK PASSED ON BOTH LOCAL WRITERS. origin/v2.0-alpha HEAD `b7bf7fc3`; now `89e9f8bf` w/ re-soak docs.)**
 > Built C1-C4 from `docs/2026-06-24-announcer-refine/roundtable/pass04_plan.md` + `CODE_MAP.md` +
 > `coda-segue/roundtable/pass03_plan.md`, all behind the `story_scaffold` widget (byte-identical off; NO
 > workflow-JSON change); +65 unit tests; per chunk full suite green vs the 5 pre-existing `267a53e`
@@ -1560,7 +1606,17 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE (2026-06-22, PLANNER) = STORY-QUALITY LIFT -- the 4-round roundtable CONVERGED; build-ready
+**>>> ACTIVE (2026-06-25, PLANNER->CODER HANDOFF) = SCHEMA-ADHERENCE MODEL-AGNOSTIC ROBUSTNESS. The full
+build narrative is in the CURRENT STEP block at the very top of this file. TL;DR: two converged levers from
+the 2026-06-25 roundtable campaign (~$0.79) -- (1) TOLERANCE, build-ready, `docs/2026-06-25-schema-adherence/
+roundtable/pass04_plan.md` C0-C6, strict-first so the local happy path stays byte-identical, touches the
+`structured_call` core; (2) BINARY decomposition, converged but GATED, `docs/2026-06-25-schema-adherence/
+binary/pass01_plan.md`, a dialogue/stage-direction span classifier built ONLY after G1 (offline abstain-
+residual count) clears. ORDER: build Lever-1 first, then G1, then the binary lane if warranted. NO
+workflow-JSON change. Each chunk suite + Bug Bible green vs the 5 pre-existing `267a53e` fails; commit+push
+per green chunk; prod/main + tags GATED. Do NOT auto-start -- wait for operator GO.**
+
+**>>> SUPERSEDED (2026-06-22, PLANNER) = STORY-QUALITY LIFT -- the 4-round roundtable CONVERGED; build-ready
 coder kickoff `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md`. NEXT = operator GO to
 BUILD in a coder window: manual no-bypass baseline re-smoke -> D1 leak -> D3 role -> D2 stance; D4
 escalation OUT OF SCOPE. Full defect->fix map + spend in the ROUNDTABLE block at the very top of this file.**
@@ -2065,6 +2121,13 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 ## 5. OPEN TICKETS
 
+- **SCHEMA-ADHERENCE (NEW 2026-06-25 -- build-ready, awaiting operator GO; see the CURRENT STEP block at the
+  top of this file):** LEVER 1 tolerance `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md` C0-C6
+  (strict-first, touches the `structured_call` core -> dedicated coder session). LEVER 2 binary lane
+  `docs/2026-06-25-schema-adherence/binary/pass01_plan.md` GATED on **G1** (offline abstain-residual count --
+  the cheap first move; may DROP the lane) + **G2** (byte-identity of abstain). Motivated by the Opus
+  frontier probe tripping `normalize_length` (operator wants ANY user-chosen model -- local or remote -- to
+  work). NO workflow-JSON change.
 - **LOOK-QA BUGS (NEW 2026-06-14 eve — operator look-QA pass; all in `BUG_LOG_2026-06.md`):**
   - **BUG-408 default MUSIC sounds non-musical (SA3).** **IMPLEMENTED 2026-06-14 (`3a4f71d`).** Path B:
     SA3-shaped prompt + real negative + per-cue `seconds_start` within a 30s `seconds_total` context (latent
