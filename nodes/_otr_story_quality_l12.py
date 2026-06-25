@@ -792,12 +792,32 @@ def build_sq_data(
         # APPEND-only intent enrichment when the model under-delivered (keeps a
         # good intent intact; guarantees the climax is concrete + on-stage).
         beat_role = entry["beat_role"]
-        if beat_role in (BEAT_ROLE_PERSONAL_STAKE, BEAT_ROLE_IRREVERSIBLE_CHOICE):
+        grounded_intent = new_intent
+        enrichment = ""
+        if beat_role in _ENRICH_ROLES:
             fc = fallback_content(beat_role, domain, seed, idx)
             entry.update(fc)
-            new_intent = _enrich_intent(new_intent, beat_role, slot, fc)
+            enrichment = _enrich_tail(grounded_intent, beat_role, slot, fc)
 
-        new_intent = new_intent.strip()[:_INTENT_MAX].strip()
+        # KILL 4 (2026-06-24): reserve room for the enrichment so a long intent
+        # cannot truncate the concrete climax clause off the end (the old
+        # [:_INTENT_MAX] cut the tail). max(0, ...) guards the negative slice.
+        if enrichment:
+            base = grounded_intent.strip()
+            tail = enrichment.strip()
+            if not base:
+                new_intent = tail[:_INTENT_MAX]
+            else:
+                sep = "; "
+                reserve = _INTENT_MAX - len(sep) - len(tail)
+                if reserve <= 0:
+                    new_intent = tail[:_INTENT_MAX]
+                else:
+                    new_intent = (
+                        base[:max(0, reserve)].strip() + sep + tail
+                    )[:_INTENT_MAX]
+        else:
+            new_intent = grounded_intent.strip()[:_INTENT_MAX].strip()
         if new_intent and new_intent != intent:
             try:
                 setattr(b, "intent", new_intent)
@@ -818,22 +838,73 @@ def premise_texts(meta: Any) -> Tuple[str, ...]:
     return tuple(out)
 
 
-def _enrich_intent(
+# KILL 4 (2026-06-24): role-keyed enrichment. The dramatic-function beats that
+# earn an APPEND-only concrete clause -- setup / pressure / personal_stake + every
+# climax class. CONSEQUENCE is omitted (unreachable under climax-last today;
+# revisit with KILL 3 -- a deliberate omission, not a stub).
+_ENRICH_ROLES = frozenset(
+    {BEAT_ROLE_SETUP, BEAT_ROLE_PRESSURE, BEAT_ROLE_PERSONAL_STAKE}
+) | CLIMAX_CLASS_ROLES
+
+# Per-role tail templates ({obj} = conflict_object, {cost} = personal_cost). The
+# IRREVERSIBLE_CHOICE + PERSONAL_STAKE strings are unchanged from the pre-KILL-4
+# behavior, so those two roles enrich byte-identically.
+_ENRICH_TAILS: Dict[str, str] = {
+    BEAT_ROLE_SETUP:
+        "the scene is set: {obj} is already in play before the pressure builds",
+    BEAT_ROLE_PRESSURE:
+        "the pressure tightens around {obj}, and {cost} now rides on it",
+    BEAT_ROLE_PERSONAL_STAKE:
+        "what is personally at stake: {cost}",
+    BEAT_ROLE_IRREVERSIBLE_CHOICE:
+        "on-stage, the decision about {obj} is made now, costing {cost}",
+    BEAT_ROLE_REVELATION:
+        "on-stage, the truth about {obj} comes to light now",
+    BEAT_ROLE_REVERSAL:
+        "on-stage, the situation around {obj} turns against what was expected",
+    BEAT_ROLE_UNRESOLVED_FINAL_SOUND:
+        "the question of {obj} is left hanging as the final sound fades",
+    BEAT_ROLE_RECONCILIATION:
+        "on-stage, they make their peace over {obj} now",
+    BEAT_ROLE_BITTERSWEET_PARTING:
+        "on-stage, they part over {obj} -- gaining and losing in one breath",
+    BEAT_ROLE_IRONIC_TWIST:
+        "the outcome of {obj} lands with an ironic turn, costing {cost}",
+    BEAT_ROLE_QUIET_ACCEPTANCE:
+        "on-stage, they quietly accept what {obj} has cost: {cost}",
+    BEAT_ROLE_CONFESSION:
+        "on-stage, the truth about {obj} is confessed aloud now",
+}
+
+
+def _enrich_tail(
     intent: str, beat_role: str, slot: Mapping[str, str], fc: Mapping[str, str],
 ) -> str:
-    """APPEND a concise deterministic clause only when intent is thin / lacks
-    the grounded conflict object. Never overwrites a substantive intent."""
+    """The concrete deterministic clause for a dramatic-function beat, or "" when
+    the intent is already substantive AND lands the grounded object (never
+    overwrites a good intent) or the role earns no enrichment. Returns ONLY the
+    tail; the caller joins it + reserves room through truncation (KILL 4)."""
     obj = slot.get("conflict_object", "")
     has_obj = bool(obj) and obj.casefold().split()[-1] in intent.casefold()
     thin = len(intent.split()) < 6
     if not thin and has_obj:
+        return ""
+    template = _ENRICH_TAILS.get(beat_role)
+    if not template:
+        return ""
+    return template.format(obj=obj, cost=fc.get("personal_cost", ""))
+
+
+def _enrich_intent(
+    intent: str, beat_role: str, slot: Mapping[str, str], fc: Mapping[str, str],
+) -> str:
+    """Back-compat combined-string form: APPEND the role's tail to the intent (or
+    return it unchanged when no enrichment is earned). build_sq_data now calls
+    _enrich_tail directly so it can reserve room for the tail through truncation;
+    this wrapper keeps the old contract for any direct caller. The two
+    pre-KILL-4 roles (irreversible_choice / personal_stake) are byte-identical."""
+    tail = _enrich_tail(intent, beat_role, slot, fc)
+    if not tail:
         return intent
-    if beat_role == BEAT_ROLE_IRREVERSIBLE_CHOICE:
-        tail = (
-            f"on-stage, the decision about {obj} is made now, "
-            f"costing {fc.get('personal_cost', '')}"
-        )
-    else:  # personal_stake
-        tail = f"what is personally at stake: {fc.get('personal_cost', '')}"
     sep = "" if not intent.strip() else "; "
     return f"{intent.strip()}{sep}{tail}"
