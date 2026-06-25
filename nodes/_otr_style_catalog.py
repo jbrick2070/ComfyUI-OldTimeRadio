@@ -20,6 +20,7 @@ UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 # Each entry: slug (snake_case id), label (human), sound_world, story_engine,
@@ -731,3 +732,41 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
         f"{cast_seed}:style:{int(emergency)}".encode("utf-8")
     ).hexdigest(), 16)
     return pool[h % len(pool)]
+
+
+@dataclass(frozen=True)
+class StoryContract:
+    """One immutable per-episode style decision, selected ONCE pre-outline and
+    threaded through the whole body (KILL 2, 2026-06-24). ``grammar`` is the
+    rendered prompt block consumed at the macro prompt -- the first and only
+    caller of render_style_grammar (whose prior "zero callers" state was the
+    literal KILL-2 bug: the style was selected but never injected)."""
+    slug: str
+    label: str
+    sound_world: str
+    story_engine: str
+    ending_mode: str
+    ending_tag: str
+    ending_template: str
+    grammar: str
+
+
+def build_story_contract(cast_seed: Any, script_brief: str, news_seed: str,
+                         meta: Any) -> StoryContract:
+    """Select the episode style deterministically (sha256(cast_seed)-keyed via
+    select_style) from the script_brief (or the raw news_seed when no brief)
+    BEFORE the outline is generated, and freeze its full grammar for the body.
+    Never raises on a missing style (get_style -> {} -> empty fields)."""
+    text = script_brief or news_seed or ""
+    slug = select_style(text, meta, cast_seed)
+    s = get_style(slug) or {}
+    return StoryContract(
+        slug=slug,
+        label=s.get("label", ""),
+        sound_world=s.get("sound_world", ""),
+        story_engine=s.get("story_engine", ""),
+        ending_mode=s.get("ending_mode", ""),
+        ending_tag=s.get("ending_tag", ""),
+        ending_template=ending_template_for(slug),
+        grammar=render_style_grammar(slug),
+    )

@@ -334,6 +334,21 @@ class OutlineRequest:
                              # sprint, ADR docs/news_interpreter_adr.md);
                              # branch added in the post-sprint prompt
                              # tightening pass (2026-05-10).
+    style_grammar: str = ""
+                             # OPTIONAL (KILL 2 style-grammar, 2026-06-24). The
+                             # rendered grammar block for the episode's selected
+                             # StoryContract (label / sound_world / story_engine /
+                             # ending_mode), injected at the MACRO prompt when
+                             # non-empty. Empty (default; lever off) => byte-
+                             # identical prompt. This is the ONLY place sound_world
+                             # enters a prompt -- it shapes structure/mood, never a
+                             # dialogue line.
+    story_engine: str = ""
+                             # OPTIONAL (KILL 2, 2026-06-24). The StoryContract's
+                             # conflict-shape one-liner, threaded into the phase +
+                             # beat prompts so a divergent premise is planned with a
+                             # non-"console standoff" engine. Empty (default) =>
+                             # byte-identical prompt.
     key_terms: tuple[str, ...] = ()
                              # OPTIONAL. news_interpreter's verbatim
                              # journalistic terms (people, places, technology)
@@ -1149,6 +1164,14 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
         source_line,
         f"Style: {req.style}",
     ]
+    # KILL 2 (2026-06-24): inject the selected StoryContract's full grammar block
+    # (label / sound_world / story_engine / ending_mode) so the body is composed in
+    # that radio style. First + only caller of render_style_grammar (its prior
+    # zero-callers state was the KILL-2 bug). Empty (lever off / unknown slug) =>
+    # byte-identical to the pre-grammar prompt.
+    _sg = req.style_grammar.strip()
+    if _sg:
+        parts.append(_sg)
     # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
     # REAL Path C macro prompt. The legacy _build_user_prompt (where the hint was
     # first wired) is back-compat/test-only and never runs in production, so the
@@ -1191,6 +1214,8 @@ def _build_phase_user_prompt(
     phase_beat_count: int,
     arc_phases: tuple[str, ...],
     phase_index: int,
+    *,
+    story_engine: str = "",
 ) -> str:
     """Stage 2 user prompt -- ask for speaker assignment per beat in one phase.
 
@@ -1201,6 +1226,14 @@ def _build_phase_user_prompt(
         f"Title: {macro.title}",
         f"Premise: {macro.premise}",
         f"Setting: {macro.setting}",
+    ]
+    # KILL 2 (2026-06-24): the StoryContract conflict-shape engine on the phase
+    # prompt (sound_world is deliberately NOT rendered here -- it stays at the
+    # macro prompt only). Empty (lever off) => byte-identical phase prompt.
+    _se = (story_engine or "").strip()
+    if _se:
+        parts.append(f"Story engine: {_se}")
+    parts.extend([
         "",
         _format_cast_block(req),
         "",
@@ -1212,7 +1245,7 @@ def _build_phase_user_prompt(
         f"in the {phase_name!r} phase. Return only the JSON object "
         f"with a `beats` array containing exactly {phase_beat_count} "
         f"entries, each with a `speaker` field.",
-    ]
+    ])
     return "\n".join(parts)
 
 
@@ -1243,6 +1276,7 @@ def _build_beat_user_prompt(
     previous_beat_intent: Optional[str] = None,
     next_beat_speaker: Optional[str] = None,
     phase_summary: Optional[str] = None,
+    story_engine: str = "",
 ) -> str:
     """Stage 3 user prompt -- ask for intent + mood for one beat.
 
@@ -1282,6 +1316,11 @@ def _build_beat_user_prompt(
         "",
         f"Phase: {phase_name}",
     ]
+    # KILL 2 (2026-06-24): the conflict-shape engine on the per-beat prompt too
+    # (sound_world stays at the macro prompt only). Empty => byte-identical.
+    _se = (story_engine or "").strip()
+    if _se:
+        parts.append(f"Story engine: {_se}")
     if phase_summary:
         parts.append(f"Phase focus: {phase_summary}")
     parts.append(f"Beat {beat_idx + 1} of {beat_total} in this phase")
@@ -1888,6 +1927,7 @@ def generate_outline(
         phase_user = _build_phase_user_prompt(
             req, macro, phase_name, phase_beat_count,
             arc_phases, phase_idx,
+            story_engine=req.story_engine,
         )
 
         def _phase_check(parsed: _PhaseSkeleton) -> str | None:
@@ -2062,6 +2102,7 @@ def generate_outline(
                 previous_beat_intent=previous_beat_intent,
                 next_beat_speaker=next_beat_speaker,
                 phase_summary=phase_summary,
+                story_engine=req.story_engine,
             )
             # LLM slot: creative -- per-beat intent/mood (narrative pass)
             try:

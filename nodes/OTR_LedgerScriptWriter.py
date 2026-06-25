@@ -2538,6 +2538,14 @@ class OTR_LedgerScriptWriter:
         from . import _otr_story_quality_l12 as _OTRSQL12
         from . import _otr_story_select as _OTRSEL
         from . import _otr_pitch_room as _OTRPR
+        from . import _otr_style_catalog as _OTRSTYLE
+        # KILL 2 (2026-06-24): hoist the style-grammar gate to ONE variable so every
+        # story_scaffold branch below (the pre-outline StoryContract, the
+        # OutlineRequest style fields, the safe-open capture, the news coda) reads
+        # the same value. _apply_story_scaffold_env (above) already applied the
+        # widget override to OTR_ENABLE_STYLE_GRAMMAR; OFF => every new branch is
+        # skipped => byte-identical.
+        _style_grammar_on = _OTRCFG.style_grammar_enabled()
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -3029,6 +3037,34 @@ class OTR_LedgerScriptWriter:
             episode_budget.music_inter_count,
         )
 
+        # KILL 2 (2026-06-24): build ONE StoryContract pre-outline (cast_seed-keyed,
+        # selected from script_brief/news_seed) so the SAME radio style steers the
+        # macro prompt, the climax shape, and the body. OFF => contract stays None
+        # => no style fields on OutlineRequest, no meta.story_contract => byte-
+        # identical. build_story_contract never raises on a missing style, but the
+        # call is wrapped LOUD per CLAUDE.md so a defect can never break the writer.
+        contract = None
+        if _style_grammar_on:
+            try:
+                contract = _OTRSTYLE.build_story_contract(
+                    cast_seed,
+                    script_brief,
+                    str(resolved.get("news_seed", "") or ""),
+                    meta,
+                )
+                meta.setdefault("story_quality", {})
+                meta["story_contract"] = {
+                    "slug": contract.slug,
+                    "label": contract.label,
+                    "ending_tag": contract.ending_tag,
+                }
+            except Exception as _contract_exc:  # noqa: BLE001 -- never break the writer
+                log.warning(
+                    "[OTR_LedgerScriptWriter] story-contract build skipped (%s); "
+                    "style falls back to the premise-keyed draw", _contract_exc,
+                )
+                contract = None
+
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
             style=resolved["style"],
@@ -3041,6 +3077,8 @@ class OTR_LedgerScriptWriter:
             budget=episode_budget,
             prior_macro=_refine_prior_macro,
             prior_critique=_refine_prior_critique,
+            style_grammar=(contract.grammar if contract else ""),
+            story_engine=(contract.story_engine if contract else ""),
         )
         # T1 PITCH ROOM (2026-06-23) -- THE primary story-architecture lever.
         # Default OFF (OTR_ENABLE_PITCH_ROOM). When ON (and NOT a refine sub-pass
@@ -3213,21 +3251,31 @@ class OTR_LedgerScriptWriter:
         # L12 build path so the role flows through build_sq_data, and injects the
         # matching final-beat ending template at the climax beat. OFF => no style,
         # climax stays irreversible_choice (the build_sq_data default).
-        _style_grammar_on = _OTRCFG.style_grammar_enabled()
         _climax_role = _OTRSQL12.BEAT_ROLE_IRREVERSIBLE_CHOICE
         _style_slug = ""
         _ending_tag = ""
         if _style_grammar_on:
             try:
-                from . import _otr_style_catalog as _OTRSTYLE
-                _premise_str = str(getattr(outline, "premise", "") or "")
-                _style_slug = _OTRSTYLE.select_style(_premise_str, meta, cast_seed)
-                _ending_tag = str(
-                    (_OTRSTYLE.get_style(_style_slug) or {}).get("ending_tag", "")
-                )
+                if contract is not None:
+                    # KILL 2 (2026-06-24): the climax SHAPE comes from the ONE
+                    # pre-outline StoryContract (selected from script_brief/
+                    # news_seed BEFORE generate_outline), not a second premise-keyed
+                    # select_style draw here -- one style source per episode.
+                    _style_slug = contract.slug
+                    _ending_tag = contract.ending_tag
+                    _ending_template = contract.ending_template
+                else:
+                    # Defensive: flag on but the contract build raised (already
+                    # LOUD-logged) -> fall back to the original premise-keyed draw
+                    # so the climax shape is still chosen.
+                    _premise_str = str(getattr(outline, "premise", "") or "")
+                    _style_slug = _OTRSTYLE.select_style(_premise_str, meta, cast_seed)
+                    _ending_tag = str(
+                        (_OTRSTYLE.get_style(_style_slug) or {}).get("ending_tag", "")
+                    )
+                    _ending_template = _OTRSTYLE.ending_template_for(_style_slug)
                 if _ending_tag in _OTRSQL12.CLIMAX_CLASS_ROLES:
                     _climax_role = _ending_tag
-                _ending_template = _OTRSTYLE.ending_template_for(_style_slug)
             except Exception as exc:  # noqa: BLE001 -- grammar must never break audio
                 log.warning(
                     "[OTR_LedgerScriptWriter] style-grammar select skipped (%s); "
