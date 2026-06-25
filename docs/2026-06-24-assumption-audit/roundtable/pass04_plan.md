@@ -56,7 +56,7 @@ Only the ending_tag survives; the rich grammar is never injected.
 
 ### KILL 4 -- "body beats need only soft role prose." They get nothing deterministic.
 - Evidence: `build_sq_data` enrich gate `if beat_role in (PERSONAL_STAKE,
-  IRREVERSIBLE_CHOICE)` (~694); `_enrich_intent` treats every other role as
+  IRREVERSIBLE_CHOICE)` (l12:700, re-verified); `_enrich_intent` treats every other role as
   personal_stake. setup/pressure/consequence + all non-irreversible climax classes
   are starved.
 - FIX: role-keyed enrichment map (setup/pressure/personal_stake + every
