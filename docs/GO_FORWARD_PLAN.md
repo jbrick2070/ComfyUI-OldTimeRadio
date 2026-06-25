@@ -1,7 +1,7 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE LEVER-1 LOAD-BEARING SHIPPED + PUSHED; C4 DEFERRED per a
-> best-practice roundtable. origin/v2.0-alpha HEAD `d4ca6cd4` == local. NEXT = G1, the offline abstain-residual count.)**
+> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE SPRINT COMPLETE: Lever 1 SHIPPED; Lever 2 DROPPED via G1;
+> C4 DEFERRED. origin/v2.0-alpha HEAD `d4ca6cd4` == local + docs on top. NEXT = forward-order engine track / operator pick.)**
 > A coder session built the model-agnostic tolerance from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`,
 > REFINED by two LIVE grounding roundtables whose converged resolutions are the actual build spec (pass04's literal
 > C1/C4 were SUPERSEDED where grounding contradicted them -- the operator chose "roundtable the fork" both times):
@@ -29,11 +29,18 @@
 > NO workflow-JSON / node / widget change (env+code only -- the schema is internal pydantic, not a node widget).
 > The whole sprint touched ONLY `_otr_structured_call.py` + `_otr_radio_editor.py`'s schema + tests. prod/main +
 > tags GATED.
-> **>>> NEXT = G1 (offline, no-GPU): MEASURE the abstain residual** -- what fraction of action/dialogue SPANS the
-> existing two-tier deterministic detectors (`split_stage_business` + `detect_stage_business_for_reroll`) do NOT
-> already handle. If ~0, DROP the binary dialogue/stage-direction lane (`docs/2026-06-25-schema-adherence/binary/
-> pass01_plan.md`); if non-trivial, build it in SHADOW MODE gated on G2 (byte-identity of abstain). Operator-gated
-> before building the lane. C4 reopens only on a real captured non-alias schema drift.
+> **>>> G1 DONE (offline, no-GPU) -> DROP the binary dialogue/stage-direction lane (Lever 2).** Over 638 shipped
+> ledgers / 5,513 character lines, the existing two-tier deterministic detectors (`split_stage_business` +
+> `detect_stage_business_for_reroll`, whitelist `_NARRATION_VERBS`) leave a GENUINE residual of ~0: a deliberately
+> over-broad verb-agnostic heuristic flags 841 (15.3%) candidates, but a 40-line sample is 0/40 genuine -- all
+> false positives (names ending in `s` like "Reeves", ordinary 3rd-person dialogue verbs, and in-character SPOKEN
+> commands like "Initiating final descent" an LLM lane would WRONGLY strip). The deterministic detectors already
+> catch the real stage business; the lane is unnecessary, G2 is moot. Results + the reusable measure
+> (`scripts/_otr_g1_abstain_residual.py`): `docs/2026-06-25-schema-adherence/binary/G1_RESULTS.md`.
+> **SCHEMA-ADHERENCE SPRINT COMPLETE: Lever 1 (tolerance) SHIPPED; Lever 2 (binary) DROPPED via G1; C4 DEFERRED
+> with a ready recipe.** Future non-whitelist leak -> cheap fix is ADD the verb to `_NARRATION_VERBS`, not an LLM
+> lane. C4 reopens only on a real captured non-alias schema drift. **NEXT = the forward-order engine track
+> (section 3 -- Wan eyeball / coverage sweep, mostly operator-gated GPU) or the operator's pick.**
 >
 > **>>> PRIOR STEP (the planner handoff that kicked off this build) -- 2026-06-25 (SCHEMA-ADHERENCE BUILD HANDOFF -> a fresh CODER window. Docs only this
 > session; design roundtable CONVERGED, NOTHING coded yet. origin/v2.0-alpha HEAD `89e9f8bf` == local.)**
@@ -1642,16 +1649,17 @@
 ## 1. CURRENT STEP
 
 **>>> ACTIVE (2026-06-25, CODER) = SCHEMA-ADHERENCE -- LEVER-1 LOAD-BEARING SHIPPED (`516644eb`, `d4ca6cd4`);
-C4 DEFERRED; NEXT = G1. The full build narrative is in the CURRENT STEP block at the very top of this file.
+C4 DEFERRED; Lever 2 DROPPED via G1; SPRINT COMPLETE. The full build narrative is in the CURRENT STEP block at the very top.
 TL;DR: Lever 1 = TOLERANCE built from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`, refined by
 two live grounding roundtables (nested-fork/ + c4-scope/). C0+C1+C2+C5+C6 (`516644eb`) + C3 ladder (`d4ca6cd4`)
 SHIPPED + pushed: the proven nested Opus `normalize_length` failure validates on attempt 1 via the shared
 `apply_field_aliases`/`__otr_field_aliases__` before-validator; structural rung is JSON-syntax-only (token-burn
 fix); canonical happy path byte-identical; NO workflow-JSON change. C4 (schema-in-repair) DEFERRED -- the proven
 failure is fixed so it would test dead code; recipe ready in c4-scope/. Lever 2 = BINARY decomposition still
-GATED on **G1** (offline abstain-residual count) + G2. Each chunk shipped suite-green vs the 5 pre-existing
-`267a53e` fails + Bug Bible 16/7/3. **NEXT = run G1 (offline, no-GPU); build the binary lane ONLY if a
-non-trivial residual + operator GO. prod/main + tags GATED.**
+DROPPED via G1 (genuine residual ~0 over 638 ledgers / 5,513 lines; the 15.3% broad-flag was 0/40 genuine on
+inspection -- names, 3rd-person dialogue verbs, in-character spoken commands; `binary/G1_RESULTS.md`). Each chunk
+shipped suite-green vs the 5 pre-existing `267a53e` fails + Bug Bible 16/7/3. **SCHEMA-ADHERENCE SPRINT COMPLETE;
+NEXT = the forward-order engine track (section 3) or operator pick. prod/main + tags GATED.**
 
 **>>> SUPERSEDED (2026-06-22, PLANNER) = STORY-QUALITY LIFT -- the 4-round roundtable CONVERGED; build-ready
 coder kickoff `docs/2026-06-22-story-quality-lift/roundtable/pass04_plan_FINAL.md`. NEXT = operator GO to
@@ -2166,7 +2174,8 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   dead code; OPTIONAL `_build_schema_snippet`-shim recipe ready in c4-scope/, reopen on a real captured drift.
   LEVER 2 binary lane `docs/2026-06-25-schema-adherence/binary/pass01_plan.md` still GATED on **G1** (offline
   abstain-residual count -- the cheap first move; may DROP the lane) + **G2** (byte-identity of abstain).
-  **NEXT = G1.** NO workflow-JSON change.
+  **G1 DONE -> Lever 2 (binary lane) DROPPED (genuine residual ~0; `binary/G1_RESULTS.md`); SCHEMA-ADHERENCE
+  SPRINT COMPLETE.** NO workflow-JSON change.
 - **LOOK-QA BUGS (NEW 2026-06-14 eve — operator look-QA pass; all in `BUG_LOG_2026-06.md`):**
   - **BUG-408 default MUSIC sounds non-musical (SA3).** **IMPLEMENTED 2026-06-14 (`3a4f71d`).** Path B:
     SA3-shaped prompt + real negative + per-cue `seconds_start` within a 30s `seconds_total` context (latent
