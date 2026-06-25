@@ -1,7 +1,15 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE SPRINT COMPLETE: Lever 1 SHIPPED; Lever 2 DROPPED via G1;
-> C4 DEFERRED. origin/v2.0-alpha HEAD `d4ca6cd4` == local + docs on top. NEXT = forward-order engine track / operator pick.)**
+> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE SPRINT COMPLETE + LIVE-VALIDATED: Lever 1 SHIPPED; Lever 2
+> DROPPED via G1; C4 DEFERRED. origin/v2.0-alpha HEAD `d4ca6cd4` == local + docs on top. NEXT = forward-order engine track / operator pick.)**
+> **E2E GPU VALIDATION (operator-requested, 2026-06-25): a 320w all-visualizer episode on the canonical JSON
+> rendered end-to-end on BOTH writer lanes -> OBS final + `audio_byte_identical OK`, zero tracebacks. LOCAL
+> (mistral-nemo): `signal_lost_frozen_awakening` 77.8MB, 21:03. FRONTIER (`~openai/gpt-latest` via
+> `openrouter:slot-a` -- the exact path the Opus bug exhausted): `signal_lost_thumb_on_the_relay` 80.7MB, 17:42,
+> ~83k tokens (<$1). Lever-1 fired LIVE: C2 clamp coerced GPT's over-long `intent` fields; `normalize_length[openrouter:slot-a]`
+> PARSED GPT's nested BeatEdit (no Field-required exhaustion) then skipped the structural rung straight to typed
+> repair (C3) -- NO StructuredCallFailedError, the original 90k-burn failure mode is GONE. Record:
+> `docs/2026-06-25-schema-adherence/e2e/E2E_RESULTS.md`.**
 > A coder session built the model-agnostic tolerance from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`,
 > REFINED by two LIVE grounding roundtables whose converged resolutions are the actual build spec (pass04's literal
 > C1/C4 were SUPERSEDED where grounding contradicted them -- the operator chose "roundtable the fork" both times):
