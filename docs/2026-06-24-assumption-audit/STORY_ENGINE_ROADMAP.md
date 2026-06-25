@@ -69,12 +69,19 @@ after the character climax; body beats carry real dramatic framing.
 EFFORT: small-medium (news_close_brief seam exists; the open intro is the new
 piece). Build alongside / right after KILL 2 so the open draws the same style.
 
-### 3. KILL 3 -- climax POSITION (let the ending choose where it lands)  [DEFERRED]
-WHY: every episode is forced to peak on the LAST beat -- a structural mono-shape.
-Some endings (revelation, reversal) want to land earlier with a denouement after.
-WHAT: let the ending taxonomy choose the climax position; relax the validator.
-ACCEPTANCE: episodes vary in arc shape, not just ending label.
-EFFORT: larger (breaks the climax-last validator + the ending-template target +
+### 3. KILL 3 -- climax POSITION = spine-driven, not forced  [DEFERRED]
+WHY: every episode is FORCED to peak on the LAST beat regardless of the spine --
+a structural mono-shape. The fix is to stop FORCING it, not to mandate a move.
+Operator (2026-06-24): a last-beat crux is completely fine WHEN THE SPINE CALLS
+FOR IT -- many stories naturally peak last. The goal is that the spine/ending
+class DECIDES the climax position (last beat, or earlier with a denouement
+after), instead of a hardcoded "always last."
+WHAT: let the spine choose the climax beat; relax the climax-last validator to
+allow either; keep last-beat as a valid (and common) outcome.
+ACCEPTANCE: when the spine wants it last, it lands last; when the spine wants an
+earlier crux + fallout, that is allowed too -- position follows the story, not a
+rule.
+EFFORT: larger (touches the climax-last validator + the ending-template target +
 the outro's "last line = resolution" assumption -- its own build, after 1 & 2).
 
 ---
