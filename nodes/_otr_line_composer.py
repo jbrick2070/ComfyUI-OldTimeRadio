@@ -586,6 +586,21 @@ def aggregate_compose_flags(ledger_data: dict) -> dict[str, int]:
 
 
 @dataclass(frozen=True)
+class SafeOpenBrief:
+    """No-spoiler inputs for the announcer OPEN (KILL 2, 2026-06-24). Captured
+    right after the outline is generated and BEFORE build_sq_data mutates the
+    setup beat, so the open is composed by INPUT STARVATION: the script_brief
+    (which can carry the outcome) is never passed -- only these setup-framed
+    fields reach the prompt. ``cast`` is the LOCKED cast: the only proper names
+    the announcer may use."""
+    setting: str
+    time_of_day: str
+    opening_status_quo: str
+    cast: tuple[str, ...]
+    era: str = ""
+
+
+@dataclass(frozen=True)
 class LineRequest:
     """Per-beat input for compose_line.
 
@@ -2533,6 +2548,29 @@ VOICE:
 - Use only proper names that appear in the brief. Invent none.
 """
 
+# KILL 2 (2026-06-24): the input-starvation OPEN. No script_brief is passed under
+# the flag, so the prompt is built from the SafeOpenBrief only; the announcer
+# orients the listener WITHOUT revealing the outcome (the outcome is never an
+# input). Used only when story_scaffold is on.
+_ANNOUNCER_INTRO_SYSTEM_SAFE = """\
+You are the radio announcer for SIGNAL LOST, an old-time radio drama.
+Write exactly ONE spoken opening line that sets tonight's scene.
+
+OUTPUT - strict:
+- Only the words the announcer says out loud.
+- One line. No line breaks.
+- No speaker name, no colon, no quotation marks.
+- No stage directions, no brackets, no sound cues.
+- One or two sentences, roughly 12 to 30 words.
+
+VOICE:
+- A period radio host: warm, measured, a little mysterious.
+- Sentence 1 orients the listener: the time and place, and who is there.
+- Sentence 2 raises a quiet intrigue -- a question or a tension in the air.
+- Do NOT reveal the outcome, the twist, or how the story ends.
+- Use ONLY the proper names in the cast list below; invent none.
+"""
+
 _ANNOUNCER_OUTRO_SYSTEM = """\
 You are the radio announcer for SIGNAL LOST, an old-time radio drama.
 Write exactly ONE spoken closing line that ends tonight's broadcast.
@@ -2632,6 +2670,26 @@ def fallback_announcer_intro(script_brief: str) -> str:
     )
 
 
+def fallback_safe_open(safe_open_brief) -> str:
+    """Deterministic SIGNAL LOST opening built from the SafeOpenBrief ONLY --
+    never the script_brief (input starvation is the no-spoiler guarantee). Fires
+    when the open LLM pass fails validation or the brief is thin. Never raises."""
+    sb = safe_open_brief
+    setting = clean_one_line(str(getattr(sb, "setting", "") or ""), max_chars=120)
+    tod = clean_one_line(str(getattr(sb, "time_of_day", "") or ""), max_chars=40)
+    where = ", ".join(p for p in (tod, setting) if p)
+    if where:
+        where = where[0].upper() + where[1:]
+        return (
+            f"Good evening. This is SIGNAL LOST. Tonight, we open on {where}. "
+            f"Stay with us."
+        )
+    return (
+        "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
+        "through the static. Stay with us."
+    )
+
+
 def fallback_announcer_outro(news_close_brief: str) -> str:
     """Deterministic SIGNAL LOST closing line built from the close brief.
 
@@ -2711,6 +2769,8 @@ def compose_announcer_intro(
     creative_fn,
     script_brief: str,
     creative_repo_id: str | None = None,
+    story_scaffold: bool = False,
+    safe_open_brief: SafeOpenBrief | None = None,
 ) -> LineResult:
     """Compose the episode's opening announcer line.
 
@@ -2726,7 +2786,65 @@ def compose_announcer_intro(
 
     Returns a `LineResult`; `compose_flags` is ``("announcer_intro",)``
     on the LLM path or ``("announcer_intro_fallback",)`` on fallback.
+
+    KILL 2 (2026-06-24): when ``story_scaffold`` is on and a ``safe_open_brief``
+    is supplied, the open is built by INPUT STARVATION from that brief only --
+    ``script_brief`` is ignored, so the announcer cannot leak the outcome.
     """
+    # KILL 2 / announcer OPEN: the input-starvation path. The script_brief (which
+    # can carry the outcome) is never read; the prompt is built from the
+    # SafeOpenBrief setup fields only. On any failure -> fallback_safe_open, which
+    # is also script_brief-free. Flag off / no brief -> the original path below.
+    if story_scaffold and safe_open_brief is not None:
+        cast = tuple(
+            str(n) for n in getattr(safe_open_brief, "cast", ()) if str(n).strip()
+        )
+        _era = clean_one_line(str(getattr(safe_open_brief, "era", "") or ""), max_chars=60)
+        _tod = clean_one_line(str(getattr(safe_open_brief, "time_of_day", "") or ""), max_chars=60)
+        _setting = clean_one_line(str(getattr(safe_open_brief, "setting", "") or ""), max_chars=160)
+        _sq = clean_one_line(str(getattr(safe_open_brief, "opening_status_quo", "") or ""), max_chars=200)
+        user_parts = []
+        if _era:
+            user_parts.append(f"Era: {_era}")
+        if _tod:
+            user_parts.append(f"Time of day: {_tod}")
+        if _setting:
+            user_parts.append(f"Setting: {_setting}")
+        if _sq:
+            user_parts.append(f"Where things stand as we open: {_sq}")
+        if cast:
+            user_parts.append(
+                "Cast (use ONLY these proper names): " + ", ".join(cast)
+            )
+        user_parts.append(
+            "Write the announcer's opening line now -- orient the listener and "
+            "raise a quiet intrigue. Do NOT reveal how the story ends."
+        )
+        messages = [
+            {"role": "system", "content": _ANNOUNCER_INTRO_SYSTEM_SAFE},
+            {"role": "user", "content": "\n".join(user_parts)},
+        ]
+        raw = _announcer_generate(creative_fn, messages)
+        cleaned = strip_line_formatting(raw or "")
+        ok, validated = validate_announcer_line(
+            cleaned,
+            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+        )
+        if ok:
+            log.info(
+                "[OTR_AnnouncerPass] safe-open pass ok (model=%s, %d chars)",
+                creative_repo_id, len(validated),
+            )
+            return LineResult(text=validated, compose_flags=("announcer_intro",))
+        log.warning(
+            "[OTR_AnnouncerPass] safe-open pass failed validation (model=%s, "
+            "raw=%r); using deterministic safe fallback", creative_repo_id, raw,
+        )
+        return LineResult(
+            text=fallback_safe_open(safe_open_brief),
+            compose_flags=("announcer_intro_fallback", "open_safe_fallback"),
+        )
     # LLM slot: creative -- announcer intro is a narrative framing
     # pass; routed through the writer's creative_writing_model slot.
     brief = clean_one_line(script_brief or "", max_chars=0)

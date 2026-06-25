@@ -3222,6 +3222,28 @@ class OTR_LedgerScriptWriter:
                 beat_word_sum, resolved["target_words"], ratio,
             )
 
+        # KILL 2 / announcer OPEN (2026-06-24): capture the no-spoiler open brief
+        # NOW -- after the outline is final but BEFORE build_sq_data (below)
+        # mutates beat.intent in place and KILL 4 enriches the setup beat. The open
+        # is then composed by INPUT STARVATION from these setup-framed fields only
+        # (never script_brief). OFF => stays None => the original intro path runs.
+        safe_open_brief = None
+        if _style_grammar_on:
+            _open_status_quo = ""
+            for _b in outline.beats:
+                if str(getattr(_b, "speaker_role", "")) == "character":
+                    _open_status_quo = _OTRLC.clean_one_line(
+                        str(getattr(_b, "intent", "") or ""), 200,
+                    )
+                    break
+            safe_open_brief = _OTRLC.SafeOpenBrief(
+                setting=str(getattr(outline, "setting", "") or ""),
+                time_of_day=str(getattr(outline, "time_of_day", "") or ""),
+                opening_status_quo=_open_status_quo,
+                cast=tuple(character_cast),
+                era=str(meta.get("period", "") or ""),
+            )
+
         # --- F2. Story-Quality LIFT L1/L2 (2026-06-23) -- deterministic,
         # UPSTREAM beat-plan shaping. OFF by default (env OTR_STORY_QUALITY_L12).
         # When ON: build the writer-side sq dict[beat_id -> {beat_role,
@@ -4512,13 +4534,23 @@ class OTR_LedgerScriptWriter:
                     ):
                         line_res = _OTRLC.compose_announcer_intro(
                             creative_fn=creative_generate_fn,
-                            script_brief=script_brief,
+                            script_brief=(
+                                "" if _style_grammar_on else script_brief
+                            ),
                             creative_repo_id=resolved[
                                 "creative_writing_model"
                             ],
+                            story_scaffold=_style_grammar_on,
+                            safe_open_brief=safe_open_brief,
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
+                    # KILL 2 telemetry (under flag only): did the safe-open pass
+                    # fall back to the deterministic template?
+                    if _style_grammar_on:
+                        meta.setdefault("story_quality", {})["open_safe_fallback"] = (
+                            "open_safe_fallback" in line_res.compose_flags
+                        )
                 elif (
                     last_announcer_id is not None
                     and beat.beat_id == last_announcer_id
