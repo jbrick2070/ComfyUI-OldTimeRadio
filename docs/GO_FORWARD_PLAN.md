@@ -1,6 +1,48 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (STORY-ENGINE ASSUMPTION-AUDIT CONVERGED -> BUILD the fixes in a fresh
+> **>>> CURRENT STEP -- 2026-06-24 (KILL 1 BUILT + SHIPPED + PUSHED + LIVE 309w OBS SMOKE PASSED.
+> origin/v2.0-alpha HEAD `adb47483` == local. NEXT = the operator-gated KILL-1 RE-SOAK; do NOT start
+> KILL 2 until that re-soak is clean.)**
+> KILL 1 = the deterministic BODY-OUTPUT gate -- validate the SHIPPED character line, not `beat.intent`.
+> Behind the existing story-quality lever (default ON; `OTR_ENABLE_STYLE_GRAMMAR=0` = byte-identical
+> kill-switch); NO workflow-JSON change. Commit `adb47483` (+28 tests, `tests/test_body_output_gate.py`):
+> - `_otr_story_quality_l12`: `validate_composed_grounding(text, sq_entry, grounded, *, max_ungrounded=0,
+>   require_conflict_object_on_roles=CLIMAX_CLASS_ROLES|{PRESSURE})` -> (ok, split reasons) +
+>   `ungrounded_crisis_tokens` + `line_references_object`/`_content_tokens`/`_strip_possessive`;
+>   `count_ungrounded_crisis` now delegates to the token list.
+> - `LineRequest.grounded_nouns` (frozenset) threaded through `_otr_reroll.build_reroll_line_request`
+>   (from `meta.grounded_nouns`). Writer computes the palette ONCE
+>   (`premise_noun_palette(roster, news_seed, premise, *premise_texts)`), stamps `meta.grounded_nouns`,
+>   runs the gate IN-LOOP after the common `cleaned` assignment (exchange 4163 + compose 4206) and BEFORE
+>   `last_lines.append`/`update_line_text` (covers the use_exchange bypass); character beats only. ONE
+>   guarded reroll via the existing `reroll_hint` with SPLIT hints (ungrounded_crisis -> offending tokens;
+>   missing_conflict_object -> grounded object); ship-reroll-if-valid-else-original; stamps
+>   `meta.story_quality.{body_gate_rerolls, body_gate_failed, body_gate_ungrounded_crisis}`,
+>   `grounding_reroll_failed` on exception.
+> - Composer: de-license the generic-roles line (1162) + the news-facts rider (1442) when
+>   `req.conflict_object` is set; byte-identical when empty.
+> ACCEPTANCE MET: full suite green vs the 5 pre-existing `267a53e` workflow-pin fails (re-verified
+> pre-existing by stash+rerun -- KILL 1 touches ZERO workflow JSON); Bug Bible 16/7/3; the 4 touched .py
+> AST-clean, no BOM. **LIVE 309w OBS SMOKE (canonical `otr_scifi_16gb_full.json`, fresh LTX-lane boot):
+> full episode ran end-to-end in 31:09 -> OBS final
+> `otr/obs/signal_lost_corks_dance_20260624_170035_silent_procgen_blended_final.mp4` (70.3 MB);
+> `audio_byte_identical OK`; zero tracebacks. The body gate FIRED LIVE: style=overnight_jazz_host_mystery,
+> ending_tag=revelation; body_gate_rerolls=1 (validated+shipped), body_gate_failed=10 (kept-original LOUD),
+> shipped-body ungrounded_crisis density = 2 ("button" x2 across 16 char beats -- the console standoff is
+> effectively gone). The 10 "failed" are mostly missing_conflict_object on the weak local mistral-nemo (the
+> line is premise-grounded but does not echo the seed-keyed object) -- the model-ceiling reality the plan
+> flagged (a model-capability gate is the deferred belt-and-suspenders). Server killed (selective CIM),
+> :8000 FREE, VRAM ~1.4GB. Results: `docs/2026-06-24-assumption-audit/KILL1_SMOKE_RESULTS.md`.**
+> **>>> NEXT (operator-gated): the KILL-1 LIVE RE-SOAK (gemma + mistral, 320w) measuring crisis-noun
+> density in the SHIPPED body lines (not intent). Operator idea 2026-06-24: make the A/B explicit -- the
+> kill-switch ALREADY does this (`OTR_ENABLE_STYLE_GRAMMAR=0` = grammar+gate OFF = the AI's own story,
+> byte-identical to pre-grammar; default ON = the scaffolded story). The re-soak IS that comparison;
+> consider surfacing it as a node toggle for end-users. Do NOT start KILL 2 until the re-soak is clean.**
+> Then KILL 2 -> KILL 4/5 per `docs/2026-06-24-assumption-audit/roundtable/pass04_plan.md`. KILL 3
+> climax-position + model-capability gate + render profiles + `_PERSONAL_COST` rows DEFERRED.
+> prod/main + tags GATED.
+>
+> **>>> PRIOR STEP (the build target) -- 2026-06-24 (STORY-ENGINE ASSUMPTION-AUDIT CONVERGED -> BUILD the fixes in a fresh
 > CODER window. Plan is grounded + build-ready; NOTHING from it is coded yet. origin/v2.0-alpha HEAD
 > `0c8bd191` == local.)**
 > Two live story-engine runs proved the style grammar fixes the CLIMAX + announcer CLOSE but NOT the body:
