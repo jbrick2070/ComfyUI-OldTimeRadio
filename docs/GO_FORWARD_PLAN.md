@@ -1,6 +1,28 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (KILL 1 BUILT + SHIPPED + PUSHED + LIVE 309w OBS SMOKE PASSED.
+> **>>> CURRENT STEP -- 2026-06-24 (REFINE-BEFORE-CODE: a design /roundtable in a FRESH window on the
+> announcer redesign + news-coda + the KILL-2 approach, THEN code. origin/v2.0-alpha HEAD `47189349`.)**
+> KILL 1 is SHIPPED + re-soaked (the 6-leg story_scaffold bake-off landed 6 OBS episodes; ON wins -- 0
+> ungrounded machinery + varied endings vs OFF console-standoff; verdict in
+> `docs/2026-06-24-assumption-audit/roundtable/` + the bake-off doc). Operator wants the creative/design
+> refinements hardened via a roundtable BEFORE coding KILL 2. Run the `/roundtable` skill (standard repo
+> defaults: LIVE, 4 rounds, GPT+Gemini+DeepSeek panel, Claude grounded judge+panelist) grounded against the
+> real files, on: **`docs/2026-06-24-assumption-audit/ANNOUNCER_DESIGN.md`** (3 announcer jobs: scene-setting
+> OPEN no-spoilers / character CLOSE drama / NEWS CODA teaching beat) + **`STORY_ENGINE_ROADMAP.md`** + the
+> KILL-2 StoryContract section of **`roundtable/pass04_plan.md`**. REFINEMENT ASKS: (1) news-coda lead-in
+> phrasing (operator leans a light fixed tag like "The real story:"); (2) OPEN structure + length (operator
+> leans a tight 1-2 sentence cold open: time/place/characters/where-they-are-now, NO climax/outcome/twist);
+> (3) the KILL-2 injection approach -- does rendering sound_world/story_engine into every body beat actually
+> move the weak local writer, or is it the same single-prior trap that needs a deterministic gate too?;
+> (4) KILL 3 = SPINE-DRIVEN climax position (last beat is fine when the spine calls for it; remove the FORCE,
+> don't mandate a move). Operator thesis: the show TEACHES -- drama is delivery, the NEWS is the payload,
+> explicit at the end. GROUNDING WIN to confirm: the close already pulls the real news via `news_close_brief`
+> -> `compose_announcer_outro`, so the coda is largely WIRED (KILL 5 reframed "suppress" -> "frame + protect
+> the character climax"). After convergence -> hand to a CODER window: KILL 2 + announcer redesign + KILL 4
+> (behind the story_scaffold flag, byte-identical off; suite+Bug Bible per chunk; LIVE re-soak; commit+push
+> per green chunk). prod/main GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-24 (KILL 1 BUILT + SHIPPED + PUSHED + LIVE 309w OBS SMOKE PASSED.
 > origin/v2.0-alpha HEAD `adb47483` == local. NEXT = the operator-gated KILL-1 RE-SOAK; do NOT start
 > KILL 2 until that re-soak is clean.)**
 > KILL 1 = the deterministic BODY-OUTPUT gate -- validate the SHIPPED character line, not `beat.intent`.
