@@ -45,16 +45,23 @@ lane ran clean). Pulled the model (7.3 GB) and re-ran. Ledger
 | **C3 news CODA -- DYNAMIC bridge** | `news_coda_emitted = True`, `news_coda_fallback = False` -> the dynamic LLM bridge VALIDATED (compose flag `news_coda_bridge_reroll`, 2nd attempt). Close: *"While we ponder the fate of our stars and final transmissions: Researchers have confirmed the first detection of an interstellar comet passing through our solar system..."* -- gemma's own premise-specific segue + the real news appended. This is the FULL intended C3 behavior the weaker mistral could not reach. | PASS (dynamic) |
 | **C4 / grounding** | `ungrounded_crisis = {matches: 0, total: 181}` -- zero ungrounded crisis nouns; `body_gate_reroll=1`. | PASS |
 
+Pipeline integrity (gemma): freeze `frozen_with_doctor_edits`; master WAV 92.7 s;
+**`audio_byte_identical OK (53cb465f)`**; `obs_publish OK ->
+otr/obs/signal_lost_the_brass_key_20260625_000010_silent_procgen_blended_final.mp4`
+(59.8 MB); `Prompt executed in 00:25:55`. Same writer-agnostic render + mux-LAST
+spine as mistral -- unbroken. Box reset after: :8000 free, VRAM ~1.6 GB baseline.
+
 ## VERDICT
 
 C1-C4 are **proven live end-to-end on BOTH local writers**. All four behaviors
 fired on each; the body grounding is clean (mistral 0/149, gemma 0/181); both
-froze `frozen_with_doctor_edits`. mistral published a clean OBS final with
-`audio_byte_identical OK` (the writer-agnostic render + mux-LAST spine is
-unbroken); gemma additionally proved the **dynamic coda bridge** path. The toggle
-flips live (`story_scaffold=on -> OTR_ENABLE_STYLE_GRAMMAR=1 (widget override)`).
-The OFF path is byte-identical (unit-proven across +65 tests + the prior bake-off's
-live OFF episodes).
+froze `frozen_with_doctor_edits`; **both published clean OBS finals with
+`audio_byte_identical OK`** (mistral `0e97b0c7`, gemma `53cb465f`) -- the
+writer-agnostic render + mux-LAST spine is unbroken under the new code. gemma
+additionally proved the **dynamic coda bridge** path (mistral fell to the correct
+floor). The toggle flips live (`story_scaffold=on -> OTR_ENABLE_STYLE_GRAMMAR=1
+(widget override)`). The OFF path is byte-identical (unit-proven across +65 tests +
+the prior bake-off's live OFF episodes).
 
 Minor content notes (PRE-EXISTING / upstream of C1-C4, not regressions):
 1. **News-brief artifact** -- gemma's coda ended with a leaked `"Central object,
