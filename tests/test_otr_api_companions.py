@@ -145,6 +145,12 @@ def _writer_schemas() -> dict:
                     "refine_target_grade": (
                         ["Off", "C+", "B", "B+", "A"], {"default": "Off"},
                     ),
+                    # Story-scaffold toggle (2026-06-24): appended at index 24
+                    # (END) to mirror the live INPUT_TYPES + the canonical
+                    # workflow node-1 vector.
+                    "story_scaffold": (
+                        ["auto", "on", "off"], {"default": "auto"},
+                    ),
                 },
                 "optional": {},
             }
@@ -194,6 +200,7 @@ def _writer_node_fixture() -> dict:
                     "anthropic/claude-opus-4.7",              # 21 comfy_slot_a_model
                     "deepseek/deepseek-v4-pro",               # 22 comfy_slot_b_model
                     "Off",                                    # 23 refine_target_grade
+                    "auto",                                   # 24 story_scaffold
                 ],
             }
         ],
@@ -442,7 +449,7 @@ def test_round_trip_canonical_node1_inputs_correct():
     are appended at the END so creative/technical stay at wv[3]/wv[4].
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 24, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 25, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

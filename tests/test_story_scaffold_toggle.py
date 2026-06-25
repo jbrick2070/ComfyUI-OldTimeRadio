@@ -1,0 +1,106 @@
+"""Story-scaffold UI toggle (2026-06-24) -- the single user-facing control over
+the bundled scaffold (style grammar + the KILL-1 body gate + the announcer
+non-outcome close), all of which read OTR_ENABLE_STYLE_GRAMMAR.
+
+Covers: the INPUT_TYPES widget (choices/default/append-at-END); and
+``_apply_story_scaffold_env`` -- on/off override the env for the run, auto
+restores the import-time baseline (no leak), unknown values fall back to auto.
+
+Pure Python; no GPU, no LLM, no network.
+"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from nodes import OTR_LedgerScriptWriter as W  # noqa: E402
+
+_ENV = "OTR_ENABLE_STYLE_GRAMMAR"
+
+
+@pytest.fixture(autouse=True)
+def _restore_env():
+    """Snapshot + restore the env key and the module baseline around each test."""
+    had = _ENV in os.environ
+    prev = os.environ.get(_ENV)
+    base = W._OTR_SCAFFOLD_ENV_BASELINE
+    try:
+        yield
+    finally:
+        if had:
+            os.environ[_ENV] = prev
+        else:
+            os.environ.pop(_ENV, None)
+        W._OTR_SCAFFOLD_ENV_BASELINE = base
+
+
+class TestWidgetSurface:
+    def test_story_scaffold_in_input_types(self):
+        spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
+        assert "story_scaffold" in spec["optional"]
+        choices, meta = spec["optional"]["story_scaffold"]
+        assert choices == ["auto", "on", "off"]
+        assert meta["default"] == "auto"
+
+    def test_story_scaffold_is_last_optional(self):
+        spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
+        order = list(spec["optional"].keys())
+        assert order[-1] == "story_scaffold"
+
+
+class TestApplyScaffoldEnv:
+    def test_on_forces_env_1(self):
+        os.environ.pop(_ENV, None)
+        assert W._apply_story_scaffold_env("on") == "on"
+        assert os.environ[_ENV] == "1"
+
+    def test_off_forces_env_0(self):
+        os.environ.pop(_ENV, None)
+        assert W._apply_story_scaffold_env("off") == "off"
+        assert os.environ[_ENV] == "0"
+
+    def test_auto_restores_unset_baseline(self):
+        # baseline None (process started with the env unset) -> auto removes it,
+        # even if a prior on/off run set it.
+        W._OTR_SCAFFOLD_ENV_BASELINE = None
+        os.environ[_ENV] = "0"
+        assert W._apply_story_scaffold_env("auto") == "auto"
+        assert _ENV not in os.environ
+
+    def test_auto_restores_set_baseline(self):
+        # baseline "1" (the process started with it on) -> auto restores "1".
+        W._OTR_SCAFFOLD_ENV_BASELINE = "1"
+        os.environ[_ENV] = "0"
+        assert W._apply_story_scaffold_env("auto") == "auto"
+        assert os.environ[_ENV] == "1"
+
+    def test_unknown_value_falls_back_to_auto(self):
+        W._OTR_SCAFFOLD_ENV_BASELINE = None
+        os.environ[_ENV] = "1"
+        assert W._apply_story_scaffold_env("banana") == "banana"
+        assert _ENV not in os.environ
+
+    def test_case_and_whitespace_insensitive(self):
+        os.environ.pop(_ENV, None)
+        assert W._apply_story_scaffold_env("  ON ") == "on"
+        assert os.environ[_ENV] == "1"
+
+    def test_empty_is_auto(self):
+        W._OTR_SCAFFOLD_ENV_BASELINE = None
+        os.environ[_ENV] = "0"
+        assert W._apply_story_scaffold_env("") == "auto"
+        assert _ENV not in os.environ
+
+    def test_no_leak_off_then_auto(self):
+        # off sets "0"; a following auto run (unset baseline) clears it so the
+        # next prompt sees the default again -- the no-leak guarantee.
+        W._OTR_SCAFFOLD_ENV_BASELINE = None
+        W._apply_story_scaffold_env("off")
+        assert os.environ[_ENV] == "0"
+        W._apply_story_scaffold_env("auto")
+        assert _ENV not in os.environ

@@ -670,12 +670,13 @@ class TestWriterB2aSurface:
         # (END of optional). 2026-06-01 (Comfy Credits) appended the sibling
         # pair comfy_slot_a_model + comfy_slot_b_model at slots 21/22, so the
         # vector is now 23 with [0..20] intact.
-        assert len(wv) == 24, (
-            f"writer widgets_values length drift: {len(wv)} (expected 24: "
+        assert len(wv) == 25, (
+            f"writer widgets_values length drift: {len(wv)} (expected 25: "
             f"the 2026-05-29 lean-down brought it to 19, S2 appended the "
             f"OpenRouter pair -> 21, Comfy Credits appended "
-            f"comfy_slot_a_model + comfy_slot_b_model -> 23, then the refine "
-            f"loop (2026-06-23) appended refine_target_grade -> 24)"
+            f"comfy_slot_a_model + comfy_slot_b_model -> 23, the refine "
+            f"loop (2026-06-23) appended refine_target_grade -> 24, then the "
+            f"story-scaffold toggle (2026-06-24) appended story_scaffold -> 25)"
         )
         # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -723,6 +724,12 @@ class TestWriterB2aSurface:
         assert wv[23] == "Off", (
             f"refine_target_grade (slot 23) must ship 'Off' (the refine loop is "
             f"default-OFF in the shipped bake); got {wv[23]!r}"
+        )
+        # Slot 24: story_scaffold (scaffold toggle, 2026-06-24) -- APPENDED at
+        # the END; ships "auto" (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
+        assert wv[24] == "auto", (
+            f"story_scaffold (slot 24) must ship 'auto' (follow the env/default "
+            f"scaffold setting in the shipped bake); got {wv[24]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

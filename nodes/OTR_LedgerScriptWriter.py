@@ -113,6 +113,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -158,6 +159,14 @@ DEFAULT_TRAITS = "neutral"
 # runtime code.
 
 LAST_LINES_WINDOW = 5
+
+# Story-scaffold UI toggle (2026-06-24) -- the OTR_ENABLE_STYLE_GRAMMAR value the
+# process STARTED with (the headless/operator env, or None when unset). The
+# writer's `story_scaffold` widget can force the scaffold on/off per run (it sets
+# the env so every downstream config + module read is consistent); the "auto"
+# setting restores THIS baseline so an on/off run never leaks to the next prompt
+# in a long-lived server.
+_OTR_SCAFFOLD_ENV_BASELINE = os.environ.get("OTR_ENABLE_STYLE_GRAMMAR")
 """Rolling context window size for compose_line. Each character /
 announcer beat appends to the window; non-voiced beats do not.
 
@@ -1539,6 +1548,29 @@ def _otr_body_gate_hint(reasons, sq_entry) -> str:
     return " ".join(parts).strip()
 
 
+def _apply_story_scaffold_env(scaffold) -> str:
+    """Resolve the ``story_scaffold`` widget into ``OTR_ENABLE_STYLE_GRAMMAR``.
+
+    The widget is the single user-facing control over the whole bundled scaffold
+    (style grammar + the KILL-1 body gate + the outline announcer-close gate,
+    which all read that env). ``"on"`` / ``"off"`` override the env for THIS run;
+    ``"auto"`` (or any unknown value) restores ``_OTR_SCAFFOLD_ENV_BASELINE`` --
+    the value the process started with -- so an on/off run never leaks to the
+    next prompt in a long-lived server. Pure side effect on ``os.environ``;
+    returns the normalized scaffold string. Never raises."""
+    s = str(scaffold or "auto").strip().lower()
+    if s == "on":
+        os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = "1"
+    elif s == "off":
+        os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = "0"
+    else:  # "auto" (or any unknown value) -- respect the process baseline
+        if _OTR_SCAFFOLD_ENV_BASELINE is None:
+            os.environ.pop("OTR_ENABLE_STYLE_GRAMMAR", None)
+        else:
+            os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = _OTR_SCAFFOLD_ENV_BASELINE
+    return s
+
+
 # ---------------------------------------------------------------------------
 # Class
 # ---------------------------------------------------------------------------
@@ -2045,6 +2077,28 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Story-scaffold toggle (2026-06-24) -- APPENDED at the END of
+                # optional (next widgets_values index, BUG-LOCAL-097) so existing
+                # widget indices are untouched. The single user-facing control
+                # over the whole bundled scaffold (style grammar + the KILL-1
+                # body-output gate + the announcer non-outcome close).
+                "story_scaffold": (
+                    ["auto", "on", "off"],
+                    {
+                        "default": "auto",
+                        "tooltip": (
+                            "How much the radio-drama SCAFFOLD shapes the story. "
+                            "off = a story drawn straight from the news seed (the "
+                            "base prompt only -- no style catalog, no climax-"
+                            "shape grammar, no grounding gate; the writer's own "
+                            "take). on = the news story shaped by ONE of the ~100 "
+                            "radio-drama styles (varied climax + ending + the "
+                            "premise-grounding body gate). auto (default) = follow "
+                            "the OTR_ENABLE_STYLE_GRAMMAR env / its default (ON). "
+                            "on/off override that env for THIS run."
+                        ),
+                    },
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -2315,6 +2369,10 @@ class OTR_LedgerScriptWriter:
         auth_token_comfy_org=None,
         api_key_comfy_org=None,
         refine_target_grade="Off",
+        # Story-scaffold UI toggle (2026-06-24): auto/on/off. Governs the whole
+        # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
+        # top of the body). Default "auto" => env/default => byte-identical.
+        story_scaffold="auto",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -2329,6 +2387,25 @@ class OTR_LedgerScriptWriter:
         The optional default-OFF iterative story-REVISION loop (v1, 2026-06-23)
         is delegated to ``_refine_loop`` on the INITIAL call; each refine pass
         re-enters this body with ``_refine_active=True`` and runs it directly."""
+        # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
+        # process env FIRST, before generate_outline + every style-grammar read,
+        # so this single control governs the whole bundled scaffold: the style
+        # grammar + the KILL-1 body-output gate (via
+        # _otr_config.style_grammar_enabled) AND the outline announcer-close gate
+        # (which reads OTR_ENABLE_STYLE_GRAMMAR directly). "on"/"off" override the
+        # env for THIS run; "auto" restores the import-time baseline so an on/off
+        # run never leaks to the next prompt in a long-lived server. A local
+        # `import os` binds the name first -- run() has a later function-local
+        # `import os`, which makes os function-local for the whole body (the
+        # 096ef64 UnboundLocalError gotcha).
+        import os
+        _scaffold = _apply_story_scaffold_env(story_scaffold)
+        if _scaffold in ("on", "off"):
+            log.info(
+                "[OTR_LedgerScriptWriter] story_scaffold=%s -> "
+                "OTR_ENABLE_STYLE_GRAMMAR=%s (widget override)",
+                _scaffold, os.environ.get("OTR_ENABLE_STYLE_GRAMMAR"),
+            )
         if not _refine_active:
             from . import _otr_story_select as _OTRSEL_GATE
             _rcfg = _OTRSEL_GATE.resolve_refine_passes(
@@ -5299,10 +5376,10 @@ if __name__ == "__main__":
         # removal) -> 14 (optimization_profile removed) -> 15
         # (lemmy_cameo added). Current: 11 widget-surface + 4 Phase 4
         # v4 sampling knobs.
-        assert n_optional == 15, (
+        assert n_optional == 16, (
             f"optional widget count drift: {n_optional} "
-            f"(expected 15: 11 widget-surface + 4 Phase 4 v4 "
-            f"sampling knobs)"
+            f"(expected 16: 11 widget-surface + 4 Phase 4 v4 "
+            f"sampling knobs + story_scaffold appended 2026-06-24)"
         )
         # S30 B2a: both model widgets carry the catalog dropdown_choices()
         # output (list of labels). DEFAULT must match catalog.DEFAULT_LLM.
@@ -5315,7 +5392,7 @@ if __name__ == "__main__":
             assert meta["default"] == _D, (
                 f"{slot_key} default drift: {meta['default']!r} != {_D!r}"
             )
-        print("[2/9] PASS: INPUT_TYPES schema (15 optional widgets)")
+        print("[2/9] PASS: INPUT_TYPES schema (16 optional widgets)")
     except Exception:
         failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
         print("[2/9] FAIL: INPUT_TYPES schema")
