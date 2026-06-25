@@ -130,11 +130,12 @@ class PostValidationError(ValueError):
 
     `post_validator` reports such a failure by returning an error
     string (see `structured_call`); the ladder wraps that string in
-    this exception. It subclasses `ValueError` so the ladder's existing
-    `except (json.JSONDecodeError, ValidationError, ValueError)` arms
-    catch it with no change -- a content failure advances the ladder
-    exactly like a schema failure, and is fed to the typed-repair
-    factory as the Attempt 3 error.
+    this exception. It subclasses `ValueError`, but the ladder's
+    `except (json.JSONDecodeError, ValidationError, PostValidationError)`
+    arms catch it EXPLICITLY (a plain `ValueError` is NOT recoverable and
+    propagates) -- a content failure advances the ladder exactly like a
+    schema failure, and is fed to the typed-repair factory as the
+    typed-repair error.
     """
 
 
@@ -436,7 +437,7 @@ def _clamp_overlong_strings(
 
 
 # ---------------------------------------------------------------------------
-# Public entrypoint -- the 4-attempt retry ladder
+# Public entrypoint -- the 3-attempt retry ladder
 # ---------------------------------------------------------------------------
 
 
@@ -506,14 +507,20 @@ def structured_call(
         Short string for logging / slot attribution.
 
     The ladder (stops at the first schema-valid result that also
-    clears `post_validator`):
+    clears `post_validator`; only `json.JSONDecodeError`,
+    `pydantic.ValidationError`, and `PostValidationError` are recoverable
+    -- a plain `ValueError` propagates):
       Attempt 1: `slot_fn` at `base_temperature`.
-      Attempt 2: SAME prompt at `structural_retry_temperature` (lower).
-      Attempt 3: typed repair -- `repair_prompt_factory` either builds
-                 a repair prompt (run at the static low temperature
-                 `_REPAIR_TEMPERATURE`) or hands back a finished
-                 `schema` instance, which is returned directly with no
-                 LLM call. The ladder ends here.
+      Structural retry: SAME prompt at `structural_retry_temperature`
+                 (lower) -- run ONLY when the prior failure was a
+                 `json.JSONDecodeError` (malformed JSON a calmer re-prompt
+                 may fix). A `ValidationError` / `PostValidationError`
+                 SKIPS this rung (a re-prompt re-emits the same bad shape
+                 and only burns tokens) and goes straight to typed repair.
+      Typed repair: `repair_prompt_factory` either builds a repair prompt
+                 (run at the static low temperature `_REPAIR_TEMPERATURE`)
+                 or hands back a finished `schema` instance, returned
+                 directly with no LLM call. The ladder ends here.
     """
     # --- Invariant: structural retry must LOWER temperature (2B). ---
     # Fail loud at entry. A structural retry at >= base temperature is
@@ -549,9 +556,9 @@ def structured_call(
     if attempts_run < max_attempts:
         attempts_run += 1
         log.info(
-            "[OTR_StructuredCall] '%s' attempt 1/%d: base call at "
+            "[OTR_StructuredCall] '%s' attempt %d/%d: base call at "
             "temperature=%.3f",
-            helper_name, max_attempts, base_temperature,
+            helper_name, attempts_run, max_attempts, base_temperature,
         )
         try:
             last_raw = _invoke_slot(
@@ -560,20 +567,28 @@ def structured_call(
                 max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
-        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt 1 failed: %s",
-                helper_name, exc,
+                "[OTR_StructuredCall] '%s' attempt %d failed: %s",
+                helper_name, attempts_run, exc,
             )
 
-    # --- Attempt 2: SAME prompt, lower temperature (structural retry). ---
-    if attempts_run < max_attempts:
+    # --- Structural retry: SAME prompt, lower temperature -- ONLY for a JSON
+    # SYNTAX failure. A re-prompt at lower temperature can shake loose a
+    # parseable object when the model emitted malformed JSON. It does NOT help a
+    # ValidationError / PostValidationError (the JSON parsed; the SHAPE or
+    # CONTENT is wrong) -- a re-prompt just re-emits the same shape, burning a
+    # credit-billed call (the 2026-06-25 Opus normalize_length exhaustion: the
+    # structural rung never helped, it only spent tokens). So on a non-syntax
+    # failure skip straight to the typed repair; spend the structural retry only
+    # on json.JSONDecodeError. attempts_run advances ONLY when this branch runs.
+    if attempts_run < max_attempts and isinstance(last_error, json.JSONDecodeError):
         attempts_run += 1
         log.info(
-            "[OTR_StructuredCall] '%s' attempt 2/%d: structural retry at "
+            "[OTR_StructuredCall] '%s' attempt %d/%d: structural retry at "
             "temperature=%.3f (lowered from %.3f)",
-            helper_name, max_attempts,
+            helper_name, attempts_run, max_attempts,
             structural_retry_temperature, base_temperature,
         )
         try:
@@ -583,20 +598,20 @@ def structured_call(
                 max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
-        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt 2 failed: %s",
-                helper_name, exc,
+                "[OTR_StructuredCall] '%s' attempt %d failed: %s",
+                helper_name, attempts_run, exc,
             )
 
-    # --- Attempt 3: typed repair at a static low temperature. ---
+    # --- Typed repair at a static low temperature (the final rung). ---
     if attempts_run < max_attempts:
         attempts_run += 1
         log.info(
-            "[OTR_StructuredCall] '%s' attempt 3/%d: typed repair at "
+            "[OTR_StructuredCall] '%s' attempt %d/%d: typed repair at "
             "temperature=%.3f",
-            helper_name, max_attempts, _REPAIR_TEMPERATURE,
+            helper_name, attempts_run, max_attempts, _REPAIR_TEMPERATURE,
         )
         try:
             repair_error: BaseException = (
@@ -623,10 +638,10 @@ def structured_call(
                     if content_error is not None:
                         raise PostValidationError(content_error)
                 log.info(
-                    "[OTR_StructuredCall] '%s' attempt 3: repair factory "
+                    "[OTR_StructuredCall] '%s' attempt %d: repair factory "
                     "resolved the failure deterministically; no LLM "
                     "repair call made",
-                    helper_name,
+                    helper_name, attempts_run,
                 )
                 return repair_prompt
             repair_messages = _prompt_to_messages(repair_prompt)
@@ -636,11 +651,11 @@ def structured_call(
                 max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
-        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt 3 (repair) failed: %s",
-                helper_name, exc,
+                "[OTR_StructuredCall] '%s' attempt %d (repair) failed: %s",
+                helper_name, attempts_run, exc,
             )
 
     # --- Ladder exhausted: fail loud. ---

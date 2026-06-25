@@ -12,8 +12,8 @@ Coverage map:
     1. Attempt 1 succeeds -> one slot call, valid result returned.
     2. Attempt 1 fails (bad JSON), Attempt 2 succeeds -> two calls;
        Attempt 2 ran at `structural_retry_temperature`.
-    3. Attempt 1 fails (schema), Attempt 2 succeeds -> same, schema
-       rejection path.
+    3. Attempt 1 fails (schema) -> the structural rung is SKIPPED (C3,
+       syntax-only); the typed repair runs as the 2nd call.
     4. Attempts 1+2 fail, Attempt 3 (repair) succeeds -> three calls,
        `repair_prompt_factory` was invoked.
     5. Attempts 1+2 fail, default repair factory used when caller
@@ -29,8 +29,8 @@ Coverage map:
   post_validator (content validation beyond the pydantic schema):
    10. post_validator returns None -> the schema-valid instance is
        accepted; one slot call.
-   11. post_validator rejection advances the ladder past a schema-
-       valid Attempt 1 to Attempt 2.
+   11. post_validator rejection skips the structural rung (C3) and
+       advances a schema-valid Attempt 1 to the typed repair.
    12. a content rejection feeds the typed-repair factory as a
        PostValidationError carrying the content message.
    13. all attempts content-rejected -> StructuredCallFailedError
@@ -187,7 +187,12 @@ def test_attempt_two_runs_at_structural_retry_temperature():
 # ---------------------------------------------------------------------------
 
 
-def test_schema_violation_on_attempt_one_advances_to_attempt_two():
+def test_schema_violation_on_attempt_one_skips_structural_and_repairs():
+    # C3: a ValidationError (parseable JSON, wrong shape) does NOT spend the
+    # structural retry -- a re-prompt would re-emit the same shape and only
+    # burn tokens. The ladder skips straight to the typed repair, so the 2nd
+    # slot call is the REPAIR rung at the static low repair temperature, NOT
+    # the structural retry temperature.
     slot = _make_counting_slot_fn(
         responses=[_schema_violating_json(), _valid_json()],
     )
@@ -201,7 +206,7 @@ def test_schema_violation_on_attempt_one_advances_to_attempt_two():
     )
     assert result.score == 42
     assert len(slot.calls) == 2
-    assert slot.calls[1]["temperature"] == pytest.approx(0.25)
+    assert slot.calls[1]["temperature"] == pytest.approx(sc._REPAIR_TEMPERATURE)
 
 
 # ---------------------------------------------------------------------------
@@ -417,9 +422,10 @@ def test_post_validator_none_return_accepts_instance():
 
 
 def test_post_validator_rejection_advances_the_ladder():
-    # Both responses are schema-valid; the post_validator rejects the
-    # first on content grounds and accepts the second. The ladder must
-    # advance to Attempt 2 even though Attempt 1 was schema-valid.
+    # C3: a content rejection (PostValidationError) is not a JSON-syntax error,
+    # so the structural rung is skipped and the ladder advances straight to the
+    # typed repair. Attempt 1 is schema-valid but content-rejected; the repair
+    # rung's response clears the content check.
     slot = _make_counting_slot_fn(responses=[_valid_json(), _valid_json()])
     post_validator = _make_counting_post_validator(
         verdicts=["score is content-invalid for this pass", None],
@@ -435,23 +441,25 @@ def test_post_validator_rejection_advances_the_ladder():
     )
     assert isinstance(result, SampleSchema)
     assert len(slot.calls) == 2, (
-        "a content rejection on Attempt 1 should advance to Attempt 2"
+        "a content rejection on Attempt 1 should skip the structural rung and "
+        "advance to the typed repair"
     )
-    # Attempt 2 ran at the lowered structural retry temperature.
-    assert slot.calls[1]["temperature"] == pytest.approx(0.15)
+    # The 2nd call is the typed repair (structural skipped) at the repair temp.
+    assert slot.calls[1]["temperature"] == pytest.approx(sc._REPAIR_TEMPERATURE)
     assert len(post_validator.seen) == 2
 
 
 def test_post_validator_failure_feeds_typed_repair_factory():
-    # Attempts 1+2 are schema-valid but content-rejected; Attempt 3
-    # (repair) is accepted. The repair factory must receive a
-    # PostValidationError carrying the content message.
+    # A content rejection on Attempt 1 feeds the typed-repair factory a
+    # PostValidationError carrying the content message. C3: the structural rung
+    # is skipped (a content failure is not a JSON-syntax error), so the typed
+    # repair is the 2nd slot call; its response clears the content check.
     slot = _make_counting_slot_fn(
-        responses=[_valid_json(), _valid_json(), _valid_json()],
+        responses=[_valid_json(), _valid_json()],
     )
     repair_factory = _make_recording_repair_factory()
     post_validator = _make_counting_post_validator(
-        verdicts=["too few key terms", "too few key terms", None],
+        verdicts=["too few key terms", None],
     )
     result = sc.structured_call(
         prompt="produce a title and score",
@@ -464,7 +472,7 @@ def test_post_validator_failure_feeds_typed_repair_factory():
         helper_name="sample_pass",
     )
     assert isinstance(result, SampleSchema)
-    assert len(slot.calls) == 3
+    assert len(slot.calls) == 2
     assert len(repair_factory.invocations) == 1
     repair_error = repair_factory.invocations[0]["error"]
     assert isinstance(repair_error, sc.PostValidationError)
@@ -472,14 +480,15 @@ def test_post_validator_failure_feeds_typed_repair_factory():
 
 
 def test_post_validator_exhaustion_raises_with_post_validation_error():
-    # Every attempt is schema-valid but the post_validator rejects all
-    # of them -> StructuredCallFailedError whose last_error is a
-    # PostValidationError.
+    # Every attempt is schema-valid but the post_validator rejects all of them
+    # -> StructuredCallFailedError whose last_error is a PostValidationError.
+    # C3: a content failure skips the structural rung, so the ladder is base +
+    # typed repair = 2 attempts, then exhausts.
     slot = _make_counting_slot_fn(
-        responses=[_valid_json(), _valid_json(), _valid_json()],
+        responses=[_valid_json(), _valid_json()],
     )
     post_validator = _make_counting_post_validator(
-        verdicts=["content reject", "content reject", "content reject"],
+        verdicts=["content reject", "content reject"],
     )
     with pytest.raises(sc.StructuredCallFailedError) as exc_info:
         sc.structured_call(
@@ -491,16 +500,16 @@ def test_post_validator_exhaustion_raises_with_post_validation_error():
             post_validator=post_validator,
             helper_name="casting_pass",
         )
-    assert len(slot.calls) == 3
+    assert len(slot.calls) == 2
     assert isinstance(exc_info.value.last_error, sc.PostValidationError)
     assert "content reject" in str(exc_info.value.last_error)
-    assert exc_info.value.attempts == 3
+    assert exc_info.value.attempts == 2
 
 
 def test_post_validation_error_is_a_value_error():
-    # PostValidationError subclasses ValueError so the ladder's existing
-    # except (json.JSONDecodeError, ValidationError, ValueError) arms
-    # catch a content rejection with no change.
+    # PostValidationError subclasses ValueError, and the ladder's except
+    # (json.JSONDecodeError, ValidationError, PostValidationError) arms
+    # catch a content rejection explicitly.
     assert issubclass(sc.PostValidationError, ValueError)
 
 

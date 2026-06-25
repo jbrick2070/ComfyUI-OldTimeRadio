@@ -218,7 +218,10 @@ def test_schema_retry_lowers_temperature():
     second call really is the ladder's Attempt 2, not a stray
     re-entry."""
     led = _mk_ledger()
-    spy = _make_spy_fn(responses=[_schema_invalid_json(), _valid_brief_json()])
+    # C3: the structural retry runs ONLY on a JSON-SYNTAX failure (a schema
+    # error skips straight to the typed repair), so the first response must be
+    # unparseable to exercise the structural rung at its lowered temperature.
+    spy = _make_spy_fn(responses=["this is not valid JSON at all {{{", _valid_brief_json()])
 
     sb.run_story_brief_reflection(led, spy)
 
