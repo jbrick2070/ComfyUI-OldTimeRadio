@@ -29,6 +29,7 @@ Public surface:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from dataclasses import dataclass, field, replace
@@ -2890,6 +2891,113 @@ def compose_announcer_intro(
     return LineResult(
         text=fallback_announcer_intro(brief),
         compose_flags=("announcer_intro_fallback",),
+    )
+
+
+# ---------------------------------------------------------------------------
+# KILL 2 -- NEWS CODA (2026-06-24, coda-segue roundtable). A dynamic premise->
+# news segue: the LLM writes ONLY a short bridge clause (specific to tonight's
+# tale, never the outcome); the real news_close_brief is APPENDED
+# deterministically so the weak model can never blend the fact away. Reliability
+# is structural. compose_announcer_outro (below) is left UNTOUCHED -- off / no
+# news brief runs it verbatim, so it stays byte-identical.
+# ---------------------------------------------------------------------------
+NEWS_CODA_POOL = ("The real story:", "The true account:", "From tonight's headlines:")
+BRIDGE_GENERIC_OPENERS = (
+    "and now", "but in the real world", "in reality", "the real story",
+    "meanwhile", "tonight we", "what really happened",
+)
+_BRIDGE_MAX_CHARS = 80
+_CODA_FACT_MAX = 200
+_CODA_TOTAL_MAX = 320
+
+_NEWS_CODA_SYSTEM = """\
+You are the radio announcer for SIGNAL LOST, an old-time radio drama.
+Write ONE short bridge clause that turns from tonight's fictional tale to the real
+world. The real news report is added AFTER your clause by the producer -- you do
+NOT write it.
+
+OUTPUT - strict:
+- Only the words the announcer says out loud. One line, no line breaks.
+- No speaker name, no quotation marks, no brackets, no sound cues.
+- A SHORT pivot clause, at most ~16 words, ending with a colon.
+
+VOICE:
+- A period radio host: warm, measured.
+- Reference tonight's tale by its SUBJECT or SETTING (not how it ended).
+- Do NOT state any fact, number, date, or the story's outcome.
+- Do NOT open with a stock phrase ("And now", "But in the real world", "In reality",
+  "The real story", "Meanwhile"). Make the turn specific to tonight's tale.
+"""
+
+
+def validate_news_coda_bridge(text) -> tuple[bool, str]:
+    """Validate the LLM bridge clause ONLY (coda-specific -- do NOT reuse
+    validate_announcer_line: a TRAILING colon is the intended turn; only a LEADING
+    speaker label is rejected). Returns ``(ok, cleaned)``. Never raises."""
+    cleaned = clean_one_line(text or "", max_chars=0)
+    if not cleaned:
+        return False, ""
+    if "\n" in (text or "").strip():
+        return False, ""
+    if any(ch in cleaned for ch in "[]{}"):
+        return False, ""
+    up = cleaned.upper()
+    if any(up.startswith(p) for p in _ANNOUNCER_BAD_PREFIXES):
+        return False, ""
+    low = cleaned.lower()
+    if any(low.startswith(g) for g in BRIDGE_GENERIC_OPENERS):
+        return False, ""
+    if len(cleaned) > _BRIDGE_MAX_CHARS:
+        return False, ""
+    return True, cleaned
+
+
+def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
+                      cast_seed=0, creative_repo_id=None) -> LineResult:
+    """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
+    clause from the premise + the safe intro tone (NEVER the outcome / the news
+    fact); the real ``news_close_brief`` is appended deterministically, so the
+    weak local model can never write the fact wrong. sha256(cast_seed)
+    rotating-pool fallback floor. Never raises.
+
+    ``premise`` MUST be the macro dramatic premise (setup-framed), NOT the
+    script_brief (whose news distillation can hint the resolution). ``intro_text``
+    is the SAFE no-spoiler open -- safe to pass for tone.
+    """
+    # 1) clean the FACT first (defined before generate/validate/fallback).
+    fact = clean_one_line(news_close_brief or "", max_chars=_CODA_FACT_MAX)
+    if not fact:
+        return LineResult(text="", compose_flags=("news_coda_no_brief",))  # caller handles
+    fact = (fact[0].upper() + fact[1:]) if fact[0].isalpha() else fact
+
+    def _assemble(bridge: str) -> str:
+        b = clean_one_line(bridge, max_chars=_BRIDGE_MAX_CHARS).rstrip(".!?,;: ")
+        b = b + ":"                                   # normalize the turn (no "x.:")
+        return clean_one_line(f"{b} {fact}", max_chars=_CODA_TOTAL_MAX)
+
+    # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
+    def _msgs(retry: bool):
+        u = f"Tonight's tale (setup only):\n{premise}"
+        if intro_text:
+            u += f"\n\nThe announcer's opening line was:\n{intro_text}"
+        if retry:
+            u += "\n\nAttempt 2 -- different wording; be more specific to the tale."
+        return [{"role": "system", "content": _NEWS_CODA_SYSTEM},
+                {"role": "user", "content": u}]   # fresh 2-msg array, no role-stutter
+
+    for attempt, flag in ((False, "news_coda_bridge"), (True, "news_coda_bridge_reroll")):
+        raw = _announcer_generate(creative_fn, _msgs(attempt))   # no seed arg
+        ok, bridge = validate_news_coda_bridge(strip_line_formatting(raw or ""))
+        if ok:
+            return LineResult(text=_assemble(bridge), compose_flags=(flag,))
+
+    # 3) deterministic fallback floor -- stable hash (NOT builtin hash()).
+    h = int(hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(), 16)
+    prefix = NEWS_CODA_POOL[h % len(NEWS_CODA_POOL)]
+    return LineResult(
+        text=clean_one_line(f"{prefix} {fact}", max_chars=_CODA_TOTAL_MAX),
+        compose_flags=("news_coda_fallback", "news_coda_bridge_invalid"),
     )
 
 

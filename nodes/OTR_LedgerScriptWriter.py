@@ -4692,25 +4692,70 @@ class OTR_LedgerScriptWriter:
             # hedging. Both null-guarded ("" when unavailable) -> the
             # composer's post-check skips cleanly on an unresolved/missing
             # ending.
-            _outro_ending_change = str(
-                (meta.get("dramatic_state") or {}).get("ending_change") or ""
-            )
-            _outro_final_char_line = ""
-            for _ln in reversed(led.data.get("lines") or []):
-                if str(_ln.get("speaker_role") or "").strip() == "character":
-                    _t = str(_ln.get("text") or "").strip()
-                    if _t:
-                        _outro_final_char_line = _t
-                        break
-            with slot_scheduler.helper_context("compose_announcer_outro"):
-                outro_res = _OTRLC.compose_announcer_outro(
-                    creative_fn=creative_generate_fn,
-                    script_brief=script_brief,
-                    news_close_brief=nc_brief,
-                    intro_text=intro_text,
-                    creative_repo_id=resolved["creative_writing_model"],
-                    ending_change=_outro_ending_change,
-                    final_character_line=_outro_final_char_line,
+            # KILL 2 / NEWS CODA (2026-06-24): a dynamic premise->news segue. The
+            # LLM writes ONLY a short bridge clause (from the premise + the safe
+            # intro tone, never the outcome); the real news_close_brief is appended
+            # deterministically so the weak model can't blend the fact away.
+            # compose_announcer_outro is UNTOUCHED -- the off / no-brief path runs
+            # it verbatim, so the fictional close stays byte-identical.
+            if _style_grammar_on and nc_brief.strip():
+                with slot_scheduler.helper_context("compose_news_coda"):
+                    outro_res = _OTRLC.compose_news_coda(
+                        creative_fn=creative_generate_fn,
+                        news_close_brief=nc_brief,
+                        premise=str(getattr(outline, "premise", "") or ""),
+                        intro_text=intro_text,
+                        cast_seed=cast_seed,
+                        creative_repo_id=resolved["creative_writing_model"],
+                    )
+                if not outro_res.text:
+                    # Pathological (brief cleaned to empty) -- never ship an empty
+                    # close. Deterministic news outro, LOUD.
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] news coda produced no text "
+                        "(brief=%r); using the deterministic outro fallback",
+                        nc_brief,
+                    )
+                    outro_res = _OTRLC.LineResult(
+                        text=_OTRLC.fallback_announcer_outro(nc_brief),
+                        compose_flags=("news_coda_fallback", "news_coda_empty_close"),
+                    )
+            else:
+                # The fictional-outro path (flag off, OR on but no news brief).
+                # Build its inputs INSIDE the else -- only this path needs them.
+                _outro_ending_change = str(
+                    (meta.get("dramatic_state") or {}).get("ending_change") or ""
+                )
+                _outro_final_char_line = ""
+                for _ln in reversed(led.data.get("lines") or []):
+                    if str(_ln.get("speaker_role") or "").strip() == "character":
+                        _t = str(_ln.get("text") or "").strip()
+                        if _t:
+                            _outro_final_char_line = _t
+                            break
+                with slot_scheduler.helper_context("compose_announcer_outro"):
+                    outro_res = _OTRLC.compose_announcer_outro(
+                        creative_fn=creative_generate_fn,
+                        script_brief=script_brief,
+                        news_close_brief=nc_brief,
+                        intro_text=intro_text,
+                        creative_repo_id=resolved["creative_writing_model"],
+                        ending_change=_outro_ending_change,
+                        final_character_line=_outro_final_char_line,
+                    )
+                if _style_grammar_on:
+                    # On-flag but no news brief -> mark it (text unchanged; frozen).
+                    import dataclasses as _dc
+                    outro_res = _dc.replace(
+                        outro_res,
+                        compose_flags=outro_res.compose_flags + ("news_coda_no_brief",),
+                    )
+            # KILL 2 telemetry (under flag only).
+            if _style_grammar_on:
+                _sqd = meta.setdefault("story_quality", {})
+                _sqd["news_coda_emitted"] = bool(nc_brief.strip())
+                _sqd["news_coda_fallback"] = (
+                    "news_coda_fallback" in outro_res.compose_flags
                 )
             # patch_line_text recomputes char_count + word_count in
             # lockstep; patch_line_fields stamps the outro compose_flags
