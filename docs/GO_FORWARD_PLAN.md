@@ -1,6 +1,43 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (ANNOUNCER/KILL-2 DESIGN ROUNDTABLE CONVERGED -> HAND TO A CODER WINDOW.
+> **>>> CURRENT STEP -- 2026-06-25 (ANNOUNCER REDESIGN + KILL 2 + KILL 4 ALL BUILT + SHIPPED + PUSHED +
+> LIVE RE-SOAK PASSED ON BOTH LOCAL WRITERS. origin/v2.0-alpha HEAD `b7bf7fc3` == local.)**
+> Built C1-C4 from `docs/2026-06-24-announcer-refine/roundtable/pass04_plan.md` + `CODE_MAP.md` +
+> `coda-segue/roundtable/pass03_plan.md`, all behind the `story_scaffold` widget (byte-identical off; NO
+> workflow-JSON change); +65 unit tests; per chunk full suite green vs the 5 pre-existing `267a53e`
+> workflow-pin fails + Bug Bible 16/7/3; commit AND push per green chunk.
+> - C1 `14704f98` KILL 2 StoryContract: new frozen `StoryContract` + `build_story_contract` in
+>   `_otr_style_catalog` (cast_seed-keyed select_style from script_brief/news_seed); `grammar ==
+>   render_style_grammar(slug)` -- its first+only caller (the literal "zero callers" fix).
+>   `OutlineRequest.style_grammar`/`story_engine` (default ""); macro prompt renders the grammar block
+>   (sound_world lives HERE only), phase+beat thread story_engine. Writer hoists `_style_grammar_on` to one
+>   gate, builds the contract pre-outline, swaps the late select_style source to the contract under flag,
+>   stamps `meta.story_contract`.
+> - C2 `69125683` announcer OPEN by INPUT STARVATION: new frozen `SafeOpenBrief` + `_ANNOUNCER_INTRO_SYSTEM_SAFE`
+>   + `fallback_safe_open`; `compose_announcer_intro(...,story_scaffold,safe_open_brief)` builds the open from
+>   the safe brief ONLY (script_brief never read -> the outcome can't leak). Writer captures the SafeOpenBrief
+>   after generate_outline + BEFORE build_sq_data mutates the setup beat; `open_safe_fallback` telemetry.
+> - C3 `e58fba40` dynamic NEWS CODA: new `compose_news_coda` (LLM writes a short bridge from `outline.premise`
+>   + the safe intro tone, never the outcome; real `news_close_brief` appended deterministically;
+>   `validate_news_coda_bridge`; sha256(cast_seed) rotating-pool floor). Writer early-branches to it under
+>   flag+brief; else `compose_announcer_outro` UNTOUCHED (off byte-identical) + `dataclasses.replace` marker.
+>   Supersedes pass04 STEP F; drops the climax-line decoupling.
+> - C4 `b7bf7fc3` KILL 4: role-keyed enrichment (setup/pressure/personal_stake + every climax class;
+>   consequence omitted) + truncation reserve/clamp (`max(0,...)`) so a long intent can't cut the climax
+>   clause; the 2 prior roles stay byte-identical.
+> **LIVE RE-SOAK PASS (2026-06-25, canonical JSON, LTX lane, toggle ON per-prompt):** mistral ON = full
+> end-to-end (contract retirement_home_ghost_story/bittersweet_parting; safe-open no-spoiler;
+> `open_safe_fallback=False`; coda delivered the real comet news via the floor; `ungrounded_crisis 0/149`;
+> freeze frozen_with_doctor_edits; **`audio_byte_identical OK`**; OBS final
+> `signal_lost_comets_trail_..._final.mp4` 51.8 MB; 25:25). gemma ON (after pulling its Ollama model) =
+> contract final_message_before_silence/quiet_acceptance; safe-open ok; **dynamic coda bridge VALIDATED**
+> (`news_coda_fallback=False`); `ungrounded_crisis 0/181`; froze clean. Full results:
+> `docs/2026-06-24-announcer-refine/RESOAK_RESULTS.md`. Minor PRE-EXISTING notes: a `"Central object, if
+> useful."` artifact leaks from the news-brief central-object injection into the coda's appended fact (fix in
+> the brief builder, not the coda); gemma prose stays techno-tense (model ceiling). KILL 3 (climax POSITION)
+> still DEFERRED. prod/main + tags GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-24 (ANNOUNCER/KILL-2 DESIGN ROUNDTABLE CONVERGED -> HAND TO A CODER WINDOW.
 > Docs only this session; NOTHING coded yet. origin/v2.0-alpha HEAD `b717980d` == local.)**
 > The refine-before-code roundtable ran LIVE, 4 rounds (R1 arc -> R2 implementability -> R3 wiring -> R4
 > convergence), panel GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, Claude grounded judge+panelist; total spend
