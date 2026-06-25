@@ -42,6 +42,20 @@
 > read -- incl the outline announcer-close gate -- is consistent; auto restores the import-time baseline,
 > no cross-prompt leak). Appended at writer widget slot 24 in the canonical JSON (same change); guards
 > 24->25; +10 tests. This makes the scaffold-vs-freeform A/B a UI flip.
+> **>>> BAKE-OFF RUN 2026-06-24 (operator-requested, autonomous): 6 FULL episodes to OBS, 3 ON vs 3 OFF,
+> recipe = visualizer character beats + LTX-AV audio bookends + flux2_klein bookend images, canonical JSON,
+> 200w. ALL 6 LANDED in `otr/obs`. WINNER = ON (scaffold).** ON episodes (Breath of Warning / Blade's Dawn /
+> Broadcast Dilemma) all shipped **0 ungrounded crisis nouns** with varied climax styles + endings
+> (bittersweet / revelation / ironic); OFF (Keys to Control / Unmasked Data / Flame Before Time) was
+> variable -- "Keys to Control" collapsed to the console standoff ("Lockdown mission control... count
+> three"), and every OFF closed by restating the news outcome. Both modes still `arc=uneven` (mistral-nemo
+> ceiling -- the scaffold fixes sameness + grounding, not raw prose). KILL 5 (close-by-ending_tag) is still
+> the gap: one ON close drifted to the news outcome. Two legs needed a recovery rerun (NOT KILL-1/toggle
+> bugs): off#3 = `build_news_briefs` key_term-not-in-source hard-fail (fresh news passed +
+> `news_briefs_required=False`); on#3 = freeze `needs_full_rerun` (BUG-LOCAL-276, shipped via
+> `OTR_BYPASS_FREEZE_HALT=1`). Unattended-batch recipe: boot with `OTR_BYPASS_FREEZE_HALT=1` +
+> `news_briefs_required=False`. Results: `docs/2026-06-24-assumption-audit/BAKEOFF_RESULTS.md`. Box reset,
+> :8000 FREE.
 > **>>> NEXT (operator-gated): the KILL-1 LIVE RE-SOAK (gemma + mistral, 320w) measuring crisis-noun
 > density in the SHIPPED body lines (not intent), now driveable via the `story_scaffold` toggle (on vs
 > off). Do NOT start KILL 2 until the re-soak is clean.**
