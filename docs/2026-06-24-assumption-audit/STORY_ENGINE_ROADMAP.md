@@ -46,17 +46,28 @@ content; two different styles on the same news produce visibly different stories
 EFFORT: medium (touches the writer, outline, line composer; ADD `meta.story_
 contract`, do NOT collapse the old style fields yet).
 
-### 2. KILL 4 + KILL 5 -- un-starve the body beats + fix the close  [AFTER 1]
-WHY: setup/pressure/consequence + non-irreversible climax beats get NO
-deterministic dramatic content today (only personal_stake/irreversible do). And
-the announcer close still reads out the news outcome ("published in The Lancet")
-because it isn't governed by the ending tag.
-WHAT: role-keyed enrichment for every dramatic role; route the announcer close by
-`ending_tag` (non-resolving for unresolved/revelation/quiet -- prompt AND
-fallback).
-ACCEPTANCE: closes match the ending class (no news-outcome narration on
-non-resolving endings); body beats carry real dramatic framing.
-EFFORT: small-medium.
+### 2. ANNOUNCER REDESIGN + KILL 4 -- the teaching frame + un-starve the body  [AFTER 1]
+Operator product direction (2026-06-24): the show TEACHES via story -- drama is
+the delivery, the NEWS is the payload. Full spec: `ANNOUNCER_DESIGN.md`. Three
+announcer jobs:
+- **OPEN = set the scene, no spoilers** (NEW): replace the hardcoded generic
+  "gather 'round" (`_otr_outline` ~1591) with TIME + PLACE + CHARACTERS + where
+  they are NOW -- orient + intrigue, but withhold the climax/outcome/twist.
+- **CHARACTER CLOSE** = the drama lands in the characters' voices (the climax
+  beat already exists; the announcer must not pre-empt it).
+- **NEWS CODA = the real fact, every episode, lightly labeled** (the teaching
+  beat at the very end). This REFRAMES KILL 5: from "suppress the outcome" to
+  "deliver the real news deliberately, after the drama." GROUNDING WIN: the close
+  already pulls the real news via `news_close_brief` -> `compose_announcer_outro`,
+  so the coda is largely WIRED -- the work is framing + protecting the character
+  climax, NOT the old suppression branch.
+- **KILL 4 (un-starve body)**: role-keyed enrichment for setup/pressure + all
+  climax classes (only personal_stake/irreversible get content today).
+ACCEPTANCE: the open names setting/era/characters + the opening situation with NO
+spoiler; the news coda delivers the real fact as a recognizable teaching beat
+after the character climax; body beats carry real dramatic framing.
+EFFORT: small-medium (news_close_brief seam exists; the open intro is the new
+piece). Build alongside / right after KILL 2 so the open draws the same style.
 
 ### 3. KILL 3 -- climax POSITION (let the ending choose where it lands)  [DEFERRED]
 WHY: every episode is forced to peak on the LAST beat -- a structural mono-shape.
