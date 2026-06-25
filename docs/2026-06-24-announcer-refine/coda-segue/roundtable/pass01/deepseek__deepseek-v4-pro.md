@@ -1,0 +1,27 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
+
+VERDICT: **yes-with-fixes** — the plan correctly identifies the tension but lacks crucial design specifics that would make a reliable dynamic coda without exacerbating the proven weak-model failures; these must be resolved before a build attempt.
+
+MUST-FIX BEFORE BUILD:
+1. [PROPOSED RESOLVING DESIGN] The coda’s system prompt is entirely unaddressed. The existing `_ANNOUNCER_OUTRO_SYSTEM` (grounding) forbids news summaries and demands a “concrete final image,” directly contradicting a teaching coda. Using it as‑is guarantees the LLM will not produce the required “here’s the real fact” line. **Fix:** define a separate `_NEWS_CODA_SYSTEM` prompt that permits a news‑aware, teaching tone while retaining the period‑host voice, and wire it into `compose_announcer_outro` under a `coda_mode` flag. Alternatively, if the coda is meant to replace the normal outro, specify that the existing outro constraints are overridden when `news_coda` is enabled.
+
+2. [PROPOSED RESOLVING DESIGN] The anti‑generic strategy is insufficient. Relying only on position and “shape” without any minimal lexical anchor will cause weak models (mistral/gemma) to default to generic transitions like “And now, the real story…” — especially under low temperature — exactly what the operator wants to avoid. **Fix:** add a lightweight, non‑fixed anchor, e.g., require the coda to include one significant news‑content token within its first six words, and a blacklist of forbidden generic phrases in the prompt; or explicitly declare that for weakest models the fallback floor will carry almost all episodes, and dynamic only triggers when a stronger model is available. This decision must be stated.
+
+3. [ASK 3] The token‑overlap gate (`>=1 news token, low overlap with ending_change`) is claimed to be a sufficient blend guard, but it does not catch semantic blends (e.g., “the real danger was greed” when the fiction was a monster). That is a direct replay of the original weak‑model failure that drove the fixed‑phrase decision. **Fix:** either strengthen the guard with a negative instruction in the prompt (“Do not restate any element of the dramatic outcome”) AND a post‑check for negation of the ending change, or openly accept that the gate is probabilistic and the fallback is the true reliability floor. If the latter, the plan must quantify the acceptable failure rate and confirm operator sign‑off.
+
+4. [PROPOSED RESOLVING DESIGN] The coda‑generation flow must explicitly exclude `ending_change` from the LLM’s view, or include it with a strong inhibitory instruction. Currently `compose_announcer_outro` receives both `ending_change` and `news_close_brief`; if the dynamic coda uses the same call, the model will see the fictional outcome and is likely to blend it. **Fix:** decide whether the coda prompt will contain `ending_change`. If not, modify `compose_announcer_outro` (or a new `compose_news_coda_outro`) to omit it; if it must remain, add a high‑priority “DO NOT MENTION THE DRAMATIC OUTCOME” rule. This choice is missing and critical to prevent the very problem the guardrails aim to stop.
+
+5. [PROPOSED RESOLVING DESIGN] The design doesn’t clarify how the coda integrates with the existing outro line. The document states the coda *is* the trailing announcer outro line, yet the current outro serves a journalistic “final image” purpose. **Fix:** explicitly declare that when `news_coda` is active, `compose_announcer_outro` will produce the coda line instead of the normal outro, and that the journalistic landing note is delivered entirely by the coda. This may also require removing the journalistic‑image constraint from the prompt used for coda generation, which ties back to point 1.
+
+SHOULD-FIX:
+- The “word band” for coda validation is mentioned but not bounded. Provide an example range (e.g., 10–30 words) to prevent overly short or rambling lines.
+- The reroll strategy only triggers once; specify that the second attempt should use a slightly altered prompt/seed to avoid identical failure.
+- The token‑extraction machinery (`_content_tokens`) is assumed to work overnight on short news briefs; verify with at least a manual test on a few real `news_close_brief` samples to ensure token granularity matches the blend‑risk.
+
+OPTIONAL / NICE-TO-HAVE:
+- A small set of hand‑authored coda templates (e.g., “What you just heard was fictional. The truth is [NEWS_TOKEN].”) that can be filled and used as a superior fallback before the fully fixed phrase, giving some variation even when the dynamic pass fails.
+
+CUT THESE (scope / over-engineering):
+- None. The dynamic generation, token gate, and fallback floor are necessary to meet the operator’s requirement; no extraneous subsystems are proposed.
+
+[ASSUMPTION] The plan assumes that `_content_tokens` can be applied to short news‑brief strings and `ending_change` strings to produce token sets that reliably detect overlap; this has not been demonstrated in the grounding or elsewhere. [ASSUMPTION] The plan assumes the existing `compose_announcer_outro` can be cleanly forked or parameterized without breaking the main outro path, which needs verification against the full call graph.

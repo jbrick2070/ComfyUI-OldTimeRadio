@@ -1,0 +1,64 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: no. The plan is directionally specific, but several required interfaces/data shapes are undefined or contradict current signatures/validators, so a coder will hit ambiguous or non-buildable steps.
+
+MUST-FIX BEFORE BUILD:
+1. [1] `StoryContract` field shape is internally inconsistent. The proposed frozen object is `StoryContract(slug,label,sound_world,story_engine,ending_tag,ending_template,grammar)`, but the implementation instructions and acceptance require rendering `ending_mode` into outline prompts. Grounding shows catalog has `ending_mode` in `render_style_grammar`, while existing late code preserves only `ending_tag`. Concrete fix: define the exact dataclass, e.g. `StoryContract(slug: str, label: str, sound_world: str, story_engine: str, ending_mode: str, ending_tag: str, ending_template: str, grammar: str)`, or explicitly map `ending_tag -> ending_mode` if they are the same. Do not leave both names implicit.
+
+2. [1], [8] `build_story_contract` is underspecified around the emergency/style pool behavior. Current `select_style(premise, meta, cast_seed)` calls `premise_wants_emergency(premise, meta)` using `outline.premise`; the new pre-outline path says build from `script_brief or news_seed`. That changes the emergency/non-emergency pool unless the new function defines the replacement input and preserves intent. Concrete fix: specify `build_story_contract(news_seed: str, script_brief: str, meta: dict, cast_seed: int) -> StoryContract`, and inside it call the existing emergency classifier with the chosen pre-outline text, or add a new pre-outline emergency predicate with tests for parity where possible.
+
+3. [2 / Job 1] `SafeOpenBrief` is not implementable as written because its data shape and fallback behavior are undefined, and one required source is explicitly unresolved. Grounding says `setting` and `time_of_day` exist, `opening_status_quo` is new, and “era source = verify-at-build”. Concrete fix: define a dataclass/dict schema:
+   `SafeOpenBrief(setting: str, time_of_day: str, era: str, cast: tuple[NameRole], opening_status_quo: str, tone_label: str)`.
+   Define how `era` is obtained; if absent, use a deterministic default or omit it. Define deterministic fallback for missing `opening_status_quo`, e.g. first non-announcer setup beat intent sanitized, or `outline.premise` stripped of outcome terms. Without this, the open composer cannot be called reliably.
+
+4. [2 / Job 1], [5] The proposed `compose_announcer_intro` change conflicts with byte-identical off behavior unless the signature remains backward compatible. Current signature is `compose_announcer_intro(*, creative_fn, script_brief, creative_repo_id=None)`. Concrete fix: keep that signature valid and add optional keyword-only parameters with defaults, e.g. `story_scaffold: bool = False, safe_open_brief: SafeOpenBrief | None = None, story_contract: StoryContract | None = None`. Branch only when `story_scaffold and safe_open_brief`; otherwise execute the current code path byte-for-byte, including current fallback.
+
+5. [2 / Job 1] The spoiler “token-overlaps ending_change / news_close_brief outcome vocabulary” gate is too vague and will either reject valid opens or miss spoilers. Common words, setting words, character names, and news-domain words will overlap. Concrete fix: define deterministic tokenization and filtering: lowercase, strip punctuation, remove stopwords, remove cast names, remove setting/time terms, require overlap against content tokens of length >= N, and define a numeric threshold. Also define how `ending_change` and `news_close_brief` are passed into the intro composer, because current `compose_announcer_intro` receives neither.
+
+6. [2 / Job 3] The news-coda validator is not implementable against current validators. Existing `validate_announcer_line` uses min/max character constants, while the plan asks for an 18-45 word coda band plus “label required + fact required + no fictional ending restatement.” Concrete fix: add a separate validator function with exact signature, e.g. `validate_news_coda_line(text: str, *, lead_ins: tuple[str, ...], news_close_brief: str, ending_change: str) -> tuple[bool, str]`. Define whether “fact required” means exact substring, keyword overlap, or deterministic key-term overlap. Do not reuse the old 14-34-word prompt text without changing the actual char-bound constants or validator.
+
+7. [2 / Job 3], [5] `compose_announcer_outro` needs an explicit flag and parameters; otherwise gating the resolved-fiction branch cannot be coded cleanly. Current signature has no `story_scaffold`, no `lead_in`, and only `final_character_line`. Concrete fix: extend with defaulted keyword-only args:
+   `story_scaffold: bool = False, climax_character_line: str = "", coda_lead_in: str = ""`.
+   When off, keep current branch exactly. When on, use `climax_character_line or final_character_line`, suppress the `resolved and ending` “State this outcome plainly” user/system additions, and pass `ending_change` only to validator/fallback as forbidden content.
+
+8. [2 / Job 3] The deterministic coda prefix cannot be merely “inject the lead-in as a PREFIX” without defining where it is attached. If it is included only in the prompt, the LLM can omit or alter it; if prepended after generation, validation/length budgets change. Concrete fix: generate or validate the body separately, then construct `f"{lead_in} {body}"`, or require the model output to start with one selected lead-in and hard-repair/fallback if not. Tests should assert exact prefix.
+
+9. [2 / Job 3] The fallback path for news coda is missing. Current fallback choices are `_resolved_outro_fallback(ending_change, close)` or `fallback_announcer_outro(close)`, both incompatible with “do not restate fictional ending” and deterministic lead-in. Concrete fix: add `fallback_news_coda_outro(lead_in: str, news_close_brief: str, climax_character_line: str = "") -> str` that never reads `script_brief` or `ending_change`, starts with the selected lead-in, and is validated by the coda validator.
+
+10. [2 / Job 2], [8] “Pass the CLIMAX beat’s line” is underdefined at the data-model level. Grounding says `_climax_beat_id` exists and current code finds the last character by scanning `led.data["lines"]`, but it does not show the line record shape. Concrete fix: verify line entries contain a beat id matching `_climax_beat_id`. If yes, implement lookup by that field. If no, store a `beat_id -> rendered character line` map during line generation and use that. Do not assume `led.data["lines"]` has the needed key without verifying.
+
+11. [2 / Job 1] The new `opening_status_quo` outline field requires updates to all outline serialization/parsing/fallback paths, not just `OutlineRequest`. Grounding only confirms existing macro fields `premise`, `setting`, `time_of_day`. Concrete fix: specify the target object/schema that will hold `opening_status_quo`, update macro prompt instructions, parser, fallback/default builder, and tests for missing field. Under flag off, parser output and prompts must remain unchanged.
+
+12. [1] “Add style fields to `OutlineRequest` rendered in `_build_macro/phase/beat_user_prompt`” lacks exact field names/defaults and risks conflating existing `style` with the new contract. Grounding says `OutlineRequest.style` is user-selected style and distinct. Concrete fix: add explicit fields such as `story_engine: str = ""`, `ending_mode: str = ""`, `sound_world: str = ""`, `story_contract_slug: str = ""`; render them only when `story_scaffold` is enabled and values are non-empty. Do not repurpose `style`.
+
+13. [1], [5] `meta.story_contract` and `meta.story_quality.story_contract_slug` are not defined as serializable shapes. A frozen dataclass stored directly may break JSON encoding or existing metadata comparisons. Concrete fix: store only a plain dict or slug, e.g. `meta["story_contract"] = {"slug": contract.slug, "label": contract.label, "ending_tag": contract.ending_tag}` under the flag. Keep `meta.style` and `resolved["style"]` unchanged as required.
+
+14. [3] KILL-4 truncation math is underspecified and can produce negative or malformed strings. “Truncate original intent to `_INTENT_MAX - len(enrichment)` FIRST” ignores separator length and multi-byte/word-boundary concerns. Concrete fix: compute `suffix = enrichment_text`, `sep = " " or "\n"`, `budget = _INTENT_MAX - len(sep) - len(suffix)`. If `budget < 0`, truncate `suffix` to `_INTENT_MAX` and do not append original. Otherwise append `original[:budget].strip() + sep + suffix.strip()`. Add tests where enrichment alone exceeds `_INTENT_MAX`.
+
+15. [3] The “role-keyed enrichment map for setup / pressure / personal_stake + every CLIMAX_CLASS_ROLES member” lacks exact role constants and fallback content keys. Current code only knows `BEAT_ROLE_PERSONAL_STAKE`, `BEAT_ROLE_IRREVERSIBLE_CHOICE` in the shown branch. Concrete fix: define the exact mapping from role constant to enrichment function/template and required `entry` fields. Do not use free-text role names that may not match constants.
+
+SHOULD-FIX:
+1. [1] “Mood / render: route `sound_world` to beat mood + visualizer/LTX prompt” is not grounded with call sites or APIs. Concrete fix: mark this as verify-at-build, or specify the exact functions/objects after inspecting the render pipeline. Until then, limit first build to outline prompt injection and metadata.
+
+2. [1] “Line beats pass compact register/tone tag” is not grounded with `LineRequest` shape. Concrete fix: verify `LineRequest` fields and line prompt builder before committing this requirement. If no safe field exists, add a defaulted optional field behind `story_scaffold` or defer.
+
+3. [1] Acceptance criterion “two different styles on the same news produce measurably different conflict objects + structure” is not deterministic unless the test can force two slugs. Current selection is seed-hash based. Concrete fix: add a test-only/style-override parameter or construct contracts directly in unit tests.
+
+4. [2 / Job 1] Acceptance says the open “contains NO outcome/twist/climax token,” but “twist” and “climax” vocabularies are not defined. Concrete fix: narrow this to no forbidden content-token overlap with `ending_change` and `news_close_brief` after the specified filter.
+
+5. [2 / Job 3] The prompt says the coda should deliver the real fact “after the character climax,” but there is exactly one trailing announcer beat. This is fine only if the climax remains before the trailing announcer. Concrete fix: when KILL-3 later allows non-last climaxes, ensure any post-climax character beats do not make the outro feel disconnected, or adjust coda wording to bridge from the final dramatic state while referencing the climax line.
+
+6. [6] Telemetry flags need exact write locations and default values. Concrete fix: initialize all listed fields only under `story_scaffold`, with numeric counters for rerolls/fallbacks and booleans for emitted/failed. Avoid adding empty telemetry when off, per [5].
+
+7. [7] Build order combines announcer redesign and KILL-4 “together,” but both touch line/body/outro pipeline and complicate bisecting byte-identical regressions. Concrete fix: split into separate commits/tests even if done in one window: StoryContract, intro, outro, KILL-4.
+
+8. [5] “NO request-shape change visible to old paths” conflicts with adding fields to `OutlineRequest`, even with defaults, if tests compare dataclass repr/asdict or serialized requests. Concrete fix: verify existing tests/snapshots. If snapshots include default fields, gate serialization/rendering rather than relying on dataclass defaults.
+
+OPTIONAL / NICE-TO-HAVE:
+- [2 / Job 3] Use a closed seed-keyed lead-in set only after the single fixed lead-in passes validation. Start with one phrase to reduce test surface.
+- [1] Add a small `to_prompt_block()` method on `StoryContract` to avoid duplicated rendering logic, but only after the dataclass fields are finalized.
+
+CUT THESE (over-engineering):
+1. [1] Cut first-build “visualizer/LTX prompt” routing unless exact call sites are already known. The core KILL-2 proof is outline/body structural steering; render-prompt routing can be a separate, lower-risk change.
+2. [2 / Job 3] Cut the 3-5 lead-in variants initially. One deterministic lead-in is enough to prove the coda path, validator, and byte-identical boundary.
+3. [1] Cut “measurably different conflict objects + structure” from unit-test acceptance for the build. Keep it as re-soak/evaluation; unit tests should assert prompt/data plumbing, not subjective structural divergence.

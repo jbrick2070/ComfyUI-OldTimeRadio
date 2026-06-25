@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-25T05:20:27.457919+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-06-24-announcer-refine\\coda-segue\\roundtable\\pass01_plan.md",
+  "prompt_tokens_est": 4719,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 4844,
+      "completion_tokens": 3177,
+      "cost_usd": 0.037825
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 5510,
+      "completion_tokens": 4165,
+      "cost_usd": 0.0485375
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 5200,
+      "completion_tokens": 8605,
+      "cost_usd": 0.00974835
+    }
+  ],
+  "total_cost_usd": 0.0961
+}

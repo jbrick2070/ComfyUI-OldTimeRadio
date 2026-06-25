@@ -1,6 +1,42 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-24 (REFINE-BEFORE-CODE: a design /roundtable in a FRESH window on the
+> **>>> CURRENT STEP -- 2026-06-24 (ANNOUNCER/KILL-2 DESIGN ROUNDTABLE CONVERGED -> HAND TO A CODER WINDOW.
+> Docs only this session; NOTHING coded yet. origin/v2.0-alpha HEAD `b717980d` == local.)**
+> The refine-before-code roundtable ran LIVE, 4 rounds (R1 arc -> R2 implementability -> R3 wiring -> R4
+> convergence), panel GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, Claude grounded judge+panelist; total spend
+> ~$0.51; CONVERGED at R4 (all 3 verdicts yes-with-fixes = spec-precision only, no new architecture).
+> **BUILD-READY TICKET: `docs/2026-06-24-announcer-refine/roundtable/pass04_plan.md`** (self-contained;
+> pass00->pass04 trail + per-round judgments + claude_anchor + raw panel reviews alongside) + **`CODE_MAP.md`**
+> in the same dir (exact file:line + GREP ANCHORS for every edit point + reuse/new-symbol inventory -- the
+> coder edits by anchor, no reasoning needed; lines are as of HEAD b717980d, grep the anchor if drifted).
+> **THE BUILD (all behind `story_scaffold`, byte-identical off, NO workflow-JSON change; 4 commits):**
+> - C1 KILL 2 StoryContract: build pre-outline (cast_seed-keyed), inject the style GRAMMAR at the MACRO prompt
+>   (CONSUMES render_style_grammar -> fixes its zero-callers) + story_engine at phase/beat; carry
+>   `OutlineRequest.style_grammar`/`story_engine`; REPLACE (don't delete) the late select_style @ :3224 with
+>   contract.slug under flag; meta.story_contract dict. Scoped HONESTLY as a STRUCTURAL steer (sound_world
+>   stays OUT of dialogue line prompts -- stage-direction-leak risk; per-line teeth = the existing conflict_object).
+> - C2 ANNOUNCER OPEN: deterministic no-spoiler by INPUT STARVATION -- sever script_brief; build a SafeOpenBrief
+>   (setting/time_of_day/opening_status_quo/cast/era) CAPTURED right after generate_outline + BEFORE build_sq_data
+>   mutates the setup-beat intent (the R3 sequence-bug catch); fallback never reads script_brief. (Spoiler belt
+>   DEFERRED -- starvation is the guarantee.)
+> - C3 NEWS CODA (REFINED 2026-06-24 by a 3-round coda-segue roundtable, ~$0.30, CONVERGED): a DYNAMIC
+>   news-aware segue, NOT a fixed tag (operator call). New `compose_news_coda`: the LLM writes ONLY a short
+>   BRIDGE clause (specific to tonight's tale via `outline.premise` + the safe `intro_text`, NEVER the
+>   outcome/news facts); the real `news_close_brief` is APPENDED deterministically -> the weak model can't
+>   blend (it never writes the fact). sha256(cast_seed) rotating-pool fallback floor; coda-specific
+>   `validate_news_coda_bridge` (length cap + generic-opener blacklist); empty-brief -> normal fictional outro
+>   (never fabricate). `compose_announcer_outro` UNTOUCHED (off-path byte-identical). REPLACES the fixed
+>   `NEWS_CODA_LEAD_IN`; DROPS the climax-line decoupling (coda never touches the fictional climax). Spec:
+>   `docs/2026-06-24-announcer-refine/coda-segue/roundtable/pass03_plan.md`.
+> - C4 KILL 4: role-keyed enrichment (setup/pressure/personal_stake + every CLIMAX_CLASS_ROLES member;
+>   consequence omitted, not stubbed) + the truncation reserve/clamp (max(0,...) -- fixes a negative-slice bug).
+> Per chunk: full suite + Bug Bible green vs the 5 pre-existing 267a53e fails; run()-level OFF-flag golden
+> (open/outro/ledger-meta) + test_audio_byte_identical green; commit AND push to v2.0-alpha. After C1-C4 ->
+> LIVE re-soak (gemma + mistral) via the story_scaffold toggle. KILL 3 (climax POSITION) still DEFERRED.
+> 10-item verify-at-build checklist in pass04_plan.md. OPERATOR creative call (not a blocker): the
+> NEWS_CODA_LEAD_IN wording. prod/main + tags GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-24 (REFINE-BEFORE-CODE: a design /roundtable in a FRESH window on the
 > announcer redesign + news-coda + the KILL-2 approach, THEN code. origin/v2.0-alpha HEAD `47189349`.)**
 > KILL 1 is SHIPPED + re-soaked (the 6-leg story_scaffold bake-off landed 6 OBS episodes; ON wins -- 0
 > ungrounded machinery + varied endings vs OFF console-standoff; verdict in
