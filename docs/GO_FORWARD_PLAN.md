@@ -33,11 +33,18 @@
 > line is premise-grounded but does not echo the seed-keyed object) -- the model-ceiling reality the plan
 > flagged (a model-capability gate is the deferred belt-and-suspenders). Server killed (selective CIM),
 > :8000 FREE, VRAM ~1.4GB. Results: `docs/2026-06-24-assumption-audit/KILL1_SMOKE_RESULTS.md`.**
+> **>>> ALSO SHIPPED 2026-06-24 (operator-requested): the `story_scaffold` UI toggle (`3f053ba4`).**
+> A user-facing dropdown on the writer node -- auto / on / off -- the single control over the whole
+> bundled scaffold. `off` = a radio drama from the news seed (base prompt only, no style catalog /
+> climax-shape grammar / grounding gate -- the writer's own story); `on` = the news story shaped by one
+> of the ~100 radio-drama styles; `auto` (default) = follow `OTR_ENABLE_STYLE_GRAMMAR` / its default
+> (ON). Resolved via `_apply_story_scaffold_env` at the top of `run()` (sets the env so EVERY downstream
+> read -- incl the outline announcer-close gate -- is consistent; auto restores the import-time baseline,
+> no cross-prompt leak). Appended at writer widget slot 24 in the canonical JSON (same change); guards
+> 24->25; +10 tests. This makes the scaffold-vs-freeform A/B a UI flip.
 > **>>> NEXT (operator-gated): the KILL-1 LIVE RE-SOAK (gemma + mistral, 320w) measuring crisis-noun
-> density in the SHIPPED body lines (not intent). Operator idea 2026-06-24: make the A/B explicit -- the
-> kill-switch ALREADY does this (`OTR_ENABLE_STYLE_GRAMMAR=0` = grammar+gate OFF = the AI's own story,
-> byte-identical to pre-grammar; default ON = the scaffolded story). The re-soak IS that comparison;
-> consider surfacing it as a node toggle for end-users. Do NOT start KILL 2 until the re-soak is clean.**
+> density in the SHIPPED body lines (not intent), now driveable via the `story_scaffold` toggle (on vs
+> off). Do NOT start KILL 2 until the re-soak is clean.**
 > Then KILL 2 -> KILL 4/5 per `docs/2026-06-24-assumption-audit/roundtable/pass04_plan.md`. KILL 3
 > climax-position + model-capability gate + render profiles + `_PERSONAL_COST` rows DEFERRED.
 > prod/main + tags GATED.
