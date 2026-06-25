@@ -274,38 +274,84 @@ def _invoke_slot(
     )
 
 
-def _parse_and_validate(
-    raw: str,
+def apply_field_aliases(
+    aliases: dict[str, tuple[str, ...]],
+    data: Any,
+) -> Any:
+    """Deterministic, whitelist-exact key normalization for ONE model's own
+    top-level keys, for use inside a pydantic ``mode="before"`` validator.
+
+    Maps a declared SYNONYM key to its CANONICAL field name ONLY when the
+    canonical key is absent and EXACTLY ONE synonym is present. An explicit
+    canonical key always wins; 0 or >= 2 synonyms (a collision) leave the field
+    untouched, so a genuinely missing required field still fails LOUD. No-op on
+    canonical input (byte-identical) and on a non-dict ``data`` -- a
+    ``mode="before"`` validator may receive a model instance or another type
+    during internal pydantic operations (e.g. ``model_copy``). Copies the dict
+    once on the first move; never mutates the input. Whitelist-exact and
+    deterministic: no fuzzy or positional matching, so a given input yields the
+    same normalization every run.
+
+    ``aliases`` maps ``canonical_field -> tuple(synonym_keys)`` (top-level keys
+    of the annotated model). This is the single home for the alias rule; the
+    proven nested case (a ``BeatEdit`` whose action arrived under ``lever``) and
+    any future annotated schema route through it via that schema's own
+    ``mode="before"`` validator. pydantic runs that validator on nested models
+    during recursion, so the nested fix needs no path-walking in the core.
+    """
+    if not isinstance(data, dict) or not aliases:
+        return data
+    out: Optional[dict] = None
+    for canonical, synonyms in aliases.items():
+        src = out if out is not None else data
+        if canonical in src:
+            continue  # explicit canonical always wins
+        present = [s for s in synonyms if s in src]
+        if len(present) != 1:
+            continue  # 0 -> nothing to map; >= 2 -> ambiguous, leave fail-loud
+        if out is None:
+            out = dict(data)
+        out[canonical] = out.pop(present[0])
+        log.debug(
+            "[OTR_StructuredCall] field alias: %r -> %r", present[0], canonical,
+        )
+    return out if out is not None else data
+
+
+def validate_tolerant_data(
+    data: object,
     schema: type[T],
+    *,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
 ) -> T:
-    """Extract the first JSON object from `raw`, validate, content-check.
+    """Strict-first validate, then bounded tolerance, then the content check.
 
-    Uses the shared `_otr_json.parse_first_json_object` -- no second
-    JSON parser. Raises `json.JSONDecodeError` on unparseable output or
-    `pydantic.ValidationError` on a schema mismatch.
+    The shared tolerant core reused by ``structured_call`` (through
+    ``_parse_and_validate`` / ``parse_validate_tolerant``) AND by the binary
+    decision lane. The ladder:
 
-    When `post_validator` is supplied it runs on the schema-valid
-    instance: a non-None return value is a content rejection and is
-    raised as `PostValidationError`. All three exception types are
-    caught by the ladder, which advances to the next attempt.
+      1. ``schema.model_validate(data)`` -- the EXACT current strict parse. A
+         schema with no tolerance hooks is byte-identical to today.
+      2. On ``ValidationError`` ONLY: clamp over-long top-level string fields to
+         their declared ``max_length`` and re-validate. A verbose/weak model can
+         overflow a short capped tag field (e.g. the outline's ``time_of_day``,
+         max 40 chars: an 8B model wrote a whole sentence -> the whole episode
+         aborted, 2026-06-18). This fires solely on a would-fail output -- a good
+         model's result is never touched (byte-identical) -- and any OTHER
+         validation error still propagates.
+      3. ``post_validator`` content check (a CONTENT failure pydantic cannot
+         see -- a voice preset outside the pool, a speaker outside the locked
+         cast) -> ``PostValidationError`` on rejection.
 
-    `post_validator` is expected to RETURN an error string (or None),
-    never to raise -- a raising post_validator is a programming error
-    and is allowed to propagate.
+    DELIBERATELY NO alias key-normalization here: alias drift is handled DURING
+    step 1 by each annotated schema's own ``mode="before"`` validator
+    (``apply_field_aliases``), so it also covers NESTED models (pydantic
+    recursion) and stays byte-identical on canonical input. Keeping the except
+    arm to CLAMPING only avoids a second alias code path in the shared core.
     """
-    data = _otr_json.parse_first_json_object(raw or "")
     try:
         instance = schema.model_validate(data)
     except ValidationError as ve:
-        # A verbose/weak model can overflow a short, capped tag field (e.g. the
-        # outline's `time_of_day`, max 40 chars: an 8B model wrote a whole
-        # sentence -> the whole episode aborted, 2026-06-18). Clamp ONLY the
-        # over-long string fields to their declared max_length and re-validate.
-        # This fires solely on a would-fail output -- a good model's result is
-        # never touched (byte-identical) -- and any OTHER validation error still
-        # propagates to the retry ladder. Tolerate imperfect structured output;
-        # never crash a render over a too-long label.
         repaired = _clamp_overlong_strings(data, ve)
         if repaired is None:
             raise
@@ -321,6 +367,39 @@ def _parse_and_validate(
         if content_error is not None:
             raise PostValidationError(content_error)
     return instance
+
+
+def parse_validate_tolerant(
+    raw: str,
+    schema: type[T],
+    *,
+    post_validator: Optional[Callable[[T], Optional[str]]] = None,
+) -> T:
+    """Extract the first JSON object from ``raw`` then ``validate_tolerant_data``.
+
+    Uses the shared ``_otr_json.parse_first_json_object`` -- no second JSON
+    parser. Raises ``json.JSONDecodeError`` on unparseable output. Raw-string
+    structured sites call this; already-parsed-dict sites call
+    ``validate_tolerant_data`` directly (e.g. the binary decision lane).
+    """
+    data = _otr_json.parse_first_json_object(raw or "")
+    return validate_tolerant_data(data, schema, post_validator=post_validator)
+
+
+def _parse_and_validate(
+    raw: str,
+    schema: type[T],
+    post_validator: Optional[Callable[[T], Optional[str]]] = None,
+) -> T:
+    """Back-compat thin wrapper over ``parse_validate_tolerant``.
+
+    Preserved so the retry ladder's three call sites stay unchanged. Behavior is
+    byte-identical to the pre-refactor function: parse the first JSON object ->
+    strict validate with the over-long-string clamp fallback -> ``post_validator``
+    content check (raised as ``PostValidationError``). All three recoverable
+    exception types are caught by the ladder, which advances to the next attempt.
+    """
+    return parse_validate_tolerant(raw, schema, post_validator=post_validator)
 
 
 def _clamp_overlong_strings(

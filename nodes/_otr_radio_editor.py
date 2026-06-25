@@ -92,7 +92,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -259,6 +259,16 @@ class BeatEdit(BaseModel):
     adjacent same-speaker beat for MERGE_SHORT_LINES.
     """
 
+    # Schema-adherence (2026-06-25): canonical_field -> synonym keys a writer may
+    # emit. Read by the shared `apply_field_aliases` helper in the before-validator
+    # below. v1 v-set proven against the real Opus failure (the action under
+    # `lever`) + the shipped BUG-LOCAL-303 remaps (`index`, `merge_with`).
+    __otr_field_aliases__: ClassVar[dict[str, tuple[str, ...]]] = {
+        "beat_index": ("index",),
+        "merge_with_index": ("merge_with",),
+        "action": ("lever",),
+    }
+
     beat_index: int = Field(..., ge=0, description="0-based index into the voiced-beat list")
     action: str = Field(
         ...,
@@ -277,19 +287,24 @@ class BeatEdit(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_field_aliases(cls, data):
-        """BUG-LOCAL-303: LLMs (claude-opus included) routinely emit the
-        shortened field name ``index`` instead of the schema's ``beat_index``
-        (and ``merge_with`` for ``merge_with_index``). Accept those as aliases
-        so the length / micro-repair pass validates on attempt 1 instead of
-        burning 2-3 credit-billed structured-call retries on a pure field-name
-        mismatch. Best-effort: only a plain dict is remapped, and an explicit
-        ``beat_index`` always wins over ``index``."""
-        if isinstance(data, dict):
-            if "beat_index" not in data and "index" in data:
-                data = {**data, "beat_index": data["index"]}
-            if "merge_with_index" not in data and "merge_with" in data:
-                data = {**data, "merge_with_index": data["merge_with"]}
-        return data
+        """BUG-LOCAL-303 + 2026-06-25 schema-adherence: frontier / remote writers
+        (claude-opus included) emit shortened or renamed field names -- ``index``
+        for ``beat_index``, ``merge_with`` for ``merge_with_index``, and (the
+        proven 2026-06-25 Opus failure) ``lever`` for the required ``action`` on a
+        NESTED BeatEdit. Normalize via the shared whitelist-exact alias helper
+        keyed on ``__otr_field_aliases__`` (canonical-wins, exactly-one-synonym,
+        dict-only, byte-identical on canonical input) so the length / micro-repair
+        pass validates on attempt 1 instead of burning credit-billed
+        structured-call retries on a pure field-name mismatch. pydantic runs this
+        on every nested edit during ``RadioEditPlan`` validation. A genuinely
+        missing ``action`` still fails LOUD, and Guard1 (``post_validate_plan``)
+        rejects an out-of-``ALL_ACTIONS`` value, so a mis-aliased value is
+        fail-closed, never silent-wrong."""
+        try:
+            from ._otr_structured_call import apply_field_aliases
+        except ImportError:  # pragma: no cover - standalone / test load
+            from _otr_structured_call import apply_field_aliases  # type: ignore
+        return apply_field_aliases(cls.__otr_field_aliases__, data)
 
     def is_tier1(self) -> bool:
         return self.action in TIER1_ACTIONS

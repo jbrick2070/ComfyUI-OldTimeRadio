@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-25T21:01:24.657798+00:00",
+  "doc": "docs\\2026-06-25-schema-adherence\\nested-fork\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 9862,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 9121,
+      "completion_tokens": 5378,
+      "cost_usd": 0.06518125
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 10315,
+      "completion_tokens": 4053,
+      "cost_usd": 0.053423750000000006
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 9688,
+      "completion_tokens": 7516,
+      "cost_usd": 0.010753200000000001
+    }
+  ],
+  "total_cost_usd": 0.1294
+}
