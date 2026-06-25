@@ -3057,6 +3057,11 @@ class OTR_LedgerScriptWriter:
                     "slug": contract.slug,
                     "label": contract.label,
                     "ending_tag": contract.ending_tag,
+                    # 2026-06-25: carry the selected style's sound_world into the
+                    # ledger meta. It was DROPPED here before, so the episode
+                    # canon's sound_palette (derived from it) was always empty
+                    # even though the style had a rich audio world.
+                    "sound_world": contract.sound_world,
                 }
             except Exception as _contract_exc:  # noqa: BLE001 -- never break the writer
                 log.warning(
@@ -3436,11 +3441,26 @@ class OTR_LedgerScriptWriter:
         # else outline.title) so the J.5 disk write has a sane
         # last-resort value if title regen fails; only the COMPOSITION
         # header is forced to TBD.
+        # 2026-06-25: populate the episode canon's sound_palette from the
+        # selected style's sound_world (the StoryContract carries it). Without
+        # this the written episode_canon.json always had sound_palette=[] -- the
+        # style's audio world was selected but never reached the canon/ledger.
+        # This feeds the WRITTEN canon + meta only; the per-line composition
+        # header (_tbd_canon below) deliberately stays sound_world-free, because
+        # sound effects in a line prompt invite stage-direction leak (the
+        # _otr_outline design keeps sound_world at the macro prompt only).
+        _canon_sound_palette: list = []
+        if contract is not None and getattr(contract, "sound_world", ""):
+            _canon_sound_palette = [
+                part.strip() for part in str(contract.sound_world).split(",")
+                if part.strip()
+            ]
         canon = _OTRC.episode_canon_from_outline_dict({
             "title":       resolved["episode_title"] or outline.title,
             "premise":     outline.premise,
             "setting":     outline.setting,
             "time_of_day": outline.time_of_day,
+            "sound_palette": _canon_sound_palette,
         })
         # Build the composition header from a TBD-titled canon so the
         # composer never sees a real or provisional title. The canon
