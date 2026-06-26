@@ -33,9 +33,6 @@ _ANCHOR_BLOCK_HEAD = (
     "Specificity anchors (when natural, ground a line in one of these concrete "
     "details; do not force them into every line):"
 )
-_CENTRAL_OBJECT_LEAD = "Central object, if useful:"
-
-
 def _as_str_list(items: Any) -> List[str]:
     """Coerce key_terms-like input to a clean list[str]. Never raises."""
     if items is None:
@@ -157,11 +154,20 @@ def inject_anchors_into_header(canon_header: Any, anchors: Any) -> str:
 
 
 def inject_central_object_into_brief(brief: Any, central_object: Any) -> str:
-    """Append the central object to the close brief (unchanged when ""). Pure."""
+    """Land the news close on the central object as a concrete FINAL IMAGE
+    (unchanged when "").
+
+    The close brief is SPOKEN VERBATIM by the news coda (compose_news_coda
+    appends it deterministically), so this emits a CLEAN, capitalized,
+    end-stopped sentence -- NEVER the prompt-scaffold label. The literal
+    "Central object, if useful:" used to be concatenated here and the announcer
+    SPOKE it ("...Central object, if useful: a cracked phone."); BUG flagged +
+    fixed 2026-06-25. Pure; deterministic; never raises."""
     text = str(brief or "")
     obj = sanitize_for_prompt(central_object)
     if not obj:
         return text
+    if obj[:1].islower():            # read as a sentence, not a sentence fragment
+        obj = obj[0].upper() + obj[1:]
     tail = obj if obj[-1:] in ".!?" else obj + "."
-    addition = f"{_CENTRAL_OBJECT_LEAD} {tail}"
-    return f"{text} {addition}".strip() if text else addition
+    return f"{text} {tail}".strip() if text else tail

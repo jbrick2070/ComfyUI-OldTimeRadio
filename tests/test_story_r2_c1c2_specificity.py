@@ -95,7 +95,12 @@ class TestInjectors:
     def test_central_object_appended_and_omitted(self):
         b = "The lab cleared its name."
         out = inject_central_object_into_brief(b, "a cracked phone")
-        assert "Central object" in out and "a cracked phone" in out
+        # the close lands on the concrete object as a CLEAN final image -- the
+        # prompt-scaffold label must NEVER leak into the SPOKEN brief (BUG
+        # 2026-06-25: the announcer spoke "Central object, if useful: ...").
+        assert "Central object" not in out
+        assert "if useful" not in out
+        assert "A cracked phone." in out                     # capitalized sentence
         assert inject_central_object_into_brief(b, "") == b   # unchanged when ""
         # no double period
         assert ".." not in inject_central_object_into_brief(b, "the pencil.")
