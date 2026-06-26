@@ -1,6 +1,37 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 LATE EVENING (CODER: BOTH build-ready specs BUILT + SHIPPED + PUSHED, all green
+> **>>> CURRENT STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION -- Chunk 1 SHIPPED, overnight soak RUNNING,
+> Chunk 2 build-ready. origin/v2.0-alpha HEAD `e8fa941d` == local. prod/main + tags GATED.)**
+> **Operator ask: "remove the two legacy [ltx_av_talk/ltx_av_music] and ensure the still logic is most robust" + run
+> the 420w overnight soak. Hardened via a 2-round LIVE roundtable (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, ~$0.61,
+> docs/2026-06-26-ltx-consolidation/): the panel caught that ONE engine serving BOTH character + scene beats
+> mis-routes the character beats 3 ways -> fix = ROLE-driven routing, not family-driven.**
+> - **SHIPPED `e8fa941d` -- Chunk 1 (robust still routing); full suite green vs the 5 pre-existing 267a53e
+>   workflow-pin fails + Bug Bible 16/7/3 + no-BOM + AST-clean:** `ltx_audio_in` now renders end-to-end. render_driver
+>   routes it like flux/flat_still (the beat's WIDE scene still -- scene_open radio bookend for announcer/music,
+>   scene_character for character beats) -> fixes the `requires init_image (got '')` crash on b000_music_open.
+>   Role-driven: one shared `_is_character_face_beat` classifier (role primary); `_uses_ambient_master_audio` excludes
+>   char-face beats (clean own voice); char beats get the gear-free char fallback; 512x288 AV canvas clamp. Other
+>   engines (ltx_video/wan_i2v/flux_still/humo) UNCHANGED. +11 tests/test_ltx_audio_in_routing.py.
+> - **OVERNIGHT SOAK RUNNING (operator "launch the soak yourself"):** scripts/_otr_overnight_420_soak.py launched
+>   detached vs a fresh :8000 boot (scripts/_otr_overnight_420_boot.cmd). Recipe: bookends=ltx_audio_in,
+>   other-beats=still_parallax (img=z_image_turbo -- CHANGED from still_kenburns so the turbo intro stills actually
+>   SHOW, not a procedural floor), voice=indextts2, 420w act=3; locals=mistral-nemo+gemma-4-e2b, frontier=grok-4.3,
+>   creativity rotation, $20 frontier cap, 9.5h wall. Loads the REAL workflows/otr_scifi_16gb_full.json; finals ->
+>   otr/obs. Morning summary scheduled. VRAM CAVEAT: box was at 4.6 GB (operator active) at launch -> early legs may
+>   trip the 14.5 GB ceiling; frees as the box quiesces overnight.
+> - **NEXT = Chunk 2 (remove the 2 legacy engines) -- BUILD-READY spec:
+>   docs/2026-06-26-ltx-consolidation/roundtable/pass02_plan.md (CHUNK 2 + verify-at-build).** DELETE LtxAvTalkEngine
+>   + LtxAvMusicEngine (eng_ltx_av.py, set ltx_audio_in default_roles=music/announcer); registry CAPABILITIES +
+>   VALIDATED_ENGINES (-2, +ltx_audio_in); scripts/otr_video_dep_pilot.py; render_driver name-maps
+>   (SYNTH_FALLBACKS/ENGINE_FAMILY/_LTX_OPEN_ENGINES/1082-canvas-clamp -> ltx_audio_in only); config/profiles/
+>   16gb_full.json + canonical workflow node-87 (ltx_av_music -> ltx_audio_in, SAME commit, re-validate); ~12 test
+>   files (test_video_ltx_av, test_ltx_av_driver_wiring, test_capability_profiles, test_workflow_live_passes_validator
+>   wv87, test_image_platform_c1, test_video_ledger/motion/perbeat_audio, test_still_aspect_and_labels,
+>   test_tested_only_dropdown_gate, test_ltx_open_health, tests/debug_prompt.json). NOT done this session (context).
+>   The soak uses role_overrides so it does NOT block on Chunk 2.**
+>
+> **>>> PRIOR STEP -- 2026-06-25 LATE EVENING (CODER: BOTH build-ready specs BUILT + SHIPPED + PUSHED, all green
 > per chunk. origin/v2.0-alpha HEAD `db9d8ea7` == local. NEXT = the forward-order engine track (section 3 -- Wan
 > eyeball / coverage sweep, mostly operator-gated GPU) OR an operator pick. prod/main + tags GATED.)**
 > **SHIPPED -- 7 commits, each: full suite green vs the 5 pre-existing `267a53e` workflow-pin fails (verified
