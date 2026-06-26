@@ -1,6 +1,50 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 EVENING (CODER HANDOFF: two build-ready specs CONVERGED + waiting to be BUILT.
+> **>>> CURRENT STEP -- 2026-06-25 LATE EVENING (CODER: BOTH build-ready specs BUILT + SHIPPED + PUSHED, all green
+> per chunk. origin/v2.0-alpha HEAD `db9d8ea7` == local. NEXT = the forward-order engine track (section 3 -- Wan
+> eyeball / coverage sweep, mostly operator-gated GPU) OR an operator pick. prod/main + tags GATED.)**
+> **SHIPPED -- 7 commits, each: full suite green vs the 5 pre-existing `267a53e` workflow-pin fails (verified
+> pre-existing by stash+rerun) + Bug Bible 16/7/3 + AST-clean + no-BOM + commit AND push to v2.0-alpha:**
+> - `95bbcbd2` **leak-floor-v2** (SPEC 1, DEFAULT-OFF/dark via `OTR_ENABLE_LEAK_FLOOR_V2` + `OTR_STRICT_LOCAL_CLEAN`,
+>   byte-identical off): `_otr_line_hygiene` EntityPolicy/Defect/VerificationResult + `verify_and_repair_line` + 4
+>   rules -- rule1 `strip_participle_before_quote` (NEW sibling; the `Gasping,` leak is `_leading_stage_strip`'s
+>   line-271 lowercase guard NOT `_NARRATION_VERBS`, which is NOT widened), rule2 `scrub_roster_vocative` (ALL-CAPS
+>   full-name vocative drop), rule3 `has_malformed_internal_quote`, rule4 news-bleed at `build_allowed_roster`
+>   (`build_banned_source_proper_nouns` + `banned_terms`; rejects President Trump, NASA/CERN stay). Writer builds
+>   the per-episode EntityPolicy + threads it; `_otr_ledger_scrub` gated rule-1 freeze backstop; +16 acceptance
+>   tests (4 leaks + 3 negatives, 0 leak + 0 FP).
+> - `5d140b82` **operator-flagged audio fix** (NOT in the specs -- Jeffrey reported the announcer SPEAKING
+>   "Central object, if useful: <obj>"): `inject_central_object_into_brief` was concatenating the prompt-scaffold
+>   label into the SPOKEN `news_close_brief`. Fixed in the brief builder -> a clean capitalized final-image
+>   sentence; removed the unused `_CENTRAL_OBJECT_LEAD`; test guards the label can't return.
+> - **SPEC 2 -- story-ledger DRIFT, 5 chunks IN ORDER:**
+>   - `d1bb9e7d` **C1 kill the StoryCritic fail-OPEN**: `ArcVerdict += "unverified"`; `clean()` returns it (NOT
+>     "strong") on every failure path; freeze DERIVES `meta.story_critic_status {ran,validated,failure}` from the
+>     verdict (no `run_story_critic` signature change -> no stub churn); A3 floor downgrades strong/unverified +
+>     reroll-targets -> "uneven"; finalize maps an unverified critic frozen_clean -> frozen_with_warns (observable,
+>     never a hard block).
+>   - `fbc829ac` **C2 cross-stage consistency guard (THE core)**: NEW `_otr_ledger_consistency.py` pure
+>     `assert_ledger_consistency` off a `SOURCE_OF_TRUTH_MATRIX` (sound_palette<-contract.sound_world, title/premise/
+>     setting/time_of_day<-outline->canon, style<-slug, cast, beat ids). GROUNDING CORRECTION: CastLock is a
+>     DOWNSTREAM node (re-locks the FROZEN ledger) -> NOT in scope at freeze; the check runs in the WRITER pre-emit
+>     where contract/outline/canon are real objects (castlock=None, cast source = ledger.cast). Audio-safe non-
+>     strict (LOUD warn + `meta.consistency_status`, never raises); CI enforcement = `tests/test_ledger_canon_parity.py`
+>     (14, incl. the golden sound_palette regression).
+>   - `e6ad1b0d` **C3 CI drift guards** (test-only): widget-ORDER-vs-live-INPUT_TYPES check (BUG-LOCAL-097, reuses
+>     the validator's widget classifiers; validated clean on the canonical 22 nodes) + a vintage-`l3-2026-05-14`
+>     schema-compat fixture (schema-version pin + no false consistency defect on an old ledger).
+>   - `9f725f4a` **C4 freeze WARN taxonomy**: deterministic 3-tier `classify_freeze_warning` /
+>     `build_freeze_warn_taxonomy` (structural_error blocks / story_accuracy_warning ships non-clean+visible /
+>     cosmetic clean-with-warns); stops mislabeling a shipped continuity/unverified/consistency finding "structural".
+>   - `db9d8ea7` **C5 whole-episode critic context + cut StanceIssue**: NEW `_critic_story_bearing_lines`
+>     (character + announcer) rendered READ-ONLY in the prompt + the beat_intent doctor-drift instruction;
+>     reroll_targets kept character-only via a NEW post_validator guard (the spec's "already rejects" was untrue);
+>     CUT the TELEMETRY-ONLY `StanceIssue` (model + field + prompt + `test_d2_antagonist_stance.py`).
+> **OPEN VERIFY (operator, GPU):** leak-floor-v2 is DEFAULT-OFF -- a live 320w validation per writer lane gates its
+> promotion to default-ON. The consistency guard + WARN taxonomy run live on every render (audio-safe, never block);
+> eyeball `meta.consistency_status` / `meta.freeze_warn_taxonomy` on the next soak.
+>
+> **>>> PRIOR STEP -- 2026-06-25 EVENING (CODER HANDOFF: two build-ready specs CONVERGED + waiting to be BUILT.
 > origin/v2.0-alpha HEAD `62c9f4f0` == local. The planner window produced the specs; a CODER window builds them.)**
 > **NEXT CODING WORK -- build these two, IN ORDER; each chunk: regression suite + Bug Bible green, AST/no-BOM,
 > commit AND push to v2.0-alpha per green chunk. Both are CONTENT/TEST-ONLY -- NO workflow-JSON node/widget churn;
@@ -1698,7 +1742,18 @@
 
 ## 1. CURRENT STEP
 
-**>>> ACTIVE (2026-06-25, CODER) = SCHEMA-ADHERENCE -- LEVER-1 LOAD-BEARING SHIPPED (`516644eb`, `d4ca6cd4`);
+**>>> ACTIVE (2026-06-25 LATE, CODER) = leak-floor-v2 + story-ledger DRIFT BOTH BUILT + SHIPPED + PUSHED.**
+origin/v2.0-alpha HEAD `db9d8ea7` == local. 7 commits, each suite-green vs the 5 pre-existing `267a53e` fails +
+Bug Bible 16/7/3 + AST/no-BOM: leak-floor-v2 `95bbcbd2` (DEFAULT-OFF/dark); the operator-flagged central-object
+announcer leak `5d140b82`; story-ledger DRIFT C1 `d1bb9e7d` (kill critic fail-open / ArcVerdict unverified) -> C2
+`fbc829ac` (pure `assert_ledger_consistency` + parity test, grounding-corrected to run in the WRITER since CastLock
+is downstream) -> C3 `e6ad1b0d` (widget-ORDER + vintage-ledger CI guards) -> C4 `9f725f4a` (freeze WARN taxonomy) ->
+C5 `db9d8ea7` (whole-episode critic context + cut StanceIssue). Full narrative in the CURRENT STEP block at the very
+top of this file. **NEXT = the forward-order engine track (section 3) or operator pick.** OPEN VERIFY (operator,
+GPU): promote leak-floor-v2 to default-ON after a live 320w validation per writer lane; eyeball
+`meta.consistency_status` + `meta.freeze_warn_taxonomy` on the next soak. prod/main + tags GATED.
+
+**>>> SUPERSEDED (2026-06-25, CODER) = SCHEMA-ADHERENCE -- LEVER-1 LOAD-BEARING SHIPPED (`516644eb`, `d4ca6cd4`);
 C4 DEFERRED; Lever 2 DROPPED via G1; SPRINT COMPLETE. The full build narrative is in the CURRENT STEP block at the very top.
 TL;DR: Lever 1 = TOLERANCE built from `docs/2026-06-25-schema-adherence/roundtable/pass04_plan.md`, refined by
 two live grounding roundtables (nested-fork/ + c4-scope/). C0+C1+C2+C5+C6 (`516644eb`) + C3 ladder (`d4ca6cd4`)
