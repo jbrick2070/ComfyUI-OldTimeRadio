@@ -30,7 +30,25 @@ Root cause chain:
    :144), and the render_driver `init_source=scene_still` path
    (`render_driver.py:~901`). Only the EMISSION is missing.
 
-## The fix (scoped)
+## OPERATOR REFRAME (2026-06-26, the correct fix direction)
+The radio bookend still ALREADY exists and renders fine -- a prior episode
+(`signal_lost_bells_beneath_sardis_..._final.mp4`) opens on a perfect control-room
+`scene_open` still under the announcer. So do NOT "emit a new" music still. Instead
+REUSE THE SAME `scene_open` radio bookend still for the MUSIC bookend beat (and the
+closing bookend), so the bookend ALWAYS has its still at start + end regardless of
+which video/still model is selected -- "use the same bookend still as in this".
+
+Pointer: `render_driver` sources the still per beat at ~`render_driver.py:790-911`.
+The `b000_music_open` beat (char_id="") currently lands `init_image=""` (~:892)
+instead of the existing `scene_open` ST-3 radio-bookend still (the `init_source=
+scene_still` path, ~:901/:911). The fix: make the music-open (and closing-music)
+bookend beat resolve to the SAME `scene_open` radio bookend still the announcer open
+uses -- one shared bookend still, fed to whatever engine the bookend role has
+(ltx_audio_in I2V, humo, etc.). It is model-agnostic by construction then.
+Confirm the `scene_open` still object is generated for the episode (it is when the
+announcer open is present) and just route it to the music bookend beat's init_image.
+
+## The fix (earlier framing -- SUPERSEDED by the reframe above; kept for context)
 In `derive_scene_still_targets` (otr_meta_brief_image_prompt.py:249): when the
 **music bookend** beat's video engine consumes a still (gate on
 `engine_consumes_still` / `accepts_still` via the image policy, like the
