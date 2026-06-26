@@ -1,7 +1,8 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION -- Chunk 1 SHIPPED, overnight soak RUNNING,
-> Chunk 2 build-ready. origin/v2.0-alpha HEAD `e8fa941d` == local. prod/main + tags GATED.)**
+> **>>> CURRENT STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION COMPLETE -- Chunk 1 + Chunk 2 SHIPPED (one
+> ltx_audio_in engine; ltx_av_talk/ltx_av_music DELETED), overnight soak RUNNING. origin/v2.0-alpha HEAD
+> `a30f5945` == local. prod/main + tags GATED.)**
 > **Operator ask: "remove the two legacy [ltx_av_talk/ltx_av_music] and ensure the still logic is most robust" + run
 > the 420w overnight soak. Hardened via a 2-round LIVE roundtable (GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro, ~$0.61,
 > docs/2026-06-26-ltx-consolidation/): the panel caught that ONE engine serving BOTH character + scene beats
@@ -20,16 +21,16 @@
 >   creativity rotation, $20 frontier cap, 9.5h wall. Loads the REAL workflows/otr_scifi_16gb_full.json; finals ->
 >   otr/obs. Morning summary scheduled. VRAM CAVEAT: box was at 4.6 GB (operator active) at launch -> early legs may
 >   trip the 14.5 GB ceiling; frees as the box quiesces overnight.
-> - **NEXT = Chunk 2 (remove the 2 legacy engines) -- BUILD-READY spec:
->   docs/2026-06-26-ltx-consolidation/roundtable/pass02_plan.md (CHUNK 2 + verify-at-build).** DELETE LtxAvTalkEngine
->   + LtxAvMusicEngine (eng_ltx_av.py, set ltx_audio_in default_roles=music/announcer); registry CAPABILITIES +
->   VALIDATED_ENGINES (-2, +ltx_audio_in); scripts/otr_video_dep_pilot.py; render_driver name-maps
->   (SYNTH_FALLBACKS/ENGINE_FAMILY/_LTX_OPEN_ENGINES/1082-canvas-clamp -> ltx_audio_in only); config/profiles/
->   16gb_full.json + canonical workflow node-87 (ltx_av_music -> ltx_audio_in, SAME commit, re-validate); ~12 test
->   files (test_video_ltx_av, test_ltx_av_driver_wiring, test_capability_profiles, test_workflow_live_passes_validator
->   wv87, test_image_platform_c1, test_video_ledger/motion/perbeat_audio, test_still_aspect_and_labels,
->   test_tested_only_dropdown_gate, test_ltx_open_health, tests/debug_prompt.json). NOT done this session (context).
->   The soak uses role_overrides so it does NOT block on Chunk 2.**
+> - **SHIPPED `a30f5945` -- Chunk 2 (legacy removal); full suite green vs the SAME 5 pre-existing 267a53e fails
+>   (zero new) + Bug Bible 16/7/3 + no-BOM + AST-clean:** DELETED LtxAvTalkEngine + LtxAvMusicEngine (eng_ltx_av.py);
+>   ltx_audio_in is the ONE audio-in engine + the music/announcer default. Repointed registry CAPABILITIES +
+>   VALIDATED_ENGINES, scripts/otr_video_dep_pilot.py, render_driver name-maps (SYNTH_FALLBACKS / ENGINE_FAMILY /
+>   _LTX_OPEN_ENGINES / 512x288 canvas clamp), config/profiles/16gb_full.json, and canonical workflow node-87 (x2)
+>   -- all to ltx_audio_in (JSON re-validated, 21 files). 14 test files updated. ZERO live ltx_av_talk/ltx_av_music
+>   refs remain (only removal-assertions).
+> - **NEXT = operator look-QA on the overnight soak output (morning summary -> obs finals) + any remaining
+>   engine-track work (section 3). The 5 pre-existing 267a53e workflow-pin fails are UNRELATED to this work and
+>   still open (test_capability_profiles/test_workflow_apply x2/test_workflow_live/test_full_workflow_v2).**
 >
 > **>>> PRIOR STEP -- 2026-06-25 LATE EVENING (CODER: BOTH build-ready specs BUILT + SHIPPED + PUSHED, all green
 > per chunk. origin/v2.0-alpha HEAD `db9d8ea7` == local. NEXT = the forward-order engine track (section 3 -- Wan
