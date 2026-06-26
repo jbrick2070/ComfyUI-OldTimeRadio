@@ -112,6 +112,42 @@ def transcript_sanitizer_enabled() -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+def leak_floor_v2_enabled() -> bool:
+    """Return True iff the leak-floor-v2 deterministic line verifier is on.
+
+    Leaking-words build (2026-06-25, ``docs/2026-06-25-leaking-words/``). One
+    mandatory deterministic offline verifier over four named leak classes
+    (capitalised-participle-before-a-quote extract; ALL-CAPS roster-vocative
+    drop; double-quote-only malformed-internal check; news-bleed real-person /
+    political-figure filtering at ``build_allowed_roster``). Env-gated via
+    ``OTR_ENABLE_LEAK_FLOOR_V2``; DEFAULT OFF. AUDIO-AFFECTING (it can change the
+    shipped line text), so it ships DARK exactly like ``composer_action_strip``
+    / ``transcript_sanitizer`` above (95/107) and is promoted to default-ON only
+    after a live 320w validation per writer lane. When OFF, no verifier runs, no
+    roster term is filtered, no ``leak_floor`` compose_flag is minted, and the
+    pipeline is byte-identical to the pre-leak-floor render.
+    """
+    import os
+    raw = (os.environ.get("OTR_ENABLE_LEAK_FLOOR_V2") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def strict_local_clean_enabled() -> bool:
+    """Return True iff leak-floor-v2 runs in FAIL-CLOSED (strict) mode.
+
+    When on, the verifier's correctness layer is mandatory: an unrepairable
+    leak (e.g. a malformed internal quote with the per-line recompose budget
+    exhausted) marks the ``VerificationResult`` as ``failed`` so CI / release
+    promotion can assert 0 leaks. DEFAULT OFF => best-effort: ship the
+    best-effort cleaned text + telemetry (the pre-promotion dark window).
+    Env-gated via ``OTR_STRICT_LOCAL_CLEAN``. Independent of
+    ``leak_floor_v2_enabled`` (strict has no effect while the verifier is off).
+    """
+    import os
+    raw = (os.environ.get("OTR_STRICT_LOCAL_CLEAN") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 def story_quality_v2_enabled(meta: Any) -> bool:
     """Return True iff the story-quality-v2 spine is enabled for this episode.
 

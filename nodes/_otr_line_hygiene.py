@@ -27,6 +27,7 @@ UTF-8 no BOM. 4-space indentation.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from typing import Any
 
 _WS = re.compile(r"\s+")
@@ -916,3 +917,239 @@ def sanitize_transcript_text(text: Any) -> "tuple[str, list]":
         return s, reasons
     except Exception:  # noqa: BLE001
         return str(text or ""), []
+
+
+# ---------------------------------------------------------------------------
+# leak-floor-v2 (2026-06-25, docs/2026-06-25-leaking-words/) -- ONE mandatory
+# deterministic offline verifier over four named leak classes, using NARROW
+# STRUCTURAL extract-or-fail rules (NOT verb-whitelist widening, NOT broad -ing
+# scrubbing). PURE: stdlib only, deterministic, idempotent, never raises. The
+# composer/writer gate every call behind ``_otr_config.leak_floor_v2_enabled()``
+# so this layer ships DARK (default-OFF, byte-identical) until a live validation
+# promotes it. The GROUNDED root cause of the shipped ``Gasping, "..."`` leak is
+# ``_leading_stage_strip``'s lowercase-start guard (line 271), which never
+# consults the verb whitelist -- so rule 1 is a NEW SIBLING, and we do NOT touch
+# ``_leading_stage_strip`` or widen ``_NARRATION_VERBS``. Rule 4 (news-bleed)
+# lives at ``_otr_line_composer.build_allowed_roster`` (fixed at the existing
+# roster gate, not by a new detector); the verifier only ECHOES it as a
+# line-level membership check over ``EntityPolicy.banned``.
+# ---------------------------------------------------------------------------
+
+#: A leading CAPITALISED PARTICIPLE wrapper ("Gasping," / "Frowned,") the model
+#: emitted BEFORE the actual quoted dialogue. Anchored to be the WHOLE
+#: outside-segment-0 (``$``) so "Running to the door, I shouted" (more after the
+#: word) never matches, and ``"Running," she said`` (starts WITH the quote, so
+#: outside-segment-0 is empty) never matches. ``[a-z]+`` before ``ing|ed`` needs
+#: >=1 lead char, so short imperatives ("King," / "Red,") do not match.
+_PARTICIPLE_WRAPPER_RE = re.compile(r"^[A-Z][a-z]+(?:ing|ed),\s*$")
+
+
+def strip_participle_before_quote(text: Any) -> "tuple[str, bool]":
+    """Rule 1. Extract the quoted dialogue when a line is a bare capitalised
+    participle wrapper + a quoted span (``Gasping, "I can't believe it."`` ->
+    ``I can't believe it.``). Returns ``(text, changed)``; unchanged unless the
+    outside wrapper matches ``_PARTICIPLE_WRAPPER_RE`` AND the first quoted span
+    is non-empty (the required quote is the false-positive guard). Reuses
+    ``segment_double_quotes`` after curly->straight normalisation. Pure;
+    idempotent (the result carries no wrapper / no double quotes); never
+    raises."""
+    try:
+        s = "" if text is None else str(text)
+        norm, segments = segment_double_quotes(s)
+        nq = norm.count('"')
+        # need one BALANCED quoted span: segment[0] outside, segment[1] in-quote
+        if nq < 2 or nq % 2 != 0 or len(segments) < 2:
+            return s, False
+        seg0_text, seg0_in_quote = segments[0]
+        seg1_text, seg1_in_quote = segments[1]
+        if seg0_in_quote or not seg1_in_quote:
+            return s, False
+        if _PARTICIPLE_WRAPPER_RE.match(seg0_text) and seg1_text.strip():
+            return seg1_text.strip(), True
+        return s, False
+    except Exception:  # noqa: BLE001 -- never raise on a spoken line
+        return ("" if text is None else str(text)), False
+
+
+def scrub_roster_vocative(text: Any, roster_fullnames: Any) -> str:
+    """Rule 2. Drop an ALL-CAPS FULL-NAME vocative addressing another cast
+    member (``YUKI MARTIN, no!`` -> ``no!``; ``Get out, YUKI MARTIN!`` ->
+    ``Get out!``).
+
+    ``scrub_self_vocative`` (above) only strips the SPEAKER's own name; this
+    targets ANOTHER character's full name. Full names ONLY (a name contains a
+    space), so a first-name vocative (``YUKI!``) is never touched. Matched
+    longest-first, ALL-CAPS only (the shouty leaked form -- a normal-case
+    ``Yuki Martin, hello`` is left to ordinary dialogue), at a vocative position
+    only (leading ``^NAME[,!:-]`` or trailing ``[, ]NAME[.!?]?$``). DROPs the
+    vocative (deterministic -- not title-case) and preserves terminal
+    punctuation. Returns the original if scrubbing would empty the line. Pure;
+    idempotent; never raises."""
+    try:
+        s = "" if text is None else str(text)
+        names = sorted(
+            {str(n).strip() for n in (roster_fullnames or ())
+             if n and " " in str(n).strip()},
+            key=len, reverse=True,
+        )
+        if not names:
+            return s
+        out = s
+        for name in names:
+            esc = re.escape(name.upper())  # ALL-CAPS literal, no IGNORECASE
+            # leading vocative: ^NAME[,!:-] ...
+            out = re.sub(rf"^\s*{esc}\s*[,!:\-]+\s*", "", out)
+            # trailing vocative: [, ]NAME[.!?]?$ -> drop name, keep terminal punct
+            out = re.sub(
+                rf"[,\s]+{esc}\s*([.!?])?\s*$",
+                lambda m: (m.group(1) or ""), out,
+            )
+        out = _WS.sub(" ", out).strip()
+        return out or s.strip()
+    except Exception:  # noqa: BLE001
+        return ("" if text is None else str(text))
+
+
+def has_malformed_internal_quote(text: Any) -> bool:
+    """Rule 3. True iff the line has an ODD number of double quotes that is NOT
+    a single EDGE wrapper -- an unclosed INTERNAL quote that must be recomposed.
+    An edge wrapper (exactly one ``"`` at the start XOR the end) is NOT malformed
+    (``sanitize_transcript_text`` balances it). Double quotes ONLY -- apostrophes
+    / ``don't`` never trip it (``segment_double_quotes`` ignores single quotes).
+    Pure; never raises."""
+    try:
+        norm, _segments = segment_double_quotes(text)
+        cnt = norm.count('"')
+        if cnt % 2 == 0:
+            return False
+        stripped = norm.strip()
+        edge_wrapper = (
+            cnt == 1
+            and (stripped.startswith('"') != stripped.endswith('"'))
+        )
+        return not edge_wrapper
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@dataclass(frozen=True)
+class EntityPolicy:
+    """Transient per-episode entity policy for leak-floor-v2 (NOT persisted --
+    the ledger schema stays frozen). ``allowed`` = cast + setting + fictional
+    world nouns + legit news orgs (NASA/CERN); ``banned`` = real-person /
+    political-figure source entities (President Trump, ...). Both UPPERCASE by
+    convention. Invariant: ``banned & allowed == frozenset()``."""
+    allowed: frozenset = field(default_factory=frozenset)
+    banned: frozenset = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True)
+class Defect:
+    """One leak-floor-v2 finding. ``target_span`` is ``(start, end)`` for tests
+    + telemetry; ``(-1, -1)`` when not span-anchored."""
+    reason_code: str
+    target_span: "tuple[int, int]" = (-1, -1)
+
+
+@dataclass(frozen=True)
+class VerificationResult:
+    """Result of ``verify_and_repair_line``. ``text`` is the (possibly repaired)
+    line; ``changed`` is True iff a rule mutated it; ``needs_recompose`` asks the
+    composer for ONE reroll; ``failed`` is set only under ``strict`` once the
+    recompose budget is spent; ``compose_flags`` are the per-line breadcrumbs."""
+    text: str
+    changed: bool = False
+    defects: "tuple[Defect, ...]" = ()
+    needs_recompose: bool = False
+    failed: bool = False
+    compose_flags: "tuple[str, ...]" = ()
+
+
+def verify_and_repair_line(
+    text: Any,
+    req: Any = None,
+    policy: Any = None,
+    *,
+    strict: bool = False,
+    repair_budget: int = 1,
+) -> "VerificationResult":
+    """leak-floor-v2 entry point: run the four deterministic leak rules on ONE
+    composed line BEFORE TTS/freeze.
+
+    Rules 1-2 EXTRACT / scrub in place (the text is repaired); rule 3 (malformed
+    internal quote) + rule 4 (a banned source entity survived into the line) set
+    ``needs_recompose`` so the composer reroll handles them -- falling back to
+    best-effort + telemetry, or ``failed`` under ``strict`` once the recompose
+    budget is spent. ``policy`` (an ``EntityPolicy``) supplies the ALL-CAPS
+    full-name roster (rule 2) + the banned-entity set (rule 4). ``req`` is
+    accepted for signature parity / future per-request tuning (unused today).
+    PURE -- no env reads (the caller passes ``strict`` from
+    ``strict_local_clean_enabled()``); deterministic; idempotent; never raises.
+    """
+    try:
+        s = "" if text is None else str(text)
+        defects: list = []
+        flags: list = []
+        changed = False
+        needs_recompose = False
+        out = s
+
+        # Rule 1: capitalised participle before a quote -> extract the dialogue.
+        r1, c1 = strip_participle_before_quote(out)
+        if c1:
+            defects.append(Defect("capitalized_participle_before_quote"))
+            flags.append("leak_floor:participle_before_quote")
+            out = r1
+            changed = True
+
+        # Rule 2: ALL-CAPS full-name roster vocative -> drop.
+        fullnames: tuple = ()
+        if policy is not None:
+            try:
+                fullnames = tuple(
+                    n for n in policy.allowed
+                    if isinstance(n, str) and " " in n
+                )
+            except Exception:  # noqa: BLE001
+                fullnames = ()
+        r2 = scrub_roster_vocative(out, fullnames)
+        if r2 != out:
+            defects.append(Defect("roster_vocative"))
+            flags.append("leak_floor:roster_vocative")
+            out = r2
+            changed = True
+
+        # Rule 3: malformed INTERNAL double quote -> recompose (no in-place fix).
+        if has_malformed_internal_quote(out):
+            defects.append(Defect("malformed_quote"))
+            flags.append("leak_floor:malformed_quote")
+            needs_recompose = True
+
+        # Rule 4 (line-level echo): a banned real-person / political entity
+        # survived into the line. PRIMARY enforcement is upstream at
+        # build_allowed_roster (the phantom/roster gate rerolls it); this
+        # membership check forces a recompose even if it slipped the roster.
+        if policy is not None:
+            try:
+                low = out.lower()
+                for b in policy.banned:
+                    bs = str(b).strip().lower()
+                    if bs and bs in low:
+                        defects.append(Defect("banned_source_entity"))
+                        flags.append("leak_floor:banned_source_entity")
+                        needs_recompose = True
+                        break
+            except Exception:  # noqa: BLE001
+                pass
+
+        failed = bool(strict and needs_recompose and repair_budget <= 0)
+        return VerificationResult(
+            text=out,
+            changed=changed,
+            defects=tuple(defects),
+            needs_recompose=needs_recompose,
+            failed=failed,
+            compose_flags=tuple(flags),
+        )
+    except Exception:  # noqa: BLE001 -- the verifier must never break a render
+        return VerificationResult(text=("" if text is None else str(text)))

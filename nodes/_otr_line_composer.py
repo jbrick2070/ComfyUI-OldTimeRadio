@@ -45,7 +45,9 @@ try:  # pragma: no cover - exercised by both import styles
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
+        scrub_roster_vocative,
         strip_action_marker,
+        verify_and_repair_line,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
@@ -55,7 +57,9 @@ except ImportError:  # pragma: no cover
         flag_on_the_nose,
         flag_stage_business,
         flag_thesis_close,
+        scrub_roster_vocative,
         strip_action_marker,
+        verify_and_repair_line,
     )
 
 # Story-quality v2 (R3) tunables. _otr_config is a stdlib-only leaf -> safe to
@@ -64,11 +68,15 @@ try:  # pragma: no cover - exercised by both import styles
     from ._otr_config import (
         OBJECTIVE_DEFLECTION_TENSION_MIN,
         composer_action_strip_enabled,
+        leak_floor_v2_enabled,
+        strict_local_clean_enabled,
     )
 except ImportError:  # pragma: no cover
     from _otr_config import (  # type: ignore
         OBJECTIVE_DEFLECTION_TENSION_MIN,
         composer_action_strip_enabled,
+        leak_floor_v2_enabled,
+        strict_local_clean_enabled,
     )
 
 log = logging.getLogger("OTR")
@@ -81,6 +89,7 @@ __all__ = [
     "compose_line",
     "strip_line_formatting",
     "build_allowed_roster",
+    "build_banned_source_proper_nouns",
     "detect_phantom_names",
     "strip_announcer_vocative",
     "aggregate_compose_flags",
@@ -304,6 +313,7 @@ def build_allowed_roster(
     key_terms: Iterable[str] = (),
     *,
     include_announcer: bool = True,
+    banned_terms: Iterable[str] = (),
 ) -> frozenset[str]:
     """Build the UPPERCASE allowed_roster for the Phase 0 name gate.
 
@@ -320,6 +330,13 @@ def build_allowed_roster(
                         trigger phantom-name flags.
       include_announcer keep "ANNOUNCER" in the roster (default True).
                         Set False only in pure-test contexts.
+      banned_terms      leak-floor-v2 (2026-06-25): UPPERCASE real-person /
+                        political-figure source entities to EXCLUDE from the
+                        roster even if they arrived via key_terms (so the
+                        existing phantom gate REJECTS "President Trump" -> a
+                        reroll). Empty (the default) is a no-op => byte-identical
+                        to the pre-leak-floor roster. Excluded last so it wins
+                        over a cast/key_term collision.
 
     Returns a frozenset of UPPERCASE strings. Whitespace trimmed on
     each entry; empty entries dropped. Stable across calls — no RNG,
@@ -346,7 +363,112 @@ def build_allowed_roster(
         term_s = str(term or "").strip()
         if term_s:
             roster.add(term_s.upper())
+    banned_u = {str(b or "").strip().upper() for b in (banned_terms or ()) if str(b or "").strip()}
+    if banned_u:
+        roster -= banned_u
     return frozenset(roster)
+
+
+# ---------------------------------------------------------------------------
+# leak-floor-v2 rule 4 (2026-06-25, docs/2026-06-25-leaking-words/) -- news-bleed.
+# Real-person / political-figure source entities ("President Trump") ship today
+# because the comments mandate that news terms arrive via key_terms, and
+# build_allowed_roster ALLOWLISTS every key_term -> the phantom gate passes the
+# name. The fix is at the roster, not a new detector: classify the real-person /
+# political class OUT of key_terms (honorific + surname, a small living-figure
+# stoplist) and route them to banned_terms; org / place / mission terms
+# (NASA / CERN / JPL / Voyager) STAY in key_terms (legit in sci-fi). Conservative
+# (favours false NEGATIVES over false positives, like the rest of the gates): the
+# bare Firstname-Lastname person heuristic is NOT applied (it would wrongly ban
+# "New York"); a name is banned only on a strong signal (honorific or stoplist).
+# ---------------------------------------------------------------------------
+
+#: Honorific / civic-title prefix + a Capitalized surname = a real public figure
+#: ("President Trump", "Senator Warren", "Governor Newsom", "Dr. Fauci").
+_BANNED_HONORIFIC_RE = re.compile(
+    r"\b(?:President|Vice[- ]President|Senator|Governor|Mayor|Chancellor|"
+    r"Premier|Prime\s+Minister|PM|Representative|Rep|Congress(?:man|woman|member)|"
+    r"Secretary|Minister|Ambassador|President[- ]elect|Sen|Gov|Pres)\.?\s+"
+    r"[A-Z][a-z]+\b"
+)
+
+#: A small, conservative stoplist of living political / public figures whose
+#: bare SURNAME (or full name) is a real-person source entity, not fiction. Kept
+#: short + SFW; extend deliberately. UPPERCASE for case-insensitive membership.
+_BANNED_FIGURE_STOPLIST: frozenset = frozenset({
+    "TRUMP", "BIDEN", "HARRIS", "OBAMA", "CLINTON", "BUSH", "PENCE",
+    "PUTIN", "ZELENSKY", "ZELENSKYY", "XI JINPING", "NETANYAHU", "MODI",
+    "MACRON", "SCHOLZ", "SUNAK", "STARMER", "TRUDEAU", "ERDOGAN",
+    "KIM JONG UN", "KIM JONG-UN", "MUSK", "BEZOS", "ZUCKERBERG",
+    "DESANTIS", "NEWSOM", "PELOSI", "MCCONNELL", "FAUCI",
+})
+
+#: Org / place / mission terms that look proper-noun-ish but are LEGIT in
+#: sci-fi dialogue and must NEVER be banned (they stay in key_terms). Belt for
+#: the honorific/stoplist paths; UPPERCASE.
+_LEGIT_SOURCE_ORGS: frozenset = frozenset({
+    "NASA", "CERN", "JPL", "ESA", "NOAA", "SPACEX", "BOEING", "TESLA",
+    "VOYAGER", "HUBBLE", "ISS", "MIT", "CALTECH", "DARPA", "FAA", "FDA",
+    "WHO", "UN", "EU", "NATO", "GOOGLE", "APPLE", "MICROSOFT", "IBM",
+    "INTEL", "NVIDIA", "AMAZON", "BLUE ORIGIN", "ROSCOSMOS", "JAXA",
+})
+
+
+def build_banned_source_proper_nouns(
+    terms: Iterable[str] = (),
+    raw_text: str = "",
+) -> frozenset[str]:
+    """leak-floor-v2 rule 4: extract the real-person / political-figure source
+    entities (UPPERCASE) to ban from the allowed_roster.
+
+    Scans both the curated ``terms`` (key_terms) and an optional ``raw_text``
+    (the news script brief). A term/phrase is banned when it matches the
+    honorific+surname pattern OR is a known living-figure stoplist entry. Org /
+    place / mission acronyms (NASA, CERN, ...) are NEVER banned. Conservative by
+    design: a bare Title-Case "Firstname Lastname" is NOT banned (it would catch
+    "New York"). Returns a frozenset of UPPERCASE banned surface forms (the
+    honorific phrase AND its surname, plus any matched stoplist name). Pure;
+    deterministic; never raises."""
+    try:
+        banned: set[str] = set()
+
+        def _consider(s: str) -> None:
+            s = str(s or "").strip()
+            if not s:
+                return
+            su = s.upper()
+            if su in _LEGIT_SOURCE_ORGS:
+                return
+            # honorific + surname anywhere in the chunk
+            for m in _BANNED_HONORIFIC_RE.finditer(s):
+                phrase = m.group(0).strip()
+                banned.add(phrase.upper())
+                surname = phrase.split()[-1].strip(".")
+                if surname:
+                    banned.add(surname.upper())
+            # whole term IS a stoplist figure (bare surname / full name)
+            if su in _BANNED_FIGURE_STOPLIST:
+                banned.add(su)
+            else:
+                # any stoplist surname as a whole word inside the term
+                for fig in _BANNED_FIGURE_STOPLIST:
+                    if " " in fig:
+                        if fig in su:
+                            banned.add(fig)
+                    elif re.search(rf"(?<![\w]){re.escape(fig)}(?![\w])", su):
+                        banned.add(fig)
+
+        for t in terms or ():
+            _consider(t)
+        if raw_text:
+            # scan the brief sentence-by-sentence so the honorific regex anchors
+            for chunk in re.split(r"[.!?\n]+", str(raw_text)):
+                _consider(chunk)
+        # never ban a legit org that slipped in via a multi-word match
+        banned -= _LEGIT_SOURCE_ORGS
+        return frozenset(b for b in banned if b)
+    except Exception:  # noqa: BLE001 -- never break the roster build
+        return frozenset()
 
 
 def _strip_sentence_lead_word(sentence: str) -> str:
@@ -787,6 +909,13 @@ class LineRequest:
     # composer itself does not render it (the gate is writer-side). Empty
     # default => no effect => byte-identical.
     grounded_nouns: frozenset = field(default_factory=frozenset)
+    # leak-floor-v2 (2026-06-25) -- the TRANSIENT per-episode EntityPolicy
+    # (_otr_line_hygiene.EntityPolicy: allowed roster + banned source entities).
+    # The writer builds it ONCE when OTR_ENABLE_LEAK_FLOOR_V2 is on and threads
+    # it here so compose_line can run verify_and_repair_line before TTS/freeze.
+    # None (the default) => the verifier never runs => byte-identical to the
+    # pre-leak-floor pipeline. NOT persisted (the ledger schema stays frozen).
+    entity_policy: Optional[object] = None
 
 
 @dataclass(frozen=True)
@@ -2164,6 +2293,7 @@ def compose_line(
     stage3_banned_phrases=None,  # Optional[List[str]]
     _stage3_repair_attempted: bool = False,  # recursion guard
     _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
+    _leak_repair_attempted: bool = False,  # leak-floor-v2 recompose guard
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -2325,6 +2455,69 @@ def compose_line(
             "%s line: %s",
             len(cast_flags), req.speaker, list(cast_flags),
         )
+
+    # 3a-bis. leak-floor-v2 (2026-06-25) -- deterministic line verifier over the
+    # four named leak classes (capitalised-participle-before-quote extract,
+    # ALL-CAPS roster vocative drop, malformed internal quote, banned source
+    # entity). DEFAULT-OFF/dark: skipped entirely unless OTR_ENABLE_LEAK_FLOOR_V2
+    # is on AND the writer threaded a per-episode EntityPolicy -> byte-identical
+    # off. Runs AFTER cast_strip + BEFORE the phantom gate so the gate sees the
+    # verified text (a participle extract can expose an inner phantom). A
+    # malformed-quote / banned-entity defect asks for ONE recompose via the
+    # shared _leak_repair_attempted guard, then falls back to best-effort +
+    # telemetry (the freeze floor is the deterministic backstop).
+    if (
+        leak_floor_v2_enabled()
+        and req.entity_policy is not None
+        and not _leak_repair_attempted
+    ):
+        _vr = verify_and_repair_line(
+            cleaned, req, req.entity_policy,
+            strict=strict_local_clean_enabled(), repair_budget=1,
+        )
+        if _vr.compose_flags:
+            compose_flags = compose_flags + _vr.compose_flags
+        if _vr.changed and _vr.text:
+            cleaned = _vr.text
+            word_count = len(cleaned.split())
+        if _vr.needs_recompose:
+            _existing = getattr(req, "reroll_hint", "") or ""
+            _leak_hint = (
+                "output only the in-character spoken words: no leading action "
+                "description, no malformed or unclosed quotation marks, and no "
+                "real-world political figures or public officials"
+            )
+            _leak_combined = (
+                f"{_existing}; {_leak_hint}" if _existing else _leak_hint)
+            log.warning(
+                "[OTR_LineComposer] leak-floor-v2 defect on %s line "
+                "(%s) -- one recompose", req.speaker,
+                ",".join(d.reason_code for d in _vr.defects),
+            )
+            try:
+                return compose_line(
+                    creative_fn=creative_fn,
+                    req=req,
+                    max_attempts=max_attempts,
+                    base_temperature=base_temperature,
+                    max_new_tokens_cap=max_new_tokens_cap,
+                    stop_strings=stop_strings,
+                    creative_repo_id=creative_repo_id,
+                    reroll_hint=_leak_combined,
+                    enable_stage3_validators=enable_stage3_validators,
+                    stage3_plan=stage3_plan,
+                    stage3_beat=stage3_beat,
+                    stage3_banned_phrases=stage3_banned_phrases,
+                    _stage3_repair_attempted=_stage3_repair_attempted,
+                    _stage_dir_repair_attempted=_stage_dir_repair_attempted,
+                    _leak_repair_attempted=True,
+                )
+            except LineCompositionFailedError:
+                log.warning(
+                    "[OTR_LineComposer] leak-floor-v2 reroll exhausted for %s "
+                    "-- keeping best-effort; freeze floor is the backstop",
+                    req.speaker,
+                )
 
     # 3b. Phantom-name gate. Detect-and-flag only -- the line commits
     # regardless. Empty roster skips the gate entirely so early-stage

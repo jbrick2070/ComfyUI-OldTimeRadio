@@ -2535,6 +2535,7 @@ class OTR_LedgerScriptWriter:
         # loads at import time.
         from . import _otr_legacy_to_stage1_adapter as _OTRL2S1
         from . import _otr_config as _OTRCFG
+        from . import _otr_line_hygiene as _OTRHY  # leak-floor-v2 EntityPolicy
         from . import _otr_story_quality_l12 as _OTRSQL12
         from . import _otr_story_select as _OTRSEL
         from . import _otr_pitch_room as _OTRPR
@@ -3847,10 +3848,50 @@ class OTR_LedgerScriptWriter:
         # on lines[k].compose_flags; the composer does NOT reroll.
         # Phase 3 reviewer + deterministic Step 2.5 fallback own
         # repair downstream. See synthesis §6.A (Option 1, strict).
+        # leak-floor-v2 rule 4 (2026-06-25, DEFAULT-OFF/dark): split real-person
+        # / political-figure source entities OUT of the roster so the EXISTING
+        # phantom gate REJECTS them (-> reroll); org/place/mission terms
+        # (NASA/CERN/JPL) stay. OFF => banned set empty, no key_term filtered,
+        # banned_terms=() is a no-op => the roster is byte-identical. Also builds
+        # the transient per-episode EntityPolicy threaded onto every LineRequest.
+        _lfv2_on = _OTRCFG.leak_floor_v2_enabled()
+        _lfv2_banned: frozenset = frozenset()
+        _episode_entity_policy = None
+        roster_key_terms = key_terms_tuple
+        if _lfv2_on:
+            try:
+                _lfv2_news_text = str(
+                    (meta.get("news") or {}).get("script_brief") or ""
+                )
+            except Exception:  # noqa: BLE001
+                _lfv2_news_text = ""
+            _lfv2_banned = _OTRLC.build_banned_source_proper_nouns(
+                terms=key_terms_tuple, raw_text=_lfv2_news_text,
+            )
+            if _lfv2_banned:
+                _banned_u = {b.upper() for b in _lfv2_banned}
+                roster_key_terms = tuple(
+                    t for t in key_terms_tuple
+                    if str(t).strip().upper() not in _banned_u
+                )
         allowed_roster = _OTRLC.build_allowed_roster(
             cast_rows=cast_rows,
-            key_terms=key_terms_tuple,
+            key_terms=roster_key_terms,
+            banned_terms=_lfv2_banned,
         )
+        if _lfv2_on:
+            _episode_entity_policy = _OTRHY.EntityPolicy(
+                allowed=allowed_roster,
+                banned=frozenset(b.upper() for b in _lfv2_banned),
+            )
+            meta["leak_floor_v2"] = {
+                "active": True,
+                "banned": sorted(_lfv2_banned),
+                "filtered_key_terms": sorted(
+                    {str(t) for t in key_terms_tuple}
+                    - {str(t) for t in roster_key_terms}
+                ),
+            }
         # Wiring-review #7 / #9 (2026-05-11): stamp the canonical
         # allowed_roster on meta as a sorted JSON-serializable list
         # so every downstream consumer (composer, Pass 1 auditor,
@@ -3907,7 +3948,10 @@ class OTR_LedgerScriptWriter:
             for r in cast_rows
             if (r.get("name") if isinstance(r, dict) else getattr(r, "name", ""))
         )
-        allowed_things = frozenset(key_terms_tuple)
+        # leak-floor-v2 (2026-06-25): render the FILTERED key_terms in the prompt
+        # NAMED ENTITIES bucket so a banned real-person term is not re-injected
+        # (roster_key_terms == key_terms_tuple when the flag is off => identical).
+        allowed_things = frozenset(roster_key_terms)
 
         # Phase 4 v4 (2026-05-11): full-cast voice cards block. Joined
         # in cast_rows order (dict ordering preserves insertion order).
@@ -4196,6 +4240,9 @@ class OTR_LedgerScriptWriter:
                 canon_header=canon_header,
                 last_lines=list(last_lines),
                 allowed_roster=allowed_roster,
+                # leak-floor-v2 (2026-06-25): transient per-episode policy (None
+                # when the flag is off => compose_line's verifier never runs).
+                entity_policy=_episode_entity_policy,
                 # Phase 1 (2026-05-11) prompt enrichment.
                 style_descriptor=style_descriptor,
                 outline_spine=outline_spine,

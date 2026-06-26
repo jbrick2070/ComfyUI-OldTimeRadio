@@ -103,18 +103,26 @@ try:  # pragma: no cover - exercised by both import styles
         sanitize_transcript_text,
         scrub_leading_stage_direction,
         split_stage_business,
+        strip_participle_before_quote,
         strip_quote_anchored_stage_direction,
     )
-    from ._otr_config import transcript_sanitizer_enabled
+    from ._otr_config import (
+        leak_floor_v2_enabled,
+        transcript_sanitizer_enabled,
+    )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         BARE_STAGE_FLOOR_ACTIVE,
         sanitize_transcript_text,
         scrub_leading_stage_direction,
         split_stage_business,
+        strip_participle_before_quote,
         strip_quote_anchored_stage_direction,
     )
-    from _otr_config import transcript_sanitizer_enabled  # type: ignore
+    from _otr_config import (  # type: ignore
+        leak_floor_v2_enabled,
+        transcript_sanitizer_enabled,
+    )
 
 __all__ = [
     "ScrubResult",
@@ -498,6 +506,18 @@ def _strip_stage_directions(
             out = _WS_RUN_RE.sub(" ", bare).strip()
             if reasons is not None:
                 reasons.append("leading_bare")
+    # leak-floor-v2 rule 1 (2026-06-25, DEFAULT-OFF/dark) -- FREEZE-floor backstop
+    # for the capitalised-participle-before-quote class (`Gasping, "..."`). The
+    # lowercase-start guard in scrub_leading_stage_direction (hygiene line 271)
+    # cannot reach this CAPITALISED class, so this extracts the inner dialogue as
+    # the deterministic guarantee for any line that bypassed compose_line's
+    # verifier (e.g. announcer composes). Gated => OFF is byte-identical.
+    if leak_floor_v2_enabled():
+        _lf_text, _lf_changed = strip_participle_before_quote(out)
+        if _lf_changed:
+            out = _WS_RUN_RE.sub(" ", _lf_text).strip()
+            if reasons is not None:
+                reasons.append("leak_floor_participle")
     return out, (out != original)
 
 
