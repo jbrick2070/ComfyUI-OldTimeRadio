@@ -1083,5 +1083,174 @@ class TestCascadeB3Surface:
         assert isinstance(wv[6], str)
 
 
+# ---------------------------------------------------------------------------
+# story-ledger DRIFT chunk 3 (2026-06-25): CI drift guards.
+#
+# (a) WIDGET POSITIONAL/ORDER drift (BUG-LOCAL-097). The file already checks
+#     widgets_values TYPING + link integrity + stale dropdown literals, and the
+#     OTR_WorkflowValidator checks the widgets_values LENGTH vector
+#     (BUG-LOCAL-293). NEITHER checks the saved widget ORDER against the LIVE
+#     INPUT_TYPES order. A widget INSERTED mid-list (a non-append edit) leaves
+#     every saved widgets_values slot bound to the wrong widget -- silent drift.
+#     This zips each node's saved widget-name sequence (from inputs[].widget.name)
+#     against the live INPUT_TYPES widget order and fails on any non-append
+#     misalignment (a removed / renamed / reordered widget).
+# (b) Vintage ledger SCHEMA-COMPAT. A field whose default changes SEMANTICS must
+#     fail-loud or derive deterministically -- never silently default to wrong
+#     (the sound_palette class). A frozen l3-2026-05-14 ledger must still read
+#     cleanly through the new consistency guard with no false positive.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_ncm() -> dict:
+    """Resolve NODE_CLASS_MAPPINGS the way OTR_WorkflowValidator does (the
+    registry lives on the custom-node ROOT package, not nodes/). Returns {} if
+    the env cannot resolve it (the test then skips)."""
+    import importlib
+    import sys as _sys
+    comfy_root = PACK_ROOT.parent.parent  # ...\ComfyUI
+    if str(comfy_root) not in _sys.path:
+        _sys.path.insert(0, str(comfy_root))
+    for modname in ("custom_nodes.ComfyUI-OldTimeRadio", "ComfyUI-OldTimeRadio"):
+        try:
+            pkg = importlib.import_module(modname)
+            ncm = getattr(pkg, "NODE_CLASS_MAPPINGS", {}) or {}
+            if ncm:
+                return ncm
+        except Exception:  # noqa: BLE001
+            continue
+    return {}
+
+
+def _live_widget_order(input_types: dict) -> list[str]:
+    """Ordered NAMES of the inputs that occupy a widgets_values slot (widget-
+    backed AND not forceInput), required then optional -- the canonical widget
+    order the saved graph must agree with."""
+    from nodes._otr_workflow_validator import (
+        _wv_is_widget_backed, _wv_has_force_input,
+    )
+    req = (input_types.get("required") or {})
+    opt = (input_types.get("optional") or {})
+    out: list[str] = []
+    for name, spec in list(req.items()) + list(opt.items()):
+        if _wv_is_widget_backed(spec) and not _wv_has_force_input(spec):
+            out.append(name)
+    return out
+
+
+def _is_ordered_subsequence(names, order) -> bool:
+    """True iff ``names`` appears, in order, as a subsequence of ``order``."""
+    it = iter(order)
+    return all(n in it for n in names)
+
+
+class TestWidgetOrderVsInputTypes:
+    """BUG-LOCAL-097: the saved widget ORDER must match the live INPUT_TYPES."""
+
+    def test_saved_widget_names_match_live_input_types_order(self):
+        ncm = _resolve_ncm()
+        if not ncm:
+            pytest.skip("NODE_CLASS_MAPPINGS not resolvable in this env")
+        if not WORKFLOW_FILES:
+            pytest.skip("no workflow JSONs discovered")
+
+        violations: list[str] = []
+        checked = 0
+        for path in WORKFLOW_FILES:
+            doc = _load_json(path)
+            if _classify(doc) != "ui":
+                continue
+            for node in (doc.get("nodes") or []):
+                ntype = node.get("type")
+                cls = ncm.get(ntype)
+                if cls is None or not hasattr(cls, "INPUT_TYPES"):
+                    continue  # non-OTR / unloadable node -- exempt
+                try:
+                    order = _live_widget_order(cls.INPUT_TYPES() or {})
+                except Exception:  # noqa: BLE001
+                    continue
+                saved = [
+                    inp["widget"]["name"]
+                    for inp in (node.get("inputs") or [])
+                    if isinstance(inp, dict)
+                    and isinstance(inp.get("widget"), dict)
+                    and inp["widget"].get("name")
+                ]
+                if not saved:
+                    continue
+                checked += 1
+                if not _is_ordered_subsequence(saved, order):
+                    missing = [w for w in saved if w not in order]
+                    violations.append(
+                        f"{path.name} node {node.get('id')} {ntype}: saved "
+                        f"widget order {saved} is not an in-order subsequence "
+                        f"of live INPUT_TYPES order {order}"
+                        + (f" (removed/renamed: {missing})" if missing else
+                           " (reordered)")
+                    )
+        assert not violations, (
+            "widget ORDER drift vs live INPUT_TYPES (a non-append widget edit "
+            "rebinds every later slot -- BUG-LOCAL-097):\n  "
+            + "\n  ".join(violations)
+        )
+        assert checked > 0, (
+            "the widget-order guard exercised ZERO nodes -- the resolver or the "
+            "saved inputs[].widget.name shape changed; the guard is now blind"
+        )
+
+
+class TestVintageLedgerSchemaCompat:
+    """A frozen l3-2026-05-14 ledger must read cleanly; a semantics-changing
+    default must fail-loud or derive deterministically, never silently wrong."""
+
+    def _vintage_l3_ledger(self) -> dict:
+        # A minimal, FROZEN l3-2026-05-14 ledger as a pre-sound_palette /
+        # pre-story_contract / pre-consistency_status writer would have emitted.
+        return {
+            "schema_version": "l3-2026-05-14",
+            "episode_id": "ep_vintage_l3",
+            "cast": [
+                {"char_id": "c01", "name": "VEGA", "speaker_role": "character"},
+                {"char_id": "c02", "name": "ANNOUNCER",
+                 "speaker_role": "announcer"},
+            ],
+            "lines": [
+                {"line_id": "l001", "beat_id": "b001", "char_id": "c01"},
+                {"line_id": "l002", "beat_id": "b002", "char_id": "c01"},
+            ],
+            "meta": {"episode_title": "An Old Signal"},
+        }
+
+    def test_schema_version_pinned(self):
+        # a SILENT schema bump is forbidden -- this fails loud on a rename.
+        from nodes._otr_ledger_freeze import EXPECTED_SCHEMA_VERSION
+        assert EXPECTED_SCHEMA_VERSION == "l3-2026-05-14"
+        assert self._vintage_l3_ledger()["schema_version"] == EXPECTED_SCHEMA_VERSION
+
+    def test_vintage_ledger_no_false_consistency_defect(self):
+        # the new consistency guard (chunk 2) must NOT fire on a vintage ledger
+        # that predates story_contract/canon: no source -> no silent-wrong defect.
+        from nodes._otr_ledger_consistency import assert_ledger_consistency
+        defects = assert_ledger_consistency(
+            contract=None, outline=None, castlock=None, canon=None,
+            ledger=self._vintage_l3_ledger(),
+        )
+        assert defects == [], f"vintage ledger tripped the guard: {defects}"
+
+    def test_missing_sound_palette_default_is_deterministic_not_wrong(self):
+        # an outline dict with NO sound_palette derives [] deterministically
+        # (not garbage); and with no contract sound_world to source, that empty
+        # palette is NOT a defect (the regression only fires when a source EXISTS).
+        from nodes._otr_canon import episode_canon_from_outline_dict
+        from nodes._otr_ledger_consistency import assert_ledger_consistency
+        canon = episode_canon_from_outline_dict({
+            "title": "An Old Signal", "premise": "A relay wakes.",
+            "setting": "a relay", "time_of_day": "night",
+        })
+        assert canon.sound_palette == []
+        # no contract -> the sound_palette row is skipped -> no false positive.
+        assert assert_ledger_consistency(canon=canon, ledger={"meta": {}}) == []
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
