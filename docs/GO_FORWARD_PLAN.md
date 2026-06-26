@@ -46,9 +46,26 @@
 > catch the real stage business; the lane is unnecessary, G2 is moot. Results + the reusable measure
 > (`scripts/_otr_g1_abstain_residual.py`): `docs/2026-06-25-schema-adherence/binary/G1_RESULTS.md`.
 > **SCHEMA-ADHERENCE SPRINT COMPLETE: Lever 1 (tolerance) SHIPPED; Lever 2 (binary) DROPPED via G1; C4 DEFERRED
-> with a ready recipe.** Future non-whitelist leak -> cheap fix is ADD the verb to `_NARRATION_VERBS`, not an LLM
-> lane. C4 reopens only on a real captured non-alias schema drift. **NEXT = the forward-order engine track
-> (section 3 -- Wan eyeball / coverage sweep, mostly operator-gated GPU) or the operator's pick.**
+> with a ready recipe.** C4 reopens only on a real captured non-alias schema drift.
+> **>>> LEAKING-WORDS ROUNDTABLE (2026-06-25, R1+R2 CONVERGED, GPT-5.5+Gemini-3.1+DeepSeek-v4, ~$0.42) -- build-ready
+> plan `leak-floor-v2` at `docs/2026-06-25-leaking-words/pass02_plan.md` (coder ticket, NOT yet built).** The panel
+> GROUNDING CORRECTED the prior "cheap fix is ADD the verb to `_NARRATION_VERBS`" note: that is WRONG -- the shipped
+> `Gasping, "..."` leak is the `_leading_stage_strip` LOWERCASE-start guard (`_otr_line_hygiene.py` line 271), which
+> never consults the verb whitelist, so widening `_NARRATION_VERBS` does nothing for it. Converged fix = ONE
+> mandatory deterministic offline verifier over 4 leak classes via NARROW structural rules (capitalised-participle+
+> quote extract; full-name caps-vocative scrub; double-quote-only malformed check); news-bleed ("President Trump")
+> fixed at `build_allowed_roster` by filtering the real-person class out of `key_terms` so the EXISTING Phase-0 gate
+> rejects it (NASA/CERN stay); LLM cleaner CUT for v1 (unanimous). Ships DEFAULT-OFF/dark (audio-affecting per the
+> `_otr_config.py` 95/107 pattern) + a regression corpus of today's 4 leaks. Judgment: pass02_judgment.md.
+> **>>> CROSS-ENGINE RENDER VALIDATION (2026-06-25, operator-requested): 8 episodes rendered end-to-end -> OBS finals,
+> all `audio_byte_identical OK`, all with the sound_palette fix populated.** 4 all-visualizer (mistral/GPT/gemma/grok)
+> + 2 LTX+flux2_klein (mistral `time_slipping_away` 95.7MB, GPT `botswanas_empty_chair` 185MB) + 2 wan_ti2v(5B)+
+> flux2_klein (mistral `illuminating_doubt` 295.9MB; GPT in flight). **wan_ti2v 5B VRAM peak 9.7GB << 14.5GB ceiling
+> = the structural reason it renders where the 14B OOMs.** sound_palette FIX shipped `2baba3a4` (sound_world stamped
+> into the contract meta + derived into `episode_canon.sound_palette`). Story analysis: frontier(GPT)>local; the
+> machinery improved vs 2026-06-24 (every episode now carries a StoryContract). Docs pushed `41d49e24`.
+> **NEXT = leak-floor-v2 (coder, build-ready) OR the forward-order engine track (section 3 -- Wan eyeball / coverage
+> sweep, mostly operator-gated GPU) -- operator's pick.**
 >
 > **>>> PRIOR STEP (the planner handoff that kicked off this build) -- 2026-06-25 (SCHEMA-ADHERENCE BUILD HANDOFF -> a fresh CODER window. Docs only this
 > session; design roundtable CONVERGED, NOTHING coded yet. origin/v2.0-alpha HEAD `89e9f8bf` == local.)**
