@@ -1,7 +1,32 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-25 (SCHEMA-ADHERENCE SPRINT COMPLETE + LIVE-VALIDATED: Lever 1 SHIPPED; Lever 2
-> DROPPED via G1; C4 DEFERRED. origin/v2.0-alpha HEAD `d4ca6cd4` == local + docs on top. NEXT = forward-order engine track / operator pick.)**
+> **>>> CURRENT STEP -- 2026-06-25 EVENING (CODER HANDOFF: two build-ready specs CONVERGED + waiting to be BUILT.
+> origin/v2.0-alpha HEAD `62c9f4f0` == local. The planner window produced the specs; a CODER window builds them.)**
+> **NEXT CODING WORK -- build these two, IN ORDER; each chunk: regression suite + Bug Bible green, AST/no-BOM,
+> commit AND push to v2.0-alpha per green chunk. Both are CONTENT/TEST-ONLY -- NO workflow-JSON node/widget churn;
+> byte-identical audio spine untouched; ledger schema frozen except ONE `ArcVerdict` enum-value add.**
+> 1. **leak-floor-v2** -- spec `docs/2026-06-25-leaking-words/pass02_plan.md` (+ judgment pass02_judgment.md).
+>    4 narrow DETERMINISTIC leak rules (capitalised-participle+quote extract; caps-cast-vocative scrub via a new
+>    `scrub_roster_vocative`; double-quote-only malformed check) + news-bleed fixed AT `build_allowed_roster`
+>    (filter the real-person/political class out of `key_terms` so the EXISTING Phase-0 gate rejects "President
+>    Trump"; NASA/CERN stay). Ships DEFAULT-OFF/dark (audio-affecting, per `_otr_config.py` 95/107). Acceptance:
+>    `tests/test_leak_floor_v2.py` = the 4 observed shipped leaks (positive) + 3 negatives (first-name vocative,
+>    legit org noun, non-stage `-ing` opening); 0 leak + 0 FP. GROUNDED ROOT-CAUSE: the `Gasping,` leak is the
+>    `_leading_stage_strip` LOWERCASE-start guard (line 271), NOT the verb whitelist -- do NOT widen `_NARRATION_VERBS`.
+> 2. **story-ledger DRIFT** -- spec `docs/2026-06-25-story-ledger-integrity/roundtable/CODER_BUILD_SPEC.md`
+>    (R1-converged, panel+code-grounded). 5 chunks IN ORDER: (1) kill the StoryCritic FAIL-OPEN -- add `"unverified"`
+>    to `ArcVerdict` (line 238), `clean()` returns it NOT "strong" (line 261; exhaust ~445-455), stamp
+>    `meta.story_critic_status`, freeze maps unverified->non-clean, A3 floor (~567-590) downgrades strong/unverified+
+>    reroll-targets to "uneven"; (2) THE core -- a PURE `assert_ledger_consistency` + `tests/test_ledger_canon_parity.py`
+>    reflecting `StoryContract`/`CastLock` (the sound_palette-class guard; no LLM); (3) CI drift guards -- ADD a
+>    widget-order-vs-live-`INPUT_TYPES` check to `tests/test_workflow_json_guardrails.py` (it only checks typing today)
+>    + a vintage-ledger schema-compat fixture; (4) freeze WARN taxonomy (structural blocks / accuracy-warn ships
+>    non-clean / cosmetic clean-with-warns -- stop calling a shipped arc failure "structural"); (5) critic gets
+>    READ-ONLY whole-story context (it filters `speaker_role=="character"` at line ~394) + outline `beat_intent` in the
+>    prompt + CUT `StanceIssue` (~150-166, telemetry-only dead-end). Guards DETERMINISTIC, never LLM; multi-LLM binary
+>    voting is CUT.
+> **>>> PRIOR STEP -- 2026-06-25 (SCHEMA-ADHERENCE SPRINT COMPLETE + LIVE-VALIDATED: Lever 1 SHIPPED; Lever 2
+> DROPPED via G1; C4 DEFERRED. + 8-episode cross-engine render validation; wan_ti2v 5B confirmed non-crashing @ 9.7GB peak.)**
 > **E2E GPU VALIDATION (operator-requested, 2026-06-25): a 320w all-visualizer episode on the canonical JSON
 > rendered end-to-end on BOTH writer lanes -> OBS final + `audio_byte_identical OK`, zero tracebacks. LOCAL
 > (mistral-nemo): `signal_lost_frozen_awakening` 77.8MB, 21:03. FRONTIER (`~openai/gpt-latest` via
