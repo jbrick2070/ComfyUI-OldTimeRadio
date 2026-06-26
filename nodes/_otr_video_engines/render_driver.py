@@ -720,13 +720,41 @@ def ltx_prompt_diversity_status(trace):
             "ok": (len(shas) < 2) or distinct > 1, "sha8s": shas}
 
 
-def _uses_ambient_master_audio(engine_id, family):
+def _is_character_face_beat(shot):
+    """The ROLE-driven 'talking head' signal: a beat that needs the character's OWN
+    clean voice + a character prompt, NOT the ambient master slice + scene prompt the
+    announcer / music / scene BOOKEND beats get. Role is PRIMARY. announcer_visual /
+    music_visual are NEVER character-face. The audio_driven_face family (HuMo) on a
+    non-open beat counts; the unified ``ltx_audio_in`` audio-in lane counts when it
+    drives a CHARACTER beat (it is one engine for bookends AND characters, so the
+    talk-vs-scene split that used to live in ltx_av_talk/ltx_av_music now lives on the
+    ROLE). Other engines (ltx_video / wan_i2v / flux_still) are UNCHANGED -- they are
+    never character-face here, so their audio/prompt routing is untouched. Pure."""
+    role = str((shot or {}).get("role") or "")
+    if not role:
+        _gid = str((shot or {}).get("group_id") or "")
+        if _gid.startswith("grp_"):
+            role = _gid[len("grp_"):]
+    if role in ("announcer_visual", "music_visual"):
+        return False
+    if engine_family(str((shot or {}).get("engine_id") or ""), "") == "audio_driven_face":
+        return True
+    if str((shot or {}).get("engine_id") or "") == "ltx_audio_in" and role == "character_video":
+        return True
+    return False
+
+
+def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
     """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
-    ``audio_conditioned_video`` family (ltx_av_music -- which HARD-requires
-    audio_ref) + the visualizer scopes. These get a bounded master slice when a
-    beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk) is
-    EXCLUDED: it needs the character's OWN voice, so a master-mix slice would make
-    it lip-sync to the wrong audio -- it keeps its no-audio degrade instead."""
+    ``audio_conditioned_video`` family (ltx_av_music / ltx_audio_in BOOKEND beats --
+    which HARD-require audio_ref) + the visualizer scopes. These get a bounded master
+    slice when a beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk)
+    is EXCLUDED: it needs the character's OWN voice, so a master-mix slice would make
+    it lip-sync to the wrong audio. A CHARACTER-FACE beat is excluded for the SAME
+    reason regardless of family -- ``ltx_audio_in`` on a character beat must use the
+    character's clean own voice, never the ambient mix (2026-06-26 role-driven)."""
+    if is_char_face:
+        return False
     return str(family) == "audio_conditioned_video" or str(engine_id) == "visualizer"
 
 
@@ -866,7 +894,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # flux_still (Ken Burns) + flat_still (static hold) are the static_image_gen
     # "show the selected still" engines -- both condition on the beat's scene still
     # so the operator's chosen image (e.g. flux2_klein) is what's displayed.
-    if str(shot.get("engine_id") or "") in ("flux_still", "flat_still"):
+    # ltx_audio_in (2026-06-26) JOINS them: it is the unified WIDE audio-in LTX lane
+    # (render_aspect="wide") that does I2V on the beat's scene still + the shot audio
+    # -- the SAME per-beat wide still these engines use (scene_open for the
+    # announcer/music BOOKENDS, scene_character for character beats), portrait
+    # cleared so it can never leak into a wide frame. Unlike the cheap families it
+    # has NO floor: a missing required still fails LOUD in render_clip (no fallbacks).
+    if str(shot.get("engine_id") or "") in ("flux_still", "flat_still", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
@@ -893,9 +927,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_source = "missing_scene_still"
             _LOG.warning(
                 "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
-                "has NO scene still in the ledger -- the cheap family will "
-                "synthesize its dark floor for this beat; investigate the "
-                "image phase for beat %s.", _eng, _bid, _bid)
+                "has NO scene still in the ledger -- a cheap family (flux/flat_still) "
+                "synthesizes its dark floor; a still-REQUIRED engine (ltx_audio_in) "
+                "fails LOUD in render_clip (no fallbacks). Investigate the image "
+                "phase for beat %s.", _eng, _bid, _bid)
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --
@@ -962,7 +997,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # cumulative timeline position -- NEVER the whole master (an episode-length
         # WAV would blow up the audio encoder).
         if ((start_s is None or dur_s is None)
-                and _uses_ambient_master_audio(shot.get("engine_id"), _family)):
+                and _uses_ambient_master_audio(shot.get("engine_id"), _family,
+                                               _is_character_face_beat(shot))):
             _afps = int(((ledger or {}).get("video") or {}).get("fps") or 25) or 25
             _an = int(shot.get("target_frame_count") or 0)
             if dur_s is None:
@@ -1079,7 +1115,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # from ltx_video's 832x480 ON PURPOSE (heavier 22B). Env
     # OTR_LTX_AV_RENDER_CANVAS (default 512x288; /32-friendly); M4 may bump it once
     # a larger canvas is GPU-verified <= 14.5 GB.
-    if str(shot.get("engine_id") or "") in ("ltx_av_talk", "ltx_av_music"):
+    if str(shot.get("engine_id") or "") in ("ltx_av_talk", "ltx_av_music",
+                                            "ltx_audio_in"):
         _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", "512x288")
         try:
             _avw, _avh = (int(x) for x in _avc.lower().split("x", 1))
@@ -1097,9 +1134,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     creative = shot.get("creative") or {}
     text_prompt = str(creative.get("text_prompt") or "")
     _fam = engine_family(str(shot.get("engine_id") or ""), "")
-    _is_char_face_beat = (_fam == "audio_driven_face"
-                          and _shot_role not in ("announcer_visual",
-                                                 "music_visual"))
+    # ROLE-driven (2026-06-26): the shared classifier also catches ltx_audio_in
+    # CHARACTER beats (audio_conditioned_video family), so the gear scrub + the
+    # char-fallback prompt + the scene-prompt EXCLUSION all apply to them exactly
+    # like an audio_driven_face talking head. announcer/music bookends stay scene.
+    _is_char_face_beat = _is_character_face_beat(shot)
     if text_prompt:
         # HuMo-seam ticket Part C (2026-06-11): CHARACTER face beats get the
         # gear scrub (the c01 lesson: scrub the OUTPUT, never add "no
@@ -1130,13 +1169,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),
                            beat=_beat_id_for_shot(shot))
-    elif _fam == "audio_driven_face":
+    elif _is_char_face_beat or _fam == "audio_driven_face":
         # HuMo-seam ticket Part C: a FACE beat with NO M4 creative prompt is
         # the proven microphone re-introduction path -- the build_request
         # studio default ("a 1940s radio studio... on air") re-dresses the
         # gear the FLUX portraits were scrubbed of. LOUD + a gear-free
         # fallback for character beats; the announcer keeps the studio
-        # default (radio-styled by design). Never silent.
+        # default (radio-styled by design). Never silent. (2026-06-26: the
+        # _is_char_face_beat arm also routes ltx_audio_in CHARACTER beats here
+        # so they get the gear-free char fallback, not the generic radio default.)
         if _is_char_face_beat:
             _LOG.warning(
                 "[OTR.render_driver] HuMo character beat %s carries NO M4 "
@@ -1160,8 +1201,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
-    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_av_music")
-            and not text_prompt):
+    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_av_music",
+                                             "ltx_audio_in")
+            and not text_prompt and not _is_char_face_beat):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
         # beat-id suffix is definitive; empty source_line_ids counts only
         # for OPEN roles (a hypothetical provider/b-roll shot without source

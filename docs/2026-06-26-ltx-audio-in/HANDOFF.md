@@ -1,5 +1,61 @@
 # LTX audio-in -- handoff (2026-06-26)
 
+## FINAL SCOPE (operator 2026-06-26): collapse to ONE engine + robust still logic
+Operator directive: REMOVE the two legacy LTX-AV engines and keep ONE audio-in
+engine; make the still logic the MOST ROBUST (works regardless of which video /
+still model is chosen). Roundtable authorized if the builder is genuinely torn --
+but the approach below is converged, so build it; only roundtable a real fork.
+
+### A. Collapse to one engine
+- DELETE `LtxAvTalkEngine` + `LtxAvMusicEngine` from `eng_ltx_av.py`; keep the
+  single unified engine (`ltx_audio_in`, or rename to `ltx_av` -- operator's pick;
+  ltx_av reads cleaner as the twin of `ltx_video`). It is `_is_talk=True` (I2V on
+  any still), `accepts_still=True`, roles = announcer_visual + music_visual +
+  character_video, `default_roles` = the bookend roles (so it is the DEFAULT the
+  two legacy ones used to be), required text_prompt + audio_ref + init_image, NO
+  fallback.
+- REMOVE the `ltx_av_talk` + `ltx_av_music` rows from `registry.py` CAPABILITIES
+  and from `scripts/otr_video_dep_pilot.py` OPT_IN_ENGINES (keep the one).
+- REPOINT the canonical `workflows/otr_scifi_16gb_full.json`: any bookend role
+  widget set to `ltx_av_talk` / `ltx_av_music` -> the unified engine (CLAUDE.md
+  Section 0: JSON change in the SAME commit; re-run OTR_WorkflowValidator + the
+  widget/link audit). Grep the repo for the two old names -> ZERO live references.
+- Update the tests (test_ltx_audio_in_engine + any that name the two variants).
+
+### B. Robust still logic (the durable rule -- model-agnostic)
+The still PRESENCE + feeding is driven by ONE capability, per beat, so ANY
+video/still model combo gets the right still or correctly skips:
+- For EVERY beat, the still dispatcher already keys on
+  `engine_consumes_still(eng)` (accepts_still / required_inputs init_image). KEEP
+  that as the single gate.
+- CHARACTER beats -> the character PORTRAIT still (already works for accepts_still
+  engines; a procedural engine like still_kenburns correctly skips). For
+  "z-image-turbo intro stills" the char-beat engine MUST be an accepts_still still
+  lane (still_parallax), NOT the procedural still_kenburns.
+- BOOKEND beats (b000 music-open, announcer open, announcer close, closing music)
+  -> the SAME shared `scene_open` radio bookend still (the control-room still that
+  ALREADY renders today -- see signal_lost_bells_beneath_sardis). The still-spine
+  must EMIT that one scene_open still whenever ANY bookend role's engine
+  `engine_consumes_still`, and `render_driver` must feed it as init_image to EVERY
+  bookend beat whose engine consumes a still (today the music-open beat lands
+  init_image='' at ~render_driver.py:892 instead of the scene_still). One still,
+  start + end, fed to whatever engine the role has -> model-agnostic by
+  construction; an engine that ignores stills (T2V / procedural) simply does not
+  read it. This is the operator's "use the same bookend still as in this".
+- FALLBACK posture (NO silent fallback, per the no-fallbacks contract): if a
+  bookend engine consumes a still but the scene_open still could not be generated
+  (e.g. no image model), the still-spine must GUARANTEE it earlier (emission is
+  gated on the engine's need) rather than fail at render. If genuinely torn on the
+  guarantee-vs-fail-loud edge, THAT is the spot to /roundtable.
+
+### Validate (one smoke), then relaunch the soak
+Boot `_otr_overnight_420_boot.cmd`; smoke `_otr_combo_soak.py` with the unified
+engine on bookends + still_parallax char beats + indextts2, 80w/act 1, until an OBS
+final lands in output/otr/obs. Then relaunch `_otr_overnight_420_soak.py`.
+
+---
+
+
 ## Status
 - **`ltx_audio_in` engine SHIPPED** (`8dfd56b8`): the unified, agnostic LTX audio-in
   lane (I2V on any still + audio, music OR voice). Correct + suite-green + declared
