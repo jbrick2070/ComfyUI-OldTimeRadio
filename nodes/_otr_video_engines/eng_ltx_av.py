@@ -596,4 +596,37 @@ class LtxAvMusicEngine(_LtxAvBase):
     _is_talk = False
 
 
-__all__ = ["LtxAvTalkEngine", "LtxAvMusicEngine"]
+@register
+class LtxAudioInEngine(_LtxAvBase):
+    """LTX AUDIO-IN -- the UNIFIED, AGNOSTIC audio-in lane (operator 2026-06-26).
+
+    ONE engine for every audio-reactive role: it does LTX I2V on WHATEVER still
+    the pipeline mints -- a talk face, a radio-bookend scene still, a character
+    portrait -- conditioned on the shot AUDIO, music OR voice. It does NOT care
+    which; the render core already does ``i2v on ANY init image`` (render_clip,
+    the talk-face AND the scene still for music/announcer share one path). This
+    is the simplest model: ``ltx_video`` is the regular (no-audio) LTX lane, and
+    ``ltx_audio_in`` is the audio-in lane. The talk-vs-music split
+    (``ltx_av_talk`` / ``ltx_av_music``) stays for back-compat callers, but a
+    caller that just wants reliable LTX-with-audio everywhere picks this one.
+
+    Mechanics: ``_is_talk=True`` selects the I2V branch (condition on the still +
+    the audio slice -- there is no separate LTX 'lip-sync' parameter; talk is
+    just I2V on a face still); ``accepts_still=True`` makes the coverage arch
+    MINT the still for EVERY shot it covers (bookends included -- the same scene
+    still the other video engines already get for music/announcer), so the
+    init_image is never missing. Required: text_prompt + audio_ref + init_image.
+    NO fallbacks -- fail LOUD. Same LTX-AV weights / VRAM ceiling as the lane."""
+
+    name = "ltx_audio_in"
+    family = "audio_conditioned_video"   # agnostic -- NOT audio_driven_face
+    roles = ("announcer_visual", "music_visual", "character_video")
+    # opt-in (no default_roles) so it never silently displaces ltx_av_music as
+    # the per-role default; selected via the role override / the workflow JSON.
+    required_inputs = ("text_prompt", "audio_ref", "init_image")
+    accepts_still = True                 # mint a still for EVERY shot (bookends incl.)
+    fallback_engine = None               # NO FALLBACKS (547671d): fail LOUD
+    _is_talk = True                      # I2V branch: condition on the still + audio
+
+
+__all__ = ["LtxAvTalkEngine", "LtxAvMusicEngine", "LtxAudioInEngine"]

@@ -87,6 +87,19 @@ OPT_IN_ENGINES = {
             "<=14.5GB at the floor + the sync-loose look passes A/B (M4)"
         ),
     },
+    "ltx_audio_in": {
+        "lib_module": "ltx_video",
+        "adapter_class": "LtxAudioInEngine",
+        "forward": "render_clip",
+        "flag": "OTR_ENABLE_LTX_AV",
+        "assumed_call": (
+            "in-process ComfyUI graph (I2V on the minted still + audio-conditioned "
+            "concat -> LTXVSeparateAVLatent -> VAEDecodeTiled); GGUF Q3_K_M, Gemma-3 "
+            "on CPU. The UNIFIED agnostic audio-in lane (music OR voice). "
+            "# TODO-for-GPU-smoke: confirm the I2V audio-conditioned forward holds "
+            "<=14.5GB at the floor across music + announcer + character (M4)"
+        ),
+    },
     "ltx_video": {
         "lib_module": "ltx_video",
         "adapter_class": "LtxVideoEngine",
