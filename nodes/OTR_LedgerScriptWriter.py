@@ -5414,6 +5414,32 @@ class OTR_LedgerScriptWriter:
         # substitution -- another such ledger-only mutation -- is gone
         # (late title binding means no provisional title in dialogue).
         script_text = _PL.assemble_script_text_from_ledger(led.data)
+        # story-ledger DRIFT chunk 2 (2026-06-25): PRE-FREEZE cross-stage
+        # consistency guard. contract / outline / canon are the REAL objects
+        # here; OTR_CastLock is a DOWNSTREAM node (it re-locks the FROZEN
+        # ledger), so the cast source-of-truth is led.data["cast"] -> castlock
+        # is None. Audio-safe: non-strict => LOUD warn + meta.consistency_status,
+        # NEVER raises (a guard that breaks the writer is worse than the drift;
+        # CI enforcement lives in tests/test_ledger_canon_parity.py). Stamped
+        # BEFORE the json.dumps so consistency_status ships in the ledger.
+        try:
+            from . import _otr_ledger_consistency as _OTRLCONS
+            _cons_status = _OTRLCONS.evaluate_consistency(
+                contract=contract, outline=outline, castlock=None,
+                canon=canon, ledger=led.data, strict=False,
+            )
+            if not _cons_status.get("clean", True):
+                log.warning(
+                    "[OTR_LedgerScriptWriter] ledger/canon consistency: %d "
+                    "defect(s) %s (stamped meta.consistency_status)",
+                    _cons_status.get("defect_count", 0),
+                    [d.get("field") for d in _cons_status.get("defects", [])],
+                )
+        except Exception as _cons_exc:  # noqa: BLE001 -- never break the writer
+            log.warning(
+                "[OTR_LedgerScriptWriter] consistency check skipped: %r",
+                _cons_exc,
+            )
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
         news_json = _build_news_payload(
             outline, resolved["news_seed"], resolved["seed_source"],
