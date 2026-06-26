@@ -55,12 +55,10 @@ UNIVERSAL_FLOOR = "still_kenburns"
 #: no-compile lane; hunyuan3d_talk/trellis_talk stay registered-dark for the
 #: deferred toolkit lane); the overlay keeps the chains resolvable in contexts
 #: that never import that module (mirrors scripts/otr_video_soak).
-SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo",
-                   # LTX-AV lane (belt-and-braces for the guarded-import edge:
-                   # if eng_ltx_av fails to import, fallback_of still resolves a
-                   # chain that terminates at the floor). Mirrors each engine's
-                   # declared fallback_engine.
-                   "ltx_av_talk": "humo", "ltx_av_music": "ltx_video"}
+SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
+# ltx_audio_in declares fallback_engine=None (NO FALLBACKS, 547671d) -> it gets NO
+# SYNTH_FALLBACKS entry; a failed render fails LOUD. (The deleted ltx_av_talk /
+# ltx_av_music had belt-and-braces entries; removed 2026-06-26 with the engines.)
 
 #: engine_id -> family, for restamping onto a fallback engine (covers the
 #: possibly-unimported 3D engines + the A/cheap engines).
@@ -74,10 +72,9 @@ ENGINE_FAMILY = {
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
     "abstract": "abstract", "station_card": "static_image_gen",
     "visualizer": "abstract", "flux_still": "static_image_gen",
-    # LTX-AV (audio-input) lane: talk reuses audio_driven_face (portrait I2V +
-    # audio), music is the NEW audio_conditioned_video family.
-    "ltx_av_talk": "audio_driven_face",
-    "ltx_av_music": "audio_conditioned_video",
+    # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
+    # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
+    "ltx_audio_in": "audio_conditioned_video",
 }
 
 #: The (role, engine, family) rotation covering all 5 roles + the non-3D
@@ -1115,8 +1112,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # from ltx_video's 832x480 ON PURPOSE (heavier 22B). Env
     # OTR_LTX_AV_RENDER_CANVAS (default 512x288; /32-friendly); M4 may bump it once
     # a larger canvas is GPU-verified <= 14.5 GB.
-    if str(shot.get("engine_id") or "") in ("ltx_av_talk", "ltx_av_music",
-                                            "ltx_audio_in"):
+    if str(shot.get("engine_id") or "") == "ltx_audio_in":
         _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", "512x288")
         try:
             _avw, _avh = (int(x) for x in _avc.lower().split("x", 1))
@@ -1201,8 +1197,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
-    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_av_music",
-                                             "ltx_audio_in")
+    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_audio_in")
             and not text_prompt and not _is_char_face_beat):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
         # beat-id suffix is definitive; empty source_line_ids counts only
@@ -1770,7 +1765,7 @@ def apply_engine_override(ledger):
 #: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
 #: the prompt-only ltx_video + the additive LTX-AV audio lanes.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx_av_talk", "ltx_av_music"})
+    {"ltx_video", "ltx_audio_in"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})

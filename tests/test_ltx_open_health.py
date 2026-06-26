@@ -25,8 +25,8 @@ def test_healthy_ltx_open_passes():
 
 
 def test_ltx_av_open_also_healthy():
-    m = _manifest([_row("b001", "announcer_visual", "ltx_av_talk"),
-                   _row("b000_music_open", "music_visual", "ltx_av_music")])
+    m = _manifest([_row("b001", "announcer_visual", "ltx_audio_in"),
+                   _row("b000_music_open", "music_visual", "ltx_audio_in")])
     assert rd.check_ltx_open_health(m) == []
 
 

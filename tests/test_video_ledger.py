@@ -205,10 +205,10 @@ def test_video_treatment_forensic_sections(tmp_path):
             "costly_choice_beat": "b004",
         },
         "render_engines": {
-            "histogram": {"flat_still": 16, "ltx_av_music": 2},
+            "histogram": {"flat_still": 16, "ltx_audio_in": 2},
             "video_revision": 3,
             "by_role": {"character_video": {"flat_still": 14},
-                        "music_visual": {"ltx_av_music": 2}},
+                        "music_visual": {"ltx_audio_in": 2}},
             "vram_peak_mb": 12900,
         },
     })
@@ -243,7 +243,7 @@ def test_video_treatment_forensic_sections(tmp_path):
     assert "indextts2" in content and "kokoro" in content
     # RENDER ENGINES (video + image)
     assert "RENDER ENGINES" in content
-    assert "ltx_av_music" in content
+    assert "ltx_audio_in" in content
     assert "z_image_turbo" in content
     assert "12900" in content        # VRAM peak
     # SYSTEM block

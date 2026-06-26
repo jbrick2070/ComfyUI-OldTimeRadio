@@ -491,10 +491,10 @@ def test_still_needed_for_role_fails_safe():
 def test_still_needed_keys_on_accepts_still_capability():
     # Coverage arch (2026-06-18): every real motion lane declares accepts_still=True
     # (MotionEngineBase default), so a SILENT ltx_video clip now consumes the role's
-    # selected image -- this is the flux2/flux-on-LTX fix. The audio-reactive
-    # ltx_av_music lane opts OUT (accepts_still=False) and mints no still.
+    # selected image -- this is the flux2/flux-on-LTX fix. The visualizer lane opts
+    # OUT (accepts_still=False) and mints no still.
     pol_ltx = {"video_models": {"music_video_model": {"engine_id": "ltx_video"}}}
-    pol_avm = {"video_models": {"music_video_model": {"engine_id": "ltx_av_music"}}}
+    pol_avm = {"video_models": {"music_video_model": {"engine_id": "visualizer"}}}
     assert disp._still_needed_for_role(pol_ltx, "music_visual") is True
     assert disp._still_needed_for_role(pol_avm, "music_visual") is False
 

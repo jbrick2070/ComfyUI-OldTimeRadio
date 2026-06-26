@@ -37,7 +37,7 @@ def test_ltx_video_registered_and_dark():
     eng = vreg.get_engine("ltx_video")
     assert isinstance(eng, LtxVideoEngine)
     assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
-    # 2026-06-17: announcer + music DEFAULT moved to ltx_av_music (the audio-in
+    # 2026-06-17: announcer + music DEFAULT moved to ltx_audio_in (the audio-in
     # lane). ltx_video keeps its roles (still SELECTABLE) but no longer claims a
     # default role -- so it is registry-gated behind OTR_ENABLE_LTX_VIDEO.
     assert eng.default_roles == ()
@@ -66,7 +66,7 @@ def test_wan_i2v_registered_and_dark():
 # --------------------------------------------------------------------------- #
 def test_registry_gates_ltx_until_flag(monkeypatch):
     # 2026-06-17: ltx_video no longer claims any DEFAULT role (announcer + music
-    # moved to ltx_av_music). With no env it is registry-gated for ALL its roles;
+    # moved to ltx_audio_in). With no env it is registry-gated for ALL its roles;
     # with OTR_ENABLE_LTX_VIDEO=1 it is usable again -- still SELECTABLE, opt-in.
     monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
     for role in ("announcer_visual", "music_visual", "scene_broll",

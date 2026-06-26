@@ -7,15 +7,16 @@ the two lanes diverge on purpose (this lane snaps frames UP via
 ``av_dims.next_8n1``; ``eng_ltx_video`` snaps DOWN). ``eng_ltx_video.py`` is FROZEN
 and is never imported or touched here.
 
-Two adapters over one shared core (M0-GROUNDED graph; GGUF Q3_K_M proven on the
+ONE adapter over the shared core (M0-GROUNDED graph; GGUF Q3_K_M proven on the
 RTX 5080 at 13688 MB peak <= the 14500 ceiling, Gemma-3 encoder offloaded to CPU):
 
-* ``ltx_av_talk``  -- roles (announcer_visual, character_video); family
-  ``audio_driven_face``; required text_prompt + audio_ref + init_image; lip-sync
-  attempt from the still (I2V) + the audio slice; fallback -> humo.
-* ``ltx_av_music`` -- role (music_visual,); family ``audio_conditioned_video``;
-  required text_prompt + audio_ref; audio-reactive scene motion (sync-loose);
-  fallback -> ltx_video.
+* ``ltx_audio_in`` -- the ONE audio-in lane; roles (announcer_visual,
+  music_visual, character_video); family ``audio_conditioned_video``; required
+  text_prompt + audio_ref + init_image; I2V on the beat's WIDE scene still + the
+  audio slice (music OR voice); the per-role default for the music/announcer
+  bookends; NO fallback (fail LOUD). The old ltx_av_talk/ltx_av_music split was
+  REMOVED 2026-06-26 -- the talk-vs-scene routing lives on the BEAT ROLE in
+  render_driver (``_is_character_face_beat``), not on two engines.
 
 V-1 absolute: the lane DISCARDS LTX's audio side entirely -- the graph terminates
 at ``LTXVSeparateAVLatent -> video_latent -> VAEDecodeTiled`` (the audio_latent
@@ -561,72 +562,42 @@ class _LtxAvBase(_MC.MotionEngineBase):
 
 
 @register
-class LtxAvTalkEngine(_LtxAvBase):
-    """LTX-AV talk lane: lip-sync attempt from the FLUX still (I2V) + the audio
-    slice. Reuses the ``audio_driven_face`` family; degrades to HuMo (then the
-    HuMo 1.7B tier -> still floor)."""
-
-    name = "ltx_av_talk"
-    family = "audio_driven_face"
-    roles = ("announcer_visual", "character_video")
-    required_inputs = ("text_prompt", "audio_ref", "init_image")
-    fallback_engine = None              # NO FALLBACKS (547671d): fail LOUD
-    _is_talk = True
-
-
-@register
-class LtxAvMusicEngine(_LtxAvBase):
-    """LTX-AV music/scene lane: audio-reactive scene motion (sync-loose; the
-    visuals breathe with the track). NEW ``audio_conditioned_video`` family;
-    degrades to the golden prompt-only ``ltx_video`` (then the still floor)."""
-
-    name = "ltx_av_music"
-    family = "audio_conditioned_video"
-    # announcer_visual ADDED (2026-06-17): the audio-reactive scene lane is the
-    # DEFAULT for both music + announcer (the radio b-roll reacts to the track /
-    # the announcer's voice). default_roles must be a subset of roles.
-    roles = ("music_visual", "announcer_visual")
-    default_roles = ("music_visual", "announcer_visual")
-    required_inputs = ("text_prompt", "audio_ref")
-    #: Coverage arch opt-OUT: the audio-reactive music/announcer lane synthesizes
-    #: from the TRACK, not a still -> do NOT mint an init image for it (overrides the
-    #: MotionEngineBase default True). See docs/2026-06-18-coverage-arch-wiring/.
-    accepts_still = False
-    fallback_engine = None              # NO FALLBACKS (547671d): fail LOUD
-    _is_talk = False
-
-
-@register
 class LtxAudioInEngine(_LtxAvBase):
-    """LTX AUDIO-IN -- the UNIFIED, AGNOSTIC audio-in lane (operator 2026-06-26).
+    """LTX AUDIO-IN -- the ONE audio-in LTX lane (operator 2026-06-26).
 
     ONE engine for every audio-reactive role: it does LTX I2V on WHATEVER still
-    the pipeline mints -- a talk face, a radio-bookend scene still, a character
-    portrait -- conditioned on the shot AUDIO, music OR voice. It does NOT care
-    which; the render core already does ``i2v on ANY init image`` (render_clip,
-    the talk-face AND the scene still for music/announcer share one path). This
-    is the simplest model: ``ltx_video`` is the regular (no-audio) LTX lane, and
-    ``ltx_audio_in`` is the audio-in lane. The talk-vs-music split
-    (``ltx_av_talk`` / ``ltx_av_music``) stays for back-compat callers, but a
-    caller that just wants reliable LTX-with-audio everywhere picks this one.
+    the pipeline mints -- a radio-bookend scene still, a character scene still, a
+    face -- conditioned on the shot AUDIO, music OR voice. It does NOT care which;
+    the render core does ``i2v on ANY init image``. The simplest model:
+    ``ltx_video`` is the regular (no-audio) LTX lane, ``ltx_audio_in`` is the
+    audio-in lane.
+
+    The old talk/music split (``ltx_av_talk`` audio_driven_face / ``ltx_av_music``
+    audio_conditioned_video) was REMOVED 2026-06-26: that split was never about the
+    engine -- it encoded two ROLE routings (portrait+clean-audio+char-prompt for a
+    talking head vs scene-still+ambient-audio+scene-prompt for a bookend). That
+    routing now lives on the BEAT ROLE in ``render_driver`` (``_is_character_face_
+    beat``), NOT on two engines. Do not reintroduce the split.
 
     Mechanics: ``_is_talk=True`` selects the I2V branch (condition on the still +
-    the audio slice -- there is no separate LTX 'lip-sync' parameter; talk is
-    just I2V on a face still); ``accepts_still=True`` makes the coverage arch
-    MINT the still for EVERY shot it covers (bookends included -- the same scene
-    still the other video engines already get for music/announcer), so the
-    init_image is never missing. Required: text_prompt + audio_ref + init_image.
-    NO fallbacks -- fail LOUD. Same LTX-AV weights / VRAM ceiling as the lane."""
+    the audio slice -- there is no separate LTX 'lip-sync' parameter). The render
+    driver hands it the beat's WIDE scene still (scene_open radio bookend for the
+    announcer/music BOOKENDS, scene_character for character beats), so init_image
+    is never missing. ``default_roles`` makes it the per-role DEFAULT for the music
+    + announcer bookends (the slot the deleted ltx_av_music held). Required:
+    text_prompt + audio_ref + init_image. NO fallbacks -- fail LOUD. Same LTX-AV
+    weights / VRAM ceiling as the lane."""
 
     name = "ltx_audio_in"
     family = "audio_conditioned_video"   # agnostic -- NOT audio_driven_face
     roles = ("announcer_visual", "music_visual", "character_video")
-    # opt-in (no default_roles) so it never silently displaces ltx_av_music as
-    # the per-role default; selected via the role override / the workflow JSON.
+    # the per-role DEFAULT for the music + announcer bookends (inheriting the slot
+    # the deleted ltx_av_music engine held). default_roles must be subset of roles.
+    default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref", "init_image")
     accepts_still = True                 # mint a still for EVERY shot (bookends incl.)
     fallback_engine = None               # NO FALLBACKS (547671d): fail LOUD
     _is_talk = True                      # I2V branch: condition on the still + audio
 
 
-__all__ = ["LtxAvTalkEngine", "LtxAvMusicEngine", "LtxAudioInEngine"]
+__all__ = ["LtxAudioInEngine"]

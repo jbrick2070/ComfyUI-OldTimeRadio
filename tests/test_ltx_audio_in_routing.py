@@ -74,7 +74,7 @@ def test_ambient_audio_character_beat_excluded():
 
 def test_ambient_audio_two_arg_backcompat():
     # the new is_char_face arg defaults False -> the legacy 2-arg call is unchanged.
-    assert rd._uses_ambient_master_audio("ltx_av_music", "audio_conditioned_video") is True
+    assert rd._uses_ambient_master_audio("ltx_audio_in", "audio_conditioned_video") is True
     assert rd._uses_ambient_master_audio("humo", "audio_driven_face") is False
 
 

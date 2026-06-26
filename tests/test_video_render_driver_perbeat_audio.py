@@ -149,12 +149,12 @@ class TestSliceMasterAudio:
 
 
 # --------------------------------------------------------------------------- #
-# 2026-06-22: ambient-audio (ltx_av_music / visualizer) no-timing music-beat gap
+# 2026-06-22: ambient-audio (ltx_audio_in / visualizer) no-timing music-beat gap
 # --------------------------------------------------------------------------- #
 class TestAmbientAudioMusicBeatGap:
     def test_uses_ambient_master_audio_scope(self):
-        # ltx_av_music's family + the visualizer engine = ambient master lanes.
-        assert rd._uses_ambient_master_audio("ltx_av_music", "audio_conditioned_video") is True
+        # ltx_audio_in's family + the visualizer engine = ambient master lanes.
+        assert rd._uses_ambient_master_audio("ltx_audio_in", "audio_conditioned_video") is True
         assert rd._uses_ambient_master_audio("visualizer", "abstract") is True
         # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
         # never a master-mix slice (would lip-sync to the wrong audio).
@@ -221,7 +221,7 @@ class TestAmbientAudioMusicBeatGap:
 
         with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
             req = rd.build_request_from_shot(shot, ledger, master_audio_path=str(master))
-        # audio_ref satisfied (would otherwise FamilyInputGap-crash ltx_av_music):
+        # audio_ref satisfied (would otherwise FamilyInputGap-crash ltx_audio_in):
         # build_request puts it at the top-level req["audio_ref"], and
         # _present_request_tokens then reports "audio_ref" -> the family gate passes.
         assert (req.get("audio_ref") or {}).get("path") == slice_path

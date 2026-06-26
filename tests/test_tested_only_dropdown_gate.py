@@ -31,7 +31,7 @@ def test_video_validated_set():
     # wan_ti2v (forced-lane smoke PASSED 2026-06-18, NVML peak 12.9 GB < cap) +
     # visualizer + flat_still (CPU/ffmpeg-only stills -> trivially valid).
     assert vreg.VALIDATED_ENGINES == frozenset({
-        "ltx_video", "ltx_av_music", "ltx_av_talk",
+        "ltx_video", "ltx_audio_in",
         "humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
         "wan_ti2v", "visualizer", "flat_still",
         # mesh_stage PROMOTED 2026-06-21 (operator: 3D ready for all 3 slots);

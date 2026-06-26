@@ -1,0 +1,447 @@
+{
+  "63": {
+    "class_type": "OTR_WorkflowValidator",
+    "inputs": {
+      "workflow_json_path": "",
+      "validate_anyway": true,
+      "strict_unknown_types": true,
+      "profile_id": "",
+      "master_hash": "",
+      "generated_by": ""
+    }
+  },
+  "1": {
+    "class_type": "OTR_LedgerScriptWriter",
+    "inputs": {
+      "episode_title": "",
+      "target_words": 350,
+      "num_characters": 2,
+      "creative_writing_model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "custom_premise": "",
+      "include_act_breaks": true,
+      "act_count": "auto",
+      "style": "let the story decide",
+      "style_custom": "",
+      "creativity": "balanced",
+      "perfect_run_spacesaver": false,
+      "min_p": 0.05,
+      "repetition_penalty": 1.03,
+      "max_new_tokens_cap": 200,
+      "lemmy_cameo": "roll (~11% chance)",
+      "use_exchange": true,
+      "enable_production_stage3_validators": true,
+      "news_briefs_required": true,
+      "openrouter_slot_a_model": "(enable OpenRouter)",
+      "openrouter_slot_b_model": "(enable OpenRouter)",
+      "comfy_slot_a_model": "(enable Comfy Credits)",
+      "comfy_slot_b_model": "(enable Comfy Credits)"
+    }
+  },
+  "3": {
+    "class_type": "OTR_SceneSequencer",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "tts_audio_clips": [
+        "81",
+        0
+      ],
+      "announcer_audio_clips": [
+        "82",
+        0
+      ],
+      "start_line": 0,
+      "end_line": 999,
+      "output_dir": "",
+      "default_tts": "bark",
+      "dialogue_offset_ms": 0.0,
+      "sfx_offset_ms": 0.0
+    }
+  },
+  "4": {
+    "class_type": "OTR_AudioEnhance",
+    "inputs": {
+      "audio": [
+        "3",
+        0
+      ],
+      "target_sample_rate": 48000,
+      "spatial_width": 0.3,
+      "haas_delay_ms": 0.8,
+      "bass_warmth": 0.15,
+      "lpf_cutoff_hz": 16000.0,
+      "tape_emulation": "subtle",
+      "normalize_dbfs": -1.0
+    }
+  },
+  "7": {
+    "class_type": "OTR_EpisodeAssembler",
+    "inputs": {
+      "scene_audio": [
+        "4",
+        0
+      ],
+      "episode_title": "",
+      "opening_theme_audio": [
+        "83",
+        0
+      ],
+      "closing_theme_audio": [
+        "83",
+        1
+      ],
+      "opening_duration_sec": 10.0,
+      "closing_duration_sec": 8.0,
+      "crossfade_ms": 500
+    }
+  },
+  "12": {
+    "class_type": "OTR_SignalLostVideo",
+    "inputs": {
+      "audio": [
+        "7",
+        0
+      ],
+      "script_json": [
+        "62",
+        1
+      ],
+      "news_used": [
+        "62",
+        2
+      ],
+      "fps": 25,
+      "resolution": "1920x1080",
+      "episode_title": "",
+      "closing_audio": [
+        "83",
+        1
+      ],
+      "draw_scopes": false
+    }
+  },
+  "62": {
+    "class_type": "OTR_LedgerFreezeCascade",
+    "inputs": {
+      "script_text": [
+        "1",
+        0
+      ],
+      "script_json": [
+        "1",
+        1
+      ],
+      "news_used": [
+        "1",
+        2
+      ],
+      "estimated_minutes": [
+        "1",
+        3
+      ],
+      "technical_model": [
+        "1",
+        4
+      ],
+      "enable_phase_7_audio_readiness": true,
+      "enable_phase_8_video_readiness": true,
+      "vram_ceiling_gb": 14.0,
+      "render_selection": "all",
+      "render_max_n": 6,
+      "protagonist_only": false,
+      "manual_line_ids": ""
+    }
+  },
+  "80": {
+    "class_type": "OTR_CastLock",
+    "inputs": {
+      "script_json": [
+        "62",
+        6
+      ],
+      "voice_bank": "default",
+      "cast_voice_policy": "auto_registry",
+      "delivery_profile": "neutral",
+      "allow_voice_reuse": true
+    }
+  },
+  "81": {
+    "class_type": "OTR_BatchCharacterVoices",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "engine": "indextts2",
+      "ledger_json": [
+        "80",
+        0
+      ],
+      "gate_in": "mono_safe"
+    }
+  },
+  "82": {
+    "class_type": "OTR_AnnouncerVoice",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "engine": "kokoro",
+      "ledger_json": [
+        "80",
+        0
+      ],
+      "gate_in": [
+        "81",
+        2
+      ],
+      "stereo_policy": "mono_safe"
+    }
+  },
+  "83": {
+    "class_type": "OTR_StableAudioTheme",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "engine": "stable_audio_3",
+      "ledger_json": [
+        "80",
+        0
+      ],
+      "gate_in": [
+        "82",
+        2
+      ],
+      "stereo_policy": "mono_safe"
+    }
+  },
+  "84": {
+    "class_type": "OTR_SilentComposite",
+    "inputs": {
+      "base_video_path": [
+        "12",
+        0
+      ],
+      "canvas_w": 832,
+      "canvas_h": 25,
+      "fps": "ffmpeg",
+      "ffmpeg": "",
+      "clip_manifest_json": [
+        "92",
+        1
+      ]
+    }
+  },
+  "85": {
+    "class_type": "OTR_MasterAudioMux",
+    "inputs": {
+      "silent_video_path": [
+        "93",
+        0
+      ],
+      "master_audio_path": [
+        "7",
+        1
+      ],
+      "audio_done": [
+        "7",
+        3
+      ]
+    }
+  },
+  "86": {
+    "class_type": "OTR_CaptionBurn",
+    "inputs": {
+      "video_path": [
+        "84",
+        0
+      ],
+      "burn_captions": "sdh_standard",
+      "caption_style": 25,
+      "fps": "ffmpeg",
+      "ffmpeg": "",
+      "ledger_path": ""
+    }
+  },
+  "87": {
+    "class_type": "OTR_VideoDirector",
+    "inputs": {
+      "announcer_video_model": "ltx_audio_in",
+      "music_video_model": "ltx_audio_in",
+      "other_beats_video_model": "humo_1.7B",
+      "announcer_image_model": "flux_gen1",
+      "music_image_model": "flux_gen1",
+      "other_beats_image_model": "flux_gen1",
+      "other_beats_clip_mode": "pool_n_loop",
+      "other_beats_n": 4,
+      "fps": 25,
+      "canvas_w": 832,
+      "canvas_h": 480,
+      "seed_mode": "request_hash",
+      "request_seed": 42,
+      "allow_auto_fallback": true,
+      "episode_duration_target": "auto",
+      "custom_models_json": "{}",
+      "gate_in": [
+        "63",
+        0
+      ]
+    }
+  },
+  "88": {
+    "class_type": "OTR_ImageDirector",
+    "inputs": {
+      "announcer_granularity": "per_object",
+      "music_granularity": "per_object",
+      "other_beats_granularity": "per_object",
+      "fresh_cap": 15,
+      "seed_mode": "request_hash",
+      "request_seed": 42,
+      "video_policy_json": [
+        "87",
+        0
+      ],
+      "custom_models_json": "{}"
+    }
+  },
+  "89": {
+    "class_type": "OTR_MetaBriefImagePromptGen",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "image_policy_json": [
+        "88",
+        0
+      ],
+      "consistency_gate_warn_only": false
+    }
+  },
+  "90": {
+    "class_type": "OTR_ShotLock",
+    "inputs": {
+      "script_json": [
+        "62",
+        1
+      ],
+      "audio_done": [
+        "7",
+        3
+      ],
+      "video_policy_json": [
+        "87",
+        0
+      ],
+      "image_done": false
+    }
+  },
+  "91": {
+    "class_type": "OTR_ImageGenDispatcher",
+    "inputs": {
+      "script_json": [
+        "90",
+        0
+      ],
+      "image_policy_json": [
+        "88",
+        0
+      ],
+      "image_prompts_json": [
+        "89",
+        0
+      ],
+      "gate_in": [
+        "7",
+        3
+      ],
+      "episode_id": [
+        "90",
+        4
+      ]
+    }
+  },
+  "92": {
+    "class_type": "OTR_VideoRenderBatch",
+    "inputs": {
+      "mode": "episode",
+      "beats": 40,
+      "oom_index": 20,
+      "frame_count": 25,
+      "engine": "humo_1.7B",
+      "portrait_path": "",
+      "audio_path": "",
+      "patched_ledger_json": [
+        "91",
+        0
+      ],
+      "master_audio_path": [
+        "7",
+        1
+      ],
+      "image_done": [
+        "91",
+        1
+      ]
+    }
+  },
+  "93": {
+    "class_type": "OTR_PostUpscaleProcgenBlend",
+    "inputs": {
+      "source_mp4_path": [
+        "86",
+        0
+      ],
+      "procgen_mp4_path": [
+        "12",
+        0
+      ],
+      "blend_mode": "screen",
+      "blend_opacity": 1.0,
+      "ffmpeg": "ffmpeg",
+      "bypass": false,
+      "out_suffix": "_procgen_blended",
+      "shadow_crush_threshold": 18,
+      "green_only_overlay": true,
+      "burn_captions": true,
+      "caption_style": "sdh_standard",
+      "scopes_mp4_path": [
+        "94",
+        0
+      ],
+      "audio_bars": "bottom"
+    }
+  },
+  "94": {
+    "class_type": "OTR_SceneAwareScopes",
+    "inputs": {
+      "clip_manifest_json": [
+        "92",
+        1
+      ],
+      "audio": [
+        "7",
+        0
+      ],
+      "out_w": 1920,
+      "out_h": 1080,
+      "ffmpeg": "ffmpeg",
+      "landscape_bars": "off"
+    }
+  },
+  "9999": {
+    "class_type": "PreviewAudio",
+    "inputs": {
+      "audio": [
+        "7",
+        0
+      ]
+    }
+  }
+}

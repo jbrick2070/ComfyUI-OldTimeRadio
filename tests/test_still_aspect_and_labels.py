@@ -119,7 +119,7 @@ def test_label_round_trips_to_bare_id():
 def test_bare_legacy_value_still_resolves():
     # Old saved graphs store the bare id -> must pass through unchanged.
     assert vd._engine_id_from_pick("humo") == "humo"
-    assert vd._engine_id_from_pick("ltx_av_music") == "ltx_av_music"
+    assert vd._engine_id_from_pick("ltx_audio_in") == "ltx_audio_in"
 
 
 def test_add_custom_sentinel_is_preserved():

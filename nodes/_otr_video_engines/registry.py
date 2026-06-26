@@ -239,19 +239,7 @@ CAPABILITIES = {
     # the projection ckpt (LTXAVTextEncoderLoader reads it) -> listed here + gated
     # in eng_ltx_av._weight_paths. Estimate stays 14000 (the free_after_use engine
     # path frees the Gemma encoder before the unet+decode peak; verify on the soak).
-    "ltx_av_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                    "required_toolchain": None, "requires_sidecar": False,
-                    "cpu_ok": False,
-                    "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
-                                           "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
-                                           "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
-    "ltx_av_music": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                     "required_toolchain": None, "requires_sidecar": False,
-                     "cpu_ok": False,
-                     "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
-                                            "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
-                                            "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
-    # ltx_audio_in (2026-06-26): the UNIFIED, AGNOSTIC audio-in lane -- one engine
+    # ltx_audio_in (2026-06-26): the ONE audio-in lane -- one engine
     # for music + announcer + character (I2V on whatever still + the shot audio,
     # music or voice). Same LTX-2.3 22B audio weights / heavy class / OTR_ENABLE_LTX_AV
     # gate as the talk/music pair; accepts_still=True so the bookend still is minted.
@@ -288,8 +276,7 @@ __all__.append("CAPABILITIES")
 # ---------------------------------------------------------------------------
 VALIDATED_ENGINES = frozenset({
     "ltx_video",
-    "ltx_av_music",
-    "ltx_av_talk",
+    "ltx_audio_in",
     "humo",
     "humo_1.7B",
     "humo_1.7B_169",
