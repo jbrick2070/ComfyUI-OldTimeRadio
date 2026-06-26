@@ -92,18 +92,23 @@ class TestInjectors:
         assert "Specificity anchors" in out and "three robotic arms" in out
         assert inject_anchors_into_header(h, []) == h        # unchanged when empty
 
-    def test_central_object_appended_and_omitted(self):
+    def test_central_object_not_appended_to_close(self):
+        # operator 2026-06-26: the announcer's close ends on the brief news
+        # summary, NOT a tacked-on random object -- a bare "Artemis program."
+        # (proper-noun program) or even "A cracked phone." (a fragment, not a
+        # complete sentence) dangles as an unneeded spoken reference. The object
+        # is no longer appended; the brief is returned UNCHANGED. (The earlier
+        # scaffold-label leak "Central object, if useful: ..." stays fixed too.)
         b = "The lab cleared its name."
         out = inject_central_object_into_brief(b, "a cracked phone")
-        # the close lands on the concrete object as a CLEAN final image -- the
-        # prompt-scaffold label must NEVER leak into the SPOKEN brief (BUG
-        # 2026-06-25: the announcer spoke "Central object, if useful: ...").
-        assert "Central object" not in out
+        assert out == b                                      # no object appended
+        assert "cracked phone" not in out
+        assert "Central object" not in out                   # scaffold label never leaks
         assert "if useful" not in out
-        assert "A cracked phone." in out                     # capitalized sentence
-        assert inject_central_object_into_brief(b, "") == b   # unchanged when ""
-        # no double period
-        assert ".." not in inject_central_object_into_brief(b, "the pencil.")
+        # proper-noun / program names + empties: all leave the close unchanged.
+        assert inject_central_object_into_brief(b, "Artemis program") == b
+        assert inject_central_object_into_brief(b, "") == b
+        assert inject_central_object_into_brief(b, "the pencil.") == b
 
     def test_sanitize_strips_newlines_no_word_slice(self):
         s = sanitize_for_prompt("an experimental\nquantum\tcomputer")

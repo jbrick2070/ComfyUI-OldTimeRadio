@@ -157,17 +157,18 @@ def inject_central_object_into_brief(brief: Any, central_object: Any) -> str:
     """Land the news close on the central object as a concrete FINAL IMAGE
     (unchanged when "").
 
-    The close brief is SPOKEN VERBATIM by the news coda (compose_news_coda
-    appends it deterministically), so this emits a CLEAN, capitalized,
-    end-stopped sentence -- NEVER the prompt-scaffold label. The literal
-    "Central object, if useful:" used to be concatenated here and the announcer
-    SPOKE it ("...Central object, if useful: a cracked phone."); BUG flagged +
-    fixed 2026-06-25. Pure; deterministic; never raises."""
-    text = str(brief or "")
-    obj = sanitize_for_prompt(central_object)
-    if not obj:
-        return text
-    if obj[:1].islower():            # read as a sentence, not a sentence fragment
-        obj = obj[0].upper() + obj[1:]
-    tail = obj if obj[-1:] in ".!?" else obj + "."
-    return f"{text} {tail}".strip() if text else tail
+    The close brief is SPOKEN VERBATIM by the news coda. It used to get the
+    central object appended as a final "image" sentence, but that landed as an
+    UNNEEDED bare reference the announcer spoke awkwardly -- "...crewed lunar
+    missions. Artemis program." (a proper-noun program); and even a common-noun
+    "...A cracked phone." is "just a ref", a fragment, not a complete sentence.
+    Operator 2026-06-26: the close should END ON THE BRIEF NEWS SUMMARY (a
+    complete summary sentence -- which the ``brief`` already is), NEVER a
+    tacked-on random object. (An even earlier bug spoke the prompt-scaffold label
+    "Central object, if useful:"; fixed 2026-06-25.) So the object is NO LONGER
+    appended -- the news-summary brief is returned unchanged.
+
+    ``central_object`` stays in the signature (callers unchanged) for a future
+    NATURAL landing that WEAVES the object into a COMPLETE sentence rather than a
+    bare fragment. Pure; deterministic; never raises."""
+    return str(brief or "")
