@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-06-26T01:47:10.542689+00:00",
+  "doc": "docs\\2026-06-25-leaking-words\\roundtable\\pass01_plan.md",
+  "prompt_tokens_est": 55117,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 54075,
+      "completion_tokens": 4985,
+      "cost_usd": 0.11744375000000001
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 61592,
+      "completion_tokens": 4766,
+      "cost_usd": 0.12465000000000001
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 57507,
+      "completion_tokens": 1083,
+      "cost_usd": 0.025957755
+    }
+  ],
+  "total_cost_usd": 0.2681
+}
