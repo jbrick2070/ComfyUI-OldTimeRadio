@@ -11,8 +11,9 @@ Covers the whole-script story critic in `nodes/_otr_story_critic.py`:
      retry ladder exhausts and the call ends on a clean() report.
   5. the `post_validator` rejects a report citing an unknown `line_id`;
      the ladder exhausts and the call ends on a clean() report.
-  6. `StoryCriticReport.clean()` is the all-empty `arc_verdict="strong"`
-     safe fallback.
+  6. `StoryCriticReport.clean()` is the all-empty `arc_verdict="unverified"`
+     FAIL-CLOSED fallback (story-ledger DRIFT 2026-06-25 -- it no longer
+     claims "strong"); `run_story_critic` stamps `status_out` provenance.
 
 Pure-Python. Fake `generate_fn` for every LLM call -- NO GPU, NO HF, NO
 real model. Mirrors the fake-generate-fn pattern in
@@ -283,8 +284,10 @@ def test_garbage_response_returns_clean_report():
     report = run_story_critic(fn, _fake_ledger(), _cast_rows())
 
     assert isinstance(report, StoryCriticReport)
-    # Identical to the safe fallback: all sections empty, arc strong.
-    assert report.arc_verdict == "strong"
+    # Identical to the FAIL-CLOSED fallback: all sections empty,
+    # arc_verdict="unverified" (story-ledger DRIFT 2026-06-25 -- a crashed
+    # critic no longer claims "strong").
+    assert report.arc_verdict == "unverified"
     assert report.continuity_issues == []
     assert report.voice_drift == []
     assert report.flat_lines == []
@@ -308,7 +311,7 @@ def test_raising_generate_fn_is_swallowed():
     report = run_story_critic(fn, _fake_ledger(), _cast_rows())
 
     assert isinstance(report, StoryCriticReport)
-    assert report.arc_verdict == "strong"
+    assert report.arc_verdict == "unverified"
     assert report.reroll_targets == []
     assert report.render_priority == []
 
@@ -333,7 +336,7 @@ def test_invalid_arc_verdict_rejected_ends_clean():
     report = run_story_critic(fn, _fake_ledger(), _cast_rows())
 
     assert isinstance(report, StoryCriticReport)
-    assert report.arc_verdict == "strong"
+    assert report.arc_verdict == "unverified"
 
 
 def test_invalid_arc_verdict_then_valid_recovers():
@@ -373,7 +376,7 @@ def test_post_validator_rejects_unknown_line_id():
     report = run_story_critic(fn, _fake_ledger(), _cast_rows())
 
     assert isinstance(report, StoryCriticReport)
-    assert report.arc_verdict == "strong"
+    assert report.arc_verdict == "unverified"
     assert report.continuity_issues == []
 
 
@@ -413,15 +416,49 @@ def test_post_validator_lenient_on_empty_ledger():
 # ---------------------------------------------------------------------------
 
 
-def test_clean_classmethod_is_all_empty_strong():
+def test_clean_classmethod_is_all_empty_unverified():
+    # story-ledger DRIFT (2026-06-25): clean() is the FAIL-CLOSED fallback --
+    # all sections empty but arc_verdict="unverified", NOT "strong".
     report = StoryCriticReport.clean()
     assert isinstance(report, StoryCriticReport)
-    assert report.arc_verdict == "strong"
+    assert report.arc_verdict == "unverified"
     assert report.continuity_issues == []
     assert report.voice_drift == []
     assert report.flat_lines == []
     assert report.reroll_targets == []
     assert report.render_priority == []
+
+
+# ---------------------------------------------------------------------------
+# 7. story-ledger DRIFT (2026-06-25): kill the fail-OPEN. ArcVerdict gains the
+#    "unverified" FAIL-CLOSED sentinel; every failure path returns it (NOT
+#    "strong"). The freeze cascade derives meta.story_critic_status from it.
+# ---------------------------------------------------------------------------
+
+
+def test_arcverdict_literal_includes_unverified():
+    from nodes._otr_story_critic import ArcVerdict
+
+    assert "unverified" in ArcVerdict.__args__
+    # the real verdicts are still present (no accidental replacement)
+    for v in ("strong", "uneven", "flat", "mid_collapse"):
+        assert v in ArcVerdict.__args__
+
+
+def test_success_returns_real_verdict_not_unverified():
+    fn = _mk_generate_fn(_full_report_json())
+    report = run_story_critic(fn, _fake_ledger(), _cast_rows())
+    # a real evaluation NEVER yields the unverified sentinel
+    assert report.arc_verdict == "uneven"
+
+
+def test_every_failure_path_is_unverified_not_strong():
+    # exhausted ladder (garbage), raising slot fn -- BOTH fail-closed.
+    for fn in (_mk_generate_fn("not json at all {{{"), _raising_generate_fn()):
+        report = run_story_critic(fn, _fake_ledger(), _cast_rows())
+        assert report.arc_verdict == "unverified", (
+            "a crashed critic must fail CLOSED (unverified), never claim strong"
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

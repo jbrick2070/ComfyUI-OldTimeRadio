@@ -230,12 +230,21 @@ class StanceIssue(BaseModel):
     severity: str = ""
 
 
-# The four arc verdicts. `strong` is the all-clear; `uneven` flags a
-# script whose arc has soft patches; `flat` flags an arc with no real
-# rise or fall; `mid_collapse` flags the specific failure where the
-# middle of the episode loses dramatic tension. `strong` is the safe
-# fallback default (and the value `StoryCriticReport.clean()` returns).
-ArcVerdict = Literal["strong", "uneven", "flat", "mid_collapse"]
+# The arc verdicts. `strong` is the all-clear; `uneven` flags a script
+# whose arc has soft patches; `flat` flags an arc with no real rise or
+# fall; `mid_collapse` flags the specific failure where the middle of the
+# episode loses dramatic tension.
+#
+# `unverified` (story-ledger DRIFT, 2026-06-25) is the FAIL-CLOSED fallback
+# the critic could not actually evaluate -- an exhausted retry ladder or a
+# raising slot fn. It REPLACES the old fail-OPEN behaviour where a crashed
+# critic returned `strong` (a masterpiece verdict on a script it never
+# read). `unverified` is observable (it ships NON-clean via the freeze
+# WARN taxonomy) but is NOT a hard ship-block -- never gate audio on a
+# flaky LLM. `strong` stays the field DEFAULT (a real report that omits the
+# section is an all-clear); only `clean()` -- the failure fallback -- now
+# returns `unverified`.
+ArcVerdict = Literal["strong", "uneven", "flat", "mid_collapse", "unverified"]
 
 
 class StoryCriticReport(BaseModel):
@@ -268,15 +277,19 @@ class StoryCriticReport(BaseModel):
 
     @classmethod
     def clean(cls) -> "StoryCriticReport":
-        """Return the safe-fallback report: all sections empty,
-        `arc_verdict="strong"`.
+        """Return the FAIL-CLOSED fallback report: all sections empty,
+        `arc_verdict="unverified"`.
 
-        This is what `run_story_critic` returns on ANY failure. It asks
-        for no reroll (Sprint 5C does nothing) and supplies no render
-        ordering (Sprint 6 falls back to ledger order) -- a critic that
-        could not run leaves the pipeline exactly as it found it.
+        This is what `run_story_critic` returns on ANY failure (exhausted
+        ladder, raising slot fn). It asks for no reroll (Sprint 5C does
+        nothing) and supplies no render ordering (Sprint 6 falls back to
+        ledger order) -- a critic that could not run leaves the pipeline
+        exactly as it found it -- but it NO LONGER claims `strong` (the old
+        fail-OPEN bug: a crashed critic read as a masterpiece). `unverified`
+        is observable downstream (the freeze WARN taxonomy ships it
+        NON-clean) without hard-blocking audio. story-ledger DRIFT 2026-06-25.
         """
-        return cls()
+        return cls(arc_verdict="unverified")
 
 
 # ---------------------------------------------------------------------------
@@ -577,7 +590,11 @@ def run_story_critic(
     output. Any failure -- an exhausted `structured_call` retry ladder, a
     raising slot fn, or anything else -- is logged and
     `StoryCriticReport.clean()` is returned (all sections empty,
-    `arc_verdict="strong"`): the pipeline is left exactly as it was found.
+    `arc_verdict="unverified"`, the FAIL-CLOSED fallback): the pipeline is
+    left exactly as it was found, but the verdict no longer claims `strong`.
+    The freeze cascade derives `meta.story_critic_status` from the returned
+    report's `arc_verdict` (story-ledger DRIFT 2026-06-25) -- an `unverified`
+    verdict is the observable, fail-closed signal that the critic never ran.
     """
     user_prompt = _render_critic_user_prompt(
         candidate_ledger, cast_rows, scope_line_ids,

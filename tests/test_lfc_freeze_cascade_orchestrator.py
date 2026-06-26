@@ -106,6 +106,17 @@ def _stub_reviewer_disposition(verdict: str = "clean_no_edits",
 # ---------------------------------------------------------------------------
 
 
+def _validated_strong_critic(*_a, **_k):
+    """A critic that RAN and found nothing: arc_verdict='strong', no targets.
+
+    story-ledger DRIFT (2026-06-25): tests that isolate the reviewer/gap-audit
+    path stub this so the critic's verdict does not pollute the freeze verdict.
+    Without it an empty critic generate_fn yields the fail-CLOSED 'unverified'
+    sentinel, which now (correctly) ships as frozen_with_warns -- the killed
+    fail-open. The dedicated test below pins that new behaviour."""
+    return _LFC_ORCH._OTRSC.StoryCriticReport(arc_verdict="strong")
+
+
 class TestCascadeHappyPath:
     def test_clean_clean_frozen_clean(self):
         led = _ledger_obj(_clean_ledger_data())
@@ -114,7 +125,9 @@ class TestCascadeHappyPath:
             return _stub_reviewer_disposition("clean_no_edits")
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=fake_review):
+                          side_effect=fake_review), \
+             patch.object(_LFC_ORCH._OTRSC, "run_story_critic",
+                          side_effect=_validated_strong_critic):
             disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         assert disp.verdict == "frozen_clean"
@@ -124,6 +137,38 @@ class TestCascadeHappyPath:
         assert disp.gap_audit_pre.is_clean
         assert disp.gap_audit_post is not None
         assert disp.gap_audit_post.is_clean
+
+    def test_unverified_critic_ships_frozen_with_warns(self):
+        # story-ledger DRIFT (2026-06-25): kill the fail-OPEN. A critic that
+        # could not evaluate the arc (empty generate_fn -> clean()/unverified)
+        # must NOT ship as frozen_clean (the old masterpiece-on-a-crash bug).
+        # It maps to the observable, non-clean frozen_with_warns + a visible
+        # meta.story_critic_status -- but is NEVER a hard ship-block.
+        led = _ledger_obj(_clean_ledger_data())
+
+        def fake_review(_fn, _led):
+            return _stub_reviewer_disposition("clean_no_edits")
+
+        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                          side_effect=fake_review), \
+             patch("nodes._otr_anti_loop.anti_loop_reroll_targets",
+                   return_value=[]):
+            # NB: no critic stub -> the empty generate_fn exhausts the ladder
+            # -> StoryCriticReport.clean() == arc_verdict "unverified". The
+            # anti-loop floor is stubbed empty so the A3 downgrade does not
+            # turn the verdict into "uneven" -- it stays the unverified signal.
+            disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert disp.verdict == "frozen_with_warns"
+        meta = led.data["meta"]
+        assert meta["freeze_verdict"] == "frozen_with_warns"
+        assert meta["story_critic_status"] == {
+            "ran": True, "validated": False,
+            "failure": "critic_unverified_fail_closed",
+        }
+        assert meta.get("freeze_unverified_critic") is True
+        # observable, NOT a hard block: a terminal rerun verdict is never set.
+        assert disp.verdict not in ("needs_full_rerun", "too_many_edits")
 
     def test_clean_with_warns_frozen_with_warns(self):
         data = _clean_ledger_data()
@@ -382,7 +427,9 @@ class TestFreezeDispositionDataclass:
             return _stub_reviewer_disposition("clean_no_edits")
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=fake_review):
+                          side_effect=fake_review), \
+             patch.object(_LFC_ORCH._OTRSC, "run_story_critic",
+                          side_effect=_validated_strong_critic):
             disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         d = disp.to_dict()

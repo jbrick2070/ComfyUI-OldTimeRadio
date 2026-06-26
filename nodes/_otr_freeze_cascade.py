@@ -757,6 +757,18 @@ def run_freeze_cascade(
         ledger_data.get("cast", []) or [],
     )
     meta["story_critic_report"] = story_critic_report.model_dump()
+    # story-ledger DRIFT (2026-06-25): derive observable critic provenance so a
+    # fail-CLOSED critic (arc_verdict="unverified" == run_story_critic.clean())
+    # is visible, not silent. `validated` is deterministic off the verdict --
+    # the critic NEVER emits "unverified" on a real evaluation (it is the
+    # clean() failure sentinel); a real verdict is strong/uneven/flat/
+    # mid_collapse. Lives on meta only -- the frozen report schema is unchanged.
+    _critic_unverified = (story_critic_report.arc_verdict == "unverified")
+    meta["story_critic_status"] = {
+        "ran": True,
+        "validated": not _critic_unverified,
+        "failure": "critic_unverified_fail_closed" if _critic_unverified else "",
+    }
     log.info(
         "[LFC] Sprint 5B story critic: arc_verdict=%s, %d reroll "
         "target(s), %d flat line(s), %d continuity issue(s), %d line(s) "
@@ -795,13 +807,22 @@ def run_freeze_cascade(
             _existing_ids.add(_lid)
             _mech_added += 1
         if _mech_added:
+            # story-ledger DRIFT (2026-06-25): a report cannot be CLEAN and
+            # also DEMAND rerolls. If the mechanical floor adds anti-loop
+            # targets to a `strong`/`unverified` report, deterministically
+            # downgrade the arc verdict to `uneven` so the verdict matches the
+            # repair work it is asking for (closes the strong-but-rerolling
+            # contradiction).
+            if story_critic_report.arc_verdict in ("strong", "unverified"):
+                story_critic_report.arc_verdict = "uneven"
             meta["story_critic_report"] = story_critic_report.model_dump()
             meta["anti_loop_mechanical_targets_added"] = _mech_added
             log.info(
                 "[LFC] A3 mechanical floor: unioned %d deterministic "
                 "anti-loop target(s) into the critic reroll set "
-                "(total now %d).",
+                "(total now %d, arc_verdict=%s).",
                 _mech_added, len(story_critic_report.reroll_targets),
+                story_critic_report.arc_verdict,
             )
     except Exception as _a3_exc:  # noqa: BLE001 -- floor must never break freeze
         log.warning("[LFC] A3 mechanical floor failed: %r", _a3_exc)
@@ -1190,6 +1211,19 @@ def run_freeze_cascade(
         final_verdict = "frozen_with_doctor_edits"
     else:
         final_verdict = meta.get("freeze_verdict", "frozen_clean")
+    # story-ledger DRIFT (2026-06-25): an UNVERIFIED critic (fail-closed --
+    # it could not actually evaluate the arc) must NOT ship as `frozen_clean`
+    # (the old fail-open masterpiece). Map it to the observable, restampable
+    # `frozen_with_warns` -- non-clean + operator-visible, never a hard
+    # ship-block (audio is never gated on a flaky LLM). A real verdict
+    # (strong/uneven/flat/mid_collapse) is untouched.
+    if (
+        final_verdict == "frozen_clean"
+        and getattr(story_critic_report, "arc_verdict", "") == "unverified"
+    ):
+        final_verdict = "frozen_with_warns"
+        meta["freeze_verdict"] = "frozen_with_warns"
+        meta["freeze_unverified_critic"] = True
     disp = FreezeDisposition(
         verdict=final_verdict,
         reviewer_disposition=reviewer_disp,
