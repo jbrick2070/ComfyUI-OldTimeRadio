@@ -58,7 +58,6 @@ __all__ = [
     "VoiceDriftNote",
     "FlatLine",
     "RerollTarget",
-    "StanceIssue",
     "StoryCriticReport",
     "run_story_critic",
 ]
@@ -201,35 +200,6 @@ class RerollTarget(BaseModel):
     failed_dimension: FailedDimension = "unspecified"
 
 
-class StanceIssue(BaseModel):
-    """D2 (2026-06-22, story-quality lift) -- TELEMETRY ONLY.
-
-    A character whose stance toward the protagonist / central object REVERSES
-    across the episode with no turn beat that earns it (the "Chandra's Echo"
-    antagonist who flip-flops). This is a pure observation surfaced on
-    `meta.story_critic_report`; it is DELIBERATELY NOT wired to a `RerollTarget`,
-    a `FailedDimension`, a freeze gate, or `needs_full_rerun` -- R3 grounding
-    proved no cross-run repair channel survives a JSON-frozen rerun, so any such
-    wiring would be a silent dead-end repair path. Every field defaults so a
-    partial response still validates.
-
-      character_id     the character whose stance reversed.
-      target           who/what the stance is toward (FREE-FORM string).
-      prior_stance     the stance established earlier.
-      new_stance       the contradicting stance.
-      missing_turn_beat a beat_id OR a plain reason there is no earned turn.
-      line_ids         the lines that evidence the reversal.
-      severity         the critic's free-form severity label.
-    """
-    character_id: str = ""
-    target: str = ""
-    prior_stance: str = ""
-    new_stance: str = ""
-    missing_turn_beat: str = ""
-    line_ids: list[str] = Field(default_factory=list)
-    severity: str = ""
-
-
 # The arc verdicts. `strong` is the all-clear; `uneven` flags a script
 # whose arc has soft patches; `flat` flags an arc with no real rise or
 # fall; `mid_collapse` flags the specific failure where the middle of the
@@ -270,10 +240,6 @@ class StoryCriticReport(BaseModel):
     arc_verdict: ArcVerdict = "strong"
     reroll_targets: list[RerollTarget] = Field(default_factory=list)
     render_priority: list[str] = Field(default_factory=list)
-    # D2 (2026-06-22, story-quality lift) -- TELEMETRY ONLY. Defaulted empty so
-    # older stored reports + clean() still validate. NEVER read by the reroll /
-    # freeze path (see StanceIssue docstring).
-    stance_issues: list[StanceIssue] = Field(default_factory=list)
 
     @classmethod
     def clean(cls) -> "StoryCriticReport":
@@ -367,15 +333,6 @@ single list, dramatic peaks FIRST -- the moments that carry the episode at
 the top, the quiet connective lines at the bottom. The render stage uses
 this order to budget effort.
 
-SECTION 7 -- STANCE CONSISTENCY (observation only). Consider each character's
-stance toward the protagonist and toward the central conflict across all their
-lines. Flag a character whose stance REVERSES with no turn beat that earns it
--- an adversary who suddenly relents, an ally who suddenly turns, with nothing
-shown to motivate the change. Emit a stance_issues entry
-{character_id, target, prior_stance, new_stance, missing_turn_beat, line_ids,
-severity} for each. This is an OBSERVATION for the record only -- it does NOT
-ask for a reroll and does NOT change any verdict. A coherent script has none.
-
 Return EXACTLY one JSON object matching this schema:
 {
   "continuity_issues": [{"line_id": "...", "issue": "..."}, ...],
@@ -383,13 +340,32 @@ Return EXACTLY one JSON object matching this schema:
   "flat_lines": [{"line_id": "...", "reason": "..."}, ...],
   "arc_verdict": "strong" | "uneven" | "flat" | "mid_collapse",
   "reroll_targets": [{"line_id": "...", "hint": "...", "failed_dimension": "knowledge|pressure|relationship|decision|obstacle|tension|unspecified"}, ...],
-  "render_priority": ["line_id", "line_id", ...],
-  "stance_issues": [{"character_id": "...", "target": "...", "prior_stance": "...", "new_stance": "...", "missing_turn_beat": "...", "line_ids": ["..."], "severity": "..."}, ...]
+  "render_priority": ["line_id", "line_id", ...]
 }
 
 Every list may be empty. No prose before or after the JSON. No markdown
 fences.
 """
+
+
+#: Story-ledger DRIFT chunk 5 (2026-06-25): the roles that CARRY the story --
+#: character dialogue AND the announcer framing. Drift (continuity, a contradicted
+#: setup, an outcome the announcer spoiled) lives in the announcer beats too, so
+#: the critic gets them as READ-ONLY CONTEXT. music / sfx / title cue beats are
+#: not story-bearing and are excluded.
+_STORY_BEARING_ROLES: frozenset = frozenset({"character", "announcer"})
+
+
+def _critic_story_bearing_lines(candidate_ledger: dict) -> list[dict]:
+    """All STORY-BEARING lines (character + announcer) in canonical order --
+    the critic's READ-ONLY continuity/arc context. The critic may JUDGE + REROLL
+    only the character subset (``_critic_character_lines``); the announcer beats
+    are shown so a continuity break or a spoiled-outcome drift that spans the
+    framing is visible. Pure; never raises."""
+    return [
+        ln for ln in (candidate_ledger.get("lines", []) or [])
+        if ln.get("speaker_role") in _STORY_BEARING_ROLES
+    ]
 
 
 def _critic_character_lines(candidate_ledger: dict) -> list[dict]:
@@ -476,18 +452,37 @@ def _render_critic_user_prompt(
                 _t = _fr.get("tension")
                 if isinstance(_t, int) and 1 <= _t <= 5:
                     tension_by_id[str(_lid)] = _t
+    # Story-ledger DRIFT chunk 5: a READ-ONLY whole-episode block (character +
+    # announcer) so continuity / arc / spoiled-outcome drift that spans the
+    # framing is visible -- it used to be invisible (character-only). The
+    # judging + reroll surface stays character-only below. The unscoped full
+    # episode is shown even on a scoped re-score so cross-episode continuity is
+    # never lost. beat_intent (the ORIGINAL dramatic intent per beat) renders on
+    # each row -- the script doctor runs BEFORE the critic and may have rewritten
+    # a line OFF its beat_intent; that drift is a continuity/flat finding.
+    story_lines = _critic_story_bearing_lines(candidate_ledger)
+    if story_lines:
+        parts.append(
+            "FULL EPISODE (READ-ONLY CONTEXT -- includes the announcer framing; "
+            "each row shows beat_intent, the ORIGINAL dramatic intent for that "
+            "beat):"
+        )
+        parts.append(_render_lines_for_doctor(story_lines, tension_by_id))
+        parts.append("")
     parts.append(
-        "EPISODE SCRIPT (CHARACTER DIALOGUE BEATS ONLY -- "
-        "post-script-doctor, ready for the story-quality critic):"
+        "CHARACTER DIALOGUE BEATS YOU MAY JUDGE + REROLL "
+        "(post-script-doctor):"
     )
     parts.append(_render_lines_for_doctor(character_lines, tension_by_id))
     parts.append("")
     parts.append(
-        "You are seeing ONLY character dialogue beats -- announcer, music, "
-        "and SFX beats are locked structural content and are not your "
-        "concern. Walk the 6-section rubric in order on the lines above, "
-        "then emit the single JSON StoryCriticReport. Use only line_ids "
-        "shown above; do not invent any."
+        "Use the FULL EPISODE above ONLY for context (continuity, arc, voice "
+        "drift, and whether a line still serves its beat_intent after the "
+        "script doctor). You may emit reroll_targets and flat_lines ONLY for "
+        "the CHARACTER dialogue beats in the second block -- announcer, music, "
+        "and SFX beats are locked structural content you cannot reroll. Walk "
+        "the 6-section rubric in order, then emit the single JSON "
+        "StoryCriticReport. Use only line_ids shown above; do not invent any."
     )
     return "\n".join(parts)
 
@@ -520,6 +515,15 @@ def _make_critic_post_validator(candidate_ledger: dict):
         for ln in (candidate_ledger.get("lines", []) or [])
         if ln.get("line_id")
     }
+    # Story-ledger DRIFT chunk 5: the CHARACTER subset -- the only rerollable
+    # surface. The critic now sees the announcer framing as read-only context,
+    # so a reroll_target on a locked announcer/music/sfx beat must be rejected
+    # (it is dead -- nothing downstream can reroll it).
+    character_line_ids: set[str] = {
+        str(ln.get("line_id"))
+        for ln in (candidate_ledger.get("lines", []) or [])
+        if ln.get("line_id") and ln.get("speaker_role") == "character"
+    }
 
     def post_validator(report: "StoryCriticReport") -> Optional[str]:
         # An empty ledger means there is nothing to cross-check against;
@@ -549,6 +553,21 @@ def _make_critic_post_validator(candidate_ledger: dict):
                 f"report references {len(set(unknown))} line_id(s) not "
                 f"present in the ledger: {preview}"
             )
+        # reroll_targets must be CHARACTER lines only (chunk 5). Fires only when
+        # the target EXISTS (a hallucinated id is caught above) but is a locked
+        # non-character beat. An empty character set (pure-test ledger) skips.
+        if character_line_ids:
+            non_char = sorted({
+                str(t.line_id) for t in report.reroll_targets
+                if t.line_id and str(t.line_id) in valid_line_ids
+                and str(t.line_id) not in character_line_ids
+            })
+            if non_char:
+                return (
+                    f"reroll_targets must be CHARACTER lines only; "
+                    f"{len(non_char)} target(s) on locked non-character "
+                    f"beats: {', '.join(non_char[:8])}"
+                )
         return None
 
     return post_validator

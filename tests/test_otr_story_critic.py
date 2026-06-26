@@ -35,6 +35,10 @@ from nodes._otr_story_critic import (  # noqa: E402
     RerollTarget,
     StoryCriticReport,
     VoiceDriftNote,
+    _critic_character_lines,
+    _critic_story_bearing_lines,
+    _make_critic_post_validator,
+    _render_critic_user_prompt,
     _scope_character_lines,
     run_story_critic,
 )
@@ -459,6 +463,75 @@ def test_every_failure_path_is_unverified_not_strong():
         assert report.arc_verdict == "unverified", (
             "a crashed critic must fail CLOSED (unverified), never claim strong"
         )
+
+
+# ---------------------------------------------------------------------------
+# 8. story-ledger DRIFT chunk 5: whole-story READ-ONLY context (incl. announcer)
+#    + reroll_targets stay character-only + StanceIssue CUT.
+# ---------------------------------------------------------------------------
+
+
+def _mixed_ledger() -> dict:
+    return {
+        "meta": {},
+        "cast": [
+            {"char_id": "c01", "name": "RIVERA", "speaker_role": "character"},
+            {"char_id": "an", "name": "ANNOUNCER", "speaker_role": "announcer"},
+        ],
+        "lines": [
+            {"line_id": "l001", "beat_id": "b001", "speaker_role": "character",
+             "text": "We have to move now.", "beat_intent": "push the crew"},
+            {"line_id": "l900", "beat_id": "b000", "speaker_role": "announcer",
+             "text": "Tonight, on Signal Lost...", "beat_intent": "frame the open"},
+            {"line_id": "lmus", "beat_id": "bmus", "speaker_role": "music",
+             "text": "[theme sting]"},
+        ],
+    }
+
+
+def test_story_bearing_lines_includes_announcer_excludes_music():
+    lines = _critic_story_bearing_lines(_mixed_ledger())
+    ids = [ln["line_id"] for ln in lines]
+    assert ids == ["l001", "l900"]   # character + announcer, NOT music
+
+
+def test_character_lines_still_character_only():
+    ids = [ln["line_id"] for ln in _critic_character_lines(_mixed_ledger())]
+    assert ids == ["l001"]
+
+
+def test_prompt_shows_full_episode_context_incl_announcer():
+    prompt = _render_critic_user_prompt(
+        _mixed_ledger(),
+        [{"char_id": "c01", "name": "RIVERA", "speaker_role": "character"}],
+    )
+    assert "READ-ONLY CONTEXT" in prompt
+    assert "Tonight, on Signal Lost" in prompt        # announcer shown as context
+    assert "CHARACTER DIALOGUE BEATS YOU MAY JUDGE" in prompt
+    assert "beat_intent" in prompt                    # doctor-drift signal present
+    assert "CHARACTER lines" not in prompt or "reroll" in prompt.lower()
+
+
+def test_post_validator_rejects_announcer_reroll_target():
+    pv = _make_critic_post_validator(_mixed_ledger())
+    # a reroll target on the (real, but locked) announcer line is rejected.
+    bad = StoryCriticReport(
+        reroll_targets=[RerollTarget(line_id="l900", hint="punch it up")],
+    )
+    msg = pv(bad)
+    assert msg is not None and "CHARACTER lines only" in msg
+    # a character-line target is accepted.
+    ok = StoryCriticReport(
+        reroll_targets=[RerollTarget(line_id="l001", hint="punch it up")],
+    )
+    assert pv(ok) is None
+
+
+def test_stance_issues_cut_from_schema():
+    # the TELEMETRY-ONLY dead-end was removed (model + field + prompt).
+    assert "stance_issues" not in StoryCriticReport.model_fields
+    import nodes._otr_story_critic as sc
+    assert not hasattr(sc, "StanceIssue")
 
 
 if __name__ == "__main__":  # pragma: no cover
