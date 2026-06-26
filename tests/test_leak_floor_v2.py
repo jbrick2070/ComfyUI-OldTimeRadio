@@ -247,6 +247,21 @@ def test_build_allowed_roster_banned_default_is_noop():
     assert a == b
 
 
+def test_leak_floor_v2_is_on_by_default(monkeypatch):
+    # operator directive 2026-06-26: leak-floor-v2 is ON in the canonical end-to-end
+    # workflow -- no waiting for a per-lane validation gate. The writer node calls
+    # leak_floor_v2_enabled() unconditionally, so a True default means the leak
+    # verifier runs on EVERY render (the leaks degrade the story). Opt-OUT only via
+    # OTR_ENABLE_LEAK_FLOOR_V2=0. This guard prevents a silent revert to dark.
+    from nodes import _otr_config as cfg
+    monkeypatch.delenv("OTR_ENABLE_LEAK_FLOOR_V2", raising=False)
+    assert cfg.leak_floor_v2_enabled() is True             # DEFAULT ON
+    monkeypatch.setenv("OTR_ENABLE_LEAK_FLOOR_V2", "0")
+    assert cfg.leak_floor_v2_enabled() is False            # explicit opt-out for A/B
+    monkeypatch.setenv("OTR_ENABLE_LEAK_FLOOR_V2", "1")
+    assert cfg.leak_floor_v2_enabled() is True
+
+
 def test_narration_verbs_not_widened():
     # the GROUNDED fix does NOT widen the verb whitelist to catch the leak --
     # "gasping" (the real `Gasping,` leak token) and "weeping" stay absent;

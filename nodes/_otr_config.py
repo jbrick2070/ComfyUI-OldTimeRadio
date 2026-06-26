@@ -119,17 +119,22 @@ def leak_floor_v2_enabled() -> bool:
     mandatory deterministic offline verifier over four named leak classes
     (capitalised-participle-before-a-quote extract; ALL-CAPS roster-vocative
     drop; double-quote-only malformed-internal check; news-bleed real-person /
-    political-figure filtering at ``build_allowed_roster``). Env-gated via
-    ``OTR_ENABLE_LEAK_FLOOR_V2``; DEFAULT OFF. AUDIO-AFFECTING (it can change the
-    shipped line text), so it ships DARK exactly like ``composer_action_strip``
-    / ``transcript_sanitizer`` above (95/107) and is promoted to default-ON only
-    after a live 320w validation per writer lane. When OFF, no verifier runs, no
-    roster term is filtered, no ``leak_floor`` compose_flag is minted, and the
-    pipeline is byte-identical to the pre-leak-floor render.
+    political-figure filtering at ``build_allowed_roster``).
+
+    DEFAULT ON (operator directive 2026-06-26: ship the quality fixes in the
+    canonical end-to-end workflow, no waiting for a per-lane validation gate --
+    the leaks degrade the story, e.g. the announcer SPEAKING a leaked stage
+    participle / vocative / scaffold). The rules are deterministic + NARROW and
+    negative-tested (first-name vocative, legit orgs, non-stage ``-ing`` openings
+    are NOT touched), so the false-positive risk that held it dark is low.
+    AUDIO-AFFECTING by design -- it scrubs the leaked text out of the spoken line,
+    so a render with a leak is intentionally NO LONGER byte-identical to the
+    pre-fix (leaky) render; that is the point. Opt OUT for an A/B with
+    ``OTR_ENABLE_LEAK_FLOOR_V2=0``.
     """
     import os
-    raw = (os.environ.get("OTR_ENABLE_LEAK_FLOOR_V2") or "").strip().lower()
-    return raw in ("1", "true", "yes", "on")
+    raw = (os.environ.get("OTR_ENABLE_LEAK_FLOOR_V2") or "on").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 def strict_local_clean_enabled() -> bool:
