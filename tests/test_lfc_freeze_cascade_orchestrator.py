@@ -170,6 +170,38 @@ class TestCascadeHappyPath:
         # observable, NOT a hard block: a terminal rerun verdict is never set.
         assert disp.verdict not in ("needs_full_rerun", "too_many_edits")
 
+    def test_continuity_critic_ships_frozen_with_warns_not_structural(self):
+        # story-ledger DRIFT chunk 4: a VALIDATED critic that reports a
+        # continuity issue is a story-ACCURACY warning -> the renderable episode
+        # ships NON-clean (frozen_with_warns), classified accuracy NOT
+        # structural, and is never a hard block.
+        led = _ledger_obj(_clean_ledger_data())
+
+        def fake_review(_fn, _led):
+            return _stub_reviewer_disposition("clean_no_edits")
+
+        def fake_critic(*_a, **_k):
+            return _LFC_ORCH._OTRSC.StoryCriticReport(
+                arc_verdict="uneven",
+                continuity_issues=[
+                    {"line_id": "l001", "issue": "the door was open then shut"}
+                ],
+            )
+
+        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                          side_effect=fake_review), \
+             patch.object(_LFC_ORCH._OTRSC, "run_story_critic",
+                          side_effect=fake_critic), \
+             patch("nodes._otr_anti_loop.anti_loop_reroll_targets",
+                   return_value=[]):
+            disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert disp.verdict == "frozen_with_warns"
+        tax = led.data["meta"]["freeze_warn_taxonomy"]
+        assert any("door was open" in w for w in tax["story_accuracy_warning"])
+        assert tax["structural_error"] == []   # a continuity note is NOT structural
+        assert disp.verdict not in ("needs_full_rerun", "too_many_edits")
+
     def test_clean_with_warns_frozen_with_warns(self):
         data = _clean_ledger_data()
         # Drop episode_title -> warn from Phase 10 + Phase 0.

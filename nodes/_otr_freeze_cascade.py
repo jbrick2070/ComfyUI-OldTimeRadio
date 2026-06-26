@@ -122,6 +122,99 @@ FREEZE_TERMINAL_FAILURE_VERDICTS: frozenset[str] = frozenset({
 
 
 # ---------------------------------------------------------------------------
+# Freeze WARN taxonomy (story-ledger DRIFT chunk 4, 2026-06-25).
+#
+# Stop labeling a SHIPPED arc / critic / continuity failure "structural".
+# Three deterministic tiers (no LLM):
+#   * structural_error       -> a genuinely UNRENDERABLE gap (missing voiced
+#                               text, broken structure). BLOCKS at Phase 10
+#                               (needs_full_rerun) -- this is the ONLY blocking
+#                               tier and it is already enforced by the critical-
+#                               gap path; the taxonomy just names it.
+#   * story_accuracy_warning -> continuity / canon-divergence / an UNVERIFIED
+#                               critic / a ledger-consistency defect. The
+#                               episode is RENDERABLE, so it SHIPS -- but NON-
+#                               clean (frozen_with_warns) + operator-visible
+#                               meta. NEVER a hard block (don't gate audio on a
+#                               flaky LLM or a cosmetic-content note).
+#   * cosmetic_warning       -> everything else: ships clean-with-warns.
+# ---------------------------------------------------------------------------
+FREEZE_WARN_TIERS: tuple[str, ...] = (
+    "structural_error", "story_accuracy_warning", "cosmetic_warning",
+)
+
+#: substrings (casefolded) that mark a finding as genuinely STRUCTURAL
+#: (unrenderable) -- kept tight so a content note never reads as structural.
+_STRUCTURAL_WARN_KEYS: tuple[str, ...] = (
+    "unrenderable", "missing voiced", "no voiced", "empty line", "empty spoken",
+    "missing line", "missing beat", "broken link", "no lines", "critical gap",
+    "missing audio", "zero-length", "missing speaker",
+)
+#: substrings that mark a STORY-ACCURACY (content-correctness) finding.
+_ACCURACY_WARN_KEYS: tuple[str, ...] = (
+    "continuity", "canon", "divergen", "unverified", "inconsistent",
+    "consistency", "timeline", "contradict", "prop ", "stance", "premise",
+    "sound_palette", "drift",
+)
+
+
+def classify_freeze_warning(text: Any) -> str:
+    """Deterministically bucket ONE finding string into a FREEZE_WARN_TIERS
+    tier. Structural (unrenderable) wins over accuracy; anything unmatched is
+    cosmetic. Pure; never raises."""
+    try:
+        s = str(text or "").casefold()
+        if any(k in s for k in _STRUCTURAL_WARN_KEYS):
+            return "structural_error"
+        if any(k in s for k in _ACCURACY_WARN_KEYS):
+            return "story_accuracy_warning"
+        return "cosmetic_warning"
+    except Exception:  # noqa: BLE001
+        return "cosmetic_warning"
+
+
+def build_freeze_warn_taxonomy(
+    *,
+    gap_warnings: Any = (),
+    critic_report: Any = None,
+    critic_status: Any = None,
+    consistency_status: Any = None,
+) -> dict:
+    """Bucket every non-structural freeze finding into the 3-tier taxonomy.
+
+    Sources: the gap-audit warnings (classified by text), an UNVERIFIED critic
+    (critic_status.validated is False -> accuracy), the critic's continuity
+    issues (-> accuracy), and any ledger-consistency defects (-> accuracy).
+    Returns ``{tier: [messages]}`` for every tier. PURE; never raises."""
+    tax: dict = {t: [] for t in FREEZE_WARN_TIERS}
+    try:
+        for w in (gap_warnings or ()):
+            tax[classify_freeze_warning(w)].append(str(w)[:240])
+        # an unverified critic is a story-ACCURACY warning (chunk 1 fail-closed),
+        # never structural -- the episode renders, the arc just was not checked.
+        if isinstance(critic_status, dict) and critic_status.get("validated") is False:
+            tax["story_accuracy_warning"].append(
+                "story_critic_unverified: the arc was not actually evaluated"
+            )
+        if critic_report is not None:
+            for ci in (getattr(critic_report, "continuity_issues", None) or []):
+                issue = (ci.get("issue") if isinstance(ci, dict)
+                         else getattr(ci, "issue", "")) or ""
+                tax["story_accuracy_warning"].append(
+                    f"continuity: {str(issue)[:200]}"
+                )
+        if isinstance(consistency_status, dict) and not consistency_status.get(
+            "clean", True
+        ):
+            for d in (consistency_status.get("defects") or []):
+                fld = d.get("field") if isinstance(d, dict) else str(d)
+                tax["story_accuracy_warning"].append(f"consistency: {fld}")
+    except Exception:  # noqa: BLE001 -- taxonomy is observability, never fatal
+        pass
+    return tax
+
+
+# ---------------------------------------------------------------------------
 # Disposition
 # ---------------------------------------------------------------------------
 
@@ -1211,19 +1304,31 @@ def run_freeze_cascade(
         final_verdict = "frozen_with_doctor_edits"
     else:
         final_verdict = meta.get("freeze_verdict", "frozen_clean")
-    # story-ledger DRIFT (2026-06-25): an UNVERIFIED critic (fail-closed --
-    # it could not actually evaluate the arc) must NOT ship as `frozen_clean`
-    # (the old fail-open masterpiece). Map it to the observable, restampable
-    # `frozen_with_warns` -- non-clean + operator-visible, never a hard
-    # ship-block (audio is never gated on a flaky LLM). A real verdict
-    # (strong/uneven/flat/mid_collapse) is untouched.
-    if (
-        final_verdict == "frozen_clean"
-        and getattr(story_critic_report, "arc_verdict", "") == "unverified"
+    # story-ledger DRIFT chunk 4 (2026-06-25): the freeze WARN taxonomy. Bucket
+    # every non-structural finding (gap-audit warns + an UNVERIFIED critic +
+    # critic continuity issues + ledger-consistency defects) into the 3 tiers
+    # and stamp it operator-visible. A STORY-ACCURACY warning (continuity /
+    # canon-divergence / unverified / consistency) ships the renderable episode
+    # NON-clean (frozen_with_warns) -- it is NOT a structural block (which is
+    # reserved for the genuinely unrenderable Phase-10 critical gap above). This
+    # generalizes the chunk-1 unverified->non-clean map; a real, validated,
+    # clean arc with no warnings still ships frozen_clean.
+    _warn_tax = build_freeze_warn_taxonomy(
+        gap_warnings=list(getattr(post_report, "warnings", None) or []),
+        critic_report=story_critic_report,
+        critic_status=meta.get("story_critic_status"),
+        consistency_status=meta.get("consistency_status"),
+    )
+    meta["freeze_warn_taxonomy"] = _warn_tax
+    if _warn_tax["story_accuracy_warning"]:
+        meta["freeze_story_accuracy_warnings"] = _warn_tax["story_accuracy_warning"]
+    if getattr(story_critic_report, "arc_verdict", "") == "unverified":
+        meta["freeze_unverified_critic"] = True
+    if final_verdict == "frozen_clean" and (
+        _warn_tax["story_accuracy_warning"] or _warn_tax["cosmetic_warning"]
     ):
         final_verdict = "frozen_with_warns"
         meta["freeze_verdict"] = "frozen_with_warns"
-        meta["freeze_unverified_critic"] = True
     disp = FreezeDisposition(
         verdict=final_verdict,
         reviewer_disposition=reviewer_disp,
