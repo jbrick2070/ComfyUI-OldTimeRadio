@@ -14,7 +14,10 @@ that the two legacy engines are GONE.
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -120,6 +123,57 @@ def test_ltx_audio_in_videovae_is_split_enc_dec():
     assert g["i2v"]["inputs"]["vae"] != g["decode"]["inputs"]["vae"]
 
 
+def _fake_comfy_mm(monkeypatch, start_bytes):
+    """Inject a fake comfy.model_management with a settable EXTRA_RESERVED_VRAM."""
+    import nodes._otr_video_engines.eng_ltx_av as e
+    fake_mm = types.SimpleNamespace(EXTRA_RESERVED_VRAM=start_bytes)
+    fake_comfy = types.ModuleType("comfy")
+    fake_comfy.model_management = fake_mm
+    monkeypatch.setitem(sys.modules, "comfy", fake_comfy)
+    monkeypatch.setitem(sys.modules, "comfy.model_management", fake_mm)
+    return e, fake_mm
+
+
+def test_ltx_av_vram_reserve_bumps_then_restores(monkeypatch):
+    """The reserve holds OTR_LTX_AV_RESERVE_VRAM_GB free DURING the render so the
+    22B unet leaves activation headroom (the steady ~11.5 s/it vs the 223 s/it
+    spill), and restores the original reserve AFTER so it never leaks to the next
+    engine. (GPU-proven 2026-06-26: EXTRA_RESERVED_VRAM=3GB -> 11.5 s/it.)"""
+    e, mm = _fake_comfy_mm(monkeypatch, 600 * 1024 * 1024)
+    monkeypatch.setattr(e, "_LTX_AV_RESERVE_VRAM_GB", 3.0)
+    seen = {}
+    with e._ltx_av_vram_reserve():
+        seen["inside"] = mm.EXTRA_RESERVED_VRAM
+    assert seen["inside"] == 3 * 1024 * 1024 * 1024     # bumped to 3 GB inside
+    assert mm.EXTRA_RESERVED_VRAM == 600 * 1024 * 1024  # restored after
+
+
+def test_ltx_av_vram_reserve_restores_on_exception(monkeypatch):
+    # a LOUD render failure (no-fallback path) must NOT leak the bumped reserve.
+    e, mm = _fake_comfy_mm(monkeypatch, 600 * 1024 * 1024)
+    monkeypatch.setattr(e, "_LTX_AV_RESERVE_VRAM_GB", 3.0)
+    with pytest.raises(ValueError):
+        with e._ltx_av_vram_reserve():
+            raise ValueError("render blew up")
+    assert mm.EXTRA_RESERVED_VRAM == 600 * 1024 * 1024
+
+
+def test_ltx_av_vram_reserve_never_lowers_an_existing_higher_reserve(monkeypatch):
+    # if the operator already reserves MORE (e.g. --reserve-vram 5), don't shrink it.
+    e, mm = _fake_comfy_mm(monkeypatch, 5 * 1024 * 1024 * 1024)
+    monkeypatch.setattr(e, "_LTX_AV_RESERVE_VRAM_GB", 3.0)
+    with e._ltx_av_vram_reserve():
+        assert mm.EXTRA_RESERVED_VRAM == 5 * 1024 * 1024 * 1024   # unchanged (5 > 3)
+    assert mm.EXTRA_RESERVED_VRAM == 5 * 1024 * 1024 * 1024
+
+
+def test_ltx_av_vram_reserve_disabled_is_noop(monkeypatch):
+    # =0 disables; must be a clean no-op even with no comfy importable.
+    import nodes._otr_video_engines.eng_ltx_av as e
+    monkeypatch.setattr(e, "_LTX_AV_RESERVE_VRAM_GB", 0.0)
+    with e._ltx_av_vram_reserve():
+        pass
+
+
 if __name__ == "__main__":  # pragma: no cover
-    import pytest
     sys.exit(pytest.main([__file__, "-v"]))

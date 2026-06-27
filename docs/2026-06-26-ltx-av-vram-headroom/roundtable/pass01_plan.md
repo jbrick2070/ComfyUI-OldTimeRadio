@@ -58,3 +58,35 @@ apply. Locked by
 
 Roundtable: **~$0.38 total** (one truncated probe pass + one full 12k-token
 3-model pass: GPT-5.5 + Gemini-3.1-pro + DeepSeek-v4-pro).
+
+## Iteration 2 -- VRAM reserve (GPU-VALIDATED 2026-06-26)
+
+The VideoVAE split (bought ~1 GB: usable 12297 -> 13296) was NOT enough on its
+own: on the operator's box the **desktop apps eat ~5 GB VRAM** (Chrome, the Claude
+app, Snagit, StreamDeck, Edge webviews, ...), so the 22B AV unet (10.5 GB) still
+full-loaded with near-zero activation room and stalled at "Model Initializing".
+The fundamental issue is capacity: 10.5 GB unet + audio activations must fit
+alongside a 5 GB desktop tax on a 16 GB card.
+
+FIX (the deferred B lever, now load-bearing): **force a PARTIAL unet load by
+holding ~3 GB free for activations.** Grounded -- ComfyUI's `EXTRA_RESERVED_VRAM`
+global (comfy/model_management.py L789-800; the `--reserve-vram` lever) is real
+and settable, and the GGUF unet DOES honor partial load (the `ltx_video` b001 beat
+already logged "loaded partially; 5455 loaded, 5081 offloaded"). Two surfaces:
+
+* **Engine-scoped (the durable cross-path fix):** `eng_ltx_av._ltx_av_vram_reserve()`
+  bumps `EXTRA_RESERVED_VRAM` to `OTR_LTX_AV_RESERVE_VRAM_GB` (default 3.0) around
+  `run_graph`, restores in `finally` (exception-safe; never lowers a higher
+  operator reserve). Works in the **GUI** (where the operator renders) AND
+  headless. Locked by 4 CPU tests.
+* **Headless boot belt-and-suspenders:** `--reserve-vram 3` in
+  `_otr_overnight_420_boot.cmd` (proven to apply: usable dropped 14737 -> 10860 =
+  ~3.9 GB held back).
+
+RESULT (live 30-word all-`ltx_audio_in`, headless): the AV beats render at a
+**steady ~11.5 s/it** (b000 ~11.5, b001 ~11.0 -- consistent step-to-step, no
+thrash) = ~92 s/clip, vs the old **223 s/it** spill. **~19x faster and
+deterministic** -- the 6.84-or-223 lottery is gone. Tune via
+`OTR_LTX_AV_RESERVE_VRAM_GB` (lower = faster but less spill margin under heavy
+desktop load). Suite: LTX/motion 126/126; Bug Bible 16/7/3; full suite only the 5
+pre-existing 267a53e workflow-pin fails.

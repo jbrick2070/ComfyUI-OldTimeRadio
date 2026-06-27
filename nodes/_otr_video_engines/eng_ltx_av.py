@@ -39,11 +39,15 @@ OTR_LTX_AV_TEXT_ENCODER (Gemma-3 in text_encoders); OTR_LTX_AV_PROJECTION_CKPT
 """
 from __future__ import annotations
 
+import contextlib
+import logging
 import os
 
 from .._otr_shared import av_dims as _AVD
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
+
+_LOG = logging.getLogger("OTR.eng_ltx_av")
 
 # --- frame + canvas grounding (LTX-AV lane only; snap UP, never copy Lane A) ---
 _LTX_AV_MIN_FRAMES = _AVD._LTX_MIN_FRAMES        # 9 (8n+1 floor)
@@ -69,6 +73,46 @@ _FLOOR_VIDEO_VAE = 1 * _GiB
 _FLOOR_AUDIO_VAE = int(0.2 * _GiB)
 _FLOOR_LORA = 5 * _GiB
 _FLOOR_PROJECTION_CKPT = 30 * _GiB
+
+# --- VRAM reserve (2026-06-26): force a PARTIAL unet load so the 22B AV unet
+# leaves room for the audio-conditioned activation peak instead of cramming the
+# card full and spilling to system RAM (the 6.84-vs-223 s/it knife-edge on a 16GB
+# box whose desktop apps already eat ~5GB). OTR_LTX_AV_RESERVE_VRAM_GB (default
+# 3.0) is held free during run_graph via ComfyUI's real EXTRA_RESERVED_VRAM global
+# (the same lever as --reserve-vram), restored in finally so a LOUD render failure
+# never leaks it into the next engine. =0 disables. Works in BOTH the GUI and the
+# headless path (a boot-only CLI arg cannot reach the Desktop app).
+_LTX_AV_RESERVE_VRAM_GB = float(os.environ.get("OTR_LTX_AV_RESERVE_VRAM_GB", "3.0"))
+
+
+@contextlib.contextmanager
+def _ltx_av_vram_reserve():
+    """Hold OTR_LTX_AV_RESERVE_VRAM_GB free across the LTX-AV graph run so the
+    unet loads partially. Pure no-op when the reserve is <=0, ComfyUI is absent,
+    or the global is already higher. Exception-safe (restores in finally)."""
+    gb = _LTX_AV_RESERVE_VRAM_GB
+    if gb <= 0:
+        yield
+        return
+    try:
+        from comfy import model_management as _mm
+    except Exception:  # noqa: BLE001
+        yield
+        return
+    old = getattr(_mm, "EXTRA_RESERVED_VRAM", None)
+    target = int(gb * 1024 * 1024 * 1024)
+    bumped = False
+    try:
+        if old is not None and target > old:
+            _mm.EXTRA_RESERVED_VRAM = target
+            bumped = True
+            _LOG.warning("[eng_ltx_av] reserving %.1f GB VRAM for the LTX-AV "
+                         "render (partial unet load; was %.0f MB)",
+                         gb, old / 1024 / 1024)
+        yield
+    finally:
+        if bumped:
+            _mm.EXTRA_RESERVED_VRAM = old
 
 # --- SHARP mode: the GPU-proven distilled chain on the A2V graph (2026-06-17) ---
 # OTR_LTX_AV_SHARP (default ON) selects the distilled sharpness recipe -- the
@@ -465,7 +509,8 @@ class _LtxAvBase(_MC.MotionEngineBase):
         # ceiling). KEEP the unet + the model head (lora in sharp / modelsampling
         # in M0) + the terminal so the patcher is never dangled.
         keep = {"unet", self._TERMINAL, "lora" if sharp else "modelsampling"}
-        results = _wb.run_graph(graph, classes, free_after_use=True, keep=keep)
+        with _ltx_av_vram_reserve():
+            results = _wb.run_graph(graph, classes, free_after_use=True, keep=keep)
         images = results[self._TERMINAL][0]
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
