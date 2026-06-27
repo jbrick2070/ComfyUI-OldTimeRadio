@@ -55,6 +55,27 @@
 >   visualizer/procgen for video = fast) to make real readable episodes for Claude's PERSONAL read (is the story
 >   actually improving from leak-floor-v2 / news-close / specificity anchors / StoryCritic?), THEN a /roundtable to
 >   harden the next lever. The 30w runs were SPEED tests -- too short to judge story quality.**
+> - **PARALLEL LANE -- SANCTIONED, PREP-ONLY (Wan 2.2 TI2V-5B low-VRAM bakeoff):** an OPTIMIZATION, not a rescue
+>   (OTR's wan_ti2v already runs ~9.7GB OBSERVED peak -- workflow-specific, not a model floor; Comfy docs say native
+>   5B "fits well on 8GB"). A SEPARATE window may do NETWORK/DISK/HARNESS PREP ONLY; the GPU render WAITS for the LTX
+>   bakeoff to free the card (one GPU = one render; one coder in the code at a time). Scope: (a) FIRST inspect
+>   `eng_wan_ti2v` -- native `Load Diffusion Model` (models/diffusion_models) vs `UnetLoaderGGUF` (models/unet)? the
+>   GGUF path differs; phrase it "is QuantStack TI2V-5B GGUF architecturally compatible with OTR's wan_ti2v
+>   assumptions", do NOT assume. (b) target `QuantStack/Wan2.2-TI2V-5B-GGUF` (direct conv of Wan-AI/Wan2.2-TI2V-5B;
+>   TI2V text+image-to-video; NOT I2V-A14B / T2V-A14B / S2V-14B). (c) the 5B needs **`wan2.2_vae.safetensors`** (NOT
+>   the 14B-only `wan_2.1_vae`) -- EXPLICIT check; reuse OTR's UMT5 TE/VAE ONLY if they match. (d) bake off ONLY
+>   current-baseline vs Q2_K(1.85GB) vs Q3_K_M(2.55GB) first (skip Q3_K_S = tiny diff on 16GB; add Q4_0(3.03GB) only
+>   if Q3 wins-but-soft). Log file/format + s/it + total + peak VRAM + res/frames/scheduler/offload + TE/VAE-on-GPU +
+>   clip -> `otr\episodes\_bakeoff_wan\<quant>.mp4`. **FAILURE CRITERION:** if a GGUF quant needs node substitutions
+>   BEYOND `UnetLoaderGGUF` + the model path -> DOCUMENT and STOP before wiring (don't let the lane sprawl). WAN22
+>   gotcha: ComfyUI + ComfyUI-GGUF must support `WAN22` (confirm; OTR runs wan_ti2v so likely OK IF already GGUF).
+> - **TIERED ENGINE POLICY (operator design 2026-06-26; ENCODE only AFTER the bakeoff proves the quants):** select the
+>   video engine by VRAM CLASS, matching the model-agnostic platform: **LTX 2.3 audio-in = 12-16GB+** (quality / A2V);
+>   **Wan TI2V-5B i2v = 8-12GB** (image-to-video); **Wan TI2V-5B t2v-LOW (no image input, low frames/res) = under-8GB
+>   SURVIVAL/DRAFT/compatibility lane ONLY**. NOTE the t2v-low lane has NO still-image anchoring -> it does NOT carry
+>   OTR's character/scene stills, so it is a "does it run on weak hardware" portability lane, NOT a production look --
+>   lowest priority. Wires as wan_ti2v sub-modes (i2v vs t2v_low); the under-8 lane is future-proofing, not for this
+>   16GB operator's daily renders (LTX-audio + Wan-i2v are the production pair).
 >
 > **>>> PRIOR STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION COMPLETE -- Chunk 1 + Chunk 2 SHIPPED (one
 > ltx_audio_in engine; ltx_av_talk/ltx_av_music DELETED), overnight soak RUNNING. origin/v2.0-alpha HEAD
