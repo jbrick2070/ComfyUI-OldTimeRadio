@@ -88,6 +88,13 @@ rem logs at DEBUG show per-model partial load/unload sizes -- the residency
 rem attribution evidence. Same recipe otherwise.
 set _OTR_VERBOSE=
 if /i "%3"=="DEBUG" set _OTR_VERBOSE=--verbose DEBUG
+rem Optional VRAM clamp (Wan TI2V-5B low-VRAM bakeoff, 2026-06-27): set
+rem OTR_HEADLESS_RESERVE_VRAM_GB to reserve that many GB away from model loading,
+rem so a 16GB card simulates an 8GB/6GB card and ComfyUI's allocator forces the
+rem same aggressive offload / sysmem spill a low-VRAM user hits. Default UNSET =
+rem no clamp = byte-identical to every prior boot (no other lane sets it).
+set _OTR_RESERVE=
+if defined OTR_HEADLESS_RESERVE_VRAM_GB set _OTR_RESERVE=--reserve-vram %OTR_HEADLESS_RESERVE_VRAM_GB%
 rem CUSTOM NODES (2026-06-12, Desktop-v2 install move): the install root's
 rem custom_nodes holds ONLY the OldTimeRadio junction -- the wrapper packs
 rem (ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...) live in
@@ -104,6 +111,7 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   --output-directory %OTR_REAL_OUTPUT% ^
   --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
   --disable-metadata ^
+  %_OTR_RESERVE% ^
   %_OTR_VERBOSE% ^
   > "%1" 2>&1
 rem --disable-metadata (2026-06-12): the core V3 SaveGLB node (mesh_stage) does

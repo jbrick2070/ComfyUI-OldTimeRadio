@@ -1,6 +1,73 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-26 LATE (LTX-AV VRAM SPILL FIXED + GPU-VALIDATED; bug cataloged; cosmetic JSON tidy.
+> **>>> CURRENT STEP -- 2026-06-26 LATEST (LTX distilled BAKEOFF + recipe-follows-model SHIPPED & GPU-PROVEN;
+> Wan TI2V-5B low-VRAM bakeoff NO-GPU PREP STARTED -- Step-1 architecture gate = GO. origin/v2.0-alpha HEAD
+> `9218b38e` == local. prod/main + tags GATED.)**
+> **LTX A2V -- DONE this session (the prior step's "immediate next" is now complete):**
+> - **Isolated dev-vs-distilled bakeoff RAN** (workflows/ltx_av_bakeoff_gguf.json + scripts/run_ltx_av_bakeoff.py,
+>   committed `bd455b35`): dev Q3_K_M+SHARP 13.0 s/it / 15.5 GB / 231s; distilled-1.1 Q2_K 7.4 / 13.3 / 80s (soft
+>   faces); Q3_K_M 9.4 / 15.1 / 95s (dev-match); Q4_K_M 32.5 / 16.1 / 281s (SPILLS, out). 3-way panel
+>   (Claude+Gemini+Codex) CONVERGED: **distilled-1.1 Q3_K_M = daily driver; dev Q3_K_M+SHARP = hero/final;
+>   Q4_K_M OUT; Q2_K emergency-VRAM only.**
+> - **Recipe FOLLOWS THE MODEL shipped** (`fd9edc28` + log line `9218b38e`): eng_ltx_av binary OTR_LTX_AV_SHARP ->
+>   tri-state resolver `_recipe()` -- auto-detects sharp_lora(ltx-2.3-22b-dev-)/distilled_native(ltx-2.3-22b-distilled-1.1-)
+>   from the unet basename; `OTR_LTX_AV_RECIPE` override (auto|sharp_lora|distilled_native|m0_base); FAIL-LOUD on
+>   ambiguous unet / bad override / retired OTR_LTX_AV_SHARP (NO FALLBACKS). distilled_native = sharp recipe MINUS the
+>   LoRA (unet->guider directly, no ModelSamplingLTXV, fixed distilled sigmas + euler_cfg_pp + cfg 1.0). One
+>   _recipe_config struct feeds all 4 sites + the dynamic _keep_set + sigmas-injection (Gemini's 2 lifecycle catches).
+>   A2V ONLY; eng_ltx_video FROZEN. No widget change (env/code-driven; canonical JSON untouched). +11 tests; Bug Bible
+>   green; suite has the SAME 5 pre-existing 267a53e workflow-pin fails (proven independent by stash+rerun).
+> - **LIVE smoke PASS:** a fresh-cut 30w run + a 3-slot (announcer+music+character) run rendered full episodes; node-92
+>   ok=true; distilled_native VERIFIED through eng_ltx_av.render_clip via ZERO LoraLoaderModelOnly + ZERO
+>   ModelSamplingLTXV in the server log. Flip daily<->hero = swap OTR_LTX_AV_UNET only.
+> - **DEFAULT-WIRING DEFERRED (operator call):** the engine still defaults to dev (sharp_lora); making distilled_native
+>   the DEFAULT belongs with the 16GB/8GB/non-RTX/Mac/AMD TIER+SHIP decision (the recipe is env-driven, so each tier
+>   profile just sets OTR_LTX_AV_UNET and the recipe auto-follows -- no per-platform code fork). LTX-AV is a CUDA/16GB
+>   feature by design (fails closed without NVML); 8GB/Mac/AMD route around it to the lighter lanes.
+> **WAN 2.2 TI2V-5B low-VRAM GGUF BAKEOFF (image-to-video ONLY) -- NO-GPU PREP STARTED. Scope: touch eng_wan_ti2v.py
+> + a NEW isolated Wan bakeoff harness ONLY; do NOT touch eng_humo.py (HuMo done/out of scope) or eng_ltx_av.py.
+> SERIALIZE the GPU render behind the in-flight LTX 3-slot smoke (one GPU=one render; one coder in code at a time).**
+> - **STEP 1 ARCHITECTURE GATE = GO (read-only inspection of eng_wan_ti2v.py, 2026-06-26):** "is QuantStack TI2V-5B
+>   GGUF architecturally compatible with OTR's wan_ti2v assumptions?" -> YES. OTR ALREADY loads the 5B via
+>   `UnetLoaderGGUF` (`_loader_mode()` returns gguf by default; OTR_WAN_TI2V_LOADER pins it; the GGUF resolves from
+>   `diffusion_models` OR `unet`). The 5B graph (schema-verified vs live /object_info 2026-06-18) is: UnetLoaderGGUF ->
+>   ModelSamplingSD3(shift 5.0) -> KSampler(euler/simple, steps 30, cfg 5.0, denoise 1.0); CLIPLoaderGGUF(umt5,
+>   type=wan) -> CLIPTextEncode pos/neg DIRECT; VAELoader(`wan2.2_vae.safetensors` REQUIRED -- M8 allow-list, fails
+>   closed on the 2.1 VAE) -> `Wan22ImageToVideoLatent`(vae, start_image, w/h/length) -> KSampler -> VAEDecodeTiled.
+>   **Swapping a GGUF quant = change OTR_WAN_TI2V_UNET_NAME ONLY -- NO node substitution beyond UnetLoaderGGUF + path.
+>   So the FAILURE CRITERION is NOT triggered: GO to build the harness.** (Confirm ComfyUI-GGUF supports WAN22 at build.)
+> - **NEXT no-GPU:** Step 2 confirm QuantStack/Wan2.2-TI2V-5B-GGUF + that wan2.2_vae + the umt5 TE on disk match (reuse
+>   only if they match) + ComfyUI-GGUF WAN22 currency; Step 3 download current-baseline + Q2_K(1.85GB) + Q3_K_M(2.55GB)
+>   to C:\ComfyUI-Models (skip Q3_K_S; Q4_0 only if Q3 wins-but-soft); Step 4 build the ISOLATED standalone Wan TI2V
+>   bakeoff JSON (minimal graph above, swappable unet only -- mirror the LTX bakeoff harness) + a runner logging
+>   file/format + s/it + total + peak VRAM + res/frames/scheduler/offload + clip -> otr\episodes\_bakeoff_wan\<quant>.mp4.
+>   Step 5 (GPU, ONLY after the LTX smoke frees the card) run headless + report; winner wires as a wan_ti2v option in
+>   the SAME commit as the canonical workflow change (CLAUDE.md S0; re-validate) + tests; suite + Bug Bible green;
+>   commit+push v2.0-alpha. Operator /roundtable manually as needed.
+> - **2026-06-27 HARNESS BUILT (NO-GPU; Steps 2-4 in code). Operator ran their own convergence roundtable
+>   (AntiGravity); Claude grounded every claim vs the real files + judged.** Two ISOLATED files (HuMo + LTX engines
+>   + eng_wan_ti2v.py UNTOUCHED -- the harness submits a RAW core-node API graph over HTTP, no engine import):
+>   - `scripts/otr_wan_ti2v_bakeoff_gguf.json` (next to the runner, NOT under workflows/ -- that dir's guardrail/zod
+>     tests require canonical LiteGraph shape; this is an intentional API-prompt harness input) -- format ON PURPOSE (named inputs) to sidestep the
+>     LiteGraph positional-`widgets_values` trap; mirrors `eng_wan_ti2v._build_graph` (UnetLoaderGGUF ->
+>     ModelSamplingSD3 shift5 -> KSampler euler/simple/30/cfg5/denoise1; CLIPLoaderGGUF umt5 type=wan ->
+>     CLIPTextEncode pos/neg; VAELoader wan2.2_vae -> Wan22ImageToVideoLatent 832x480x49 -> VAEDecodeTiled
+>     256/64/16/8 -> CreateVideo 24fps -> SaveVideo). Quant swap = node-1 `unet_name` ONLY.
+>   - `scripts/run_wan_ti2v_bakeoff.py` -- BOOT-PER-LEG (NOT the LTX single-session loop): a leg = quant x clamp
+>     tier, each its own reset_box + boot + one /prompt + teardown. Clamp tiers vram_full/8gb/6gb ride the
+>     launcher's NEW optional `OTR_HEADLESS_RESERVE_VRAM_GB` -> `--reserve-vram (total-target)` clause
+>     (`_otr_soak_server_launch.cmd`, additive + default-OFF = byte-identical for every other lane). Logs s/it +
+>     peak VRAM + **peak SYSTEM RAM** + sysmem-spill hint; `--dry-validate` = cheap no-GPU node-currency + quant-enum
+>     preflight; QUANTS baseline Q5_K_M + Q3_K_M + Q2_K (missing-on-disk = SKIP, so Step 3 download gates legs).
+>   - WHY boot-per-leg (convergence catch): `--reserve-vram` is startup-only (can't mutate live over HTTP) AND Comfy
+>     deliberately does NOT force-unload between prompts (wrapper_bridge `_soft_free`, BUG-265 anti-frag), so a
+>     single-session loop carries the prior quant's UNET/TE resident + contaminates the next peak. Static-green
+>     (AST + JSON refint + wan2.2-VAE/clip-type=wan/euler/temporal_overlap<size + no-BOM).
+>   - **NEXT (GPU now free 2026-06-27): suite + Bug Bible; commit+push v2.0-alpha; then Step 3 download Q3_K_M
+>     (2.55GB)/Q2_K (1.85GB) -> C:\ComfyUI-Models\unet; then `--dry-validate`; then the GPU sweep.** Overnight
+>     priority per operator = the 420w big-chunky-story soak (below), so the Wan GPU sweep waits for the card again.
+>
+> **>>> PRIOR STEP -- 2026-06-26 LATE (LTX-AV VRAM SPILL FIXED + GPU-VALIDATED; bug cataloged; cosmetic JSON tidy.
 > origin/v2.0-alpha HEAD `53418748` == local (reserve tuned 3->4GB after a live 72->5.6 s/it pass). NEXT = (1) ISOLATED
 > distilled-1.1 vs dev Q3_K_M SPEED+QUALITY A/B (quants Q2_K/Q3_K_M/Q4_K_M + distilled companions DOWNLOADING now to
 > C:\ComfyUI-Models\{unet\distilled-1.1, vae, text_encoders}); THEN (2) 400-700w VISUALIZER-ONLY story-quality review +

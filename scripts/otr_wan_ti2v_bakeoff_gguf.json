@@ -1,0 +1,114 @@
+{
+  "_comment": "ISOLATED Wan 2.2 TI2V-5B GGUF low-VRAM bakeoff (image-to-video ONLY). Standalone harness -- NOT the canonical otr_scifi_16gb_full.json and NOT wired into any engine. API-prompt format (named inputs) on purpose: it mirrors eng_wan_ti2v._build_graph exactly and avoids the positional widgets_values drift of LiteGraph. run_wan_ti2v_bakeoff.py swaps node 1 unet_name ONLY per quant (no node substitution). Graph (schema-verified vs /object_info 2026-06-18): UnetLoaderGGUF -> ModelSamplingSD3(shift 5) -> KSampler(euler/simple,30,cfg5,denoise1); CLIPLoaderGGUF(umt5,type=wan) -> CLIPTextEncode pos/neg DIRECT; VAELoader(wan2.2_vae REQUIRED, fail-closed on the 2.1 VAE) -> Wan22ImageToVideoLatent(vae,start_image,w/h/length) -> KSampler -> VAEDecodeTiled -> CreateVideo -> SaveVideo. wan_ti2v stays sacred: this file does not import or alter eng_wan_ti2v.py / eng_humo.py / eng_ltx_av.py.",
+  "1": {
+    "class_type": "UnetLoaderGGUF",
+    "_meta": {"title": "Wan TI2V-5B UNET (GGUF, SWAP THIS per quant)"},
+    "inputs": {
+      "unet_name": "PLACEHOLDER_UNET_SET_BY_RUNNER.gguf"
+    }
+  },
+  "2": {
+    "class_type": "ModelSamplingSD3",
+    "_meta": {"title": "ModelSamplingSD3 shift 5.0"},
+    "inputs": {
+      "model": ["1", 0],
+      "shift": 5.0
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoaderGGUF",
+    "_meta": {"title": "umt5 encoder (GGUF, type=wan)"},
+    "inputs": {
+      "clip_name": "umt5-xxl-encoder-Q5_K_M.gguf",
+      "type": "wan"
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "positive"},
+    "inputs": {
+      "text": "subtle natural motion, cinematic lighting, detailed",
+      "clip": ["3", 0]
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "negative"},
+    "inputs": {
+      "text": "low quality, worst quality, blurry, distorted, watermark, text, static",
+      "clip": ["3", 0]
+    }
+  },
+  "6": {
+    "class_type": "VAELoader",
+    "_meta": {"title": "Wan2.2 VAE (REQUIRED)"},
+    "inputs": {
+      "vae_name": "wan2.2_vae.safetensors"
+    }
+  },
+  "7": {
+    "class_type": "LoadImage",
+    "_meta": {"title": "fixed init still"},
+    "inputs": {
+      "image": "c02_466a19906ccb.png"
+    }
+  },
+  "8": {
+    "class_type": "Wan22ImageToVideoLatent",
+    "_meta": {"title": "Wan22 image->video latent"},
+    "inputs": {
+      "width": 832,
+      "height": 480,
+      "length": 49,
+      "batch_size": 1,
+      "vae": ["6", 0],
+      "start_image": ["7", 0]
+    }
+  },
+  "9": {
+    "class_type": "KSampler",
+    "_meta": {"title": "KSampler euler/simple 30 cfg5"},
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 5.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["2", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["8", 0]
+    }
+  },
+  "10": {
+    "class_type": "VAEDecodeTiled",
+    "_meta": {"title": "VAEDecodeTiled (8GB-floor knobs; runner may sweep temporal)"},
+    "inputs": {
+      "samples": ["9", 0],
+      "vae": ["6", 0],
+      "tile_size": 256,
+      "overlap": 64,
+      "temporal_size": 16,
+      "temporal_overlap": 8
+    }
+  },
+  "11": {
+    "class_type": "CreateVideo",
+    "_meta": {"title": "frames -> VIDEO (silent, no audio for i2v)"},
+    "inputs": {
+      "images": ["10", 0],
+      "fps": 24.0
+    }
+  },
+  "12": {
+    "class_type": "SaveVideo",
+    "_meta": {"title": "SaveVideo (runner sets filename_prefix per leg)"},
+    "inputs": {
+      "video": ["11", 0],
+      "filename_prefix": "otr/episodes/_bakeoff_wan/clip",
+      "format": "mp4",
+      "codec": "h264"
+    }
+  }
+}
