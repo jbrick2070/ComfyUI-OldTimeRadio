@@ -1,0 +1,25 @@
+VERDICT: yes-with-fixes. The plan is directionally buildable, but several wiring contracts are underspecified enough to produce wrong render paths or dirty GPU state.
+
+MUST-FIX BEFORE BUILD:
+1. [Scaler: `_encode_segment_from_dir`] Defect: background sharpening is keyed only as “real bg” vs generated black, but the real code’s file-backed bg is often the procgen floor, not a character/real clip. In `nodes/otr_silent_composite.py:570-578`, the dir-clip background is either `bg_still_path`, `base_video_path`, or black; `base_video_path` is the procgen floor from `OTR_SignalLostVideo`, wired in `workflows/otr_scifi_16gb_full.json` link 246. If implementation treats any `os.path.isfile(bg_path)` branch at `nodes/otr_silent_composite.py:424-439` as `sharpen=True`, floor-backed 3D gaps get sharpened against the plan’s floor=false rule. Concrete fix: pass an explicit `bg_sharpen` into `_encode_segment_from_dir`; set `False` for `base_video_path` floor and black, and make the still-plate decision explicit.
+
+2. [VRAM verify] Defect: the proposed probe sequence can skip cleanup if the peak assertion raises before the existing post-render cleanup path. Current code runs `_wb.reclaim_idle_models(...)` before the post-render ceiling check at `nodes/_otr_video_engines/eng_ltx_av.py:621-633`. Concrete fix: stop the `VramPeakProbe` immediately after `_wb.run_graph`, but perform `_retain_model_patchers`, frame extraction/encode as needed, and `_wb.reclaim_idle_models(...)` in a guaranteed cleanup block before calling `_MC.assert_peak_within_ceiling(...)`.
+
+3. [Decode env] Defect: the new `OTR_LTX_AV_DECODE_TEMPORAL_SIZE` / `OTR_LTX_AV_DECODE_TEMPORAL_OVERLAP` contract lacks validation. Today the graph hard-codes valid values at `nodes/_otr_video_engines/eng_ltx_av.py:556-559`; moving to env inside `_build_graph` can let non-int, zero, negative, or overlap>=size values reach `VAEDecodeTiled` as a late wrapper failure. Concrete fix: add a small runtime parser inside `_build_graph` that fail-louds or clamps with a named error before graph construction; test monkeypatch without module reload.
+
+4. [Scaler alpha contract] Defect: the proposed alpha test reuses `tests/test_3d_image_streams.py:197-227`, but that only proves alpha=255 source-over opacity. It will not catch sharpen/filter-chain damage to transparent or semi-transparent foreground edges. Current fg path explicitly starts as RGBA at `nodes/otr_silent_composite.py:444-457`. Concrete fix: add a semi-transparent/transparent-edge RGBA fixture and assert the composited edge remains transparent/partially transparent after the new `format=rgba -> scale -> unsharp -> overlay` path. verify: ffmpeg `unsharp` alpha behavior on this stack.
+
+5. [ffmpeg unsharp preflight] Defect: “parse `ffmpeg -filters`” is not threaded through the configured ffmpeg binary. `OTR_SilentComposite` accepts an `ffmpeg` input at `nodes/otr_silent_composite.py:640-647` and resolves it via `_ffmpeg_bin` at `nodes/otr_silent_composite.py:79-81`. Concrete fix: make the capability check use the same resolved `fb` for the current call, and only require `unsharp` on sharpen=True paths.
+
+SHOULD-FIX:
+1. [Smoke] Current smoke preflight is still distilled-native-specific at `scripts/run_otr_30word_smoke.py:196-245` and imports `RECIPE_DISTILLED_NATIVE` at `scripts/run_otr_30word_smoke.py:38-41`. The plan says validate whichever recipe runs, but also says “default = sharp_lora”; implementation must remove only the recipe-specific assumptions while preserving the live workflow and Z-Image/LTX enablement checks at `scripts/run_otr_30word_smoke.py:202-212`.
+
+2. [Scaler sequencing] `_seg_vf` currently owns trim, scale, pad, fps, and tpad ordering at `nodes/otr_silent_composite.py:319-326`; `_encode_segment` calls it at `nodes/otr_silent_composite.py:336-349`. The helper spec should explicitly preserve `trim -> scale/pad/unsharp/fps -> tpad`, because moving `tpad` before `fps` changes frame budgeting.
+
+3. [Workflow validation] The plan says no canonical JSON edit, which is acceptable only if no node inputs/widgets are added. If any decode or sharpen control becomes a widget/input instead of env-only, `workflows/otr_scifi_16gb_full.json` must be updated in the same change and revalidated; node #84 already has positional widgets for `canvas_w/canvas_h/fps/ffmpeg/output_path`.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add the active decode knobs and recipe to the LTX render log next to the existing recipe line at `nodes/_otr_video_engines/eng_ltx_av.py:580-584`, not only to the smoke report.
+
+CUT THESE (over-engineering):
+1. Companion-drift manifest hardening: safe to keep cut; `plan_timeline_segments` already consumes explicit frame budgets and source paths at `nodes/otr_silent_composite.py:212-288`, and this round’s changes do not alter manifest schema.
