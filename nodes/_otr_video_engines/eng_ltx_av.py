@@ -78,11 +78,16 @@ _FLOOR_PROJECTION_CKPT = 30 * _GiB
 # leaves room for the audio-conditioned activation peak instead of cramming the
 # card full and spilling to system RAM (the 6.84-vs-223 s/it knife-edge on a 16GB
 # box whose desktop apps already eat ~5GB). OTR_LTX_AV_RESERVE_VRAM_GB (default
-# 3.0) is held free during run_graph via ComfyUI's real EXTRA_RESERVED_VRAM global
+# 4.0) is held free during run_graph via ComfyUI's real EXTRA_RESERVED_VRAM global
 # (the same lever as --reserve-vram), restored in finally so a LOUD render failure
 # never leaks it into the next engine. =0 disables. Works in BOTH the GUI and the
-# headless path (a boot-only CLI arg cannot reach the Desktop app).
-_LTX_AV_RESERVE_VRAM_GB = float(os.environ.get("OTR_LTX_AV_RESERVE_VRAM_GB", "3.0"))
+# headless path (a boot-only CLI arg cannot reach the Desktop app). 4.0 NOT 3.0:
+# on a 16GB card 3.0 left usable (~10958MB) still > the 10537MB unet, so it
+# FULL-loaded + the activation peak grazed the 435MB-free cliff (~72 s/it marginal
+# spill, 2026-06-26 live). 4.0 pushes usable BELOW the unet -> a true PARTIAL load
+# with ~4.4GB activation room -> steady, no spill. Raise it if a heavier desktop
+# still spills.
+_LTX_AV_RESERVE_VRAM_GB = float(os.environ.get("OTR_LTX_AV_RESERVE_VRAM_GB", "4.0"))
 
 
 @contextlib.contextmanager
