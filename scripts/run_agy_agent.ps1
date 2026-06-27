@@ -34,6 +34,7 @@ param(
   [string]$Repo = "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio",
   [Parameter(Mandatory = $true)][string]$RunId,
   [switch]$Worktree,
+  [string]$Model = "gemini-3.5-pro",
   [string]$AgyBin = "C:\Users\jeffr\AppData\Local\agy\bin"
 )
 
@@ -71,10 +72,12 @@ Write nothing to stdout. After writing the file, exit immediately.
 "@
 $prompt = (Get-Content $promptIn -Raw) + $directive
 
-Write-Host "[agy] run=$RunId workdir=$workdir -> $out" -ForegroundColor Cyan
+$modelArgs = @(); if ($Model) { $modelArgs = @("--model", $Model) }
+$Model | Out-File -Encoding utf8 (Join-Path $run "agy_model_selected.txt")
+Write-Host "[agy] run=$RunId model=$Model workdir=$workdir -> $out" -ForegroundColor Cyan
 Push-Location $workdir
 try {
-  & agy --dangerously-skip-permissions -p $prompt 1> $log 2>&1
+  & agy @modelArgs --dangerously-skip-permissions -p $prompt 1> $log 2>&1
   $code = $LASTEXITCODE
 }
 finally { Pop-Location }
