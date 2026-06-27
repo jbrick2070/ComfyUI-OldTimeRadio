@@ -6,11 +6,14 @@ writer brief, neutralizes disabled slot-picker sentinels when the live schema
 does not accept them, submits to the live ComfyUI server, and reports PASS/FAIL.
 
 This script is intentionally a live smoke harness, not a generated workflow and
-not an isolated LTX graph. The server must be freshly booted with:
-
-  OTR_LTX_AV_UNET=distilled-1.1\\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf
-
-Leave OTR_LTX_AV_RECIPE unset so eng_ltx_av auto-resolves distilled_native.
+not an isolated LTX graph. The preflight validates WHICHEVER recipe
+``LtxAudioInEngine._recipe()`` resolves (sharp_lora is the default on the dev
+unet; distilled_native on the distilled-1.1 unet; m0_base via
+OTR_LTX_AV_RECIPE=m0_base) -- it no longer hard-pins the distilled unet. Boot the
+server with OTR_ENABLE_LTX_AV=1 + the desired OTR_LTX_AV_UNET (+ optional
+OTR_LTX_AV_RECIPE override) and the Z-Image / LTX enablement env. The preflight
+records the resolved recipe + the decode temporal knobs actually wired into the
+graph; the live run reports the propagated NVML render-phase peak.
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -37,7 +40,9 @@ import requests  # noqa: E402
 
 from nodes._otr_video_engines.eng_ltx_av import (  # noqa: E402
     LtxAudioInEngine,
+    RECIPE_SHARP_LORA,
     RECIPE_DISTILLED_NATIVE,
+    RECIPE_M0_BASE,
 )
 from nodes._otr_video_engines import wrapper_bridge as wb  # noqa: E402
 
@@ -193,16 +198,38 @@ def _patch_director_inputs(prompt: dict[str, Any],
     return changes
 
 
-def _preflight_distilled_native_graph() -> list[str]:
-    if os.environ.get("OTR_LTX_AV_UNET") != DISTILLED_UNET:
-        raise RuntimeError(
-            "OTR_LTX_AV_UNET must be %r for this smoke; got %r"
-            % (DISTILLED_UNET, os.environ.get("OTR_LTX_AV_UNET"))
-        )
+# Per-recipe LTX-AV graph contract (generalized 2026-06-27 from the
+# distilled-native-only preflight). The smoke validates WHICHEVER recipe
+# _recipe() resolves -- the LTX-AV upgrade wire defaults sharp_lora on the dev
+# unet, distilled_native on the distilled-1.1 unet, m0_base via env override.
+_RECIPE_GRAPH_EXPECT = {
+    RECIPE_SHARP_LORA: {
+        "present": ("lora", "sigmas"),
+        "absent": ("modelsampling", "sched"),
+        "guider_model": ("lora", 0),
+    },
+    RECIPE_DISTILLED_NATIVE: {
+        "present": ("sigmas",),
+        "absent": ("lora", "modelsampling", "sched"),
+        "guider_model": ("unet", 0),
+    },
+    RECIPE_M0_BASE: {
+        "present": ("modelsampling", "sched"),
+        "absent": ("lora", "sigmas"),
+        "guider_model": ("modelsampling", 0),
+    },
+}
+
+
+def _preflight_ltx_av_graph() -> list[str]:
+    """Validate the LTX-AV graph for WHICHEVER recipe _recipe() resolves (no
+    hard distilled-unet pin). Keeps the live-workflow + Z-Image/LTX enablement
+    checks; asserts the per-recipe node present/absent set + the guider model
+    wire; records the resolved recipe + the decode temporal knobs actually wired
+    into the graph (the propagated NVML render-phase peak is reported by the live
+    run, not the preflight)."""
     if os.environ.get("OTR_ENABLE_LTX_AV") != "1":
         raise RuntimeError("OTR_ENABLE_LTX_AV=1 is required for ltx_audio_in")
-    if os.environ.get("OTR_LTX_AV_RECIPE"):
-        raise RuntimeError("leave OTR_LTX_AV_RECIPE unset for auto-detect")
     if os.environ.get("OTR_LTX_AV_SHARP") is not None:
         raise RuntimeError("OTR_LTX_AV_SHARP is retired and must be unset")
     if os.environ.get("OTR_ENABLE_ZIMAGE") != "1":
@@ -213,8 +240,10 @@ def _preflight_distilled_native_graph() -> list[str]:
 
     eng = LtxAudioInEngine()
     recipe = eng._recipe()
-    if recipe != RECIPE_DISTILLED_NATIVE:
-        raise RuntimeError("expected distilled_native, got %r" % recipe)
+    expect = _RECIPE_GRAPH_EXPECT.get(recipe)
+    if expect is None:
+        raise RuntimeError(
+            "smoke does not know how to validate LTX-AV recipe %r" % recipe)
     graph = eng._build_graph(
         {"text_prompt": "30-word smoke", "seed": 0},
         105,
@@ -223,25 +252,31 @@ def _preflight_distilled_native_graph() -> list[str]:
         "audio.wav",
         "still.png",
     )
-    forbidden = [nid for nid in ("lora", "modelsampling", "sched")
-                 if nid in graph]
+    missing = [nid for nid in expect["present"] if nid not in graph]
+    if missing:
+        raise RuntimeError(
+            "%s graph is missing required node(s): %s"
+            % (recipe, ", ".join(missing)))
+    forbidden = [nid for nid in expect["absent"] if nid in graph]
     if forbidden:
         raise RuntimeError(
-            "distilled_native graph contains forbidden node(s): %s"
-            % ", ".join(forbidden)
-        )
-    if "sigmas" not in graph:
-        raise RuntimeError("distilled_native graph is missing fixed sigmas")
+            "%s graph contains forbidden node(s): %s"
+            % (recipe, ", ".join(forbidden)))
     model_wire = graph["guider"]["inputs"].get("model")
-    if model_wire != wb.Wire("unet", 0):
+    want_wire = wb.Wire(*expect["guider_model"])
+    if model_wire != want_wire:
         raise RuntimeError(
-            "distilled_native guider model must wire directly from unet; got %r"
-            % (model_wire,)
-        )
+            "%s guider model must wire from %s; got %r"
+            % (recipe, expect["guider_model"], model_wire))
+    dec = graph["decode"]["inputs"]
     return [
-        "recipe auto-detected distilled_native",
-        "graph has no LoraLoaderModelOnly, no ModelSamplingLTXV, no LTXVScheduler",
-        "graph uses fixed sigmas and wires unet directly into CFGGuider",
+        "recipe resolved %s" % recipe,
+        "graph present=[%s] absent=[%s]"
+        % (", ".join(expect["present"]), ", ".join(expect["absent"])),
+        "guider model wires from %s" % (expect["guider_model"][0],),
+        "decode temporal_size=%s temporal_overlap=%s (spatial tile=%s overlap=%s)"
+        % (dec.get("temporal_size"), dec.get("temporal_overlap"),
+           dec.get("tile_size"), dec.get("overlap")),
     ]
 
 
@@ -406,7 +441,7 @@ def main(argv: list[str] | None = None) -> int:
     print("[smoke] COMFYUI=%s" % COMFYUI_BASE, flush=True)
     print("[smoke] OUTPUT=%s" % OUTPUT_DIR, flush=True)
 
-    checks = _preflight_distilled_native_graph()
+    checks = _preflight_ltx_av_graph()
     for line in checks:
         print("[smoke] preflight: " + line, flush=True)
 

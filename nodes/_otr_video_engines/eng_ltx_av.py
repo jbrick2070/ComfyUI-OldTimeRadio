@@ -64,6 +64,52 @@ _LTX_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, jpeg artifacts, distorted, deformed, "
     "static, frozen pose, still image, watermark, text")
 
+# Decode tiling (LTX-AV quality wire, 2026-06-27): the WHOLE-CLIP temporal decode
+# (VAEDecodeTiled temporal_size 4096 / overlap 8) eliminates the inter-tile
+# "flash" seam the bakeoff measured (seam p99 0.235 -> 0.0) at the SAME s/it and
+# peak VRAM as the legacy tiled decode -- the operator's PROVISIONAL winner pick
+# (operator eyeballs the final clip; the bakeoff-converged tiled 128/32 is the
+# LOUD env fallback if a smoke trips the 14.5 GB ceiling). Read INSIDE
+# _build_graph so a monkeypatch needs no module reload. Spatial tile 512 /
+# overlap 64 stays fixed.
+_LTX_AV_DECODE_TEMPORAL_SIZE_DEFAULT = 4096
+_LTX_AV_DECODE_TEMPORAL_OVERLAP_DEFAULT = 8
+
+
+def _decode_temporal_knobs():
+    """Resolve ``(temporal_size, temporal_overlap)`` for VAEDecodeTiled from the
+    env, FAIL-LOUD (NO clamp). Absent -> the whole-clip defaults (4096/8).
+    Present but non-int -> raise; ``size <= 0`` -> raise; ``overlap < 0`` ->
+    raise; ``overlap >= size`` -> raise. A NAMED ValueError fires BEFORE the graph
+    is built so a bad box config fails loud instead of silently degrading."""
+    def _read_int(name, default):
+        raw = os.environ.get(name)
+        if raw is None or str(raw).strip() == "":
+            return int(default)
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            raise ValueError(
+                "eng_ltx_av: %s=%r is not an integer (decode temporal knob; "
+                "no clamp -- fix the env)" % (name, raw))
+    size = _read_int("OTR_LTX_AV_DECODE_TEMPORAL_SIZE",
+                     _LTX_AV_DECODE_TEMPORAL_SIZE_DEFAULT)
+    overlap = _read_int("OTR_LTX_AV_DECODE_TEMPORAL_OVERLAP",
+                        _LTX_AV_DECODE_TEMPORAL_OVERLAP_DEFAULT)
+    if size <= 0:
+        raise ValueError(
+            "eng_ltx_av: OTR_LTX_AV_DECODE_TEMPORAL_SIZE=%d must be > 0 "
+            "(no clamp)" % size)
+    if overlap < 0:
+        raise ValueError(
+            "eng_ltx_av: OTR_LTX_AV_DECODE_TEMPORAL_OVERLAP=%d must be >= 0 "
+            "(no clamp)" % overlap)
+    if overlap >= size:
+        raise ValueError(
+            "eng_ltx_av: OTR_LTX_AV_DECODE_TEMPORAL_OVERLAP=%d must be < "
+            "OTR_LTX_AV_DECODE_TEMPORAL_SIZE=%d (no clamp)" % (overlap, size))
+    return size, overlap
+
 # Weight sanity floors (GiB) -- catch a truncated / wrong download, NOT exact
 # byte checks. Q3_K_M unet ~9.3 GiB; Gemma-3 fp4 ~8.2 GiB; video VAE ~1.35 GiB.
 _GiB = 1024 ** 3
@@ -553,10 +599,14 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "latent_image": W("concat", 0)}}
         g["separate"] = {"class": "separate",
                          "inputs": {"av_latent": W("sampler", 0)}}
+        # Decode temporal tiling: env-overridable per-render, FAIL-LOUD (no clamp).
+        # Default 4096/8 = whole-clip (no inter-tile seam); env -> tiled fallback.
+        decode_t_size, decode_t_overlap = _decode_temporal_knobs()
         g["decode"] = {"class": "decode", "inputs": {
             "samples": W("separate", 0), "vae": W("videovae_dec", 0),
             "tile_size": 512, "overlap": 64,
-            "temporal_size": 64, "temporal_overlap": 8}}
+            "temporal_size": decode_t_size,
+            "temporal_overlap": decode_t_overlap}}
         return g
 
     # ---- residency ----
@@ -618,20 +668,37 @@ class _LtxAvBase(_MC.MotionEngineBase):
         # has NO head node, so _keep_set keeps only {unet, terminal} -- keeping a
         # node that does not exist in the graph would crash run_graph.
         keep = self._keep_set(self._TERMINAL, rcfg)
-        with _ltx_av_vram_reserve():
-            results = _wb.run_graph(graph, classes, free_after_use=True, keep=keep)
-        images = results[self._TERMINAL][0]
-        self._retain_model_patchers(results, prepared)
+        # PASS-PM: sample the REAL render-window VRAM peak (first heavy load
+        # through VAEDecode), not just the post-cleanup instantaneous read -- the
+        # whole-clip decode + the additively-resident encoder can peak mid-render.
+        # Leak/cleanup-safe: results/images init to None so the finally never
+        # dangles a patcher or encodes a half-built result.
+        results = images = None
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
+        try:
+            with _ltx_av_vram_reserve():
+                results = _wb.run_graph(graph, classes, free_after_use=True,
+                                        keep=keep)
+            images = results[self._TERMINAL][0]
+        finally:
+            peak = probe.stop()
+            # retain the patchers ONLY if the graph actually produced a result;
+            # ALWAYS reclaim (LOUD; never unload_all) so the resident stack drops
+            # under the ceiling before the assert + the next beat.
+            if results is not None:
+                self._retain_model_patchers(results, prepared)
+            _wb.reclaim_idle_models(reason="%s post-decode" % self.name)
+        # Assert the MEASURED render-window peak (not the drained post-cleanup
+        # read) is within the ceiling, AFTER reclaim.
+        if not os.environ.get("OTR_TEST_MODE"):
+            _MC.assert_peak_within_ceiling(peak, label="%s-render" % self.name)
+        if images is None:                       # success path always sets images
+            raise _wb.GraphExecutionError(
+                "%s: run_graph produced no terminal image" % self.name)
         frames = _wb.images_to_uint8(images)
         out_path = otr_engine_tmp_mp4("otr_ltx_av_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
-        # BUG-291 reclaim (LOUD; never unload_all): evict the umt5/Gemma encoder +
-        # idle patchers so the resident stack drops under the ceiling before the
-        # PASS-PM assert and the next beat starts drained.
-        _wb.reclaim_idle_models(reason="%s post-decode" % self.name)
-        if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_vram_within_ceiling("%s-render" % self.name)
-        return {"out_path": path, "frame_count": n}
+        return {"out_path": path, "frame_count": n, "vram_peak_mb": peak}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
@@ -722,6 +789,9 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "has_audio": False,
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # PASS-PM: the REAL render-window NVML peak (None off the GPU box),
+            # threaded render_clip -> here -> render_shot -> the episode report.
+            "vram_peak_mb": raw.get("vram_peak_mb"),
         }
 
 

@@ -69,6 +69,64 @@ def _even(n: int) -> int:
     return n if n % 2 == 0 else n - 1
 
 
+#: Composite sharpening amount (ffmpeg ``unsharp`` luma_amount). The LTX-AV
+#: quality bakeoff (2026-06-27) found the native render is SOFT once the
+#: composite upscales it to the 1472x832 canvas; a lanczos resample + a light
+#: unsharp on the clip/still paths recovers ~+9% Laplacian sharpness at ZERO GPU
+#: cost. Env OTR_COMPOSITE_UNSHARP_AMOUNT (default 0.4; the bakeoff also exposed
+#: 0.8 as the heavier option -- an operator eyeball item for face halos). A bad
+#: value falls back to the default (cosmetic knob -- not fail-loud).
+_UNSHARP_AMOUNT_DEFAULT = 0.4
+
+
+def _unsharp_amount() -> float:
+    try:
+        return float(os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT",
+                                    _UNSHARP_AMOUNT_DEFAULT))
+    except (TypeError, ValueError):
+        return _UNSHARP_AMOUNT_DEFAULT
+
+
+def _scale_filter(w, h, fps, *, sharpen, pad=True, in_label=None,
+                  out_label=None, pre="", post=""):
+    """The ONE shared composite scale chain (LTX-AV quality wire, 2026-06-27).
+
+    Emits, IN ORDER: ``scale=w:h:force_original_aspect_ratio=decrease`` (with
+    ``:flags=lanczos`` appended ONLY when ``sharpen``), then -- iff ``sharpen`` --
+    ``unsharp=5:5:<amt>:5:5:0.0`` (``<amt>`` = ``OTR_COMPOSITE_UNSHARP_AMOUNT``,
+    default 0.4), then -- iff ``pad`` -- ``pad=w:h:(ow-iw)/2:(oh-ih)/2:color=black``,
+    then ``fps=fps``.
+
+    ``sharpen=True``  -> lanczos + unsharp (the soft-native fix; clip + real
+    still-plate + RGBA foreground paths).
+    ``sharpen=False`` -> the legacy bilinear scale,pad,fps chain BYTE-IDENTICAL
+    (the procgen floor + black gap-fill + the silent-canonical normalize -- not
+    sharpened, since the floor/credits roll must not be touched).
+    ``pad=False``     -> NO pad (the straight-RGBA foreground: ``pad ...
+    color=black`` would paint opaque borders over the alpha edges -> destroy the
+    matte). The overlay re-centers the fg, so the pad is unnecessary there.
+
+    Returns a plain filter chain usable directly as ``-vf`` when ``in_label`` /
+    ``out_label`` are ``None``; a labeled ``[in]...[out]`` segment for a
+    ``-filter_complex`` graph when BOTH labels are given. ``pre`` is inserted
+    immediately after the input label (e.g. ``format=rgba,`` for the fg, or the
+    floor ``trim=...,setpts=...,`` prefix); ``post`` is appended before the output
+    label (e.g. the floor ``,tpad=stop_mode=clone:...`` hold)."""
+    scale = "scale=%d:%d:force_original_aspect_ratio=decrease" % (int(w), int(h))
+    parts = [scale]
+    if sharpen:
+        parts[0] = scale + ":flags=lanczos"
+        parts.append("unsharp=5:5:%g:5:5:0.0" % _unsharp_amount())
+    if pad:
+        parts.append("pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black"
+                     % (int(w), int(h)))
+    parts.append("fps=%d" % int(fps))
+    chain = pre + ",".join(parts) + post
+    if in_label is not None and out_label is not None:
+        return "[%s]%s[%s]" % (in_label, chain, out_label)
+    return chain
+
+
 def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
                                   h: int = 832, fps: int = 25, ffmpeg: str = "ffmpeg"):
     """Re-encode ``in_path`` into the canonical ALWAYS-SILENT clip; FAIL CLOSED.
@@ -82,11 +140,9 @@ def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
     if not os.path.isfile(in_path):
         raise ValueError(f"OTR_SilentComposite: input missing: {in_path!r}")
     w, h, fps = _even(w), _even(h), max(1, int(fps))
-    vf = (
-        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black,"
-        f"fps={fps}"
-    )
+    # The normalize path is the procgen floor / single-base passthrough -> NOT
+    # sharpened (sharpen=False keeps it byte-identical to the legacy chain).
+    vf = _scale_filter(w, h, fps, sharpen=False)
     cmd = [
         fb, "-y", "-loglevel", "error",
         "-i", in_path,
@@ -316,14 +372,17 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     return segments, cursor
 
 
-def _seg_vf(w, h, fps, start_frame):
+def _seg_vf(w, h, fps, start_frame, sharpen=True):
+    """The per-segment ``-vf`` chain: an optional source trim, then the SHARED
+    scale chain (lanczos+unsharp when ``sharpen``), then the tpad last-frame hold.
+    PRESERVES the ``trim -> scale/unsharp/pad/fps -> tpad`` ordering. ``sharpen``
+    is True for a real clip (the soft-native fix) and False for the procgen-floor
+    slice (byte-identical to the legacy chain)."""
     trim = ("trim=start_frame=%d,setpts=PTS-STARTPTS," % int(start_frame)) \
         if int(start_frame) > 0 else ""
-    return (
-        "%sscale=%d:%d:force_original_aspect_ratio=decrease,"
-        "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d,"
-        "tpad=stop_mode=clone:stop_duration=3600" % (trim, w, h, w, h, fps)
-    )
+    return _scale_filter(
+        w, h, fps, sharpen=sharpen, pre=trim,
+        post=",tpad=stop_mode=clone:stop_duration=3600")
 
 
 def _color_args(out_path):
@@ -334,7 +393,7 @@ def _color_args(out_path):
 
 
 def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
-                    loop=False):
+                    loop=False, sharpen=True):
     """One canonical silent segment of EXACTLY ``n_frames`` from ``src`` (a clip,
     or the floor sliced at ``start_frame``): truncates a long source, holds the
     last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error.
@@ -342,10 +401,13 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     ``loop=True`` stream-loops the input (-stream_loop -1) so a SHORT source
     REPEATS to fill ``n_frames`` -- the credits-tail backdrop keeps moving
     instead of freezing on the last frame (operator 2026-06-17). The tpad clone
-    in _seg_vf stays as a safety but never triggers under an infinite loop."""
+    in _seg_vf stays as a safety but never triggers under an infinite loop.
+
+    ``sharpen`` is True for a real engine clip (lanczos+unsharp soft-native fix)
+    and False for the procgen-floor slice (NOT sharpened -- byte-identical)."""
     loop_args = ["-stream_loop", "-1"] if loop else []
     cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
-           "-vf", _seg_vf(w, h, fps, start_frame),
+           "-vf", _seg_vf(w, h, fps, start_frame, sharpen=sharpen),
            "-frames:v", str(int(n_frames))] + _color_args(seg_path)
     p = _run(cmd)
     if p.returncode != 0:
@@ -423,26 +485,30 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
     _write_frames_concat(frames, listfile, fps)
     if bg_path and os.path.isfile(bg_path) and bg_is_still:
         # A single still plate: loop it to fill the beat (no trim/tpad needed --
-        # the loop + the overlay eof_action=repeat hold it for every frame).
+        # the loop + the overlay eof_action=repeat hold it for every frame). A
+        # REAL still plate IS sharpened (sharpen=True) -- it is composited content,
+        # not the procgen floor.
         bg_in = ["-loop", "1", "-i", bg_path]
-        bg_filter = ("[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,"
-                     "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d[bg]"
-                     % (w, h, w, h, fps))
+        bg_filter = _scale_filter(w, h, fps, sharpen=True,
+                                  in_label="0:v", out_label="bg")
     elif bg_path and os.path.isfile(bg_path):
+        # The procgen-floor video slice -> NOT sharpened (byte-identical to the
+        # legacy chain); preserve the trim prefix + tpad hold.
         bg_in = ["-i", bg_path]
         trim = (("trim=start_frame=%d,setpts=PTS-STARTPTS,"
                  % int(bg_start_frame)) if int(bg_start_frame) > 0 else "")
-        bg_filter = ("[0:v]" + trim +
-                     "scale=%d:%d:force_original_aspect_ratio=decrease,"
-                     "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,fps=%d,"
-                     "tpad=stop_mode=clone:stop_duration=3600[bg]"
-                     % (w, h, w, h, fps))
+        bg_filter = _scale_filter(
+            w, h, fps, sharpen=False, in_label="0:v", out_label="bg",
+            pre=trim, post=",tpad=stop_mode=clone:stop_duration=3600")
     else:
         bg_in = ["-f", "lavfi", "-i",
                  "color=c=black:s=%dx%d:r=%d" % (w, h, fps)]
         bg_filter = "[0:v]null[bg]"
-    fg_filter = ("[1:v]format=rgba,fps=%d,scale=%d:%d:"
-                 "force_original_aspect_ratio=decrease[fg]" % (fps, w, h))
+    # FOREGROUND: straight-alpha RGBA -> sharpen=True but pad=False (a black pad
+    # would paint opaque borders over the alpha edges -> destroy the matte). The
+    # overlay re-centers the fg, so no pad is needed.
+    fg_filter = _scale_filter(w, h, fps, sharpen=True, pad=False,
+                              in_label="1:v", out_label="fg", pre="format=rgba,")
     # 3D image streams chunk 7: DEFAULT = straight-alpha SOURCE-OVER at FULL
     # opacity. Compositing in RGB (overlay format=rgb) makes an OPAQUE mesh pixel
     # (alpha==255) fully REPLACE the plate -- no premultiplied-edge ghost, no
@@ -577,12 +643,15 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                     bg_start_frame=seg["src_start_frame"],
                     bg_is_still=use_still)
             elif kind == "clip":
+                # A REAL engine clip -> sharpen (lanczos+unsharp soft-native fix).
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=0,
-                                loop=bool(seg.get("loop")))
+                                loop=bool(seg.get("loop")), sharpen=True)
             elif kind == "floor":
+                # The procgen floor slice -> NOT sharpened (byte-identical chain).
                 _encode_segment(fb, base_video_path, seg["n_frames"], seg_path,
-                                w=w, h=h, fps=fps, start_frame=seg["src_start_frame"])
+                                w=w, h=h, fps=fps, start_frame=seg["src_start_frame"],
+                                sharpen=False)
             else:
                 _encode_black(fb, seg["n_frames"], seg_path, w=w, h=h, fps=fps)
             seg_paths.append(seg_path)

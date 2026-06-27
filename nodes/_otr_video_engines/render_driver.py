@@ -1493,7 +1493,11 @@ def render_shot(shot, request, *, fallback_of=None, video_revision=1,
         raise RenderError(
             "shot %s engine %r failed to render; fallbacks are disabled (%s) -- "
             "fix the engine or its inputs: %s" % (sid, eng, kind, exc)) from exc
-    return clip, out_shot, [], [eng], _mc.vram_used_mb()
+    # Prefer the engine's MEASURED render-window peak (LTX-AV threads it onto the
+    # clip via VramPeakProbe) over the instantaneous post-render read, so the
+    # episode report records the true render-phase peak; fall back when absent.
+    clip_peak = clip.get("vram_peak_mb") if isinstance(clip, dict) else None
+    return clip, out_shot, [], [eng], (clip_peak or _mc.vram_used_mb())
 
 
 def run_episode(ledger, *, fallback_of, oom_shot_id=None,
