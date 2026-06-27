@@ -1,6 +1,27 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-27 LTX-AV QUALITY BAKEOFF *RAN* -- AWAITING OPERATOR WINNER PICK. origin/v2.0-alpha
+> **>>> CURRENT STEP -- 2026-06-27 PARALLEL LANES (two coder windows). Last updated 2026-06-27; origin/v2.0-alpha
+> HEAD `08540ceb` == local. prod/main + tags GATED.**
+>
+> **LANE A -- STORY-QUALITY BUILD (NEW; CPU-only, JSON-FREE).** Roundtable R1->R4 COMPLETE + GO. Coder spec:
+> `docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md` (build order 3.1 dignity -> 3.2 anchor/one-breath ->
+> 3.3 stage-leak -> 3.4 cliche -> 3.6 cost-scrub -> 3.5 coda-counters -> 3.7 register; all pure-python in the
+> writer/composer set + scripts/story_quality_scan.py). Touches NO workflow JSON, NO GPU. Step 0 = read-only baseline
+> scan. Open operator decision Q7 (reroll budget <=4 default vs <=3). Docs UNCOMMITTED (git ?? docs/2026-06-27-story-quality/).
+>
+> **LANE B -- LTX-AV QUALITY BAKEOFF winner-wire (EXISTING step; GPU + workflow JSON).** Bakeoff RAN (13 legs/12 OK);
+> awaiting operator winner pick from the clips, THEN wire into otr_silent_composite (scaler) + eng_ltx_av (decode
+> temporal_size) + render_driver (canvas). Detail block immediately below. OWNS the GPU/5080 + :8000 + the workflow
+> JSON otr_scifi_16gb_full.json.
+>
+> **PARALLEL-WORK RULES (both lanes):** (1) workflow JSON otr_scifi_16gb_full.json = LANE B ONLY; Lane A stays
+> JSON-free. (2) ONLY shared python file = nodes/OTR_LedgerScriptWriter.py (Lane A v2-flag thread ~L2636/L4287; Lane B
+> engine config) -- land Lane A's tiny v2-thread edit FIRST, or assign the file to one window + rebase. (3) GPU/5080 +
+> :8000 = Lane B; Lane A is CPU-only (regression suite + read-only scan). (4) Separate git WORKTREES, both -> v2.0-alpha,
+> small frequent pushes + rebase; stagger the full-suite/Bug-Bible runs. (5) EVERY window updates this doc + the
+> otr-build-tracker.
+>
+> **>>> LANE B DETAIL -- 2026-06-27 LTX-AV QUALITY BAKEOFF *RAN* -- AWAITING OPERATOR WINNER PICK. origin/v2.0-alpha
 > HEAD `7c3e2f26` == local. The isolated PLAN-v5 bakeoff is BUILT + SWEPT. prod/main + tags GATED.**
 > - **BUILT (NO-GPU):** scripts/build_ltx_av_q_bakeoff_workflow.py (distilled_native silent builder @512x288x153 ->
 >   scripts/otr_ltx_av_q_bakeoff_distilled_native.json; SaveImage frames, NO LoRA/ModelSamplingLTXV/LTXVScheduler) +
@@ -25,8 +46,16 @@
 >     -> EYEBALL-ONLY (the stutter + the distilled re-spaced-sigma look).
 >   - All legs: scene-cuts 0; VRAM <= ceiling on every OK leg; the VRAM ceiling abort + reserve step-up retry chain both
 >     fired correctly (704@reserve4 aborted at +34 MB, 704@reserve5 passed); s/it abort never needed (no spill).
-> - **CLAUDE's RECOMMENDED BALANCED WINNER (pending operator eyeball):** 512x288 + whole-clip decode (4096/8) +
->   lanczos+unsharp composite scaler + i2v 0.75 + native sigmas -- seam gone, ~15% sharper, 0 freezes, baseline speed/VRAM.
+> - **CONVERGED WINNER (3 review voices + Claude judge -- LOCKED 2026-06-27):** Codex r1/r2 (pasted) +
+>   AntiGravity/Gemini (pasted) + a fresh LOCAL Codex r4 (roundtables/2026-06-27-ltx-av-wiring/r4/, codex exec
+>   read-only; agy CLI installed but needs interactive sign-in) all = GO-WITH-FIXES; Claude grounded every claim.
+>   FINAL = **DECODE temporal_size 128 / overlap 32** (tiled, seam imperceptible ratio 0.57, ~228MB headroom vs
+>   whole-clip's 27-162MB knife-edge) + **scaler lanczos + unsharp 0.4** (the unsharp is the sharpener; resampler
+>   ~irrelevant: lanczos +1.3% vs unsharp0.4 +8.9% vs unsharp0.8 +14.7%) + **canvas 512x288**. Whole-clip 4096/8 =
+>   documented manual max-quality option only. The decode+scaler fix is RECIPE-AGNOSTIC; distilled_native-as-default
+>   stays the separately-deferred operator decision. Hardened plan: roundtables/2026-06-27-ltx-av-wiring/r4/final.md.
+>   Open eyeball: unsharp 0.4 vs 0.8 (halo on faces) -- clips S0_lanczos_unsharp04/08 in _bakeoff_ltxq/. Stutter
+>   (i2v 0.62) was NOT validated by the bakeoff (freezedetect read 0 at baseline) -- remains an eyeball item.
 > - **PANEL QA PROMPT for the candidate models (operator-requested):** `docs/2026-06-27-ltx-av-qa/PANEL_QA_PROMPT.md`
 >   (copy-paste; full results table + the perf-vs-quality ask).
 > - **NEXT (operator-gated):** operator (+ /roundtable panel) picks the winner from the clips; THEN wire it into
