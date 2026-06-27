@@ -1,7 +1,36 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-27 PARALLEL LANES (two coder windows). Last updated 2026-06-27; origin/v2.0-alpha
-> HEAD `08540ceb` == local. prod/main + tags GATED.**
+> **>>> CURRENT STEP -- 2026-06-27 SWIM HANDOFF: ONE fresh window, TWO AUTONOMOUS JOBS in order. Last updated
+> HEAD `2e7544f8` == origin/v2.0-alpha. Operator AFK (swimming); run BOTH to green, do NOT wait; stop ONLY on a
+> genuine ambiguity or the >=14.5GB / irreversible line. prod/main + tags GATED.**
+> - **JOB 1 (FIRST) -- LTX winner-wire.** Operator PICK = whole-clip decode 4096/8 + lanczos+unsharp 0.4 + canvas
+>   512x288 + i2v0.75 native (PROVISIONAL -- commit-note it's the recommended pick; operator eyeballs the final clip
+>   later). Wire per the ROUNDTABLE-HARDENED, code-grounded spec `roundtables/2026-06-27-ltx-upgrade-wire/final.md`
+>   (r1->r4 converged: Codex gpt-5.5/high + AntiGravity gemini-3.5-pro + Claude judge). Must-haves from final.md:
+>   SHARED 4-path scaler helper `_scale_filter(w,h,fps,*,sharpen,pad=True)` in otr_silent_composite, ALPHA-SAFE
+>   (pad=False on the RGBA character fg; base_video_path floor + black NOT sharpened; still-plate bg = sharpen;
+>   normalize_to_silent_canonical = no); unsharp amt env `OTR_COMPOSITE_UNSHARP_AMOUNT`=0.4; eng_ltx_av decode env
+>   `OTR_LTX_AV_DECODE_TEMPORAL_SIZE`/`_OVERLAP` read in `_build_graph` (default 4096/8 per the pick, FAIL-LOUD on
+>   bad values NO clamp, fall back to 128/32 LOUD via env if the smoke trips >14.5GB), spatial 512/64 fixed;
+>   render_driver canvas only if bumped (512 = no change). VRAM: `VramPeakProbe(interval_s=0.1)` start/stop around
+>   run_graph, leak/cleanup-safe (init results=images=None), thread `vram_peak_mb`
+>   render_clip->_clip_from_raw->render_shot->report, assert vs `_MC.dynamic_vram_ceiling_mb()` AFTER cleanup. Smoke:
+>   generalize `run_otr_30word_smoke._preflight` per `_recipe()` (default sharp_lora). ALL node/wiring changes go IN
+>   `workflows/otr_scifi_16gb_full.json` SAME change (CLAUDE.md S0) -> re-validate (OTR_WorkflowValidator + JSON
+>   round-trip + link/widget audit). Reset box SELECTIVELY before each headless run; single resident <=14.5GB; LOUD
+>   fallbacks; don't touch eng_humo.py / eng_wan_ti2v.py. Tests = final.md S5.
+> - **JOB 2 (after JOB 1 ships green) -- story-quality build** `docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md`
+>   in order **3.1 -> 3.2 -> 3.3 -> 3.4 -> 3.6 -> 3.5 -> 3.7**; Step 0 (read-only baseline scan) FIRST; reroll-budget
+>   default <=4 (Q7); honor the R4 must-fixes (four-guard propagation incl Stage-3 L2592; coda truncation
+>   `clean_one_line(brief,0)` vs `(brief,_CODA_FACT_MAX)`; substring anchor match; v2-gated `_quality_flags_for_line`;
+>   flag-once). (This is the prior LANE A; now JOB 2, run by the SAME autonomous window after JOB 1.)
+> - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
+>   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
+>
+> **>>> PRIOR STEP -- 2026-06-27 PARALLEL LANES (two coder windows). origin/v2.0-alpha
+> HEAD `08540ceb`. prod/main + tags GATED. (Superseded by the SWIM HANDOFF above: one window now runs LTX then
+> story-quality. LTX bakeoff RAN + winner picked + wiring plan hardened via /roundtable-local r1->r4 ->
+> roundtables/2026-06-27-ltx-upgrade-wire/final.md; HEAD advanced 08540ceb->2e7544f8.)**
 >
 > **LANE A -- STORY-QUALITY BUILD (NEW; CPU-only, JSON-FREE).** Roundtable R1->R4 COMPLETE + GO. Coder spec:
 > `docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md` (build order 3.1 dignity -> 3.2 anchor/one-breath ->
