@@ -375,7 +375,7 @@ def build_manifest(prompt, leg, reserve_gb, baseline_vram_mb, conform_vf=None):
         "decode_temporal": [dec.get("temporal_size"), dec.get("temporal_overlap")],
         "sigmas_text": sig.get("text"), "sigmas_kind": leg["sigmas"],
         "cfg": guider.get("cfg"), "sampler": ksel.get("sampler_name"),
-        "seed": noise.get("noise_seed"), "fps": cond.get("fps"),
+        "seed": noise.get("noise_seed"), "fps": cond.get("frame_rate"),
         "unet": unet.get("unet_name"), "video_audio_vae": vaes,
         "text_encoder": next((v for v in te.values()
                               if isinstance(v, str) and v.endswith(".safetensors")), None),
