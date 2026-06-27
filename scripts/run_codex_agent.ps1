@@ -33,6 +33,8 @@ param(
   [Parameter(Mandatory = $true)][string]$RunId,
   [ValidateSet("review", "edit")][string]$Mode = "review",
   [switch]$Dangerous,
+  [ValidateSet("minimal", "low", "medium", "high", "xhigh")][string]$Reasoning = "high",
+  [string]$Model = "auto",
   [string]$CodexBin = "C:\Users\jeffr\AppData\Local\OpenAI\Codex\bin\aec6b7c6fcdfb66a"
 )
 
@@ -67,12 +69,37 @@ switch ($Mode) {
 Write-Host "[codex] run=$RunId mode=$Mode repo=$Repo" -ForegroundColor Cyan
 Write-Host "[codex] flags: $($sandboxArgs -join ' ') --json --color never -o codex_final.md" -ForegroundColor DarkGray
 
+# --- model + reasoning selection (poll the LIVE catalog: codex debug models; default high) ---
+$selModel = $Model
+if ($Model -eq "auto") {
+  $modelsRaw = (& codex debug models 2>$null | Out-String)
+  $modelsRaw | Out-File -Encoding utf8 (Join-Path $run "codex_models.json")
+  if     ($modelsRaw -match '"slug":"gpt-5\.5"')    { $selModel = "gpt-5.5" }
+  elseif ($modelsRaw -match '"slug":"gpt-5-codex"') { $selModel = "gpt-5-codex" }
+  elseif ($modelsRaw -match '"slug":"(gpt-5[^"]*)"'){ $selModel = $matches[1] }  # strongest gpt-5.x
+  else { $selModel = "" }   # let codex use its default
+}
+$modelArgs = @(); if ($selModel) { $modelArgs = @("-m", $selModel) }
+$selModel | Out-File -Encoding utf8 (Join-Path $run "codex_model_selected.txt")
+
 # robust contract: prompt via stdin (`-`); final answer to a FILE; events to JSONL.
-Get-Content $prompt -Raw | & codex exec -C $Repo @sandboxArgs --json --color never -o $out - *> $log
-$code = $LASTEXITCODE
+function Invoke-CodexExec([string]$reff) {
+  $reff | Out-File -Encoding utf8 (Join-Path $run "codex_reasoning_selected.txt")
+  $m = if ($selModel) { $selModel } else { "default" }
+  Write-Host "[codex] model=$m reasoning=$reff $($sandboxArgs -join ' ') -o codex_final.md" -ForegroundColor DarkGray
+  Get-Content $prompt -Raw | & codex exec -C $Repo @modelArgs @sandboxArgs -c "model_reasoning_effort=`"$reff`"" --json --color never -o $out - *> $log
+  return $LASTEXITCODE
+}
+
+$code = Invoke-CodexExec $Reasoning
+if (($code -ne 0 -or -not (Test-Path $out)) -and $Reasoning -eq "xhigh") {
+  Write-Host "[codex] xhigh failed -> retry once with high" -ForegroundColor Yellow
+  $code = Invoke-CodexExec "high"
+}
 $code | Out-File -Encoding utf8 $exit
 
 if ($code -ne 0) { throw "[codex] FAILED exit=$code -- see $log" }
 if (-not (Test-Path $out)) { throw "[codex] exit 0 but no output file: $out (see $log)" }
-Write-Host "[codex] OK exit=0 -> $out ($((Get-Item $out).Length) bytes)" -ForegroundColor Green
+$m = if ($selModel) { $selModel } else { "default" }
+Write-Host "[codex] OK exit=0 model=$m -> $out ($((Get-Item $out).Length) bytes)" -ForegroundColor Green
 Get-Content $out
