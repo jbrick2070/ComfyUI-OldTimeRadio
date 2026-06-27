@@ -1,6 +1,62 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION COMPLETE -- Chunk 1 + Chunk 2 SHIPPED (one
+> **>>> CURRENT STEP -- 2026-06-26 LATE (LTX-AV VRAM SPILL FIXED + GPU-VALIDATED; bug cataloged; cosmetic JSON tidy.
+> origin/v2.0-alpha HEAD `53418748` == local (reserve tuned 3->4GB after a live 72->5.6 s/it pass). NEXT = (1) ISOLATED
+> distilled-1.1 vs dev Q3_K_M SPEED+QUALITY A/B (quants Q2_K/Q3_K_M/Q4_K_M + distilled companions DOWNLOADING now to
+> C:\ComfyUI-Models\{unet\distilled-1.1, vae, text_encoders}); THEN (2) 400-700w VISUALIZER-ONLY story-quality review +
+> a /roundtable. prod/main + tags GATED.)**
+> **Operator pain this session: all-`ltx_audio_in` episodes rendered char/bookend beats at a 6.84-or-223 s/it LOTTERY
+> (one beat 54s, the next ~30 MIN), stalling at "Model Initializing" -- NOT an OOM. Roundtable-converged
+> (docs/2026-06-26-ltx-av-vram-headroom/, GPT-5.5+Gemini-3.1-pro+DeepSeek-v4-pro ~$0.38) -> TWO root causes:**
+> - **`ae8ec55e` VideoVAE graph-pin split:** the single `videovae` in `eng_ltx_av._build_graph` fed BOTH i2v
+>   (pre-sampler) AND decode (post-sampler); run_graph free_after_use frees only after the LAST consumer -> 1.38GB
+>   pinned through the denoise loop. Split into `videovae_enc`(i2v)+`videovae_dec`(decode) -> reclaimed before the
+>   sampler. Internal render graph only (no workflow-JSON change); +split-lock test.
+> - **`bd5ffd23` activation reserve (load-bearing):** the operator's DESKTOP APPS eat ~5GB VRAM, so the 10.5GB 22B
+>   unet FULL-loaded with ~0 activation room -> the audio-conditioned sampler spilled to system RAM (sysmem
+>   fallback). `eng_ltx_av._ltx_av_vram_reserve()` holds `OTR_LTX_AV_RESERVE_VRAM_GB` (default 3) free via comfy
+>   `EXTRA_RESERVED_VRAM` around run_graph (restored in finally; exception-safe; works GUI+headless). GGUF unet
+>   honors partial load (ltx_video b001 already did). +4 reserve tests.
+> - **GPU-VALIDATED: live 30w all-ltx_audio_in headless -> 6 consecutive beats STEADY ~11 s/it (~90s/clip) vs the
+>   old 223 = ~19x faster + DETERMINISTIC (no lottery). LTX/motion 126/126; Bug Bible 16/7/3; only the 5 pre-existing
+>   267a53e workflow-pin fails. OPERATOR: RESTART ComfyUI to load it (py module cache); lower
+>   OTR_LTX_AV_RESERVE_VRAM_GB for more speed / less margin; closing desktop apps frees headroom.**
+> - **`fa1ca903` BUG-LOCAL-414 + Bible `07.16`** (Three-File Contract; survival-guide pushed `4df8e00`): the spill is
+>   a NEW instance of a RECURRING VRAM-pressure-slow-crawl-without-OOM family (Bible 11.07/07.01/07.03), cataloged.
+> - **`d183544d` cosmetic tidy:** node-87 `music_video_model` bare `ltx_audio_in` -> `ltx_audio_in (16:9)` (GUI shows
+>   the suffix like the sibling rows; resolves identically; validated round-trip + no-BOM).
+> - **EARLIER THIS SESSION (the LTX-consolidation start + after):** leak-floor-v2 flipped DEFAULT-ON; the news-close
+>   `inject_central_object_into_brief` made a NO-OP (keeps the brief NEWS summary, drops the tacked-on object).
+> - **OPEN TICKET (caught, NOT fixed):** `normalize_length` is FAILING -- the writer LLM emits edit items keyed
+>   `type` not the schema's `action`, so it exhausts the ladder + bails (non-fatal). It is WHY the 30w tests ballooned
+>   to ~110w (length control off). SIBLING of BUG-303 (`index`->`beat_index`): a 1-line `BeatEdit.__otr_field_aliases__`
+>   add (`action`<-`type`). Fix it as part of the story-quality pass.
+> - **`53418748` reserve tuned 3->4GB + GPU-CONTENTION learned (live):** 3GB still let the unet FULL-load (usable
+>   10958 > the 10537 unet) -> 72 s/it marginal spill; 4GB forces a real PARTIAL load (~540MB offloaded) -> no spill.
+>   THEN the GUI still ran 42 s/it at 53% GPU-util while HEADLESS hit 5.6 s/it at ~full util -- the gap is DESKTOP GPU
+>   CONTENTION, not the model. On this Legion (HYBRID display, iGPU drives the panel) Snagit/StreamDeck/Chrome/Edge
+>   still hold 5080 graphics ctxs, and a per-app "Power Saving (Intel)" only applies on app RESTART. RECIPE for fast
+>   GUI renders: 4GB reserve (shipped) + route those apps to the iGPU AND RESTART them; GUARANTEED-fast = render
+>   HEADLESS. The model + fix are VINDICATED -- no Q2_K downgrade is needed for speed.
+> - **DISTILLED-1.1 SPEED+QUALITY A/B (DOWNLOADING, then isolated test -- THE immediate next step):** operator wants
+>   to know if the NATIVE distilled-1.1 model beats the dev+SHARP-LoRA path on QUALITY (faces/lip-sync). Downloading
+>   `unsloth/LTX-2.3-GGUF` distilled-1.1 Q2_K(7.94)/Q3_K_M(10.63)/Q4_K_M(14.19) + distilled audio/video VAE +
+>   embeddings_connectors (Gemma-3 TE reused from dev) -> `C:\ComfyUI-Models\{unet\distilled-1.1, vae, text_encoders}`.
+>   DELIVERABLE = an ISOLATED BAKEOFF (operator-requested): a minimal STANDALONE ComfyUI JSON -- just the LTX-AV graph
+>   (GGUF unet + TE + video/audio VAE -> ONE ltx_audio_in clip from a FIXED still + audio; the unet file is the only
+>   swap), NOT the full OTR pipeline -- plus a runner that renders the SAME still+audio through EACH candidate (dev
+>   Q3_K_M baseline + distilled-1.1 Q2_K/Q3_K_M/Q4_K_M) HEADLESS and logs per-quant **s/it + peak VRAM (efficiency)**
+>   and writes each clip to a clearly-LABELED path (e.g. otr\episodes\_bakeoff\<quant>.mp4) for **operator side-by-side
+>   quality comparison**. For distilled, **DROP the SHARP distilled-LoRA** (the model is
+>   already distilled -> double-distill = mush), use native distilled sigmas/cfg + the distilled companions; compare
+>   s/it AND faces vs the dev Q3_K_M baseline. Operator JUDGES the look (quality is the question; speed is solved).
+>   If distilled-1.1 wins -> swap `OTR_LTX_AV_UNET` + companions + drop the LoRA in `eng_ltx_av`.
+> - **AFTER the A/B (operator-chosen story-quality lane): 400-700w VISUALIZER-ONLY runs** -- skip the slow LTX video (use
+>   visualizer/procgen for video = fast) to make real readable episodes for Claude's PERSONAL read (is the story
+>   actually improving from leak-floor-v2 / news-close / specificity anchors / StoryCritic?), THEN a /roundtable to
+>   harden the next lever. The 30w runs were SPEED tests -- too short to judge story quality.**
+>
+> **>>> PRIOR STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION COMPLETE -- Chunk 1 + Chunk 2 SHIPPED (one
 > ltx_audio_in engine; ltx_av_talk/ltx_av_music DELETED), overnight soak RUNNING. origin/v2.0-alpha HEAD
 > `a30f5945` == local. prod/main + tags GATED.)**
 > **Operator ask: "remove the two legacy [ltx_av_talk/ltx_av_music] and ensure the still logic is most robust" + run
