@@ -1,6 +1,112 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-26 LATEST (LTX distilled BAKEOFF + recipe-follows-model SHIPPED & GPU-PROVEN;
+> **>>> CURRENT STEP -- 2026-06-27 LTX-AV QUALITY BAKEOFF *RAN* -- AWAITING OPERATOR WINNER PICK. origin/v2.0-alpha
+> HEAD `7c3e2f26` == local. The isolated PLAN-v5 bakeoff is BUILT + SWEPT. prod/main + tags GATED.**
+> - **BUILT (NO-GPU):** scripts/build_ltx_av_q_bakeoff_workflow.py (distilled_native silent builder @512x288x153 ->
+>   scripts/otr_ltx_av_q_bakeoff_distilled_native.json; SaveImage frames, NO LoRA/ModelSamplingLTXV/LTXVScheduler) +
+>   scripts/run_ltx_av_q_bakeoff.py (boot-per-leg; FAIL-LOUD resolved-API-prompt manifest; stages 0-3; per-leg gates;
+>   silent encode via the PRODUCTION wrapper_bridge.encode_frames_to_silent_mp4, imported by file path). Committed
+>   `24fedea7` + `7c3e2f26`; suite green vs the 5 pre-existing `267a53e` workflow-pin fails; Bug Bible 16/7/3.
+> - **THE RAIL WORKED:** `--dry-validate` caught a real bug pre-GPU (manifest read `fps` but the live LTXVConditioning
+>   names it `frame_rate`) -> fixed (`7c3e2f26`) -> all manifests PASS live. The fail-loud manifest passed on every one
+>   of the 13 sweep attempts (the #1 risk -- measuring the legacy SHARP/LoRA graph -- is guarded).
+> - **SWEEP RAN headless (13 attempts, 12 OK; boot-per-leg, one GPU=one render). Clips + per-leg JSON/MD + manifests in
+>   `otr/episodes/_bakeoff_ltxq/`. Results table: `docs/2026-06-27-ltx-av-qa/` + `ltxq_bakeoff_results.md`:**
+>   - (1) **TEMPORAL SEAM / "flash" = FIXED by WHOLE-CLIP DECODE** (VAEDecodeTiled temporal_size 4096 / overlap 8):
+>     seam p99 `0.2353` (jump 2.07x local median = the visible flash) -> `0.0` (no seam), at the SAME s/it (5.37 vs 6.04)
+>     and peak VRAM (14338 vs 14337 MB) as L0 -- and it MATCHES the shipped sister `eng_ltx_video` decode, so it wires
+>     byte-for-byte. Best TILED alternative = 128/32 (seam ratio 0.57, VRAM 14272).
+>   - (2) **SOFTNESS = FREE +14.7% sharpness** by swapping the composite scaler bilinear -> lanczos+unsharp
+>     (otr_silent_composite `_seg_vf`; Laplacian 27.17 vs 23.69 at the common 1472x832; ZERO GPU cost).
+>   - (3) **CANVAS bump = optional:** 640x384 fits (14476 MB, 8.98 s/it, but freezes=5 appeared); 704x384 OVER the
+>     14.5 GB ceiling at reserve 4 (aborted at 14534) but FITS at reserve 5 (13355 MB, 8.75 s/it). Native-Laplacian
+>     across canvases is resolution-confounded (a smaller frame scores higher per-pixel) -> judge canvas sharpness BY EYE.
+>   - (4) **i2v 0.75-vs-0.62 + native-vs-respaced sigmas:** objective metrics do NOT separate them (seam 0, freezes 0)
+>     -> EYEBALL-ONLY (the stutter + the distilled re-spaced-sigma look).
+>   - All legs: scene-cuts 0; VRAM <= ceiling on every OK leg; the VRAM ceiling abort + reserve step-up retry chain both
+>     fired correctly (704@reserve4 aborted at +34 MB, 704@reserve5 passed); s/it abort never needed (no spill).
+> - **CLAUDE's RECOMMENDED BALANCED WINNER (pending operator eyeball):** 512x288 + whole-clip decode (4096/8) +
+>   lanczos+unsharp composite scaler + i2v 0.75 + native sigmas -- seam gone, ~15% sharper, 0 freezes, baseline speed/VRAM.
+> - **PANEL QA PROMPT for the candidate models (operator-requested):** `docs/2026-06-27-ltx-av-qa/PANEL_QA_PROMPT.md`
+>   (copy-paste; full results table + the perf-vs-quality ask).
+> - **NEXT (operator-gated):** operator (+ /roundtable panel) picks the winner from the clips; THEN wire it into
+>   otr_silent_composite (scaler) + eng_ltx_av (decode temporal_size) + render_driver (canvas, only if bumped) in the
+>   SAME change, re-validate (OTR_WorkflowValidator + round-trip + link/widget audit), suite + Bug Bible, commit+push
+>   v2.0-alpha. Do NOT touch eng_humo.py / eng_wan_ti2v.py. prod/main + tags GATED.
+>
+> **>>> EXECUTED SPEC (PLAN v5) -- 2026-06-27 LTX-AV QUALITY BAKEOFF (isolated smoke; RAN). origin/v2.0-alpha
+> HEAD `230dd1b8` (build started here). The overnight 420w soak exposed the ltx_audio_in clips as LOW QUALITY + micro-stutter; root-caused
+> via a 3-AI QA (Claude + Gemini + Codex), all code-grounded + converged. prod/main + tags GATED.**
+> - **DIAGNOSIS (converged):** (1) QUALITY = the `render_driver.py:1116` clamp `OTR_LTX_AV_RENDER_CANVAS=512x288`
+>   (engine native = 832x480, eng_ltx_av.py:55-56); `OTR_SilentComposite` (otr_silent_composite.py:323-325) then
+>   upscales ~8.3x AREA to the 1472x832 canvas -> softness. Root = the tiny native render, NOT the upscaler. (2)
+>   STUTTER = LTX init-image boundary HOLD + low-motion tail -- NOT ping-pong (eng_ltx_av renders `next_8n1` full
+>   length @ :605-627, never calls `wrapper_bridge.extend_frames_to_target`; Codex verified 153/153 unique frames,
+>   zero dups, palindrome test FAILED). freezedetect hits only on the 153f clip (~0.16s start, 0.12s end). (3)
+>   "FLASH" = NOT hard cuts (0 scene-cuts, max scene score 0.003); it's TEMPORAL-VAE-TILING seams --
+>   `VAEDecodeTiled temporal_size=64/overlap=8` (eng_ltx_av.py:556-559) = a 56-frame stride, and the p99-luma jumps
+>   land EXACTLY at frames 55->56 / 111->112 (Codex). Sigma-boiling from the bunched `LTX_DISTILLED_SIGMAS`
+>   (eng_ltx_av.py:148; 5/8 steps >0.97 then a hard 0.42->0.0 drop) is a SECONDARY suspect (Gemini).
+> - **HARD CONSTRAINTS:** VRAM knife-edge (AV stack cycles ~24GB through the 16GB card; 512x288 already peaks
+>   13688MB <= 14500). 832x480 = 2.71x pixels -> LIKELY over budget unless another lever changes -> use MEASURED
+>   tiers + a reserve bump, hard-fail >14.5GB. For distilled_native, `OTR_LTX_AV_STEPS` ALONE does NOTHING -- the
+>   path uses FIXED manual sigmas (eng_ltx_av.py:538-544); changing effective steps REQUIRES a new sigma tuple.
+> - **PLAN = isolated LTX-AV quality bakeoff** (clone workflows/ltx_av_bakeoff_gguf.json + scripts/run_ltx_av_bakeoff.py;
+>   FIXED still+audio+seed+prompt, distilled_native Q3_K_M, wide aspect; vary ONE lever per leg IN THE STANDALONE JSON,
+>   carry the winner forward; each leg logs peak VRAM + s/it + wall, HARD-fail >14.5GB, writes
+>   `otr\episodes\_bakeoff_ltxq\<leg>.mp4` for side-by-side QA):
+>   L0 baseline (512x288 / native-sigmas / overlap8 / i2v0.75); L1 `temporal_overlap` 8->16->32 (the flash);
+>   L2 `i2v_strength` 0.75->0.62 (the boundary stutter); L3 a RE-SPACED 8-step sigma tuple A/B vs native (gamble --
+>   distilled is calibrated to its schedule); L4 canvas 640x384 then 704x384 + reserve 4->6-7GB (the sharpness;
+>   832x480 ONLY if 704 fits). Operator + AIs eyeball clips; pick the best clean combo <=14.5GB; THEN wire the winner
+>   into render_driver/eng_ltx_av defaults + the boot/profile (SAME change as any code), re-validate, suite + Bug
+>   Bible, commit+push v2.0-alpha.
+> - **Lever locations (code-grounded):** canvas `render_driver.py:1116`; reserve `eng_ltx_av.py:90`; sigmas
+>   `eng_ltx_av.py:148`; i2v_strength `eng_ltx_av.py:152-154/174-181` (`_recipe_config`); VAE temporal
+>   `eng_ltx_av.py:556-559`. The isolated standalone JSON varies these DIRECTLY -- NO production-code change until the
+>   winner is wired. One GPU = one render (serialize). z_image soak bug already FIXED (OTR_ZIMAGE_UNET=nvfp4 in the
+>   boot, verified live); LTX-AV default unet set to distilled-1.1 Q3_K_M.
+> - **>>> PLAN v2 (post-finalization roundtable; Gemini R4 = NO-GO on the v1 greedy sweep, fixes accepted). The v1
+>   L0-L4 greedy carry-forward is SUPERSEDED -- the levers INTERACT (sigmas<->i2v_strength; canvas<->temporal/spatial
+>   tile), so a greedy winner is false. Revised:**
+>   - **PHASE 0 (FREE, do FIRST, no GPU re-render): composite scaler upgrade.** otr_silent_composite.py:323-325 upscales
+>     512->1472 with ffmpeg default (bilinear) -> softness. Re-composite an EXISTING bakeoff clip with `flags=lanczos`
+>     + mild `unsharp` vs the current scaler; eyeball + sharpness proxy. ZERO VRAM/render cost; may recover most of the
+>     softness WITHOUT raising the render canvas (could make Phase B unnecessary).
+>   - **PHASE A (cheap, baseline 512x288, FACTORIAL not greedy):** A1 `temporal_overlap` 8->16->32 (+ optional
+>     temporal_size 64->128) -- metric YDIF max at frames 55/111 < 2.0. A2 a 2x2 grid {native vs re-spaced sigmas} x
+>     {i2v 0.75 vs 0.62} -- metric freezedetect total frozen <0.1s + eyeball coherence (the re-spaced sigma MUST NOT
+>     break the distilled look). Pick the best (overlap, sigmas, i2v) on the baseline canvas.
+>   - **PHASE B (expensive, LAST, OPTIONAL fallback): canvas bump** ONLY if Phase 0+A aren't enough. 640x384 FIRST with
+>     `tile_size` scaled to the new canvas + reserve raised CAUTIOUSLY; ABORT if s/it collapses toward the 223 spill
+>     regime (the reserve-VRAM global is brittle per docs/2026-06-26-ltx-av-vram-headroom). 704x384 only if 640 holds.
+>   - **Per leg:** peak VRAM + s/it + wall + YDIF-seam + freezedetect (objective gates), hard-fail >14.5GB, labeled clip
+>     `otr\episodes\_bakeoff_ltxq\<leg>.mp4`. SAFEST single ship = Phase 0 scaler (zero risk) then the Phase-A winner.
+>     Wire winner(s) across otr_silent_composite (scaler) + eng_ltx_av (temporal/sigma/i2v) + render_driver (canvas),
+>     re-validate, suite + Bug Bible, commit+push v2.0-alpha.
+> - **>>> PLAN v5 (LOCKED; folds BOTH v4 votes -- Gemini + Codex, both GO-with-fixes. Deltas over v2 above):**
+>   - WHOLE-CLIP DECODE = ONE leg `4096/8` (matches the shipped sister `eng_ltx_video.py:761-767`, so a win wires
+>     byte-for-byte), RUN LAST; `256/8` DROPPED as a separate leg (identical at >=153f -- decode chunk =
+>     min(temporal_size, frames)); 256 is the contingency value ONLY if 4096 mis-allocates on the UNET-resident
+>     ltx_audio_in path (eng_ltx_av.py:613-622 keeps the 22B resident through run_graph).
+>   - STAGE-3 RESERVE starts at PRODUCTION 4GB (eng_ltx_av.py:90); step to 5-6 ONLY on a spill/OOM; NEVER accept a
+>     crawling "pass" -- the `s/it>30 OR >2.5x-baseline` abort is LOAD-BEARING (a 704x384 sampler peak vs the resident
+>     22B can hit the 223 s/it spill BEFORE decode).
+>   - SHARPNESS baseline = "L0 conformed with the STAGE-0 WINNING scaler" (>=15% Laplacian variance; Stage 0 + Stage 3
+>     legs ONLY).
+>   - SEAM gate: `p99-luma jump <2.5 AND <=1.5x LOCAL median` = clean pass; if NO tiled candidate passes, rank by
+>     seam-reduction-vs-L0 and require >=75% reduction (never strand the bakeoff with no winner); whole-clip legs
+>     record "no seam"; seam indices DYNAMIC from (temporal_size-overlap).
+>   - MANIFEST adds OUTPUT POLICY: the bakeoff renders SILENT to MATCH production (`encode_frames_to_silent_mp4`,
+>     eng_ltx_av.py:625-627) -- NOT the legacy builder's CreateVideo/SaveVideo audio-mux
+>     (build_ltx_av_bakeoff_workflow.py:213-218); + unique run-id/pre-delete, raw + conformed paths, mtime/size/SHA,
+>     encoder settings, audio-ABSENT assertion. Plus the resolved-API-PROMPT asserts (canvas/length/sigmas-text/
+>     temporal+spatial-tile/i2v/unet=distilled/LoRA+ModelSamplingLTXV+LTXVScheduler ABSENT/cfg=1.0/euler_cfg_pp/
+>     CPU-encoder/seed/fps/prompt+asset SHA/boot reserve+baseline VRAM/conform -vf hash). Fail loud on any mismatch.
+>   - HIGHEST RISK (both votes, unchanged): the harness measuring the WRONG graph (legacy builder is SHARP/LoRA
+>     @832x480x105) -- the fail-loud resolved-API-prompt manifest is the load-bearing safety rail.
+>
+> **>>> PRIOR STEP -- 2026-06-26 LATEST (LTX distilled BAKEOFF + recipe-follows-model SHIPPED & GPU-PROVEN;
 > Wan TI2V-5B low-VRAM bakeoff NO-GPU PREP STARTED -- Step-1 architecture gate = GO. origin/v2.0-alpha HEAD
 > `9218b38e` == local. prod/main + tags GATED.)**
 > **LTX A2V -- DONE this session (the prior step's "immediate next" is now complete):**
