@@ -119,20 +119,28 @@ def _ltx_av_vram_reserve():
         if bumped:
             _mm.EXTRA_RESERVED_VRAM = old
 
-# --- SHARP mode: the GPU-proven distilled chain on the A2V graph (2026-06-17) ---
-# OTR_LTX_AV_SHARP (default ON) selects the distilled sharpness recipe -- the
-# distilled LoRA @0.70 + euler_cfg_pp + the 8-step LTX_DISTILLED_SIGMAS + cfg 1.0,
-# with ModelSamplingLTXV + LTXVScheduler DROPPED (the LoRA-wrapped unet feeds the
-# guider directly; the fixed sigmas already carry the shift, so ModelSamplingLTXV
-# would double-shift -> blur). This is a CONFIG mode chosen at graph-build, NEVER
-# an in-render fallback. =0 restores the M0 base pass. The recipe mirrors
-# eng_ltx_video's distilled chain; that module is FROZEN and never imported here,
-# so the tiny helpers below are DUPLICATED on purpose (V-12 cold-import).
-
-
-def _sharp_enabled():
-    """SHARP recipe on (default) vs the M0 base pass (OTR_LTX_AV_SHARP=0)."""
-    return os.environ.get("OTR_LTX_AV_SHARP", "1") != "0"
+# --- recipe selector: the recipe FOLLOWS THE MODEL (2026-06-26 bakeoff) --------
+# The A2V lane runs ONE of THREE recipes, chosen at graph-build, NEVER an in-render
+# fallback (CLAUDE.md NO FALLBACKS -- fail LOUD):
+#   sharp_lora        dev GGUF + distilled LoRA @0.70 + euler_cfg_pp + the fixed
+#                     8-step LTX_DISTILLED_SIGMAS + cfg 1.0 + i2v strength 0.75;
+#                     ModelSamplingLTXV + LTXVScheduler DROPPED (the LoRA carries
+#                     the shift -- ModelSamplingLTXV would double-shift -> blur).
+#                     The kept HERO/final path.
+#   distilled_native  distilled-1.1 GGUF (distillation BAKED IN): the same
+#                     distilled recipe as sharp_lora but with NO LoRA -- the unet
+#                     feeds the guider directly. The new DEFAULT daily driver.
+#   m0_base           ModelSamplingLTXV + LTXVScheduler + euler + cfg 3.0 +
+#                     strength 1.0, no LoRA. Legacy base pass, OVERRIDE-ONLY.
+# Selection: env OTR_LTX_AV_RECIPE (auto|sharp_lora|distilled_native|m0_base),
+# default "auto" -> derived from the OTR_LTX_AV_UNET basename family. The recipe
+# mirrors eng_ltx_video's distilled chain; that module is FROZEN and never imported
+# here, so the tiny helpers below are DUPLICATED on purpose (V-12 cold-import).
+RECIPE_AUTO = "auto"
+RECIPE_SHARP_LORA = "sharp_lora"
+RECIPE_DISTILLED_NATIVE = "distilled_native"
+RECIPE_M0_BASE = "m0_base"
+_VALID_RECIPES = (RECIPE_SHARP_LORA, RECIPE_DISTILLED_NATIVE, RECIPE_M0_BASE)
 
 
 #: Distilled sigma schedule (ComfyUI-Goofer, GPU-proven on the RTX 5080). 8 steps;
@@ -148,6 +156,30 @@ _LTX_AV_SHARP_I2V_STRENGTH = 0.75
 _LTX_AV_DISTILLED_LORA_DEFAULT = os.path.join(
     "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
 _LTX_AV_DISTILLED_LORA_STRENGTH = 0.7
+
+
+def _recipe_config(recipe):
+    """Static per-recipe config consumed UNIFORMLY by _weight_paths /
+    _node_candidates / _build_graph / render_clip -- never a binary 'sharp' bool,
+    so the three states (and the three director roles) stay consistent.
+
+    use_lora           -> require + wire LoraLoaderModelOnly (sharp_lora only).
+    use_modelsampling  -> require + wire ModelSamplingLTXV + LTXVScheduler (m0 only).
+    manual_sigmas      -> inject the in-adapter fixed LTX_DISTILLED_SIGMAS
+                          (sharp_lora AND distilled_native); else LTXVScheduler."""
+    if recipe == RECIPE_SHARP_LORA:
+        return {"use_lora": True, "use_modelsampling": False, "manual_sigmas": True,
+                "sampler": _LTX_AV_SHARP_SAMPLER, "cfg": _LTX_AV_SHARP_CFG,
+                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH}
+    if recipe == RECIPE_DISTILLED_NATIVE:
+        return {"use_lora": False, "use_modelsampling": False, "manual_sigmas": True,
+                "sampler": _LTX_AV_SHARP_SAMPLER, "cfg": _LTX_AV_SHARP_CFG,
+                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH}
+    if recipe == RECIPE_M0_BASE:
+        return {"use_lora": False, "use_modelsampling": True, "manual_sigmas": False,
+                "sampler": "euler", "cfg": _LTX_AV_CFG,
+                "i2v_strength": _LTX_AV_I2V_STRENGTH}
+    raise ValueError("unknown LTX-AV recipe %r" % recipe)
 
 
 class _SigmasFromValues:
@@ -230,6 +262,54 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return os.environ.get("OTR_LTX_AV_DISTILLED_LORA",
                               _LTX_AV_DISTILLED_LORA_DEFAULT)
 
+    # ---- recipe resolution (fail-loud; the recipe FOLLOWS THE MODEL) ----
+    def _recipe(self):
+        """Resolve the active recipe. Read fresh every call (an operator flips
+        daily<->hero per beat by swapping OTR_LTX_AV_UNET / OTR_LTX_AV_RECIPE).
+        NO FALLBACKS: a retired flag, a bad override, or an unrecognized unet
+        RAISE -- never guess, never warn-and-continue, never double-distill."""
+        if os.environ.get("OTR_LTX_AV_SHARP") is not None:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "OTR_LTX_AV_SHARP is retired -- use OTR_LTX_AV_RECIPE="
+                "auto|sharp_lora|distilled_native|m0_base", kind="video")
+        sel = os.environ.get("OTR_LTX_AV_RECIPE", RECIPE_AUTO).strip().lower()
+        if sel != RECIPE_AUTO:
+            if sel not in _VALID_RECIPES:
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "OTR_LTX_AV_RECIPE=%r invalid -- use "
+                    "auto|sharp_lora|distilled_native|m0_base" % sel, kind="video")
+            return sel
+        return self._detect_recipe(self._unet_name())
+
+    def _detect_recipe(self, unet_name):
+        """auto: STRICT family match on the unet basename (lowercased). An
+        unknown family RAISES (the operator sets OTR_LTX_AV_RECIPE) -- a name that
+        trips both tokens or neither is ambiguous and never silently resolved."""
+        base = os.path.basename(str(unet_name or "").replace("\\", "/")).lower()
+        if base.startswith("ltx-2.3-22b-distilled-1.1-"):
+            return RECIPE_DISTILLED_NATIVE
+        if base.startswith("ltx-2.3-22b-dev-"):
+            return RECIPE_SHARP_LORA
+        raise EngineUnusable(
+            self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+            "cannot auto-detect the LTX-AV recipe from unet %r -- set "
+            "OTR_LTX_AV_RECIPE=sharp_lora|distilled_native|m0_base" % base,
+            kind="video")
+
+    @staticmethod
+    def _keep_set(terminal, rcfg):
+        """Residency keep-set for run_graph: unet + terminal, plus ONLY the model
+        head node that actually exists in this recipe's graph (distilled_native
+        has neither lora nor modelsampling -- keeping a missing node is a crash)."""
+        keep = {"unet", terminal}
+        if rcfg["use_lora"]:
+            keep.add("lora")
+        elif rcfg["use_modelsampling"]:
+            keep.add("modelsampling")
+        return keep
+
     def _weight_paths(self):
         """(label, full_path, floor_bytes) for each required weight artifact. The
         projection ckpt is ALWAYS required (LTXAVTextEncoderLoader reads it); the
@@ -243,7 +323,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
             ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
             ("audio VAE", _resolve("vae", self._audio_vae_name()), _FLOOR_AUDIO_VAE),
         ]
-        if _sharp_enabled():
+        if _recipe_config(self._recipe())["use_lora"]:
             paths.append(("distilled LoRA",
                           _resolve("loras", self._distilled_lora_name()), _FLOOR_LORA))
         return paths
@@ -274,6 +354,12 @@ class _LtxAvBase(_MC.MotionEngineBase):
                 "unavailable on this host (the LTX-AV lane fails closed rather "
                 "than run an unbounded heavy forward)"
                 % (self.name, _MC.dynamic_vram_ceiling_mb()), kind="video")
+        # 3b -- recipe resolution FIRST (fail-loud BEFORE node/weight gating):
+        #       a retired OTR_LTX_AV_SHARP, a bad OTR_LTX_AV_RECIPE, or an
+        #       unrecognized unet family RAISES here, at the gate, never mid-render
+        #       (CLAUDE.md NO FALLBACKS). _node_candidates + _weight_paths below
+        #       consult the same resolver, so the graph cannot drift from the gate.
+        self._recipe()
         # 4 -- node gate: every required ComfyUI class must resolve (lazy read)
         from . import wrapper_bridge as _wb
         missing = []
@@ -345,15 +431,17 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "i2v": ("LTXVImgToVideo",),
             "emptylatent": ("EmptyLTXVLatentVideo",),
         }
-        if _sharp_enabled():
-            # SHARP: the LoRA-wrapped unet feeds the guider; the fixed sigmas come
-            # from the in-adapter _SigmasFromValues injector -- ModelSamplingLTXV
-            # and LTXVScheduler are DROPPED (the LoRA + fixed shift replace them).
+        rcfg = _recipe_config(self._recipe())
+        if rcfg["use_lora"]:
+            # sharp_lora: the LoRA-wrapped unet feeds the guider; the fixed sigmas
+            # come from the in-adapter _SigmasFromValues injector.
             cands["lora"] = ("LoraLoaderModelOnly",)
-        else:
-            # M0 base pass: ModelSamplingLTXV + LTXVScheduler (no LoRA).
+        if rcfg["use_modelsampling"]:
+            # m0_base: ModelSamplingLTXV + LTXVScheduler (no LoRA, no manual sigmas).
             cands["modelsampling"] = ("ModelSamplingLTXV",)
             cands["sched"] = ("LTXVScheduler",)
+        # distilled_native: adds NEITHER -- the distilled unet feeds the guider
+        # directly + the in-adapter fixed sigmas (distillation baked into the GGUF).
         return cands
 
     def _build_graph(self, plan, length, width, height, audio_name, image_name):
@@ -368,13 +456,13 @@ class _LtxAvBase(_MC.MotionEngineBase):
         -> VAEDecodeTiled(video only; audio latent DROPPED, V-1)."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
-        sharp = _sharp_enabled()
+        rcfg = _recipe_config(self._recipe())
         positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
-        cfg = _LTX_AV_SHARP_CFG if sharp else _LTX_AV_CFG
-        sampler_name = _LTX_AV_SHARP_SAMPLER if sharp else "euler"
-        i2v_strength = _LTX_AV_SHARP_I2V_STRENGTH if sharp else _LTX_AV_I2V_STRENGTH
+        cfg = rcfg["cfg"]
+        sampler_name = rcfg["sampler"]
+        i2v_strength = rcfg["i2v_strength"]
         use_i2v = bool(image_name)
         g = {
             "unet": {"class": "unet", "inputs": {"unet_name": self._unet_name()}},
@@ -397,19 +485,24 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "noise": {"class": "noise", "inputs": {"noise_seed": seed}},
             "ksel": {"class": "ksel", "inputs": {"sampler_name": sampler_name}},
         }
-        # SHARP: distilled LoRA-wrapped unet feeds the guider (NO ModelSamplingLTXV
-        # -- ManualSigmas carries the shift, so it would double-shift). M0: the
-        # ModelSamplingLTXV-shifted unet feeds the guider (no LoRA).
-        if sharp:
+        # Model head -> guider, per recipe:
+        #   sharp_lora       : unet -> LoRA -> guider (the LoRA carries the shift;
+        #                      NO ModelSamplingLTXV or it would double-shift -> blur).
+        #   distilled_native : unet -> guider DIRECTLY (distillation baked into the
+        #                      GGUF -- no LoRA, no ModelSamplingLTXV).
+        #   m0_base          : unet -> ModelSamplingLTXV -> guider (no LoRA).
+        if rcfg["use_lora"]:
             g["lora"] = {"class": "lora", "inputs": {
                 "model": W("unet", 0),
                 "lora_name": self._distilled_lora_name(),
                 "strength_model": _LTX_AV_DISTILLED_LORA_STRENGTH}}
             model_wire = W("lora", 0)
-        else:
+        elif rcfg["use_modelsampling"]:
             g["modelsampling"] = {"class": "modelsampling", "inputs": {
                 "model": W("unet", 0), "max_shift": 2.05, "base_shift": 0.95}}
             model_wire = W("modelsampling", 0)
+        else:
+            model_wire = W("unet", 0)
         # i2v when an init image is present (the talk face ALWAYS; the scene still
         # for music/announcer beats); else the empty-latent t2v path.
         if use_i2v:
@@ -442,9 +535,10 @@ class _LtxAvBase(_MC.MotionEngineBase):
         g["guider"] = {"class": "guider", "inputs": {
             "model": model_wire, "positive": guider_pos,
             "negative": guider_neg, "cfg": cfg}}
-        # SHARP: the fixed LTX_DISTILLED_SIGMAS via the in-adapter injector ("sigmas"
-        # is added to the resolved-class map by render_clip). M0: LTXVScheduler.
-        if sharp:
+        # manual_sigmas (sharp_lora + distilled_native): the fixed
+        # LTX_DISTILLED_SIGMAS via the in-adapter injector ("sigmas" is added to the
+        # resolved-class map by render_clip). m0_base: LTXVScheduler.
+        if rcfg["manual_sigmas"]:
             g["sigmas"] = {"class": "sigmas",
                            "inputs": {"values": list(LTX_DISTILLED_SIGMAS)}}
             sigmas_wire = W("sigmas", 0)
@@ -481,7 +575,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
         latent is dropped at LTXVSeparateAVLatent; only the mux adds audio)."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
-        sharp = _sharp_enabled()
+        rcfg = _recipe_config(self._recipe())
         plan = self._build_render_request(request)
         if not plan["audio_path"]:
             raise _wb.GraphExecutionError(
@@ -492,9 +586,11 @@ class _LtxAvBase(_MC.MotionEngineBase):
                 % (self.name, plan["init_image"]))
         classes = dict(getattr(self, "_classes", None)
                        or _wb.resolve_graph_classes(self._node_candidates()))
-        if sharp:
-            # the SIGMAS source is in-adapter (not a registered node class);
-            # inject AFTER resolve so the resolver never sees it (mirrors eng_ltx_video)
+        if rcfg["manual_sigmas"]:
+            # the SIGMAS source is in-adapter (not a registered node class); inject
+            # AFTER resolve so the resolver never sees it (mirrors eng_ltx_video).
+            # Fires for BOTH sharp_lora and distilled_native (both run the fixed
+            # distilled sigmas) -- NOT just the LoRA path.
             classes.setdefault("sigmas", _SigmasFromValues)
         audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
         # i2v on ANY init image (the talk face; the scene still for music/announcer)
@@ -512,8 +608,10 @@ class _LtxAvBase(_MC.MotionEngineBase):
         # intermediates before the unet+VAE-decode peak so the GGUF unet (+ the LoRA
         # patch in sharp mode) never co-resides with the encoder (the 14.5 GB
         # ceiling). KEEP the unet + the model head (lora in sharp / modelsampling
-        # in M0) + the terminal so the patcher is never dangled.
-        keep = {"unet", self._TERMINAL, "lora" if sharp else "modelsampling"}
+        # in M0) + the terminal so the patcher is never dangled. distilled_native
+        # has NO head node, so _keep_set keeps only {unet, terminal} -- keeping a
+        # node that does not exist in the graph would crash run_graph.
+        keep = self._keep_set(self._TERMINAL, rcfg)
         with _ltx_av_vram_reserve():
             results = _wb.run_graph(graph, classes, free_after_use=True, keep=keep)
         images = results[self._TERMINAL][0]
