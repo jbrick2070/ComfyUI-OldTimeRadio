@@ -575,7 +575,13 @@ class _LtxAvBase(_MC.MotionEngineBase):
         latent is dropped at LTXVSeparateAVLatent; only the mux adds audio)."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
-        rcfg = _recipe_config(self._recipe())
+        recipe = self._recipe()
+        rcfg = _recipe_config(recipe)
+        # one LOUD line per beat so any render log self-documents the recipe that
+        # actually ran (recipe FOLLOWS THE MODEL) -- no need to infer it from the
+        # absence of a LoRA load.
+        _LOG.info("[OTR video] ltx_audio_in recipe=%s unet=%s",
+                  recipe, os.path.basename(str(self._unet_name())))
         plan = self._build_render_request(request)
         if not plan["audio_path"]:
             raise _wb.GraphExecutionError(
