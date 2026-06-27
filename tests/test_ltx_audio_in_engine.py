@@ -93,6 +93,33 @@ def test_ltx_audio_in_registered():
         assert "ltx_av_music" not in names
 
 
+def test_ltx_audio_in_videovae_is_split_enc_dec():
+    """VRAM headroom (roundtable 2026-06-26, docs/2026-06-26-ltx-av-vram-headroom):
+    the video VAE MUST be two distinct graph nodes -- an encode-side
+    ``videovae_enc`` feeding i2v and a decode-side ``videovae_dec`` feeding decode
+    -- so ``wrapper_bridge.run_graph``'s ``free_after_use`` drops the ~1.38 GB
+    encode VAE BEFORE the sampler activation peak, instead of pinning it through
+    the whole denoise loop. The OLD single shared ``videovae`` node fed BOTH i2v
+    AND decode, so the last-consumer free never fired until decode -> ~1.4 GB
+    stolen from the sampler -> the 6.84-vs-223 s/it sysmem-spill knife-edge. A
+    future re-merge to one node silently reintroduces the leak; this locks it."""
+    from nodes._otr_video_engines import wrapper_bridge as wb
+    eng = LtxAudioInEngine()
+    plan = {"text_prompt": "a vintage radio console", "seed": 1,
+            "target_frame_count": 49}
+    g = eng._build_graph(plan, 49, 512, 288, "voice.wav", "still.png")
+    # the leak signature -- a single shared "videovae" node -- must be GONE.
+    assert "videovae" not in g, "single shared videovae reintroduces the VRAM leak"
+    # two distinct VAELoader nodes (same class, different graph ids).
+    assert g["videovae_enc"]["class"] == "videovae"
+    assert g["videovae_dec"]["class"] == "videovae"
+    # i2v conditions on the ENC vae; decode on the DEC vae -- DISTINCT sources so
+    # free_after_use can reclaim the encode VAE before the sampler runs.
+    assert g["i2v"]["inputs"]["vae"] == wb.Wire("videovae_enc", 0)
+    assert g["decode"]["inputs"]["vae"] == wb.Wire("videovae_dec", 0)
+    assert g["i2v"]["inputs"]["vae"] != g["decode"]["inputs"]["vae"]
+
+
 if __name__ == "__main__":  # pragma: no cover
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))

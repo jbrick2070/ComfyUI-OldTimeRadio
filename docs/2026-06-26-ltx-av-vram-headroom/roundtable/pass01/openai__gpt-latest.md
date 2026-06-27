@@ -1,0 +1,49 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: no. Primary fix is directionally plausible, but the plan does not specify a real ComfyUI API/call site, and current `run_graph`/graph shape contradicts the assumed load/free ordering.
+
+MUST-FIX BEFORE BUILD:
+1. [Proposed fix primary / A] Defect: “model_management reserved-vram global / minimum_memory_required hint” is not an implementable API contract. No symbol, units, ownership, or semantics are specified in the plan or grounding. `eng_ltx_av.render_clip` only calls `_wb.run_graph(...)`; `wrapper_bridge.run_graph` has no parameter for VRAM reserve or model-load hints. Concrete fix: identify and code against one verified ComfyUI API, e.g. a version-checked context manager around the exact `comfy.model_management` attribute/function that affects model loading. If using a mutable global, save old value, add bytes/MiB with explicit units, restore in `finally`, and fail loud if the expected symbol is absent.
+
+2. [Proposed fix primary / A + eng_ltx_av.render_clip] Defect: scoping “strictly to `ltx_audio_in`” is not true if the implementation mutates a ComfyUI process-wide reserve global. ComfyUI Desktop can have other queued/in-process graph work; a global reserve change can affect unrelated engines while `ltx_audio_in` is rendering. Concrete fix: prefer a per-call ComfyUI loader hint if one exists. If only a global exists, guard the reserve + `_wb.run_graph(...)` region with a module-level `threading.RLock` shared by all OTR engines that might mutate/load models, and document that the lock intentionally serializes heavy model loads.
+
+3. [Grounding: wrapper_bridge._topo_order/run_graph vs Diagnosis/Proposed fix] Defect: the plan assumes “encode -> unet denoise -> tiled VAE decode” and that `free_after_use` evicts the encoder before the unet load/peak. The provided executor does not enforce that. `_topo_order` processes all initially-ready nodes together sorted by node id, so loader nodes with no dependencies (`audiovae`, `te`, `unet`, `videovae`, etc.) are scheduled before downstream consumers can free anything. `free_after_use` only deletes a source after a later consumer runs. Concrete fix: either split `ltx_audio_in` into explicit phases or add an executor scheduling mechanism that delays heavy loaders until their phase. At minimum, make the sampler/unet phase start only after text/audio/image latent prep outputs are materialized and unneeded encoders/VAEs are freed.
+
+4. [Open Q4 + eng_ltx_av._build_graph] Defect: Video VAE co-residency during denoise is not an open question; current graph keeps it alive through the sampler. `g["i2v"]` consumes `W("videovae", 0)` and `g["decode"]` also consumes `W("videovae", 0)`, so `run_graph`’s remaining-consumer count cannot free `videovae` until after `decode`. That means the ~1.38 GB VideoVAE must be included in the activation headroom calculation. Concrete fix: either size the reserve assuming VideoVAE is resident during the denoise loop, or split the graph so VideoVAE is loaded for I2V encode, freed before sampler, then reloaded for decode. AudioVAE can only be assumed freed before sampler after fixing execution order in item 3.
+
+5. [Invariants: “Stay within 14.5 GB measured ceiling guard” + eng_ltx_av.render_clip] Defect: the existing ceiling assert does not validate the failing peak. `render_clip` calls `_wb.reclaim_idle_models(...)` before `_MC.assert_vram_within_ceiling(...)`, so a 15.8 GB sampler peak can be hidden by post-decode reclaim. Concrete fix: add peak VRAM measurement around `_wb.run_graph(...)` itself, preferably NVML sampled before graph, during/after sampler, after decode, and before reclaim. Assert the max observed peak <= `_MC.dynamic_vram_ceiling_mb()` or the 14.5 GB invariant is not actually guarded.
+
+6. [Proposed fix primary / Open Q3] Defect: the headroom value is not specified enough to build or test. “~2-3 GB” and “1.5 / 2 / 3 GB” leave the implementor guessing and can cause either continued spill or excessive layer streaming. Concrete fix: add an env-configured integer, e.g. `OTR_LTX_AV_RESERVED_VRAM_MB`, default one value only, with bounds and logging. Acceptance should run a fixed sweep separately, but the committed workflow/code needs one default, one log line showing old/new reserve, and pass/fail criteria for per-step time and peak VRAM.
+
+7. [Proposed fix primary / wrapper_bridge.run_graph] Defect: errors during graph execution must restore the reserve, but the plan only says “finally block” at a high level. Because `render_clip` also stages inputs, encodes frames, retains patchers, reclaims, and asserts, the reserve scope must be exact. Concrete fix: wrap only the `_wb.run_graph(...)` call and any ComfyUI model load it triggers:
+   `with _ltx_av_vram_reserve(...): results = _wb.run_graph(...)`.
+   Do not leave the reserve raised through ffmpeg encode or post-decode reclaim.
+
+8. [Secondary B] Defect: `PYTORCH_CUDA_ALLOC_CONF` cannot be safely implemented from the shown files. It only takes effect before CUDA allocator initialization, but `eng_ltx_av.py` and `wrapper_bridge.py` are lazy-import GPU code, not guaranteed prestartup. Concrete fix: put this in the actual ComfyUI/OTR prestartup path before any `torch` import or CUDA probe. Add a startup log echoing the final env value before CUDA init. [ASSUMPTION] Verify the real prestartup file/path; it is not in the grounding.
+
+9. [Secondary B] Defect: allocator knob support is unspecified for `torch 2.10.0+cu130` on Windows. Setting unsupported `PYTORCH_CUDA_ALLOC_CONF` keys can warn, no-op, or fail depending on build. Concrete fix: default to only verified keys on the target box. Gate `expandable_segments` behind a runtime smoke test or an explicit opt-in env, and log whether PyTorch accepted the config. Do not claim B can create 2 GB of headroom without measurement.
+
+10. [Invariants / workflow wiring] Defect: “WIRED + ON in `workflows/otr_scifi_16gb_full.json`” conflicts with “pure runtime VRAM reserve may need no widget.” There is no data shape for a workflow setting, and no grounding excerpt for that JSON. Concrete fix: decide one activation surface. If env-only, add no workflow requirement and document the default. If workflow-controlled, define the widget/key name, type, default, and where `eng_ltx_av.render_clip` reads it. Verify: actual workflow schema.
+
+SHOULD-FIX:
+1. [Diagnosis] Defect: “driver silently spills to system RAM” is plausible but not proven by the code. The only hard evidence is `nvidia-smi` at 211 MiB free plus 33x slowdown. Concrete fix: add diagnostic logging for CUDA/sysmem fallback/OOM behavior if available, or at least log NVML free/used immediately before sampler, after sampler, and on exception. Keep the root-cause claim as “probable” until instrumented.
+
+2. [render_driver.classify_failure] Defect: real CUDA OOMs are not classified as OOM unless they are the synthetic `OomSignal`. `classify_failure` maps most runtime exceptions to `CRASH_BEFORE_LOAD`. With NVIDIA “prefer no fallback,” a true CUDA OOM may be mislabeled. Concrete fix: classify exceptions whose message/name contains `CUDA out of memory`, `OutOfMemoryError`, or PyTorch CUDA OOM type as `_rt.FailureKind.OOM`.
+
+3. [eng_ltx_av.render_clip] Defect: `reclaim_idle_models` after decode is outside a `finally`. If `_wb.run_graph`, frame conversion, or ffmpeg encode fails, the post-decode reclaim and ceiling check are skipped. Concrete fix: add a `finally` that performs best-effort `_wb.reclaim_idle_models(reason="%s failure cleanup" % self.name)` after any graph/encode failure, while preserving the original exception.
+
+4. [Proposed fix primary / performance] Defect: forcing partial load can produce deterministic but still bad layer-streaming latency. The plan lacks an upper latency acceptance threshold. Concrete fix: require a soak of consecutive `ltx_audio_in` beats with p50/p95 `s/it` thresholds and no single step above a defined cap, e.g. fail if any 512x288 8-step beat exceeds the selected budget.
+
+5. [Fallback C] Defect: Q2_K is described as a fallback but not wired into config or validation. `_unet_name()` defaults to Q3_K_M and only reads `OTR_LTX_AV_UNET`; `_weight_paths()` only sanity-checks size floors, not quant identity. Concrete fix: if C remains in scope, document exact operator step: download filename, set `OTR_LTX_AV_UNET=<q2 file>`, restart, and confirm floor checks still pass. Do not implement an automatic quant fallback because invariants reject fallbacks/quality loss.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add one log line in `eng_ltx_av.render_clip` with canvas, length, reserve MB, sharp mode, unet filename, and peak/free VRAM summary.
+- Add a CPU unit test for the reserve context manager restore-on-exception using a fake `model_management` object.
+- Add a GPU-only smoke script that renders two consecutive `ltx_audio_in` clips and emits per-step timing plus NVML peak.
+
+CUT THESE (over-engineering):
+1. [Secondary D] NVIDIA Control Panel “CUDA - Sysmem Fallback Policy” is not a code fix and cannot be reliably enforced by this repo. Keep it as operator diagnostic documentation only; do not block the build on it.
+
+2. [Secondary B] `expandable_segments` should be cut from the default implementation unless the target torch/Windows build is verified to accept and improve it. It is not required for the primary headroom fix and adds platform-specific failure/no-op risk.
+
+3. [Fallback C] Automatic Q2_K fallback should be cut. The invariant says no fallbacks and no quality loss; Q2_K is lossy and not present on disk. Keep it as a manual last-resort runbook step only.

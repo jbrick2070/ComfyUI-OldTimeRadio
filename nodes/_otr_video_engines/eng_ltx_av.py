@@ -338,8 +338,8 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "cond": {"class": "cond", "inputs": {
                 "positive": W("pos", 0), "negative": W("neg", 0),
                 "frame_rate": float(self.target_fps)}},
-            "videovae": {"class": "videovae",
-                         "inputs": {"vae_name": self._video_vae_name()}},
+            "videovae_dec": {"class": "videovae",
+                             "inputs": {"vae_name": self._video_vae_name()}},
             "audiovae": {"class": "audiovae",
                          "inputs": {"vae_name": self._audio_vae_name()}},
             "loadaudio": {"class": "loadaudio", "inputs": {"audio": audio_name}},
@@ -365,9 +365,19 @@ class _LtxAvBase(_MC.MotionEngineBase):
         # for music/announcer beats); else the empty-latent t2v path.
         if use_i2v:
             g["loadimage"] = {"class": "loadimage", "inputs": {"image": image_name}}
+            # VideoVAE split (roundtable 2026-06-26, VRAM headroom): a SEPARATE
+            # encode-side VAE node so run_graph's free_after_use drops its ~1.38 GB
+            # right after i2v -- BEFORE the sampler activation peak -- instead of
+            # pinning it through the whole denoise loop. The single shared
+            # "videovae" used to feed BOTH i2v AND decode, so the last-consumer
+            # free never fired until decode -> ~1.4 GB stolen from the sampler ->
+            # sysmem spill (the 6.84-vs-223 s/it knife-edge). decode reloads the
+            # VAE (cache-warm) after the peak. Same class, distinct graph node.
+            g["videovae_enc"] = {"class": "videovae",
+                                 "inputs": {"vae_name": self._video_vae_name()}}
             g["i2v"] = {"class": "i2v", "inputs": {
                 "positive": W("cond", 0), "negative": W("cond", 1),
-                "vae": W("videovae", 0), "image": W("loadimage", 0),
+                "vae": W("videovae_enc", 0), "image": W("loadimage", 0),
                 "width": int(width), "height": int(height), "length": int(length),
                 "batch_size": 1, "strength": i2v_strength}}
             video_latent = W("i2v", 2)
@@ -401,7 +411,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
         g["separate"] = {"class": "separate",
                          "inputs": {"av_latent": W("sampler", 0)}}
         g["decode"] = {"class": "decode", "inputs": {
-            "samples": W("separate", 0), "vae": W("videovae", 0),
+            "samples": W("separate", 0), "vae": W("videovae_dec", 0),
             "tile_size": 512, "overlap": 64,
             "temporal_size": 64, "temporal_overlap": 8}}
         return g
