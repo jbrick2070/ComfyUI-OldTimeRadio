@@ -69,13 +69,15 @@
 >   clip -> `otr\episodes\_bakeoff_wan\<quant>.mp4`. **FAILURE CRITERION:** if a GGUF quant needs node substitutions
 >   BEYOND `UnetLoaderGGUF` + the model path -> DOCUMENT and STOP before wiring (don't let the lane sprawl). WAN22
 >   gotcha: ComfyUI + ComfyUI-GGUF must support `WAN22` (confirm; OTR runs wan_ti2v so likely OK IF already GGUF).
-> - **TIERED ENGINE POLICY (operator design 2026-06-26; ENCODE only AFTER the bakeoff proves the quants):** select the
->   video engine by VRAM CLASS, matching the model-agnostic platform: **LTX 2.3 audio-in = 12-16GB+** (quality / A2V);
->   **Wan TI2V-5B i2v = 8-12GB** (image-to-video); **Wan TI2V-5B t2v-LOW (no image input, low frames/res) = under-8GB
->   SURVIVAL/DRAFT/compatibility lane ONLY**. NOTE the t2v-low lane has NO still-image anchoring -> it does NOT carry
->   OTR's character/scene stills, so it is a "does it run on weak hardware" portability lane, NOT a production look --
->   lowest priority. Wires as wan_ti2v sub-modes (i2v vs t2v_low); the under-8 lane is future-proofing, not for this
->   16GB operator's daily renders (LTX-audio + Wan-i2v are the production pair).
+> - **TIER COVERAGE AUDIT (operator clarification 2026-06-26 -- the GOAL is COVERAGE, NOT auto-selection):** the point
+>   is to confirm the model-agnostic platform has a PROVEN/viable engine OPTION at each VRAM class (the operator PICKS
+>   per hardware; NO auto-selector is being built). Map by CAPABILITY x VRAM: **audio-driven SCENE / A2V** = LTX 2.3
+>   audio-in (22B, 12-16GB; distilled-1.1 bakeoff = smallest-viable; under-8GB is the OPEN GAP -- LTX is just big).
+>   **image-to-video** = Wan TI2V-5B (native 8-12GB / Q3 mid / Q2_K under-8 via the Wan bakeoff; t2v-only = no-anchor
+>   draft/compat floor). **audio-driven FACE (lip-sync)** = HuMo -- ALREADY PROVEN, no work: HuMo-1.7B = the LOW-VRAM
+>   face option (~3-4GB peak), HuMo-14B = the high-quality opt-in. **draft/floor (no model, any VRAM)** = visualizer /
+>   still_parallax (procgen). COVERAGE is solid EXCEPT under-8GB A2V; the LTX + Wan bakeoffs just fill the
+>   smallest-viable cells. This is a CHECKLIST of options-per-tier, NOT a runtime auto-picker.
 >
 > **>>> PRIOR STEP -- 2026-06-26 (CODER: LTX audio-in CONSOLIDATION COMPLETE -- Chunk 1 + Chunk 2 SHIPPED (one
 > ltx_audio_in engine; ltx_av_talk/ltx_av_music DELETED), overnight soak RUNNING. origin/v2.0-alpha HEAD
