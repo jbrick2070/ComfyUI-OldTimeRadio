@@ -39,16 +39,30 @@ The skill currently does `CODEX_CMD = ["codex", "exec"]` and captures stdout, wi
 (Codex must be on PATH, or use the full exe at
 `C:\Users\jeffr\AppData\Local\OpenAI\Codex\bin\<hash>\codex.exe`.)
 
-## AntiGravity (agy) reality on this box -- do NOT rely on it headless
-`agy` is installed + signed in (jbrick2070@gmail.com, Google AI Pro) and the INTERACTIVE CLI
-works. But headless `agy -p` with a captured/redirected stdout returns EMPTY (exits 0, writes
-nothing to the pipe) -- tested with `-p`, `--new-project -p`, sessions killed, repo cwd, patient
-wait. Its `--print` answer goes to the TUI/session store, not a pipe (a TTY requirement). So:
-- roundtable-local's automated panel = **Codex only** on this machine.
-- AntiGravity contributes the second voice by being run in its INTERACTIVE window (or the IDE) and
-  the result pasted in -- exactly how Gemini's review reached the 2026-06-27 convergence.
-- Full agy automation later would need a ConPTY/winpty bridge or an agy build with a file-output
-  flag.
+## AntiGravity (agy) headless -- SOLVED via the FILE-HANDOFF protocol (proven 2026-06-27)
+`agy` is installed + signed in (jbrick2070@gmail.com, Google AI Pro). Its `--print`/`-p` SWALLOWS
+stdout when redirected on Windows (needs a real TTY) -- capturing stdout fails (exit 0, empty),
+tested every way (`-p`, `--new-project`, sessions killed, repo cwd, patient wait). The FIX: agy is
+an AGENT, so instruct it IN THE PROMPT to WRITE its review to a file with its own write tool, then
+read that file -- stdout is never used. PROVEN: `agy --dangerously-skip-permissions -p "...write
+AGY_FILE_OK to <file> then stop..."` -> the file contained `AGY_FILE_OK`, exit 0.
+
+Runner: `scripts/run_agy_agent.ps1` (reads prompt_agy.md, appends the strict write directive, runs
+agy with skip-permissions, reads agy_final.md; success = exit 0 AND file exists; `-Worktree` for
+hard isolation).
+
+Of the three proposed bypasses: **#3 file-handoff WORKS**; #1 `| clip` does NOT (still a stdout
+redirect -> empty); #2 log-scraping is an untested, fragile fallback.
+
+SAFETY: file-handoff needs `--dangerously-skip-permissions` (UNSANDBOXED agent). Mitigate with the
+review-only prompt directive + the git-committed repo (any stray edit shows in `git status`, is
+revertible) + optional `-Worktree` (agy runs in a throwaway checkout, can't touch your real tree).
+Codex's `--sandbox read-only` is a HARDER guarantee, so Codex stays the primary lane; agy is the
+real second voice.
+
+So /roundtable-local now has a true 2-agent HEADLESS local panel on this box: Codex
+(run_codex_agent.ps1) + AntiGravity (run_agy_agent.ps1). Claude still writes its own grounded
+anchor and is the sole judge.
 
 ## How to actually update the saved skill
 Claude (Cowork) CANNOT persist edits to the saved `roundtable-local` skill from a chat session --
