@@ -15,10 +15,10 @@
 > visual eyeball (unsharp 0.4 vs 0.8, the i2v-0.62 stutter).** VRAM-fit is ALREADY de-risked: the bakeoff directly
 > measured the whole-clip 4096/8 decode at 14338 MB < 14500 and VRAM-NEUTRAL vs tiled (14338 vs 14337).
 >
-> **>>> JOB 2 IN PROGRESS (story-quality build, plan docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md).
-> HEAD `138a8531` == origin/v2.0-alpha. Step 0 baseline scan DONE (15 legs -> docs/2026-06-27-story-quality/
-> r3_pre.{json,md}; frostbite shows the ds_source=fallback dignity defect). THREE items SHIPPED + PUSHED, each
-> green vs the same 5 pre-existing 267a53e fails + Bug Bible 16/7/3:**
+> **>>> JOB 2 COMPLETE -- story-quality gate-seam cluster fully SHIPPED (plan docs/2026-06-27-story-quality/
+> STORY_QUALITY_BUILD_PLAN.md). HEAD `88001ff2` == origin/v2.0-alpha. Step 0 baseline scan DONE (15 legs ->
+> docs/2026-06-27-story-quality/r3_pre.{json,md}). The early three items SHIPPED + PUSHED, each green vs the same 5
+> pre-existing 267a53e fails + Bug Bible 16/7/3:**
 > - **3.1 dignity guard** `0c7ff6d4` -- is_nonownable_story_object + derive_safe_fallback_term in
 >   _otr_dramatic_state_llm._fallback_state (no ownership templates over people/protected-identity; stamps
 >   meta.dramatic_state_fallback_term[_replaced]); secondary people-class skip in _otr_specificity.derive_central_object.
@@ -28,26 +28,32 @@
 >   NEAR-duplicates (overlap >= 0.5), reassigns from the contrasting pool; deterministic, replay-parity preserved.
 >   (3.7 SCAN counters + flag_low_register_divergence + the optional line-level reroll deferred to the 3.2 seam.)
 >
-> **>>> REMAINING JOB 2 = the 3.2 GATE-SEAM CLUSTER (the hard, interdependent core). NEXT STEP = 3.2:** build the
-> shared `_quality_flags_for_line` scorer at compose_line ~L2364 + flag_anchor_stuffing / flag_one_breath /
-> extract_specificity_anchors_from_header in _otr_line_hygiene; THEN 3.3 (stage-action leak: is_whole_line_stage_action
-> + the BN-1 dialogue-opener guard), 3.4 (expand _CLICHE_RES + re-verify-after-reroll), 3.5 (coda counters), then the
-> story_quality_scan.py counter plumbing + the deferred 3.6/3.7 flag halves. **CRITICAL RISK = MF-1: thread ALL FOUR
-> recursion guards (_stage_dir_repair_attempted, _quality_repair_attempted, _leak_repair_attempted,
-> _stage3_repair_attempted) on EVERY recursive compose_line call -- the FOUR sites are clean-quality (~L2415),
-> leak-floor (L2498), Stage-3 (L2592, today passes ONLY _stage3_repair_attempted), and the draft.** Q7 budget default
-> <=4 (do NOT force <=3). Honor MF-2 (coda truncation via clean_one_line(brief,0) vs (brief,_CODA_FACT_MAX)), MF-3
-> substring anchors, MF-5 single-scorer v2-gating (3.2+3.6 v2-gated; cliche/stage/nose always-on; coda never enters),
-> MF-6 flag-once, W-F v2-flag threading. This cluster touches production line-composition control flow -- build it in a
-> focused window with full budget + the suite/Bug-Bible/B7/cast-replay-parity gate per chunk. prod/main + tags GATED.
-> **>>> THE PLAN IS BUILD-READY -- CODE IT, do NOT re-roundtable.** STORY_QUALITY_BUILD_PLAN.md is R1->R4 CONVERGED
-> with the R4 verdict "GO for coder handoff"; every MF-* is a local one-liner folded at coding time (no design change,
-> no build-order change). The next window is a CODER window: prove comprehension of the CURRENT STEP, then BUILD 3.2 ->
-> 3.3 -> 3.4 -> 3.5 -> scan-plumbing -> deferred 3.6/3.7 flag halves in order, committing per green chunk to v2.0-alpha
-> (operator pre-approved the build). Read STORY_QUALITY_BUILD_PLAN.md sections 3.2/W-A..W-H/R4 IN FULL first; the four
-> compose_line recursion sites are in nodes/_otr_line_composer.py (clean-quality ~L2415, leak-floor L2498, Stage-3
-> L2592, draft inside compose_line_draft); the new detectors go in nodes/_otr_line_hygiene.py; scan counters in
-> scripts/story_quality_scan.py. Already DONE this baton: 3.1/3.6/3.7 (don't rebuild them).
+> **>>> JOB 2 GATE-SEAM CLUSTER -- SHIPPED + PUSHED 2026-06-27. HEAD `88001ff2` == origin/v2.0-alpha. All six chunks
+> green vs the SAME 5 pre-existing 267a53e workflow-pin fails (stash-proven on a clean tree -- zero new failures) +
+> Bug Bible 16/7/3 + B7 sweep + cast-replay-parity:**
+> - **3.2** `cf12c127` -- shared `_quality_flags_for_line` scorer (MF-5) at the compose_line clean-quality gate +
+>   flag_anchor_stuffing / flag_one_breath / extract_specificity_anchors_from_header in _otr_line_hygiene; W-D hint
+>   (top-1, anchor+one_breath collapse, 240 cap); Q7 budget default <=4. **MF-1 DONE: all four recursion guards
+>   (_stage_dir/_quality/_leak/_stage3) now thread on EVERY recursive compose_line call -- the clean-quality, leak-floor,
+>   AND Stage-3 sites were fixed (Stage-3 previously passed ONLY _stage3).** Flag-OFF byte-identical.
+> - **3.3** `a0ec12e3` -- is_whole_line_stage_action (BN-1 dialogue-opener guard + contraction guard) wired into the
+>   existing detect_stage_business_for_reroll draft path (reason `whole_line_action`).
+> - **3.4** `0a3830c7` -- _CLICHE_RES expanded (pronoun-generalized + hangs-in-the-balance/over-my-dead-body/etc.) +
+>   re-verify-after-reroll: keep the fewer-defect draft (original on tie), stamp `quality_reroll_degraded`.
+> - **3.5** `d63d87c9` -- _news_coda_fact_flags stamps `news_coda_truncated` (MF-2 clean_one_line compare; coda fact
+>   NEVER trimmed -- measurement-only).
+> - **scan plumbing + deferred 3.6/3.7 flag halves** `88001ff2` -- story_quality_scan.r3_quality_metrics (all W-C
+>   counters; MF-4 r2_helpers_loaded + a guard test); composer stamps `quality_residual:<code>`; flag_personal_cost_
+>   boilerplate (3.6) wired into scorer+scan; flag_low_register_divergence (3.7) added. r3_pre re-baselined on the 15
+>   signal_lost legs: anchor-stuffing 10, one-breath 25, stage-action 2, ownership-on-people 1, coda-fallback 5.
+>
+> **>>> NEW CURRENT STEP = operator VALIDATION SOAK (GPU/operator-gated):** render a FRESH episode with
+> `story_quality_v2_enabled=True` (RESTART ComfyUI first -- module cache; .py edits don't load live), then re-run
+> `scripts/story_quality_scan.py` on the new ledgers and confirm the gate-seam counters DROP vs r3_pre (target per
+> W-H: ownership_template_on_nonownable_count==0, stage_action_leak_lines==0, personal_cost_boilerplate_lines==0,
+> news_coda_mojibake_count==0, news_coda_truncated_count==0, speech_signature_near_duplicate_count==0, anchor-stuffing/
+> one-breath trending down, quality_residual not increasing). The BUILD is complete + measurement-ready; this is a
+> measurement/eyeball pass, not code. prod/main + tags GATED. Plan: docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md.
 >
 > - **JOB 1 (FIRST) -- LTX winner-wire.** Operator PICK = whole-clip decode 4096/8 + lanczos+unsharp 0.4 + canvas
 >   512x288 + i2v0.75 native (PROVISIONAL -- commit-note it's the recommended pick; operator eyeballs the final clip
