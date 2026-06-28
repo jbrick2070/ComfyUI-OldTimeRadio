@@ -846,18 +846,22 @@ _ENRICH_ROLES = frozenset(
     {BEAT_ROLE_SETUP, BEAT_ROLE_PRESSURE, BEAT_ROLE_PERSONAL_STAKE}
 ) | CLIMAX_CLASS_ROLES
 
-# Per-role tail templates ({obj} = conflict_object, {cost} = personal_cost). The
-# IRREVERSIBLE_CHOICE + PERSONAL_STAKE strings are unchanged from the pre-KILL-4
-# behavior, so those two roles enrich byte-identically.
+# Per-role tail templates ({obj} = conflict_object). 3.6 (story-quality R2): the
+# {cost} clause (personal_cost) was DROPPED from all five tails that carried it
+# -- it homogenized nearly every beat ("the trust they will lose either way" rode
+# almost everything and leaked into a spoken line). W-E (judge): DROP, do not
+# replace with a generic cost phrase (that re-homogenizes). Each tail now anchors
+# ONLY to the concrete {obj}; personal_cost stays in the SQ dict for telemetry but
+# is never formatted into a tail.
 _ENRICH_TAILS: Dict[str, str] = {
     BEAT_ROLE_SETUP:
         "the scene is set: {obj} is already in play before the pressure builds",
     BEAT_ROLE_PRESSURE:
-        "the pressure tightens around {obj}, and {cost} now rides on it",
+        "the pressure tightens around {obj}",
     BEAT_ROLE_PERSONAL_STAKE:
-        "what is personally at stake: {cost}",
+        "what is personally at stake turns on {obj}",
     BEAT_ROLE_IRREVERSIBLE_CHOICE:
-        "on-stage, the decision about {obj} is made now, costing {cost}",
+        "on-stage, the decision about {obj} is made now",
     BEAT_ROLE_REVELATION:
         "on-stage, the truth about {obj} comes to light now",
     BEAT_ROLE_REVERSAL:
@@ -869,9 +873,9 @@ _ENRICH_TAILS: Dict[str, str] = {
     BEAT_ROLE_BITTERSWEET_PARTING:
         "on-stage, they part over {obj} -- gaining and losing in one breath",
     BEAT_ROLE_IRONIC_TWIST:
-        "the outcome of {obj} lands with an ironic turn, costing {cost}",
+        "the outcome of {obj} lands with an ironic turn",
     BEAT_ROLE_QUIET_ACCEPTANCE:
-        "on-stage, they quietly accept what {obj} has cost: {cost}",
+        "on-stage, they quietly accept what {obj} has come to",
     BEAT_ROLE_CONFESSION:
         "on-stage, the truth about {obj} is confessed aloud now",
 }

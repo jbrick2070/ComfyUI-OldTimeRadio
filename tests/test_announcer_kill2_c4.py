@@ -77,26 +77,36 @@ class TestEnrichTail:
     def test_consequence_role_gets_no_tail(self):
         assert L12._enrich_tail("thin", L12.BEAT_ROLE_CONSEQUENCE, self.SLOT, self.FC) == ""
 
+    def test_no_role_tail_ever_emits_personal_cost(self):
+        """3.6: the personal_cost boilerplate must NEVER ride a tail (it
+        homogenized nearly every beat -- 'her good name' here stands in for the
+        live 'the trust they will lose either way')."""
+        for role in L12._ENRICH_TAILS:
+            tail = L12._enrich_tail("thin", role, self.SLOT, self.FC)
+            assert "her good name" not in tail, role
 
-class TestEnrichIntentByteIdentical:
-    """The two pre-KILL-4 roles must still produce the EXACT prior enrichment."""
 
-    def test_irreversible_choice_unchanged(self):
+class TestEnrichIntentCostDropped:
+    """3.6 (story-quality R2): the {cost} (personal_cost) clause is DROPPED from
+    every tail -- it homogenized nearly every beat. Each enrichment now anchors
+    ONLY to the concrete object; personal_cost never appears in the tail."""
+
+    def test_irreversible_choice_no_cost_clause(self):
         out = L12._enrich_intent(
             "short", L12.BEAT_ROLE_IRREVERSIBLE_CHOICE,
             {"conflict_object": "the red ledger"}, {"personal_cost": "her good name"},
         )
-        assert out == (
-            "short; on-stage, the decision about the red ledger is made now, "
-            "costing her good name"
-        )
+        assert out == "short; on-stage, the decision about the red ledger is made now"
+        assert "her good name" not in out
+        assert "costing" not in out
 
-    def test_personal_stake_unchanged(self):
+    def test_personal_stake_no_cost_clause(self):
         out = L12._enrich_intent(
             "short", L12.BEAT_ROLE_PERSONAL_STAKE,
             {"conflict_object": "the key"}, {"personal_cost": "his freedom"},
         )
-        assert out == "short; what is personally at stake: his freedom"
+        assert out == "short; what is personally at stake turns on the key"
+        assert "his freedom" not in out
 
 
 class TestTruncationClamp:
