@@ -1,6 +1,42 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 JOB 3 ROUTE-A CODE SHIPPED + PUSHED `af88f059` == origin/v2.0-alpha. prod/main +
+> **>>> CURRENT STEP -- 2026-06-28 ROUTE-A 14B PROMOTION SHIPPED + LIVE-VALIDATED + EXTENDED. HEAD `a919d2ad` ==
+> origin/v2.0-alpha. prod/main + tags GATED.** The HuMo-14B promotion is DONE and PROVEN on the real workflow, plus
+> operator-directed extensions. Trail: `af88f059` Route-A core -> `02c31b9a` plan -> `cee68422` announcer+music ALSO
+> on humo_14B_169 (operator: 14B on all 3 audio roles) -> `0439b1ce` radio-face music bookend + looping credits ->
+> `a919d2ad` README refresh.
+> - **Route-A LIVE-VALIDATED:** a 30-word episode rendered END-TO-END on the real workflow (queue_smoke --profile
+>   16gb_full) -> `output/otr/obs/signal_lost_glass_shattering_secrets_20260628_031838_..._final.mp4` (48MB,
+>   audio_byte_identical OK). ALL 6 beats rendered on `humo_14B_169` (music bookend + 2 announcer + 3 character),
+>   ZERO OOM (~15.9GB thin-headroom, single-resident). Operator eyeball: "perhaps the best video my project has seen."
+> - **14B on ALL 3 AUDIO roles** (announcer/music/character): node 87 widgets + 16gb_full role_overrides both =
+>   humo_14B_169 (per-role slots WIN over the legacy other_beats fallback, so humo_1.7B can never be auto-picked for
+>   character). scene_broll=wan_ti2v / background_abstract=ltx_video (PROVISIONAL; operator may eyeball/swap).
+> - **MUSIC BOOKEND fix (eng radio-face):** the instrumental music bookend (char_id="" -> no portrait, no per-line
+>   voice) used to ABORT humo (needs audio_ref+init_image, no fallbacks). FIXED: a committed custom radio-FACE still
+>   `assets/radio_face_bookend.png` (env OTR_RADIO_BOOKEND_IMAGE) as init_image + a targeted call-site condition feeds
+>   it the bounded master THEME slice as audio_ref (NOT by broadening _uses_ambient_master_audio -- character humo
+>   keeps its OWN voice). HuMo is now never starved on any of the 3 audio roles.
+> - **Credits music LOOP (procgen layer):** video_engine credits cue now LOOPS (seam crossfade) to fill the credits
+>   instead of fade-then-silence (env OTR_CREDITS_MUSIC_LOOP=0 reverts). **CAVEAT/OPEN:** this is the PROCGEN audio,
+>   which the final mux DISCARDS -- the final episode uses the frozen master mix (mux-LAST, byte-identical), and the
+>   credits scroll (video ~77s) outlasts the master audio (~56s) -> ~21s SILENT credits. The real fix (extend the
+>   master's closing theme to cover the credits) TOUCHES THE FROZEN AUDIO SPINE + re-baselines test_audio_byte_identical
+>   -> OPERATOR-GATED, NOT done. Flagged for review.
+> - **GREEN:** full suite = only the SAME 6 pre-existing workflow-pin/b7 fails (stash-PROVEN zero new); Bug Bible
+>   16/7/3; workflow validator + 19-slot widget audit clean; AST/no-BOM/JSON clean. New tests
+>   tests/test_route_a_14b_promotion.py (13). Test pins updated for Route-A (two_heavy_roles announcer; legacy-audit
+>   Director->OTR_VideoDirector wording).
+> - **OVERNIGHT SOAK RUNNING (2026-06-28 ~03:40, ~8h):** `_otr_overnight_420_soak.py` (now env-configurable;
+>   gitignored run script) launched LOCAL-ONLY (no spend), 420-720w random, indextts2, ALL-VISUALIZER fast floor:
+>   announcer/music/character=visualizer (no still) + scene_broll/background=still_kenburns (both consumes_still=False
+>   -> ZERO stills minted -> no FLUX/z-image gen -> fast volume). Finals -> otr/obs for the team. Log:
+>   docs/2026-06-28-route-a-live/overnight_soak.log.
+> - **README refreshed** (a919d2ad): accurate + newbie + trimmed 669->~170 lines.
+> - **NEXT (operator):** (a) eyeball the soak batch in otr/obs; (b) decide the 2 PROVISIONAL scene/bg engine picks;
+>   (c) greenlight the credits-music-in-master fix (frozen-spine, re-baseline); (d) prod/main promotion stays GATED.
+>
+> **>>> PRIOR STEP -- 2026-06-28 JOB 3 ROUTE-A CODE SHIPPED + PUSHED `af88f059` == origin/v2.0-alpha. prod/main +
 > tags GATED.** The HuMo-14B promotion (per `kibitz-runs/2026-06-28-promote-14b/final.md`) is BUILT, wired, green,
 > committed and pushed. ROUTE-A landed in ONE change: a shared role->slot map (`nodes/_otr_shared/role_slots.py`) splits
 > the legacy `other_beats_video_model` slot into per-role `character_video_model` / `scene_broll_video_model` /
