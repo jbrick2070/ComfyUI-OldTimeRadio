@@ -33,8 +33,18 @@
 >   -> ZERO stills minted -> no FLUX/z-image gen -> fast volume). Finals -> otr/obs for the team. Log:
 >   docs/2026-06-28-route-a-live/overnight_soak.log.
 > - **README refreshed** (a919d2ad): accurate + newbie + trimmed 669->~170 lines.
-> - **NEXT (operator):** (a) eyeball the soak batch in otr/obs; (b) decide the 2 PROVISIONAL scene/bg engine picks;
->   (c) greenlight the credits-music-in-master fix (frozen-spine, re-baseline); (d) prod/main promotion stays GATED.
+ - **>>> NEXT SESSION (operator-directed 2026-06-28) = 3-WAY STORY-QUALITY KIBITZ.** Run `/kibitz` (Codex `codex exec`
+>   + AntiGravity `agy -p` + Claude as the code-grounded panelist AND judge) on STORY QUALITY, using the OVERNIGHT
+>   all-visualizer soak batch as the evidence: read the rendered episodes + ledgers in `output/otr/obs` +
+>   `output/otr/episodes/<ep>/audio/*_ledger.json` + the soak roll-up `scripts/_otr_overnight_420_soak.jsonl` /
+>   `_summary.json`. GOAL: converge a build-ready STORY-CODING update plan (writer / composer / critic / dramatic-state
+>   CONTENT only -- CPU, NO workflow JSON, NO GPU; this is the operator-directed exception to the parked
+>   story-pipeline). Claude writes its own grounded review FIRST, grounds the two agents' claims vs the real Windows
+>   files (Desktop Commander), discards misreads, synthesizes; r1 arc -> r2 coding -> r3 wiring -> r4 convergence.
+>   Then build the converged content changes default-OFF/byte-identical-when-able, full suite + Bug Bible per chunk.
+> - **ALSO open (operator):** (a) eyeball the soak batch in otr/obs; (b) decide the 2 PROVISIONAL scene/bg engine
+>   picks (wan_ti2v / ltx_video); (c) greenlight the credits-music-in-master fix (frozen-spine, re-baseline);
+>   (d) prod/main promotion stays GATED.
 >
 > **>>> PRIOR STEP -- 2026-06-28 JOB 3 ROUTE-A CODE SHIPPED + PUSHED `af88f059` == origin/v2.0-alpha. prod/main +
 > tags GATED.** The HuMo-14B promotion (per `kibitz-runs/2026-06-28-promote-14b/final.md`) is BUILT, wired, green,
