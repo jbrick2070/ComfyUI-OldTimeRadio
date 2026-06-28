@@ -778,6 +778,244 @@ def flag_objective_literal(text: Any, beat_objective: Any) -> "tuple[bool, str]"
         return False, ""
 
 
+# ---------------------------------------------------------------------------
+# 3.2 (story-quality, 2026-06-27) -- anchor-stuffing + one-breath gates (FLAG
+# ONLY; v2-gated + character-only at the composer). The weak-writer failure is a
+# line that crams every specificity anchor + every clause into one unsayable
+# breath. These read the SAME injected "Specificity anchors (...)" block the
+# writer appends to the canon_header (_otr_specificity.inject_anchors_into_header)
+# so the engine and the scan agree. Pure, deterministic, never raise.
+# ---------------------------------------------------------------------------
+
+#: Prefix that marks the injected specificity-anchor block in a canon_header.
+#: Kept as a lowercase substring so a minor wording drift in the writer's block
+#: head does not silently zero the parse (matched case-insensitively).
+_ANCHOR_BLOCK_PREFIX = "specificity anchors"
+
+
+def extract_specificity_anchors_from_header(canon_header: Any) -> "list[str]":
+    """Parse the bullet anchors out of the injected "Specificity anchors (...)"
+    block of a canon_header, in HEADER ORDER (no `LineRequest` field). Returns
+    ``[]`` when the block is absent / empty. Pure; deterministic; never raises."""
+    try:
+        s = "" if canon_header is None else str(canon_header)
+        if not s:
+            return []
+        anchors: list[str] = []
+        in_block = False
+        for raw in s.splitlines():
+            stripped = raw.strip()
+            if not in_block:
+                if stripped.lower().startswith(_ANCHOR_BLOCK_PREFIX):
+                    in_block = True
+                continue
+            if stripped.startswith("- "):
+                item = stripped[2:].strip()
+                if item:
+                    anchors.append(item)
+            elif not stripped:
+                break          # a blank line closes the block
+            else:
+                break          # a non-bullet line closes the block
+        return anchors
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def flag_anchor_stuffing(
+    text: Any, anchors: Any, *, threshold: int = 3,
+) -> "tuple[bool, str]":
+    """(flagged, hint): a single character line crams ``>= threshold`` DISTINCT
+    specificity anchors. Plain casefold-substring match (MF-3: key_terms carry
+    "41.3 degrees C", "837/835", hyphens -- they match literally). The hint lists
+    the present anchors in header order. Pure; never raises."""
+    try:
+        s = str(text or "")
+        if not s.strip():
+            return False, ""
+        low = s.casefold()
+        seen: set = set()
+        present: list[str] = []
+        for a in (anchors or ()):
+            a = str(a or "").strip()
+            if not a:
+                continue
+            key = a.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            if key in low:
+                present.append(a)
+        if len(present) >= threshold:
+            return True, (
+                "anchor-stuffing: this one line carries "
+                f"{len(present)} concrete anchors ({', '.join(present)}) -- keep "
+                "at most one and let the others live in other lines"
+            )
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
+#: A soft word ceiling: above this AND with excessive clause nesting trips the
+#: one-breath gate even before the hard ceiling.
+_ONE_BREATH_SOFT_WORDS = 22
+_CLAUSE_MARK_RE = re.compile(r"[,;]")
+_CLAUSE_CONJ = frozenset({
+    "and", "but", "or", "so", "then", "while", "because", "which", "that", "as",
+    "though", "although", "whereas",
+})
+
+
+def flag_one_breath(
+    text: Any, *, max_words: int = 28, max_clause_markers: int = 3,
+) -> "tuple[bool, str]":
+    """(flagged, hint): the line is too long / too nested to say in one spoken
+    breath -- ``> max_words`` words, OR ``> _ONE_BREATH_SOFT_WORDS`` words with
+    ``>= max_clause_markers`` comma/semicolon/conjunction breaks. Pure; never
+    raises."""
+    try:
+        s = " ".join(str(text or "").split())
+        if not s:
+            return False, ""
+        words = re.findall(r"[A-Za-z']+", s)
+        n = len(words)
+        if n > max_words:
+            return True, (
+                f"one-breath: {n} words is too long to speak in a single breath "
+                "-- cut it to one short spoken clause"
+            )
+        if n > _ONE_BREATH_SOFT_WORDS:
+            marks = len(_CLAUSE_MARK_RE.findall(s))
+            conj = sum(1 for w in words if w.lower() in _CLAUSE_CONJ)
+            if marks + conj >= max_clause_markers:
+                return True, (
+                    f"one-breath: {n} words across {marks + conj} clauses -- "
+                    "break it into fewer, shorter spoken beats"
+                )
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
+# ---------------------------------------------------------------------------
+# 3.3 (story-quality, 2026-06-27) -- whole-line stage-action leak detector.
+#
+# Broadens the leak net beyond the verb-whitelisted is_third_person_action_clause
+# (<=12 words, lead must be a _NARRATION_VERBS verb): a WHOLE character line that
+# is an impersonal 3rd-person action chain ("snaps off pen's tip, jams it into
+# the port, turning it into scrap metal") with NO 1st/2nd-person pronoun and no
+# quote reads as a leaked stage direction. STRUCTURAL (not a fixed whitelist) but
+# guarded by BN-1 so terse dialogue ("Looks like rain, Watson.") is never tripped.
+# Drives a reroll (never silently strips). Pure; deterministic; never raises.
+# ---------------------------------------------------------------------------
+
+#: BN-1 dialogue-opener allowlist: a perception/copula opener is dialogue, not a
+#: stage direction, even though it leads with a 3rd-person-singular verb.
+_DIALOGUE_OPENER_ALLOW = (
+    "looks like", "sounds like", "seems like", "seems ", "seem ",
+    "feels like", "smells like", "looks ",
+)
+_THIRD_PERSON_SUBJECTS = frozenset({"he", "she", "they"})
+
+
+def is_whole_line_stage_action(text: Any, *, max_words: int = 32) -> bool:
+    """True iff the WHOLE line reads as an impersonal 3rd-person stage-action
+    chain (a leaked direction), not spoken dialogue.
+
+    Requires: no double quote; ``<= max_words`` words; NO 1st/2nd-person pronoun
+    root anywhere (3rd-person he/she/they is permitted as the actor); an
+    action-verb lead (in the extended ``_NARRATION_VERBS``, or an ``-ing``/
+    ``-ed``/``-s`` inflection); and -- BN-1 false-positive guard -- when the lead
+    is NOT whitelisted, the line must carry a comma-separated action chain OR an
+    explicit 3rd-person subject. A perception/copula opener (``Looks like rain,
+    Watson.``) is exempt. Pure; never raises."""
+    try:
+        s = " ".join(str(text or "").split())
+        if not s:
+            return False
+        norm = _CURLY_DQUOTE_RE.sub(lambda m: _CURLY_DQUOTE[m.group(0)], s)
+        if '"' in norm:
+            return False
+        low = norm.lower()
+        # BN-1 allowlist: a perception/copula opener is dialogue.
+        for opener in _DIALOGUE_OPENER_ALLOW:
+            if low.startswith(opener):
+                return False
+        words = re.findall(r"[a-z']+", low)
+        if not words or len(words) > max_words:
+            return False
+        # no 1st/2nd-person pronoun root anywhere -> impersonal / 3rd-person.
+        for w in words:
+            root = re.split(r"['’]", w)[0]
+            if w in _PRONOUN_ROOTS or root in _PRONOUN_ROOTS:
+                return False
+        lead = words[0]
+        if lead in _DIALOGUE_STARTER:
+            return False
+        third_subject = False
+        verb = lead
+        if lead in _THIRD_PERSON_SUBJECTS and len(words) > 1:
+            third_subject = True
+            verb = words[1]
+        if verb in _COPULA_MODAL or verb in _DIALOGUE_STARTER:
+            return False
+        whitelisted = verb in _NARRATION_VERBS
+        verbish = bool(verb) and (
+            verb.endswith("ing")
+            or verb.endswith("ed")
+            or (verb.endswith("s") and len(verb) > 2)
+        )
+        if not (whitelisted or verbish):
+            return False
+        # BN-1: a non-whitelisted lead needs a comma-separated action chain (the
+        # real heatwave-b008 "snaps..., jams..., turning..." signature), so a
+        # short non-action 3rd-person line ("She knows the code.") -- subject +
+        # cognition verb, no chain -- is never swept up.
+        if not whitelisted and "," not in norm:
+            return False
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# ---------------------------------------------------------------------------
+# 3.6 (story-quality, 2026-06-27) -- personal-cost boilerplate flag (BN-3).
+#
+# The L12 _enrich_tail cost clause was DROPPED from beat intents (commit
+# c005f1e3), but the generic phrasing ("the trust they will lose either way")
+# still leaks into a SPOKEN line when the writer echoes a prior beat intent. This
+# dedicated detector (NOT the announcer-scoped _BANNED_THESIS_RES) flags it on a
+# character line. Matches the three canonical _PERSONAL_COST phrases + light
+# pronoun flex; a CONCRETE consequence ("loses access to the archive") is left
+# alone. Pure; never raises.
+# ---------------------------------------------------------------------------
+
+_PERSONAL_COST_BOILERPLATE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
+    r"what it costs (?:them|us|me|him|her|you|then)\b.{0,16}to be the one who",
+    r"the trust .{0,20}\blose\b.{0,8}either way",
+    r"the part of (?:themselves|ourselves|myself|himself|herself|yourself|"
+    r"yourselves)\b.{0,20}to set down",
+))
+
+
+def flag_personal_cost_boilerplate(text: Any) -> "tuple[bool, str]":
+    """(flagged, hint): the line leans on the generic L12 personal-cost
+    boilerplate instead of a concrete consequence. Pure; never raises."""
+    try:
+        s = str(text or "")
+        for rx in _PERSONAL_COST_BOILERPLATE_RES:
+            m = rx.search(s)
+            if m:
+                return True, (
+                    f"personal-cost boilerplate {m.group(0)!r} -- name the "
+                    "concrete thing this character loses, not a generic cost"
+                )
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def is_truncated(text: Any) -> bool:
     """True when the line looks cut mid-thought (so the caller recomposes).
 

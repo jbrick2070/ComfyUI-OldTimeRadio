@@ -40,9 +40,13 @@ from typing import Iterable, Optional
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         detect_stage_business_for_reroll,
+        extract_specificity_anchors_from_header,
+        flag_anchor_stuffing,
         flag_cliche,
         flag_objective_literal,
         flag_on_the_nose,
+        flag_one_breath,
+        flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
         scrub_roster_vocative,
@@ -52,9 +56,13 @@ try:  # pragma: no cover - exercised by both import styles
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         detect_stage_business_for_reroll,
+        extract_specificity_anchors_from_header,
+        flag_anchor_stuffing,
         flag_cliche,
         flag_objective_literal,
         flag_on_the_nose,
+        flag_one_breath,
+        flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
         scrub_roster_vocative,
@@ -2267,6 +2275,76 @@ def compose_line_draft(
     raise LineCompositionFailedError(attempts=attempts, request=req)
 
 
+# Story-quality 3.2 (2026-06-27) -- the ONE per-line quality scorer (MF-5): the
+# single source of truth for the clean-quality gate AND its post-reroll
+# re-verify, so the re-verify can never reject a reroll for a flag the gate never
+# raised. ALWAYS-ON: cliche / flat stage-business / on-the-nose. v2 + CHARACTER
+# only: anchor-stuffing, one-breath, personal-cost boilerplate, objective-literal.
+# Coda / announcer lines never enter (they are composed by separate functions;
+# this is only reached from compose_line, and the v2 subset gates on
+# speaker_role == "character"). Returns [(code, reason, compose_flag), ...] in a
+# STABLE order. Pure; deterministic; never raises.
+_QUALITY_HINT_PRIORITY = (
+    "one_breath", "anchor_stuffing", "personal_cost", "cliche",
+    "stage_business", "on_the_nose", "objective_literal",
+)
+#: one_breath + anchor_stuffing co-occur and share the rewrite -> one combined
+#: hint (W-D). 240-char cap applied by _quality_reroll_hint.
+_QUALITY_COLLAPSE_HINT = (
+    "Rewrite as one spoken beat under ~20 words, using at most one concrete "
+    "detail"
+)
+
+
+def _quality_flags_for_line(cleaned, req):
+    """Single per-line quality scorer. See the module note above. Pure."""
+    try:
+        flags: list = []
+        _h, _r = flag_cliche(cleaned)
+        if _h:
+            flags.append(("cliche", _r, "cliche"))
+        _h, _r = flag_stage_business(cleaned)
+        if _h:
+            flags.append(("stage_business", _r, "stage_business"))
+        _h, _r = flag_on_the_nose(cleaned)
+        if _h:
+            flags.append(("on_the_nose", _r, "on_the_nose"))
+        if (getattr(req, "story_quality_v2_enabled", False)
+                and getattr(req, "speaker_role", "") == "character"):
+            anchors = extract_specificity_anchors_from_header(
+                getattr(req, "canon_header", ""))
+            _h, _r = flag_anchor_stuffing(cleaned, anchors)
+            if _h:
+                flags.append(("anchor_stuffing", _r, "anchor_stuffing"))
+            _h, _r = flag_one_breath(cleaned)
+            if _h:
+                flags.append(("one_breath", _r, "one_breath"))
+            _h, _r = flag_personal_cost_boilerplate(cleaned)
+            if _h:
+                flags.append(("personal_cost", _r, "personal_cost"))
+            _obj = (getattr(req, "beat_objective", "") or "").strip()
+            if _obj:
+                _h, _r = flag_objective_literal(cleaned, _obj)
+                if _h:
+                    flags.append(
+                        ("objective_literal", _r, "objective_literal"))
+        return flags
+    except Exception:  # noqa: BLE001 -- a scorer must never break a render
+        return []
+
+
+def _quality_reroll_hint(flags) -> str:
+    """W-D hint composition: TOP-1 by priority, EXCEPT one_breath+anchor_stuffing
+    collapse into one combined rewrite. 240-char cap. Pure."""
+    by_code = {code: reason for code, reason, _flag in flags}
+    if "one_breath" in by_code and "anchor_stuffing" in by_code:
+        return _QUALITY_COLLAPSE_HINT[:240]
+    for code in _QUALITY_HINT_PRIORITY:
+        if code in by_code:
+            return str(by_code[code] or "")[:240]
+    return ""
+
+
 def compose_line(
     *,
     creative_fn,                # the generation slot -- all sub-passes
@@ -2294,6 +2372,7 @@ def compose_line(
     _stage3_repair_attempted: bool = False,  # recursion guard
     _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
     _leak_repair_attempted: bool = False,  # leak-floor-v2 recompose guard
+    _quality_repair_attempted: bool = False,  # clean-quality (3.2) reroll guard
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -2356,46 +2435,38 @@ def compose_line(
     # malformed/undelimited shapes are still intact; the freeze floor is the
     # deterministic backstop. These remaining S3 craft gates still recompose via
     # the existing recursive-repair pattern; the guard caps it at one level.
-    # L1 (story-quality v2, R3 2026-06-22) -- objective-literal floor. Declared
-    # in outer scope so the exhaustion fall-through can still stamp the retry
-    # breadcrumb. Default False keeps the flag-OFF path byte-identical.
-    _ol_hit = False
-    _ol_reason = ""
-    if not _stage_dir_repair_attempted:
-        _cl_hit, _cl_reason = flag_cliche(cleaned)
-        _sb_hit, _sb_reason = flag_stage_business(cleaned)
-        _nose_hit, _nose_reason = flag_on_the_nose(cleaned)  # C5
-        # L1 gate: only under the story-quality-v2 flag, only a character beat.
-        # A bald restatement of the beat objective recomposes ONCE through the
-        # SAME <=1-reroll pattern as the S3 gates (NOT run_targeted_reroll /
-        # MAX_REROLL_CYCLES). Missing objective frame -> skip (one warning when
-        # the beat is at real tension, so a mis-wired frame is visible).
-        if req.story_quality_v2_enabled and req.speaker_role == "character":
-            if (req.beat_objective or "").strip():
-                _ol_hit, _ol_reason = flag_objective_literal(
-                    cleaned, req.beat_objective,
-                )
-            elif 1 <= req.beat_tension <= 5:
-                log.warning(
-                    "[OTR_LineComposer] L1 objective-literal gate skipped for "
-                    "%s -- character beat at tension %d carries no "
-                    "beat_objective frame", req.speaker, req.beat_tension,
-                )
-        if _cl_hit or _sb_hit or _nose_hit or _ol_hit:
-            _reasons = [
-                r for h, r in (
-                    (_cl_hit, _cl_reason),
-                    (_sb_hit, _sb_reason), (_nose_hit, _nose_reason),
-                    (_ol_hit, _ol_reason),
-                ) if h
-            ]
-            _flag_hint = "; ".join(_reasons)
+    # Story-quality clean-quality gate (3.2, 2026-06-27). The shared
+    # _quality_flags_for_line scorer (MF-5) is the SINGLE source of truth: always
+    # -on cliche/stage-business/on-the-nose + the v2+character subset (anchor
+    # -stuffing, one-breath, personal-cost boilerplate, objective-literal). On any
+    # hit it recomposes ONCE through the existing recursive-repair pattern. The
+    # _quality_repair_attempted guard (next to _stage_dir / _leak) caps it at one
+    # level, and MF-1 threads ALL FOUR guards on the recursive call so a
+    # quality-reroll cannot re-open draft/leak/stage-3. _q_retry_flags is declared
+    # in outer scope so the exhaustion fall-through still stamps the breadcrumb;
+    # () when the gate did not fire so the flag-OFF path is byte-identical.
+    _q_retry_flags: tuple[str, ...] = ()
+    if not _stage_dir_repair_attempted and not _quality_repair_attempted:
+        # L1 observability: a tense character beat with no objective frame is a
+        # mis-wire -- warn once (the scorer itself skips objective-literal then).
+        if (req.story_quality_v2_enabled and req.speaker_role == "character"
+                and not (req.beat_objective or "").strip()
+                and 1 <= req.beat_tension <= 5):
+            log.warning(
+                "[OTR_LineComposer] L1 objective-literal gate skipped for "
+                "%s -- character beat at tension %d carries no "
+                "beat_objective frame", req.speaker, req.beat_tension,
+            )
+        _q_flags = _quality_flags_for_line(cleaned, req)
+        if _q_flags:
+            _q_hint = _quality_reroll_hint(_q_flags)
             _existing = getattr(req, "reroll_hint", "") or ""
-            _sd_combined = (
-                f"{_existing}; {_flag_hint}" if _existing else _flag_hint)
+            _q_combined = (
+                f"{_existing}; {_q_hint}" if _existing else _q_hint)
+            _q_codes = ", ".join(c for c, _r, _f in _q_flags)
             log.warning(
                 "[OTR_LineComposer] draft quality flag for %s (%s) -- "
-                "one reroll", req.speaker, _flag_hint,
+                "one reroll", req.speaker, _q_codes,
             )
             try:
                 _rr = compose_line(
@@ -2406,40 +2477,46 @@ def compose_line(
                     max_new_tokens_cap=max_new_tokens_cap,
                     stop_strings=stop_strings,
                     creative_repo_id=creative_repo_id,
-                    reroll_hint=_sd_combined,
+                    reroll_hint=_q_combined,
                     enable_stage3_validators=enable_stage3_validators,
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,
                     stage3_banned_phrases=stage3_banned_phrases,
+                    # MF-1: thread ALL FOUR recursion guards. _stage_dir + the
+                    # new _quality close the draft + clean gate; _leak/_stage3 are
+                    # threaded (inherited) so the rerolled line still gets its one
+                    # leak-floor LLM pass (Q7 budget default <=4 -- NOT forced to
+                    # <=3 by setting _leak_repair_attempted True here).
                     _stage3_repair_attempted=_stage3_repair_attempted,
                     _stage_dir_repair_attempted=True,
+                    _leak_repair_attempted=_leak_repair_attempted,
+                    _quality_repair_attempted=True,
                 )
-                # L1: stamp the retry breadcrumb on the recomposed result so the
-                # telemetry pass can aggregate objective_literal_retry counts
-                # (the composer is a pure leaf -- it never touches led["meta"]).
-                if _ol_hit:
+                # Stamp one <code>_retry breadcrumb per fired flag (MF-6: built
+                # once, appended once; the recursive call skips this gate so it
+                # cannot duplicate). The scan aggregates quality_retry_lines from
+                # any *_retry flag; objective_literal_retry stays its exact name.
+                _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
+                if _retry:
                     _rr = replace(
-                        _rr,
-                        compose_flags=_rr.compose_flags
-                        + ("objective_literal_retry",),
+                        _rr, compose_flags=_rr.compose_flags + _retry,
                     )
                 return _rr
             except LineCompositionFailedError:
                 log.warning(
-                    "[OTR_LineComposer] stage-direction reroll exhausted for "
+                    "[OTR_LineComposer] quality reroll exhausted for "
                     "%s -- keeping draft; freeze floor is the backstop",
                     req.speaker,
                 )
+                _q_retry_flags = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
 
     # Stage 3 -- deterministic strip pipeline. Every strip below runs
     # before this function returns, so the caller appends the corrected
     # line (not a raw hallucination) to its rolling window.
-    # L1: seed with the retry breadcrumb when the gate fired but the reroll
-    # exhausted (fell through to keep the draft) -- () when the flag is off so
-    # the flag-OFF path is byte-identical.
-    compose_flags: tuple[str, ...] = (
-        ("objective_literal_retry",) if _ol_hit else ()
-    )
+    # Seed with the retry breadcrumbs when the gate fired but the reroll
+    # exhausted (fell through to keep the draft) -- () when the gate did not fire
+    # so the flag-OFF path is byte-identical.
+    compose_flags: tuple[str, ...] = _q_retry_flags
 
     # 3a. cast_strip -- remap near-miss phantom names to the locked
     # cast spelling (Levenshtein via auto_remap_phantom). Runs before
@@ -2508,9 +2585,13 @@ def compose_line(
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,
                     stage3_banned_phrases=stage3_banned_phrases,
+                    # MF-1: thread ALL FOUR guards. _quality is threaded
+                    # (inherited) so a leak reroll cannot re-open the clean
+                    # -quality gate once it has already run.
                     _stage3_repair_attempted=_stage3_repair_attempted,
                     _stage_dir_repair_attempted=_stage_dir_repair_attempted,
                     _leak_repair_attempted=True,
+                    _quality_repair_attempted=_quality_repair_attempted,
                 )
             except LineCompositionFailedError:
                 log.warning(
@@ -2602,7 +2683,14 @@ def compose_line(
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,
                     stage3_banned_phrases=stage3_banned_phrases,
+                    # MF-1: thread ALL FOUR guards. Previously only
+                    # _stage3_repair_attempted was passed, so a stage-3 repair
+                    # re-opened draft/clean/leak/quality. Now every recursive
+                    # compose_line call propagates the full guard set.
                     _stage3_repair_attempted=True,
+                    _stage_dir_repair_attempted=_stage_dir_repair_attempted,
+                    _leak_repair_attempted=_leak_repair_attempted,
+                    _quality_repair_attempted=_quality_repair_attempted,
                 )
                 cleaned = repaired.text
                 # Concat compose_flags from both passes; dedupe trivially
