@@ -25,10 +25,13 @@ from nodes._otr_line_hygiene import (  # noqa: E402
     is_whole_line_stage_action,
 )
 from nodes._otr_line_composer import (  # noqa: E402
+    _CODA_FACT_MAX,
     LineRequest,
+    _news_coda_fact_flags,
     _quality_flags_for_line,
     _quality_reroll_hint,
     compose_line,
+    compose_news_coda,
 )
 
 _HEADER_WITH_ANCHORS = (
@@ -283,6 +286,45 @@ class TestComposerQualityGate:
         res = compose_line(creative_fn=mock, req=_req(story_quality_v2_enabled=True))
         assert calls["n"] == 2                       # initial + one quality reroll
         assert res.text == _STUFFED
+
+
+class TestCodaTruncationFlag:
+    """3.5: measurement-only. The coda fact is never trimmed by the new flag; it
+    only records when the existing _CODA_FACT_MAX cap bit (MF-2)."""
+
+    def test_short_fact_no_flag(self):
+        assert _news_coda_fact_flags("NASA confirmed the probe landed.",
+                                     "NASA confirmed the probe landed.") == ()
+
+    def test_capped_fact_flags_truncated(self):
+        raw = "word " * 60                      # ~300 chars before cleaning
+        from nodes._otr_line_composer import clean_one_line
+        capped = clean_one_line(raw, _CODA_FACT_MAX)
+        assert len(capped) <= _CODA_FACT_MAX
+        assert _news_coda_fact_flags(raw, capped) == ("news_coda_truncated",)
+
+    def test_compose_news_coda_short_brief_unchanged(self):
+        def fn(messages, **kw):
+            return "A tale of a keeper and a signal in the dark"
+        res = compose_news_coda(
+            creative_fn=fn, news_close_brief="The dam held through the night.",
+            premise="A keeper waits for a ship", cast_seed=42)
+        assert "news_coda_truncated" not in res.compose_flags
+
+    def test_compose_news_coda_long_brief_stamps_truncated(self):
+        long_brief = ("Investigators confirmed that the failed launch traces to a "
+                      "cracked seal in the upper stage, a part flagged twice in "
+                      "prior reviews and cleared each time despite the written "
+                      "objections of two senior engineers who later resigned over "
+                      "the decision and the way it was recorded.")
+        assert len(long_brief) > _CODA_FACT_MAX
+
+        def fn(messages, **kw):
+            return "A tale of a keeper and a signal in the dark"
+        res = compose_news_coda(
+            creative_fn=fn, news_close_brief=long_brief,
+            premise="A keeper waits for a ship", cast_seed=42)
+        assert "news_coda_truncated" in res.compose_flags
 
 
 if __name__ == "__main__":  # pragma: no cover

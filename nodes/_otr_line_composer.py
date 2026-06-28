@@ -3249,6 +3249,23 @@ def validate_news_coda_bridge(text) -> tuple[bool, str]:
     return True, cleaned
 
 
+def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
+    """3.5 (2026-06-27) coda execution flag -- MEASUREMENT-ONLY. The coda fact is
+    NEVER trimmed by this; it only RECORDS when the deterministic _CODA_FACT_MAX
+    cap actually bit, so the scan can count truncations. MF-2: compare the
+    hygiene-only clean (max_chars=0 disables truncation) against the capped fact
+    -- NEVER a raw len>200 (which would false-fire on whitespace/quotes). Pure;
+    never raises. (mojibake + generic-bridge stay scan-derived per the W-C map;
+    news_coda_fallback is already stamped on the fallback path.)"""
+    try:
+        full = clean_one_line(str(raw_fact or ""), 0)
+        if full != str(cleaned_fact or ""):
+            return ("news_coda_truncated",)
+    except Exception:  # noqa: BLE001
+        return ()
+    return ()
+
+
 def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       cast_seed=0, creative_repo_id=None) -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
@@ -3265,6 +3282,9 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
     fact = clean_one_line(news_close_brief or "", max_chars=_CODA_FACT_MAX)
     if not fact:
         return LineResult(text="", compose_flags=("news_coda_no_brief",))  # caller handles
+    # 3.5 (measurement-only): record if the _CODA_FACT_MAX cap bit, BEFORE the
+    # capitalization step so a leading-letter case change never false-fires.
+    _coda_extra = _news_coda_fact_flags(news_close_brief, fact)
     fact = (fact[0].upper() + fact[1:]) if fact[0].isalpha() else fact
 
     def _assemble(bridge: str) -> str:
@@ -3286,14 +3306,16 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
         raw = _announcer_generate(creative_fn, _msgs(attempt))   # no seed arg
         ok, bridge = validate_news_coda_bridge(strip_line_formatting(raw or ""))
         if ok:
-            return LineResult(text=_assemble(bridge), compose_flags=(flag,))
+            return LineResult(
+                text=_assemble(bridge), compose_flags=(flag,) + _coda_extra)
 
     # 3) deterministic fallback floor -- stable hash (NOT builtin hash()).
     h = int(hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(), 16)
     prefix = NEWS_CODA_POOL[h % len(NEWS_CODA_POOL)]
     return LineResult(
         text=clean_one_line(f"{prefix} {fact}", max_chars=_CODA_TOTAL_MAX),
-        compose_flags=("news_coda_fallback", "news_coda_bridge_invalid"),
+        compose_flags=("news_coda_fallback", "news_coda_bridge_invalid")
+        + _coda_extra,
     )
 
 
