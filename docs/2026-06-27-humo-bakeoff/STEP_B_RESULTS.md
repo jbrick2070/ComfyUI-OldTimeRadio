@@ -39,6 +39,22 @@ levers to constrain it: drop `--cuda-malloc` (native allocator + expandable_segm
 max_split_size) -- but that edits the shared launcher, a deeper experiment; OR rely on
 cudaMallocAsync yielding the pool under real cross-engine pressure (the sentinel-style test).
 
+## CFG BUG FOUND + FIXED (operator eyeball caught the mush)
+The first Q3 render (cfg 1.0) produced ABSTRACT MUSH (B-R -7.25), not a doctor scene.
+ROOT CAUSE: cfg 1.0 is a DISTILL-ONLY setting -- it works for the 14B only because of the
+lightx2v distill LoRA. The 17B GGUF is LoRA-FREE, so cfg 1.0 ran a SINGLE unguided pass (no
+classifier-free guidance) -> the model ignored the prompt and melted. (My Step B leg copied
+the 14B's cfg 1.0 -- a config bug, not a quant/loader failure.) Re-run at **cfg 5.0**:
+s/it DOUBLED 12.7 -> 26 (the cond+uncond CFG passes = the proof guidance was off before), and
+B-R went -7.25 -> **+9.2, matching the 14B's +9.9** = coherent, scene-correct colour. So the
+17B-Q3-GGUF is NOT broken; it just needs real CFG.
+
+## Q3 @ cfg 5.0 (the corrected candidate)
+- COHERENT (B-R +9.2 ~= 14B); operator eyeball pending on the 14B-vs-Q3cfg5 montage.
+- true-alloc 11528 MB (<=13.5); NVML 15845 MB (>14.5, the cudaMallocAsync pool again).
+- 26 s/it x 20 steps ~= 520 s for 33 frames -- ~5x the 14B per clip (no distill = 20 steps,
+  + CFG doubling). The SPEED is now the main downside vs the 14B's 6-step distill (112 s).
+
 ## Bottom line
 Q3 17B-GGUF renders the 14B-class look, FASTER than the 14B (12.7 vs 18.7 s/it), with TRUE
 demand 11.5 GB (fits 13.5) -- a real candidate. The only blocker is the cudaMallocAsync pool

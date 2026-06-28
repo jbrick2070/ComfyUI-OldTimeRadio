@@ -825,6 +825,11 @@ def main():
     ap.add_argument("--alloc-conf", default=None,
                     help="set PYTORCH_CUDA_ALLOC_CONF for the boot (Step A A/B), e.g. "
                          "'expandable_segments:True'")
+    ap.add_argument("--cfg", type=float, default=None,
+                    help="override the KSampler cfg for the selected leg(s) (e.g. 5.0 to "
+                         "test a non-distill GGUF that needs real classifier-free guidance)")
+    ap.add_argument("--steps", type=int, default=None,
+                    help="override the KSampler steps for the selected leg(s)")
     ap.add_argument("--reset-selftest", action="store_true",
                     help="call reset_box() once and confirm THIS process survives")
     args = ap.parse_args()
@@ -848,6 +853,12 @@ def main():
     legs = BUILD.LEGS
     if args.only:
         legs = [l for l in legs if args.only in l["label"]]
+    if args.cfg is not None or args.steps is not None:
+        for l in legs:
+            if args.cfg is not None:
+                l["cfg"] = args.cfg
+            if args.steps is not None:
+                l["steps"] = args.steps
     results = []
     for leg in legs:
         r = run_leg(leg)
