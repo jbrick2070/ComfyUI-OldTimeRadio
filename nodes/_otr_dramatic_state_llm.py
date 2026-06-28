@@ -55,6 +55,8 @@ __all__ = [
     "derive_news_dramatic_state",
     "ARC_SHAPES",
     "pick_arc_shape",
+    "is_nonownable_story_object",
+    "derive_safe_fallback_term",
 ]
 
 # F8 (story-engine v1): arc-shape variety. A seeded pre-step picks one of these
@@ -235,10 +237,81 @@ _SHAPE_TEMPLATES = {
 }
 
 
-def _pick_templates(term: str, arc_shape: str = "") -> Tuple[str, str, str, str]:
+# 3.1 dignity guard (story-quality R2): the fallback DramaticState must NEVER
+# template ownership / credit / control over PEOPLE or a protected-identity /
+# harm-population group (frostbite_facility shipped "take sole credit for
+# transgender people" / "Control of transgender people passes to whoever is
+# willing to pay the higher price."). The head-noun rule keeps object heads with
+# a people MODIFIER ownable ("patient records", "children's health study",
+# "survey data"); the protected-identity substring set also catches an ownable
+# head riding a harm phrase ("suicide thoughts").
+_PEOPLE_NOUNS = frozenset({
+    "people", "person", "persons", "man", "men", "woman", "women",
+    "child", "children", "kid", "kids", "resident", "residents",
+    "patient", "patients", "worker", "workers", "citizen", "citizens",
+    "population", "populations", "community", "communities", "group", "groups",
+    "humanity", "victim", "victims", "family", "families",
+    "individual", "individuals",
+})
+#: Protected-identity / harm-population substrings -- non-ownable even when the
+#: grammatical head is an object noun. Casefolded substring match.
+_PROTECTED_IDENTITY_SUBSTRINGS = ("transgender", "suicide")
+#: Index of the ownership tuple in _TEMPLATES ("take sole credit" / "Control of
+#: {t} passes ...") -- dropped from the candidate set when ownership is barred.
+_OWNERSHIP_TEMPLATE_INDEX = 2
+#: Neutral, always-ownable default object term for the dignity fallback.
+_SAFE_DEFAULT_TERM = "the findings"
+
+
+def is_nonownable_story_object(term: object) -> bool:
+    """True when ``term`` names PEOPLE or a protected-identity / harm-population
+    group -- a thing a dramatic-state template must never put up for ownership,
+    credit, or control (3.1 dignity guard). An object head with a people MODIFIER
+    is ownable and returns False (``patient records``, ``children's health
+    study``, ``survey data``). Deterministic; never raises."""
+    t = _norm(term)
+    if not t:
+        return False
+    for sub in _PROTECTED_IDENTITY_SUBSTRINGS:
+        if sub in t:
+            return True
+    words = t.split()
+    if not words:
+        return False
+    head = words[-1]
+    if head in _PEOPLE_NOUNS:
+        return True
+    if head.endswith("s") and head[:-1] in _PEOPLE_NOUNS:   # naive plural fold
+        return True
+    return False
+
+
+def derive_safe_fallback_term(key_terms: object, cast: object = (),
+                              default: str = _SAFE_DEFAULT_TERM) -> str:
+    """The first key term that is a safe, OWNABLE story object (not people-class
+    / protected-identity, not a cast member's name); else ``default``.
+    Deterministic; never raises."""
+    cast_norm = {_norm(c) for c in (cast or ()) if _norm(c)}
+    for kt in (key_terms or ()):
+        s = str(kt).strip()
+        if not s or _norm(s) in cast_norm:
+            continue
+        if not is_nonownable_story_object(s):
+            return s
+    return default
+
+
+def _pick_templates(term: str, arc_shape: str = "", *,
+                    allow_ownership: bool = True) -> Tuple[str, str, str, str]:
     tmpls = _SHAPE_TEMPLATES.get(arc_shape, _TEMPLATES)
-    idx = (sum(ord(c) for c in term) % len(tmpls)) if term else 0
-    a, b, q, e = tmpls[idx]
+    if not allow_ownership and tmpls is _TEMPLATES:
+        # Drop the ownership/credit tuple so a people-class term can never be
+        # templated as something to "take sole credit for" / "control".
+        tmpls = tuple(t for i, t in enumerate(_TEMPLATES)
+                      if i != _OWNERSHIP_TEMPLATE_INDEX)
+    candidates = tmpls or _TEMPLATES        # defensive belt (never empty)
+    idx = (sum(ord(c) for c in term) % len(candidates)) if term else 0
+    a, b, q, e = candidates[idx]
     return (a.replace("{t}", term), b.replace("{t}", term),
             q.replace("{t}", term), e.replace("{t}", term))
 
@@ -249,10 +322,21 @@ def _fallback_state(meta: Any, voice_slot_ids, costly_choice_beat: str,
     _DEFAULT_* constant path. Guarantees the chosen term is in meta key_terms
     (the turning-slot detail floor)."""
     key_terms = _key_terms(meta)
-    term = key_terms[0] if key_terms else (
+    raw_first = key_terms[0] if key_terms else (
         _first_noun_phrase(_script_brief(meta)) or "the event")
+    # 3.1 dignity guard: pick the first OWNABLE key term (else the neutral
+    # default) BEFORE templating, and drop the ownership tuple if the chosen term
+    # is somehow still people-class (belt). Preserves the legacy term byte-for-
+    # byte whenever the first key term is already an ownable object.
+    candidates = list(key_terms) or [raw_first]
+    term = derive_safe_fallback_term(candidates, default=_SAFE_DEFAULT_TERM)
+    replaced = _norm(term) != _norm(raw_first)
     _inject_key_term(meta, term)
-    a, b, q, e = _pick_templates(term, arc_shape)
+    allow_ownership = not is_nonownable_story_object(term)
+    a, b, q, e = _pick_templates(term, arc_shape, allow_ownership=allow_ownership)
+    if isinstance(meta, dict):
+        meta["dramatic_state_fallback_term"] = term
+        meta["dramatic_state_fallback_term_replaced"] = bool(replaced)
     return DramaticState(
         dramatic_question=_trunc(q, 240),
         character_a_wants=_trunc(a, 120),

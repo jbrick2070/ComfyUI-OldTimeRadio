@@ -79,6 +79,29 @@ def _candidate_tokens(s: str) -> Set[str]:
     return {t.casefold() for t in _TOKEN.findall(s)}
 
 
+# 3.1 dignity guard (secondary): never surface a people-class term as the central
+# OBJECT. The REQUIRED guard lives in _otr_dramatic_state_llm._fallback_state; a
+# small local head-noun check here keeps the modules decoupled (no circular
+# import). Object heads with a people MODIFIER stay ownable ("patient records").
+_PEOPLE_HEAD_NOUNS = frozenset({
+    "people", "person", "persons", "man", "men", "woman", "women",
+    "child", "children", "kid", "kids", "resident", "residents",
+    "patient", "patients", "worker", "workers", "citizen", "citizens",
+    "population", "populations", "community", "communities", "group", "groups",
+    "humanity", "victim", "victims", "family", "families",
+    "individual", "individuals",
+})
+
+
+def _is_people_class_object(term: Any) -> bool:
+    words = _TOKEN.findall(str(term or "").casefold())
+    if not words:
+        return False
+    head = words[-1]
+    return head in _PEOPLE_HEAD_NOUNS or (
+        head.endswith("s") and head[:-1] in _PEOPLE_HEAD_NOUNS)
+
+
 def derive_specificity_anchors(key_terms: Any, cast: Any) -> List[str]:
     """3-5 concrete anchors from the curated key_terms, excluding cast names.
     Pure, deterministic, never raises."""
@@ -112,6 +135,8 @@ def derive_central_object(key_terms: Any, cast: Any) -> str:
         if term.casefold() in cast_tok or (_candidate_tokens(term) & cast_tok):
             continue
         if term.isupper():                       # ALL-CAPS org acronym (NASA)
+            continue
+        if _is_people_class_object(term):         # 3.1: people are never objects
             continue
         words = term.split()
         if len(words) == 1 and words[0][:1].isupper():
