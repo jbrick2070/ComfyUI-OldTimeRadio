@@ -195,8 +195,13 @@ def boot_server(server_log_path):
     env.pop("CUDA_VISIBLE_DEVICES", None)
     env.pop("OTR_TEST_MODE", None)
     env.pop("OTR_HEADLESS_RESERVE_VRAM_GB", None)   # HuMo: no startup reserve
-    log("booting ComfyUI :%d (no-FLOOR, OTR_ENABLE_HUMO=1) -> %s"
-        % (PORT, server_log_path))
+    alloc = os.environ.get("OTR_BAKEOFF_ALLOC_CONF")
+    if alloc:
+        env["PYTORCH_CUDA_ALLOC_CONF"] = alloc      # allocator A/B (Step A)
+    else:
+        env.pop("PYTORCH_CUDA_ALLOC_CONF", None)
+    log("booting ComfyUI :%d (no-FLOOR, OTR_ENABLE_HUMO=1, ALLOC_CONF=%s) -> %s"
+        % (PORT, alloc or "<default>", server_log_path))
     return subprocess.Popen([SOAK_LAUNCH_CMD, server_log_path],
                             cwd=os.path.dirname(SOAK_LAUNCH_CMD), env=env)
 
@@ -383,6 +388,7 @@ def build_manifest(prompt, meta):
         "encoder": "wrapper_bridge.encode_frames_to_silent_mp4 (libx264 crf18 "
                    "bt709, SILENT)", "audio_absent": True,
         "vram_decision_gate_mb": VRAM_GATE_MB, "box_ceiling_mb": BOX_CEILING_MB,
+        "alloc_conf": os.environ.get("OTR_BAKEOFF_ALLOC_CONF") or "<default>",
     }
     checks = [
         ("unet", meta["unet"], manifest["unet"]),
@@ -627,6 +633,16 @@ def run_leg(leg):
                 log("LEG %s ABORT: reclaim node did not run" % label)
                 return result
 
+        # honest in-process VRAM meter (Step A): the probe logs TRUE peak since the
+        # pre-sampler reset. nvidia-smi "used" counts the cached reserve pool; the gap
+        # between max_allocated (true demand) and reserved/NVML is the fit question.
+        pm = grep_log(server_log, slog_offset,
+                      r"\[OTR_BakeoffVramProbe\] marker=\w+ max_allocated_mb=([\d.]+) "
+                      r"max_reserved_mb=([\d.]+)")
+        if pm:
+            a, rv = pm[-1]
+            result["true_vram_mb"] = {"max_allocated": float(a), "max_reserved": float(rv)}
+
         if status != "ok":
             result["status"] = status
             result["error"] = reason
@@ -647,18 +663,27 @@ def run_leg(leg):
         result["face_metrics"] = face_metrics_softgated(frames)
 
         peak = result["peak_vram_mb"]
+        ta = (result.get("true_vram_mb") or {}).get("max_allocated")
+        exp_len = (result.get("manifest") or {}).get("length")
         result["gates"] = {
-            "vram_decision_13500": peak <= VRAM_GATE_MB,
-            "within_box_14500": peak <= BOX_CEILING_MB,
+            "nvml_peak_mb": peak,
+            "true_alloc_mb": ta,
+            "true_alloc_le_13500": (ta is not None and ta <= VRAM_GATE_MB),
+            "nvml_le_14500": peak <= BOX_CEILING_MB,
+            "promotable": (ta is not None and ta <= VRAM_GATE_MB
+                           and peak <= BOX_CEILING_MB),
             "audio_absent": result["ffprobe"].get("has_audio") is False,
-            "frames_written": result["frame_count"] > 0,
+            "frame_count_ok": (exp_len is not None
+                               and result["frame_count"] == exp_len),
         }
         result["status"] = "ok"
-        log("LEG %s OK | peakVRAM %.0fMB (gate<=%d: %s) | %ss/it | %d frames | "
-            "B-R frame=%s still=%s | %s"
-            % (label, peak, VRAM_GATE_MB,
-               result["gates"]["vram_decision_13500"], result["s_per_it"],
-               result["frame_count"], result["blue_cast"].get("frame_b_minus_r"),
+        log("LEG %s OK | true-alloc %sMB (<=%d:%s) | NVML %.0fMB (<=%d:%s) | "
+            "promotable=%s | %ss/it | %d/%s frames | B-R %s vs still %s | %s"
+            % (label, ("%.0f" % ta) if ta is not None else "n/a", VRAM_GATE_MB,
+               result["gates"]["true_alloc_le_13500"], peak, BOX_CEILING_MB,
+               result["gates"]["nvml_le_14500"], result["gates"]["promotable"],
+               result["s_per_it"], result["frame_count"], exp_len,
+               result["blue_cast"].get("frame_b_minus_r"),
                result["blue_cast"].get("still_b_minus_r"), out_clip))
     except AssertionError as e:
         result["status"] = "manifest_fail"
@@ -690,24 +715,28 @@ def write_results(results):
         "ceiling %d MB reported separately. DIAGNOSTIC -- production untouched."
         % (STILL_NAME, AUDIO_NAME, VRAM_GATE_MB, BOX_CEILING_MB),
         "",
-        "| leg | engine | two-stage | peak VRAM MB | <=13500? | s/it | wall s | "
-        "frames | B-R frame | B-R still | audio? | status |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| leg | engine | two-stage | alloc-conf | true-alloc MB | NVML MB | "
+        "promotable | s/it | frames | B-R frame | B-R still | audio? | status |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         m = r.get("manifest", {})
         g = r.get("gates", {})
+        tv = r.get("true_vram_mb", {})
         bc = r.get("blue_cast", {})
         fp = r.get("ffprobe", {})
-        lines.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
-            r.get("label", "?"), m.get("engine_id", "-"), m.get("two_stage", "-"),
-            r.get("peak_vram_mb", "-"), g.get("vram_decision_13500", "-"),
-            r.get("s_per_it", "-"), r.get("wall_s", "-"),
-            r.get("frame_count", "-"), bc.get("frame_b_minus_r", "-"),
-            bc.get("still_b_minus_r", "-"),
-            ("yes" if fp.get("has_audio") else "no") if fp else "-",
-            r.get("status", "?") + ("" if r.get("status") == "ok"
-                                    else " (%s)" % str(r.get("error", ""))[:48])))
+        lines.append(
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+                r.get("label", "?"), m.get("engine_id", "-"), m.get("two_stage", "-"),
+                m.get("alloc_conf", "-"),
+                ("%.0f" % tv["max_allocated"]) if tv.get("max_allocated") is not None
+                else "-",
+                r.get("peak_vram_mb", "-"), g.get("promotable", "-"),
+                r.get("s_per_it", "-"), r.get("frame_count", "-"),
+                bc.get("frame_b_minus_r", "-"), bc.get("still_b_minus_r", "-"),
+                ("yes" if fp.get("has_audio") else "no") if fp else "-",
+                r.get("status", "?") + ("" if r.get("status") == "ok"
+                                        else " (%s)" % str(r.get("error", ""))[:48])))
     lines += ["", "Clips: `otr/episodes/_bakeoff_humo/<leg>.mp4` -- operator eyeball "
               "decides before any promotion (two-stage split / VramPeakProbe / "
               "profile flip are DEFERRED)."]
@@ -734,6 +763,11 @@ def dry_validate():
         if "WanHuMoImageToVideo" not in schemas:
             ok = False
             log("DRY FAIL: WanHuMoImageToVideo not registered")
+        for _cls in (BUILD.RESET_CLASS, BUILD.PROBE_CLASS):
+            if _cls not in schemas:
+                ok = False
+                log("DRY FAIL: %s not registered (restart ComfyUI to load the "
+                    "sibling pack's new nodes)" % _cls)
         for leg in BUILD.LEGS:
             prompt, meta = BUILD.build_leg_prompt(leg, schemas=schemas)
             checks = BUILD.validate_prompt(prompt, meta, schemas=schemas)
@@ -785,6 +819,9 @@ def main():
                     help="boot once no-FLOOR, assert every leg manifest, render NOTHING")
     ap.add_argument("--only", default=None,
                     help="run only the leg whose label contains this substring")
+    ap.add_argument("--alloc-conf", default=None,
+                    help="set PYTORCH_CUDA_ALLOC_CONF for the boot (Step A A/B), e.g. "
+                         "'expandable_segments:True'")
     ap.add_argument("--reset-selftest", action="store_true",
                     help="call reset_box() once and confirm THIS process survives")
     args = ap.parse_args()
@@ -795,6 +832,8 @@ def main():
         log("reset-selftest: SURVIVED (reset_box did not kill self)")
         return 0
 
+    if args.alloc_conf is not None:
+        os.environ["OTR_BAKEOFF_ALLOC_CONF"] = args.alloc_conf
     os.makedirs(BAKEOFF_DIR, exist_ok=True)
     os.makedirs(FRAMES_ROOT, exist_ok=True)
     stage_assets()

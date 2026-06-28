@@ -84,6 +84,8 @@ LEGS = [
 ]
 
 RECLAIM_CLASS = "OTR_BakeoffReclaim"
+RESET_CLASS = "OTR_BakeoffVramReset"   # latent passthrough: reset CUDA peak pre-sampler
+PROBE_CLASS = "OTR_BakeoffVramProbe"   # image passthrough: log true peak post-decode
 
 
 def log(msg):
@@ -142,24 +144,35 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
         prompt[alias_to_id[alias]] = {"class_type": ctype, "inputs": inputs}
 
     next_id = len(spec) + 1
-    # Two-stage: splice OTR_BakeoffReclaim between humo(slot2) and ksampler.latent.
+    humo_id = alias_to_id["humo"]
+    latent_src = [humo_id, 2]
+    # Two-stage: splice OTR_BakeoffReclaim between humo(slot2) and the sampler.
     if leg["two_stage"]:
         reclaim_id = str(next_id)
         next_id += 1
-        humo_id = alias_to_id["humo"]
         prompt[reclaim_id] = {
             "class_type": RECLAIM_CLASS,
-            "inputs": {"samples": [humo_id, 2],
+            "inputs": {"samples": latent_src,
                        "reason": "humo bakeoff pre-sampler (%s)" % leg["label"]}}
-        prompt[alias_to_id["ksampler"]]["inputs"]["latent_image"] = [reclaim_id, 0]
-
-    # SaveImage terminal (lossless PNG batch) from VAEDecode IMAGE slot 0.
+        latent_src = [reclaim_id, 0]
+    # VRAM RESET on the latent edge, AFTER reclaim/humo and BEFORE KSampler, so the
+    # probe reads the TRUE sampler+decode peak since this reset.
+    reset_id = str(next_id)
+    next_id += 1
+    prompt[reset_id] = {"class_type": RESET_CLASS, "inputs": {"samples": latent_src}}
+    prompt[alias_to_id["ksampler"]]["inputs"]["latent_image"] = [reset_id, 0]
+    # VRAM PROBE on the image edge, AFTER VAEDecode and BEFORE SaveImage.
+    probe_id = str(next_id)
+    next_id += 1
+    prompt[probe_id] = {"class_type": PROBE_CLASS,
+                        "inputs": {"images": [alias_to_id["vaedecode"], 0]}}
+    # SaveImage terminal (lossless PNG batch) fed from the probe passthrough.
     save_id = str(next_id)
+    next_id += 1
     prefix = "otr/episodes/_bakeoff_humo/_frames/%s/frame" % leg["label"]
     prompt[save_id] = {
         "class_type": "SaveImage",
-        "inputs": {"filename_prefix": prefix,
-                   "images": [alias_to_id["vaedecode"], 0]}}
+        "inputs": {"filename_prefix": prefix, "images": [probe_id, 0]}}
 
     # Optional per-leg cfg override (the 1.7B de-blue sweep): rewrite the KSampler
     # cfg literal in the built prompt so the manifest cross-check still matches.
@@ -183,6 +196,7 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
         "terminal": "SaveImage", "frames_prefix": prefix,
         "save_node_id": save_id,
         "reclaim_present": bool(leg["two_stage"]),
+        "reset_present": True, "probe_present": True,
     }
     return prompt, meta
 
@@ -215,28 +229,45 @@ def validate_prompt(prompt, meta, schemas=None):
 
     ks = [n for n, d in prompt.items() if d["class_type"] == "KSampler"]
     chk("one_KSampler", len(ks) == 1, "found %d" % len(ks))
+    humo = [n for n, d in prompt.items() if d["class_type"] == "WanHuMoImageToVideo"]
     reclaims = [n for n, d in prompt.items() if d["class_type"] == RECLAIM_CLASS]
-    if meta["two_stage"]:
-        chk("reclaim_spliced", len(reclaims) == 1, "found %d" % len(reclaims))
-        if ks and reclaims:
-            li = prompt[ks[0]]["inputs"].get("latent_image")
-            chk("ksampler_latent_from_reclaim",
-                isinstance(li, list) and li[0] == reclaims[0], "latent_image=%r" % (li,))
-            humo = [n for n, d in prompt.items()
-                    if d["class_type"] == "WanHuMoImageToVideo"]
-            rs = prompt[reclaims[0]]["inputs"].get("samples")
-            chk("reclaim_samples_from_humo_slot2",
-                isinstance(rs, list) and humo and rs == [humo[0], 2],
-                "samples=%r" % (rs,))
-    else:
-        chk("no_reclaim_in_single_leg", len(reclaims) == 0, "found %d" % len(reclaims))
-        if ks:
-            li = prompt[ks[0]]["inputs"].get("latent_image")
-            humo = [n for n, d in prompt.items()
-                    if d["class_type"] == "WanHuMoImageToVideo"]
-            chk("ksampler_latent_from_humo_slot2",
-                isinstance(li, list) and humo and li == [humo[0], 2],
-                "latent_image=%r" % (li,))
+    resets = [n for n, d in prompt.items() if d["class_type"] == RESET_CLASS]
+    probes = [n for n, d in prompt.items() if d["class_type"] == PROBE_CLASS]
+    vae = [n for n, d in prompt.items() if d["class_type"] == "VAEDecode"]
+
+    # KSampler.latent_image must come from the RESET node (always spliced).
+    chk("one_VramReset", len(resets) == 1, "found %d" % len(resets))
+    if ks and resets:
+        li = prompt[ks[0]]["inputs"].get("latent_image")
+        chk("ksampler_latent_from_reset",
+            isinstance(li, list) and li[0] == resets[0], "latent_image=%r" % (li,))
+        # RESET.samples comes from reclaim (two-stage) or humo slot2 (single).
+        rsrc = prompt[resets[0]]["inputs"].get("samples")
+        if meta["two_stage"]:
+            chk("reclaim_spliced", len(reclaims) == 1, "found %d" % len(reclaims))
+            if reclaims:
+                chk("reset_samples_from_reclaim",
+                    isinstance(rsrc, list) and rsrc == [reclaims[0], 0],
+                    "samples=%r" % (rsrc,))
+                rs = prompt[reclaims[0]]["inputs"].get("samples")
+                chk("reclaim_samples_from_humo_slot2",
+                    isinstance(rs, list) and humo and rs == [humo[0], 2],
+                    "samples=%r" % (rs,))
+        else:
+            chk("no_reclaim_in_single_leg", len(reclaims) == 0,
+                "found %d" % len(reclaims))
+            chk("reset_samples_from_humo_slot2",
+                isinstance(rsrc, list) and humo and rsrc == [humo[0], 2],
+                "samples=%r" % (rsrc,))
+    # SaveImage.images must come from the PROBE node, fed by VAEDecode.
+    chk("one_VramProbe", len(probes) == 1, "found %d" % len(probes))
+    if saves and probes:
+        si = prompt[saves[0]]["inputs"].get("images")
+        chk("save_images_from_probe",
+            isinstance(si, list) and si[0] == probes[0], "images=%r" % (si,))
+        pi = prompt[probes[0]]["inputs"].get("images")
+        chk("probe_images_from_vaedecode",
+            isinstance(pi, list) and vae and pi == [vae[0], 0], "images=%r" % (pi,))
 
     msss = [n for n, d in prompt.items() if d["class_type"] == "ModelSamplingSD3"]
     chk("one_ModelSamplingSD3", len(msss) == 1, "found %d" % len(msss))
@@ -257,6 +288,8 @@ def validate_prompt(prompt, meta, schemas=None):
         chk("all_classes_registered", not missing, ", ".join(missing))
         chk("WanHuMoImageToVideo_registered", "WanHuMoImageToVideo" in schemas)
         chk("OTR_BakeoffReclaim_registered", RECLAIM_CLASS in schemas)
+        chk("OTR_BakeoffVramReset_registered", RESET_CLASS in schemas)
+        chk("OTR_BakeoffVramProbe_registered", PROBE_CLASS in schemas)
     return checks
 
 
