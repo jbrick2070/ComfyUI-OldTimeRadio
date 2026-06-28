@@ -76,16 +76,25 @@
 >   default <=4 (Q7); honor the R4 must-fixes (four-guard propagation incl Stage-3 L2592; coda truncation
 >   `clean_one_line(brief,0)` vs `(brief,_CODA_FACT_MAX)`; substring anchor match; v2-gated `_quality_flags_for_line`;
 >   flag-once). (This is the prior LANE A; now JOB 2, run by the SAME autonomous window after JOB 1.)
-> - **JOB 3 (after JOB 2, GPU-sequenced) -- HuMo quality check (operator concern: "HuMo lost quality").** GROUNDED:
->   eng_humo.py UNCHANGED since 2026-06-17; recent changes were IMPROVEMENTS (de-blue 1.7B cfg5->1 `fdb93286`,
->   colour-correct 14B 16:9, fast 6-step 14B default `ea024c70`) -> a code regression is unlikely. Likely cause =
->   the auto-downgrade chain humo_14B->humo_1.7B->still under VRAM pressure (`dc2d5399`, LOUD restamp): a hot box
->   silently drops 14B to the lighter 1.7B. TEST: a small HuMo bakeoff -- force the **14B keystone vs the 1.7B**
->   tier on ONE fixed face beat (same still+audio+seed), reset the box before each leg, single resident <=14.5GB,
->   LOUD fallbacks; write side-by-side clips to `otr/episodes/_bakeoff_humo/<tier>.mp4` + log the tier that ACTUALLY
->   ran + peak VRAM; ALSO grep a recent episode ledger for a humo downgrade restamp (was 14B falling to 1.7B?).
->   STOP after rendering and leave the clips for the OPERATOR'S EYEBALL -- "lost quality" is his judgment, not the
->   agent's. Don't wire any change from this; it's a diagnostic.
+> - **JOB 3 (after JOB 2, GPU-sequenced) -- HuMo quality bakeoff (operator concern: "HuMo lost quality").**
+>   PREMISE CORRECTED by the 2026-06-27 kibitz (Codex + AntiGravity converged, Claude verified): there is NO
+>   silent 14B->1.7B downgrade. `render_shot()` (render_driver.py:1468-1495) DISABLED all fallbacks 2026-06-16
+>   ("this is art, not a space shuttle") -- HuMo either renders 14B or RAISES RenderError LOUD; the
+>   `fallback_engine="humo_1.7B"` (eng_humo.py:106) is VESTIGIAL. So "lost quality" is either (a) the 14B OUTPUT
+>   quality (the 6-step lightx2v distill caps it) or (b) 14B failing/raising under AV-stack VRAM. Full r1-hardened
+>   plan = `roundtables/2026-06-27-humo-optim/r1/r1_plan.md`. Build it as TWO phases:
+>   **Phase A (isolated, clean boot per leg, fixed still+audio+seed = the LTX pair c02_466a19906ccb.png +
+>   c02_b002_line.wav):** headline 3-way -- (a) 14B + distill @ 6 steps cfg1.0 (fast default), (b) 14B NO-LoRA
+>   (`OTR_HUMO_LORA_NAME=none`) @ ~25 steps cfg~5 (max-quality), (c) 1.7B (control). CFG sweep ONLY on no-LoRA legs;
+>   resolution NATIVE only (480x832 portrait + optional 832x480 wide); SHIFT is hardcoded 8.0 (eng_humo.py:271) ->
+>   add `OTR_HUMO_SHIFT` env wired into the workflow JSON SAME change (CLAUDE.md S0) OR mutate the API graph
+>   (cf. scripts/_otr_humo_shift_sweep.py). FAIL-LOUD per-leg manifest records + ASSERTS the unet/tier that ACTUALLY
+>   loaded (the LTX #1 risk: measuring the wrong graph). **Phase B (production-pressure sentinel, NO reboot):** load
+>   the AV stack (LTX-AV + Whisper) immediately before the HuMo leg in ONE resident session -> does 14B fit
+>   <=14.5GB or RAISE? Test pre-emptive `--reserve-vram` (post-decode eviction already exists eng_humo.py:361).
+>   CUT: NEGATIVE + broad FRAMES sweeps. Side-by-side clips -> `otr/episodes/_bakeoff_humo/<leg>.mp4`; objective
+>   face/lip proxies ONLY if OpenCV/landmark libs are present, else VRAM+s/it+eyeball. STOP and leave clips for the
+>   OPERATOR'S EYEBALL -- don't wire any quality change; the ONLY production-candidate fix is the Phase-B reserve.
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
