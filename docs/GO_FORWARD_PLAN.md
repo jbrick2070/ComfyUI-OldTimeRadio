@@ -1,8 +1,20 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
 > **>>> CURRENT STEP -- 2026-06-27 SWIM HANDOFF: ONE fresh window, TWO AUTONOMOUS JOBS in order. Last updated
-> HEAD `2e7544f8` == origin/v2.0-alpha. Operator AFK (swimming); run BOTH to green, do NOT wait; stop ONLY on a
+> HEAD `7bbce1d8` == origin/v2.0-alpha. Operator AFK (swimming); run BOTH to green, do NOT wait; stop ONLY on a
 > genuine ambiguity or the >=14.5GB / irreversible line. prod/main + tags GATED.**
+>
+> **>>> JOB 1 CODE SHIPPED GREEN + PUSHED `7bbce1d8` (2026-06-27).** LTX winner-wire per final.md landed: shared
+> alpha-safe `_scale_filter` across all 4 composite scale paths (fg pad=False, floor not sharpened, still-plate
+> sharpened) + unsharp env 0.4; `_decode_temporal_knobs` env-overridable fail-loud (default 4096/8 whole-clip per
+> the operator's PROVISIONAL pick; 128/32 = LOUD env fallback) read in `_build_graph`; `VramPeakProbe` threaded
+> render_clip->_clip_from_raw->render_shot->episode report; per-recipe smoke; 20 new CPU tests. Full suite green vs
+> the SAME 5 pre-existing `267a53e` workflow-pin fails (PROVEN pre-existing by a stashed-tree re-run -- my changes
+> add ZERO new failures); Bug Bible 16/7/3; AST/no-BOM/no-0-byte clean. NO canonical-JSON edit (env-only). **REMAINING
+> JOB-1 PRE-SHIP = operator/GPU live `ltx_audio_in` smoke (final.md S6): render-phase NVML peak < ceiling + the
+> visual eyeball (unsharp 0.4 vs 0.8, the i2v-0.62 stutter).** VRAM-fit is ALREADY de-risked: the bakeoff directly
+> measured the whole-clip 4096/8 decode at 14338 MB < 14500 and VRAM-NEUTRAL vs tiled (14338 vs 14337). **NOW ON
+> JOB 2 (story-quality build).**
 > - **JOB 1 (FIRST) -- LTX winner-wire.** Operator PICK = whole-clip decode 4096/8 + lanczos+unsharp 0.4 + canvas
 >   512x288 + i2v0.75 native (PROVISIONAL -- commit-note it's the recommended pick; operator eyeballs the final clip
 >   later). Wire per the ROUNDTABLE-HARDENED, code-grounded spec `roundtables/2026-06-27-ltx-upgrade-wire/final.md`
