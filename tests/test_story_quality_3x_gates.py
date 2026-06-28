@@ -19,6 +19,7 @@ from nodes._otr_line_hygiene import (  # noqa: E402
     detect_stage_business_for_reroll,
     extract_specificity_anchors_from_header,
     flag_anchor_stuffing,
+    flag_cliche,
     flag_one_breath,
     flag_personal_cost_boilerplate,
     is_whole_line_stage_action,
@@ -141,6 +142,31 @@ class TestWholeLineWiredIntoReroll:
         assert not (hit and reason == "whole_line_action")
 
 
+class TestClicheExpansion:
+    @pytest.mark.parametrize("line", [
+        "You're playing with fire, Watson.",
+        "We're playing with fire here.",
+        "Everything hangs in the balance now.",
+        "Over my dead body.",
+        "Not on my watch.",
+        "That secret is best left buried.",
+        "We're running out of time.",
+        "Move, before it's too late.",
+        "Shut down the lab. Safety first.",
+        "The whole plan could go up in smoke.",
+    ])
+    def test_new_cliches_flagged(self, line):
+        assert flag_cliche(line)[0] is True
+
+    @pytest.mark.parametrize("line", [
+        "The fuse is on fire.",
+        "The balance arm is stuck.",
+        "I checked my watch.",
+    ])
+    def test_near_misses_left_alone(self, line):
+        assert flag_cliche(line)[0] is False
+
+
 def _req(**over):
     base = dict(
         speaker="EDNA", intent="confront", mood="tense", target_words=15,
@@ -213,6 +239,37 @@ class TestComposerQualityGate:
         assert calls["n"] == 1                       # byte-identical, no reroll
         assert res.text == _STUFFED
         assert not any(f.endswith("_retry") for f in res.compose_flags)
+
+    def test_reroll_not_better_keeps_original_and_stamps_degraded(self):
+        """3.4 re-verify: a reroll that swaps one cliche for another (same defect
+        count) is NOT kept -- the original draft ships, with quality_reroll_degraded."""
+        draft = "You're playing with fire, Watson."
+        worse = "Not on my watch, Watson."          # still one cliche
+        calls = {"n": 0}
+
+        def mock(messages, *, temperature, max_new_tokens):
+            calls["n"] += 1
+            return draft if calls["n"] == 1 else worse
+
+        res = compose_line(creative_fn=mock, req=_req())
+        assert calls["n"] == 2                       # one reroll attempted
+        assert res.text == draft                     # original kept (tie -> original)
+        assert "quality_reroll_degraded" in res.compose_flags
+        assert "cliche_retry" in res.compose_flags
+
+    def test_reroll_better_is_kept(self):
+        draft = "You're playing with fire, Watson."
+        clean = "The seal cracked sometime before midnight."
+        calls = {"n": 0}
+
+        def mock(messages, *, temperature, max_new_tokens):
+            calls["n"] += 1
+            return draft if calls["n"] == 1 else clean
+
+        res = compose_line(creative_fn=mock, req=_req())
+        assert res.text == clean
+        assert "cliche_retry" in res.compose_flags
+        assert "quality_reroll_degraded" not in res.compose_flags
 
     def test_reroll_budget_bounded(self):
         """A persistently stuffed draft rerolls at most once (the guard caps it);

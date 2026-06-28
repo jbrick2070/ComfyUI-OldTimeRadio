@@ -632,12 +632,23 @@ def flag_thesis_close(text: Any) -> "tuple[bool, str]":
 # ---------------------------------------------------------------------------
 
 _CLICHE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
-    r"\byou['’]re playing with fire\b",
+    # 3.4 (2026-06-27): generalize the pronoun -- the shipped batch had
+    # "You're playing with fire, Watson" reach the ledger past the you-only form.
+    r"\b(?:you|we|i|they)['’]?re playing with fire\b",
     r"\bthis changes everything\b",
     r"\bwe['’]re not leaving anything to chance\b",
     r"\bleaving nothing to chance\b",
     r"\bthere['’]s no turning back\b",
     r"\bagainst all odds\b",
+    # 3.4 expansion -- phrases the local writer shipped (dialing/compass/marked).
+    r"\bhangs in the balance\b",
+    r"\bover my dead body\b",
+    r"\bnot on my watch\b",
+    r"\bbest left buried\b",
+    r"\brunning out of time\b",
+    r"\bbefore it['’]?s too late\b",
+    r"\bsafety first\b",
+    r"\bgo(?:es)? up in smoke\b",
 ))
 
 #: FLAT action-announce filler ("I'll go check") -- a character narrating an
