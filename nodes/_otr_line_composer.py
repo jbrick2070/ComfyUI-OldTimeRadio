@@ -2499,24 +2499,33 @@ def compose_line(
                 # <code>_retry breadcrumb per ORIGINAL fired flag (MF-6: built
                 # once, appended once; the recursive call skips this gate).
                 _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
-                _after = len(_quality_flags_for_line(_rr.text, req))
-                if _after < len(_q_flags):
-                    # the reroll genuinely reduced defects -> keep it.
-                    if _retry:
+                _after_flags = _quality_flags_for_line(_rr.text, req)
+                if len(_after_flags) < len(_q_flags):
+                    # the reroll genuinely reduced defects -> keep it. Any defect
+                    # that SURVIVED the reroll is stamped quality_residual:<code>
+                    # so the scan can count residual lines (W-C). MF-6: appended
+                    # once on the kept result.
+                    _resid = tuple(
+                        f"quality_residual:{c}" for c, _r, _f in _after_flags)
+                    _extra = _retry + _resid
+                    if _extra:
                         _rr = replace(
-                            _rr, compose_flags=_rr.compose_flags + _retry,
+                            _rr, compose_flags=_rr.compose_flags + _extra,
                         )
                     return _rr
                 # the reroll did NOT improve (>= original) -> keep the original
                 # draft and stamp quality_reroll_degraded so the scan can see the
-                # reroll was wasted. Fall through to the strip pipeline on the
-                # ORIGINAL cleaned text (the freeze floor is the backstop).
+                # reroll was wasted. The original's own defects are the residuals.
+                # Fall through to the strip pipeline on the ORIGINAL cleaned text
+                # (the freeze floor is the backstop).
                 log.warning(
                     "[OTR_LineComposer] quality reroll did not reduce defects "
                     "for %s (%d -> %d) -- keeping original draft",
-                    req.speaker, len(_q_flags), _after,
+                    req.speaker, len(_q_flags), len(_after_flags),
                 )
-                _q_retry_flags = _retry + ("quality_reroll_degraded",)
+                _q_retry_flags = (
+                    _retry + ("quality_reroll_degraded",)
+                    + tuple(f"quality_residual:{c}" for c, _r, _f in _q_flags))
             except LineCompositionFailedError:
                 log.warning(
                     "[OTR_LineComposer] quality reroll exhausted for "

@@ -71,8 +71,15 @@ try:
     from nodes._otr_line_hygiene import (  # type: ignore
         detect_leading_stage_business, flag_cliche, flag_on_the_nose,
         flag_stage_business, flag_thesis_close,
+        # 3.x (2026-06-27) gate-seam detectors -- re-run on final text by the scan.
+        detect_mojibake, extract_specificity_anchors_from_header,
+        flag_anchor_stuffing, flag_one_breath, flag_personal_cost_boilerplate,
+        is_whole_line_stage_action,
     )
     from nodes._otr_dramatic_state import wants_are_default  # type: ignore
+    from nodes._otr_casting import (  # type: ignore
+        _SIG_NEAR_DUP_THRESHOLD, speech_signature_overlap,
+    )
     _HAS_R2_HELPERS = True
 except Exception:  # noqa: BLE001
     _HAS_R2_HELPERS = False
@@ -81,12 +88,27 @@ except Exception:  # noqa: BLE001
         return (False, "")
 
     flag_cliche = flag_on_the_nose = flag_stage_business = flag_thesis_close = _r2_false  # type: ignore
+    flag_anchor_stuffing = flag_one_breath = flag_personal_cost_boilerplate = _r2_false  # type: ignore
 
     def detect_leading_stage_business(_t):  # type: ignore
         return (False, "")
 
     def wants_are_default(_s):  # type: ignore
         return False
+
+    def extract_specificity_anchors_from_header(_h):  # type: ignore
+        return []
+
+    def is_whole_line_stage_action(_t, **_k):  # type: ignore
+        return False
+
+    def detect_mojibake(_t):  # type: ignore
+        return False
+
+    def speech_signature_overlap(_a, _b):  # type: ignore
+        return 0.0
+
+    _SIG_NEAR_DUP_THRESHOLD = 0.5  # type: ignore
 
 try:
     from nodes._otr_line_hygiene import detect_narration_self_address  # type: ignore
@@ -310,6 +332,132 @@ def r2_lever_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Story-Quality 3.x gate-seam cluster (2026-06-27) -- read-only counters.
+# ---------------------------------------------------------------------------
+#: Low-effort generic close openers (the close should land the real news image).
+_GENERIC_BRIDGE_OPENERS = (
+    "the real story", "the true account", "and now, the real world",
+    "meanwhile, in the real world", "but in the real world",
+    "now, the real world",
+)
+#: 3.1 ownership-template surface markers (over a people-class central object).
+_OWNERSHIP_TEMPLATE_MARKERS = (
+    "take sole credit for", "control what becomes of", "control of",
+    "sole credit", "ownership of", "passes to whoever",
+)
+_PEOPLE_HEAD_NOUNS_SCAN = frozenset({
+    "people", "person", "persons", "men", "women", "children", "kids",
+    "residents", "patients", "workers", "citizens", "population", "populations",
+    "community", "communities", "humanity", "victims", "families", "individuals",
+    "group", "groups",
+})
+
+
+def _compose_flags(ln: Dict[str, Any]) -> List[str]:
+    cf = ln.get("compose_flags")
+    return [str(x) for x in cf] if isinstance(cf, list) else []
+
+
+def _is_people_class_object_scan(term: Any) -> bool:
+    words = re.findall(r"[A-Za-z]+", str(term or "").casefold())
+    if not words:
+        return False
+    head = words[-1]
+    return head in _PEOPLE_HEAD_NOUNS_SCAN or (
+        head.endswith("s") and head[:-1] in _PEOPLE_HEAD_NOUNS_SCAN)
+
+
+def r3_quality_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
+    """Story-Quality 3.x gate-seam counts over a frozen ledger (read-only).
+
+    Re-runs the v2 detectors on FINAL text (anchor-stuffing, one-breath,
+    whole-line stage-action, personal-cost boilerplate) and reads the engine
+    -stamped quality_* / news_coda_* / dramatic_state_* breadcrumbs. mojibake +
+    generic-bridge + register-overlap are scan-derived. Never raises -> zeros."""
+    m = _meta(ledger)
+    lines = _lines(ledger)
+    char = [ln for ln in lines
+            if str(ln.get("speaker_role") or "").strip() == "character"]
+    anchors = m.get("specificity_anchors")
+    anchors = anchors if isinstance(anchors, list) else []
+
+    anchor_stuffing = sum(
+        1 for ln in char if flag_anchor_stuffing(ln.get("text"), anchors)[0])
+    one_breath = sum(1 for ln in char if flag_one_breath(ln.get("text"))[0])
+    stage_action_leak = sum(
+        1 for ln in char if is_whole_line_stage_action(ln.get("text")))
+    personal_cost = sum(
+        1 for ln in char if flag_personal_cost_boilerplate(ln.get("text"))[0])
+
+    quality_retry = sum(
+        1 for ln in char if any(f.endswith("_retry") for f in _compose_flags(ln)))
+    quality_residual = sum(
+        1 for ln in char
+        if any(f.startswith("quality_residual:") for f in _compose_flags(ln)))
+    quality_degraded = sum(
+        1 for ln in char if "quality_reroll_degraded" in _compose_flags(ln))
+
+    coda_trunc = sum(1 for ln in lines if "news_coda_truncated" in _compose_flags(ln))
+    coda_fallback = sum(1 for ln in lines if "news_coda_fallback" in _compose_flags(ln))
+    outro = find_outro_text(ledger)
+    coda_mojibake = 1 if detect_mojibake(outro) else 0
+    low_outro = outro.strip().lower()
+    coda_generic = 1 if any(
+        low_outro.startswith(p) for p in _GENERIC_BRIDGE_OPENERS) else 0
+
+    ds_source = str(m.get("dramatic_state_source") or "")
+    ds_fallback = 1 if ds_source == "fallback" else 0
+    ds_replaced = 1 if m.get("dramatic_state_fallback_term_replaced") else 0
+    central = m.get("central_object")
+    ownable_people = 1 if _is_people_class_object_scan(central) else 0
+    ownership_on_nonownable = 0
+    if ownable_people:
+        ds = m.get("dramatic_state")
+        blob = ""
+        if isinstance(ds, dict):
+            blob = " ".join(str(ds.get(k) or "") for k in (
+                "character_a_wants", "character_b_wants", "ending_change"))
+        if any(mk in blob.lower() for mk in _OWNERSHIP_TEMPLATE_MARKERS):
+            ownership_on_nonownable = 1
+
+    sigs = []
+    for c in (ledger.get("cast") or []):
+        if isinstance(c, dict) and str(c.get("name") or "").upper() != "ANNOUNCER":
+            s = str(c.get("speech_signature") or "")
+            if s.strip():
+                sigs.append(s)
+    near_dup = 0
+    max_overlap = 0.0
+    for i in range(len(sigs)):
+        for j in range(i + 1, len(sigs)):
+            ov = speech_signature_overlap(sigs[i], sigs[j])
+            max_overlap = max(max_overlap, ov)
+            if ov >= _SIG_NEAR_DUP_THRESHOLD:
+                near_dup += 1
+
+    return {
+        "anchor_stuffing_lines": anchor_stuffing,
+        "one_breath_violation_lines": one_breath,
+        "stage_action_leak_lines": stage_action_leak,
+        "personal_cost_boilerplate_lines": personal_cost,
+        "quality_retry_lines": quality_retry,
+        "quality_residual_lines": quality_residual,
+        "quality_reroll_degraded_lines": quality_degraded,
+        "news_coda_truncated_count": coda_trunc,
+        "news_coda_fallback_count": coda_fallback,
+        "news_coda_mojibake_count": coda_mojibake,
+        "news_coda_generic_bridge_count": coda_generic,
+        "dramatic_state_fallback_count": ds_fallback,
+        "dramatic_state_fallback_replaced_count": ds_replaced,
+        "ownable_people_object_count": ownable_people,
+        "ownership_template_on_nonownable_count": ownership_on_nonownable,
+        "speech_signature_near_duplicate_count": near_dup,
+        "register_overlap_ratio": round(max_overlap, 3),
+        "r2_helpers_loaded": bool(_HAS_R2_HELPERS),
+    }
+
+
 def scan_ledger(path: str, target_override: Optional[int]) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         ledger = json.load(f)
@@ -333,6 +481,7 @@ def scan_ledger(path: str, target_override: Optional[int]) -> Dict[str, Any]:
         "outro_hedge_vs_resolved": outro_hedge_vs_resolved(ledger),
         "narration_self_address_lines": narration_self_address_lines(ledger),
         **r2_lever_metrics(ledger),
+        **r3_quality_metrics(ledger),
     }
 
 
@@ -348,6 +497,24 @@ def aggregate(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "narration_self_address_total": sum(int(r["narration_self_address_lines"]) for r in rows),
         "arc_shapes": sorted({r["arc_shape"] for r in rows if r["arc_shape"]}),
         "engine_detector": _HAS_ENGINE_DETECTOR,
+        # Story-Quality 3.x gate-seam totals (2026-06-27).
+        "anchor_stuffing_total": sum(int(r.get("anchor_stuffing_lines", 0)) for r in rows),
+        "one_breath_violation_total": sum(int(r.get("one_breath_violation_lines", 0)) for r in rows),
+        "stage_action_leak_total": sum(int(r.get("stage_action_leak_lines", 0)) for r in rows),
+        "personal_cost_boilerplate_total": sum(int(r.get("personal_cost_boilerplate_lines", 0)) for r in rows),
+        "quality_retry_total": sum(int(r.get("quality_retry_lines", 0)) for r in rows),
+        "quality_residual_total": sum(int(r.get("quality_residual_lines", 0)) for r in rows),
+        "quality_reroll_degraded_total": sum(int(r.get("quality_reroll_degraded_lines", 0)) for r in rows),
+        "news_coda_truncated_total": sum(int(r.get("news_coda_truncated_count", 0)) for r in rows),
+        "news_coda_fallback_total": sum(int(r.get("news_coda_fallback_count", 0)) for r in rows),
+        "news_coda_mojibake_total": sum(int(r.get("news_coda_mojibake_count", 0)) for r in rows),
+        "news_coda_generic_bridge_total": sum(int(r.get("news_coda_generic_bridge_count", 0)) for r in rows),
+        "dramatic_state_fallback_total": sum(int(r.get("dramatic_state_fallback_count", 0)) for r in rows),
+        "dramatic_state_fallback_replaced_total": sum(int(r.get("dramatic_state_fallback_replaced_count", 0)) for r in rows),
+        "ownable_people_object_total": sum(int(r.get("ownable_people_object_count", 0)) for r in rows),
+        "ownership_template_on_nonownable_total": sum(int(r.get("ownership_template_on_nonownable_count", 0)) for r in rows),
+        "speech_signature_near_duplicate_total": sum(int(r.get("speech_signature_near_duplicate_count", 0)) for r in rows),
+        "r2_helpers_loaded": bool(_HAS_R2_HELPERS),
     }
 
 

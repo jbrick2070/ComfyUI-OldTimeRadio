@@ -978,7 +978,9 @@ def is_whole_line_stage_action(text: Any, *, max_words: int = 32) -> bool:
         if verb in _COPULA_MODAL or verb in _DIALOGUE_STARTER:
             return False
         whitelisted = verb in _NARRATION_VERBS
-        verbish = bool(verb) and (
+        # A contraction lead ("it's", "that's", "here's") ends in -s but is
+        # "<subject> is", not an action verb -> never verbish.
+        verbish = bool(verb) and "'" not in verb and "’" not in verb and (
             verb.endswith("ing")
             or verb.endswith("ed")
             or (verb.endswith("s") and len(verb) > 2)

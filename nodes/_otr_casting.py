@@ -1437,6 +1437,36 @@ def speech_signature_overlap(a, b) -> float:
     return len(ta & tb) / min(len(ta), len(tb))
 
 
+def flag_low_register_divergence(cast, *, threshold: float = 0.67):
+    """3.7 (2026-06-27) deferred flag half: (flagged, reason) when two CHARACTER
+    voices share a near-duplicate speech signature (token overlap >= threshold).
+    The cast-time fix (`diversify_speech_signatures`) collides at the tighter
+    _SIG_NEAR_DUP_THRESHOLD; this is a measurement/observability helper for the
+    scan + an optional cast-time check. ANNOUNCER excluded. Pure; never raises."""
+    try:
+        sigs: list = []
+        for row in (cast or ()):
+            if isinstance(row, dict):
+                name = str(row.get("name") or "")
+                sig = str(row.get("speech_signature") or "")
+            else:
+                name = str(getattr(row, "name", "") or "")
+                sig = str(getattr(row, "speech_signature", "") or "")
+            if name.strip().upper() == "ANNOUNCER":
+                continue
+            if sig.strip():
+                sigs.append((name, sig))
+        for i in range(len(sigs)):
+            for j in range(i + 1, len(sigs)):
+                if speech_signature_overlap(sigs[i][1], sigs[j][1]) >= threshold:
+                    return True, (
+                        f"near-duplicate register: {sigs[i][0]!r} vs "
+                        f"{sigs[j][0]!r}")
+        return False, ""
+    except Exception:  # noqa: BLE001
+        return False, ""
+
+
 def diversify_speech_signatures(cast, seed: int = 0):
     """Ensure each cast row's speech_signature is DISTINCT (C3). A non-colliding
     LLM signature is KEPT; an empty / 'plain spoken' default / EXACT-duplicate /
