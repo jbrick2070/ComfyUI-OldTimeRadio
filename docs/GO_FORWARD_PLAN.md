@@ -13,8 +13,34 @@
 > add ZERO new failures); Bug Bible 16/7/3; AST/no-BOM/no-0-byte clean. NO canonical-JSON edit (env-only). **REMAINING
 > JOB-1 PRE-SHIP = operator/GPU live `ltx_audio_in` smoke (final.md S6): render-phase NVML peak < ceiling + the
 > visual eyeball (unsharp 0.4 vs 0.8, the i2v-0.62 stutter).** VRAM-fit is ALREADY de-risked: the bakeoff directly
-> measured the whole-clip 4096/8 decode at 14338 MB < 14500 and VRAM-NEUTRAL vs tiled (14338 vs 14337). **NOW ON
-> JOB 2 (story-quality build).**
+> measured the whole-clip 4096/8 decode at 14338 MB < 14500 and VRAM-NEUTRAL vs tiled (14338 vs 14337).
+>
+> **>>> JOB 2 IN PROGRESS (story-quality build, plan docs/2026-06-27-story-quality/STORY_QUALITY_BUILD_PLAN.md).
+> HEAD `138a8531` == origin/v2.0-alpha. Step 0 baseline scan DONE (15 legs -> docs/2026-06-27-story-quality/
+> r3_pre.{json,md}; frostbite shows the ds_source=fallback dignity defect). THREE items SHIPPED + PUSHED, each
+> green vs the same 5 pre-existing 267a53e fails + Bug Bible 16/7/3:**
+> - **3.1 dignity guard** `0c7ff6d4` -- is_nonownable_story_object + derive_safe_fallback_term in
+>   _otr_dramatic_state_llm._fallback_state (no ownership templates over people/protected-identity; stamps
+>   meta.dramatic_state_fallback_term[_replaced]); secondary people-class skip in _otr_specificity.derive_central_object.
+> - **3.6 cost-tail scrub** `c005f1e3` -- DROPPED {cost} from all 5 _ENRICH_TAILS (W-E: drop, don't replace);
+>   personal_cost stays telemetry-only. (flag_personal_cost_boilerplate gate-wiring deferred to the 3.2 seam.)
+> - **3.7 near-dup signatures** `138a8531` -- speech_signature_overlap + diversify_speech_signatures now collides
+>   NEAR-duplicates (overlap >= 0.5), reassigns from the contrasting pool; deterministic, replay-parity preserved.
+>   (3.7 SCAN counters + flag_low_register_divergence + the optional line-level reroll deferred to the 3.2 seam.)
+>
+> **>>> REMAINING JOB 2 = the 3.2 GATE-SEAM CLUSTER (the hard, interdependent core). NEXT STEP = 3.2:** build the
+> shared `_quality_flags_for_line` scorer at compose_line ~L2364 + flag_anchor_stuffing / flag_one_breath /
+> extract_specificity_anchors_from_header in _otr_line_hygiene; THEN 3.3 (stage-action leak: is_whole_line_stage_action
+> + the BN-1 dialogue-opener guard), 3.4 (expand _CLICHE_RES + re-verify-after-reroll), 3.5 (coda counters), then the
+> story_quality_scan.py counter plumbing + the deferred 3.6/3.7 flag halves. **CRITICAL RISK = MF-1: thread ALL FOUR
+> recursion guards (_stage_dir_repair_attempted, _quality_repair_attempted, _leak_repair_attempted,
+> _stage3_repair_attempted) on EVERY recursive compose_line call -- the FOUR sites are clean-quality (~L2415),
+> leak-floor (L2498), Stage-3 (L2592, today passes ONLY _stage3_repair_attempted), and the draft.** Q7 budget default
+> <=4 (do NOT force <=3). Honor MF-2 (coda truncation via clean_one_line(brief,0) vs (brief,_CODA_FACT_MAX)), MF-3
+> substring anchors, MF-5 single-scorer v2-gating (3.2+3.6 v2-gated; cliche/stage/nose always-on; coda never enters),
+> MF-6 flag-once, W-F v2-flag threading. This cluster touches production line-composition control flow -- build it in a
+> focused window with full budget + the suite/Bug-Bible/B7/cast-replay-parity gate per chunk. prod/main + tags GATED.
+>
 > - **JOB 1 (FIRST) -- LTX winner-wire.** Operator PICK = whole-clip decode 4096/8 + lanczos+unsharp 0.4 + canvas
 >   512x288 + i2v0.75 native (PROVISIONAL -- commit-note it's the recommended pick; operator eyeballs the final clip
 >   later). Wire per the ROUNDTABLE-HARDENED, code-grounded spec `roundtables/2026-06-27-ltx-upgrade-wire/final.md`
