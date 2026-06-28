@@ -12,6 +12,9 @@
     "announcer_visual": "ltx_audio_in",
     "music_visual": "ltx_audio_in",
     "other_beats_visual": "humo_1.7B",
+    "character_visual": "humo_14B_169",
+    "scene_broll_visual": "wan_ti2v",
+    "background_abstract_visual": "ltx_video",
     "announcer_image": "flux_gen1",
     "music_image": "flux_gen1",
     "other_beats_image": "flux_gen1"

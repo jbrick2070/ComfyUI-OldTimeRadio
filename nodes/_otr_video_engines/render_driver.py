@@ -2033,6 +2033,16 @@ def _episode_facts(ep, meta):
     shots = {s["shot_id"]: s for s in sec["shots"]}
     oom = shots[meta["oom_shot_id"]]
     clips = {sid: _clip_summary(c) for sid, c in ep["clips"].items()}
+    # Route-A (2026-06-28 HuMo-14B promotion): count the promoted 14B tier and
+    # assert it ONLY rendered on character_video shots (face + audio role). The
+    # histogram gate previously saw only "humo" (the portrait base), so the 14B
+    # promotion was invisible to acceptance. A non-empty misrouted list means the
+    # per-role routing leaked humo_14B_169 onto a non-character role.
+    humo_14b_169 = sorted(sid for sid, c in clips.items()
+                          if c["engine_id"] == "humo_14B_169" and c["exists"])
+    humo_14b_169_misrouted = sorted(
+        sid for sid in humo_14b_169
+        if (shots.get(sid) or {}).get("role") != "character_video")
     return {
         "n_clips": len(ep["clips"]),
         "all_clips_real": all(c["exists"] and c["size"] > 0
@@ -2044,6 +2054,8 @@ def _episode_facts(ep, meta):
         "audio_sha": led["audio"]["master_audio_sha256"],
         "humo_rendered": sum(1 for c in clips.values()
                              if c["engine_id"] == "humo" and c["exists"]),
+        "humo_14B_169_rendered": len(humo_14b_169),
+        "humo_14B_169_misrouted": humo_14b_169_misrouted,
         "vram_peak_mb": ep["vram_peak_mb"],
         "trace": ep["trace"],
         "clips": clips,
@@ -2105,6 +2117,13 @@ def assert_soak_ok(report):
             raise SoakError("%s: humo never rendered in-process (0 real humo "
                             "clips) -- the heavy in-process forward did not run"
                             % tag)
+        # Route-A: the promoted 14B tier must NEVER land on a non-character role
+        # (it needs face + audio; render_shot has no fallbacks). .get keeps the
+        # synthetic-report path (which never routes the 14B) valid.
+        if f.get("humo_14B_169_misrouted"):
+            raise SoakError("%s: humo_14B_169 rendered on non-character_video "
+                            "shot(s) %r -- per-role routing leak"
+                            % (tag, f["humo_14B_169_misrouted"]))
         if f["vram_peak_mb"] and f["vram_peak_mb"] > ceiling:
             raise SoakError("%s: VRAM peak %d MB > ceiling %d MB"
                             % (tag, f["vram_peak_mb"], ceiling))

@@ -107,7 +107,13 @@ def test_mesh_stage_roles_exactly_the_three_e5_slots():
             "required_inputs": eng.required_inputs}
     from nodes.otr_video_director import VIDEO_SLOT_ROLES
     for slot, slot_roles in VIDEO_SLOT_ROLES.items():
-        assert any(rc.engine_fits_role(desc, role) for role in slot_roles), slot
+        fits = any(rc.engine_fits_role(desc, role) for role in slot_roles)
+        if slot_roles == ("background_abstract",):
+            # Route-A: the pure background_abstract_video_model slot supplies only
+            # text_prompt -- an init_image engine (mesh_stage) cannot serve it.
+            assert not fits, slot
+        else:
+            assert fits, slot
     assert rc.engine_fits_role(desc, "background_abstract") is False  # supplies no init_image
     # capability-only (2026-06-22): mesh_stage (needs init_image) now ALSO fits
     # scene_broll, which supplies a still -- additive; the roles whitelist is gone.

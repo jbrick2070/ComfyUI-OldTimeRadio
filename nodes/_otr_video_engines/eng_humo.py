@@ -52,6 +52,13 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # 2.1 VAE 4n+1 length rule is enforced via wrapper_bridge.quantize_frames_4n1.
 _HUMO_MIN_FRAMES = 33          # below this has hung this hardware (legacy floor)
 _HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp8
+# Route-A (2026-06-28): the 14B fp8 tier rides ~15.9 GB at 832x480 -- thin
+# headroom ACCEPTED by the operator, BOUNDED by a per-beat render-frame cap. 49
+# (4n+1) is the bakeoff-proven safe length (docs/2026-06-27-humo-bakeoff: zero
+# OOM at 832x480/<=49f, single + cross-engine resident). Beats longer than the
+# cap render at the cap then mirror-extend to the audio target (exact-fit);
+# raise it ONLY after a higher-frame GPU probe. env: OTR_HUMO_14B_SAFE_FRAMES.
+_HUMO_14B_SAFE_RENDER_FRAMES = 49
 # (HuMo render dims live in _otr_shared.aspect now -- portrait 480x832 / wide
 # 832x480 -- selected by each engine's render_aspect, so the constants moved out.)
 # An ASCII negative (CLAUDE.md: ASCII-only source). HuMo's best negative is the
@@ -92,6 +99,13 @@ class HuMoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
+    #: Per-beat render-frame cap (Route-A). ``None`` = uncapped (use
+    #: ``_HUMO_MAX_FRAMES``, the legacy behaviour for humo / humo_1.7B*). A heavy
+    #: tier that rides thin VRAM headroom (the 14B) overrides this with a safe
+    #: integer; render_clip then renders at the cap and EXACT-FITS the decoded
+    #: frames to the audio-derived target (trim/mirror-extend) so frame_count
+    #: still matches.
+    safe_render_frames = None
     #: Render aspect == this engine's IDENTITY (the operator picks the look with
     #: one dropdown choice): 'portrait' 480x832 (the classic pillarbox) here on
     #: the base; the humo_1.7B_169 variant overrides to 'wide' 832x480. The
@@ -336,9 +350,17 @@ class HuMoEngine(_MC.MotionEngineBase):
             or _wb.resolve_graph_classes(self._node_candidates())
         audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
         image_name = _wb.stage_into_comfy_input(plan["init_image"])
+        target_fc = int(plan["target_frame_count"] or 0)
+        # Route-A: a capped tier (the 14B) renders at its VRAM-safe cap, then
+        # exact-fits the decoded frames back to the audio target below. Uncapped
+        # tiers (humo / humo_1.7B*) keep the legacy 177-frame ceiling unchanged.
+        cap = self.safe_render_frames
+        if cap is not None:
+            cap = int(os.environ.get("OTR_HUMO_14B_SAFE_FRAMES", cap))
+        render_max = cap if cap is not None else _HUMO_MAX_FRAMES
         length = _wb.quantize_frames_4n1(
-            plan["target_frame_count"] or self.target_fps,
-            min_frames=_HUMO_MIN_FRAMES, max_frames=_HUMO_MAX_FRAMES)
+            target_fc or self.target_fps,
+            min_frames=_HUMO_MIN_FRAMES, max_frames=render_max)
         width, height = self._native_dims()
         graph = self._build_graph(image_name, audio_name, plan, length, width, height)
         # Render FULLY RESIDENT -- the proven BUG-265 low_vram_default path: the
@@ -350,6 +372,12 @@ class HuMoEngine(_MC.MotionEngineBase):
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
+        # Route-A exact-fit: a capped tier may have rendered FEWER frames than the
+        # audio target (or, on a tiny beat quantized up to the floor, more) -- trim
+        # or mirror-extend so the encoded clip's frame_count EQUALS target_fc (else
+        # the composite holds the last frame / the manifest timing drifts).
+        if cap is not None and target_fc > 0:
+            frames = _wb.fit_frames_to_target(frames, target_fc)
         out_path = otr_engine_tmp_mp4("otr_humo_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # Restore the proven HuMo VRAM discipline the refactor dropped: the frames
@@ -556,6 +584,10 @@ class HuMo14BLandscapeEngine(HuMoEngine):
 
     name = "humo_14B_169"
     render_aspect = "wide"
+    #: Route-A VRAM frame cap (only this 14B tier; base humo / humo_1.7B* stay
+    #: uncapped). render_clip renders at the cap then exact-fits to the audio
+    #: target. env override: OTR_HUMO_14B_SAFE_FRAMES (after a higher-frame probe).
+    safe_render_frames = _HUMO_14B_SAFE_RENDER_FRAMES
 
     def _cfg(self):
         # Inherit the 14B distill cfg (1.0); a 16:9 tuning hook is available via

@@ -27,6 +27,7 @@ log = logging.getLogger("OTR")
 from ._otr_video_engines import registry as _vreg
 from ._otr_image_engines import registry as _ireg
 from ._otr_shared import role_compat as _rc
+from ._otr_shared import role_slots as _role_slots
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path. When a role
 #: is set to this, its real engine id is read from the ``custom_models_json``
@@ -75,13 +76,17 @@ def _engine_id_from_pick(pick) -> str:
     return s[:idx] if idx != -1 else s
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
-VIDEO_SLOT_ROLES = {
-    "announcer_video_model": ("announcer_visual",),
-    "music_video_model": ("music_visual",),
-    "other_beats_video_model": (
-        "character_video", "scene_broll", "background_abstract",
-    ),
-}
+#: Route-A: the ONE shared map (nodes/_otr_shared/role_slots.py) -- the three
+#: other-beats roles now own per-role slots (character_video_model /
+#: scene_broll_video_model / background_abstract_video_model); the legacy
+#: other_beats_video_model slot stays (migration fallback) and must still fit all
+#: three other-beats roles.
+VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
+
+#: Sentinel default for the three per-role video COMBOs: leave a role unset and
+#: it inherits the legacy ``other_beats_video_model`` pick. The Director maps it
+#: to engine_id "" so role_slots.engine_id_for_role falls back to other-beats.
+USE_OTHER_BEATS = "(use Other Beats default)"
 CLIP_MODES = ("unique_per_beat", "pool_n_loop")
 SEED_MODES = ("request_hash", "fixed")
 
@@ -103,6 +108,13 @@ def _video_model_combo() -> list:
     :func:`_engine_id_from_pick`, and a bare legacy value still resolves)."""
     names = list(_vreg.validated_engine_names()) or list(_vreg.all_engine_names())
     return [_label_for(n) for n in names] + [ADD_CUSTOM]
+
+
+def _per_role_video_combo() -> list:
+    """The video COMBO for the three Route-A per-role slots: the
+    :data:`USE_OTHER_BEATS` sentinel FIRST (the default -- inherit the Other
+    Beats pick) then the standard validated-video list + custom sentinel."""
+    return [USE_OTHER_BEATS] + _video_model_combo()
 
 
 def _image_model_combo() -> list:
@@ -217,6 +229,33 @@ class OTRVideoDirector:
                         '{"other_beats_video_model": "my_engine"}.'
                     ),
                 }),
+                # Route-A per-role video models (2026-06-28 HuMo-14B promotion).
+                # APPENDED here (after custom_models_json, before the forceInput
+                # gate_in) so they land at the END of node 87 widgets_values
+                # (BUG-LOCAL-097: never insert mid-list). Default = the
+                # USE_OTHER_BEATS sentinel -> inherit the Other Beats pick.
+                "character_video_model": (_per_role_video_combo(), {
+                    "default": USE_OTHER_BEATS,
+                    "tooltip": (
+                        "Video model for CHARACTER (face + audio) beats. Set to "
+                        "humo_14B_169 for the 14B promotion; default inherits the "
+                        "Other Beats pick."
+                    ),
+                }),
+                "scene_broll_video_model": (_per_role_video_combo(), {
+                    "default": USE_OTHER_BEATS,
+                    "tooltip": (
+                        "Video model for SCENE B-ROLL beats (text/still motion, "
+                        "no audio). Default inherits the Other Beats pick."
+                    ),
+                }),
+                "background_abstract_video_model": (_per_role_video_combo(), {
+                    "default": USE_OTHER_BEATS,
+                    "tooltip": (
+                        "Video model for BACKGROUND ABSTRACT beats (text prompt "
+                        "only). Default inherits the Other Beats pick."
+                    ),
+                }),
                 "gate_in": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -239,6 +278,9 @@ class OTRVideoDirector:
                other_beats_clip_mode, other_beats_n, fps, canvas_w, canvas_h,
                seed_mode, request_seed, allow_auto_fallback,
                episode_duration_target="auto", custom_models_json="{}",
+               character_video_model=USE_OTHER_BEATS,
+               scene_broll_video_model=USE_OTHER_BEATS,
+               background_abstract_video_model=USE_OTHER_BEATS,
                gate_in=""):
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
@@ -253,6 +295,18 @@ class OTRVideoDirector:
             "music_video_model": _engine_id_from_pick(music_video_model),
             "other_beats_video_model": _engine_id_from_pick(other_beats_video_model),
         }
+        # Route-A per-role slots. The USE_OTHER_BEATS sentinel (or empty) emits
+        # engine_id "" so role_slots.engine_id_for_role falls back to the legacy
+        # other_beats pick (clean migration for old graphs + the lighter tiers).
+        for slot, pick in (
+            ("character_video_model", character_video_model),
+            ("scene_broll_video_model", scene_broll_video_model),
+            ("background_abstract_video_model", background_abstract_video_model),
+        ):
+            video_models[slot] = (
+                "" if str(pick) == USE_OTHER_BEATS
+                else _engine_id_from_pick(pick)
+            )
         resolved_video = {}
         for slot, picked in video_models.items():
             resolved_video[slot] = self._resolve_and_validate(
@@ -304,13 +358,15 @@ class OTRVideoDirector:
 
     @staticmethod
     def _role_aspects(resolved_video):
-        """Map each still-bearing role to the SELECTED engine's ``render_aspect``
-        so character stills match their video engine: announcer_visual <-
-        announcer_video_model, character_video <- other_beats_video_model.
-        Unknown / custom / unresolved picks -> 'portrait' (the safe legacy look).
-        Pure: a registry read, no side effects."""
-        def _asp(slot):
-            eid = (resolved_video.get(slot) or {}).get("engine_id") or ""
+        """Map each video ROLE to its SELECTED engine's ``render_aspect`` so
+        stills match their video engine. Route-A: one entry PER ROLE
+        (announcer_visual / music_visual / character_video / scene_broll /
+        background_abstract), each resolved through the shared per-role map (the
+        per-role slot, then the legacy other_beats fallback). Unknown / custom /
+        unresolved picks -> 'portrait' (the safe legacy look). Pure registry
+        read, no side effects."""
+        def _asp_for_role(role):
+            eid = _role_slots.engine_id_for_role(resolved_video, role)
             try:
                 eng = _vreg.get_engine(eid)
                 if getattr(eng, "render_aspect", "portrait") == "wide":
@@ -319,9 +375,11 @@ class OTRVideoDirector:
                 pass
             return "portrait"
         return {
-            "announcer_visual": _asp("announcer_video_model"),
-            "music_visual": _asp("music_video_model"),
-            "character_video": _asp("other_beats_video_model"),
+            "announcer_visual": _asp_for_role("announcer_visual"),
+            "music_visual": _asp_for_role("music_visual"),
+            "character_video": _asp_for_role("character_video"),
+            "scene_broll": _asp_for_role("scene_broll"),
+            "background_abstract": _asp_for_role("background_abstract"),
         }
 
     @staticmethod

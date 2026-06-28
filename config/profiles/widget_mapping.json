@@ -14,6 +14,18 @@
       "registry": "video",
       "targets": [["OTR_VideoDirector", "other_beats_video_model"]]
     },
+    "role_overrides.character_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "character_video_model"]]
+    },
+    "role_overrides.scene_broll_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "scene_broll_video_model"]]
+    },
+    "role_overrides.background_abstract_visual": {
+      "registry": "video",
+      "targets": [["OTR_VideoDirector", "background_abstract_video_model"]]
+    },
     "role_overrides.announcer_image": {
       "registry": "image",
       "targets": [["OTR_VideoDirector", "announcer_image_model"]]

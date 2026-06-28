@@ -58,7 +58,13 @@ def test_still_parallax_fits_three_slots_not_background():
     desc = {"engine_id": "still_parallax", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
     for slot, slot_roles in VIDEO_SLOT_ROLES.items():
-        assert any(rc.engine_fits_role(desc, role) for role in slot_roles), slot
+        fits = any(rc.engine_fits_role(desc, role) for role in slot_roles)
+        if slot_roles == ("background_abstract",):
+            # Route-A: the pure background_abstract_video_model slot supplies only
+            # text_prompt -- an init_image engine (still_parallax) cannot serve it.
+            assert not fits, slot
+        else:
+            assert fits, slot
     for role in ("announcer_visual", "music_visual", "character_video",
                  "scene_broll"):
         assert rc.engine_fits_role(desc, role) is True

@@ -39,6 +39,7 @@ log = logging.getLogger("OTR")
 
 from ._otr_shared import resolver as _resolver
 from ._otr_shared.role_compat import Role
+from ._otr_shared import role_slots as _role_slots
 
 # ---------------------------------------------------------------------------
 # Role mapping + which roles are "character-bearing" (get the rich derivation)
@@ -706,20 +707,11 @@ def build_execution_plan(beats, budget, creative, policy):
     shots)`` after ``resolver.validate_execution_groups``.
     """
     video_models = (policy or {}).get("video_models") or {}
-    role_to_slot = {
-        Role.ANNOUNCER_VISUAL.value: "announcer_video_model",
-        Role.MUSIC_VISUAL.value: "music_video_model",
-        Role.CHARACTER_VIDEO.value: "other_beats_video_model",
-        Role.SCENE_BROLL.value: "other_beats_video_model",
-        Role.BACKGROUND_ABSTRACT.value: "other_beats_video_model",
-    }
 
     def engine_for(role):
-        slot = role_to_slot.get(role, "other_beats_video_model")
-        entry = video_models.get(slot)
-        if isinstance(entry, dict):
-            return entry.get("engine_id") or ""
-        return str(entry or "")
+        # Route-A: per-role video slot with the legacy other_beats fallback
+        # (ONE shared map; nodes/_otr_shared/role_slots.py).
+        return _role_slots.engine_id_for_role(video_models, role)
 
     roles_present = []
     for b in beats:

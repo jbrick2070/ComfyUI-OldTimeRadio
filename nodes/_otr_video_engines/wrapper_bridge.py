@@ -466,6 +466,26 @@ def extend_frames_to_target(frames, target_frame_count):
     return np.ascontiguousarray(tiled[:target])
 
 
+def fit_frames_to_target(frames, target_frame_count):
+    """EXACT-FIT ``frames`` to ``target_frame_count``: TRIM when over,
+    mirror-extend (:func:`extend_frames_to_target`) when short, identity on a
+    match. The capped render tiers (e.g. HuMo-14B's VRAM frame cap) need this so
+    the encoded clip's frame_count EQUALS the audio-derived target -- a short clip
+    would otherwise make the composite hold the last frame, and a long one would
+    drift the manifest timing. ``frames`` is the uint8 ``[N,H,W,C]`` array from
+    :func:`images_to_uint8`; numpy is imported lazily (cold-import V-12). Pure;
+    CPU-testable."""
+    import numpy as np
+    arr = np.asarray(frames)
+    n = int(arr.shape[0]) if arr.ndim else 0
+    target = int(target_frame_count or 0)
+    if n == 0 or target <= 0 or n == target:
+        return arr
+    if n > target:
+        return np.ascontiguousarray(arr[:target])
+    return extend_frames_to_target(arr, target)
+
+
 # --------------------------------------------------------------------------- #
 # ffmpeg command builders (pure) + runners (the ffmpeg leaf)
 # --------------------------------------------------------------------------- #

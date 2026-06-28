@@ -46,6 +46,7 @@ log = logging.getLogger("OTR")
 from ._otr_image_engines import registry as _ireg
 from ._otr_video_engines import registry as _vreg
 from ._otr_shared import role_compat as _rc
+from ._otr_shared import role_slots as _role_slots
 from ._otr_image_engines.schemas import GRANULARITY_MODES
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path (mirrors the
@@ -139,30 +140,33 @@ def three_d_locked_slots(video_policy: dict) -> set:
     via :func:`_is_3d_engine` when an engine's capability cannot be read
     (fail-closed, 3D plan section 3)."""
     vm = (video_policy or {}).get("video_models") or {}
-    pair = {
-        "announcer_image_model": "announcer_video_model",
-        "music_image_model": "music_video_model",
-        "other_beats_image_model": "other_beats_video_model",
+    # Route-A: each IMAGE slot is locked if ANY of its paired ROLES' video engine
+    # requires a mesh portrait. other_beats_image_model now pairs with the three
+    # per-role video slots (character / scene_broll / background_abstract), each
+    # resolved via the ONE shared map (per-role slot + legacy fallback).
+    img_slot_roles = {
+        "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),
+        "music_image_model": (_rc.Role.MUSIC_VISUAL.value,),
+        "other_beats_image_model": (
+            _rc.Role.CHARACTER_VIDEO.value,
+            _rc.Role.SCENE_BROLL.value,
+            _rc.Role.BACKGROUND_ABSTRACT.value,
+        ),
     }
     locked = set()
-    for img_slot, vid_slot in pair.items():
-        entry = vm.get(vid_slot)
-        engine_id = entry.get("engine_id") if isinstance(entry, dict) else str(entry or "")
-        if _is_3d_engine(engine_id, slot=vid_slot):
-            locked.add(img_slot)
+    for img_slot, roles in img_slot_roles.items():
+        for role in roles:
+            engine_id = _role_slots.engine_id_for_role(vm, role)
+            if _is_3d_engine(engine_id, slot=_role_slots.slot_for_role(role)):
+                locked.add(img_slot)
+                break
     return locked
 
 
 #: Image-prompt ROLE -> the video slot that renders it (the role->engine join the
-#: prompt fork needs). character_video + the other-beats roles all ride the
-#: other_beats_video_model (OTR_VideoDirector._aspects_from_policy:322-324).
-_ROLE_TO_VIDEO_SLOT = {
-    "announcer_visual": "announcer_video_model",
-    "music_visual": "music_video_model",
-    "character_video": "other_beats_video_model",
-    "background_abstract": "other_beats_video_model",
-    "scene_broll": "other_beats_video_model",
-}
+#: prompt fork needs). Route-A: the ONE shared per-role map
+#: (nodes/_otr_shared/role_slots.py); aliased here for any importer of this name.
+_ROLE_TO_VIDEO_SLOT = _role_slots.ROLE_TO_VIDEO_SLOT
 
 
 def _is_mesh_fodder_engine(engine_id: str) -> bool:
@@ -187,10 +191,8 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
     policy dict; tolerant (a non-fodder / unknown engine just drops out)."""
     vm = (video_policy or {}).get("video_models") or {}
     roles = set()
-    for role, vid_slot in _ROLE_TO_VIDEO_SLOT.items():
-        entry = vm.get(vid_slot)
-        engine_id = (entry.get("engine_id") if isinstance(entry, dict)
-                     else str(entry or ""))
+    for role in _role_slots.ROLE_TO_VIDEO_SLOT:
+        engine_id = _role_slots.engine_id_for_role(vm, role)
         if _is_mesh_fodder_engine(engine_id):
             roles.add(role)
     return sorted(roles)

@@ -34,6 +34,7 @@ log = logging.getLogger("OTR")
 
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
+from ._otr_shared import role_slots as _role_slots
 from ._otr_image_engines import registry as _ireg
 
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
@@ -277,16 +278,10 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     return dst
 
 
-#: object role -> the OTR_VideoDirector video slot that owns it (mirrors
-#: otr_video_director.VIDEO_SLOT_ROLES). Used to look up the SELECTED video engine
-#: for a still's role so an unused still (procedural floor) can be skipped.
-_ROLE_TO_VIDEO_SLOT = {
-    "announcer_visual": "announcer_video_model",
-    "music_visual": "music_video_model",
-    "character_video": "other_beats_video_model",
-    "scene_broll": "other_beats_video_model",
-    "background_abstract": "other_beats_video_model",
-}
+#: object role -> the OTR_VideoDirector video slot that owns it. Route-A: the
+#: ONE shared per-role map (nodes/_otr_shared/role_slots.py); aliased here so any
+#: importer of this name keeps working but the rule lives in one place.
+_ROLE_TO_VIDEO_SLOT = _role_slots.ROLE_TO_VIDEO_SLOT
 
 
 def engine_consumes_still(eng) -> bool:
@@ -320,12 +315,15 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     vmodels = (image_policy or {}).get("video_models") or {}
     if not vmodels:
         return True                       # legacy policy: dispatch every still
-    slot = _ROLE_TO_VIDEO_SLOT.get(str(role))
-    if not slot:
+    # Unknown role -> keep the still (fail-safe), matching the legacy
+    # _ROLE_TO_VIDEO_SLOT.get(role) -> None -> True behaviour. engine_id_for_role
+    # tolerantly maps an unknown role to the legacy slot, so guard explicitly.
+    if str(role) not in _role_slots.ROLE_TO_VIDEO_SLOT:
         return True
-    entry = vmodels.get(slot) or {}
-    eng_id = (entry.get("engine_id") if isinstance(entry, dict)
-              else str(entry or ""))
+    # Route-A: resolve the role's video engine via the ONE shared map (per-role
+    # slot, then the legacy other_beats fallback) so character_video correctly
+    # reads character_video_model (humo_14B_169 consumes the still it requires).
+    eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
     if not eng_id:
         return True
     try:
