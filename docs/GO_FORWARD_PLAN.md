@@ -40,6 +40,14 @@
 > substring anchors, MF-5 single-scorer v2-gating (3.2+3.6 v2-gated; cliche/stage/nose always-on; coda never enters),
 > MF-6 flag-once, W-F v2-flag threading. This cluster touches production line-composition control flow -- build it in a
 > focused window with full budget + the suite/Bug-Bible/B7/cast-replay-parity gate per chunk. prod/main + tags GATED.
+> **>>> THE PLAN IS BUILD-READY -- CODE IT, do NOT re-roundtable.** STORY_QUALITY_BUILD_PLAN.md is R1->R4 CONVERGED
+> with the R4 verdict "GO for coder handoff"; every MF-* is a local one-liner folded at coding time (no design change,
+> no build-order change). The next window is a CODER window: prove comprehension of the CURRENT STEP, then BUILD 3.2 ->
+> 3.3 -> 3.4 -> 3.5 -> scan-plumbing -> deferred 3.6/3.7 flag halves in order, committing per green chunk to v2.0-alpha
+> (operator pre-approved the build). Read STORY_QUALITY_BUILD_PLAN.md sections 3.2/W-A..W-H/R4 IN FULL first; the four
+> compose_line recursion sites are in nodes/_otr_line_composer.py (clean-quality ~L2415, leak-floor L2498, Stage-3
+> L2592, draft inside compose_line_draft); the new detectors go in nodes/_otr_line_hygiene.py; scan counters in
+> scripts/story_quality_scan.py. Already DONE this baton: 3.1/3.6/3.7 (don't rebuild them).
 >
 > - **JOB 1 (FIRST) -- LTX winner-wire.** Operator PICK = whole-clip decode 4096/8 + lanczos+unsharp 0.4 + canvas
 >   512x288 + i2v0.75 native (PROVISIONAL -- commit-note it's the recommended pick; operator eyeballs the final clip
