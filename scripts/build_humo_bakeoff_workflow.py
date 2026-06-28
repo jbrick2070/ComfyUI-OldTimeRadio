@@ -57,7 +57,11 @@ STILL_NAME, AUDIO_NAME = FIXED_ASSETS[0], FIXED_ASSETS[1]
 # engine / two-stage eviction). Frame count is a short lip-sync clip, quantized
 # to the Wan-2.1-VAE 4n+1 rule and clamped to the HuMo floor/ceiling.
 SEED = 0
-FRAMES = int(os.environ.get("OTR_BAKEOFF_FRAMES", "81"))   # ~3.2s @ 25fps, 4n+1
+FRAMES = int(os.environ.get("OTR_BAKEOFF_FRAMES", "49"))   # ~2s @ 25fps, 4n+1
+# (49 keeps the lip-sync clip short so the peak is UNET-weight-dominated, not
+# activation-dominated -- a fairer "does the tier FIT" measurement + it leaves
+# headroom to actually COMPLETE and emit a clip for the eyeball. Override via
+# OTR_BAKEOFF_FRAMES.)
 POSITIVE = "a person speaking to camera, subtle natural facial motion"
 
 #: Map the bakeoff engine id to its registered HuMoEngine subclass.
@@ -157,6 +161,15 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
         "inputs": {"filename_prefix": prefix,
                    "images": [alias_to_id["vaedecode"], 0]}}
 
+    # Optional per-leg cfg override (the 1.7B de-blue sweep): rewrite the KSampler
+    # cfg literal in the built prompt so the manifest cross-check still matches.
+    cfg_val = eng._cfg()
+    if leg.get("cfg") is not None:
+        cfg_val = float(leg["cfg"])
+        for nd in prompt.values():
+            if nd["class_type"] == "KSampler":
+                nd["inputs"]["cfg"] = cfg_val
+
     names = eng._loader_names()
     lora = names.get("lora")
     skip_lora = (not lora) or str(lora).strip().lower() in ("none", "skip", "off")
@@ -165,7 +178,7 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
         "two_stage": bool(leg["two_stage"]), "sentinel": bool(leg.get("sentinel")),
         "unet": names["unet"], "lora": (None if skip_lora else lora),
         "clip": names["clip"], "vae": names["vae"], "whisper": names["whisper"],
-        "shift": 8.0, "steps": eng._steps(), "cfg": eng._cfg(), "seed": int(seed),
+        "shift": 8.0, "steps": eng._steps(), "cfg": cfg_val, "seed": int(seed),
         "width": width, "height": height, "length": length,
         "terminal": "SaveImage", "frames_prefix": prefix,
         "save_node_id": save_id,

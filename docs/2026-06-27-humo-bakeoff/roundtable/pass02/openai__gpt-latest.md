@@ -1,0 +1,10 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: no. The plan still cannot be implemented as written because core gates lack concrete code changes/data shapes, GGUF loader wiring is underspecified against the existing graph API, and the “1.7B control only” requirement contradicts the grounded production fallback chain.
+
+MUST-FIX BEFORE BUILD:
+1. [Acceptance gates: “Frame-count fit matrix”] Defect: the plan requires a matrix but gives no implementable frame list or runner changes. `build_humo_bakeoff_workflow.py` has a single global `FRAMES = int(os.environ.get("OTR_BAKEOFF_FRAMES", "49"))`; `run_humo_bakeoff.py` iterates only `BUILD.LEGS`. Concrete fix: define an explicit matrix, e.g. `frames=[49, 97, 177]` or `frames=[49, representative, 177]` with `representative` numerically specified, then modify `BUILD.LEGS` or `run_humo_bakeoff.py` to generate `(leg, frames)` combinations, include frame count in `label`, `manifest`, output paths, and gates.
+
+2. [Acceptance gates: “representative beat”] Defect: “representative beat” is undefined and cannot be coded or verified. Concrete fix: name the exact audio/still pair and exact target frame count/duration for this point, or remove it and use only fixed frame counts.
+
+3. [Acceptance gates: “Promotion path … Each idea must name its exact workflow/profile edit”] Defect: none of the ranked ideas specifies the required edits to `workflows/otr_scifi_16gb_full.json` or `config/profiles/16gb_full.json`. The document itself says every idea must name them. Concrete fix: for each promotable idea, add a patch-level statement such as “change profile role X engine from `humo_1.7B_169` to `humo_14B_169`; set env/profile fields `OTR_HUMO_UNET_NAME=...`, `OTR_HUMO_LORA_NAME=...`, `OTR_HUMO_STEPS=...

@@ -86,8 +86,14 @@ LTX_SENTINEL_WF = os.path.join(REPO, "scripts",
                                "otr_ltx_av_q_bakeoff_distilled_native.json")
 
 FPS = 25.0
-VRAM_GATE_MB = 13500          # the DECISION gate (fit with headroom -> promote later)
-BOX_CEILING_MB = 14500        # OOM-abort guard, REPORTED (not the gate)
+VRAM_GATE_MB = 13500          # the DECISION gate (fit with REAL headroom -> promote)
+BOX_CEILING_MB = 14500        # single-resident reference ceiling, REPORTED (not a gate/abort)
+# OOM-abort = the TRUE physical guard. nvidia-smi "used" for a --cuda-malloc process
+# includes the allocator's reserved/cached pool, so a render can read ~15-15.9 GB and
+# still complete within the 16 GB card; aborting at 14.5 only kills renders that would
+# finish (and yields no clip). We abort just under physical VRAM so renders COMPLETE
+# and produce clips for the eyeball, then REPORT the peak vs 13500/14500.
+OOM_ABORT_MB = int(os.environ.get("OTR_BAKEOFF_OOM_ABORT_MB", "16000"))
 SIT_ABS_CAP = 90.0            # s/it spiral guard (HuMo 14B is slower than LTX)
 POLL_S = 2.0
 
@@ -500,10 +506,10 @@ def poll_with_abort(pid, server_log, slog_offset, vp, wall_cap=1800.0):
     last_sit = None
     while True:
         wall = time.time() - t0
-        if vp.peak_mb and vp.peak_mb > BOX_CEILING_MB:
+        if vp.peak_mb and vp.peak_mb > OOM_ABORT_MB:
             reset_box()
-            return ("abort", "VRAM %.0fMB > box ceiling %d (OOM guard)"
-                    % (vp.peak_mb, BOX_CEILING_MB), last_sit, None)
+            return ("abort", "VRAM %.0fMB > OOM guard %d (near physical)"
+                    % (vp.peak_mb, OOM_ABORT_MB), last_sit, None)
         with open(server_log, "r", encoding="utf-8", errors="replace") as f:
             f.seek(slog_offset)
             sl = f.read()

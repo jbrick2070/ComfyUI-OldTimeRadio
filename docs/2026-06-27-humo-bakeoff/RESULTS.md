@@ -72,3 +72,24 @@ The production two-stage split + a VramPeakProbe in eng_humo + the `config/profi
 1.7B->14B flip are all DEFERRED. Nothing was promoted. Re-run any time:
 `python scripts/run_humo_bakeoff.py` (or `--dry-validate`). The sibling helper lives at
 `custom_nodes/otr_bakeoff_helper/` (outside this repo).
+
+## Operator eyeball verdict (2026-06-27, on the 14B-vs-1.7B side-by-side)
+`_sidebyside_14B_vs_1p7B.mp4` (left = 14B two-stage, right = 1.7B ship). Operator call:
+**LEFT (14B) = usable / keeper; RIGHT (1.7B) = REJECT for final.** The 1.7B shows foreground
+shoulder/neck clutter, an accidental over-the-shoulder crop, weaker expression, a less clear
+face, and more "AI mush" around the coat/body edges (the weaker model handling the same
+still+audio worse -- NOT a cfg/colour issue, so the de-blue sweep was held). Both tiers have a
+weak, unrealistic mouth/teeth interior; this is a HuMo-inherent limitation, softened further by
+the 6-step distill, and is worse on the 1.7B.
+
+**The tension this exposes:** the visually-preferred 14B is exactly the tier that does NOT fit
+VRAM safely (rides ~15.8-16 GB, no headroom), while the VRAM-safe 1.7B is the one the operator
+rejected. So neither the plain fp8 14B nor the 1.7B is a clean ship.
+
+**Recommended next lever (NOT done here; operator-gated):** a **quantized HuMo-14B (GGUF)** so the
+14B look fits UNDER the VRAM ceiling -- the lever r2_plan flagged for exactly this case ("the only
+lever that lowers the ~14 GB fp8 UNET weight itself; revisit IF the two-stage can't hit 13.5"),
+now indicated because the two-stage evict reached only 15779 MB. A GGUF quant gives the SAME 14B
+look at lower weight VRAM but does NOT improve the mouth (same model); the mouth/teeth realism is a
+separate lever (more sampling steps / no-distill-LoRA, or a different audio-driven-face model).
+Nothing was promoted; the fp8 14B was NOT flipped into 16gb_full.
