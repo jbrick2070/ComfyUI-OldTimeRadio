@@ -676,6 +676,23 @@ def flag_cliche(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
+def find_cliche_phrase(text: Any) -> str:
+    """Return the EXACT matched cliche span (``m.group(0)``) from the first
+    ``_CLICHE_RES`` hit, or ``""`` if none. Companion to ``flag_cliche`` (which
+    returns only ``(bool, reason)``) -- used by S4 for exact-span replacement so
+    the repair swaps just the worn phrase and never parses the reason string.
+    Pure; never raises."""
+    try:
+        s = str(text or "")
+        for rx in _CLICHE_RES:
+            m = rx.search(s)
+            if m:
+                return m.group(0)
+        return ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 #: C5 (story-quality R2) -- on-the-nose emotion: a character NAMING their feeling
 #: or the stakes flatly ("I'm scared", "this is dangerous") instead of implying
 #: it. A strong writer shows; this gate rerolls the weak end.
@@ -913,6 +930,59 @@ def flag_one_breath(
         return False, ""
     except Exception:  # noqa: BLE001
         return False, ""
+
+
+# ---------------------------------------------------------------------------
+# G1 (story-quality v2, 2026-06-28) -- budget-derived one-breath cap + clause
+# scoring feature. The legacy hard 28-word one-breath cap collapsed rich lines
+# into noun-salad and, x the 14-beat skeleton, hard-bounded an episode at
+# ~210-310 voiced words regardless of target_words. derive_one_breath_cap lets a
+# generous per-beat budget raise the cap so a fuller spoken line survives; below
+# 28 / absent / malformed it returns 28 so the v2-OFF path is byte-identical.
+# ---------------------------------------------------------------------------
+
+#: coordinating conjunctions (FANBOYS) on word boundaries -- the _hard_clauses
+#: scoring feature. Deliberately NARROWER than flag_one_breath's _CLAUSE_CONJ
+#: (which also counts then/while/because/which/that/as) so the two never alias.
+_FANBOYS_RE = re.compile(r"\b(?:for|and|nor|but|or|yet|so)\b", re.IGNORECASE)
+
+
+def derive_one_breath_cap(words_per_beat_range: Any) -> int:
+    """Budget-derived one-breath word cap (story-quality v2). The per-beat word
+    budget's HIGH end becomes the one-breath ceiling, clamped to ``[28, 60]``.
+
+    ``words_per_beat_range`` round-trips through ``meta`` as a JSON LIST, so accept
+    any list/tuple with >= 2 numeric elements; anything else (absent / malformed /
+    ``(0,0)``) -> 28, the legacy cap, so the v2-OFF / no-range path is identical.
+    Returns ``min(max(eff_hi, 28), 60)`` when ``eff_hi > 0`` else 28. Pure; never
+    raises."""
+    try:
+        rng = words_per_beat_range
+        if isinstance(rng, (list, tuple)) and len(rng) >= 2:
+            lo, hi = rng[0], rng[1]
+            if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
+                eff_hi = int(hi)
+                if eff_hi > 0:
+                    return min(max(eff_hi, 28), 60)
+        return 28
+    except Exception:  # noqa: BLE001
+        return 28
+
+
+def _hard_clauses(text: Any) -> int:
+    """Count HARD clause boundaries: ``,`` ``;`` ``:`` plus coordinating FANBOYS
+    conjunctions on word boundaries (case-insensitive). A SCORING feature for
+    ``line_quality_defect_score``'s tie-break only -- never a gate. Pure; never
+    raises."""
+    try:
+        s = str(text or "")
+        if not s:
+            return 0
+        punct = s.count(",") + s.count(";") + s.count(":")
+        fanboys = len(_FANBOYS_RE.findall(s))
+        return punct + fanboys
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 # ---------------------------------------------------------------------------

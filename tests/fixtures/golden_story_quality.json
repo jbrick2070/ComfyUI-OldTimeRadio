@@ -1,0 +1,77 @@
+{
+ "_README": "G1 story-quality golden fixtures (2026-06-28, kibitz option C). Each row pairs a REAL shipped FAILING line (raw_text -- the gate over-correction collapsing rich beats into short noun-salad) with a hand-authored CORRECTED line at the per-beat budget. corrected_text is a checked-in literal: NEVER produced by the composer/repair or the helper under test (anti-tautology). words_per_beat_range is stored explicitly (do NOT infer budget_hi from per-line target_words). budget_hi == derive_one_breath_cap(words_per_beat_range). Corrected lines are authored as short declarative sentences so flag_one_breath's soft clause tripwire (>22 words AND >=3 [,;]+conj) does NOT fire at the budget cap, yet wc>28 so they WOULD flag at the legacy 28 cap -- proving the budget cap is what permits them. Source ledgers: signal_lost_{plancks_vanishing_horizon,ledger_ink_runs_dry,dance_of_keys}_20260628_*. SFW, UTF-8 no BOM.",
+ "rows": [
+  {
+   "episode_id": "signal_lost_plancks_vanishing_horizon",
+   "beat_id": "b004",
+   "engine": "grok",
+   "words_per_beat_range": [28, 50],
+   "source_target_words": 50,
+   "expected_cliche_span": "",
+   "raw_collapsed": true,
+   "raw_roster_caps": false,
+   "raw_text": "Storm the helm Quasimodo protects his paradox self to bury the merger disclosure.",
+   "corrected_text": "Hold the helm steady, Quasimodo. You are guarding your own paradox. I can see it. You would sink this whole gondola before you let the merger disclosure reach the deck above us."
+  },
+  {
+   "episode_id": "signal_lost_plancks_vanishing_horizon",
+   "beat_id": "b011",
+   "engine": "grok",
+   "words_per_beat_range": [28, 50],
+   "source_target_words": 53,
+   "expected_cliche_span": "",
+   "raw_collapsed": true,
+   "raw_roster_caps": false,
+   "raw_text": "Restore the quantum beacon cells or the loan covenant buries your pension with those papers.",
+   "corrected_text": "Restore the quantum beacon cells now. The loan covenant is already moving against you. Stall one more minute. Your pension vanishes into those same retracted papers. Then we both go down with this gondola."
+  },
+  {
+   "episode_id": "signal_lost_ledger_ink_runs_dry",
+   "beat_id": "b005",
+   "engine": "gemma",
+   "words_per_beat_range": [22, 40],
+   "source_target_words": 30,
+   "expected_cliche_span": "",
+   "raw_collapsed": false,
+   "raw_roster_caps": true,
+   "raw_text": "I need to see the actual records proving what they agreed to when CLARISSE GORDON claim this whole arrangement was a miracle",
+   "corrected_text": "Show me the actual records, Victor. I need to see what they truly agreed to. You called this whole arrangement a miracle. I will not take your word for a miracle. Not anymore."
+  },
+  {
+   "episode_id": "signal_lost_ledger_ink_runs_dry",
+   "beat_id": "b016",
+   "engine": "gemma",
+   "words_per_beat_range": [22, 40],
+   "source_target_words": 31,
+   "expected_cliche_span": "",
+   "raw_collapsed": true,
+   "raw_roster_caps": true,
+   "raw_text": "The ledger isn't the point, VICTOR STENDAHL; the turning of the page is what matters now.",
+   "corrected_text": "The ledger is not the point, Victor. The page is already turning. What matters now is whose name still stands after the ink finally runs dry. Yours might not."
+  },
+  {
+   "episode_id": "signal_lost_dance_of_keys",
+   "beat_id": "b005",
+   "engine": "mistral",
+   "words_per_beat_range": [22, 40],
+   "source_target_words": 31,
+   "expected_cliche_span": "Over my dead body",
+   "raw_collapsed": false,
+   "raw_roster_caps": false,
+   "raw_text": "Over my dead body, Lemmy. I've got the wrench, remember? And I won't hesitate to throw the breakers myself if you force my hand.",
+   "corrected_text": "You touch those breakers, you go through me first. I have the wrench. I will not hesitate. Force my hand here. I will throw every last one of them myself, Pim."
+  },
+  {
+   "episode_id": "signal_lost_dance_of_keys",
+   "beat_id": "b014",
+   "engine": "mistral",
+   "words_per_beat_range": [22, 40],
+   "source_target_words": 32,
+   "expected_cliche_span": "Not on my watch",
+   "raw_collapsed": true,
+   "raw_roster_caps": false,
+   "raw_text": "Not on my watch, Pim. This old girl's still got some juice left.",
+   "corrected_text": "You are not pulling this console while I still stand here, Pim. This old girl has fight left in her. I have nursed her through worse nights. We hold the line together."
+  }
+ ]
+}
