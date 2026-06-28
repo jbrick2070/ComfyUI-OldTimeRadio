@@ -120,6 +120,18 @@
 >   eyeballs the four clips first; the colour win suggests hardening 1.7B de-blue instead of flipping.
 >   Verified: unit 5/5, --dry-validate PASS, full suite (only the 5 pre-existing UI-save workflow-pin
 >   fails, confirmed present at pristine HEAD) + Bug Bible 16p + B7 5p green.
+>   **>>> JOB 3 FINAL VERDICT (2026-06-27, operator eyeball) -- docs/2026-06-27-humo-bakeoff/FINAL_VERDICT.md.**
+>   Operator: **14B fp8 wins 100%**; 1.7B rejected (mush/blue); 17B-GGUF rejected (cfg-1.0 mush was a
+>   distill-only-cfg BUG, fixed at cfg5 -> coherent B-R+9.2, but loses to 14B + ~5x slower + NVML-pool).
+>   ALL levers exhausted: two-stage evict (-217MB), allocator A/B (14B ~15.86GB REAL, not cache), GGUF
+>   (no 14B GGUF exists; 17B-GGUF true-demand 11.5GB fits + audio-xattn works but quality-rejected). On
+>   this hardware the 14B look and comfortable VRAM headroom are mutually exclusive. LOAD-BEARING fact:
+>   the 14B rendered EVERY leg (single 15996 / two-stage 15779 / sentinel-w-LTX 15974) with ZERO OOM at
+>   832x480/<=49f -- thin headroom (fails the 14.5 gate) but COMPLETES, incl. cross-engine. So it is now
+>   a RISK call: (A) promote 14B fp8 accepting thin headroom (single-resident + bounded beat + two-stage
+>   evict; flip 16gb_full humo_1.7B->humo_14B_169 via widget_mapping.json, SEPARATE gated coder task),
+>   (B) keep 1.7B (safe, rejected) + de-blue, or (C) park for a better-fitting model. AWAITING operator
+>   pick. Harness+probes shipped (HEAD 1de7978f); diagnostic only, production untouched.
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
