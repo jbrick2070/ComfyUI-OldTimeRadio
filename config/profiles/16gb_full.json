@@ -9,8 +9,8 @@
   "allow_sidecars": true,
   "max_model_class": "heavy",
   "role_overrides": {
-    "announcer_visual": "ltx_audio_in",
-    "music_visual": "ltx_audio_in",
+    "announcer_visual": "humo_14B_169",
+    "music_visual": "humo_14B_169",
     "other_beats_visual": "humo_1.7B",
     "character_visual": "humo_14B_169",
     "scene_broll_visual": "wan_ti2v",
