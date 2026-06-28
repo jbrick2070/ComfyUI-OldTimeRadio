@@ -104,6 +104,22 @@
 >   way STOP and leave clips for the OPERATOR'S EYEBALL before flipping the profile. (Optimization settings + a
 >   "is a newer audio-driven-face model more reliable than HuMo-14B?" check are being hardened via the 2026-06-27
 >   humo-optim kibitz r2 -> `roundtables/2026-06-27-humo-optim/`.)
+>   **>>> JOB 3 RAN 2026-06-27 (diagnostic; production UNTOUCHED; HEAD 306af3c6 on v2.0-alpha).**
+>   Built per the r4-converged `roundtables/2026-06-27-humo-optim/final.md` (standalone bakeoff:
+>   sibling `custom_nodes/otr_bakeoff_helper` OTR_BakeoffReclaim encoder-only evict +
+>   `scripts/build_humo_bakeoff_workflow.py` + `scripts/run_humo_bakeoff.py`; eng_humo / workflow JSON /
+>   pack __init__ NOT touched). 4 legs rendered on the 5080 (fixed still+audio+seed, 49f @832x480),
+>   clips -> `output/otr/episodes/_bakeoff_humo/<leg>.mp4`, full table in
+>   `docs/2026-06-27-humo-bakeoff/RESULTS.md`. **VERDICT: KEEP humo_1.7B.** Peak VRAM (external
+>   nvidia-smi): 14B single 15996 MB, 14B two-stage 15779 MB (the OTR_BakeoffReclaim umt5+whisper
+>   evict shaved only ~217 MB -- the fp8 14B UNET + Wan video activations dominate; BUG-265 redux),
+>   1.7B control 15089 MB, sentinel (LTX-AV resident, peak 14944, then HuMo) 15974 MB. NONE meet the
+>   <=13.5 GB safe-fit gate, so the two-stage lever does NOT make the 14B promotable. Quality: 14B
+>   B-R ~9.9 (colour-balanced) vs 1.7B B-R ~21.9 (bluer) -- 14B looks better but has no VRAM headroom.
+>   ALL promotion DEFERRED (two-stage split / VramPeakProbe / 16gb_full profile flip): operator
+>   eyeballs the four clips first; the colour win suggests hardening 1.7B de-blue instead of flipping.
+>   Verified: unit 5/5, --dry-validate PASS, full suite (only the 5 pre-existing UI-save workflow-pin
+>   fails, confirmed present at pristine HEAD) + Bug Bible 16p + B7 5p green.
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
