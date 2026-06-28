@@ -81,6 +81,15 @@ LEGS = [
      "two_stage": False, "sentinel": False},
     {"label": "iv_sentinel_14B_twostage", "engine": "humo_14B_169",
      "two_stage": True, "sentinel": True},
+    # Step B (roundtable-decided): 17B-GGUF legs -- the only quantized HuMo that lowers
+    # the weight floor (no 14B GGUF exists). LoRA-free (14B-shaped distill won't apply),
+    # 20 steps, cfg 1.0, two-stage encoder evict, on-disk Q3 first then Q5. Topology from
+    # the 14B engine; the unet node is swapped to UnetLoaderGGUF. NOT in the default
+    # sweep order intent -- run via --only humo_17b_gguf.
+    {"label": "humo_17b_gguf_q3", "engine": "humo_14B_169", "two_stage": True,
+     "sentinel": False, "gguf": "HuMo-17b-Q3_K_M.gguf", "steps": 20, "cfg": 1.0},
+    {"label": "humo_17b_gguf_q5", "engine": "humo_14B_169", "two_stage": True,
+     "sentinel": False, "gguf": "Wan2_1-HuMo-17B_Q5_K_M.gguf", "steps": 20, "cfg": 1.0},
 ]
 
 RECLAIM_CLASS = "OTR_BakeoffReclaim"
@@ -127,13 +136,36 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
     Returns ``(prompt, meta)``. The prompt is the standalone HuMo graph with a
     SaveImage terminal; for a two-stage leg the OTR_BakeoffReclaim node is spliced
     on the WanHuMoImageToVideo(slot2) -> KSampler.latent_image edge."""
-    eng = engine_for(leg["engine"])
-    width, height = eng._native_dims()
-    length = quantize_frames_4n1(frames, eng_humo._HUMO_MIN_FRAMES,
-                                 eng_humo._HUMO_MAX_FRAMES)
-    plan = {"text_prompt": positive, "seed": int(seed)}
-    spec = eng._build_graph(image_name, audio_name, plan, length, width, height)
-    candidates = eng._node_candidates()
+    # GGUF leg (Step B): build the 14B topology LoRA-FREE with the GGUF unet name via
+    # env (eng_humo._build_graph drops the lora node + rewires modelsampling<-unet on
+    # OTR_HUMO_LORA_NAME=none); the unet node's class is swapped to UnetLoaderGGUF below.
+    # Restore env immediately so sequential leg builds in one process don't contaminate.
+    gguf = leg.get("gguf")
+    _envsave = {}
+    if gguf:
+        for _k, _v in (("OTR_HUMO_LORA_NAME", "none"),
+                       ("OTR_HUMO_UNET_NAME", gguf),
+                       ("OTR_HUMO_STEPS", str(leg.get("steps", 20)))):
+            _envsave[_k] = os.environ.get(_k)
+            os.environ[_k] = _v
+    try:
+        eng = engine_for(leg["engine"])
+        width, height = eng._native_dims()
+        length = quantize_frames_4n1(frames, eng_humo._HUMO_MIN_FRAMES,
+                                     eng_humo._HUMO_MAX_FRAMES)
+        plan = {"text_prompt": positive, "seed": int(seed)}
+        spec = eng._build_graph(image_name, audio_name, plan, length, width, height)
+        candidates = eng._node_candidates()
+        names = eng._loader_names()
+        steps_v = eng._steps()
+        cfg_default = eng._cfg()
+        engine_name = eng.name
+    finally:
+        for _k, _v in _envsave.items():
+            if _v is None:
+                os.environ.pop(_k, None)
+            else:
+                os.environ[_k] = _v
 
     # Stable integer ids for every alias (insertion order is deterministic).
     alias_to_id = {alias: str(i + 1) for i, alias in enumerate(spec)}
@@ -174,24 +206,34 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
         "class_type": "SaveImage",
         "inputs": {"filename_prefix": prefix, "images": [probe_id, 0]}}
 
+    # GGUF leg: swap the unet node class to UnetLoaderGGUF (inputs = unet_name only;
+    # no weight_dtype) -- the proven eng_wan_i2v contract. The 14B topology above gave
+    # it UNETLoader + the gguf name; here we correct the loader class.
+    loader_class = "UNETLoader"
+    if gguf:
+        loader_class = "UnetLoaderGGUF"
+        prompt[alias_to_id["unet"]] = {
+            "class_type": loader_class, "inputs": {"unet_name": gguf}}
+
     # Optional per-leg cfg override (the 1.7B de-blue sweep): rewrite the KSampler
     # cfg literal in the built prompt so the manifest cross-check still matches.
-    cfg_val = eng._cfg()
+    cfg_val = cfg_default
     if leg.get("cfg") is not None:
         cfg_val = float(leg["cfg"])
         for nd in prompt.values():
             if nd["class_type"] == "KSampler":
                 nd["inputs"]["cfg"] = cfg_val
 
-    names = eng._loader_names()
     lora = names.get("lora")
     skip_lora = (not lora) or str(lora).strip().lower() in ("none", "skip", "off")
     meta = {
-        "label": leg["label"], "engine_id": eng.name,
+        "label": leg["label"], "engine_id": engine_name, "gguf": gguf or None,
         "two_stage": bool(leg["two_stage"]), "sentinel": bool(leg.get("sentinel")),
-        "unet": names["unet"], "lora": (None if skip_lora else lora),
+        "loader_class": loader_class, "loader_param": "unet_name",
+        "unet": (gguf if gguf else names["unet"]),
+        "lora": (None if skip_lora else lora),
         "clip": names["clip"], "vae": names["vae"], "whisper": names["whisper"],
-        "shift": 8.0, "steps": eng._steps(), "cfg": cfg_val, "seed": int(seed),
+        "shift": 8.0, "steps": steps_v, "cfg": cfg_val, "seed": int(seed),
         "width": width, "height": height, "length": length,
         "terminal": "SaveImage", "frames_prefix": prefix,
         "save_node_id": save_id,

@@ -324,7 +324,8 @@ def _enum_options(schemas, cls, param):
 def assert_checkpoints(schemas, meta):
     """Fail LOUD if any of this leg's checkpoint files is NOT among the server's
     loader enums (== not installed). Never silently skip a leg into a false DONE."""
-    want = [("UNETLoader", "unet_name", meta["unet"]),
+    want = [(meta.get("loader_class", "UNETLoader"),
+             meta.get("loader_param", "unet_name"), meta["unet"]),
             ("CLIPLoader", "clip_name", meta["clip"]),
             ("VAELoader", "vae_name", meta["vae"]),
             ("AudioEncoderLoader", "audio_encoder_name", meta["whisper"])]
@@ -366,7 +367,9 @@ def _sha256_file(path):
 def build_manifest(prompt, meta):
     """Extract the RESOLVED recipe from the built /prompt and assert it matches the
     intended (meta). The #1 risk is measuring the WRONG graph -- any mismatch aborts."""
-    unet = prompt[_find(prompt, "UNETLoader")]["inputs"]
+    lc = meta.get("loader_class", "UNETLoader")
+    lp = meta.get("loader_param", "unet_name")
+    unet = prompt[_find(prompt, lc)]["inputs"]
     msss = prompt[_find(prompt, "ModelSamplingSD3")]["inputs"]
     ks = prompt[_find(prompt, "KSampler")]["inputs"]
     humo = prompt[_find(prompt, "WanHuMoImageToVideo")]["inputs"]
@@ -376,7 +379,7 @@ def build_manifest(prompt, meta):
     manifest = {
         "leg": meta["label"], "engine_id": meta["engine_id"],
         "two_stage": meta["two_stage"], "sentinel": meta["sentinel"],
-        "unet": unet.get("unet_name"),
+        "unet": unet.get(lp), "loader_class": lc,
         "lora": (prompt[lora_nid]["inputs"].get("lora_name") if lora_nid else None),
         "shift": msss.get("shift"), "steps": ks.get("steps"), "cfg": ks.get("cfg"),
         "seed": ks.get("seed"),

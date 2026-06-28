@@ -1,0 +1,26 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: yes-with-fixes. Pivot to a diagnostic 17B-GGUF bakeoff leg, but the plan is not build-ready until it removes the false “14B GGUF” premise, avoids the existing 1.7B/“17B” naming collision, and makes the GGUF loader path explicit.
+
+MUST-FIX BEFORE BUILD:
+1. [STEP_A_RESULTS.md / “Next per final.md” + The blocker] The current Step B story is internally broken: it says “quantized HuMo-14B GGUF,” but the new finding says no HuMo-14B GGUF exists. Concrete fix: rewrite Step B as “HuMo-17B GGUF feasibility gate” with pass/fail criteria: single resident NVML peak <=13.5 GB target / <=14.5 GB hard, 33f smoke completes, output remains silent, operator eyeball beats or materially approaches the current humo_1.7B fallback.
+
+2. [eng_humo.py: HuMo17BEngine / _HUMO_17B_UNET] Do not reuse the existing “17B” symbols or env namespace for the new leg. The grounded code shows `HuMo17BEngine` is actually the 1.7B tier: `_HUMO_17B_UNET = "humo_1.7B_fp16.safetensors"`, `name = "humo_1.7B"`, and envs are `OTR_HUMO_17B_*`. That is already misleading and will collide with a real 17B GGUF bakeoff. Concrete fix: in `build_humo_bakeoff_workflow.py` use bakeoff-only IDs like `humo_17b_gguf_q5` and `humo_17b_gguf_q3`; do not introduce or depend on `OTR_HUMO_17B_*` for the real 17B diagnostic leg.
+
+3. [eng_humo.py:_node_candidates + eng_wan_i2v.py:_loader_mode/_build_graph] A 17B GGUF leg cannot be produced by the current `eng_humo` graph path. `eng_humo._node_candidates()` hardcodes `"unet": ("UNETLoader",)`, and `_build_graph()` gives the unet node `{"unet_name": ..., "weight_dtype": "default"}`. The grounded GGUF pattern in `eng_wan_i2v` uses `"UnetLoaderGGUF"` and passes only `{"unet_name": ...}`. Concrete fix in the bakeoff builder: emit a separate diagnostic graph where the unet node class resolves to `UnetLoaderGGUF` and the inputs are exactly `{"unet_name": <gguf basename>}`. Do not call the production `eng_humo._build_graph()` for this leg unless the builder overrides both class resolution and unet inputs.
+
+4. [Code facts + eng_humo.py:_build_graph] The 17B GGUF leg must be LoRA-free. The current 14B tier uses `LoraLoaderModelOnly` with `lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`; the prompt states that LoRA is 14B-shaped and will mismatch 17B. Concrete fix: omit the `lora` node entirely for `humo_17b_gguf_q5/q3`; wire `ModelSamplingSD3.model` directly from `UnetLoaderGGUF`.
+
+5. [Code facts + eng_humo.py:_steps/_cfg/_build_graph] Do not inherit the 14B distill sampling defaults. The 14B path defaults to 6 steps because of the 14B lightx2v distill LoRA; the 1.7B fallback defaults to 20 steps because it is LoRA-free. Concrete fix: bake the diagnostic 17B GGUF leg as LoRA-free with `steps=20` initially, `cfg=1.0`, `ModelSamplingSD3 shift=8.0`, `sampler_name="uni_pc"`, `scheduler="simple"`, `denoise=1.0`. Only rerun the better-fitting candidate at 25 steps if the 20-step leg fits and the operator says quality is close.
+
+6. [Code facts: “WanHuMoImageToVideo audio cross-attn must accept a GGUF-loaded 17B”] The main feasibility risk is not just VRAM; it is whether `WanHuMoImageToVideo` accepts the model object produced by `UnetLoaderGGUF`. Concrete fix: make the first run a 33f smoke that exercises the full audio path: `LoadAudio -> AudioEncoderLoader -> AudioEncoderEncode -> WanHuMoImageToVideo -> KSampler -> VAEDecode`. Treat any model-type, cross-attention, conditioning, or shape error as a hard fail for the 17B-GGUF path.
+
+7. [STEP_A_RESULTS.md] Use NVML, not torch allocator stats, as the acceptance meter. Step A grounded that `torch.cuda.max_memory_allocated` under-reports because ComfyUI loads weights outside those stats. Concrete fix: `run_humo_bakeoff.py` must reuse the Step-A NVML peak meter around the full render window, not just log `torch.cuda.max_memory_allocated`. The hard gate is NVML peak <=14.5 GB; <=13.5 GB is the target.
+
+8. [Want from panel / HARD constraints] The diagnostic must be one resident leg per process or otherwise prove teardown between legs. Concrete fix: run Q5 and Q3 as isolated bakeoff invocations, or force explicit cleanup between legs and verify post-leg NVML drain before starting the next. Do not let Q5/Q3/14B/1.7B co-residency contaminate the peak measurement. [ASSUMPTION: current `run_humo_bakeoff.py` may support multiple legs per invocation; verify before wiring.]
+
+SHOULD-FIX:
+1. [Ranked rec] Ranked recommendation:
+   1) Test `Wan2_1-HuMo-17B_Q5_K_M.gguf` first. One-line why: it is the highest-quality on-disk GGUF candidate and the only plausible “near-14B” weight-floor replacement if it fits.
+   2) Test `HuMo-17b-Q3_K_M.gguf` second only if Q5 exceeds the ceiling or is too close to the hard limit. One-line why: Q3 has more VRAM headroom but likely more quality loss.
+   3) Keep `humo_1.7B` de-blue hardening as fallback, not first choice. One-line why: it already fits conceptually, but it is not the claimed 14B
