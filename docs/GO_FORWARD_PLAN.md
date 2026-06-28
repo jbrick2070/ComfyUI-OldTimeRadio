@@ -93,8 +93,17 @@
 >   the AV stack (LTX-AV + Whisper) immediately before the HuMo leg in ONE resident session -> does 14B fit
 >   <=14.5GB or RAISE? Test pre-emptive `--reserve-vram` (post-decode eviction already exists eng_humo.py:361).
 >   CUT: NEGATIVE + broad FRAMES sweeps. Side-by-side clips -> `otr/episodes/_bakeoff_humo/<leg>.mp4`; objective
->   face/lip proxies ONLY if OpenCV/landmark libs are present, else VRAM+s/it+eyeball. STOP and leave clips for the
->   OPERATOR'S EYEBALL -- don't wire any quality change; the ONLY production-candidate fix is the Phase-B reserve.
+>   face/lip proxies ONLY if OpenCV/landmark libs are present, else VRAM+s/it+eyeball. QUALITY TARGET = the 5/21
+>   recipe (commit 8e7fd801): HuMo-14B fp8 + lightx2v 480p distill LoRA + ModelSamplingSD3 shift 8 -- the tier in
+>   production BEFORE BUG-265 (09c2d493, 2026-05-24) demoted it to 1.7B because it staged ~16.5GB and OOM-thrashed.
+>   The shipping `config/profiles/16gb_full.json` STILL pins `video_render_engine: humo_1.7B` -- that pin IS the
+>   "lost quality." **OPERATOR DECISION GATE (2026-06-27):** if the bakeoff can fit 14B SAFELY with REAL headroom
+>   (peak <= ~13.5GB so it is NOT riding 100% of VRAM -- via lazy umt5-TE detach / smaller-or-quantized TE / a
+>   lighter 14B quant), PROMOTE it: flip 16gb_full role+slot 1.7B->14B (SAME-change profile edit + re-validate).
+>   If it CANNOT fit safely, KEEP 1.7B (reliability wins) and instead harden the 1.7B optimization settings. EITHER
+>   way STOP and leave clips for the OPERATOR'S EYEBALL before flipping the profile. (Optimization settings + a
+>   "is a newer audio-driven-face model more reliable than HuMo-14B?" check are being hardened via the 2026-06-27
+>   humo-optim kibitz r2 -> `roundtables/2026-06-27-humo-optim/`.)
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
