@@ -76,6 +76,16 @@
 >   default <=4 (Q7); honor the R4 must-fixes (four-guard propagation incl Stage-3 L2592; coda truncation
 >   `clean_one_line(brief,0)` vs `(brief,_CODA_FACT_MAX)`; substring anchor match; v2-gated `_quality_flags_for_line`;
 >   flag-once). (This is the prior LANE A; now JOB 2, run by the SAME autonomous window after JOB 1.)
+> - **JOB 3 (after JOB 2, GPU-sequenced) -- HuMo quality check (operator concern: "HuMo lost quality").** GROUNDED:
+>   eng_humo.py UNCHANGED since 2026-06-17; recent changes were IMPROVEMENTS (de-blue 1.7B cfg5->1 `fdb93286`,
+>   colour-correct 14B 16:9, fast 6-step 14B default `ea024c70`) -> a code regression is unlikely. Likely cause =
+>   the auto-downgrade chain humo_14B->humo_1.7B->still under VRAM pressure (`dc2d5399`, LOUD restamp): a hot box
+>   silently drops 14B to the lighter 1.7B. TEST: a small HuMo bakeoff -- force the **14B keystone vs the 1.7B**
+>   tier on ONE fixed face beat (same still+audio+seed), reset the box before each leg, single resident <=14.5GB,
+>   LOUD fallbacks; write side-by-side clips to `otr/episodes/_bakeoff_humo/<tier>.mp4` + log the tier that ACTUALLY
+>   ran + peak VRAM; ALSO grep a recent episode ledger for a humo downgrade restamp (was 14B falling to 1.7B?).
+>   STOP after rendering and leave the clips for the OPERATOR'S EYEBALL -- "lost quality" is his judgment, not the
+>   agent's. Don't wire any change from this; it's a diagnostic.
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
