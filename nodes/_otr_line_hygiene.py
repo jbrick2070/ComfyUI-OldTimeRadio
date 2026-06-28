@@ -464,6 +464,12 @@ def detect_stage_business_for_reroll(
         # unbalanced or no quotes (b017): undelimited action clause anywhere
         if _contains_undelimited_action_clause(norm):
             return (True, _BARE_STAGE_HINT, "undelimited_action_clause")
+        # 3.3 (2026-06-27): a WHOLE-line impersonal action chain the per-chunk
+        # clause check misses -- non-whitelisted verb leads joined by commas
+        # ("snaps off pen's tip, jams it into the port, turning it to scrap")
+        # that the heatwave-b008 leak rode through with EMPTY compose_flags.
+        if is_whole_line_stage_action(norm):
+            return (True, _BARE_STAGE_HINT, "whole_line_action")
         return (False, "", "")
     except Exception:  # noqa: BLE001
         return (False, "", "")

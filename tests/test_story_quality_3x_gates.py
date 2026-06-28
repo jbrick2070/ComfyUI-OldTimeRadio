@@ -16,6 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes._otr_line_hygiene import (  # noqa: E402
+    detect_stage_business_for_reroll,
     extract_specificity_anchors_from_header,
     flag_anchor_stuffing,
     flag_one_breath,
@@ -119,6 +120,25 @@ class TestFlagPersonalCostBoilerplate:
     def test_concrete_consequence_left_alone(self):
         assert flag_personal_cost_boilerplate(
             "She loses access to the observatory archive.")[0] is False
+
+
+class TestWholeLineWiredIntoReroll:
+    """3.3: is_whole_line_stage_action feeds the existing draft-stage detector."""
+
+    def test_all_nonwhitelisted_action_chain_drives_reroll(self):
+        # No chunk leads with a whitelisted _NARRATION_VERBS verb, so the
+        # per-chunk undelimited check misses it; the whole-line detector catches
+        # the impersonal comma chain (the 3.3 value-add).
+        hit, hint, reason = detect_stage_business_for_reroll(
+            "snaps off the cap, cracks the seal, drains the vial", "MARLOWE")
+        assert hit is True
+        assert reason == "whole_line_action"
+        assert hint
+
+    def test_quoted_dialogue_not_a_whole_line_hit(self):
+        hit, _hint, reason = detect_stage_business_for_reroll(
+            '"My thumb keeps catching on the log\'s corner," I said.', "ALICE")
+        assert not (hit and reason == "whole_line_action")
 
 
 def _req(**over):
