@@ -1407,36 +1407,80 @@ def _norm_sig(s) -> str:
     return " ".join(str(s or "").lower().split()).strip(" .")
 
 
+#: Speech-signature stopwords -- joiners that carry no register meaning, dropped
+#: before the overlap comparison so "measured, precise" and "measured and precise"
+#: tokenize the same.
+_SIG_STOPWORDS = frozenset({"and", "but", "the", "a", "an", "with", "of", "very",
+                            "or", "yet", "then"})
+#: 3.7 (story-quality R2): two signatures count as NEAR-duplicates -- and collide
+#: in diversify_speech_signatures -- when their token overlap coefficient reaches
+#: this. 0.5 catches a shared DOMINANT trait ("measured, precise, weary" vs
+#: "measured, concise" share "measured" = 0.5 of the shorter set) while leaving
+#: disjoint registers ("clipped, procedural" / "warm, rambling" = 0.0) alone.
+_SIG_NEAR_DUP_THRESHOLD = 0.5
+
+
+def _sig_tokens(s) -> set:
+    import re
+    return {t for t in re.findall(r"[a-z]+", _norm_sig(s))
+            if len(t) > 2 and t not in _SIG_STOPWORDS}
+
+
+def speech_signature_overlap(a, b) -> float:
+    """Token OVERLAP COEFFICIENT (0..1) between two speech signatures -- the shared
+    fraction of the SMALLER token set, so identical registers score 1.0 and a
+    shared dominant trait scores high even when one signature is longer.
+    Deterministic; never raises."""
+    ta, tb = _sig_tokens(a), _sig_tokens(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / min(len(ta), len(tb))
+
+
 def diversify_speech_signatures(cast, seed: int = 0):
     """Ensure each cast row's speech_signature is DISTINCT (C3). A non-colliding
-    LLM signature is KEPT; an empty / 'plain spoken' default / duplicate one is
-    reassigned from a deterministic contrasting pool (rotated by `seed` for
-    C7 reproducibility) so two characters never share a register. Mutates rows
-    in place; never raises."""
+    LLM signature is KEPT; an empty / 'plain spoken' default / EXACT-duplicate /
+    NEAR-duplicate one (3.7: token overlap >= threshold, e.g. "measured, precise,
+    weary" vs "measured, concise") is reassigned from a deterministic contrasting
+    pool (rotated by `seed` for C7 reproducibility) so two characters never share
+    a register. Mutates rows in place; never raises."""
     try:
         n = len(_SPEECH_REGISTER_POOL)
         start = (int(seed) % n) if n else 0
         pool = [_SPEECH_REGISTER_POOL[(start + i) % n] for i in range(n)]
         used: set = set()
+        kept: list = []           # the signatures retained so far (near-dup base)
         default_norm = _norm_sig("plain spoken")
         pool_idx = 0
+
+        def _near_dup(sig) -> bool:
+            return any(speech_signature_overlap(sig, k) >= _SIG_NEAR_DUP_THRESHOLD
+                       for k in kept)
+
         for row in cast:
             if not isinstance(row, dict):
                 continue
             sig = str(row.get("speech_signature") or "").strip()
             norm = _norm_sig(sig)
-            if (not sig) or norm == default_norm or norm in used:
-                while (pool_idx < len(pool)
-                       and _norm_sig(pool[pool_idx]) in used):
+            if (not sig) or norm == default_norm or norm in used or _near_dup(sig):
+                # advance past any pool entry already used OR near-dup of a kept
+                # signature, so the reassignment is itself genuinely contrasting.
+                while pool_idx < len(pool) and (
+                        _norm_sig(pool[pool_idx]) in used
+                        or _near_dup(pool[pool_idx])):
                     pool_idx += 1
                 if pool_idx < len(pool):
-                    row["speech_signature"] = pool[pool_idx]
-                    used.add(_norm_sig(pool[pool_idx]))
+                    new_sig = pool[pool_idx]
+                    row["speech_signature"] = new_sig
+                    used.add(_norm_sig(new_sig))
+                    kept.append(new_sig)
                     pool_idx += 1
                 else:
-                    used.add(norm)  # more chars than pool (>8) -- leave as-is
+                    used.add(norm)        # more chars than pool -- leave as-is
+                    kept.append(sig)
             else:
                 used.add(norm)
+                kept.append(sig)
         return cast
     except Exception:  # noqa: BLE001
         return cast
