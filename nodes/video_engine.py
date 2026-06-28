@@ -2220,14 +2220,35 @@ class SignalLostVideoRenderer:
                     _c_np = _sig.resample(
                         _c_np, int(len(_c_np) * sr / _csr)
                     ).astype(np.float32)
-                # If closing cue is shorter than HUD duration, pad with
-                # a gentle tail decay (NOT a loop) then silence.
+                # If closing cue is shorter than the credits (HUD) duration, LOOP
+                # it to fill the whole credits instead of padding with silence
+                # (operator 2026-06-28: "the credits are sad with no audio"). Tile
+                # the cue with a short equal-power crossfade at each seam so there
+                # is no click, trim to the credits length, then a 2s fade-out at
+                # the very end. OTR_CREDITS_MUSIC_LOOP=0 restores the old
+                # fade-then-silence behaviour.
                 if len(_c_np) < hud_samples:
-                    # Fade out the last 2 seconds of the cue
-                    fade_out = min(int(2 * sr), len(_c_np) // 2)
-                    _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
-                    # Pad remainder with silence
-                    _c_np = np.pad(_c_np, (0, hud_samples - len(_c_np)))
+                    if os.environ.get("OTR_CREDITS_MUSIC_LOOP", "1") != "1":
+                        fade_out = min(int(2 * sr), len(_c_np) // 2)
+                        _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
+                        _c_np = np.pad(_c_np, (0, hud_samples - len(_c_np)))
+                    else:
+                        _body = _c_np.astype(np.float32)
+                        _xf = int(min(0.25 * sr, len(_body) // 4))
+                        if _xf > 0:
+                            _out = _body.copy()
+                            while len(_out) < hud_samples:
+                                _a = _out[-_xf:] * np.linspace(1, 0, _xf, dtype=np.float32)
+                                _b = _body[:_xf] * np.linspace(0, 1, _xf, dtype=np.float32)
+                                _out = np.concatenate([_out[:-_xf], _a + _b, _body[_xf:]])
+                            _c_np = _out[:hud_samples]
+                        else:
+                            _reps = (hud_samples + len(_body) - 1) // max(1, len(_body))
+                            _c_np = np.tile(_body, _reps)[:hud_samples]
+                        fade_out = min(int(2 * sr), len(_c_np) // 2)
+                        _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
+                        log.info("[Video] Credits music: LOOPED closing cue to fill "
+                                 "%.1fs credits (seam crossfade)", hud_samples / sr)
                 else:
                     _c_np = _c_np[:hud_samples]
                     # Fade out last 2 seconds

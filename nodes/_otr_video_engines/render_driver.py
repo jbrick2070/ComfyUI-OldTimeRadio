@@ -755,6 +755,34 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
     return str(family) == "audio_conditioned_video" or str(engine_id) == "visualizer"
 
 
+def _role_of_shot(shot) -> str:
+    """The beat's role: the explicit ShotRow ``role``, else derived from the
+    ``grp_<role>`` group_id (mirrors :func:`_is_character_face_beat`). Pure."""
+    role = str((shot or {}).get("role") or "")
+    if not role:
+        gid = str((shot or {}).get("group_id") or "")
+        if gid.startswith("grp_"):
+            role = gid[len("grp_"):]
+    return role
+
+
+#: The committed default custom "radio-face" still HuMo animates on the
+#: instrumental MUSIC bookend (Route-A, 2026-06-28 operator call). Repo-relative
+#: so it ships with the pack; override with OTR_RADIO_BOOKEND_IMAGE.
+_RADIO_BOOKEND_IMAGE_DEFAULT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "assets", "radio_face_bookend.png")
+
+
+def _radio_bookend_image() -> str:
+    """Resolve the radio-face still for the HuMo music bookend: the
+    ``OTR_RADIO_BOOKEND_IMAGE`` env override else the committed default asset.
+    Returns "" (LOUD at the call site) if neither exists -- never a missing path
+    fed to the engine."""
+    cand = os.environ.get("OTR_RADIO_BOOKEND_IMAGE") or _RADIO_BOOKEND_IMAGE_DEFAULT
+    return cand if (cand and os.path.isfile(cand)) else ""
+
+
 def _cumulative_beat_start(ledger, shot, fps):
     """The beat's start (seconds) in the MASTER mix, as BEAT-ACCURATE as possible
     without per-line timing on the beat itself (operator 2026-06-22: ltx_av should
@@ -959,6 +987,26 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "(init_source=missing_scene_still). This should not happen "
                 "after the still-spine coverage fix; investigate the image "
                 "phase for beat %s.", _bid, _bid)
+    # Route-A (2026-06-28): the instrumental MUSIC bookend (char_id="" -> no
+    # portrait) routed to HuMo would abort (no init_image, no fallbacks). Operator
+    # call: animate a custom radio-FACE still to the opening/closing theme. Give
+    # the humo music bookend that image as its init_image; the theme audio rides
+    # the ambient master slice (_uses_ambient_master_audio now covers humo
+    # bookends). Only the music bookend (no portrait) takes this -- a real
+    # character/announcer humo beat already has its portrait above.
+    if (not init_image and _family == "audio_driven_face"
+            and _role_of_shot(shot) == "music_visual"):
+        _radio = _radio_bookend_image()
+        if _radio:
+            init_image = _radio
+            init_source = "radio_bookend"
+            _LOG.info("[OTR.render_driver] music bookend %s: HuMo radio-face "
+                      "still %s", shot.get("shot_id"), os.path.basename(_radio))
+        else:
+            _LOG.warning("[OTR.render_driver] music bookend %s: HuMo radio-face "
+                         "still MISSING (set OTR_RADIO_BOOKEND_IMAGE or ship "
+                         "assets/radio_face_bookend.png) -- beat will fail LOUD",
+                         shot.get("shot_id"))
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
@@ -993,9 +1041,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # from the beat's target_frame_count (its audio-derived length) at its
         # cumulative timeline position -- NEVER the whole master (an episode-length
         # WAV would blow up the audio encoder).
+        # Route-A (2026-06-28): the HuMo MUSIC bookend (instrumental open/close,
+        # no per-line voice) must ALSO get a bounded master THEME slice so HuMo is
+        # not starved of audio_ref. Targeted HERE, not in _uses_ambient_master_audio
+        # -- that predicate by contract EXCLUDES audio_driven_face so a humo
+        # CHARACTER beat keeps its OWN clean voice; only the music bookend (role
+        # music_visual, is_char_face already False) takes the theme slice.
+        _humo_music_bookend = (_family == "audio_driven_face"
+                               and _role_of_shot(shot) == "music_visual")
         if ((start_s is None or dur_s is None)
-                and _uses_ambient_master_audio(shot.get("engine_id"), _family,
-                                               _is_character_face_beat(shot))):
+                and (_humo_music_bookend
+                     or _uses_ambient_master_audio(
+                         shot.get("engine_id"), _family,
+                         _is_character_face_beat(shot)))):
             _afps = int(((ledger or {}).get("video") or {}).get("fps") or 25) or 25
             _an = int(shot.get("target_frame_count") or 0)
             if dur_s is None:

@@ -343,10 +343,12 @@ def test_two_heavy_roles_still_validate():
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
-    # Shipped defaults (CS-4 policy flip 2026-06-11, operator-directed): the
-    # character tier defaults to humo_1.7B (BUG-265 Option C restored); the
-    # 14B stays registered + selectable opt-in.
-    assert profile["role_overrides"]["announcer_visual"] == "ltx_audio_in"  # heavy (2026-06-17 audio-in default)
+    # Route-A (2026-06-28, operator-directed): the 14B promotion puts
+    # humo_14B_169 on ALL THREE audio roles (announcer / music / character), so
+    # announcer_visual is now the heavy humo_14B_169 (was ltx_audio_in).
+    # other_beats_visual stays humo_1.7B (the legacy other-beats fallback for the
+    # lighter tiers); the 14B remains registered + selectable.
+    assert profile["role_overrides"]["announcer_visual"] == "humo_14B_169"  # heavy (Route-A)
     assert profile["role_overrides"]["other_beats_visual"] == "humo_1.7B"
     # The two-heavy case stays a static-validation GREEN (single-heavy
     # residency is wrapper_bridge's RUNTIME invariant, never a static profile

@@ -59,7 +59,7 @@ VIDEO_SLOT_ROLES = {
     LEGACY_OTHER_BEATS_SLOT: _OTHER_BEATS_ROLES,
 }
 
-#: The per-role video slots the Director emits / the profile applier knows, in
+#: The per-role video slots OTR_VideoDirector emits / the profile applier knows, in
 #: canonical (serialized-widget) order. EXCLUDES the legacy slot (a
 #: migration-only INPUT, never emitted fresh).
 PER_ROLE_VIDEO_SLOTS = (
@@ -71,7 +71,7 @@ PER_ROLE_VIDEO_SLOTS = (
 )
 
 #: The three NEW per-role slots Route-A adds (the slots that did not exist before
-#: the split). The Director appends widgets for these; the profile schema /
+#: the split). OTR_VideoDirector appends widgets for these; the profile schema /
 #: applier / widget_mapping learn exactly these three.
 NEW_ROUTE_A_VIDEO_SLOTS = (
     "character_video_model",
@@ -82,7 +82,7 @@ NEW_ROUTE_A_VIDEO_SLOTS = (
 
 def _engine_id_of(entry) -> str:
     """Bare engine id from a slot value: either a ``{"engine_id": ...}`` dict
-    (the Director's resolved shape) or a bare id string. Empty -> ""."""
+    (the OTR_VideoDirector resolved shape) or a bare id string. Empty -> ""."""
     if isinstance(entry, dict):
         return str(entry.get("engine_id") or "")
     return str(entry or "")

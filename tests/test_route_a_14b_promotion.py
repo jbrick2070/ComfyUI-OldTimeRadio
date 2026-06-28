@@ -112,7 +112,7 @@ def test_only_humo_14b_169_is_frame_capped():
 
 
 # --------------------------------------------------------------------------- #
-# End-to-end routing: Director -> policy -> role_compat + dispatcher
+# End-to-end routing: OTR_VideoDirector -> policy -> role_compat + dispatcher
 # --------------------------------------------------------------------------- #
 def _direct_policy():
     pol_json, = vd.OTRVideoDirector().direct(
