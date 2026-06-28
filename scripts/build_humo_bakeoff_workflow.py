@@ -11,11 +11,11 @@ __init__.py).
 How it works
 ------------
 ``HuMoEngine._build_graph`` returns the in-process ``run_graph`` spec --
-``{alias: {"class": <alias in _node_candidates>, "inputs": {name: literal |
+``{node_key: {"class": <node_key in _node_candidates>, "inputs": {name: literal |
 Wire(src, slot)}}}`` (eng_humo.py:215). This module TRANSLATES that spec into the
 HTTP ``/prompt`` shape -- ``{node_id: {"class_type": <real class>, "inputs":
 {name: literal | [src_id, slot]}}}`` (cf. render_humo_batch.py:560-689) -- assigns
-integer node ids, resolves each alias to its real ComfyUI ``class_type`` via
+integer node ids, resolves each node_key to its real ComfyUI ``class_type`` via
 ``_node_candidates``, and appends a ``SaveImage`` terminal fed from VAEDecode.
 
 For the TWO-STAGE leg it splices the sibling ``OTR_BakeoffReclaim`` node onto the
@@ -109,8 +109,8 @@ def engine_for(name):
     return cls()
 
 
-def _class_type_for(alias, candidates, schemas):
-    """Resolve a graph alias to its real ComfyUI class_type: the first candidate
+def _class_type_for(node_key, candidates, schemas):
+    """Resolve a graph node_key to its real ComfyUI class_type: the first candidate
     registered in ``schemas`` (when a server is up), else the first candidate."""
     cands = candidates if isinstance(candidates, (list, tuple)) else (candidates,)
     cands = [c for c in cands if c]
@@ -121,11 +121,11 @@ def _class_type_for(alias, candidates, schemas):
     return cands[0]
 
 
-def _to_link(val, alias_to_id):
+def _to_link(val, node_key_to_id):
     """Translate a run_graph input value to /prompt shape: a Wire(src, slot) ->
     ``[node_id, slot]``; a literal passes through."""
     if isinstance(val, Wire):
-        return [alias_to_id[val.src], int(val.slot)]
+        return [node_key_to_id[val.src], int(val.slot)]
     return val
 
 
@@ -167,16 +167,16 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
             else:
                 os.environ[_k] = _v
 
-    # Stable integer ids for every alias (insertion order is deterministic).
-    alias_to_id = {alias: str(i + 1) for i, alias in enumerate(spec)}
+    # Stable integer ids for every node_key (insertion order is deterministic).
+    node_key_to_id = {node_key: str(i + 1) for i, node_key in enumerate(spec)}
     prompt = {}
-    for alias, node in spec.items():
-        ctype = _class_type_for(alias, candidates[alias], schemas)
-        inputs = {k: _to_link(v, alias_to_id) for k, v in node["inputs"].items()}
-        prompt[alias_to_id[alias]] = {"class_type": ctype, "inputs": inputs}
+    for node_key, node in spec.items():
+        ctype = _class_type_for(node_key, candidates[node_key], schemas)
+        inputs = {k: _to_link(v, node_key_to_id) for k, v in node["inputs"].items()}
+        prompt[node_key_to_id[node_key]] = {"class_type": ctype, "inputs": inputs}
 
     next_id = len(spec) + 1
-    humo_id = alias_to_id["humo"]
+    humo_id = node_key_to_id["humo"]
     latent_src = [humo_id, 2]
     # Two-stage: splice OTR_BakeoffReclaim between humo(slot2) and the sampler.
     if leg["two_stage"]:
@@ -192,12 +192,12 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
     reset_id = str(next_id)
     next_id += 1
     prompt[reset_id] = {"class_type": RESET_CLASS, "inputs": {"samples": latent_src}}
-    prompt[alias_to_id["ksampler"]]["inputs"]["latent_image"] = [reset_id, 0]
+    prompt[node_key_to_id["ksampler"]]["inputs"]["latent_image"] = [reset_id, 0]
     # VRAM PROBE on the image edge, AFTER VAEDecode and BEFORE SaveImage.
     probe_id = str(next_id)
     next_id += 1
     prompt[probe_id] = {"class_type": PROBE_CLASS,
-                        "inputs": {"images": [alias_to_id["vaedecode"], 0]}}
+                        "inputs": {"images": [node_key_to_id["vaedecode"], 0]}}
     # SaveImage terminal (lossless PNG batch) fed from the probe passthrough.
     save_id = str(next_id)
     next_id += 1
@@ -212,7 +212,7 @@ def build_leg_prompt(leg, image_name=STILL_NAME, audio_name=AUDIO_NAME,
     loader_class = "UNETLoader"
     if gguf:
         loader_class = "UnetLoaderGGUF"
-        prompt[alias_to_id["unet"]] = {
+        prompt[node_key_to_id["unet"]] = {
             "class_type": loader_class, "inputs": {"unet_name": gguf}}
 
     # Optional per-leg cfg override (the 1.7B de-blue sweep): rewrite the KSampler
