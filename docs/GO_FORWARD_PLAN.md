@@ -1,6 +1,30 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-27 SWIM HANDOFF: ONE fresh window, TWO AUTONOMOUS JOBS in order. Last updated
+> **>>> CURRENT STEP -- 2026-06-28 JOB 3 ROUTE-A CODE SHIPPED + PUSHED `af88f059` == origin/v2.0-alpha. prod/main +
+> tags GATED.** The HuMo-14B promotion (per `kibitz-runs/2026-06-28-promote-14b/final.md`) is BUILT, wired, green,
+> committed and pushed. ROUTE-A landed in ONE change: a shared role->slot map (`nodes/_otr_shared/role_slots.py`) splits
+> the legacy `other_beats_video_model` slot into per-role `character_video_model` / `scene_broll_video_model` /
+> `background_abstract_video_model`; all 4 former duplicate maps (ShotLock / ImageDirector / ImageGenDispatcher /
+> VideoDirector) import it with a legacy other_beats migration fallback (8gb_lite / cpu_floor keep using the old key).
+> Director gained 3 optional per-role widgets (USE_OTHER_BEATS sentinel default) APPENDED after `custom_models_json`
+> (BUG-LOCAL-097 no mid-list insert) + the labelled picks in node 87 widgets_values (19 slots, audited). 16gb_full
+> role_overrides + widget_mapping gained the 3 keys: **character_visual=humo_14B_169 (DECIDED)**,
+> **scene_broll_visual=wan_ti2v (PROVISIONAL)**, **background_abstract_visual=ltx_video (PROVISIONAL)** -- each passes
+> `engine_fits_role`; the two PROVISIONAL picks await the OPERATOR EYEBALL. `HuMo14BLandscapeEngine` got a VRAM frame
+> cap (`safe_render_frames=49`, bakeoff-proven, env `OTR_HUMO_14B_SAFE_FRAMES`) + exact-fit
+> (`wrapper_bridge.fit_frames_to_target` trim/mirror-extend) so frame_count==target; base humo / 1.7B stay uncapped.
+> `_episode_facts` now counts `humo_14B_169` + asserts character_video-only (assert_soak_ok guard). New tests
+> `tests/test_route_a_14b_promotion.py` (13) + still_parallax/mesh_stage slot tests updated for the text-only
+> background slot. **GREEN:** full suite shows ONLY the 6 pre-existing workflow-pin/b7 fails (stash-PROVEN -- zero new),
+> Bug Bible 16/7/3, workflow validator + 19-slot widget audit clean, AST/no-BOM/JSON-valid. **REMAINING (GPU /
+> operator-gated):** preflight confirmed the 14B fp8 ckpt is present
+> (`C:\ComfyUI-Models\diffusion_models\Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`) + the engine config is
+> correct; the LIVE EPISODE render (reset box -> headless boot w/ OTR_ENABLE_HUMO -> render w/ 16gb_full -> confirm the
+> histogram shows humo_14B_169 ONLY on character_video rows + OBS publish + no OOM at a representative AND a max-cap
+> beat) + the OPERATOR EYEBALL of the 14B character clips and the two PROVISIONAL scene/bg engine picks is the last
+> step before any prod/main promotion (which stays GATED).
+>
+> **>>> PRIOR STEP -- 2026-06-27 SWIM HANDOFF: ONE fresh window, TWO AUTONOMOUS JOBS in order. Last updated
 > HEAD `7bbce1d8` == origin/v2.0-alpha. Operator AFK (swimming); run BOTH to green, do NOT wait; stop ONLY on a
 > genuine ambiguity or the >=14.5GB / irreversible line. prod/main + tags GATED.**
 >
@@ -132,6 +156,18 @@
 >   evict; flip 16gb_full humo_1.7B->humo_14B_169 via widget_mapping.json, SEPARATE gated coder task),
 >   (B) keep 1.7B (safe, rejected) + de-blue, or (C) park for a better-fitting model. AWAITING operator
 >   pick. Harness+probes shipped (HEAD 1de7978f); diagnostic only, production untouched.
+>   **>>> CURRENT STEP (2026-06-28, HEAD 371233c4) -- JOB 3 14B PROMOTION PLAN IS BUILD-READY; awaiting operator.**
+>   Operator chose PROMOTE the 14B. Kibitz r1->r4 CONVERGED (Codex + Claude; agy unavailable
+>   headless -- console/GEMINI_API_KEY gaps) -> `kibitz-runs/2026-06-28-promote-14b/final.md`. KEY
+>   RESULT: it is NOT a profile flip -- it is ROUTE-A, a per-sub-role VIDEO+IMAGE routing feature
+>   (other_beats_visual stamps ONE engine onto character/scene/background, but HuMo needs face+audio
+>   and render_shot has NO fallbacks -> face-less beats abort; image dispatcher would skip the
+>   required HuMo still). Build-ready slices + a verify-at-build checklist are in final.md. ONE
+>   operator input is still needed before a CODER window starts: the EXACT engine ids for
+>   `scene_broll_video_model` + `background_abstract_video_model` (character=humo_14B_169 decided;
+>   each must pass engine_fits_role). Thin-headroom (~15.9 GB) ACCEPTED, bounded by single-resident
+>   + a 14B-only frame cap. NEXT: operator gives the two engine ids -> coder window builds Route-A
+>   per final.md. Diagnostic/planning only this session; eng_humo/workflow/profile UNTOUCHED.
 > - **BOTH:** full suite + Bug Bible + B7 sweep BEFORE each commit; commit+push per green chunk to `v2.0-alpha` ONLY;
 >   100% local; UTF-8 no BOM; SFW; prod/main + tags GATED; update THIS doc + `otr-build-tracker` as you go.
 >
