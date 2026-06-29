@@ -16,13 +16,15 @@ from nodes._otr_image_engines import registry as ireg
 
 
 # Engines that exist in the registry but are NOT validated -> must be HIDDEN.
+# (The 3D scaffolds triposg_talk/hunyuan3d_talk/trellis_talk/triposr + the image
+# scaffolds hidream_i1/sd35_large were UNREGISTERED 2026-06-29 (C3), so they are
+# no longer "registered but hidden" -- they are simply gone.)
 _HIDDEN_VIDEO = {
-    "abstract", "flux_still", "hunyuan3d_talk", "station_card",
-    "still_kenburns", "still_parallax", "trellis_talk", "triposg_talk",
-    "triposr", "wan_i2v",
+    "abstract", "flux_still", "station_card",
+    "still_kenburns", "still_parallax", "wan_i2v",
 }
 _HIDDEN_IMAGE = {
-    "hidream_i1", "qwen_image", "sd35_large",
+    "qwen_image",
 }
 
 

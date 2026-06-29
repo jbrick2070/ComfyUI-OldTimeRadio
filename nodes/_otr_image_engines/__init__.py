@@ -49,34 +49,24 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# C4-C6 (generic peers, default-OFF): more model-agnostic image engines from the
-# C2 dep/license matrix, each registering identically and greyed until its own
-# OTR_ENABLE_<X>=1 + weights exist. HiDream-I1 (GGUF/MIT, in-stack like Qwen);
-# Lumina-Image 2.0 (native lightweight/Apache-2.0). All commercial-clean
-# (MIT/Apache). Each has its OWN guard so a quirk in one never blocks the others
-# -- and proves the "+ Add Custom Model" open-set story: the registry grows by
-# dropping in an adapter, no other edits.
-# (Chroma1-HD was DROPPED 2026-06-18 by operator decision: it is a de-restricted
-# /uncensored FLUX finetune and OTR will not ship a path to that content.)
-try:  # pragma: no cover - trivial guard
-    from . import hidream_i1 as _hidream_i1  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# Lumina-Image 2.0 (native lightweight/Apache-2.0), a model-agnostic image peer
+# from the C2 dep/license matrix: registers identically, greyed until its weights
+# exist. Its own guard so a quirk never blocks the others -- and proves the
+# "+ Add Custom Model" open-set story: the registry grows by dropping in an
+# adapter, no other edits.
+# (HiDream-I1 was UNREGISTERED 2026-06-29 (C3): a NotImplementedError dark
+# scaffold is no longer imported/selectable. Chroma1-HD was DROPPED 2026-06-18:
+# a de-restricted/uncensored FLUX finetune OTR will not ship a path to.)
 try:  # pragma: no cover - trivial guard
     from . import lumina_image as _lumina_image  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
 
-# C7-C8 (generic peers, default-OFF, CONDITIONAL license -> commercial_clean=False):
-# matrix candidates whose license is conditional/unconfirmed, registered HONESTLY
-# so the layer holds mixed-license peers and the license gate surfaces each one's
-# real terms. SD 3.5 Large (Stability Community, free only below a revenue tier);
-# FLUX.2 Klein (FLUX-family, verify -- plus BUG-070 SageAttention at render time).
-# Each greyed until its own OTR_ENABLE_<X>=1 + weights exist; own guard each.
-try:  # pragma: no cover - trivial guard
-    from . import sd35_large as _sd35_large  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# FLUX.2 Klein (FLUX-family, verify -- plus BUG-070 SageAttention at render time),
+# a model-agnostic image peer registered HONESTLY (commercial_clean per its real
+# license terms); greyed until its weights exist; own guard.
+# (SD 3.5 Large was UNREGISTERED 2026-06-29 (C3): a NotImplementedError dark
+# scaffold is no longer imported/selectable.)
 try:  # pragma: no cover - trivial guard
     from . import flux2_klein as _flux2_klein  # noqa: F401
 except Exception:  # noqa: BLE001

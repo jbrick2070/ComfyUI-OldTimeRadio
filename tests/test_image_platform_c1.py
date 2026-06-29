@@ -354,13 +354,18 @@ def test_char3d_family_without_capability_fails_closed(clean_image_registry,
             video_policy_json=video_policy))
 
 
-def test_triposg_talk_locks_via_real_registry():
-    """The REAL registered triposg_talk adapter (W7-pre) drives the lock via
-    its requires_mesh_portrait=True declaration -- no registry stubbing."""
-    from nodes._otr_video_engines import eng_character_3d  # noqa: F401
+def test_char3d_engine_locks_via_capability(clean_image_registry,
+                                            clean_video_registry):
+    """A character_3d-family engine that declares requires_mesh_portrait=True
+    drives the lock (capability-based, never a hard-coded name). Uses a
+    test-registered stub: the real 3D scaffolds were UNREGISTERED 2026-06-29
+    (C3), so the lock is proven against a registered character_3d stub instead."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    clean_video_registry._registry.clear()
+    clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
     locked = three_d_locked_slots({"video_models": {
-        "other_beats_video_model": {"engine_id": "triposg_talk",
-                                    "custom": False},
+        "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
     }})
     assert "other_beats_image_model" in locked
 

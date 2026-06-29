@@ -32,9 +32,9 @@ def test_enumerate_covers_all_registered_engines():
     engines = pilot.enumerate_engines()
     names = {e["engine"] for e in engines}
     assert names == set(ireg.all_engine_names())
-    # the full peer set is present (Flux gen-1 + C2/C3 + C4-C8)
-    assert {"flux_gen1", "z_image_turbo", "qwen_image", "hidream_i1",
-            "lumina_image", "sd35_large", "flux2_klein"} <= names
+    # the surviving peer set is present (hidream_i1 + sd35_large UNREGISTERED C3)
+    assert {"flux_gen1", "z_image_turbo", "qwen_image",
+            "lumina_image", "flux2_klein"} <= names
 
 
 def test_isolation_classification():
@@ -45,8 +45,8 @@ def test_isolation_classification():
     # the GGUF/native peers = in-stack (expose MODEL_ENV). z_image_turbo joined
     # this group 2026-06-18 when it was rebuilt in-process (the stale cu128
     # sidecar stub was dropped; gate is now OTR_ZIMAGE_UNET).
-    for n in ("z_image_turbo", "qwen_image", "hidream_i1",
-              "lumina_image", "sd35_large", "flux2_klein"):
+    for n in ("z_image_turbo", "qwen_image",
+              "lumina_image", "flux2_klein"):
         assert by_name[n]["isolation"] == "in_stack", n
         assert by_name[n]["gate_env"], n
 
@@ -54,8 +54,6 @@ def test_isolation_classification():
 def test_commercial_clean_reported_honestly():
     by_name = {e["engine"]: e for e in pilot.enumerate_engines()}
     assert by_name["qwen_image"]["commercial_clean"] is True       # Apache
-    assert by_name["hidream_i1"]["commercial_clean"] is True       # MIT
-    assert by_name["sd35_large"]["commercial_clean"] is False      # Community (conditional)
     assert by_name["flux2_klein"]["commercial_clean"] is True      # FLUX.2 klein 4B = Apache-2.0 (confirmed 2026-06-18)
 
 
@@ -77,9 +75,9 @@ def test_run_pilot_counts():
     # 2026-06-18: z_image_turbo was rebuilt in-process, so there are now NO
     # sidecar image engines (every image peer runs in-stack via ComfyUI loaders).
     assert report["sidecar_count"] == 0
-    # the GGUF/native peers + z_image (chroma_hd dropped 2026-06-18 -> one fewer):
-    # z_image_turbo, qwen_image, hidream_i1, lumina_image, sd35_large, flux2_klein.
-    assert report["in_stack_count"] >= 6
+    # the surviving GGUF/native peers (hidream_i1 + sd35_large UNREGISTERED C3):
+    # z_image_turbo, qwen_image, lumina_image, flux2_klein.
+    assert report["in_stack_count"] >= 4
     assert "sidecar_probe" not in report         # no probe unless --lib given
 
 

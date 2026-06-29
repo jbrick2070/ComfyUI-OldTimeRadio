@@ -111,9 +111,9 @@ CAPABILITIES = {
     "flux2_klein": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
                     "requires_sidecar": False, "cpu_ok": False,
                     "model_requirements": ["flux.2-klein"]},
-    "hidream_i1": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
-                   "requires_sidecar": False, "cpu_ok": False,
-                   "model_requirements": ["hidream-i1"]},
+    # hidream_i1 CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
+    # (NotImplementedError render) is unregistered; the registry-consistency
+    # invariant forbids a row without a registered engine.
     # MEASURED 2026-06-18 on the 5080: the lumina2 split-file recipe stages the
     # Gemma-2 TE (4986 MB) then the 2.6B diffusion (4977 MB) sequentially; the
     # steady diffusion+VAE residency is ~7 GB (TE offloads before sampling) and
@@ -125,9 +125,9 @@ CAPABILITIES = {
     "qwen_image": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": False,
                    "model_requirements": ["qwen-image"]},
-    "sd35_large": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
-                   "requires_sidecar": False, "cpu_ok": False,
-                   "model_requirements": ["sd3.5-large"]},
+    # sd35_large CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
+    # (NotImplementedError render) is unregistered; the registry-consistency
+    # invariant forbids a row without a registered engine.
     # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
     # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
     # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down. The

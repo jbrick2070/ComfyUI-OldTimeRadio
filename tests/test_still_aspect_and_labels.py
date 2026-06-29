@@ -16,8 +16,9 @@ from nodes._otr_video_engines import registry as vreg
 # The only PORTRAIT still-feed paths (operator rule: "wide UNLESS HuMo-portrait OR
 # a requires_mesh_portrait 3D engine"). Everything else renders 16:9 -> wide still.
 _PORTRAIT_ENGINES = {
-    "humo", "humo_1.7B",                       # HuMo-portrait
-    "triposg_talk", "hunyuan3d_talk", "trellis_talk",  # mesh-portrait 3D talkers
+    "humo", "humo_1.7B",                       # HuMo-portrait (the only registered
+                                               # portraits; the mesh-portrait 3D
+                                               # talkers were unregistered C3)
 }
 
 
@@ -58,10 +59,15 @@ def test_ltx_video_is_wide_the_bug_fix():
 
 
 def test_mesh_portrait_3d_engines_are_portrait():
-    # requires_mesh_portrait engines feed the mesher a PORTRAIT still even though
-    # the final video is 16:9 -- do NOT flip them to wide.
-    for name in ("triposg_talk", "hunyuan3d_talk", "trellis_talk"):
-        eng = _engine(name)
+    # The 3D talkers were UNREGISTERED 2026-06-29 (C3); their SOURCE classes still
+    # declare requires_mesh_portrait + render_aspect=portrait (they feed the mesher
+    # a PORTRAIT still even though the final video is 16:9). Checked directly since
+    # they are no longer in the registry.
+    from nodes._otr_video_engines.eng_character_3d import (
+        Hunyuan3DTalkEngine, TripoSGTalkEngine, TrellisTalkEngine,
+    )
+    for cls in (TripoSGTalkEngine, Hunyuan3DTalkEngine, TrellisTalkEngine):
+        eng = cls()
         assert getattr(eng, "requires_mesh_portrait", False) is True
         assert eng.render_aspect == "portrait"
 

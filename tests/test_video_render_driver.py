@@ -22,14 +22,11 @@ from nodes._otr_shared.fallback import resolve_fallback_chain
 
 def test_fallback_chain_character3d_converges_to_floor():
     fb = rd.make_fallback_of()
-    # W7-pre: triposg_talk is the v1 character_3d lane.
-    chain = resolve_fallback_chain("triposg_talk", fb)
-    assert chain == ["triposg_talk", "humo", "humo_1.7B",
-                     "still_kenburns"]
-    # The deferred-toolkit engine keeps the same resolvable chain shape.
-    chain = resolve_fallback_chain("hunyuan3d_talk", fb)
-    assert chain == ["hunyuan3d_talk", "humo", "humo_1.7B",
-                     "still_kenburns"]
+    # soak_oom_3d is the synthetic soak stub (C3 -- the real 3D scaffolds are
+    # unregistered): it resolves to humo via the overlay, then the registry walks
+    # humo -> humo_1.7B -> still_kenburns.
+    chain = resolve_fallback_chain("soak_oom_3d", fb)
+    assert chain == ["soak_oom_3d", "humo", "humo_1.7B", "still_kenburns"]
 
 
 def test_fallback_dangling_engine_gets_universal_floor():
@@ -58,7 +55,7 @@ def test_fixture_matches_shipped_soak_shape():
     assert len(section["shots"]) == 40
     assert section["video_revision"] == 1
     oom = section["shots"][20]
-    assert (oom["engine_id"], oom["family"]) == ("triposg_talk", "character_3d")
+    assert (oom["engine_id"], oom["family"]) == ("soak_oom_3d", "character_3d")
     assert meta["oom_shot_id"] == "shot_0020"
 
 
@@ -73,7 +70,7 @@ def test_build_request_is_deterministic_per_shot():
 
 def _passing_episode(n, oom_sid):
     decisions = [
-        {"shot_id": oom_sid, "from_engine": "triposg_talk",
+        {"shot_id": oom_sid, "from_engine": "soak_oom_3d",
          "to_engine": "humo", "failure_kind": "oom", "block_class": "hard",
          "video_revision": 1},
         {"shot_id": oom_sid, "from_engine": "humo_1.7B",
@@ -97,7 +94,7 @@ def _passing_report(n=6, oom_sid="shot_0002"):
         "meta": {"n_beats": n, "oom_shot_id": oom_sid, "oom_index": 2},
         "vram_ceiling_mb": 14500,
         "episode_1": copy.deepcopy(ep), "episode_2": copy.deepcopy(ep),
-        "input_oom_engine": "triposg_talk", "input_oom_trail": [],
+        "input_oom_engine": "soak_oom_3d", "input_oom_trail": [],
     }
 
 

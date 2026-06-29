@@ -66,7 +66,7 @@ from __future__ import annotations
 
 import os
 
-from .registry import EngineUnusable, EngineUsabilityReason, register
+from .registry import EngineUnusable, EngineUsabilityReason
 
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
@@ -235,7 +235,6 @@ def _assert_usable_triposg(name):
 # TripoSGTalk adapter (the v1 no-compile lane; W7-pre dark scaffold)
 # ---------------------------------------------------------------------------
 
-@register
 class TripoSGTalkEngine:
     """TripoSG geometry -> shrinkwrap -> Rhubarb -> Blender alpha (dark).
 
@@ -307,7 +306,6 @@ class TripoSGTalkEngine:
 # Hunyuan3DTalk adapter
 # ---------------------------------------------------------------------------
 
-@register
 class Hunyuan3DTalkEngine:
     """Tencent HunyuanVideo-Talk 3D talking-head adapter (dark scaffold).
 
@@ -381,7 +379,6 @@ class Hunyuan3DTalkEngine:
 # TrellisTalk adapter
 # ---------------------------------------------------------------------------
 
-@register
 class TrellisTalkEngine:
     """Microsoft TRELLIS image-to-3D driven adapter (dark scaffold).
 

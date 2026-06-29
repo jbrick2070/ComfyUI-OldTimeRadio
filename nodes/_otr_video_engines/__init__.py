@@ -109,33 +109,12 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# character_3d dark scaffold adapters (W7-pre slice): triposg_talk (the v1
-# no-compile lane, S-3D-0-gated) + hunyuan3d_talk/trellis_talk (the deferred
-# cu128 toolkit lane). All three are DEFAULT-OFF / dark and FAIL CLOSED until
-# their gates clear. Imported UNCONDITIONALLY here so all three appear in the
-# static per-role dropdown (V-6: the COMBO always shows the full registry; the
-# usability gate is assert_usable, not the import).
-# Cold-import clean (V-12): eng_character_3d imports only stdlib + the dep-free
-# registry, no torch/diffusers/comfy at module scope. Guarded so a packaging
-# quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_character_3d as _eng_character_3d  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-
-# triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean 8GB
-# sibling of mesh_stage (TripoSR image->mesh -> Blender turntable stage).
-# DEFAULT-OFF / dark (empty default_roles + OTR_ENABLE_TRIPOSR) so it shows in
-# the static per-role dropdown (V-6) but is never a default and fails closed
-# until the operator installs a TripoSR node + MIT weights and GPU-validates it
-# (then promote into registry.VALIDATED_ENGINES). Cold-import clean (V-12: lazy
-# everything inside load/render_clip). Guarded so a packaging quirk never breaks
-# the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_triposr as _eng_triposr  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# UNREGISTERED 2026-06-29 (C3 -- "registry IS the menu"): the dark 3D scaffolds
+# triposg_talk / hunyuan3d_talk / trellis_talk (eng_character_3d) and triposr
+# (eng_triposr) render NotImplementedError, so they are NO LONGER imported here
+# and are NOT selectable. The source files stay on disk; re-add this import +
+# the @register decorator(s) + a CAPABILITIES row in the SAME change when a real
+# forward ships (then they return to the dropdown).
 
 
 # visualizer (2026-06-18): the LOW-VRAM ffmpeg-only procedural CRT scope engine --

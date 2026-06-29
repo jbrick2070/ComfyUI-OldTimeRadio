@@ -50,21 +50,21 @@ FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
 #: -- every chain terminates at a registered radio floor that always renders).
 UNIVERSAL_FLOOR = "still_kenburns"
 
-#: character_3d engine -> its A-side audio_driven_face fallback. The 3D
-#: adapters self-register via eng_character_3d (W7-pre: triposg_talk is the v1
-#: no-compile lane; hunyuan3d_talk/trellis_talk stay registered-dark for the
-#: deferred toolkit lane); the overlay keeps the chains resolvable in contexts
-#: that never import that module (mirrors scripts/otr_video_soak).
-SYNTH_FALLBACKS = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
+#: Synthetic SOAK-stub fallback. ``soak_oom_3d`` is NOT a real engine -- it is the
+#: soak fixture's stand-in for a heavy character_3d-family engine, forced to OOM so
+#: the harness demonstrates the cross-engine restamp to humo -> humo_1.7B ->
+#: still_kenburns. (The real 3D scaffolds triposg_talk / hunyuan3d_talk /
+#: trellis_talk were UNREGISTERED 2026-06-29 (C3); their dead names are gone here.)
+SYNTH_FALLBACKS = {"soak_oom_3d": "humo"}
 # ltx_audio_in declares fallback_engine=None (NO FALLBACKS, 547671d) -> it gets NO
 # SYNTH_FALLBACKS entry; a failed render fails LOUD. (The deleted ltx_av_talk /
 # ltx_av_music had belt-and-braces entries; removed 2026-06-26 with the engines.)
 
-#: engine_id -> family, for restamping onto a fallback engine (covers the
-#: possibly-unimported 3D engines + the A/cheap engines).
+#: engine_id -> family, for restamping onto a fallback engine (covers the soak
+#: stub + the A/cheap engines).
 ENGINE_FAMILY = {
-    "triposg_talk": "character_3d",
-    "hunyuan3d_talk": "character_3d", "humo": "audio_driven_face",
+    "soak_oom_3d": "character_3d",       # synthetic soak stub (see SYNTH_FALLBACKS)
+    "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_kenburns": "static_motion",
     "still_parallax": "static_motion",
@@ -88,12 +88,12 @@ _PROFILES = (
     ("background_abstract", "abstract", "abstract"),
     ("announcer_visual", "station_card", "static_image_gen"),
 )
-#: The forced-OOM character_3d group (W7-pre: triposg_talk is the v1 3D lane;
-#: degrades to humo).
-_CHAR3D = ("character_video", "triposg_talk", "character_3d")
+#: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
+#: stand-in heavy character_3d engine) degrades to humo.
+_CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
 #: The heavy engines the soak forces to OOM on the character_3d shot so the chain
 #: walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B"})
+OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
@@ -102,8 +102,8 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: while assert_soak_ok expects exactly 2 LOUD OOM *decisions* -- the
 #: humo->humo_1.7B hop is an INTRA-ENGINE tier swap, not a restamp decision.
 #: The soak is green with this shape; keep the two constants consistent under
-#: the triposg_talk name, never "fix" one without the other.
-EXPECTED_OOM_TRAIL = ["triposg_talk->humo (oom)", "humo->humo_1.7B (oom)",
+#: the soak_oom_3d stub name, never "fix" one without the other.
+EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
                       "humo_1.7B->still_kenburns (oom)"]
 
 
@@ -2196,9 +2196,9 @@ def assert_soak_ok(report):
     if report["episode_1"]["decisions"] != report["episode_2"]["decisions"]:
         raise SoakError("non-deterministic: the two episodes' fallback "
                         "decisions differ")
-    # W7-pre rename: the fixture's character_3d shot is triposg_talk now
-    # (3D plan 7.0; p3 Gemini -- this carryover check follows the new id).
-    if (report["input_oom_engine"] != "triposg_talk"
+    # The fixture's character_3d shot is the synthetic soak_oom_3d stub (C3);
+    # this carryover check follows that id.
+    if (report["input_oom_engine"] != "soak_oom_3d"
             or report["input_oom_trail"]):
         raise SoakError("carryover: the shared input fixture was mutated")
     checks.append("determinism: two back-to-back episodes identical "

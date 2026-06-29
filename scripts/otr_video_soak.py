@@ -10,8 +10,8 @@ SHIPPED A-S7 decision machinery (the retry taxonomy + the fallback-chain
 resolver + the durable LOUD ledger restamp) using an INJECTED fake renderer that
 simulates the OOM. It proves -- without a GPU -- that the episode completes with
 every beat producing a clip, that the character_3d group degrades
-``triposg_talk -> humo -> humo_1.7B -> still_kenburns`` (W7-pre:
-triposg_talk is the v1 3D lane) to the always-succeeds radio floor with a LOUD
+``soak_oom_3d -> humo -> humo_1.7B -> still_kenburns`` (soak_oom_3d is a
+synthetic soak stub) to the always-succeeds radio floor with a LOUD
 restamp at the SAME ``video_revision``, that the frozen audio section is
 byte-identical before and after, and that two back-to-back runs are
 deterministic with no cross-episode carryover.
@@ -54,8 +54,7 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 
 #: engine_id -> family, for restamping a shot onto its fallback engine.
 ENGINE_FAMILY = {
-    "triposg_talk": "character_3d",
-    "hunyuan3d_talk": "character_3d",
+    "soak_oom_3d": "character_3d",       # synthetic soak stub (see make_fallback_of)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_kenburns": "static_motion",
@@ -77,13 +76,13 @@ _PROFILES = (
     ("announcer_visual", "station_card", "static_image_gen"),
 )
 
-#: The forced-OOM character_3d group (W7-pre: triposg_talk is the v1 3D lane;
-#: degrades to humo).
-_CHAR3D = ("character_video", "triposg_talk", "character_3d")
+#: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
+#: stand-in heavy character_3d engine) degrades to humo.
+_CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
 
 #: The heavy engines the soak forces to OOM on the character_3d shot so the
 #: chain walks all the way to the radio floor.
-OOM_ENGINES = frozenset({"triposg_talk", "humo", "humo_1.7B"})
+OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
 
 
 class OomSignal(RuntimeError):
@@ -136,15 +135,14 @@ def build_full_ledger(section: dict) -> dict:
 
 def make_fallback_of():
     """Return a ``fallback_of(name) -> next | None`` over the REAL registry plus
-    the synthetic ``character_3d -> humo`` hop.
+    the synthetic ``soak_oom_3d -> humo`` hop.
 
-    humo -> humo_1.7B -> still_kenburns come from the live
-    adapters' ``fallback_engine``; the 3D adapters are not imported by this
-    harness (eng_character_3d stays unloaded) so their hop is overlaid
-    (W7-pre: triposg_talk is the v1 lane; hunyuan3d_talk stays registered-dark
-    in the repo). A floor engine returns ``None`` (terminal).
+    humo -> humo_1.7B -> still_kenburns come from the live adapters'
+    ``fallback_engine``; ``soak_oom_3d`` is a synthetic soak stub (NOT a real
+    engine -- the real 3D scaffolds were unregistered 2026-06-29, C3), so its hop
+    to humo is overlaid here. A floor engine returns ``None`` (terminal).
     """
-    synth = {"triposg_talk": "humo", "hunyuan3d_talk": "humo"}
+    synth = {"soak_oom_3d": "humo"}
 
     def fallback_of(name):
         if name in synth:
@@ -244,7 +242,7 @@ def run_two_episode_soak(*, n_beats: int = 40, oom_index: int = 20) -> dict:
 #: with 3 decisions (unlike render_driver's GPU soak, where humo->humo_1.7B is
 #: an intra-engine tier swap and only 2 decisions appear -- semantics
 #: preserved per the 3D plan 7.0 judge ruling).
-EXPECTED_OOM_TRAIL = ["triposg_talk->humo (oom)", "humo->humo_1.7B (oom)",
+EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
                       "humo_1.7B->still_kenburns (oom)"]
 
 
@@ -306,7 +304,7 @@ def assert_soak_ok(result: dict):
     # no carryover: the shared input fixture was not mutated by either run.
     in_oom = {s["shot_id"]: s for s in
               result["input_ledger"]["video"]["shots"]}[meta["oom_shot_id"]]
-    if in_oom["engine_id"] != "triposg_talk" or in_oom["degradation_trail"]:
+    if in_oom["engine_id"] != "soak_oom_3d" or in_oom["degradation_trail"]:
         raise SoakError("carryover: the input fixture was mutated by a run")
     checks.append("determinism: two back-to-back episodes identical; input "
                   "fixture unmutated (no carryover)")

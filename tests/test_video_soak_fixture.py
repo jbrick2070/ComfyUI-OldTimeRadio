@@ -52,7 +52,7 @@ def test_fixture_is_40_beats_all_roles_all_families():
         assert fam in families
     char3d = [s for s in shots if s["family"] == "character_3d"]
     assert len(char3d) == 1 and char3d[0]["shot_id"] == meta["oom_shot_id"]
-    assert char3d[0]["engine_id"] == "triposg_talk"
+    assert char3d[0]["engine_id"] == "soak_oom_3d"   # synthetic soak stub (C3)
 
 
 def test_fixture_rejects_out_of_range_oom_index():
@@ -113,7 +113,7 @@ def test_two_runs_are_deterministic_and_leave_input_unmutated():
     in_shots = {s["shot_id"]: s
                 for s in result["input_ledger"]["video"]["shots"]}
     oom_in = in_shots[result["meta"]["oom_shot_id"]]
-    assert oom_in["engine_id"] == "triposg_talk" and oom_in["degradation_trail"] == []
+    assert oom_in["engine_id"] == "soak_oom_3d" and oom_in["degradation_trail"] == []
 
 
 # --------------------------------------------------------------------------- #

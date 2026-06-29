@@ -205,30 +205,12 @@ CAPABILITIES = {
     "wan_ti2v": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
                  "requires_sidecar": False, "cpu_ok": False,
                  "model_requirements": ["wan2.2-ti2v-5b"]},
-    # triposg_talk: the v1 NO-COMPILE character_3d lane -- prebuilt cu128
-    # wheels only (NO cu128_toolkit requirement; that distinction is the whole
-    # point of the lane, 3D plan section 4). Still flag-gated dark at the
-    # adapter (OTR_ENABLE_TRIPOSG_TALK + S-3D-0), so an enable-set "fit" never
-    # means "renders today" -- assert_usable stays the usability authority.
-    "triposg_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                     "required_toolchain": None, "requires_sidecar": True,
-                     "cpu_ok": False, "model_requirements": ["triposg"]},
-    # triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean,
-    # 8GB-tier sibling of mesh_stage (TripoSR single-image->mesh, ~6-8 GB,
-    # sub-second). Static mesher (image_to_video family; turntable motion only,
-    # NEVER lip-sync). MIT -> commercial_clean. No cu128 toolkit (prebuilt
-    # wheels / transformers), runs in-process, no sidecar. medium / ~7000 MB
-    # DRAFT -- tighten on the GPU probe. Registered DARK (OTR_ENABLE_TRIPOSR);
-    # kept OUT of VALIDATED_ENGINES until the forward is GPU-validated.
-    "triposr": {"vram_class": "medium", "vram_estimate_mb": 7000,
-                "required_toolchain": None, "requires_sidecar": False,
-                "cpu_ok": False, "model_requirements": ["triposr"]},
-    "hunyuan3d_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                       "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
-                       "cpu_ok": False, "model_requirements": ["hunyuan3d-2"]},
-    "trellis_talk": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                     "required_toolchain": "cu128_toolkit", "requires_sidecar": True,
-                     "cpu_ok": False, "model_requirements": ["trellis"]},
+    # triposg_talk / triposr / hunyuan3d_talk / trellis_talk CAPABILITIES rows
+    # REMOVED 2026-06-29 (C3 -- "registry IS the menu"): these dark 3D scaffolds
+    # render NotImplementedError and are now UNREGISTERED, and the
+    # registry-consistency invariant forbids a CAPABILITIES row without a
+    # registered engine. Restore the row WITH the @register + package import in
+    # the SAME change when a real forward ships.
     # LTX-AV (audio-input) lane -- the LTX-2.3 22B audio-conditioned engines.
     # vram_estimate is the M0-MEASURED Q3_K_M peak (13688 MB at 512x288x97, 8
     # steps, Gemma-3 encoder offloaded to CPU via device=cpu) -- under the 14500

@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import os
 
-from .registry import register, EngineUnusable, EngineUsabilityReason
+from .registry import EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
 log = logging.getLogger("OTR.image.sd35_large")
@@ -46,7 +46,6 @@ def _role_of(profile) -> str:
     return str(getattr(profile, "role", "") or "")
 
 
-@register
 class SD35LargeEngine:
     """The SD 3.5 Large image adapter (reduced ``prompt -> image`` protocol)."""
 

@@ -133,28 +133,9 @@ OPT_IN_ENGINES = {
             "acceptance render per slot at 1472x832"
         ),
     },
-    # triposr (2026-06-18): the LOWER-TIER MIT 3D mesher -- the license-clean
-    # 8GB sibling of mesh_stage. Same in-process pattern (the TripoSR node runs
-    # under the comfy host, absent in the pytest sandbox, present in production);
-    # Blender is a spawned exe (OTR_BLENDER_EXE gate), not an importable lib. MIT
-    # license (commercial-clean). VERIFY-AT-BUILD: the live graph is captured
-    # from /object_info before the forward is wired.
-    "triposr": {
-        "lib_module": "comfy",
-        "adapter_class": "TripoSREngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_TRIPOSR",
-        "assumed_call": (
-            "in-process TripoSR node: image -> TripoSR mesh -> cached GLB "
-            "(mesher id 'triposr', MIT weights, local_files_only); then the "
-            "BUG-291 reclaim barrier; then the SAME pinned portable Blender "
-            "turntable stage mesh_stage uses (WORKBENCH matcap, straight-alpha "
-            "PNG dir, atomic publish).  # TODO-for-GPU-smoke: install a TripoSR "
-            "ComfyUI node + MIT weights, capture its INPUT_TYPES + output socket "
-            "from a live /object_info, run the VRAM probe on the 5080 (DRAFT "
-            "7000 MB), then one acceptance render per slot"
-        ),
-    },
+    # triposr REMOVED from the probe manifest 2026-06-29 (C3): the dark MIT 3D
+    # mesher is unregistered (NotImplementedError render), so there is no adapter
+    # to dep-verify. Restore the row WITH the @register when a real forward ships.
     # visualizer (2026-06-18): the low-VRAM ffmpeg-only procedural CRT scope engine.
     # No heavy/contaminating lib -- ffmpeg is a spawned exe, soundfile is the only
     # importable external dep (the floor audio path already uses it), PIL/numpy are
@@ -280,65 +261,10 @@ OPT_IN_ENGINES = {
             "forward fits the 14.5 GB ceiling and render-twice determinism"
         ),
     },
-    # W7-pre: the v1 NO-COMPILE character_3d lane (3D plan section 4).
-    # Prebuilt cu128 wheels + SDPA only (no source builds, no cu128 toolkit);
-    # gated on the S-3D-0 sidecar probe + the T2b keystone.
-    "triposg_talk": {
-        "lib_module": "triposg",
-        "adapter_class": "TripoSGTalkEngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_TRIPOSG_TALK",
-        "assumed_call": (
-            "cu128 sidecar (OTR_TRIPOSG_SIDECAR_PYTHON venv, wheels-only): "
-            "TripoSG portrait->GLB geometry, template shrinkwrap (trimesh + "
-            "scipy), Rhubarb CPU viseme curves, Blender headless alpha frames; "
-            "inputs: audio_ref WAV + init_image MESH PORTRAIT + ARKit-52 "
-            "template NPZ; output: alpha frame DIRECTORY at the episode 16:9 "
-            "canvas. MIT license (commercial_clean=True). VRAM sub-ceiling "
-            "14000 MB.  "
-            "# TODO-for-GPU-smoke: S-3D-0 -- sidecar venv builds OFFLINE from "
-            "wheels only (--only-binary=:all:), self-test imports clean (SDPA, "
-            "no flash_attn), portrait->GLB manifold, mesh-spawn VRAM <= 14000; "
-            "then the T2b keystone (probe_c wrap on the TripoSG corpus)."
-        ),
-    },
-    # Phase 3 / B opt-in: character_3d dark scaffold adapters (DEFERRED cu128
-    # TOOLKIT lane). Both run in their own cu128 sidecar venv (NOT the ComfyUI
-    # cu130 venv); the venv python path is OTR_B_SIDECAR_PYTHON (hunyuan3d) /
-    # OTR_TRELLIS_SIDECAR_PYTHON (trellis). Asset-gated (Phase 5 keystone:
-    # real meshes + ARKit-52 template + probe_c <20% binding GO).
-    "hunyuan3d_talk": {
-        "lib_module": "hunyuanvideo",
-        "adapter_class": "Hunyuan3DTalkEngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_CHARACTER_3D",
-        "assumed_call": (
-            "cu128 sidecar: drive HunyuanVideo-Talk mesh-to-talking-head pipeline "
-            "(OTR_B_SIDECAR_PYTHON venv); inputs: audio_ref WAV + init_image "
-            "portrait/mesh + ARKit-52 template NPZ; output: 480x832 @25fps mp4 "
-            "(pillarbox-padded to compositor canvas). VRAM sub-ceiling 14000 MB.  "
-            "# TODO-for-GPU-smoke: Phase 5 keystone -- confirm OTR_B_MESH_DIR "
-            "contains real meshes, OTR_B_ARKIT_TEMPLATE_NPZ exists, probe_c "
-            "<20%% binding, cu128 toolchain green, render-twice determinism on "
-            "sm_120. commercial_clean=False -- verify-at-build."
-        ),
-    },
-    "trellis_talk": {
-        "lib_module": "trellis",
-        "adapter_class": "TrellisTalkEngine",
-        "forward": "render_clip",
-        "flag": "OTR_ENABLE_TRELLIS_TALK",
-        "assumed_call": (
-            "cu128 sidecar: drive Microsoft TRELLIS image-to-3D pipeline "
-            "(OTR_TRELLIS_SIDECAR_PYTHON venv); MIT license (commercial_clean=True);"
-            " inputs: audio_ref WAV + init_image portrait; output: 480x832 @25fps "
-            "mp4. VRAM sub-ceiling 14000 MB. Chain A (trellis-first) deferred to "
-            "Phase 5.  "
-            "# TODO-for-GPU-smoke: Phase 5 keystone -- confirm OTR_B_MESH_DIR, "
-            "OTR_B_ARKIT_TEMPLATE_NPZ, probe_c <20%% binding, cu128 toolchain, "
-            "render-twice determinism on sm_120."
-        ),
-    },
+    # triposg_talk / hunyuan3d_talk / trellis_talk REMOVED from the probe manifest
+    # 2026-06-29 (C3): the dark character_3d scaffolds are unregistered
+    # (NotImplementedError render), so there is no adapter to dep-verify. Restore
+    # the rows WITH the @register + package import when a real forward ships.
 }
 
 

@@ -1,15 +1,14 @@
-"""CPU tests for the character_3d dark scaffold (W7-pre migration slice).
+"""CPU tests for the character_3d dark scaffolds (UNREGISTERED, C3).
 
-Covers: registry presence, family-in-FAMILIES, role-fit, fail-closed reasons
-(hunyuan/trellis: flag -> venv -> mesh -> ARKit-52, semantics UNCHANGED;
-triposg: flag -> venv -> weights -> template(+hash) -> rhubarb -> blender,
-NEVER the generated-mesh dir), the requires_mesh_portrait capability field,
-fallback chain terminates at still_kenburns, cold-import clean (V-12). No GPU,
-no model load, no sidecar. UTF-8, no BOM, ASCII-only source.
-
-These are ADD-ONLY (dark scaffold renders nothing): the adapters are registered
-but always fail-closed until their gates clear (triposg: S-3D-0 + T2b keystone;
-hunyuan/trellis: the deferred cu128 toolkit lane).
+UNREGISTERED 2026-06-29 (C3 -- "registry IS the menu"): the three 3D talkers
+(triposg_talk / hunyuan3d_talk / trellis_talk) render NotImplementedError, so
+they are no longer registered/selectable and carry no CAPABILITIES row. The
+SOURCE classes stay on disk (they return when a real forward ships): these tests
+instantiate them DIRECTLY and prove the identity + the fail-closed ladders
+(triposg: flag -> venv -> weights -> template(+hash) -> rhubarb -> blender, NEVER
+the generated-mesh dir; hunyuan/trellis: flag -> venv -> mesh -> ARKit-52) +
+NotImplementedError render are all intact, while the registry no longer lists
+them. No GPU, no model load, no sidecar. UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -18,26 +17,47 @@ import os
 import pytest
 
 from nodes._otr_video_engines import registry as vreg
-from nodes._otr_video_engines import eng_character_3d  # noqa: F401 -- registers
+from nodes._otr_video_engines.eng_character_3d import (
+    Hunyuan3DTalkEngine,
+    TripoSGTalkEngine,
+    TrellisTalkEngine,
+)
 
 
-CHAR3D_ENGINES = ("triposg_talk", "hunyuan3d_talk", "trellis_talk")
+#: name -> SOURCE class (the scaffolds are unregistered, so the tests build them
+#: directly instead of through the registry).
+ENGINE_CLASSES = {
+    "triposg_talk": TripoSGTalkEngine,
+    "hunyuan3d_talk": Hunyuan3DTalkEngine,
+    "trellis_talk": TrellisTalkEngine,
+}
+CHAR3D_ENGINES = tuple(ENGINE_CLASSES)
 CHAR3D_ROLES = ("announcer_visual", "character_video")
 
 
+def _eng(name):
+    """Instantiate the scaffold's SOURCE class directly (it is unregistered)."""
+    return ENGINE_CLASSES[name]()
+
+
 # ---------------------------------------------------------------------------
-# Registration + family identity
+# Unregistered contract (C3) + family identity (the family still exists)
 # ---------------------------------------------------------------------------
 
-def test_char3d_adapters_registered():
+def test_char3d_adapters_unregistered():
+    # C3: dropped from the registry + the full dropdown; no CAPABILITIES row.
     for name in CHAR3D_ENGINES:
-        assert vreg.is_registered(name), f"{name} not in video registry"
-        assert vreg.get_engine(name).name == name
+        assert not vreg.is_registered(name), f"{name} must be unregistered (C3)"
+        assert name not in vreg.all_engine_names()
+        assert name not in vreg.CAPABILITIES
 
 
-def test_char3d_family_is_character_3d():
+def test_char3d_source_identity_intact():
+    # The source classes keep their name + the character_3d family.
     for name in CHAR3D_ENGINES:
-        assert vreg.get_engine(name).family == "character_3d"
+        eng = _eng(name)
+        assert eng.name == name
+        assert eng.family == "character_3d"
 
 
 def test_char3d_family_in_schemas_families():
@@ -59,7 +79,7 @@ def test_char3d_families_sync_invariant():
 
 def test_char3d_roles():
     for name in CHAR3D_ENGINES:
-        eng = vreg.get_engine(name)
+        eng = _eng(name)
         for role in CHAR3D_ROLES:
             assert role in eng.roles, f"{name} missing role {role}"
 
@@ -67,18 +87,18 @@ def test_char3d_roles():
 def test_char3d_default_roles_empty():
     """Both adapters are dark -- never a default for any role."""
     for name in CHAR3D_ENGINES:
-        assert vreg.get_engine(name).default_roles == ()
+        assert _eng(name).default_roles == ()
 
 
 def test_char3d_required_inputs():
     for name in CHAR3D_ENGINES:
-        eng = vreg.get_engine(name)
+        eng = _eng(name)
         assert "audio_ref" in eng.required_inputs
         assert "init_image" in eng.required_inputs
 
 
 # ---------------------------------------------------------------------------
-# Fail-closed (flag -> venv -> mesh -> ARKit-52)
+# Fail-closed (flag -> venv -> mesh -> ARKit-52) -- source behavior preserved
 # ---------------------------------------------------------------------------
 
 def _clear_3d_env(monkeypatch):
@@ -95,7 +115,7 @@ def _clear_3d_env(monkeypatch):
 
 def test_hunyuan3d_fails_closed_no_flag(monkeypatch):
     _clear_3d_env(monkeypatch)
-    eng = vreg.get_engine("hunyuan3d_talk")
+    eng = _eng("hunyuan3d_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.GATED_BY_FLAG
@@ -104,7 +124,7 @@ def test_hunyuan3d_fails_closed_no_flag(monkeypatch):
 
 def test_trellis_fails_closed_no_flag(monkeypatch):
     _clear_3d_env(monkeypatch)
-    eng = vreg.get_engine("trellis_talk")
+    eng = _eng("trellis_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.GATED_BY_FLAG
@@ -115,7 +135,7 @@ def test_hunyuan3d_fails_closed_no_venv(monkeypatch, tmp_path):
     _clear_3d_env(monkeypatch)
     monkeypatch.setenv("OTR_ENABLE_CHARACTER_3D", "1")
     # venv env not set -> MISSING_MODEL
-    eng = vreg.get_engine("hunyuan3d_talk")
+    eng = _eng("hunyuan3d_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
@@ -129,7 +149,7 @@ def test_hunyuan3d_fails_closed_no_mesh_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_ENABLE_CHARACTER_3D", "1")
     monkeypatch.setenv("OTR_B_SIDECAR_PYTHON", str(fake_venv))
     # mesh dir not set -> MISSING_MODEL
-    eng = vreg.get_engine("hunyuan3d_talk")
+    eng = _eng("hunyuan3d_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
@@ -147,7 +167,7 @@ def test_hunyuan3d_fails_closed_empty_mesh_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_ENABLE_CHARACTER_3D", "1")
     monkeypatch.setenv("OTR_B_SIDECAR_PYTHON", str(fake_venv))
     monkeypatch.setenv("OTR_B_MESH_DIR", str(mesh_dir))
-    eng = vreg.get_engine("hunyuan3d_talk")
+    eng = _eng("hunyuan3d_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
@@ -165,7 +185,7 @@ def test_hunyuan3d_fails_closed_no_arkit_npz(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_B_SIDECAR_PYTHON", str(fake_venv))
     monkeypatch.setenv("OTR_B_MESH_DIR", str(mesh_dir))
     # ARKit npz not set -> MISSING_MODEL
-    eng = vreg.get_engine("hunyuan3d_talk")
+    eng = _eng("hunyuan3d_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
@@ -207,7 +227,7 @@ def _stage_triposg_assets(monkeypatch, tmp_path, *, upto):
 
 def test_triposg_fails_closed_no_flag(monkeypatch):
     _clear_3d_env(monkeypatch)
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.GATED_BY_FLAG
@@ -225,7 +245,7 @@ def test_triposg_fail_closed_order(monkeypatch, tmp_path, upto, expect_env):
     """Each missing prerequisite is named in dependency order (3D plan 7.1)."""
     _clear_3d_env(monkeypatch)
     _stage_triposg_assets(monkeypatch, tmp_path, upto=upto)
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert exc.value.reason is vreg.EngineUsabilityReason.MISSING_MODEL
@@ -239,7 +259,7 @@ def test_triposg_never_gates_on_the_generated_mesh_dir(monkeypatch, tmp_path):
     _clear_3d_env(monkeypatch)
     _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
     assert "OTR_B_MESH_DIR" not in os.environ
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     assert eng.assert_usable({}, {}) == "triposg_talk"
 
 
@@ -249,7 +269,7 @@ def test_triposg_template_hash_pin_mismatch_fails_closed(monkeypatch, tmp_path):
     _clear_3d_env(monkeypatch)
     _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
     monkeypatch.setenv("OTR_B_ARKIT_TEMPLATE_HASH", "0" * 64)
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     with pytest.raises(vreg.EngineUnusable) as exc:
         eng.assert_usable({}, {})
     assert "MISMATCH" in str(exc.value)
@@ -261,7 +281,7 @@ def test_triposg_template_hash_pin_match_passes(monkeypatch, tmp_path):
     _stage_triposg_assets(monkeypatch, tmp_path, upto="blender")
     digest = hashlib.sha256(b"fake-npz").hexdigest()
     monkeypatch.setenv("OTR_B_ARKIT_TEMPLATE_HASH", digest)
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     assert eng.assert_usable({}, {}) == "triposg_talk"
 
 
@@ -270,7 +290,7 @@ def test_triposg_recheck_every_attempt_no_cached_missing(monkeypatch, tmp_path):
     attempts flips the verdict (no cached "missing")."""
     _clear_3d_env(monkeypatch)
     _stage_triposg_assets(monkeypatch, tmp_path, upto="rhubarb")
-    eng = vreg.get_engine("triposg_talk")
+    eng = _eng("triposg_talk")
     with pytest.raises(vreg.EngineUnusable):
         eng.assert_usable({}, {})
     blender = tmp_path / "blender.exe"
@@ -285,7 +305,7 @@ def test_triposg_recheck_every_attempt_no_cached_missing(monkeypatch, tmp_path):
 
 def test_char3d_adapters_declare_requires_mesh_portrait():
     for name in CHAR3D_ENGINES:
-        assert getattr(vreg.get_engine(name), "requires_mesh_portrait", False) \
+        assert getattr(_eng(name), "requires_mesh_portrait", False) \
             is True, f"{name} must declare requires_mesh_portrait=True"
 
 
@@ -308,12 +328,12 @@ def test_requires_mesh_portrait_is_a_real_schema_field():
 
 
 # ---------------------------------------------------------------------------
-# load / render_clip raise NAMED errors
+# load / render_clip raise NAMED errors (the "returns when built" guard)
 # ---------------------------------------------------------------------------
 
 def test_char3d_load_raises_runtime_error():
     for name in CHAR3D_ENGINES:
-        eng = vreg.get_engine(name)
+        eng = _eng(name)
         with pytest.raises(RuntimeError) as exc:
             eng.load()
         assert "dark scaffold" in str(exc.value).lower()
@@ -321,34 +341,32 @@ def test_char3d_load_raises_runtime_error():
 
 def test_char3d_render_clip_raises_not_implemented():
     for name in CHAR3D_ENGINES:
-        eng = vreg.get_engine(name)
+        eng = _eng(name)
         with pytest.raises(NotImplementedError):
             eng.render_clip({}, {})
 
 
 # ---------------------------------------------------------------------------
-# Fallback chain terminates at still_kenburns
+# Fallback: an unregistered 3D name still terminates at the radio floor
 # ---------------------------------------------------------------------------
 
-def test_char3d_fallback_chain_terminates():
-    """Both 3D adapters declare fallback_engine='humo'; the chain must reach
-    still_kenburns via render_driver.make_fallback_of."""
-    from nodes._otr_video_engines.render_driver import make_fallback_of, FLOOR_NAMES
+def test_char3d_source_declares_humo_fallback():
+    """The source classes keep fallback_engine='humo' (returns when built)."""
+    for name in CHAR3D_ENGINES:
+        assert _eng(name).fallback_engine == "humo"
 
-    # Register placeholder cheap families so still_kenburns is present
-    from nodes._otr_video_engines import cheap_families  # noqa: F401
+
+def test_char3d_unregistered_name_floors_directly():
+    """make_fallback_of resolves an UNREGISTERED 3D name straight to the
+    universal radio floor (it is not in the registry and not in the soak
+    overlay), so the chain still terminates LOUD rather than dangling."""
+    from nodes._otr_video_engines.render_driver import make_fallback_of, FLOOR_NAMES
+    from nodes._otr_video_engines import cheap_families  # noqa: F401 - registers floor
 
     fallback_fn = make_fallback_of()
     for name in CHAR3D_ENGINES:
-        chain = [name]
         nxt = fallback_fn(name)
-        while nxt is not None and nxt not in FLOOR_NAMES:
-            chain.append(nxt)
-            nxt = fallback_fn(nxt)
-        chain.append(nxt)
-        assert nxt in FLOOR_NAMES, (
-            f"Fallback chain for {name} did not terminate at a floor: {chain}"
-        )
+        assert nxt in FLOOR_NAMES, f"{name} did not floor: {nxt}"
 
 
 # ---------------------------------------------------------------------------
@@ -356,25 +374,10 @@ def test_char3d_fallback_chain_terminates():
 # ---------------------------------------------------------------------------
 
 def test_char3d_cold_import_no_heavy_libs():
-    """Importing eng_character_3d must not pull in torch / diffusers / comfy.
-
-    This test imports the module (already done at module level) and checks
-    sys.modules for the known-heavy suspects. It is NOT an exhaustive check --
-    it is a quick guard that the module scope stays clean.
-    """
+    """Importing eng_character_3d must not pull in torch / diffusers / comfy."""
     import sys
-    heavy = [k for k in sys.modules if k.startswith((
-        "torch", "torchvision", "torchaudio",
-        "diffusers", "transformers",
-        "comfy.", "comfy_extras.",
-    ))]
-    # None of the heavy libs must have been imported as a SIDE EFFECT of
-    # importing eng_character_3d (they may be present from other test
-    # fixtures, so we only assert the module itself is present and clean at
-    # the module-scope import level).
     mod = sys.modules.get("nodes._otr_video_engines.eng_character_3d")
     assert mod is not None, "eng_character_3d not in sys.modules"
-    # Confirm the module's own globals contain none of the heavy names
     mod_globals_heavy = [
         k for k in dir(mod)
         if k in ("torch", "diffusers", "transformers", "comfy")
@@ -382,16 +385,3 @@ def test_char3d_cold_import_no_heavy_libs():
     assert mod_globals_heavy == [], (
         f"eng_character_3d has heavy imports in module globals: {mod_globals_heavy}"
     )
-
-
-def test_char3d_registered_with_all_flags_unset(monkeypatch):
-    """V-6: engines appear in all_engine_names() regardless of flag state."""
-    for var in (
-        "OTR_ENABLE_CHARACTER_3D", "OTR_ENABLE_TRELLIS_TALK",
-        "OTR_B_SIDECAR_PYTHON", "OTR_TRELLIS_SIDECAR_PYTHON",
-        "OTR_B_MESH_DIR", "OTR_B_ARKIT_TEMPLATE_NPZ",
-    ):
-        monkeypatch.delenv(var, raising=False)
-    names = vreg.all_engine_names()
-    for name in CHAR3D_ENGINES:
-        assert name in names, f"{name} missing from registry with all 3D flags unset"

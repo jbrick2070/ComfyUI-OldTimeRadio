@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import os
 
-from .registry import EngineUnusable, EngineUsabilityReason, register
+from .registry import EngineUnusable, EngineUsabilityReason
 
 #: Mesher identity (mirrors mesh_stage.MESHER_ID/_VERSION -- the cache key carries
 #: this so a TripoSR GLB never collides with a hy3d2mv GLB for the same portrait).
@@ -88,7 +88,6 @@ def _assert_usable_triposr(name):
         )
 
 
-@register
 class TripoSREngine:
     """TripoSR (MIT) image->mesh -> Blender turntable stage (dark scaffold).
 

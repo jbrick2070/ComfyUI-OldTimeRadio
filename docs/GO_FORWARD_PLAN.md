@@ -43,7 +43,19 @@
 > dropped the gated_by_flag detail; the harness CODE refactor (OPT_IN_ENGINES->probe rename, drop flag keys,
 > drop the flag_set ready-assert, coverage acceptance_preflight) STAYS for C5. Full suite 5750/0, Bug Bible
 > 16/3xfail, B7 green. The per-model SMOKE PASS resumes now (selecting humo/wan/ltx_av/still_parallax/
-> flux2_klein/z_image just renders -- no launch flag). NEXT = C3 (unregister the dark scaffolds).
+> flux2_klein/z_image just renders -- no launch flag). NEXT = C4.
+>
+> **C3 SHIPPED (2026-06-29 this session):** UNREGISTERED the dark NotImplementedError scaffolds -- video
+> triposg_talk / hunyuan3d_talk / trellis_talk (eng_character_3d) + triposr; image hidream_i1 + sd35_large
+> (dropped @register + package import + CAPABILITIES row; the source files are KEPT -- they "return when
+> built"). Fixed the ripple in the SAME chunk: render_driver + scripts/otr_video_soak SYNTH_FALLBACKS /
+> ENGINE_FAMILY / OOM_ENGINES / EXPECTED_OOM_TRAIL -- the soak's SYNTHETIC OOM head renamed triposg_talk ->
+> the explicit `soak_oom_3d` stub (same 3-hop chain shape, no dead real-engine names); the video + image
+> dep-pilot probe manifests dropped the unregistered entries. Tests: rewrote test_video_character_3d +
+> test_video_triposr to the unregistered/source-still-dark contract (instantiate the classes directly),
+> retargeted the soak + dropdown-gate + dep-pilot + still-aspect tests, test_image_platform_c1's 3D-lock now
+> uses a test-registered stub, and DELETED the now-empty test_image_engine_matrix_peers (both subjects
+> unregistered). Full suite 5723/0, Bug Bible 16/3xfail, B7 green. NEXT = C4 (delete VALIDATED_ENGINES filter).
 >
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
@@ -173,8 +185,9 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). C2 SHIPPED this session
-(requires_flag GATE removed, suite 5750/0). NEXT = build C3 (unregister the dark scaffolds).
+per-model smoke pass resumes after C2 (the gate removal). C2 + C3 SHIPPED this session
+(requires_flag GATE removed; dark scaffolds unregistered; suite 5723/0). NEXT = build C4
+(delete VALIDATED_ENGINES + validated_engine_names from both registries).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.
