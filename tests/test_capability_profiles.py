@@ -343,19 +343,20 @@ def test_two_heavy_roles_still_validate():
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
-    # Route-A (2026-06-28, operator-directed; other_beats 14B upgrade): the 16gb
-    # master runs humo_14B_169 on ALL THREE visible video slots (announcer /
-    # music / other_beats) -- the consistent-quality default. The three per-role
-    # sub-slots (character / scene_broll / background_abstract) are OMITTED from
-    # the profile so they inherit other_beats (the sentinel on the master); they
-    # exist only as advanced explicit overrides. humo_1.7B stays the lighter-tier
-    # fallback + a registered/selectable engine.
-    assert profile["role_overrides"]["announcer_visual"] == "humo_14B_169"  # heavy (Route-A)
-    assert profile["role_overrides"]["other_beats_visual"] == "humo_14B_169"  # 14B default
-    # The two-heavy case stays a static-validation GREEN (single-heavy
-    # residency is wrapper_bridge's RUNTIME invariant, never a static profile
-    # rejection): force the 14B back into the character slot for the check.
-    profile["role_overrides"]["other_beats_visual"] = "humo"             # heavy
+    # 2026-06-28 (operator): the 16gb master DEFAULTS the three visible video
+    # slots to visualizer -- the working/clean default (no GPU, no FLUX since
+    # visualizer ignores init_image, no gated HuMo). The three per-role sub-slots
+    # (character / scene_broll / background_abstract) are OMITTED from the profile
+    # so they inherit other_beats (the sentinel on the master); they exist only as
+    # advanced explicit overrides. humo_14B_169 / humo_1.7B stay registered +
+    # selectable.
+    assert profile["role_overrides"]["announcer_visual"] == "visualizer"
+    assert profile["role_overrides"]["other_beats_visual"] == "visualizer"
+    # Force TWO heavy roles to keep the static two-heavy regression green (single-
+    # heavy residency is wrapper_bridge's RUNTIME invariant, never a static profile
+    # rejection).
+    profile["role_overrides"]["announcer_visual"] = "humo_14B_169"        # force heavy
+    profile["role_overrides"]["other_beats_visual"] = "humo"             # force heavy
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
     assert "ltx_audio_in" in enabled and "humo" in enabled

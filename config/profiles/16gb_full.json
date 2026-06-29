@@ -9,9 +9,9 @@
   "allow_sidecars": true,
   "max_model_class": "heavy",
   "role_overrides": {
-    "announcer_visual": "humo_14B_169",
-    "music_visual": "humo_14B_169",
-    "other_beats_visual": "humo_14B_169",
+    "announcer_visual": "visualizer",
+    "music_visual": "visualizer",
+    "other_beats_visual": "visualizer",
     "announcer_image": "flux_gen1",
     "music_image": "flux_gen1",
     "other_beats_image": "flux_gen1"

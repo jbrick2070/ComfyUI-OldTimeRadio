@@ -89,15 +89,16 @@ def test_production_workflow_visual_structure_pinned():
     n87 = nodes[87]
     assert n87["type"] == "OTR_VideoDirector"
     wv87 = n87["widgets_values"]
-    # 2026-06-27/28 route-a (operator: 14B on all 3 audio roles): announcer + music
-    # video models are pinned to the humo_14B_169 lane. The canonical SAVED value is
-    # the BARE engine id (OTR_VideoDirector._engine_id_from_pick); the dropdown
-    # display label "(16:9)" is stripped on save so the capability-profile validator
-    # and the 16gb-identity profile (bare ids) stay consistent.
-    assert wv87[0] == "humo_14B_169", (
-        "announcer_video_model regressed off the humo_14B_169 lane: %r" % wv87[0])
-    assert wv87[1] == "humo_14B_169", (
-        "music_video_model regressed off the humo_14B_169 lane: %r" % wv87[1])
+    # 2026-06-28 (operator): the saved master DEFAULTS the three visible video
+    # slots to visualizer -- the working/clean default (no GPU, no FLUX since
+    # visualizer ignores init_image, no gated HuMo, no red dropdowns). The three
+    # Route-A sub-slots are exposed but default to the (use Other Beats default)
+    # sentinel; humo_14B_169 stays registered + selectable. Values are bare engine
+    # ids so the capability-profile validator + 16gb-identity profile stay consistent.
+    assert wv87[0] == "visualizer", (
+        "announcer_video_model regressed off the visualizer default: %r" % wv87[0])
+    assert wv87[1] == "visualizer", (
+        "music_video_model regressed off the visualizer default: %r" % wv87[1])
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])
