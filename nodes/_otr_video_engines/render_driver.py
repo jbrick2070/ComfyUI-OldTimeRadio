@@ -1689,48 +1689,6 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             "vram_peak_mb": vram_peak}
 
 
-def apply_selection_enable_set(ledger):
-    """Dropdown-is-the-only-switch (operator 2026-06-29): the per-role engine
-    SELECTIONS that OTR_VideoDirector emitted and OTR_ShotLock stamped onto each
-    shot's ``engine_id`` ARE the opt-in consent. Satisfy each selected engine's
-    runtime opt-in flag (``requires_flag``, e.g. ``OTR_ENABLE_HUMO``) in THIS
-    process BEFORE the per-shot ``assert_usable`` gate, so a model the operator
-    picked in the three video dropdowns renders WITHOUT a separate launch-time
-    OTR_ENABLE_* env. Drives the opt-ins simultaneously, behind the scenes, off
-    the dropdowns -- never a hidden switch that beats them.
-
-    Scope is deliberately tight: only the engines actually stamped on this
-    episode's shots are enabled (an unpicked engine stays gated). The
-    dep-on-disk half of ``assert_usable`` is UNTOUCHED -- a missing checkpoint
-    still fails LOUD -- and the dep-pilot / gpu-smoke harnesses keep their own
-    explicit-flag path (they drive ``run_episode`` directly, not this). LOUD:
-    logs the derived set. Best-effort; never blocks the render."""
-    try:
-        section = (ledger or {}).get("video") or {}
-        engine_ids = sorted({
-            str(s.get("engine_id") or "")
-            for s in (section.get("shots") or [])
-            if s.get("engine_id")
-        })
-        enabled = []
-        for eid in engine_ids:
-            try:
-                flag = getattr(_vreg.get_engine(eid), "requires_flag", None)
-            except Exception:  # noqa: BLE001 - unknown engine: assert_usable speaks
-                flag = None
-            if flag and os.environ.get(flag) != "1":
-                os.environ[flag] = "1"
-                enabled.append("%s(%s)" % (eid, flag))
-        if enabled:
-            _LOG.warning(
-                "[OTR video] dropdown-driven opt-in: enabled %s from the shot "
-                "selection (no launch flag needed; dep-on-disk still enforced)",
-                ", ".join(enabled))
-    except Exception as _exc:  # noqa: BLE001 - never block the render
-        _LOG.warning("[OTR video] selection enable-set skipped: %s", _exc)
-    return ledger
-
-
 def run_real_episode(ledger, *, fallback_of=None, canvas=None,
                      master_audio_path=""):
     """Drive one REAL episode from a ShotLock-planned ledger: per-shot requests
@@ -1774,10 +1732,6 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None,
         except Exception:  # noqa: BLE001 - never block the render on re-resolve
             pass
     ledger = apply_engine_override(ledger)
-    # Dropdown-is-the-only-switch: the selected engines stamped on the shots
-    # (post force-override) drive their runtime opt-in flags in-process, so a
-    # picked model renders without a launch-time OTR_ENABLE_* (operator 2026-06-29).
-    ledger = apply_selection_enable_set(ledger)
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
     return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
