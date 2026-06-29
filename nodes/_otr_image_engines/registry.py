@@ -140,53 +140,9 @@ __all__.append("CAPABILITIES")
 
 
 # ---------------------------------------------------------------------------
-# TESTED-ONLY DROPDOWN GATE (2026-06-17 operator directive). The per-role image
-# COMBO in OTR_ImageDirector lists ONLY engines VALIDATED in production -- the
-# untested peers (hidream_i1, qwen_image, sd35_large) are HIDDEN from the
-# dropdown. Display gate only: every engine stays REGISTERED (V-6 --
-# all_engine_names() unchanged), and the "+ Add Custom Model" sentinel remains
-# the escape hatch. Mirrors the video registry's VALIDATED_ENGINES (a separate
-# frozenset, NOT a CAPABILITIES key, because validate_declaration rejects unknown
-# CAPABILITIES keys).
-#
-# Validated IMAGE engines: flux_gen1 (production default, wired x3 in
-# otr_scifi_16gb_full.json), z_image_turbo + flux2_klein (2026-06-18), and
-# lumina_image (2026-06-18, the lightweight Apache-2.0 low-VRAM peer).
+# VALIDATED_ENGINES + validated_engine_names() REMOVED 2026-06-29 (C4 -- "registry
+# IS the menu"): there is NO validated-subset dropdown filter. Every REGISTERED
+# image engine is SELECTABLE; the per-role director COMBO is built from
+# all_engine_names() (validation is the operator's MANUAL process, never a code
+# gate). The "+ Add Custom Model" sentinel remains the escape hatch.
 # ---------------------------------------------------------------------------
-VALIDATED_ENGINES = frozenset({
-    "flux_gen1",
-    # z_image_turbo: GPU-VERIFIED 2026-06-18 on the RTX 5080 (nvfp4 diffusion +
-    # qwen3-4b fp8 TE + ae VAE; clean on-prompt filmic still at ~10 GB, 8 steps,
-    # 12 s). The low-VRAM commercial-clean (Apache-2.0) image option.
-    "z_image_turbo",
-    # flux2_klein: GPU-VERIFIED 2026-06-18 on the RTX 5080 (FLUX.2 [klein] 4B GGUF
-    # Q4_K_M + the klein-MATCHED qwen_3_4b TE [7680-wide; flux2-dev's Mistral was
-    # 15360 -> the mat1/mat2 error] + flux2-vae). In a full flux2->silent-LTX episode
-    # the dispatcher minted real stills end-to-end: "[OTR.image.flux2_klein] minted
-    # still 832x480 ... steps=20 guidance=4.00", TE staged 7671 MB, no dim error.
-    # Apache-2.0 (commercial-clean). Stays opt-in via OTR_ENABLE_FLUX2_KLEIN.
-    "flux2_klein",
-    # lumina_image: GPU-VERIFIED 2026-06-18 on the RTX 5080 (Lumina-Image 2.0,
-    # the native split-file flow recipe: UNETLoader lumina_2_model_bf16 +
-    # CLIPLoader[type=lumina2] gemma_2_2b TE + VAELoader lumina2_ae ->
-    # ModelSamplingAuraFlow -> KSampler -> VAEDecode). The exact engine recipe
-    # minted a real 1216x832 still in 23.5 s (model_type FLOW; TE 4986 MB +
-    # diffusion 4977 MB staged sequentially; resident peak ~12.2 GB << 14.5 GB
-    # ceiling -- and the engine's render_image reclaims after decode). Apache-2.0
-    # (commercial-clean). The lightweight low-VRAM peer; opt-in via
-    # OTR_ENABLE_LUMINA. Smoke: scripts/_otr_lumina_image_smoke.py.
-    "lumina_image",
-})
-__all__.append("VALIDATED_ENGINES")
-
-
-def validated_engine_names() -> list:
-    """Registered image engines that are VALIDATED, sorted.
-
-    The intersection of the live registry with :data:`VALIDATED_ENGINES` -- the
-    tested-only source for the OTR_ImageDirector per-role dropdowns.
-    """
-    return sorted(set(_IMAGE_REGISTRY.all_engine_names()) & VALIDATED_ENGINES)
-
-
-__all__.append("validated_engine_names")

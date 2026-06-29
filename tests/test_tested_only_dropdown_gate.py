@@ -1,91 +1,57 @@
-"""Tested-only dropdown gate (2026-06-17 operator directive).
+"""Dropdown == registry (C4 -- "registry IS the menu", 2026-06-29).
 
-The OTR_VideoDirector / OTR_ImageDirector per-role COMBOs must list ONLY engines
-that have been GPU-validated end-to-end -- untested engines (3D talkers,
-wan_i2v/wan_ti2v until tested, the abstract / CPU-floor families, untested image
-peers) are HIDDEN from the dropdown. This is a DISPLAY gate only: every engine
-stays REGISTERED so role_compat / assert_usable / the force-map experiment knob
-still see the full set (invariant V-6).
+The TESTED-ONLY dropdown gate (VALIDATED_ENGINES + validated_engine_names) was
+DELETED 2026-06-29 (C4): there is no validated-subset filter. The
+OTR_VideoDirector / OTR_ImageDirector per-role COMBOs now list EVERY REGISTERED
+engine + the "+ Add Custom Model" sentinel -- a registered engine is selectable
+and renders (it may hard-fail LOUD; validation is the operator's MANUAL process,
+never a code gate). The bare engine id is still the SAVED value (the video combo
+shows aspect-derived labels for display only).
 """
 from __future__ import annotations
 
-from nodes import otr_video_director as vd
 from nodes import otr_image_director as idr
-from nodes._otr_video_engines import registry as vreg
+from nodes import otr_video_director as vd
 from nodes._otr_image_engines import registry as ireg
+from nodes._otr_video_engines import registry as vreg
 
 
-# Engines that exist in the registry but are NOT validated -> must be HIDDEN.
-# (The 3D scaffolds triposg_talk/hunyuan3d_talk/trellis_talk/triposr + the image
-# scaffolds hidream_i1/sd35_large were UNREGISTERED 2026-06-29 (C3), so they are
-# no longer "registered but hidden" -- they are simply gone.)
-_HIDDEN_VIDEO = {
-    "abstract", "flux_still", "station_card",
-    "still_kenburns", "still_parallax", "wan_i2v",
-}
-_HIDDEN_IMAGE = {
-    "qwen_image",
-}
-
-
-def test_video_validated_set():
-    # The GPU-validated video engines: the LTX lanes + the HuMo family +
-    # wan_ti2v (forced-lane smoke PASSED 2026-06-18, NVML peak 12.9 GB < cap) +
-    # visualizer + flat_still (CPU/ffmpeg-only stills -> trivially valid).
-    assert vreg.VALIDATED_ENGINES == frozenset({
-        "ltx_video", "ltx_audio_in",
-        "humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
-        "wan_ti2v", "visualizer", "flat_still",
-        # mesh_stage PROMOTED 2026-06-21 (operator: 3D ready for all 3 slots);
-        # GPU smoke PASSED 2026-06-20. Selectable-not-default (default_roles=()).
-        "mesh_stage",
-    })
-
-
-def test_image_validated_set():
-    # flux_gen1 (default) + z_image_turbo + flux2_klein + lumina_image (all
-    # GPU-validated on the RTX 5080 2026-06-18; lumina_image minted a real
-    # 1216x832 still in 23.5 s via its native lumina2 flow recipe, resident peak
-    # ~12.2 GB << 14.5 GB -- the lightweight Apache-2.0 low-VRAM peer).
-    assert ireg.VALIDATED_ENGINES == frozenset(
-        {"flux_gen1", "z_image_turbo", "flux2_klein", "lumina_image"})
-
-
-def test_video_combo_lists_only_validated_plus_sentinel():
+def test_video_combo_is_the_full_registry_plus_sentinel():
     combo = vd._video_model_combo()
     assert combo[-1] == vd.ADD_CUSTOM
-    # The video combo entries are aspect-LABELLED (e.g. "humo (portrait)"); parse
-    # each back to the bare engine id before comparing to the validated set.
+    # entries are aspect-LABELLED (e.g. "humo (portrait)"); parse each back to the
+    # bare engine id before comparing to the FULL registry.
     listed = {vd._engine_id_from_pick(c) for c in combo} - {vd.ADD_CUSTOM}
-    assert listed == set(vreg.VALIDATED_ENGINES)
-    # the untested engines are HIDDEN from the dropdown
-    assert listed.isdisjoint(_HIDDEN_VIDEO)
+    assert listed == set(vreg.all_engine_names())
 
 
-def test_image_combo_lists_only_validated_plus_sentinel():
+def test_image_combo_is_the_full_registry_plus_sentinel():
     combo = idr._image_model_combo()
     assert combo[-1] == idr.ADD_CUSTOM
     listed = set(combo) - {idr.ADD_CUSTOM}
-    assert listed == set(ireg.VALIDATED_ENGINES)
-    assert listed.isdisjoint(_HIDDEN_IMAGE)
+    assert listed == set(ireg.all_engine_names())
 
 
-def test_registry_still_full_v6_intact():
-    """V-6: hidden engines remain REGISTERED (only the DISPLAY list narrows)."""
-    all_video = set(vreg.all_engine_names())
-    all_image = set(ireg.all_engine_names())
-    # every hidden engine is still in the registry...
-    assert _HIDDEN_VIDEO <= all_video
-    assert _HIDDEN_IMAGE <= all_image
-    # ...and so are the validated ones.
-    assert set(vreg.VALIDATED_ENGINES) <= all_video
-    assert set(ireg.VALIDATED_ENGINES) <= all_image
+def test_no_validated_subset_filter_remains():
+    # C4: the validated-subset filter is GONE from BOTH registries.
+    assert not hasattr(vreg, "VALIDATED_ENGINES")
+    assert not hasattr(vreg, "validated_engine_names")
+    assert not hasattr(ireg, "VALIDATED_ENGINES")
+    assert not hasattr(ireg, "validated_engine_names")
 
 
-def test_validated_names_are_intersection_with_registry():
-    assert set(vreg.validated_engine_names()) == (
-        set(vreg.all_engine_names()) & vreg.VALIDATED_ENGINES
-    )
-    assert set(ireg.validated_engine_names()) == (
-        set(ireg.all_engine_names()) & ireg.VALIDATED_ENGINES
-    )
+def test_formerly_hidden_engines_are_now_selectable():
+    # Engines the old gate HID (untested-but-registered) are now in the dropdown --
+    # registry IS the menu.
+    video = {vd._engine_id_from_pick(c) for c in vd._video_model_combo()}
+    assert {"wan_i2v", "still_kenburns", "still_parallax"} <= video
+    image = set(idr._image_model_combo())
+    assert "qwen_image" in image
+
+
+def test_registry_unchanged_v6_intact():
+    """V-6: the registry is the single source -- the dropdown no longer narrows it."""
+    assert set(vd._engine_id_from_pick(c) for c in vd._video_model_combo()
+               if c != vd.ADD_CUSTOM) == set(vreg.all_engine_names())
+    assert (set(idr._image_model_combo()) - {idr.ADD_CUSTOM}) == set(
+        ireg.all_engine_names())

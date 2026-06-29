@@ -96,7 +96,7 @@ def test_flat_still_registered_validated_all_roles():
     for role in ("announcer_visual", "music_visual", "character_video",
                  "scene_broll", "background_abstract"):
         assert role in eng.roles
-    assert "flat_still" in vreg.VALIDATED_ENGINES         # shows in the dropdown
+    assert "flat_still" in vreg.all_engine_names()        # shows in the dropdown (C4)
 
 
 def test_canvas_and_frame_defaults():

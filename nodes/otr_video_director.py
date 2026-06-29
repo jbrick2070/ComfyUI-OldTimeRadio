@@ -92,45 +92,37 @@ SEED_MODES = ("request_hash", "fixed")
 
 
 def _video_model_combo() -> list:
-    """TESTED-ONLY video engines + the custom sentinel (2026-06-17 gate).
+    """Every REGISTERED video engine + the custom sentinel (registry IS the menu).
 
-    Lists only GPU-VALIDATED engines (``registry.validated_engine_names()``) so
-    the operator cannot pick an untested model from the UI. Every engine remains
-    REGISTERED (V-6: ``all_engine_names()`` is untouched, so role_compat /
-    assert_usable / the force-map experiment knob still see the full set); this
-    narrows the *display* list only. ``+ Add Custom Model`` stays the escape hatch
-    for an explicitly-declared engine. Falls back to the full registry only if the
-    validated set is somehow empty, so a box-fresh graph still validates.
+    Built from ``registry.all_engine_names()`` -- there is NO validated-subset
+    filter (C4, 2026-06-29): a registered engine is SELECTABLE and renders (it may
+    hard-fail LOUD; validation is the operator's MANUAL process, never a code gate).
+    ``+ Add Custom Model`` stays the escape hatch for an explicitly-declared engine.
 
     Each entry is the engine's aspect-DERIVED label (``humo (portrait)`` vs
     ``humo_1.7B_169 (16:9)``) so the two HuMo paths are obvious at a glance; the
     SAVED value stays the bare engine id (``direct()`` parses the label back via
     :func:`_engine_id_from_pick`, and a bare legacy value still resolves)."""
-    names = list(_vreg.validated_engine_names()) or list(_vreg.all_engine_names())
+    names = list(_vreg.all_engine_names())
     return [_label_for(n) for n in names] + [ADD_CUSTOM]
 
 
 def _per_role_video_combo() -> list:
     """The video COMBO for the three Route-A per-role slots: the
     :data:`USE_OTHER_BEATS` sentinel FIRST (the default -- inherit the Other
-    Beats pick) then the standard validated-video list + custom sentinel."""
+    Beats pick) then the full video list + custom sentinel."""
     return [USE_OTHER_BEATS] + _video_model_combo()
 
 
 def _image_model_combo() -> list:
-    """TESTED-ONLY image engines + the custom sentinel (operator 2026-06-18: "don't
-    show end users any model that isn't 100% wired and tested -- best experience").
+    """Every REGISTERED image engine + the custom sentinel (registry IS the menu).
 
-    Lists only GPU-VALIDATED image engines (``image_registry.validated_engine_names()``
-    = flux_gen1 / z_image_turbo / flux2_klein) so an end user cannot pick an untested
-    or unenabled model from the UI (exactly the gated_by_flag friction). Every engine
-    stays REGISTERED (V-6: ``all_engine_names()`` untouched, so role_compat /
-    assert_usable / the force-map knob still see the full set); this narrows the
-    *display* list only. ``+ Add Custom Model`` is the escape hatch. Falls back to the
-    full registry, then ``IMAGE_DEFAULTS``, only if the validated set is somehow empty
-    so a box-fresh graph still validates."""
-    names = (list(_ireg.validated_engine_names())
-             or list(_ireg.all_engine_names()) or list(IMAGE_DEFAULTS))
+    Built from ``image_registry.all_engine_names()`` -- there is NO validated-subset
+    filter (C4, 2026-06-29): every registered image engine is SELECTABLE (validation
+    is the operator's MANUAL process, never a code gate). Falls back to
+    ``IMAGE_DEFAULTS`` only if the registry is somehow empty so a box-fresh graph
+    still validates. ``+ Add Custom Model`` is the escape hatch."""
+    names = list(_ireg.all_engine_names()) or list(IMAGE_DEFAULTS)
     return names + [ADD_CUSTOM]
 
 

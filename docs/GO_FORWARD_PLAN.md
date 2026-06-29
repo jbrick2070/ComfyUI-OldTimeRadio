@@ -55,7 +55,15 @@
 > test_video_triposr to the unregistered/source-still-dark contract (instantiate the classes directly),
 > retargeted the soak + dropdown-gate + dep-pilot + still-aspect tests, test_image_platform_c1's 3D-lock now
 > uses a test-registered stub, and DELETED the now-empty test_image_engine_matrix_peers (both subjects
-> unregistered). Full suite 5723/0, Bug Bible 16/3xfail, B7 green. NEXT = C4 (delete VALIDATED_ENGINES filter).
+> unregistered). Full suite 5723/0, Bug Bible 16/3xfail, B7 green. NEXT = C5.
+>
+> **C4 SHIPPED (2026-06-29 this session):** DELETED the validated-subset dropdown filter -- `VALIDATED_ENGINES`
+> + `validated_engine_names()` removed from BOTH the video and image registries; the 3 director COMBOs
+> (`otr_video_director._video_model_combo` / `_image_model_combo` + `otr_image_director._image_model_combo`)
+> now build from `all_engine_names()`, so the dropdown == the full registry (every registered engine is
+> selectable; manual validation only). Tests: rewrote test_tested_only_dropdown_gate to the dropdown==registry
+> contract + retargeted test_still_aspect_and_labels / test_ltx_audio_in_engine / test_video_cheap_render off
+> the deleted filter. Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C5 (decouple the harness flag).
 >
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
@@ -185,9 +193,9 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). C2 + C3 SHIPPED this session
-(requires_flag GATE removed; dark scaffolds unregistered; suite 5723/0). NEXT = build C4
-(delete VALIDATED_ENGINES + validated_engine_names from both registries).
+per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 SHIPPED this session
+(requires_flag GATE removed; dark scaffolds unregistered; VALIDATED_ENGINES filter deleted;
+suite 5722/0). NEXT = build C5 (decouple the gpu-smoke/coverage/dep-pilot harness from the flag).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.

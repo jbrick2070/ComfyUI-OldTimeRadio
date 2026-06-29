@@ -68,9 +68,10 @@ def test_legacy_talk_music_engines_are_gone():
     from nodes._otr_video_engines import registry as _reg
     assert "ltx_av_talk" not in _reg.CAPABILITIES
     assert "ltx_av_music" not in _reg.CAPABILITIES
-    assert "ltx_av_talk" not in _reg.VALIDATED_ENGINES
-    assert "ltx_av_music" not in _reg.VALIDATED_ENGINES
-    assert "ltx_audio_in" in _reg.VALIDATED_ENGINES
+    # C4: the validated-subset filter is gone; selectability == registration.
+    assert "ltx_av_talk" not in _reg.all_engine_names()
+    assert "ltx_av_music" not in _reg.all_engine_names()
+    assert "ltx_audio_in" in _reg.all_engine_names()
 
 
 def test_ltx_audio_in_registered():

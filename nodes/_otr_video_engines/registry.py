@@ -236,72 +236,9 @@ __all__.append("CAPABILITIES")
 
 
 # ---------------------------------------------------------------------------
-# TESTED-ONLY DROPDOWN GATE (2026-06-17 operator directive). The per-role video
-# COMBO in OTR_VideoDirector lists ONLY engines that have been VALIDATED on the
-# GPU end-to-end -- untested engines (3D talkers, wan_i2v/wan_ti2v until tested,
-# the abstract / CPU-floor families, etc.) are HIDDEN from the dropdown so the
-# operator cannot accidentally pick a non-working model. This is a DISPLAY gate
-# only: every engine stays REGISTERED (V-6 -- all_engine_names() is unchanged, so
-# role_compat / assert_usable / the force-map experiment knob still see the full
-# set), and the "+ Add Custom Model" sentinel remains the escape hatch for an
-# explicitly-declared custom engine.
-#
-# To promote an engine: add its name here AFTER a green GPU validation. This is a
-# SEPARATE frozenset (not a CAPABILITIES row key) on purpose -- capability_profiles
-# .validate_declaration rejects unknown CAPABILITIES keys, and "validated" is a
-# build-status fact, not a hardware-capability fact.
-#
-# Validated VIDEO engines as of 2026-06-17 (GPU-proven end-to-end, audio
-# byte-identical): the LTX lanes + the HuMo family. humo_1.7B_169 is functional
-# (still cfg 2.5 / mildly cool -- see GO_FORWARD_PLAN); it is listed because it
-# renders correctly, only its colour grade is unfinished.
+# VALIDATED_ENGINES + validated_engine_names() REMOVED 2026-06-29 (C4 -- "registry
+# IS the menu"): there is NO validated-subset dropdown filter. Every REGISTERED
+# engine is SELECTABLE; the per-role director COMBO is built from
+# all_engine_names() (validation is the operator's MANUAL process, never a code
+# gate). The "+ Add Custom Model" sentinel remains the escape hatch.
 # ---------------------------------------------------------------------------
-VALIDATED_ENGINES = frozenset({
-    "ltx_video",
-    "ltx_audio_in",
-    "humo",
-    "humo_1.7B",
-    "humo_1.7B_169",
-    "humo_14B_169",
-    # wan_ti2v PROMOTED 2026-06-18: forced-lane GPU smoke PASSED on the 5080 via
-    # the real adapter (OTR_VideoRenderBatch mode=single, executor thread) -- i2v
-    # rendered 33 frames from a 16:9 still, engine vram_used ~8.1 GB, independent
-    # NVML peak 12,945 MiB (< the 14.5 GB cap). The 8GB-tier 5B motion engine
-    # (b-roll / scene / background; NO audio -> never the lip-sync path).
-    "wan_ti2v",
-    # visualizer PROMOTED 2026-06-18: a full visualizer-all-roles 120w episode
-    # rendered END-TO-END on the 5080 (random seed, via _otr_combo_soak -> the real
-    # OTR_VideoRenderBatch + mux) -> status=success after 4 soak-found robustness
-    # fixes (assert_usable / b000 master-slice / idle-on-silence / 0-frame default).
-    # The CPU/ffmpeg-only procedural CRT scope floor (near-zero GPU; default-ON).
-    "visualizer",
-    # flat_still 2026-06-18: a DEAD-FLAT static still (the selected image held with
-    # NO pan/zoom, fit+pad so a face is never cropped) -- the "I want stills, not
-    # video" option (operator). CPU/ffmpeg-only, no weights, no VRAM, always renders
-    # -> commercial-clean + trivially valid; listed so end users can pick it.
-    "flat_still",
-    # mesh_stage PROMOTED 2026-06-21 (operator: "at least one 3D model ready
-    # for all 3 slots"): the textured-hero PoC GPU smoke PASSED on the 5080
-    # 2026-06-20 (portrait -> Hunyuan3D-2mv mesh -> Blender WORKBENCH turntable
-    # -> RGBA frame directory -> directory-clip composite). family
-    # image_to_video, default_roles=() so it is SELECTABLE-NOT-DEFAULT for
-    # every role; gated behind OTR_ENABLE_MESH_STAGE + OTR_BLENDER_EXE.
-    # NOTE: commercial_clean=False (Tencent Hunyuan community license -- the
-    # E-7 license-record gate still applies before any default-on / ship).
-    "mesh_stage",
-})
-__all__.append("VALIDATED_ENGINES")
-
-
-def validated_engine_names() -> list:
-    """Registered engines that are VALIDATED (GPU-proven), sorted.
-
-    The intersection of the live registry with :data:`VALIDATED_ENGINES` -- the
-    tested-only source for the OTR_VideoDirector per-role dropdowns. Intersecting
-    with the registry (rather than returning the frozenset directly) keeps the
-    list honest if an engine is ever renamed or unregistered.
-    """
-    return sorted(set(_VIDEO_REGISTRY.all_engine_names()) & VALIDATED_ENGINES)
-
-
-__all__.append("validated_engine_names")

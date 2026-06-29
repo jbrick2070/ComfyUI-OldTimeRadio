@@ -69,14 +69,13 @@ DEFAULT_FRESH_CAP = 15
 
 
 def _image_model_combo() -> list:
-    """TESTED-ONLY image engines + the custom sentinel (2026-06-17 gate).
+    """Every REGISTERED image engine + the custom sentinel (registry IS the menu).
 
-    Lists only production-VALIDATED engines (``registry.validated_engine_names()``)
-    so untested image peers are hidden from the UI. Display gate only -- every
-    engine stays REGISTERED (V-6: ``all_engine_names()`` untouched). Falls back to
-    the full registry only if the validated set is somehow empty, so a box-fresh
-    graph still validates. ``+ Add Custom Model`` stays the escape hatch."""
-    names = list(_ireg.validated_engine_names()) or list(_ireg.all_engine_names())
+    Built from ``registry.all_engine_names()`` -- there is NO validated-subset
+    filter (C4, 2026-06-29): every registered image engine is SELECTABLE (validation
+    is the operator's MANUAL process, never a code gate). ``+ Add Custom Model``
+    stays the escape hatch."""
+    names = list(_ireg.all_engine_names())
     return names + [ADD_CUSTOM]
 
 

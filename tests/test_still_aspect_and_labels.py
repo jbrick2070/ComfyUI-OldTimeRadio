@@ -132,10 +132,10 @@ def test_add_custom_sentinel_is_preserved():
     assert vd._engine_id_from_pick(vd.ADD_CUSTOM) == vd.ADD_CUSTOM
 
 
-def test_combo_entries_all_parse_to_validated_ids():
+def test_combo_entries_all_parse_to_registered_ids():
     combo = vd._video_model_combo()
     parsed = {vd._engine_id_from_pick(c) for c in combo} - {vd.ADD_CUSTOM}
-    assert parsed == set(vreg.validated_engine_names())
+    assert parsed == set(vreg.all_engine_names())   # registry IS the menu (C4)
 
 
 def test_direct_parses_labelled_pick_to_bare_engine_id():
