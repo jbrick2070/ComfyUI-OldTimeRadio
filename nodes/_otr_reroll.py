@@ -393,6 +393,11 @@ def build_reroll_line_request(
         # reroll composes under the SAME authoring contract the first pass did.
         # Default False (key absent) => byte-identical to a pre-R3 reroll.
         story_quality_v2_enabled=bool(meta.get("story_quality_v2_enabled", False)),
+        # G1 (story-quality v2, 2026-06-28): reconstruct the per-beat word budget
+        # from the ledger meta (stamped v2-ONLY) so a reroll derives the SAME
+        # one-breath cap (derive_one_breath_cap) the first pass used. Absent => ()
+        # => legacy 28-word cap => byte-identical to a pre-G1 reroll.
+        words_per_beat_range=tuple(meta.get("words_per_beat_range") or ()),
         # KILL 1 (2026-06-24 assumption-audit): carry the grounded premise
         # palette the writer stamped on meta so a freeze-cascade reroll composes
         # against the SAME grounding the in-loop body-output gate validated.

@@ -75,6 +75,8 @@ try:
         detect_mojibake, extract_specificity_anchors_from_header,
         flag_anchor_stuffing, flag_one_breath, flag_personal_cost_boilerplate,
         is_whole_line_stage_action,
+        # G1 (story-quality v2, 2026-06-28) -- budget-derived one-breath cap.
+        derive_one_breath_cap,
     )
     from nodes._otr_dramatic_state import wants_are_default  # type: ignore
     from nodes._otr_casting import (  # type: ignore
@@ -89,6 +91,9 @@ except Exception:  # noqa: BLE001
 
     flag_cliche = flag_on_the_nose = flag_stage_business = flag_thesis_close = _r2_false  # type: ignore
     flag_anchor_stuffing = flag_one_breath = flag_personal_cost_boilerplate = _r2_false  # type: ignore
+
+    def derive_one_breath_cap(_r):  # type: ignore  # G1 fallback: legacy 28 cap
+        return 28
 
     def detect_leading_stage_business(_t):  # type: ignore
         return (False, "")
@@ -384,7 +389,15 @@ def r3_quality_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
 
     anchor_stuffing = sum(
         1 for ln in char if flag_anchor_stuffing(ln.get("text"), anchors)[0])
-    one_breath = sum(1 for ln in char if flag_one_breath(ln.get("text"))[0])
+    # G1 (2026-06-28): score one-breath on the SAME budget-derived cap + relaxed
+    # clause threshold the composer gate + reroll used (one derive_one_breath_cap).
+    # Absent words_per_beat_range (v2-OFF ledger) => 28/3 => legacy-identical count.
+    _ob_cap = derive_one_breath_cap(m.get("words_per_beat_range"))
+    _ob_clause = max(3, _ob_cap // 8)
+    one_breath = sum(
+        1 for ln in char
+        if flag_one_breath(ln.get("text"), max_words=_ob_cap,
+                           max_clause_markers=_ob_clause)[0])
     stage_action_leak = sum(
         1 for ln in char if is_whole_line_stage_action(ln.get("text")))
     personal_cost = sum(

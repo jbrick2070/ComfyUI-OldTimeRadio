@@ -39,6 +39,8 @@ from typing import Iterable, Optional
 # stdlib-only leaf -> no import cycle. Dual import (package / standalone).
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
+        _hard_clauses,
+        derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
         flag_anchor_stuffing,
@@ -49,12 +51,15 @@ try:  # pragma: no cover - exercised by both import styles
         flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
+        is_truncated,
         scrub_roster_vocative,
         strip_action_marker,
         verify_and_repair_line,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
+        _hard_clauses,
+        derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
         flag_anchor_stuffing,
@@ -65,6 +70,7 @@ except ImportError:  # pragma: no cover
         flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
+        is_truncated,
         scrub_roster_vocative,
         strip_action_marker,
         verify_and_repair_line,
@@ -892,6 +898,12 @@ class LineRequest:
     # withholding) is dormant and _build_user_prompt renders the pre-R3 prompt
     # byte-for-byte. NEVER inferred from text.
     story_quality_v2_enabled: bool = False
+    # G1 (story-quality v2, 2026-06-28) -- the per-episode words_per_beat_range
+    # (episode_budget.words_per_beat_range; meta round-trips it as a LIST). On the
+    # v2 path derive_one_breath_cap(range) raises the one-breath cap so a
+    # budget-length spoken line is not collapsed into noun-salad. (0,0) / absent =>
+    # legacy 28-word cap => v2-OFF byte-identical. NEVER inferred from text.
+    words_per_beat_range: tuple = (0, 0)
     # Story-quality LIFT L1/L2 (2026-06-23) -- deterministic upstream beat
     # shaping. beat_role = the dramatic FUNCTION of this beat (setup / pressure
     # / personal_stake / irreversible_choice / consequence); conflict_object +
@@ -2294,6 +2306,15 @@ _QUALITY_COLLAPSE_HINT = (
     "Rewrite as one spoken beat under ~20 words, using at most one concrete "
     "detail"
 )
+#: G1 (story-quality v2, 2026-06-28): the v2 collapse hint does NOT force the
+#: ~20-word compression that turned rich lines into noun-salad -- it asks for
+#: NATURAL spoken dialogue at the per-beat budget, split into short sentences,
+#: keeping the specifics. Selected by _quality_reroll_hint on the v2 path only;
+#: the original constant stays byte-identical for v2-OFF. <=240 chars.
+_QUALITY_COLLAPSE_HINT_V2 = (
+    "Rephrase as natural spoken dialogue; split into two short sentences if "
+    "needed; keep the specifics; drop listing or cramming; do not pad"
+)
 
 
 def _quality_flags_for_line(cleaned, req):
@@ -2316,7 +2337,17 @@ def _quality_flags_for_line(cleaned, req):
             _h, _r = flag_anchor_stuffing(cleaned, anchors)
             if _h:
                 flags.append(("anchor_stuffing", _r, "anchor_stuffing"))
-            _h, _r = flag_one_breath(cleaned)
+            # G1 (2026-06-28): the one-breath cap is the per-beat budget's high
+            # end (derive_one_breath_cap), and the SOFT clause tripwire is relaxed
+            # in proportion -- the cap alone is necessary but NOT sufficient (the
+            # soft path fires on clause count regardless of max_words), so a fuller
+            # well-structured line is not rerolled into noun-salad. (0,0)/absent
+            # range => 28/3 => byte-identical to the legacy flag_one_breath call.
+            _ob_cap = derive_one_breath_cap(
+                getattr(req, "words_per_beat_range", (0, 0)))
+            _h, _r = flag_one_breath(
+                cleaned, max_words=_ob_cap,
+                max_clause_markers=max(3, _ob_cap // 8))
             if _h:
                 flags.append(("one_breath", _r, "one_breath"))
             _h, _r = flag_personal_cost_boilerplate(cleaned)
@@ -2333,16 +2364,37 @@ def _quality_flags_for_line(cleaned, req):
         return []
 
 
-def _quality_reroll_hint(flags) -> str:
+def _quality_reroll_hint(flags, story_quality_v2_enabled: bool = False) -> str:
     """W-D hint composition: TOP-1 by priority, EXCEPT one_breath+anchor_stuffing
-    collapse into one combined rewrite. 240-char cap. Pure."""
+    collapse into one combined rewrite. 240-char cap. Pure. G1 (2026-06-28): on
+    the v2 path the collapse hint is the non-compressing _QUALITY_COLLAPSE_HINT_V2
+    (rephrase as natural dialogue, keep specifics, do not pad); v2-OFF keeps the
+    original constant byte-identical."""
     by_code = {code: reason for code, reason, _flag in flags}
     if "one_breath" in by_code and "anchor_stuffing" in by_code:
-        return _QUALITY_COLLAPSE_HINT[:240]
+        _hint = (_QUALITY_COLLAPSE_HINT_V2 if story_quality_v2_enabled
+                 else _QUALITY_COLLAPSE_HINT)
+        return _hint[:240]
     for code in _QUALITY_HINT_PRIORITY:
         if code in by_code:
             return str(by_code[code] or "")[:240]
     return ""
+
+
+def line_quality_defect_score(text, req) -> int:
+    """G1 (story-quality v2, 2026-06-28) -- a single ordering used ONLY on the v2
+    path to decide whether a reroll genuinely improved the line: the count of
+    quality flags + a strong penalty for a truncated/mid-cut line + a mild penalty
+    for excessive hard-clause nesting. LOWER wins; the ORIGINAL keeps a tie. Pure;
+    never raises."""
+    try:
+        flags = _quality_flags_for_line(text, req)
+        score = len(flags) + 2 * int(is_truncated(text))
+        if _hard_clauses(text) > 3:
+            score += 1
+        return score
+    except Exception:  # noqa: BLE001 -- a scorer must never break a render
+        return 0
 
 
 def compose_line(
@@ -2459,7 +2511,8 @@ def compose_line(
             )
         _q_flags = _quality_flags_for_line(cleaned, req)
         if _q_flags:
-            _q_hint = _quality_reroll_hint(_q_flags)
+            _q_hint = _quality_reroll_hint(
+                _q_flags, req.story_quality_v2_enabled)
             _existing = getattr(req, "reroll_hint", "") or ""
             _q_combined = (
                 f"{_existing}; {_q_hint}" if _existing else _q_hint)
@@ -2500,7 +2553,17 @@ def compose_line(
                 # once, appended once; the recursive call skips this gate).
                 _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
                 _after_flags = _quality_flags_for_line(_rr.text, req)
-                if len(_after_flags) < len(_q_flags):
+                # G1 (2026-06-28): v2 scores BOTH drafts on ONE defect ordering
+                # (flags + 2*truncation + clause-nesting) so a clean ~35-word line
+                # beats a 20-word fragment; v2-OFF keeps the legacy flag-count
+                # comparison byte-identical. Lower wins; ORIGINAL keeps a tie.
+                if req.story_quality_v2_enabled:
+                    _keep_reroll = (
+                        line_quality_defect_score(_rr.text, req)
+                        < line_quality_defect_score(cleaned, req))
+                else:
+                    _keep_reroll = len(_after_flags) < len(_q_flags)
+                if _keep_reroll:
                     # the reroll genuinely reduced defects -> keep it. Any defect
                     # that SURVIVED the reroll is stamped quality_residual:<code>
                     # so the scan can count residual lines (W-C). MF-6: appended

@@ -3037,6 +3037,14 @@ class OTR_LedgerScriptWriter:
             list(episode_budget.words_per_beat_range),
             episode_budget.music_inter_count,
         )
+        # G1 (story-quality v2, 2026-06-28): stamp the per-beat word budget so the
+        # reroll rebuilder (_otr_reroll) + story_quality_scan derive the SAME
+        # one-breath cap as the first pass (derive_one_breath_cap). v2-ONLY -- the
+        # key stays OFF the ledger for a v2-OFF render (byte-identical) and the
+        # scan/reroll then fall back to the legacy 28-word cap.
+        if meta.get("story_quality_v2_enabled"):
+            meta["words_per_beat_range"] = list(
+                episode_budget.words_per_beat_range)
 
         # KILL 2 (2026-06-24): build ONE StoryContract pre-outline (cast_seed-keyed,
         # selected from script_brief/news_seed) so the SAME radio style steers the
@@ -4286,6 +4294,13 @@ class OTR_LedgerScriptWriter:
                 # Default False (meta key absent) => byte-identical pre-R3 prompt.
                 story_quality_v2_enabled=bool(
                     meta.get("story_quality_v2_enabled", False)
+                ),
+                # G1 (story-quality v2, 2026-06-28) -- the per-beat word budget so
+                # the composer's one-breath gate derives a budget-sized cap on the
+                # v2 path. Always threaded (consumed ONLY when v2), so a v2-OFF
+                # render is byte-identical (the cap stays the legacy 28).
+                words_per_beat_range=tuple(
+                    episode_budget.words_per_beat_range
                 ),
                 # Story-quality LIFT L1/L2 (2026-06-23) -- threaded from the
                 # writer-side sq dict. Empty unless OTR_STORY_QUALITY_L12 is on
