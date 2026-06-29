@@ -265,12 +265,12 @@ def _reasoning_effort_from_env() -> str | None:
 
 
 def openrouter_enabled() -> bool:
-    """C3 gate: remote is reachable ONLY when the key is present AND the
-    explicit enable flag is set. Either missing ⇒ remote is off and the
-    virtual rows never appear in the dropdowns (S2)."""
-    return bool(_env("OPENROUTER_API_KEY")) and os.environ.get(
-        "OTR_ENABLE_OPENROUTER", "0"
-    ) == "1"
+    """Remote is reachable when the API KEY is present -- a creds-present check,
+    NOT a promotion gate. C6 (2026-06-29 -- "registry IS the menu"): the separate
+    OTR_ENABLE_OPENROUTER opt-in flag is GONE; any CONFIGURED LLM (its credentials
+    present) is selectable, and the virtual rows appear in the dropdowns whenever
+    the key is set. No key ⇒ remote is off (the rows never appear, S2)."""
+    return bool(_env("OPENROUTER_API_KEY"))
 
 
 def is_openrouter_row_id(repo_id: str) -> bool:

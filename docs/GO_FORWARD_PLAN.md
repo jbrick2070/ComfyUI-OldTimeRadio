@@ -73,7 +73,18 @@
 > the probe manifest `OPT_IN_ENGINES` -> `PROBE_ENGINES` and deleted the vestigial "flag" keys + the verdict
 > "flag" field. Tests: retargeted test_video_gpu_smoke (not-ready-without-deps), test_coverage_sweep_acceptance
 > (no enable-flag preflight), test_video_dep_pilot + test_audio_dep_pilot (PROBE_ENGINES + curated no-drift
-> contract, not flag-derived). Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C6 (voice + LLM gates).
+> contract, not flag-derived). Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7.
+>
+> **C6 SHIPPED (2026-06-29 this session):** removed the VOICE + LLM opt-in gates. Audio: deleted the
+> `GATED_BY_FLAG` block from the audio registry `assert_usable` (registry IS the menu) + set
+> `requires_flag=None` on the 3 flagged voice/music adapters (chatterbox / dia / stable_audio_music). The
+> `requires_flag` field annotation + the `GATED_BY_FLAG` enum are KEPT (audio protocol-parity frozen). LLM:
+> `openrouter_enabled()` now returns `bool(OPENROUTER_API_KEY)` only -- the separate `OTR_ENABLE_OPENROUTER`
+> opt-in flag is GONE as a gate (any CONFIGURED LLM with its creds present is selectable; the API-key/creds
+> check stays). **HARD CONSTRAINT HELD: test_audio_byte_identical GREEN** -- the default voice/music engines
+> (already flag-free) + the master-mux path are UNCHANGED; only the selectability of non-default engines
+> changed. Flipped ~9 audio gate tests + 1 OpenRouter gate test to the selectable contract. Full suite
+> 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7 (docstring cleanup + the guard test).
 >
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
@@ -203,10 +214,10 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 + C5 SHIPPED this session
-(requires_flag GATE removed; dark scaffolds unregistered; VALIDATED_ENGINES filter deleted;
-gpu-smoke/coverage/dep-pilot harness decoupled from the flag; suite 5722/0). NEXT = build C6
-(remove the voice + LLM opt-in gates; test_audio_byte_identical MUST stay green).
+per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 + C5 + C6 SHIPPED this
+session (requires_flag GATE removed; dark scaffolds unregistered; VALIDATED_ENGINES filter
+deleted; harness decoupled from the flag; voice + LLM gates removed with test_audio_byte_identical
+GREEN; suite 5722/0). NEXT = build C7 (docstring/comment cleanup + the guard test).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.

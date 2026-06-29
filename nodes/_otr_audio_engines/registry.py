@@ -166,15 +166,12 @@ def assert_usable(name: str, role: str) -> str:
             f"engine '{name}' serves roles {tuple(getattr(eng, 'roles', ()))}, "
             f"not '{role}'",
         )
-    if role in getattr(eng, "default_roles", ()):
-        return name
-    flag = getattr(eng, "requires_flag", None)
-    if flag and os.getenv(flag, "0") != "1":
-        raise EngineUnusable(
-            name, role, EngineUsabilityReason.GATED_BY_FLAG,
-            f"engine '{name}' is opt-in for role '{role}'; set {flag}=1 to "
-            f"enable it",
-        )
+    # Registered + role-compatible == usable. The registry IS the menu: a
+    # registered audio engine is selectable (C6 -- no flag gate; validation is the
+    # operator's MANUAL process). Disk/token/commercial checks require IO and are
+    # enforced downstream (this method does no IO). The byte-identical default
+    # voice/music engines + the master-mux path are UNCHANGED -- only the
+    # selectability of the non-default engines changes.
     return name
 
 

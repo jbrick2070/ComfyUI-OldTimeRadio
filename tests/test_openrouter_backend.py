@@ -98,10 +98,13 @@ def test_disabled_when_key_missing(monkeypatch):
     assert orb.openrouter_enabled() is False
 
 
-def test_disabled_when_flag_unset(monkeypatch):
+def test_enabled_when_key_present_no_flag_needed(monkeypatch):
+    # C6 (2026-06-29 -- "registry IS the menu"): the OTR_ENABLE_OPENROUTER opt-in
+    # flag is GONE as a gate. With the API key present (creds), OpenRouter is
+    # ENABLED -- no separate launch flag required.
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
     monkeypatch.delenv("OTR_ENABLE_OPENROUTER", raising=False)
-    assert orb.openrouter_enabled() is False
+    assert orb.openrouter_enabled() is True
 
 
 def test_enabled_when_both_set(enabled_env):

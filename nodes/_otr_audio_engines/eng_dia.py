@@ -56,7 +56,7 @@ class DiaEngine:
     roles = ("char_voice",)
     default_roles = ()
     commercial_clean = True  # Apache-2.0
-    requires_flag = "OTR_ENABLE_DIA"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     interface = "per_line"
     sample_rate = 44100      # Descript Audio Codec; must match char_dia_v1
     requires_voice_ref = True

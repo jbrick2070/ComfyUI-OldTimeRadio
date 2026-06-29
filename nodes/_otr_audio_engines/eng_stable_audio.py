@@ -20,7 +20,7 @@ class StableAudioMusicEngine:
     roles = ("music",)
     default_roles = ()
     commercial_clean = True  # Stability Community license (revenue-capped)
-    requires_flag = "OTR_ENABLE_STABLE_AUDIO"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     interface = "clip"
     sample_rate = 44100
 

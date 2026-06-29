@@ -50,7 +50,7 @@ class ChatterboxEngine:
     roles = ("char_voice", "announcer_voice")
     default_roles = ()
     commercial_clean = True  # MIT
-    requires_flag = "OTR_ENABLE_CHATTERBOX"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     interface = "per_line"
     # FIXED 24000 (NOT a dynamic m.sr): _render_per_line packs at the profile
     # rate and pack_audio_batch raises on any clip whose rate differs.

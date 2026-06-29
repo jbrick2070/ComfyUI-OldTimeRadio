@@ -72,17 +72,14 @@ def test_assert_usable_default_always_runs():
     assert R.assert_usable("stub_default", "stub_role") == "stub_default"
 
 
-def test_assert_usable_optin_fails_closed_when_flag_off(monkeypatch):
-    # Fail closed (C-6): an un-flagged opt-in engine raises a classified
-    # error -- it is NEVER silently swapped for the role default.
+def test_assert_usable_optin_selectable_no_flag(monkeypatch):
+    # C6 -- registry IS the menu: a registered, role-compatible engine is usable
+    # with NO flag gate (the requires_flag field is now vestigial; validation is
+    # the operator's MANUAL process). It is never silently swapped for the default.
     monkeypatch.delenv("OTR_TEST_STUB_FLAG", raising=False)
     R.register(_StubOptInEngine)
     R.register(_StubDefaultEngine)
-    with pytest.raises(R.EngineUnusable) as ei:
-        R.assert_usable("stub_optin", "stub_role")
-    assert ei.value.reason is R.EngineUsabilityReason.GATED_BY_FLAG
-    assert ei.value.engine == "stub_optin"
-    assert ei.value.role == "stub_role"
+    assert R.assert_usable("stub_optin", "stub_role") == "stub_optin"
 
 
 def test_assert_usable_optin_runs_when_flag_on(monkeypatch):

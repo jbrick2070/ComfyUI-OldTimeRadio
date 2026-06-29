@@ -43,25 +43,22 @@ def test_chatterbox_serves_both_voice_roles():
 
 def test_optin_flags_and_licensing():
     cb = AE.get_engine("chatterbox")
-    assert cb.requires_flag == "OTR_ENABLE_CHATTERBOX"
+    assert cb.requires_flag is None  # C6: registry IS the menu (no flag gate)
     assert cb.commercial_clean is True
     idx = AE.get_engine("indextts2")
     assert idx.requires_flag is None  # PROMOTED 2026-06-04: shipped char_voice default
     assert idx.commercial_clean is False  # Bilibili non-commercial (non-blocking warn)
     sa = AE.get_engine("stable_audio_music")
-    assert sa.requires_flag == "OTR_ENABLE_STABLE_AUDIO"
+    assert sa.requires_flag is None  # C6: registry IS the menu (no flag gate)
     assert sa.commercial_clean is True
 
 
-def test_assert_usable_optin_off_fails_closed(monkeypatch):
-    # Fail closed (C-6): a still-opt-in char-voice engine raises GATED_BY_FLAG
-    # when its flag is off. indextts2 was PROMOTED 2026-06-04 to the shipped
-    # char_voice default (always usable, no flag); chatterbox stays opt-in.
+def test_assert_usable_no_flag_gate(monkeypatch):
+    # C6 -- registry IS the menu: chatterbox is selectable with NO flag gate (the
+    # deeper venv/weights checks run in load(), not in assert_usable). indextts2
+    # (the shipped char_voice default) is likewise usable.
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
-    with pytest.raises(AE.EngineUnusable) as ei:
-        AE.assert_usable("chatterbox", "char_voice")
-    assert ei.value.reason is AE.EngineUsabilityReason.GATED_BY_FLAG
-    # indextts2 is the promoted default -> always usable even with its flag off.
+    assert AE.assert_usable("chatterbox", "char_voice") == "chatterbox"
     monkeypatch.delenv("OTR_ENABLE_INDEXTTS2", raising=False)
     assert AE.assert_usable("indextts2", "char_voice") == "indextts2"
 

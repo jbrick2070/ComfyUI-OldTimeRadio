@@ -33,8 +33,8 @@ def test_chatterbox_and_dia_registered_with_roles():
     dia = AE.get_engine("dia")
     assert "char_voice" in cbx.roles
     assert dia.roles == ("char_voice",)
-    assert cbx.requires_flag == "OTR_ENABLE_CHATTERBOX"
-    assert dia.requires_flag == "OTR_ENABLE_DIA"
+    assert cbx.requires_flag is None  # C6: registry IS the menu (no flag gate)
+    assert dia.requires_flag is None
     assert cbx.commercial_clean is True and dia.commercial_clean is True
     assert cbx.sample_rate == 24000 and dia.sample_rate == 44100
 
@@ -67,14 +67,14 @@ def test_requires_voice_ref_implies_voice_ref_kind():
 
 
 # --- fail-closed gating + load() ------------------------------------------- #
-def test_optin_engines_gated_off_by_default(monkeypatch):
+def test_optin_engines_selectable_no_flag(monkeypatch):
+    # C6 -- registry IS the menu: chatterbox + dia are selectable with NO flag
+    # gate (the venv/weights checks run in load(), not assert_usable).
     from nodes import _otr_audio_engines as AE
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
     monkeypatch.delenv("OTR_ENABLE_DIA", raising=False)
     for name in ("chatterbox", "dia"):
-        with pytest.raises(AE.EngineUnusable) as ei:
-            AE.assert_usable(name, "char_voice")
-        assert ei.value.reason == AE.EngineUsabilityReason.GATED_BY_FLAG
+        assert AE.assert_usable(name, "char_voice") == name
 
 
 def test_optin_engines_usable_when_flagged(monkeypatch):

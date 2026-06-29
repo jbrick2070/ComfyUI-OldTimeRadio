@@ -43,16 +43,17 @@ def test_resolve_legacy_defaults_without_flags():
     assert r.resolve_casting_plan(role="music", engine="musicgen").profile_id == "music_musicgen_v1"
 
 
-def test_resolve_optin_fails_closed_when_flag_off(monkeypatch):
+def test_resolve_optin_selectable_no_flag(monkeypatch):
+    # C6 -- registry IS the menu: an opt-in engine resolves with NO flag gate
+    # (validation is the operator's MANUAL process, never a code gate).
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
     monkeypatch.delenv("OTR_ENABLE_STABLE_AUDIO", raising=False)
     r = EP.load_resolver()
-    with pytest.raises(EngineUnusable) as ei:
-        r.resolve_casting_plan(role="char_voice", engine="chatterbox")
-    assert ei.value.reason is EngineUsabilityReason.GATED_BY_FLAG
-    with pytest.raises(EngineUnusable) as ei2:
-        r.resolve_casting_plan(role="music", engine="stable_audio_music")
-    assert ei2.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+    p = r.resolve_casting_plan(role="char_voice", engine="chatterbox",
+                               voice_bank="default")
+    assert p.profile_id == "char_chatterbox_v1"
+    p2 = r.resolve_casting_plan(role="music", engine="stable_audio_music")
+    assert p2.profile_id  # resolves without a flag gate
 
 
 def test_resolve_optin_succeeds_when_flag_on(monkeypatch):

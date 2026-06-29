@@ -155,10 +155,9 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
         node.generate(script_json=script, engine="bark")  # char-voice only
     assert wrong_role.value.reason is EngineUsabilityReason.INCOMPATIBLE_PROFILE
 
-    monkeypatch.delenv("OTR_ENABLE_STABLE_AUDIO", raising=False)
-    with pytest.raises(EngineUnusable) as gated:
-        node.generate(script_json=script, engine="stable_audio_music")
-    assert gated.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+    # C6: no GATED_BY_FLAG dispatch case any more -- a registered engine is
+    # selectable (the registry IS the menu). The fail-closed taxonomy here is
+    # MALFORMED_CONFIG (unknown engine) + INCOMPATIBLE_PROFILE (wrong role) above.
 
 
 def test_stable_audio_missing_hf_token_fails_closed(monkeypatch):
