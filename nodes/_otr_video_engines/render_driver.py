@@ -44,7 +44,7 @@ _LOG = logging.getLogger("OTR.video.render_driver")
 #: to the real procedural CRT engine (eng_visualizer.py), which REQUIRES audio_ref
 #: + ffmpeg and so is NOT a guaranteed always-renders floor terminus.
 FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
-                         "flux_still"})
+                         "still_pan"})
 #: The universal floor terminus appended to any engine whose declared chain
 #: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
 #: -- every chain terminates at a registered radio floor that always renders).
@@ -71,7 +71,7 @@ ENGINE_FAMILY = {
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
     "abstract": "abstract", "station_card": "static_image_gen",
-    "visualizer": "abstract", "flux_still": "static_image_gen",
+    "visualizer": "abstract", "still_pan": "static_image_gen",
     # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
     # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
     "ltx_audio_in": "audio_conditioned_video",
@@ -725,7 +725,7 @@ def _is_character_face_beat(shot):
     non-open beat counts; the unified ``ltx_audio_in`` audio-in lane counts when it
     drives a CHARACTER beat (it is one engine for bookends AND characters, so the
     talk-vs-scene split that used to live in ltx_av_talk/ltx_av_music now lives on the
-    ROLE). Other engines (ltx_video / wan_i2v / flux_still) are UNCHANGED -- they are
+    ROLE). Other engines (ltx_video / wan_i2v / still_pan) are UNCHANGED -- they are
     never character-face here, so their audio/prompt routing is untouched. Pure."""
     role = str((shot or {}).get("role") or "")
     if not role:
@@ -907,16 +907,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "scene still in the ledger -- falling back to the pre-spine "
                 "init (%s)", _family, shot.get("shot_id"), _bid,
                 init_source)
-    # FIX1 / BUG-LOCAL-403 (opener centre BLACK): flux_still is family
+    # FIX1 / BUG-LOCAL-403 (opener centre BLACK): still_pan is family
     # "static_image_gen" -- in NEITHER _SCENE_INIT_FAMILIES nor the ltx_video
-    # branch -- so an opener that picks flux_still for the music slot kept
+    # branch -- so an opener that picks still_pan for the music slot kept
     # init_image="" (the b000 music-open beat has char_id="") and the cheap
     # family synthesized its dark floor (color=0x0A0E14) => a black centre.
-    # Condition flux_still on the beat's SCENE still like the other init-driven
+    # Condition still_pan on the beat's SCENE still like the other init-driven
     # engines; LOUD if absent (never a silent black). station_card (the other
     # static_image_gen family) is intentionally NOT included here -- its
     # announcer-card behavior is unchanged.
-    # flux_still (Ken Burns) + flat_still (static hold) are the static_image_gen
+    # still_pan (Ken Burns) + still_flat (static hold) are the static_image_gen
     # "show the selected still" engines -- both condition on the beat's scene still
     # so the operator's chosen image (e.g. flux2_klein) is what's displayed.
     # ltx_audio_in (2026-06-26) JOINS them: it is the unified WIDE audio-in LTX lane
@@ -925,11 +925,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # announcer/music BOOKENDS, scene_character for character beats), portrait
     # cleared so it can never leak into a wide frame. Unlike the cheap families it
     # has NO floor: a missing required still fails LOUD in render_clip (no fallbacks).
-    if str(shot.get("engine_id") or "") in ("flux_still", "flat_still", "ltx_audio_in"):
+    if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
-        # BUG 1 (2026-06-20 operator directive): flux_still / flat_still are
+        # BUG 1 (2026-06-20 operator directive): still_pan / still_flat are
         # LANDSCAPE engines (render_aspect="wide") -- they NEVER condition on the
         # 832x1216 VERTICAL portrait. The 8bc5381 "_spk==character -> portrait"
         # branch pillarboxed the portrait in the 1472x832 frame and the procgen
@@ -952,7 +952,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_source = "missing_scene_still"
             _LOG.warning(
                 "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
-                "has NO scene still in the ledger -- a cheap family (flux/flat_still) "
+                "has NO scene still in the ledger -- a cheap family (still_pan/still_flat) "
                 "synthesizes its dark floor; a still-REQUIRED engine (ltx_audio_in) "
                 "fails LOUD in render_clip (no fallbacks). Investigate the image "
                 "phase for beat %s.", _eng, _bid, _bid)
@@ -1116,9 +1116,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # 2026-06-10 + 2026-06-14): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox). LTX/Wan were given
     # the landscape canvas in 2026-06-10, but the still/floor families
-    # (flux_still, station_card, still_kenburns, visualizer) STILL inherited the
+    # (still_pan, station_card, still_kenburns, visualizer) STILL inherited the
     # 480x832 portrait -> skinny-portrait b-roll pillarboxed in the 16:9 frame
-    # (2026-06-14 operator catch on flux_still). Give the composite landscape
+    # (2026-06-14 operator catch on still_pan). Give the composite landscape
     # canvas to every engine EXCEPT the face families: audio_driven_face (HuMo)
     # keeps its accepted portrait pillarbox; lipsync_overlay / character_3d align
     # to a face. Both dims stay /32-friendly for the LTX latent grid; env-
@@ -1153,7 +1153,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # 1472x832 -> "starts sharp then gets blurry" (the engine's own note: "0.75
     # re-noises into mush at 1472x832"). Render LTX at its 6/5 native canvas and
     # let OTR_SilentComposite scale the clip to the 1472x832 deliverable. The
-    # still/floor families (flux_still etc.) KEEP the full landscape canvas above.
+    # still/floor families (still_pan etc.) KEEP the full landscape canvas above.
     # Env OTR_LTX_RENDER_CANVAS (default 832x480, the 6/5 value; /32-friendly).
     if str(shot.get("engine_id") or "") == "ltx_video":
         _lxc = os.environ.get("OTR_LTX_RENDER_CANVAS", "832x480")

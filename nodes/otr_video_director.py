@@ -63,17 +63,26 @@ def _label_for(engine_id) -> str:
     return "%s%s" % (engine_id, _aspect_suffix(engine_id))
 
 
+#: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that
+#: still carries the pre-rename name resolves to the current engine so the pick
+#: keeps working. 2026-06-29: flat_still -> still_flat, flux_still -> still_pan
+#: (the misleading "flux" name was dropped -- the engine is ffmpeg, never Flux).
+_LEGACY_ENGINE_ALIASES = {"flat_still": "still_flat", "flux_still": "still_pan"}
+
+
 def _engine_id_from_pick(pick) -> str:
     """Parse a dropdown pick back to the bare engine id (the saved/looked-up
     VALUE). Take the token BEFORE the first ' (' so a suffixed label
     (``'humo (portrait)'``) yields ``'humo'``; a bare legacy value with no
     suffix (old saved graphs) passes through unchanged; the ADD_CUSTOM sentinel
-    (no ' (') is preserved so the custom path still triggers."""
+    (no ' (') is preserved so the custom path still triggers. A renamed engine's
+    old id is mapped via :data:`_LEGACY_ENGINE_ALIASES` so old picks resolve."""
     s = str(pick or "")
     if s == ADD_CUSTOM:
         return s
     idx = s.find(" (")
-    return s[:idx] if idx != -1 else s
+    bare = s[:idx] if idx != -1 else s
+    return _LEGACY_ENGINE_ALIASES.get(bare, bare)
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
 #: Route-A: the ONE shared map (nodes/_otr_shared/role_slots.py) -- the three

@@ -7,13 +7,13 @@ not by the engine family. These lock that:
 
 * ltx_audio_in conditions on the beat's WIDE scene still (the scene_open
   radio-bookend still for announcer/music; scene_character for character beats),
-  EXACTLY like flux_still/flat_still -- never the vertical portrait, no init='' gap.
+  EXACTLY like still_pan/still_flat -- never the vertical portrait, no init='' gap.
 * a CHARACTER ltx_audio_in beat is classified character-face -> clean own-voice
   audio (no ambient master slice) + a character prompt (not the scene prompt).
 * announcer/music BOOKEND ltx_audio_in beats stay scene (ambient slice + scene
   prompt), and clamp to the VRAM-safe 512x288 AV canvas.
 
-Other engines (ltx_video / wan_i2v / flux_still / humo) are intentionally
+Other engines (ltx_video / wan_i2v / still_pan / humo) are intentionally
 UNCHANGED -- these assert that too, so the additive role wiring never drifts them.
 """
 import pytest
@@ -50,11 +50,11 @@ def test_classifier_humo_character_is_face_via_family():
 
 
 def test_classifier_does_not_capture_other_engines():
-    # ltx_video / wan_i2v / flux_still are NEVER character-face here -> their
+    # ltx_video / wan_i2v / still_pan are NEVER character-face here -> their
     # audio + prompt routing is untouched by the role wiring.
     assert rd._is_character_face_beat(_shot("ltx_video", "character_video")) is False
     assert rd._is_character_face_beat(_shot("wan_i2v", "character_video")) is False
-    assert rd._is_character_face_beat(_shot("flux_still", "scene_broll")) is False
+    assert rd._is_character_face_beat(_shot("still_pan", "scene_broll")) is False
 
 
 # ---- the ambient-master-audio gate ------------------------------------------

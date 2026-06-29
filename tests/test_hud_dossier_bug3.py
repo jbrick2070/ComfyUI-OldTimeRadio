@@ -22,9 +22,9 @@ def _led():
                                "character_a_wants": "protect the lab",
                                "character_b_wants": "ship the product",
                                "ending_change": "Hayes goes public"},
-            "render_engines": {"by_role": {"character_video": {"flat_still": 3},
-                                           "announcer_visual": {"flat_still": 2}},
-                               "histogram": {"flat_still": 6}},
+            "render_engines": {"by_role": {"character_video": {"still_flat": 3},
+                                           "announcer_visual": {"still_flat": 2}},
+                               "histogram": {"still_flat": 6}},
         },
         "cast": [{"name": "HAYES VANCE", "char_id": "c01",
                   "voice_preset": "v2/en_speaker_3", "voice_engine": "bark"}],
@@ -64,7 +64,7 @@ def test_dossier_has_render_engines_block_video_and_image():
     body = "\n".join(
         l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
     assert "character_video" in body
-    assert "flat_still" in body                  # video engine per role
+    assert "still_flat" in body                  # video engine per role
     assert "z_image_turbo" in body               # image engine per role
 
 

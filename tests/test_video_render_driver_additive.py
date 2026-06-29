@@ -268,9 +268,9 @@ def test_build_request_from_shot_seed_keyed_to_hash_not_index():
     assert rd.build_request_from_shot(s1, led)["seed_bundle"] == r1["seed_bundle"]
 
 
-def _flux_still_opener_ledger():
+def _still_pan_opener_ledger():
     """A ShotLock-shaped ledger whose OPENER beat (b000_music_open, char_id="")
-    picks flux_still for the music slot, with the ST-3 scene-still write-back
+    picks still_pan for the music slot, with the ST-3 scene-still write-back
     present (kind scene_open, beat_id b000_music_open) -- the real opener shape
     from a live render (signal_lost_..._171037)."""
     return {
@@ -291,7 +291,7 @@ def _flux_still_opener_ledger():
         "video": {"video_revision": 1, "fps": 25, "shots": [
             {"shot_id": "shot_b000_music_open",
              "source_line_ids": ["b000_music_open"],
-             "engine_id": "flux_still", "family": "static_image_gen",
+             "engine_id": "still_pan", "family": "static_image_gen",
              "group_id": "grp_music", "target_frame_count": 238,
              "degradation_trail": [], "render_request_hash": "hash_b000",
              "cache_keys": {"request_hash": "hash_b000"},
@@ -300,23 +300,23 @@ def _flux_still_opener_ledger():
     }
 
 
-def test_build_request_from_shot_flux_still_opener_conditions_on_scene_still():
-    # FIX1 / BUG-LOCAL-403: flux_still (family static_image_gen) must condition
+def test_build_request_from_shot_still_pan_opener_conditions_on_scene_still():
+    # FIX1 / BUG-LOCAL-403: still_pan (family static_image_gen) must condition
     # the opener on its beat scene still -- without it the cheap family draws a
     # black floor (the all-black opener centre). beat_id b000_music_open keys
     # both _beat_id_for_shot and the scene_open still row.
-    led = _flux_still_opener_ledger()
+    led = _still_pan_opener_ledger()
     shot = led["video"]["shots"][0]
     req = rd.build_request_from_shot(shot, led)
     assert req["asset_refs"]["init_image"] == "X:/img/still_b000_music_open.png"
     assert req["observability"]["init_source"] == "scene_still"
 
 
-def test_build_request_from_shot_flux_still_missing_still_is_loud_not_black():
+def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black():
     # No scene still for the opener -> init stays empty (the cheap family will
     # draw its floor) but the degrade is LOUD (the branch warns), never a silent
     # scene_still claim. init_source falls back to "none".
-    led = _flux_still_opener_ledger()
+    led = _still_pan_opener_ledger()
     led["images"]["images"] = [r for r in led["images"]["images"]
                                if r["object_id"] != "still_b000_music_open"]
     shot = led["video"]["shots"][0]
@@ -325,12 +325,12 @@ def test_build_request_from_shot_flux_still_missing_still_is_loud_not_black():
     assert req["observability"]["init_source"] == "none"
 
 
-def test_build_request_from_shot_flux_still_fills_landscape_canvas():
-    # 2026-06-14 operator catch: flux_still (and the other still/floor families)
+def test_build_request_from_shot_still_pan_fills_landscape_canvas():
+    # 2026-06-14 operator catch: still_pan (and the other still/floor families)
     # inherited build_request's 480x832 HuMo PORTRAIT default -> a skinny portrait
     # pillarboxed in the 16:9 frame. Non-face engines must FILL the landscape
     # canvas; only audio_driven_face (HuMo) keeps its portrait pillarbox.
-    led = _flux_still_opener_ledger()
+    led = _still_pan_opener_ledger()
     req = rd.build_request_from_shot(led["video"]["shots"][0], led)
     assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)
     assert req["canvas"]["w"] > req["canvas"]["h"]        # landscape, not portrait

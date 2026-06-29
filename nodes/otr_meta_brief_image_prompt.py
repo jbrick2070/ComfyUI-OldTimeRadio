@@ -799,8 +799,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                                           era_profile="portrait")
             # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
             # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
-            # so a flux_still beat standing in for a HuMo portrait shows the same
-            # graded look as the scene stills/bookend (flux_still Ken-Burns-
+            # so a still_pan beat standing in for a HuMo portrait shows the same
+            # graded look as the scene stills/bookend (still_pan Ken-Burns-
             # animates the minted PNG, so the PNG must carry the grade). The
             # radio broadcast-distress tail stays scene-still-only (a person is
             # not a radio set). Idempotent -- never duplicates.

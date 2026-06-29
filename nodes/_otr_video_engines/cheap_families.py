@@ -7,7 +7,8 @@ GPU engine exists. Each registers exactly like a future heavy engine (HuMo / LTX
 
 Families (schemas.FAMILIES): ``abstract`` (procedural pattern), ``static_motion``
 (still_kenburns -- a still with a slow pan), ``static_image_gen`` (station_card /
-flux_still). Each produces an ALWAYS-SILENT ``CanonicalClip`` (``has_audio`` is
+still_pan -- a provided still with a Ken Burns pan / still_flat -- the same still
+held flat). Each produces an ALWAYS-SILENT ``CanonicalClip`` (``has_audio`` is
 always False -- audio is added ONLY by ``OTR_MasterAudioMux``, V-1).
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + the
@@ -127,7 +128,7 @@ class _CheapFamilyBase:
         still = self._still_path(request) if self.uses_still else ""
         if still and os.path.exists(still):
             # ``_still_motion`` chooses the Ken Burns pan (cover+crop, default) vs the
-            # FLAT hold (fit+pad, no crop -> a face is never cut) -- the flat_still
+            # FLAT hold (fit+pad, no crop -> a face is never cut) -- the still_flat
             # 'just a still, no motion' contract.
             if getattr(self, "_still_motion", True):
                 cmd = _wb.ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)
@@ -200,30 +201,35 @@ class StationCardFamily(_CheapFamilyBase):
 
 
 @register
-class FluxStillFamily(_CheapFamilyBase):
-    name = "flux_still"
+class StillPanFamily(_CheapFamilyBase):
+    """A provided still given a slow Ken Burns pan/zoom (cover+crop) for the beat --
+    the 'still, but moving' option. CPU/ffmpeg-only, no weights, no VRAM, always
+    renders -> commercial-clean. The still is minted by the SEPARATELY-chosen image
+    engine; this family only animates it (so it is independent of the image engine).
+    ``_still_motion`` defaults True (the pan); contrast ``still_flat`` (flat hold)."""
+    name = "still_pan"
     family = "static_image_gen"
     # A plain still needs only text_prompt (supplied by EVERY role), so it is the
     # fast, universal "just a still" pick -- eligible in all five roles. BUG-LOCAL-401:
-    # music_visual + background_abstract were missing, so music_video_model='flux_still'
+    # music_visual + background_abstract were missing, so music_video_model='still_pan'
     # failed OTR_VideoDirector role validation even though a still is valid there.
     roles = ("announcer_visual", "music_visual", "character_video",
              "scene_broll", "background_abstract")
     default_roles = ()              # selectable peer; not the in-stack default
     required_inputs = ("text_prompt",)
-    commercial_clean = False        # Flux.1-dev = BFL non-commercial (migration)
-    uses_still = True               # animate a provided flux still when present
+    commercial_clean = True         # own ffmpeg + the chosen still; no model license
+    uses_still = True               # animate a provided still (Ken Burns pan) when present
 
 
 @register
-class FlatStillFamily(_CheapFamilyBase):
+class StillFlatFamily(_CheapFamilyBase):
     """A DEAD-FLAT still: the selected image held STATIC (no pan/zoom, fit+pad so a
     face is NEVER cropped) for the beat -- the 'I want stills, not video' option
     (operator 2026-06-18). Eligible in every role; CPU/ffmpeg-only, no weights, no
     VRAM, always renders -> commercial-clean + validated. ``accepts_still`` so the
     image dispatcher mints the role's selected still for it (the central coverage
     gate); ``_still_motion=False`` selects the flat hold over the Ken Burns pan."""
-    name = "flat_still"
+    name = "still_flat"
     family = "static_image_gen"
     roles = ("announcer_visual", "music_visual", "character_video",
              "scene_broll", "background_abstract")
@@ -237,5 +243,5 @@ class FlatStillFamily(_CheapFamilyBase):
 
 __all__ = [
     "AbstractFamily", "StillKenBurnsFamily", "StationCardFamily",
-    "FluxStillFamily", "FlatStillFamily",
+    "StillPanFamily", "StillFlatFamily",
 ]

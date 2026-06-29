@@ -488,7 +488,7 @@ class TestSceneStillObjects:
 
     def test_portrait_carries_cinematic_grade_bug411(self):
         """BUG-411 consistency (operator 2026-06-14): portraits now carry the
-        same cinematic GRADE tail as the scene stills, so a flux_still beat in
+        same cinematic GRADE tail as the scene stills, so a still_pan beat in
         place of HuMo shows the 6/5 graded look. Radio tail stays OFF portraits
         (a person is not a radio set); the gear scrub still removes radio words."""
         from nodes import otr_meta_brief_image_prompt as mbp

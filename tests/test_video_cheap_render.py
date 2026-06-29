@@ -25,8 +25,8 @@ _HAS_FFPROBE = shutil.which("ffprobe") is not None
 # 2026-06-18: "visualizer" graduated from a cheap floor stub to the real procedural
 # CRT engine (eng_visualizer.py) -- it is no longer a _CheapFamilyBase, so it is
 # dropped from the cheap-family render matrix (covered by test_video_visualizer.py).
-_FAMILIES = ("abstract", "still_kenburns", "station_card", "flux_still",
-             "flat_still")
+_FAMILIES = ("abstract", "still_kenburns", "station_card", "still_pan",
+             "still_flat")
 
 
 def _req(frames=6, w=96, h=64, fps=25, **extra):
@@ -64,8 +64,8 @@ def test_floor_clip_contract_shape():
     assert clip["frame_count"] == 30 and clip["fps"] == 25 and clip["clip_id"] == "s1"
 
 
-def test_flat_still_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
-    """flat_still holds the still FLAT (ffmpeg_still_static_cmd: fit+pad, no crop)
+def test_still_flat_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
+    """still_flat holds the still FLAT (ffmpeg_still_static_cmd: fit+pad, no crop)
     while still_kenburns pans it (ffmpeg_still_motion_cmd) -- the 'stills, no
     motion, no face-crop' contract. Asserts WHICH command each engine selects, with
     a real still present (no ffmpeg run -- the builders are stubbed)."""
@@ -80,15 +80,15 @@ def test_flat_still_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
     monkeypatch.setattr(wb, "run_ffmpeg", lambda cmd: None)
     req = _req(asset_refs={"init_image": str(still)})
 
-    vreg.get_engine("flat_still").render_clip(req)
+    vreg.get_engine("still_flat").render_clip(req)
     assert "static" in calls and "motion" not in calls   # flat = NO pan
     calls.clear()
     vreg.get_engine("still_kenburns").render_clip(req)
     assert "motion" in calls and "static" not in calls   # ken burns = pan
 
 
-def test_flat_still_registered_validated_all_roles():
-    eng = vreg.get_engine("flat_still")
+def test_still_flat_registered_validated_all_roles():
+    eng = vreg.get_engine("still_flat")
     assert eng.family == "static_image_gen"
     assert eng.commercial_clean is True
     assert getattr(eng, "accepts_still", False) is True   # coverage gate mints its still
@@ -96,7 +96,7 @@ def test_flat_still_registered_validated_all_roles():
     for role in ("announcer_visual", "music_visual", "character_video",
                  "scene_broll", "background_abstract"):
         assert role in eng.roles
-    assert "flat_still" in vreg.all_engine_names()        # shows in the dropdown (C4)
+    assert "still_flat" in vreg.all_engine_names()        # shows in the dropdown (C4)
 
 
 def test_canvas_and_frame_defaults():
@@ -118,23 +118,23 @@ def test_still_path_extraction():
 def test_uses_still_flags():
     assert vreg.get_engine("still_kenburns").uses_still is True
     assert vreg.get_engine("station_card").uses_still is True
-    assert vreg.get_engine("flux_still").uses_still is True
+    assert vreg.get_engine("still_pan").uses_still is True
     assert vreg.get_engine("abstract").uses_still is False
 
 
-def test_flux_still_fits_all_roles_bug401():
-    """BUG-LOCAL-401: flux_still is the fast 'just a still' pick and must be valid
+def test_still_pan_fits_all_roles_bug401():
+    """BUG-LOCAL-401: still_pan is the fast 'just a still' pick and must be valid
     in EVERY video role -- it needs only text_prompt, which every role supplies.
     A missing role tag (music_visual / background_abstract) made
-    music_video_model='flux_still' fail OTR_VideoDirector validation at execute
+    music_video_model='still_pan' fail OTR_VideoDirector validation at execute
     even though a still is perfectly valid for a music beat."""
     from nodes._otr_shared import role_compat as rc
-    eng = vreg.get_engine("flux_still")
-    desc = {"engine_id": "flux_still", "roles": tuple(eng.roles),
+    eng = vreg.get_engine("still_pan")
+    desc = {"engine_id": "still_pan", "roles": tuple(eng.roles),
             "required_inputs": tuple(eng.required_inputs)}
     for role in ("announcer_visual", "music_visual", "character_video",
                  "scene_broll", "background_abstract"):
-        assert rc.engine_fits_role(desc, role), f"flux_still must fit role {role!r}"
+        assert rc.engine_fits_role(desc, role), f"still_pan must fit role {role!r}"
 
 
 # --- real ffmpeg renders (the floor leaf) ---------------------------------- #

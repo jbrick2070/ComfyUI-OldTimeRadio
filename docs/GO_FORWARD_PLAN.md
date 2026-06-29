@@ -8,6 +8,14 @@
 > validation is the operator's MANUAL process, never a code gate. No `OTR_ENABLE_*`, no `VALIDATED_ENGINES`
 > filter, no production guard, no behind-the-scenes "model waiting to be promoted".
 >
+> **FOLLOW-UP (2026-06-29, post-C7): still-engine RENAME shipped** -- `flat_still -> still_flat`,
+> `flux_still -> still_pan` (operator: "still should be FIRST; don't mention ken burns"). Dropped the
+> "flux" misnomer end-to-end -- de-fluxed the registry CAPABILITIES row (was heavy/12000/model=flux.1-dev,
+> now cpu/0/[] -- the engine is pure ffmpeg, never loads Flux) + commercial_clean True. `still_parallax`
+> (the DepthAnything 2.5D depth pan) is the real, UNCHANGED engine -- the rename collision was avoided.
+> Legacy alias in `_engine_id_from_pick` so old saved picks/ledgers still resolve. Full suite 5729/0,
+> Bug Bible 16/3xfail, B7 green; guard + alias regression tests lock it. PUSHED to v2.0-alpha.
+>
 > CODE-READY PLAN (kibitz-hardened, 2 grounded rounds Codex+Antigravity -> the AUTHORITATIVE spec is
 > `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`; problem framing in `docs/2026-06-29-dropdown-optin/`).
 > Sequenced, suite+BugBible+B7 green AND push per green chunk to v2.0-alpha:

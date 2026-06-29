@@ -111,13 +111,13 @@ def test_exit_empty_results_is_red_even_non_acceptance():
 
 def test_exit_all_pass_non_acceptance_is_green():
     results = [_leg("sweep_music_visual_visualizer"),
-               _leg("sweep_announcer_visual_flux_still")]
+               _leg("sweep_announcer_visual_still_pan")]
     assert sweep.sweep_exit_code(results, acceptance=False) == 0
 
 
 def test_exit_one_fail_is_red():
     results = [_leg("sweep_music_visual_visualizer"),
-               _leg("sweep_announcer_visual_flux_still", "SOAK_FAIL")]
+               _leg("sweep_announcer_visual_still_pan", "SOAK_FAIL")]
     assert sweep.sweep_exit_code(results, acceptance=False) == 1
 
 

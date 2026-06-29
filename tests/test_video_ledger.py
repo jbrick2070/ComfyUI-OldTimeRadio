@@ -205,9 +205,9 @@ def test_video_treatment_forensic_sections(tmp_path):
             "costly_choice_beat": "b004",
         },
         "render_engines": {
-            "histogram": {"flat_still": 16, "ltx_audio_in": 2},
+            "histogram": {"still_flat": 16, "ltx_audio_in": 2},
             "video_revision": 3,
-            "by_role": {"character_video": {"flat_still": 14},
+            "by_role": {"character_video": {"still_flat": 14},
                         "music_visual": {"ltx_audio_in": 2}},
             "vram_peak_mb": 12900,
         },

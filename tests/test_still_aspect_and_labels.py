@@ -128,6 +128,17 @@ def test_bare_legacy_value_still_resolves():
     assert vd._engine_id_from_pick("ltx_audio_in") == "ltx_audio_in"
 
 
+def test_renamed_engine_legacy_alias_resolves():
+    # Renamed 2026-06-29: a saved graph/ledger that still picks the OLD id resolves
+    # to the current engine (flat_still -> still_flat, flux_still -> still_pan; the
+    # misleading "flux" name was dropped -- the engine is ffmpeg, never Flux).
+    assert vd._engine_id_from_pick("flat_still") == "still_flat"
+    assert vd._engine_id_from_pick("flux_still") == "still_pan"
+    # ...and the current ids are real registered engines (the menu).
+    assert "still_flat" in vreg.all_engine_names()
+    assert "still_pan" in vreg.all_engine_names()
+
+
 def test_add_custom_sentinel_is_preserved():
     assert vd._engine_id_from_pick(vd.ADD_CUSTOM) == vd.ADD_CUSTOM
 

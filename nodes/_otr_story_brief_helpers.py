@@ -374,7 +374,7 @@ STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, people shown with 
                             "full heads and clear headroom inside frame, faces "
                             "unobstructed, balanced composition")
 #: Scene-CHARACTER framing (BUG 1, 2026-06-20 operator directive): the LANDSCAPE
-#: still-only character beat (flat_still / flux_still / ltx_video on a character
+#: still-only character beat (still_flat / still_pan / ltx_video on a character
 #: line). Leads with the CHARACTER (compose_still_prompt subject = appearance) in
 #: a WIDE 16:9 environment shot -- a medium shot framing the person inside the
 #: scene, NEVER the vertical portrait (which pillarboxes -> the radio-booth floor
@@ -398,7 +398,7 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     (``portrait_prompt`` -> ``appearance`` -> ``character_description`` on
     ``char_entry``); ``"scene_character"`` (BUG 1, 2026-06-20) ALSO leads with
     the character description but composes a WIDE 16:9 medium shot (the landscape
-    still-only character beat -- flat_still/flux_still/ltx_video) and DROPS the
+    still-only character beat -- still_flat/still_pan/ltx_video) and DROPS the
     radio-booth tail; every other scene kind (``scene_open`` / ``scene_beat``)
     leads with :func:`get_open_subject` (``synthetic`` = kind=="scene_open"
     -- the b000 opening-music beat is the synthetic open). Pure; never

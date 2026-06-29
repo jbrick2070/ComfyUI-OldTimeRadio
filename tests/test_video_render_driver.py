@@ -121,7 +121,7 @@ def test_assert_soak_ok_rejects_violations(mutate):
 
 def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     """BUG-LOCAL-412 (6/5 parity): ltx_video renders at its native 832x480
-    (LTX-2B mushes above 480p; the composite scales it up) while flux_still
+    (LTX-2B mushes above 480p; the composite scales it up) while still_pan
     keeps the full 1472x832 landscape canvas. Both env-overridable."""
     monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
@@ -138,7 +138,7 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     req_ltx = rd.build_request_from_shot(shot("ltx_video", "text_to_video"),
                                          ledger)
     assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == (832, 480)
-    req_flux = rd.build_request_from_shot(shot("flux_still", "static_image_gen"),
+    req_flux = rd.build_request_from_shot(shot("still_pan", "static_image_gen"),
                                           ledger)
     assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
     monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
@@ -146,8 +146,8 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (768, 432)
 
 
-def test_flat_still_character_beat_uses_landscape_scene_still_not_portrait():
-    """BUG 1 (2026-06-20 operator directive): still-only (flat_still / flux_still)
+def test_still_flat_character_beat_uses_landscape_scene_still_not_portrait():
+    """BUG 1 (2026-06-20 operator directive): still-only (still_flat / still_pan)
     are LANDSCAPE engines -- a CHARACTER beat conditions on its per-beat 16:9
     CHARACTER scene still (kind=scene_character, minted in the image phase),
     NEVER the 832x1216 vertical portrait (which pillarboxed -> the radio-booth
@@ -171,7 +171,7 @@ def test_flat_still_character_beat_uses_landscape_scene_still_not_portrait():
 
     def shot(beat, cid):
         return {"shot_id": "shot_" + beat, "beat_id": beat,
-                "engine_id": "flat_still", "family": "static_image_gen",
+                "engine_id": "still_flat", "family": "static_image_gen",
                 "target_frame_count": 50, "source_line_ids": [beat],
                 "char_id": cid, "creative": {}}
 
@@ -183,7 +183,7 @@ def test_flat_still_character_beat_uses_landscape_scene_still_not_portrait():
     assert req_music["asset_refs"].get("init_image") == "scene_b003.png"
 
 
-def test_flat_still_character_beat_missing_still_clears_init_no_portrait_leak():
+def test_still_flat_character_beat_missing_still_clears_init_no_portrait_leak():
     """BUG 1: when a CHARACTER beat has NO scene still, the landscape still engine
     degrades to its dark floor (init_image cleared) -- the vertical portrait must
     NEVER leak into the 1472x832 frame."""
@@ -198,7 +198,7 @@ def test_flat_still_character_beat_missing_still_clears_init_no_portrait_leak():
         ]},
     }
     shot = {"shot_id": "shot_b002", "beat_id": "b002",
-            "engine_id": "flat_still", "family": "static_image_gen",
+            "engine_id": "still_flat", "family": "static_image_gen",
             "target_frame_count": 50, "source_line_ids": ["b002"],
             "char_id": "c01", "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)

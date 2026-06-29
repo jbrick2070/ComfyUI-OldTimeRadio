@@ -188,7 +188,7 @@ def test_cheap_families_registered():
     names = set(vreg.all_engine_names())
     # "visualizer" graduated to a real engine (eng_visualizer.py) 2026-06-18; it is
     # no longer a cheap floor family.
-    for fam in ("abstract", "still_kenburns", "station_card", "flux_still"):
+    for fam in ("abstract", "still_kenburns", "station_card", "still_pan"):
         assert fam in names, f"cheap family {fam} not registered in the video registry"
 
 
