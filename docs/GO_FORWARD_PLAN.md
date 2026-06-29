@@ -33,6 +33,18 @@
 > - **C7** docstring/comment cleanup (engine_registry_base GATED_BY_FLAG now dead for video/image) + a guard
 >   test (no REGISTERED engine carries a live flag gate / renders NotImplementedError).
 >
+> **C2 SHIPPED (2026-06-29 this session):** removed the `requires_flag` GATE -- the base
+> `engine_registry_base.assert_usable` block is gone + the 8 render-ready video adapters
+> (humo / wan_i2v / wan_ti2v / still_parallax / mesh_stage / ltx_video / ltx_av / visualizer) and the 4 image
+> survivors (flux2_klein / z_image_turbo / qwen_image / lumina_image) all set `requires_flag=None` (vestigial;
+> the `GATED_BY_FLAG` enum member + the field annotation are KEPT for audio protocol-parity, audio FROZEN).
+> Flipped ~30 video/image gate tests to the "registry IS the menu" contract. The dep-pilot/gpu-smoke RIPPLE
+> (3 tests) was handled test-only -- the dep-pilot no-drift contract dropped the flag coupling + gpu-smoke
+> dropped the gated_by_flag detail; the harness CODE refactor (OPT_IN_ENGINES->probe rename, drop flag keys,
+> drop the flag_set ready-assert, coverage acceptance_preflight) STAYS for C5. Full suite 5750/0, Bug Bible
+> 16/3xfail, B7 green. The per-model SMOKE PASS resumes now (selecting humo/wan/ltx_av/still_parallax/
+> flux2_klein/z_image just renders -- no launch flag). NEXT = C3 (unregister the dark scaffolds).
+>
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
 > Suite 5750/0, Bug Bible 16/3xfail at HEAD. The per-model SMOKE PASS is PAUSED: it resumes AFTER C2 lands
@@ -161,7 +173,8 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). NEXT = build C2.
+per-model smoke pass resumes after C2 (the gate removal). C2 SHIPPED this session
+(requires_flag GATE removed, suite 5750/0). NEXT = build C3 (unregister the dark scaffolds).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.

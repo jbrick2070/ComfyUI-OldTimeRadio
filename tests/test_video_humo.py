@@ -39,8 +39,8 @@ def test_humo_registered_and_dark():
     eng = vreg.get_engine("humo")
     assert isinstance(eng, HuMoEngine)
     assert eng.family == "audio_driven_face" and eng.family in sc.FAMILIES
-    assert eng.default_roles == ()                 # not a default -> dark
-    assert eng.requires_flag == "OTR_ENABLE_HUMO"
+    assert eng.default_roles == ()                 # not a default
+    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("audio_ref", "init_image")
     assert eng.roles == ("announcer_visual", "music_visual", "character_video")
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
@@ -63,12 +63,10 @@ def test_humo_required_inputs_match_family_schema():
 # --------------------------------------------------------------------------- #
 # Registry gating (dark until the opt-in flag) + role membership
 # --------------------------------------------------------------------------- #
-def test_registry_gates_humo_until_flag(monkeypatch):
+def test_registry_humo_selectable_no_flag(monkeypatch):
+    # Registry IS the menu: humo is usable for every role it serves with NO flag
+    # gate. Role incompatibility still fails closed.
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
-    for role in ("announcer_visual", "music_visual", "character_video"):
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("humo", role)               # dark -> GATED_BY_FLAG
-    monkeypatch.setenv("OTR_ENABLE_HUMO", "1")
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"
     for role in ("scene_broll", "background_abstract"):
@@ -99,16 +97,12 @@ def test_humo_role_fit_audio_driven_face():
 # --------------------------------------------------------------------------- #
 # Fail-closed usability ladder (no heavy import; CPU box)
 # --------------------------------------------------------------------------- #
-def test_humo_assert_usable_flag_then_install_tolerates_sage(monkeypatch):
+def test_humo_assert_usable_install_tolerates_sage(monkeypatch):
     eng = vreg.get_engine("humo")
-    monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
-    with pytest.raises(vreg.EngineUnusable) as e1:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Flag set + SageAttention resident + ckpt absent -> MISSING_MODEL (NOT
-    # INCOMPATIBLE_PROFILE: HuMo loads in-process and does not adopt ltx_video's
-    # hard BUG-070 Sage abort; its Sage tolerance is a GPU-smoke verify item).
-    monkeypatch.setenv("OTR_ENABLE_HUMO", "1")
+    # No flag gate (registry IS the menu). SageAttention resident + ckpt absent
+    # -> MISSING_MODEL (NOT INCOMPATIBLE_PROFILE: HuMo loads in-process and does
+    # not adopt ltx_video's hard BUG-070 Sage abort; its Sage tolerance is a
+    # GPU-smoke verify item).
     monkeypatch.setitem(sys.modules, "sageattention",
                         types.ModuleType("sageattention"))
     monkeypatch.setenv("OTR_HUMO_CKPT", str(REPO_ROOT / "_no_ckpt.safetensors"))

@@ -44,12 +44,14 @@ def _check(report, name):
 # readiness verdict reflects reality (flag off -> NOT READY)
 # --------------------------------------------------------------------------- #
 def test_humo_report_not_ready_when_flag_off():
+    # gpu-smoke keeps its OWN flag table (decoupled from the now-flagless adapter
+    # registry; that flag_set ready-assert is retired in the later harness pass).
+    # With the flag off the smoke verdict is NOT READY via flag_set=False -- the
+    # adapter assert_usable no longer gates on a flag.
     r = SMK.run_smoke("humo")
     assert r["engine"] == "humo" and r["ready"] is False
     assert _check(r, "registered")["ok"] is True
     assert _check(r, "flag_set")["ok"] is False
-    au = _check(r, "assert_usable")
-    assert au["ok"] is False and "gated_by_flag" in au["detail"]
 
 
 def test_assert_usable_advances_to_missing_model_with_flag_on(monkeypatch):

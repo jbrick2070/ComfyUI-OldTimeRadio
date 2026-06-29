@@ -65,13 +65,12 @@ def test_assert_usable_fails_closed_when_vae_absent(tmp_path, monkeypatch):
     assert "VAE" in str(exc.value)
 
 
-def test_assert_usable_flag_gate_precedes_loader_check(tmp_path, monkeypatch):
-    # Flag off -> GATED_BY_FLAG, regardless of loader presence.
+def test_assert_usable_no_flag_gate(tmp_path, monkeypatch):
+    # No flag gate (registry IS the menu): a full install is usable even with the
+    # (vestigial) OTR_ENABLE_WAN_I2V unset.
     eng = _stage_full_install(tmp_path, monkeypatch)
     monkeypatch.delenv("OTR_ENABLE_WAN_I2V", raising=False)
-    with pytest.raises(EngineUnusable) as exc:
-        eng.assert_usable(host_caps={}, profile={})
-    assert exc.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+    assert eng.assert_usable(host_caps={}, profile={}) == "wan_i2v"
 
 
 def test_assert_usable_ckpt_check_precedes_aux_check(tmp_path, monkeypatch):

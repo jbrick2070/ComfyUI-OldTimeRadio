@@ -21,9 +21,9 @@ def test_engine_registered_and_legacy_gone():
 
 def test_default_roles_are_the_bookends():
     # ltx_audio_in is the per-role DEFAULT for music + announcer (inheriting the
-    # slot the deleted ltx_av_music held); it is opt-out via OTR_ENABLE_LTX_AV.
+    # slot the deleted ltx_av_music held). Registry IS the menu: no flag gate.
     assert LtxAudioInEngine.default_roles == ("music_visual", "announcer_visual")
-    assert LtxAudioInEngine.requires_flag == "OTR_ENABLE_LTX_AV"
+    assert LtxAudioInEngine.requires_flag is None
 
 
 def test_family_and_required_inputs():
@@ -69,13 +69,17 @@ def test_role_fit_serves_bookends_and_character():
     assert not role_compat.engine_fits_role(d, "background_abstract")
 
 
-def test_assert_usable_opt_out_flag(monkeypatch):
-    # opt-OUT: the lane is default-ON; only OTR_ENABLE_LTX_AV=0 disables it ->
-    # GATED_BY_FLAG (no flag set = enabled, proceeds past step 1).
+def test_assert_usable_no_flag_gate(monkeypatch):
+    # No flag gate (registry IS the menu): OTR_ENABLE_LTX_AV=0 no longer disables
+    # the lane. The ladder still fails closed on the REAL gates -- here NVML, which
+    # the heavy LTX-AV lane requires to enforce the VRAM ceiling. NEVER GATED_BY_FLAG.
     monkeypatch.setenv("OTR_ENABLE_LTX_AV", "0")
+    monkeypatch.setattr(
+        "nodes._otr_shared.gpu_residency.nvml_available", lambda *a, **k: False)
     with pytest.raises(EngineUnusable) as exc:
         LtxAudioInEngine().assert_usable(host_caps=None, profile=None)
-    assert exc.value.reason == EngineUsabilityReason.GATED_BY_FLAG
+    assert exc.value.reason == EngineUsabilityReason.INCOMPATIBLE_PROFILE
+    assert exc.value.reason != EngineUsabilityReason.GATED_BY_FLAG
 
 
 def test_ref_path_extraction():

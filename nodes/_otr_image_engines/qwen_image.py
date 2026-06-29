@@ -81,7 +81,7 @@ class QwenImageEngine:
     roles = ROLES
     default_roles = ()
     commercial_clean = True          # Apache-2.0 (C2 matrix; operator confirms weights provenance)
-    requires_flag = ENABLE_FLAG      # default-OFF (build-or-NO-GO)
+    requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
     engine_version = "1"
 

@@ -40,8 +40,7 @@ class VisualizerEngine:
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()                  # never an auto-default; explicit pick only
     commercial_clean = True             # own code + ffmpeg encode only
-    requires_flag = "OTR_ENABLE_VISUALIZER"   # opt-OUT (default-ON): the accessible
-                                              # CPU/ffmpeg floor; set =0 to disable
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("audio_ref",)    # audio only; no init_image, no weights
     #: Coverage arch opt-OUT (explicit): the CRT scope floor synthesizes from audio
     #: and IGNORES a still -> mint NO image, so an all-visualizer episode needs no
@@ -77,10 +76,6 @@ class VisualizerEngine:
 
     # ---- usability (fail LOUD; no NVML / weights / node gate) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        if os.getenv(self.requires_flag, "1") == "0":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "visualizer disabled by %s=0" % self.requires_flag, kind="video")
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
             raise EngineUnusable(

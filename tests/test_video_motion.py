@@ -39,9 +39,9 @@ def test_ltx_video_registered_and_dark():
     assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
     # 2026-06-17: announcer + music DEFAULT moved to ltx_audio_in (the audio-in
     # lane). ltx_video keeps its roles (still SELECTABLE) but no longer claims a
-    # default role -- so it is registry-gated behind OTR_ENABLE_LTX_VIDEO.
+    # default role.
     assert eng.default_roles == ()
-    assert eng.requires_flag == "OTR_ENABLE_LTX_VIDEO"
+    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("text_prompt",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
@@ -54,7 +54,7 @@ def test_wan_i2v_registered_and_dark():
     assert isinstance(eng, WanI2VEngine)
     assert eng.family == "image_to_video" and eng.family in sc.FAMILIES
     assert eng.default_roles == ()
-    assert eng.requires_flag == "OTR_ENABLE_WAN_I2V"
+    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.declared_isolation == mc.ISOLATION_SIDECAR_OPTIONAL
     assert eng.binds_seed is True
@@ -64,27 +64,18 @@ def test_wan_i2v_registered_and_dark():
 # --------------------------------------------------------------------------- #
 # Registry gating (dark until the opt-in flag) + role membership
 # --------------------------------------------------------------------------- #
-def test_registry_gates_ltx_until_flag(monkeypatch):
-    # 2026-06-17: ltx_video no longer claims any DEFAULT role (announcer + music
-    # moved to ltx_audio_in). With no env it is registry-gated for ALL its roles;
-    # with OTR_ENABLE_LTX_VIDEO=1 it is usable again -- still SELECTABLE, opt-in.
+def test_registry_ltx_selectable_no_flag(monkeypatch):
+    # 2026-06-17: ltx_video claims no DEFAULT role (announcer + music moved to
+    # ltx_audio_in). Registry IS the menu: it is SELECTABLE for all its roles with
+    # NO flag gate.
     monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
-    for role in ("announcer_visual", "music_visual", "scene_broll",
-                 "background_abstract"):
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("ltx_video", role)          # no longer default -> gated
-    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
     for role in ("scene_broll", "background_abstract", "music_visual",
                  "announcer_visual"):
         assert vreg.assert_usable("ltx_video", role) == "ltx_video"
 
 
-def test_registry_gates_wan_until_flag(monkeypatch):
+def test_registry_wan_selectable_no_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_WAN_I2V", raising=False)
-    for role in ("scene_broll", "music_visual", "character_video"):
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("wan_i2v", role)
-    monkeypatch.setenv("OTR_ENABLE_WAN_I2V", "1")
     for role in ("scene_broll", "music_visual", "character_video"):
         assert vreg.assert_usable("wan_i2v", role) == "wan_i2v"
     with pytest.raises(vreg.EngineUnusable):
@@ -123,19 +114,11 @@ def test_wan_role_fit_image_to_video_needs_init_image():
 # --------------------------------------------------------------------------- #
 # Fail-closed usability ladders (no heavy import; CPU box)
 # --------------------------------------------------------------------------- #
-def test_ltx_assert_usable_flag_then_sage_then_install(monkeypatch):
+def test_ltx_assert_usable_sage_then_install(monkeypatch):
     eng = vreg.get_engine("ltx_video")
-    # PROMOTED DEFAULT-ON (production restore 2026-06-10): the saved
-    # production workflow routes the radio open through ltx_video, so the
-    # engine is enabled UNLESS explicitly opted out with =0.
-    monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "0")
-    with pytest.raises(vreg.EngineUnusable) as e1:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Default (flag UNSET) = enabled -> falls through to the SageAttention
-    # gate: resident Sage -> BUG-070 INCOMPATIBLE_PROFILE (fail closed BEFORE
+    # No flag gate (registry IS the menu). The first gate is the SageAttention
+    # check: resident Sage -> BUG-070 INCOMPATIBLE_PROFILE (fail closed BEFORE
     # the checkpoint check / any forward).
-    monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
     monkeypatch.setitem(sys.modules, "sageattention",
                         types.ModuleType("sageattention"))
     with pytest.raises(vreg.EngineUnusable) as e2:
@@ -151,15 +134,11 @@ def test_ltx_assert_usable_flag_then_sage_then_install(monkeypatch):
     assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
 
 
-def test_wan_assert_usable_flag_then_install_tolerates_sage(monkeypatch):
+def test_wan_assert_usable_install_tolerates_sage(monkeypatch):
     eng = vreg.get_engine("wan_i2v")
-    monkeypatch.delenv("OTR_ENABLE_WAN_I2V", raising=False)
-    with pytest.raises(vreg.EngineUnusable) as e1:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Flag set + Sage resident + ckpt absent -> MISSING_MODEL (NOT
-    # INCOMPATIBLE_PROFILE: wan tolerates Sage by escaping to a sidecar).
-    monkeypatch.setenv("OTR_ENABLE_WAN_I2V", "1")
+    # No flag gate (registry IS the menu). Sage resident + ckpt absent ->
+    # MISSING_MODEL (NOT INCOMPATIBLE_PROFILE: wan tolerates Sage by escaping to
+    # a sidecar).
     monkeypatch.setitem(sys.modules, "sageattention",
                         types.ModuleType("sageattention"))
     monkeypatch.setenv("OTR_WAN_I2V_CKPT", str(REPO_ROOT / "_no_ckpt.safetensors"))

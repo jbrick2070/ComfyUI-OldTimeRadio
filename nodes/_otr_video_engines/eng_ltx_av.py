@@ -270,7 +270,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
 
     default_roles = ()                  # subclasses set their default roles
     commercial_clean = True             # Apache GGUF + LTX-2 Community + distilled LoRA
-    requires_flag = "OTR_ENABLE_LTX_AV"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
@@ -376,19 +376,12 @@ class _LtxAvBase(_MC.MotionEngineBase):
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Ordered, fail-closed-before-GPU gate (six PINNED reasons only):
-        1 flag; 2 BUG-070 Sage gate; 3 NVML REQUIRED (this lane only -- fail
-        closed so the ceiling guard never silently no-ops); 4 node gate (every
-        required ComfyUI class resolves); 5 weight floors (realpath + size);
-        6 av_dims on request_template.canvas (None tolerated)."""
-        # 1 -- opt-OUT flag (DEFAULT ON: ltx_av is the music/announcer default;
-        #      set OTR_ENABLE_LTX_AV=0 to disable the audio-in lane)
-        if os.getenv(self.requires_flag, "1") == "0":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "%s disabled by %s=0" % (self.name, self.requires_flag),
-                kind="video")
-        # 2 -- BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
+        """Ordered, fail-closed-before-GPU gate (five PINNED reasons only):
+        1 BUG-070 Sage gate; 2 NVML REQUIRED (this lane only -- fail
+        closed so the ceiling guard never silently no-ops); 3 node gate (every
+        required ComfyUI class resolves); 4 weight floors (realpath + size);
+        5 av_dims on request_template.canvas (None tolerated)."""
+        # BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
         _MC.assert_sage_not_patched(self.name, self.family)
         # 3 -- NVML REQUIRED for the heaviest lane (grounded fail-open risk:
         #      probe_used_mb()->0 makes the ceiling asserts no-op)

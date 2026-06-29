@@ -61,12 +61,10 @@ def test_peer_registry_round_trip(mod, name, flag, model_env, clean):
 
 
 @pytest.mark.parametrize("mod,name,flag,model_env,clean", PEERS, ids=PEER_IDS)
-def test_peer_default_off_gated_by_flag(monkeypatch, mod, name, flag, model_env, clean):
+def test_peer_selectable_no_flag(monkeypatch, mod, name, flag, model_env, clean):
+    # Registry IS the menu: a registered peer is selectable for a role it serves
+    # with NO flag gate (the deeper disk check is the adapter's).
     monkeypatch.delenv(flag, raising=False)
-    with pytest.raises(ireg.EngineUnusable) as ei:
-        ireg.assert_usable(name, "announcer_visual")
-    assert ei.value.reason is ireg.EngineUsabilityReason.GATED_BY_FLAG
-    monkeypatch.setenv(flag, "1")
     assert ireg.assert_usable(name, "announcer_visual") == name
 
 

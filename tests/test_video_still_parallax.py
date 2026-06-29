@@ -42,7 +42,7 @@ def test_still_parallax_registered_selectable_not_default():
     assert isinstance(eng, StillParallaxEngine)
     assert eng.family == "static_motion" and eng.family in sc.FAMILIES
     assert eng.default_roles == ()             # NEVER a default until look-QA
-    assert eng.requires_flag == "OTR_ENABLE_STILL_PARALLAX"
+    assert eng.requires_flag is None           # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is True        # Apache-2.0 SMALL ckpt pinned
     assert eng.fallback_engine == "still_kenburns"
@@ -73,26 +73,18 @@ def test_still_parallax_fits_three_slots_not_background():
     assert rc.engine_fits_role(desc, "background_abstract") is False
 
 
-def test_registry_gates_still_parallax_until_flag(monkeypatch):
+def test_registry_still_parallax_selectable_no_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_STILL_PARALLAX", raising=False)
     eng = vreg.get_engine("still_parallax")
-    for role in eng.roles:                     # opt-in: dark for EVERY role
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("still_parallax", role)
-    monkeypatch.setenv("OTR_ENABLE_STILL_PARALLAX", "1")
-    for role in eng.roles:
+    for role in eng.roles:                     # registry IS the menu: no flag gate
         assert vreg.assert_usable("still_parallax", role) == "still_parallax"
 
 
-def test_still_parallax_assert_usable_flag_then_model(monkeypatch, tmp_path):
+def test_still_parallax_assert_usable_model(monkeypatch, tmp_path):
     eng = vreg.get_engine("still_parallax")
-    monkeypatch.delenv("OTR_ENABLE_STILL_PARALLAX", raising=False)
-    with pytest.raises(vreg.EngineUnusable) as e1:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Flag on but the pinned local snapshot missing -> MISSING_MODEL naming
-    # the env knob + the HF repo id (offline-first: never a runtime fetch).
-    monkeypatch.setenv("OTR_ENABLE_STILL_PARALLAX", "1")
+    # No flag gate (registry IS the menu). The pinned local snapshot missing ->
+    # MISSING_MODEL naming the env knob + the HF repo id (offline-first: never a
+    # runtime fetch).
     monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(tmp_path / "absent"))
     with pytest.raises(vreg.EngineUnusable) as e2:
         eng.assert_usable(host_caps={}, profile={})

@@ -94,7 +94,7 @@ class ZImageTurboEngine:
     roles = ROLES
     default_roles = ()               # opt-in peer (Flux remains the default)
     commercial_clean = True          # Apache-2.0
-    requires_flag = ENABLE_FLAG      # default-OFF
+    requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
     engine_version = "1"
 

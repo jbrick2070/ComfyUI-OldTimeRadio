@@ -123,11 +123,12 @@ def test_assert_usable_wrong_role_is_incompatible_profile():
     assert exc.value.reason is base.EngineUsabilityReason.INCOMPATIBLE_PROFILE
 
 
-def test_assert_usable_optin_without_flag_is_gated(monkeypatch):
+def test_assert_usable_optin_without_flag_is_selectable(monkeypatch):
+    # Registry IS the menu: a registered, role-compatible engine is usable with
+    # NO flag gate -- validation is the operator's manual process, never a code
+    # gate. The (vestigial) requires_flag no longer gates selectability.
     monkeypatch.delenv("OTR_ENABLE_FANCY", raising=False)
-    with pytest.raises(base.EngineUnusable) as exc:
-        _reg().assert_usable("fancy", "scene_broll")
-    assert exc.value.reason is base.EngineUsabilityReason.GATED_BY_FLAG
+    assert _reg().assert_usable("fancy", "scene_broll") == "fancy"
 
 
 def test_assert_usable_optin_with_flag_set_ok(monkeypatch):

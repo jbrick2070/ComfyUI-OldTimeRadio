@@ -298,7 +298,7 @@ class MeshStageEngine(_CheapFamilyBase):
     roles = ("music_visual", "announcer_visual", "character_video")
     #: NEVER a default until the operator's look-QA + the E-7 license record.
     default_roles = ()
-    requires_flag = "OTR_ENABLE_MESH_STAGE"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("init_image",)
     commercial_clean = False            # Tencent community license (E-7 gate)
     engine_version = "1"
@@ -386,15 +386,9 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.join(out, "otr", "episodes", "_shared", "mesh_cache")
 
     # ---- usability ladder (fail-closed; ORDER MATTERS; no heavy import) ----
-    # flag -> Blender exe -> hy3d checkpoint. NEVER the cache/mesh dir (the
+    # Blender exe -> hy3d checkpoint. NEVER the cache/mesh dir (the
     # 3D-plan 7.1 deadlock lesson: meshes are GENERATED at render time).
     def assert_usable(self, host_caps, profile, request_template=None):
-        if os.getenv(self.requires_flag, "0") != "1":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "%s is opt-in (0-E easy on-ramp; selectable-not-default until "
-                "operator look-QA + the Tencent license record E-7); set %s=1 "
-                "to enable it" % (self.name, self.requires_flag), kind="video")
         blender = self._blender_exe()
         if not blender or not os.path.exists(blender):
             raise EngineUnusable(

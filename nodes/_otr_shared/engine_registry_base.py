@@ -217,14 +217,9 @@ class EngineRegistry:
                 f"{tuple(getattr(eng, 'roles', ()))}, not '{role}'",
                 kind=self.kind,
             )
-        if role in getattr(eng, "default_roles", ()):
-            return name
-        flag = getattr(eng, "requires_flag", None)
-        if flag and os.getenv(flag, "0") != "1":
-            raise EngineUnusable(
-                name, role, EngineUsabilityReason.GATED_BY_FLAG,
-                f"engine '{name}' is opt-in for role '{role}'; set {flag}=1 "
-                f"to enable it",
-                kind=self.kind,
-            )
+        # Registered + role-compatible == usable. The registry IS the menu: a
+        # registered engine is selectable and renders (it may still hard-fail
+        # LOUD downstream); there is NO flag gate -- validation is the operator's
+        # manual process, never a code gate. Disk/token/commercial checks require
+        # IO and are enforced downstream (this method does no IO).
         return name

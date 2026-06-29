@@ -42,14 +42,10 @@ def test_qwen_image_registry_round_trip():
     assert ireg.get_engine("qwen_image").name == "qwen_image"
 
 
-def test_qwen_image_default_off_gated_by_flag(monkeypatch):
+def test_qwen_image_selectable_no_flag(monkeypatch):
+    # Registry IS the menu: qwen_image is selectable for a role it serves with NO
+    # flag gate (the deeper disk check is the adapter's).
     monkeypatch.delenv(qwi.ENABLE_FLAG, raising=False)
-    # default-OFF: the registry greys it (GATED_BY_FLAG) for a role it serves
-    with pytest.raises(ireg.EngineUnusable) as ei:
-        ireg.assert_usable("qwen_image", "announcer_visual")
-    assert ei.value.reason is ireg.EngineUsabilityReason.GATED_BY_FLAG
-    # flag ON -> the registry admits it (the deeper disk check is the adapter's)
-    monkeypatch.setenv(qwi.ENABLE_FLAG, "1")
     assert ireg.assert_usable("qwen_image", "announcer_visual") == "qwen_image"
 
 
@@ -69,7 +65,7 @@ def test_qwen_image_protocol_parity():
     assert not hasattr(eng, "canonicalize")     # reduced prompt->image set (AS-4)
     assert eng.required_inputs == ("text_prompt",)
     assert eng.commercial_clean is True         # Apache-2.0 (per the C2 matrix)
-    assert eng.requires_flag == "OTR_ENABLE_QWEN_IMAGE"
+    assert eng.requires_flag is None            # registry IS the menu (no flag gate)
 
 
 def test_qwen_image_role_filter_shared():

@@ -104,7 +104,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     default_roles = ()
     required_inputs = ("init_image",)
     commercial_clean = True             # GGUF + VAE are Apache-2.0 (see MODEL_MANIFEST)
-    requires_flag = "OTR_ENABLE_WAN_TI2V"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_SIDECAR_OPTIONAL
     target_fps = 25
@@ -151,14 +151,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         )
 
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed before any forward: the opt-in flag, the UNET ckpt, the M8
-        Wan2.2-VAE guard, then ALL aux graph loaders (umt5 CLIP + the 2.2 VAE)
-        present on disk."""
-        if os.getenv(self.requires_flag, "0") != "1":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "wan_ti2v is opt-in; set %s=1 (core Comfy Wan 5B nodes, no KJ "
-                "wrapper)" % self.requires_flag, kind="video")
+        """Fail closed before any forward: the UNET ckpt, the M8 Wan2.2-VAE
+        guard, then ALL aux graph loaders (umt5 CLIP + the 2.2 VAE) present on
+        disk."""
         # Fail CLOSED on a bad/non-portable render knob (sampler whitelist + env
         # range-checks) BEFORE any forward -- never a raw crash mid-render.
         self._resolve_render_config()

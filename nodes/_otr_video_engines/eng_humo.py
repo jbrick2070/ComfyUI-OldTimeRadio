@@ -95,7 +95,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
     commercial_clean = False            # license is profile data; verify-at-build
-    requires_flag = "OTR_ENABLE_HUMO"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
@@ -155,16 +155,11 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed before any forward: the opt-in flag, then checkpoint
-        presence (verify-at-build). Imports nothing heavy -- runs at
+        """Fail closed before any forward on checkpoint presence
+        (verify-at-build). Imports nothing heavy -- runs at
         lock/validate time on the CPU box. HuMo loads in-process; its
         SageAttention tolerance is a GPU-smoke verify item, NOT a hard CPU gate
         (unlike ltx_video's BUG-070 int8-PV abort)."""
-        if os.getenv(self.requires_flag, "0") != "1":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "humo is opt-in; set %s=1 and install the HuMo wrapper + "
-                "checkpoints" % self.requires_flag, kind="video")
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,

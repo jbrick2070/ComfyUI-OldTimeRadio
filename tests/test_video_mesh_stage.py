@@ -62,7 +62,7 @@ def test_mesh_stage_registered_selectable_not_default():
     assert eng.family == "image_to_video" and eng.family in sc.FAMILIES
     assert eng.family != "character_3d"
     assert eng.default_roles == ()             # NEVER a default until look-QA
-    assert eng.requires_flag == "OTR_ENABLE_MESH_STAGE"
+    assert eng.requires_flag is None           # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is False       # Tencent license -- E-7 gate
     assert eng.fallback_engine == "still_parallax"   # E-5 chain head
@@ -120,25 +120,17 @@ def test_mesh_stage_roles_exactly_the_three_e5_slots():
     assert rc.engine_fits_role(desc, "scene_broll") is True
 
 
-def test_registry_gates_mesh_stage_until_flag(monkeypatch):
+def test_registry_mesh_stage_selectable_no_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_MESH_STAGE", raising=False)
     eng = vreg.get_engine("mesh_stage")
-    for role in eng.roles:
-        with pytest.raises(vreg.EngineUnusable):
-            vreg.assert_usable("mesh_stage", role)
-    monkeypatch.setenv("OTR_ENABLE_MESH_STAGE", "1")
-    for role in eng.roles:
+    for role in eng.roles:                     # registry IS the menu: no flag gate
         assert vreg.assert_usable("mesh_stage", role) == "mesh_stage"
 
 
-def test_mesh_stage_assert_usable_flag_blender_then_ckpt(monkeypatch, tmp_path):
+def test_mesh_stage_assert_usable_blender_then_ckpt(monkeypatch, tmp_path):
     eng = vreg.get_engine("mesh_stage")
-    monkeypatch.delenv("OTR_ENABLE_MESH_STAGE", raising=False)
-    with pytest.raises(vreg.EngineUnusable) as e1:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e1.value.reason == vreg.EngineUsabilityReason.GATED_BY_FLAG
-    # Flag on, Blender missing -> MISSING_MODEL naming OTR_BLENDER_EXE.
-    monkeypatch.setenv("OTR_ENABLE_MESH_STAGE", "1")
+    # No flag gate (registry IS the menu). Blender missing -> MISSING_MODEL
+    # naming OTR_BLENDER_EXE.
     monkeypatch.setenv("OTR_BLENDER_EXE", str(tmp_path / "absent" / "blender.exe"))
     with pytest.raises(vreg.EngineUnusable) as e2:
         eng.assert_usable(host_caps={}, profile={})

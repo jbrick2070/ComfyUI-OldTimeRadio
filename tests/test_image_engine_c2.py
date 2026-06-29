@@ -26,14 +26,10 @@ def test_registry_holds_two_engines():
     assert len(names) >= 2  # model-agnostic: the registry holds >=2 image engines
 
 
-def test_z_image_default_off_gated_by_flag(monkeypatch):
+def test_z_image_selectable_no_flag(monkeypatch):
+    # Registry IS the menu: z_image_turbo is selectable for a role it serves with
+    # NO flag gate (the deeper disk/dep check is the adapter's).
     monkeypatch.delenv(zit.ENABLE_FLAG, raising=False)
-    # default-OFF: the registry greys it (GATED_BY_FLAG) for a role it serves
-    with pytest.raises(ireg.EngineUnusable) as ei:
-        ireg.assert_usable("z_image_turbo", "announcer_visual")
-    assert ei.value.reason is ireg.EngineUsabilityReason.GATED_BY_FLAG
-    # flag ON -> the registry admits it (the deeper disk/dep check is the adapter's)
-    monkeypatch.setenv(zit.ENABLE_FLAG, "1")
     assert ireg.assert_usable("z_image_turbo", "announcer_visual") == "z_image_turbo"
 
 
@@ -53,7 +49,7 @@ def test_z_image_protocol_parity():
     assert not hasattr(eng, "canonicalize")     # reduced prompt->image set (AS-4)
     assert eng.required_inputs == ("text_prompt",)
     assert eng.commercial_clean is True         # Apache-2.0 (per the C2 matrix)
-    assert eng.requires_flag == "OTR_ENABLE_ZIMAGE"
+    assert eng.requires_flag is None            # registry IS the menu (no flag gate)
 
 
 def test_z_image_role_filter_shared():

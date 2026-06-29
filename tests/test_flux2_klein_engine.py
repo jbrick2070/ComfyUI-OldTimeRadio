@@ -27,19 +27,17 @@ def test_klein_registered_optin_clean():
     assert eng.default_roles == ()                 # opt-in peer, never "primary"
     assert eng.commercial_clean is True            # FLUX.2 klein 4B = Apache-2.0
     assert eng.required_inputs == ("text_prompt",)
-    assert eng.requires_flag == "OTR_ENABLE_FLUX2_KLEIN"
+    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     for meth in ("load", "unload", "assert_usable", "prepare", "render_image", "teardown"):
         assert callable(getattr(eng, meth))
     assert not hasattr(eng, "canonicalize")        # reduced prompt->image set
 
 
-def test_klein_flag_then_weight_gates(monkeypatch, tmp_path):
+def test_klein_weight_gate(monkeypatch, tmp_path):
     eng = ireg.get_engine("flux2_klein")
-    # (1) flag OFF -> registry greys it (GATED_BY_FLAG).
+    # (1) Registry IS the menu: a registered engine is selectable, no flag gate.
     monkeypatch.delenv("OTR_ENABLE_FLUX2_KLEIN", raising=False)
-    with pytest.raises(ireg.EngineUnusable) as ei:
-        ireg.assert_usable("flux2_klein", "music_visual")
-    assert ei.value.reason is ireg.EngineUsabilityReason.GATED_BY_FLAG
+    assert ireg.assert_usable("flux2_klein", "music_visual") == "flux2_klein"
     # (2) engine-level: no weight -> MISSING_MODEL (fail-closed, BUG-046).
     monkeypatch.delenv("OTR_FLUX2_KLEIN_CKPT", raising=False)
     with pytest.raises(ireg.EngineUnusable) as ei2:
@@ -50,9 +48,6 @@ def test_klein_flag_then_weight_gates(monkeypatch, tmp_path):
     ck.write_bytes(b"\x00\x01\x02\x03")
     monkeypatch.setenv("OTR_FLUX2_KLEIN_CKPT", str(ck))
     assert eng.assert_usable({}, {"role": "music_visual"}) == "flux2_klein"
-    # (4) flag ON + weight present -> the registry passes it through.
-    monkeypatch.setenv("OTR_ENABLE_FLUX2_KLEIN", "1")
-    assert ireg.assert_usable("flux2_klein", "music_visual") == "flux2_klein"
 
 
 def test_klein_env_constants_exported():

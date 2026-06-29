@@ -30,7 +30,7 @@ def test_registered_and_identity():
     eng = vreg.get_engine("visualizer")
     assert eng.name == "visualizer"
     assert eng.family == "abstract"
-    assert eng.requires_flag == "OTR_ENABLE_VISUALIZER"
+    assert eng.requires_flag is None            # registry IS the menu (no flag gate)
     assert eng.default_roles == ()
     assert eng.required_inputs == ("audio_ref",)
     assert eng.render_aspect == "wide"
@@ -47,13 +47,13 @@ def test_serves_all_three_visual_roles():
 # --------------------------------------------------------------------------- #
 # assert_usable -- LOUD, no fallback
 # --------------------------------------------------------------------------- #
-def test_assert_usable_disabled_by_flag(monkeypatch):
-    # Default-ON (opt-out) since promotion 2026-06-18 -- OTR_ENABLE_VISUALIZER=0
-    # disables; unset/anything-else enables the accessible floor.
+def test_assert_usable_no_flag_gate(monkeypatch):
+    # No flag gate (registry IS the menu): OTR_ENABLE_VISUALIZER=0 no longer
+    # disables the floor -- ffmpeg presence is the only real gate.
+    if not sd.find_ffmpeg("ffmpeg"):
+        pytest.skip("ffmpeg not on PATH")
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "0")
-    with pytest.raises(EngineUnusable) as exc:
-        VisualizerEngine().assert_usable(host_caps={}, profile={})
-    assert exc.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "visualizer"
 
 
 def test_assert_usable_default_on_when_flag_unset(monkeypatch):

@@ -176,7 +176,7 @@ class StillParallaxEngine(_CheapFamilyBase):
              "scene_broll")
     #: NEVER a default until the operator's look-QA promotes it (0-E gate).
     default_roles = ()
-    requires_flag = "OTR_ENABLE_STILL_PARALLAX"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("init_image",)   # a REAL still is the whole point
     commercial_clean = True             # Apache-2.0 SMALL ckpt (pinned above)
     engine_version = "1"
@@ -210,14 +210,7 @@ class StillParallaxEngine(_CheapFamilyBase):
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed: still_parallax is OPT-IN (the 0-E lane lands
-        selectable-not-default), then the pinned local model must exist."""
-        if os.getenv(self.requires_flag, "0") != "1":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "%s is opt-in (0-E easy on-ramp; selectable-not-default until "
-                "operator look-QA); set %s=1 to enable it"
-                % (self.name, self.requires_flag), kind="video")
+        """Fail closed on the pinned local model: it must exist on disk."""
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,

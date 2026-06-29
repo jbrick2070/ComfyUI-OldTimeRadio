@@ -86,7 +86,7 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     default_roles = ()
     required_inputs = ("init_image",)
     commercial_clean = False            # license is profile data; verify-at-build
-    requires_flag = "OTR_ENABLE_WAN_I2V"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_SIDECAR_OPTIONAL
     target_fps = 25
@@ -120,15 +120,10 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         )
 
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Fail closed before any forward: the opt-in flag, then ALL three graph
-        loaders (UNET + umt5 CLIP + VAE) present on disk. Wan TOLERATES Sage by
+        """Fail closed before any forward: ALL three graph loaders
+        (UNET + umt5 CLIP + VAE) present on disk. Wan TOLERATES Sage by
         escaping to a sidecar (``resolve_isolation``), so it does NOT hard-fail
         on Sage the way ltx_video does."""
-        if os.getenv(self.requires_flag, "0") != "1":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "wan_i2v is opt-in; set %s=1 (core Comfy Wan nodes, no KJ wrapper)"
-                % self.requires_flag, kind="video")
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,

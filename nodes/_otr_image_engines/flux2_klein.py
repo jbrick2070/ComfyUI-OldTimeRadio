@@ -86,7 +86,7 @@ class Flux2KleinEngine:
     roles = ROLES
     default_roles = ()
     commercial_clean = True          # FLUX.2 [klein] 4B = Apache-2.0 (confirmed 2026-06-18)
-    requires_flag = ENABLE_FLAG      # default-OFF
+    requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
     engine_version = "1"
 

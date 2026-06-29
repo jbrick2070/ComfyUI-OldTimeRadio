@@ -29,8 +29,8 @@ def test_registered_and_identity():
     eng = vreg.get_engine("wan_ti2v")
     assert eng.name == "wan_ti2v"
     assert eng.family == "image_to_video"
-    assert eng.requires_flag == "OTR_ENABLE_WAN_TI2V"
-    assert eng.default_roles == ()              # dark / selectable-not-default
+    assert eng.requires_flag is None            # registry IS the menu (no flag gate)
+    assert eng.default_roles == ()              # selectable-not-default
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is True         # Apache-2.0 (manifest)
 
@@ -367,12 +367,12 @@ def test_tiled_vae_can_be_disabled(monkeypatch):
 # --------------------------------------------------------------------------- #
 # assert_usable fail-closed ladder
 # --------------------------------------------------------------------------- #
-def test_flag_gate_precedes_everything(tmp_path, monkeypatch):
+def test_no_flag_gate_selectable(tmp_path, monkeypatch):
+    # No flag gate (registry IS the menu): a full install is usable even with the
+    # (vestigial) OTR_ENABLE_WAN_TI2V unset.
     eng = _stage_full_install(tmp_path, monkeypatch)
     monkeypatch.delenv("OTR_ENABLE_WAN_TI2V", raising=False)
-    with pytest.raises(EngineUnusable) as exc:
-        eng.assert_usable(host_caps={}, profile={})
-    assert exc.value.reason is EngineUsabilityReason.GATED_BY_FLAG
+    assert eng.assert_usable(host_caps={}, profile={}) == "wan_ti2v"
 
 
 def test_missing_unet_fails_closed(tmp_path, monkeypatch):

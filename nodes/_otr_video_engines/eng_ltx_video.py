@@ -281,7 +281,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     fallback_engine = "still_kenburns"
     required_inputs = ("text_prompt",)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
-    requires_flag = "OTR_ENABLE_LTX_VIDEO"
+    requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
@@ -363,19 +363,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         """Ordered, fail-closed-before-GPU gate (PINNED reasons only); mirrors
         eng_ltx_av.assert_usable (the proven GGUF lane), V-12-safe (no heavy
         import -- runs at lock/validate time on the CPU box):
-        1 opt-in flag (DEFAULT ON -- the saved workflow routes the radio open
-          through ltx_video; set OTR_ENABLE_LTX_VIDEO=0 to opt OUT);
-        2 BUG-070 SageAttention gate (int8-PV aborts LTX silently);
-        3 the 5 GGUF weight artifacts present + above their sanity floor;
-        4 node gate -- every required ComfyUI class resolves (lazy mapping read).
+        1 BUG-070 SageAttention gate (int8-PV aborts LTX silently);
+        2 the 5 GGUF weight artifacts present + above their sanity floor;
+        3 node gate -- every required ComfyUI class resolves (lazy mapping read).
         All fail-closed NAMED EngineUnusable so the manager's fallback catches it."""
-        # 1 -- opt-in flag (DEFAULT ON; opt-out with =0)
-        if os.getenv(self.requires_flag, "1") == "0":
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "%s disabled by %s=0" % (self.name, self.requires_flag),
-                kind="video")
-        # 2 -- BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
+        # BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
         _MC.assert_sage_not_patched(self.name, self.family)
         # 3 -- weights present + above the sanity floor (realpath -> broken
         #      symlinks fail)

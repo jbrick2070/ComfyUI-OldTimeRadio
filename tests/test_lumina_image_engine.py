@@ -25,21 +25,18 @@ def test_lumina_registered_optin_clean():
     assert eng.default_roles == ()                 # opt-in peer, never "primary"
     assert eng.commercial_clean is True            # Apache-2.0
     assert eng.required_inputs == ("text_prompt",)
-    assert eng.requires_flag == "OTR_ENABLE_LUMINA"
+    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     # protocol parity (reduced prompt->image set; no canonicalize)
     for meth in ("load", "unload", "assert_usable", "prepare", "render_image", "teardown"):
         assert callable(getattr(eng, meth))
     assert not hasattr(eng, "canonicalize")
 
 
-def test_lumina_flag_then_weight_gates(monkeypatch, tmp_path):
+def test_lumina_weight_gate(monkeypatch, tmp_path):
     eng = ireg.get_engine("lumina_image")
-    # Two-layer gate: the REGISTRY gates on the enable flag; the ENGINE gates on
-    # the weights file. (1) flag OFF -> registry greys it (GATED_BY_FLAG).
+    # (1) Registry IS the menu: a registered engine is selectable, no flag gate.
     monkeypatch.delenv("OTR_ENABLE_LUMINA", raising=False)
-    with pytest.raises(ireg.EngineUnusable) as ei:
-        ireg.assert_usable("lumina_image", "music_visual")
-    assert ei.value.reason is ireg.EngineUsabilityReason.GATED_BY_FLAG
+    assert ireg.assert_usable("lumina_image", "music_visual") == "lumina_image"
     # (2) engine-level: no weight -> MISSING_MODEL (fail-closed, BUG-046).
     monkeypatch.delenv("OTR_LUMINA_CKPT", raising=False)
     with pytest.raises(ireg.EngineUnusable) as ei2:
@@ -50,9 +47,6 @@ def test_lumina_flag_then_weight_gates(monkeypatch, tmp_path):
     ck.write_bytes(b"\x00\x01\x02\x03")
     monkeypatch.setenv("OTR_LUMINA_CKPT", str(ck))
     assert eng.assert_usable({}, {"role": "music_visual"}) == "lumina_image"
-    # (4) flag ON + weight present -> the registry passes it through.
-    monkeypatch.setenv("OTR_ENABLE_LUMINA", "1")
-    assert ireg.assert_usable("lumina_image", "music_visual") == "lumina_image"
 
 
 def test_lumina_env_constants_exported():

@@ -106,18 +106,23 @@ def test_opt_in_engines_match_registry_adapters():
         assert hasattr(adapter, spec["forward"]), (
             f"{name} adapter is missing its forward {spec['forward']!r}"
         )
-        assert adapter.requires_flag == spec["flag"]
+        # NOTE: the adapter registry no longer carries a flag gate (registry IS
+        # the menu). The probe manifest's vestigial "flag" key is retired in the
+        # later harness pass; it is NO LONGER asserted against adapter.requires_flag.
 
 
-def test_pilot_covers_exactly_the_flag_gated_video_engines():
-    """The pilot covers every registered video engine that runs behind an opt-in
-    flag (the sidecar-isolated ones). Cheap radio-floor families + migration
-    peers have no flag and no external lib to probe, so they are excluded."""
+def test_pilot_covers_registered_dep_needing_engines():
+    """The pilot's probe set is the CURATED list of video engines that need an
+    external library / sidecar dep-verified -- it is metadata, NOT derived from a
+    flag gate (the registry no longer carries one; registry IS the menu). No-drift
+    contract: every probe entry is a registered engine, and the cheap radio-floor
+    families (no external lib) are excluded."""
     from nodes._otr_video_engines import registry as vreg
 
-    gated = {n for n in vreg.all_engine_names()
-             if getattr(vreg.get_engine(n), "requires_flag", None)}
-    assert set(PILOT.OPT_IN_ENGINES) == gated
+    names = set(vreg.all_engine_names())
+    assert set(PILOT.OPT_IN_ENGINES) <= names          # every probe entry is registered
+    assert "still_kenburns" not in PILOT.OPT_IN_ENGINES  # cheap floor: no lib to probe
+    assert "humo" in PILOT.OPT_IN_ENGINES                # a real dep-needing engine
 
 
 def test_new_source_is_ascii_no_em_dash():
