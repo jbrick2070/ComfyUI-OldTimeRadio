@@ -3298,6 +3298,49 @@ VOICE:
   "The real story", "Meanwhile"). Make the turn specific to tonight's tale.
 """
 
+#: S2 (story-quality v2, 2026-06-28) -- v2-ONLY in-context examples, appended to a
+#: LOCAL copy of _NEWS_CODA_SYSTEM (the constant is NEVER mutated). Teaches the
+#: tale-specific pivot the gate wants instead of a stock opener.
+_NEWS_CODA_SYSTEM_V2_EXAMPLES = """
+Examples (tonight's tale -> your bridge clause):
+- A lighthouse keeper hiding a smuggled ledger -> Beyond tonight's lamp-lit ledger:
+- Two chemists racing a failing reactor -> Past the sparks of tonight's frantic lab:
+- A clerk who buried one fatal file -> Away from tonight's locked archive:
+"""
+
+#: S2 arc-shape-keyed CURATED bridge pool -- the v2 fallback floor: a curated,
+#: tale-toned pivot in place of a generic NEWS_CODA_POOL prefix, chosen by
+#: sha256(cast_seed). EVERY entry MUST pass validate_news_coda_bridge (asserted in
+#: tests/test_story_quality_coda.py): <=80 chars, no bracket, no generic opener, no
+#: speaker label. Unknown arc_shape OR zero valid => legacy NEWS_CODA_POOL (kept).
+_NEWS_CODA_ARC_BRIDGES = {
+    "betrayal": (
+        "Beyond tonight's tangle of crossed loyalties",
+        "Past the quiet treachery of tonight's tale",
+        "Away from the masks worn in tonight's story",
+    ),
+    "heist": (
+        "Beyond the locked rooms of tonight's tale",
+        "Past tonight's carefully timed theft",
+        "Away from the midnight scheme of tonight's story",
+    ),
+    "investigation_without_answer": (
+        "Beyond tonight's unanswered questions",
+        "Past the loose ends of tonight's tale",
+        "Away from the open file of tonight's story",
+    ),
+    "setup_complication_resolution": (
+        "Beyond tonight's hard-won turn",
+        "Past the trouble that drove tonight's tale",
+        "Away from the tested resolve of tonight's story",
+    ),
+    "slow_dread": (
+        "Beyond the long shadow of tonight's tale",
+        "Past tonight's creeping unease",
+        "Away from the slow chill of tonight's story",
+    ),
+}
+
 
 def validate_news_coda_bridge(text) -> tuple[bool, str]:
     """Validate the LLM bridge clause ONLY (coda-specific -- do NOT reuse
@@ -3339,7 +3382,9 @@ def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
 
 
 def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
-                      cast_seed=0, creative_repo_id=None) -> LineResult:
+                      cast_seed=0, creative_repo_id=None,
+                      story_quality_v2_enabled: bool = False,
+                      arc_shape: str = "") -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
     fact); the real ``news_close_brief`` is appended deterministically, so the
@@ -3365,13 +3410,19 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
         return clean_one_line(f"{b} {fact}", max_chars=_CODA_TOTAL_MAX)
 
     # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
+    # S2 (2026-06-28): on the v2 path the system prompt is a LOCAL copy of the
+    # constant + in-context premise->bridge examples (the constant is untouched =>
+    # v2-OFF byte-identical).
+    _system = (_NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
+               if story_quality_v2_enabled else _NEWS_CODA_SYSTEM)
+
     def _msgs(retry: bool):
         u = f"Tonight's tale (setup only):\n{premise}"
         if intro_text:
             u += f"\n\nThe announcer's opening line was:\n{intro_text}"
         if retry:
             u += "\n\nAttempt 2 -- different wording; be more specific to the tale."
-        return [{"role": "system", "content": _NEWS_CODA_SYSTEM},
+        return [{"role": "system", "content": _system},
                 {"role": "user", "content": u}]   # fresh 2-msg array, no role-stutter
 
     for attempt, flag in ((False, "news_coda_bridge"), (True, "news_coda_bridge_reroll")):
@@ -3383,6 +3434,22 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
 
     # 3) deterministic fallback floor -- stable hash (NOT builtin hash()).
     h = int(hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(), 16)
+    # S2 (2026-06-28): the v2 floor is an arc_shape-keyed CURATED bridge (a
+    # tale-toned pivot validated by validate_news_coda_bridge) in place of the
+    # generic NEWS_CODA_POOL prefix. Unknown arc_shape OR zero valid templates =>
+    # legacy pool below (also the entire v2-OFF path) => byte-identical there.
+    if story_quality_v2_enabled and arc_shape:
+        _arc = _NEWS_CODA_ARC_BRIDGES.get(arc_shape)
+        if _arc:
+            _valid = [b for b in _arc if validate_news_coda_bridge(b)[0]]
+            if _valid:
+                _bridge = _valid[h % len(_valid)]
+                return LineResult(
+                    text=_assemble(_bridge),
+                    compose_flags=(
+                        "news_coda_fallback", "news_coda_bridge_invalid",
+                        "news_coda_arc_bridge") + _coda_extra,
+                )
     prefix = NEWS_CODA_POOL[h % len(NEWS_CODA_POOL)]
     return LineResult(
         text=clean_one_line(f"{prefix} {fact}", max_chars=_CODA_TOTAL_MAX),

@@ -4789,6 +4789,12 @@ class OTR_LedgerScriptWriter:
                         intro_text=intro_text,
                         cast_seed=cast_seed,
                         creative_repo_id=resolved["creative_writing_model"],
+                        # S2 (story-quality v2, 2026-06-28): v2 system examples +
+                        # arc_shape-keyed curated fallback floor. Both default
+                        # off/"" => v2-OFF byte-identical.
+                        story_quality_v2_enabled=bool(
+                            meta.get("story_quality_v2_enabled", False)),
+                        arc_shape=str(meta.get("arc_shape") or ""),
                     )
                 if not outro_res.text:
                     # Pathological (brief cleaned to empty) -- never ship an empty
