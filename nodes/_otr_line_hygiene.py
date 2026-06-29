@@ -693,6 +693,58 @@ def find_cliche_phrase(text: Any) -> str:
         return ""
 
 
+#: C5 (S4, story-quality v2) -- curated plain-language swaps for each _CLICHE_RES
+#: worn phrase, applied as a deterministic LAST-RESORT span replacement when the
+#: LLM reroll could not shed the cliche. A leading capital is preserved; a
+#: pronoun-carrying form keeps its pronoun. SFW, period-neutral.
+_CLICHE_REPLACEMENTS = tuple(
+    (re.compile(_p, re.IGNORECASE), _r) for _p, _r in (
+        (r"\b((?:you|we|i|they)['’]?re) playing with fire\b", r"\1 taking a real risk"),
+        (r"\bthis changes everything\b", "this changes our plan"),
+        (r"\bwe['’]?re not leaving anything to chance\b", "we are checking every detail"),
+        (r"\bleaving nothing to chance\b", "checking every detail"),
+        (r"\bthere['’]?s no turning back\b", "there is no undoing this"),
+        (r"\bagainst all odds\b", "with everything against us"),
+        (r"\bhangs in the balance\b", "could go either way"),
+        (r"\bover my dead body\b", "not while I can stop it"),
+        (r"\bnot on my watch\b", "not while I am here"),
+        (r"\bbest left buried\b", "better left alone"),
+        (r"\brunning out of time\b", "almost out of time"),
+        (r"\bbefore it['’]?s too late\b", "while we still can"),
+        (r"\bsafety first\b", "carefully, now"),
+        (r"\bgoes up in smoke\b", "comes apart"),
+        (r"\bgo up in smoke\b", "come apart"),
+    )
+)
+
+
+def repair_cliche_span(text: Any) -> str:
+    """C5 (S4): swap the FIRST worn-cliche span for a curated plain phrase,
+    preserving a leading capital (and a pronoun-carrying form's pronoun). The
+    deterministic LAST-RESORT repair when the LLM reroll could not shed a cliche,
+    so a known worn phrase never ships. Returns the text UNCHANGED when no curated
+    pattern matches (the caller then stamps ``cliche_shipped_after_reroll``).
+    Pure; idempotent on clean text; never raises."""
+    try:
+        s = "" if text is None else str(text)
+        if not s:
+            return s
+        for rx, repl in _CLICHE_REPLACEMENTS:
+            if not rx.search(s):
+                continue
+
+            def _do(mm, _repl=repl):
+                out = mm.expand(_repl)
+                if mm.group(0)[:1].isupper() and out[:1].islower():
+                    out = out[:1].upper() + out[1:]
+                return out
+
+            return rx.sub(_do, s, count=1)
+        return s
+    except Exception:  # noqa: BLE001
+        return s
+
+
 #: C5 (story-quality R2) -- on-the-nose emotion: a character NAMING their feeling
 #: or the stakes flatly ("I'm scared", "this is dangerous") instead of implying
 #: it. A strong writer shows; this gate rerolls the weak end.

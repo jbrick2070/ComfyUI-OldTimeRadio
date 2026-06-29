@@ -43,6 +43,7 @@ try:  # pragma: no cover - exercised by both import styles
         derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
+        find_cliche_phrase,
         flag_anchor_stuffing,
         flag_cliche,
         flag_objective_literal,
@@ -52,6 +53,7 @@ try:  # pragma: no cover - exercised by both import styles
         flag_stage_business,
         flag_thesis_close,
         is_truncated,
+        repair_cliche_span,
         scrub_roster_vocative,
         strip_action_marker,
         verify_and_repair_line,
@@ -62,6 +64,7 @@ except ImportError:  # pragma: no cover
         derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
+        find_cliche_phrase,
         flag_anchor_stuffing,
         flag_cliche,
         flag_objective_literal,
@@ -71,6 +74,7 @@ except ImportError:  # pragma: no cover
         flag_stage_business,
         flag_thesis_close,
         is_truncated,
+        repair_cliche_span,
         scrub_roster_vocative,
         strip_action_marker,
         verify_and_repair_line,
@@ -2571,6 +2575,17 @@ def compose_line(
                     _resid = tuple(
                         f"quality_residual:{c}" for c, _r, _f in _after_flags)
                     _extra = _retry + _resid
+                    # C5 (S4, v2): deterministic last-resort cliche span-replace on
+                    # the kept reroll -- it may have swapped one worn phrase for
+                    # another. Repair the FIRST span; if a cliche still ships
+                    # (unmapped / a second span), stamp cliche_shipped_after_reroll.
+                    if req.story_quality_v2_enabled:
+                        _rr_fixed = repair_cliche_span(_rr.text)
+                        if _rr_fixed != _rr.text:
+                            _rr = replace(_rr, text=_rr_fixed)
+                            _extra = _extra + ("cliche_repaired",)
+                        if find_cliche_phrase(_rr.text):
+                            _extra = _extra + ("cliche_shipped_after_reroll",)
                     if _extra:
                         _rr = replace(
                             _rr, compose_flags=_rr.compose_flags + _extra,
@@ -2603,6 +2618,19 @@ def compose_line(
     # Seed with the retry breadcrumbs when the gate fired but the reroll
     # exhausted (fell through to keep the draft) -- () when the gate did not fire
     # so the flag-OFF path is byte-identical.
+    # C5 (S4, v2): deterministic last-resort cliche span-replace on the kept
+    # ORIGINAL draft when the quality reroll fired but did not shed the cliche
+    # (mirrors the kept-reroll repair). Only when the gate fired (_q_retry_flags
+    # non-empty); v2-OFF / no-gate => byte-identical.
+    if req.story_quality_v2_enabled and _q_retry_flags:
+        _cl_fixed = repair_cliche_span(cleaned)
+        if _cl_fixed != cleaned:
+            cleaned = _cl_fixed
+            word_count = len(cleaned.split())
+            _q_retry_flags = _q_retry_flags + ("cliche_repaired",)
+        if find_cliche_phrase(cleaned):
+            _q_retry_flags = _q_retry_flags + ("cliche_shipped_after_reroll",)
+
     compose_flags: tuple[str, ...] = _q_retry_flags
 
     # 3a. cast_strip -- remap near-miss phantom names to the locked
