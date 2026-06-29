@@ -1,11 +1,16 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
 > **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD CODE-COMPLETE (C1-C6 SHIPPED; handoff @ HEAD
-> `343e0868` == origin/v2.0-alpha). prod/main + tags GATED. NEXT = the 1-local + 1-grok ACCEPTANCE RENDER.**
+> `a4ade2a2` == origin/v2.0-alpha). prod/main + tags GATED. ACCEPTANCE RENDER IN PROGRESS (8 eps -> obs).**
 > WHERE WE ARE (this session): baseline UI-save reds FIXED + C1-C6 SHIPPED + pushed (story-quality build
 > CODE-COMPLETE). C4 body-gate `041d28d8` + C5 cliche span-replace `5afde8fb` + C6 (S5 scan register_overlap
 > = two principals by line count) `343e0868`: suite 5759/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST verified.
-> Remaining: the 1-local + 1-grok ACCEPTANCE RENDER (GPU; report voiced-word counts -- the length experiment).
+> ACCEPTANCE RENDER RUNNING (operator AFK 2026-06-28): 8 eps -> otr/obs on a FRESH :8000 server (FLOOR +
+> OTR_STORY_QUALITY_V2=1 + OTR_ENABLE_OPENROUTER=1), all-visualizer + indextts2, v2 ON. Legs 1-4
+> {gemma-12b, grok} x {720, 1340} (scripts/_otr_accept_4leg.py) then 4 LONG 1340w {mistral-nemo,
+> gemma-4-E4B, gemma-4-E2B, gemma-2-2b} (scripts/_otr_accept_extra.py); voiced-word counts ->
+> scripts/_otr_accept_*.jsonl; logs in docs/2026-06-28-c4-body-gate/. The :8000 server stays RESIDENT
+> after -- selective-reset before the next headless run (CLAUDE.md S4).
 > node-87 other_beats SETTLED = keep `humo_1.7B` (operator 2026-06-28; both stay selectable).
 > - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
 >   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
