@@ -167,7 +167,8 @@ def test_r3_dignity_counters():
 
 def test_r3_register_near_duplicate():
     led = _ledger(
-        [{"speaker_role": "character", "text": "Hello."}],
+        [{"speaker_role": "character", "speaker": "A", "text": "Hello."},
+         {"speaker_role": "character", "speaker": "B", "text": "Hi there."}],
         cast=[
             {"name": "A", "speech_signature": "measured, precise, weary"},
             {"name": "B", "speech_signature": "measured, precise"},
@@ -175,8 +176,34 @@ def test_r3_register_near_duplicate():
         ],
     )
     m = _scan.r3_quality_metrics(led)
+    # A + B are the two principals (one line each) and share most of their
+    # register -> near-duplicate + high overlap between the principals.
     assert m["speech_signature_near_duplicate_count"] >= 1
     assert m["register_overlap_ratio"] >= 0.5
+
+
+def test_r3_register_overlap_uses_principals_not_minor_pair():
+    # The two PRINCIPALS (most dialogue lines) have DISTINCT registers; a MINOR
+    # third voice nearly duplicates a principal. register_overlap must reflect the
+    # principals (low), NOT the minor pair the old all-pairs max would surface.
+    led = _ledger(
+        [{"speaker_role": "character", "speaker": "LEAD1", "text": "The seal cracked."},
+         {"speaker_role": "character", "speaker": "LEAD1", "text": "We move at dawn."},
+         {"speaker_role": "character", "speaker": "LEAD2", "text": "I disagree, plainly."},
+         {"speaker_role": "character", "speaker": "LEAD2", "text": "Hold the line."},
+         {"speaker_role": "character", "speaker": "EXTRA", "text": "Yes, sir."}],
+        cast=[
+            {"name": "LEAD1", "speech_signature": "clipped, procedural, cold"},
+            {"name": "LEAD2", "speech_signature": "warm, rambling, wry"},
+            {"name": "EXTRA", "speech_signature": "clipped, procedural, cold"},
+            {"name": "ANNOUNCER", "speech_signature": "narrator"},
+        ],
+    )
+    m = _scan.r3_quality_metrics(led)
+    # principals = LEAD1 (2 lines) + LEAD2 (2 lines); disjoint registers -> ~0.
+    assert m["register_overlap_ratio"] < 0.5
+    # EXTRA duplicates LEAD1's register -> still caught by the all-pairs near-dup.
+    assert m["speech_signature_near_duplicate_count"] >= 1
 
 
 def test_r3_clean_episode_all_zero():

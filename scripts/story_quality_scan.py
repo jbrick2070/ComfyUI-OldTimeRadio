@@ -434,20 +434,39 @@ def r3_quality_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
         if any(mk in blob.lower() for mk in _OWNERSHIP_TEMPLATE_MARKERS):
             ownership_on_nonownable = 1
 
-    sigs = []
+    # Voice registers per CAST name (announcer excluded). near_dup stays an
+    # all-pairs signal: are ANY two character voices near-duplicate?
+    sig_by_name: Dict[str, str] = {}
     for c in (ledger.get("cast") or []):
-        if isinstance(c, dict) and str(c.get("name") or "").upper() != "ANNOUNCER":
-            s = str(c.get("speech_signature") or "")
-            if s.strip():
-                sigs.append(s)
+        if isinstance(c, dict):
+            nm = str(c.get("name") or "").strip().upper()
+            if nm and nm != "ANNOUNCER":
+                sig_by_name[nm] = str(c.get("speech_signature") or "")
+    sigs = [s for s in sig_by_name.values() if s.strip()]
     near_dup = 0
-    max_overlap = 0.0
     for i in range(len(sigs)):
         for j in range(i + 1, len(sigs)):
-            ov = speech_signature_overlap(sigs[i], sigs[j])
-            max_overlap = max(max_overlap, ov)
-            if ov >= _SIG_NEAR_DUP_THRESHOLD:
+            if speech_signature_overlap(sigs[i], sigs[j]) >= _SIG_NEAR_DUP_THRESHOLD:
                 near_dup += 1
+    # S5 (C6, 2026-06-28): register_overlap is measured between the TWO PRINCIPALS
+    # -- the top-2 CHARACTER speakers by dialogue-line count -- NOT the max over
+    # every cast pair (a minor pair's overlap is not what makes an episode feel
+    # like two interchangeable leads). Principals are found by line count (robust;
+    # deterministic on ties via first appearance), never by name-parsing the
+    # verb-phrase wants. 0.0 unless two principals each carry a non-empty register.
+    _line_counts: Dict[str, int] = {}
+    for ln in char:
+        nm = str(ln.get("speaker") or "").strip().upper()
+        if nm:
+            _line_counts[nm] = _line_counts.get(nm, 0) + 1
+    _principals = [
+        nm for nm, _ in sorted(_line_counts.items(), key=lambda kv: -kv[1])[:2]]
+    register_overlap = 0.0
+    if len(_principals) == 2:
+        _p1 = sig_by_name.get(_principals[0], "")
+        _p2 = sig_by_name.get(_principals[1], "")
+        if _p1.strip() and _p2.strip():
+            register_overlap = speech_signature_overlap(_p1, _p2)
 
     return {
         "anchor_stuffing_lines": anchor_stuffing,
@@ -466,7 +485,7 @@ def r3_quality_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
         "ownable_people_object_count": ownable_people,
         "ownership_template_on_nonownable_count": ownership_on_nonownable,
         "speech_signature_near_duplicate_count": near_dup,
-        "register_overlap_ratio": round(max_overlap, 3),
+        "register_overlap_ratio": round(register_overlap, 3),
         "r2_helpers_loaded": bool(_HAS_R2_HELPERS),
     }
 
