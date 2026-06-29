@@ -293,7 +293,7 @@ def ffprobe_streams(path: str) -> dict:
     """Stream + duration summary via ffprobe (read-only)."""
     proc = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",
-         "stream=codec_type,codec_name:format=duration,size",
+         "stream=codec_type,codec_name,duration:format=duration,size",
          "-of", "json", path],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if proc.returncode != 0:
@@ -325,11 +325,36 @@ def assert_obs_final_playable(after_ts: float, master_wav: str) -> str:
         raise SoakFail("obs final %r lacks a video+audio stream pair: %r"
                        % (obs_mp4, kinds))
     dur = float((info.get("format") or {}).get("duration") or -1)
+
+    def _stream_dur(streams, kind):
+        for s in streams:
+            if s.get("codec_type") == kind:
+                try:
+                    return float(s.get("duration"))
+                except (TypeError, ValueError):
+                    return -1.0
+        return -1.0
+
+    a_dur = _stream_dur(info.get("streams", []), "audio")
+    v_dur = _stream_dur(info.get("streams", []), "video")
     m_info = ffprobe_streams(master_wav)
     m_dur = float((m_info.get("format") or {}).get("duration") or -1)
-    if abs(dur - m_dur) > 2.0:
-        raise SoakFail("obs final duration %.2fs vs master %.2fs differs by "
-                       "> 2.0s" % (dur, m_dur))
+    # The obs final's AUDIO stream IS the frozen master mux, so it must match the
+    # master duration within tolerance (no truncation / no runaway -- byte-identity
+    # proves the content; this proves the length). The VIDEO stream may run LONGER
+    # than the audio because of the silent rolling-credits tail (BUG-410), so the
+    # old two-sided check of the CONTAINER duration (== the longer video track)
+    # vs the master false-failed every credits-tail episode. Assert audio==master
+    # AND video covers all the audio (never shorter -> clipped audio).
+    if a_dur < 0:
+        raise SoakFail("obs final %r: no decodable audio-stream duration"
+                       % obs_mp4)
+    if abs(a_dur - m_dur) > 2.0:
+        raise SoakFail("obs final AUDIO %.2fs vs master %.2fs differs by > 2.0s"
+                       % (a_dur, m_dur))
+    if v_dur >= 0 and v_dur + 2.0 < a_dur:
+        raise SoakFail("obs final VIDEO %.2fs is SHORTER than its audio "
+                       "%.2fs (audio clipped)" % (v_dur, a_dur))
     proc = subprocess.run(["ffmpeg", "-v", "error", "-i", obs_mp4,
                            "-f", "null", "-"],
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
