@@ -1254,6 +1254,7 @@ SCIENCE_NEWS_FEEDS = [
     "https://news.mit.edu/topic/mitquantum-computing-rss.xml",         # MIT quantum computing, open
     "https://news.mit.edu/rss/topic/neuroscience-neurology-and-cognitive-sciences",  # MIT brain + cognitive sci, open
     "https://news.mit.edu/topic/mitsynthetic-biology-rss.xml",         # MIT synthetic biology, open
+    "https://news.mit.edu/topic/mitmedia-lab-0-rss.xml",               # MIT Media Lab, open
     # -- Carnegie Mellon (open-access university research feeds) --
     "https://www.ri.cmu.edu/feed/",                       # CMU Robotics Institute, open
     "https://www.cs.cmu.edu/news/feed.rss",               # CMU School of Computer Science, open
