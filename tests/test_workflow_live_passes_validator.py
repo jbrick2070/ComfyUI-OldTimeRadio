@@ -89,16 +89,17 @@ def test_production_workflow_visual_structure_pinned():
     n87 = nodes[87]
     assert n87["type"] == "OTR_VideoDirector"
     wv87 = n87["widgets_values"]
-    # 2026-06-28 (operator): the saved master DEFAULTS the three visible video
-    # slots to visualizer -- the working/clean default (no GPU, no FLUX since
-    # visualizer ignores init_image, no gated HuMo, no red dropdowns). The three
-    # Route-A sub-slots are exposed but default to the (use Other Beats default)
-    # sentinel; humo_14B_169 stays registered + selectable. Values are bare engine
-    # ids so the capability-profile validator + 16gb-identity profile stay consistent.
+    # 2026-06-29: keep the broad/cheap visible video slots on visualizer, but
+    # route character beats through the Route-A 14B wide HuMo lane. Values are
+    # bare engine ids so the capability-profile validator + 16gb-identity profile
+    # stay consistent.
     assert wv87[0] == "visualizer", (
         "announcer_video_model regressed off the visualizer default: %r" % wv87[0])
     assert wv87[1] == "visualizer", (
         "music_video_model regressed off the visualizer default: %r" % wv87[1])
+    assert wv87[16] == "humo_14B_169", (
+        "character_video_model must stay on the Route-A 14B motion lane: %r"
+        % wv87[16])
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

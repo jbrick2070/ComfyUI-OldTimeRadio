@@ -25,6 +25,13 @@ from nodes import _otr_model_catalog as catalog
 from nodes._otr_model_inputs import UnknownModelError, MissingModelInputError, require_model
 
 
+@pytest.fixture(autouse=True)
+def offline_catalog_env(monkeypatch):
+    """Keep the offline catalog tests independent of operator remote-LLM env."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_COMFY_CREDITS", raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Fixture HF cache
 # ---------------------------------------------------------------------------
