@@ -56,7 +56,7 @@ TOOL_VERSION = "2"
 # The opt-in / sidecar-isolated video engines this pilot verifies. ``assumed_call``
 # is the render interface the live GPU wiring must confirm AFTER this pilot proves
 # the import is clean -- the single source of truth the worker + adapter point at.
-OPT_IN_ENGINES = {
+PROBE_ENGINES = {
     # LTX-AV (audio-input) lane -- in-process, flag-gated behind OTR_ENABLE_LTX_AV.
     # Rides the same LTX/GGUF wrapper stack as ltx_video (no distinct pip lib);
     # the real probe is "the ComfyUI-GGUF + ComfyUI-LTXVideo node classes resolve"
@@ -66,7 +66,6 @@ OPT_IN_ENGINES = {
         "lib_module": "ltx_video",
         "adapter_class": "LtxAudioInEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_LTX_AV",
         "assumed_call": (
             "in-process ComfyUI graph (I2V on the minted still + audio-conditioned "
             "concat -> LTXVSeparateAVLatent -> VAEDecodeTiled); GGUF Q3_K_M, Gemma-3 "
@@ -79,7 +78,6 @@ OPT_IN_ENGINES = {
         "lib_module": "ltx_video",
         "adapter_class": "LtxVideoEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_LTX_VIDEO",
         "assumed_call": (
             "in-process: drive the installed LTX-Video ComfyUI wrapper node "
             "classes (MODEL+CLIP+VAE: ltx-video-2b ckpt + gemma text encoder + "
@@ -98,7 +96,6 @@ OPT_IN_ENGINES = {
         "lib_in_stack": True,           # spine dep; gate = local DA-V2-S snapshot
         "adapter_class": "StillParallaxEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_STILL_PARALLAX",
         "assumed_call": (
             "in-process: AutoModelForDepthEstimation (DA-V2-SMALL, "
             "local_files_only) -> one depth map per still -> pure-numpy "
@@ -118,7 +115,6 @@ OPT_IN_ENGINES = {
         "lib_module": "comfy",
         "adapter_class": "MeshStageEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_MESH_STAGE",
         "assumed_call": (
             "in-process core nodes: CheckpointLoaderSimple(hy3d-dit-v2-mv) + "
             "CLIPVisionLoader/Encode -> Hunyuan3Dv2Conditioning -> "
@@ -147,7 +143,6 @@ OPT_IN_ENGINES = {
                                      # gate is ffmpeg + assert_usable, not a lib probe
         "adapter_class": "VisualizerEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_VISUALIZER",
         "assumed_call": (
             "in-process CPU: soundfile-decode the per-beat audio -> mono -> "
             "_analyze_audio_np + _dual_ema -> paint the full-16:9 CRT scope look "
@@ -162,7 +157,6 @@ OPT_IN_ENGINES = {
         "lib_module": "wan",
         "adapter_class": "WanI2VEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_WAN_I2V",
         "assumed_call": (
             "in-process by default (sidecar_optional -> sidecar when SageAttention "
             "is resident): drive the installed Wan 2.2 i2v wrapper (two-expert "
@@ -182,7 +176,6 @@ OPT_IN_ENGINES = {
         "lib_module": "wan",
         "adapter_class": "WanTi2vEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_WAN_TI2V",
         "assumed_call": (
             "in-process by default (sidecar_optional -> sidecar when SageAttention "
             "is resident): drive the installed Wan 2.2 TI2V-5B graph "
@@ -198,7 +191,6 @@ OPT_IN_ENGINES = {
         "lib_module": "humo",
         "adapter_class": "HuMoEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_HUMO",
         "assumed_call": (
             "in-process: drive the installed HuMo ComfyUI wrapper node classes "
             "(loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via "
@@ -219,7 +211,6 @@ OPT_IN_ENGINES = {
         "lib_module": "humo",
         "adapter_class": "HuMo17BEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_HUMO",
         "assumed_call": (
             "in-process: same HuMo ComfyUI wrapper node classes as the 14B tier "
             "but the 1.7B UNET, LoRA-free, ~20 steps / cfg 1.0 (de-blued from 5.0 "
@@ -235,7 +226,6 @@ OPT_IN_ENGINES = {
         "lib_module": "humo",
         "adapter_class": "HuMo17BLandscapeEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_HUMO",
         "assumed_call": (
             "in-process: the humo_1.7B tier rendered at 16:9 LANDSCAPE 832x480 "
             "(render_aspect='wide') instead of the 480x832 portrait, cfg 2.5 (the "
@@ -250,7 +240,6 @@ OPT_IN_ENGINES = {
         "lib_module": "humo",
         "adapter_class": "HuMo14BLandscapeEngine",
         "forward": "render_clip",
-        "flag": "OTR_ENABLE_HUMO",
         "assumed_call": (
             "in-process: the 14B keystone rendered at 16:9 LANDSCAPE 832x480 "
             "(render_aspect='wide') instead of the 480x832 portrait, same 14B ckpt "
@@ -422,7 +411,7 @@ def _adapter_forward(engine_name):
     """Bound adapter forward for ``engine_name`` from the video registry, or
     ``None``. Importing the registry pulls NO engine library (adapters
     lazy-import inside the worker venv), so this is safe headless."""
-    spec = OPT_IN_ENGINES[engine_name]
+    spec = PROBE_ENGINES[engine_name]
     _ensure_repo_on_path()
     try:
         from nodes._otr_video_engines.registry import get_engine
@@ -438,17 +427,15 @@ def _adapter_forward(engine_name):
 def probe_one(engine_name, *, do_import=True):
     """Probe ONE engine in THIS process. Headless-safe: a missing library is a
     clean ``lib_absent`` verdict, never an exception. Returns a verdict dict."""
-    if engine_name not in OPT_IN_ENGINES:
+    if engine_name not in PROBE_ENGINES:
         return {"engine": engine_name, "status": "unknown_engine"}
-    spec = OPT_IN_ENGINES[engine_name]
+    spec = PROBE_ENGINES[engine_name]
     fwd = _adapter_forward(engine_name)
     verdict = {
         "engine": engine_name,
         "lib_module": spec["lib_module"],
         "adapter_class": spec["adapter_class"],
-        "forward": spec["forward"],
-        "flag": spec["flag"],
-        "assumed_call": spec["assumed_call"],
+        "forward": spec["forward"],        "assumed_call": spec["assumed_call"],
         "adapter_registered": fwd is not None,
         "forward_present": fwd is not None,
         "banned_deps_clean": True,
@@ -536,7 +523,7 @@ def run_pilot(engines=None, *, isolated=True, python=None, scan_nodes=True):
     audit (KJNodes gate F + torch.hub ban) and reports it under
     ``custom_node_scan`` / ``startup_audit_clean``.
     """
-    names = list(engines) if engines else list(OPT_IN_ENGINES)
+    names = list(engines) if engines else list(PROBE_ENGINES)
     verdicts = []
     for name in names:
         if isolated:

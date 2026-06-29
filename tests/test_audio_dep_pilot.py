@@ -74,7 +74,7 @@ def test_dep_snapshot_shape():
 # Probe behavior (headless: libraries absent)
 # --------------------------------------------------------------------------- #
 def test_probe_one_absent_lib_is_clean_and_imports_no_banned_dep():
-    for name in PILOT.OPT_IN_ENGINES:
+    for name in PILOT.PROBE_ENGINES:
         v = PILOT.probe_one(name, do_import=True)
         assert v["engine"] == name
         # Library absent in the sandbox -> a clean, non-crashing verdict.
@@ -102,51 +102,45 @@ def test_probe_one_no_import_reports_structure_only():
 
 def test_run_pilot_in_process_headless_not_ready():
     report = PILOT.run_pilot(isolated=False)
-    assert report["engine_count"] == len(PILOT.OPT_IN_ENGINES)
+    assert report["engine_count"] == len(PILOT.PROBE_ENGINES)
     assert report["ready_count"] == 0  # libs absent -> nothing structurally ready
     assert report["all_structural_preconditions_met"] is False
-    assert {v["engine"] for v in report["engines"]} == set(PILOT.OPT_IN_ENGINES)
+    assert {v["engine"] for v in report["engines"]} == set(PILOT.PROBE_ENGINES)
 
 
 # --------------------------------------------------------------------------- #
 # No-drift contract with the real adapter registry
 # --------------------------------------------------------------------------- #
-def test_opt_in_engines_match_registry_adapters():
+def test_probe_engines_match_registry_adapters():
     from nodes import _otr_audio_engines as AE
 
-    for name, spec in PILOT.OPT_IN_ENGINES.items():
+    for name, spec in PILOT.PROBE_ENGINES.items():
         adapter = AE.get_engine(name)  # raises if the name is unregistered
         assert type(adapter).__name__ == spec["adapter_class"]
         assert hasattr(adapter, spec["forward"]), (
             f"{name} adapter is missing its forward {spec['forward']!r}"
         )
-        assert adapter.requires_flag == spec["flag"]
+        # NOTE: the probe manifest no longer carries a "flag" key (C5 -- the
+        # registry IS the menu; flags do not gate). module/class/forward is the
+        # no-drift contract.
 
 
-def test_pilot_covers_exactly_the_optin_engines():
+def test_pilot_covers_the_dep_needing_engines():
     from nodes import _otr_audio_engines as AE
-    from nodes import _otr_engine_profiles as EP
 
-    # The dep pilot covers every non-native engine that needs Blackwell
-    # dependency validation: a flag-gated opt-in library (chatterbox,
-    # stable_audio_music) OR an isolated out-of-process worker (indextts2,
-    # runtime=oop_venv -- PROMOTED 2026-06-04 to the char_voice default but still
-    # pilot-gated until F validates its Path B venv). Byte-identical in-graph
-    # defaults (bark/kokoro/musicgen) and ComfyUI-native engines (stable_audio_3)
-    # have no external lib to probe and are excluded.
-    resolver = EP.load_resolver()
-    needs_pilot = set()
-    for role in ("char_voice", "announcer_voice", "music"):
-        for eng in AE.engines_for_role(role):
-            adapter = AE.get_engine(eng)
-            if getattr(adapter, "native", False):
-                continue
-            flag_gated = bool(getattr(adapter, "requires_flag", None))
-            prof = resolver.profile_for(role, eng) if resolver else None
-            oop_venv = bool(prof and prof.runtime == "oop_venv")
-            if flag_gated or oop_venv:
-                needs_pilot.add(eng)
-    assert set(PILOT.OPT_IN_ENGINES) == needs_pilot
+    # The dep pilot's probe set is the CURATED list of NON-NATIVE voice/music
+    # engines that need Blackwell dependency validation (an external sidecar
+    # library OR an out-of-process venv). It is metadata, NOT derived from a flag
+    # gate (the registry IS the menu; C5). No-drift contract: every probe entry is
+    # a REGISTERED, NON-NATIVE engine, and the byte-identical in-graph defaults
+    # (bark / kokoro / musicgen) + the ComfyUI-native engine (stable_audio_3) are
+    # EXCLUDED -- they have no external lib to probe.
+    probe = set(PILOT.PROBE_ENGINES)
+    for name in probe:
+        adapter = AE.get_engine(name)                # raises if unregistered
+        assert not getattr(adapter, "native", False), name
+    for excluded in ("bark", "kokoro", "musicgen", "stable_audio_3"):
+        assert excluded not in probe, excluded
 
 
 def test_source_is_ascii_no_em_dash():

@@ -56,10 +56,10 @@ def test_dep_snapshot_shape():
 # Probe behavior (headless: libraries absent)
 # --------------------------------------------------------------------------- #
 def test_probe_one_absent_lib_is_clean_and_imports_no_banned_dep():
-    for name in PILOT.OPT_IN_ENGINES:
+    for name in PILOT.PROBE_ENGINES:
         v = PILOT.probe_one(name, do_import=True)
         assert v["engine"] == name
-        if PILOT.OPT_IN_ENGINES[name].get("lib_in_stack"):
+        if PILOT.PROBE_ENGINES[name].get("lib_in_stack"):
             # In-stack rows (spine deps, e.g. transformers for
             # still_parallax) report the truthful lib_in_stack verdict; the
             # real gate is the local model snapshot via assert_usable.
@@ -88,10 +88,10 @@ def test_probe_one_no_import_reports_structure_only():
 
 def test_run_pilot_in_process_headless_not_ready():
     report = PILOT.run_pilot(isolated=False)
-    assert report["engine_count"] == len(PILOT.OPT_IN_ENGINES)
+    assert report["engine_count"] == len(PILOT.PROBE_ENGINES)
     assert report["ready_count"] == 0          # libs absent -> nothing import-clean-ready
     assert report["all_imports_clean"] is False
-    assert {v["engine"] for v in report["engines"]} == set(PILOT.OPT_IN_ENGINES)
+    assert {v["engine"] for v in report["engines"]} == set(PILOT.PROBE_ENGINES)
 
 
 # --------------------------------------------------------------------------- #
@@ -100,7 +100,7 @@ def test_run_pilot_in_process_headless_not_ready():
 def test_opt_in_engines_match_registry_adapters():
     from nodes._otr_video_engines.registry import get_engine
 
-    for name, spec in PILOT.OPT_IN_ENGINES.items():
+    for name, spec in PILOT.PROBE_ENGINES.items():
         adapter = get_engine(name)             # raises if the name is unregistered
         assert type(adapter).__name__ == spec["adapter_class"]
         assert hasattr(adapter, spec["forward"]), (
@@ -120,9 +120,9 @@ def test_pilot_covers_registered_dep_needing_engines():
     from nodes._otr_video_engines import registry as vreg
 
     names = set(vreg.all_engine_names())
-    assert set(PILOT.OPT_IN_ENGINES) <= names          # every probe entry is registered
-    assert "still_kenburns" not in PILOT.OPT_IN_ENGINES  # cheap floor: no lib to probe
-    assert "humo" in PILOT.OPT_IN_ENGINES                # a real dep-needing engine
+    assert set(PILOT.PROBE_ENGINES) <= names          # every probe entry is registered
+    assert "still_kenburns" not in PILOT.PROBE_ENGINES  # cheap floor: no lib to probe
+    assert "humo" in PILOT.PROBE_ENGINES                # a real dep-needing engine
 
 
 def test_new_source_is_ascii_no_em_dash():

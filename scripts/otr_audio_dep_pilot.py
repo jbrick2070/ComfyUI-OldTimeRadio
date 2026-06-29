@@ -54,12 +54,11 @@ TOOL_VERSION = "1"
 # G1 must wire AFTER this pilot confirms the signature on GPU -- the single
 # source of truth the adapter TODO-for-F comments point back to. Keeping it here
 # (data, not prose) lets the harness diff the assumption against reality.
-OPT_IN_ENGINES = {
+PROBE_ENGINES = {
     "chatterbox": {
         "lib_module": "chatterbox",
         "adapter_class": "ChatterboxEngine",
         "forward": "generate_voice",
-        "flag": "OTR_ENABLE_CHATTERBOX",
         "assumed_call": (
             "ChatterboxTTS.generate(text, audio_prompt_path=<ref>, "
             "exaggeration=<float>, cfg=<float>, temperature=<float>, "
@@ -74,7 +73,6 @@ OPT_IN_ENGINES = {
         # PROMOTED 2026-06-04: indextts2 is the shipped char_voice default (no
         # flag); it stays dep-pilot-gated via its isolated oop_venv Path B worker
         # until F validates the Blackwell deps.
-        "flag": None,
         "assumed_call": (
             "IndexTTS2(cfg, model_dir).infer(spk_audio_prompt=<ref>, "
             "text=<str>, emo_vector=<list>, seed=<int>, "
@@ -86,7 +84,6 @@ OPT_IN_ENGINES = {
         "lib_module": "dia",
         "adapter_class": "DiaEngine",
         "forward": "generate_voice",
-        "flag": "OTR_ENABLE_DIA",
         "assumed_call": (
             "Dia.from_pretrained(<id>, compute_dtype=<str>).generate("
             "'[S1] <text>', audio_prompt=<ref>)  # TODO-for-F: confirm the "
@@ -98,7 +95,6 @@ OPT_IN_ENGINES = {
         "lib_module": "stable_audio_tools",
         "adapter_class": "StableAudioMusicEngine",
         "forward": "generate_clip",
-        "flag": "OTR_ENABLE_STABLE_AUDIO",
         "assumed_call": (
             "ComfyUI-native SA3 sampler / generate_diffusion_cond(model, "
             "steps=<int>, conditioning=[{prompt, seconds_total}], seed=<int>, "
@@ -187,7 +183,7 @@ def _adapter_forward(engine_name):
     Importing the registry pulls NO engine library (adapters lazy-import inside
     load/generate), so this is safe headless.
     """
-    spec = OPT_IN_ENGINES[engine_name]
+    spec = PROBE_ENGINES[engine_name]
     _ensure_repo_on_path()
     try:
         from nodes import _otr_audio_engines as AE
@@ -203,18 +199,16 @@ def _adapter_forward(engine_name):
 def probe_one(engine_name, *, do_import=True):
     """Probe ONE engine in THIS process. Headless-safe: a missing library is a
     clean ``lib_absent`` verdict, never an exception. Returns a verdict dict."""
-    if engine_name not in OPT_IN_ENGINES:
+    if engine_name not in PROBE_ENGINES:
         return {"engine": engine_name, "status": "unknown_engine"}
-    spec = OPT_IN_ENGINES[engine_name]
+    spec = PROBE_ENGINES[engine_name]
     fwd = _adapter_forward(engine_name)
     binds_gen = forward_accepts_generator(fwd) if fwd is not None else None
     verdict = {
         "engine": engine_name,
         "lib_module": spec["lib_module"],
         "adapter_class": spec["adapter_class"],
-        "forward": spec["forward"],
-        "flag": spec["flag"],
-        "assumed_call": spec["assumed_call"],
+        "forward": spec["forward"],        "assumed_call": spec["assumed_call"],
         "adapter_registered": fwd is not None,
         "adapter_forward_binds_generator": binds_gen,
         "banned_deps_clean": True,
@@ -281,7 +275,7 @@ def probe_isolated(engine_name, *, python=None, timeout=600):
 
 def run_pilot(engines=None, *, isolated=True, python=None):
     """Probe each engine; return the aggregate report. Never raises."""
-    names = list(engines) if engines else list(OPT_IN_ENGINES)
+    names = list(engines) if engines else list(PROBE_ENGINES)
     verdicts = []
     for name in names:
         if isolated:

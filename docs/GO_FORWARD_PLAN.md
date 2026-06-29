@@ -63,7 +63,17 @@
 > now build from `all_engine_names()`, so the dropdown == the full registry (every registered engine is
 > selectable; manual validation only). Tests: rewrote test_tested_only_dropdown_gate to the dropdown==registry
 > contract + retargeted test_still_aspect_and_labels / test_ltx_audio_in_engine / test_video_cheap_render off
-> the deleted filter. Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C5 (decouple the harness flag).
+> the deleted filter. Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C6.
+>
+> **C5 SHIPPED (2026-06-29 this session):** DECOUPLED the harness from the flag. gpu-smoke
+> (`otr_video_gpu_smoke`) dropped the `flag_set` ready-assert + the ENGINES "flag" key + the "set the flag"
+> next-step (NOT READY now means deps/forward absent, never an opt-in flag). coverage-sweep
+> (`otr_coverage_sweep`) dropped the `OTR_ENABLE_WAN_*` acceptance preflight + `WAN_ENABLE_FLAGS` (only
+> OTR_TEST_MODE + --exclude stay gated). dep-pilot (`otr_video_dep_pilot` + `otr_audio_dep_pilot`): renamed
+> the probe manifest `OPT_IN_ENGINES` -> `PROBE_ENGINES` and deleted the vestigial "flag" keys + the verdict
+> "flag" field. Tests: retargeted test_video_gpu_smoke (not-ready-without-deps), test_coverage_sweep_acceptance
+> (no enable-flag preflight), test_video_dep_pilot + test_audio_dep_pilot (PROBE_ENGINES + curated no-drift
+> contract, not flag-derived). Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C6 (voice + LLM gates).
 >
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
@@ -193,9 +203,10 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 SHIPPED this session
+per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 + C5 SHIPPED this session
 (requires_flag GATE removed; dark scaffolds unregistered; VALIDATED_ENGINES filter deleted;
-suite 5722/0). NEXT = build C5 (decouple the gpu-smoke/coverage/dep-pilot harness from the flag).
+gpu-smoke/coverage/dep-pilot harness decoupled from the flag; suite 5722/0). NEXT = build C6
+(remove the voice + LLM opt-in gates; test_audio_byte_identical MUST stay green).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.

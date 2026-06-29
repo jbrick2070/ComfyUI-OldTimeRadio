@@ -91,11 +91,10 @@ SLOTS = (
 )
 
 #: The CORE/BLOCKING Wan engines the GATE-A acceptance sweep must exercise --
-#: never --exclude-able in acceptance, each gated behind its enable flag. The
-#: sweep is NOT green until BOTH pass (GO_FORWARD section 4A M2 + M3).
+#: never --exclude-able in acceptance. The sweep is NOT green until they pass
+#: (GO_FORWARD section 4A M2). (Their OTR_ENABLE_WAN_* enable flags are GONE --
+#: C5, "registry IS the menu": a registered Wan engine is selectable, no flag.)
 CORE_WAN_ENGINES = ("wan_i2v", "wan_ti2v")
-WAN_ENABLE_FLAGS = {"wan_i2v": "OTR_ENABLE_WAN_I2V",
-                    "wan_ti2v": "OTR_ENABLE_WAN_TI2V"}
 
 
 # --------------------------------------------------------------------------- #
@@ -107,29 +106,16 @@ def acceptance_preflight(env, registered_engines, exclude_args):
     the enumerated registry set, so it is CPU-testable with no server.
 
     M5: ``OTR_TEST_MODE`` MUST be unset, else eng_wan_i2v skips its render-phase
-    VRAM<=14.5GB assert. M3: every REGISTERED core Wan engine must have its
-    enable flag set to "1" (a gated-off Wan leg enumerates "run", fails
-    assert_usable closed, falls back, and -- pre-M1 -- false-passes; the same
-    gated_by_flag mechanism that floored HuMo-1.7B), and ``--exclude`` must not
-    filter a core Wan engine (the non-Wan sweep's escape hatch is forbidden)."""
+    VRAM<=14.5GB assert. M3: ``--exclude`` must not filter a core Wan engine (the
+    non-Wan sweep's escape hatch is forbidden in acceptance). (The OTR_ENABLE_WAN_*
+    enable-flag preflight was REMOVED 2026-06-29, C5 -- the registry IS the menu: a
+    registered Wan engine is selectable and renders, no launch flag.)"""
     problems = []
     test_mode = str(env.get("OTR_TEST_MODE", "")).strip()
     if test_mode not in ("", "0"):
         problems.append(
             "OTR_TEST_MODE=%r is set -- it MUST be unset for acceptance so the "
             "Wan render-phase VRAM<=14.5GB assert actually runs (M5)" % test_mode)
-    for engine in CORE_WAN_ENGINES:
-        if engine not in registered_engines:
-            # wan_ti2v may not be registered yet (8GB tier not built). A
-            # not-yet-registered core engine is caught by the RESULTS gate (M2),
-            # not the enable-flag preflight.
-            continue
-        flag = WAN_ENABLE_FLAGS[engine]
-        if str(env.get(flag, "0")).strip() != "1":
-            problems.append(
-                "core Wan engine %s is registered but its enable flag %s != 1 "
-                "(M3: acceptance must enable it, else it falls back closed)"
-                % (engine, flag))
     for ex in exclude_args:
         hit = next((e for e in CORE_WAN_ENGINES if ex and ex in e), None)
         if hit is not None:

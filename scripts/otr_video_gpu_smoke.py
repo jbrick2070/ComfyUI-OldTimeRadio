@@ -42,20 +42,22 @@ from nodes._otr_video_engines import eng_ltx_video            # noqa: E402,F401
 from nodes._otr_video_engines import eng_wan_i2v              # noqa: E402,F401
 from nodes._otr_video_engines import cheap_families           # noqa: E402,F401
 
-#: Per-engine operator metadata (install hint + whether Sage matters).
+#: Per-engine operator metadata (install hint + whether Sage matters). No flag
+#: key: a registered engine is selectable (C5, "registry IS the menu") -- the
+#: smoke verdict reflects deps + assert_usable, never an opt-in flag.
 ENGINES = {
     "humo": {
-        "flag": "OTR_ENABLE_HUMO", "kind": "in-process",
+        "kind": "in-process",
         "install": "HuMo wrapper + ckpts (umt5_xxl CLIP, wan_2.1 VAE, "
                    "whisper_large_v3 audio encoder, HuMo diffusion/LoRA); "
                    "set OTR_HUMO_CKPT",
         "sage": "tolerated (verify on GPU)", "has_fallback": True},
     "ltx_video": {
-        "flag": "OTR_ENABLE_LTX_VIDEO", "kind": "in-process",
+        "kind": "in-process",
         "install": "LTX-Video wrapper + ckpt; set OTR_LTX_VIDEO_CKPT",
         "sage": "MUST be clear (BUG-070 int8-PV abort)", "has_fallback": False},
     "wan_i2v": {
-        "flag": "OTR_ENABLE_WAN_I2V", "kind": "in-process (sidecar under Sage)",
+        "kind": "in-process (sidecar under Sage)",
         "install": "Wan 2.2 I2V wrapper + ckpt; set OTR_WAN_I2V_CKPT",
         "sage": "escalates to a cu128 sidecar", "has_fallback": False},
 }
@@ -165,9 +167,6 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
     except Exception as e:                        # noqa: BLE001
         add("dep_pilot_import_clean", False, "pilot error: %s" % e)
 
-    flag = meta["flag"]
-    add("flag_set", os.getenv(flag, "0") == "1", "%s=%s" % (flag, os.getenv(flag, "0")))
-
     eng = _vreg.get_engine(engine)
     try:
         eng.assert_usable(host_caps={}, profile={})
@@ -206,7 +205,7 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
     report = {"engine": engine, "kind": meta["kind"], "checks": checks}
     report["ready"] = all(c["ok"] for c in checks
                           if c["name"] in ("registered", "dep_pilot_import_clean",
-                                           "flag_set", "assert_usable"))
+                                           "assert_usable"))
     if engine == "humo":
         report["fallback_demo"] = demonstrate_humo_fallback()
     if run_render:
@@ -218,15 +217,16 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
 
 def _next_steps(engine):
     meta = ENGINES[engine]
+    # No "set the enable flag" step (C5 -- the registry IS the menu; a registered
+    # engine is selectable with no launch flag). NOT READY just means the deps /
+    # forward are not installed/implemented yet.
     return [
         "1. Install: %s" % meta["install"],
-        "2. setx %s 1   (then restart ComfyUI so the env + module cache reload)"
-        % meta["flag"],
-        "3. Dep pilot: python scripts\\otr_video_dep_pilot.py --python "
+        "2. Dep pilot: python scripts\\otr_video_dep_pilot.py --python "
         "<venv py> --json   (and --scan-custom-nodes)",
-        "4. Implement + run the in-process forward (the NotImplementedError "
+        "3. Implement + run the in-process forward (the NotImplementedError "
         "GPU slice): load + render_clip on the 5080.",
-        "5. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
+        "4. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
         "twice for determinism%s."
         % (" + exercise the humo -> humo_1.7B -> still_kenburns fallback"
            if engine == "humo" else ""),

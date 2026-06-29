@@ -60,10 +60,12 @@ def test_preflight_flags_test_mode_set():
     assert any("OTR_TEST_MODE" in p and "M5" in p for p in problems)
 
 
-def test_preflight_flags_registered_wan_with_disabled_flag():
-    # wan_i2v registered but its enable flag is not 1.
+def test_preflight_no_longer_requires_an_enable_flag():
+    # C5: the OTR_ENABLE_WAN_* enable-flag preflight is GONE -- a registered Wan
+    # engine is selectable with no launch flag (registry IS the menu). An env
+    # WITHOUT the flag is clean (only OTR_TEST_MODE + --exclude stay gated).
     problems = sweep.acceptance_preflight({}, {"wan_i2v"}, [])
-    assert any("OTR_ENABLE_WAN_I2V" in p and "M3" in p for p in problems)
+    assert problems == []
 
 
 def test_preflight_skips_unregistered_core_engine():
@@ -73,10 +75,11 @@ def test_preflight_skips_unregistered_core_engine():
     assert not any("wan_ti2v" in p for p in problems)
 
 
-def test_preflight_requires_registered_wan_ti2v_flag():
-    env = {"OTR_ENABLE_WAN_I2V": "1"}  # wan_ti2v flag missing
-    problems = sweep.acceptance_preflight(env, {"wan_i2v", "wan_ti2v"}, [])
-    assert any("OTR_ENABLE_WAN_TI2V" in p for p in problems)
+def test_preflight_no_flag_required_for_registered_wan_ti2v():
+    # C5: no enable-flag preflight -- wan_ti2v registered + no OTR_TEST_MODE /
+    # --exclude is clean (the OTR_ENABLE_WAN_TI2V gate is gone).
+    problems = sweep.acceptance_preflight({}, {"wan_i2v", "wan_ti2v"}, [])
+    assert problems == []
 
 
 def test_preflight_forbids_exclude_of_core_wan_substring():
