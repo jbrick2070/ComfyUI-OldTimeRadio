@@ -1,15 +1,22 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `3088af9f` ==
-> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C4 (S3 body-gate text-scored accept).**
-> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1/C2/C3 SHIPPED + pushed (4 green commits
-> + docs). Suite 5741/0, Bug Bible 16/3xfail, B7 green on every chunk. Remaining: C4 -> C5 -> C6 ->
-> the 1-local+1-grok acceptance render. OPEN: node-87 other_beats = humo_1.7B (committed-test intent)
-> vs the UI-save's `visualizer` -- operator to confirm (1-value flip). The C4 design is PINPOINTED below.
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `041d28d8` ==
+> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C5 (S4 cliche exact-span replace). C4 SHIPPED.**
+> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1/C2/C3/C4 SHIPPED + pushed. C4 (S3 body-gate
+> text-scored accept) shipped `041d28d8`: suite 5750/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST verified.
+> Remaining: C5 -> C6 -> the 1-local+1-grok acceptance render. node-87 other_beats SETTLED = keep `humo_1.7B`
+> (operator 2026-06-28; both humo_1.7B + visualizer stay selectable in the dropdown). C5/C6 PINPOINTED below.
 > - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
 >   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
 >   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
-> - **C4 plan (PINPOINTED -- the body gate is `OTR_LedgerScriptWriter.run` L4515-4589):** today the gate
+> - **C4 SHIPPED `041d28d8` (S3 body-gate text-scored accept; was PINPOINTED -- `OTR_LedgerScriptWriter.run`
+>   L4515-4589):** new module helper `_otr_body_score` scores original vs reroll on the SHIPPED text
+>   (`10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps`, lower wins, ORIGINAL on tie);
+>   hard_leak = `verify_and_repair_line(text, policy=...).needs_recompose`; run_on uses C2's
+>   `derive_one_breath_cap` + `max_clause_markers=max(3,cap//8)`; roster_caps matches the locked cast full
+>   names from `req.allowed_roster`; a MID-CLAUSE roster-caps hit TRIGGERS a reroll (never an in-place strip);
+>   v2-OFF keeps `_use_rr=_bg_res_ok` byte-identical. Lock: `tests/test_story_quality_body_gate.py` (9). The
+>   original C4 design follows for history: today the gate
 >   rerolls ONLY on grounding failure (`validate_composed_grounding`) and accepts the reroll ONLY if it
 >   re-validates grounding (L4548 `if _bg_res_ok and _bg_res.text.strip()`). S3 (v2-gated) replaces the
 >   ACCEPT test with a total-order score on the SHIPPED TEXT for BOTH `cleaned` (orig) and `_bg_res.text`:
@@ -89,7 +96,7 @@
 See the CURRENT STEP block at the TOP of this file -- 2026-06-28: the 3-way story-quality
 kibitz CONVERGED -> build-ready `kibitz-runs/2026-06-28-story-quality/final.md` (G1 lead:
 the line-compression gates over-correct -> length+craft one root cause; v2-gated 6-commit
-plan; S1 deferred, S6 cut). NEXT = operator decision gate -> coder window builds it.
+plan; S1 deferred, S6 cut). C1-C4 SHIPPED (HEAD `041d28d8`); NEXT = C5 (S4 cliche) -> C6 -> acceptance render.
 
 Older ACTIVE/SUPERSEDED step history -> `docs/GO_FORWARD_ARCHIVE.md`.
 
