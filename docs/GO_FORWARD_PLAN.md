@@ -1,7 +1,11 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS. HEAD `5198d8fe` == origin/v2.0-alpha.
-> prod/main + tags GATED. NEXT = C4 (S3 body-gate text-scored accept).**
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `3088af9f` ==
+> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C4 (S3 body-gate text-scored accept).**
+> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1/C2/C3 SHIPPED + pushed (4 green commits
+> + docs). Suite 5741/0, Bug Bible 16/3xfail, B7 green on every chunk. Remaining: C4 -> C5 -> C6 ->
+> the 1-local+1-grok acceptance render. OPEN: node-87 other_beats = humo_1.7B (committed-test intent)
+> vs the UI-save's `visualizer` -- operator to confirm (1-value flip). The C4 design is PINPOINTED below.
 > - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
 >   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
 >   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
