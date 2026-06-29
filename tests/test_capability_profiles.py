@@ -343,13 +343,15 @@ def test_two_heavy_roles_still_validate():
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
-    # Route-A (2026-06-28, operator-directed): the 14B promotion puts
-    # humo_14B_169 on ALL THREE audio roles (announcer / music / character), so
-    # announcer_visual is now the heavy humo_14B_169 (was ltx_audio_in).
-    # other_beats_visual stays humo_1.7B (the legacy other-beats fallback for the
-    # lighter tiers); the 14B remains registered + selectable.
+    # Route-A (2026-06-28, operator-directed; other_beats 14B upgrade): the 16gb
+    # master runs humo_14B_169 on ALL THREE visible video slots (announcer /
+    # music / other_beats) -- the consistent-quality default. The three per-role
+    # sub-slots (character / scene_broll / background_abstract) are OMITTED from
+    # the profile so they inherit other_beats (the sentinel on the master); they
+    # exist only as advanced explicit overrides. humo_1.7B stays the lighter-tier
+    # fallback + a registered/selectable engine.
     assert profile["role_overrides"]["announcer_visual"] == "humo_14B_169"  # heavy (Route-A)
-    assert profile["role_overrides"]["other_beats_visual"] == "humo_1.7B"
+    assert profile["role_overrides"]["other_beats_visual"] == "humo_14B_169"  # 14B default
     # The two-heavy case stays a static-validation GREEN (single-heavy
     # residency is wrapper_bridge's RUNTIME invariant, never a static profile
     # rejection): force the 14B back into the character slot for the check.
