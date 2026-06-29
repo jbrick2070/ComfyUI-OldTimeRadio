@@ -1,7 +1,8 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-29 DELETE ALL CODE-GATING (registry IS the menu). HEAD `cf4487a6` ==
-> origin/v2.0-alpha (pushed). prod/main + tags GATED.** OPERATOR DIRECTIVE (2026-06-29, supersedes the
+> **>>> CURRENT STEP -- 2026-06-29 DELETE ALL CODE-GATING (registry IS the menu): C2-C7 ALL SHIPPED +
+> PUSHED to origin/v2.0-alpha (full suite 5728/0, Bug Bible 16/3xfail, B7 green; guard test locks it).
+> prod/main + tags GATED.** OPERATOR DIRECTIVE (2026-06-29, supersedes the
 > opt-in/validated model): NO opt-in / validation / promotion gates ANYWHERE (video, image, voice, LLM).
 > The registry IS the menu -- a REGISTERED engine is SELECTABLE and renders (may hard-fail LOUD, that's OK);
 > validation is the operator's MANUAL process, never a code gate. No `OTR_ENABLE_*`, no `VALIDATED_ENGINES`
@@ -84,7 +85,19 @@
 > check stays). **HARD CONSTRAINT HELD: test_audio_byte_identical GREEN** -- the default voice/music engines
 > (already flag-free) + the master-mux path are UNCHANGED; only the selectability of non-default engines
 > changed. Flipped ~9 audio gate tests + 1 OpenRouter gate test to the selectable contract. Full suite
-> 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7 (docstring cleanup + the guard test).
+> 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7.
+>
+> **C7 SHIPPED (2026-06-29 this session) -- CAMPAIGN COMPLETE (C2-C7 all green + pushed):** docstring/comment
+> cleanup + the GUARD TEST. Cleaned `engine_registry_base` (removed the now-unused `import os`; updated the
+> module / EngineCore / `EngineUsabilityReason` / `assert_usable` docstrings so `GATED_BY_FLAG` + the
+> `requires_flag` field read as DEAD/vestigial-kept-for-parity, not live gates) + the parallel audio-registry
+> `assert_usable` docstring + the stale user-facing OpenRouter "set OTR_ENABLE_OPENROUTER=1" help/error
+> messages (now "set OPENROUTER_API_KEY"). NEW guard `tests/test_registry_is_the_menu_guard.py` (6 tests):
+> no REGISTERED video/image/audio engine declares a live `requires_flag`; the dark NotImplementedError
+> scaffolds stay UNREGISTERED; no registered render is a dark-scaffold stub; OpenRouter is gated only on
+> creds. Full suite 5728/0, Bug Bible 16/3xfail, B7 green. The per-model SMOKE PASS now resumes (selecting
+> any registered video/image/voice/LLM engine just renders -- no launch flag, no validated-subset filter).
+> prod/main + tags remain operator-GATED.
 >
 > WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
 > (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
@@ -214,10 +227,12 @@ See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL COD
 (registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
 Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
 sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). C2 + C3 + C4 + C5 + C6 SHIPPED this
-session (requires_flag GATE removed; dark scaffolds unregistered; VALIDATED_ENGINES filter
-deleted; harness decoupled from the flag; voice + LLM gates removed with test_audio_byte_identical
-GREEN; suite 5722/0). NEXT = build C7 (docstring/comment cleanup + the guard test).
+per-model smoke pass resumes after C2 (the gate removal). **DELETE-ALL-CODE-GATING COMPLETE: C2-C7
+all SHIPPED + PUSHED this session** (requires_flag GATE removed; dark scaffolds unregistered;
+VALIDATED_ENGINES filter deleted; harness decoupled from the flag; voice + LLM gates removed with
+test_audio_byte_identical GREEN; docstrings cleaned + a guard test locks the invariant; suite 5728/0,
+Bug Bible 16/3xfail, B7 green). NEXT = the per-model SMOKE PASS (now flag-free) -> then prod/main +
+tag promotion (operator-GATED).
 
 Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
 1-grok acceptance render was still pending when the opt-in-gating work took priority.

@@ -6,8 +6,8 @@ remote OpenRouter model through the SAME `load`/`generate`/`unload`
 surface the local transformers backends use -- with zero local VRAM.
 
 Hard constraints honoured here (see the go-forward plan, C1-C9):
-  * C3 offline-first: no remote path is reachable unless BOTH
-    `OPENROUTER_API_KEY` and `OTR_ENABLE_OPENROUTER=1` are set.
+  * offline-first: no remote path is reachable unless `OPENROUTER_API_KEY`
+    is set (C6: the separate OTR_ENABLE_OPENROUTER opt-in flag gate was removed).
   * C6 hard cost guard: a conservative per-call AND per-run token
     ceiling is enforced BEFORE the network call; the call aborts
     rather than spend unbounded credits. Spend is logged per call.
@@ -881,7 +881,7 @@ class OpenRouterBackend:
         if not openrouter_enabled():
             raise OpenRouterConfigError(
                 f"{repo_id} selected but OpenRouter is not enabled. Set "
-                f"OPENROUTER_API_KEY and OTR_ENABLE_OPENROUTER=1 "
+                f"OPENROUTER_API_KEY "
                 f"(see docs/openrouter-setup.md)."
             )
         letter = _slot_letter(repo_id)

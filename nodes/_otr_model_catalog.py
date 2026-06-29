@@ -233,7 +233,8 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
 
 def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
     """The two virtual OpenRouter rows (S2) -- present ONLY when remote
-    is enabled (OPENROUTER_API_KEY set AND OTR_ENABLE_OPENROUTER=1). When
+    is enabled (OPENROUTER_API_KEY set; C6: the OTR_ENABLE_OPENROUTER opt-in
+    flag gate was removed). When
     disabled the tuple is empty, so _by_repo_id / dropdowns / Path-1
     validation never see them and the offline baseline is untouched (C3,
     C8). Per FC4 these carry loader_backend='openrouter_http',
@@ -992,7 +993,7 @@ def validate_model_id(
     if normalized.startswith("openrouter:"):
         raise UnknownModelError(
             f"{normalized!r} is an OpenRouter remote model, but remote is "
-            f"not enabled. Set OPENROUTER_API_KEY and OTR_ENABLE_OPENROUTER=1 "
+            f"not enabled. Set OPENROUTER_API_KEY "
             f"(plus OPENROUTER_MODEL_A / OPENROUTER_MODEL_B), then restart "
             f"ComfyUI in a fresh terminal. See docs/openrouter-setup.md."
         )

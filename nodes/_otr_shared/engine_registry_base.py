@@ -23,14 +23,13 @@ module re-expresses the pattern as dependency-free, reusable primitives:
   video registry owns one; the image registry (C1) will own another. Audio keeps
   its own frozen copy and is untouched.
 
-Import-time is side-effect-free: only ``enum``, ``os`` and ``typing`` -- no IO,
-no network, no CUDA, no model framework. Importing this module pulls in nothing
+Import-time is side-effect-free: only ``enum`` and ``typing`` -- no IO, no
+network, no CUDA, no model framework. Importing this module pulls in nothing
 heavy (V-12).
 """
 from __future__ import annotations
 
 import enum
-import os
 from typing import Optional, Protocol, runtime_checkable
 
 
@@ -47,10 +46,12 @@ class EngineCore(Protocol):
 
     ``roles`` lists the roles the engine can serve; ``default_roles`` lists the
     roles where it is the in-stack default (sorts first in the dropdown).
-    ``requires_flag`` gates an opt-in engine behind an env var. ``load`` /
-    ``unload`` bracket model residency and must be cheap when already in the
-    desired state (residency belongs there, never in ``__init__`` -- importing a
-    package must never pull weights).
+    ``requires_flag`` is VESTIGIAL (always ``None`` on registered engines, C2-C6
+    -- the registry IS the menu, no flag gate); the field is retained only so the
+    audio ``AudioEngine(Protocol)`` parity holds. ``load`` / ``unload`` bracket
+    model residency and must be cheap when already in the desired state (residency
+    belongs there, never in ``__init__`` -- importing a package must never pull
+    weights).
     """
 
     name: str
@@ -64,18 +65,19 @@ class EngineCore(Protocol):
 
 
 class EngineUsabilityReason(str, enum.Enum):
-    """The six reasons an engine may be refused for a role (fail-closed).
+    """The reasons an engine may be refused for a role (fail-closed).
 
-    Registry-level checks (no IO) raise ``GATED_BY_FLAG``, ``MALFORMED_CONFIG``
-    and ``INCOMPATIBLE_PROFILE``. The disk/token/commercial reasons
-    (``MISSING_MODEL``, ``MISSING_HF_TOKEN``, ``NONCOMMERCIAL_BLOCKED``) require
-    IO and are raised downstream by the profile resolver + release gate, which
-    reuse this same enum + :class:`EngineUnusable` so the taxonomy is
-    single-sourced across audio, video and image. Identical to the shipped audio
-    taxonomy by design (one taxonomy, three namespaces).
+    Registry-level checks (no IO) raise ``MALFORMED_CONFIG`` and
+    ``INCOMPATIBLE_PROFILE``. ``GATED_BY_FLAG`` is now DEAD -- the flag gate was
+    removed (C2-C6, "registry IS the menu"); the member is retained only so the
+    enum stays identical to the frozen audio taxonomy (protocol-parity). The
+    disk/token/commercial reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``,
+    ``NONCOMMERCIAL_BLOCKED``) require IO and are raised downstream by the profile
+    resolver + release gate, which reuse this same enum + :class:`EngineUnusable`
+    so the taxonomy is single-sourced across audio, video and image.
     """
 
-    GATED_BY_FLAG = "gated_by_flag"
+    GATED_BY_FLAG = "gated_by_flag"   # DEAD: no engine gates on a flag (C2-C6); kept for parity
     MISSING_MODEL = "missing_model"
     MISSING_HF_TOKEN = "missing_hf_token"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
@@ -197,11 +199,10 @@ class EngineRegistry:
 
         * ``MALFORMED_CONFIG`` -- no engine named ``name`` is registered.
         * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role``.
-        * ``GATED_BY_FLAG`` -- a non-default opt-in engine whose
-          ``requires_flag`` env var is not set to ``"1"``.
 
-        A default-for-role engine is always usable. Disk/token/commercial checks
-        require IO and are enforced downstream (this method does no IO).
+        There is NO ``GATED_BY_FLAG`` case (C2-C6 -- the registry IS the menu): a
+        registered, role-compatible engine is always usable. Disk/token/commercial
+        checks require IO and are enforced downstream (this method does no IO).
         """
         if not self.is_registered(name):
             raise EngineUnusable(

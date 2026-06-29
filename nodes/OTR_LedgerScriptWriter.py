@@ -1780,8 +1780,8 @@ class OTR_LedgerScriptWriter:
                             "the C7 byte-identical audio baseline. "
                             "Suffix tags like [NOT DOWNLOADED] are "
                             "stripped before HF lookup. To use a remote "
-                            "OpenRouter model, set OPENROUTER_API_KEY + "
-                            "OTR_ENABLE_OPENROUTER=1 and pick OpenRouter A/B "
+                            "OpenRouter model, set OPENROUTER_API_KEY and "
+                            "pick OpenRouter A/B "
                             "(see docs/openrouter-setup.md)."
                         ),
                     },
@@ -1800,7 +1800,7 @@ class OTR_LedgerScriptWriter:
                             "pick a smaller model here when you want "
                             "Slot 1 != Slot 2 routing for VRAM headroom. "
                             "To use a remote OpenRouter model, set "
-                            "OPENROUTER_API_KEY + OTR_ENABLE_OPENROUTER=1 and "
+                            "OPENROUTER_API_KEY and "
                             "pick OpenRouter A/B (see docs/openrouter-setup.md)."
                         ),
                     },
@@ -2105,7 +2105,7 @@ class OTR_LedgerScriptWriter:
                             "is set to 'openrouter:slot-a'. Choices are the "
                             "cached OpenRouter catalog (run the refresh "
                             "script); shows '(enable OpenRouter)' until "
-                            "OPENROUTER_API_KEY + OTR_ENABLE_OPENROUTER=1 are "
+                            "OPENROUTER_API_KEY is "
                             "set. A saved slug is preserved even if absent "
                             "from a stale cache. See docs/openrouter-setup.md."
                         ),

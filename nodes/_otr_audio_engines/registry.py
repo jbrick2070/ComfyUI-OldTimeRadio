@@ -143,16 +143,15 @@ def assert_usable(name: str, role: str) -> str:
 
     Returns the validated engine name on success. Raises :class:`EngineUnusable`
     with a classified reason otherwise -- never silently resolves to another
-    engine (C-6):
+    engine:
 
     * ``MALFORMED_CONFIG`` -- no engine named ``name`` is registered.
     * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role`` in ``roles``.
-    * ``GATED_BY_FLAG`` -- a non-default opt-in engine whose ``requires_flag``
-      env var is not set to ``"1"``.
 
-    A default-for-role engine is always usable. Disk/token/commercial checks
-    (the other three reason codes) require IO and are enforced downstream by the
-    profile resolver and release gate, not here (C-5: the registry does no IO).
+    There is NO ``GATED_BY_FLAG`` case (C6 -- the registry IS the menu): a
+    registered, role-compatible engine is always usable. Disk/token/commercial
+    checks require IO and are enforced downstream by the profile resolver and
+    release gate, not here (the registry does no IO).
     """
     if not is_registered(name):
         raise EngineUnusable(
