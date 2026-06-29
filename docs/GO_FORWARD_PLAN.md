@@ -1,7 +1,31 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS. HEAD `75930608` == origin/v2.0-alpha.
-> prod/main + tags GATED. NEXT = C3 (S2 coda bridge floor).**
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS. HEAD `5198d8fe` == origin/v2.0-alpha.
+> prod/main + tags GATED. NEXT = C4 (S3 body-gate text-scored accept).**
+> - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
+>   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
+>   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
+> - **C4 plan (PINPOINTED -- the body gate is `OTR_LedgerScriptWriter.run` L4515-4589):** today the gate
+>   rerolls ONLY on grounding failure (`validate_composed_grounding`) and accepts the reroll ONLY if it
+>   re-validates grounding (L4548 `if _bg_res_ok and _bg_res.text.strip()`). S3 (v2-gated) replaces the
+>   ACCEPT test with a total-order score on the SHIPPED TEXT for BOTH `cleaned` (orig) and `_bg_res.text`:
+>   `score = 10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps` (lower wins, ORIGINAL
+>   on tie). Add a module helper `_otr_body_score(text, bg_entry, grounded_nouns, entity_policy, req)`:
+>   grounding_failed = not validate_composed_grounding(...)[0]; hard_leak from verify_and_repair_line(text,
+>   _episode_entity_policy) [check its return shape first]; trunc = is_truncated; run_on = flag_one_breath(
+>   text, max_words=derive_one_breath_cap(req.words_per_beat_range))[0]; roster_caps = an ALL-CAPS token-run
+>   matching an episode CAST FULL NAME (NOT any caps token -- NASA/UCLA safe; cast names live on the locked
+>   cast rows). v2-OFF keeps `_use_rr = _bg_res_ok` (byte-identical). roster_caps detail: a MID-CLAUSE hit
+>   (grammatical subject/object, "...when CLARISSE GORDON claim...") => set the reroll TRIGGER (needs_recompose,
+>   alongside `not _bg_ok`), NEVER an in-place strip (that yields "...when claim..."); only a LEADING/TRAILING
+>   vocative is scrub-safe via scrub_roster_vocative. Add `tests/test_story_quality_body_gate.py`. Imports
+>   needed in the writer: derive_one_breath_cap + is_truncated (from _otr_line_hygiene). Reuse the existing
+>   reroll loop -- do NOT add a second compose path. **C5 (S4)** = find_cliche_phrase exact-span replacement
+>   before EVERY quality-gate return path (kept-reroll AND kept-original) in _otr_line_composer L~2515, curated
+>   safe-replacement map (case-match) + the _quality_repair_attempted guard; else accept 2nd-best + stamp
+>   `cliche_shipped_after_reroll`. **C6 (S5)** = story_quality_scan two principals = top-2 by dialogue-line
+>   count (wants are verb phrases, no name parse); update test_story_quality_scan_r2 expected register_overlap.
+>   Then the 1-local + 1-grok acceptance render (report voiced-word counts; the length experiment).
 > - **C2 shipped** (`75930608`): G1 gate de-compression -- `_QUALITY_COLLAPSE_HINT_V2` (non-compressing,
 >   v2-selected), `line_quality_defect_score` v2 keep-better, and the budget-derived one-breath cap
 >   (`derive_one_breath_cap` + relaxed clause `max(3,cap//8)`) threaded at first-pass / reroll / scan from
