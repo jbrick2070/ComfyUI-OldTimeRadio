@@ -1246,6 +1246,20 @@ SCIENCE_NEWS_FEEDS = [
     "https://feeds.arstechnica.com/arstechnica/science",  # Ars, open
     "https://theconversation.com/us/science/rss",         # The Conversation, open
     "https://cosmosmagazine.com/feed/",                   # Cosmos, open
+    # -- MIT News (open-access university research feeds) --
+    "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml",  # MIT AI, open
+    "https://news.mit.edu/topic/mitmachine-learning-rss.xml",          # MIT machine learning, open
+    "https://news.mit.edu/topic/mitcomputers-rss.xml",                 # MIT CSAIL / computer science, open
+    "https://news.mit.edu/topic/mitrobotics-rss.xml",                  # MIT robotics, open
+    "https://news.mit.edu/topic/mitquantum-computing-rss.xml",         # MIT quantum computing, open
+    "https://news.mit.edu/rss/topic/neuroscience-neurology-and-cognitive-sciences",  # MIT brain + cognitive sci, open
+    "https://news.mit.edu/topic/mitsynthetic-biology-rss.xml",         # MIT synthetic biology, open
+    # -- Carnegie Mellon (open-access university research feeds) --
+    "https://www.ri.cmu.edu/feed/",                       # CMU Robotics Institute, open
+    "https://www.cs.cmu.edu/news/feed.rss",               # CMU School of Computer Science, open
+    "https://blog.ml.cmu.edu/feed/",                      # ML@CMU research blog (low-volume), open
+    "https://hcii.cmu.edu/taxonomy/term/72/feed",         # CMU HCII human-computer interaction, open
+    "https://www.sei.cmu.edu/news/feeds/latest/rss/",     # CMU SEI software engineering / AI / security, open
 ]
 
 
