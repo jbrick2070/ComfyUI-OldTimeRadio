@@ -10,25 +10,26 @@ The dialogue-craft spine (L1 objective-literal gate, L2 authoring contract,
 L7 dialogue|action split, + telemetry) is gated behind a SINGLE per-episode
 feature flag carried on the ledger meta:
 
-    meta["story_quality_v2_enabled"]  (bool, default False)
+    meta["story_quality_v2_enabled"]  (bool, BAKED IN -- always True)
 
-Flag OFF => byte-identical to the pre-R3 pipeline: no new code path runs, no
-new compose_flags are minted, and no ``meta.story_quality`` summary object is
-written. The flag is read at every new seam via ``story_quality_v2_enabled``.
-
-The default is FALSE: the spine ships dark and is enabled deliberately
-(operator config / a future workflow toggle), never by accident.
+BAKED IN (operator 2026-06-28): the writer always stamps this True -- the craft
+spine IS the engine, there is NO env kill-switch and no user-facing on/off lever.
+The flag + the ``story_quality_v2_enabled`` helper remain only as an internal
+seam so unit tests can still construct a LineRequest with it False to lock the
+individual leaf behaviors; production always runs the v2 path.
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-# Default state of the story-quality-v2 spine.
-# 2026-06-23 (operator): flipped to TRUE -- the R3 soak proved the spine is
-# stable + harmless (15+ clean episodes, continuity issues ~0, no test/golden
-# impact) even though it is not a measurable quality LIFT on weak local writers.
-# Left ON so L1/L7 stay armed as a defect safety-net + telemetry keeps
-# accruing; OTR_STORY_QUALITY_V2=0 (or false/no/off) is the kill-switch.
+# Default state of the story-quality-v2 spine -- BAKED IN (operator 2026-06-28).
+# 2026-06-23 flipped it True (R3 soak: stable, ~0 continuity issues). 2026-06-28
+# the C1-C6 craft build (body-gate text-score, cliche span-repair, one-breath
+# cap, coda bridge, two-principal scan) proved a real LIFT in the acceptance soak
+# (~450-500 voiced words vs the old ~210-310 ceiling, zero cliche/on-the-nose/
+# register defects), so the OTR_STORY_QUALITY_V2 kill-switch was REMOVED -- v2 is
+# the engine now, never off. This default stays True for the helper's
+# missing-key fallback.
 STORY_QUALITY_V2_DEFAULT: bool = True
 
 # L2 authoring contract: the minimum beat_tension (1..5) at which a character

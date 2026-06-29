@@ -2721,29 +2721,13 @@ class OTR_LedgerScriptWriter:
         meta = led.data.setdefault("meta", {})
         meta["cast_status"] = "building"
         meta["requested_num_characters"] = resolved["num_characters"]
-        # L2/L7 (story-quality v2, R3 2026-06-22): stamp the per-episode feature
-        # flag from the OTR_STORY_QUALITY_V2 env lever (ZERO workflow-JSON
-        # change). The key is stamped ONLY when enabled -> when OFF (default) the
-        # meta dict carries NO new key and the episode is byte-identical to
-        # pre-R3 (the whole spine -- objective withholding, objective-literal
-        # gate, dialogue|action split, telemetry -- stays dormant). The reader
-        # An explicit OTR_STORY_QUALITY_V2 wins (1/true/yes/on -> on;
-        # 0/false/no/off -> off); UNSET falls back to STORY_QUALITY_V2_DEFAULT
-        # (now True). NOTE: `run()` does a LOCAL `import os` further down (this
-        # file's convention), which makes `os` function-local -- so it must be
-        # imported HERE before this first use, or it UnboundLocalErrors.
-        import os as _os_sqv2
-        try:
-            from ._otr_config import STORY_QUALITY_V2_DEFAULT as _SQV2_DEFAULT
-        except ImportError:  # pragma: no cover
-            from _otr_config import STORY_QUALITY_V2_DEFAULT as _SQV2_DEFAULT  # type: ignore
-        _sqv2_raw = (_os_sqv2.environ.get("OTR_STORY_QUALITY_V2") or "").strip().lower()
-        if _sqv2_raw:
-            _sqv2_on = _sqv2_raw in ("1", "true", "yes", "on")
-        else:
-            _sqv2_on = bool(_SQV2_DEFAULT)
-        if _sqv2_on:
-            meta["story_quality_v2_enabled"] = True
+        # Story-quality v2 is BAKED IN (operator 2026-06-28): the dialogue-craft
+        # spine (objective gate, body-gate text-score, cliche span-repair,
+        # one-breath budget cap, news-coda bridge, two-principal scan + telemetry)
+        # IS the engine, not an opt-in lever. Always enabled -- the
+        # OTR_STORY_QUALITY_V2 env kill-switch is removed so the improvement can
+        # never silently regress. (Default was already True since 2026-06-23.)
+        meta["story_quality_v2_enabled"] = True
 
         # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
         # disk NOW, before the style-picker / news-interpreter / cast /
