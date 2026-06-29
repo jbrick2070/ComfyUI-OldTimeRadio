@@ -1,11 +1,11 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `041d28d8` ==
-> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C5 (S4 cliche exact-span replace). C4 SHIPPED.**
-> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1/C2/C3/C4 SHIPPED + pushed. C4 (S3 body-gate
-> text-scored accept) shipped `041d28d8`: suite 5750/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST verified.
-> Remaining: C5 -> C6 -> the 1-local+1-grok acceptance render. node-87 other_beats SETTLED = keep `humo_1.7B`
-> (operator 2026-06-28; both humo_1.7B + visualizer stay selectable in the dropdown). C5/C6 PINPOINTED below.
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `5afde8fb` ==
+> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C6 (S5 scan two-principals). C4+C5 SHIPPED.**
+> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1-C5 SHIPPED + pushed. C4 body-gate `041d28d8`
+> + C5 (S4 cliche exact-span replace) `5afde8fb`: suite 5758/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST
+> verified. Remaining: C6 (S5 scan two-principals) -> the 1-local+1-grok acceptance render. node-87
+> other_beats SETTLED = keep `humo_1.7B` (operator 2026-06-28; both stay selectable). C6 PINPOINTED below.
 > - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
 >   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
 >   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
@@ -31,7 +31,7 @@
 >   alongside `not _bg_ok`), NEVER an in-place strip (that yields "...when claim..."); only a LEADING/TRAILING
 >   vocative is scrub-safe via scrub_roster_vocative. Add `tests/test_story_quality_body_gate.py`. Imports
 >   needed in the writer: derive_one_breath_cap + is_truncated (from _otr_line_hygiene). Reuse the existing
->   reroll loop -- do NOT add a second compose path. **C5 (S4)** = find_cliche_phrase exact-span replacement
+>   reroll loop -- do NOT add a second compose path. **C5 (S4) SHIPPED `5afde8fb`** = find_cliche_phrase exact-span replacement
 >   before EVERY quality-gate return path (kept-reroll AND kept-original) in _otr_line_composer L~2515, curated
 >   safe-replacement map (case-match) + the _quality_repair_attempted guard; else accept 2nd-best + stamp
 >   `cliche_shipped_after_reroll`. **C6 (S5)** = story_quality_scan two principals = top-2 by dialogue-line
@@ -96,7 +96,7 @@
 See the CURRENT STEP block at the TOP of this file -- 2026-06-28: the 3-way story-quality
 kibitz CONVERGED -> build-ready `kibitz-runs/2026-06-28-story-quality/final.md` (G1 lead:
 the line-compression gates over-correct -> length+craft one root cause; v2-gated 6-commit
-plan; S1 deferred, S6 cut). C1-C4 SHIPPED (HEAD `041d28d8`); NEXT = C5 (S4 cliche) -> C6 -> acceptance render.
+plan; S1 deferred, S6 cut). C1-C5 SHIPPED (HEAD `5afde8fb`); NEXT = C6 (S5 scan two-principals) -> acceptance render.
 
 Older ACTIVE/SUPERSEDED step history -> `docs/GO_FORWARD_ARCHIVE.md`.
 
