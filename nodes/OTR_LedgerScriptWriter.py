@@ -1548,6 +1548,116 @@ def _otr_body_gate_hint(reasons, sq_entry) -> str:
     return " ".join(parts).strip()
 
 
+def _otr_cast_fullnames(req) -> "tuple[str, ...]":
+    """The episode's LOCKED cast FULL names for the C4 (S3) roster-caps signal:
+    the multi-word entries of the UPPERCASE ``allowed_roster`` on the line
+    request. NASA/UCLA-safe -- full names ONLY (a name contains a space), never
+    a single ALL-CAPS token. Longest-first (so a substring name never shadows a
+    longer one). Pure; never raises."""
+    try:
+        roster = getattr(req, "allowed_roster", ()) or ()
+        return tuple(sorted(
+            {str(n).strip() for n in roster if n and " " in str(n).strip()},
+            key=len, reverse=True,
+        ))
+    except Exception:  # noqa: BLE001
+        return ()
+
+
+def _otr_allcaps_cast_hits(text, fullnames) -> int:
+    """Count ALL-CAPS occurrences of a locked cast FULL name in ``text`` -- the
+    gemma shout-leak (``...when CLARISSE GORDON claim...``). Case-SENSITIVE on
+    the uppercase literal (a normal-case ``Clarisse Gordon`` is NOT a defect),
+    word-boundary anchored; mirrors ``scrub_roster_vocative``'s matching. Pure;
+    never raises."""
+    try:
+        s = "" if text is None else str(text)
+        if not s or not fullnames:
+            return 0
+        n = 0
+        for name in fullnames:
+            up = str(name).strip().upper()
+            if " " in up and re.search(rf"\b{re.escape(up)}\b", s):
+                n += 1
+        return n
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _otr_roster_caps_midclause(text, fullnames) -> bool:
+    """True when an ALL-CAPS locked cast FULL name survives a leading/trailing
+    vocative scrub -- i.e. it sits MID-CLAUSE (a grammatical subject/object,
+    ``...when CLARISSE GORDON claim...``) where an in-place strip would mangle
+    the sentence, so the body gate must REROLL rather than strip. A pure
+    leading/trailing vocative is scrubbed by ``scrub_roster_vocative`` and does
+    NOT trip this. Pure; never raises."""
+    try:
+        from . import _otr_line_hygiene as _HY
+        scrubbed = _HY.scrub_roster_vocative(text, fullnames)
+        return _otr_allcaps_cast_hits(scrubbed, fullnames) > 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _otr_body_score(text, bg_entry, grounded_nouns, entity_policy, req) -> int:
+    """C4 (S3) total-order defect score for ONE shipped character line -- LOWER
+    is cleaner. The body gate scores the SHIPPED text of BOTH the original and a
+    reroll and keeps the lower (ORIGINAL on tie), so a reroll is accepted only
+    when it is genuinely better, not merely re-grounded. Weighted so grounding
+    dominates, then a hard (unscrubable) leak, then truncation / run-on, then a
+    cast-name shout as the tie-break:
+
+        10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps
+
+    The run-on cap MATCHES C2's one-breath gate exactly (``derive_one_breath_cap``
+    + relaxed ``max_clause_markers = max(3, cap // 8)``) so a budget-length
+    multi-clause line C2 deliberately allowed is not counted against a reroll
+    here. Pure + deterministic; never raises (any feature that errors scores 0,
+    never a crash mid-render)."""
+    from . import _otr_story_quality_l12 as _SQL12
+    from . import _otr_line_hygiene as _HY
+    try:
+        s = "" if text is None else str(text)
+        try:
+            _roles = _SQL12.CLIMAX_CLASS_ROLES | {_SQL12.BEAT_ROLE_PRESSURE}
+            g_ok, _ = _SQL12.validate_composed_grounding(
+                s, bg_entry, grounded_nouns,
+                max_ungrounded=0,
+                require_conflict_object_on_roles=_roles,
+            )
+            grounding_failed = 0 if g_ok else 1
+        except Exception:  # noqa: BLE001
+            grounding_failed = 0
+        try:
+            hard_leak = 1 if _HY.verify_and_repair_line(
+                s, policy=entity_policy,
+            ).needs_recompose else 0
+        except Exception:  # noqa: BLE001
+            hard_leak = 0
+        try:
+            trunc = 1 if _HY.is_truncated(s) else 0
+        except Exception:  # noqa: BLE001
+            trunc = 0
+        try:
+            _cap = _HY.derive_one_breath_cap(
+                getattr(req, "words_per_beat_range", (0, 0)))
+            run_on = 1 if _HY.flag_one_breath(
+                s, max_words=_cap, max_clause_markers=max(3, _cap // 8),
+            )[0] else 0
+        except Exception:  # noqa: BLE001
+            run_on = 0
+        roster_caps = _otr_allcaps_cast_hits(s, _otr_cast_fullnames(req))
+        return (
+            10 * grounding_failed
+            + 3 * hard_leak
+            + 2 * trunc
+            + 2 * run_on
+            + 1 * roster_caps
+        )
+    except Exception:  # noqa: BLE001 -- scoring must never break a render
+        return 0
+
+
 def _apply_story_scaffold_env(scaffold) -> str:
     """Resolve the ``story_scaffold`` widget into ``OTR_ENABLE_STYLE_GRAMMAR``.
 
@@ -4524,8 +4634,31 @@ class OTR_LedgerScriptWriter:
                         require_conflict_object_on_roles=_bg_roles,
                     )
                     _bg_sq = meta.setdefault("story_quality", {})
-                    if not _bg_ok:
+                    # C4 (S3, story-quality v2): also REROLL on a MID-CLAUSE
+                    # roster-caps shout (a locked cast FULL name in ALL CAPS at a
+                    # grammatical subject/object position, where an in-place strip
+                    # would mangle the clause), and ACCEPT the reroll by a total-
+                    # order defect score on the shipped text (below) rather than
+                    # grounding alone. v2-OFF => _bg_v2 False => fullnames () =>
+                    # no new trigger + the legacy accept test => byte-identical.
+                    _bg_v2 = bool(meta.get("story_quality_v2_enabled", False))
+                    _bg_fullnames = (
+                        _otr_cast_fullnames(line_req) if _bg_v2 else ()
+                    )
+                    _bg_roster_mid = bool(
+                        _bg_fullnames
+                        and _otr_roster_caps_midclause(cleaned, _bg_fullnames)
+                    )
+                    if (not _bg_ok) or _bg_roster_mid:
                         _bg_hint = _otr_body_gate_hint(_bg_reasons, _bg_entry)
+                        if _bg_roster_mid:
+                            _bg_hint = (
+                                (_bg_hint + " ") if _bg_hint else ""
+                            ) + (
+                                "Do not write a character's full name in "
+                                "capital letters; refer to other characters "
+                                "normally."
+                            )
                         try:
                             with slot_scheduler.helper_context("compose_line"):
                                 _bg_res = _OTRLC.compose_line(
@@ -4545,7 +4678,26 @@ class OTR_LedgerScriptWriter:
                                 max_ungrounded=0,
                                 require_conflict_object_on_roles=_bg_roles,
                             )
-                            if _bg_res_ok and _bg_res.text.strip():
+                            # C4 ACCEPT: v2 keeps the reroll only when it scores
+                            # STRICTLY cleaner on the shipped text (lower wins,
+                            # ORIGINAL on tie); v2-OFF keeps the legacy grounding-
+                            # only accept => byte-identical.
+                            _bg_rr_ok = bool(_bg_res.text.strip())
+                            if _bg_v2:
+                                _use_rr = _bg_rr_ok and (
+                                    _otr_body_score(
+                                        _bg_res.text, _bg_entry,
+                                        _grounded_nouns,
+                                        _episode_entity_policy, line_req,
+                                    )
+                                    < _otr_body_score(
+                                        cleaned, _bg_entry, _grounded_nouns,
+                                        _episode_entity_policy, line_req,
+                                    )
+                                )
+                            else:
+                                _use_rr = bool(_bg_res_ok and _bg_rr_ok)
+                            if _use_rr:
                                 cleaned = _bg_res.text
                                 beat_compose_flags = (
                                     tuple(_bg_res.compose_flags)
