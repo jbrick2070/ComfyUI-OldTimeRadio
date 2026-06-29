@@ -50,7 +50,7 @@ $env:HF_HOME = 'C:\ComfyUI-Models\huggingface'
 $env:OTR_NEWS_BRIEFS_REQUIRED = '0'
 # R2 + 0-E coverage: make the engine enable-set EXPLICIT in this launcher so the
 # nightly never depends on ambient env. The 2026-06-13 soak floored humo_1.7B
-# (58x) / humo (10x) to still_kenburns with reason=gated_by_flag because
+# (58x) / humo (10x) to still_motion with reason=gated_by_flag because
 # OTR_ENABLE_HUMO was unset at this direct main.py boot (the canonical
 # _otr_soak_server_launch.cmd sets it; this ps1 bypassed it). That is NOT an OOM
 # or a forward/wrapper bug -- the HuMo in-process VRAM path (CS-4/BUG-291) is left

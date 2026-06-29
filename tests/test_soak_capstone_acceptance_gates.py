@@ -61,7 +61,7 @@ def test_no_fallback_passes_on_empty_trace():
 def test_no_fallback_fails_on_silent_floor_fallback():
     # The exact CS-1 shape: a wan_i2v shot that fell back to the radio floor.
     trace = [
-        _row("b000", "wan_i2v", "still_kenburns", extra_attempts=("still_kenburns",)),
+        _row("b000", "wan_i2v", "still_motion", extra_attempts=("still_motion",)),
         _row("b001", "humo_1.7B", "humo_1.7B"),
     ]
     with pytest.raises(soak.SoakFail) as exc:

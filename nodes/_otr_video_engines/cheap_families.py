@@ -6,8 +6,8 @@ GPU engine exists. Each registers exactly like a future heavy engine (HuMo / LTX
 / Wan) -- model-agnostic, selected per role; no model is "primary".
 
 Families (schemas.FAMILIES): ``abstract`` (procedural pattern), ``static_motion``
-(still_kenburns -- a still with a slow pan), ``static_image_gen`` (station_card /
-still_pan -- a provided still with a Ken Burns pan / still_flat -- the same still
+(still_motion -- a still with a slow pan), ``static_image_gen`` (station_card /
+still_pan -- a provided still with a pan / still_flat -- the same still
 held flat). Each produces an ALWAYS-SILENT ``CanonicalClip`` (``has_audio`` is
 always False -- audio is added ONLY by ``OTR_MasterAudioMux``, V-1).
 
@@ -43,7 +43,7 @@ class _CheapFamilyBase:
     required_inputs: tuple = ()
     engine_version = "1"
     #: True when this family animates a provided still (asset_refs.init_image /
-    #: still) with a Ken Burns pan; False families always synthesize a procedural
+    #: still) with a pan; False families always synthesize a procedural
     #: floor. Either way render_clip ALWAYS produces a valid silent clip.
     uses_still = False
 
@@ -112,13 +112,13 @@ class _CheapFamilyBase:
     def render_clip(self, request, prepared=None):
         """Render ONE always-silent CanonicalClip via ffmpeg (the CPU radio floor).
 
-        A provided still (asset_refs) is animated with a gentle Ken Burns pan when
+        A provided still (asset_refs) is animated with a gentle pan when
         ``uses_still``; otherwise the family's libavfilter source is synthesized.
         Output is the platform's silent bt709 / yuv420p contract (V-1: only
         OTR_MasterAudioMux ever adds audio). This family's canonicalize() is
         identity, so the canonical clip is returned here directly. With valid
         inputs it ALWAYS succeeds -- the fallback-chain terminus the A-S6 chain
-        humo -> humo_1.7B -> still_kenburns converges on."""
+        humo -> humo_1.7B -> still_motion converges on."""
         from . import wrapper_bridge as _wb       # lazy import: cold-import clean
         import os
         from ._tmp import otr_engine_tmp_mp4
@@ -127,7 +127,7 @@ class _CheapFamilyBase:
         out_path = otr_engine_tmp_mp4("otr_floor_%s_" % self.name)
         still = self._still_path(request) if self.uses_still else ""
         if still and os.path.exists(still):
-            # ``_still_motion`` chooses the Ken Burns pan (cover+crop, default) vs the
+            # ``_still_motion`` chooses the pan (cover+crop, default) vs the
             # FLAT hold (fit+pad, no crop -> a face is never cut) -- the still_flat
             # 'just a still, no motion' contract.
             if getattr(self, "_still_motion", True):
@@ -172,13 +172,13 @@ class AbstractFamily(_CheapFamilyBase):
 
 
 @register
-class StillKenBurnsFamily(_CheapFamilyBase):
-    name = "still_kenburns"
+class StillMotionFamily(_CheapFamilyBase):
+    name = "still_motion"
     family = "static_motion"
     roles = ("scene_broll", "background_abstract", "announcer_visual")
     default_roles = ("scene_broll",)
     required_inputs = ("text_prompt",)
-    uses_still = True               # Ken Burns pan over a provided still when present
+    uses_still = True               # pan over a provided still when present
 
 
 @register
@@ -202,7 +202,7 @@ class StationCardFamily(_CheapFamilyBase):
 
 @register
 class StillPanFamily(_CheapFamilyBase):
-    """A provided still given a slow Ken Burns pan/zoom (cover+crop) for the beat --
+    """A provided still given a slow pan/zoom (cover+crop) for the beat --
     the 'still, but moving' option. CPU/ffmpeg-only, no weights, no VRAM, always
     renders -> commercial-clean. The still is minted by the SEPARATELY-chosen image
     engine; this family only animates it (so it is independent of the image engine).
@@ -218,7 +218,7 @@ class StillPanFamily(_CheapFamilyBase):
     default_roles = ()              # selectable peer; not the in-stack default
     required_inputs = ("text_prompt",)
     commercial_clean = True         # own ffmpeg + the chosen still; no model license
-    uses_still = True               # animate a provided still (Ken Burns pan) when present
+    uses_still = True               # animate a provided still (pan) when present
 
 
 @register
@@ -228,7 +228,7 @@ class StillFlatFamily(_CheapFamilyBase):
     (operator 2026-06-18). Eligible in every role; CPU/ffmpeg-only, no weights, no
     VRAM, always renders -> commercial-clean + validated. ``accepts_still`` so the
     image dispatcher mints the role's selected still for it (the central coverage
-    gate); ``_still_motion=False`` selects the flat hold over the Ken Burns pan."""
+    gate); ``_still_motion=False`` selects the flat hold over the pan."""
     name = "still_flat"
     family = "static_image_gen"
     roles = ("announcer_visual", "music_visual", "character_video",
@@ -242,6 +242,6 @@ class StillFlatFamily(_CheapFamilyBase):
 
 
 __all__ = [
-    "AbstractFamily", "StillKenBurnsFamily", "StationCardFamily",
+    "AbstractFamily", "StillMotionFamily", "StationCardFamily",
     "StillPanFamily", "StillFlatFamily",
 ]

@@ -66,8 +66,10 @@ def _label_for(engine_id) -> str:
 #: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that
 #: still carries the pre-rename name resolves to the current engine so the pick
 #: keeps working. 2026-06-29: flat_still -> still_flat, flux_still -> still_pan
-#: (the misleading "flux" name was dropped -- the engine is ffmpeg, never Flux).
-_LEGACY_ENGINE_ALIASES = {"flat_still": "still_flat", "flux_still": "still_pan"}
+#: (the misleading "flux" name was dropped -- the engine is ffmpeg, never Flux);
+#: still_kenburns -> still_motion (the always-renders radio floor was renamed).
+_LEGACY_ENGINE_ALIASES = {"flat_still": "still_flat", "flux_still": "still_pan",
+                          "still_kenburns": "still_motion"}
 
 
 def _engine_id_from_pick(pick) -> str:

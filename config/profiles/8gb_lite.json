@@ -11,7 +11,7 @@
   "role_overrides": {
     "announcer_visual": "station_card",
     "music_visual": "visualizer",
-    "other_beats_visual": "still_kenburns",
+    "other_beats_visual": "still_motion",
     "announcer_image": "z_image_turbo",
     "music_image": "z_image_turbo",
     "other_beats_image": "z_image_turbo"
@@ -20,7 +20,7 @@
     "char_voice_engine": "bark",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "still_kenburns",
+    "video_render_engine": "still_motion",
     "sequencer_default_tts": "bark"
   },
   "features": {

@@ -6,7 +6,7 @@ Apache-2.0; the larger DA-V2 Base/Large checkpoints are CC-BY-NC and are
 BANNED from this engine -- license gate, 0-E spec), then a pure-numpy
 depth-weighted pixel-shift camera sway rendered through the platform's
 silent bt709 pipeline. Extends the ``static_motion`` cheap family
-(still_kenburns's family): same canvas/timing/still resolution helpers,
+(still_motion's family): same canvas/timing/still resolution helpers,
 same canonical-clip shape, plus a real depth model.
 
 CPU-DEGRADABLE: the model is ~25M params and runs on CPU when no CUDA
@@ -183,7 +183,7 @@ class StillParallaxEngine(_CheapFamilyBase):
     uses_still = True
     #: Declared LOUD fallback (the chain would universal-floor here anyway;
     #: declaring it keeps the degradation explicit + ledger-stampable).
-    fallback_engine = "still_kenburns"
+    fallback_engine = "still_motion"
 
     def __init__(self):
         self._model = None

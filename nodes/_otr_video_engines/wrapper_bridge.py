@@ -514,7 +514,7 @@ def ffmpeg_silent_mp4_cmd(out_path, width, height, fps, *, ffmpeg="ffmpeg", crf=
 
 def ffmpeg_still_motion_cmd(still_path, out_path, width, height, fps, frame_count,
                             *, ffmpeg="ffmpeg", zoom_to=1.08, crf=18):
-    """Ken Burns: a slow zoom over ONE still -> a silent bt709 clip of exactly
+    """Slow pan: a slow zoom over ONE still -> a silent bt709 clip of exactly
     ``frame_count`` frames. The still is scaled to COVER the canvas with one
     uniform scale (no stretch) and centre-cropped, then zoompan eases the zoom."""
     n = max(1, int(frame_count))
@@ -534,7 +534,7 @@ def ffmpeg_still_motion_cmd(still_path, out_path, width, height, fps, frame_coun
 def ffmpeg_still_static_cmd(still_path, out_path, width, height, fps, frame_count,
                             *, ffmpeg="ffmpeg", crf=18, pad_color="black"):
     """Flat hold: ONE still shown STATIC (NO pan/zoom) for exactly ``frame_count``
-    frames -> a silent bt709 clip. Unlike the Ken Burns ``ffmpeg_still_motion_cmd``
+    frames -> a silent bt709 clip. Unlike the slow-pan ``ffmpeg_still_motion_cmd``
     (which scales to COVER + centre-CROPs -> can cut a face), this scales to FIT
     (``force_original_aspect_ratio=decrease``) and PADs (letterboxes) so the WHOLE
     image is always visible and NOTHING is cropped -- the flat-still contract for

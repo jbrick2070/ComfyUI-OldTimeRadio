@@ -23,7 +23,7 @@ from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_shared.fallback import resolve_fallback_chain
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
-# Importing the adapters registers humo / humo_1.7B / still_kenburns so the
+# Importing the adapters registers humo / humo_1.7B / still_motion so the
 # real declared fallback chain can be walked below.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
@@ -162,13 +162,13 @@ def test_restamp_shot_row_is_pure_and_chains_trail():
     assert out["engine_id"] == "humo_1.7B"
     assert out["family"] == "audio_driven_face"
     assert out["degradation_trail"] == ["humo->humo_1.7B (oom)"]
-    out2 = rt.restamp_shot_row(out, to_engine="still_kenburns",
+    out2 = rt.restamp_shot_row(out, to_engine="still_motion",
                                to_family="static_motion",
                                from_engine="humo_1.7B",
                                kind=rt.FailureKind.OOM)
     assert out2["degradation_trail"] == [
-        "humo->humo_1.7B (oom)", "humo_1.7B->still_kenburns (oom)"]
-    assert out2["engine_id"] == "still_kenburns"
+        "humo->humo_1.7B (oom)", "humo_1.7B->still_motion (oom)"]
+    assert out2["engine_id"] == "still_motion"
 
 
 def test_append_runtime_fallback_decision_same_revision_fail_closed():
@@ -220,18 +220,18 @@ def test_real_humo_chain_resolves_and_restamps_to_floor():
     def fallback_of(name):
         return getattr(vreg.get_engine(name), "fallback_engine", None)
     chain = resolve_fallback_chain("humo", fallback_of)
-    assert chain == ["humo", "humo_1.7B", "still_kenburns"]
+    assert chain == ["humo", "humo_1.7B", "still_motion"]
     fam = {"humo": "audio_driven_face", "humo_1.7B": "audio_driven_face",
-           "still_kenburns": "static_motion"}
+           "still_motion": "static_motion"}
     row = {"shot_id": "shot_09", "engine_id": "humo",
            "family": fam["humo"], "degradation_trail": []}
     for frm, to in zip(chain, chain[1:]):
         row = rt.restamp_shot_row(row, to_engine=to, to_family=fam[to],
                                   from_engine=frm, kind=rt.FailureKind.OOM)
-    assert row["engine_id"] == "still_kenburns"
-    assert fallback_of("still_kenburns") is None  # radio floor terminates
+    assert row["engine_id"] == "still_motion"
+    assert fallback_of("still_motion") is None  # radio floor terminates
     assert row["degradation_trail"] == [
-        "humo->humo_1.7B (oom)", "humo_1.7B->still_kenburns (oom)"]
+        "humo->humo_1.7B (oom)", "humo_1.7B->still_motion (oom)"]
 
 
 # --------------------------------------------------------------------------- #

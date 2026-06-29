@@ -321,7 +321,7 @@ def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
     # the ONE place that decides whether a still is actually minted (visualizer /
     # abstract floor -> 0); audio_driven_face (HuMo) keeps its PORTRAIT and ignores
     # the scene still (render_driver family branch) but KEEPS one as OOM-fallback
-    # insurance (humo->still_kenburns needs a scene still). (open b000 added above.)
+    # insurance (humo->still_motion needs a scene still). (open b000 added above.)
     ob = other_beats if isinstance(other_beats, dict) else {}
     pooling = (str(ob.get("clip_mode") or "unique_per_beat") == "pool_n_loop")
     pool_n = int(ob.get("pool_n") or 0)
@@ -800,7 +800,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
             # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
             # so a still_pan beat standing in for a HuMo portrait shows the same
-            # graded look as the scene stills/bookend (still_pan Ken-Burns-
+            # graded look as the scene stills/bookend (still_pan
             # animates the minted PNG, so the PNG must carry the grade). The
             # radio broadcast-distress tail stays scene-still-only (a person is
             # not a radio set). Idempotent -- never duplicates.

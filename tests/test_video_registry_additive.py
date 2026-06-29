@@ -21,7 +21,7 @@ from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 
-CORE_ENGINES = ("humo", "humo_1.7B", "still_kenburns")
+CORE_ENGINES = ("humo", "humo_1.7B", "still_motion")
 
 
 def test_registry_is_the_shared_video_base_instance():

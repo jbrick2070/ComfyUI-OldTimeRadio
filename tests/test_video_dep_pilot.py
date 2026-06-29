@@ -121,7 +121,7 @@ def test_pilot_covers_registered_dep_needing_engines():
 
     names = set(vreg.all_engine_names())
     assert set(PILOT.PROBE_ENGINES) <= names          # every probe entry is registered
-    assert "still_kenburns" not in PILOT.PROBE_ENGINES  # cheap floor: no lib to probe
+    assert "still_motion" not in PILOT.PROBE_ENGINES  # cheap floor: no lib to probe
     assert "humo" in PILOT.PROBE_ENGINES                # a real dep-needing engine
 
 

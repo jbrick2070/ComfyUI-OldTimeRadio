@@ -33,7 +33,7 @@ def test_ltx_av_open_also_healthy():
 def test_procgen_fallback_open_flagged():
     # the 6/15 failure: the announcer/music open rendered on the still floor
     m = _manifest([
-        _row("b000_music_open", "music_visual", "still_kenburns"),
+        _row("b000_music_open", "music_visual", "still_motion"),
         _row("b001", "announcer_visual", "abstract"),
         _row("b002", "character_video", "humo"),    # non-open: ignored
     ])
@@ -53,7 +53,7 @@ def test_clips_zero_open_flagged():
 
 
 def test_strict_mode_raises():
-    m = _manifest([_row("b001", "announcer_visual", "still_kenburns")])
+    m = _manifest([_row("b001", "announcer_visual", "still_motion")])
     with pytest.raises(rd.RenderFloorError):
         rd.check_ltx_open_health(m, strict=True)
     # non-strict only warns (returns the offenders, no raise)
@@ -74,9 +74,9 @@ def test_build_clip_manifest_nonstrict_does_not_raise(monkeypatch):
     result = {
         "ledger": {"video": {"shots": [
             {"shot_id": "s0", "role": "announcer_visual",
-             "engine_id": "still_kenburns", "target_frame_count": 10}]},
+             "engine_id": "still_motion", "target_frame_count": 10}]},
             "lines": []},
-        "clips": {"s0": {"path": "", "engine_id": "still_kenburns"}},
+        "clips": {"s0": {"path": "", "engine_id": "still_motion"}},
         "trace": [],
     }
     man = rd.build_clip_manifest(result, episode_id="e")   # must not raise

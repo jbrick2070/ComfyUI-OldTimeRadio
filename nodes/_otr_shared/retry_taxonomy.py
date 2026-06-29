@@ -5,7 +5,7 @@ and each class has a single deterministic action:
 
 * ``BlockClass.HARD`` -- renderability / safety-integrity failures. The chosen
   engine cannot produce a usable clip for this shot, so the render node walks
-  the declared ``fallback_engine`` chain (humo -> humo_1.7B -> still_kenburns,
+  the declared ``fallback_engine`` chain (humo -> humo_1.7B -> still_motion,
   resolved by :mod:`nodes._otr_shared.fallback`) down to the zero-VRAM radio
   floor, which always succeeds. The swap is LOUD: the node logs it and restamps
   the ledger -- never a silent substitution (operator directive 2026-06-07).

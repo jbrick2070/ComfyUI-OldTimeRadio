@@ -14,7 +14,7 @@ NOT-READY verdict with the exact next steps. ``--run-render`` additionally drive
 the adapter lifecycle and reports the real outcome (the GPU slice raises
 NotImplementedError until the operator wires it -- reported honestly, never a
 pass). For humo it also demonstrates the LOUD humo -> humo_1.7B ->
-still_kenburns fallback restamp on a simulated OOM.
+still_motion fallback restamp on a simulated OOM.
 
 Run on the 5080 AFTER: install the wrapper + ckpts, set the engine's ckpt env,
 ``setx OTR_ENABLE_<ENGINE> 1``, restart ComfyUI. Cold-import clean; UTF-8, no
@@ -94,7 +94,7 @@ def _registry_fallback_of(name):
 
 
 def demonstrate_humo_fallback():
-    """Walk + LOUD-restamp the real humo -> humo_1.7B -> still_kenburns chain on
+    """Walk + LOUD-restamp the real humo -> humo_1.7B -> still_motion chain on
     a simulated OOM (CPU-real; proves the wiring the GPU OOM will trigger)."""
     chain = resolve_fallback_chain("humo", _registry_fallback_of)
     section = {"video_revision": 1, "shots": [], "runtime_fallback_decisions": []}
@@ -106,7 +106,7 @@ def demonstrate_humo_fallback():
         section = _rt.append_runtime_fallback_decision(section, rec)
         logs.append(_rt.format_swap_log(rec))
     return {"chain": chain, "logs": logs,
-            "converges_to_floor": chain[-1] == "still_kenburns",
+            "converges_to_floor": chain[-1] == "still_motion",
             "decisions": section["runtime_fallback_decisions"]}
 
 
@@ -181,7 +181,7 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
 
     if meta["has_fallback"]:
         chain = resolve_fallback_chain(engine, _registry_fallback_of)
-        add("fallback_chain", chain[-1] == "still_kenburns", " -> ".join(chain))
+        add("fallback_chain", chain[-1] == "still_motion", " -> ".join(chain))
 
     try:
         if hasattr(eng, "_build_render_request"):
@@ -228,7 +228,7 @@ def _next_steps(engine):
         "GPU slice): load + render_clip on the 5080.",
         "4. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
         "twice for determinism%s."
-        % (" + exercise the humo -> humo_1.7B -> still_kenburns fallback"
+        % (" + exercise the humo -> humo_1.7B -> still_motion fallback"
            if engine == "humo" else ""),
     ]
 

@@ -51,7 +51,7 @@ string (no new enum value needed).
 ``render_clip()`` raises NAMED NotImplementedError (dark -- the W7 forward).
 
 Fallback chain: all three declare ``fallback_engine = "humo"`` so the chain
-``triposg_talk -> humo -> humo_1.7B -> still_kenburns`` matches
+``triposg_talk -> humo -> humo_1.7B -> still_motion`` matches
 the ``render_driver.SYNTH_FALLBACKS`` overlay WITHOUT requiring a soak re-cert
 now. Trellis-first (chain A: ``trellis_talk -> humo``) defers with its lane.
 

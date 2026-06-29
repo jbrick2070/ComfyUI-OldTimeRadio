@@ -497,8 +497,8 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
     if expect_floor:
         if "humo" in hist or "humo_1.7B" in hist:
             raise SoakFail("floor leg rendered HuMo anyway: %r" % hist)
-        if hist.get("still_kenburns", 0) <= 0:
-            raise SoakFail("floor leg: still_kenburns absent: %r" % hist)
+        if hist.get("still_motion", 0) <= 0:
+            raise SoakFail("floor leg: still_motion absent: %r" % hist)
         print("[soak] FLOOR histogram OK: %r" % hist, flush=True)
     elif expect_engine:
         # TALKING-BEATS-ONLY assert (2026-06-10 marathon refinement): a big

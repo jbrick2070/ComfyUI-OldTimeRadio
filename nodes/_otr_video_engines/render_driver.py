@@ -7,7 +7,7 @@ a HARD failure, classifies it via the A-S7 retry taxonomy, walks the declared
 ``fallback_engine`` chain (resolved by :mod:`nodes._otr_shared.fallback`), and
 restamps the ledger LOUDLY (log the swap + append a ``runtime_fallback_decisions``
 record at the SAME ``video_revision``) until a clip renders. Every chain is
-guaranteed to terminate at the registered radio floor (``still_kenburns``), so an
+guaranteed to terminate at the registered radio floor (``still_motion``), so an
 episode NEVER aborts and a beat is NEVER dropped. The frozen ``ledger['audio']``
 section is read-only throughout (V-1 / the audio spine is frozen).
 
@@ -43,17 +43,17 @@ _LOG = logging.getLogger("OTR.video.render_driver")
 #: (2026-06-18): "visualizer" was removed -- it graduated from a cheap floor stub
 #: to the real procedural CRT engine (eng_visualizer.py), which REQUIRES audio_ref
 #: + ffmpeg and so is NOT a guaranteed always-renders floor terminus.
-FLOOR_NAMES = frozenset({"still_kenburns", "abstract", "station_card",
+FLOOR_NAMES = frozenset({"still_motion", "abstract", "station_card",
                          "still_pan"})
 #: The universal floor terminus appended to any engine whose declared chain
 #: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
 #: -- every chain terminates at a registered radio floor that always renders).
-UNIVERSAL_FLOOR = "still_kenburns"
+UNIVERSAL_FLOOR = "still_motion"
 
 #: Synthetic SOAK-stub fallback. ``soak_oom_3d`` is NOT a real engine -- it is the
 #: soak fixture's stand-in for a heavy character_3d-family engine, forced to OOM so
 #: the harness demonstrates the cross-engine restamp to humo -> humo_1.7B ->
-#: still_kenburns. (The real 3D scaffolds triposg_talk / hunyuan3d_talk /
+#: still_motion. (The real 3D scaffolds triposg_talk / hunyuan3d_talk /
 #: trellis_talk were UNREGISTERED 2026-06-29 (C3); their dead names are gone here.)
 SYNTH_FALLBACKS = {"soak_oom_3d": "humo"}
 # ltx_audio_in declares fallback_engine=None (NO FALLBACKS, 547671d) -> it gets NO
@@ -66,7 +66,7 @@ ENGINE_FAMILY = {
     "soak_oom_3d": "character_3d",       # synthetic soak stub (see SYNTH_FALLBACKS)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
-    "still_kenburns": "static_motion",
+    "still_motion": "static_motion",
     "still_parallax": "static_motion",
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
@@ -84,7 +84,7 @@ _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
-    ("scene_broll", "still_kenburns", "static_motion"),
+    ("scene_broll", "still_motion", "static_motion"),
     ("background_abstract", "abstract", "abstract"),
     ("announcer_visual", "station_card", "static_image_gen"),
 )
@@ -104,7 +104,7 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: The soak is green with this shape; keep the two constants consistent under
 #: the soak_oom_3d stub name, never "fix" one without the other.
 EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
-                      "humo_1.7B->still_kenburns (oom)"]
+                      "humo_1.7B->still_motion (oom)"]
 
 
 class OomSignal(RuntimeError):
@@ -142,7 +142,7 @@ class SoakError(AssertionError):
 def make_fallback_of(synth=None):
     """``fallback_of(name) -> next | None`` over the REAL registry + the synthetic
     B overlay, guaranteeing termination at the radio floor (a dangling engine
-    with no declared fallback degrades to ``still_kenburns``)."""
+    with no declared fallback degrades to ``still_motion``)."""
     overlay = dict(SYNTH_FALLBACKS)
     if synth:
         overlay.update(synth)
@@ -470,7 +470,7 @@ def _mesh_fodder_index(ledger):
 
 
 #: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine
-#: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_kenburns) take
+#: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_motion) take
 #: asset_refs.init_image from the beat's scene still; audio_driven_face keeps
 #: the character portrait; text engines (ltx_video) stay text-only by design.
 _SCENE_INIT_FAMILIES = frozenset({"image_to_video", "static_motion"})
@@ -531,7 +531,7 @@ _OPENING_MUSIC_SUFFIX = "b000_music_open"
 #: negation, total <= 240 chars, first motion verb within the first 140. The
 #: refactor had diluted these into ~185-char scene-DESCRIPTIVE "brief+beat"
 #: prompts ("a 1940s radio station studio, glowing warmly..."), which the model
-#: reads as "render this set" -> flat Ken-Burns pans on the conditioned still.
+#: reads as "render this set" -> flat pans on the conditioned still.
 _LTX_MOTION_PROMPT_BY_ROLE = {
     "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
                   "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
@@ -916,7 +916,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # engines; LOUD if absent (never a silent black). station_card (the other
     # static_image_gen family) is intentionally NOT included here -- its
     # announcer-card behavior is unchanged.
-    # still_pan (Ken Burns) + still_flat (static hold) are the static_image_gen
+    # still_pan (slow pan) + still_flat (static hold) are the static_image_gen
     # "show the selected still" engines -- both condition on the beat's scene still
     # so the operator's chosen image (e.g. flux2_klein) is what's displayed.
     # ltx_audio_in (2026-06-26) JOINS them: it is the unified WIDE audio-in LTX lane
@@ -1116,7 +1116,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # 2026-06-10 + 2026-06-14): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox). LTX/Wan were given
     # the landscape canvas in 2026-06-10, but the still/floor families
-    # (still_pan, station_card, still_kenburns, visualizer) STILL inherited the
+    # (still_pan, station_card, still_motion, visualizer) STILL inherited the
     # 480x832 portrait -> skinny-portrait b-roll pillarboxed in the 16:9 frame
     # (2026-06-14 operator catch on still_pan). Give the composite landscape
     # canvas to every engine EXCEPT the face families: audio_driven_face (HuMo)
@@ -1286,7 +1286,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # anchor carries the LOOK from the FLUX still, so the prompt's only
             # job is to MOVE. The refactor had led with a scene-DESCRIPTIVE
             # subject ("a 1940s radio station studio, glowing warmly...") which
-            # the model reads as "render this set" -> flat Ken-Burns pans on the
+            # the model reads as "render this set" -> flat pans on the
             # conditioned still. An optional short atmosphere fragment appends
             # AFTER the motion verbs, dropped if it breaks the 240-char budget.
             _motion_key = _ltx_motion_role_key(
@@ -1838,7 +1838,7 @@ def check_ltx_open_health(manifest, *, strict=None):
     console opener, incl. the synthetic b000 music_open) that did NOT render on
     an LTX engine. The 6/15 ``eye_of_the_storm`` open was SOFT because the
     episode rendered ZERO LTX clips and the open fell to the by-design procgen /
-    still_kenburns floor at raw 1472x832 (no upscale) -- a SILENT degrade. This
+    still_motion floor at raw 1472x832 (no upscale) -- a SILENT degrade. This
     makes it LOUD: every offending open beat logs a warning; with strict mode
     (env ``OTR_LTX_OPEN_STRICT=1`` or ``strict=True``) it RAISES so a build can
     never ship a procgen-fallback open unnoticed. Pure read of the manifest
@@ -2149,7 +2149,7 @@ def assert_soak_ok(report):
             raise SoakError("%s: not every beat produced a real on-disk clip "
                             "(%d/%d, all_real=%s)"
                             % (tag, f["n_clips"], n, f["all_clips_real"]))
-        if f["oom_final_engine"] != "still_kenburns":
+        if f["oom_final_engine"] != "still_motion":
             raise SoakError("%s: character_3d OOM did not converge to the radio "
                             "floor (got %r)" % (tag, f["oom_final_engine"]))
         if f["oom_trail"] != EXPECTED_OOM_TRAIL:

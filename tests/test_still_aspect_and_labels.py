@@ -132,11 +132,14 @@ def test_renamed_engine_legacy_alias_resolves():
     # Renamed 2026-06-29: a saved graph/ledger that still picks the OLD id resolves
     # to the current engine (flat_still -> still_flat, flux_still -> still_pan; the
     # misleading "flux" name was dropped -- the engine is ffmpeg, never Flux).
+    # still_kenburns -> still_motion (the always-renders radio floor was renamed).
     assert vd._engine_id_from_pick("flat_still") == "still_flat"
     assert vd._engine_id_from_pick("flux_still") == "still_pan"
+    assert vd._engine_id_from_pick("still_kenburns") == "still_motion"
     # ...and the current ids are real registered engines (the menu).
     assert "still_flat" in vreg.all_engine_names()
     assert "still_pan" in vreg.all_engine_names()
+    assert "still_motion" in vreg.all_engine_names()
 
 
 def test_add_custom_sentinel_is_preserved():

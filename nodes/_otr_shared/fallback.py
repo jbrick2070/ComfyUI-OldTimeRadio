@@ -3,7 +3,7 @@
 A video role can degrade at render time when its chosen engine is unusable (OOM,
 missing weights, a load failure): the 14B ``audio_driven_face`` engine HuMo
 degrades to its lighter ``humo_1.7B`` tier, which in turn degrades to the
-in-process radio-floor ``still_kenburns``. Each engine declares a SINGLE next hop
+in-process radio-floor ``still_motion``. Each engine declares a SINGLE next hop
 via a ``fallback_engine`` attribute (``None`` / absent = terminal radio floor);
 this module walks that single-linked chain to the floor.
 

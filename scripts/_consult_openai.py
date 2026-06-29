@@ -159,7 +159,7 @@ ROUND_2_PROMPT = """ROUND 2 of 3 -- Graphical fidelity & replacement modules.
 You've now seen the full Visual stack. Reality check:
 
 - WorldMirror 2.0 is the ONLY shipped Visual 2.0 model. Pano / Stereo / Nav are all "Coming Soon" with no ETA.
-- The current worker.py is in stub mode: it writes solid-color PNGs and uses ffmpeg's `zoompan` filter to make Ken Burns motion clips driven by camera adjectives from the shotlist. That's the visual today.
+- The current worker.py is in stub mode: it writes solid-color PNGs and uses ffmpeg's `zoompan` filter to make slow-pan motion clips driven by camera adjectives from the shotlist. That's the visual today.
 - The design doc Section 11 lists candidate replacement modules: `Diffusion360_ComfyUI` (text -> 360 pano, SDXL-based), `SPAG4D` (pano -> 3DGS, ~6-8 GB VRAM), `ComfyUI-Sharp` (image -> 3DGS, sub-1s, very low VRAM), `SplaTraj` (semantic camera path planning), with `ComfyUI-3D-Pack` as an umbrella.
 - Hardware: RTX 5080 Laptop, 16 GB VRAM, Blackwell sm_120, Windows. Python 3.12, torch 2.10, CUDA 13.0 in main env. Worker runs CPU-only today; GPU work must wait for Bark TTS to finish or coordinate via a VRAM gate.
 - HARD CONSTRAINT: audio output must be byte-identical to v1.7 baseline (C7). Audio is king. Worker must never starve the audio pipeline of VRAM during generation. Bark TTS holds the GPU ~12-18 min per episode.
@@ -168,7 +168,7 @@ YOUR TASKS:
 
 1. **Lowest-risk highest-payoff visual upgrade.** Of the candidate stand-in modules, which single one should land first? Justify in 3 bullets: visual payoff, risk, integration cost.
 
-2. **Sequencing.** Propose a 3-step ladder from today's Ken Burns stub to "real visual fidelity." For each step, name the module + what visual capability it adds + what blocks it from being step 1.
+2. **Sequencing.** Propose a 3-step ladder from today's slow-pan stub to "real visual fidelity." For each step, name the module + what visual capability it adds + what blocks it from being step 1.
 
 3. **Missing modules.** What's NOT in the design doc that I should consider? Specifically:
    - Anchor image generation (the design doc waves a hand at "any text-to-image model"). What's the right local SDXL/Flux pickfor SIGNAL LOST's CRT/broadcast-static aesthetic?

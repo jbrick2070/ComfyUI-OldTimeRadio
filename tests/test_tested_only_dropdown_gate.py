@@ -44,7 +44,7 @@ def test_formerly_hidden_engines_are_now_selectable():
     # Engines the old gate HID (untested-but-registered) are now in the dropdown --
     # registry IS the menu.
     video = {vd._engine_id_from_pick(c) for c in vd._video_model_combo()}
-    assert {"wan_i2v", "still_kenburns", "still_parallax"} <= video
+    assert {"wan_i2v", "still_motion", "still_parallax"} <= video
     image = set(idr._image_model_combo())
     assert "qwen_image" in image
 

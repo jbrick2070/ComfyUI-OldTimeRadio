@@ -11,13 +11,13 @@
   "role_overrides": {
     "announcer_visual": "station_card",
     "music_visual": "visualizer",
-    "other_beats_visual": "still_kenburns"
+    "other_beats_visual": "still_motion"
   },
   "slot_overrides": {
     "char_voice_engine": "bark",
     "announcer_voice_engine": "kokoro",
     "music_engine": "musicgen",
-    "video_render_engine": "still_kenburns",
+    "video_render_engine": "still_motion",
     "sequencer_default_tts": "bark"
   },
   "features": {

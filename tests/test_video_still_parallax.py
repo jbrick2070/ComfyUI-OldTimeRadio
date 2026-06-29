@@ -45,7 +45,7 @@ def test_still_parallax_registered_selectable_not_default():
     assert eng.requires_flag is None           # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is True        # Apache-2.0 SMALL ckpt pinned
-    assert eng.fallback_engine == "still_kenburns"
+    assert eng.fallback_engine == "still_motion"
     assert "still_parallax" in vreg.all_engine_names()   # full dropdown (V-6)
     assert "not real 3D" in eng.honest_label   # the honest 0-E label
     for role in rc.ROLES:                      # never the default for ANY role
@@ -179,7 +179,7 @@ def test_render_clip_missing_still_raises_dependency_missing():
 def test_engine_family_and_fallback_chain_both_copies():
     assert rd.ENGINE_FAMILY["still_parallax"] == "static_motion"
     assert rd.engine_family("still_parallax") == "static_motion"
-    assert rd.make_fallback_of()("still_parallax") == "still_kenburns"
+    assert rd.make_fallback_of()("still_parallax") == "still_motion"
     assert "still_parallax" not in rd.FLOOR_NAMES   # model-gated, NOT a floor
     soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
     spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)

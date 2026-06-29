@@ -2,7 +2,7 @@
 
 The cheap families are the always-succeeds radio floor: render_clip produces the
 platform's silent bt709 / yuv420p clip with ffmpeg (no heavy model). This is the
-fallback-chain terminus the A-S6 chain humo -> humo_1.7B -> still_kenburns
+fallback-chain terminus the A-S6 chain humo -> humo_1.7B -> still_motion
 converges on and the M1 episode's CPU path, so it is proven end-to-end here on the
 build box (ffmpeg present); the ffmpeg-running tests skip cleanly without it.
 UTF-8, no BOM, ASCII-only source.
@@ -25,7 +25,7 @@ _HAS_FFPROBE = shutil.which("ffprobe") is not None
 # 2026-06-18: "visualizer" graduated from a cheap floor stub to the real procedural
 # CRT engine (eng_visualizer.py) -- it is no longer a _CheapFamilyBase, so it is
 # dropped from the cheap-family render matrix (covered by test_video_visualizer.py).
-_FAMILIES = ("abstract", "still_kenburns", "station_card", "still_pan",
+_FAMILIES = ("abstract", "still_motion", "station_card", "still_pan",
              "still_flat")
 
 
@@ -55,18 +55,18 @@ def _has_audio(path):
 
 # --- clip-dict contract + pure helpers (no ffmpeg) ------------------------- #
 def test_floor_clip_contract_shape():
-    eng = vreg.get_engine("still_kenburns")
+    eng = vreg.get_engine("still_motion")
     clip = eng._floor_clip(_req(), "C:/o.mp4", 25, 30)
     assert clip["has_audio"] is False and clip["pixel_format"] == "yuv420p"
     assert clip["color_primaries"] == clip["transfer"] == clip["matrix"] == "bt709"
-    assert clip["engine_id"] == "still_kenburns"
+    assert clip["engine_id"] == "still_motion"
     assert clip["family"] == "static_motion"
     assert clip["frame_count"] == 30 and clip["fps"] == 25 and clip["clip_id"] == "s1"
 
 
-def test_still_flat_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
+def test_still_flat_uses_static_cmd_pan_uses_motion(monkeypatch, tmp_path):
     """still_flat holds the still FLAT (ffmpeg_still_static_cmd: fit+pad, no crop)
-    while still_kenburns pans it (ffmpeg_still_motion_cmd) -- the 'stills, no
+    while still_motion pans it (ffmpeg_still_motion_cmd) -- the 'stills, no
     motion, no face-crop' contract. Asserts WHICH command each engine selects, with
     a real still present (no ffmpeg run -- the builders are stubbed)."""
     from nodes._otr_video_engines import wrapper_bridge as wb
@@ -83,8 +83,8 @@ def test_still_flat_uses_static_cmd_kenburns_uses_motion(monkeypatch, tmp_path):
     vreg.get_engine("still_flat").render_clip(req)
     assert "static" in calls and "motion" not in calls   # flat = NO pan
     calls.clear()
-    vreg.get_engine("still_kenburns").render_clip(req)
-    assert "motion" in calls and "static" not in calls   # ken burns = pan
+    vreg.get_engine("still_motion").render_clip(req)
+    assert "motion" in calls and "static" not in calls   # still_motion = the pan path
 
 
 def test_still_flat_registered_validated_all_roles():
@@ -92,7 +92,7 @@ def test_still_flat_registered_validated_all_roles():
     assert eng.family == "static_image_gen"
     assert eng.commercial_clean is True
     assert getattr(eng, "accepts_still", False) is True   # coverage gate mints its still
-    assert getattr(eng, "_still_motion", True) is False   # flat hold, not ken burns
+    assert getattr(eng, "_still_motion", True) is False   # flat hold, not a pan
     for role in ("announcer_visual", "music_visual", "character_video",
                  "scene_broll", "background_abstract"):
         assert role in eng.roles
@@ -109,14 +109,14 @@ def test_canvas_and_frame_defaults():
 
 
 def test_still_path_extraction():
-    eng = vreg.get_engine("still_kenburns")
+    eng = vreg.get_engine("still_motion")
     assert eng._still_path({"asset_refs": {"init_image": "C:/p.png"}}) == "C:/p.png"
     assert eng._still_path({"asset_refs": {"still": {"path": "C:/s.png"}}}) == "C:/s.png"
     assert eng._still_path({"asset_refs": {}}) == ""
 
 
 def test_uses_still_flags():
-    assert vreg.get_engine("still_kenburns").uses_still is True
+    assert vreg.get_engine("still_motion").uses_still is True
     assert vreg.get_engine("station_card").uses_still is True
     assert vreg.get_engine("still_pan").uses_still is True
     assert vreg.get_engine("abstract").uses_still is False
@@ -156,11 +156,11 @@ def test_each_family_renders_silent_clip(name):
 
 
 @pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
-def test_still_kenburns_over_a_real_still(tmp_path):
+def test_still_motion_over_a_real_still(tmp_path):
     still = tmp_path / "still.png"
     subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x223344:s=80x80",
                     "-frames:v", "1", str(still)], check=True, capture_output=True)
-    eng = vreg.get_engine("still_kenburns")
+    eng = vreg.get_engine("still_motion")
     clip = eng.render_clip(_req(frames=8, asset_refs={"init_image": str(still)}), None)
     p = pathlib.Path(clip["path"])
     try:

@@ -39,7 +39,7 @@ section 1A. Produce a written review only.
   eng_still_parallax.py, the cheap-family / floor render path, and wherever the
   floor writes `otr_floor_*` / `otr_parallax_*` / `otr_ltx_*` temp mp4s),
   `nodes/_otr_shared/capability_profiles.py` (availability/fit logic),
-  `nodes/_otr_shared/fallback.py` (the humo->latentsync->still_kenburns chain),
+  `nodes/_otr_shared/fallback.py` (the humo->latentsync->still_motion chain),
   and the writer post-validator that raises `PostValidationError: V1: key_term ...
   not in source` (search `OTR_LedgerScriptWriter` / "key_term" / "PostValidation").
 - Rendered output to spot-check (open a few): the live server output tree
@@ -50,7 +50,7 @@ section 1A. Produce a written review only.
 ## The three findings to confirm / root-cause / fix
 - **R1 (PRIMARY, hit every full-render leg both passes):** the floor + cheap-family
   video render path leaks `.mp4` files into the system temp dir
-  (`%LOCALAPPDATA%\Temp`) and never cleans them up (`otr_floor_still_kenburns_*`,
+  (`%LOCALAPPDATA%\Temp`) and never cleans them up (`otr_floor_still_motion_*`,
   `otr_floor_<engine>_*`, `otr_parallax_*`, `otr_ltx_*`; ~6/leg). The strict
   hygiene gate (`assert_no_stray_writes`) fails on this even though the episode
   rendered playable with byte-identical master audio. Likely a NamedTemporaryFile

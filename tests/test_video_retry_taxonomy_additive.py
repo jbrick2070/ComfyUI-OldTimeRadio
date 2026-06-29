@@ -132,13 +132,13 @@ def test_append_runtime_fallback_decision_rejects_revision_mismatch():
 def test_restamp_shot_row_is_pure_and_appends_trail():
     row = {"engine_id": "humo", "family": "audio_driven_face"}
     out = rt.restamp_shot_row(
-        row, to_engine="still_kenburns", to_family="static_motion",
+        row, to_engine="still_motion", to_family="static_motion",
         from_engine="humo", kind=rt.FailureKind.OOM)
     assert out is not row
     assert row == {"engine_id": "humo", "family": "audio_driven_face"}
-    assert out["engine_id"] == "still_kenburns"
+    assert out["engine_id"] == "still_motion"
     assert out["family"] == "static_motion"
-    assert out["degradation_trail"] == ["humo->still_kenburns (oom)"]
+    assert out["degradation_trail"] == ["humo->still_motion (oom)"]
 
 
 def test_format_swap_log_is_loud_and_reaffirms_audio_untouched():

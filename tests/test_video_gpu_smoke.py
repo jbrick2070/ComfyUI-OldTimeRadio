@@ -68,9 +68,9 @@ def test_assert_usable_advances_to_missing_model_with_flag_on(monkeypatch):
 def test_humo_fallback_chain_and_demo():
     r = SMK.run_smoke("humo")
     assert _check(r, "fallback_chain")["detail"] == \
-        "humo -> humo_1.7B -> still_kenburns"
+        "humo -> humo_1.7B -> still_motion"
     demo = r["fallback_demo"]
-    assert demo["chain"] == ["humo", "humo_1.7B", "still_kenburns"]
+    assert demo["chain"] == ["humo", "humo_1.7B", "still_motion"]
     assert demo["converges_to_floor"] is True
     assert len(demo["decisions"]) == 2
     assert all(d["block_class"] == "hard" and d["failure_kind"] == "oom"

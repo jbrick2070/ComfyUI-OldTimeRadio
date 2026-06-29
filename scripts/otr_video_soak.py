@@ -10,7 +10,7 @@ SHIPPED A-S7 decision machinery (the retry taxonomy + the fallback-chain
 resolver + the durable LOUD ledger restamp) using an INJECTED fake renderer that
 simulates the OOM. It proves -- without a GPU -- that the episode completes with
 every beat producing a clip, that the character_3d group degrades
-``soak_oom_3d -> humo -> humo_1.7B -> still_kenburns`` (soak_oom_3d is a
+``soak_oom_3d -> humo -> humo_1.7B -> still_motion`` (soak_oom_3d is a
 synthetic soak stub) to the always-succeeds radio floor with a LOUD
 restamp at the SAME ``video_revision``, that the frozen audio section is
 byte-identical before and after, and that two back-to-back runs are
@@ -39,7 +39,7 @@ if _REPO_ROOT not in sys.path:
 from nodes._otr_shared import retry_taxonomy as _rt  # noqa: E402
 from nodes._otr_shared.fallback import resolve_fallback_chain
 from nodes._otr_video_engines import registry as _vreg
-# Register the real engines so the real humo -> humo_1.7B -> still_kenburns
+# Register the real engines so the real humo -> humo_1.7B -> still_motion
 # chain is walked (the character_3d -> humo hop is the synthetic B overlay).
 from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
@@ -57,7 +57,7 @@ ENGINE_FAMILY = {
     "soak_oom_3d": "character_3d",       # synthetic soak stub (see make_fallback_of)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
-    "still_kenburns": "static_motion",
+    "still_motion": "static_motion",
     "still_parallax": "static_motion",
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video",
@@ -71,7 +71,7 @@ _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
-    ("scene_broll", "still_kenburns", "static_motion"),
+    ("scene_broll", "still_motion", "static_motion"),
     ("background_abstract", "abstract", "abstract"),
     ("announcer_visual", "station_card", "static_image_gen"),
 )
@@ -137,7 +137,7 @@ def make_fallback_of():
     """Return a ``fallback_of(name) -> next | None`` over the REAL registry plus
     the synthetic ``soak_oom_3d -> humo`` hop.
 
-    humo -> humo_1.7B -> still_kenburns come from the live adapters'
+    humo -> humo_1.7B -> still_motion come from the live adapters'
     ``fallback_engine``; ``soak_oom_3d`` is a synthetic soak stub (NOT a real
     engine -- the real 3D scaffolds were unregistered 2026-06-29, C3), so its hop
     to humo is overlaid here. A floor engine returns ``None`` (terminal).
@@ -243,7 +243,7 @@ def run_two_episode_soak(*, n_beats: int = 40, oom_index: int = 20) -> dict:
 #: an intra-engine tier swap and only 2 decisions appear -- semantics
 #: preserved per the 3D plan 7.0 judge ruling).
 EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
-                      "humo_1.7B->still_kenburns (oom)"]
+                      "humo_1.7B->still_motion (oom)"]
 
 
 def _episode_facts(epresult: dict, meta: dict) -> dict:
@@ -274,7 +274,7 @@ def assert_soak_ok(result: dict):
         if f["n_clips"] != n or not f["all_clips"]:
             raise SoakError("%s: not every beat produced a clip (%d/%d)"
                             % (tag, f["n_clips"], n))
-        if f["oom_final_engine"] != "still_kenburns":
+        if f["oom_final_engine"] != "still_motion":
             raise SoakError("%s: character_3d OOM did not converge to the radio "
                             "floor (got %r)" % (tag, f["oom_final_engine"]))
         if f["oom_trail"] != EXPECTED_OOM_TRAIL:
@@ -317,7 +317,7 @@ GPU_GATE_MESSAGE = (
     "On the 5080, wire the live OTR_VideoRenderBatch + the real engines and run "
     "this same 40-beat all-roles fixture end-to-end TWICE back-to-back, with:\n"
     "  - a real mid-episode character_3d OOM -> humo -> humo_1.7B -> "
-    "still_kenburns convergence (LOUD restamp in the ledger);\n"
+    "still_motion convergence (LOUD restamp in the ledger);\n"
     "  - VRAM peak <= 14.5 GB at every inter-engine boundary;\n"
     "  - render-twice determinism (identical per-shot request_hash);\n"
     "  - tests/test_audio_byte_identical.py GREEN (output audio PCM sha == the "

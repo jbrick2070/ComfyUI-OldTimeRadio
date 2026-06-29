@@ -23,7 +23,7 @@ from nodes._otr_video_engines import render_driver as rd
 # --------------------------------------------------------------------------- #
 def test_engine_family_known_and_unknown():
     assert rd.engine_family("humo") == "audio_driven_face"
-    assert rd.engine_family("still_kenburns") == "static_motion"
+    assert rd.engine_family("still_motion") == "static_motion"
     assert rd.engine_family("totally_unknown_xyz") == "abstract"
     assert rd.engine_family("totally_unknown_xyz", default="static_motion") == (
         "static_motion")
@@ -78,7 +78,7 @@ def test_make_fallback_of_overlay_and_terminus():
     fb = rd.make_fallback_of(synth={"custom_engine": "humo"})
     assert fb("custom_engine") == "humo"
     assert fb("soak_oom_3d") == "humo"                  # default synth soak-stub overlay
-    assert fb("still_kenburns") is None                 # floor is terminal
+    assert fb("still_motion") is None                 # floor is terminal
     assert fb("zzz_not_registered_nonfloor") == rd.UNIVERSAL_FLOOR
 
 
@@ -515,9 +515,9 @@ def test_apply_engine_override_rewrites_by_role(monkeypatch):
 
 def test_apply_engine_override_star_and_noenv(monkeypatch):
     led = _two_shot_ledger()
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=still_kenburns")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=still_motion")
     out = rd.apply_engine_override(led)
-    assert all(s["engine_id"] == "still_kenburns"
+    assert all(s["engine_id"] == "still_motion"
                for s in out["video"]["shots"])
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     led2 = _two_shot_ledger()
@@ -647,7 +647,7 @@ def test_built_character_3d_request_is_schema_valid():
     # the soak/global-assets builder is schema-valid too
     soak_req = rd.build_request(
         {"shot_id": "shot_0003", "role": "scene_broll",
-         "engine_id": "still_kenburns", "family": "static_motion"},
+         "engine_id": "still_motion", "family": "static_motion"},
         {"init_image": "p.png", "audio_ref": "a.wav"}, 25)
     VideoRequest.model_validate(soak_req)
 

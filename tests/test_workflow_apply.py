@@ -249,7 +249,7 @@ def test_patch_creative_refuses_managed_engine_widget(schemas, master_copy):
     director = [n for n in master_copy["nodes"] if n["type"] == "OTR_VideoDirector"][0]
     with pytest.raises(ProfileError, match="not on the creative whitelist"):
         wa.patch_creative(master_copy, director["id"], "announcer_video_model",
-                          "still_kenburns", schemas=schemas)
+                          "still_motion", schemas=schemas)
 
 
 # ---------------------------------------------------------------------------

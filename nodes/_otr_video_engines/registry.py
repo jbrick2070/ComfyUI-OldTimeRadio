@@ -127,7 +127,7 @@ __all__.append("EngineCore")
 CAPABILITIES = {
     "abstract": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                  "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "still_kenburns": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "still_motion": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "station_card": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},

@@ -18,7 +18,7 @@ No model is "primary" -- HuMo is one peer adapter among the motion engines.
 
 Fallback: a render-time failure degrades the 14B HuMo to its ``fallback_engine``
 (the lighter ``humo_1.7B`` tier), which degrades to the zero-VRAM
-``still_kenburns`` radio floor; the chain ``humo -> humo_1.7B -> still_kenburns``
+``still_motion`` radio floor; the chain ``humo -> humo_1.7B -> still_motion``
 is acyclic and terminates (see
 ``nodes/_otr_shared/fallback.py``). The audio that drives HuMo is the FROZEN
 master; HuMo emits an ALWAYS-SILENT clip (``has_audio`` False) -- only
@@ -114,7 +114,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: Family-degradation next hop. The 14B keystone degrades FIRST to the 1.7B
     #: HuMo tier -- a real talking face that fits a tighter VRAM budget -- on an
     #: OOM/VRAM (or any HARD) failure, ONLY then to the zero-VRAM still
-    #: floor: humo -> humo_1.7B -> still_kenburns (operator hard
+    #: floor: humo -> humo_1.7B -> still_motion (operator hard
     #: auto-downgrade rule 2026-06-09; see nodes/_otr_shared/fallback.py). One
     #: single-linked hop per engine; the LOUD restamp happens in the render node.
     fallback_engine = "humo_1.7B"
@@ -497,11 +497,11 @@ class HuMo17BEngine(HuMoEngine):
     and cfg 1.0, dropped from 5.0 which produced a blue colour cast, fixed
     2026-06-17). Shares roles / required_inputs / requires_flag / the in-process
     graph topology with the 14B base; only the tier config differs. Degrades on
-    to the zero-VRAM still floor (humo -> humo_1.7B -> still_kenburns)."""
+    to the zero-VRAM still floor (humo -> humo_1.7B -> still_motion)."""
 
     name = "humo_1.7B"
     engine_version = "1"
-    fallback_engine = "still_kenburns"
+    fallback_engine = "still_motion"
 
     def _ckpt_path(self):
         env = os.environ.get("OTR_HUMO_17B_CKPT")

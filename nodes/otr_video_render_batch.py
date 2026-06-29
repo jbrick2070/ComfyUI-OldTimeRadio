@@ -3,7 +3,7 @@ video engines via :mod:`nodes._otr_video_engines.render_driver` (A-S7.5).
 
 Three modes: ``soak`` runs the full-episode A-S7.5 soak (the A-ship gate -- 40
 beats, all roles, a forced mid-episode character_3d OOM converging
-triposg_talk -> humo -> humo_1.7B -> still_kenburns with LOUD
+triposg_talk -> humo -> humo_1.7B -> still_motion with LOUD
 restamps, run TWICE back-to-back for determinism, frozen audio untouched);
 ``single`` renders
 ONE shot via one engine (the focused in-process forward validation); ``episode``

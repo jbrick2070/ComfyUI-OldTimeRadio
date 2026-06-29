@@ -24,23 +24,23 @@ def test_fallback_chain_character3d_converges_to_floor():
     fb = rd.make_fallback_of()
     # soak_oom_3d is the synthetic soak stub (C3 -- the real 3D scaffolds are
     # unregistered): it resolves to humo via the overlay, then the registry walks
-    # humo -> humo_1.7B -> still_kenburns.
+    # humo -> humo_1.7B -> still_motion.
     chain = resolve_fallback_chain("soak_oom_3d", fb)
-    assert chain == ["soak_oom_3d", "humo", "humo_1.7B", "still_kenburns"]
+    assert chain == ["soak_oom_3d", "humo", "humo_1.7B", "still_motion"]
 
 
 def test_fallback_dangling_engine_gets_universal_floor():
     fb = rd.make_fallback_of()
     # ltx_video / wan_i2v declare no fallback_engine -> the driver appends the
     # registered radio floor so the chain never dangles (survival BUG 12.23).
-    assert resolve_fallback_chain("ltx_video", fb) == ["ltx_video", "still_kenburns"]
-    assert resolve_fallback_chain("wan_i2v", fb) == ["wan_i2v", "still_kenburns"]
+    assert resolve_fallback_chain("ltx_video", fb) == ["ltx_video", "still_motion"]
+    assert resolve_fallback_chain("wan_i2v", fb) == ["wan_i2v", "still_motion"]
 
 
 def test_fallback_floor_is_terminal():
     fb = rd.make_fallback_of()
-    assert fb("still_kenburns") is None
-    assert resolve_fallback_chain("still_kenburns", fb) == ["still_kenburns"]
+    assert fb("still_motion") is None
+    assert resolve_fallback_chain("still_motion", fb) == ["still_motion"]
 
 
 def test_classify_failure_is_always_hard():
@@ -74,14 +74,14 @@ def _passing_episode(n, oom_sid):
          "to_engine": "humo", "failure_kind": "oom", "block_class": "hard",
          "video_revision": 1},
         {"shot_id": oom_sid, "from_engine": "humo_1.7B",
-         "to_engine": "still_kenburns", "failure_kind": "oom",
+         "to_engine": "still_motion", "failure_kind": "oom",
          "block_class": "hard", "video_revision": 1},
     ]
     trace = [{"shot_id": "shot_%04d" % i, "attempts": ["x"],
               "final_engine": "x"} for i in range(n)]
     return {
         "n_clips": n, "all_clips_real": True,
-        "oom_final_engine": "still_kenburns", "oom_trail": rd.EXPECTED_OOM_TRAIL,
+        "oom_final_engine": "still_motion", "oom_trail": rd.EXPECTED_OOM_TRAIL,
         "decisions": decisions, "video_revision": 1,
         "audio_sha": rd.FROZEN_AUDIO_SHA, "humo_rendered": 2,
         "vram_peak_mb": 10000, "trace": trace, "clips": {},

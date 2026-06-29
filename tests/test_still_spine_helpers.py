@@ -676,7 +676,7 @@ class TestDispatcherStillSpine:
                     "char_id": "c01", "creative": {}}
 
         # static_motion + image_to_video -> scene still
-        for eng, fam in (("still_kenburns", "static_motion"),
+        for eng, fam in (("still_motion", "static_motion"),
                          ("wan_i2v", "image_to_video")):
             req = rd.build_request_from_shot(shot(eng, fam), ledger)
             assert req["observability"]["init_source"] == "scene_still", eng
@@ -756,13 +756,13 @@ class TestDispatcherStillSpine:
         # never the scene still (asset_refs omits an empty init_image key)
         assert req2["asset_refs"].get("init_image", "") != str(scene)
 
-    def test_st5_kenburns_reads_driver_built_request(self, tmp_path):
+    def test_st5_still_motion_reads_driver_built_request(self, tmp_path):
         """ST-5/W6 pin: the request the DRIVER builds for a static_motion
-        shot is readable by still_kenburns' own _still_path (the ST-0 probe,
+        shot is readable by still_motion' own _still_path (the ST-0 probe,
         locked as a test) -- the 6/5 conditioned look ships through this
         seam with zero new GPU risk."""
         from nodes._otr_video_engines import render_driver as rd
-        from nodes._otr_video_engines.cheap_families import StillKenBurnsFamily
+        from nodes._otr_video_engines.cheap_families import StillMotionFamily
         still = tmp_path / "still_b001_xyz.png"
         still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
         ledger = {
@@ -772,11 +772,11 @@ class TestDispatcherStillSpine:
                 {"object_id": "still_b001", "kind": "scene_open",
                  "beat_id": "b001", "path": str(still)}]},
         }
-        shot = {"shot_id": "shot_b001", "engine_id": "still_kenburns",
+        shot = {"shot_id": "shot_b001", "engine_id": "still_motion",
                 "family": "static_motion", "target_frame_count": 25,
                 "source_line_ids": ["b001"], "char_id": "", "creative": {}}
         req = rd.build_request_from_shot(shot, ledger)
-        eng = StillKenBurnsFamily()
+        eng = StillMotionFamily()
         assert eng.uses_still is True
         assert eng._still_path(req) == str(still)
 

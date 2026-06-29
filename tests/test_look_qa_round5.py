@@ -164,7 +164,7 @@ class TestPerBeatScenePrompts:
     def test_open_leads_with_motion_not_subject(self, monkeypatch):
         # 6/5 BUG-LOCAL-112: the i2v still carries the LOOK; the video prompt is
         # MOTION-ONLY -> it leads with the motion frame, NOT the set subject
-        # (the pre-112 dilution that caused flat Ken-Burns pans).
+        # (the pre-112 dilution that caused flat pans).
         monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
         led = _scene_ledger()
         p = _rd.build_request_from_shot(

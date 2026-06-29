@@ -5,7 +5,7 @@ shipped A-S7 decision machinery TWICE back-to-back, forcing a mid-episode OOM on
 the character_3d group. These tests pin: the fixture shape (all roles + families,
 one character_3d group), that every beat produces a clip, that the character_3d
 group converges triposg_talk -> humo -> humo_1.7B ->
-still_kenburns (W7-pre: triposg_talk is the v1 3D lane) to the radio floor with
+still_motion (W7-pre: triposg_talk is the v1 3D lane) to the radio floor with
 LOUD restamps at the SAME video_revision, that the frozen
 audio section is byte-identical after the run, that two runs are deterministic
 with no carryover, and (negative control) that a floor that cannot render fails
@@ -74,11 +74,11 @@ def test_character_3d_oom_converges_to_floor_with_three_restamps():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
     sec = result["e1"]["ledger"]["video"]
     oom = {s["shot_id"]: s for s in sec["shots"]}[result["meta"]["oom_shot_id"]]
-    assert oom["engine_id"] == "still_kenburns"      # converged to the radio floor
+    assert oom["engine_id"] == "still_motion"      # converged to the radio floor
     assert oom["family"] == "static_motion"
     assert oom["degradation_trail"] == SOAK.EXPECTED_OOM_TRAIL
     decisions = sec["runtime_fallback_decisions"]
-    # 3 hops now: triposg_talk -> humo -> humo_1.7B -> still_kenburns
+    # 3 hops now: triposg_talk -> humo -> humo_1.7B -> still_motion
     assert len(decisions) == 3
     assert all(d["failure_kind"] == "oom" and d["block_class"] == "hard"
                and d["video_revision"] == 1 for d in decisions)
@@ -89,7 +89,7 @@ def test_every_beat_renders_including_around_the_oom():
     clips = result["e1"]["clips"]
     assert len(clips) == 40 and all(clips.values())
     assert clips["shot_0000"]["ok"] and clips["shot_0039"]["ok"]   # mid-episode OOM
-    assert clips["shot_0020"]["engine_id"] == "still_kenburns"     # the OOM beat
+    assert clips["shot_0020"]["engine_id"] == "still_motion"     # the OOM beat
 
 
 def test_frozen_audio_is_byte_identical_after_soak():
@@ -124,7 +124,7 @@ def test_floor_failure_raises_soakerror():
     ledger = SOAK.build_full_ledger(section)
     fb = SOAK.make_fallback_of()
     bad = SOAK.SoakRenderer(meta["oom_shot_id"],
-                            SOAK.OOM_ENGINES | {"still_kenburns"})
+                            SOAK.OOM_ENGINES | {"still_motion"})
     with pytest.raises(SOAK.SoakError):
         SOAK.run_episode_soak(ledger, fallback_of=fb, renderer=bad)
 

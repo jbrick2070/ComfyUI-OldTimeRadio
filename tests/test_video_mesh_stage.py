@@ -321,10 +321,10 @@ def test_engine_family_fallback_chain_both_copies():
     assert rd.ENGINE_FAMILY["mesh_stage"] == "image_to_video"
     assert rd.engine_family("mesh_stage") == "image_to_video"
     fb = rd.make_fallback_of()
-    # E-5: the LOUD chain mesh_stage -> still_parallax -> still_kenburns.
+    # E-5: the LOUD chain mesh_stage -> still_parallax -> still_motion.
     assert fb("mesh_stage") == "still_parallax"
-    assert fb("still_parallax") == "still_kenburns"
-    assert fb("still_kenburns") is None        # the floor terminates
+    assert fb("still_parallax") == "still_motion"
+    assert fb("still_motion") is None        # the floor terminates
     soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
     spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)
     soak = importlib.util.module_from_spec(spec)

@@ -16,6 +16,14 @@
 > Legacy alias in `_engine_id_from_pick` so old saved picks/ledgers still resolve. Full suite 5729/0,
 > Bug Bible 16/3xfail, B7 green; guard + alias regression tests lock it. PUSHED to v2.0-alpha.
 >
+> **FOLLOW-UP-2 (2026-06-29): all "ken burns" refs REMOVED** -- the universal-floor engine
+> `still_kenburns -> still_motion` (matches its `static_motion` family; KEPT as the always-renders floor +
+> scene_broll default -- NOT retired). Updated the 5 `fallback_engine` chains + UNIVERSAL_FLOOR / FLOOR_NAMES
+> / ENGINE_FAMILY / soak OOM-trail / oom-final-engine + the 8gb_lite & cpu_floor profiles + the soak/gpu-smoke
+> harnesses; scrubbed every "Ken Burns" comment -> "pan". Legacy alias still_kenburns -> still_motion added so
+> old saved graphs that picked the floor still open (that alias KEY is the only remaining literal). Full
+> suite 5729/0, Bug Bible 16/3xfail, B7 green. PUSHED to v2.0-alpha.
+>
 > CODE-READY PLAN (kibitz-hardened, 2 grounded rounds Codex+Antigravity -> the AUTHORITATIVE spec is
 > `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`; problem framing in `docs/2026-06-29-dropdown-optin/`).
 > Sequenced, suite+BugBible+B7 green AND push per green chunk to v2.0-alpha:

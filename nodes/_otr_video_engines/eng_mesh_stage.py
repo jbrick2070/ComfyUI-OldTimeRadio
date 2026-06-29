@@ -312,7 +312,7 @@ class MeshStageEngine(_CheapFamilyBase):
     #: never required_inputs/uses_still (those also catch Wan/LTX/still engines).
     #: Any future single-image-subject 3D mesher declares it too.
     requires_mesh_fodder = True
-    #: E-5 LOUD fallback chain: mesh_stage -> still_parallax -> still_kenburns
+    #: E-5 LOUD fallback chain: mesh_stage -> still_parallax -> still_motion
     #: (each hop restamps the ledger; the chain composes via fallback_engine).
     fallback_engine = "still_parallax"
 

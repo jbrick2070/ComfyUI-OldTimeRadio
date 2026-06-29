@@ -319,7 +319,7 @@ portrait resolves from the portrait index and per-beat audio is sliced from the
 frozen master (`render_driver.py:657-746`). HuMo receives both `init_image` and
 `audio_ref`; the demotion happens at LOAD/FORWARD time and is caught by the
 fallback loop (`render_driver.py:1106-1133`), which restamps LOUD and walks
-`humo -> humo_1.7B -> latentsync -> still_kenburns`.
+`humo -> humo_1.7B -> latentsync -> still_motion`.
 
 **The finding splits into EXPECTED behavior and a REAL must-root-cause item:**
 
@@ -368,7 +368,7 @@ VRAM discipline; must be GPU-soaked (single resident heavy <= 14.5 GB, audio
 byte-identical) before shipping.
 
 **Regression test.** GPU-smoke (operator lane): after a HuMo beat, assert the
-trace row `final_engine == "humo_1.7B"` (real talking face, not `still_kenburns`)
+trace row `final_engine == "humo_1.7B"` (real talking face, not `still_motion`)
 for a fixed-seed 1-beat episode within 14.5 GB. CPU-side: assert a
 character_video request carrying `init_image` + `audio_ref` satisfies
 `_assert_family_inputs_satisfiable("humo", req)` (guards against an input-gate
@@ -413,7 +413,7 @@ finals per slot to confirm the aesthetic call.
 
 | Slot | Default | Selectable-not-default | Rationale |
 |---|---|---|---|
-| announcer_visual | `flux_still` | `station_card`, `still_parallax` | flux_still rendered native portrait beats reliably with zero heavy video-phase VRAM (the Flux gen happens in the image phase; the video slot only Ken-Burns-animates the minted still). station_card is the lighter card look; still_parallax adds subtle motion. |
+| announcer_visual | `flux_still` | `station_card`, `still_parallax` | flux_still rendered native portrait beats reliably with zero heavy video-phase VRAM (the Flux gen happens in the image phase; the video slot only pan-animates the minted still). station_card is the lighter card look; still_parallax adds subtle motion. |
 | music_visual | `visualizer` | `ltx_orbit` (premium motion), `abstract` | visualizer/abstract are zero-VRAM procedural and rendered 1/1 native, bulletproof. ltx_orbit also rendered 1/1 with the best motion but loads LTX in-process -- premium-selectable until R1 lands and a longer soak confirms headroom. Avoid mesh_stage (demotes to parallax). |
 | other_beats_visual (character) | `flux_still` | `still_parallax` (motion look) | flux_still rendered 3/3 native character beats, still_parallax 3/3 native. Both reliable, good look, no heavy video-phase VRAM. |
 
