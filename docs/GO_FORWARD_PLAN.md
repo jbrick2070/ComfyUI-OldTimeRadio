@@ -1,11 +1,12 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS (handoff @ HEAD `5afde8fb` ==
-> origin/v2.0-alpha). prod/main + tags GATED. NEXT = C6 (S5 scan two-principals). C4+C5 SHIPPED.**
-> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1-C5 SHIPPED + pushed. C4 body-gate `041d28d8`
-> + C5 (S4 cliche exact-span replace) `5afde8fb`: suite 5758/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST
-> verified. Remaining: C6 (S5 scan two-principals) -> the 1-local+1-grok acceptance render. node-87
-> other_beats SETTLED = keep `humo_1.7B` (operator 2026-06-28; both stay selectable). C6 PINPOINTED below.
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD CODE-COMPLETE (C1-C6 SHIPPED; handoff @ HEAD
+> `343e0868` == origin/v2.0-alpha). prod/main + tags GATED. NEXT = the 1-local + 1-grok ACCEPTANCE RENDER.**
+> WHERE WE ARE (this session): baseline UI-save reds FIXED + C1-C6 SHIPPED + pushed (story-quality build
+> CODE-COMPLETE). C4 body-gate `041d28d8` + C5 cliche span-replace `5afde8fb` + C6 (S5 scan register_overlap
+> = two principals by line count) `343e0868`: suite 5759/0, Bug Bible 16/3xfail, B7 green, no-BOM/AST verified.
+> Remaining: the 1-local + 1-grok ACCEPTANCE RENDER (GPU; report voiced-word counts -- the length experiment).
+> node-87 other_beats SETTLED = keep `humo_1.7B` (operator 2026-06-28; both stay selectable).
 > - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
 >   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
 >   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
@@ -34,7 +35,7 @@
 >   reroll loop -- do NOT add a second compose path. **C5 (S4) SHIPPED `5afde8fb`** = find_cliche_phrase exact-span replacement
 >   before EVERY quality-gate return path (kept-reroll AND kept-original) in _otr_line_composer L~2515, curated
 >   safe-replacement map (case-match) + the _quality_repair_attempted guard; else accept 2nd-best + stamp
->   `cliche_shipped_after_reroll`. **C6 (S5)** = story_quality_scan two principals = top-2 by dialogue-line
+>   `cliche_shipped_after_reroll`. **C6 (S5) SHIPPED `343e0868`** = story_quality_scan two principals = top-2 by dialogue-line
 >   count (wants are verb phrases, no name parse); update test_story_quality_scan_r2 expected register_overlap.
 >   Then the 1-local + 1-grok acceptance render (report voiced-word counts; the length experiment).
 > - **C2 shipped** (`75930608`): G1 gate de-compression -- `_QUALITY_COLLAPSE_HINT_V2` (non-compressing,
@@ -96,7 +97,7 @@
 See the CURRENT STEP block at the TOP of this file -- 2026-06-28: the 3-way story-quality
 kibitz CONVERGED -> build-ready `kibitz-runs/2026-06-28-story-quality/final.md` (G1 lead:
 the line-compression gates over-correct -> length+craft one root cause; v2-gated 6-commit
-plan; S1 deferred, S6 cut). C1-C5 SHIPPED (HEAD `5afde8fb`); NEXT = C6 (S5 scan two-principals) -> acceptance render.
+plan; S1 deferred, S6 cut). C1-C6 SHIPPED (HEAD `343e0868`); NEXT = the 1-local + 1-grok ACCEPTANCE RENDER.
 
 Older ACTIVE/SUPERSEDED step history -> `docs/GO_FORWARD_ARCHIVE.md`.
 
