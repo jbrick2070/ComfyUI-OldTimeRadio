@@ -1096,15 +1096,8 @@ class TestL2AuthoringContract:
     _OBJ = "Objective: get Marlowe to confess"
     _DEFLECT = "this line IS the deflection"
 
-    def test_flag_off_emits_objective_byte_identical(self):
-        """Default (flag off): the Objective is emitted and no deflection
-        directive appears -- pre-R3 prompt unchanged."""
-        p = _build_user_prompt(_l2_req(story_quality_v2_enabled=False))
-        assert "Objective: get Marlowe to confess" in p
-        assert self._DEFLECT not in p
-
     def test_flag_on_high_tension_withholds_objective_and_injects(self):
-        p = _build_user_prompt(_l2_req(story_quality_v2_enabled=True))
+        p = _build_user_prompt(_l2_req())
         assert "Objective: get Marlowe to confess" not in p
         assert self._DEFLECT in p
         # the dramatic content the model still needs is retained
@@ -1114,14 +1107,14 @@ class TestL2AuthoringContract:
     def test_flag_on_low_tension_keeps_objective(self):
         """Below OBJECTIVE_DEFLECTION_TENSION_MIN the gate does not fire."""
         p = _build_user_prompt(
-            _l2_req(story_quality_v2_enabled=True, beat_tension=3)
+            _l2_req(beat_tension=3)
         )
         assert "Objective: get Marlowe to confess" in p
         assert self._DEFLECT not in p
 
     def test_flag_on_no_subtext_keeps_objective(self):
         p = _build_user_prompt(
-            _l2_req(story_quality_v2_enabled=True, beat_subtext="")
+            _l2_req(beat_subtext="")
         )
         assert "Objective: get Marlowe to confess" in p
         assert self._DEFLECT not in p
@@ -1130,7 +1123,7 @@ class TestL2AuthoringContract:
         """Only character beats deflect -- an announcer-role beat is untouched
         even under the flag at high tension."""
         p = _build_user_prompt(
-            _l2_req(story_quality_v2_enabled=True, speaker_role="announcer")
+            _l2_req(speaker_role="announcer")
         )
         assert "Objective: get Marlowe to confess" in p
         assert self._DEFLECT not in p
@@ -1139,11 +1132,11 @@ class TestL2AuthoringContract:
         from nodes._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN as MIN
         # exactly at the threshold the gate fires
         p = _build_user_prompt(
-            _l2_req(story_quality_v2_enabled=True, beat_tension=MIN)
+            _l2_req(beat_tension=MIN)
         )
         assert self._DEFLECT in p
         # one below it does not
         p2 = _build_user_prompt(
-            _l2_req(story_quality_v2_enabled=True, beat_tension=MIN - 1)
+            _l2_req(beat_tension=MIN - 1)
         )
         assert self._DEFLECT not in p2

@@ -55,7 +55,11 @@ class TestComposeNewsCoda:
         assert "landed safely" not in usermsg.lower()
         assert "A keeper waits for a ship" in usermsg          # premise passed
         assert "lamp turns over black water" in usermsg.lower()  # safe intro tone
-        assert sysmsg == LC._NEWS_CODA_SYSTEM
+        # story-quality v2 (baked in): the sent system message is the base
+        # _NEWS_CODA_SYSTEM contract with the few-shot _NEWS_CODA_SYSTEM_V2_EXAMPLES
+        # appended (the base constant is never mutated).
+        assert sysmsg.startswith(LC._NEWS_CODA_SYSTEM)
+        assert "Examples (tonight's tale -> your bridge clause):" in sysmsg
 
     def test_generic_opener_retries_then_floor(self):
         cap = []

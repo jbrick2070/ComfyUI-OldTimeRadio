@@ -58,8 +58,11 @@ def _req():
 
 
 class TestReroll:
-    @pytest.mark.parametrize("dirty", [_CLICHE, _BUSINESS])
-    def test_flagged_draft_rerolls(self, dirty):
+    @pytest.mark.parametrize("dirty, retry_flag", [
+        (_CLICHE, "cliche_retry"),
+        (_BUSINESS, "stage_business_retry"),
+    ])
+    def test_flagged_draft_rerolls(self, dirty, retry_flag):
         calls = {"n": 0}
 
         def mock(messages, *, temperature, max_new_tokens):
@@ -67,8 +70,13 @@ class TestReroll:
             return dirty if calls["n"] == 1 else _CLEAN
 
         res = compose_line(creative_fn=mock, req=_req())
+        # The flagged draft triggers EXACTLY one reroll and stamps the quality
+        # retry breadcrumb. story-quality v2 (baked in): whether the reroll's
+        # output ships is decided by line_quality_defect_score (keep only if it
+        # STRICTLY reduces defects; tie keeps the original), so the shipped text
+        # is not asserted here -- the contract under test is the single reroll.
         assert calls["n"] == 2          # one reroll
-        assert res.text == _CLEAN
+        assert retry_flag in res.compose_flags
 
     def test_clean_draft_no_reroll(self):
         calls = {"n": 0}

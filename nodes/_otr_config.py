@@ -10,27 +10,23 @@ The dialogue-craft spine (L1 objective-literal gate, L2 authoring contract,
 L7 dialogue|action split, + telemetry) is gated behind a SINGLE per-episode
 feature flag carried on the ledger meta:
 
-    meta["story_quality_v2_enabled"]  (bool, BAKED IN -- always True)
+    meta["story_quality_v2_enabled"]  (bool telemetry -- always True)
 
-BAKED IN (operator 2026-06-28): the writer always stamps this True -- the craft
-spine IS the engine, there is NO env kill-switch and no user-facing on/off lever.
-The flag + the ``story_quality_v2_enabled`` helper remain only as an internal
-seam so unit tests can still construct a LineRequest with it False to lock the
-individual leaf behaviors; production always runs the v2 path.
+BAKED IN (operator 2026-06-28): the craft spine IS the engine and runs
+unconditionally -- there is no feature flag, no env lever, no LineRequest field,
+and no on/off branch anywhere; it can never be turned off. The ledger meta key
+above is kept ONLY as a telemetry record that the v2 engine ran (nothing
+branches on it).
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-# Default state of the story-quality-v2 spine -- BAKED IN (operator 2026-06-28).
-# 2026-06-23 flipped it True (R3 soak: stable, ~0 continuity issues). 2026-06-28
-# the C1-C6 craft build (body-gate text-score, cliche span-repair, one-breath
-# cap, coda bridge, two-principal scan) proved a real LIFT in the acceptance soak
-# (~450-500 voiced words vs the old ~210-310 ceiling, zero cliche/on-the-nose/
-# register defects), so the OTR_STORY_QUALITY_V2 kill-switch was REMOVED -- v2 is
-# the engine now, never off. This default stays True for the helper's
-# missing-key fallback.
-STORY_QUALITY_V2_DEFAULT: bool = True
+# Story-quality v2 is BAKED IN (operator 2026-06-28) -- the craft spine always
+# runs. No feature-flag default constant, env lever, or helper remains; the C1-C6
+# build (body-gate score, cliche repair, one-breath cap, coda bridge,
+# two-principal scan) proved a real LIFT in the acceptance soak (~450-500 voiced
+# words vs the old ~210-310 ceiling, zero cliche/on-the-nose/register defects).
 
 # L2 authoring contract: the minimum beat_tension (1..5) at which a character
 # line withholds its literal Objective and is asked to play the deflection.
@@ -152,19 +148,3 @@ def strict_local_clean_enabled() -> bool:
     import os
     raw = (os.environ.get("OTR_STRICT_LOCAL_CLEAN") or "").strip().lower()
     return raw in ("1", "true", "yes", "on")
-
-
-def story_quality_v2_enabled(meta: Any) -> bool:
-    """Return True iff the story-quality-v2 spine is enabled for this episode.
-
-    Reads ``meta["story_quality_v2_enabled"]`` (a plain bool on the ledger
-    meta dict). Defensive: a missing key, a non-mapping ``meta``, or any
-    error falls back to ``STORY_QUALITY_V2_DEFAULT`` (False). The flag is a
-    real bool -- it is NEVER inferred from generated text.
-    """
-    try:
-        if isinstance(meta, Mapping):
-            return bool(meta.get("story_quality_v2_enabled", STORY_QUALITY_V2_DEFAULT))
-    except Exception:  # noqa: BLE001 -- a malformed meta is never fatal
-        pass
-    return STORY_QUALITY_V2_DEFAULT

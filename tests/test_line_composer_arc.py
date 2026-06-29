@@ -101,7 +101,11 @@ def test_sprint3_request_renders_dramatic_frame_above_last_spoken():
     # Block exists.
     assert "DRAMATIC QUESTION: Will Maeve sign" in prompt
     assert "THIS BEAT:" in prompt
-    assert "Objective: press maeve to name her own forged signature" in prompt
+    # story-quality v2 (baked in): at tension >= OBJECTIVE_DEFLECTION_TENSION_MIN
+    # (=4) with subtext on a character beat, the L2 authoring contract WITHHOLDS
+    # the bald Objective line and injects the deflection directive instead.
+    assert "Objective: press maeve to name her own forged signature" not in prompt
+    assert "this line IS the deflection" in prompt
     assert "Obstacle:  maeve has rehearsed her denials" in prompt
     assert "Turn:      maeve names the omission aloud" in prompt
     assert "Subtext:   alice already knows the answer" in prompt

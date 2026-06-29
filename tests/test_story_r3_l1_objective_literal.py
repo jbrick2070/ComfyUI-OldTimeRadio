@@ -75,27 +75,11 @@ class TestComposerGate:
             return _BALD if calls["n"] == 1 else _SUBTEXT
 
         res = compose_line(
-            creative_fn=mock, req=_req(story_quality_v2_enabled=True),
+            creative_fn=mock, req=_req(),
         )
         assert calls["n"] == 2                       # exactly one reroll
         assert res.text == _SUBTEXT
         assert "objective_literal_retry" in res.compose_flags
-
-    def test_flag_off_bald_draft_no_reroll(self):
-        """Flag OFF: the bald restatement is NOT detected -> no reroll, no
-        flag -> byte-identical to pre-R3."""
-        calls = {"n": 0}
-
-        def mock(messages, *, temperature, max_new_tokens):
-            calls["n"] += 1
-            return _BALD
-
-        res = compose_line(
-            creative_fn=mock, req=_req(story_quality_v2_enabled=False),
-        )
-        assert calls["n"] == 1
-        assert res.text == _BALD
-        assert "objective_literal_retry" not in res.compose_flags
 
     def test_flag_on_subtextual_draft_no_reroll(self):
         calls = {"n": 0}
@@ -105,7 +89,7 @@ class TestComposerGate:
             return _SUBTEXT
 
         res = compose_line(
-            creative_fn=mock, req=_req(story_quality_v2_enabled=True),
+            creative_fn=mock, req=_req(),
         )
         assert calls["n"] == 1
         assert "objective_literal_retry" not in res.compose_flags
@@ -120,7 +104,7 @@ class TestComposerGate:
 
         res = compose_line(
             creative_fn=mock,
-            req=_req(story_quality_v2_enabled=True, beat_objective=""),
+            req=_req(beat_objective=""),
         )
         assert calls["n"] == 1
         assert "objective_literal_retry" not in res.compose_flags

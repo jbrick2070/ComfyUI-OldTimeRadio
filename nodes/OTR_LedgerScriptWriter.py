@@ -3136,9 +3136,8 @@ class OTR_LedgerScriptWriter:
         # one-breath cap as the first pass (derive_one_breath_cap). v2-ONLY -- the
         # key stays OFF the ledger for a v2-OFF render (byte-identical) and the
         # scan/reroll then fall back to the legacy 28-word cap.
-        if meta.get("story_quality_v2_enabled"):
-            meta["words_per_beat_range"] = list(
-                episode_budget.words_per_beat_range)
+        meta["words_per_beat_range"] = list(
+            episode_budget.words_per_beat_range)
 
         # KILL 2 (2026-06-24): build ONE StoryContract pre-outline (cast_seed-keyed,
         # selected from script_brief/news_seed) so the SAME radio style steers the
@@ -4383,12 +4382,6 @@ class OTR_LedgerScriptWriter:
                 beat_tension=_a5_tension,
                 # F4 (story-engine v1) -- speaker gender/pronouns.
                 speaker_gender=gender_by_name.get(speaker, ""),
-                # L2 (story-quality v2, R3 2026-06-22) -- thread the per-episode
-                # flag from meta so the composer's authoring contract can gate.
-                # Default False (meta key absent) => byte-identical pre-R3 prompt.
-                story_quality_v2_enabled=bool(
-                    meta.get("story_quality_v2_enabled", False)
-                ),
                 # G1 (story-quality v2, 2026-06-28) -- the per-beat word budget so
                 # the composer's one-breath gate derives a budget-sized cap on the
                 # v2 path. Always threaded (consumed ONLY when v2), so a v2-OFF
@@ -4623,12 +4616,8 @@ class OTR_LedgerScriptWriter:
                     # grammatical subject/object position, where an in-place strip
                     # would mangle the clause), and ACCEPT the reroll by a total-
                     # order defect score on the shipped text (below) rather than
-                    # grounding alone. v2-OFF => _bg_v2 False => fullnames () =>
-                    # no new trigger + the legacy accept test => byte-identical.
-                    _bg_v2 = bool(meta.get("story_quality_v2_enabled", False))
-                    _bg_fullnames = (
-                        _otr_cast_fullnames(line_req) if _bg_v2 else ()
-                    )
+                    # grounding alone.
+                    _bg_fullnames = _otr_cast_fullnames(line_req)
                     _bg_roster_mid = bool(
                         _bg_fullnames
                         and _otr_roster_caps_midclause(cleaned, _bg_fullnames)
@@ -4662,25 +4651,20 @@ class OTR_LedgerScriptWriter:
                                 max_ungrounded=0,
                                 require_conflict_object_on_roles=_bg_roles,
                             )
-                            # C4 ACCEPT: v2 keeps the reroll only when it scores
+                            # C4 ACCEPT: keep the reroll only when it scores
                             # STRICTLY cleaner on the shipped text (lower wins,
-                            # ORIGINAL on tie); v2-OFF keeps the legacy grounding-
-                            # only accept => byte-identical.
+                            # ORIGINAL on tie).
                             _bg_rr_ok = bool(_bg_res.text.strip())
-                            if _bg_v2:
-                                _use_rr = _bg_rr_ok and (
-                                    _otr_body_score(
-                                        _bg_res.text, _bg_entry,
-                                        _grounded_nouns,
-                                        _episode_entity_policy, line_req,
-                                    )
-                                    < _otr_body_score(
-                                        cleaned, _bg_entry, _grounded_nouns,
-                                        _episode_entity_policy, line_req,
-                                    )
+                            _use_rr = _bg_rr_ok and (
+                                _otr_body_score(
+                                    _bg_res.text, _bg_entry, _grounded_nouns,
+                                    _episode_entity_policy, line_req,
                                 )
-                            else:
-                                _use_rr = bool(_bg_res_ok and _bg_rr_ok)
+                                < _otr_body_score(
+                                    cleaned, _bg_entry, _grounded_nouns,
+                                    _episode_entity_policy, line_req,
+                                )
+                            )
                             if _use_rr:
                                 cleaned = _bg_res.text
                                 beat_compose_flags = (
@@ -4925,11 +4909,8 @@ class OTR_LedgerScriptWriter:
                         intro_text=intro_text,
                         cast_seed=cast_seed,
                         creative_repo_id=resolved["creative_writing_model"],
-                        # S2 (story-quality v2, 2026-06-28): v2 system examples +
-                        # arc_shape-keyed curated fallback floor. Both default
-                        # off/"" => v2-OFF byte-identical.
-                        story_quality_v2_enabled=bool(
-                            meta.get("story_quality_v2_enabled", False)),
+                        # S2 (story-quality v2, 2026-06-28): system examples +
+                        # arc_shape-keyed curated fallback floor.
                         arc_shape=str(meta.get("arc_shape") or ""),
                     )
                 if not outro_res.text:

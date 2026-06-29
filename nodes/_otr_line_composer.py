@@ -896,12 +896,6 @@ class LineRequest:
     # correct pronouns/title (kills the "Mister <female>"-class mismatch).
     # Empty string -> no PRONOUNS directive (legacy callers unaffected).
     speaker_gender: str = ""
-    # Story-quality v2 (R3, 2026-06-22) -- the per-episode feature flag,
-    # threaded from meta["story_quality_v2_enabled"] by the writer + the reroll
-    # rebuilder. Default False => the L2 authoring contract (objective
-    # withholding) is dormant and _build_user_prompt renders the pre-R3 prompt
-    # byte-for-byte. NEVER inferred from text.
-    story_quality_v2_enabled: bool = False
     # G1 (story-quality v2, 2026-06-28) -- the per-episode words_per_beat_range
     # (episode_budget.words_per_beat_range; meta round-trips it as a LIST). On the
     # v2 path derive_one_breath_cap(range) raises the one-breath cap so a
@@ -1443,8 +1437,7 @@ def _build_user_prompt(req: LineRequest) -> str:
     # generated text. Flag OFF (default) => the whole branch is dead and the
     # block below renders the pre-R3 prompt byte-for-byte.
     _sqv2_deflect = (
-        req.story_quality_v2_enabled
-        and req.speaker_role == "character"
+        req.speaker_role == "character"
         and req.beat_tension >= OBJECTIVE_DEFLECTION_TENSION_MIN
         and bool((req.beat_subtext or "").strip())
     )
@@ -2334,8 +2327,7 @@ def _quality_flags_for_line(cleaned, req):
         _h, _r = flag_on_the_nose(cleaned)
         if _h:
             flags.append(("on_the_nose", _r, "on_the_nose"))
-        if (getattr(req, "story_quality_v2_enabled", False)
-                and getattr(req, "speaker_role", "") == "character"):
+        if getattr(req, "speaker_role", "") == "character":
             anchors = extract_specificity_anchors_from_header(
                 getattr(req, "canon_header", ""))
             _h, _r = flag_anchor_stuffing(cleaned, anchors)
@@ -2368,17 +2360,14 @@ def _quality_flags_for_line(cleaned, req):
         return []
 
 
-def _quality_reroll_hint(flags, story_quality_v2_enabled: bool = False) -> str:
+def _quality_reroll_hint(flags) -> str:
     """W-D hint composition: TOP-1 by priority, EXCEPT one_breath+anchor_stuffing
-    collapse into one combined rewrite. 240-char cap. Pure. G1 (2026-06-28): on
-    the v2 path the collapse hint is the non-compressing _QUALITY_COLLAPSE_HINT_V2
-    (rephrase as natural dialogue, keep specifics, do not pad); v2-OFF keeps the
-    original constant byte-identical."""
+    collapse into one combined rewrite. 240-char cap. Pure. The collapse hint is
+    the non-compressing _QUALITY_COLLAPSE_HINT_V2 (rephrase as natural dialogue,
+    keep specifics, do not pad)."""
     by_code = {code: reason for code, reason, _flag in flags}
     if "one_breath" in by_code and "anchor_stuffing" in by_code:
-        _hint = (_QUALITY_COLLAPSE_HINT_V2 if story_quality_v2_enabled
-                 else _QUALITY_COLLAPSE_HINT)
-        return _hint[:240]
+        return _QUALITY_COLLAPSE_HINT_V2[:240]
     for code in _QUALITY_HINT_PRIORITY:
         if code in by_code:
             return str(by_code[code] or "")[:240]
@@ -2505,7 +2494,7 @@ def compose_line(
     if not _stage_dir_repair_attempted and not _quality_repair_attempted:
         # L1 observability: a tense character beat with no objective frame is a
         # mis-wire -- warn once (the scorer itself skips objective-literal then).
-        if (req.story_quality_v2_enabled and req.speaker_role == "character"
+        if (req.speaker_role == "character"
                 and not (req.beat_objective or "").strip()
                 and 1 <= req.beat_tension <= 5):
             log.warning(
@@ -2515,8 +2504,7 @@ def compose_line(
             )
         _q_flags = _quality_flags_for_line(cleaned, req)
         if _q_flags:
-            _q_hint = _quality_reroll_hint(
-                _q_flags, req.story_quality_v2_enabled)
+            _q_hint = _quality_reroll_hint(_q_flags)
             _existing = getattr(req, "reroll_hint", "") or ""
             _q_combined = (
                 f"{_existing}; {_q_hint}" if _existing else _q_hint)
@@ -2561,12 +2549,9 @@ def compose_line(
                 # (flags + 2*truncation + clause-nesting) so a clean ~35-word line
                 # beats a 20-word fragment; v2-OFF keeps the legacy flag-count
                 # comparison byte-identical. Lower wins; ORIGINAL keeps a tie.
-                if req.story_quality_v2_enabled:
-                    _keep_reroll = (
-                        line_quality_defect_score(_rr.text, req)
-                        < line_quality_defect_score(cleaned, req))
-                else:
-                    _keep_reroll = len(_after_flags) < len(_q_flags)
+                _keep_reroll = (
+                    line_quality_defect_score(_rr.text, req)
+                    < line_quality_defect_score(cleaned, req))
                 if _keep_reroll:
                     # the reroll genuinely reduced defects -> keep it. Any defect
                     # that SURVIVED the reroll is stamped quality_residual:<code>
@@ -2575,17 +2560,16 @@ def compose_line(
                     _resid = tuple(
                         f"quality_residual:{c}" for c, _r, _f in _after_flags)
                     _extra = _retry + _resid
-                    # C5 (S4, v2): deterministic last-resort cliche span-replace on
+                    # C5 (S4): deterministic last-resort cliche span-replace on
                     # the kept reroll -- it may have swapped one worn phrase for
                     # another. Repair the FIRST span; if a cliche still ships
                     # (unmapped / a second span), stamp cliche_shipped_after_reroll.
-                    if req.story_quality_v2_enabled:
-                        _rr_fixed = repair_cliche_span(_rr.text)
-                        if _rr_fixed != _rr.text:
-                            _rr = replace(_rr, text=_rr_fixed)
-                            _extra = _extra + ("cliche_repaired",)
-                        if find_cliche_phrase(_rr.text):
-                            _extra = _extra + ("cliche_shipped_after_reroll",)
+                    _rr_fixed = repair_cliche_span(_rr.text)
+                    if _rr_fixed != _rr.text:
+                        _rr = replace(_rr, text=_rr_fixed)
+                        _extra = _extra + ("cliche_repaired",)
+                    if find_cliche_phrase(_rr.text):
+                        _extra = _extra + ("cliche_shipped_after_reroll",)
                     if _extra:
                         _rr = replace(
                             _rr, compose_flags=_rr.compose_flags + _extra,
@@ -2618,11 +2602,11 @@ def compose_line(
     # Seed with the retry breadcrumbs when the gate fired but the reroll
     # exhausted (fell through to keep the draft) -- () when the gate did not fire
     # so the flag-OFF path is byte-identical.
-    # C5 (S4, v2): deterministic last-resort cliche span-replace on the kept
-    # ORIGINAL draft when the quality reroll fired but did not shed the cliche
-    # (mirrors the kept-reroll repair). Only when the gate fired (_q_retry_flags
-    # non-empty); v2-OFF / no-gate => byte-identical.
-    if req.story_quality_v2_enabled and _q_retry_flags:
+    # C5 (S4): deterministic last-resort cliche span-replace on the kept ORIGINAL
+    # draft when the quality reroll fired but did not shed the cliche (mirrors the
+    # kept-reroll repair). Only when the gate actually fired (_q_retry_flags
+    # non-empty); a no-gate line is untouched.
+    if _q_retry_flags:
         _cl_fixed = repair_cliche_span(cleaned)
         if _cl_fixed != cleaned:
             cleaned = _cl_fixed
@@ -3411,7 +3395,6 @@ def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
 
 def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       cast_seed=0, creative_repo_id=None,
-                      story_quality_v2_enabled: bool = False,
                       arc_shape: str = "") -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
@@ -3438,11 +3421,9 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
         return clean_one_line(f"{b} {fact}", max_chars=_CODA_TOTAL_MAX)
 
     # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
-    # S2 (2026-06-28): on the v2 path the system prompt is a LOCAL copy of the
-    # constant + in-context premise->bridge examples (the constant is untouched =>
-    # v2-OFF byte-identical).
-    _system = (_NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
-               if story_quality_v2_enabled else _NEWS_CODA_SYSTEM)
+    # S2 (2026-06-28): the system prompt is the constant + in-context
+    # premise->bridge examples.
+    _system = _NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
 
     def _msgs(retry: bool):
         u = f"Tonight's tale (setup only):\n{premise}"
@@ -3462,11 +3443,11 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
 
     # 3) deterministic fallback floor -- stable hash (NOT builtin hash()).
     h = int(hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(), 16)
-    # S2 (2026-06-28): the v2 floor is an arc_shape-keyed CURATED bridge (a
+    # S2 (2026-06-28): the floor is an arc_shape-keyed CURATED bridge (a
     # tale-toned pivot validated by validate_news_coda_bridge) in place of the
     # generic NEWS_CODA_POOL prefix. Unknown arc_shape OR zero valid templates =>
-    # legacy pool below (also the entire v2-OFF path) => byte-identical there.
-    if story_quality_v2_enabled and arc_shape:
+    # legacy pool below.
+    if arc_shape:
         _arc = _NEWS_CODA_ARC_BRIDGES.get(arc_shape)
         if _arc:
             _valid = [b for b in _arc if validate_news_coda_bridge(b)[0]]

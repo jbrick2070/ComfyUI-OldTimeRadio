@@ -12,7 +12,6 @@ from pathlib import Path
 
 from nodes._otr_line_composer import (
     LineRequest,
-    _QUALITY_COLLAPSE_HINT,
     _QUALITY_COLLAPSE_HINT_V2,
     _quality_flags_for_line,
     _quality_reroll_hint,
@@ -27,7 +26,7 @@ _CORRECTED = json.loads(
 def _char_req(**kw) -> LineRequest:
     base = dict(speaker="ANYA", intent="", mood="", target_words=50,
                 canon_header="", last_lines=(),
-                speaker_role="character", story_quality_v2_enabled=True)
+                speaker_role="character")
     base.update(kw)
     return LineRequest(**base)
 
@@ -40,14 +39,8 @@ def _collapse_flags():
 
 
 def test_collapse_hint_v2_on_v2_path():
-    assert _quality_reroll_hint(_collapse_flags(), True) == _QUALITY_COLLAPSE_HINT_V2[:240]
-    assert "do not pad" in _quality_reroll_hint(_collapse_flags(), True)
-
-
-def test_collapse_hint_legacy_when_v2_off():
-    assert _quality_reroll_hint(_collapse_flags(), False) == _QUALITY_COLLAPSE_HINT[:240]
-    # default arg (no flag) is also the legacy constant -> byte-identical caller
-    assert _quality_reroll_hint(_collapse_flags()) == _QUALITY_COLLAPSE_HINT[:240]
+    assert _quality_reroll_hint(_collapse_flags()) == _QUALITY_COLLAPSE_HINT_V2[:240]
+    assert "do not pad" in _quality_reroll_hint(_collapse_flags())
 
 
 # --- the defect-score ordering ------------------------------------------------

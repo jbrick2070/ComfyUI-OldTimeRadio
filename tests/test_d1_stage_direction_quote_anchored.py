@@ -186,9 +186,20 @@ class TestScrubIntegrationBreadcrumb:
         led = self._ledger(B005)
         res = scrub_ledger(led, repair_available=True)
         row = led["lines"][0]
-        assert row["text"] == '"Not before I amplify it. The world deserves to hear this."'
+        # story-quality v2 (baked in): the L7 dialogue|action split now OWNS the
+        # trailing-after-quote class -- it runs first, keeps ONLY the spoken
+        # dialogue (unquoted) and records the leaked action as an action_split
+        # breadcrumb, so the later stage-direction floor has nothing left to strip.
+        assert "Not before I amplify it. The world deserves to hear this." in row["text"]
+        assert "adjusts dials" not in row["text"]
         flags = list(row.get("compose_flags") or [])
-        assert any(f.startswith("stage_dir_stripped:") for f in flags)
+        # the leaked trailing action is recorded as a breadcrumb (action_split is
+        # the v2 owner; the legacy stage_dir_stripped breadcrumb covered the same
+        # case pre-bake-in).
+        assert any(
+            f.startswith("action_split:") or f.startswith("stage_dir_stripped:")
+            for f in flags
+        )
         assert any("trailing_after_quote" in f for f in flags)
         assert CODE_STAGE_DIRECTION in [f.code for f in res.findings]
 

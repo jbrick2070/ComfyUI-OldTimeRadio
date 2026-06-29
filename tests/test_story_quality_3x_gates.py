@@ -26,6 +26,7 @@ from nodes._otr_line_hygiene import (  # noqa: E402
 )
 from nodes._otr_line_composer import (  # noqa: E402
     _CODA_FACT_MAX,
+    _QUALITY_COLLAPSE_HINT_V2,
     LineRequest,
     _news_coda_fact_flags,
     _quality_flags_for_line,
@@ -187,26 +188,24 @@ _CLEAN = "Name's on the chip, Steiner. Let's see it before dawn."
 
 
 class TestScorer:
-    def test_v2_off_skips_anchor_and_one_breath(self):
-        # v2 OFF => only cliche/stage/nose run; a stuffed line scores 0 flags.
-        flags = _quality_flags_for_line(_STUFFED, _req(story_quality_v2_enabled=False))
-        assert [c for c, _, _ in flags] == []
-
     def test_v2_on_character_flags_anchor_stuffing(self):
-        flags = _quality_flags_for_line(_STUFFED, _req(story_quality_v2_enabled=True))
+        flags = _quality_flags_for_line(_STUFFED, _req())
         assert "anchor_stuffing" in {c for c, _, _ in flags}
 
     def test_announcer_role_skips_v2_subset(self):
         flags = _quality_flags_for_line(
-            _STUFFED, _req(story_quality_v2_enabled=True, speaker_role="announcer"))
+            _STUFFED, _req(speaker_role="announcer"))
         assert "anchor_stuffing" not in {c for c, _, _ in flags}
 
 
 class TestHintComposition:
     def test_collapse_when_one_breath_and_anchor(self):
+        # v2 baked in: one_breath + anchor_stuffing collapse into the single
+        # non-compressing V2 rewrite hint ("...do not pad").
         flags = [("one_breath", "a", "one_breath"),
                  ("anchor_stuffing", "b", "anchor_stuffing")]
-        assert "one spoken beat" in _quality_reroll_hint(flags)
+        assert _quality_reroll_hint(flags) == _QUALITY_COLLAPSE_HINT_V2[:240]
+        assert "do not pad" in _quality_reroll_hint(flags)
 
     def test_top1_priority_one_breath_over_cliche(self):
         flags = [("cliche", "cliche-reason", "cliche"),
@@ -226,26 +225,18 @@ class TestComposerQualityGate:
             calls["n"] += 1
             return _STUFFED if calls["n"] == 1 else _CLEAN
 
-        res = compose_line(creative_fn=mock, req=_req(story_quality_v2_enabled=True))
+        res = compose_line(creative_fn=mock, req=_req())
         assert calls["n"] == 2                       # exactly one reroll
         assert res.text == _CLEAN
         assert "anchor_stuffing_retry" in res.compose_flags
 
-    def test_v2_off_stuffed_draft_no_reroll(self):
-        calls = {"n": 0}
-
-        def mock(messages, *, temperature, max_new_tokens):
-            calls["n"] += 1
-            return _STUFFED
-
-        res = compose_line(creative_fn=mock, req=_req(story_quality_v2_enabled=False))
-        assert calls["n"] == 1                       # byte-identical, no reroll
-        assert res.text == _STUFFED
-        assert not any(f.endswith("_retry") for f in res.compose_flags)
-
     def test_reroll_not_better_keeps_original_and_stamps_degraded(self):
         """3.4 re-verify: a reroll that swaps one cliche for another (same defect
-        count) is NOT kept -- the original draft ships, with quality_reroll_degraded."""
+        count) is NOT kept -- the ORIGINAL draft is retained (not the worse
+        reroll), with quality_reroll_degraded. v2 baked in: the kept original's
+        cliche span is then deterministically repaired before shipping, so the
+        text is the cliche-repaired original (cliche_repaired) -- never the worse
+        reroll."""
         draft = "You're playing with fire, Watson."
         worse = "Not on my watch, Watson."          # still one cliche
         calls = {"n": 0}
@@ -256,9 +247,11 @@ class TestComposerQualityGate:
 
         res = compose_line(creative_fn=mock, req=_req())
         assert calls["n"] == 2                       # one reroll attempted
-        assert res.text == draft                     # original kept (tie -> original)
+        assert res.text != worse                     # the worse reroll is rejected
+        assert "Watson" in res.text                  # repaired original, not the reroll
         assert "quality_reroll_degraded" in res.compose_flags
         assert "cliche_retry" in res.compose_flags
+        assert "cliche_repaired" in res.compose_flags
 
     def test_reroll_better_is_kept(self):
         draft = "You're playing with fire, Watson."
@@ -283,7 +276,7 @@ class TestComposerQualityGate:
             calls["n"] += 1
             return _STUFFED                          # never improves
 
-        res = compose_line(creative_fn=mock, req=_req(story_quality_v2_enabled=True))
+        res = compose_line(creative_fn=mock, req=_req())
         assert calls["n"] == 2                       # initial + one quality reroll
         assert res.text == _STUFFED
 

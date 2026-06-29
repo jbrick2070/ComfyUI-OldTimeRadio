@@ -845,7 +845,7 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
     # per-episode flag (read once from meta -- the row schema is FIXED, there is
     # no per-line meta dict). Flag OFF -> the whole L7 branch below is skipped and
     # the per-line loop is byte-identical to pre-R3.
-    _sqv2_on = bool((led.get("meta") or {}).get("story_quality_v2_enabled"))
+    _sqv2_on = True  # L7 dialogue|action split is baked in (v2 is the engine)
     # L4 (story-quality LIFT, 2026-06-23): minimal transcript sanitizer, env-
     # gated + AUDIO-AFFECTING -> default OFF => byte-identical. Read once.
     _transcript_sanitizer_on = transcript_sanitizer_enabled()

@@ -37,7 +37,7 @@ def test_every_arc_bridge_validates():
 def test_v2_fallback_ships_curated_arc_bridge():
     res = compose_news_coda(
         creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-        cast_seed=7, story_quality_v2_enabled=True, arc_shape="betrayal")
+        cast_seed=7, arc_shape="betrayal")
     assert "news_coda_arc_bridge" in res.compose_flags
     # the shipped text opens with one of the curated betrayal bridges (+ ":")
     starts = [b for b in _NEWS_CODA_ARC_BRIDGES["betrayal"]
@@ -46,25 +46,17 @@ def test_v2_fallback_ships_curated_arc_bridge():
     assert _BRIEF.split()[0] in res.text  # the real fact is appended
 
 
-def test_v2_off_uses_legacy_pool_byte_identical():
-    res = compose_news_coda(
-        creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-        cast_seed=7, story_quality_v2_enabled=False, arc_shape="betrayal")
-    assert "news_coda_arc_bridge" not in res.compose_flags
-    assert any(res.text.startswith(p) for p in NEWS_CODA_POOL)
-
-
 def test_unknown_arc_shape_falls_back_to_legacy():
     res = compose_news_coda(
         creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-        cast_seed=7, story_quality_v2_enabled=True, arc_shape="not_a_real_arc")
+        cast_seed=7, arc_shape="not_a_real_arc")
     assert "news_coda_arc_bridge" not in res.compose_flags
     assert any(res.text.startswith(p) for p in NEWS_CODA_POOL)
 
 
 def test_arc_selection_deterministic_by_cast_seed():
     kw = dict(creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-              story_quality_v2_enabled=True, arc_shape="heist")
+              arc_shape="heist")
     a = compose_news_coda(cast_seed=3, **kw).text
     b = compose_news_coda(cast_seed=3, **kw).text
     assert a == b  # same seed -> same curated bridge

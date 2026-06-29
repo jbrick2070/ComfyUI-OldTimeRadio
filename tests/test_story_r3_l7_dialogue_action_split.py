@@ -108,16 +108,6 @@ class TestScrubIntegration:
         # word_count restamped to the dialogue, not the original
         assert row["word_count"] == len(row["text"].split())
 
-    def test_flag_off_byte_identical(self):
-        led = _ledger(flag_on=False)
-        scrub_ledger(led, repair_available=True)
-        row = led["lines"][1]
-        # no split recorded; the action text is NOT extracted under flag-off
-        assert get_line_action(row) == ""
-        assert not any(
-            f.startswith("action_split:") for f in row.get("compose_flags", [])
-        )
-
     def test_idempotent_no_double_split(self):
         led = _ledger(flag_on=True)
         scrub_ledger(led, repair_available=True)
@@ -165,11 +155,6 @@ class TestTelemetry:
         assert sq["l1_rerolls"] == 1
         assert sq["l7_splits"] == 1
         assert sq["l7_split_failures"] == 1
-
-    def test_flag_off_writes_no_summary(self):
-        led = self._ledger_with_flags(flag_on=False)
-        scrub_ledger(led, repair_available=True)
-        assert "story_quality" not in led.get("meta", {})
 
     def test_merge_preserves_sibling_keys(self):
         """L5a: the scrub MERGES into meta.story_quality -- a key stamped
