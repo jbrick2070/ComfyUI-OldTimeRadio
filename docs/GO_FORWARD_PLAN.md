@@ -1,7 +1,12 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD STARTED. HEAD `738b3b63` == origin/v2.0-alpha.
-> prod/main + tags GATED. NEXT = C2 (G1 gate de-compression).**
+> **>>> CURRENT STEP -- 2026-06-28 STORY-QUALITY BUILD IN PROGRESS. HEAD `75930608` == origin/v2.0-alpha.
+> prod/main + tags GATED. NEXT = C3 (S2 coda bridge floor).**
+> - **C2 shipped** (`75930608`): G1 gate de-compression -- `_QUALITY_COLLAPSE_HINT_V2` (non-compressing,
+>   v2-selected), `line_quality_defect_score` v2 keep-better, and the budget-derived one-breath cap
+>   (`derive_one_breath_cap` + relaxed clause `max(3,cap//8)`) threaded at first-pass / reroll / scan from
+>   one helper + `meta["words_per_beat_range"]` stamped v2-only. v2-OFF byte-identical. Suite 5736/0,
+>   Bug Bible green. Lock: `tests/test_story_quality_g1.py`.
 > - **BASELINE FIX shipped** (`6d30cec2`): HEAD had 6 PRE-EXISTING reds (b7 sweep, capability_profiles,
 >   force_input_sockets, 2x workflow_apply, structure-pin) from a ComfyUI Desktop UI-save that polluted
 >   `otr_scifi_16gb_full.json`. Fixed: node 87 widgets_values display-labels -> bare engine ids
