@@ -35,6 +35,22 @@ fail-loud, fix the tests that assert a fallback trail (e.g. soak OOM-trail, dep-
 Sequence it AFTER the engine fixes (HuMo cfg/clip-fill, ltx_audio_in VRAM) so the hard-fail
 surface is small. Scope as a coder kickoff; do NOT do it mid-soak.
 
+## 0c. ENGINE MENU CLEANUP + RADIO-STILL DEFAULT (operator directive 2026-06-29, HARD)
+
+- **RETIRE `still_motion`** -- it is the always-works FALLBACK floor (the `humo->humo_1.7B->
+  still_motion` terminus). It duplicates `still_pan` (both pan a still); with no fallbacks it has no
+  reason to exist. Unregister it (drop `@register` + CAPABILITIES row + the package export, the C3
+  pattern) and rip it out of every fallback chain / FLOOR_NAMES / UNIVERSAL_FLOOR. Keep `still_pan`
+  (the real pan) + `still_flat` (static) + `still_parallax` (depth).
+- **RETIRE `station_card`** -- broken (black, missing `accepts_still`) and unneeded. Unregister +
+  drop from the announcer dropdown + fix the ripple tests.
+- **ANNOUNCER + MUSIC = ALWAYS A RADIO-THEMED STILL.** Those beats must always render a clean still
+  with a RADIO in the scene (vintage broadcast radio / mic / console somewhere) -- never a black card,
+  never a fallback. Implement in the announcer/music image PROMPT (`otr_meta_brief_image_prompt.py`):
+  inject a radio/broadcast element into the scene prompt for those roles (pairs with B4 framing +
+  BUG-411 FluxGuidance/negative). Default video for those beats = a still engine (flat/pan/parallax),
+  not visualizer/card. This is the sane on-brand baseline for the two bookend roles.
+
 ---
 
 ## A. HARD-FAILS -- fix at root, then retest in isolation
@@ -137,6 +153,16 @@ regression like the ltx_audio_in SHARP swap or the HuMo 1.7B-vs-16:9 mixup is ob
 This is the user-facing twin of the per-beat recipe instrumentation (S-B): label at selection time,
 log at render time. Pair the label with the registry CAPABILITIES row so they never drift.
 
+**STAMP THE RECIPE IN THE LEDGER (operator 2026-06-29, "what did I use for this?").** An episode does
+NOT record which video/image engine made each beat -- the stills_manifest stamps only the prompt source
+(`char_scene_llm`), not the model, and the ledger has no per-beat delivered-engine field. So neither the
+operator nor Claude can reconstruct a run from its saved files (the "Illuminating Debate" mystery: great
+character video + black abstract bookends, but no record of flux-vs-z_image or the per-slot video pick).
+FIX: stamp per-beat `delivered_engine` (video) + `image_engine` + `recipe/quant` into the saved ledger
+(survives `_merge_with_disk`), so every episode self-documents its recipe -> reproduce a good one,
+diagnose a bad one. This is the durable twin of the no-fallbacks `delivered_engine` record (Section 0)
+and the dropdown labels.
+
 ## B4. STILL / IMAGE FRAMING (operator 2026-06-29, eyeball on still_flat "Echoes of the Carnival")
 
 The still engines render SHARP + well-composed (operator: "OK ... still and video are OK, PASS"), but
@@ -157,6 +183,29 @@ the cinematic style suffix, and a real NEGATIVE prompt. Without FluxGuidance + a
 deformed figures. FIX: restore FluxGuidance @ ~3.5 + the cinematic/radio suffixes + bookend seed AND add
 an anatomy NEGATIVE ("deformed, melted, blobby, distorted, malformed, mutated, extra limbs, fused").
 PROMOTE BUG-411 from the backlog -- it's the same root as the framing item. Forensic in `BUG_LOG_2026-06.md`.
+
+## B5. PER-ENGINE EYEBALL JUDGMENTS (operator, live during the fill soak)
+
+- **stills (still_flat / still_pan / still_parallax / still_motion): PASS** -- clean, well-composed,
+  reliable (+ framing headroom B4 + the BUG-411 negative). The dependable character/scene option.
+- **ltx_video: PASS** (earlier eyeball).
+- **station_card: BLACK -- ROOT CAUSE FOUND (cheap_families.py StationCardFamily).** Announcer-only.
+  It has `uses_still=True` ("show a provided card still") but is MISSING `accepts_still=True` (which
+  StillFlatFamily HAS) -> the image dispatcher never mints a still for it -> it renders the procedural
+  DARK FLOOR (black). So it's effectively BROKEN/empty, not just weak. FIX: either give it
+  `accepts_still=True` so the chosen image engine mints a real card image, OR generate a true station-ID
+  card asset (text/logo/graphic) instead of the black floor. Decide if station_card stays as an engine.
+
+- **ENGINE LABEL COPY (for the B3 dropdown-labels fix) -- grounded `cheap_families.py`:**
+  still_flat = "Still -- static, no motion"; still_pan = "Still -- slow pan/zoom (Ken Burns)";
+  still_motion = "Still -- slow pan (always-works floor)"; still_parallax = "Still -- 2.5D depth
+  parallax (camera moves through depth)"; station_card = "Station-ID card (announcer only)";
+  abstract = "Procedural abstract pattern (audio-reactive)"; visualizer = "CRT scope visualizer
+  (audio-reactive)". Two-choice model in the help text: IMAGE engine mints the picture, the VIDEO
+  engine decides what happens to it (hold / pan / parallax / animate).
+- **HuMo: DEFECT** (blur cfg-regression + clip underrun; fix pending).
+- **ltx_audio_in: HARD FAIL** (VRAM, S-B; fix pending).
+- _(wan_i2v / wan_ti2v / mesh_stage / abstract + the 5 image engines: pending the fill-soak landing.)_
 
 ## C. SILENT-FALLBACK AUDIT (the "Rendered" column)
 

@@ -66,6 +66,32 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
   RadioEditPlan nested under a top-level `RadioEditPlan` key -> `projected_word_total` "missing"
   -> retry ladder exhausts -> length normalization skipped (warn-only). Fix the LEVER-1
   tolerant-unwrap to peel a top-level schema-name wrapper; retest on a gemma leg.
+- **S-E NO-FALLBACKS + ENGINE-MENU + UX CLEANUP (operator directives 2026-06-29).** Detail +
+  receipts in `docs/2026-06-29-coverage-soak/RETEST_LIST.md` (Section 0 + B3 + B5 + 0c). Bundle:
+  - **NO FALLBACKS / hard-fail:** a selected engine RENDERS or raises a LOUD hard error -- never a
+    silent degrade to stills (the ltx_audio_in "looks like stills" + the black-floor carrier bug).
+    Rip out the fallback chains / `resolve_fallback_chain` / `SYNTH_FALLBACKS`. (S-A's legibility floor
+    becomes detect-and-fail/flag, NOT a still-swap.)
+  - **RETIRE engines:** `still_motion` (the fallback-floor twin of still_pan -- falls away with the
+    rip-out), `station_card` (broken black card, missing `accepts_still`), and `abstract` (redundant
+    with the real `visualizer`). Unregister + workflow-JSON dropdowns + ripple tests (the C3 pattern).
+  - **ADD `visualizer_rainbow` -- a CREATIVE shader-driven visual (operator 2026-06-29, "let's get real
+    creative ... fancy with shaders and stuff").** NOT just a recolored CRT: a fun, vibrant, GLSL/shader-
+    based audio-reactive piece (rainbow palette + generative shader effects -- plasma / flow-fields /
+    bloom / feedback, audio-driven). It REUSES `eng_visualizer.py`'s audio analysis (FFT / RMS / onsets)
+    to drive shader uniforms. Fills the fun-audio-reactive slot that `abstract` vacates. **Own
+    `/roundtable` for the creative direction + the shader stack** (GLSL via moderngl / ffmpeg GL filters /
+    a ComfyUI shader node -- pick during the roundtable) BEFORE building. Register + CAPABILITIES + node-87
+    dropdown + label ("Rainbow shader visualizer -- audio-reactive"). Creative sprint, schedule after the
+    correctness fixes (S-A..S-E core).
+  - **DROPDOWN LABELS:** every option states model + variant + recipe (HuMo size/aspect/tier, which LTX,
+    Wan i2v/ti2v, image model; "abstract/visualizer = audio-reactive, no scene image"). The owner
+    couldn't tell engines apart -- labels are required. Grounded label copy in RETEST_LIST B5.
+  - **STAMP THE RECIPE IN THE LEDGER:** per-beat `delivered_engine` (video) + `image_engine` +
+    `recipe/quant`, durable through `_merge_with_disk`, so every episode self-documents what made it
+    ("what did I use?" is unanswerable from saved files today). Durable twin of no-fallbacks + labels.
+  - **ANNOUNCER + MUSIC = always a radio-themed still** (vintage radio in the scene) -- never a black
+    card / abstract / fallback; the sane on-brand bookend default. Image-prompt change (+ B4 framing).
 
 **DEFERRED BACKLOG** (still pending, lower priority -- detail in sections 3-5 + the bug logs):
 GATE-A punch list incl. BUG-411 (flux lost its cinematic tint -- restore FluxGuidance ~3.5 +
