@@ -1,36 +1,45 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-30 | HEAD 10c5991a == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-06-30 | HEAD f5b78ac5 == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
 > do NOT record done work here. prod/main + tags remain operator-GATED.
 
-## 1. CURRENT STEP -- ALL-ENGINES x ALL-SLOTS FIX (kibitz r1-r4 CONVERGED; BUILD-READY)
+## 1. CURRENT STEP -- ALL-ENGINES x ALL-SLOTS FIX: C0-C5 CODE SHIPPED; remaining = LIVE-GPU soak RUN
 
-The combo QA exposed the real blocker: stills/engines do NOT render correctly in every slot
-(character beats came back as static stills; image legs came back BLACK). Root-caused + hardened to a
-sprint-ready plan: **`docs/2026-06-30-slot-audit/SPRINT_PLAN.md`** (the coder contract). Build C0->C5,
-each green (suite + Bug Bible + B7) and pushed per chunk.
+The slot-audit sprint (`docs/2026-06-30-slot-audit/SPRINT_PLAN.md`) C0-C5 is BUILT, green
+(suite 5851/0 + Bug Bible + B7), and PUSHED to v2.0-alpha (8f701a73, 65c11bc1, 96aa54dc, ca2ac0e8,
+f5b78ac5). What landed:
 
-- C0 (OPERATOR DECISION, do first): keep+fix the 3 still options (still_pan/still_flat/still_motion);
-  RETIRE `station_card` (broken black card) + `abstract` (redundant w/ visualizer) -- or keep+fix them.
-  This is the ONLY open decision; everything else is determined.
-- C1 BLACK FIX: add `accepts_still=True` to StillPanFamily + StillMotionFamily (cheap_families.py) so
-  the dispatcher mints their scene still; do NOT generalize the scene-still bind (would wire b-roll
-  stills into HuMo). Test `init_source=="scene_still"`.
-- C2 KILL THE DRIFT: override the VIDEO registry `engines_for_role`/`assert_usable` to use
-  `role_compat.engine_fits_role` (capability), FAIL-SOFT to legacy `roles` only when required_inputs is
-  missing/None or the role is unknown (NEVER for `()`). `roles` -> UI-sort metadata only.
-- C3 scene_broll routing: verify the b-roll `speaker_role` token; map it in `SPEAKER_TO_VIDEO_ROLE`.
-- C4 matrix test: every engine x 5 roles eligibility == `engine_fits_role` (capability, not flat-True).
-- C5 REBUILD THE SOAK ON THE CANONICAL JSON (`workflows/otr_scifi_16gb_full.json`): converge the 3
-  stale soak entry points, set all 5 role keys via `apply_profile_to_workflow` (widget_mapping
-  node-type, no node ids), named baselines (still_flat video / flux_gen1 image), + a content oracle on
-  the per-beat manifest clips (non-dark luma + motion for motion engines; static stills exempt). Merge
-  with `docs/2026-06-29-coverage-soak/COMBO_SOAK_CONVERGED_PLAN.md`.
+- **C0 SHIPPED (8f701a73):** RETIRED `station_card` + `abstract` engines (operator directive: both
+  redundant -- visualizer covers it, visualizer_rainbow is the planned creative slot). Deregistered +
+  CAPABILITIES rows removed + render_driver/soak dead-name constants repointed + profile JSONs
+  (8gb_lite/cpu_floor announcer -> still_flat). The `abstract` FAMILY name survives (visualizer).
+- **C1 SHIPPED (8f701a73):** `accepts_still=True` on StillPan + StillMotion families -> the image
+  dispatcher MINTS their scene still (D2 BLACK fix). Bind set NOT generalized (HuMo excluded).
+- **C2 SHIPPED (65c11bc1):** `VideoEngineRegistry(EngineRegistry)` overrides `engines_for_role` +
+  `assert_usable` to use `role_compat.engine_fits_role` (capability); fail-soft to legacy `roles` ONLY
+  when required_inputs missing/None or role unknown, NEVER for `()` (D1 drift killed).
+- **C3 SHIPPED (96aa54dc):** `sfx` speaker_role (the only unmapped writer token) -> `scene_broll` in
+  SPEAKER_TO_VIDEO_ROLE, so the scene_broll slot is routable (D4).
+- **C4 SHIPPED (ca2ac0e8):** `tests/test_video_role_eligibility_matrix.py` -- all engines x 5 roles,
+  eligibility == capability (not flat-True), + the `()`-fits-all and None-falls-to-legacy proofs.
+- **C5 SHIPPED (f5b78ac5):** `nodes/_otr_shared/content_oracle.py` (per-beat luma floor + freeze
+  detect, motion-required by family, statics exempt) + `nodes/_otr_shared/slot_matrix.py`
+  (`build_all_five_role_profile` -- sets all 5 INDEPENDENT role keys via the applier, drops the legacy
+  other_beats fallback) + `tests/test_slot_matrix_soak.py` (OFFLINE proof on the canonical JSON + real
+  ffmpeg oracle fixtures). The gitignored `_otr_combo_soak.py` runner was converged locally to the
+  all-5-role builder (imports the tracked builder).
 
-ACCEPTANCE: every video+still engine eligible (capability) AND renders real content in all 3 slots
-(no black floor; static OK for static engines); the canonical-JSON soak proves it; audio byte-identical;
-no shim. VERIFY-AT-BUILD checklist in the SPRINT_PLAN.
+REMAINING (GPU-gated, NOT code): RUN the live all-engines x all-slots soak -- boot headless ComfyUI,
+load `otr_scifi_16gb_full.json`, apply the all-5-role profile (`slot_matrix.build_all_five_role_profile`),
+render a leg per engine, and run `content_oracle.check_manifest` on the per-beat manifest clips. ALSO
+optionally finish converging the other two gitignored runners (`scripts/otr_coverage_sweep.py` SLOTS is
+still 3-role; `scripts/_otr_cov_runner.py`) onto `build_all_five_role_profile`. The accelerator for this
+is S-F (the visual smoke fixture) so each leg is minutes not ~28 min.
+
+ACCEPTANCE (met in CODE; live RUN proves empirically): every video+still engine eligible by capability
+AND renders real content in all 3 slots (no black floor; static OK for static engines); audio
+byte-identical; no shim. VERIFY-AT-BUILD checklist in the SPRINT_PLAN -- all green.
 
 ## 1A. CONSOLIDATED NEXT STEPS (post-soak sprints, priority order)
 
