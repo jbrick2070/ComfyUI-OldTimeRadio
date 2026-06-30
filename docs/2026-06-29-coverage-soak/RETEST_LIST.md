@@ -25,6 +25,15 @@ selective CIM reset before each isolated run (never a blanket python kill).
 - **Title-reveal glitch** -- "WEIGHT OF THE BLU5NV#03W" seen at ~0:00:02 is the intentional title scramble-in (BUG-409 `_title_reveal_progress`, resolves in first ~40%); CONFIRM it resolves to the clean title by ~40% of the window, not a stuck scramble.
 - **humo / humo_1.7B / humo_1.7B_169** (x3 each) -- confirm each variant renders its own beats (no silent degrade to the floor) + VRAM.
 - **HuMo VARIANT OPTIMIZATION (operator 2026-06-29: "some HuMos may be good, some bad, we never optimized them").** The 4 variants (humo 14B / humo_1.7B / humo_1.7B_169 16:9 / humo_14B_169 16:9) differ in quality/motion/aspect and have NEVER been tuned. BUT the clip-underrun held-frame (S-A) MASKS their true quality -- you only see a frozen tail. So evaluate + optimize them on FILLED clips, i.e. AFTER the S-A clip-fill ships, in a dedicated HuMo-variant pass: per-variant cfg / steps / frame-budget / aspect, eyeball good-vs-bad, set the best default per role. Do NOT judge HuMo variants on the current frozen-tail renders. Ties to S-C HuMo phrase-chunking (shorter beats fit the 177f budget).
+  - **MODEL UPGRADE (operator 2026-06-29: "retire this HuMo for a good one or experiment").** HuMo =
+    `bytedance-research/HuMo` (Sept 2025, arxiv 2509.08519) ships ONLY 1.7B + 17B; the 1.7B is the
+    DRAFT tier (mushy), the 17B is the QUALITY tier; there is NO newer HuMo to switch to. The 17B is
+    ALREADY on disk -- `Wan2_1-HuMo-17B_Q5_K_M.gguf` (11.9 GB) + `HuMo-17b-Q3_K_M.gguf` (8.4 GB) --
+    and the 17B GGUF is SMALLER than the current 14B fp8 (16.7 GB), so likely sharper AND lighter.
+    EXPERIMENT (env, no code): `OTR_HUMO_UNET_NAME=<17B gguf>` + `OTR_HUMO_CFG=5.0` + clip-fill, eyeball
+    + verify <=14.5 GB single-resident. If good -> promote 17B as the character default, retire 1.7B to
+    draft-only. If the 17B is ALSO mush -> HuMo is not worth it -> character defaults to still+parallax
+    (legible, reliable motion), HuMo opt-in. Refs: Comfy-Org/HuMo_ComfyUI, QuantStack/HuMo-GGUF.
   - **REGRESSION FOUND (git): the 1.7B blur is a cfg drop.** Proven sharp config `06e50304`
     (2026-06-07) = `uni_pc / cfg 5.0 / 20-step / no-LoRA`. `fdb93286` (2026-06-17)
     *"de-blue humo_1.7B (cfg 5.0->1.0 kills the blue cast)"* dropped cfg 5.0 -> 1.0;
