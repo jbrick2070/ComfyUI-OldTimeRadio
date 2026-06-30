@@ -534,7 +534,25 @@ class SceneAwareScopes:
                         yield frame
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
-        out_path = os.path.join(tempfile.gettempdir(), f"otr_scopes_{key}_{ts}.mp4")
+        # OH-2 hygiene: write the scopes intermediate to the OTR-controlled scratch
+        # tier (otr/episodes/_shared/tmp -- the OH-3 janitor sweeps it), NEVER the
+        # ambient system temp dir. A server NOT booted via the soak launcher leaves
+        # TEMP unrepointed, so gettempdir() lands otr_scopes_*.mp4 in
+        # %LOCALAPPDATA%\Temp and trips the soak hygiene gate even though the render
+        # is fine (2026-06-30). The downstream OTR_PostUpscaleProcgenBlend consumes
+        # this path; cleanup is the janitor's -- never delete it in the producer.
+        try:
+            try:
+                from ._otr_paths import otr_shared_tmp_dir
+            except ImportError:                      # flat (sys.path) load
+                from _otr_paths import otr_shared_tmp_dir  # type: ignore
+            _tmp_root = str(otr_shared_tmp_dir())
+            os.makedirs(_tmp_root, exist_ok=True)
+        except Exception as _tmp_exc:                # noqa: BLE001
+            _tmp_root = tempfile.gettempdir()
+            log.warning("[SceneAwareScopes] OTR tmp tier unavailable (%s); "
+                        "falling back to %s (test/headless only)", _tmp_exc, _tmp_root)
+        out_path = os.path.join(_tmp_root, f"otr_scopes_{key}_{ts}.mp4")
         log.info("[SceneAwareScopes] %d frames @ %dx%d 25fps -> %s",
                  total, out_w, out_h, out_path)
         _encode_silent_mp4(_gen(), total, out_path, out_w, out_h, fps, ffmpeg)
