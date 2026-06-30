@@ -24,6 +24,16 @@ selective CIM reset before each isolated run (never a blanket python kill).
 - **HuMo PORTRAIT QUALITY (operator eyeball 2026-06-29, "Weight of the Blueprints" announcer):** the rendered face is MURKY/blurry -- an indistinct gold blob, not a clear announcer. Diagnose source: is the INPUT portrait (flux_gen1 still under `episodes/<ep>/stills/c01_*.png`) already poor, or is HuMo + the upscale/pillarbox degrading it? Inspect the source still vs the HuMo output side by side. Applies to humo / humo_1.7B / humo_14B_169.
 - **Title-reveal glitch** -- "WEIGHT OF THE BLU5NV#03W" seen at ~0:00:02 is the intentional title scramble-in (BUG-409 `_title_reveal_progress`, resolves in first ~40%); CONFIRM it resolves to the clean title by ~40% of the window, not a stuck scramble.
 - **humo / humo_1.7B / humo_1.7B_169** (x3 each) -- confirm each variant renders its own beats (no silent degrade to the floor) + VRAM.
+- **HuMo VARIANT OPTIMIZATION (operator 2026-06-29: "some HuMos may be good, some bad, we never optimized them").** The 4 variants (humo 14B / humo_1.7B / humo_1.7B_169 16:9 / humo_14B_169 16:9) differ in quality/motion/aspect and have NEVER been tuned. BUT the clip-underrun held-frame (S-A) MASKS their true quality -- you only see a frozen tail. So evaluate + optimize them on FILLED clips, i.e. AFTER the S-A clip-fill ships, in a dedicated HuMo-variant pass: per-variant cfg / steps / frame-budget / aspect, eyeball good-vs-bad, set the best default per role. Do NOT judge HuMo variants on the current frozen-tail renders. Ties to S-C HuMo phrase-chunking (shorter beats fit the 177f budget).
+  - **REGRESSION FOUND (git): the 1.7B blur is a cfg drop.** Proven sharp config `06e50304`
+    (2026-06-07) = `uni_pc / cfg 5.0 / 20-step / no-LoRA`. `fdb93286` (2026-06-17)
+    *"de-blue humo_1.7B (cfg 5.0->1.0 kills the blue cast)"* dropped cfg 5.0 -> 1.0;
+    current `eng_humo.py:152 _cfg()` defaults to 1.0. The no-LoRA 1.7B is non-distilled
+    and needs cfg ~5.0 for guidance -- at cfg 1.0 it UNDERGUIDES -> blur (the 14B distill
+    correctly uses cfg 1.0; the change wrongly applied it to the 1.7B too). ENV-TESTABLE
+    NOW (no code): re-render a 1.7B beat with `OTR_HUMO_CFG=5.0` (+ `OTR_HUMO_STEPS=20`,
+    sampler uni_pc) and A/B vs the cfg-1.0 blur; if sharp, bake cfg 5.0 back as the 1.7B
+    default + solve the blue cast separately (color-correct / VAE, not by killing cfg).
 - **wan_i2v (14B) / wan_ti2v (5B)** -- VRAM peak + real camera motion eyeball (single low-noise expert risk, GO_FORWARD 4A S3). Isolated, reset between.
 - **mesh_stage** (x3) -- prove it renders the Blender mesh and does NOT fall back to still_parallax (Blravender exe present); check the histogram shows `mesh_stage`, not the floor.
 - **ltx_video** (announcer, other_beats) -- only music ran (PASS); confirm the other 2 slots.

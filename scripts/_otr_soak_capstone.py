@@ -275,11 +275,21 @@ def assert_no_stray_writes(before: set, root: str, sys_temp_before: set,
             raise SoakFail("run leaked otr_* entries into the system temp "
                            "dir %r: %r" % (sys_temp, sorted(leaked)[:10]))
     obs_new = sorted(_obs_listing() - obs_before)
-    if len(obs_new) != 1 or not obs_new[0].lower().endswith(".mp4"):
-        raise SoakFail("the operator obs dir %r must gain EXACTLY the final "
-                       "mp4; this run added: %r" % (_obs_dir(), obs_new))
-    print("[soak] no stray writes outside otr (%d new in-tree files; obs "
-          "gained only %s)" % (len(new), obs_new[0]), flush=True)
+    stray = [f for f in obs_new if not f.lower().endswith(".mp4")]
+    if stray:
+        raise SoakFail("the operator obs dir %r gained a non-final-mp4 file "
+                       "(stray write): %r" % (_obs_dir(), stray))
+    if not obs_new:
+        raise SoakFail("the operator obs dir %r gained NO final mp4 -- the run "
+                       "produced no deliverable" % _obs_dir())
+    # >1 final mp4 is BENIGN, not a stray write: a PRIOR leg's obs publish is
+    # async and can land inside this leg's hygiene window (the steel_against_skin
+    # + the_bleeding_canvas race, 2026-06-29). The per-leg deliverable is verified
+    # separately by assert_obs_final_playable against THIS leg's episode; here we
+    # only guard that every NEW obs entry is a final mp4 (no stray junk).
+    print("[soak] no stray writes outside otr (%d new in-tree files; obs gained "
+          "%d final mp4(s): %s)" % (len(new), len(obs_new), ", ".join(obs_new)),
+          flush=True)
 
 
 def _sys_temp_otr_entries() -> set:
