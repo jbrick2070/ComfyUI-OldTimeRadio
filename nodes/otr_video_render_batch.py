@@ -180,6 +180,26 @@ class OTRVideoRenderBatch:
             return ({"ok": False, "mode": "episode",
                      "error": "ledger has no video.shots (run OTR_ShotLock first)"},
                     "", "node_episode_report.json")
+        # S-F VISUAL SMOKE CAPTURE: persist the exact node-92 INPUT (the
+        # OTR_ShotLock-planned ledger + the master audio path) as a forensic
+        # artifact -- a twin of the node_episode_report write below. This is the
+        # ONLY place that ledger shape (video.shots + images.images) exists on
+        # the wire; nothing else persists it, so scripts/otr_visual_smoke.py
+        # bakes its bundle from this. Best-effort, never raises; no behavior
+        # change to the render (read-only of the inputs).
+        try:
+            import os as _os
+            from ._otr_paths import otr_state_dir as _sd
+            _sdir = str(_sd())
+            _os.makedirs(_sdir, exist_ok=True)
+            with open(_os.path.join(_sdir, "node_episode_input.json"),
+                      "w", encoding="utf-8") as _cf:
+                json.dump({"ledger": ledger,
+                           "master_audio_path": str(master_audio_path or "")},
+                          _cf, ensure_ascii=True, default=str)
+        except Exception as _cap_exc:  # noqa: BLE001 -- never break the render
+            log.warning("[OTR_VideoRenderBatch] smoke-input capture skipped: %s",
+                        _cap_exc)
         episode_id = str(ledger.get("episode_id")
                          or (ledger.get("meta") or {}).get("episode_id") or "")
         # Per-beat motion clause (opt-in OTR_LTX_MOTION_CLAUSE=1; default OFF -> no-op,

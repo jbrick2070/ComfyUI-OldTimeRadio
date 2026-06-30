@@ -1,0 +1,136 @@
+{
+ "OTR_VideoRenderBatch": {
+  "input": {
+   "required": {
+    "mode": [
+     [
+      "soak",
+      "single",
+      "episode"
+     ],
+     {
+      "default": "soak"
+     }
+    ],
+    "beats": [
+     "INT",
+     {
+      "default": 40,
+      "min": 1,
+      "max": 400
+     }
+    ],
+    "oom_index": [
+     "INT",
+     {
+      "default": 20,
+      "min": 0,
+      "max": 399
+     }
+    ],
+    "frame_count": [
+     "INT",
+     {
+      "default": 25,
+      "min": 1,
+      "max": 240
+     }
+    ]
+   },
+   "optional": {
+    "engine": [
+     "STRING",
+     {
+      "default": "humo_1.7B"
+     }
+    ],
+    "portrait_path": [
+     "STRING",
+     {
+      "default": ""
+     }
+    ],
+    "audio_path": [
+     "STRING",
+     {
+      "default": ""
+     }
+    ],
+    "patched_ledger_json": [
+     "STRING",
+     {
+      "default": "{}",
+      "multiline": true,
+      "forceInput": true,
+      "tooltip": "mode=episode: the OTR_ShotLock-planned (and image-genned) ledger JSON. run_real_episode renders one REAL per-beat clip per shot; the emitted clip manifest feeds OTR_SilentComposite."
+     }
+    ],
+    "master_audio_path": [
+     "STRING",
+     {
+      "default": "",
+      "forceInput": true,
+      "tooltip": "mode=episode: path to the FROZEN master mix (MP4 or WAV). Beats whose ledger line has no per-line *_wav_path get audio_ref filled by slicing [start_s, start_s+dur_s] from this file (read-only ffmpeg; master is NEVER mutated). Wire from OTR_EpisodeAssembler.output_path (the frozen master WAV). Leave unset to degrade LOUD on missing per-line wavs."
+     }
+    ],
+    "image_done": [
+     "STRING",
+     {
+      "multiline": true,
+      "default": "",
+      "forceInput": true,
+      "tooltip": "Image-done gate (mirrors audio_done; ST-0.2 still-spine). Wire from OTR_ImageGenDispatcher.image_done so the video render cannot start before every episode still exists on disk (W4). Opaque STRING; the token is never parsed."
+     }
+    ]
+   }
+  }
+ },
+ "OTR_WorkflowValidator": {
+  "input": {
+   "required": {
+    "workflow_json_path": [
+     "STRING",
+     {
+      "multiline": false,
+      "default": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_scifi_16gb_full.json"
+     }
+    ],
+    "validate_anyway": [
+     "BOOLEAN",
+     {
+      "default": true
+     }
+    ],
+    "strict_unknown_types": [
+     "BOOLEAN",
+     {
+      "default": true
+     }
+    ]
+   },
+   "optional": {
+    "profile_id": [
+     "STRING",
+     {
+      "multiline": false,
+      "default": ""
+     }
+    ],
+    "master_hash": [
+     "STRING",
+     {
+      "multiline": false,
+      "default": ""
+     }
+    ],
+    "generated_by": [
+     "STRING",
+     {
+      "multiline": false,
+      "default": ""
+     }
+    ]
+   }
+  }
+ }
+}
