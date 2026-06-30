@@ -99,15 +99,30 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
   - **RETIRE engines:** `still_motion` (the fallback-floor twin of still_pan -- falls away with the
     rip-out), `station_card` (broken black card, missing `accepts_still`), and `abstract` (redundant
     with the real `visualizer`). Unregister + workflow-JSON dropdowns + ripple tests (the C3 pattern).
-  - **ADD `visualizer_rainbow` -- a CREATIVE shader-driven visual (operator 2026-06-29, "let's get real
-    creative ... fancy with shaders and stuff").** NOT just a recolored CRT: a fun, vibrant, GLSL/shader-
-    based audio-reactive piece (rainbow palette + generative shader effects -- plasma / flow-fields /
-    bloom / feedback, audio-driven). It REUSES `eng_visualizer.py`'s audio analysis (FFT / RMS / onsets)
-    to drive shader uniforms. Fills the fun-audio-reactive slot that `abstract` vacates. **Own
-    `/roundtable` for the creative direction + the shader stack** (GLSL via moderngl / ffmpeg GL filters /
-    a ComfyUI shader node -- pick during the roundtable) BEFORE building. Register + CAPABILITIES + node-87
-    dropdown + label ("Rainbow shader visualizer -- audio-reactive"). Creative sprint, schedule after the
-    correctness fixes (S-A..S-E core).
+  - **ADD `viz_mxc` (multi-colored OTR visualizer) -- HARDENED PLAN READY, BUILD AFTER THIS SOAK
+    (operator 2026-06-30).** The creative rainbow replacement for retired `abstract`. Kibitz r1+r2
+    CONVERGED (Claude Code + Codex + Antigravity + Claude anchor); coder contract:
+    **`docs/2026-06-30-viz-rainbow/VIZ_MXC_HARDENED_PLAN.md`**. Locked decisions (operator: must run on
+    AMD/Mac/any box -- NO GPU shaders for v1): ONE engine `viz_mxc_cpu`, `required_inputs=()`
+    (audio-OPTIONAL -> reactive when audio present, procedural OTR rainbow when not = ALSO the no-image
+    floor for scene/background; `accepts_still=False` so it never triggers z_image on a non-audio slot);
+    CPU **numpy/PIL paint -> `scope_draw.encode_silent_mp4`** ONLY (NO ffmpeg showcqt/showspectrum --
+    breaks the silent/frame-count contract); reuse `scope_draw.analyze_audio_np`; new shared
+    `paint_rainbow_frame`. OTR MYSTIQUE look (radio dial / tube / magic-eye / signal-spectrum sweep, muted
+    not neon, reuse `build_vignette`+`build_scanlines`+grain). WIRING must-fixes (same chunk): add to
+    `_uses_ambient_master_audio` + `ENGINE_FAMILY` + `content_oracle._FAMILY_FALLBACK`; CAPABILITIES row;
+    auto-derived label (NO custom label -- breaks `_engine_id_from_pick`); node-87 promotion is a separate
+    operator-gated chunk that updates the pinned `test_workflow_live_passes_validator` + 16gb_full profile
+    in one commit. `viz_mxc_gpu` (torch-compute, NVIDIA-first, fail-closed) DEFERRED to a later opt-in
+    spike -- never blocks the CPU tier. Build order C-mxc1..C-mxc3 in the plan. SCHEDULE: after the current
+    all-engines all-slots sweep/soak completes.
+  - **RENAME `visualizer` -> `viz_green` (companion to viz_mxc, operator 2026-06-30).** Pairs the green
+    CRT scope (`viz_green`) with the multi-colored `viz_mxc`. MODERATE/mechanical lift (~77 refs / 16 files
+    + the `8gb_lite`/`cpu_floor` profiles + node-87 in `otr_scifi_16gb_full.json`). Follow the EXACT
+    `still_kenburns -> still_motion` precedent: rename the engine `name` + CAPABILITIES key + all code/test
+    refs + the family maps + the `_uses_ambient_master_audio` gate, update the saved JSON values, AND add
+    `"visualizer": "viz_green"` to `_LEGACY_ENGINE_ALIASES` so old saved graphs/profiles still resolve.
+    Do it WITH the viz_mxc build (same files/gates) for efficiency; full suite + Bug Bible + B7 green + push.
   - **DROPDOWN LABELS:** every option states model + variant + recipe + VRAM tier (HuMo: 1.7B = LOW-VRAM
     ~3.3 GB fast draft / 14B = HIGH-VRAM ~15.9 GB max quality, spills on 16 GB; KEEP BOTH -- a real low/high
     split, operator 2026-06-29; which LTX,
