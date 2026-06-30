@@ -31,16 +31,23 @@ determinism; LOUD fallbacks; master audio byte-identical (`test_audio_byte_ident
 suite + Bug Bible + B7 green AND push per green chunk to v2.0-alpha. Keep EVERY engine
 user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 
-- **S-A [HIGH] VISUAL LEGIBILITY FLOOR + IMAGE CONTRACT.** Root cause (grounded on
-  `signal_lost_weight_of_the_blueprints_20260629_163656`): the saved ledger has NO `images`
-  key + empty cast portrait fields, while `stills_manifest.json` HAS the clean `c01` portrait
-  -> HuMo animates a wrong/empty init -> murky portrait, yet the completion gates PASS. Fix:
-  (1) preserve/stamp `ledger['images']` (or reload stills_manifest before render); (2) stamp
-  per-beat `init_source`/`init_image` into the clip manifest; (3) legibility guard after each
-  clip (sharpness RATIO vs source -- relative/catastrophic only; motion via freezedetect;
-  face-presence = phase 2); (4) on failure composite the clear still + subtle parallax;
-  (5) record `attempted_engine`/`delivered_engine`/`fallback_reason` via the EXISTING
-  humo->still_parallax LOUD restamp. Detail: `docs/2026-06-29-coverage-soak/RETEST_LIST.md` B2.
+- **S-A [HIGH] DELIVERY-QUALITY FLOOR (clip-fill + legibility).** NOT a routing bug -- a
+  short/dead generated clip is allowed to ship. Grounded + REPRODUCED on two episodes
+  (`weight_of_the_blueprints_163656`, `steel_against_skin_170522`): the announcer portraits
+  ARE present at render (`[portrait_ledger] still_b001/b005 ... recorded via ledger['images']`),
+  but `humo_1.7B` UNDERRUNS -- `CLIP UNDERRUN: shot_b005 rendered 177 frame(s) for a 434-frame
+  target (41%); the composite will HOLD the last frame for the rest of the beat`. The held
+  static last-frame IS the murky/dead plate (177 = HuMo per-clip frame ceiling vs long 405-434f
+  announcer beats). Completion gates (obs ships, audio byte-identical) PASS regardless. Fix,
+  priority: (1) **clip-fill** -- a motion engine that underruns LOOPS / ping-pong-extends to the
+  target (the composite's OWN recommendation), never holds the last frame; (2) **legibility
+  guard** after each clip (sharpness RATIO vs source -- relative/catastrophic only; motion via
+  freezedetect; face-presence = phase 2); (3) on failure composite the clear still + subtle
+  parallax; (4) record `attempted_engine`/`delivered_engine`/`fallback_reason` via the EXISTING
+  humo->still_parallax LOUD restamp. SECONDARY/forensic (aids diagnosis, NOT the cause):
+  preserve `ledger['images']` durably (`production_ledger._merge_with_disk` drops top-level
+  `images`) + stamp per-beat `init_image_used`/`init_source`. (HuMo phrase-chunking in S-C
+  attacks the same underrun root.) Detail: `docs/2026-06-29-coverage-soak/RETEST_LIST.md` B2.
 - **S-B ltx_audio_in VRAM FIT (regression).** Breaches the 14.5 GB ceiling (~15.9 GB,
   `eng_ltx_av.py:687`) and hard-fails in all 3 slots. Regression: `7bbce1d8` "bakeoff-winner
   quality upgrade (PROVISIONAL)" + `fd9edc28` switched to dev-Q3_K_M + SHARP LoRA (~15.5 GB);

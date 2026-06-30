@@ -30,31 +30,39 @@ selective CIM reset before each isolated run (never a blanket python kill).
 
 ## B2. VISUAL LEGIBILITY FLOOR + IMAGE CONTRACT (operator-directed 2026-06-29) -- HIGH PRIORITY
 
-ROOT CAUSE CONFIRMED (grounded on `signal_lost_weight_of_the_blueprints_20260629_163656`):
-the saved ledger has **NO `images` key** and all 3 cast rows have **empty portrait
-fields `{}`**, yet `stills/stills_manifest.json` beside it HAS the clean contract
-(`c01` portrait, `role: announcer_visual`, real path + content_hash). So the clean
-announcer portrait exists but the video render never got a durable "beat -> portrait"
-mapping -> HuMo animated a wrong/empty/degraded init -> the murky helmet-blob center
-plate. The source still is fine; the **image contract between stills_manifest and the
-ledger/render is broken.** This passes the completion gates (obs ships, audio
-byte-identical) while shipping a visually broken clip -- same class as the duration-gate
-bug. Fix = QUALITY FLOOR, not choice-limiting (keep every engine selectable).
+ROOT CAUSE CONFIRMED + REPRODUCED (render logs for `weight_of_the_blueprints_163656`
+AND `steel_against_skin_170522`): this is a "bad/short generated clip was allowed to
+ship" bug, NOT a routing-choice bug and NOT (primarily) a missing-image bug.
+- The announcer portraits ARE present at render: `[portrait_ledger] still_b001/b005 ...
+  recorded via ledger['images']`. HuMo got real image data.
+- `humo_1.7B` UNDERRUNS: `CLIP UNDERRUN (LOUD): shot_b005 rendered 177 frame(s) for a
+  434-frame target (41%) -- the composite will HOLD the last frame for the rest of the
+  beat ... investigate 'humo_1.7B'`. The held static last-frame IS the murky/dead plate
+  (177 = HuMo per-clip frame ceiling vs the long 405-434f announcer beats).
+- Completion gates (obs ships, audio byte-identical) PASS regardless -- same class as the
+  duration-gate bug: a visually broken clip passes the non-visual gates.
+- The saved ledger LOSING `images` (`production_ledger._merge_with_disk` drops top-level
+  `images`; in-memory ledger from `OTR_ImageGenDispatcher` DID carry them into
+  `OTR_VideoRenderBatch`) is a FORENSIC gap, not the render cause. `video_readiness=0`
+  is a stale EARLY check of legacy cast-row portrait fields -- not the modern contract.
+Fix = QUALITY FLOOR, not choice-limiting (keep every engine selectable).
 
 Sequenced (video-only; master audio immutable; reuse the existing humo->still_parallax
 LOUD durable-restamp chain; suite + Bug Bible + B7 per chunk):
-1. **Preserve/stamp `ledger['images']`** into the final saved ledger (or reload
-   `stills_manifest.json` before video render) so each beat KNOWS its portrait/still.
-   PRIMARY fix -- likely resolves the murk at the source (HuMo gets the clean c01).
-2. **Stamp per-beat `init_source` / `init_image`** into the clip manifest (proves #1).
-3. **Legibility guard after each generated clip:** sharpness (variance-of-Laplacian
-   RATIO vs the source -- RELATIVE/catastrophic only; HuMo 480x832 is inherently softer,
-   an absolute "blurrier than source" check would flag every HuMo beat), motion (reuse
-   freezedetect), subject-presence (face-detect = phase 2, heavier).
-4. **On guard failure, composite the clear source still with subtle parallax/pan** --
-   never ship a murky/dead generated clip when a clean source plate exists.
-5. **Record `attempted_engine` + `delivered_engine` + `fallback_reason`** in the ledger
+1. **Clip-fill (PRIMARY):** a motion engine that underruns its frame target LOOPS /
+   ping-pong-extends to the target (the composite's own recommendation) instead of holding
+   the last frame -> motion across the whole beat, no frozen plate.
+2. **Legibility guard after each clip:** sharpness (variance-of-Laplacian RATIO vs the
+   source -- RELATIVE/catastrophic only; HuMo 480x832 is inherently softer, an absolute
+   "blurrier than source" check would flag every HuMo beat), motion (reuse freezedetect),
+   subject-presence (face-detect = phase 2, heavier).
+3. **On guard failure, composite the clear source still with subtle parallax/pan** --
+   never ship a murky/dead/frozen generated clip when a clean source plate exists.
+4. **Record `attempted_engine` + `delivered_engine` + `fallback_reason`** in the ledger
    (the existing A2 restamp pattern); the dropdown choice is preserved as "attempted".
+5. **SECONDARY/forensic:** preserve `ledger['images']` durably + stamp per-beat
+   `init_image_used` / `init_source` (aids diagnosis; not the cause). HuMo phrase-chunking
+   (section E) attacks the same underrun root -- shorter beats fit HuMo's 177-frame budget.
 
 ## C. SILENT-FALLBACK AUDIT (the "Rendered" column)
 
