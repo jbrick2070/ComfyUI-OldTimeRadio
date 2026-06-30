@@ -31,6 +31,7 @@ from .._otr_shared.engine_registry_base import (
 
 __all__ = [
     "VideoEngine",
+    "VideoEngineRegistry",
     "EngineUnusable",
     "EngineUsabilityReason",
     "register",
