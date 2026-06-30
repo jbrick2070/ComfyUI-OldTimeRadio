@@ -1,8 +1,33 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-29 | HEAD 1572861b == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-06-29 | HEAD 9e4f3a33 == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY.** Completed/shipped work lives in `docs/GO_FORWARD_ARCHIVE.md` -- do NOT
 > record done work here. prod/main + tags remain operator-GATED.
+
+> **SPRINT EXECUTION STATUS (session 2026-06-29 eve -- code-only chunks, all green+pushed):**
+> SHIPPED: **S-F** (`c6c50579` visual smoke fixture: pruned node-92 prompt + bundle baker +
+> node-92 input capture), **S-A** (`4e13a692` clip-fill loop on underrun + delivered-frames
+> legibility floor + freezedetect parse), **S-B** (`eb8c3781` ltx_audio_in VRAM-fit observability
+> + recipe receipt; the canvas is already 512x288, the fit lever is recipe/quant), **S-D**
+> (`5a50fa40` gemma `{"RadioEditPlan":{...}}` unwrap), **S-E5** (`9e4f3a33` ledger recipe-stamp
+> per_clip/by_engine). Suite 5766p/0f + Bug Bible green at each push. **BUG-411** code = DONE
+> (bookend seed 4242 verified present `otr_image_gen_dispatcher.py:129`; remaining = operator
+> look-QA eyeball only).
+> NEEDS OPERATOR / GPU (not safely autonomous):
+> - **S-E E1 + E3 (no-fallback scaffolding rip-out + engine retirement)** -- ENTANGLED with the
+>   A-S7.5 soak (`make_fallback_of` / `EXPECTED_OOM_TRAIL` / `_PROFILES` / `build_soak_fixture` /
+>   `run_gpu_soak` / `assert_soak_ok` all share the constants E1 removes). The SPRINT_PLAN E1
+>   scopes "migrate the run_real_episode/render_single call sites + constants + fallback tests"
+>   but does NOT say whether the soak's forced-OOM degradation DEMO gets gutted or preserved.
+>   OPERATOR DECISION NEEDED before the rip-out (operator-intent, not a roundtable question).
+> - **S-E E4 (dropdown labels) + E6 (radio-still bookend)** -- E4 changes the combo OPTION
+>   strings that saved workflow-JSON values must match (JSON-adjacent); E6 is an image-prompt
+>   change best validated by the look-QA eyeball. Defer with E1/E3.
+> - **S-C C1 (audio_motion_profile producer)** -- new node; wire into the workflow JSON per the
+>   hard rule (own chunk).
+> - **Live GPU batch (task)** -- reset+boot fresh server (loads the new node-92 capture + S-A
+>   clip-fill), run ONE clean 30w reference -> S-F replay (executed=={92}) + S-A render proof
+>   (delivered frames==target, no held murk, audio byte-identical) + S-B NVML<=14.5GB x3 slots.
 
 ## 1. CURRENT STEP -- 30-WORD COVERAGE SOAK (in progress)
 
