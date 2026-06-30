@@ -43,3 +43,48 @@ def test_radioeditplan_parses_edits_with_index_alias():
         "projected_word_total": 120,
     })
     assert [x.beat_index for x in plan.edits] == [0, 1]
+
+
+# ---------------------------------------------------------------------------
+# S-D: gemma wrapper-key drift -- {"RadioEditPlan": {...}} unwrap
+# ---------------------------------------------------------------------------
+import pytest  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+
+
+def test_unwrap_schema_name_wrapper():
+    # gemma nests the plan one level deep under its schema name -> made
+    # projected_word_total read as 'missing' -> retries exhausted -> length
+    # normalization silently skipped. The unwrap peels EXACTLY this wrapper.
+    plan = RadioEditPlan.model_validate({
+        "RadioEditPlan": {"edits": [{"index": 0, "action": "KEEP"}],
+                          "projected_word_total": 90}})
+    assert plan.projected_word_total == 90
+    assert [x.beat_index for x in plan.edits] == [0]
+
+
+def test_unwrapped_plan_unchanged():
+    plan = RadioEditPlan.model_validate(
+        {"edits": [{"index": 1, "action": "KEEP"}], "projected_word_total": 50})
+    assert plan.projected_word_total == 50
+    assert [x.beat_index for x in plan.edits] == [1]
+
+
+def test_single_key_non_wrapper_plan_ok():
+    # a single-key plan whose key is NOT the schema name is left alone.
+    plan = RadioEditPlan.model_validate({"projected_word_total": 30})
+    assert plan.projected_word_total == 30 and plan.edits == []
+
+
+def test_multi_key_wrapper_rejected():
+    # an AMBIGUOUS multi-key wrapper is NOT unwrapped -> fails LOUD.
+    with pytest.raises(ValidationError):
+        RadioEditPlan.model_validate({
+            "RadioEditPlan": {"edits": [], "projected_word_total": 10},
+            "stray": 1})
+
+
+def test_non_dict_inner_wrapper_not_unwrapped():
+    # a wrapper whose inner is not a dict is left alone -> fails LOUD.
+    with pytest.raises(ValidationError):
+        RadioEditPlan.model_validate({"RadioEditPlan": [1, 2, 3]})

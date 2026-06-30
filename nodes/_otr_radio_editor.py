@@ -321,6 +321,25 @@ class RadioEditPlan(BaseModel):
     edits: List[BeatEdit] = Field(default_factory=list)
     projected_word_total: int = Field(..., ge=0)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_schema_name_wrapper(cls, data):
+        """S-D (gemma wrapper-key drift): some local writers (gemma) emit the
+        plan nested under a top-level schema-name key --
+        ``{"RadioEditPlan": {"edits": [...], "projected_word_total": N}}`` --
+        which made ``projected_word_total`` read as 'missing', exhausted the
+        retry ladder, and SILENTLY skipped length normalization (warn-only).
+
+        Peel EXACTLY a single ``{"RadioEditPlan": {...}}`` wrapper (the class
+        name, dict-only inner). An AMBIGUOUS / multi-key wrapper, a wrong key, or
+        a non-dict inner is LEFT UNTOUCHED so it still fails LOUD -- never
+        silently reinterpret a malformed payload. Narrow + local; NOT the shared
+        tolerant alias core (BeatEdit._accept_field_aliases)."""
+        if (isinstance(data, dict) and len(data) == 1
+                and isinstance(data.get(cls.__name__), dict)):
+            return data[cls.__name__]
+        return data
+
 
 # ---------------------------------------------------------------------------
 # Word / char counting -- match the writer's stamp formula
