@@ -26,6 +26,13 @@ the engine under test, never a frozen pin). 52 legs, resumable.
 
 ## 1A. CONSOLIDATED NEXT STEPS (post-soak sprints, priority order)
 
+> **WIRE-READY hardened plan (kibitz r1-r4 CONVERGED 2026-06-29): `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.**
+> Grounded corrections that supersede the summary bullets below: BUG-411 already done (look-QA seed check
+> only); no-fallback already enforced at render time (S-E = scaffolding cleanup + DEPRECATE
+> `allow_auto_fallback`, not a behavior change); recipe-stamp extends `meta.render_engines`; S-F = a pruned
+> API prompt + baked asset bundle (ComfyUI MCP executes it); HuMo cfg is NOT a regression (mush = S-A clip
+> underrun); engine-retirement is separable/deferrable. The SPRINT_PLAN is the coder-window contract.
+
 Every sprint: video/content-only where noted; single resident heavy <= 14.5 GB; seed-keyed
 determinism; LOUD fallbacks; master audio byte-identical (`test_audio_byte_identical` GREEN);
 suite + Bug Bible + B7 green AND push per green chunk to v2.0-alpha. Keep EVERY engine

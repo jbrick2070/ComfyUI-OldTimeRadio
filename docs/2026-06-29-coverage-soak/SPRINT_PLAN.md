@@ -1,221 +1,139 @@
-# OTR COVERAGE-SOAK FIX SPRINT -- WIRE-READY PLAN (2026-06-29)
+# OTR COVERAGE-SOAK FIX SPRINT -- WIRE-READY PLAN (kibitz-CONVERGED 2026-06-29)
 
-Single consolidated plan for every fix the 30-word coverage soak surfaced (every video + image
-engine x 3 dropdown slots, writer = local gemma). Target for a kibitz hardening pass, then a fresh
-coder window executes it. Keep it LEAN and wire-ready.
+Hardened across a full 4-round kibitz arc (Codex/gpt-5.5 panel + Claude code-grounded judging;
+Antigravity out of credits -> Codex-only panel). r4 verdict: CONVERGED. Every claim below is grounded
+against the real Windows files. This is the coder-window contract; raw rounds + judgments in
+`kibitz-runs/2026-06-29-otr-soak-fixes/`.
 
-- Branch: `v2.0-alpha`. Workflow of record: `workflows/otr_scifi_16gb_full.json` (node-87
-  `OTR_VideoDirector` carries the slot dropdowns).
-- Two dropdown families per beat-role: an IMAGE engine (mints the still) and a VIDEO engine
-  (animates it). Three video slots: `announcer_visual` / `music_visual` / `other_beats_visual`.
+## INVARIANTS (a fix that breaks one is rejected)
+- `workflows/otr_scifi_16gb_full.json` is the production workflow: any node/wiring/widget change goes IN
+  it in the SAME commit; positional `widgets_values` (append-only); re-validate (`OTR_WorkflowValidator`
+  + JSON round-trip + link/widget audit).
+- Single resident heavy <= 14.5 GB; 100% local/offline; seed-keyed determinism; UTF-8 no BOM; SFW; no
+  "dummy".
+- Master audio BYTE-IDENTICAL (`test_audio_byte_identical` GREEN); audio spine FROZEN; conditioning WAVs
+  model-input ONLY.
+- NO FALLBACKS -- ALREADY enforced at render time (`render_shot` raises LOUD, `render_driver.py:1526-1553`).
+- Suite + Bug Bible + B7 after every change; commit AND push per green chunk to `v2.0-alpha`; verify
+  HEAD==origin / no 0-byte / no BOM / AST parse.
 
-## INVARIANTS (apply to EVERY sprint -- a "fix" that breaks one is rejected)
+## CORRECTION (do NOT chase): HuMo "mush" is NOT a cfg regression
+`eng_humo.py` cfg defaults are deliberate + measured (14B distill 1.0; 1.7B 1.0 de-blued 2026-06-17 from
+5.0; 1.7B_169 2.5). Motion is AUDIO-driven, not cfg. Real cause = the clip underrun (S-A).
 
-- `otr_scifi_16gb_full.json` is the production workflow: ANY node / wiring / widget change goes IN
-  it in the SAME change as the code (unwired code is dead). Re-validate after: `OTR_WorkflowValidator`
-  + JSON round-trip + link/widget audit. `widgets_values` is POSITIONAL -- only APPEND optional
-  widgets at the end.
-- Single resident heavy engine <= 14.5 GB (host NVML); 100% local / offline; determinism seed-keyed;
-  UTF-8 no BOM; SFW; never "dummy" (use placeholder/stub).
-- Master audio BYTE-IDENTICAL (`test_audio_byte_identical` stays GREEN); the audio spine is FROZEN
-  (mux-LAST, no `-shortest`). Any conditioning WAV is model-input ONLY -- never touches the master.
-- NO FALLBACKS (operator 2026-06-29): a selected engine RENDERS or HARD-FAILS LOUD with a named
-  reason. No silent degrade to stills.
-- Run the regression suite + Bug Bible + the B7 forbidden-sweep after EVERY code change; commit AND
-  push per green chunk to `v2.0-alpha`; verify HEAD==origin / no 0-byte / no BOM / AST parse.
-
-## CORRECTION baked in -- do NOT chase a HuMo cfg regression
-
-HuMo "mush" is NOT a cfg regression. `eng_humo.py` cfg defaults are deliberate + measured: 14B
-distill = cfg 1.0 (`_cfg`); 1.7B portrait = cfg 1.0 (de-blued 2026-06-17, was 5.0 -- 5.0 measured a
-strong blue cast, B-R +44.6 vs the source still's +25); 1.7B_169 = cfg 2.5 (sweep sweet spot); 14B_169
-inherits 1.0. The header comment states HuMo motion is AUDIO-driven, not cfg. The real cause of the
-soft/frozen picture is the CLIP UNDERRUN (S-A). Any panelist who proposes "raise HuMo cfg" is wrong --
-verify against `eng_humo.py` `_cfg()` methods.
-
-## RECOMMENDED ORDER (panel: confirm or re-sequence)
-
-S-F FIRST (accelerator -- collapses every other sprint's test loop), then S-A, S-B, S-D, S-E core,
-S-C, then BUG-411 (parallel look-QA track). `visualizer_rainbow` is a creative sprint scheduled AFTER
-the correctness fixes (own roundtable first).
+## ORDER
+S-F (bake from a CLEAN no-underrun reference) -> S-A -> S-B -> S-D -> S-E (no-fallback cleanup, THEN
+engine-retirement, THEN labels/recipe-stamp/radio-still) -> S-C (split, deferred tail) -> BUG-411 (look-QA
+verify). `visualizer_rainbow` deferred (own `/roundtable`).
 
 ---
 
-## S-F  VISUAL SMOKE FIXTURE  [ACCELERATOR -- do FIRST]
-
-GOAL: test visual engines without re-running the writer + audio on every leg.
-
-WHY: today every coverage leg re-runs gemma (minutes) + the full audio path (TTS + music) just to
-exercise a VISUAL engine -- most of the ~28 min/leg, and a DIFFERENT story each run (not
-apples-to-apples).
-
-DESIGN: BAKE one good 30-word episode's master audio + story ledger (cast / brief / beat structure /
-per-beat durations / portrait hashes) ONCE into a fixture; INJECT it and run only
-stills -> video -> composite -> mux. Each engine test then swaps ONLY the image/video engine.
-
-SEAM: the MIRROR of the existing audio-only soak, which PRUNES the graph at node-7 `EpisodeAssembler`
-to skip video (`scripts/_otr_soak_phase0.py` / `_otr_soak_phase1.py`). This starts FROM that boundary
-(frozen audio + `/otr/latest_ledger`) and skips the writer (node 1) + audio nodes.
-
-PAYOFF: ~28 min/leg -> just the render tail; identical story+audio every run = clean per-engine
-eyeball; master audio byte-identical for FREE (same baked WAV).
-
-CONSTRAINT: TEST harness ONLY -- no production-path change; the real workflow still writes a fresh
-story each episode. Inject via profile/role overrides + a fixture loader, not by editing the
-production graph.
-
-ACCEPTANCE: a fixture leg renders stills+video+composite+mux with NO writer/audio node execution
-(prove via the run trace), audio byte-identical to the baked master, total time = render tail only.
-
-OPEN: where exactly to inject the frozen ledger so the still/video stages consume it unchanged
-(portrait hashes + per-beat durations must survive `production_ledger._merge_with_disk`, which today
-drops the top-level `images`). Panel: name the cleanest inject point.
-
----
+## S-F  VISUAL SMOKE FIXTURE  [ACCELERATOR]
+GOAL: test visual engines without re-running writer + audio per leg.
+MECHANISM: submit a PRUNED ComfyUI API prompt of ONLY the render-tail nodes -- ComfyUI executes EVERY
+OUTPUT_NODE in a prompt, so the full graph would re-pull writer+audio (MasterAudioMux/SceneSequencer/
+SceneAwareScopes/PostUpscaleProcgenBlend are all OUTPUT_NODEs). DIRECTLY PATCH node-92
+(`OTR_VideoRenderBatch`) converted API-prompt inputs to baked literals -- `patched_ledger_json`,
+`master_audio_path`, `image_done` (forceInput defaults `otr_video_render_batch.py:77-99`; empty/invalid
+fixture JSON fails :173-181). Do NOT add constant producer nodes (`otr_api.py` converts widgets/links
+only). Build on `otr_coverage_sweep.py` + `otr_api.py` + the ComfyUI MCP (submit prompt + read /history).
+BAKE A BUNDLE (not just audio+ledger): the ledger + master audio + EVERY ledger-referenced portrait /
+scene still / mesh-fodder asset (`build_request_from_shot` resolves them `render_driver.py:842-944`;
+`ltx_audio_in` fails loud without the init image `eng_ltx_av.py:629-635`). REWRITE ledger asset paths to
+the bundle, and PREFLIGHT `Test-Path` + hash each referenced asset before submitting. Use a CLEAN
+reference episode (no underrun).
+ACCEPTANCE: the `/history` executed-node set is EXACTLY `{92}` (or `{63, 92}` if the validator runs --
+node 63 `OTR_WorkflowValidator` is itself OUTPUT_NODE, `_otr_workflow_validator.py:197-198`); writer
+node 1 + audio nodes ABSENT; all 6 beats render; baked master audio hash unchanged before/after; time =
+render tail; stamp a fixture HASH per leg.
 
 ## S-A  CLIP-FILL + LEGIBILITY FLOOR  [HIGH]
-
-GOAL: a motion clip that renders fewer frames than its beat must FILL the beat with motion, never a
-held / frozen last frame.
-
-ROOT CAUSE (grounded, reproduced on 2 episodes): `humo_1.7B` underruns --
-`CLIP UNDERRUN: shot_b005 rendered 177 frame(s) for a 434-frame target (41%); the composite will HOLD
-the last frame for the rest of the beat`. 177 = the HuMo per-clip ceiling; the 14B is capped at 49
-frames for VRAM safety (`eng_humo.py:61`). The held static last frame IS the dead/mushy plate.
-Completion gates (obs ships, audio byte-identical) PASS regardless -- invisible to the harness.
-
-FIX (priority):
-1. CLIP-FILL -- a motion engine that underruns LOOPS / ping-pong (boomerang) extends to the target
-   frame count (the composite's OWN recommendation), never holds the last frame. Touch the HOLD path
-   in `otr_silent_composite.py`.
-2. LEGIBILITY GUARD after each clip -- sharpness RATIO vs the source still (relative / catastrophic
-   only) + motion via `freezedetect`. On failure -> HARD FAIL LOUD (NO fallback, per S-E), restamp
-   `delivered_engine` / `fail_reason` in the ledger. (face-presence check = phase 2.)
-3. FORENSIC (aids diagnosis, not the cause): preserve `ledger['images']` durably (today
-   `production_ledger._merge_with_disk` drops top-level `images`); stamp per-beat
-   `init_image_used` / `init_source`.
-
-ACCEPTANCE: a long-beat HuMo episode shows continuous motion to beat end (`freezedetect` held% under
-threshold); no silent still-swap; audio byte-identical.
-
-NOTE: S-C HuMo phrase-chunking attacks the SAME underrun root from the audio side -- sequence so they
-do not collide (panel to advise: boomerang-extend vs chunk-the-audio as the PRIMARY).
-
----
+ROOT CAUSE: clips underrun the beat; the composite holds the last frame (`tpad=clone`).
+`_warn_clip_underrun` (`otr_silent_composite.py:243`) already detects. CAP: `_HUMO_MAX_FRAMES=177` for
+base humo/1.7B; only `humo_14B_169` caps at 49 -> fill is SIZE-AGNOSTIC (`frame_count < target`).
+FIX: in `plan_timeline_segments` compute `should_loop` (real clip row: `exists && path && frame_count>0
+&& frame_count < target`) BEFORE `_warn_clip_underrun` so the LOUD warning stops once fill is on
+(`otr_silent_composite.py:243-257, 325-339`); set `loop=True` for those rows (reuse the credits-tail loop
+path); keep `tpad`/`loop=False` for floor/credits/non-loop sources (`:360-368, 395-411, 645-649`).
+MANIFEST CONTRACT (r4): KEEP raw `frame_count` = engine output (`build_clip_manifest`,
+`render_driver.py:2000-2008`) so the loop decision still fires. Add a SEPARATE `delivered_frame_count` /
+`segment_frame_count` check AFTER `plan_timeline_segments`/`assemble_silent_timeline`; put `freeze_score`
+/ `quality_status` / `fail_reason` in the COMPOSITE report / a post-assemble QA artifact -- do NOT
+overwrite raw manifest semantics.
+LEGIBILITY GUARD (STAGED): FIRST commit = assert DELIVERED segment frames == target + `freezedetect` on
+the SILENT video only (never the master). DEFER sharpness-ratio gating to a later commit.
+ACCEPTANCE: delivered segment/output frames == target after loop-fill; raw `frame_count` stays engine-
+produced; `test_audio_byte_identical` + composite tests green.
 
 ## S-B  ltx_audio_in VRAM FIT  [HIGH]
-
-GOAL: `ltx_audio_in` renders within the 14.5 GB ceiling in all 3 slots (today it hard-fails ~15.9 GB,
-`eng_ltx_av.py:687`).
-
-ROOT CAUSE: regression `7bbce1d8` (bakeoff "quality upgrade", PROVISIONAL) + `fd9edc28` (switched to
-dev-Q3_K_M + SHARP LoRA, ~15.5 GB). Last-good = `c4d7815b` base recipe @ 512x288 = 13688 MB.
-
-FIX (in order): (1) OBSERVABILITY FIRST -- per-beat log recipe / unet / quant / LoRA / canvas /
-frames / audio-source / phase-marker / peak VRAM; (2) RE-FIT via recipe / quant / offload
-(`OTR_LTX_AV_RECIPE=distilled_native` / lighter quant), NOT higher resolution; quality/resolution
-tiers LAST, probe-gated. Replace the stale `13688` comment in `render_driver.py` with "see runtime
-logs / bakeoff manifest".
-
-WIRING: confirm the node-87 ltx canvas widget in the JSON matches the chosen canvas (default
-512x288).
-
-ACCEPTANCE: `ltx_audio_in` renders in all 3 slots; render-phase NVML <= 14.5 GB; audio byte-identical.
-
----
-
-## S-C  AUDIO-IN CONDITIONING  [MED]
-
-GOAL: a shared per-beat `audio_motion_profile` (rms / peak / onset / silence / brightness /
-dynamic-range / speech-vs-music / duration) drives EVERY engine -- audio-in engines get real audio;
-non-audio engines get prompt / camera / parallax / light from the profile.
-
-NOTES: normalized conditioning WAVs are model-input ONLY (master untouched -> byte-identical holds).
-HuMo phrase-chunking for long dialogue (chunk to the 49-frame cap, mirror-extend per chunk) also
-attacks the S-A underrun root. Probe-gated HQ tiers last.
-
----
+ROOT CAUSE: regression `7bbce1d8`+`fd9edc28` (~15.9 GB, `eng_ltx_av.py:687`); last-good `c4d7815b`
+@512x288=13688 MB. FIX: observability FIRST (per-beat recipe/unet/quant/LoRA/canvas/frames/audio-source/
+phase/peak VRAM), then re-fit via recipe/quant/offload (not higher res).
+WIRING: canvas is a `render_driver` override, env-overridable via `OTR_LTX_AV_RENDER_CANVAS`
+(applied `render_driver.py:1173-1179`), NOT a node-87 widget. ACCEPTANCE: explicitly SET + RECORD (in the
+bakeoff/run manifest) the effective `OTR_LTX_AV_RENDER_CANVAS=512x288` + the canvas applied in
+`build_request_from_shot` + measured NVML peak <= 14.5 GB across all 3 slots; audio byte-identical.
+Replace the stale `13688` comment with a bakeoff-manifest link.
 
 ## S-D  gemma normalize_length WRAPPER-KEY DRIFT  [MED]
+FIX: add `@model_validator(mode="before")` on `RadioEditPlan` (`_otr_radio_editor.py:316-323`, NO
+before-validator today) that unwraps EXACTLY `{"RadioEditPlan": {...}}` and REJECTS ambiguous/multi-key
+wrappers -- NOT the shared tolerant core. Add the multi-key-wrapper regression in the SAME commit.
 
-GOAL: every gemma episode applies length normalization (today skipped warn-only).
+## S-E  NO-FALLBACKS CLEANUP + ENGINE-MENU + UX  [HIGH] -- ordered sub-steps
+E1. NO-FALLBACK SCAFFOLDING (runtime already loud): `make_fallback_of` is STILL CALLED (run_real_episode
+   `render_driver.py:1737`, render_single `:2217`); migrate those call sites + the constants
+   (`FLOOR_NAMES`/`UNIVERSAL_FLOOR`/`SYNTH_FALLBACKS`/`ENGINE_FAMILY`/`_PROFILES`/`EXPECTED_OOM_TRAIL`,
+   `render_driver.py:46-107,146,157-159,2282`; `eng_character_3d.py:55,257,326`) + the fallback tests
+   (`test_video_character_3d.py:363-369`, `test_video_render_driver_additive.py:77-82`) in ONE commit.
+E2. `allow_auto_fallback` = DEPRECATE-IN-PLACE (NOT delete this sprint): keep node-87 input/widget (wv13)
+   + `direct()` signature (`otr_video_director.py:216,278-283,342`), force it false in the emitted policy,
+   relabel "(deprecated)". Deletion shifts wv14..18 and `otr_api.py:608-617` hard-fails on widget-length
+   drift -- do a clean delete only as a SEPARATE JSON rebaseline.
+E3. ENGINE RETIREMENT (SEPARABLE / can defer -- bigger than dropdowns): `still_motion`/`station_card`/
+   `abstract` live in the floor constants above + `cheap_families.py:165-190` + capability rows
+   `registry.py:127-133` + soak-fixture expectations + tests. Do this AFTER E1 (the floor constants are
+   gone by then). Migrate every remaining runtime constant / soak fixture / capability row / test, then
+   unregister + remove node-87 dropdown options (current saved node-87 values are
+   visualizer/flux_gen1/humo_14B_169 -- none is a retired engine, so NO widget-value rewrite needed).
+E4. DROPDOWN LABELS: MUST stay `engine_id (display metadata...)` -- `_engine_id_from_pick` parses text
+   BEFORE the first `" ("` (`otr_video_director.py:61-87,105-125`). Add a registry display field; render
+   e.g. `humo_1.7B (HuMo 1.7B, portrait, LOW-VRAM ~3.3 GB)`, `humo (HuMo 14B, portrait, HIGH-VRAM
+   ~15.9 GB)` -- KEEP BOTH HuMos. Add a test: every `_video_model_combo()` label round-trips through
+   `_engine_id_from_pick`.
+E5. RECIPE-STAMP: extend the EXISTING versioned `meta.render_engines` payload (today: histogram /
+   video_revision / by_role / vram_peak_mb; `otr_video_render_batch.py:26-49`) -- PRESERVE those keys, add
+   a `per_clip`/`by_engine` recipe block (`delivered_engine` + recipe/quant); engines without recipe
+   fields -> `recipe=null` (never drop the existing keys). PREREQ: engines must RETURN
+   recipe/unet/lora/quant/canvas/audio_source/phase in the raw clip (`eng_ltx_av` returns only
+   out_path/frame_count/vram_peak_mb; `_clip_from_raw` keeps only vram_peak_mb,
+   `eng_ltx_av.py:621-627,691-694,776-788`) -> thread into `build_clip_manifest` -> the payload. `meta`
+   is per-key merged by `_merge_with_disk` (durable); do NOT touch `TOP_PRESERVE`.
+E6. ANNOUNCER + MUSIC = always a radio-themed still (broadcast-studio vocab already at
+   `otr_meta_brief_image_prompt.py:127`); never black/abstract/fallback.
+E7. ADD `visualizer_rainbow` -- DEFERRED (own `/roundtable` for the GLSL shader stack first; reuses
+   `eng_visualizer.py` audio analysis).
 
-ROOT CAUSE: gemma returns the RadioEditPlan nested under a top-level `RadioEditPlan` key ->
-`projected_word_total` reads "missing" -> the retry ladder exhausts -> normalization skipped. Fix the
-LEVER-1 tolerant-unwrap to peel a top-level schema-name wrapper; retest on a gemma leg.
+## S-C  AUDIO-IN CONDITIONING  [split -- deferred tail]
+C1 = `audio_motion_profile` extraction + ledger stamp (schema field, producer node, IS_CHANGED/cache key,
+PROVE conditioning WAVs never replace the master). C2 (deferred) = per-engine consumers + HuMo
+phrase-chunking. Not needed to land S-A/S-B/S-F.
 
----
+## BUG-411  [look-QA verify -- DONE except one check]
+FluxGuidance @3.5 (`flux_gen1.py:88-92,130-135`), cinematic grade tail (`otr_meta_brief_image_prompt.py
+:535`), radio distress tail (:805), portrait STYLE_ANCHOR (:92) ALL present. VERIFY only the bookend
+seed 4242; implement only if missing. No JSON node (image gen runs through `OTR_ImageGenDispatcher`).
 
-## S-E  NO-FALLBACKS + ENGINE-MENU + UX CLEANUP  [HIGH] (operator directives 2026-06-29)
+## VERIFY-AT-BUILD CHECKLIST (r4)
+1. S-F: pruned prompt renders all beats from the baked BUNDLE, no missing-dependency error.
+2. S-F: `/history` executed set == `{92}` or `{63,92}`; writer node 1 + audio nodes absent.
+3. S-F: baked master audio hash unchanged before/after; every bundle asset preflight-exists + hash-matches.
+4. S-E: `allow_auto_fallback` stays in node-87 widgets/signature, policy forces false, `otr_api.py`
+   conversion green.
+5. S-E: every displayed label parses back to a registered engine id via `_engine_id_from_pick`.
+6. S-A: raw `frame_count` stays engine-produced; delivered segment frames == target after loop-fill;
+   `test_audio_byte_identical` + composite tests green.
+7. S-B: `OTR_LTX_AV_RENDER_CANVAS=512x288` set + recorded; NVML peak <= 14.5 GB across all 3 slots.
 
-- NO FALLBACKS / hard-fail: rip out the fallback chains (`resolve_fallback_chain` / `SYNTH_FALLBACKS`
-  / the `humo -> still` degrade). A selected engine RENDERS or raises a LOUD hard error. S-A's
-  legibility floor becomes detect-and-FAIL, not a still-swap.
-- RETIRE engines: `still_motion` (fallback-floor twin of `still_pan`), `station_card` (broken black
-  card, missing `accepts_still`), `abstract` (redundant with `visualizer`). Unregister + remove from
-  the node-87 JSON dropdowns + ripple the tests (the C3 rename pattern). `cheap_families.py`.
-- DROPDOWN LABELS: every option states model + variant + recipe + VRAM tier. HuMo: 1.7B = LOW-VRAM
-  ~3.3 GB fast draft / 14B = HIGH-VRAM ~15.9 GB max quality (spills 16 GB) -- KEEP BOTH (a real
-  low/high split). Which LTX, Wan i2v/ti2v, image model; "visualizer = audio-reactive, no scene
-  image".
-- STAMP RECIPE IN LEDGER: per-beat `delivered_engine` (video) + `image_engine` + `recipe/quant`,
-  DURABLE through `production_ledger._merge_with_disk` (which today drops top-level `images`), so
-  every episode self-documents what made it ("what did I use?" is unanswerable from saved files
-  today).
-- ANNOUNCER + MUSIC = always a radio-themed still (vintage radio in the scene) -- never a black card /
-  abstract / fallback; the on-brand bookend default. Image-prompt change
-  (`otr_meta_brief_image_prompt.py`).
-- ADD `visualizer_rainbow` (CREATIVE, schedule LAST): a GLSL/shader audio-reactive visual (rainbow
-  palette + plasma / flow-fields / bloom / feedback), reusing `eng_visualizer.py`'s audio analysis
-  (FFT / RMS / onsets) to drive shader uniforms. Own `/roundtable` for the shader stack + creative
-  direction BEFORE building. Register + CAPABILITIES row + node-87 dropdown + label.
-
----
-
-## BUG-411  flux CINEMATIC RESTORE  [look-QA, parallel track]
-
-ROOT CAUSE: the 6/5 flux pipeline rewrite into `_otr_image_engines/flux_gen1.py` +
-`otr_meta_brief_image_prompt.py` DROPPED the look levers (model/steps/cfg/sampler are identical).
-RESTORE: (1) a FluxGuidance node @ ~3.5 (flux_gen1 has none -- biggest factor), (2) the cinematic
-style suffix, (3) the radio broadcast-distress suffix, (4) bookend seed 4242, (5) the portrait style
-line. Wire the FluxGuidance node into the JSON if the image path runs through the graph.
-
----
-
-## OPEN QUESTIONS FOR THE PANEL
-
-1. S-A primary: boomerang-loop-extend (composite side) vs phrase-chunk-the-audio (S-C side) vs render
-   more frames -- which is right given the 49-frame 14B cap AND the byte-identical-audio constraint?
-2. S-F inject point: cleanest seam to feed a frozen ledger+audio into the still/video stages without
-   touching the production graph, given `_merge_with_disk` drops top-level `images`.
-3. NO-FALLBACKS blast radius: which call sites assume a fallback exists (composite, resolver, sweep
-   harness) and will hard-break when the chains are ripped out? Sequence so the suite stays green.
-4. Order: is S-F-first correct, or does a correctness fix (S-A) need to land before the fixture is
-   trustworthy as a baseline?
-
----
-
-## APPENDIX -- PANEL ALSO CHECK THESE ComfyUI CUSTOM-NODE INVARIANTS
-
-(Cite the real node file/class for every claim; if you cannot see the code, write "verify: <what>".)
-
-1. NODE-CLASS CONTRACT: every exported node class is in `NODE_CLASS_MAPPINGS` (+ a
-   `NODE_DISPLAY_NAME_MAPPINGS` label) -- a defined-but-unmapped class is dead. `INPUT_TYPES` is a
-   @classmethod dict (`required`/`optional`/`hidden`); `RETURN_TYPES` is a tuple (trailing comma for
-   one output) length-matched to `FUNCTION`'s return; `CATEGORY`/`FUNCTION` set. Widget order is
-   POSITIONAL -- appending an optional input is safe; inserting mid-list silently shifts saved widget
-   values (this is why retiring engines / adding `visualizer_rainbow` must touch the JSON in the same
-   change).
-2. TENSOR LAYOUT: IMAGE = float32 [0,1], [B,H,W,C] (channels LAST); MASK = [B,H,W]; LATENT =
-   {"samples": tensor}. Flag channels-first / missing-batch-dim / hard-coded device assumptions.
-3. VRAM / MODEL MANAGEMENT: heavy models load through `comfy.model_management` (residency/offload/
-   eviction managed there), not pinned in module globals with no free path. Flag any plan that holds
-   a model resident across runs without eviction (ties to the <=14.5 GB ceiling + the inter-beat
-   reclaim).
-4. IS_CHANGED / CACHING: a node with hidden external state (file / clock / RNG / network) must
-   implement `IS_CHANGED` so it does not serve stale cache. Flag the smoke-fixture / ledger-inject
-   path for cache correctness (S-F must not serve a stale render).
-5. IMPORT ISOLATION: no heavy / optional imports (torch extras, model libs, CUDA ext) at module top
-   level -- lazy-import inside the node method; no import-time side effects (weight downloads, file
-   opens). Flag any new engine (`visualizer_rainbow` shader stack) that imports a shader lib at top
-   level.
+(ComfyUI node-class / tensor / VRAM / IS_CHANGED / import-isolation profile invariants apply to every new
+/ edited node.)
