@@ -6,8 +6,34 @@ image engine x 3 slots, writer = local gemma, visualizer excluded). The
 (`scripts/_otr_coverage_matrix.json` + the `otr-coverage-soak` dashboard).
 
 Invariants for every retest: single resident heavy <= 14.5 GB (host NVML);
-seed-keyed determinism; LOUD fallbacks; master audio byte-identical; UTF-8 no BOM;
+seed-keyed determinism; master audio byte-identical; UTF-8 no BOM;
 selective CIM reset before each isolated run (never a blanket python kill).
+
+## 0. NO FALLBACKS -- HARD FAIL (operator directive 2026-06-29, HARD)
+
+"If a model doesn't work it should be a HARD FAIL." Silently degrading a failed engine
+to stills is CONFUSING and HIDES the failure (the ltx_audio_in fill leg "looked like
+stills" because it fell back to still_flat x6 -- the operator couldn't tell it had failed,
+and it wasted a 35-min render). So: a selected engine RENDERS or HARD-FAILS LOUD with a
+named reason -- NEVER a silent swap to stills/floor. The soak runs `--strict` (the M1/CS-1
+no-runtime-fallback gate). **This RECONSIDERS S-A:** the legibility floor must NOT silently
+"fall back to a clean still" either -- a bad/frozen clip should HARD-FAIL (or LOUD-flag the
+engine as producing a defect), so we FIX the engine, not paper over it. Operator confirms
+the direction; the coder treats S-A as detect-and-fail/flag, not silent-still-swap. (The
+ONE sanctioned non-fallback "floor" is a deliberate, labeled user choice, not an automatic
+swap.)
+
+**RIP OUT ALL FALLBACKS -- PRODUCTION CLEANBREAK (operator 2026-06-29: "I wanted to rip out
+ALL fallbacks").** Beyond the soak `--strict` switch, the operator wants the fallback
+MACHINERY removed from production: the engine-degrade chains (`humo -> humo_1.7B ->
+still_parallax -> floor`), `nodes/_otr_shared/fallback.py` `resolve_fallback_chain`, the
+render_driver `SYNTH_FALLBACKS`/`OOM_ENGINES` degrade paths, and the legibility-floor-as-
+fallback (S-A). A selected engine RENDERS or raises a LOUD hard error -- no silent
+substitution. Own SPRINT (cleanbreak, suite + Bug Bible + B7 + workflow-JSON wiring per
+chunk): inventory every fallback site, delete the chain resolution, convert each to a
+fail-loud, fix the tests that assert a fallback trail (e.g. soak OOM-trail, dep-pilot).
+Sequence it AFTER the engine fixes (HuMo cfg/clip-fill, ltx_audio_in VRAM) so the hard-fail
+surface is small. Scope as a coder kickoff; do NOT do it mid-soak.
 
 ---
 
@@ -110,6 +136,27 @@ regression like the ltx_audio_in SHARP swap or the HuMo 1.7B-vs-16:9 mixup is ob
 - **Images:** flux_gen1 / flux2_klein / z_image_turbo / qwen_image / lumina_image -- spell the model.
 This is the user-facing twin of the per-beat recipe instrumentation (S-B): label at selection time,
 log at render time. Pair the label with the registry CAPABILITIES row so they never drift.
+
+## B4. STILL / IMAGE FRAMING (operator 2026-06-29, eyeball on still_flat "Echoes of the Carnival")
+
+The still engines render SHARP + well-composed (operator: "OK ... still and video are OK, PASS"), but
+the subject is framed TIGHT -- head near the top edge -> cropped when the portrait-ish still is fit into
+the 16:9 landscape frame. FIX in the still/image PROMPT (`nodes/otr_meta_brief_image_prompt.py` +
+`flux_gen1` / the image director): add headroom + footroom -- "wide shot, full subject in frame, space
+above the head and below, centred, not cropped" -- so the generated still fits the landscape frame.
+Alternative: generate the still at the landscape aspect directly instead of portrait-then-crop.
+Applies to ALL image engines (flux_gen1 / flux2_klein / z_image_turbo / qwen_image / lumina_image).
+
+**DEFORMED / MELTY FIGURES [HIGH] (operator 2026-06-29, "Echoes of the Carnival" -- "not a clean
+shape, improve the image prompt so it's not the blocky scene").** Some character stills render as a
+melted/blobby/malformed humanoid (no clean anatomy) -- inconsistent: the same episode had a CLEAN
+suited figure on one beat and a deformed blob on another. This is almost certainly **BUG-411** (already
+in the DEFERRED BACKLOG): the 6/5 flux-pipeline rewrite (`flux_gen1.py` + `otr_meta_brief_image_prompt.py`)
+DROPPED the look levers -- **FluxGuidance ~3.5 (flux_gen1 has NO FluxGuidance node = biggest factor)**,
+the cinematic style suffix, and a real NEGATIVE prompt. Without FluxGuidance + a negative, flux mints
+deformed figures. FIX: restore FluxGuidance @ ~3.5 + the cinematic/radio suffixes + bookend seed AND add
+an anatomy NEGATIVE ("deformed, melted, blobby, distorted, malformed, mutated, extra limbs, fused").
+PROMOTE BUG-411 from the backlog -- it's the same root as the framing item. Forensic in `BUG_LOG_2026-06.md`.
 
 ## C. SILENT-FALLBACK AUDIT (the "Rendered" column)
 
