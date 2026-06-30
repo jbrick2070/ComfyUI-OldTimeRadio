@@ -31,6 +31,44 @@ def test_ltx_audio_in_identity():
     assert e.family == "audio_conditioned_video"
 
 
+# --- S-B observability: quant label + recipe receipt threaded into the clip ----
+def test_quant_label_from_unet_basename(monkeypatch):
+    e = LtxAudioInEngine()
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+    assert e._quant_label() == "Q3_K_M"
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-distilled-Q2_K.gguf")
+    assert e._quant_label() == "Q2_K"
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-fp8.safetensors")
+    assert e._quant_label() == "fp8"
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-plain.safetensors")
+    assert e._quant_label() == ""
+
+
+def test_clip_from_raw_threads_recipe_receipt():
+    e = LtxAudioInEngine()
+    raw = {"out_path": "x.mp4", "frame_count": 120, "vram_peak_mb": 13900,
+           "recipe": "distilled_native", "unet": "ltx-2.3-22b-distilled-Q2_K.gguf",
+           "quant": "Q2_K", "use_lora": False, "canvas": "512x288",
+           "audio_source": "b001.wav"}
+    clip = e._clip_from_raw(raw, {"shot_id": "shot_b001"})
+    assert clip["recipe"] == "distilled_native"
+    assert clip["quant"] == "Q2_K"
+    assert clip["use_lora"] is False
+    assert clip["render_canvas"] == "512x288"
+    assert clip["audio_source"] == "b001.wav"
+    assert clip["vram_peak_mb"] == 13900
+    # the raw frame_count stays engine-produced (never overwritten)
+    assert clip["frame_count"] == 120
+
+
+def test_clip_from_raw_tolerates_missing_receipt():
+    # a raw without the S-B receipt (e.g. a legacy/other path) -> None fields, no crash
+    e = LtxAudioInEngine()
+    clip = e._clip_from_raw({"out_path": "x.mp4", "frame_count": 10},
+                            {"shot_id": "s"})
+    assert clip["recipe"] is None and clip["quant"] is None
+
+
 def test_ltx_audio_in_covers_every_audio_role():
     # one engine for music + announcer (bookends) + character.
     for role in ("announcer_visual", "music_visual", "character_video"):

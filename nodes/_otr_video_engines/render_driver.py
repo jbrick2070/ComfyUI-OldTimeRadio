@@ -1162,14 +1162,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lxw, _lxh = 832, 480
         req["canvas"]["w"], req["canvas"]["h"] = _lxw, _lxh
-    # LTX-AV (audio-input) lane (M3 delta a): render at the M0-PROVEN-SAFE native
-    # canvas. 512x288 MEASURED 13688 MB peak <= 14500 on the 5080 at GGUF Q3_K_M;
-    # the 22B A2V model would blow the budget at the 480x832 portrait (talk) /
-    # 1472x832 landscape (music) defaults set above, so clamp BOTH ltx_av lanes
-    # here and let OTR_SilentComposite scale the clip to the deliverable. Diverges
-    # from ltx_video's 832x480 ON PURPOSE (heavier 22B). Env
-    # OTR_LTX_AV_RENDER_CANVAS (default 512x288; /32-friendly); M4 may bump it once
-    # a larger canvas is GPU-verified <= 14.5 GB.
+    # LTX-AV (audio-input) lane (M3 delta a): render at the M0-PROVEN-SAFE small
+    # native canvas (the 22B A2V model would blow the budget at the 480x832
+    # portrait (talk) / 1472x832 landscape (music) defaults set above), then let
+    # OTR_SilentComposite scale the clip to the deliverable. Diverges from
+    # ltx_video's 832x480 ON PURPOSE (heavier 22B). Env OTR_LTX_AV_RENDER_CANVAS
+    # (default 512x288; /32-friendly). The MEASURED per-recipe VRAM peaks (the
+    # fit lever is recipe/quant, NOT resolution -- see eng_ltx_av._quant_label +
+    # the per-beat PLAN log line + the bakeoff manifest), NOT a hardcoded MB here.
     if str(shot.get("engine_id") or "") == "ltx_audio_in":
         _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", "512x288")
         try:

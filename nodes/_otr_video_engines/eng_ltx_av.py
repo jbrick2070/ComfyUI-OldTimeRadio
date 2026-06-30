@@ -7,8 +7,11 @@ the two lanes diverge on purpose (this lane snaps frames UP via
 ``av_dims.next_8n1``; ``eng_ltx_video`` snaps DOWN). ``eng_ltx_video.py`` is FROZEN
 and is never imported or touched here.
 
-ONE adapter over the shared core (M0-GROUNDED graph; GGUF Q3_K_M proven on the
-RTX 5080 at 13688 MB peak <= the 14500 ceiling, Gemma-3 encoder offloaded to CPU):
+ONE adapter over the shared core (M0-GROUNDED graph; Gemma-3 encoder offloaded to
+CPU). Per-beat recipe / quant / canvas / measured VRAM peak are logged LOUD by
+render_clip and threaded into the clip raw (S-B observability); the
+fit-vs-quality recipe pick + the measured peaks live in the bakeoff manifest, NOT
+a hardcoded number here (see docs/ the LTX-AV GGUF quant bakeoff + each run log):
 
 * ``ltx_audio_in`` -- the ONE audio-in lane; roles (announcer_visual,
   music_visual, character_video); family ``audio_conditioned_video``; required
@@ -285,6 +288,15 @@ class _LtxAvBase(_MC.MotionEngineBase):
     # ---- config resolution (env override -> folder_paths -> join) ----
     def _unet_name(self):
         return os.environ.get("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+
+    def _quant_label(self):
+        """The GGUF quant / precision token from the unet basename (e.g.
+        ``Q3_K_M`` / ``Q2_K`` / ``fp8``) for the per-beat observability line + the
+        S-E recipe stamp; ``""`` when the basename carries none. Pure."""
+        import re
+        m = re.search(r"(Q\d+(?:_[A-Za-z0-9]+)*|fp8|fp16|bf16)",
+                      os.path.basename(str(self._unet_name())))
+        return m.group(1) if m else ""
 
     def _encoder_name(self):
         return os.environ.get("OTR_LTX_AV_TEXT_ENCODER",
@@ -652,6 +664,16 @@ class _LtxAvBase(_MC.MotionEngineBase):
             if (length - 1) % _AVD._LTX_TEMPORAL_BASE != 0:
                 length = _LTX_AV_MAX_FRAMES
         _AVD.assert_ltx_dims(width, height, length)
+        # S-B observability: ONE comprehensive per-beat line so any render log
+        # self-documents EXACTLY what ran (recipe / quant / LoRA / canvas / frames
+        # / audio source) -- the fit regression was invisible because the log only
+        # carried recipe+unet. The measured peak is logged at assert time below.
+        _audio_src = os.path.basename(str(plan["audio_path"] or ""))
+        _LOG.info(
+            "[OTR video] ltx_audio_in PLAN recipe=%s unet=%s quant=%s lora=%s "
+            "canvas=%dx%d frames=%d audio=%s",
+            recipe, os.path.basename(str(self._unet_name())), self._quant_label(),
+            bool(rcfg["use_lora"]), width, height, length, _audio_src or "-")
         graph = self._build_graph(plan, length, width, height, audio_name, image_name)
         # free_after_use (the eng_ltx_video pattern): evict the Gemma encoder +
         # intermediates before the unet+VAE-decode peak so the GGUF unet (+ the LoRA
@@ -691,7 +713,13 @@ class _LtxAvBase(_MC.MotionEngineBase):
         frames = _wb.images_to_uint8(images)
         out_path = otr_engine_tmp_mp4("otr_ltx_av_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
-        return {"out_path": path, "frame_count": n, "vram_peak_mb": peak}
+        # S-B/E5: thread the recipe receipt into the raw so the episode report +
+        # the ledger recipe-stamp self-document the fit (recipe / quant / LoRA /
+        # canvas / audio source) alongside the measured peak.
+        return {"out_path": path, "frame_count": n, "vram_peak_mb": peak,
+                "recipe": recipe, "unet": os.path.basename(str(self._unet_name())),
+                "quant": self._quant_label(), "use_lora": bool(rcfg["use_lora"]),
+                "canvas": "%dx%d" % (width, height), "audio_source": _audio_src}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
@@ -785,6 +813,11 @@ class _LtxAvBase(_MC.MotionEngineBase):
             # PASS-PM: the REAL render-window NVML peak (None off the GPU box),
             # threaded render_clip -> here -> render_shot -> the episode report.
             "vram_peak_mb": raw.get("vram_peak_mb"),
+            # S-B/E5 recipe receipt (None for a raw that did not carry it).
+            "recipe": raw.get("recipe"), "unet": raw.get("unet"),
+            "quant": raw.get("quant"), "use_lora": raw.get("use_lora"),
+            "render_canvas": raw.get("canvas"),
+            "audio_source": raw.get("audio_source"),
         }
 
 
