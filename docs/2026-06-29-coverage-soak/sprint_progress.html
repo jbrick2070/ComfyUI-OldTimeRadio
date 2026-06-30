@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTR Soak-Fix Sprint Progress</title><style>
+:root{color-scheme:light}*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f7f7f8;color:#1b1b1f}
+.wrap{padding:18px 20px 36px;max-width:920px;margin:0 auto}
+h1{font-size:18px;margin:0 0 2px}.sub{color:#6b6b73;font-size:12.5px;margin-bottom:14px}
+.note{background:#fff;border:1px solid #e6e6ea;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:12.5px;line-height:1.5}
+.note b{color:#1b1b1f}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e6ea;border-radius:10px;overflow:hidden;font-size:13px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid #efeff2;vertical-align:top}
+th{background:#fafafb;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#6b6b73}
+tr:last-child td{border-bottom:none}
+.id{font-weight:700;white-space:nowrap}.pri{font-size:11px;color:#7a7a82}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:650}
+.p-todo{background:#eef0f3;color:#5b5b63}.p-next{background:#fff3da;color:#9a6700}
+.p-doing{background:#dfeaff;color:#1c4fb0}.p-done{background:#e3f4ea;color:#157347}
+.foot{margin-top:12px;color:#8a8a92;font-size:11.5px;line-height:1.5}
+</style></head><body><div class="wrap">
+<h1>OTR Coverage-Soak Fix Sprint &mdash; Progress</h1>
+<div class="sub">kibitz-converged plan (r1&ndash;r4) &middot; contract = <b>docs/2026-06-29-coverage-soak/SPRINT_PLAN.md</b> &middot; HEAD 4417738d</div>
+
+<div class="note">
+<b>Grounded facts (don't re-litigate):</b> HuMo "mush" is the clip underrun (S-A), NOT a cfg regression.
+BUG-411 is already implemented (look-QA seed-4242 check only). No-fallback is already enforced at render
+time &mdash; S-E is scaffolding cleanup + <i>deprecate</i> allow_auto_fallback (no behavior change).
+recipe-stamp extends <b>meta.render_engines</b>. S-F = a pruned API prompt + a baked asset <b>bundle</b>
+(ComfyUI MCP executes it).
+</div>
+
+<table><thead><tr><th>Sprint</th><th>What</th><th>Status</th></tr></thead><tbody>
+<tr><td class="id">S-F<div class="pri">accelerator</div></td><td>Visual smoke fixture &mdash; pruned API prompt (render-tail node 92), baked asset bundle, /history=={92}/{63,92}. Speeds every other sprint.</td><td><span class="pill p-next">NEXT</span></td></tr>
+<tr><td class="id">S-A<div class="pri">high</div></td><td>Clip-fill (composite loop, size-agnostic) + legibility floor. Assert delivered frames==target; keep raw frame_count raw; should_loop before the warning.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-B<div class="pri">high</div></td><td>ltx_audio_in VRAM fit &mdash; observability first, re-fit via recipe/quant. Pin + record OTR_LTX_AV_RENDER_CANVAS=512x288; NVML&le;14.5 GB x3 slots.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-D<div class="pri">med</div></td><td>gemma normalize_length &mdash; @model_validator(before) on RadioEditPlan unwrapping {"RadioEditPlan":{...}}, reject multi-key. + regression.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E1<div class="pri">high</div></td><td>No-fallback scaffolding cleanup &mdash; migrate make_fallback_of call sites + FLOOR/SYNTH constants + fallback tests in one commit.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E2</td><td>Deprecate-in-place allow_auto_fallback (keep node-87 wv13, force false in policy). No JSON widget-shift.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E3<div class="pri">separable</div></td><td>Engine retirement (still_motion/station_card/abstract) &mdash; bigger than dropdowns (floor constants + soak fixtures + tests). After E1; deferrable.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E4</td><td>Dropdown labels &mdash; registry display field; keep <code>engine_id (...)</code> format; round-trip test. KEEP both HuMos (LOW/HIGH VRAM).</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E5</td><td>Recipe-stamp &mdash; extend meta.render_engines (preserve existing keys; recipe=null default); engines must RETURN recipe fields.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E6</td><td>Announcer + music = always a radio-themed still (never black/abstract/fallback).</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">S-E7<div class="pri">creative</div></td><td>visualizer_rainbow (GLSL shader, audio-reactive) &mdash; DEFERRED; own /roundtable first.</td><td><span class="pill p-todo">deferred</span></td></tr>
+<tr><td class="id">S-C<div class="pri">split</div></td><td>Audio-in conditioning &mdash; C1 audio_motion_profile extract+stamp; C2 (deferred) per-engine consumers + HuMo phrase-chunking.</td><td><span class="pill p-todo">to do</span></td></tr>
+<tr><td class="id">BUG-411<div class="pri">look-QA</div></td><td>flux cinematic &mdash; already implemented; only VERIFY bookend seed 4242.</td><td><span class="pill p-todo">verify</span></td></tr>
+</tbody></table>
+
+<div class="foot">Coder window: flip a row's pill (todo &rarr; NEXT/doing &rarr; done) as you land each green chunk.
+Order: S-F &rarr; S-A &rarr; S-B &rarr; S-D &rarr; S-E1..E6 &rarr; S-C(C1) &rarr; BUG-411. Each chunk: suite + Bug Bible + B7, commit+push to v2.0-alpha.</div>
+</div></body></html>
