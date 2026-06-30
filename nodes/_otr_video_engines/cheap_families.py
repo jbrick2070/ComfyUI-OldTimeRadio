@@ -5,11 +5,12 @@ families that need NO heavy model, so a watchable episode (M1) renders before an
 GPU engine exists. Each registers exactly like a future heavy engine (HuMo / LTX
 / Wan) -- model-agnostic, selected per role; no model is "primary".
 
-Families (schemas.FAMILIES): ``abstract`` (procedural pattern), ``static_motion``
-(still_motion -- a still with a slow pan), ``static_image_gen`` (station_card /
-still_pan -- a provided still with a pan / still_flat -- the same still
-held flat). Each produces an ALWAYS-SILENT ``CanonicalClip`` (``has_audio`` is
-always False -- audio is added ONLY by ``OTR_MasterAudioMux``, V-1).
+Families (schemas.FAMILIES): ``static_motion`` (still_motion -- a still with a slow
+pan), ``static_image_gen`` (still_pan -- a provided still with a pan / still_flat --
+the same still held flat). Each produces an ALWAYS-SILENT ``CanonicalClip``
+(``has_audio`` is always False -- audio is added ONLY by ``OTR_MasterAudioMux``,
+V-1). (The ``abstract`` procedural floor + the ``station_card`` card were RETIRED
+2026-06-30, C0; the ``abstract`` family name lives on via ``eng_visualizer``.)
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + the
 role vocabulary. ffmpeg / PIL / numpy / torch are imported LAZILY inside
@@ -162,13 +163,14 @@ class _CheapFamilyBase:
         return None
 
 
-@register
-class AbstractFamily(_CheapFamilyBase):
-    name = "abstract"
-    family = "abstract"
-    roles = ("background_abstract", "music_visual")
-    default_roles = ("background_abstract",)
-    required_inputs = ()            # procedural -- needs nothing
+# 2026-06-30 (C0, operator directive): ``AbstractFamily`` (engine_id "abstract")
+# and ``StationCardFamily`` (engine_id "station_card") were RETIRED -- abstract was
+# redundant with the real ``visualizer`` audio-reactive scope (and the future
+# ``visualizer_rainbow`` fills the fun audio-reactive slot), and station_card was the
+# broken black card. Both are UNREGISTERED + their CAPABILITIES rows removed. The
+# family NAME "abstract" survives (visualizer is family="abstract"; the cheap-base
+# default + schemas.FAMILIES keep it). The chain floor terminus is UNIVERSAL_FLOOR =
+# "still_motion" (never was "abstract"), so retiring the engine leaves the floor intact.
 
 
 @register
@@ -179,16 +181,9 @@ class StillMotionFamily(_CheapFamilyBase):
     default_roles = ("scene_broll",)
     required_inputs = ("text_prompt",)
     uses_still = True               # pan over a provided still when present
-
-
-@register
-class StationCardFamily(_CheapFamilyBase):
-    name = "station_card"
-    family = "static_image_gen"
-    roles = ("announcer_visual", "background_abstract")
-    default_roles = ("announcer_visual",)
-    required_inputs = ("text_prompt",)
-    uses_still = True               # show a provided card still when present
+    accepts_still = True            # C1: mint the selected still (coverage gate) so
+    #                                 a still_motion beat shows the chosen image, not
+    #                                 the dark floor (D2 BLACK fix)
 
 
 # 2026-06-18: the cheap ``visualizer`` floor stub was SUPERSEDED by the real
@@ -219,6 +214,9 @@ class StillPanFamily(_CheapFamilyBase):
     required_inputs = ("text_prompt",)
     commercial_clean = True         # own ffmpeg + the chosen still; no model license
     uses_still = True               # animate a provided still (pan) when present
+    accepts_still = True            # C1: mint the selected still (coverage gate) so an
+    #                                 opener/beat that picks still_pan shows the chosen
+    #                                 image instead of the dark floor (D2 BLACK fix)
 
 
 @register
@@ -242,6 +240,5 @@ class StillFlatFamily(_CheapFamilyBase):
 
 
 __all__ = [
-    "AbstractFamily", "StillMotionFamily", "StationCardFamily",
-    "StillPanFamily", "StillFlatFamily",
+    "StillMotionFamily", "StillPanFamily", "StillFlatFamily",
 ]

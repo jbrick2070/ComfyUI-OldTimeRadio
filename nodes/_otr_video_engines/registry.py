@@ -125,12 +125,12 @@ __all__.append("EngineCore")
 #   model_requirements  informational model-asset ids for the S5 wizard.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
-    "abstract": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
-                 "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # "abstract" + "station_card" rows REMOVED 2026-06-30 (C0 -- "registry IS the
+    # menu"): both engines were UNREGISTERED (abstract redundant with visualizer;
+    # station_card the broken black card), and the registry-consistency invariant
+    # forbids a CAPABILITIES row without a registered engine.
     "still_motion": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "station_card": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
-                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "visualizer": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_flat": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,

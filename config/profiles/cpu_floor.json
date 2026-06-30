@@ -9,7 +9,7 @@
   "allow_sidecars": false,
   "max_model_class": "cpu",
   "role_overrides": {
-    "announcer_visual": "station_card",
+    "announcer_visual": "still_flat",
     "music_visual": "visualizer",
     "other_beats_visual": "still_motion"
   },

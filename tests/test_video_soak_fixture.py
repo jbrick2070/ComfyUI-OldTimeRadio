@@ -46,9 +46,12 @@ def test_fixture_is_40_beats_all_roles_all_families():
     # lipsync_overlay is still a registered schema family but has NO engine after
     # the latentsync cleanbreak (2026-06-17), so the soak rotation -- which is
     # engine-backed -- no longer carries it.
+    # C0 2026-06-30: the "abstract" engine was retired, so the soak rotation no
+    # longer carries the "abstract" family (visualizer keeps the family name but is
+    # not in the engine-backed rotation). The remaining families are all covered.
     for fam in ("audio_driven_face", "image_to_video",
                 "text_to_video", "static_image_gen", "static_motion",
-                "abstract", "character_3d"):
+                "character_3d"):
         assert fam in families
     char3d = [s for s in shots if s["family"] == "character_3d"]
     assert len(char3d) == 1 and char3d[0]["shot_id"] == meta["oom_shot_id"]

@@ -519,6 +519,18 @@ def test_engine_consumes_still_capability_vs_dual_read():
         types.SimpleNamespace(required_inputs=("text_prompt",))) is False
 
 
+def test_c1_still_pan_and_motion_consume_their_scene_still():
+    """C1 (D2 BLACK fix, 2026-06-30): still_pan + still_motion declare
+    accepts_still=True so the image dispatcher MINTS the role's selected scene
+    still for them (instead of the dark floor). still_flat already did; visualizer
+    opts OUT (audio-reactive, ignores stills)."""
+    from nodes._otr_video_engines import registry as vreg
+    assert disp.engine_consumes_still(vreg.get_engine("still_pan")) is True
+    assert disp.engine_consumes_still(vreg.get_engine("still_motion")) is True
+    assert disp.engine_consumes_still(vreg.get_engine("still_flat")) is True
+    assert disp.engine_consumes_still(vreg.get_engine("visualizer")) is False
+
+
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
     # All video roles = visualizer (no init_image) -> NO still generated, gen_fn
     # never called -> an all-procedural episode needs no image model at all.

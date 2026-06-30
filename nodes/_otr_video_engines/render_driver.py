@@ -43,8 +43,7 @@ _LOG = logging.getLogger("OTR.video.render_driver")
 #: (2026-06-18): "visualizer" was removed -- it graduated from a cheap floor stub
 #: to the real procedural CRT engine (eng_visualizer.py), which REQUIRES audio_ref
 #: + ffmpeg and so is NOT a guaranteed always-renders floor terminus.
-FLOOR_NAMES = frozenset({"still_motion", "abstract", "station_card",
-                         "still_pan"})
+FLOOR_NAMES = frozenset({"still_motion", "still_pan", "still_flat"})
 #: The universal floor terminus appended to any engine whose declared chain
 #: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
 #: -- every chain terminates at a registered radio floor that always renders).
@@ -70,8 +69,10 @@ ENGINE_FAMILY = {
     "still_parallax": "static_motion",
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
-    "abstract": "abstract", "station_card": "static_image_gen",
+    # "abstract" + "station_card" entries REMOVED 2026-06-30 (C0, engines retired);
+    # the "abstract" FAMILY name survives (visualizer) + is the engine_family() default.
     "visualizer": "abstract", "still_pan": "static_image_gen",
+    "still_flat": "static_image_gen",
     # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
     # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
     "ltx_audio_in": "audio_conditioned_video",
@@ -85,8 +86,10 @@ _PROFILES = (
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
     ("scene_broll", "still_motion", "static_motion"),
-    ("background_abstract", "abstract", "abstract"),
-    ("announcer_visual", "station_card", "static_image_gen"),
+    # C0 2026-06-30: abstract + station_card retired -> repoint these soak legs to
+    # surviving still families that fit the role by capability (both mint via C1).
+    ("background_abstract", "still_flat", "static_image_gen"),
+    ("announcer_visual", "still_pan", "static_image_gen"),
 )
 #: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
 #: stand-in heavy character_3d engine) degrades to humo.

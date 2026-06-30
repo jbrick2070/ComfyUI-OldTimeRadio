@@ -188,24 +188,28 @@ def test_cheap_families_registered():
     names = set(vreg.all_engine_names())
     # "visualizer" graduated to a real engine (eng_visualizer.py) 2026-06-18; it is
     # no longer a cheap floor family.
-    for fam in ("abstract", "still_motion", "station_card", "still_pan"):
+    # C0 2026-06-30: abstract + station_card retired -> assert the surviving floors.
+    for fam in ("still_motion", "still_pan", "still_flat"):
         assert fam in names, f"cheap family {fam} not registered in the video registry"
 
 
 def test_cheap_family_usable_and_role_filtered():
-    # abstract serves background_abstract and is usable there (no opt-in flag)
-    assert vreg.assert_usable("abstract", "background_abstract") == "abstract"
-    # the SHARED role filter (AS-1) offers cheap families per their roles
+    # still_motion serves background_abstract and is usable there (no opt-in flag).
+    # NOTE: at C0 assert_usable still uses the legacy `roles` whitelist; C2 converts
+    # these membership assertions to capability reasons.
+    assert vreg.assert_usable("still_motion", "background_abstract") == "still_motion"
+    # the SHARED role filter (AS-1, capability) offers floors per their inputs
     descs = [
         {"engine_id": n, "roles": tuple(vreg.get_engine(n).roles),
          "required_inputs": tuple(getattr(vreg.get_engine(n), "required_inputs", ()))}
         for n in vreg.all_engine_names()
     ]
     bg = rc.filter_engines_for_role("background_abstract", descs)
-    assert "abstract" in bg                       # "visualizer" no longer serves bg
-    # incompatible role fails closed (abstract does NOT serve character_video)
+    assert "still_motion" in bg                    # text-only floor fits bg by capability
+    # incompatible role fails closed under the legacy whitelist (still_motion's
+    # `roles` does not list character_video).
     with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("abstract", "character_video")
+        vreg.assert_usable("still_motion", "character_video")
 
 
 def test_cheap_families_cold_import_clean():
@@ -242,7 +246,7 @@ def test_plan_timeline_segments_clip_floor_black_and_total():
         {"shot_id": "s0", "target_frame_count": 20, "path": "/x/a.mp4",
          "exists": True, "engine_id": "humo"},
         {"shot_id": "s1", "target_frame_count": 30, "path": "", "exists": False,
-         "engine_id": "abstract"},                       # gap -> floor / black
+         "engine_id": "still_motion"},                   # gap -> floor / black
         {"shot_id": "s2", "target_frame_count": 0, "path": "/x/c.mp4",
          "exists": True},                                # 0 frames -> skipped
     ]}

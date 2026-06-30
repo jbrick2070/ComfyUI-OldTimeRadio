@@ -25,8 +25,8 @@ _HAS_FFPROBE = shutil.which("ffprobe") is not None
 # 2026-06-18: "visualizer" graduated from a cheap floor stub to the real procedural
 # CRT engine (eng_visualizer.py) -- it is no longer a _CheapFamilyBase, so it is
 # dropped from the cheap-family render matrix (covered by test_video_visualizer.py).
-_FAMILIES = ("abstract", "still_motion", "station_card", "still_pan",
-             "still_flat")
+# C0 2026-06-30: "abstract" + "station_card" retired -> dropped from the matrix.
+_FAMILIES = ("still_motion", "still_pan", "still_flat")
 
 
 def _req(frames=6, w=96, h=64, fps=25, **extra):
@@ -100,7 +100,7 @@ def test_still_flat_registered_validated_all_roles():
 
 
 def test_canvas_and_frame_defaults():
-    eng = vreg.get_engine("abstract")
+    eng = vreg.get_engine("still_motion")
     assert eng._canvas_dims({}) == (832, 480, 25)        # platform defaults
     assert eng._canvas_dims(
         {"canvas": {"w": 1280, "h": 720, "fps": 24}}) == (1280, 720, 24)
@@ -117,9 +117,8 @@ def test_still_path_extraction():
 
 def test_uses_still_flags():
     assert vreg.get_engine("still_motion").uses_still is True
-    assert vreg.get_engine("station_card").uses_still is True
     assert vreg.get_engine("still_pan").uses_still is True
-    assert vreg.get_engine("abstract").uses_still is False
+    assert vreg.get_engine("still_flat").uses_still is True
 
 
 def test_still_pan_fits_all_roles_bug401():

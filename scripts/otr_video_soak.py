@@ -62,18 +62,24 @@ ENGINE_FAMILY = {
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video",
     "mesh_stage": "image_to_video",
-    "station_card": "static_image_gen",
-    "abstract": "abstract",
+    # C0 2026-06-30: station_card + abstract retired (engines unregistered); the
+    # surviving still families carry static_image_gen. Keep in sync with
+    # render_driver.ENGINE_FAMILY.
+    "still_pan": "static_image_gen",
+    "still_flat": "static_image_gen",
 }
 
 #: (role, engine, family) rotation covering all 5 roles + the non-3D families.
+#: C0 2026-06-30: background_abstract + the 2nd announcer leg repointed from the
+#: retired abstract/station_card to surviving still families (kept in sync with
+#: render_driver._PROFILES).
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
     ("scene_broll", "still_motion", "static_motion"),
-    ("background_abstract", "abstract", "abstract"),
-    ("announcer_visual", "station_card", "static_image_gen"),
+    ("background_abstract", "still_flat", "static_image_gen"),
+    ("announcer_visual", "still_pan", "static_image_gen"),
 )
 
 #: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
