@@ -84,7 +84,9 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     a ComfyUI shader node -- pick during the roundtable) BEFORE building. Register + CAPABILITIES + node-87
     dropdown + label ("Rainbow shader visualizer -- audio-reactive"). Creative sprint, schedule after the
     correctness fixes (S-A..S-E core).
-  - **DROPDOWN LABELS:** every option states model + variant + recipe (HuMo size/aspect/tier, which LTX,
+  - **DROPDOWN LABELS:** every option states model + variant + recipe + VRAM tier (HuMo: 1.7B = LOW-VRAM
+    ~3.3 GB fast draft / 14B = HIGH-VRAM ~15.9 GB max quality, spills on 16 GB; KEEP BOTH -- a real low/high
+    split, operator 2026-06-29; which LTX,
     Wan i2v/ti2v, image model; "abstract/visualizer = audio-reactive, no scene image"). The owner
     couldn't tell engines apart -- labels are required. Grounded label copy in RETEST_LIST B5.
   - **STAMP THE RECIPE IN THE LEDGER:** per-beat `delivered_engine` (video) + `image_engine` +
@@ -92,6 +94,19 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     ("what did I use?" is unanswerable from saved files today). Durable twin of no-fallbacks + labels.
   - **ANNOUNCER + MUSIC = always a radio-themed still** (vintage radio in the scene) -- never a black
     card / abstract / fallback; the sane on-brand bookend default. Image-prompt change (+ B4 framing).
+- **S-F [ACCELERATOR] VISUAL SMOKE FIXTURE -- bake story+audio+ledger, run stills+video only (operator
+  2026-06-29).** Today every coverage leg re-runs the WRITER (gemma, minutes) + the full AUDIO path (TTS +
+  music) just to test a VISUAL engine -- that is most of the ~28 min/leg, and a DIFFERENT story each run
+  (not apples-to-apples). Build a smoke that BAKES one good 30-word episode's master audio + story ledger
+  (cast / brief / beat structure / per-beat durations / portrait hashes) ONCE into a fixture, then INJECTS
+  it and runs only the stills -> video -> composite -> mux tail. Each engine test then swaps ONLY the
+  image/video engine and re-renders the cheap visual tail -> minutes not tens; identical story+audio every
+  run = a clean per-engine eyeball; master audio byte-identical for FREE (same baked WAV). Seam = the MIRROR
+  of the existing audio-only soak (which PRUNES the graph at node-7 `EpisodeAssembler` to skip video) -- this
+  starts FROM that boundary (the frozen audio + `/otr/latest_ledger`) and skips the writer + audio nodes.
+  ACCELERATES the current soak + the GATE-A sweep + every future engine test -- schedule EARLY (before
+  grinding the rest of the matrix by hand). Keep it a TEST harness only (no production-path change; the real
+  workflow still writes a fresh story each episode).
 
 **DEFERRED BACKLOG** (still pending, lower priority -- detail in sections 3-5 + the bug logs):
 GATE-A punch list incl. BUG-411 (flux lost its cinematic tint -- restore FluxGuidance ~3.5 +
