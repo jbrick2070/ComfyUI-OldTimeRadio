@@ -1,259 +1,74 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> **>>> CURRENT STEP -- 2026-06-29 DELETE ALL CODE-GATING (registry IS the menu): C2-C7 ALL SHIPPED +
-> PUSHED to origin/v2.0-alpha (full suite 5728/0, Bug Bible 16/3xfail, B7 green; guard test locks it).
-> prod/main + tags GATED.** OPERATOR DIRECTIVE (2026-06-29, supersedes the
-> opt-in/validated model): NO opt-in / validation / promotion gates ANYWHERE (video, image, voice, LLM).
-> The registry IS the menu -- a REGISTERED engine is SELECTABLE and renders (may hard-fail LOUD, that's OK);
-> validation is the operator's MANUAL process, never a code gate. No `OTR_ENABLE_*`, no `VALIDATED_ENGINES`
-> filter, no production guard, no behind-the-scenes "model waiting to be promoted".
->
-> **FOLLOW-UP (2026-06-29, post-C7): still-engine RENAME shipped** -- `flat_still -> still_flat`,
-> `flux_still -> still_pan` (operator: "still should be FIRST; don't mention ken burns"). Dropped the
-> "flux" misnomer end-to-end -- de-fluxed the registry CAPABILITIES row (was heavy/12000/model=flux.1-dev,
-> now cpu/0/[] -- the engine is pure ffmpeg, never loads Flux) + commercial_clean True. `still_parallax`
-> (the DepthAnything 2.5D depth pan) is the real, UNCHANGED engine -- the rename collision was avoided.
-> Legacy alias in `_engine_id_from_pick` so old saved picks/ledgers still resolve. Full suite 5729/0,
-> Bug Bible 16/3xfail, B7 green; guard + alias regression tests lock it. PUSHED to v2.0-alpha.
->
-> **FOLLOW-UP-2 (2026-06-29): all "ken burns" refs REMOVED** -- the universal-floor engine
-> `still_kenburns -> still_motion` (matches its `static_motion` family; KEPT as the always-renders floor +
-> scene_broll default -- NOT retired). Updated the 5 `fallback_engine` chains + UNIVERSAL_FLOOR / FLOOR_NAMES
-> / ENGINE_FAMILY / soak OOM-trail / oom-final-engine + the 8gb_lite & cpu_floor profiles + the soak/gpu-smoke
-> harnesses; scrubbed every "Ken Burns" comment -> "pan". Legacy alias still_kenburns -> still_motion added so
-> old saved graphs that picked the floor still open (that alias KEY is the only remaining literal). Full
-> suite 5729/0, Bug Bible 16/3xfail, B7 green. PUSHED to v2.0-alpha.
->
-> CODE-READY PLAN (kibitz-hardened, 2 grounded rounds Codex+Antigravity -> the AUTHORITATIVE spec is
-> `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`; problem framing in `docs/2026-06-29-dropdown-optin/`).
-> Sequenced, suite+BugBible+B7 green AND push per green chunk to v2.0-alpha:
-> - **C2** remove the `requires_flag` GATE: base `engine_registry_base.assert_usable` L222-228 + each
->   RENDER-READY video adapter check (humo / wan_i2v / wan_ti2v / still_parallax / mesh_stage / ltx_video /
->   ltx_av / visualizer). Image adapters rely on the base gate only (flux2_klein/z_image just disk-check).
->   KEEP the disk MISSING_MODEL checks. KEEP `requires_flag` field as vestigial (set None on survivors) +
->   `GATED_BY_FLAG` enum member -- the audio protocol-parity tests iterate AudioEngine.__annotations__ and
->   audio is FROZEN. Flip the ~video/image tests that assert gated_by_flag. (C2 = the actual smoke unblock.)
-> - **C3** UNREGISTER the dark scaffolds (NotImplementedError render path): `triposr`, `triposg_talk`,
->   `hunyuan3d_talk`, `trellis_talk` (video) + `hidream_i1`, `sd35_large` (image) -- drop @register + package
->   import + CAPABILITIES row; FIX the ripple IN THE SAME CHUNK: render_driver `SYNTH_FALLBACKS`/`ENGINE_FAMILY`/
->   `OOM_ENGINES`/`EXPECTED_OOM_TRAIL`, `otr_image_director.three_d_locked_slots`, and the fixtures/tests that
->   expect them registered (use a test-registered stub).
-> - **C4** drop `VALIDATED_ENGINES` + `validated_engine_names()` (both registries) -> directors use
->   `all_engine_names()`; flip test_tested_only_dropdown_gate + test_still_aspect_and_labels +
->   test_video_triposr + test_ltx_audio_in_engine + test_video_cheap_render.
-> - **C5** harness decouple from the flag: gpu-smoke drop the `flag_set` ready-assert; coverage drop the
->   `OTR_ENABLE_WAN_*` acceptance_preflight; dep-pilot KEEP its probe manifest (module/class/forward metadata
->   not in CAPABILITIES) but rename OPT_IN_ENGINES->probe + drop `flag` keys; fix test_video/audio_dep_pilot.
-> - **C6** voice+LLM: remove the requires_flag GATE from the audio voice adapters + audio registry base +
->   any LLM opt-in gate (writer/openrouter as a GATE) -- KEEP creds/file-presence checks. HARD CONSTRAINT:
->   `test_audio_byte_identical` MUST stay green (defaults + master-mux UNCHANGED; only selectability changes).
-> - **C7** docstring/comment cleanup (engine_registry_base GATED_BY_FLAG now dead for video/image) + a guard
->   test (no REGISTERED engine carries a live flag gate / renders NotImplementedError).
->
-> **C2 SHIPPED (2026-06-29 this session):** removed the `requires_flag` GATE -- the base
-> `engine_registry_base.assert_usable` block is gone + the 8 render-ready video adapters
-> (humo / wan_i2v / wan_ti2v / still_parallax / mesh_stage / ltx_video / ltx_av / visualizer) and the 4 image
-> survivors (flux2_klein / z_image_turbo / qwen_image / lumina_image) all set `requires_flag=None` (vestigial;
-> the `GATED_BY_FLAG` enum member + the field annotation are KEPT for audio protocol-parity, audio FROZEN).
-> Flipped ~30 video/image gate tests to the "registry IS the menu" contract. The dep-pilot/gpu-smoke RIPPLE
-> (3 tests) was handled test-only -- the dep-pilot no-drift contract dropped the flag coupling + gpu-smoke
-> dropped the gated_by_flag detail; the harness CODE refactor (OPT_IN_ENGINES->probe rename, drop flag keys,
-> drop the flag_set ready-assert, coverage acceptance_preflight) STAYS for C5. Full suite 5750/0, Bug Bible
-> 16/3xfail, B7 green. The per-model SMOKE PASS resumes now (selecting humo/wan/ltx_av/still_parallax/
-> flux2_klein/z_image just renders -- no launch flag). NEXT = C4.
->
-> **C3 SHIPPED (2026-06-29 this session):** UNREGISTERED the dark NotImplementedError scaffolds -- video
-> triposg_talk / hunyuan3d_talk / trellis_talk (eng_character_3d) + triposr; image hidream_i1 + sd35_large
-> (dropped @register + package import + CAPABILITIES row; the source files are KEPT -- they "return when
-> built"). Fixed the ripple in the SAME chunk: render_driver + scripts/otr_video_soak SYNTH_FALLBACKS /
-> ENGINE_FAMILY / OOM_ENGINES / EXPECTED_OOM_TRAIL -- the soak's SYNTHETIC OOM head renamed triposg_talk ->
-> the explicit `soak_oom_3d` stub (same 3-hop chain shape, no dead real-engine names); the video + image
-> dep-pilot probe manifests dropped the unregistered entries. Tests: rewrote test_video_character_3d +
-> test_video_triposr to the unregistered/source-still-dark contract (instantiate the classes directly),
-> retargeted the soak + dropdown-gate + dep-pilot + still-aspect tests, test_image_platform_c1's 3D-lock now
-> uses a test-registered stub, and DELETED the now-empty test_image_engine_matrix_peers (both subjects
-> unregistered). Full suite 5723/0, Bug Bible 16/3xfail, B7 green. NEXT = C5.
->
-> **C4 SHIPPED (2026-06-29 this session):** DELETED the validated-subset dropdown filter -- `VALIDATED_ENGINES`
-> + `validated_engine_names()` removed from BOTH the video and image registries; the 3 director COMBOs
-> (`otr_video_director._video_model_combo` / `_image_model_combo` + `otr_image_director._image_model_combo`)
-> now build from `all_engine_names()`, so the dropdown == the full registry (every registered engine is
-> selectable; manual validation only). Tests: rewrote test_tested_only_dropdown_gate to the dropdown==registry
-> contract + retargeted test_still_aspect_and_labels / test_ltx_audio_in_engine / test_video_cheap_render off
-> the deleted filter. Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C6.
->
-> **C5 SHIPPED (2026-06-29 this session):** DECOUPLED the harness from the flag. gpu-smoke
-> (`otr_video_gpu_smoke`) dropped the `flag_set` ready-assert + the ENGINES "flag" key + the "set the flag"
-> next-step (NOT READY now means deps/forward absent, never an opt-in flag). coverage-sweep
-> (`otr_coverage_sweep`) dropped the `OTR_ENABLE_WAN_*` acceptance preflight + `WAN_ENABLE_FLAGS` (only
-> OTR_TEST_MODE + --exclude stay gated). dep-pilot (`otr_video_dep_pilot` + `otr_audio_dep_pilot`): renamed
-> the probe manifest `OPT_IN_ENGINES` -> `PROBE_ENGINES` and deleted the vestigial "flag" keys + the verdict
-> "flag" field. Tests: retargeted test_video_gpu_smoke (not-ready-without-deps), test_coverage_sweep_acceptance
-> (no enable-flag preflight), test_video_dep_pilot + test_audio_dep_pilot (PROBE_ENGINES + curated no-drift
-> contract, not flag-derived). Full suite 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7.
->
-> **C6 SHIPPED (2026-06-29 this session):** removed the VOICE + LLM opt-in gates. Audio: deleted the
-> `GATED_BY_FLAG` block from the audio registry `assert_usable` (registry IS the menu) + set
-> `requires_flag=None` on the 3 flagged voice/music adapters (chatterbox / dia / stable_audio_music). The
-> `requires_flag` field annotation + the `GATED_BY_FLAG` enum are KEPT (audio protocol-parity frozen). LLM:
-> `openrouter_enabled()` now returns `bool(OPENROUTER_API_KEY)` only -- the separate `OTR_ENABLE_OPENROUTER`
-> opt-in flag is GONE as a gate (any CONFIGURED LLM with its creds present is selectable; the API-key/creds
-> check stays). **HARD CONSTRAINT HELD: test_audio_byte_identical GREEN** -- the default voice/music engines
-> (already flag-free) + the master-mux path are UNCHANGED; only the selectability of non-default engines
-> changed. Flipped ~9 audio gate tests + 1 OpenRouter gate test to the selectable contract. Full suite
-> 5722/0, Bug Bible 16/3xfail, B7 green. NEXT = C7.
->
-> **C7 SHIPPED (2026-06-29 this session) -- CAMPAIGN COMPLETE (C2-C7 all green + pushed):** docstring/comment
-> cleanup + the GUARD TEST. Cleaned `engine_registry_base` (removed the now-unused `import os`; updated the
-> module / EngineCore / `EngineUsabilityReason` / `assert_usable` docstrings so `GATED_BY_FLAG` + the
-> `requires_flag` field read as DEAD/vestigial-kept-for-parity, not live gates) + the parallel audio-registry
-> `assert_usable` docstring + the stale user-facing OpenRouter "set OTR_ENABLE_OPENROUTER=1" help/error
-> messages (now "set OPENROUTER_API_KEY"). NEW guard `tests/test_registry_is_the_menu_guard.py` (6 tests):
-> no REGISTERED video/image/audio engine declares a live `requires_flag`; the dark NotImplementedError
-> scaffolds stay UNREGISTERED; no registered render is a dark-scaffold stub; OpenRouter is gated only on
-> creds. Full suite 5728/0, Bug Bible 16/3xfail, B7 green. The per-model SMOKE PASS now resumes (selecting
-> any registered video/image/voice/LLM engine just renders -- no launch flag, no validated-subset filter).
-> prod/main + tags remain operator-GATED.
->
-> WHERE WE ARE (2026-06-29 late session): the interim "drive the flag from the dropdown selection" approach
-> (option B, 1c73aec) was REVERTED at `cf4487a6` (pushed) -- the operator wants the gate DELETED, not driven.
-> Suite 5750/0, Bug Bible 16/3xfail at HEAD. The per-model SMOKE PASS is PAUSED: it resumes AFTER C2 lands
-> (once the gate is gone, selecting humo/wan/ltx_av/still_parallax/flux2_klein/z_image just renders -- no
-> launch flag). Smoke list (post-C2): video = visualizer / ltx_video / ltx_av / humo_14B_169 / wan_ti2v /
-> wan_i2v / still_parallax(3D); image = flux_gen1 / flux2_klein / z_image_turbo. ComfyUI Desktop needs a
-> RESTART to load each code chunk (Python module cache).
->
-> WHERE WE ARE (2026-06-29 session -- a big operator-directed UX + robustness pass on top of C1-C6, all
-> pushed to v2.0-alpha):
-> - **Node 87 truthful video dropdowns** (`c6183500`+`11afbd64`): the 3 hidden Route-A per-role slots carried
->   saved engines (humo_14B_169/wan_ti2v/ltx_video) that SILENTLY beat the visible other_beats dropdown ->
->   humo ran unasked + flux minted stills for it. Exposed the 3 slots on node 87 + defaulted them to the
->   `(use Other Beats default)` sentinel; 3 visible video slots -> `visualizer` (clean default, no red);
->   `allow_auto_fallback=False` (strict, no silent swap). Synced config/profiles/16gb_full.json
->   (other_beats_visual=visualizer; per-role keys OMITTED=inherit) + test_workflow_live_passes_validator +
->   test_two_heavy_roles. Proven by a 449s all-visualizer render (zero FLUX/HuMo, obs_publish OK, audio
->   byte-identical). Suite 5750/0.
-> - **Story-quality v2 BAKED IN / de-forked** (`73b32af3`): on/off lever removed, the C1-C6 spine runs
->   unconditionally; ~16 files; suite green.
-> - **Kokoro pack (54 voices) installed** (1038lab/KokoroTTS -> models\TTS\KokoroTTS\voices) so the announcer
->   voices (bm_george etc.) resolve, not just bm_fable. On disk (not git).
-> - **Soak hardening** (`dd273614`): the overnight soak failed SILENTLY (337 legs / 0 episodes) on a config
->   bug -- `act_count=3` vs 80-word episodes -> the budget validator rejected EVERY leg. ROOT FIX -- WORDS
->   DYNAMICALLY STEER THE ACTS: `_otr_overnight_420_soak.py` derives per-leg `act_count=max(1,min(6,words//120))`,
->   words floored at 60 (legacy 420w->3 preserved) so the budget node can never reject a leg. +
->   `docs/2026-06-29-soak-runbook/SOAK_RUNBOOK.md`: the verify-a-shipped-obs-episode-BEFORE-trusting-the-loop
->   gate + full procedure. Re-validated: leg 0 success, 1 ep -> obs. (Harness .py is .gitignored -- the fix
->   lives on disk; force-add if you want it git-tracked.)
-> OPEN: **HUMO "dropdown is the only switch" flag-free refactor REVERTED** (kept the tree green) -- removing
-> humo's OTR_ENABLE_HUMO gate ripples into the dep-pilot + gpu-smoke infra (they conflate "flag-gated" with
-> "needs-dep-verification"); needs a design call (do flag-free engines still get dep-verified?) before redoing
-> across ~16 engines + ~20 tests. **char_voice=indextts2** as the saved node default = 1-value follow-up.
-> **/soak skill** (interactive preflight checker) requested -- can't install a Cowork skill from a session
-> (-> Settings>Capabilities); substance = the runbook + the dynamic-acts fix. **Kibitz r1** done
-> (codex+antigravity reviews in kibitz-runs/2026-06-29-soak-runbook/r1; not synthesized -- operator pivoted).
-> node-87 other_beats SETTLED = keep `humo_1.7B` (operator 2026-06-28; both stay selectable).
-> - **C3 shipped** (`5198d8fe`): S2 news-coda arc bridge floor -- v2 system examples +
->   `_NEWS_CODA_ARC_BRIDGES` (arc_shape-keyed, sha256(cast_seed)-selected, each validator-checked);
->   unknown arc / v2-OFF keep the legacy NEWS_CODA_POOL byte-identical. Lock: `test_story_quality_coda.py`.
-> - **C4 SHIPPED `041d28d8` (S3 body-gate text-scored accept; was PINPOINTED -- `OTR_LedgerScriptWriter.run`
->   L4515-4589):** new module helper `_otr_body_score` scores original vs reroll on the SHIPPED text
->   (`10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps`, lower wins, ORIGINAL on tie);
->   hard_leak = `verify_and_repair_line(text, policy=...).needs_recompose`; run_on uses C2's
->   `derive_one_breath_cap` + `max_clause_markers=max(3,cap//8)`; roster_caps matches the locked cast full
->   names from `req.allowed_roster`; a MID-CLAUSE roster-caps hit TRIGGERS a reroll (never an in-place strip);
->   v2-OFF keeps `_use_rr=_bg_res_ok` byte-identical. Lock: `tests/test_story_quality_body_gate.py` (9). The
->   original C4 design follows for history: today the gate
->   rerolls ONLY on grounding failure (`validate_composed_grounding`) and accepts the reroll ONLY if it
->   re-validates grounding (L4548 `if _bg_res_ok and _bg_res.text.strip()`). S3 (v2-gated) replaces the
->   ACCEPT test with a total-order score on the SHIPPED TEXT for BOTH `cleaned` (orig) and `_bg_res.text`:
->   `score = 10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps` (lower wins, ORIGINAL
->   on tie). Add a module helper `_otr_body_score(text, bg_entry, grounded_nouns, entity_policy, req)`:
->   grounding_failed = not validate_composed_grounding(...)[0]; hard_leak from verify_and_repair_line(text,
->   _episode_entity_policy) [check its return shape first]; trunc = is_truncated; run_on = flag_one_breath(
->   text, max_words=derive_one_breath_cap(req.words_per_beat_range))[0]; roster_caps = an ALL-CAPS token-run
->   matching an episode CAST FULL NAME (NOT any caps token -- NASA/UCLA safe; cast names live on the locked
->   cast rows). v2-OFF keeps `_use_rr = _bg_res_ok` (byte-identical). roster_caps detail: a MID-CLAUSE hit
->   (grammatical subject/object, "...when CLARISSE GORDON claim...") => set the reroll TRIGGER (needs_recompose,
->   alongside `not _bg_ok`), NEVER an in-place strip (that yields "...when claim..."); only a LEADING/TRAILING
->   vocative is scrub-safe via scrub_roster_vocative. Add `tests/test_story_quality_body_gate.py`. Imports
->   needed in the writer: derive_one_breath_cap + is_truncated (from _otr_line_hygiene). Reuse the existing
->   reroll loop -- do NOT add a second compose path. **C5 (S4) SHIPPED `5afde8fb`** = find_cliche_phrase exact-span replacement
->   before EVERY quality-gate return path (kept-reroll AND kept-original) in _otr_line_composer L~2515, curated
->   safe-replacement map (case-match) + the _quality_repair_attempted guard; else accept 2nd-best + stamp
->   `cliche_shipped_after_reroll`. **C6 (S5) SHIPPED `343e0868`** = story_quality_scan two principals = top-2 by dialogue-line
->   count (wants are verb phrases, no name parse); update test_story_quality_scan_r2 expected register_overlap.
->   Then the 1-local + 1-grok acceptance render (report voiced-word counts; the length experiment).
-> - **C2 shipped** (`75930608`): G1 gate de-compression -- `_QUALITY_COLLAPSE_HINT_V2` (non-compressing,
->   v2-selected), `line_quality_defect_score` v2 keep-better, and the budget-derived one-breath cap
->   (`derive_one_breath_cap` + relaxed clause `max(3,cap//8)`) threaded at first-pass / reroll / scan from
->   one helper + `meta["words_per_beat_range"]` stamped v2-only. v2-OFF byte-identical. Suite 5736/0,
->   Bug Bible green. Lock: `tests/test_story_quality_g1.py`.
-> - **BASELINE FIX shipped** (`6d30cec2`): HEAD had 6 PRE-EXISTING reds (b7 sweep, capability_profiles,
->   force_input_sockets, 2x workflow_apply, structure-pin) from a ComfyUI Desktop UI-save that polluted
->   `otr_scifi_16gb_full.json`. Fixed: node 87 widgets_values display-labels -> bare engine ids
->   (humo_14B_169 (16:9)->humo_14B_169 @0/1/16; visualizer (16:9)->humo_1.7B @2); dropped converted-input
->   widget keys on nodes 80-83; renamed `alias`->`node_key` in build_humo_bakeoff_workflow.py; updated the
->   stale ltx_audio_in pin. **OPERATOR FLAG:** node-87 other_beats set to humo_1.7B (committed test intent),
->   NOT the UI-save's `visualizer` -- flip if visualizer was the intended dropdown choice (1-value change).
-> - **C1 shipped** (`738b3b63`): shared leaf helpers (`derive_one_breath_cap`/`_hard_clauses`/
->   `find_cliche_phrase` in `_otr_line_hygiene.py`) + golden fixtures + `test_story_quality_golden.py`
->   (kibitz option C: hybrid raw-failing + corrected-target rows). Additive; v2-OFF byte-identical.
->   Full suite 5732/0, Bug Bible 16/3xfail, B7 green.
-> - **C2 GROUNDED MUST-DO (from the fixtures kibitz):** `flag_one_breath`'s SOFT clause tripwire (>22 words
->   AND >=3 [,;]+conj) fires even under a raised `max_words` -- so C2's v2 path MUST thread BOTH
->   `derive_one_breath_cap(range)` for max_words AND a relaxed `max_clause_markers` (the gate at
->   `_otr_line_composer` L2319 calls `flag_one_breath(cleaned)` with DEFAULTS today). Else fuller multi-clause
->   lines keep getting rerolled -> defeats G1. See `kibitz-runs/2026-06-28-story-quality-fixtures/final.md`.
-> - **REMAINING:** C2 (G1) -> C3 (S2 coda) -> C4 (S3 body-gate) -> C5 (S4 cliche) -> C6 (S5 scan); each
->   suite+BugBible+B7 green, commit+push per chunk; then the 1-local+1-grok acceptance render.
->
-> **>>> PRIOR CONTEXT -- 2026-06-28 3-WAY STORY-QUALITY KIBITZ CONVERGED -> build-ready final.md.** The operator-directed
-> story-quality kibitz (Codex gpt-5.5/high + Antigravity gemini-3.5-pro + Claude as code-grounded panelist AND
-> judge; 8 agent calls, $0 local) converged at r4 -> `kibitz-runs/2026-06-28-story-quality/final.md` (r1->r4
-> plans + judgment logs alongside; anchors in `docs/2026-06-28-story-quality-kibitz/`).
-> - **LEAD FINDING (G1):** the 2026-06-27 anti-overstuffing gates now OVER-correct. `_QUALITY_COLLAPSE_HINT`
->   (`_otr_line_composer` L2293) literally says "rewrite ... under ~20 words, at most one concrete detail" -> it
->   FORCES the compression that turns rich lines into noun-salad, AND (the 14-beat skeleton x the ~22-28-word
->   `one_breath` cap) hard-bounds every episode at ~210-310 voiced words regardless of `target_words`. LENGTH +
->   CRAFT share ONE root cause -- the fix is to TUNE the gates (v2-gated), not remove them.
-> - **Evidence:** the 27-ep overnight all-visualizer soak + 3 operator-directed enrichment renders (mistral-720,
->   grok-720, grok-1340; all-visualizer, kokoro). Grounded census: the 2026-06-27 gate-seam cluster (3.1-3.7)
->   HOLDS (anchor-stuffing/dignity/cost-boilerplate/near-dup/coda-trunc all ~0). NEW defects: G1 (lead), S2 (coda
->   fallback 18/29, WEAK-LOCAL -- grok PASSES the bridge), S3 (gemma reroll roster-caps + run-ons), S4 (cliche
->   still ships), S5 (interchangeable voices -> measurement-only), S1 (seed drift -- DEFERRED), S6 (CUT).
-> - **Length probe:** `target_words` is a near-no-op (grok @720w=213 voiced words, @1340w=263, @2000w=ERROR over
->   the ~1363-word ceiling = `BEAT_WORD_HARD_MAX(80) x 14 beats`). Addressed via G1 as a SIDE EFFECT; NEVER padded.
-> - **Panel corrected 3 draft errors (all code-grounded):** S1 dramatic binding, S5 `speech_signature` threading,
->   and the G1 keep-better re-score ALL already EXIST -> reframed "add" -> "fix/enforce". `final.md` = a
->   v2-gated, flag-OFF-byte-identical, **6-green-commit** plan (shared leaf helpers -> G1 -> S2 -> S3 -> S4 -> S5)
->   with one shared `derive_one_breath_cap` helper, a concrete golden-ledger acceptance set, and a
->   verify-at-build checklist.
-> - **NEXT:** operator DECISION GATE (final.md last section: confirm `story_quality_v2` is the gate flag; accept
->   "length as a side effect, per-line cap up to ~60w, no padding"; keep the ~1363 ceiling; S1 deferred / S6 cut)
->   -> then a CODER window builds the 6-commit sequence (CPU/content only, suite+BugBible+B7 per chunk, push per
->   green chunk to `v2.0-alpha`).
-> - **BOX STATE:** a headless ComfyUI on :8000 (booted FLOOR + `OTR_ENABLE_OPENROUTER=1`, PID 27224) is left
->   RESIDENT idle from the enrichment renders; the operator's Comfy Desktop :8001 was untouched. Selective-reset
->   before the next headless run (CLAUDE.md S4). NOTE: the soak launcher hydrates the OpenRouter KEY but does NOT
->   set `OTR_ENABLE_OPENROUTER=1` -- that gap is why the overnight soak ran 0 frontier legs.
->
-## 1. CURRENT STEP
+> Last updated 2026-06-29 | HEAD 1572861b == origin/v2.0-alpha | branch v2.0-alpha.
+> **FORWARD-ONLY.** Completed/shipped work lives in `docs/GO_FORWARD_ARCHIVE.md` -- do NOT
+> record done work here. prod/main + tags remain operator-GATED.
 
-See the CURRENT STEP block at the TOP of this file -- 2026-06-29: DELETE ALL CODE-GATING
-(registry IS the menu; no opt-in/validation/promotion gates in video/image/voice/LLM).
-Code-ready kibitz-hardened plan = `kibitz-runs/2026-06-29-delete-optin-v2/r2/final.md`,
-sequenced C2-C7; interim option-B reverted at `cf4487a6` (pushed); suite 5750/0. The
-per-model smoke pass resumes after C2 (the gate removal). **DELETE-ALL-CODE-GATING COMPLETE: C2-C7
-all SHIPPED + PUSHED this session** (requires_flag GATE removed; dark scaffolds unregistered;
-VALIDATED_ENGINES filter deleted; harness decoupled from the flag; voice + LLM gates removed with
-test_audio_byte_identical GREEN; docstrings cleaned + a guard test locks the invariant; suite 5728/0,
-Bug Bible 16/3xfail, B7 green). NEXT = the per-model SMOKE PASS (now flag-free) -> then prod/main +
-tag promotion (operator-GATED).
+## 1. CURRENT STEP -- 30-WORD COVERAGE SOAK (in progress)
 
-Prior step (2026-06-28, story-quality): C1-C6 SHIPPED (HEAD `343e0868`); the 1-local +
-1-grok acceptance render was still pending when the opt-in-gating work took priority.
+A live 30-word episode per REGISTERED engine across all 3 video slots (announcer_visual /
+music_visual / other_beats_visual) + every IMAGE engine x the 3 image slots; writer =
+LOCAL gemma (Ollama 127.0.0.1:11434, NO cloud). visualizer is NOT a target (excluded); each
+leg renders the engine under test + a neutral `still_flat` filler so the output is a CLEAN
+per-engine eyeball, not a visualizer-dominated frame. `character_visual` is DYNAMIC (tracks
+the engine under test, never a frozen pin). 52 legs, resumable.
+
+- Harness: `scripts/_otr_cov_runner.py` (`--mode all`, merges + resumes) ->
+  `scripts/_otr_coverage_matrix.json` -> the `otr-coverage-soak` dashboard (EMBEDDED snapshot
+  -- sandboxed artifacts can't read local files; refreshed each check-in via
+  `scripts/_otr_build_dash.py`).
+- ACCEPTANCE: each registered engine RENDERS or hard-fails LOUD with a NAMED reason -> a
+  coverage matrix; nothing silently dropped (the dashboard "Rendered" column flags any silent
+  fallback); audio byte-identical on every PASS.
+- Reset before each headless run: selective CIM kill (never a blanket python kill). The server
+  reads the profile/workflow JSON fresh per leg (no restart needed for a config change).
+- Retest/retry backlog (fill from the final matrix): `docs/2026-06-29-coverage-soak/RETEST_LIST.md`.
+
+## 1A. CONSOLIDATED NEXT STEPS (post-soak sprints, priority order)
+
+Every sprint: video/content-only where noted; single resident heavy <= 14.5 GB; seed-keyed
+determinism; LOUD fallbacks; master audio byte-identical (`test_audio_byte_identical` GREEN);
+suite + Bug Bible + B7 green AND push per green chunk to v2.0-alpha. Keep EVERY engine
+user-selectable -- these are QUALITY FLOORS, never choice-limiting.
+
+- **S-A [HIGH] VISUAL LEGIBILITY FLOOR + IMAGE CONTRACT.** Root cause (grounded on
+  `signal_lost_weight_of_the_blueprints_20260629_163656`): the saved ledger has NO `images`
+  key + empty cast portrait fields, while `stills_manifest.json` HAS the clean `c01` portrait
+  -> HuMo animates a wrong/empty init -> murky portrait, yet the completion gates PASS. Fix:
+  (1) preserve/stamp `ledger['images']` (or reload stills_manifest before render); (2) stamp
+  per-beat `init_source`/`init_image` into the clip manifest; (3) legibility guard after each
+  clip (sharpness RATIO vs source -- relative/catastrophic only; motion via freezedetect;
+  face-presence = phase 2); (4) on failure composite the clear still + subtle parallax;
+  (5) record `attempted_engine`/`delivered_engine`/`fallback_reason` via the EXISTING
+  humo->still_parallax LOUD restamp. Detail: `docs/2026-06-29-coverage-soak/RETEST_LIST.md` B2.
+- **S-B ltx_audio_in VRAM FIT (regression).** Breaches the 14.5 GB ceiling (~15.9 GB,
+  `eng_ltx_av.py:687`) and hard-fails in all 3 slots. Regression: `7bbce1d8` "bakeoff-winner
+  quality upgrade (PROVISIONAL)" + `fd9edc28` switched to dev-Q3_K_M + SHARP LoRA (~15.5 GB);
+  last-good = `c4d7815b` base recipe @ 512x288 = 13688 MB. FIX-FIRST = observability (per-beat
+  recipe / unet / quant / LoRA / canvas / frames / audio-source / phase-marker / peak VRAM),
+  THEN re-fit via recipe/quant/offload (`OTR_LTX_AV_RECIPE` / `distilled_native` / lighter
+  quant) -- NOT higher resolution. Quality/resolution tiers LAST, probe-gated. Replace the
+  stale 13688 comment with "see runtime logs / bakeoff manifest".
+- **S-C AUDIO-IN CONDITIONING SPRINT.** Shared per-beat `audio_motion_profile` (rms / peak /
+  onset / silence / brightness / dynamic-range / speech-vs-music / duration) driving EVERY
+  engine -- audio-in engines get real audio, non-audio engines get prompt / camera / parallax /
+  light from the profile; normalized conditioning WAVs (model-input only, master untouched);
+  HuMo phrase-chunking for long dialogue (vs mirror-extending the 49-frame cap, `eng_humo.py:61`);
+  probe-gated HQ tiers last.
+- **S-D gemma normalize_length wrapper-key drift.** Every gemma episode: the model returns the
+  RadioEditPlan nested under a top-level `RadioEditPlan` key -> `projected_word_total` "missing"
+  -> retry ladder exhausts -> length normalization skipped (warn-only). Fix the LEVER-1
+  tolerant-unwrap to peel a top-level schema-name wrapper; retest on a gemma leg.
+
+**DEFERRED BACKLOG** (still pending, lower priority -- detail in sections 3-5 + the bug logs):
+GATE-A punch list incl. BUG-411 (flux lost its cinematic tint -- restore FluxGuidance ~3.5 +
+the cinematic/radio suffixes + bookend seed) and look-QA; Wan i2v back-burner (drifts off the
+still; LTX holds -- Path B two-expert only if revisited); 3D path decision (WorldMirror
+multi-view vs TripoSG object-mesh -- BLOCKED on operator pick); switchable distribution S3-S6.
 
 Older ACTIVE/SUPERSEDED step history -> `docs/GO_FORWARD_ARCHIVE.md`.
+
+---
 
 ## 2. HARD RULES (invariants -- apply every session)
 
