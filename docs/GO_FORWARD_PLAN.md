@@ -1,62 +1,36 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-30 | HEAD 770aa72a == origin/v2.0-alpha | branch v2.0-alpha.
-> **OVERNIGHT 2026-06-30:** the proven coverage runner (`scripts/_otr_cov_runner.py --mode all`) is
-> rendering the 18 pending video x image combos -> `output\otr\obs` against the live :8000 server
-> (log `scripts/_otr_overnight_combos.log`; resumable matrix `scripts/_otr_coverage_matrix.json`).
-> Operator directive: a BAKED combo soak (start from story-ledger + audio, vary engine picks, ->obs).
-> KIBITZ-CONVERGED design (r1-r3, grounded): `docs/2026-06-29-coverage-soak/COMBO_SOAK_CONVERGED_PLAN.md`
-> -- bake boundary is UPSTREAM OF THE DIRECTORS (ShotLock bakes the engine_id), keep directors->mux
-> live, vary node-87/88 picks per leg. CLEAN-BREAK rip-out keep/remove list converged in the same doc.
-> CAVEAT: the overnight server predates today's S-A clip-fill -> HuMo combos still show the murk; a
-> fresh-code re-render is the attended follow-up.
-> **FORWARD-ONLY.** Completed/shipped work lives in `docs/GO_FORWARD_ARCHIVE.md` -- do NOT
-> record done work here. prod/main + tags remain operator-GATED.
+> Last updated 2026-06-30 | HEAD 10c5991a == origin/v2.0-alpha | branch v2.0-alpha.
+> **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
+> do NOT record done work here. prod/main + tags remain operator-GATED.
 
-> **SPRINT EXECUTION STATUS (session 2026-06-29 eve -- code-only chunks, all green+pushed):**
-> SHIPPED: **S-F** (`c6c50579` visual smoke fixture: pruned node-92 prompt + bundle baker +
-> node-92 input capture), **S-A** (`4e13a692` clip-fill loop on underrun + delivered-frames
-> legibility floor + freezedetect parse), **S-B** (`eb8c3781` ltx_audio_in VRAM-fit observability
-> + recipe receipt; the canvas is already 512x288, the fit lever is recipe/quant), **S-D**
-> (`5a50fa40` gemma `{"RadioEditPlan":{...}}` unwrap), **S-E5** (`9e4f3a33` ledger recipe-stamp
-> per_clip/by_engine). Suite 5766p/0f + Bug Bible green at each push. **BUG-411** code = DONE
-> (bookend seed 4242 verified present `otr_image_gen_dispatcher.py:129`; remaining = operator
-> look-QA eyeball only).
-> NEEDS OPERATOR / GPU (not safely autonomous):
-> - **S-E E1 + E3 (no-fallback scaffolding rip-out + engine retirement)** -- ENTANGLED with the
->   A-S7.5 soak (`make_fallback_of` / `EXPECTED_OOM_TRAIL` / `_PROFILES` / `build_soak_fixture` /
->   `run_gpu_soak` / `assert_soak_ok` all share the constants E1 removes). The SPRINT_PLAN E1
->   scopes "migrate the run_real_episode/render_single call sites + constants + fallback tests"
->   but does NOT say whether the soak's forced-OOM degradation DEMO gets gutted or preserved.
->   OPERATOR DECISION NEEDED before the rip-out (operator-intent, not a roundtable question).
-> - **S-E E4 (dropdown labels) + E6 (radio-still bookend)** -- E4 changes the combo OPTION
->   strings that saved workflow-JSON values must match (JSON-adjacent); E6 is an image-prompt
->   change best validated by the look-QA eyeball. Defer with E1/E3.
-> - **S-C C1 (audio_motion_profile producer)** -- new node; wire into the workflow JSON per the
->   hard rule (own chunk).
-> - **Live GPU batch (task)** -- reset+boot fresh server (loads the new node-92 capture + S-A
->   clip-fill), run ONE clean 30w reference -> S-F replay (executed=={92}) + S-A render proof
->   (delivered frames==target, no held murk, audio byte-identical) + S-B NVML<=14.5GB x3 slots.
+## 1. CURRENT STEP -- ALL-ENGINES x ALL-SLOTS FIX (kibitz r1-r4 CONVERGED; BUILD-READY)
 
-## 1. CURRENT STEP -- 30-WORD COVERAGE SOAK (in progress)
+The combo QA exposed the real blocker: stills/engines do NOT render correctly in every slot
+(character beats came back as static stills; image legs came back BLACK). Root-caused + hardened to a
+sprint-ready plan: **`docs/2026-06-30-slot-audit/SPRINT_PLAN.md`** (the coder contract). Build C0->C5,
+each green (suite + Bug Bible + B7) and pushed per chunk.
 
-A live 30-word episode per REGISTERED engine across all 3 video slots (announcer_visual /
-music_visual / other_beats_visual) + every IMAGE engine x the 3 image slots; writer =
-LOCAL gemma (Ollama 127.0.0.1:11434, NO cloud). visualizer is NOT a target (excluded); each
-leg renders the engine under test + a neutral `still_flat` filler so the output is a CLEAN
-per-engine eyeball, not a visualizer-dominated frame. `character_visual` is DYNAMIC (tracks
-the engine under test, never a frozen pin). 52 legs, resumable.
+- C0 (OPERATOR DECISION, do first): keep+fix the 3 still options (still_pan/still_flat/still_motion);
+  RETIRE `station_card` (broken black card) + `abstract` (redundant w/ visualizer) -- or keep+fix them.
+  This is the ONLY open decision; everything else is determined.
+- C1 BLACK FIX: add `accepts_still=True` to StillPanFamily + StillMotionFamily (cheap_families.py) so
+  the dispatcher mints their scene still; do NOT generalize the scene-still bind (would wire b-roll
+  stills into HuMo). Test `init_source=="scene_still"`.
+- C2 KILL THE DRIFT: override the VIDEO registry `engines_for_role`/`assert_usable` to use
+  `role_compat.engine_fits_role` (capability), FAIL-SOFT to legacy `roles` only when required_inputs is
+  missing/None or the role is unknown (NEVER for `()`). `roles` -> UI-sort metadata only.
+- C3 scene_broll routing: verify the b-roll `speaker_role` token; map it in `SPEAKER_TO_VIDEO_ROLE`.
+- C4 matrix test: every engine x 5 roles eligibility == `engine_fits_role` (capability, not flat-True).
+- C5 REBUILD THE SOAK ON THE CANONICAL JSON (`workflows/otr_scifi_16gb_full.json`): converge the 3
+  stale soak entry points, set all 5 role keys via `apply_profile_to_workflow` (widget_mapping
+  node-type, no node ids), named baselines (still_flat video / flux_gen1 image), + a content oracle on
+  the per-beat manifest clips (non-dark luma + motion for motion engines; static stills exempt). Merge
+  with `docs/2026-06-29-coverage-soak/COMBO_SOAK_CONVERGED_PLAN.md`.
 
-- Harness: `scripts/_otr_cov_runner.py` (`--mode all`, merges + resumes) ->
-  `scripts/_otr_coverage_matrix.json` -> the `otr-coverage-soak` dashboard (EMBEDDED snapshot
-  -- sandboxed artifacts can't read local files; refreshed each check-in via
-  `scripts/_otr_build_dash.py`).
-- ACCEPTANCE: each registered engine RENDERS or hard-fails LOUD with a NAMED reason -> a
-  coverage matrix; nothing silently dropped (the dashboard "Rendered" column flags any silent
-  fallback); audio byte-identical on every PASS.
-- Reset before each headless run: selective CIM kill (never a blanket python kill). The server
-  reads the profile/workflow JSON fresh per leg (no restart needed for a config change).
-- Retest/retry backlog (fill from the final matrix): `docs/2026-06-29-coverage-soak/RETEST_LIST.md`.
+ACCEPTANCE: every video+still engine eligible (capability) AND renders real content in all 3 slots
+(no black floor; static OK for static engines); the canonical-JSON soak proves it; audio byte-identical;
+no shim. VERIFY-AT-BUILD checklist in the SPRINT_PLAN.
 
 ## 1A. CONSOLIDATED NEXT STEPS (post-soak sprints, priority order)
 

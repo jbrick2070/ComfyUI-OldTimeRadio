@@ -7,6 +7,35 @@ parked) stay in `GO_FORWARD_PLAN.md`.
 
 ---
 
+## 2026-06-29..30 -- SOAK-FIX SPRINT + COMBO QA + SLOT-AUDIT (all SHIPPED / superseded)
+
+SHIPPED (each green: suite 5766/0 + Bug Bible; pushed to v2.0-alpha):
+- **S-F** `c6c50579` -- visual smoke fixture (pruned node-92 prompt + bundle baker + node-92 input
+  capture `state/node_episode_input.json`).
+- **S-A** `4e13a692` -- clip-fill loop on underrun + delivered-frames legibility floor + freezedetect.
+- **S-B** `eb8c3781` -- ltx_audio_in VRAM-fit observability + recipe receipt (canvas already 512x288;
+  fit lever = recipe/quant, the live bakeoff pick deferred).
+- **S-D** `5a50fa40` -- gemma `{"RadioEditPlan":{...}}` schema-name unwrap.
+- **S-E5** `9e4f3a33` -- ledger recipe-stamp (`meta.render_engines` per_clip/by_engine).
+- **Soak hygiene fix** `f691f243` -- SceneAwareScopes scratch -> OTR tmp tier (was leaking
+  `otr_scopes_*.mp4` to system Temp -> 11 hygiene SOAK_FAILs that were clean renders) + a ratchet test.
+- **BUG-411** -- verified DONE (bookend seed 4242 present `otr_image_gen_dispatcher.py:129`); remaining
+  = operator look-QA eyeball.
+
+OVERNIGHT COMBO RUN (2026-06-30): the proven `_otr_cov_runner.py --mode all` rendered 18 combos -> obs
+(~5.6h). QA found: real video engines (ltx_video/humo*/wan_ti2v) produce content; still-carrier/image
+legs were BLACK + character beats came back STILL -> the root causes are now the CURRENT STEP
+(slot-audit). Live `_qa_review/` finals + `output\otr\QA_REVIEW.html` generated for eyeball.
+
+KIBITZ CAMPAIGNS converged (design history under `kibitz-runs/` + `docs/`): cleanbreak+soak-reengineer
+(`docs/2026-06-29-coverage-soak/COMBO_SOAK_CONVERGED_PLAN.md`), the scopes hygiene fix, and the
+ALL-ENGINES x ALL-SLOTS audit (`docs/2026-06-30-slot-audit/SPRINT_PLAN.md` -- now the CURRENT STEP).
+
+SUPERSEDED: the "30-word coverage soak" current step (it ran; its results drove the slot-audit) and the
+SPRINT EXECUTION STATUS narrative -- folded here.
+
+---
+
 > **>>> SHIPPED 2026-06-29 -- DELETE-ALL-CODE-GATING (C2-C7) + STILL RENAMES + SOAK GATE FIX + HuMo-14B CHARACTER ROUTING. HEAD `1572861b` == origin/v2.0-alpha. prod/main + tags GATED.**
 > - **C2-C7 "registry IS the menu" campaign SHIPPED + PUSHED** (`c6ca5d88`->`e61b90ef`): removed the `requires_flag`
 >   GATE (base + 8 render-ready video adapters + 4 image survivors set `requires_flag=None`, vestigial); UNREGISTERED
