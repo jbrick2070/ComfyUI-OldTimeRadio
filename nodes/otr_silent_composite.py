@@ -240,17 +240,39 @@ def _probe_audio_duration(path):
 _CLIP_UNDERRUN_FRAC = 0.5
 
 
-def _warn_clip_underrun(row, target_n):
+def _should_loop_fill(row, target_n):
+    """S-A clip-fill: a real clip that UNDERRUNS its beat target loops to fill
+    (the composite's own recommendation) instead of holding the last frame (the
+    HuMo 177/434 murk). Decision reads the RAW engine-output ``frame_count``
+    (``build_clip_manifest`` keeps it raw) vs the beat ``target_frame_count``;
+    ANY shortfall fills. A frame-DIRECTORY clip (the 3D alpha handoff) is exempt
+    -- it has its own dir encoder. Env ``OTR_CLIP_FILL=0`` restores the legacy
+    held-last-frame behavior. Pure (a single os.path.isdir probe)."""
+    if os.environ.get("OTR_CLIP_FILL", "1") == "0":
+        return False
+    real = int((row or {}).get("frame_count") or 0)
+    tgt = int(target_n or 0)
+    if real <= 0 or tgt <= 0 or real >= tgt:
+        return False
+    p = str((row or {}).get("path") or "")
+    if p and os.path.isdir(p):
+        return False
+    return True
+
+
+def _warn_clip_underrun(row, target_n, *, will_loop=False):
     """LOUD-warn (never raise -- no-loud-fail rule) when a real clip row carries
-    far fewer on-disk frames than its beat target, so the composite will hold the
-    last frame for most of the beat. A loop-fill row is exempt (it repeats to fill
-    by design). Pure except for the warning; clip-fill Piece 5."""
+    far fewer on-disk frames than its beat target, so the composite WOULD hold
+    the last frame for most of the beat. A loop-fill row is exempt -- once
+    clip-fill is on (``will_loop``) the clip REPEATS to fill, so the held-frame
+    murk can no longer happen and the LOUD warning is silenced. Pure except for
+    the warning; clip-fill Piece 5."""
     try:
         frac = float(os.environ.get("OTR_CLIP_UNDERRUN_FRAC",
                                     _CLIP_UNDERRUN_FRAC))
     except (TypeError, ValueError):
         frac = _CLIP_UNDERRUN_FRAC
-    if frac <= 0 or (row or {}).get("loop"):
+    if frac <= 0 or will_loop or (row or {}).get("loop"):
         return
     real = int((row or {}).get("frame_count") or 0)
     tgt = int(target_n or 0)
@@ -323,9 +345,11 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 emit(gap_src, "", gap_n, _floor_aligned(cursor, gap_n))
                 cursor = start_frame
             if r.get("exists") and r.get("path"):
-                _warn_clip_underrun(r, n)
+                _fill = _should_loop_fill(r, n)
+                _warn_clip_underrun(r, n, will_loop=_fill)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
-                     r.get("engine_id"), bg_still_path=r.get("bg_still_path"))
+                     r.get("engine_id"), loop=_fill,
+                     bg_still_path=r.get("bg_still_path"))
             else:
                 emit(gap_src, "", n, _floor_aligned(cursor, n),
                      r.get("shot_id"), r.get("engine_id"))
@@ -334,9 +358,11 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         for r in rows:
             n = int(r.get("target_frame_count") or 0)
             if r.get("exists") and r.get("path"):
-                _warn_clip_underrun(r, n)
+                _fill = _should_loop_fill(r, n)
+                _warn_clip_underrun(r, n, will_loop=_fill)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
-                     r.get("engine_id"), bg_still_path=r.get("bg_still_path"))
+                     r.get("engine_id"), loop=_fill,
+                     bg_still_path=r.get("bg_still_path"))
             elif floor_available:
                 start = min(cursor, max(0, ff - n)) if ff else cursor
                 emit("floor", "", n, start, r.get("shot_id"), r.get("engine_id"))
@@ -370,6 +396,94 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
     return segments, cursor
+
+
+def timeline_quality_report(manifest, segments):
+    """S-A legibility floor (staged commit 1): a SEPARATE post-plan view that
+    asserts each real-clip beat DELIVERS its full target span and flags any beat
+    that would freeze. PURE -- never overwrites the raw manifest ``frame_count``
+    (which stays engine-produced); it only reads the planned segments.
+
+    Per clip beat: ``frame_count`` (raw engine output), ``target_frame_count``,
+    ``delivered_frame_count`` (sum of its clip segments), ``looped`` (clip-fill
+    engaged), and ``quality_status`` one of: ``ok`` (clip already >= target),
+    ``looped_fill`` (underran, now loop-filled to target), ``held_last_frame``
+    (underran with fill OFF -> the murk), ``no_clip_segment`` (fell to the
+    still/floor spine -- not a clip-fill failure). ``delivered_frames_ok`` is
+    True when NO beat is held_last_frame and every clip beat delivered ==
+    target."""
+    clips = {str(r.get("shot_id")): r
+             for r in ((manifest or {}).get("clips") or [])
+             if r.get("shot_id") and int((r or {}).get("target_frame_count") or 0) > 0}
+    seg_by_shot = {}
+    for s in (segments or []):
+        if s.get("source") == "clip" and s.get("shot_id"):
+            seg_by_shot.setdefault(str(s["shot_id"]), []).append(s)
+    beats = []
+    ok_all = True
+    for sid, r in clips.items():
+        tgt = int(r.get("target_frame_count") or 0)
+        raw = int(r.get("frame_count") or 0)
+        segs = seg_by_shot.get(sid, [])
+        delivered = sum(int(s.get("n_frames") or 0) for s in segs)
+        looped = any(s.get("loop") for s in segs)
+        if not segs:
+            status = "no_clip_segment"
+        elif raw > 0 and raw < tgt:
+            status = "looped_fill" if looped else "held_last_frame"
+        else:
+            status = "ok"
+        beats.append({
+            "shot_id": sid, "beat_id": r.get("beat_id"),
+            "engine_id": r.get("engine_id"), "target_frame_count": tgt,
+            "frame_count": raw, "delivered_frame_count": delivered,
+            "looped": bool(looped), "quality_status": status})
+        if status == "held_last_frame":
+            ok_all = False
+        elif segs and delivered != tgt:
+            ok_all = False
+    return {"delivered_frames_ok": ok_all, "beats": beats,
+            "underran": [b for b in beats
+                         if b["quality_status"] in ("looped_fill", "held_last_frame")]}
+
+
+_FREEZE_RE = None
+
+
+def parse_freezedetect(stderr):
+    """Parse ffmpeg ``freezedetect`` stderr into a list of frozen spans
+    ``[{start, end}]`` (seconds). PURE -- offline-testable. An open
+    freeze_start with no freeze_end (frozen through EOF) yields end=None."""
+    global _FREEZE_RE
+    if _FREEZE_RE is None:
+        import re
+        _FREEZE_RE = re.compile(
+            r"lavfi\.freezedetect\.freeze_(start|end)[:=]\s*([0-9.]+)")
+    spans = []
+    cur = None
+    for tag, val in _FREEZE_RE.findall(stderr or ""):
+        v = float(val)
+        if tag == "start":
+            cur = {"start": v, "end": None}
+            spans.append(cur)
+        elif tag == "end" and cur is not None:
+            cur["end"] = v
+            cur = None
+    return spans
+
+
+def freezedetect_silent(video_path, *, ffmpeg="ffmpeg", noise_db=-60, dur_s=2.0):
+    """Run ffmpeg ``freezedetect`` over the SILENT video only (never the master)
+    and return the parsed frozen spans. Used by the S-A live legibility proof;
+    NOT wired into the default assemble path (it adds a full decode pass).
+    FAIL-SOFT: returns ``[]`` if ffmpeg is unavailable."""
+    fb = _ffmpeg_bin(ffmpeg)
+    if not fb or not os.path.isfile(video_path):
+        return []
+    p = _run([fb, "-hide_banner", "-i", video_path, "-vf",
+              "freezedetect=n=%ddB:d=%s" % (int(noise_db), str(dur_s)),
+              "-map", "0:v:0", "-f", "null", os.devnull])
+    return parse_freezedetect((p.stderr or "") + (p.stdout or ""))
 
 
 def _seg_vf(w, h, fps, start_frame, sharpen=True):
@@ -615,6 +729,25 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         target_total_frames=target_total, fps=fps)
     if not segments or total <= 0:
         raise ValueError("OTR_SilentComposite: manifest has no renderable beats")
+    # S-A legibility floor: a SEPARATE delivered-frames view (raw manifest
+    # frame_count untouched). LOUD-report any underran beat + whether clip-fill
+    # filled it; a held_last_frame beat (fill OFF) is a legibility failure.
+    qa = timeline_quality_report(manifest, segments)
+    if qa["underran"]:
+        report.append(
+            "clip-fill: %d beat(s) underran -> %s"
+            % (len(qa["underran"]),
+               ", ".join("%s %s(%d/%d)"
+                         % (b["shot_id"], b["quality_status"],
+                            b["frame_count"], b["target_frame_count"])
+                         for b in qa["underran"])))
+    if not qa["delivered_frames_ok"]:
+        _held = sum(1 for b in qa["beats"]
+                    if b["quality_status"] == "held_last_frame")
+        report.append(
+            "LEGIBILITY (LOUD): %d beat(s) did NOT deliver full target frames "
+            "(held_last_frame -> static murk); clip-fill is OFF "
+            "(OTR_CLIP_FILL=0)" % _held)
     workdir = tempfile.mkdtemp(prefix="otr_assemble_")
     try:
         seg_paths = []
@@ -680,6 +813,13 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     report.append("assembled %d beats -> %d frames @%dfps %sx%s silent; "
                   "budget %d OK" % (len(segments), got, fps,
                                     info.get("width", w), info.get("height", h), total))
+    # S-A post-assemble QA artifact (best-effort): self-documents per-beat
+    # delivered frames + clip-fill status next to the silent video.
+    try:
+        with open(out_path + ".qa.json", "w", encoding="utf-8") as _qf:
+            json.dump(qa, _qf, ensure_ascii=True, indent=1)
+    except Exception:  # noqa: BLE001 -- QA artifact is best-effort
+        pass
     return out_path, report
 
 

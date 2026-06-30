@@ -184,21 +184,44 @@ def _manifest(rows, fps=25):
     return {"fps": fps, "clips": rows}
 
 
-def test_underrun_warns_on_short_clip(monkeypatch, caplog):
+def test_underrun_loops_and_suppresses_warn(monkeypatch, caplog):
+    # S-A: default clip-fill ON -> a short clip LOOPS to fill the beat (never
+    # holds the last frame), and the LOUD underrun warning is SILENCED because
+    # the fill has handled it.
     from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
+             "exists": True, "frame_count": 17, "target_frame_count": 280,
+             "start_s": None}]
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        segs, total = sc.plan_timeline_segments(_manifest(rows))
+    assert total == 280                      # the segment still spans the beat
+    clip_segs = [s for s in segs if s["source"] == "clip"]
+    assert clip_segs and all(s["loop"] for s in clip_segs)   # loop-filled
+    assert not any("CLIP UNDERRUN" in r.message for r in caplog.records)
+
+
+def test_underrun_warns_when_fill_disabled(monkeypatch, caplog):
+    # OTR_CLIP_FILL=0 restores the legacy held-last-frame behavior -> the LOUD
+    # underrun warning fires again and the segment does NOT loop.
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
+    monkeypatch.setenv("OTR_CLIP_FILL", "0")
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
              "exists": True, "frame_count": 17, "target_frame_count": 280,
              "start_s": None}]
     with caplog.at_level(logging.WARNING, logger="OTR"):
         segs, total = sc.plan_timeline_segments(_manifest(rows))
     assert any("CLIP UNDERRUN" in r.message for r in caplog.records)
-    assert total == 280                      # the segment still spans the beat
+    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
 
 
 def test_no_underrun_warn_when_clip_fills_target(monkeypatch, caplog):
+    # 277/280 is above the 50% underrun threshold -> no LOUD warn either way.
     from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
              "exists": True, "frame_count": 277, "target_frame_count": 280,
              "start_s": None}]
@@ -210,9 +233,81 @@ def test_no_underrun_warn_when_clip_fills_target(monkeypatch, caplog):
 def test_underrun_guard_disabled_by_env(monkeypatch, caplog):
     from nodes import otr_silent_composite as sc
     monkeypatch.setenv("OTR_CLIP_UNDERRUN_FRAC", "0")
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
              "exists": True, "frame_count": 1, "target_frame_count": 280,
              "start_s": None}]
     with caplog.at_level(logging.WARNING, logger="OTR"):
         sc.plan_timeline_segments(_manifest(rows))
     assert not any("CLIP UNDERRUN" in r.message for r in caplog.records)
+
+
+# --------------------------------------------------------------------------- #
+# S-A -- clip-fill loop decision + delivered-frames QA + freezedetect parse
+# --------------------------------------------------------------------------- #
+def test_full_clip_does_not_loop(monkeypatch):
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [{"shot_id": "s", "engine_id": "ltx_video", "path": "x.mp4",
+             "exists": True, "frame_count": 280, "target_frame_count": 280,
+             "start_s": None}]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
+
+
+def test_dir_clip_not_loop_filled(monkeypatch, tmp_path):
+    # A frame-DIRECTORY clip (3D alpha handoff) has its own fill -> never looped.
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    d = tmp_path / "frames"
+    d.mkdir()
+    rows = [{"shot_id": "s", "engine_id": "character_3d", "path": str(d),
+             "exists": True, "frame_count": 10, "target_frame_count": 280,
+             "start_s": None}]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
+
+
+def test_timeline_quality_report_statuses(monkeypatch):
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [
+        {"shot_id": "a", "engine_id": "humo", "path": "a.mp4", "exists": True,
+         "frame_count": 100, "target_frame_count": 280, "start_s": None},
+        {"shot_id": "b", "engine_id": "ltx", "path": "b.mp4", "exists": True,
+         "frame_count": 280, "target_frame_count": 280, "start_s": None},
+        {"shot_id": "c", "engine_id": "still", "path": "", "exists": False,
+         "frame_count": 0, "target_frame_count": 120, "start_s": None},
+    ]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    qa = sc.timeline_quality_report(_manifest(rows), segs)
+    st = {b["shot_id"]: b["quality_status"] for b in qa["beats"]}
+    assert st["a"] == "looped_fill"
+    assert st["b"] == "ok"
+    assert st["c"] == "no_clip_segment"
+    assert qa["delivered_frames_ok"]                       # no held_last_frame
+    da = next(b for b in qa["beats"] if b["shot_id"] == "a")
+    assert da["delivered_frame_count"] == 280 and da["frame_count"] == 100
+
+
+def test_timeline_quality_report_held_when_fill_off(monkeypatch):
+    from nodes import otr_silent_composite as sc
+    monkeypatch.setenv("OTR_CLIP_FILL", "0")
+    rows = [{"shot_id": "a", "engine_id": "humo", "path": "a.mp4",
+             "exists": True, "frame_count": 100, "target_frame_count": 280,
+             "start_s": None}]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    qa = sc.timeline_quality_report(_manifest(rows), segs)
+    assert qa["beats"][0]["quality_status"] == "held_last_frame"
+    assert not qa["delivered_frames_ok"]
+
+
+def test_parse_freezedetect():
+    from nodes import otr_silent_composite as sc
+    stderr = (
+        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_start: 1.5\n"
+        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_duration: 1.5\n"
+        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_end: 3.0\n"
+        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_start: 7.2\n")
+    spans = sc.parse_freezedetect(stderr)
+    assert spans == [{"start": 1.5, "end": 3.0}, {"start": 7.2, "end": None}]
