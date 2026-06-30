@@ -2012,6 +2012,14 @@ def build_clip_manifest(result, *, episode_id=""):
             "init_source": str(trow.get("init_source") or ""),
             "init_image_used": str(trow.get("init_image") or ""),
             "exists": exists,
+            # S-B/E5 recipe receipt: the render engine threads recipe / quant /
+            # LoRA / canvas / measured peak into the canonical clip; carry it onto
+            # the manifest row so the ledger recipe-stamp self-documents what made
+            # each beat. None for engines that emit no receipt (OPTIONAL field).
+            "recipe": clip.get("recipe"), "quant": clip.get("quant"),
+            "use_lora": clip.get("use_lora"),
+            "render_canvas": clip.get("render_canvas"),
+            "vram_peak_mb": clip.get("vram_peak_mb"),
         }
         # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
         # turntable mesh on a TRANSPARENT background -- it composites over a

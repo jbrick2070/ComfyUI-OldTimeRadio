@@ -23,26 +23,51 @@ import logging
 log = logging.getLogger("OTR")
 
 
-def _stamp_render_engines_meta(manifest, vram_peak_mb):
-    """Stamp the per-role VIDEO engine map + engine histogram + VRAM peak into
-    the production-ledger meta so the episode treatment / credits sheet can
-    report exactly which engine rendered each role. Best-effort; never raises.
-
-    (The per-role IMAGE engine is already durable in ``ledger['images']`` --
-    each still row carries ``role`` + ``engine_id`` -- so only the VIDEO side
-    needs stamping here.)"""
+def _build_render_engines_payload(manifest, vram_peak_mb):
+    """Pure: the ``meta.render_engines`` payload. Preserves the existing keys
+    (histogram / video_revision / by_role / vram_peak_mb) and ADDS the S-E5
+    recipe receipt -- a per-beat ``delivered_engine`` + recipe/quant/LoRA/canvas/
+    peak block + a by-engine roll-up -- so every saved episode self-documents
+    "what did I use?" (the durable twin of no-fallbacks + dropdown labels). An
+    engine that emits no receipt stamps recipe=None (never drops the row). No
+    I/O; unit-testable."""
     by_role: dict[str, dict[str, int]] = {}
+    per_clip: list = []
+    by_engine: dict[str, dict] = {}
     for clip in (manifest or {}).get("clips") or []:
         role = str(clip.get("role") or "?")
         eng = str(clip.get("engine_id") or "?")
         by_role.setdefault(role, {})
         by_role[role][eng] = by_role[role].get(eng, 0) + 1
-    payload = {
+        receipt = {
+            "recipe": clip.get("recipe"), "quant": clip.get("quant"),
+            "use_lora": clip.get("use_lora"),
+            "render_canvas": clip.get("render_canvas"),
+            "vram_peak_mb": clip.get("vram_peak_mb"),
+        }
+        per_clip.append({"shot_id": clip.get("shot_id"), "role": role,
+                         "delivered_engine": eng, **receipt})
+        by_engine.setdefault(eng, receipt)
+    return {
         "histogram": (manifest or {}).get("engine_histogram") or {},
         "video_revision": (manifest or {}).get("video_revision"),
         "by_role": by_role,
         "vram_peak_mb": vram_peak_mb,
+        "per_clip": per_clip,        # E5
+        "by_engine": by_engine,      # E5
     }
+
+
+def _stamp_render_engines_meta(manifest, vram_peak_mb):
+    """Stamp the per-role VIDEO engine map + histogram + VRAM peak + the E5
+    recipe receipt into the production-ledger meta so the episode treatment /
+    credits sheet reports exactly which engine + recipe rendered each beat.
+    Best-effort; never raises.
+
+    (The per-role IMAGE engine is already durable in ``ledger['images']`` --
+    each still row carries ``role`` + ``engine_id`` -- so only the VIDEO side
+    needs stamping here.)"""
+    payload = _build_render_engines_payload(manifest, vram_peak_mb)
     from .production_ledger import get_ledger
 
     led = get_ledger()
