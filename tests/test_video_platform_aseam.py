@@ -110,8 +110,14 @@ def test_video_registry_register_and_assert_usable(clean_video_registry):
     assert vreg.all_engine_names() == ["ltx"]
     assert vreg.engines_for_role("text_to_video") == ["ltx"]
     assert vreg.assert_usable("ltx", "text_to_video") == "ltx"
+    # C2 (2026-06-30): eligibility is CAPABILITY. A text-only engine fits EVERY real
+    # role (every role supplies text_prompt), so the rejection case must be an engine
+    # whose required input the role cannot supply: an audio-driven engine is refused
+    # by background_abstract (which supplies only text_prompt, no audio_ref).
+    vreg.register(_stub_engine(name="talker", roles=("character_video",),
+                               required_inputs=("audio_ref", "init_image")))
     with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("ltx", "character_video")  # role not served
+        vreg.assert_usable("talker", "background_abstract")  # role can't supply audio_ref
     with pytest.raises(vreg.EngineUnusable):
         vreg.assert_usable("missing", "text_to_video")  # not registered
 

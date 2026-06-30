@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Optional, Protocol, runtime_checkable
 
+from .._otr_shared import role_compat as _role_compat
 from .._otr_shared.engine_registry_base import (
     EngineCore,
     EngineRegistry,
@@ -39,6 +40,7 @@ __all__ = [
     "engines_for_role",
     "default_engine_for_role",
     "assert_usable",
+    "descriptor_for_engine",
 ]
 
 
@@ -89,10 +91,113 @@ class VideoEngine(Protocol):
     def teardown(self, prepared) -> None: ...
 
 
+class VideoEngineRegistry(EngineRegistry):
+    """The VIDEO registry: eligibility is CAPABILITY, not the legacy `roles` list.
+
+    C2 (D1 drift fix, 2026-06-30). Production already validates per-role picks by
+    CAPABILITY (``role_compat.engine_fits_role``: an engine fits a role iff the role
+    can supply every ``required_inputs`` token). The shared base, however, still
+    gated ``engines_for_role`` / ``assert_usable`` on the per-engine ``roles``
+    whitelist -- so a capability-fit engine (e.g. ltx_video for character_video) was
+    rejected by the registry while production accepted it, and the soak filled a
+    still instead of the video. These two methods are overridden HERE -- not in
+    :class:`EngineRegistry`, which also serves the IMAGE + AUDIO registries -- to
+    delegate to ``role_compat``. ``roles`` is now UI-SORT metadata only
+    (``default_roles`` still sorts the dropdown).
+
+    FAIL-SOFT: fall back to the legacy ``roles`` whitelist ONLY when an engine
+    declares no ``required_inputs`` (``None`` / missing) OR the role is unknown to
+    role_compat -- NEVER for ``required_inputs == ()`` (a valid capability that fits
+    EVERY role; e.g. a pure-procedural engine). ``RoleCompatError`` (unknown role) is
+    wrapped so the public contract is preserved: ``engines_for_role`` filters it out
+    via the legacy path; ``assert_usable`` raises :class:`EngineUnusable`.
+    """
+
+    def _descriptor(self, name: str) -> dict:
+        """The role_compat EngineDescriptor for a REGISTERED engine. ``required_inputs``
+        is read straight off the adapter -- ``None`` (missing) is the fail-soft trigger
+        and is preserved distinct from ``()`` (declared, fits all roles)."""
+        eng = self._registry[name]
+        ri = getattr(eng, "required_inputs", None)
+        return {
+            "engine_id": name,
+            "roles": tuple(getattr(eng, "roles", ()) or ()),
+            "required_inputs": tuple(ri) if ri is not None else None,
+        }
+
+    def _capability_decision(self, name: str, role: str):
+        """``(decided, fits)``. ``decided is False`` -> the caller must fall back to
+        the legacy ``roles`` whitelist (no capability declared, or unknown role)."""
+        desc = self._descriptor(name)
+        if desc["required_inputs"] is None:
+            return (False, False)                 # no capability declared -> legacy
+        try:
+            return (True, _role_compat.engine_fits_role(desc, role))
+        except _role_compat.RoleCompatError:
+            return (False, False)                 # unknown role -> legacy
+
+    def engines_for_role(self, role: str) -> list:
+        """Names serving ``role`` BY CAPABILITY (default engine[s] first).
+
+        Fail-soft: an engine with no declared ``required_inputs``, or any engine when
+        ``role`` is unknown to role_compat, is filtered by the legacy ``roles`` list.
+        The default-for-role engine still sorts first (``default_roles``)."""
+        names = []
+        for name, eng in self._registry.items():
+            decided, fits = self._capability_decision(name, role)
+            if decided:
+                if fits:
+                    names.append(name)
+            elif role in tuple(getattr(eng, "roles", ()) or ()):
+                names.append(name)                # legacy fail-soft
+        names.sort(
+            key=lambda n: (
+                role not in tuple(getattr(self._registry[n], "default_roles", ()) or ()),
+                n,
+            )
+        )
+        return names
+
+    def assert_usable(self, name: str, role: str) -> str:
+        """Validate ``name`` may run for ``role`` BY CAPABILITY; FAIL CLOSED.
+
+        ``MALFORMED_CONFIG`` -- not registered. ``INCOMPATIBLE_PROFILE`` -- the role
+        cannot supply the engine's ``required_inputs`` (capability), or (fail-soft,
+        for an engine with no declared inputs / an unknown role) the legacy ``roles``
+        list does not list ``role``. Never silently resolves to another engine."""
+        if not self.is_registered(name):
+            raise EngineUnusable(
+                name, role, EngineUsabilityReason.MALFORMED_CONFIG,
+                f"no {self.kind} engine named '{name}' is registered",
+                kind=self.kind,
+            )
+        decided, fits = self._capability_decision(name, role)
+        if decided:
+            if not fits:
+                desc = self._descriptor(name)
+                raise EngineUnusable(
+                    name, role, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+                    f"engine '{name}' requires inputs {tuple(desc['required_inputs'])} "
+                    f"which role '{role}' does not supply",
+                    kind=self.kind,
+                )
+            return name
+        # Fail-soft: no capability declared (or unknown role) -> legacy `roles` gate.
+        eng = self._registry[name]
+        if role not in tuple(getattr(eng, "roles", ()) or ()):
+            raise EngineUnusable(
+                name, role, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+                f"engine '{name}' serves roles "
+                f"{tuple(getattr(eng, 'roles', ()))}, not '{role}'",
+                kind=self.kind,
+            )
+        return name
+
+
 # One registry instance for the video namespace (its own dict; no audio
 # cross-pollution). Module-level functions bind to it so the public API matches
 # the shipped audio registry's function surface 1:1 (AS-4 "one pattern").
-_VIDEO_REGISTRY = EngineRegistry("video")
+_VIDEO_REGISTRY = VideoEngineRegistry("video")
 
 register = _VIDEO_REGISTRY.register
 get_engine = _VIDEO_REGISTRY.get_engine
@@ -101,6 +206,14 @@ all_engine_names = _VIDEO_REGISTRY.all_engine_names
 engines_for_role = _VIDEO_REGISTRY.engines_for_role
 default_engine_for_role = _VIDEO_REGISTRY.default_engine_for_role
 assert_usable = _VIDEO_REGISTRY.assert_usable
+
+
+def descriptor_for_engine(name: str) -> dict:
+    """The role_compat EngineDescriptor (``engine_id`` / ``roles`` /
+    ``required_inputs``) for a registered video engine. The SHARED builder the C2
+    registry override + the C4 capability matrix test both read, so the eligibility
+    rule has ONE source. Raises ``KeyError`` for an unregistered name."""
+    return _VIDEO_REGISTRY._descriptor(name)
 
 # Re-export the protocol core under the video namespace for adapters that prefer
 # an explicit base reference (duck-typing still works without it).

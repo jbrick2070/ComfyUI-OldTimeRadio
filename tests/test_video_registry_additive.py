@@ -51,8 +51,15 @@ def test_engines_for_role_is_self_consistent_and_a_subset():
     for role in rc.ROLES:
         listed = vreg.engines_for_role(role)
         assert set(listed) <= all_names
-        for name in listed:                            # each actually serves it
-            assert role in tuple(vreg.get_engine(name).roles)
+        for name in listed:                            # each actually fits the role
+            desc = vreg.descriptor_for_engine(name)
+            # C2 (2026-06-30): engines_for_role is CAPABILITY-based. Each listed
+            # engine either fits by capability, or (fail-soft, when it declares no
+            # required_inputs) lists the role in its legacy `roles` whitelist.
+            if desc["required_inputs"] is None:
+                assert role in tuple(vreg.get_engine(name).roles)
+            else:
+                assert rc.engine_fits_role(desc, role)
 
 
 def test_default_engine_for_role_is_registered_and_lists_role():

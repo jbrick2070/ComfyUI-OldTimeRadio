@@ -194,9 +194,8 @@ def test_cheap_families_registered():
 
 
 def test_cheap_family_usable_and_role_filtered():
-    # still_motion serves background_abstract and is usable there (no opt-in flag).
-    # NOTE: at C0 assert_usable still uses the legacy `roles` whitelist; C2 converts
-    # these membership assertions to capability reasons.
+    # C2 (2026-06-30): eligibility is CAPABILITY. still_motion (text-only) fits
+    # background_abstract -- and in fact every role -- so it is usable there.
     assert vreg.assert_usable("still_motion", "background_abstract") == "still_motion"
     # the SHARED role filter (AS-1, capability) offers floors per their inputs
     descs = [
@@ -206,10 +205,10 @@ def test_cheap_family_usable_and_role_filtered():
     ]
     bg = rc.filter_engines_for_role("background_abstract", descs)
     assert "still_motion" in bg                    # text-only floor fits bg by capability
-    # incompatible role fails closed under the legacy whitelist (still_motion's
-    # `roles` does not list character_video).
+    # incompatible role fails closed BY CAPABILITY: visualizer needs audio_ref, which
+    # background_abstract (text-only) cannot supply -> refused.
     with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("still_motion", "character_video")
+        vreg.assert_usable("visualizer", "background_abstract")
 
 
 def test_cheap_families_cold_import_clean():
