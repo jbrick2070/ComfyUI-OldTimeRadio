@@ -61,6 +61,13 @@ SPEAKER_TO_VIDEO_ROLE = {
     "character": Role.CHARACTER_VIDEO.value,
     "char_voice": Role.CHARACTER_VIDEO.value,
     "dialogue": Role.CHARACTER_VIDEO.value,
+    # C3 (D4 fix, 2026-06-30): "sfx" is the writer's ONLY non-dialogue / non-announcer
+    # / non-music speaker_role (VALID_SPEAKER_ROLES = character/announcer/music_*/sfx).
+    # It used to fall through to background_abstract, so the scene_broll video slot was
+    # NEVER exercised. A sound-effect beat is an environmental/scene beat -> route it to
+    # scene_broll (b-roll of the scene) so scene_broll_video_model is reachable. Harmless
+    # if no sfx beats exist in a given episode; both roles pool as OTHER-BEATS.
+    "sfx": Role.SCENE_BROLL.value,
 }
 _DEFAULT_VIDEO_ROLE = Role.BACKGROUND_ABSTRACT.value
 

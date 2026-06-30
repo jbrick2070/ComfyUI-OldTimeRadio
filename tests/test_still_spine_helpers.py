@@ -313,6 +313,20 @@ class TestSceneStillObjects:
         # NOT pooled into an other_pool_* loop target
         assert not any(t["beat_id"].startswith("other_pool_") for t in targets)
 
+    def test_c3_sfx_speaker_role_maps_to_scene_broll(self):
+        """C3 (D4 fix, 2026-06-30): 'sfx' is the writer's only non-dialogue/
+        non-announcer/non-music speaker_role; it now routes to scene_broll (was
+        falling through to background_abstract) so the scene_broll video slot is
+        reachable. Verifies the map + the resolver."""
+        from nodes import otr_shot_lock as sl
+        from nodes._otr_speaker_role import VALID_SPEAKER_ROLES
+        assert sl.SPEAKER_TO_VIDEO_ROLE.get("sfx") == "scene_broll"
+        assert sl._video_role_for_line({"speaker_role": "sfx"}) == "scene_broll"
+        # every canonical writer speaker_role now resolves to a real (non-default)
+        # video role EXCEPT none -- sfx was the last unmapped token.
+        for tok in VALID_SPEAKER_ROLES:
+            assert tok in sl.SPEAKER_TO_VIDEO_ROLE, tok
+
     def test_pool_n_loop_pools_other_beats_stills(self):
         # operator 2026-06-18: pool_n_loop -> the OTHER-BEATS (background_abstract/
         # scene_broll) SHARE N pool stills (other_pool_0..N-1), NOT one per beat;
