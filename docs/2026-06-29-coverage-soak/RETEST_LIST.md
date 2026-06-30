@@ -25,6 +25,22 @@ selective CIM reset before each isolated run (never a blanket python kill).
 - **Title-reveal glitch** -- "WEIGHT OF THE BLU5NV#03W" seen at ~0:00:02 is the intentional title scramble-in (BUG-409 `_title_reveal_progress`, resolves in first ~40%); CONFIRM it resolves to the clean title by ~40% of the window, not a stuck scramble.
 - **humo / humo_1.7B / humo_1.7B_169** (x3 each) -- confirm each variant renders its own beats (no silent degrade to the floor) + VRAM.
 - **HuMo VARIANT OPTIMIZATION (operator 2026-06-29: "some HuMos may be good, some bad, we never optimized them").** The 4 variants (humo 14B / humo_1.7B / humo_1.7B_169 16:9 / humo_14B_169 16:9) differ in quality/motion/aspect and have NEVER been tuned. BUT the clip-underrun held-frame (S-A) MASKS their true quality -- you only see a frozen tail. So evaluate + optimize them on FILLED clips, i.e. AFTER the S-A clip-fill ships, in a dedicated HuMo-variant pass: per-variant cfg / steps / frame-budget / aspect, eyeball good-vs-bad, set the best default per role. Do NOT judge HuMo variants on the current frozen-tail renders. Ties to S-C HuMo phrase-chunking (shorter beats fit the 177f budget).
+  - **DROPDOWN LABELS (operator 2026-06-29, HARD: "it's important on our dropdown we ALWAYS state
+    what HuMo it is").** Node-87 video dropdown HuMo options MUST carry a clear human label: model
+    size (1.7B / 14B / 17B) + aspect (portrait / 16:9) + tier (draft / quality), e.g.
+    `HuMo 1.7B (portrait, draft)`, `HuMo 14B (16:9)`, `HuMo 17B (16:9, quality)`. The bare engine ids
+    (humo / humo_1.7B / humo_1.7B_169 / humo_14B_169) are why the mushy 1.7B draft got confused with the
+    good 16:9 all session. Operator: the **16:9 HuMo WAS great recently** (a good config exists in git --
+    restore it, do NOT abandon HuMo); 16:9 is the right aspect (no pillarbox). Restore the good 16:9
+    config + clip-fill; 17B is the optional quality bump.
+  - **PER-VARIANT INDEPENDENT SMOKE -- KEEP ALL THREE (operator 2026-06-29: "maybe we don't give up on
+    1.7, we DO need to tag it in the dropdowns AND independently smoke it to get it quality").** Do NOT
+    abandon the 1.7B -- it is the fast/light tier and HAD quality at cfg 5.0 (pre-`fdb93286`). Each HuMo
+    variant gets its OWN isolated smoke to dial in quality, not a single shared verdict:
+    (a) **1.7B (fast/draft):** smoke `OTR_HUMO_CFG=5.0` + 20-step + uni_pc -> restore the proven sharp
+    recipe; (b) **14B 16:9:** restore the good recent config; (c) **17B 16:9 (quality):** the env-swap
+    experiment. ALL get clip-fill + a clear dropdown tag. Deliverable: each variant ships at its best
+    achievable quality, clearly labeled, user-selectable.
   - **MODEL UPGRADE (operator 2026-06-29: "retire this HuMo for a good one or experiment").** HuMo =
     `bytedance-research/HuMo` (Sept 2025, arxiv 2509.08519) ships ONLY 1.7B + 17B; the 1.7B is the
     DRAFT tier (mushy), the 17B is the QUALITY tier; there is NO newer HuMo to switch to. The 17B is
@@ -82,6 +98,18 @@ LOUD durable-restamp chain; suite + Bug Bible + B7 per chunk):
 5. **SECONDARY/forensic:** preserve `ledger['images']` durably + stamp per-beat
    `init_image_used` / `init_source` (aids diagnosis; not the cause). HuMo phrase-chunking
    (section E) attacks the same underrun root -- shorter beats fit HuMo's 177-frame budget.
+
+## B3. ENGINE DROPDOWN LABELING -- GENERAL (operator 2026-06-29, HARD)
+
+Every node-87 dropdown option for a multi-model engine MUST state, in the label, the underlying
+model + variant + recipe/quant it uses -- so the user always knows exactly what they selected (and a
+regression like the ltx_audio_in SHARP swap or the HuMo 1.7B-vs-16:9 mixup is obvious at a glance).
+- **HuMo:** size (1.7B / 14B / 17B) + aspect (portrait / 16:9) + tier (draft / quality).
+- **LTX:** which LTX -- model + recipe, e.g. `LTX 2.3 22B distilled` vs `LTX-AV 22B dev-Q3_K_M + SHARP`.
+- **Wan:** `Wan i2v 14B` vs `Wan ti2v 5B`.
+- **Images:** flux_gen1 / flux2_klein / z_image_turbo / qwen_image / lumina_image -- spell the model.
+This is the user-facing twin of the per-beat recipe instrumentation (S-B): label at selection time,
+log at render time. Pair the label with the registry CAPABILITIES row so they never drift.
 
 ## C. SILENT-FALLBACK AUDIT (the "Rendered" column)
 
