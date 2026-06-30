@@ -1,6 +1,15 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-29 | HEAD 9e4f3a33 == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-06-30 | HEAD 770aa72a == origin/v2.0-alpha | branch v2.0-alpha.
+> **OVERNIGHT 2026-06-30:** the proven coverage runner (`scripts/_otr_cov_runner.py --mode all`) is
+> rendering the 18 pending video x image combos -> `output\otr\obs` against the live :8000 server
+> (log `scripts/_otr_overnight_combos.log`; resumable matrix `scripts/_otr_coverage_matrix.json`).
+> Operator directive: a BAKED combo soak (start from story-ledger + audio, vary engine picks, ->obs).
+> KIBITZ-CONVERGED design (r1-r3, grounded): `docs/2026-06-29-coverage-soak/COMBO_SOAK_CONVERGED_PLAN.md`
+> -- bake boundary is UPSTREAM OF THE DIRECTORS (ShotLock bakes the engine_id), keep directors->mux
+> live, vary node-87/88 picks per leg. CLEAN-BREAK rip-out keep/remove list converged in the same doc.
+> CAVEAT: the overnight server predates today's S-A clip-fill -> HuMo combos still show the murk; a
+> fresh-code re-render is the attended follow-up.
 > **FORWARD-ONLY.** Completed/shipped work lives in `docs/GO_FORWARD_ARCHIVE.md` -- do NOT
 > record done work here. prod/main + tags remain operator-GATED.
 
