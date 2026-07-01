@@ -120,13 +120,114 @@ ANNOUNCER_CHAR_ID = "announcer"
 
 #: Radio-style announcer portrait anchor (operator-directed 2026-06-09:
 #: "announcer should get a 'radio' style image"). A human face stays in
-#: frame so the audio_driven_face family can drive the mouth; the styling
-#: reads unmistakably as period radio.
+#: frame so the audio_driven_face family can drive the mouth. LEGACY FALLBACK
+#: (2026-07-01 brief-driven radio-host): the live synthetic-announcer prompt now
+#: comes from :func:`build_radio_host_prompt` (brief-driven form); this static
+#: default is retained only as the fail-soft anchor and is deliberately
+#: era-neutral (no hardcoded "1940s" -- the era texture rides get_era_tail).
 ANNOUNCER_PORTRAIT_ANCHOR = (
-    "vintage 1940s radio announcer at a large chrome ribbon microphone, "
-    "suit and tie, art deco broadcast studio backdrop, ON AIR sign glow, "
-    "warm tube lighting"
+    "a human radio host with a clearly visible adult face, presenting at a "
+    "vintage tabletop tube radio microphone, warm broadcast lighting"
 )
+
+
+# ---------------------------------------------------------------------------
+# BRIEF-DRIVEN RADIO FORM (2026-07-01) -- kills the hardcoded-1940s anchors.
+#
+# A DETERMINISTIC brief -> radio-form-noun map (NO LLM: nondeterminism would
+# break the reproducibility invariant, and a ~7-entry explicit map is the
+# deterministic source of truth, not "drift"). This decides only the physical
+# RADIO OBJECT the imagery is built around; the era TEXTURE (palette / lighting /
+# atmosphere) still rides :func:`get_era_tail`. Ordered most-specific-first; the
+# first keyword hit wins; the default is a neutral tube radio (still a radio
+# FORM, never the retired 1940s studio anchor). So a non-1940s brief (e.g. the
+# automated_space_docking episode) no longer forces a bakelite set.
+# ---------------------------------------------------------------------------
+_RADIO_FORM_MAP = (
+    (("space", "orbital", "docking", "spacecraft", "starship", "space station",
+      "sci-fi", "science fiction", "futuristic", "galactic", "interstellar"),
+     "a sleek space-station communications console"),
+    (("undersea", "submarine", "deep sea", "abyssal", "ocean floor", "bathyscaphe"),
+     "a sealed submarine radio station"),
+    (("war", "military", "battlefield", "trench", "frontline", "front line"),
+     "a rugged portable field radio transceiver"),
+    (("western", "frontier", "old west", "dustbowl", "prairie"),
+     "a weathered cathedral-style wooden radio set"),
+    (("victorian", "steampunk", "gaslight", "brass", "clockwork"),
+     "an ornate brass-and-mahogany valve wireless set"),
+    (("mid-century", "atomic age", "1950s", "1960s", "retro-futuristic"),
+     "a mid-century tabletop transistor radio"),
+    (("noir", "detective", "deco", "art deco", "1930s", "1940s", "prohibition"),
+     "an art-deco bakelite tube radio"),
+)
+_RADIO_FORM_DEFAULT = "a vintage tabletop tube radio receiver"
+
+
+def _radio_form_haystack(meta) -> str:
+    """Lowercased brief signal text for the form resolver: ``meta.style`` plus
+    ``story_brief_terms`` setting/atmosphere. Pure; tolerant of a bare meta."""
+    m = meta if isinstance(meta, dict) else {}
+    parts = [str(m.get("style") or "")]
+    terms = m.get("story_brief_terms")
+    if isinstance(terms, dict):
+        for key in ("setting", "atmosphere"):
+            v = terms.get(key)
+            if isinstance(v, list):
+                parts.extend(str(t) for t in v)
+            elif v:
+                parts.append(str(v))
+    return " ".join(parts).lower()
+
+
+def radio_form_from_meta(meta) -> str:
+    """DETERMINISTIC brief -> radio-form noun phrase (NO LLM). The first keyword
+    match in :data:`_RADIO_FORM_MAP` wins; :data:`_RADIO_FORM_DEFAULT` (a neutral
+    tube radio, NOT the retired 1940s studio anchor) when nothing matches. Pure;
+    never empty."""
+    hay = _radio_form_haystack(meta)
+    for keys, form in _RADIO_FORM_MAP:
+        if any(k in hay for k in keys):
+            return form
+    return _RADIO_FORM_DEFAULT
+
+
+#: Positive tokens locking the radio HOST to an ADULT presenter (the one
+#: on-screen face this feature grants). "No baby": FLUX otherwise drifts a bare
+#: "host" toward an infant/child, so an explicit adult token leads.
+RADIO_HOST_FACE_POS = ("adult, mature weathered face, clearly visible human "
+                       "face, seated presenting into the microphone")
+#: The matching NEGATIVE, populated on the still's existing ``negative_prompt``
+#: field (schemas.py; NO schema change) for the radio-host / announcer face.
+RADIO_HOST_FACE_NEG = "baby, infant, child, toddler, cartoon, doll, mannequin"
+
+
+def build_radio_host_prompt(meta, aspect: str = "portrait") -> str:
+    """FULL prompt for the animatable radio-HOST FACE still (ONLY HuMo hosts).
+
+    A human host with a clearly visible ADULT face presenting AT the
+    brief-driven radio form (:func:`radio_form_from_meta`), framed for the HuMo
+    slot's ``aspect``, with era texture via :func:`get_era_tail` on the
+    ``portrait`` profile (no ambient palette bleed onto the face). Deterministic;
+    never empty. The matching negative (:data:`RADIO_HOST_FACE_NEG`) is populated
+    on the object row by the caller -- this returns the POSITIVE prompt only."""
+    form = radio_form_from_meta(meta)
+    subject = ("a human radio host with a clearly visible adult face, "
+               "presenting at %s" % form)
+    prompt = ", ".join([subject, RADIO_HOST_FACE_POS,
+                        _style_anchor_for_aspect(aspect)])
+    try:
+        try:
+            from ._otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, finish_visual_prompt)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                IMAGE_GRADE_TAIL, finish_visual_prompt)
+        prompt = finish_visual_prompt(meta, prompt, era_profile="portrait")
+        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
+            prompt = "%s, %s" % (prompt, IMAGE_GRADE_TAIL)
+    except Exception:  # noqa: BLE001
+        pass
+    return prompt
 
 
 #: Portrait canvas (the proven FLUX portrait dims; unchanged by the spine).
