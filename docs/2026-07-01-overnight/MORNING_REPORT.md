@@ -64,7 +64,13 @@ Mechanism used: `OTR_FORCE_ENGINE_MAP=*=<engine>` set at server boot (FLOOR lane
 - **S-F fixture stale-capture:** the existing `node_episode_input.json` capture (6/30 19:36) had its referenced assets already cleaned off disk (master WAV + per-beat assets gone), so a bake from it would fail the LOUD preflight. The S-F-accelerated all-engines soak therefore needs a FRESH clean reference episode rendered first. The two episodes above are fresh full renders (not S-F replays).
 - **Full-matrix S-F soak (the original Phase C fallback work) was SUPERSEDED** by the operator's two episode requests, which took priority once Jeffrey woke. The S-F import fix (`ddbbe8c2`) unblocks the default bake path for a future soak.
 - **Wasteful pre-render:** both forced-engine episodes still minted Flux character stills during image-gen (the override applies at video-render time, after image-gen runs on the default plan). Harmless but slow; a future optimization could short-circuit still-gen when a force-map maps a role to an accepts_still=False engine.
-- **Box hygiene:** every headless reset used a SELECTIVE CIM kill (main.py + port 8000) -- never a blanket python kill; MCP pythons untouched throughout. GPU returned to ~1.1-1.8 GB baseline between boots.
+- **Box hygiene:** every headless reset used a SELECTIVE CIM kill (main.py + port 8000) -- never a blanket python kill; MCP pythons untouched throughout. GPU returned to ~0.9-1.8 GB baseline between boots. Server torn down at end; box at baseline.
+- **TEST-ENV GOTCHA (found + resolved):** running `pytest` from a shell that still has `OTR_FORCE_ENGINE_MAP` set (left over from an episode render) makes 2 render-driver tests FAIL --
+  `test_video_render_driver_additive.py::test_run_real_episode_per_shot_requests_audio_frozen` and
+  `::test_video_render_batch_episode_mode_emits_manifest` -- because `apply_engine_override` reads that env var and rewrites the stub `engine_id`, breaking `engine_id == "stub_record"`. The conftest sets `OTR_TEST_MODE`/`CUDA_VISIBLE_DEVICES` but does NOT clear `OTR_FORCE_ENGINE_MAP`. NOT a regression -- clearing the env var, both pass (37/37) and the full suite is **5906 passed / 35 skipped / 0 failed**. Cheap hardening idea: have the OTR conftest `monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)` session-wide so a stray operator env can never false-red the suite.
+
+## FINAL GREEN (clean, server down, env cleared)
+Full suite **5906 / 35 skipped / 0 failed** (71.7s); Bug Bible **16 / 7 skipped / 3 xfailed**; B7 **5/5**. HEAD == origin/v2.0-alpha.
 
 ---
 
