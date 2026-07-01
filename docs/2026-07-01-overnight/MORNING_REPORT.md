@@ -70,7 +70,29 @@ Mechanism used: `OTR_FORCE_ENGINE_MAP=*=<engine>` set at server boot (FLOOR lane
   `::test_video_render_batch_episode_mode_emits_manifest` -- because `apply_engine_override` reads that env var and rewrites the stub `engine_id`, breaking `engine_id == "stub_record"`. The conftest sets `OTR_TEST_MODE`/`CUDA_VISIBLE_DEVICES` but does NOT clear `OTR_FORCE_ENGINE_MAP`. NOT a regression -- clearing the env var, both pass (37/37) and the full suite is **5906 passed / 35 skipped / 0 failed**. Cheap hardening idea: have the OTR conftest `monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)` session-wide so a stray operator env can never false-red the suite.
 
 ## FINAL GREEN (clean, server down, env cleared)
-Full suite **5906 / 35 skipped / 0 failed** (71.7s); Bug Bible **16 / 7 skipped / 3 xfailed**; B7 **5/5**. HEAD == origin/v2.0-alpha.
+Full suite **5906 / 35 skipped / 0 failed** (71.7s); Bug Bible **16 / 7 skipped / 3 xfailed**; B7 **5/5**. HEAD == origin/v2.0-alpha. (After the later flux-skip fix: **5908 / 0**.)
+
+## 7. ALL-NIGHT EPISODE SOAK (operator request) -- 13/13 SUCCESS
+Detached driver `scripts/_otr_night_soak_driver.py` ran 02:35 -> 08:24 unattended and delivered ALL 13 planned episodes, every one SUCCESS (`night_soak_results.jsonl`). Each uses `OTR_FORCE_ENGINE_MAP=*=<engine>` (all beats one engine); the driver auto-rebooted per engine and auto-retried the long-length freeze gate (only viz_mxc_cpu 800w needed a 2nd attempt). Cast/story is fresh OS-entropy per episode.
+
+| engine | words | title | obs (output/otr/obs/) |
+|---|---|---|---|
+| viz_mxc_mandala | 800 | darkness descends | signal_lost_darkness_descends_20260701_024558_...mp4 |
+| viz_mxc_mandala | 800 | storm's fury | signal_lost_storms_fury_20260701_031254_...mp4 |
+| viz_mxc_mandala | 500 | veiled shadows | signal_lost_veiled_shadows_20260701_034049_...mp4 |
+| viz_mxc_mandala | 350 | the knitted signal | signal_lost_the_knitted_signal_20260701_040610_...mp4 |
+| viz_mxc_cpu | 800 | race against time | signal_lost_race_against_time_20260701_044113_...mp4 |
+| viz_mxc_cpu | 500 | sparking synapse | signal_lost_sparking_synapse_20260701_050719_...mp4 |
+| viz_mxc_cpu | 350 | AI's red line | signal_lost_ais_red_line_20260701_053533_...mp4 |
+| viz_green | 800 | steel vs soul | signal_lost_steel_vs_soul_20260701_060055_...mp4 |
+| viz_green | 500 | neptune's blink | signal_lost_neptunes_blink_20260701_062703_...mp4 |
+| viz_green | 350 | sweat-drenched lab | signal_lost_sweatdrenched_lab_20260701_065247_...mp4 |
+| viz_mxc_mandala | 650 | paper trail of dissent | signal_lost_paper_trail_of_dissent_20260701_071747_...mp4 |
+| viz_mxc_cpu | 650 | storm's arrival | signal_lost_storms_arrival_20260701_074306_...mp4 |
+| viz_green | 650 | unopened secrets | signal_lost_unopened_secrets_20260701_080910_...mp4 |
+
+## 8. FLUX-SKIP FIX (operator request 2026-07-01, `945707f5`)
+Operator: "a mandala render should never render flux stills -- it doesn't need them if mandala is on all 3 spots." ROOT-CAUSE FIXED: `otr_image_gen_dispatcher._still_needed_for_role` now resolves the `OTR_FORCE_ENGINE_MAP`-overridden engine (via new `_effective_engine_after_force_map`) BEFORE the still/no-still decision, so an all-one-engine force to a no-still visualizer (viz_mxc_mandala / viz_mxc_cpu / viz_green) SKIPS the ~10 min Flux image-gen pass it used to waste. Unset env = byte-identical. +2 tests; suite 5908/0 + Bug Bible + B7 green; pushed. The overnight 13 were rendered on the PRE-fix code (wasteful stills); a fresh post-fix batch was relaunched 10:13 to validate + produce a faster set.
 
 ---
 
