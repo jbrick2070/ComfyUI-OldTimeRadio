@@ -304,6 +304,28 @@ def engine_consumes_still(eng) -> bool:
     return "init_image" in tuple(getattr(eng, "required_inputs", ()) or ())
 
 
+def _effective_engine_after_force_map(role: str, eng_id: str) -> str:
+    """Resolve the effective VIDEO engine for ``role`` AFTER applying
+    ``OTR_FORCE_ENGINE_MAP`` -- the SAME all-one-engine override that
+    ``render_driver.apply_engine_override`` applies at render time (operator
+    2026-07-01). The still dispatcher runs BEFORE that render-time override, so
+    without this it resolves the stale node-87 pick (e.g. humo) and mints a full
+    Flux still that the forced no-still visualizer (e.g. ``*=viz_mxc_mandala``)
+    then ignores -- a wasted ~10 min image-gen pass per episode. Unset env or any
+    parse error -> ``eng_id`` unchanged (byte-identical to a normal run, where the
+    env is unset). Pure except for the env read + a lazy import."""
+    spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
+    if not spec:
+        return eng_id
+    try:
+        from ._otr_video_engines.render_driver import parse_engine_override
+        mapping = parse_engine_override(spec)
+    except Exception:  # noqa: BLE001 - never block dispatch on a bad override
+        return eng_id
+    forced = mapping.get(role) or mapping.get("*")
+    return forced or eng_id
+
+
 def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     """True if the SELECTED video engine for ``role`` consumes the role's still.
     When the role's video engine IGNORES the still (the visualizer / abstract /
@@ -326,6 +348,10 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
     if not eng_id:
         return True
+    # Honor OTR_FORCE_ENGINE_MAP: resolve the SAME effective engine the render-time
+    # override will use, so an all-one-engine force to a no-still visualizer skips
+    # the unused Flux still instead of wasting an image-gen pass (operator 2026-07-01).
+    eng_id = _effective_engine_after_force_map(str(role), eng_id)
     try:
         from ._otr_video_engines import registry as _vreg
         eng = _vreg.get_engine(eng_id)

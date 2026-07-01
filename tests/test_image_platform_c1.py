@@ -531,6 +531,42 @@ def test_c1_still_pan_and_motion_consume_their_scene_still():
     assert disp.engine_consumes_still(vreg.get_engine("viz_green")) is False
 
 
+def test_still_needed_honors_force_engine_map(monkeypatch):
+    """Operator 2026-07-01: when OTR_FORCE_ENGINE_MAP forces a no-still visualizer
+    onto a role, the still dispatcher must resolve the SAME effective engine (the
+    render-time apply_engine_override runs LATER) and SKIP the still -- an
+    all-mandala episode must not waste a Flux image-gen pass on stills the mandala
+    ignores. Without the env, humo still consumes its init still (unchanged)."""
+    import nodes._otr_video_engines  # noqa: F401  self-register the engines
+    policy = {"video_models": {
+        "other_beats_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    assert disp._still_needed_for_role(policy, "character_video") is True
+    # force ALL roles to the mandala (accepts_still=False) -> still NOT needed
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
+    assert disp._still_needed_for_role(policy, "character_video") is False
+    # a per-role force to the rainbow scope also skips
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=viz_mxc_cpu")
+    assert disp._still_needed_for_role(policy, "character_video") is False
+    # forcing a STILL-consuming engine (all-humo) keeps the still
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=humo")
+    assert disp._still_needed_for_role(policy, "character_video") is True
+
+
+def test_effective_engine_after_force_map_failsafe(monkeypatch):
+    import nodes._otr_video_engines  # noqa: F401
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
+    assert disp._effective_engine_after_force_map(
+        "character_video", "humo") == "viz_mxc_mandala"
+    # unknown forced engine / malformed spec -> eng_id unchanged (fail-safe)
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=not_a_real_engine")
+    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "garbage-no-equals")
+    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
+
+
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
     # All video roles = viz_green (renamed from visualizer 2026-06-30, item 2;
     # no init_image) -> NO still generated, gen_fn never called -> an
