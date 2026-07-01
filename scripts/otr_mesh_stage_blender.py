@@ -29,6 +29,23 @@ seam), projects a deterministic in-memory portrait, and renders 3 frames --
 the SAME stage path as production. The selftest FAILS nonzero unless a
 NON-UNIFORM ``otr_proj`` color attribute exists after projection.
 
+ADAPTIVE CAMERA RADIUS (mesh-improve item 2, 2026-06-30): the v1 camera used
+a FLAT ``--radius``/``--elevation`` (2.5/0.35) regardless of mesh shape --
+for a longest-dim-1.0 tall mesh this filled ~84% of the frame height (a full
+top-to-bottom body, no headroom -- the operator's look-QA complaint). The
+camera's vertical FOV is now PINNED explicitly (``sensor_fit='VERTICAL'``,
+fixed lens/sensor-height -- Blender's own factory numbers, so this is a
+determinism pin, not a behavior change) so the FOV is a fixed, known
+quantity independent of render aspect. ``--radius``/``--elevation`` now
+default to None (omitted): when unset, :func:`adaptive_camera_radius`
+computes a distance from the mesh's ACTUAL post-normalize height so the
+subject fills a target fraction of the frame (headroom on every mesh shape,
+tall or squat), and elevation scales with it to preserve the v1 viewing
+angle. An explicit ``--radius``/``--elevation`` still overrides (operator
+escape hatch). The camera fix lives HERE, never a compositor crop (a crop
+only re-frames pixels already rendered too tight -- it adds no resolution
+the render never captured).
+
 The host (eng_mesh_stage) validates frame count + dims + RGBA AFTER this
 exits and publishes atomically; this script renders into the tmp dir it
 was given and exits nonzero on ANY exception (a partial render never
@@ -54,8 +71,15 @@ def parse_stage_args(argv):
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--render-engine", dest="render_engine",
                    choices=("WORKBENCH", "CYCLES"), default="WORKBENCH")
-    p.add_argument("--radius", type=float, default=2.5)
-    p.add_argument("--elevation", type=float, default=0.35)
+    #: None (omitted) = ADAPTIVE (mesh-improve item 2): main() computes the
+    #: distance/height from the mesh's actual post-normalize size. An
+    #: explicit value is the operator escape hatch and is used verbatim.
+    p.add_argument("--radius", type=float, default=None)
+    p.add_argument("--elevation", type=float, default=None)
+    #: Fraction of the vertical frame the mesh bbox height should fill when
+    #: --radius is adaptive (headroom knob). None = DEFAULT_TARGET_HEIGHT_FRAC.
+    p.add_argument("--target-height-frac", dest="target_height_frac",
+                   type=float, default=None)
     p.add_argument("--threads", type=int, default=4)
     #: The hero still projected onto the front-facing vertices (optional; the
     #: GLB stays geometry-only, projection is per-render). Empty = flat matcap.
@@ -80,6 +104,11 @@ def parse_stage_args(argv):
         p.error("--glb is required in render mode")
     if args.mode == "render" and args.surface == "portrait" and not args.portrait:
         p.error("--surface portrait requires --portrait in render mode")
+    if (args.target_height_frac is not None
+            and not (0.0 < args.target_height_frac <= 1.0)):
+        p.error("--target-height-frac must be in (0, 1]")
+    if args.radius is not None and args.radius <= 0.0:
+        p.error("--radius must be > 0")
     return args
 
 
@@ -173,6 +202,53 @@ def sample_image(pixels, width, height, u, t):
     return (float(pixels[idx]), float(pixels[idx + 1]), float(pixels[idx + 2]))
 
 
+def alpha_bbox_stats(width, height, alpha_top_origin_row_major):
+    """Pure: the tightest bounding box of non-transparent (alpha > 0) pixels
+    in a TOP-origin, row-major alpha channel of length width*height -- the
+    convention a proof script gets from ``PIL.Image.getchannel("A")``
+    (opposite of :func:`sample_image`'s Blender-native bottom-origin buffer;
+    this function is for MEASURING a rendered PNG frame, not sampling a
+    Blender in-memory image).
+
+    Mesh-improve item 2's MEASURABLE headroom contract (kibitz r1 point 2):
+    ``height_frac`` is the bbox height as a fraction of the frame height (the
+    "how much of the frame does the subject fill" number the camera's
+    ``target_frac`` knob controls); ``top_margin_px`` is the empty space
+    above the bbox (the headroom the operator asked for). Returns None when
+    every pixel is transparent (nothing rendered -- nothing to measure)."""
+    w, h = int(width), int(height)
+    a = alpha_top_origin_row_major
+    top = bottom = left = right = None
+    for y in range(h):
+        base = y * w
+        row_left = row_right = None
+        for x in range(w):
+            if a[base + x] > 0:
+                if row_left is None:
+                    row_left = x
+                row_right = x
+        if row_left is not None:
+            if top is None:
+                top = y
+            bottom = y
+            if left is None or row_left < left:
+                left = row_left
+            if right is None or row_right > right:
+                right = row_right
+    if top is None:
+        return None
+    bbox_h = bottom - top + 1
+    bbox_w = right - left + 1
+    return {
+        "bbox": (left, top, right, bottom),
+        "bbox_height_px": bbox_h,
+        "bbox_width_px": bbox_w,
+        "height_frac": bbox_h / float(h),
+        "top_margin_px": top,
+        "bottom_margin_px": h - 1 - bottom,
+    }
+
+
 #: Vertical sculpt-gradient endpoints (cool light over shadow). WORKBENCH VERTEX
 #: shading draws these per-vertex colours; per-poly smooth normals interpolate
 #: them into a soft ramp (the v1.1 "basic gradient" mesh texture).
@@ -203,6 +279,59 @@ def gradient_color(co_z, top=GRADIENT_TOP, bottom=GRADIENT_BOTTOM):
 
 
 # --------------------------------------------------------------------------- #
+# Adaptive camera framing (mesh-improve item 2, 2026-06-30; pure, CPU-tested).
+# --------------------------------------------------------------------------- #
+#: The camera's PINNED lens/sensor (Blender's own factory-default numbers --
+#: pinning them just makes the vertical FOV a fixed, known quantity instead of
+#: an implicit one that varies with render aspect via sensor_fit='AUTO').
+CAMERA_LENS_MM = 50.0
+CAMERA_SENSOR_HEIGHT_MM = 24.0
+#: Vertical FOV (degrees) at the pinned lens/sensor: 2*atan((sensor/2)/lens).
+CAMERA_VERTICAL_FOV_DEG = math.degrees(
+    2.0 * math.atan((CAMERA_SENSOR_HEIGHT_MM / 2.0) / CAMERA_LENS_MM))
+
+#: The OLD flat v1 defaults (kept as the ratio that preserves the v1 viewing
+#: angle: new_elevation = adaptive_radius * ELEVATION_TO_RADIUS_RATIO).
+LEGACY_DEFAULT_RADIUS = 2.5
+LEGACY_DEFAULT_ELEVATION = 0.35
+ELEVATION_TO_RADIUS_RATIO = LEGACY_DEFAULT_ELEVATION / LEGACY_DEFAULT_RADIUS
+
+#: Target fraction of the vertical frame the mesh bbox height should fill.
+#: At the OLD flat radius=2.5 a longest-dim-1.0 (tall) mesh filled ~84% of the
+#: frame (a full top-to-bottom body, no headroom) -- the look-QA complaint
+#: this item fixes.
+DEFAULT_TARGET_HEIGHT_FRAC = 0.62
+
+#: A camera can never sit inside (or touching) the mesh.
+MIN_CAMERA_RADIUS = 0.1
+
+
+def adaptive_camera_radius(mesh_height, *, target_frac=DEFAULT_TARGET_HEIGHT_FRAC,
+                           vertical_fov_deg=CAMERA_VERTICAL_FOV_DEG,
+                           min_radius=MIN_CAMERA_RADIUS):
+    """Pure: the camera distance that frames a mesh of the given (normalized,
+    post-``_normalize_meshes``, world-space) height so its bbox fills
+    ``target_frac`` of the vertical frame, given the camera's PINNED vertical
+    FOV. Mesh-improve item 2 ("MORE HEADROOM"): the v1 stage used a FLAT
+    radius regardless of mesh shape, which over-framed TALL meshes (a
+    character/announcer, whose longest dim IS the height -> full top-to-
+    bottom body). Using the mesh's ACTUAL post-normalize height (not an
+    assumed 1.0) makes this shape-aware: a squat/wide mesh (the radio, whose
+    longest dim is width) needs a DIFFERENT distance than a tall one. The fix
+    lives in the camera distance, never a compositor crop (a crop only
+    re-frames pixels already rendered too tight -- it adds no resolution the
+    render never captured). Never returns below ``min_radius``."""
+    h = float(mesh_height)
+    if h <= 0.0:
+        h = 1.0
+    half_angle_rad = math.radians(float(vertical_fov_deg) * float(target_frac) / 2.0)
+    if half_angle_rad <= 0.0:
+        return max(float(min_radius), LEGACY_DEFAULT_RADIUS)
+    radius = (h / 2.0) / math.tan(half_angle_rad)
+    return max(float(min_radius), radius)
+
+
+# --------------------------------------------------------------------------- #
 # Everything below runs inside Blender only (bpy imported lazily).
 # --------------------------------------------------------------------------- #
 def _clear_scene(bpy):
@@ -223,7 +352,11 @@ def _import_glb(bpy, path):
 def _normalize_meshes(bpy, meshes):
     """bbox-normalize the imported mesh set: center the combined bounds at
     the origin and scale the longest dimension to 1.0 (the camera preset's
-    framing assumption)."""
+    framing assumption). Returns ``(scale, height)`` -- ``height`` is the
+    POST-scale Z-extent (mesh-improve item 2: the adaptive camera radius
+    needs the mesh's ACTUAL height, not an assumed 1.0, since only a mesh
+    whose longest dim IS its height reaches 1.0; a wide/squat mesh is
+    shorter)."""
     from mathutils import Vector
     mins = Vector((1e30, 1e30, 1e30))
     maxs = Vector((-1e30, -1e30, -1e30))
@@ -238,7 +371,8 @@ def _normalize_meshes(bpy, meshes):
     for obj in meshes:
         obj.location = (obj.location - center) * scale
         obj.scale = obj.scale * scale
-    return scale
+    height = (maxs.z - mins.z) * scale
+    return scale, height
 
 
 def _has_vertex_colors(meshes):
@@ -367,11 +501,21 @@ def _build_turntable(bpy, radius, elevation, frames, start_angle, arc_degrees):
     """The ONE v1 camera preset: a pivot empty at the origin, the camera
     parented at (radius, elevation), tracking the origin; the pivot sweeps a
     BOUNDED hero arc (start_angle .. start_angle+arc) over frames 1..N with
-    LINEAR interpolation. frames==1 -> a single keyframe (no fcurve)."""
+    LINEAR interpolation. frames==1 -> a single keyframe (no fcurve).
+
+    Mesh-improve item 2 (2026-06-30): the camera's vertical FOV is PINNED
+    (sensor_fit='VERTICAL' + fixed lens/sensor-height, matching
+    CAMERA_LENS_MM/CAMERA_SENSOR_HEIGHT_MM) so it is a fixed, known quantity
+    -- previously Blender's implicit AUTO sensor-fit made the vertical FOV
+    vary with the render's aspect ratio, which made the adaptive-radius trig
+    ill-defined."""
     scene = bpy.context.scene
     pivot = bpy.data.objects.new("otr_pivot", None)
     scene.collection.objects.link(pivot)
     cam_data = bpy.data.cameras.new("otr_cam")
+    cam_data.sensor_fit = "VERTICAL"
+    cam_data.lens = CAMERA_LENS_MM
+    cam_data.sensor_height = CAMERA_SENSOR_HEIGHT_MM
     cam = bpy.data.objects.new("otr_cam", cam_data)
     scene.collection.objects.link(cam)
     cam.parent = pivot
@@ -470,7 +614,7 @@ def main():
         if args.mode == "selftest":
             glb = _selftest_glb(bpy, args.out)
         meshes = _import_glb(bpy, glb)
-        _normalize_meshes(bpy, meshes)
+        _scale, mesh_height = _normalize_meshes(bpy, meshes)
         # Surface look. selftest FIRST (unchanged: projects its in-memory
         # portrait + the non-uniformity gate). Render mode is a state machine:
         #   gradient -> sculpt gradient (ignore a stray --portrait, LOUD);
@@ -496,7 +640,22 @@ def main():
         # else: surface=flat with no portrait -> gray matcap (no vertex colors)
         if args.mode != "selftest":
             _smooth_mesh_normals(meshes)
-        _build_turntable(bpy, args.radius, args.elevation, args.frames,
+        # Mesh-improve item 2: ADAPTIVE radius/elevation unless the operator
+        # passed an explicit override. Elevation scales with the computed
+        # radius by the v1 ratio, preserving today's viewing angle.
+        radius = args.radius
+        if radius is None:
+            target_frac = (args.target_height_frac
+                          if args.target_height_frac is not None
+                          else DEFAULT_TARGET_HEIGHT_FRAC)
+            radius = adaptive_camera_radius(mesh_height, target_frac=target_frac)
+        elevation = args.elevation
+        if elevation is None:
+            elevation = radius * ELEVATION_TO_RADIUS_RATIO
+        print("[otr_mesh_stage_blender] camera radius=%.3f elevation=%.3f "
+              "mesh_height=%.3f (adaptive=%s)"
+              % (radius, elevation, mesh_height, args.radius is None))
+        _build_turntable(bpy, radius, elevation, args.frames,
                          args.start_angle, args.arc_degrees)
         _configure_render(bpy, args, _has_vertex_colors(meshes))
         bpy.ops.render.render(animation=True)

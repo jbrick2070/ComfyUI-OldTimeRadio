@@ -151,7 +151,8 @@ def write_manifest(manifest, path):
 def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
                       seed, *, mode="render", engine="WORKBENCH",
                       stage_script=None, portrait="", start_angle=None,
-                      arc_degrees=None, surface=""):
+                      arc_degrees=None, surface="", radius=None,
+                      elevation=None, target_height_frac=None):
     """The headless Blender invocation (E-3): ``--background
     --factory-startup --python-exit-code 1 --python stage.py -- <args>``.
     ``--python-exit-code 1`` makes ANY unhandled stage exception a nonzero
@@ -160,7 +161,11 @@ def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
     ``portrait`` (optional): the resolved hero still projected onto the
     front-facing vertices (the textured-hero PoC). Appended only when set, so
     the legacy flat-matcap invocation is byte-identical. ``start_angle`` /
-    ``arc_degrees`` (optional): the bounded hero arc, appended only when set."""
+    ``arc_degrees`` (optional): the bounded hero arc, appended only when set.
+    ``radius`` / ``elevation`` / ``target_height_frac`` (optional, mesh-improve
+    item 2): an operator override of the stage's adaptive camera framing;
+    appended only when set, so the default (adaptive, computed in-Blender
+    from the mesh's own size) invocation carries none of these tokens."""
     cmd = [
         str(blender_exe), "--background", "--factory-startup",
         "--python-exit-code", "1",
@@ -182,6 +187,12 @@ def build_blender_cmd(blender_exe, glb_path, out_dir, frames, width, height,
         cmd += ["--start-angle", str(float(start_angle))]
     if arc_degrees is not None:
         cmd += ["--arc-degrees", str(float(arc_degrees))]
+    if radius is not None:
+        cmd += ["--radius", str(float(radius))]
+    if elevation is not None:
+        cmd += ["--elevation", str(float(elevation))]
+    if target_height_frac is not None:
+        cmd += ["--target-height-frac", str(float(target_height_frac))]
     return cmd
 
 
@@ -694,12 +705,21 @@ class MeshStageEngine(_CheapFamilyBase):
         sa = os.environ.get("OTR_MESH_STAGE_START_ANGLE")
         ad = os.environ.get("OTR_MESH_STAGE_ARC_DEGREES")
         project = os.environ.get("OTR_MESH_PROJECT_PORTRAIT", "0") == "1"
+        # Mesh-improve item 2 (2026-06-30): operator escape hatch for the
+        # adaptive camera framing. Unset (the default) -> the stage script
+        # computes radius/elevation from the mesh's own post-normalize size.
+        rad = os.environ.get("OTR_MESH_STAGE_RADIUS")
+        elev = os.environ.get("OTR_MESH_STAGE_ELEVATION")
+        thf = os.environ.get("OTR_MESH_STAGE_TARGET_HEIGHT_FRAC")
         cmd = build_blender_cmd(
             blender, glb_path, tmp_dir, n, w, h, seed,
             surface=("portrait" if project else "gradient"),
             portrait=(still if project else ""),
             start_angle=(float(sa) if sa else None),
-            arc_degrees=(float(ad) if ad else None))
+            arc_degrees=(float(ad) if ad else None),
+            radius=(float(rad) if rad else None),
+            elevation=(float(elev) if elev else None),
+            target_height_frac=(float(thf) if thf else None))
         self._spawn_blender(cmd)
         validate_frame_dir(tmp_dir, n, w, h)
         final_dir = os.path.join(

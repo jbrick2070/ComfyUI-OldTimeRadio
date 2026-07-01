@@ -361,7 +361,11 @@ def test_stage_script_parser_contract():
          "--seed", "9"])
     assert (a.frames, a.width, a.height, a.seed) == (169, 1472, 832, 9)
     assert a.render_engine == "WORKBENCH"      # the ONE v1 mode
-    assert a.radius == 2.5 and a.threads == 4  # fixed-thread determinism pin
+    # 2026-06-30 mesh-improve item 2: radius/elevation default to None (the
+    # ADAPTIVE sentinel -- main() computes them from the mesh's own size).
+    assert a.radius is None and a.elevation is None
+    assert a.target_height_frac is None
+    assert a.threads == 4                      # fixed-thread determinism pin
     with pytest.raises(SystemExit):            # render mode REQUIRES the glb
         stage.parse_stage_args(["--mode", "render", "--out", "C:/o",
                                 "--frames", "3", "--width", "64",
@@ -393,6 +397,95 @@ def test_stage_script_parser_portrait_and_arc():
         ["--mode", "render", "--glb", "C:/m.glb", "--out", "C:/o",
          "--frames", "3", "--width", "64", "--height", "64"])
     assert b.portrait == "" and b.start_angle == 0.0 and b.arc_degrees == 45.0
+
+
+def test_stage_script_parser_radius_override_and_validation():
+    """2026-06-30 mesh-improve item 2: an EXPLICIT --radius/--elevation/
+    --target-height-frac overrides the adaptive default verbatim; invalid
+    values (<=0 radius, out-of-(0,1] frac) are LOUD argparse errors."""
+    stage = _load_stage()
+    base = ["--mode", "render", "--glb", "C:/m.glb", "--out", "C:/o",
+            "--frames", "3", "--width", "64", "--height", "64"]
+    b = stage.parse_stage_args(
+        base + ["--radius", "4.2", "--elevation", "0.6",
+                "--target-height-frac", "0.5"])
+    assert b.radius == 4.2 and b.elevation == 0.6 and b.target_height_frac == 0.5
+    with pytest.raises(SystemExit):
+        stage.parse_stage_args(base + ["--radius", "0"])
+    with pytest.raises(SystemExit):
+        stage.parse_stage_args(base + ["--radius", "-1"])
+    with pytest.raises(SystemExit):
+        stage.parse_stage_args(base + ["--target-height-frac", "0"])
+    with pytest.raises(SystemExit):
+        stage.parse_stage_args(base + ["--target-height-frac", "1.5"])
+    ok = stage.parse_stage_args(base + ["--target-height-frac", "1.0"])
+    assert ok.target_height_frac == 1.0
+
+
+def test_camera_vertical_fov_deg_matches_pinned_lens_sensor():
+    """The pinned lens/sensor-height (mesh-improve item 2) determine a fixed,
+    known vertical FOV via the standard 2*atan((sensor/2)/lens) formula --
+    never Blender's implicit AUTO sensor-fit (which varies with aspect)."""
+    stage = _load_stage()
+    import math
+    expected = math.degrees(2.0 * math.atan(
+        (stage.CAMERA_SENSOR_HEIGHT_MM / 2.0) / stage.CAMERA_LENS_MM))
+    assert stage.CAMERA_VERTICAL_FOV_DEG == pytest.approx(expected)
+    # Sanity: a normal (not wide-angle, not telephoto) factory-default lens.
+    assert 20.0 < stage.CAMERA_VERTICAL_FOV_DEG < 35.0
+
+
+def test_adaptive_camera_radius_matches_trig_formula():
+    stage = _load_stage()
+    import math
+    h, frac = 0.8, 0.5
+    fov = stage.CAMERA_VERTICAL_FOV_DEG
+    expected = (h / 2.0) / math.tan(math.radians(fov * frac / 2.0))
+    assert stage.adaptive_camera_radius(h, target_frac=frac) == pytest.approx(expected)
+
+
+def test_adaptive_camera_radius_is_shape_aware():
+    """A TALLER mesh (post-normalize height closer to 1.0 -- e.g. a standing
+    character, whose longest dim IS its height) needs a LARGER camera
+    distance than a squat/wide one (e.g. a radio, whose longest dim is width)
+    to hit the same target frame-fill fraction."""
+    stage = _load_stage()
+    squat = stage.adaptive_camera_radius(0.3)
+    tall = stage.adaptive_camera_radius(1.0)
+    assert tall > squat > 0.0
+
+
+def test_adaptive_camera_radius_degenerate_height_falls_back_to_one():
+    stage = _load_stage()
+    assert stage.adaptive_camera_radius(0.0) == pytest.approx(
+        stage.adaptive_camera_radius(1.0))
+    assert stage.adaptive_camera_radius(-5.0) == pytest.approx(
+        stage.adaptive_camera_radius(1.0))
+
+
+def test_adaptive_camera_radius_never_below_floor():
+    stage = _load_stage()
+    assert stage.adaptive_camera_radius(1e-9, min_radius=0.1) >= 0.1
+    # A tiny mesh height would compute a near-zero raw distance -- the floor
+    # (not the raw trig result) determines the outcome.
+    assert stage.adaptive_camera_radius(0.5, min_radius=50.0) == pytest.approx(50.0)
+
+
+def test_adaptive_camera_radius_old_flat_default_was_over_tight():
+    """Regression anchor for the operator's look-QA complaint: at the OLD
+    flat radius=2.5 with a longest-dim-1.0 (tall) mesh, the vertical
+    frame-fill was ~84% (a full top-to-bottom body, no headroom). The NEW
+    adaptive default pulls the distance back (a LARGER radius than 2.5)."""
+    stage = _load_stage()
+    import math
+    old_radius = stage.LEGACY_DEFAULT_RADIUS
+    mesh_height = 1.0
+    half_angle = math.atan((mesh_height / 2.0) / old_radius)
+    old_fill_frac = (math.degrees(2.0 * half_angle)
+                     / stage.CAMERA_VERTICAL_FOV_DEG)
+    assert old_fill_frac == pytest.approx(0.84, abs=0.02)
+    new_radius = stage.adaptive_camera_radius(mesh_height)
+    assert new_radius > old_radius
 
 
 def test_stage_script_surface_arg():
@@ -477,6 +570,50 @@ def test_sample_image_nearest_and_flip():
     assert stage.sample_image(px, 2, 2, 1.0, 0.0) == (1.0, 1.0, 1.0)
 
 
+def test_alpha_bbox_stats_all_transparent_returns_none():
+    stage = _load_stage()
+    assert stage.alpha_bbox_stats(4, 4, [0] * 16) is None
+
+
+def test_alpha_bbox_stats_full_frame_opaque():
+    stage = _load_stage()
+    stats = stage.alpha_bbox_stats(4, 4, [255] * 16)
+    assert stats["bbox"] == (0, 0, 3, 3)
+    assert stats["height_frac"] == pytest.approx(1.0)
+    assert stats["top_margin_px"] == 0 and stats["bottom_margin_px"] == 0
+
+
+def test_alpha_bbox_stats_centered_block_has_headroom():
+    """Mesh-improve item 2's measurable contract: a small opaque block
+    centered in a taller frame reports headroom on both margins (top-origin:
+    row 0 is the TOP of the frame, matching PIL's getchannel("A") convention)."""
+    stage = _load_stage()
+    w, h = 8, 8
+    alpha = [0] * (w * h)
+    for y in (3, 4):
+        for x in range(2, 6):
+            alpha[y * w + x] = 255
+    stats = stage.alpha_bbox_stats(w, h, alpha)
+    assert stats["bbox"] == (2, 3, 5, 4)
+    assert stats["bbox_height_px"] == 2 and stats["bbox_width_px"] == 4
+    assert stats["height_frac"] == pytest.approx(2.0 / 8.0)
+    assert stats["top_margin_px"] == 3
+    assert stats["bottom_margin_px"] == 3
+
+
+def test_alpha_bbox_stats_asymmetric_shape_finds_true_extents():
+    """A single lit pixel at each of two known (x, y) corners is found
+    exactly -- proves the scan doesn't conflate the row range with the
+    column range."""
+    stage = _load_stage()
+    w, h = 5, 6
+    alpha = [0] * (w * h)
+    alpha[1 * w + 4] = 10           # row 1, rightmost column
+    alpha[4 * w + 0] = 10           # row 4, leftmost column
+    stats = stage.alpha_bbox_stats(w, h, alpha)
+    assert stats["bbox"] == (0, 1, 4, 4)
+
+
 def test_build_blender_cmd_portrait_and_arc_appended():
     # Legacy invocation (no portrait) is byte-identical -- no extra tokens.
     base = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0)
@@ -493,6 +630,24 @@ def test_build_blender_cmd_portrait_and_arc_appended():
     tail = cmd[cmd.index("--") + 1:]
     assert tail[tail.index("--frames") + 1] == "3"
     assert tail[tail.index("--render-engine") + 1] == "WORKBENCH"
+
+
+def test_build_blender_cmd_radius_elevation_appended():
+    """2026-06-30 mesh-improve item 2: legacy invocation (no override) is
+    byte-identical -- the ADAPTIVE default lives in the stage script, never
+    forced from the host side. An explicit override is appended at the end."""
+    base = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0)
+    assert "--radius" not in base
+    assert "--elevation" not in base
+    assert "--target-height-frac" not in base
+    cmd = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0,
+                            radius=4.2, elevation=0.6, target_height_frac=0.5)
+    assert cmd[cmd.index("--radius") + 1] == "4.2"
+    assert cmd[cmd.index("--elevation") + 1] == "0.6"
+    assert cmd[cmd.index("--target-height-frac") + 1] == "0.5"
+    # The frozen positional tail is unchanged.
+    tail = cmd[cmd.index("--") + 1:]
+    assert tail[tail.index("--frames") + 1] == "3"
 
 
 def test_build_blender_cmd_surface_appended():

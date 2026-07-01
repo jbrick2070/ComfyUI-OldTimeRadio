@@ -213,6 +213,17 @@ BACKGROUND_PLATE_POS_SCAFFOLD = (
 MESH_FODDER_W = PORTRAIT_W
 MESH_FODDER_H = PORTRAIT_H
 
+#: 2026-06-30 mesh-improve item 1+4: the music-role mesh_fodder subject is
+#: the RADIO ITSELF (never a generic story object or a character body), and
+#: EVERY music_visual beat (open / inter / close) shares this ONE canonical
+#: subject id -- the radio is a single recurring on-air object, so the mesh
+#: cache should give it identity continuity exactly like a cast character
+#: (char_id), instead of minting a fresh, unrelated mesh per beat
+#: (the old "obj_<beat>" fallback). Keyed on the always-present video ROLE
+#: (never a line/speaker_role lookup, which is absent for lineless synthetic
+#: bookend/inter beats -- the exact case that matters most here).
+MESH_RADIO_HOST_SUBJECT_ID = "radio_host"
+
 
 def _mesh_fodder_roles_from_policy(policy_json):
     """The set of image-prompt roles whose paired video engine requires clean
@@ -554,8 +565,12 @@ def _mesh_fodder_subject(meta, char_entry, line, setting, role) -> str:
     """The SUBJECT phrase for a mesh_fodder still -> always a single, isolated
     thing the mesher can carve cleanly. A character beat meshes the CHARACTER
     (appearance); the announcer meshes the announcer figure (no studio gear, no
-    occlusion); a music/no-character beat meshes ONE emblematic story object.
-    Pure; never empty (a bare fallback keeps the mesher fed)."""
+    occlusion); a music beat meshes the RADIO ITSELF (2026-06-30 mesh-improve
+    item 1: "music bookend mesh = a 3D radio, not a character body" -- never
+    the old generic "object representing the story", which minted an
+    arbitrary, unrelated prop); any OTHER no-character beat meshes ONE
+    emblematic story object. Pure; never empty (a bare fallback keeps the
+    mesher fed)."""
     appearance = ""
     if char_entry:
         appearance = _appearance_for_char(
@@ -566,8 +581,14 @@ def _mesh_fodder_subject(meta, char_entry, line, setting, role) -> str:
         # A clean isolated figure -- NOT the radio-booth announcer anchor (that
         # carries a microphone + studio backdrop = occlusion + environment).
         return "a vintage 1940s radio announcer in a tailored suit and tie"
-    # Music / no-character beat: a single emblematic OBJECT from the story world
-    # (chunk 6 refines the object_id policy; this keeps the mesher fed cleanly).
+    if str(role) == "music_visual":
+        # The music open/inter/close mesh IS the radio -- the recurring
+        # on-air object, isolated and clean for the mesher.
+        return ("a vintage 1940s tabletop radio receiver, wood cabinet, "
+                "glowing tuning dial, cloth speaker grille")
+    # No-character beat outside announcer/music: a single emblematic OBJECT
+    # from the story world (chunk 6 refines the object_id policy; this keeps
+    # the mesher fed cleanly).
     intent = str((line or {}).get("beat_intent") or "").strip()[:120]
     base = intent or setting or "the story"
     return "a single emblematic object representing %s" % base
@@ -884,7 +905,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 # (else _still_index's last-write-wins could return the wrong row).
                 _ce = _cast_by_id.get(_cid)
                 _ln = _line_by_beat.get(_bid, {})
-                _subj_id = _cid or "obj_%s" % _bid
+                # 2026-06-30 mesh-improve item 4: every music_visual beat
+                # (open/inter/close) shares ONE canonical radio_host subject id
+                # -- identity continuity for the recurring on-air object. Keyed
+                # on the video ROLE (always present), never a line/speaker_role
+                # lookup (absent for lineless synthetic bookend/inter beats).
+                _subj_id = _cid or (
+                    MESH_RADIO_HOST_SUBJECT_ID
+                    if str(tgt.get("role") or "") == "music_visual"
+                    else "obj_%s" % _bid)
                 _fprompt = _compose_mesh_fodder_prompt(
                     meta, _ce, _ln, setting, tgt["role"])
                 _fobj = {

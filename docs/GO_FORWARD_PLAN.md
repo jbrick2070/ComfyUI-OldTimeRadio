@@ -98,8 +98,41 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 >    against a future dropdown pick or `OTR_FORCE_ENGINE_MAP` override, not a default-value change.
 >    Whether to promote `ltx_audio_in` (a HEAVY ~13.7GB engine) over the free `viz_green` as the shipped
 >    aesthetic default is a SEPARATE, GPU-smoke-gated decision, deliberately not made here.
-> 5. **mesh_stage MIN-ACCEPT** -- KIBITZ(r1) `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`. <- NEXT
-> 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
+> 5. ~~mesh_stage MIN-ACCEPT~~ -- **SHIPPED 2026-06-30** (KIBITZ r1 `docs/2026-06-30-mesh-improve/
+>    MESH_STAGE_IMPROVE_PLAN.md`, r1_judgment.md's 4 LOCKED points, r1-only scope). (1) radio subject
+>    minted in PROMPT-GEN: `_mesh_fodder_subject` (`otr_meta_brief_image_prompt.py`) gained a
+>    `role=="music_visual"` branch returning a vintage-radio phrase instead of the old generic "an
+>    emblematic object representing X" (an arbitrary, unrelated prop). (4) identity continuity: EVERY
+>    music_visual fodder beat (open/inter/close) now shares ONE canonical `MESH_RADIO_HOST_SUBJECT_ID =
+>    "radio_host"` mesh-cache id (keyed on the always-present video ROLE, never a line/speaker_role
+>    lookup -- robust to lineless synthetic bookend beats); character/announcer fodder ids UNCHANGED
+>    (verified via a live debug run, not guessed -- announcer's pre-existing `obj_<beat>` id is a
+>    separate, out-of-scope gap). (2) MEASURABLE headroom contract: the Blender camera's vertical FOV is
+>    now PINNED (`sensor_fit='VERTICAL'`, fixed lens/sensor-height -- Blender's own factory numbers, a
+>    determinism pin not a behavior change) so `adaptive_camera_radius(mesh_height, target_frac=0.62)`
+>    (new pure fn, `scripts/otr_mesh_stage_blender.py`) has a well-defined trig basis; `_normalize_meshes`
+>    now also returns the mesh's post-normalize height so the camera distance is SHAPE-AWARE (a tall
+>    character and a squat radio get different, correct distances) instead of the old flat
+>    radius=2.5/elevation=0.35 (which over-framed a longest-dim-1.0 tall mesh to ~84% of frame height --
+>    verified via `test_adaptive_camera_radius_old_flat_default_was_over_tight`). `--radius`/
+>    `--elevation`/`--target-height-frac` default to `None` (adaptive) with an explicit-override escape
+>    hatch threaded through `eng_mesh_stage.build_blender_cmd`/`render_clip`
+>    (`OTR_MESH_STAGE_RADIUS`/`_ELEVATION`/`_TARGET_HEIGHT_FRAC` env vars, mirroring the existing
+>    start_angle/arc_degrees pattern) -- byte-identical legacy invocation when unset. Also added a pure
+>    `alpha_bbox_stats` fn (the MEASURABLE contract's bbox/margin math, kibitz r1 point 2's "proof-frame
+>    bbox test") operating on a top-origin alpha buffer (PIL `getchannel("A")` convention) so a future
+>    GPU-rendered-frame proof script can reuse it; the bpy-dependent wiring (camera pin, `_build_turntable`/
+>    `main()` changes) and the actual before/after GPU proof render are OPERATOR-GATED (no GPU/Blender
+>    access this session) -- only the pure trig/bbox math got unit coverage here. (3) Routing: confirmed
+>    via a live JSON probe that `otr_scifi_16gb_full.json` node-87 selects NONE of mesh_stage's roles
+>    today (announcer/music/other_beats=`viz_green`, character_video=`humo_14B_169`) and
+>    `OTR_FORCE_ENGINE_MAP` is unset -- so NO workflow-JSON change was needed; mesh_stage stays reachable
+>    only via an operator dropdown pick or a `OTR_FORCE_ENGINE_MAP` override. Kibitz r1 SCOPE explicitly
+>    CUT Trellis/WorldMirror + broad material/lighting/turntable exploration (separate, operator-gated) and
+>    the r2-r4 rounds (r1-only per operator). 17 new/updated tests across `tests/test_video_mesh_stage.py`
+>    + `tests/test_3d_image_streams.py`. Suite 5904 passed/35 skipped/0 failed + Bug Bible 16/7/3 green;
+>    pushed, HEAD==origin.
+> 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`. <- NEXT
 > Invariants for all: single resident heavy <= 14.5 GB; audio byte-identical; no-fallback (hard-fail LOUD);
 > UTF-8 no BOM; SFW; workflow-JSON edited in the SAME change as code; suite+BugBible+B7 green + push per chunk.
 

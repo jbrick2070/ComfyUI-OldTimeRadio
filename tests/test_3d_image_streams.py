@@ -162,6 +162,65 @@ def test_build_request_stamps_mesh_subject_id_beat_when_no_char(tmp_path):
     assert req["mesh_subject_id"] == "obj_b001"
 
 
+def test_music_visual_fodder_is_the_radio_not_a_generic_object():
+    """2026-06-30 mesh-improve item 1: a no-character music-role fodder beat
+    meshes the RADIO ITSELF -- never the old generic "an emblematic object
+    representing X" (an arbitrary, unrelated prop) and never a character
+    body. Verified against the real derive_image_prompts output (not
+    guessed)."""
+    lines = _lines() + [
+        {"line_id": "b005", "speaker_role": "music_open", "char_id": "",
+         "text": "", "start_s": 5.0, "dur_s": 2.0},
+    ]
+    payload, _w = mb.derive_image_prompts(
+        _cast(), _meta(), lines=lines, mesh_fodder_roles={"music_visual"})
+    fodder = [o for o in payload["objects"]
+              if o["kind"] == "mesh_fodder" and o["role"] == "music_visual"]
+    assert fodder, "the music_open beat should mint radio mesh fodder"
+    f0 = fodder[0]
+    assert "char_id" not in f0
+    assert mb.MESH_RADIO_HOST_SUBJECT_ID == "radio_host"
+    assert f0["mesh_subject_id"] == "radio_host"
+    assert "radio" in f0["prompt"].lower()
+    assert "emblematic object" not in f0["prompt"].lower()
+
+
+def test_music_visual_fodder_shares_one_id_across_open_and_close():
+    """Every music_visual fodder beat -- open AND close -- shares the SAME
+    radio_host id (2026-06-30 mesh-improve item 4): the radio is ONE
+    recurring on-air object, never a fresh unrelated mesh per beat (the old
+    per-beat obj_<beat> cache)."""
+    lines = _lines() + [
+        {"line_id": "b005", "speaker_role": "music_open", "char_id": "",
+         "text": "", "start_s": 5.0, "dur_s": 2.0},
+        {"line_id": "b099", "speaker_role": "music_close", "char_id": "",
+         "text": "", "start_s": 90.0, "dur_s": 2.0},
+    ]
+    payload, _w = mb.derive_image_prompts(
+        _cast(), _meta(), lines=lines, mesh_fodder_roles={"music_visual"})
+    fodder = [o for o in payload["objects"]
+              if o["kind"] == "mesh_fodder" and o["role"] == "music_visual"]
+    beat_ids = {o["beat_id"] for o in fodder}
+    assert beat_ids == {"b005", "b099"}
+    ids = {o["mesh_subject_id"] for o in fodder}
+    assert ids == {"radio_host"}
+
+
+def test_character_and_announcer_fodder_ids_unaffected_by_radio_host_change():
+    """The radio_host stable-id change is scoped to role=='music_visual' only.
+    Character fodder keeps its char_id-driven subject id; the pre-existing
+    announcer fodder id (obj_<beat> -- a separate, pre-existing gap, out of
+    scope for this item) is UNCHANGED by this fix either way."""
+    payload, _w = mb.derive_image_prompts(
+        _cast(), _meta(), lines=_lines(),
+        mesh_fodder_roles={"character_video", "announcer_visual"})
+    fodder = {o["beat_id"]: o for o in payload["objects"]
+              if o["kind"] == "mesh_fodder"}
+    assert fodder["b001"]["mesh_subject_id"] == "c01"
+    assert fodder["b002"]["mesh_subject_id"] == "obj_b002"
+    assert fodder["b002"]["mesh_subject_id"] != "radio_host"
+
+
 def test_announcer_beat_meshes_announcer_not_uncast(tmp_path):
     """Chunk 6: the announcer carries char_id 'announcer', so a 3D announcer
     beat meshes the ANNOUNCER subject -- never 'uncast' on the environment."""
