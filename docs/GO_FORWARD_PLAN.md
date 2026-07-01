@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-01 | HEAD 4cf60a62 == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-07-01 | HEAD dfacea49 == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
 > do NOT record done work here. prod/main + tags remain operator-GATED.
 
@@ -189,9 +189,18 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 >      permanent always-renders radio floor + `mesh_stage`'s own `fallback_engine` target) -- the plan's
 >      original phrasing lumping it in with the other two no longer applies; only close E3 by editing this
 >      doc, do not unregister still_motion.
->    - **E4 dropdown display metadata -- PARTIALLY DONE / cosmetic gap only.** The shipped VRAM-tier suffix
->      (`registry.vram_tier_label`, this session's mesh-improve item) covers the round-trip contract; the
->      plan's fuller wording (e.g. `"HuMo 1.7B, portrait, LOW-VRAM ~3.3 GB"`) was never built. Low priority.
+>    - **E4 dropdown display metadata -- AUDIO-REACTIVE DESCRIPTOR SHIPPED 2026-07-01 (`dfacea49`); "which
+>      model" spell-out DEFERRED.** Done: `_descriptor_suffix` (`otr_video_director.py`) appends
+>      `" (audio-reactive, no scene image)"` to any family `"abstract"` + `accepts_still is False` engine
+>      (viz_green / viz_mxc_cpu / viz_mxc_mandala) -- DERIVED from registry attributes (no hand-maintained
+>      map, no drift), round-trip-safe (starts with `" ("` so `_engine_id_from_pick` strips it; saved value
+>      stays the bare id), no workflow-JSON change (node-87 stores bare ids). +2 tests in
+>      `test_still_aspect_and_labels.py`; suite 5906/0 + Bug Bible 16/7/3 + B7 5/5 green. With the shipped
+>      VRAM-tier suffix (`registry.vram_tier_label`) the round-trip contract holds. STILL DEFERRED
+>      (morning-operator call, NOT cosmetic): spelling out WHICH LTX/Wan/image model+recipe each label
+>      carries -- there is no clean registry field for it (recipe/quant resolve at render time via env like
+>      `OTR_LTX_AV_RECIPE`), so it needs a design decision (a per-engine registry descriptor vs a
+>      hand-maintained map that would violate the no-drift contract). Low priority.
 >    - **S-C C1 `audio_motion_profile` -- NOT STARTED.** Zero matches anywhere in the repo for
 >      `audio_motion_profile`; no schema field, producer node, or ledger stamp exists yet. C2 (per-engine
 >      consumers + HuMo phrase-chunking) stays deferred regardless per the plan's own scoping.
