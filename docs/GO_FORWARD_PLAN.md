@@ -1,10 +1,25 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-30 | HEAD 37254f39 == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-07-01 | HEAD f0d2b67d == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
 > do NOT record done work here. prod/main + tags remain operator-GATED.
 
-## 1. CURRENT STEP -- ALL-ENGINES x ALL-SLOTS FIX: C0-C5 CODE SHIPPED; remaining = LIVE-GPU soak RUN
+## 1. CURRENT STEP -- RECONCILIATION NOTE (2026-07-01): read section 1A FIRST
+
+**Section 1A's BUILD-READY QUEUE (items 1-6) is the CURRENT, ACCURATE record of the last several
+sessions' work -- all 6 items are now shipped or audited-and-documented; see the queue entries for
+receipts.** The block below (this section) is an OLDER "current step" describing the C0-C5 slot-audit
+sprint specifically; it predates items 1-6 and its own "REMAINING" note (S-F "the accelerator... so
+each leg is minutes not ~28 min") is STALE -- **S-F IS SHIPPED** (`c6c50579`, `scripts/otr_visual_smoke.py`;
+see queue item 6's audit). The live-GPU soak run itself (booting headless ComfyUI + rendering the
+all-5-role profile) remains un-run (still GPU-operator-gated, unrelated to code-completeness), but do
+NOT read this block as "S-F still needs building." Known pre-existing doc debt NOT reconciled here
+(out of scope for this pass -- flagging so a future full-doc pass catches it): sections 5 and 8 both
+have older cross-references calling OUT-OF-DATE topics (schema-adherence, LTX-AV) "the CURRENT STEP
+(section 1)" from back when section 1 covered those -- those pointers are stale too, separate from the
+C0-C5 content below (which is itself accurate, just no longer "current").
+
+ALL-ENGINES x ALL-SLOTS FIX: C0-C5 CODE SHIPPED; remaining = LIVE-GPU soak RUN
 
 The slot-audit sprint (`docs/2026-06-30-slot-audit/SPRINT_PLAN.md`) C0-C5 is BUILT, green
 (suite 5851/0 + Bug Bible + B7), and PUSHED to v2.0-alpha (8f701a73, 65c11bc1, 96aa54dc, ca2ac0e8,
@@ -227,9 +242,11 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     silent degrade to stills (the ltx_audio_in "looks like stills" + the black-floor carrier bug).
     Rip out the fallback chains / `resolve_fallback_chain` / `SYNTH_FALLBACKS`. (S-A's legibility floor
     becomes detect-and-fail/flag, NOT a still-swap.)
-  - **RETIRE engines:** `still_motion` (the fallback-floor twin of still_pan -- falls away with the
-    rip-out), `station_card` (broken black card, missing `accepts_still`), and `abstract` (redundant
-    with the real `visualizer`). Unregister + workflow-JSON dropdowns + ripple tests (the C3 pattern).
+  - ~~RETIRE engines: `station_card` + `abstract`~~ -- **SHIPPED** (`8f701a73`, C0; see section 1's
+    C0 bullet). **CORRECTION (2026-07-01 audit, queue item 6/E3): `still_motion` is NOT retired and
+    should NOT be** -- it is `UNIVERSAL_FLOOR` (the permanent always-renders radio floor) AND
+    `mesh_stage`'s own `fallback_engine` target; unregistering it would break both. The original text
+    here lumping it in with station_card/abstract was wrong from the start -- do not act on it.
   - **`viz_mxc_cpu` (rainbow visualizer) -- SHIPPED this session** (b01d2363; green + pushed). The
     creative rainbow replacement for retired `abstract`. Operator was under-whelmed by the PIL look ->
     the pycairo MANDALA is the upgrade (next bullet).
@@ -314,8 +331,8 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
   workflow still writes a fresh story each episode).
 
 **DEFERRED BACKLOG** (still pending, lower priority -- detail in sections 3-5 + the bug logs):
-GATE-A punch list incl. BUG-411 (flux lost its cinematic tint -- restore FluxGuidance ~3.5 +
-the cinematic/radio suffixes + bookend seed) and look-QA; Wan i2v back-burner (drifts off the
+GATE-A punch list (BUG-411 VERIFIED DONE 2026-07-01 -- see queue item 6's audit + the section 5 entry
+below; struck here) and look-QA; Wan i2v back-burner (drifts off the
 still; LTX holds -- Path B two-expert only if revisited); 3D path decision (WorldMirror
 multi-view vs TripoSG object-mesh -- BLOCKED on operator pick); switchable distribution S3-S6.
 
@@ -414,8 +431,10 @@ Older ACTIVE/SUPERSEDED step history -> `docs/GO_FORWARD_ARCHIVE.md`.
    (image-routing must-fixes already landed). Detail in the 3D plan (pointers).
 6. **Switchable distribution S3-S6** -- generator + `.gen.json` tiers + wizard + README (closing phase).
 
-**0-E parallel track:** `ltx_orbit`/`still_parallax`/`mesh_stage` CPU side shipped + all three GPU-green;
-Phase B (E-1 probe, E-6 renders, per-engine sweep legs) HELD on the `scripts/_otr_0e_gpu_go.txt` GO file.
+**0-E parallel track:** `ltx_orbit`/`still_parallax`/`mesh_stage` CPU side shipped + all three GPU-green
+(historical -- `still_parallax` was RETIRED 2026-06-30, see queue item 2; `mesh_stage` since had its own
+look-QA improve pass, queue item 5); Phase B (E-1 probe, E-6 renders, per-engine sweep legs) HELD on the
+`scripts/_otr_0e_gpu_go.txt` GO file.
 
 **Audio parallel track (own window, never blocks video):** the character-voice "whiny" fix (upstream TTS
 only; frozen spine untouched). Operator note: may have self-resolved -- verify before scheduling work.
@@ -585,17 +604,14 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   - **BUG-410 closing ROLLING CREDITS** — **CLOSED 2026-06-14 (operator-verified on flux_still).** Credits
     scroll over the held last clip to the end again (silent after the theme). Detail in `BUG_LOG_2026-06.md`
     + `docs/2026-06-14-credits-tail-fix/`. (HuMo backdrop not yet eyeballed — low risk, engine-agnostic path.)
-  - **BUG-411 flux BOOKEND / image lost its "lush" cinematic tint (NEXT — HANDOFF FOCUS).** The 6/5 image
-    pipeline (`visual/batch_flux_render.py` + `flux_prompt_extractor`) was WHOLLY REWRITTEN into
-    `_otr_image_engines/flux_gen1.py` + `otr_meta_brief_image_prompt.py` (pure insertions after `e4cb3ac`).
-    Model/steps/cfg/sampler IDENTICAL (flux1-dev-fp8, 20, 1.0, euler/simple), but the rewrite DROPPED the look
-    levers: **(1) FluxGuidance = 3.5** (flux_gen1 has NO FluxGuidance node — biggest factor), **(2) the
-    cinematic style suffix** `"cinematic, 35mm film, anamorphic lens, volumetric lighting, heavy vignette,
-    muted color grade, sharp focus"`, **(3) the radio broadcast-distress suffix** + retrofuturistic radio
-    fallback (`35mm film grain ... dim amber and cyan rim lighting`), **(4) bookend seed 4242**, **(5) portrait
-    style line**. 6/5 workflow widgets inspected + confirmed (no other hidden hardcodes). FIX = restore those in
-    the new pipeline (FluxGuidance node @ ~3.5 + the suffixes + seed). Full forensic in `BUG_LOG_2026-06.md`
-    BUG-411. CODER-READY (the next window's task).
+  - ~~BUG-411 flux BOOKEND / image lost its "lush" cinematic tint~~ -- **VERIFIED DONE (2026-07-01
+    audit, queue item 6).** All 5 look levers this entry called for are confirmed present in the current
+    code: **(1) FluxGuidance = 3.5** (`_otr_image_engines/flux_gen1.py:88`), **(2)** the cinematic style
+    suffix, **(3)** the radio broadcast-distress suffix, **(4) bookend seed 4242**
+    (`OTR_RADIO_BOOKEND_SEED`, `otr_image_gen_dispatcher.py:129,131`), **(5)** the portrait `STYLE_ANCHOR`
+    (`otr_meta_brief_image_prompt.py`). Original forensic detail (the `flux_gen1.py` rewrite dropping
+    FluxGuidance/suffixes/seed) lives in `BUG_LOG_2026-06.md` BUG-411 -- no further action needed here;
+    do not re-open without a NEW live look-QA catch.
   These are GATE-A look-QA items (operator-gated track), parallel to the engine forward order — NOT a
   reordering of section 3.
 
@@ -639,8 +655,9 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
 
 - **Non-Wan soak = ENOUGH (operator call 2026-06-13).** The non-Wan permutation coverage sweep
   (`--strict-fallback --exclude wan/latentsync/triposg`) has run sufficiently; do NOT keep grinding it.
-  The non-lip-sync FLOORS (`still_kenburns` / `still_parallax` / Ken-Burns / `station_card`) render fine
-  and are acceptable for the 8GB tier, but they are NOT the target experience -- the operator wants real
+  The non-lip-sync FLOORS (renamed/retired since this was written: `still_kenburns` -> `still_motion`;
+  `still_parallax` and `station_card` RETIRED 2026-06-30) render fine and are acceptable for the 8GB
+  tier, but they are NOT the target experience -- the operator wants real
   audio-driven lip-sync, not a still with motion. Focus the remaining runway on **getting the Wan lane
   bug-free** (section 1 + 4 + 4A). A new sweep, if ever needed, should add `--exclude-engine humo` (the
   exact-match flag added `ca10b63`: skips the 14B `humo` that TIMES OUT per CS-4, KEEPS `humo_1.7B`).
@@ -690,9 +707,11 @@ overnight-soak companion findings (R1 GPU-proven, R2 harness fix unexercised, R3
   README (newbie audience -- folds into S6/closing): Wan i2v 14B = drifts off the still (b-roll only,
   NOT openers); LTX = holds composition + subtle motion (opener default); TI2V-5B = 8GB tier, lower-res.
   Source the verdicts from the operator's bench ratings (export button).
-- **Ship defaults (release)** -- proposed: announcer + character = `flux_still`, music = `visualizer`
-  (selectable: station_card, still_parallax, abstract — `ltx_orbit` ripped 2026-06-15 in the LTX splice Phase 0). Keep HuMo/latentsync/3D
-  selectable-not-default until verified. Operator eyeballs 2-3 finals/slot.
+- **Ship defaults (release)** -- proposed: announcer + character = `flux_still`, music = `viz_green`
+  (renamed from `visualizer` 2026-06-30; selectable alternates today: `viz_mxc_cpu`/`viz_mxc_mandala` --
+  `station_card`/`abstract`/`still_parallax` are RETIRED, no longer options; `ltx_orbit` ripped 2026-06-15
+  in the LTX splice Phase 0). Keep HuMo/latentsync/3D selectable-not-default until verified. Operator
+  eyeballs 2-3 finals/slot.
 - **Harness polish** (minor) -- output-tree resolver should prefer the live server's `OTR_OUTPUT_DIR`
   (fail LOUD on mismatch); run the OH-3 janitor sweep at server boot; widen the heartbeat cadence.
 - **OH-4** -- the 14-entry / ~8.2 GB live->attic migration STAGED, awaits operator "go OH-4"
