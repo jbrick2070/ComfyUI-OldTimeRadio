@@ -68,8 +68,11 @@ def _label_for(engine_id) -> str:
 #: keeps working. 2026-06-29: flat_still -> still_flat, flux_still -> still_pan
 #: (the misleading "flux" name was dropped -- the engine is ffmpeg, never Flux);
 #: still_kenburns -> still_motion (the always-renders radio floor was renamed).
+#: 2026-06-30 (item 2): visualizer -> viz_green (companion to viz_mxc_cpu /
+#: viz_mxc_mandala; the old name no longer has a CAPABILITIES row).
 _LEGACY_ENGINE_ALIASES = {"flat_still": "still_flat", "flux_still": "still_pan",
-                          "still_kenburns": "still_motion"}
+                          "still_kenburns": "still_motion",
+                          "visualizer": "viz_green"}
 
 
 def _engine_id_from_pick(pick) -> str:

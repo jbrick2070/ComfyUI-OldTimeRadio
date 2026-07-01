@@ -344,14 +344,15 @@ def test_two_heavy_roles_still_validate():
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
     # 2026-06-28 (operator): the 16gb master DEFAULTS the three visible video
-    # slots to visualizer -- the working/clean default (no GPU, no FLUX since
-    # visualizer ignores init_image, no gated HuMo). The three per-role sub-slots
+    # slots to viz_green (renamed from visualizer 2026-06-30, item 2) -- the
+    # working/clean default (no GPU, no FLUX since viz_green ignores
+    # init_image, no gated HuMo). The three per-role sub-slots
     # (character / scene_broll / background_abstract) are OMITTED from the profile
     # so they inherit other_beats (the sentinel on the master); they exist only as
     # advanced explicit overrides. humo_14B_169 / humo_1.7B stay registered +
     # selectable.
-    assert profile["role_overrides"]["announcer_visual"] == "visualizer"
-    assert profile["role_overrides"]["other_beats_visual"] == "visualizer"
+    assert profile["role_overrides"]["announcer_visual"] == "viz_green"
+    assert profile["role_overrides"]["other_beats_visual"] == "viz_green"
     # Force TWO heavy roles to keep the static two-heavy regression green (single-
     # heavy residency is wrapper_bridge's RUNTIME invariant, never a static profile
     # rejection).

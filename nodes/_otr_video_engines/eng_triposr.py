@@ -116,8 +116,9 @@ class TripoSREngine:
     commercial_clean = True            # TripoSR: MIT license
     requires_flag = "OTR_ENABLE_TRIPOSR"
     engine_version = "1"
-    #: Lower-tier chain: triposr -> still_parallax (matches mesh_stage's chain).
-    fallback_engine = "still_parallax"
+    #: Lower-tier chain: triposr -> still_motion (still_parallax UNREGISTERED
+    #: 2026-06-30, item 2 rip-out; matches mesh_stage's updated chain).
+    fallback_engine = "still_motion"
     #: 3D sub-ceiling (documented; enforced in the live render_clip).
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
 
@@ -147,7 +148,7 @@ class TripoSREngine:
     def render_clip(self, request, prepared):
         raise NotImplementedError(
             "triposr.render_clip: dark scaffold -- not yet implemented; "
-            "fallback_engine='still_parallax' handles the chain in "
+            "fallback_engine='still_motion' handles the chain in "
             "assert_usable / render_driver fallback resolution"
         )
 

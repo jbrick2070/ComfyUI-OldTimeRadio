@@ -88,24 +88,9 @@ PROBE_ENGINES = {
             "sageattention, and render-twice determinism on sm_120"
         ),
     },
-    # 0-E easy on-ramp: 2.5D depth parallax over existing stills.
-    # DepthAnythingV2-SMALL pinned (Apache-2.0; the bigger DA-V2 ckpts are
-    # CC-BY-NC and banned). CPU-degradable; in-process transformers.
-    "still_parallax": {
-        "lib_module": "transformers",
-        "lib_in_stack": True,           # spine dep; gate = local DA-V2-S snapshot
-        "adapter_class": "StillParallaxEngine",
-        "forward": "render_clip",
-        "assumed_call": (
-            "in-process: AutoModelForDepthEstimation (DA-V2-SMALL, "
-            "local_files_only) -> one depth map per still -> pure-numpy "
-            "depth-weighted sway -> encode_frames_to_silent_mp4; CUDA when "
-            "present, CPU otherwise (same contract).  "
-            "# TODO-for-GPU-smoke: pre-fetch depth-anything/"
-            "Depth-Anything-V2-Small-hf into the HF cache, one clip on the "
-            "box confirming the parallax reads + render-twice determinism"
-        ),
-    },
+    # still_parallax REMOVED from the probe manifest 2026-06-30 (item 2 rip-out):
+    # UNREGISTERED ("registry IS the menu"), no adapter to dep-verify. Restore
+    # the row WITH the @register decorator when it returns.
     # 0-E easy on-ramp: the traditional 3D chain. The mesher drives ComfyUI
     # CORE hy3d nodes in-process (the "lib" is the comfy host itself --
     # absent in the pytest sandbox, present in production); Blender is a
@@ -132,12 +117,14 @@ PROBE_ENGINES = {
     # triposr REMOVED from the probe manifest 2026-06-29 (C3): the dark MIT 3D
     # mesher is unregistered (NotImplementedError render), so there is no adapter
     # to dep-verify. Restore the row WITH the @register when a real forward ships.
-    # visualizer (2026-06-18): the low-VRAM ffmpeg-only procedural CRT scope engine.
-    # No heavy/contaminating lib -- ffmpeg is a spawned exe, soundfile is the only
-    # importable external dep (the floor audio path already uses it), PIL/numpy are
-    # core. Flag-gated (OTR_ENABLE_VISUALIZER) so the pilot covers it, but there is
-    # nothing GPU/sidecar to probe; it runs in-process on CPU.
-    "visualizer": {
+    # viz_green (renamed from "visualizer" 2026-06-30, item 2): the low-VRAM
+    # ffmpeg-only procedural CRT scope engine. No heavy/contaminating lib --
+    # ffmpeg is a spawned exe, soundfile is the only importable external dep
+    # (the floor audio path already uses it), PIL/numpy are core. The historical
+    # OTR_ENABLE_VISUALIZER flag is vestigial (registry IS the menu); the pilot
+    # still covers it, but there is nothing GPU/sidecar to probe; it runs
+    # in-process on CPU.
+    "viz_green": {
         "lib_module": "soundfile",
         "lib_in_stack": True,        # soundfile is a spine dep (present); the real
                                      # gate is ffmpeg + assert_usable, not a lib probe
@@ -149,7 +136,7 @@ PROBE_ENGINES = {
             "(ring / orbiting particles / grid / mirrored waveform / freq bars / "
             "CRT post, COPIED torch-free into _otr_shared/scope_draw.py) -> one "
             "silent mp4 via ffmpeg stdin. Near-zero GPU; no weights, no sidecar.  "
-            "# TODO-for-GPU-smoke: a full-episode run with visualizer on all three "
+            "# TODO-for-GPU-smoke: a full-episode run with viz_green on all three "
             "roles, audio byte-identical, render time + the near-zero VRAM floor"
         ),
     },

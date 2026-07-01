@@ -73,6 +73,9 @@ ENGINE_FAMILY = {
     # render-contract tests are the coverage), just kept in sync here.
     "viz_mxc_cpu": "abstract",
     "viz_mxc_mandala": "abstract",
+    # viz_green (renamed from "visualizer" 2026-06-30, item 2) was ALSO a latent
+    # gap in this map (never added) -- closed in the SAME chunk as the rename.
+    "viz_green": "abstract",
 }
 
 #: (role, engine, family) rotation covering all 5 roles + the non-3D families.

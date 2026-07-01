@@ -42,9 +42,11 @@ def test_no_validated_subset_filter_remains():
 
 def test_formerly_hidden_engines_are_now_selectable():
     # Engines the old gate HID (untested-but-registered) are now in the dropdown --
-    # registry IS the menu.
+    # registry IS the menu. (still_parallax UNREGISTERED 2026-06-30, item 2
+    # rip-out -- no longer expected here.)
     video = {vd._engine_id_from_pick(c) for c in vd._video_model_combo()}
-    assert {"wan_i2v", "still_motion", "still_parallax"} <= video
+    assert {"wan_i2v", "still_motion"} <= video
+    assert "still_parallax" not in video
     image = set(idr._image_model_combo())
     assert "qwen_image" in image
 

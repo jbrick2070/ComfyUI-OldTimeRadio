@@ -40,9 +40,10 @@ from . import registry as _vreg
 _LOG = logging.getLogger("OTR.video.render_driver")
 
 #: The cheap radio-floor engine names (terminal; a chain ends here). NOTE
-#: (2026-06-18): "visualizer" was removed -- it graduated from a cheap floor stub
-#: to the real procedural CRT engine (eng_visualizer.py), which REQUIRES audio_ref
-#: + ffmpeg and so is NOT a guaranteed always-renders floor terminus.
+#: (2026-06-18): "visualizer" (renamed viz_green 2026-06-30) was removed -- it
+#: graduated from a cheap floor stub to the real procedural CRT engine
+#: (eng_visualizer.py), which REQUIRES audio_ref + ffmpeg and so is NOT a
+#: guaranteed always-renders floor terminus.
 FLOOR_NAMES = frozenset({"still_motion", "still_pan", "still_flat"})
 #: The universal floor terminus appended to any engine whose declared chain
 #: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
@@ -66,12 +67,12 @@ ENGINE_FAMILY = {
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
-    "still_parallax": "static_motion",
+    # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out) -- removed here too.
     "ltx_video": "text_to_video",
     "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
     # "abstract" + "station_card" entries REMOVED 2026-06-30 (C0, engines retired);
-    # the "abstract" FAMILY name survives (visualizer) + is the engine_family() default.
-    "visualizer": "abstract", "still_pan": "static_image_gen",
+    # the "abstract" FAMILY name survives (viz_green) + is the engine_family() default.
+    "viz_green": "abstract", "still_pan": "static_image_gen",   # renamed from "visualizer" 2026-06-30, item 2
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala, pycairo (2026-06-30)
     "still_flat": "static_image_gen",
@@ -749,7 +750,7 @@ def _is_character_face_beat(shot):
 def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
     """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
     ``audio_conditioned_video`` family (ltx_av_music / ltx_audio_in BOOKEND beats --
-    which HARD-require audio_ref) + the visualizer scopes. These get a bounded master
+    which HARD-require audio_ref) + the viz_green scopes. These get a bounded master
     slice when a beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk)
     is EXCLUDED: it needs the character's OWN voice, so a master-mix slice would make
     it lip-sync to the wrong audio. A CHARACTER-FACE beat is excluded for the SAME
@@ -758,7 +759,7 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
     if is_char_face:
         return False
     return (str(family) == "audio_conditioned_video"
-            or str(engine_id) in ("visualizer", "viz_mxc_cpu", "viz_mxc_mandala"))
+            or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"))
 
 
 def _role_of_shot(shot) -> str:
@@ -884,7 +885,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         else:
             # LOUD: no clean fodder minted -> do NOT silently mesh the scene
             # still (the clay-blob bug). Keep the portrait/none init; the engine
-            # fallback chain (mesh_stage -> still_parallax) degrades cleanly.
+            # fallback chain (mesh_stage -> still_motion) degrades cleanly.
             init_source = "missing_mesh_fodder"
             _mesh_fodder_missing = True
             _LOG.warning(
@@ -1032,13 +1033,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         dur_s = line.get("dur_s")
         # M3 delta (c): the SYNTHETIC opening-music beat (b000) has no ledger
         # line, so the per-line start_s/dur_s are absent. The audio-reactive lanes
-        # (ltx_av_music + the visualizer, which paints FROM the audio analysis)
+        # (ltx_av_music + viz_green, which paints FROM the audio analysis)
         # need the per-beat slice -- fall back to the SHOT row's start_s/dur_s for
         # THOSE engines only, so every other engine keeps the line-backed slice
         # path byte-identical. (2026-06-18 visualizer soak: b000_music_open reached
-        # the visualizer with an empty audio_ref and failed LOUD without this.)
+        # the engine -- renamed viz_green 2026-06-30 -- with an empty audio_ref and
+        # failed LOUD without this.)
         # AMBIENT-AUDIO lanes (ltx_av_music's audio_conditioned_video family + the
-        # visualizer) condition on the master MIX, and ltx_av_music HARD-REQUIRES
+        # viz_green scopes) condition on the master MIX, and ltx_av_music HARD-REQUIRES
         # audio_ref -- without it _assert_family_inputs_satisfiable raises
         # FamilyInputGap and the no-fallbacks rule CRASHES the episode (the
         # 2026-06-22 music-beat bug: b006/b013 inter-music beats have no per-line
@@ -1122,7 +1124,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # 2026-06-10 + 2026-06-14): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox). LTX/Wan were given
     # the landscape canvas in 2026-06-10, but the still/floor families
-    # (still_pan, station_card, still_motion, visualizer) STILL inherited the
+    # (still_pan, station_card, still_motion, viz_green) STILL inherited the
     # 480x832 portrait -> skinny-portrait b-roll pillarboxed in the 16:9 frame
     # (2026-06-14 operator catch on still_pan). Give the composite landscape
     # canvas to every engine EXCEPT the face families: audio_driven_face (HuMo)

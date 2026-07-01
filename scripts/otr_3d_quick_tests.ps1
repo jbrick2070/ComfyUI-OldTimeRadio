@@ -1,16 +1,17 @@
 <#
-  otr_3d_quick_tests.ps1 -- DECOUPLED 3D smoke (operator-directed 2026-06-12):
-  one 30-word FULL-episode test per 0-E 3D engine, EASIEST -> HARDEST, on the
-  other_beats (character) slot. Does NOT wait for the 27-leg coverage sweep.
+  otr_3d_quick_tests.ps1 -- DECOUPLED 3D smoke (operator-directed 2026-06-12).
+  one 30-word FULL-episode test per 0-E 3D engine, on the other_beats
+  (character) slot. Does NOT wait for the 27-leg coverage sweep.
 
-  Boots a FRESH headless ComfyUI on :8000 (current code), then runs the three
-  0-E engines in order via the proven coverage-sweep harness (--only), each with
-  the capstone gates (playable obs final, byte-identical master audio, hygiene,
+  Boots a FRESH headless ComfyUI on :8000 (current code), then runs the 0-E
+  engine(s) via the proven coverage-sweep harness (--only), each with the
+  capstone gates (playable obs final, byte-identical master audio, hygiene,
   VRAM ceiling). Writes a running digest + per-engine verdict.
 
-  Order: still_parallax (DepthAnythingV2-S) -> mesh_stage (hy3d-2mv mesh +
-  Blender headless). humo_1.7B stays the default for the non-3D character beats;
-  the 3D engine under test owns other_beats_visual.
+  Engine: mesh_stage (hy3d-2mv mesh + Blender headless). still_parallax was
+  retired 2026-06-30 (item 2 rip-out, UNREGISTERED) and dropped from this
+  list. humo_1.7B stays the default for the non-3D character beats; the 3D
+  engine under test owns other_beats_visual.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -24,7 +25,7 @@ $SRVERR = 'C:\Users\jeffr\Documents\ComfyUI\comfyui_8000.err.log'
 $DIGEST = Join-Path $REPO 'scripts\otr_3d_quick_digest.md'
 $MARKER = Join-Path $REPO 'scripts\.otr_3d_quick_active'
 
-$ENGINES = @('still_parallax','mesh_stage')   # easiest -> hardest
+$ENGINES = @('mesh_stage')   # still_parallax UNREGISTERED 2026-06-30 (item 2)
 
 function Dig($m){ $line = "{0} | {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m; Add-Content -Path $DIGEST -Value $line -Encoding utf8; Write-Host $line }
 
@@ -53,9 +54,8 @@ $LAUNCHCMD = Join-Path $REPO 'scripts\_otr_soak_server_launch.cmd'
 # (_marathon_extra_env.cmd: called if present). Removed after health check.
 $EXTRAENV = Join-Path $REPO 'scripts\_otr_soak_capstone_results\_marathon_extra_env.cmd'
 New-Item -ItemType Directory -Force -Path (Split-Path $EXTRAENV) | Out-Null
-@('set OTR_ENABLE_STILL_PARALLAX=1',
-  'set OTR_ENABLE_MESH_STAGE=1') | Set-Content -Path $EXTRAENV -Encoding ascii
-Dig "0-E enable flags staged (still_parallax/mesh_stage) via the launcher env seam"
+@('set OTR_ENABLE_MESH_STAGE=1') | Set-Content -Path $EXTRAENV -Encoding ascii
+Dig "0-E enable flags staged (mesh_stage) via the launcher env seam"
 # Run the .cmd DIRECTLY as -FilePath. The old `cmd.exe /c "<launch>" "<log>"`
 # form hit cmd's two-quoted-token stripping rule (4 quotes -> cmd ate the outer
 # pair -> mangled path -> launcher never ran -> ZERO log output -> "did not come

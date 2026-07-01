@@ -24,14 +24,15 @@ def test_triposr_unregistered_not_selectable():
 
 def test_triposr_source_identity_intact():
     # The source class is preserved (returns when built): a STATIC mesher
-    # (turntable motion only, NEVER lip-sync), MIT, degrades to still_parallax.
+    # (turntable motion only, NEVER lip-sync), MIT, degrades to still_motion
+    # (still_parallax retired 2026-06-30, item 2 rip-out).
     eng = TripoSREngine()
     assert eng.name == "triposr"
     assert eng.family == "image_to_video" and eng.family in schemas.FAMILIES
     assert "audio_ref" not in eng.required_inputs   # no lip-sync
     assert eng.commercial_clean is True             # MIT
     assert eng.default_roles == ()
-    assert eng.fallback_engine == "still_parallax"
+    assert eng.fallback_engine == "still_motion"
 
 
 def test_triposr_source_load_and_render_are_dark():

@@ -1,4 +1,5 @@
-"""The ``visualizer`` engine -- low-VRAM ffmpeg-only procedural CRT scopes (2026-06-18).
+"""The ``viz_green`` engine -- low-VRAM ffmpeg-only procedural CRT scopes
+(2026-06-18; renamed from ``visualizer`` 2026-06-30, item 2).
 
 CPU-only coverage: registration / identity, the LOUD assert_usable ladder (no
 fallback), the pure render-request + CanonicalClip helpers, scope_draw determinism,
@@ -26,9 +27,9 @@ from nodes._otr_shared import scope_draw as sd
 # registration / identity
 # --------------------------------------------------------------------------- #
 def test_registered_and_identity():
-    assert vreg.is_registered("visualizer")
-    eng = vreg.get_engine("visualizer")
-    assert eng.name == "visualizer"
+    assert vreg.is_registered("viz_green")
+    eng = vreg.get_engine("viz_green")
+    assert eng.name == "viz_green"
     assert eng.family == "abstract"
     assert eng.requires_flag is None            # registry IS the menu (no flag gate)
     assert eng.default_roles == ()
@@ -53,14 +54,14 @@ def test_assert_usable_no_flag_gate(monkeypatch):
     if not sd.find_ffmpeg("ffmpeg"):
         pytest.skip("ffmpeg not on PATH")
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "0")
-    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "visualizer"
+    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "viz_green"
 
 
 def test_assert_usable_default_on_when_flag_unset(monkeypatch):
     if not sd.find_ffmpeg("ffmpeg"):
         pytest.skip("ffmpeg not on PATH")
     monkeypatch.delenv("OTR_ENABLE_VISUALIZER", raising=False)
-    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "visualizer"
+    assert VisualizerEngine().assert_usable(host_caps={}, profile={}) == "viz_green"
 
 
 def test_assert_usable_passes_with_flag_and_ffmpeg(monkeypatch):
@@ -69,7 +70,7 @@ def test_assert_usable_passes_with_flag_and_ffmpeg(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")
     rt = {"audio_ref": "C:/some/beat.wav"}
     assert VisualizerEngine().assert_usable(
-        host_caps={}, profile={}, request_template=rt) == "visualizer"
+        host_caps={}, profile={}, request_template=rt) == "viz_green"
 
 
 def test_assert_usable_does_not_gate_audio_ref_pre_render(monkeypatch):
@@ -81,7 +82,7 @@ def test_assert_usable_does_not_gate_audio_ref_pre_render(monkeypatch):
         pytest.skip("ffmpeg not on PATH")
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")
     assert VisualizerEngine().assert_usable(
-        host_caps={}, profile={}, request_template={"audio_ref": ""}) == "visualizer"
+        host_caps={}, profile={}, request_template={"audio_ref": ""}) == "viz_green"
 
 
 def test_assert_usable_for_all_three_roles(monkeypatch):
@@ -92,7 +93,7 @@ def test_assert_usable_for_all_three_roles(monkeypatch):
     rt = {"audio_ref": "C:/some/beat.wav"}
     for _role in ("announcer_visual", "music_visual", "character_video"):
         assert eng.assert_usable(host_caps={}, profile={}, request_template=rt) \
-            == "visualizer"
+            == "viz_green"
 
 
 # --------------------------------------------------------------------------- #
@@ -117,7 +118,7 @@ def test_canonicalize_shape_silent():
     eng = VisualizerEngine()
     clip = eng.canonicalize({"out_path": "/t/v.mp4", "frame_count": 33},
                             {"shot_id": "b0001"}, {})
-    assert clip["engine_id"] == "visualizer"
+    assert clip["engine_id"] == "viz_green"
     assert clip["family"] == "abstract"
     assert clip["has_audio"] is False
     assert clip["type"] == "video" and clip["codec"] == "h264"
@@ -149,9 +150,9 @@ def test_paint_frame_deterministic_and_shaped():
     scan = sd.build_scanlines(w, h)
     vig = sd.build_vignette(w, h)
     a = sd.paint_frame(w, h, 2, total, fps, 0.6, freq, wave, 0.5, 0.5, scan, vig,
-                       rng_key="visualizer|7")
+                       rng_key="viz_green|7")
     b = sd.paint_frame(w, h, 2, total, fps, 0.6, freq, wave, 0.5, 0.5, scan, vig,
-                       rng_key="visualizer|7")
+                       rng_key="viz_green|7")
     arr_a, arr_b = np.asarray(a), np.asarray(b)
     assert arr_a.shape == (h, w, 3)
     assert np.array_equal(arr_a, arr_b)         # deterministic (seeded noise)
@@ -163,9 +164,9 @@ def test_paint_frame_seed_changes_noise():
     wave = np.zeros(8, dtype=np.float32)
     scan, vig = sd.build_scanlines(w, h), sd.build_vignette(w, h)
     a = np.asarray(sd.paint_frame(w, h, 1, 4, 25, 0.9, freq, wave, 0.5, 0.5,
-                                  scan, vig, rng_key="visualizer|1"))
+                                  scan, vig, rng_key="viz_green|1"))
     b = np.asarray(sd.paint_frame(w, h, 1, 4, 25, 0.9, freq, wave, 0.5, 0.5,
-                                  scan, vig, rng_key="visualizer|2"))
+                                  scan, vig, rng_key="viz_green|2"))
     assert not np.array_equal(a, b)             # different seed -> different noise
 
 

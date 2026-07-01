@@ -27,8 +27,9 @@ from typing import Optional
 #: Engine FAMILIES that must show temporal motion (the genuine moving-video
 #: lanes). Everything else -- static_image_gen (still_pan / still_flat),
 #: static_motion (still_motion / still_parallax: a slow pan that freezedetect can
-#: false-flag), abstract (visualizer) -- is motion-EXEMPT: only the luma floor
-#: applies. (Operator: "static is OK for static engines, not a failure.")
+#: false-flag), abstract (viz_green, renamed from "visualizer" 2026-06-30) -- is
+#: motion-EXEMPT: only the luma floor applies. (Operator: "static is OK for
+#: static engines, not a failure.")
 MOTION_FAMILIES: frozenset = frozenset({
     "image_to_video",
     "text_to_video",
@@ -53,7 +54,7 @@ _FAMILY_FALLBACK: dict = {
     "still_motion": "static_motion",
     "still_pan": "static_image_gen",
     "still_flat": "static_image_gen",
-    "visualizer": "abstract",
+    "viz_green": "abstract",         # renamed from "visualizer" 2026-06-30, item 2
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer -- motion-exempt (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala -- motion-exempt (2026-06-30)
 }

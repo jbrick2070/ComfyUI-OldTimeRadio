@@ -1,13 +1,15 @@
-"""0-E ticket 2 CPU tests -- still_parallax (2.5D depth parallax over stills).
+"""still_parallax (2.5D depth parallax over stills) -- UNREGISTERED dark
+scaffold (item 2 rip-out, 2026-06-30, "registry IS the menu").
 
-The DA-V2-SMALL model is absent in the pytest sandbox, so every test here
-exercises the COLD path: registration (selectable-not-default), the
-fail-closed usability ladder (opt-in flag -> local model snapshot), the
+still_parallax is no longer imported/selectable (the mesh_stage / triposr
+fallback chains now degrade directly to still_motion, not via this engine).
+The SOURCE class stays on disk (it returns when re-enabled) and keeps its
+identity: the fail-closed usability ladder (local model snapshot), the
 role_compat fit (all three OTR_VideoDirector slots; background_abstract
 excluded -- no still to warp), and the PURE parallax math (deterministic,
-frame-0 identity, depth-weighted shift, edge clamp, no-stretch cover box).
-The live depth inference + look-QA is the GPU/operator step, NOT covered
-here.
+frame-0 identity, depth-weighted shift, edge clamp, no-stretch cover box) all
+still apply via DIRECT instantiation. The live depth inference + look-QA is
+the GPU/operator step, NOT covered here.
 """
 from __future__ import annotations
 
@@ -36,25 +38,29 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # --------------------------------------------------------------------------- #
 # Registration: selectable-not-default until operator look-QA (0-E gate)
 # --------------------------------------------------------------------------- #
-def test_still_parallax_registered_selectable_not_default():
-    assert vreg.is_registered("still_parallax")
-    eng = vreg.get_engine("still_parallax")
-    assert isinstance(eng, StillParallaxEngine)
+def test_still_parallax_unregistered_not_selectable():
+    # item 2 rip-out (2026-06-30, "registry IS the menu"): dropped from the
+    # registry + the full dropdown; no CAPABILITIES row.
+    assert not vreg.is_registered("still_parallax")
+    assert "still_parallax" not in vreg.all_engine_names()
+    assert "still_parallax" not in vreg.CAPABILITIES
+
+
+def test_still_parallax_source_identity_intact():
+    # The source class is preserved (returns when re-enabled): DA-V2-SMALL
+    # depth parallax over an existing still, Apache-2.0, degrades to
+    # still_motion (matches mesh_stage/triposr's updated chain head).
+    eng = StillParallaxEngine()
     assert eng.family == "static_motion" and eng.family in sc.FAMILIES
-    assert eng.default_roles == ()             # NEVER a default until look-QA
-    assert eng.requires_flag is None           # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is True        # Apache-2.0 SMALL ckpt pinned
     assert eng.fallback_engine == "still_motion"
-    assert "still_parallax" in vreg.all_engine_names()   # full dropdown (V-6)
     assert "not real 3D" in eng.honest_label   # the honest 0-E label
-    for role in rc.ROLES:                      # never the default for ANY role
-        assert vreg.default_engine_for_role(role) != "still_parallax"
 
 
 def test_still_parallax_fits_three_slots_not_background():
     from nodes.otr_video_director import VIDEO_SLOT_ROLES
-    eng = vreg.get_engine("still_parallax")
+    eng = StillParallaxEngine()
     desc = {"engine_id": "still_parallax", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
     for slot, slot_roles in VIDEO_SLOT_ROLES.items():
@@ -73,15 +79,8 @@ def test_still_parallax_fits_three_slots_not_background():
     assert rc.engine_fits_role(desc, "background_abstract") is False
 
 
-def test_registry_still_parallax_selectable_no_flag(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_STILL_PARALLAX", raising=False)
-    eng = vreg.get_engine("still_parallax")
-    for role in eng.roles:                     # registry IS the menu: no flag gate
-        assert vreg.assert_usable("still_parallax", role) == "still_parallax"
-
-
 def test_still_parallax_assert_usable_model(monkeypatch, tmp_path):
-    eng = vreg.get_engine("still_parallax")
+    eng = StillParallaxEngine()
     # No flag gate (registry IS the menu). The pinned local snapshot missing ->
     # MISSING_MODEL naming the env knob + the HF repo id (offline-first: never a
     # runtime fetch).
@@ -164,7 +163,7 @@ def test_fit_cover_box_uniform_no_stretch():
 # LOUD missing-still behavior (honest engine: never a slate under this stamp)
 # --------------------------------------------------------------------------- #
 def test_render_clip_missing_still_raises_dependency_missing():
-    eng = vreg.get_engine("still_parallax")
+    eng = StillParallaxEngine()
     req = {"shot_id": "s1", "canvas": {"w": 64, "h": 48, "fps": 25},
            "timing": {"target_frame_count": 3}, "asset_refs": {}}
     with pytest.raises(FileNotFoundError):
@@ -176,28 +175,27 @@ def test_render_clip_missing_still_raises_dependency_missing():
 # --------------------------------------------------------------------------- #
 # Driver maps + capability row (BOTH copies; the 0-E wiring contract)
 # --------------------------------------------------------------------------- #
-def test_engine_family_and_fallback_chain_both_copies():
-    assert rd.ENGINE_FAMILY["still_parallax"] == "static_motion"
-    assert rd.engine_family("still_parallax") == "static_motion"
+def test_engine_family_removed_from_driver_kept_for_soak_audit():
+    # item 2 rip-out (2026-06-30): dropped from render_driver's live
+    # ENGINE_FAMILY (no longer a real dispatch target) + FLOOR_NAMES was never
+    # its home (model-gated, not a floor). The historical-audit copy in
+    # otr_video_soak.ENGINE_FAMILY keeps its entry so old soak fixtures still
+    # classify correctly.
+    assert "still_parallax" not in rd.ENGINE_FAMILY
+    assert "still_parallax" not in rd.FLOOR_NAMES
+    # A dangling fallback_engine self-heals to the radio floor (make_fallback_of
+    # contract: an unregistered name that is not a FLOOR_NAMES member falls
+    # through to UNIVERSAL_FLOOR).
     assert rd.make_fallback_of()("still_parallax") == "still_motion"
-    assert "still_parallax" not in rd.FLOOR_NAMES   # model-gated, NOT a floor
     soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
     spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)
     soak = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(soak)
-    assert soak.ENGINE_FAMILY["still_parallax"] == "static_motion"
-
-
-def test_capability_row_is_cpu_degradable_light():
-    row = vreg.CAPABILITIES["still_parallax"]
-    assert row["cpu_ok"] is True               # CPU-degradable by design
-    assert row["vram_class"] == "light"
-    assert row["required_toolchain"] is None and row["requires_sidecar"] is False
-    assert row["model_requirements"] == ["depth-anything-v2-small-hf"]
+    assert soak.ENGINE_FAMILY["still_parallax"] == "static_motion"   # audit-only
 
 
 def test_canonical_clip_stamps_parallax():
-    eng = vreg.get_engine("still_parallax")
+    eng = StillParallaxEngine()
     clip = eng._floor_clip({"shot_id": "s9"}, "C:/p.mp4", 25, 40)
     assert clip["engine_id"] == "still_parallax"
     assert clip["family"] == "static_motion"
@@ -265,7 +263,7 @@ def test_installed_requires_loadable_snapshot(tmp_path, monkeypatch):
     """_installed() is True only when the RESOLVED source carries a
     config.json -- a bare cache dir without a snapshot is NOT installed
     (fail-closed at assert_usable, not at load time)."""
-    eng = vreg.get_engine("still_parallax")
+    eng = StillParallaxEngine()
     repo = tmp_path / "models--depth-anything--Depth-Anything-V2-Small-hf"
     (repo / "snapshots").mkdir(parents=True)
     monkeypatch.setenv("OTR_DEPTH_ANYTHING_V2_DIR", str(repo))

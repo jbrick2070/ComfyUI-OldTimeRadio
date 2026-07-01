@@ -470,13 +470,13 @@ def _np_pixels(val):
 
 # --------------------------------------------------------------------------- #
 # Skip unused stills for procedural-floor video engines (operator 2026-06-18):
-# an all-visualizer episode must invoke NO image model (accessible: works for
+# an all-viz_green episode must invoke NO image model (accessible: works for
 # users with no image/video models).
 # --------------------------------------------------------------------------- #
 def test_still_needed_for_role_gates_on_video_engine_init_image():
-    # visualizer ignores init_image -> still NOT needed; wan_ti2v consumes
+    # viz_green ignores init_image -> still NOT needed; wan_ti2v consumes
     # init_image -> still needed.
-    pol_vis = {"video_models": {"other_beats_video_model": {"engine_id": "visualizer"}}}
+    pol_vis = {"video_models": {"other_beats_video_model": {"engine_id": "viz_green"}}}
     pol_wan = {"video_models": {"other_beats_video_model": {"engine_id": "wan_ti2v"}}}
     assert disp._still_needed_for_role(pol_vis, "character_video") is False
     assert disp._still_needed_for_role(pol_wan, "character_video") is True
@@ -486,7 +486,7 @@ def test_still_needed_for_role_fails_safe():
     # no video_models / unknown role / unknown engine -> keep the still (legacy)
     assert disp._still_needed_for_role({}, "character_video") is True
     assert disp._still_needed_for_role(
-        {"video_models": {"other_beats_video_model": {"engine_id": "visualizer"}}},
+        {"video_models": {"other_beats_video_model": {"engine_id": "viz_green"}}},
         "not_a_role") is True
     assert disp._still_needed_for_role(
         {"video_models": {"other_beats_video_model": {"engine_id": "nope_engine"}}},
@@ -496,10 +496,10 @@ def test_still_needed_for_role_fails_safe():
 def test_still_needed_keys_on_accepts_still_capability():
     # Coverage arch (2026-06-18): every real motion lane declares accepts_still=True
     # (MotionEngineBase default), so a SILENT ltx_video clip now consumes the role's
-    # selected image -- this is the flux2/flux-on-LTX fix. The visualizer lane opts
+    # selected image -- this is the flux2/flux-on-LTX fix. The viz_green lane opts
     # OUT (accepts_still=False) and mints no still.
     pol_ltx = {"video_models": {"music_video_model": {"engine_id": "ltx_video"}}}
-    pol_avm = {"video_models": {"music_video_model": {"engine_id": "visualizer"}}}
+    pol_avm = {"video_models": {"music_video_model": {"engine_id": "viz_green"}}}
     assert disp._still_needed_for_role(pol_ltx, "music_visual") is True
     assert disp._still_needed_for_role(pol_avm, "music_visual") is False
 
@@ -522,27 +522,28 @@ def test_engine_consumes_still_capability_vs_dual_read():
 def test_c1_still_pan_and_motion_consume_their_scene_still():
     """C1 (D2 BLACK fix, 2026-06-30): still_pan + still_motion declare
     accepts_still=True so the image dispatcher MINTS the role's selected scene
-    still for them (instead of the dark floor). still_flat already did; visualizer
+    still for them (instead of the dark floor). still_flat already did; viz_green
     opts OUT (audio-reactive, ignores stills)."""
     from nodes._otr_video_engines import registry as vreg
     assert disp.engine_consumes_still(vreg.get_engine("still_pan")) is True
     assert disp.engine_consumes_still(vreg.get_engine("still_motion")) is True
     assert disp.engine_consumes_still(vreg.get_engine("still_flat")) is True
-    assert disp.engine_consumes_still(vreg.get_engine("visualizer")) is False
+    assert disp.engine_consumes_still(vreg.get_engine("viz_green")) is False
 
 
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
-    # All video roles = visualizer (no init_image) -> NO still generated, gen_fn
-    # never called -> an all-procedural episode needs no image model at all.
+    # All video roles = viz_green (renamed from visualizer 2026-06-30, item 2;
+    # no init_image) -> NO still generated, gen_fn never called -> an
+    # all-procedural episode needs no image model at all.
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_vis", "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {
         "image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {
-            "announcer_video_model": {"engine_id": "visualizer"},
-            "music_video_model": {"engine_id": "visualizer"},
-            "other_beats_video_model": {"engine_id": "visualizer"}},
+            "announcer_video_model": {"engine_id": "viz_green"},
+            "music_video_model": {"engine_id": "viz_green"},
+            "other_beats_video_model": {"engine_id": "viz_green"}},
         "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(
         _pobj("c1", "a spacer, station", "ph1", role="character_video"),

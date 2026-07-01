@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-30 | HEAD f5b78ac5 == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-06-30 | HEAD 8d90562a == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
 > do NOT record done work here. prod/main + tags remain operator-GATED.
 
@@ -55,14 +55,41 @@ determinism; LOUD fallbacks; master audio byte-identical (`test_audio_byte_ident
 suite + Bug Bible + B7 green AND push per green chunk to v2.0-alpha. Keep EVERY engine
 user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 
-> ### BUILD-READY QUEUE (for a fresh coder window -- 2026-06-30)
+> ### BUILD-READY QUEUE (for a fresh coder window -- refreshed 2026-06-30 post-item2-ship)
 > These have coder-ready contracts; a new window can pick them up in this order via the otr-handoff skill:
-> 1. **viz_mxc_mandala** -- KIBITZ r1-r4 CONVERGED. `docs/2026-06-30-viz-rainbow/MANDALA_ENGINE_PLAN.md`.
-> 2. **still_parallax 100% rip-out** -- spec below (S-E); mechanical C0-pattern, no kibitz needed.
-> 3. **visualizer -> viz_green rename** -- spec below (S-E); still_kenburns->still_motion precedent, no
->    kibitz needed. Do it WITH the parallax rip-out (same files/gates).
+> 1. ~~viz_mxc_mandala~~ -- **SHIPPED `8d90562a`** (2026-06-30): `eng_viz_mandala.py` + scope_draw
+>    `paint_mandala`/`mandala_surface_to_rgb`/`apply_crt_post_rgb` + full wiring
+>    (`__init__`/`ENGINE_FAMILY`/`_uses_ambient_master_audio`/`content_oracle`/`otr_video_soak.py`
+>    ENGINE_FAMILY/`registry.CAPABILITIES`) + 13 new tests (`tests/test_video_viz_mandala.py`). Also fixed
+>    the pre-existing `viz_mxc_cpu` latent gap in `otr_video_soak.py` ENGINE_FAMILY (never added when THAT
+>    engine shipped). Suite 5884 passed/35 skipped/0 failed + Bug Bible 16/0 green; pushed, HEAD==origin.
+>    No workflow-JSON change needed (opt-in selectable, no node-87 default -- operator may set it later).
+> 2. ~~still_parallax 100% rip-out~~ -- **SHIPPED** (2026-06-30, same commit as item 3): deregistered by
+>    dropping the `@register` decorator in `eng_still_parallax.py` -- NOT just the `__init__.py` import; a
+>    bare direct import re-registers a class that still carries `@register`, which is what the dark-scaffold
+>    pattern actually needs and what caught 2 test regressions mid-ship (the plan text below undersold this).
+>    Also dropped: its CAPABILITIES row, `render_driver.ENGINE_FAMILY` entry, and the
+>    `otr_video_dep_pilot.py` PROBE_ENGINES row (a no-drift contract test asserts every probe entry is
+>    registered). Fixed the two dangling `fallback_engine="still_parallax"` refs (`eng_mesh_stage.py` /
+>    `eng_triposr.py` now point directly to `still_motion`, a 1-hop chain). Rewrote
+>    `tests/test_video_still_parallax.py` to direct-instantiation (triposr precedent) + fixed ripple in 6
+>    more test files the first pass missed (`test_capability_profiles` / `test_image_platform_c1` /
+>    `test_route_a_14b_promotion` / `test_slot_matrix_soak` / `test_video_dep_pilot` /
+>    `test_video_render_driver_perbeat_audio`). Source file kept on disk (dark scaffold, like
+>    triposr/character_3d). `content_oracle._FAMILY_FALLBACK` + `otr_video_soak.ENGINE_FAMILY` KEPT their
+>    still_parallax entries ON PURPOSE (historical-manifest audit tables, not live dispatch).
+> 3. ~~visualizer -> viz_green rename~~ -- **SHIPPED** (2026-06-30, same commit as item 2): engine `name` +
+>    CAPABILITIES key + `render_driver` ENGINE_FAMILY/`_uses_ambient_master_audio` + `content_oracle`
+>    FAMILY_FALLBACK + `otr_video_dep_pilot.PROBE_ENGINES` + all code/test refs renamed to `viz_green`.
+>    `otr_video_soak.py` ENGINE_FAMILY was ALSO missing a visualizer/viz_green entry (a second latent gap,
+>    same shape as item 1's viz_mxc_cpu miss) -- closed in this same chunk. `_LEGACY_ENGINE_ALIASES` gained
+>    `"visualizer": "viz_green"`. The 3 profile JSONs + node-87 in `otr_scifi_16gb_full.json`
+>    (`widgets_values[0:3]`) updated together (workflow-JSON change in the SAME commit as code). Python
+>    module/file/class names (`eng_visualizer.py` / `VisualizerEngine`) intentionally UNCHANGED -- only the
+>    registered engine_id was in scope. Suite 5878 passed/35 skipped/0 failed + Bug Bible 16/0 + B7 green;
+>    pushed, HEAD==origin.
 > 4. **HuMo improvements** -- KIBITZ `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` (in progress
->    2026-06-30; see `kibitz-runs/2026-06-30-humo/` for the hardened result).
+>    2026-06-30; see `kibitz-runs/2026-06-30-humo/` for the hardened result). <- NEXT
 > 5. **mesh_stage MIN-ACCEPT** -- KIBITZ(r1) `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`.
 > 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
 > Invariants for all: single resident heavy <= 14.5 GB; audio byte-identical; no-fallback (hard-fail LOUD);
@@ -139,20 +166,12 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     in one commit. `viz_mxc_gpu` (torch-compute, NVIDIA-first, fail-closed) DEFERRED to a later opt-in
     spike -- never blocks the CPU tier. Build order C-mxc1..C-mxc3 in the plan. SCHEDULE: after the current
     all-engines all-slots sweep/soak completes.
-  - **RETIRE `still_parallax` -- 100% RIP-OUT (operator verdict 2026-06-30, soak eyeball: "kinda weird
-    but sucks").** Full C0-style retirement: deregister (`@register` in `eng_still_parallax.py`), drop its
-    CAPABILITIES row (registry.py), the `__init__.py` import, the `ENGINE_FAMILY` + `content_oracle`
-    `_FAMILY_FALLBACK` entries + `_uses_ambient_master_audio`/soak-profile refs, its `OTR_ENABLE_STILL_PARALLAX`
-    plumbing, and ripple tests; keep the source file on disk (like the dark 3D scaffolds). Do it with the
-    post-soak code batch. (0-E note: still_parallax was the depth-parallax on-ramp; it's the FIRST 0-E
-    engine cut on a look verdict.)
-  - **RENAME `visualizer` -> `viz_green` (companion to viz_mxc, operator 2026-06-30).** Pairs the green
-    CRT scope (`viz_green`) with the multi-colored `viz_mxc`. MODERATE/mechanical lift (~77 refs / 16 files
-    + the `8gb_lite`/`cpu_floor` profiles + node-87 in `otr_scifi_16gb_full.json`). Follow the EXACT
-    `still_kenburns -> still_motion` precedent: rename the engine `name` + CAPABILITIES key + all code/test
-    refs + the family maps + the `_uses_ambient_master_audio` gate, update the saved JSON values, AND add
-    `"visualizer": "viz_green"` to `_LEGACY_ENGINE_ALIASES` so old saved graphs/profiles still resolve.
-    Do it WITH the viz_mxc build (same files/gates) for efficiency; full suite + Bug Bible + B7 green + push.
+  - ~~RETIRE `still_parallax`~~ -- **SHIPPED 2026-06-30** (operator verdict: "kinda weird but sucks").
+    See BUILD-READY QUEUE item 2 above for the full receipt (the actual retirement also had to drop the
+    `@register` decorator itself, not just the `__init__.py` import -- the plan text here undersold that
+    part; corrected in the queue entry for the next reader).
+  - ~~RENAME `visualizer` -> `viz_green`~~ -- **SHIPPED 2026-06-30** (same commit as the rip-out above).
+    See BUILD-READY QUEUE item 3 above for the full receipt.
   - **KEEPER-ENGINE LOOK-QA IMPROVEMENTS (operator soak eyeball 2026-06-30) -- plans drafted, build
     post-soak:**
     - **HuMo (KEEP; 1.7B class + same VRAM):** `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` --

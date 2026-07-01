@@ -89,14 +89,14 @@ def test_production_workflow_visual_structure_pinned():
     n87 = nodes[87]
     assert n87["type"] == "OTR_VideoDirector"
     wv87 = n87["widgets_values"]
-    # 2026-06-29: keep the broad/cheap visible video slots on visualizer, but
-    # route character beats through the Route-A 14B wide HuMo lane. Values are
-    # bare engine ids so the capability-profile validator + 16gb-identity profile
-    # stay consistent.
-    assert wv87[0] == "visualizer", (
-        "announcer_video_model regressed off the visualizer default: %r" % wv87[0])
-    assert wv87[1] == "visualizer", (
-        "music_video_model regressed off the visualizer default: %r" % wv87[1])
+    # 2026-06-29: keep the broad/cheap visible video slots on viz_green
+    # (renamed from visualizer 2026-06-30, item 2), but route character beats
+    # through the Route-A 14B wide HuMo lane. Values are bare engine ids so the
+    # capability-profile validator + 16gb-identity profile stay consistent.
+    assert wv87[0] == "viz_green", (
+        "announcer_video_model regressed off the viz_green default: %r" % wv87[0])
+    assert wv87[1] == "viz_green", (
+        "music_video_model regressed off the viz_green default: %r" % wv87[1])
     assert wv87[16] == "humo_14B_169", (
         "character_video_model must stay on the Route-A 14B motion lane: %r"
         % wv87[16])

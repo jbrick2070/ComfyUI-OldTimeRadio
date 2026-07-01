@@ -10,7 +10,7 @@
   "max_model_class": "medium",
   "role_overrides": {
     "announcer_visual": "still_flat",
-    "music_visual": "visualizer",
+    "music_visual": "viz_green",
     "other_beats_visual": "still_motion",
     "announcer_image": "z_image_turbo",
     "music_image": "z_image_turbo",

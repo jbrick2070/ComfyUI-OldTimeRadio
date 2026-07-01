@@ -52,9 +52,8 @@ Say "after reset: :8000 listeners=$((Get-NetTCPConnection -LocalPort 8000 -State
 # 2. STAGE ENV --------------------------------------------------------------
 New-Item -ItemType Directory -Force -Path (Split-Path $EXTRA) | Out-Null
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
-$envLines = @('set OTR_ENABLE_STILL_PARALLAX=1',
-    'set OTR_ENABLE_MESH_STAGE=1', 'set OTR_NEWS_BRIEFS_REQUIRED=0',
-    "set OTR_LTX_I2V_STRENGTH=$StrengthI2V") + $ExtraEnv
+$envLines = @('set OTR_ENABLE_MESH_STAGE=1', 'set OTR_NEWS_BRIEFS_REQUIRED=0',
+    "set OTR_LTX_I2V_STRENGTH=$StrengthI2V") + $ExtraEnv   # still_parallax UNREGISTERED 2026-06-30 (item 2), flag removed
 $envLines | Set-Content -Path $EXTRA -Encoding ascii
 Say "staged env: $($envLines -join ' | ')"
 

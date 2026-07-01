@@ -60,9 +60,10 @@ def test_probe_one_absent_lib_is_clean_and_imports_no_banned_dep():
         v = PILOT.probe_one(name, do_import=True)
         assert v["engine"] == name
         if PILOT.PROBE_ENGINES[name].get("lib_in_stack"):
-            # In-stack rows (spine deps, e.g. transformers for
-            # still_parallax) report the truthful lib_in_stack verdict; the
-            # real gate is the local model snapshot via assert_usable.
+            # In-stack rows (spine deps, e.g. soundfile for viz_green; the
+            # still_parallax row was REMOVED 2026-06-30, item 2 rip-out) report
+            # the truthful lib_in_stack verdict; the real gate is the local
+            # model snapshot / ffmpeg via assert_usable.
             assert v["status"] == "lib_in_stack", v
         else:
             # Library absent in the sandbox -> a clean, non-crashing verdict.

@@ -57,8 +57,7 @@ $env:OTR_NEWS_BRIEFS_REQUIRED = '0'
 # untouched. Production ship-defaults still gate HuMo OFF; this only makes the
 # engine selectable so the soak permutation legs actually exercise it.
 $env:OTR_ENABLE_HUMO = '1'
-$env:OTR_ENABLE_STILL_PARALLAX = '1'
-$env:OTR_ENABLE_MESH_STAGE = '1'
+$env:OTR_ENABLE_MESH_STAGE = '1'   # still_parallax UNREGISTERED 2026-06-30 (item 2), flag removed
 Remove-Item Env:OTR_C7 -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_ENABLE_OPENROUTER -ErrorAction SilentlyContinue
 Remove-Item Env:OTR_CAST_SEED -ErrorAction SilentlyContinue

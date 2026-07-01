@@ -40,7 +40,7 @@ _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 #: engines; scene_broll/background can't supply audio_ref so they take a still).
 ROLE_ENGINES = {
     "announcer_visual": "humo_1.7B",
-    "music_visual": "visualizer",
+    "music_visual": "viz_green",
     "character_video": "humo_1.7B_169",
     "scene_broll": "still_flat",
     "background_abstract": "still_flat",
@@ -158,10 +158,10 @@ def test_oracle_passes_moving_clip_for_motion_engine(tmp_path):
 
 
 def test_motion_classification_from_registry():
-    # genuine moving lanes require motion; stills + visualizer are exempt
+    # genuine moving lanes require motion; stills + viz_green are exempt
     assert co.motion_required_for_engine("ltx_video") is True
     assert co.motion_required_for_engine("humo_1.7B") is True
     assert co.motion_required_for_engine("wan_i2v") is True
     assert co.motion_required_for_engine("still_flat") is False
     assert co.motion_required_for_engine("still_motion") is False
-    assert co.motion_required_for_engine("visualizer") is False
+    assert co.motion_required_for_engine("viz_green") is False

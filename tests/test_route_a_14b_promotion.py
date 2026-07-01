@@ -166,8 +166,8 @@ def test_dispatcher_keeps_character_still_for_humo_14b():
     # background_abstract routes to ltx_video, which inherits accepts_still=True
     # (MotionEngineBase) -> it CAN use the still (i2v), so one is generated.
     assert disp._still_needed_for_role(pol, "background_abstract") is True
-    # a role routed to an accepts_still=False engine (visualizer) skips the still.
-    pol_vis = {"video_models": {"music_video_model": {"engine_id": "visualizer"}}}
+    # a role routed to an accepts_still=False engine (viz_green) skips the still.
+    pol_vis = {"video_models": {"music_video_model": {"engine_id": "viz_green"}}}
     assert disp._still_needed_for_role(pol_vis, "music_visual") is False
     # unknown role stays fail-safe (keep the still)
     assert disp._still_needed_for_role(pol, "not_a_role") is True

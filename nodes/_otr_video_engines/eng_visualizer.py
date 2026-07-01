@@ -1,4 +1,6 @@
-r"""``visualizer`` -- the low-VRAM, ffmpeg-only procedural CRT scope video engine.
+r"""``viz_green`` -- the low-VRAM, ffmpeg-only procedural CRT scope video engine
+(renamed from ``visualizer`` 2026-06-30, item 2 -- companion to viz_mxc_cpu /
+viz_mxc_mandala; old saved graphs resolve via _LEGACY_ENGINE_ALIASES).
 
 Audio-reactive CRT scopes (frequency ring + orbiting green/cyan/amber particles +
 geometric grid + mirrored waveform + freq bars + CRT post) rendered AS a per-beat
@@ -8,7 +10,7 @@ numpy + PIL + ffmpeg.
 SEPARATION INVARIANT (2026-06-17 plan section 0.2, HARD): this engine does NOT
 import or invoke the floor node (OTR_SignalLostVideo / video_engine.render), does
 NOT touch the OTR_SceneAwareScopes / OTR_PostUpscaleProcgenBlend overlay, and is
-INERT unless a role's dropdown selects ``visualizer``. The full-colour draw routines
+INERT unless a role's dropdown selects ``viz_green``. The full-colour draw routines
 are COPIED (not extracted) into the torch-free :mod:`nodes._otr_shared.scope_draw`,
 so the floor's behaviour is provably unchanged (v1; a later refactor can extract).
 
@@ -18,7 +20,8 @@ OTR_MasterAudioMux adds audio (test_audio_byte_identical invariant). NO FALLBACK
 (fallback_engine=None); assert_usable fails LOUD. Cold-import clean (V-12: soundfile
 / PIL / scope_draw imported lazily inside render_clip). UTF-8, no BOM, ASCII source.
 
-Config (env): ``OTR_ENABLE_VISUALIZER`` opt-in flag; ``OTR_FFMPEG`` ffmpeg path.
+Config (env): the historical ``OTR_ENABLE_VISUALIZER`` flag is vestigial (registry
+IS the menu; no flag gate); ``OTR_FFMPEG`` ffmpeg path is still read.
 """
 from __future__ import annotations
 
@@ -28,14 +31,14 @@ import os
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
-_LOG = logging.getLogger("OTR.video.visualizer")
+_LOG = logging.getLogger("OTR.video.viz_green")
 
 
 @register
 class VisualizerEngine:
-    """The ffmpeg-only procedural CRT scope engine (engine_id ``visualizer``)."""
+    """The ffmpeg-only procedural CRT scope engine (engine_id ``viz_green``)."""
 
-    name = "visualizer"
+    name = "viz_green"
     family = "abstract"
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()                  # never an auto-default; explicit pick only
@@ -62,7 +65,7 @@ class VisualizerEngine:
         if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "visualizer needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
+                "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
         self._loaded = True
 
     def unload(self):
@@ -80,7 +83,7 @@ class VisualizerEngine:
         if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "visualizer needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
+                "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
         # NOTE: audio_ref is NOT gated here. The per-beat audio is SLICED at
         # render time, so the assert_usable request_template carries an empty
         # audio_ref for music/announcer beats (mirrors eng_ltx_av, which also
@@ -134,7 +137,7 @@ class VisualizerEngine:
             lambda k, d=None: getattr(request, k, d))
         raw = raw or {}
         return {
-            "clip_id": get("shot_id") or get("request_id") or "visualizer_clip",
+            "clip_id": get("shot_id") or get("request_id") or "viz_green_clip",
             "type": "video", "path": raw.get("out_path", ""),
             "container": "mp4", "codec": "h264", "pixel_format": "yuv420p",
             "fps": int(self.target_fps),
@@ -182,7 +185,7 @@ class VisualizerEngine:
             sr = 24000
             audio_np = np.zeros(int(sr * total / max(1, fps)) + sr, dtype=np.float32)
             if not os.environ.get("OTR_TEST_MODE"):
-                _LOG.info("[OTR video] visualizer: beat has no audio_ref -> idle "
+                _LOG.info("[OTR video] viz_green: beat has no audio_ref -> idle "
                           "scopes from silence (%d frames)", total)
 
         volume, freqs, waves = _sd.analyze_audio_np(audio_np, int(sr), total, fps)
@@ -190,7 +193,7 @@ class VisualizerEngine:
         scanlines = _sd.build_scanlines(w, h)
         vignette = _sd.build_vignette(w, h)
         font = _sd._small_font(h)
-        rng_key = "visualizer|%d" % int(plan["seed"])
+        rng_key = "viz_green|%d" % int(plan["seed"])
 
         def _frames():
             for fi in range(total):
@@ -200,11 +203,11 @@ class VisualizerEngine:
                     rng_key=rng_key, font_small=font)
                 yield np.asarray(img, dtype=np.uint8)
 
-        out_path = otr_engine_tmp_mp4("otr_visualizer_")
+        out_path = otr_engine_tmp_mp4("otr_viz_green_")
         _sd.encode_silent_mp4(_frames(), total, out_path, w, h, fps,
                               os.environ.get("OTR_FFMPEG", "ffmpeg"))
         if not os.environ.get("OTR_TEST_MODE"):
-            _LOG.info("[OTR video] visualizer %dx%d x%d frames -> %s",
+            _LOG.info("[OTR video] viz_green %dx%d x%d frames -> %s",
                       w, h, total, out_path)
         return {"out_path": out_path, "frame_count": total}
 

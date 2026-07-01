@@ -65,7 +65,7 @@ def test_mesh_stage_registered_selectable_not_default():
     assert eng.requires_flag is None           # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is False       # Tencent license -- E-7 gate
-    assert eng.fallback_engine == "still_parallax"   # E-5 chain head
+    assert eng.fallback_engine == "still_motion"   # E-5 chain head (direct; still_parallax retired 2026-06-30)
     assert "mesh_stage" in vreg.all_engine_names()   # full dropdown (V-6)
     assert "no lip-sync" in eng.honest_label   # camera motion only (tier-1)
     for role in rc.ROLES:                      # never the default for ANY role
@@ -321,9 +321,9 @@ def test_engine_family_fallback_chain_both_copies():
     assert rd.ENGINE_FAMILY["mesh_stage"] == "image_to_video"
     assert rd.engine_family("mesh_stage") == "image_to_video"
     fb = rd.make_fallback_of()
-    # E-5: the LOUD chain mesh_stage -> still_parallax -> still_motion.
-    assert fb("mesh_stage") == "still_parallax"
-    assert fb("still_parallax") == "still_motion"
+    # E-5 2026-06-30: still_parallax retired -- the LOUD chain now degrades
+    # mesh_stage -> still_motion DIRECTLY (one hop, not via still_parallax).
+    assert fb("mesh_stage") == "still_motion"
     assert fb("still_motion") is None        # the floor terminates
     soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
     spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)

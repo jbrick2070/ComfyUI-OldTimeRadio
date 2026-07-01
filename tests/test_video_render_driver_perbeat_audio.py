@@ -149,13 +149,13 @@ class TestSliceMasterAudio:
 
 
 # --------------------------------------------------------------------------- #
-# 2026-06-22: ambient-audio (ltx_audio_in / visualizer) no-timing music-beat gap
+# 2026-06-22: ambient-audio (ltx_audio_in / viz_green) no-timing music-beat gap
 # --------------------------------------------------------------------------- #
 class TestAmbientAudioMusicBeatGap:
     def test_uses_ambient_master_audio_scope(self):
-        # ltx_audio_in's family + the visualizer engine = ambient master lanes.
+        # ltx_audio_in's family + the viz_green engine = ambient master lanes.
         assert rd._uses_ambient_master_audio("ltx_audio_in", "audio_conditioned_video") is True
-        assert rd._uses_ambient_master_audio("visualizer", "abstract") is True
+        assert rd._uses_ambient_master_audio("viz_green", "abstract") is True
         # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
         # never a master-mix slice (would lip-sync to the wrong audio).
         assert rd._uses_ambient_master_audio("humo", "audio_driven_face") is False
@@ -206,7 +206,7 @@ class TestAmbientAudioMusicBeatGap:
             "images": {"images": []},
         }
         shot = {"shot_id": "shot_b006", "beat_id": "b006",
-                "engine_id": "visualizer", "family": "abstract",
+                "engine_id": "viz_green", "family": "abstract",
                 "target_frame_count": 50, "source_line_ids": ["b006"],
                 "creative": {"text_prompt": "scope", "request_hash": "h"}}
         captured = {}

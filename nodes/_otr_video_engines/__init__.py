@@ -84,16 +84,13 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# 0-E easy on-ramp (2026-06-11): still_parallax -- 2.5D depth parallax over
-# existing stills (DepthAnythingV2-SMALL, Apache, pinned). DEFAULT-OFF /
-# selectable (empty default_roles + OTR_ENABLE_STILL_PARALLAX) until operator
-# look-QA; fails closed without the local model. Cold-import clean (lazy
-# torch/transformers/PIL/numpy inside load/render_clip). Guarded so a
-# packaging quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_still_parallax as _eng_still_parallax  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# UNREGISTERED 2026-06-30 (still_parallax rip-out, item 2 -- "registry IS the
+# menu"): the 0-E easy on-ramp 2.5D depth-parallax engine (DepthAnythingV2-SMALL)
+# is no longer imported here and is NOT selectable. The SOURCE file stays on
+# disk untouched (dark scaffold, same pattern as triposr/character_3d); re-add
+# this import + the @register decorator + a CAPABILITIES row in the SAME
+# change if it returns. mesh_stage's fallback chain now degrades directly to
+# still_motion (no longer via still_parallax).
 
 # 0-E easy on-ramp (2026-06-11): mesh_stage -- the traditional local 3D
 # chain (portrait -> hy3d-2mv core-node mesh -> cached GLB -> pinned
@@ -117,12 +114,14 @@ except Exception:  # noqa: BLE001
 # forward ships (then they return to the dropdown).
 
 
-# visualizer (2026-06-18): the LOW-VRAM ffmpeg-only procedural CRT scope engine --
-# audio-reactive scopes rendered AS the per-beat picture (the resurrected full-colour
-# video_engine look, via the COPIED torch-free routines in _otr_shared/scope_draw.py;
-# zero coupling to the floor node / the SceneAwareScopes overlay). DEFAULT-OFF / dark
-# (OTR_ENABLE_VISUALIZER) until a green end-to-end run promotes it into
-# registry.VALIDATED_ENGINES. Cold-import clean (V-12: soundfile/PIL lazy in
+# viz_green (renamed from "visualizer" 2026-06-30, item 2): the LOW-VRAM
+# ffmpeg-only procedural CRT scope engine -- audio-reactive scopes rendered AS
+# the per-beat picture (the resurrected full-colour video_engine look, via the
+# COPIED torch-free routines in _otr_shared/scope_draw.py; zero coupling to the
+# floor node / the SceneAwareScopes overlay). Selectable per role (registry IS
+# the menu; the historical OTR_ENABLE_VISUALIZER flag is vestigial). Old saved
+# graphs carrying "visualizer" resolve via otr_video_director's
+# _LEGACY_ENGINE_ALIASES. Cold-import clean (V-12: soundfile/PIL lazy in
 # render_clip). Guarded so a packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
     from . import eng_visualizer as _eng_visualizer  # noqa: F401

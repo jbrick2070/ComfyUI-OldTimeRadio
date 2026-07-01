@@ -245,8 +245,10 @@ CAPABILITIES = {
     # forbids a CAPABILITIES row without a registered engine.
     "still_motion": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "visualizer": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
-                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # viz_green (renamed from "visualizer" 2026-06-30, item 2; old saved values
+    # resolve via otr_video_director._LEGACY_ENGINE_ALIASES).
+    "viz_green": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                  "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # viz_mxc_cpu (2026-06-30): the OTR rainbow visualizer -- pure numpy/PIL/ffmpeg,
     # no GPU/shaders. required_toolchain None (a GL/torch toolchain would disable it on
     # every shipped profile). GPU shader tier (viz_mxc_gpu) is a deferred separate row.
@@ -291,13 +293,8 @@ CAPABILITIES = {
                   "model_requirements": ["ltx-2.3-22b-dev-gguf",
                                          "ltx-2.3-distilled-lora", "gemma-3-12b",
                                          "ltx-2.3-video-vae", "ltx-2.3-22b-dev"]},
-    # still_parallax (0-E easy on-ramp): DepthAnythingV2-SMALL (~25M params,
-    # Apache-2.0 -- the bigger DA-V2 ckpts are CC-BY-NC and banned) + a pure
-    # numpy warp. cpu_ok: CPU-degradable by design (slower, same contract).
-    "still_parallax": {"vram_class": "light", "vram_estimate_mb": 500,
-                       "required_toolchain": None, "requires_sidecar": False,
-                       "cpu_ok": True,
-                       "model_requirements": ["depth-anything-v2-small-hf"]},
+    # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out): no CAPABILITIES
+    # row while dark -- see nodes/_otr_video_engines/__init__.py.
     # mesh_stage (0-E easy on-ramp): hy3d-2mv core-node mesher (in-process,
     # compile-free) + headless portable Blender stage. vram_estimate is a
     # DRAFT pending the E-1 probe on the 5080; Blender renders AFTER the

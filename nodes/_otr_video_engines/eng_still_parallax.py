@@ -10,12 +10,15 @@ silent bt709 pipeline. Extends the ``static_motion`` cheap family
 same canonical-clip shape, plus a real depth model.
 
 CPU-DEGRADABLE: the model is ~25M params and runs on CPU when no CUDA
-device exists (slower, identical output contract). Registered
-SELECTABLE-NOT-DEFAULT (empty ``default_roles`` + opt-in
-``OTR_ENABLE_STILL_PARALLAX``) until operator look-QA passes; serves the
-three OTR_VideoDirector slots that can supply a still (announcer / music /
+device exists (slower, identical output contract). UNREGISTERED 2026-06-30
+(item 2 rip-out, "registry IS the menu"): no longer imported by
+nodes/_otr_video_engines/__init__.py and carries no ``@register`` decorator,
+so it is NOT selectable and direct imports do not re-register it. The class
+stays on disk (it returns when re-enabled) and still serves the three
+OTR_VideoDirector slots that can supply a still (announcer / music /
 other-beats via character_video + scene_broll -- background_abstract only
-supplies text, so role_compat excludes it fail-closed).
+supplies text, so role_compat excludes it fail-closed) via DIRECT
+instantiation.
 
 HONEST LABEL: "2.5D" -- a single still warped by its depth map. No mesh,
 no camera rig; the first REAL 3D object ships with ``mesh_stage``.
@@ -35,7 +38,7 @@ import logging
 import os
 
 from .cheap_families import _CheapFamilyBase
-from .registry import EngineUnusable, EngineUsabilityReason, register
+from .registry import EngineUnusable, EngineUsabilityReason
 
 _LOG = logging.getLogger("OTR.video.eng_still_parallax")
 
@@ -164,7 +167,6 @@ def fit_cover_box(src_w, src_h, dst_w, dst_h):
     return scaled_w, scaled_h, left, top
 
 
-@register
 class StillParallaxEngine(_CheapFamilyBase):
     """``still_parallax`` -- depth-parallax static_motion peer (0-E ticket 2)."""
 
