@@ -801,6 +801,15 @@ _NEVER_HUMO_REDIRECT_ENGINE = "ltx_audio_in"
 #: bookends when the toggle is ON.
 _RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 
+
+def _ltx_radio_face_object_id(role: str) -> str:
+    """The object_id of the WIDE radio-FACE still for an ltx_audio_in bookend
+    (ADDENDUM OTR_LTX_RADIO_FACE A/B). Per-role so announcer/music each carry
+    their own wide face still; must match otr_meta_brief_image_prompt's mint.
+    NOTE: this still is an LTX init asset (ambient motion), NOT a HuMo render --
+    the name reserves 'radio_face', not 'humo'."""
+    return "still_%s_radio_face_169" % str(role or "")
+
 #: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
 #: (announcer_visual / music_visual / character_video / scene_broll /
 #: background_abstract) to the LEDGER speaker_role vocabulary
@@ -1050,6 +1059,52 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "synthesizes its dark floor; a still-REQUIRED engine (ltx_audio_in) "
                 "fails LOUD in render_clip (no fallbacks). Investigate the image "
                 "phase for beat %s.", _eng, _bid, _bid)
+    # ADDENDUM A/B (OTR_LTX_RADIO_FACE, 2026-07-01, SEPARATE from the main
+    # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER/MUSIC bookend,
+    # OPTIONALLY swap the FACELESS brief-driven scene still for the WIDE radio-FACE
+    # still (option b). ltx does AMBIENT motion, NOT lip-sync -- the face breathes/
+    # drifts, it does not talk (HuMo remains the only true talking host). Default 0
+    # = faceless (the scene still resolved just above, unchanged). Applies ONLY when
+    # the FINAL routed bookend engine is ltx_audio_in. PRECEDENCE: if the main
+    # feature's OTR_ENABLE_HUMO_HOSTS is ON, HuMo owns the bookends -> this A/B is
+    # rejected LOUD (never a silent double-route).
+    if (os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
+            and str(shot.get("engine_id") or "") == "ltx_audio_in"
+            and _is_never_humo_video_role(_role_of_shot(shot))):
+        _abrole = _role_of_shot(shot)
+        if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
+            raise RenderError(
+                "OTR_LTX_RADIO_FACE=1 AND OTR_ENABLE_HUMO_HOSTS=1 on %s bookend "
+                "shot %s: HuMo owns the bookends, so the LTX radio-face A/B is "
+                "rejected (never a silent double-route). Turn ONE toggle off."
+                % (_abrole, shot.get("shot_id")))
+        _fid = _ltx_radio_face_object_id(_abrole)
+        _frow = next(
+            (im for im in (((ledger or {}).get("images") or {}).get("images") or [])
+             if isinstance(im, dict) and str(im.get("object_id") or "") == _fid),
+            None)
+        _fpath = str((_frow or {}).get("path") or "")
+        if not _fpath:
+            raise RenderError(
+                "OTR_LTX_RADIO_FACE=1 but no wide radio-face still %r in the ledger "
+                "for %s bookend shot %s -- NO FALLBACK (never black, never a portrait "
+                "pillarbox). Confirm MetaBrief minted it (toggle ON at the image "
+                "phase) + the dispatcher rendered it." % (_fid, _abrole,
+                                                          shot.get("shot_id")))
+        _fw = int((_frow or {}).get("w") or 0)
+        _fh = int((_frow or {}).get("h") or 0)
+        if _fw and _fh and _fw <= _fh:
+            raise RenderError(
+                "OTR_LTX_RADIO_FACE=1: radio-face still %r is %dx%d (NOT wide) for "
+                "the wide ltx_audio_in %s bookend -- feeding it would pillarbox. NO "
+                "FALLBACK: mint a WIDE radio-face still (aspect-follows the bookend "
+                "slot)." % (_fid, _fw, _fh, _abrole))
+        init_image = _fpath
+        init_source = "ltx_radio_face"
+        _LOG.warning(
+            "[OTR.render_driver] LTX-RADIO-FACE (A/B): role=%s shot %s conditioning "
+            "ltx_audio_in on the WIDE radio-face still %s (AMBIENT motion, NOT "
+            "lip-sync)", _abrole, shot.get("shot_id"), os.path.basename(_fpath))
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --

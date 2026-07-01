@@ -167,6 +167,26 @@ def _humo_hosts_enabled() -> bool:
     return os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
 
 
+#: ADDENDUM A/B (OTR_LTX_RADIO_FACE, SEPARATE from the HuMo-hosts feature): the
+#: bookend roles that get a WIDE radio-FACE still for ltx_audio_in I2V init when
+#: the A/B toggle is ON. Object_id pattern MUST match render_driver's
+#: _ltx_radio_face_object_id (still_<role>_radio_face_169).
+_LTX_RADIO_FACE_ROLES = ("announcer_visual", "music_visual")
+
+
+def _ltx_radio_face_object_id(role: str) -> str:
+    """object_id of the WIDE radio-face still for ``role`` (ltx_audio_in A/B).
+    Matches render_driver._ltx_radio_face_object_id."""
+    return "still_%s_radio_face_169" % str(role or "")
+
+
+def _ltx_radio_face_enabled() -> bool:
+    """True iff OTR_LTX_RADIO_FACE is opted ON (default OFF). The A/B applies only
+    when the routed bookend engine is ltx_audio_in (enforced in render_driver)."""
+    import os
+    return os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
+
+
 def build_radio_host_prompt(meta, aspect: str = "portrait") -> str:
     """FULL prompt for the animatable radio-HOST FACE still (ONLY HuMo hosts).
 
@@ -1013,6 +1033,28 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "negative_prompt": RADIO_HOST_FACE_NEG,
             "source": "radio_host_portrait",
         })
+
+    # ADDENDUM A/B (OTR_LTX_RADIO_FACE) -- the WIDE radio-FACE stills for the
+    # ltx_audio_in bookends (option b: ltx animates an AMBIENT face, not lip-sync).
+    # SEPARATE, opt-in; GATED so default 0 is byte-identical (no extra objects).
+    # WIDE by construction (aspect="wide") so the wide ltx_audio_in engine is never
+    # fed a pillarboxed portrait -- the exact trap the kibitz flagged. Per-role
+    # object_id matches render_driver._ltx_radio_face_object_id; seed-pinned in the
+    # dispatcher (shares the bookend seed). No-baby negative populated.
+    if _ltx_radio_face_enabled():
+        _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
+        for _abrole in _LTX_RADIO_FACE_ROLES:
+            _fprompt = build_radio_host_prompt(meta, "wide")
+            objects.append({
+                "object_id": _ltx_radio_face_object_id(_abrole),
+                "kind": "portrait",
+                "role": _abrole,
+                "w": _fw, "h": _fh,
+                "prompt": _fprompt,
+                "prompt_hash": _content_hash(_fprompt),
+                "negative_prompt": RADIO_HOST_FACE_NEG,
+                "source": "ltx_radio_face",
+            })
 
     # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
     # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The

@@ -129,7 +129,9 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
     # matches otr_meta_brief_image_prompt.RADIO_HOST_PORTRAIT_ID) both render
     # with the FIXED deterministic bookend seed so the host face is reproducible
     # run-to-run and open/inter/close share ONE canonical face.
-    if str(kind or "") == "scene_open" or str(object_id or "") == "radio_host_portrait":
+    _oid = str(object_id or "")
+    if (str(kind or "") == "scene_open" or _oid == "radio_host_portrait"
+            or _oid.endswith("_radio_face_169")):   # ADDENDUM OTR_LTX_RADIO_FACE A/B
         try:
             return int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))
         except (TypeError, ValueError):
