@@ -303,7 +303,7 @@ def load_capture(input_path=None):
     """Load the captured node-92 input (ledger + master_audio_path). Defaults to
     the state-dir ``node_episode_input.json`` the node writes each episode."""
     if input_path is None:
-        from nodes._otr_video_engines._otr_paths import otr_state_dir
+        from nodes._otr_paths import otr_state_dir
         input_path = os.path.join(str(otr_state_dir()), STATE_INPUT_NAME)
     with open(input_path, encoding="utf-8") as f:
         cap = json.load(f)
