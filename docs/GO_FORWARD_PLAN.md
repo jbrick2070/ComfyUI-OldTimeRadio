@@ -116,6 +116,13 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     in one commit. `viz_mxc_gpu` (torch-compute, NVIDIA-first, fail-closed) DEFERRED to a later opt-in
     spike -- never blocks the CPU tier. Build order C-mxc1..C-mxc3 in the plan. SCHEDULE: after the current
     all-engines all-slots sweep/soak completes.
+  - **RETIRE `still_parallax` -- 100% RIP-OUT (operator verdict 2026-06-30, soak eyeball: "kinda weird
+    but sucks").** Full C0-style retirement: deregister (`@register` in `eng_still_parallax.py`), drop its
+    CAPABILITIES row (registry.py), the `__init__.py` import, the `ENGINE_FAMILY` + `content_oracle`
+    `_FAMILY_FALLBACK` entries + `_uses_ambient_master_audio`/soak-profile refs, its `OTR_ENABLE_STILL_PARALLAX`
+    plumbing, and ripple tests; keep the source file on disk (like the dark 3D scaffolds). Do it with the
+    post-soak code batch. (0-E note: still_parallax was the depth-parallax on-ramp; it's the FIRST 0-E
+    engine cut on a look verdict.)
   - **RENAME `visualizer` -> `viz_green` (companion to viz_mxc, operator 2026-06-30).** Pairs the green
     CRT scope (`viz_green`) with the multi-colored `viz_mxc`. MODERATE/mechanical lift (~77 refs / 16 files
     + the `8gb_lite`/`cpu_floor` profiles + node-87 in `otr_scifi_16gb_full.json`). Follow the EXACT
@@ -123,6 +130,16 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
     refs + the family maps + the `_uses_ambient_master_audio` gate, update the saved JSON values, AND add
     `"visualizer": "viz_green"` to `_LEGACY_ENGINE_ALIASES` so old saved graphs/profiles still resolve.
     Do it WITH the viz_mxc build (same files/gates) for efficiency; full suite + Bug Bible + B7 green + push.
+  - **KEEPER-ENGINE LOOK-QA IMPROVEMENTS (operator soak eyeball 2026-06-30) -- plans drafted, build
+    post-soak:**
+    - **HuMo (KEEP; 1.7B class + same VRAM):** `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` --
+      portrait-quality levers (VRAM-neutral), the clip-underrun "all mush" fix (loop/ping-pong-fill, not
+      hold-last-frame), announcer/music bookend = RADIO not a face ("radio is the host"), HuMo dropdown
+      labels (model + VRAM tier), and a HuMo-ISOLATION SMOKE for fast low-VRAM A/B. KIBITZ after the soak.
+    - **mesh_stage (KEEP -- "one must-have"):** `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`
+      -- MIN-ACCEPT: opening/music beat = a 3D RADIO (not a body) + MORE HEADROOM (subject centered, not
+      full top-to-bottom). Optional r1-only kibitz for further quality. Trellis is a musing-stage
+      alternative 3D backend (3D-path decision still operator-gated).
   - **DROPDOWN LABELS:** every option states model + variant + recipe + VRAM tier (HuMo: 1.7B = LOW-VRAM
     ~3.3 GB fast draft / 14B = HIGH-VRAM ~15.9 GB max quality, spills on 16 GB; KEEP BOTH -- a real low/high
     split, operator 2026-06-29; which LTX,
