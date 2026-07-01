@@ -136,6 +136,28 @@ def test_label_zero_vram_engine_gets_no_vram_suffix():
     assert vreg.CAPABILITIES["still_flat"]["vram_estimate_mb"] == 0
 
 
+def test_label_descriptor_suffix_is_family_derived():
+    # 2026-07-01 E4: an audio-reactive visualizer (family "abstract" that mints
+    # NO scene image) carries a plain-language caveat so a music/announcer/scene
+    # pick of it is obviously scene-still-ignoring. DERIVED from family +
+    # accepts_still, never a hand-maintained per-engine string.
+    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"):
+        assert vd._descriptor_suffix(name) == " (audio-reactive, no scene image)"
+        assert vd._label_for(name).endswith(" (audio-reactive, no scene image)")
+    # a non-abstract / still-consuming engine gets NO descriptor
+    for name in ("humo", "ltx_video", "still_flat", "wan_i2v"):
+        assert vd._descriptor_suffix(name) == ""
+    # unknown engine -> '' (never raises)
+    assert vd._descriptor_suffix("not_a_real_engine") == ""
+
+
+def test_descriptor_label_still_round_trips_to_bare_id():
+    # The descriptor suffix starts with ' (' so it strips with the aspect/VRAM
+    # suffixes -> the saved value stays the bare engine id.
+    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"):
+        assert vd._engine_id_from_pick(vd._label_for(name)) == name
+
+
 def test_label_round_trips_to_bare_id():
     for name in vreg.all_engine_names():
         assert vd._engine_id_from_pick(vd._label_for(name)) == name

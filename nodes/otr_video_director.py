@@ -58,18 +58,49 @@ def _aspect_suffix(engine_id) -> str:
     return _ASPECT_SUFFIX.get(aspect, "")
 
 
+#: Plain-language behaviour caveat shown AFTER the id+aspect+VRAM suffixes for an
+#: audio-reactive visualizer -- a family ``"abstract"`` engine that mints NO scene
+#: image (``accepts_still is False``). Makes it obvious in the dropdown that a
+#: music/announcer/scene pick of one of these IGNORES the scene still and reacts
+#: to audio instead (the operator's "abstract/viz_green = audio-reactive, no scene
+#: image" label ask, 2026-07-01 E4). Starts with ``' ('`` so
+#: :func:`_engine_id_from_pick` strips it with the other suffixes.
+_DESCRIPTOR_ABSTRACT = " (audio-reactive, no scene image)"
+
+
+def _descriptor_suffix(engine_id) -> str:
+    """The behaviour-descriptor suffix for ``engine_id``, DERIVED from registry
+    attributes (never a hand-maintained per-engine map -- same no-drift contract
+    as the aspect + VRAM suffixes). Today only the audio-reactive visualizers
+    (family ``"abstract"`` that mint no still) carry one; every other engine ->
+    ``''`` (bare label unchanged). Pure registry read, never raises."""
+    try:
+        eng = _vreg.get_engine(str(engine_id))
+        family = getattr(eng, "family", None)
+        accepts_still = getattr(eng, "accepts_still", None)
+    except Exception:  # noqa: BLE001 -- unknown engine -> no descriptor
+        return ""
+    if family == "abstract" and accepts_still is False:
+        return _DESCRIPTOR_ABSTRACT
+    return ""
+
+
 def _label_for(engine_id) -> str:
     """The dropdown LABEL for an engine id:
-    ``'<id><aspect suffix><vram tier suffix>'`` (e.g.
-    ``'humo_1.7B (portrait) (~6.8GB)'``). The VRAM-tier suffix (2026-06-30 item
-    5) is auto-derived from the registry CAPABILITIES table
-    (:func:`_vreg.vram_tier_label`) -- never hand-maintained, same contract as
-    the aspect suffix. Both suffixes start with ``' ('`` so
-    :func:`_engine_id_from_pick`'s first-``' ('``-truncation strips them
-    together; a zero-VRAM engine (no aspect known, no VRAM estimate) still
-    round-trips to the bare id."""
-    return "%s%s%s" % (engine_id, _aspect_suffix(engine_id),
-                       _vreg.vram_tier_label(engine_id))
+    ``'<id><aspect suffix><vram tier suffix><descriptor suffix>'`` (e.g.
+    ``'humo_1.7B (portrait) (~6.8GB)'`` or
+    ``'viz_green (16:9) (audio-reactive, no scene image)'``). The VRAM-tier suffix
+    (2026-06-30 item 5) is auto-derived from the registry CAPABILITIES table
+    (:func:`_vreg.vram_tier_label`); the descriptor suffix (2026-07-01 E4) is
+    auto-derived from the engine's family/``accepts_still``
+    (:func:`_descriptor_suffix`) -- BOTH never hand-maintained, same contract as
+    the aspect suffix. Every suffix starts with ``' ('`` so
+    :func:`_engine_id_from_pick`'s first-``' ('``-truncation strips them all
+    together; a zero-VRAM, no-aspect, no-descriptor engine still round-trips to
+    the bare id."""
+    return "%s%s%s%s" % (engine_id, _aspect_suffix(engine_id),
+                         _vreg.vram_tier_label(engine_id),
+                         _descriptor_suffix(engine_id))
 
 
 #: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that
