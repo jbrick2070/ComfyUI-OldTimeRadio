@@ -204,6 +204,15 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 >    - **S-C C1 `audio_motion_profile` -- NOT STARTED.** Zero matches anywhere in the repo for
 >      `audio_motion_profile`; no schema field, producer node, or ledger stamp exists yet. C2 (per-engine
 >      consumers + HuMo phrase-chunking) stays deferred regardless per the plan's own scoping.
+>    - **NEW 2026-07-01 (writer, non-blocking): long-target freeze-gate flakiness.** target_words=800
+>      tripped `OTR_CastLock` `freeze_verdict='needs_full_rerun'` (BUG-LOCAL-276) on 2 of 3 attempts; the
+>      passing run converged the story at ~260 spoken words. 420w passed first try (converged ~200w). The
+>      story quality gate is unreliable AND under-delivers length at long targets -- worth a writer-side
+>      look. Also: `OTR_FORCE_ENGINE_MAP=*=<engine>` (set at server boot) cleanly forces an all-one-engine
+>      episode (proven live with viz_mxc_mandala + viz_mxc_cpu, 2026-07-01) -- but the image dispatcher still
+>      mints Flux stills for the pre-override plan before the video-time override, so a force to an
+>      `accepts_still=False` engine wastes an image-gen pass (future optimization: short-circuit still-gen
+>      when the force maps a role to a no-still engine). See `docs/2026-07-01-overnight/MORNING_REPORT.md`.
 >    Operator directive 2026-07-01: audit-and-document, do not re-implement the shipped 7; E1/E2/E3-doc/E4/C1
 >    remain open for a future session to pick up (E1/E2 are the load-bearing ones -- no-fallback is a
 >    standing operator directive; C1 is bigger/deferred-tail per the plan itself; E3/E4 are small doc/polish).
