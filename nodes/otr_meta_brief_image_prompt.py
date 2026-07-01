@@ -131,64 +131,16 @@ ANNOUNCER_PORTRAIT_ANCHOR = (
 )
 
 
-# ---------------------------------------------------------------------------
-# BRIEF-DRIVEN RADIO FORM (2026-07-01) -- kills the hardcoded-1940s anchors.
-#
-# A DETERMINISTIC brief -> radio-form-noun map (NO LLM: nondeterminism would
-# break the reproducibility invariant, and a ~7-entry explicit map is the
-# deterministic source of truth, not "drift"). This decides only the physical
-# RADIO OBJECT the imagery is built around; the era TEXTURE (palette / lighting /
-# atmosphere) still rides :func:`get_era_tail`. Ordered most-specific-first; the
-# first keyword hit wins; the default is a neutral tube radio (still a radio
-# FORM, never the retired 1940s studio anchor). So a non-1940s brief (e.g. the
-# automated_space_docking episode) no longer forces a bakelite set.
-# ---------------------------------------------------------------------------
-_RADIO_FORM_MAP = (
-    (("space", "orbital", "docking", "spacecraft", "starship", "space station",
-      "sci-fi", "science fiction", "futuristic", "galactic", "interstellar"),
-     "a sleek space-station communications console"),
-    (("undersea", "submarine", "deep sea", "abyssal", "ocean floor", "bathyscaphe"),
-     "a sealed submarine radio station"),
-    (("war", "military", "battlefield", "trench", "frontline", "front line"),
-     "a rugged portable field radio transceiver"),
-    (("western", "frontier", "old west", "dustbowl", "prairie"),
-     "a weathered cathedral-style wooden radio set"),
-    (("victorian", "steampunk", "gaslight", "brass", "clockwork"),
-     "an ornate brass-and-mahogany valve wireless set"),
-    (("mid-century", "atomic age", "1950s", "1960s", "retro-futuristic"),
-     "a mid-century tabletop transistor radio"),
-    (("noir", "detective", "deco", "art deco", "1930s", "1940s", "prohibition"),
-     "an art-deco bakelite tube radio"),
-)
-_RADIO_FORM_DEFAULT = "a vintage tabletop tube radio receiver"
-
-
-def _radio_form_haystack(meta) -> str:
-    """Lowercased brief signal text for the form resolver: ``meta.style`` plus
-    ``story_brief_terms`` setting/atmosphere. Pure; tolerant of a bare meta."""
-    m = meta if isinstance(meta, dict) else {}
-    parts = [str(m.get("style") or "")]
-    terms = m.get("story_brief_terms")
-    if isinstance(terms, dict):
-        for key in ("setting", "atmosphere"):
-            v = terms.get(key)
-            if isinstance(v, list):
-                parts.extend(str(t) for t in v)
-            elif v:
-                parts.append(str(v))
-    return " ".join(parts).lower()
-
-
-def radio_form_from_meta(meta) -> str:
-    """DETERMINISTIC brief -> radio-form noun phrase (NO LLM). The first keyword
-    match in :data:`_RADIO_FORM_MAP` wins; :data:`_RADIO_FORM_DEFAULT` (a neutral
-    tube radio, NOT the retired 1940s studio anchor) when nothing matches. Pure;
-    never empty."""
-    hay = _radio_form_haystack(meta)
-    for keys, form in _RADIO_FORM_MAP:
-        if any(k in hay for k in keys):
-            return form
-    return _RADIO_FORM_DEFAULT
+# BRIEF-DRIVEN RADIO FORM (2026-07-01): the deterministic brief -> radio-form
+# resolver lives in the PURE brief helper (_otr_story_brief_helpers) so both this
+# image node AND get_open_subject share it with no circular import. Re-exported
+# here (radio_form_from_meta / _RADIO_FORM_DEFAULT) for the image-prompt callers.
+try:
+    from ._otr_story_brief_helpers import (  # type: ignore # noqa: F401
+        radio_form_from_meta, _RADIO_FORM_DEFAULT)
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_story_brief_helpers import (  # type: ignore # noqa: F401
+        radio_form_from_meta, _RADIO_FORM_DEFAULT)
 
 
 #: Positive tokens locking the radio HOST to an ADULT presenter (the one
@@ -679,14 +631,16 @@ def _mesh_fodder_subject(meta, char_entry, line, setting, role) -> str:
     if appearance:
         return appearance
     if str(role) == "announcer_visual":
-        # A clean isolated figure -- NOT the radio-booth announcer anchor (that
-        # carries a microphone + studio backdrop = occlusion + environment).
-        return "a vintage 1940s radio announcer in a tailored suit and tie"
+        # C2 (2026-07-01): the announcer mesh is the FACELESS radio OBJECT (brief
+        # -driven form), NOT a person-with-a-face -- "only HuMo gets a face". The
+        # old "1940s radio announcer in a suit" put a human figure into the mesh,
+        # violating that invariant AND hardcoding the era. Faceless + isolated.
+        return radio_form_from_meta(meta)
     if str(role) == "music_visual":
-        # The music open/inter/close mesh IS the radio -- the recurring
-        # on-air object, isolated and clean for the mesher.
-        return ("a vintage 1940s tabletop radio receiver, wood cabinet, "
-                "glowing tuning dial, cloth speaker grille")
+        # The music open/inter/close mesh IS the radio -- the recurring on-air
+        # object, isolated and clean for the mesher. Brief-driven form (C2), no
+        # hardcoded 1940s set.
+        return radio_form_from_meta(meta)
     # No-character beat outside announcer/music: a single emblematic OBJECT
     # from the story world (chunk 6 refines the object_id policy; this keeps
     # the mesher fed cleanly).
@@ -701,7 +655,22 @@ def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role) -> str:
     the cast appearance / announcer figure / story object, and the checked-in
     scaffold enforces the neutral-plate isolation. Never empty."""
     subject = _mesh_fodder_subject(meta, char_entry, line, setting, role)
-    return "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
+    out = "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
+    # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
+    # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
+    # brief carries through to the meshed object. The isolation scaffold above
+    # still governs silhouette/plate; the tail only tints the look. Best-effort.
+    try:
+        try:
+            from ._otr_story_brief_helpers import get_era_tail  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import get_era_tail  # type: ignore
+        tail = get_era_tail(meta, profile="still")
+        if tail and tail not in out:
+            out = "%s, %s" % (out, tail)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
 
 
 def _compose_background_plate_prompt(meta, setting) -> str:
@@ -780,15 +749,34 @@ def _clean_llm_prompt(raw: str) -> str:
     return ""
 
 
+#: Radio-form vocabulary (2026-07-01): a brief-driven radio surface is inherently
+#: brief-grounded even when its exact words do not overlap the appearance/setting
+#: text (a "space-station communications console" for a docking brief). Widening
+#: the gate to accept these prevents a valid NON-1940s radio form from failing
+#: the overlap check and silently reverting to the (1940s) template.
+_RADIO_VOCAB = frozenset({
+    "radio", "console", "transceiver", "wireless", "receiver", "comms",
+    "communications", "broadcast", "microphone",
+})
+
+
 def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
     """v1 schema gate: the prompt must be GROUNDED in the brief -- it shares at
     least one significant word with the character appearance or the story
     setting. Cheap word-overlap check, not a 2nd LLM call. When neither
-    appearance nor setting is known, nothing to assert -> passes."""
+    appearance nor setting is known, nothing to assert -> passes.
+
+    Widened 2026-07-01: a recognized radio-form token (:data:`_RADIO_VOCAB`) is
+    itself brief-grounded, so a brief-driven radio surface passes even when its
+    exact words do not overlap. Strictly more permissive -- never fails a prompt
+    that passed before."""
     want = _significant_words(appearance) | _significant_words(setting)
     if not want:
         return True
-    return bool(want & _significant_words(prompt))
+    pw = _significant_words(prompt)
+    if want & pw:
+        return True
+    return bool(pw & _RADIO_VOCAB)
 
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
@@ -841,6 +829,26 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _aspect = (still_aspects or {}).get(
             "announcer_visual" if char.get("_synthetic_announcer")
             else "character_video", "portrait")
+        # C1 + E (2026-07-01 brief-driven radio-host): the synthetic announcer /
+        # radio-host prompt is BRIEF-DRIVEN and stamped DIRECTLY -- SKIP the LLM
+        # refine. The refine instruction (_build_char_prompt_request: "Do not
+        # mention radios, microphones, studios") CONTRADICTS a radio-styled host,
+        # so a refined prompt strips the radio tokens, fails _passes_consistency,
+        # and reverts to the (old 1940s) template. build_radio_host_prompt already
+        # finishes (era tail + grade) and depicts an ADULT person, so the loop's
+        # LLM / consistency / person-guard / gear-scrub / finish steps are all
+        # bypassed for this row (also saves an LLM call). The no-baby negative is
+        # populated on the object row.
+        if char.get("_synthetic_announcer"):
+            _aprompt = build_radio_host_prompt(meta, _aspect)
+            out[cid] = {
+                "prompt": _aprompt,
+                "prompt_hash": _content_hash(_aprompt),
+                "source": "announcer_template",
+                "_role": "announcer_visual",
+                "negative_prompt": RADIO_HOST_FACE_NEG,
+            }
+            continue
         prompt = ""
         source = "template"
         if llm_fn is not None:
@@ -951,7 +959,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _role = pinfo.pop("_role", "character_video")
         _pw, _ph = still_dims_for_aspect(
             _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)
-        objects.append({
+        _pobj = {
             "object_id": cid,                 # portrait object_id == char_id
             "kind": "portrait",
             "role": _role,
@@ -960,7 +968,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "prompt": pinfo["prompt"],
             "prompt_hash": pinfo["prompt_hash"],
             "source": pinfo["source"],
-        })
+        }
+        # 2026-07-01: populate the still's existing negative_prompt (schemas.py;
+        # no schema change) when set -- e.g. the radio-host "no baby" negative.
+        if pinfo.get("negative_prompt"):
+            _pobj["negative_prompt"] = pinfo["negative_prompt"]
+        objects.append(_pobj)
 
     # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
     # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The

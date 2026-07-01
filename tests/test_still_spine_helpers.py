@@ -43,26 +43,39 @@ def _meta_ok() -> dict:
 
 
 class TestGetOpenSubject:
+    # BRIEF-DRIVEN (2026-07-01): the open subject leads with the deterministic
+    # radio FORM (radio_form_from_meta), is FACELESS, and carries no hardcoded
+    # 1940s. _meta_ok() maps to no keyword -> the neutral tube-radio default.
     def test_synthetic_open_wording(self):
-        s = helpers.get_open_subject("music_visual", True)
-        assert s.startswith("a vintage radio set warming up on a wooden table")
-        assert "glowing dials and tubes" in s and "tungsten" in s
+        s = helpers.get_open_subject("music_visual", True, _meta_ok())
+        assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
+        assert "warming up" in s and "glowing dials and tubes" in s
+        assert "1940s" not in s
 
     def test_announcer_wording(self):
-        s = helpers.get_open_subject("announcer_visual", False)
-        assert s.startswith("a 1940s radio station studio")
+        s = helpers.get_open_subject("announcer_visual", False, _meta_ok())
+        assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
         assert "lit dials and tubes" in s
+        assert "1940s" not in s
 
     def test_other_open_wording(self):
-        s = helpers.get_open_subject("music_visual", False)
-        assert s.startswith("a vintage radio set glowing warmly")
+        s = helpers.get_open_subject("music_visual", False, _meta_ok())
+        assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
+        assert "glowing warmly" in s
+        assert "1940s" not in s
+
+    def test_form_follows_brief(self):
+        # A non-1940s brief drives the FORM (the whole point of the feature).
+        space = {"story_brief_terms": {"setting": ["an orbital docking bay"]}}
+        s = helpers.get_open_subject("music_visual", True, space)
+        assert "space-station communications console" in s
 
     def test_synthetic_wins_over_role(self):
-        assert helpers.get_open_subject("announcer_visual", True) == \
-            helpers.get_open_subject("music_visual", True)
+        assert helpers.get_open_subject("announcer_visual", True, _meta_ok()) == \
+            helpers.get_open_subject("music_visual", True, _meta_ok())
 
     def test_pure_and_total(self):
-        # never raises, never empty, on any junk input
+        # never raises, never empty, on any junk input (meta optional)
         for role in ("", None, "scene_broll", 7):
             for syn in (True, False):
                 assert helpers.get_open_subject(role, syn)
@@ -89,9 +102,10 @@ class TestDriverParity:
         ("scene_beat", "music_visual", False),
     ])
     def test_still_prompt_leads_with_driver_subject(self, kind, role, synthetic):
-        subject = helpers.get_open_subject(role, synthetic)
+        meta = _meta_ok()
+        subject = helpers.get_open_subject(role, synthetic, meta)
         still = helpers.compose_still_prompt(
-            _meta_ok(), kind=kind, role=role, beat_id="b000")
+            meta, kind=kind, role=role, beat_id="b000")
         assert still.startswith(subject)
 
 
@@ -135,7 +149,7 @@ class TestComposeStillPrompt:
         meta = _meta_ok()
         p = helpers.compose_still_prompt(
             meta, kind="scene_open", role="music_visual", beat_id="b000")
-        subject = helpers.get_open_subject("music_visual", True)
+        subject = helpers.get_open_subject("music_visual", True, meta)
         i_subj = p.find(subject)
         i_set = p.find("relay station, martian flats")
         i_frame = p.find(helpers.STILL_FRAMING_OPEN)

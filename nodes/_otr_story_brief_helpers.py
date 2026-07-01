@@ -344,18 +344,84 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
 # weights earlier tokens more heavily).
 # ---------------------------------------------------------------------------
 
-def get_open_subject(role: str, synthetic: bool) -> str:
-    """The CONCRETE radio-set subject for an OPEN beat (r5b operator catch:
-    image models render narrative loglines as murk -- opens lead with a
-    picture, never a sentence). Wording moved VERBATIM from the render
-    driver's round-5 scene composer; the driver now calls this. Pure."""
+# ---------------------------------------------------------------------------
+# BRIEF-DRIVEN RADIO FORM (2026-07-01) -- kills the hardcoded-1940s anchors.
+#
+# A DETERMINISTIC brief -> radio-form-noun map (NO LLM: nondeterminism would
+# break the reproducibility invariant, and a ~7-entry explicit map is the
+# deterministic source of truth, not "drift"). It decides ONLY the physical
+# RADIO OBJECT the imagery is built around; the era TEXTURE still rides
+# :func:`get_era_tail`. Lives HERE (the pure brief-helper) so both the image
+# node (build_radio_host_prompt) and get_open_subject can share it without a
+# circular import. Ordered most-specific-first; first keyword hit wins; the
+# default is a neutral tube radio (a radio FORM, never a 1940s studio anchor).
+# ---------------------------------------------------------------------------
+_RADIO_FORM_MAP = (
+    (("space", "orbital", "docking", "spacecraft", "starship", "space station",
+      "sci-fi", "science fiction", "futuristic", "galactic", "interstellar"),
+     "a sleek space-station communications console"),
+    (("undersea", "submarine", "deep sea", "abyssal", "ocean floor", "bathyscaphe"),
+     "a sealed submarine radio station"),
+    (("war", "military", "battlefield", "trench", "frontline", "front line"),
+     "a rugged portable field radio transceiver"),
+    (("western", "frontier", "old west", "dustbowl", "prairie"),
+     "a weathered cathedral-style wooden radio set"),
+    (("victorian", "steampunk", "gaslight", "brass", "clockwork"),
+     "an ornate brass-and-mahogany valve wireless set"),
+    (("mid-century", "atomic age", "1950s", "1960s", "retro-futuristic"),
+     "a mid-century tabletop transistor radio"),
+    (("noir", "detective", "deco", "art deco", "1930s", "1940s", "prohibition"),
+     "an art-deco bakelite tube radio"),
+)
+_RADIO_FORM_DEFAULT = "a vintage tabletop tube radio receiver"
+
+
+def _radio_form_haystack(meta: Any) -> str:
+    """Lowercased brief signal text for the form resolver: ``meta.style`` plus
+    ``story_brief_terms`` setting/atmosphere. Pure; tolerant of a bare meta."""
+    m = meta if isinstance(meta, dict) else {}
+    parts = [str(m.get("style") or "")]
+    terms = m.get("story_brief_terms")
+    if isinstance(terms, dict):
+        for key in ("setting", "atmosphere"):
+            v = terms.get(key)
+            if isinstance(v, list):
+                parts.extend(str(t) for t in v)
+            elif v:
+                parts.append(str(v))
+    return " ".join(parts).lower()
+
+
+def radio_form_from_meta(meta: Any) -> str:
+    """DETERMINISTIC brief -> radio-form noun phrase (NO LLM). The first keyword
+    match in :data:`_RADIO_FORM_MAP` wins; :data:`_RADIO_FORM_DEFAULT` (a neutral
+    tube radio, NOT the retired 1940s studio anchor) when nothing matches. Pure;
+    never empty."""
+    hay = _radio_form_haystack(meta)
+    for keys, form in _RADIO_FORM_MAP:
+        if any(k in hay for k in keys):
+            return form
+    return _RADIO_FORM_DEFAULT
+
+
+def get_open_subject(role: str, synthetic: bool, meta: Any = None) -> str:
+    """The CONCRETE, FACELESS radio subject for an OPEN / bookend beat (r5b
+    operator catch: image models render narrative loglines as murk -- opens lead
+    with a picture, never a sentence).
+
+    BRIEF-DRIVEN (2026-07-01): the physical radio FORM comes from
+    :func:`radio_form_from_meta` (deterministic, no LLM), so a non-1940s brief no
+    longer opens on the hardcoded 1940s set. FACELESS by contract -- ONLY HuMo
+    gets a face; this still is what ltx_audio_in / still_pan / still_flat show for
+    the bookends. Pure; never empty. ``meta`` optional (bare -> neutral tube
+    radio form)."""
+    form = radio_form_from_meta(meta or {})
     if synthetic:
-        return ("a vintage radio set warming up on a wooden table, "
-                "glowing dials and tubes, tungsten filament glow")
+        return ("%s warming up on a table, glowing dials and tubes, "
+                "warm filament glow" % form)
     if str(role or "") == "announcer_visual":
-        return ("a 1940s radio station studio, "
-                "glowing warmly, lit dials and tubes")
-    return "a vintage radio set glowing warmly, vacuum tubes and dials"
+        return "%s in a broadcast booth, glowing warmly, lit dials and tubes" % form
+    return "%s glowing warmly, vacuum tubes and dials" % form
 
 
 #: Framing hints (layer 3 of the 5-layer still composer). The macro framing
@@ -415,7 +481,7 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         if not subject:
             subject = "a period-dressed character, face clearly visible"
     else:
-        subject = get_open_subject(role, synthetic=(kind == "scene_open"))
+        subject = get_open_subject(role, synthetic=(kind == "scene_open"), meta=meta)
     m = _meta(meta)
     terms = m.get("story_brief_terms") or {}
     if not isinstance(terms, dict):

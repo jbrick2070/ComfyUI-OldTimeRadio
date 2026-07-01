@@ -999,38 +999,39 @@ def test_meta_brief_announcer_not_duplicated_when_cast_covers_it():
         "a real cast row must not be relabeled as synthetic"
 
 
-def test_meta_brief_announcer_llm_refined_keeps_grounding():
-    """The synthetic announcer entry rides the SAME llm + consistency path."""
+def test_meta_brief_announcer_skips_llm_refine_brief_driven():
+    """E (2026-07-01 brief-driven radio-host): the synthetic announcer SKIPS the
+    LLM refine (its refine instruction 'do not mention radios' contradicts a
+    radio-styled host) and stamps the brief-driven radio-host template DIRECTLY
+    -- source announcer_template, never announcer_llm, even with an llm_fn."""
     lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
     out, _w = mbp.derive_image_prompts(
         [], {}, llm_fn=lambda _p: "a velvet-voiced radio announcer, chrome microphone, art deco studio",
         lines=lines)
     ann = _by_id(out)["announcer"]
-    assert ann["source"] == "announcer_llm"
+    assert ann["source"] == "announcer_template"
     assert "radio" in ann["prompt"].lower()
+    assert ann.get("negative_prompt") and "baby" in ann["negative_prompt"]
 
 
-def test_meta_brief_announcer_gate_requires_radio_grounding():
-    """An LLM line that drops the radio styling for pure story-setting flavor
-    FAILS the announcer's gate (appearance-only grounding) and falls back to
-    the radio template -- even when the line is grounded in the setting.
-    (Live finding 2026-06-09: the Ticking Countdown announcer portrait came
-    out as a modern control-room figure because the gate accepted
-    setting-grounded prompts. Operator directive: radio style.)"""
+def test_meta_brief_announcer_is_brief_driven_radio_not_llm_flavor():
+    """E: a setting-only LLM line can no longer turn the announcer into a generic
+    control-room figure -- the announcer is brief-driven + stamped directly
+    (skip-LLM), so it always reads as an ADULT radio host (no baby). A CHARACTER
+    with the same line still rides the LLM path (the skip is announcer-only)."""
     meta = {"story_brief_terms": {"setting": ["a mission control countdown"]}}
     lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
-    out, warns = mbp.derive_image_prompts(
+    out, _warns = mbp.derive_image_prompts(
         [], meta,
         llm_fn=lambda _p: "a tense mission control countdown operator at a console",
         lines=lines)
     ann = _by_id(out)["announcer"]
-    assert ann["source"] == "announcer_template_consistency", \
-        "setting-only grounding must fail the announcer gate (got %r)" % ann["source"]
+    assert ann["source"] == "announcer_template", \
+        "the announcer must be brief-driven + skip-LLM (got %r)" % ann["source"]
     low = ann["prompt"].lower()
-    assert "radio" in low and "microphone" in low
-    assert any("missing appearance/setting" in w for w in warns)
-    # a CHARACTER with the same setting-grounded line still passes (the
-    # relaxed gate is announcer-only)
+    assert "radio" in low and "adult" in low
+    assert ann.get("negative_prompt") and "baby" in ann["negative_prompt"]
+    # a CHARACTER with the same setting-grounded line still passes via the LLM
     cast = [{"char_id": "c1", "portrait_prompt": "a flight controller"}]
     out2, _w2 = mbp.derive_image_prompts(
         cast, meta,
