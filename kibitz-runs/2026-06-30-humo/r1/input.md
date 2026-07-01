@@ -53,34 +53,10 @@
   apples-to-apples HuMo A/B, no full-episode re-run. This is the TEST HARNESS that makes the portrait-quality
   + clip-fill work above measurable in minutes. Keep 1.7B class + <= 14.5 GB.
 
-## BUILD-READY -- KIBITZ r1 FOLDED (2026-06-30; kibitz-runs/2026-06-30-humo/r1/r1_judgment.md)
-Grounded corrections that SUPERSEDE the candidate levers above:
-
-1. **Clip-underrun mush: loop-fill ALREADY EXISTS + must NOT loop a talking face.** `OTR_CLIP_FILL`
-   (`otr_silent_composite.py:243`, default-on) already loop-fills + flags `held_last_frame` as a
-   legibility failure (L734-750). But looping a HuMo speaking mouth DESYNCS lip-sync. FIX: (a) EXCLUDE
-   `audio_driven_face` engines from composite loop-fill; (b) the real HuMo underrun fix =
-   **PHRASE-CHUNKING** (render long dialogue in speech-aligned chunks within the 177-frame cap) --
-   ELEVATED TO A GOAL (deepest change; coder may want a focused r2); (c) diagnose why the eyeballed beat
-   held_last_frame. Keep the legibility guard.
-2. **Host=radio: the guard is DEAD CODE -- WIRE it.** `is_never_humo_role`/`_NEVER_HUMO_ROLES`
-   (`_otr_speaker_role.py:96,168`) is defined+exported with ZERO callers. Wire it into the render_driver
-   dispatch so announcer/music NEVER dispatch HuMo, AND remove announcer/music from HuMo's `roles`
-   (`eng_humo.py:89,94`). Route the bookends to the EXISTING `ltx_audio_in` + `radio_bookend.png` path
-   (render_driver.py:1835). CUT the "face" option and CUT a new bespoke radio-animator engine.
-3. **Classify the knobs before promising quality.** Already-tunable: `OTR_HUMO_STEPS`/`OTR_HUMO_CFG` +
-   the INIT PORTRAIT (biggest VRAM-free lever). Requires code change: LoRA strength (hardcoded 1.0),
-   sampler (`uni_pc`), scheduler (`simple`), shift (8.0). Verify-wrapper-supports: audio-conditioning
-   strength (WanHuMoImageToVideo may not accept it).
-4. **1.7B vs 14B:** node 87 currently selects `humo_14B_169`. This sprint = 1.7B quality + labels for BOTH
-   tiers; do NOT silently demote the workflow default (operator-gated).
-5. **Labels:** add a registry `vram_tier_label` metadata prop + append it in `otr_video_director._label_for`
-   (today L113 only appends aspect). Ground the number to the TRUE single-resident peak (registry 7000MB,
-   NOT the stale 3.3GB comment). Auto-derived only.
-6. **Isolation smoke = PREREQUISITE for the portrait knob A/B** (not for the guard/label/clip-fill fixes).
-   Build it first, THEN tune portrait knobs; ship the deterministic fixes without waiting on it.
-
-Ownership per change (repo rule: workflow JSON changes in the SAME chunk): guard-wiring + role-strip =
-code + tests; bookend routing = code + workflow-JSON (dropdown/defaults); labels = code + tests;
-clip-fill exclusion = code + tests; phrase-chunking = code (+ maybe r2). Suite+BugBible+B7 green + push
-per chunk; audio byte-identical; <= 14.5 GB single resident.
+## OPEN QUESTIONS FOR THE PANEL
+- Which 1.7B-class, VRAM-neutral levers ACTUALLY improve the portrait (grounded in eng_humo + the wrapper)?
+- The exact clip-fill mechanism (loop vs ping-pong vs parallax-still) + where it lands (composite vs
+  render_driver) + how it stays no-fallback-compliant + LOUD-stamped.
+- Music bookend: animated-radio approach + its engine/slot routing + capability implications.
+- Label mechanics that don't break engine-id resolution.
+- Build order + which pieces are content-only vs workflow-JSON.

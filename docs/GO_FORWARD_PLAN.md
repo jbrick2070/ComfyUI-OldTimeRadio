@@ -55,6 +55,19 @@ determinism; LOUD fallbacks; master audio byte-identical (`test_audio_byte_ident
 suite + Bug Bible + B7 green AND push per green chunk to v2.0-alpha. Keep EVERY engine
 user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 
+> ### BUILD-READY QUEUE (for a fresh coder window -- 2026-06-30)
+> These have coder-ready contracts; a new window can pick them up in this order via the otr-handoff skill:
+> 1. **viz_mxc_mandala** -- KIBITZ r1-r4 CONVERGED. `docs/2026-06-30-viz-rainbow/MANDALA_ENGINE_PLAN.md`.
+> 2. **still_parallax 100% rip-out** -- spec below (S-E); mechanical C0-pattern, no kibitz needed.
+> 3. **visualizer -> viz_green rename** -- spec below (S-E); still_kenburns->still_motion precedent, no
+>    kibitz needed. Do it WITH the parallax rip-out (same files/gates).
+> 4. **HuMo improvements** -- KIBITZ `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` (in progress
+>    2026-06-30; see `kibitz-runs/2026-06-30-humo/` for the hardened result).
+> 5. **mesh_stage MIN-ACCEPT** -- KIBITZ(r1) `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`.
+> 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
+> Invariants for all: single resident heavy <= 14.5 GB; audio byte-identical; no-fallback (hard-fail LOUD);
+> UTF-8 no BOM; SFW; workflow-JSON edited in the SAME change as code; suite+BugBible+B7 green + push per chunk.
+
 - **S-A [HIGH] DELIVERY-QUALITY FLOOR (clip-fill + legibility).** NOT a routing bug -- a
   short/dead generated clip is allowed to ship. Grounded + REPRODUCED on two episodes
   (`weight_of_the_blueprints_163656`, `steel_against_skin_170522`): the announcer portraits
@@ -99,10 +112,20 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
   - **RETIRE engines:** `still_motion` (the fallback-floor twin of still_pan -- falls away with the
     rip-out), `station_card` (broken black card, missing `accepts_still`), and `abstract` (redundant
     with the real `visualizer`). Unregister + workflow-JSON dropdowns + ripple tests (the C3 pattern).
-  - **ADD `viz_mxc` (multi-colored OTR visualizer) -- HARDENED PLAN READY, BUILD AFTER THIS SOAK
-    (operator 2026-06-30).** The creative rainbow replacement for retired `abstract`. Kibitz r1+r2
-    CONVERGED (Claude Code + Codex + Antigravity + Claude anchor); coder contract:
-    **`docs/2026-06-30-viz-rainbow/VIZ_MXC_HARDENED_PLAN.md`**. Locked decisions (operator: must run on
+  - **`viz_mxc_cpu` (rainbow visualizer) -- SHIPPED this session** (b01d2363; green + pushed). The
+    creative rainbow replacement for retired `abstract`. Operator was under-whelmed by the PIL look ->
+    the pycairo MANDALA is the upgrade (next bullet).
+  - **ADD `viz_mxc_mandala` (Cosmic Radio Mandala, pycairo) -- BUILD-READY, KIBITZ r1-r4 CONVERGED
+    2026-06-30.** Coder contract: **`docs/2026-06-30-viz-rainbow/MANDALA_ENGINE_PLAN.md`** (per-round
+    judgments in `kibitz-runs/2026-06-30-mandala/`). Separate engine (keeps viz_mxc_cpu as zero-dep
+    alternate); `fallback_engine=None` + fail-loud (no-fallback contract, render_driver.py:1531);
+    pycairo lazy-imported + isolated (NOT in requirements.video.txt); assert_usable probes cairo AND
+    ffmpeg; `render_aspect="wide"` + `declared_isolation=ISOLATION_IN_PROCESS`; surface.flush()+get_stride
+    ->rgb24; new `apply_crt_post_rgb(rgb,scanlines,vignette,fi,rng_key,vol)` helper in scope_draw; full
+    _DECL_KEYS CAPABILITIES row; opt-in selectable (NO node-87 default -- operator may set the music/title
+    bookend widget later). Ring/band coefficients = a build-time LOOK pass WITH the operator (denser look
+    approved 2026-06-30), not a frozen constant.
+  - **(historical) `viz_mxc` locked decisions** (operator: must run on
     AMD/Mac/any box -- NO GPU shaders for v1): ONE engine `viz_mxc_cpu`, `required_inputs=()`
     (audio-OPTIONAL -> reactive when audio present, procedural OTR rainbow when not = ALSO the no-image
     floor for scene/background; `accepts_still=False` so it never triggers z_image on a non-audio slot);
