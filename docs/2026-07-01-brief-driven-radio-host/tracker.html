@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTR - Brief-Driven HuMo Radio-Host - Build Tracker</title>
+<style>
+  :root{
+    --bg:#0e0f13; --panel:#161922; --panel2:#1d212c; --ink:#e8e8ec; --muted:#9aa3b2;
+    --amber:#e0a44c; --green:#4cd07a; --blue:#5aa9e6; --red:#e0645a; --line:#2a2f3c;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:26px}
+  h1{font-size:22px;margin:0 0 2px} h2{font-size:15px;margin:22px 0 10px;color:var(--amber);
+     text-transform:uppercase;letter-spacing:.06em}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+  .wrap{max-width:960px;margin:0 auto}
+  .bar{height:12px;border-radius:8px;background:var(--panel2);overflow:hidden;margin:8px 0 4px}
+  .bar > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--green))}
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0}
+  .pill{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin:12px 0}
+  ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li .n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--panel2);color:var(--amber);
+     display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+  ol.steps li .n::before{content:counter(s)}
+  .st{font-size:11px;font-weight:700;letter-spacing:.05em;padding:2px 8px;border-radius:6px;align-self:center}
+  .todo{background:#2a2f3c;color:var(--muted)} .doing{background:#3a2f18;color:var(--amber)}
+  .done{background:#183a24;color:var(--green)}
+  .trap{border-left:3px solid var(--red);padding-left:12px;margin:10px 0;color:var(--ink)}
+  .trap b{color:var(--red)}
+  code{background:#0a0b0e;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:#d7e2ef;font-size:13px}
+  a{color:var(--blue)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+  .k{color:var(--muted)} .foot{color:var(--muted);font-size:12px;margin-top:20px}
+</style>
+</head>
+<body><div class="wrap">
+  <h1>Brief-Driven HuMo Radio-Host &mdash; Build Tracker</h1>
+  <p class="sub">Feature build-note (not the main otr-build-tracker). Contract:
+     <code>docs/2026-07-01-brief-driven-radio-host/PLAN_HARDENED.md</code> &middot;
+     kibitz r1 (Codex + Antigravity + Claude Code + Claude anchor, grounded).</p>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b>Status: BUILT &amp; GREEN &mdash; pushed to v2.0-alpha</b>
+      <span class="pill" style="color:var(--green)">6 / 6 steps</span>
+    </div>
+    <div class="bar"><i style="width:100%"></i></div>
+    <div class="pillrow">
+      <span class="pill">branch v2.0-alpha</span>
+      <span class="pill">HEAD ad48246d</span>
+      <span class="pill">3 commits (bb972ddf / 4cddb26c / ad48246d)</span>
+      <span class="pill" style="color:var(--green)">suite 5930 pass / 0 fail</span>
+      <span class="pill" style="color:var(--green)">Bug Bible + B7 green</span>
+      <span class="pill">toggle default OFF</span>
+      <span class="pill">audio byte-identical</span>
+      <span class="pill">only HuMo gets a face</span>
+    </div>
+  </div>
+
+  <h2>Build order</h2>
+  <div class="card"><ol class="steps">
+    <li><span class="n"></span><div><b>radio_form_from_meta + build_radio_host_prompt</b><br>
+      <span class="k">Deterministic ~5-8 entry style/setting &rarr; radio-form-noun map (NO LLM); get_era_tail = texture only. + unit tests: brief&rarr;form, adult-not-baby.</span></div><span class="st done">DONE</span></li>
+    <li><span class="n"></span><div><b>Repoint the 4 hardcoded-1940s surfaces</b><br>
+      <span class="k">ANNOUNCER_PORTRAIT_ANCHOR :125 &middot; _mesh_fodder_subject :583/:587 (announcer&rarr;faceless too) &middot; get_open_subject :353 &middot; apply era tail in _compose_mesh_fodder_prompt :597.</span></div><span class="st done">DONE</span></li>
+    <li><span class="n"></span><div><b>radio_host_portrait object</b><br>
+      <span class="k">Distinct object_id, minted once/episode, seed-pinned (OTR_RADIO_BOOKEND_SEED), aspect-follows the HuMo slot, populate negative_prompt "baby".</span></div><span class="st done">DONE</span></li>
+    <li><span class="n"></span><div><b>OTR_ENABLE_HUMO_HOSTS toggle</b><br>
+      <span class="k">Gate _enforce_radio_is_host :821 (ON = bypass&rarr;HuMo face-radio; OFF = today's ltx_audio_in). build_request_from_shot resolves init_image for lineless music beats to radio_host_portrait, fail-LOUD.</span></div><span class="st done">DONE</span></li>
+    <li><span class="n"></span><div><b>Consistency gate fix</b><br>
+      <span class="k">Skip LLM refine for synthetic announcer (avoids the "do not mention radios" contradiction); confirm _scrub_gear_words exemption; widen _passes_consistency :682 radio vocab (comms/console/transceiver).</span></div><span class="st done">DONE</span></li>
+    <li><span class="n"></span><div><b>Acceptance + regression + green</b><br>
+      <span class="k">Non-1940s-brief prompt carries a radio-form noun, passes _passes_consistency, not scrubbed; host-reads-as-radio regression; suite + Bug Bible + B7 green; commit per chunk.</span></div><span class="st done">DONE</span></li>
+  </ol></div>
+
+  <h2>Traps the panel caught (do not re-trip)</h2>
+  <div class="card">
+    <div class="trap"><b>Never-HuMo invariant.</b> announcer/music are hard-blocked from HuMo (<code>render_driver:821</code> &rarr; <code>ltx_audio_in</code>). This feature REVERSES it &mdash; only behind the default-OFF toggle. Never a silent reversal.</div>
+    <div class="trap"><b>Lineless music beats.</b> No char_id &rarr; HuMo <code>init_image</code> resolves empty &rarr; black screen. Route bookends to the once-per-episode <code>radio_host_portrait</code>, fail-loud.</div>
+    <div class="trap"><b>"Do not mention radios."</b> The announcer LLM-refine instruction strips radio tokens &rarr; fails the gate &rarr; reverts to 1940s. Skip the refine for the synthetic announcer.</div>
+    <div class="trap"><b>get_era_tail is texture, not form.</b> It won't emit "comms console" vs "bakelite radio". Needs the explicit deterministic form map.</div>
+    <div class="trap"><b>Node-87 saves viz_green.</b> Code-only change is dormant there. Keep it ENV-opt-in; JSON default change is a separate gated commit.</div>
+  </div>
+
+  <h2>Invariants</h2>
+  <div class="card grid">
+    <div><span class="k">Audio</span><br>byte-identical (test_audio_byte_identical green)</div>
+    <div><span class="k">Default</span><br>OTR_ENABLE_HUMO_HOSTS OFF &rarr; no change to existing episodes</div>
+    <div><span class="k">Face</span><br>ONLY HuMo; mesh = faceless brief-driven radio; ltx deferred; viz no still</div>
+    <div><span class="k">Determinism</span><br>one episode-keyed radio-host face seed across open/inter/close</div>
+    <div><span class="k">Fallback</span><br>missing radio_host_portrait raises LOUD (never black)</div>
+    <div><span class="k">Hygiene</span><br>UTF-8 no BOM &middot; SFW &middot; adult (no baby) &middot; commit+push per green chunk</div>
+  </div>
+
+  <p class="foot">Reference render: docs/2026-07-01-overnight/ComfyUI_00003_.png (flux1-dev-fp8, seed 1717, automated_space_docking brief). Generated 2026-07-01 as a feature build-note.</p>
+</div></body></html>
