@@ -289,6 +289,95 @@ def paint_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     return img
 
 
+def _hue_rgb(hue, sat, val):
+    """HSV -> (r,g,b) 0..255. For the OTR look pass a MUTED sat (< ~0.6) so the
+    rainbow reads period/desaturated, not neon. colorsys is stdlib (cross-platform)."""
+    import colorsys
+    r, g, b = colorsys.hsv_to_rgb(hue % 1.0, max(0.0, min(1.0, sat)),
+                                  max(0.0, min(1.0, val)))
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def _rainbow_bars(draw, freq, x, y, w, h, base_hue):
+    """A bottom SIGNAL-SPECTRUM strip: 32 bars, each its own muted rainbow hue,
+    height by per-bin magnitude. The 'radio signal spectrum' motif."""
+    n = min(32, len(freq))
+    if n < 1:
+        return
+    bw = max(1, w // n - 1)
+    for i in range(n):
+        mag = max(0.0, min(1.0, float(freq[i])))
+        bh = max(1, int(mag * h * 1.4))
+        bx = x + i * (bw + 1)
+        col = _hue_rgb((base_hue + i / float(n)) % 1.0, 0.5, 0.3 + mag * 0.6)
+        draw.rectangle([(bx, y + h - min(bh, h)), (bx + bw, y + h)], fill=col)
+
+
+def paint_rainbow_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
+                        scanlines, vignette, rng_key="viz_mxc", font_small=None):
+    """Paint ONE full 16:9 OTR 'mxc' MULTI-COLORED frame -- a vintage radio-dial /
+    SIGNAL-SPECTRUM sweep, NOT party rainbows. The 32-bin FFT drives a MUTED rainbow
+    spectrum ring; a glowing tuning DIAL + magic-eye needle sweeps with RMS; the same
+    CRT scanlines + vignette + film grain as :func:`paint_frame` give the period
+    mystique. Same signature + silent-clip contract. Audio-optional: on silence the
+    ring/needle idle (all inputs ~0). Returns a PIL RGB Image."""
+    cx0, cy0, base_r, pad, ly = ring_geom(w, h)
+    t = fi / float(fps or 25)
+    img = Image.new("RGB", (w, h), CRT_BG)
+    draw = ImageDraw.Draw(img)
+    draw.line([(pad, ly), (w - pad, ly)], fill=CRT_DARK, width=1)
+
+    # slow global hue drift = the "tuning sweep" (onsets nudge it)
+    base_hue = (t * 0.03 + float(signal) * 0.15) % 1.0
+    cx, cy = cx0, cy0
+    r = base_r + int(float(vol) * base_r * 0.25)
+
+    # -- spectrum ring: 32 bars, each a muted rainbow hue, length by magnitude --
+    n = min(32, len(freq))
+    for i in range(n):
+        angle = 2 * math.pi * i / max(1, n) - math.pi / 2
+        mag = max(0.0, min(1.0, float(freq[i])))
+        bar_len = int(mag * h * 0.16) + 2
+        col = _hue_rgb((base_hue + i / float(max(1, n))) % 1.0, 0.55, 0.32 + mag * 0.6)
+        x0 = cx + int(r * math.cos(angle))
+        y0 = cy + int(r * math.sin(angle))
+        x1 = cx + int((r + bar_len) * math.cos(angle))
+        y1 = cy + int((r + bar_len) * math.sin(angle))
+        draw.line([(x0, y0), (x1, y1)], fill=col, width=max(2, w // 400))
+
+    # -- the dial ring (amber period rim) + the tuning NEEDLE (magic-eye) --
+    ring_bright = min(1.0, 0.35 + float(vol) * 0.65)
+    ring_col = tuple(min(255, int(c * ring_bright)) for c in CRT_AMBER)
+    draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], outline=ring_col, width=2)
+    needle_a = -math.pi / 2 + (float(signal) - 0.5) * math.pi * 0.9
+    nx = cx + int((r - 4) * math.cos(needle_a))
+    ny = cy + int((r - 4) * math.sin(needle_a))
+    draw.line([(cx, cy), (nx, ny)], fill=_hue_rgb(base_hue, 0.4, 0.9),
+              width=max(2, w // 350))
+    draw.ellipse([(cx - 4, cy - 4), (cx + 4, cy + 4)], fill=CRT_AMBER)
+
+    # -- bottom rainbow SIGNAL-SPECTRUM strip --
+    if freq is not None and len(freq) > 0:
+        _rainbow_bars(draw, freq, pad, int(h * 0.86), w - pad * 2, int(h * 0.08),
+                      base_hue)
+    f_small = font_small or _small_font(h)
+    by = h - pad
+    draw.text((pad, by - pad // 6), "OTR mxc  x  %dx%d" % (w, h),
+              fill=CRT_DARK, font=f_small)
+
+    # -- CRT post: scanlines + vignette + film grain (same period look) --
+    img = Image.alpha_composite(img.convert("RGBA"), scanlines).convert("RGB")
+    arr = np.array(img, dtype=np.float32)
+    arr *= vignette[:, :, np.newaxis]
+    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    a = np.array(img, dtype=np.int16)
+    intensity = int(4 + float(vol) * 10)
+    noise = _rng(rng_key, fi, "grain").integers(
+        -intensity, intensity + 1, size=a.shape, dtype=np.int16)
+    img = Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
+    return img
+
+
 # --------------------------------------------------------------------------- #
 # Silent ffmpeg encode (copied; SILENT -- only OTR_MasterAudioMux adds audio).
 # --------------------------------------------------------------------------- #

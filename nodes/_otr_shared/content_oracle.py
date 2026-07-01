@@ -54,6 +54,7 @@ _FAMILY_FALLBACK: dict = {
     "still_pan": "static_image_gen",
     "still_flat": "static_image_gen",
     "visualizer": "abstract",
+    "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer -- motion-exempt (2026-06-30)
 }
 
 #: Default mean-luma floor (0..255). A clip whose mean YAVG is at/below this reads

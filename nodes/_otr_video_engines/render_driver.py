@@ -72,6 +72,7 @@ ENGINE_FAMILY = {
     # "abstract" + "station_card" entries REMOVED 2026-06-30 (C0, engines retired);
     # the "abstract" FAMILY name survives (visualizer) + is the engine_family() default.
     "visualizer": "abstract", "still_pan": "static_image_gen",
+    "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer (2026-06-30)
     "still_flat": "static_image_gen",
     # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
     # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
@@ -755,7 +756,8 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
     character's clean own voice, never the ambient mix (2026-06-26 role-driven)."""
     if is_char_face:
         return False
-    return str(family) == "audio_conditioned_video" or str(engine_id) == "visualizer"
+    return (str(family) == "audio_conditioned_video"
+            or str(engine_id) in ("visualizer", "viz_mxc_cpu"))
 
 
 def _role_of_shot(shot) -> str:

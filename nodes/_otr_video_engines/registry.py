@@ -247,6 +247,11 @@ CAPABILITIES = {
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "visualizer": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # viz_mxc_cpu (2026-06-30): the OTR rainbow visualizer -- pure numpy/PIL/ffmpeg,
+    # no GPU/shaders. required_toolchain None (a GL/torch toolchain would disable it on
+    # every shipped profile). GPU shader tier (viz_mxc_gpu) is a deferred separate row.
+    "viz_mxc_cpu": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_flat": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_pan": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,

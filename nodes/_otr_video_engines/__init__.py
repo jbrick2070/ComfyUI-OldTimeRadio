@@ -128,3 +128,14 @@ try:  # pragma: no cover - trivial guard
     from . import eng_visualizer as _eng_visualizer  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# viz_mxc_cpu (2026-06-30): the OTR multi-colored ("mxc") rainbow visualizer -- the
+# creative replacement for the retired abstract floor. Pure numpy/PIL/ffmpeg (no GPU,
+# no shaders; runs on any box). AUDIO-OPTIONAL (required_inputs=()) so it fits every
+# role AND idles a procedural rainbow on silence (the no-image floor). Cold-import
+# clean (V-12: soundfile/PIL/scope_draw lazy in render_clip). Guarded so a packaging
+# quirk never breaks the namespace import. (viz_mxc_gpu shader tier is DEFERRED.)
+try:  # pragma: no cover - trivial guard
+    from . import eng_viz_rainbow as _eng_viz_rainbow  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
