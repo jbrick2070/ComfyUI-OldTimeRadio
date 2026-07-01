@@ -1,6 +1,5 @@
-# Cosmic Radio Mandala -> selectable `viz_mxc_mandala` engine -- BUILD-READY PLAN (2026-06-30)
+# Cosmic Radio Mandala -> production engine -- PLAN for kibitz (2026-06-30)
 
-Status: kibitz r1-r4 CONVERGED (grounded; see kibitz-runs/2026-06-30-mandala/{r1..r4}/*_judgment.md).
 Turn the working pycairo prototype (`docs/2026-06-30-viz-rainbow/mandala_proto.py`, rendered +
 operator-approved direction) into a real OTR video engine. Operator constraints: runs on ANY GPU/CPU
 (pycairo = CPU vector, cross-platform); OTR radio mystique (tuning eye / dial / signal-spectrum, muted
@@ -47,12 +46,12 @@ queued work per the operator's ordering.
    (private _rng, embedded in paint fns) -> add a PUBLIC `apply_crt_post_rgb(rgb, ..., rng_key)` helper in
    scope_draw (scanlines + vignette + seed-keyed grain over an RGB array), called by the mandala engine.
    DROP static-layer caching (overlays build once/run; cairo gradient cheap; scanlines sit ABOVE reactive).
-10. **Class attrs mirror eng_viz_rainbow (r4, GROUNDED L52-54):** name="viz_mxc_mandala", family="abstract",
-   required_inputs=(), accepts_still=False, fallback_engine=None, engine_version="1",
-   **render_aspect="wide"** (enforced by test_still_aspect_and_labels.py), and
-   **declared_isolation=_MC.ISOLATION_IN_PROCESS**. No module-scope cairo (not even in type annotations --
-   use string literal 'cairo.Context'); import-probe in assert_usable + import inside render_clip.
-11. **Contract:** silent h264/yuv420p/bt709; has_audio=False; frame_count EXACT; family="abstract".
+9. **Registration is concrete:** eng_viz_mandala.py `@register`; import row in __init__.py; CAPABILITIES
+   row; ENGINE_FAMILY + content_oracle._FAMILY_FALLBACK + _uses_ambient_master_audio maps (the viz_mxc_cpu
+   set). Radius cap `outer_max = min(cx,cy,w-cx,h-cy)-margin`; only the outer band bleeds.
+9. **Contract:** silent h264/yuv420p/bt709; has_audio=False; frame_count EXACT; family="abstract";
+   new CAPABILITIES row + the same map set viz_mxc_cpu touched (ambient-audio gate, ENGINE_FAMILY,
+   content_oracle._FAMILY_FALLBACK, auto-label).
 
 ## FUTURE MODES (NOT this build -- one grammar per engine)
 The other operator concepts -- Spectral Voice Entities (bezier creatures), Quantum Static Portals,
@@ -66,15 +65,15 @@ encode_silent_mp4 monkeypatched (audio-present + audio-absent) + a pycairo-missi
 frame-count exact; paint determinism; the ambient-audio + family-map regressions. Suite + Bug Bible + B7
 green; push per chunk.
 
-## BUILD LOCKS (r2 resolved -- no open choices)
-- **Perf budget:** <= ~40 ms/frame @ 1472x832 CPU; a 25-frame beat < ~1s paint. ONE local benchmark
-  script/log gate vs viz_mxc_cpu -- NOT a unit-test timing assert.
-- **CRT glue = PIL roundtrip** (native-cairo cut for v1).
-- **16:9 bounding:** core rings + tuning-eye must NOT clip on 1472x832; the outer spectrum band MAY bleed.
-  Exact ring/spoke/band coefficients = a build-time LOOK pass WITH the operator (they are actively tuning
-  density 2026-06-30) -- do NOT freeze numbers here; lock only the no-clip invariant.
-- **Tests:** mirror test_video_viz_rainbow.py PLUS a visual-acceptance smoke on RAW frames (monkeypatch
-  encode_silent_mp4, hash np.ascontiguousarray(frame).tobytes(); nonblack ratio; frame-to-frame delta).
+## OPEN FOR r2 (coding plan)
+1. **Perf budget (numeric):** set max ms/frame + max s per 25-frame beat; benchmark viz_mxc_mandala vs
+   viz_mxc_cpu. Confirm no soak regression (must be far cheaper than any GPU engine).
+2. **CRT glue path:** PIL-roundtrip (proven, simple, reuses scope_draw as-is) vs native-cairo
+   OPERATOR_MULTIPLY (faster, more code). Pick by the measured budget.
+3. **16:9 bounding:** cap the tuning-eye + rings so they aren't clipped on 1472x832; let the outer band
+   ring bleed intentionally (denser look). Lock the radius multipliers.
+4. **Tests:** mirror test_video_viz_rainbow.py PLUS a visual-acceptance smoke (nonblack ratio,
+   frame-to-frame delta, deterministic hash) to catch a dull/static mandala.
 
 ## WIRING -- LOCKED at r3 (grounded, r3_judgment.md; STRONG convergence)
 - **Opt-in SELECTABLE engine, NOT a saved-widget default.** Registering makes it selectable in the
@@ -92,14 +91,11 @@ green; push per chunk.
   L260-273): `{"vram_class":"cpu","vram_estimate_mb":0,"required_toolchain":None,"requires_sidecar":
   False,"cpu_ok":True,"model_requirements":[]}`.
 - **assert_usable** probes BOTH `import cairo` AND `_sd.find_ffmpeg(OTR_FFMPEG)` -- separate loud messages.
-- **surface->rgb (r4):** `surface.flush()` FIRST (before get_data -- else blank/partial frames), then
-  `bgra = np.ndarray((h,w,4), np.uint8, buffer=surface.get_data(), strides=(stride,4,1))`;
-  `rgb = np.ascontiguousarray(bgra[:, :, [2,1,0]])`; assert `(h,w,3)` uint8 (encode_silent_mp4 writes
-  rgb24). stride from `surface.get_stride()`.
-- **NEW helper (r4 signature LOCKED):** `apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key, vol=0.0)`
-  in scope_draw.py -- PIL composite scanlines + multiply vignette + seed-keyed grain via `_rng(rng_key, fi,
-  ...)` with intensity ~`int(4 + vol*10)`. `fi` is REQUIRED (without it grain is frozen). Deterministic on
-  (rng_key, fi); returns HxWx3 uint8; NO in-place mutate.
+- **surface->rgb:** `bgra = np.ndarray((h,w,4), np.uint8, buffer=surface.get_data(),
+  strides=(stride,4,1))`; `rgb = np.ascontiguousarray(bgra[:, :, [2,1,0]])`; assert `(h,w,3)` uint8
+  (encode_silent_mp4 writes rgb24). stride from `surface.get_stride()`.
+- **NEW helper:** implement + export `apply_crt_post_rgb(rgb, scan, vig, rng_key)` in scope_draw.py
+  (deterministic, HxWx3 uint8, no in-place mutate) -- the CRT-glue path.
 - Radius cap to avoid 16:9 clip: outer CORE rings <= ~0.33*min(w,h); only the outer spectrum band bleeds.
 - Tests: `importorskip("cairo")` gates ONLY paint/determinism/visual-smoke; registration/capability/wiring
   /cold-import stay cairo-free; the missing-cairo assert_usable test stays UNSKIPPED via monkeypatched
