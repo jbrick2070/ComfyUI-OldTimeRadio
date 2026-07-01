@@ -15,10 +15,14 @@ from __future__ import annotations
 import pathlib
 import sys
 
+import pytest
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import otr_meta_brief_image_prompt as mbp  # noqa: E402
+from nodes import otr_image_gen_dispatcher as disp  # noqa: E402
+from nodes._otr_video_engines import render_driver as rd  # noqa: E402
 
 
 _SPACE_META = {
@@ -124,3 +128,109 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
     # survives (scrubbing would strip "radio"/"console"); we assert the token
     # the exempt path preserves is present (never a 1940s studio revert).
     assert "1940s" not in p
+
+
+# --------------------------------------------------------------------------- #
+# Chunk 3: radio_host_portrait object mint (TOGGLE-GATED, seed-pinned, aspect)
+# --------------------------------------------------------------------------- #
+def _bookend_lines():
+    return [
+        {"line_id": "b000", "speaker_role": "music_open", "char_id": ""},
+        {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"},
+    ]
+
+
+def test_radio_host_portrait_not_minted_when_toggle_off(monkeypatch):
+    # Default OFF -> byte-identical: NO extra radio-host object in the payload.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
+                                       lines=_bookend_lines())
+    ids = {o["object_id"] for o in out["objects"]}
+    assert mbp.RADIO_HOST_PORTRAIT_ID not in ids
+
+
+def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        still_aspects={"music_visual": "wide"})
+    objs = {o["object_id"]: o for o in out["objects"]}
+    rh = objs[mbp.RADIO_HOST_PORTRAIT_ID]
+    assert rh["kind"] == "portrait" and rh["role"] == "music_visual"
+    assert "space-station communications console" in rh["prompt"]
+    assert "baby" in rh["negative_prompt"]
+    # aspect FOLLOWS the HuMo (music) slot -> WIDE dims (w > h), never pillarboxed
+    assert rh["w"] > rh["h"]
+
+
+def test_radio_host_portrait_seed_is_pinned():
+    # object_id radio_host_portrait -> the FIXED bookend seed (4242 default),
+    # independent of the request hash, so open/inter/close share ONE face.
+    s = disp.resolve_object_seed({"request_seed": 999, "mode": "request_hash"},
+                                 mbp.RADIO_HOST_PORTRAIT_ID, "anyhash",
+                                 kind="portrait")
+    assert s == 4242
+
+
+# --------------------------------------------------------------------------- #
+# Chunk 4: OTR_ENABLE_HUMO_HOSTS toggle in render_driver
+# --------------------------------------------------------------------------- #
+def _humo_bookend_shot(role="music_visual"):
+    return {"shot_id": "shot_b000", "beat_id": "b000", "engine_id": "humo",
+            "role": role, "family": "audio_driven_face",
+            "target_frame_count": 25, "source_line_ids": [], "char_id": "",
+            "creative": {}}
+
+
+def test_enforce_radio_is_host_redirects_when_toggle_off(monkeypatch):
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    shot = _humo_bookend_shot()
+    rd._enforce_radio_is_host(shot)
+    assert shot["engine_id"] == "ltx_audio_in"     # today's behavior byte-for-byte
+
+
+def test_enforce_radio_is_host_noop_when_toggle_on(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    shot = _humo_bookend_shot()
+    rd._enforce_radio_is_host(shot)
+    assert shot["engine_id"] == "humo"             # HuMo radio-host allowed
+
+
+def _bookend_ledger(tmp_path, with_face=True):
+    imgs = []
+    if with_face:
+        face = tmp_path / "radio_host.png"
+        face.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        imgs.append({"object_id": "radio_host_portrait", "kind": "portrait",
+                     "path": str(face)})
+    return {"video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b000", "char_id": "",
+                       "start_s": 0.0, "dur_s": 2.0}],
+            "images": {"images": imgs}}
+
+
+def test_build_request_uses_radio_host_portrait_when_toggle_on(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _bookend_ledger(tmp_path, with_face=True)
+    shot = _humo_bookend_shot()
+    req = rd.build_request_from_shot(shot, led)
+    assert shot["engine_id"] == "humo"             # not redirected
+    assert req["observability"]["init_source"] == "radio_host_portrait"
+    assert req["observability"]["init_image"] == "radio_host.png"
+
+
+def test_build_request_fails_loud_without_face_when_toggle_on(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _bookend_ledger(tmp_path, with_face=False)
+    with pytest.raises(rd.RenderError):
+        rd.build_request_from_shot(_humo_bookend_shot(), led)
+
+
+def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypatch):
+    # Toggle OFF: the music bookend is redirected off HuMo (byte-identical) so the
+    # radio_host_portrait path never triggers.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    led = _bookend_ledger(tmp_path, with_face=False)
+    shot = _humo_bookend_shot()
+    rd.build_request_from_shot(shot, led)          # must NOT raise
+    assert shot["engine_id"] == "ltx_audio_in"

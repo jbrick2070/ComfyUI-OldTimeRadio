@@ -152,6 +152,20 @@ RADIO_HOST_FACE_POS = ("adult, mature weathered face, clearly visible human "
 #: field (schemas.py; NO schema change) for the radio-host / announcer face.
 RADIO_HOST_FACE_NEG = "baby, infant, child, toddler, cartoon, doll, mannequin"
 
+#: The ONE animatable radio-HOST FACE object minted per episode under
+#: OTR_ENABLE_HUMO_HOSTS (its own object_id, NOT a cast char_id). render_driver
+#: resolves it as the HuMo init_image for the LINELESS announcer/music bookends
+#: (which have no cast portrait). MUST match the render_driver + dispatcher
+#: literals (kept in sync by string, cross-referenced in those files).
+RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
+
+#: Toggle: default OFF = byte-identical (no radio-host FACE object minted; the
+#: bookends keep today's ltx_audio_in animated-console behavior).
+def _humo_hosts_enabled() -> bool:
+    """True iff OTR_ENABLE_HUMO_HOSTS is opted ON (default OFF)."""
+    import os
+    return os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+
 
 def build_radio_host_prompt(meta, aspect: str = "portrait") -> str:
     """FULL prompt for the animatable radio-HOST FACE still (ONLY HuMo hosts).
@@ -974,6 +988,31 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         if pinfo.get("negative_prompt"):
             _pobj["negative_prompt"] = pinfo["negative_prompt"]
         objects.append(_pobj)
+
+    # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable human
+    # face this feature grants. GATED on OTR_ENABLE_HUMO_HOSTS so OFF is
+    # byte-identical (no extra object minted). Minted ONCE per episode with its
+    # own object_id (kind=portrait -> render_driver._portrait_index resolves it
+    # as the HuMo init_image for the LINELESS announcer/music bookends). Aspect
+    # FOLLOWS the HuMo bookend slot (music_visual, else announcer_visual) so a
+    # wide HuMo engine is not fed a pillarboxed portrait; seed is pinned to
+    # OTR_RADIO_BOOKEND_SEED in the dispatcher (open/inter/close share ONE face).
+    # The no-baby negative is populated on the row.
+    if _humo_hosts_enabled():
+        _rh_aspect = (_role_aspects.get("music_visual")
+                      or _role_aspects.get("announcer_visual") or "portrait")
+        _rh_prompt = build_radio_host_prompt(meta, _rh_aspect)
+        _rhw, _rhh = still_dims_for_aspect(_rh_aspect, PORTRAIT_W, PORTRAIT_H)
+        objects.append({
+            "object_id": RADIO_HOST_PORTRAIT_ID,
+            "kind": "portrait",
+            "role": "music_visual",
+            "w": _rhw, "h": _rhh,
+            "prompt": _rh_prompt,
+            "prompt_hash": _content_hash(_rh_prompt),
+            "negative_prompt": RADIO_HOST_FACE_NEG,
+            "source": "radio_host_portrait",
+        })
 
     # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
     # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The

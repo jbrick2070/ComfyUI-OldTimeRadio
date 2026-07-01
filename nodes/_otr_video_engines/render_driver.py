@@ -794,6 +794,13 @@ def _role_of_shot(shot) -> str:
 #: default_roles) -- reused, not a new engine.
 _NEVER_HUMO_REDIRECT_ENGINE = "ltx_audio_in"
 
+#: The brief-driven radio-HOST FACE object minted once per episode by MetaBrief
+#: under OTR_ENABLE_HUMO_HOSTS (must match
+#: otr_meta_brief_image_prompt.RADIO_HOST_PORTRAIT_ID + the dispatcher's seed
+#: pin). Resolved as the HuMo init_image for the lineless announcer/music
+#: bookends when the toggle is ON.
+_RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
+
 #: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
 #: (announcer_visual / music_visual / character_video / scene_broll /
 #: background_abstract) to the LEDGER speaker_role vocabulary
@@ -837,7 +844,15 @@ def _enforce_radio_is_host(shot):
     logic (canvas / init_image / audio resolution) so everything downstream
     sees the corrected engine -- call this FIRST in
     :func:`build_request_from_shot`. No-op for every other role/engine; pure
-    except for the LOUD log + the in-place mutation."""
+    except for the LOUD log + the in-place mutation.
+
+    OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the operator
+    opts the toggle ON, the announcer/music bookends are ALLOWED to render a HuMo
+    radio-host FACE (fed the brief-driven radio_host_portrait still downstream),
+    so this redirect is a NO-OP. Default OFF = today's behavior byte-for-byte
+    (HuMo on bookends still redirects to the ltx_audio_in animated console)."""
+    if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
+        return
     role = _role_of_shot(shot)
     if not _is_never_humo_video_role(role):
         return
@@ -1072,6 +1087,36 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # already redirected it to ltx_audio_in before _family was computed. The
     # ltx_audio_in / still_pan / still_flat scene-still branch above supplies
     # its init_image instead.
+    # OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host, chunk 4): a
+    # LINELESS announcer/music bookend on a HuMo (audio_driven_face) engine has
+    # char_id="" -> no cast portrait -> empty init_image. Under the toggle, feed
+    # it the episode's ONE brief-driven radio_host_portrait FACE still (minted
+    # once by MetaBrief, kind=portrait, resolved via _portrait_index). Fail LOUD
+    # if the toggle is ON but the face still is absent -- NEVER a black-screen
+    # fallback. (Toggle OFF: _enforce_radio_is_host already redirected these off
+    # HuMo, so this block never triggers -> byte-identical.)
+    if (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+            and not init_image
+            and _family == "audio_driven_face"
+            and _is_never_humo_video_role(_role_of_shot(shot))):
+        _rh = _portrait_index(ledger).get(_RADIO_HOST_PORTRAIT_ID, "")
+        if _rh:
+            init_image = _rh
+            init_source = "radio_host_portrait"
+            _LOG.warning(
+                "[OTR.render_driver] HUMO-HOSTS: role=%s shot %s conditioning on "
+                "the brief-driven radio_host_portrait FACE still %s (the one "
+                "animatable host face)", _role_of_shot(shot), shot.get("shot_id"),
+                os.path.basename(_rh))
+        else:
+            raise RenderError(
+                "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait FACE "
+                "still is in the ledger for the lineless %s bookend shot %s -- "
+                "the HuMo host has no init_image. NO FALLBACK (never a black "
+                "screen): confirm MetaBrief minted radio_host_portrait (it mints "
+                "only when the toggle was ON at the image phase) and the image "
+                "dispatcher rendered it." % (_role_of_shot(shot),
+                                             shot.get("shot_id")))
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):

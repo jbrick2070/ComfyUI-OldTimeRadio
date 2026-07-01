@@ -124,7 +124,12 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
     env-overridable via ``OTR_RADIO_BOOKEND_SEED``) so the opening radio still is
     reproducible run-to-run independent of the request hash -- exactly the 6/5
     behavior the rewrite lost."""
-    if str(kind or "") == "scene_open":
+    # The radio BOOKEND still (scene_open) AND the radio-HOST FACE object
+    # (2026-07-01 brief-driven radio-host; object_id "radio_host_portrait",
+    # matches otr_meta_brief_image_prompt.RADIO_HOST_PORTRAIT_ID) both render
+    # with the FIXED deterministic bookend seed so the host face is reproducible
+    # run-to-run and open/inter/close share ONE canonical face.
+    if str(kind or "") == "scene_open" or str(object_id or "") == "radio_host_portrait":
         try:
             return int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))
         except (TypeError, ValueError):
