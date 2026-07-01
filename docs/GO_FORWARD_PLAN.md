@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-06-30 | HEAD e3edc1ac == origin/v2.0-alpha | branch v2.0-alpha.
+> Last updated 2026-06-30 | HEAD b05f1754 == origin/v2.0-alpha | branch v2.0-alpha.
 > **FORWARD-ONLY / ACTION ITEMS ONLY.** Shipped/done work lives in `docs/GO_FORWARD_ARCHIVE.md` --
 > do NOT record done work here. prod/main + tags remain operator-GATED.
 
