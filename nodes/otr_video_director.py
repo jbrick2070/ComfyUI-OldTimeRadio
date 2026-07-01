@@ -59,8 +59,17 @@ def _aspect_suffix(engine_id) -> str:
 
 
 def _label_for(engine_id) -> str:
-    """The dropdown LABEL for an engine id: ``'<id><aspect suffix>'``."""
-    return "%s%s" % (engine_id, _aspect_suffix(engine_id))
+    """The dropdown LABEL for an engine id:
+    ``'<id><aspect suffix><vram tier suffix>'`` (e.g.
+    ``'humo_1.7B (portrait) (~6.8GB)'``). The VRAM-tier suffix (2026-06-30 item
+    5) is auto-derived from the registry CAPABILITIES table
+    (:func:`_vreg.vram_tier_label`) -- never hand-maintained, same contract as
+    the aspect suffix. Both suffixes start with ``' ('`` so
+    :func:`_engine_id_from_pick`'s first-``' ('``-truncation strips them
+    together; a zero-VRAM engine (no aspect known, no VRAM estimate) still
+    round-trips to the bare id."""
+    return "%s%s%s" % (engine_id, _aspect_suffix(engine_id),
+                       _vreg.vram_tier_label(engine_id))
 
 
 #: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that

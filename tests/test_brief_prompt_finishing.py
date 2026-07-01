@@ -229,11 +229,18 @@ def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
 
 
 def test_humo_announcer_beat_keeps_radio_styling():
+    # NOTE 2026-06-30: _enforce_radio_is_host redirects this fixture's
+    # engine_id="humo" pick to "ltx_audio_in" before any prompt logic runs (an
+    # announcer_visual beat can no longer stay on a HuMo-family engine -- "the
+    # radio is the host"). The M4-verbatim-prompt handling below is IDENTICAL
+    # on either engine for this exempt (announcer, gear-not-scrubbed) case, so
+    # the assertions are unchanged; only the reason they hold has shifted.
     from nodes._otr_video_engines import render_driver as rd
     creative = {"text_prompt": ("vintage radio announcer at a chrome "
                                 "microphone, ON AIR sign"), "source": "llm"}
-    req = rd.build_request_from_shot(
-        _face_shot("announcer_visual", creative), _FACE_LEDGER)
+    shot = _face_shot("announcer_visual", creative)
+    req = rd.build_request_from_shot(shot, _FACE_LEDGER)
+    assert shot["engine_id"] == "ltx_audio_in"           # redirected off HuMo
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
     assert req["observability"]["prompt_source"] == "m4"
 
@@ -249,12 +256,22 @@ def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
     assert "no " not in p.lower()                      # no negations
 
 
-def test_humo_announcer_beat_missing_creative_keeps_studio_default():
+def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console():
+    """2026-06-30 HuMo-improve plan (reversing Route-A 2026-06-28, "the radio
+    is the host"): render_driver._enforce_radio_is_host now redirects an
+    announcer_visual pick of a HuMo-family engine to ltx_audio_in BEFORE any
+    prompt logic runs (this fixture's ``_face_shot`` still requests
+    engine_id="humo" -- the point is that the driver no longer honors it for
+    this role). A beat with no M4 creative prompt therefore no longer falls to
+    the old hardcoded "1940s radio studio" HuMo default: it flows through the
+    pre-existing role-driven LTX motion-prompt path (_ltx_motion_role_key),
+    producing an animated RADIO-CONSOLE prompt -- never a human face."""
     from nodes._otr_video_engines import render_driver as rd
-    req = rd.build_request_from_shot(
-        _face_shot("announcer_visual", {}), _FACE_LEDGER)
-    assert req["observability"]["prompt_source"] == "default"
-    assert "radio studio" in req["text_prompt"]        # by-design default
+    shot = _face_shot("announcer_visual", {})
+    req = rd.build_request_from_shot(shot, _FACE_LEDGER)
+    assert shot["engine_id"] == "ltx_audio_in"              # redirected off HuMo
+    assert req["observability"]["prompt_source"] == "motion_role"
+    assert "console" in req["text_prompt"].lower()
 
 
 def test_gear_scrub_regex_lockstep_with_image_prompt_module():

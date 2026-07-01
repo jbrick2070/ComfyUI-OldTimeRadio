@@ -247,8 +247,24 @@ def _should_loop_fill(row, target_n):
     (``build_clip_manifest`` keeps it raw) vs the beat ``target_frame_count``;
     ANY shortfall fills. A frame-DIRECTORY clip (the 3D alpha handoff) is exempt
     -- it has its own dir encoder. Env ``OTR_CLIP_FILL=0`` restores the legacy
-    held-last-frame behavior. Pure (a single os.path.isdir probe)."""
+    held-last-frame behavior.
+
+    ``audio_driven_face`` (HuMo) is ALSO exempt (2026-06-30 HuMo-improve plan):
+    looping a talking/lip-synced face DESYNCS the mouth from its own audio (the
+    loop replays an earlier mouth shape against later audio) -- WORSE than a
+    static hold. A held-last-frame beat is honest (the LOUD ``held_last_frame``
+    legibility status in :func:`timeline_quality_report`, never silenced) while
+    a loop-filled one would masquerade as an OK-ish ``looped_fill``. The real
+    fix is phrase-chunking (render the beat's correct duration so it never
+    underruns) -- tracked as a follow-up; this is the safe interim behavior.
+    Reads ``row["family"]`` (stamped onto every manifest clip row by
+    render_driver, e.g. ``clip.get("family") or shot.get("family")``) -- no
+    registry import needed here (this module stays dep-free / pure).
+
+    Pure (a single os.path.isdir probe)."""
     if os.environ.get("OTR_CLIP_FILL", "1") == "0":
+        return False
+    if str((row or {}).get("family") or "") == "audio_driven_face":
         return False
     real = int((row or {}).get("frame_count") or 0)
     tgt = int(target_n or 0)

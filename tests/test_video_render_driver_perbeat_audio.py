@@ -233,6 +233,80 @@ class TestAmbientAudioMusicBeatGap:
 
 
 # --------------------------------------------------------------------------- #
+# 2026-06-30 HuMo-improve plan -- "radio is the host" (reversing Route-A
+# 2026-06-28): announcer_visual / music_visual must NEVER dispatch a HuMo-
+# family (audio_driven_face) engine. Wires the previously-dormant
+# nodes._otr_speaker_role.is_never_humo_role into real render_driver dispatch.
+# --------------------------------------------------------------------------- #
+class TestRadioIsHostGuard:
+    def test_music_and_announcer_humo_picks_redirect_to_ltx_audio_in(self):
+        for role, engine_id in (("music_visual", "humo"),
+                                ("announcer_visual", "humo_1.7B")):
+            shot = {"shot_id": "s", "beat_id": "b", "role": role,
+                    "engine_id": engine_id, "family": "audio_driven_face"}
+            rd._enforce_radio_is_host(shot)
+            assert shot["engine_id"] == "ltx_audio_in", (role, engine_id)
+            assert shot["family"] == "audio_conditioned_video", (role, engine_id)
+
+    def test_character_video_humo_is_untouched(self):
+        # character_video is the ONLY role HuMo may still serve (real dialogue
+        # lip-sync) -- the guard must be a no-op here.
+        shot = {"shot_id": "s", "beat_id": "b", "role": "character_video",
+                "engine_id": "humo_14B_169", "family": "audio_driven_face"}
+        rd._enforce_radio_is_host(shot)
+        assert shot["engine_id"] == "humo_14B_169"
+        assert shot["family"] == "audio_driven_face"
+
+    def test_non_humo_bookend_engine_is_untouched(self):
+        # A non-audio_driven_face engine on a bookend role is already fine (the
+        # operator picked viz_green / ltx_audio_in themselves) -- no-op.
+        shot = {"shot_id": "s", "beat_id": "b", "role": "music_visual",
+                "engine_id": "viz_green", "family": "abstract"}
+        rd._enforce_radio_is_host(shot)
+        assert shot["engine_id"] == "viz_green"
+        assert shot["family"] == "abstract"
+
+    def test_scene_broll_and_background_abstract_are_not_gated(self):
+        # These roles cannot supply audio_ref in the first place (role_compat),
+        # so HuMo could never land here in practice -- confirm the guard is
+        # still correctly scoped to only the two bookend roles either way.
+        for role in ("scene_broll", "background_abstract"):
+            shot = {"shot_id": "s", "beat_id": "b", "role": role,
+                    "engine_id": "humo", "family": "audio_driven_face"}
+            rd._enforce_radio_is_host(shot)
+            assert shot["engine_id"] == "humo"
+
+    def test_is_never_humo_video_role_proxies_the_canonical_speaker_role_table(self):
+        # The video-role check is a thin proxy over the canonical LEDGER
+        # speaker_role policy (_otr_speaker_role.is_never_humo_role) -- not a
+        # second, independently-maintained list.
+        assert rd._is_never_humo_video_role("announcer_visual") is True
+        assert rd._is_never_humo_video_role("music_visual") is True
+        assert rd._is_never_humo_video_role("character_video") is False
+        assert rd._is_never_humo_video_role("scene_broll") is False
+        assert rd._is_never_humo_video_role("not_a_role") is False
+
+    def test_build_request_from_shot_applies_guard_before_engine_keyed_logic(self):
+        """End-to-end: build_request_from_shot (the REAL episode path) applies
+        the redirect BEFORE any engine-keyed branch runs, so a HuMo-picked
+        bookend is already ltx_audio_in by the time init_image/canvas/audio are
+        resolved -- proving the guard is WIRED IN, not just defined."""
+        ledger = {
+            "video": {"fps": 25, "shots": [
+                {"shot_id": "shot_b000", "target_frame_count": 50}]},
+            "lines": [{"line_id": "b000"}],
+            "images": {"images": []},
+        }
+        shot = {"shot_id": "shot_b000", "beat_id": "b000", "role": "music_visual",
+                "engine_id": "humo", "family": "audio_driven_face",
+                "target_frame_count": 50, "source_line_ids": ["b000"],
+                "creative": {}}
+        rd.build_request_from_shot(shot, ledger)
+        assert shot["engine_id"] == "ltx_audio_in"
+        assert shot["family"] == "audio_conditioned_video"
+
+
+# --------------------------------------------------------------------------- #
 # 7.3 slice/curve cache-key SPLIT (3D plan; don't over-key the cheap WAV)
 # --------------------------------------------------------------------------- #
 

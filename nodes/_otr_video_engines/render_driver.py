@@ -34,6 +34,11 @@ from .._otr_shared import retry_taxonomy as _rt
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
 from .._otr_shared.fallback import resolve_fallback_chain
 from .._otr_shared.resolver import prune_orphaned_groups
+from .._otr_speaker_role import (
+    SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
+    SPEAKER_ROLE_MUSIC_OPEN as _SPEAKER_ROLE_MUSIC_OPEN,
+    is_never_humo_role as _is_never_humo_role,
+)
 from . import motion_common as _mc
 from . import registry as _vreg
 
@@ -773,21 +778,83 @@ def _role_of_shot(shot) -> str:
     return role
 
 
-#: The committed default custom "radio-face" still HuMo animates on the
-#: instrumental MUSIC bookend (Route-A, 2026-06-28 operator call). Repo-relative
-#: so it ships with the pack; override with OTR_RADIO_BOOKEND_IMAGE.
-_RADIO_BOOKEND_IMAGE_DEFAULT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "assets", "radio_face_bookend.png")
+#: RADIO IS THE HOST (2026-06-30 HuMo-improve plan, reversing Route-A
+#: 2026-06-28). The Route-A workaround that animated a "radio-face" still as
+#: HuMo's init_image for the instrumental MUSIC bookend (formerly here as
+#: _RADIO_BOOKEND_IMAGE_DEFAULT / _radio_bookend_image()) is RETIRED: the
+#: operator eyeballed the result and got a generic human host, not a radio --
+#: confirming the original 2026-05-01 BUG-LOCAL-129 finding (HuMo's finetuned
+#: weights only animate a face) still holds. The replacement is a structural
+#: redirect (below), not another HuMo init-image trick.
+#:
+#: The engine every announcer_visual / music_visual beat is redirected to when
+#: it would otherwise dispatch a HuMo-family (audio_driven_face) engine: the
+#: EXISTING, general LTX-2.3 audio-in lane (family audio_conditioned_video,
+#: already the per-role DEFAULT for these two roles -- see eng_ltx_av.py
+#: default_roles) -- reused, not a new engine.
+_NEVER_HUMO_REDIRECT_ENGINE = "ltx_audio_in"
+
+#: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
+#: (announcer_visual / music_visual / character_video / scene_broll /
+#: background_abstract) to the LEDGER speaker_role vocabulary
+#: nodes._otr_speaker_role.is_never_humo_role actually checks (character /
+#: announcer / music_open / music_close / music_inter / sfx). Only ONE
+#: representative speaker_role per video role is needed -- all three MUSIC_*
+#: values are equally "never humo" in _NEVER_HUMO_ROLES, so MUSIC_OPEN stands
+#: in for music_visual. character_video / scene_broll / background_abstract
+#: have no entry -- they are never subject to this guard.
+_VIDEO_ROLE_NEVER_HUMO_PROXY = {
+    "announcer_visual": _SPEAKER_ROLE_ANNOUNCER,
+    "music_visual": _SPEAKER_ROLE_MUSIC_OPEN,
+}
 
 
-def _radio_bookend_image() -> str:
-    """Resolve the radio-face still for the HuMo music bookend: the
-    ``OTR_RADIO_BOOKEND_IMAGE`` env override else the committed default asset.
-    Returns "" (LOUD at the call site) if neither exists -- never a missing path
-    fed to the engine."""
-    cand = os.environ.get("OTR_RADIO_BOOKEND_IMAGE") or _RADIO_BOOKEND_IMAGE_DEFAULT
-    return cand if (cand and os.path.isfile(cand)) else ""
+def _is_never_humo_video_role(role: str) -> bool:
+    """True iff ``role`` (a VIDEO-engine role) must never dispatch HuMo, per the
+    canonical ledger-speaker_role policy table (_otr_speaker_role.py, 2026-05-01,
+    "the radio IS the host") -- consulted through :data:`_VIDEO_ROLE_NEVER_HUMO_PROXY`
+    since the two role vocabularies differ. Pure; unknown role -> False."""
+    proxy = _VIDEO_ROLE_NEVER_HUMO_PROXY.get(role)
+    return bool(proxy) and _is_never_humo_role(proxy)
+
+
+def _enforce_radio_is_host(shot):
+    """Mutate ``shot`` IN PLACE (the ledger's own dict, by reference -- same
+    pattern as the OTR_FORCE_ENGINE_MAP override below) so an announcer_visual /
+    music_visual beat can NEVER dispatch a HuMo-family (audio_driven_face)
+    engine: "the radio is the host", never a talking human face for the
+    bookends (operator 2026-05-01, re-affirmed 2026-06-30 after Route-A's HuMo
+    bookend workaround produced a generic face on eyeball -- see the
+    :data:`_NEVER_HUMO_REDIRECT_ENGINE` comment above).
+
+    Wires the previously-dormant :func:`nodes._otr_speaker_role.is_never_humo_role`
+    (defined 2026-05-01, zero callers until now) into REAL dispatch. A caught
+    pick is LOUDLY redirected to :data:`_NEVER_HUMO_REDIRECT_ENGINE` -- never a
+    hard-fail: this is a structural POLICY correction applied BEFORE any render
+    is attempted, not a render-time failure, so it does not touch the separate
+    NO-FALLBACKS rule in :func:`render_shot` (a HARD render failure still raises
+    LOUD with no engine swap). Must run before any engine-specific request
+    logic (canvas / init_image / audio resolution) so everything downstream
+    sees the corrected engine -- call this FIRST in
+    :func:`build_request_from_shot`. No-op for every other role/engine; pure
+    except for the LOUD log + the in-place mutation."""
+    role = _role_of_shot(shot)
+    if not _is_never_humo_video_role(role):
+        return
+    eng_id = str(shot.get("engine_id") or "")
+    if engine_family(eng_id, "") != "audio_driven_face":
+        return
+    _LOG.warning(
+        "[OTR.render_driver] RADIO-IS-HOST (LOUD): role=%s picked HuMo-family "
+        "engine %r for shot %s -- HuMo's finetuned weights only animate a "
+        "FACE (2026-05-01 BUG-LOCAL-129, re-confirmed 2026-06-30: an all-HuMo "
+        "bookend eyeballed as a generic human host, not a radio); redirecting "
+        "to %r. Pick a non-audio_driven_face engine for this role to silence "
+        "this override.", role, eng_id, shot.get("shot_id"),
+        _NEVER_HUMO_REDIRECT_ENGINE)
+    shot["engine_id"] = _NEVER_HUMO_REDIRECT_ENGINE
+    shot["family"] = engine_family(_NEVER_HUMO_REDIRECT_ENGINE,
+                                   "audio_conditioned_video")
 
 
 def _cumulative_beat_start(ledger, shot, fps):
@@ -839,6 +906,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     WAV) from which per-beat audio is sliced when the ledger carries no
     per-line ``*_wav_path``.  Passed in via :func:`run_real_episode` so the
     file is never mutated (read-only ``ffmpeg -i``)."""
+    # RADIO IS THE HOST (2026-06-30): must run FIRST, before any engine-keyed
+    # branch below reads shot["engine_id"] -- a caught announcer/music + HuMo
+    # pick is redirected here so every downstream resolution (init_image,
+    # canvas, audio) already sees the corrected engine.
+    _enforce_radio_is_host(shot)
     line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
     # Round 5 F5: the SHOT row carries the ShotLock-normalized char_id (the
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
@@ -994,26 +1066,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "(init_source=missing_scene_still). This should not happen "
                 "after the still-spine coverage fix; investigate the image "
                 "phase for beat %s.", _bid, _bid)
-    # Route-A (2026-06-28): the instrumental MUSIC bookend (char_id="" -> no
-    # portrait) routed to HuMo would abort (no init_image, no fallbacks). Operator
-    # call: animate a custom radio-FACE still to the opening/closing theme. Give
-    # the humo music bookend that image as its init_image; the theme audio rides
-    # the ambient master slice (_uses_ambient_master_audio now covers humo
-    # bookends). Only the music bookend (no portrait) takes this -- a real
-    # character/announcer humo beat already has its portrait above.
-    if (not init_image and _family == "audio_driven_face"
-            and _role_of_shot(shot) == "music_visual"):
-        _radio = _radio_bookend_image()
-        if _radio:
-            init_image = _radio
-            init_source = "radio_bookend"
-            _LOG.info("[OTR.render_driver] music bookend %s: HuMo radio-face "
-                      "still %s", shot.get("shot_id"), os.path.basename(_radio))
-        else:
-            _LOG.warning("[OTR.render_driver] music bookend %s: HuMo radio-face "
-                         "still MISSING (set OTR_RADIO_BOOKEND_IMAGE or ship "
-                         "assets/radio_face_bookend.png) -- beat will fail LOUD",
-                         shot.get("shot_id"))
+    # Route-A's HuMo-radio-face music-bookend workaround (2026-06-28) is RETIRED
+    # 2026-06-30 (see _enforce_radio_is_host above): a music_visual beat can no
+    # longer reach this point with _family == "audio_driven_face" -- the guard
+    # already redirected it to ltx_audio_in before _family was computed. The
+    # ltx_audio_in / still_pan / still_flat scene-still branch above supplies
+    # its init_image instead.
     if (not init_image
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
@@ -1049,19 +1107,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # from the beat's target_frame_count (its audio-derived length) at its
         # cumulative timeline position -- NEVER the whole master (an episode-length
         # WAV would blow up the audio encoder).
-        # Route-A (2026-06-28): the HuMo MUSIC bookend (instrumental open/close,
-        # no per-line voice) must ALSO get a bounded master THEME slice so HuMo is
-        # not starved of audio_ref. Targeted HERE, not in _uses_ambient_master_audio
-        # -- that predicate by contract EXCLUDES audio_driven_face so a humo
-        # CHARACTER beat keeps its OWN clean voice; only the music bookend (role
-        # music_visual, is_char_face already False) takes the theme slice.
-        _humo_music_bookend = (_family == "audio_driven_face"
-                               and _role_of_shot(shot) == "music_visual")
+        # Route-A's dedicated HuMo-music-bookend theme-slice carve-out
+        # (2026-06-28) is RETIRED 2026-06-30: a music_visual beat can no longer
+        # reach this point on an audio_driven_face engine (_enforce_radio_is_host
+        # redirects it to ltx_audio_in upstream), and _uses_ambient_master_audio
+        # already covers ltx_audio_in's audio_conditioned_video family directly
+        # -- no separate carve-out needed.
         if ((start_s is None or dur_s is None)
-                and (_humo_music_bookend
-                     or _uses_ambient_master_audio(
-                         shot.get("engine_id"), _family,
-                         _is_character_face_beat(shot)))):
+                and _uses_ambient_master_audio(
+                    shot.get("engine_id"), _family,
+                    _is_character_face_beat(shot))):
             _afps = int(((ledger or {}).get("video") or {}).get("fps") or 25) or 25
             _an = int(shot.get("target_frame_count") or 0)
             if dur_s is None:

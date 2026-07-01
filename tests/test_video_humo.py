@@ -42,7 +42,12 @@ def test_humo_registered_and_dark():
     assert eng.default_roles == ()                 # not a default
     assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("audio_ref", "init_image")
-    assert eng.roles == ("announcer_visual", "music_visual", "character_video")
+    # RADIO IS THE HOST (2026-06-30, reversing Route-A 2026-06-28): HuMo serves
+    # ONLY character_video now. This tuple is UI-SORT/self-description metadata
+    # only -- role_compat.engine_fits_role (below) is capability-only and does
+    # not consult it; the actual hard gate against announcer/music is
+    # render_driver._enforce_radio_is_host.
+    assert eng.roles == ("character_video",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
     assert eng.fallback_engine == "humo_1.7B"      # 14B degrades to the 1.7B tier first
@@ -64,8 +69,13 @@ def test_humo_required_inputs_match_family_schema():
 # Registry gating (dark until the opt-in flag) + role membership
 # --------------------------------------------------------------------------- #
 def test_registry_humo_selectable_no_flag(monkeypatch):
-    # Registry IS the menu: humo is usable for every role it serves with NO flag
-    # gate. Role incompatibility still fails closed.
+    # Registry IS the menu: humo is usable for NO flag gate. assert_usable is
+    # CAPABILITY-only (role_compat.engine_fits_role) and does NOT consult the
+    # `.roles` whitelist, so it still passes announcer_visual/music_visual here
+    # -- capability-FIT is necessary but no longer SUFFICIENT for those two
+    # roles; render_driver._enforce_radio_is_host is the separate, higher-level
+    # policy gate that redirects any such real dispatch to ltx_audio_in
+    # (2026-06-30 HuMo-improve plan, "the radio is the host").
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"
@@ -82,8 +92,12 @@ def test_humo_role_fit_audio_driven_face():
     desc = {"engine_id": "humo", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
     # announcer_visual, music_visual AND character_video all supply BOTH
-    # init_image and audio_ref, so HuMo fits all three (operator 2026-06-16:
-    # HuMo selectable in every role dropdown).
+    # init_image and audio_ref, so HuMo capability-FITS all three -- this is
+    # the low-level input-token check only. Whether HuMo is actually ALLOWED to
+    # dispatch for a role is a separate, higher-level policy
+    # (render_driver._enforce_radio_is_host, 2026-06-30): announcer_visual /
+    # music_visual are policy-forbidden ("radio is the host") even though they
+    # fit here; only character_video is both fit AND allowed.
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role) is True
     # scene_broll has no audio_ref; background_abstract supplies only text ->

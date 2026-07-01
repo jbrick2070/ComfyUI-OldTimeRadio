@@ -86,12 +86,22 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     name = "humo"
     family = "audio_driven_face"
-    # HuMo needs BOTH an init_image (a face) AND an audio_ref. role_compat
-    # supplies both to announcer_visual, music_visual AND character_video, so the
-    # operator can pick HuMo (portrait OR 16:9) in ALL THREE role dropdowns
-    # (operator 2026-06-16). Only the truly audio-less roles (scene_broll /
-    # background_abstract) stay excluded fail-closed.
-    roles = ("announcer_visual", "music_visual", "character_video")
+    # RADIO IS THE HOST (reversal of Route-A 2026-06-28, operator 2026-06-30):
+    # HuMo's finetuned weights only animate a FACE. Route-A had added
+    # announcer_visual/music_visual here + a radio-face-still workaround
+    # (render_driver._radio_bookend_image, since REMOVED) so the operator could
+    # pick HuMo for the music/announcer bookends; the eyeballed render showed a
+    # generic human host, not a radio -- confirming the ORIGINAL 2026-05-01
+    # BUG-LOCAL-129 finding (nodes/_otr_speaker_role.py) still holds. HuMo now
+    # serves ONLY character_video (real dialogue lip-sync). This tuple is
+    # UI-SORT/self-description metadata only (role_compat.engine_fits_role is
+    # capability-only and does not consult it -- see registry.VideoEngineRegistry
+    # docstring); the actual hard gate is render_driver._enforce_radio_is_host,
+    # which wires the previously-dormant _otr_speaker_role.is_never_humo_role
+    # into real dispatch and redirects any announcer_visual/music_visual +
+    # audio_driven_face pick to ltx_audio_in (the LTX-2.3 audio-in lane already
+    # DEFAULT for those two roles -- see eng_ltx_av.py default_roles).
+    roles = ("character_video",)
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
     commercial_clean = False            # license is profile data; verify-at-build

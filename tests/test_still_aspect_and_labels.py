@@ -1,11 +1,15 @@
-"""Still-aspect correctness + obvious HuMo dropdown labels (2026-06-17).
+"""Still-aspect correctness + obvious HuMo dropdown labels (2026-06-17; VRAM
+tier suffix added 2026-06-30, HuMo-improve plan item 5).
 
 Operator directive: every registered video/3D engine must declare an EXPLICIT
 ``render_aspect`` in {portrait, wide} so the director mints a matching init still
 (``ltx_video`` previously declared none -> silently defaulted portrait -> the wide
 render decapitated heads), and the per-role dropdown must show an aspect-DERIVED
 label (``humo (portrait)`` vs ``humo_1.7B_169 (16:9)``) while the SAVED value stays
-the bare engine id (back-compat with old saved graphs).
+the bare engine id (back-compat with old saved graphs). The label now ALSO
+appends a VRAM-tier suffix auto-derived from the registry CAPABILITIES table
+(``humo_1.7B (portrait) (~6.8GB)``) so the operator sees model + VRAM cost at a
+glance without opening the registry.
 """
 from __future__ import annotations
 
@@ -111,10 +115,25 @@ def test_role_aspects_unknown_engine_falls_back_portrait():
 # Goal B -- label <-> id round-trip (display-only, value-safe)
 # --------------------------------------------------------------------------- #
 def test_label_suffix_is_aspect_derived():
-    assert vd._label_for("humo") == "humo (portrait)"
-    assert vd._label_for("humo_1.7B") == "humo_1.7B (portrait)"
-    assert vd._label_for("humo_1.7B_169") == "humo_1.7B_169 (16:9)"
-    assert vd._label_for("ltx_video") == "ltx_video (16:9)"
+    assert vd._label_for("humo") == "humo (portrait) (~13.7GB)"
+    assert vd._label_for("humo_1.7B") == "humo_1.7B (portrait) (~6.8GB)"
+    assert vd._label_for("humo_1.7B_169") == "humo_1.7B_169 (16:9) (~6.8GB)"
+    assert vd._label_for("ltx_video") == "ltx_video (16:9) (~13.7GB)"
+
+
+def test_label_vram_tier_suffix_is_registry_derived():
+    # 2026-06-30 item 5: the VRAM-tier suffix is COMPUTED from CAPABILITIES'
+    # vram_estimate_mb, never a hand-maintained per-engine string.
+    assert vreg.vram_tier_label("humo_1.7B") == " (~6.8GB)"
+    assert vreg.vram_tier_label("not_a_real_engine") == ""     # unknown -> none
+
+
+def test_label_zero_vram_engine_gets_no_vram_suffix():
+    # A CPU-tier engine (vram_estimate_mb=0) needs no VRAM caveat -- the bare
+    # label (plus any aspect suffix) round-trips unchanged, preserving the
+    # back-compat contract for old saved graphs.
+    assert vreg.vram_tier_label("still_flat") == ""
+    assert vreg.CAPABILITIES["still_flat"]["vram_estimate_mb"] == 0
 
 
 def test_label_round_trips_to_bare_id():

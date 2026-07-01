@@ -356,6 +356,25 @@ CAPABILITIES = {
 __all__.append("CAPABILITIES")
 
 
+def vram_tier_label(name: str) -> str:
+    """Human VRAM-tier suffix for engine ``name``, e.g. ``' (~6.8GB)'`` --
+    DERIVED from the CAPABILITIES table's ``vram_estimate_mb``, never a
+    hand-maintained per-engine string (the same auto-derivation contract as
+    ``otr_video_director._aspect_suffix``). Returns ``''`` for an unregistered
+    name or a zero/absent estimate (the CPU-only engines need no VRAM caveat --
+    ``cpu_ok`` already implies free). Consumed by
+    ``otr_video_director._label_for`` so the per-role dropdown shows the model
+    AND its VRAM tier at a glance (2026-06-30 HuMo-improve plan item 5)."""
+    row = CAPABILITIES.get(str(name)) or {}
+    mb = row.get("vram_estimate_mb")
+    if not mb:
+        return ""
+    return " (~%.1fGB)" % (float(mb) / 1024.0)
+
+
+__all__.append("vram_tier_label")
+
+
 # ---------------------------------------------------------------------------
 # VALIDATED_ENGINES + validated_engine_names() REMOVED 2026-06-29 (C4 -- "registry
 # IS the menu"): there is NO validated-subset dropdown filter. Every REGISTERED

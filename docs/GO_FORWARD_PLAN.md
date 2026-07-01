@@ -88,9 +88,17 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 >    module/file/class names (`eng_visualizer.py` / `VisualizerEngine`) intentionally UNCHANGED -- only the
 >    registered engine_id was in scope. Suite 5878 passed/35 skipped/0 failed + Bug Bible 16/0 + B7 green;
 >    pushed, HEAD==origin.
-> 4. **HuMo improvements** -- KIBITZ `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` (in progress
->    2026-06-30; see `kibitz-runs/2026-06-30-humo/` for the hardened result). <- NEXT
-> 5. **mesh_stage MIN-ACCEPT** -- KIBITZ(r1) `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`.
+> 4. ~~HuMo improvements~~ -- **SHIPPED 2026-06-30** (`docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md`
+>    BUILD-READY items 1/2/4/5 -- see the detail bullet below for the full receipt; phrase-chunking (item
+>    1b, "the deepest change") and the HuMo-isolation smoke (portrait-knob A/B prerequisite) are explicitly
+>    SPLIT OUT as a follow-up per the plan's own suggestion, not bundled here). Suite 5889 passed/35
+>    skipped/0 failed + Bug Bible 16/0 + B7 green; pushed, HEAD==origin. No workflow-JSON change: the
+>    canonical `otr_scifi_16gb_full.json` node-87 announcer/music defaults were ALREADY `viz_green` (not
+>    `humo`) going in, so nothing there violated the new policy -- the fix is a structural CODE guard
+>    against a future dropdown pick or `OTR_FORCE_ENGINE_MAP` override, not a default-value change.
+>    Whether to promote `ltx_audio_in` (a HEAVY ~13.7GB engine) over the free `viz_green` as the shipped
+>    aesthetic default is a SEPARATE, GPU-smoke-gated decision, deliberately not made here.
+> 5. **mesh_stage MIN-ACCEPT** -- KIBITZ(r1) `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`. <- NEXT
 > 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
 > Invariants for all: single resident heavy <= 14.5 GB; audio byte-identical; no-fallback (hard-fail LOUD);
 > UTF-8 no BOM; SFW; workflow-JSON edited in the SAME change as code; suite+BugBible+B7 green + push per chunk.
@@ -175,18 +183,34 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
   - **KEEPER-ENGINE LOOK-QA IMPROVEMENTS (operator soak eyeball 2026-06-30) -- plans drafted, build
     post-soak:**
     - **HuMo (KEEP; 1.7B class + same VRAM):** `docs/2026-06-30-humo-improve/HUMO_IMPROVE_PLAN.md` --
-      portrait-quality levers (VRAM-neutral), the clip-underrun "all mush" fix (loop/ping-pong-fill, not
-      hold-last-frame), announcer/music bookend = RADIO not a face ("radio is the host"), HuMo dropdown
-      labels (model + VRAM tier), and a HuMo-ISOLATION SMOKE for fast low-VRAM A/B. KIBITZ after the soak.
+      **SHIPPED 2026-06-30** (see BUILD-READY QUEUE item 4 above for the full receipt): clip-underrun "all
+      mush" fix (`otr_silent_composite._should_loop_fill` now EXCLUDES `audio_driven_face` rows from
+      loop-fill -- looping a talking face desyncs the mouth from its audio, worse than a held frame; the
+      LOUD `held_last_frame` legibility guard still fires); announcer/music bookend = RADIO not a face
+      ("radio is the host", reversing Route-A 2026-06-28) via a NEW `render_driver._enforce_radio_is_host`
+      guard that wires the previously-dormant `_otr_speaker_role.is_never_humo_role` into real dispatch and
+      redirects any HuMo-family pick on those 2 roles to the existing `ltx_audio_in` engine (proven-good in
+      a live check: it flows through the pre-existing role-driven LTX motion-prompt path and produces an
+      animated radio-CONSOLE prompt, not a generic scene); `eng_humo.HuMoEngine.roles` narrowed to
+      `("character_video",)` (self-description only -- role_compat eligibility is capability-based and
+      unaffected); HuMo dropdown labels now auto-append a VRAM-tier suffix (see DROPDOWN LABELS below).
+      STILL OPEN (deliberately split out, per the plan's own note): phrase-chunking (the deepest/real fix
+      for clip-underrun -- render long dialogue in speech-aligned chunks within the 177-frame cap) and the
+      HuMo-isolation smoke (prerequisite for portrait-quality-knob A/B tuning only, not for the above).
     - **mesh_stage (KEEP -- "one must-have"):** `docs/2026-06-30-mesh-improve/MESH_STAGE_IMPROVE_PLAN.md`
       -- MIN-ACCEPT: opening/music beat = a 3D RADIO (not a body) + MORE HEADROOM (subject centered, not
       full top-to-bottom). Optional r1-only kibitz for further quality. Trellis is a musing-stage
       alternative 3D backend (3D-path decision still operator-gated).
-  - **DROPDOWN LABELS:** every option states model + variant + recipe + VRAM tier (HuMo: 1.7B = LOW-VRAM
-    ~3.3 GB fast draft / 14B = HIGH-VRAM ~15.9 GB max quality, spills on 16 GB; KEEP BOTH -- a real low/high
-    split, operator 2026-06-29; which LTX,
-    Wan i2v/ti2v, image model; "abstract/visualizer = audio-reactive, no scene image"). The owner
-    couldn't tell engines apart -- labels are required. Grounded label copy in RETEST_LIST B5.
+  - **DROPDOWN LABELS:** every option states model + variant + recipe + VRAM tier. **VRAM-tier suffix
+    SHIPPED 2026-06-30** (BUILD-READY QUEUE item 4): `registry.vram_tier_label` auto-derives ``' (~N.NGB)'``
+    from the CAPABILITIES table's `vram_estimate_mb` (never hand-maintained), appended in
+    `otr_video_director._label_for` after the existing aspect suffix -- e.g. `humo_1.7B (portrait)
+    (~6.8GB)` / `humo (portrait) (~13.7GB)` (the earlier "~3.3 GB / ~15.9 GB" figures floated in this doc
+    were STALE placeholders -- these registry-grounded numbers are the real ones; KEEP BOTH tiers, a real
+    low/high split, operator 2026-06-29). STILL OPEN: which LTX / Wan i2v/ti2v / image model each label
+    should additionally spell out beyond the auto-derived id+aspect+VRAM (e.g. recipe/quant detail); the
+    "abstract/visualizer(now viz_green) = audio-reactive, no scene image" wording still needs its own
+    label copy pass. Grounded label copy in RETEST_LIST B5.
   - **STAMP THE RECIPE IN THE LEDGER:** per-beat `delivered_engine` (video) + `image_engine` +
     `recipe/quant`, durable through `_merge_with_disk`, so every episode self-documents what made it
     ("what did I use?" is unanswerable from saved files today). Durable twin of no-fallbacks + labels.

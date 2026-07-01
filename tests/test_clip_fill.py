@@ -269,10 +269,14 @@ def test_dir_clip_not_loop_filled(monkeypatch, tmp_path):
 
 
 def test_timeline_quality_report_statuses(monkeypatch):
+    # NOTE 2026-06-30: row "b" (ltx / no family / not audio_driven_face) is the
+    # generic loop-fill case; row "a" (humo) is now EXCLUDED from loop-fill (the
+    # audio_driven_face lip-sync guard below), so it holds instead.
     from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
     rows = [
-        {"shot_id": "a", "engine_id": "humo", "path": "a.mp4", "exists": True,
+        {"shot_id": "a", "engine_id": "humo", "family": "audio_driven_face",
+         "path": "a.mp4", "exists": True,
          "frame_count": 100, "target_frame_count": 280, "start_s": None},
         {"shot_id": "b", "engine_id": "ltx", "path": "b.mp4", "exists": True,
          "frame_count": 280, "target_frame_count": 280, "start_s": None},
@@ -282,12 +286,65 @@ def test_timeline_quality_report_statuses(monkeypatch):
     segs, _ = sc.plan_timeline_segments(_manifest(rows))
     qa = sc.timeline_quality_report(_manifest(rows), segs)
     st = {b["shot_id"]: b["quality_status"] for b in qa["beats"]}
-    assert st["a"] == "looped_fill"
+    assert st["a"] == "held_last_frame"        # audio_driven_face: never loop
     assert st["b"] == "ok"
     assert st["c"] == "no_clip_segment"
-    assert qa["delivered_frames_ok"]                       # no held_last_frame
+    assert not qa["delivered_frames_ok"]        # row "a" IS a legibility failure
     da = next(b for b in qa["beats"] if b["shot_id"] == "a")
+    # the segment plan still spans the FULL target either way (loop vs hold is
+    # an ENCODING-time distinction, not a segment-length one) -- only the raw
+    # engine-reported frame_count differs from the target.
     assert da["delivered_frame_count"] == 280 and da["frame_count"] == 100
+
+
+def test_audio_driven_face_excluded_from_loop_fill(monkeypatch):
+    # 2026-06-30 HuMo-improve plan: looping a talking/lip-synced face desyncs
+    # the mouth from its own audio (the loop replays an earlier mouth shape
+    # against later audio) -- worse than a static hold. audio_driven_face
+    # (HuMo) rows are excluded from loop-fill even with OTR_CLIP_FILL=1
+    # (default) -- they fall to the pre-existing held-last-frame path, which
+    # the LOUD legibility guard (timeline_quality_report) still flags.
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [{"shot_id": "s", "engine_id": "humo_1.7B",
+             "family": "audio_driven_face", "path": "x.mp4", "exists": True,
+             "frame_count": 100, "target_frame_count": 280, "start_s": None}]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
+
+
+def test_non_face_engine_still_loop_fills_alongside_excluded_face(monkeypatch):
+    # The exclusion is PER-ROW family, not global: a non-audio_driven_face
+    # engine in the SAME manifest still gets the loop-fill benefit.
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [
+        {"shot_id": "face", "engine_id": "humo", "family": "audio_driven_face",
+         "path": "a.mp4", "exists": True, "frame_count": 100,
+         "target_frame_count": 280, "start_s": None},
+        {"shot_id": "broll", "engine_id": "wan_ti2v", "family": "image_to_video",
+         "path": "b.mp4", "exists": True, "frame_count": 100,
+         "target_frame_count": 280, "start_s": None},
+    ]
+    segs, _ = sc.plan_timeline_segments(_manifest(rows))
+    by_shot = {s["shot_id"]: s for s in segs if s["source"] == "clip"}
+    assert by_shot["face"]["loop"] is False
+    assert by_shot["broll"]["loop"] is True
+
+
+def test_should_loop_fill_reads_family_not_engine_name(monkeypatch):
+    # Direct unit coverage of the new gate: keyed on "family", not on any
+    # engine-name substring match (robust to a future audio_driven_face engine
+    # that isn't literally named "humo*").
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    assert sc._should_loop_fill(
+        {"frame_count": 10, "family": "audio_driven_face"}, 100) is False
+    assert sc._should_loop_fill(
+        {"frame_count": 10, "family": "image_to_video"}, 100) is True
+    # no family key at all (an incomplete/legacy row) -> not excluded, matches
+    # the pre-2026-06-30 behavior for rows that predate the family stamp.
+    assert sc._should_loop_fill({"frame_count": 10}, 100) is True
 
 
 def test_timeline_quality_report_held_when_fill_off(monkeypatch):
