@@ -132,7 +132,57 @@ user-selectable -- these are QUALITY FLOORS, never choice-limiting.
 >    the r2-r4 rounds (r1-only per operator). 17 new/updated tests across `tests/test_video_mesh_stage.py`
 >    + `tests/test_3d_image_streams.py`. Suite 5904 passed/35 skipped/0 failed + Bug Bible 16/7/3 green;
 >    pushed, HEAD==origin.
-> 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`. <- NEXT
+> 6. **S-A..S-F coverage-soak sprint** -- KIBITZ r1-r4 CONVERGED `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
+>    **AUDITED 2026-07-01: 7 of 11 sub-items were ALREADY SHIPPED in earlier sessions** (the plan doc
+>    itself was never updated to say so -- do NOT re-implement these, verify-only if revisiting):
+>    - ~~S-A clip-fill + legibility floor~~ SHIPPED `4e13a692` (refined `b05f1754`): `otr_silent_composite.py`
+>      `_should_loop_fill(row, target_n)` computes `frame_count>0 && frame_count<target`, called BEFORE
+>      `_warn_clip_underrun`; `loop=True` passed into `emit(...)`; raw `frame_count` stays engine-produced in
+>      `build_clip_manifest`; excludes `audio_driven_face` rows (HuMo) from loop-fill on purpose (desync
+>      risk -- a documented refinement beyond the plan text). Tests in `tests/test_clip_fill.py`.
+>    - ~~S-B ltx_audio_in VRAM fit~~ SHIPPED `eb8c3781`: per-beat observability line in `eng_ltx_av.py`
+>      (recipe/unet/quant/lora/canvas/frames/audio logged) + `VramPeakProbe`/`assert_peak_within_ceiling`;
+>      `OTR_LTX_AV_RENDER_CANVAS` env var (`render_driver.py`) defaults `"512x288"`. Actual live NVML
+>      peak-<=14.5GB confirmation across all 3 slots is still GPU-operator-verified, not re-checked here.
+>    - ~~S-D gemma wrapper-key drift~~ SHIPPED `5a50fa40`: `RadioEditPlan._unwrap_schema_name_wrapper`
+>      (`_otr_radio_editor.py:324-341`) peels EXACTLY `{"RadioEditPlan": {...}}`; multi-key/non-dict-inner
+>      wrappers LEFT UNTOUCHED (fail LOUD). Full test coverage in `tests/test_radio_editor_index_alias.py`
+>      (`test_unwrap_schema_name_wrapper`, `test_multi_key_wrapper_rejected`,
+>      `test_non_dict_inner_wrapper_not_unwrapped`, `test_single_key_non_wrapper_plan_ok`).
+>    - ~~S-E E5 recipe-stamp~~ SHIPPED `9e4f3a33`: `otr_video_render_batch.py`
+>      `_build_render_engines_payload` preserves histogram/video_revision/by_role/vram_peak_mb and adds
+>      `per_clip` (delivered_engine + recipe/quant/use_lora/render_canvas/vram_peak_mb) + a `by_engine`
+>      roll-up.
+>    - ~~S-E E6 announcer+music radio-themed still~~ SHIPPED (pre-existing): `ANNOUNCER_PORTRAIT_ANCHOR`
+>      (`otr_meta_brief_image_prompt.py`) wired unconditionally for every announcer char_id; gear-scrub
+>      explicitly exempts announcer rows.
+>    - ~~S-F visual smoke fixture~~ SHIPPED `c6c50579`: `scripts/otr_visual_smoke.py` bakes/replays against
+>      node-92 (`OTR_VideoRenderBatch`), patching `patched_ledger_json`/`master_audio_path`/`image_done`;
+>      `tests/test_visual_smoke_fixture.py`. Live `/history`-verified execution is still operator-run.
+>    - ~~BUG-411~~ VERIFIED DONE (pre-existing): FluxGuidance 3.5 (`_otr_image_engines/flux_gen1.py:88`),
+>      `STYLE_ANCHOR` + cinematic grade tail + radio distress tail (`otr_meta_brief_image_prompt.py`), bookend
+>      seed 4242 (`OTR_RADIO_BOOKEND_SEED`, `otr_image_gen_dispatcher.py:129,131`).
+>
+>    **REMAINING (NOT started / not finished -- the real gap):**
+>    - **E1 no-fallback scaffolding migration -- NOT STARTED.** `make_fallback_of(` is still a live call
+>      (`render_driver.py:1800`, `:2288`); `FLOOR_NAMES`/`UNIVERSAL_FLOOR`/`SYNTH_FALLBACKS`/
+>      `EXPECTED_OOM_TRAIL` still defined+used; `eng_character_3d.py` still references the fallback chain.
+>    - **E2 deprecate `allow_auto_fallback` in place -- NOT STARTED.** `otr_video_director.py:228` still a
+>      plain `BOOLEAN` widget passed straight through (`:354`), not forced false, not relabeled.
+>    - **E3 engine retirement -- PARTIALLY DONE / plan text is STALE.** `station_card` + `abstract` WERE
+>      retired (`8f701a73`, C0). `still_motion` is intentionally NOT retired (it is `UNIVERSAL_FLOOR`, the
+>      permanent always-renders radio floor + `mesh_stage`'s own `fallback_engine` target) -- the plan's
+>      original phrasing lumping it in with the other two no longer applies; only close E3 by editing this
+>      doc, do not unregister still_motion.
+>    - **E4 dropdown display metadata -- PARTIALLY DONE / cosmetic gap only.** The shipped VRAM-tier suffix
+>      (`registry.vram_tier_label`, this session's mesh-improve item) covers the round-trip contract; the
+>      plan's fuller wording (e.g. `"HuMo 1.7B, portrait, LOW-VRAM ~3.3 GB"`) was never built. Low priority.
+>    - **S-C C1 `audio_motion_profile` -- NOT STARTED.** Zero matches anywhere in the repo for
+>      `audio_motion_profile`; no schema field, producer node, or ledger stamp exists yet. C2 (per-engine
+>      consumers + HuMo phrase-chunking) stays deferred regardless per the plan's own scoping.
+>    Operator directive 2026-07-01: audit-and-document, do not re-implement the shipped 7; E1/E2/E3-doc/E4/C1
+>    remain open for a future session to pick up (E1/E2 are the load-bearing ones -- no-fallback is a
+>    standing operator directive; C1 is bigger/deferred-tail per the plan itself; E3/E4 are small doc/polish).
 > Invariants for all: single resident heavy <= 14.5 GB; audio byte-identical; no-fallback (hard-fail LOUD);
 > UTF-8 no BOM; SFW; workflow-JSON edited in the SAME change as code; suite+BugBible+B7 green + push per chunk.
 
