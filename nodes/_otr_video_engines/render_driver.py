@@ -752,17 +752,29 @@ def _is_character_face_beat(shot):
     return False
 
 
-def _uses_ambient_master_audio(engine_id, family, is_char_face=False):
+def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
     """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
     ``audio_conditioned_video`` family (ltx_av_music / ltx_audio_in BOOKEND beats --
     which HARD-require audio_ref) + the viz_green scopes. These get a bounded master
     slice when a beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk)
-    is EXCLUDED: it needs the character's OWN voice, so a master-mix slice would make
-    it lip-sync to the wrong audio. A CHARACTER-FACE beat is excluded for the SAME
-    reason regardless of family -- ``ltx_audio_in`` on a character beat must use the
-    character's clean own voice, never the ambient mix (2026-06-26 role-driven)."""
+    is normally EXCLUDED: it needs the character's OWN voice, so a master-mix slice
+    would make it lip-sync to the wrong audio. A CHARACTER-FACE beat is excluded for
+    the SAME reason regardless of family -- ``ltx_audio_in`` on a character beat must
+    use the character's clean own voice, never the ambient mix (2026-06-26 role-driven).
+
+    OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the toggle is ON,
+    a LINELESS announcer/music BOOKEND routes to HuMo (audio_driven_face) as the
+    radio-HOST face. That beat has NO per-line voice (it is the music/announcer bed),
+    yet HuMo HARD-requires ``audio_ref`` -- so the host is driven by the ambient MASTER
+    slice (it "hosts / sings" to the bed; deliberately not real lip-sync). This is the
+    ONE case an audio_driven_face beat uses the master mix, and only for the never-humo
+    bookend roles (a real CHARACTER face beat is still excluded above)."""
     if is_char_face:
         return False
+    if (str(family) == "audio_driven_face"
+            and os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+            and _is_never_humo_video_role(str(role or ""))):
+        return True
     return (str(family) == "audio_conditioned_video"
             or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"))
 
@@ -1216,7 +1228,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if ((start_s is None or dur_s is None)
                 and _uses_ambient_master_audio(
                     shot.get("engine_id"), _family,
-                    _is_character_face_beat(shot))):
+                    _is_character_face_beat(shot), role=_role_of_shot(shot))):
             _afps = int(((ledger or {}).get("video") or {}).get("fps") or 25) or 25
             _an = int(shot.get("target_frame_count") or 0)
             if dur_s is None:

@@ -226,6 +226,26 @@ def test_build_request_fails_loud_without_face_when_toggle_on(tmp_path, monkeypa
         rd.build_request_from_shot(_humo_bookend_shot(), led)
 
 
+def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
+    # A lineless music/announcer bookend routed to HuMo under the toggle has no
+    # per-line voice but HuMo hard-requires audio_ref -> it must use the ambient
+    # MASTER slice (host "sings" to the bed). Off / character-face stay excluded.
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    assert rd._uses_ambient_master_audio("humo", "audio_driven_face",
+                                         is_char_face=False, role="music_visual")
+    assert rd._uses_ambient_master_audio("humo", "audio_driven_face",
+                                         is_char_face=False, role="announcer_visual")
+    # a real CHARACTER face beat still uses its own voice (never the mix)
+    assert not rd._uses_ambient_master_audio("humo", "audio_driven_face",
+                                             is_char_face=True, role="character_video")
+    # character_video (not a bookend role) is not ambient even lineless
+    assert not rd._uses_ambient_master_audio("humo", "audio_driven_face",
+                                             is_char_face=False, role="character_video")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    assert not rd._uses_ambient_master_audio("humo", "audio_driven_face",
+                                             is_char_face=False, role="music_visual")
+
+
 def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypatch):
     # Toggle OFF: the music bookend is redirected off HuMo (byte-identical) so the
     # radio_host_portrait path never triggers.
