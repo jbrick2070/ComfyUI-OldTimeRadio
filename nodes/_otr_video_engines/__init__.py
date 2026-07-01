@@ -139,3 +139,15 @@ try:  # pragma: no cover - trivial guard
     from . import eng_viz_rainbow as _eng_viz_rainbow  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# viz_mxc_mandala (2026-06-30): the Cosmic Radio Mandala -- pycairo vector CPU
+# painter (tuning-eye + radio-dial rings/spokes + spectrum band), a SEPARATE
+# selectable engine alongside viz_mxc_cpu (the zero-dep PIL rainbow stays the
+# zero-dep alternate). Opt-in selectable, NOT a saved-widget default. Cold-import
+# clean (V-12: cairo/soundfile/PIL/scope_draw lazy in load/assert_usable/
+# render_clip -- cairo is NEVER at module scope). Guarded so a packaging quirk
+# never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_viz_mandala as _eng_viz_mandala  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

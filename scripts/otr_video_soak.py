@@ -67,6 +67,12 @@ ENGINE_FAMILY = {
     # render_driver.ENGINE_FAMILY.
     "still_pan": "static_image_gen",
     "still_flat": "static_image_gen",
+    # 2026-06-30: viz_mxc_cpu was a latent gap in this map (never added when it
+    # shipped); viz_mxc_mandala added in the SAME chunk it ships. Both are
+    # motion-exempt "abstract" -- no _PROFILES soak leg (the dedicated
+    # render-contract tests are the coverage), just kept in sync here.
+    "viz_mxc_cpu": "abstract",
+    "viz_mxc_mandala": "abstract",
 }
 
 #: (role, engine, family) rotation covering all 5 roles + the non-3D families.
