@@ -236,7 +236,22 @@ capability_profiles consumers.
 ## Appendices
 
 A: 3D docs-only (Tripo P1 / Rodin Gen2.5 / Meshy candidates; no
-sprint). B: Surface B (Comfy Cloud workflow) research flag
+sprint). DESIGNATED POC (operator, 2026-07-02) -- "THE PROP SHOT",
+buildable after S1+S3 with ONE new adapter:
+  1. hero in-character still (stills lane) -> ONE cloud image-to-3D row
+     (CHEAP-cand Tripo image-to-model; BEST Rodin Gen2.5) -> textured
+     GLB. No local 3D toolchain -- this is exactly what unparks 3D.
+  2. slow dolly/turntable render of the GLB -- local Blender 4.5.10
+     (already shipped + selftested, 0-E Phase A) or ComfyUI Load3D.
+  3. composite over the period background still (existing compositor).
+  4. `cloud$ kling_lipsync` (ALREADY PINNED, lipsync_overlay) takes the
+     3D-rendered clip as base_clip_ref + the episode audio slice ->
+     audio-driven mouth on real 3D geometry. NO rigging, NO ARKit
+     keystone reopened.
+  Wow-factor rationale: mesh = same object from every angle -> beat-to-
+  beat identity locked (pure I2V drifts); true 3D parallax beats
+  still_kenburns. Build cost = one 3D-gen adapter; everything else is
+  S1/S3 machinery. Rig/animate (Meshy) stays future-lane. B: Surface B (Comfy Cloud workflow) research flag
 (`OTR_ENABLE_COMFY_CLOUD_WORKFLOWS=1` + recorded headless lifecycle
 smoke artifact required before any row registers; restores ace_step +
 chatterbox voice-continuity rows -- the third-row-per-lane path).
