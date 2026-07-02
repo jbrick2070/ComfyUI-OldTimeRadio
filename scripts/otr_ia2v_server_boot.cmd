@@ -8,7 +8,10 @@ rem Usage: _otr_ia2v_server_boot.cmd "<server-log-path>"
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 set OTR_ENABLE_LTX_AV=1
-set OTR_LTX_AV_UNET=ltx2\ltx-2.3-22b-dev-Q3_K_M.gguf
+rem FLAT name -- the GGUF lives at <models>\unet\<name> (C:\ComfyUI-Models via
+rem the extra-paths yaml); an ltx2\ subfolder prefix breaks the resolve (that
+rem prefix belongs to the LORA path only). Caught proof8 attempt 2.
+set OTR_LTX_AV_UNET=ltx-2.3-22b-dev-Q3_K_M.gguf
 set OTR_LTX_AV_RECIPE=
 set OTR_ENABLE_ZIMAGE=1
 set OTR_ZIMAGE_UNET=z_image_turbo_nvfp4.safetensors
