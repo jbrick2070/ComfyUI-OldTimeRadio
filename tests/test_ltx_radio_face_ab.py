@@ -59,7 +59,12 @@ def test_radio_face_stills_minted_wide_when_toggle_on(monkeypatch):
         assert o["kind"] == "portrait" and o["role"] == role
         assert o["w"] > o["h"], "must be WIDE (never a portrait -> pillarbox)"
         assert "space-station communications console" in o["prompt"]
-        assert "baby" in o["negative_prompt"]
+    # per-role styling matches the HuMo hosts: announcer=radio-head person,
+    # music=anthropomorphic console face (operator 2026-07-01 "same for ltx").
+    assert "radio-head" in objs["still_announcer_visual_radio_face_169"]["prompt"]
+    assert "baby" in objs["still_announcer_visual_radio_face_169"]["negative_prompt"]
+    assert "dial" in objs["still_music_visual_radio_face_169"]["prompt"]
+    assert "human" in objs["still_music_visual_radio_face_169"]["negative_prompt"]
 
 
 def test_radio_face_still_seed_is_pinned():

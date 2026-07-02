@@ -1029,7 +1029,8 @@ def test_meta_brief_announcer_is_brief_driven_radio_not_llm_flavor():
     assert ann["source"] == "announcer_template", \
         "the announcer must be brief-driven + skip-LLM (got %r)" % ann["source"]
     low = ann["prompt"].lower()
-    assert "radio" in low and "adult" in low
+    # ANNOUNCER -> a brief-driven RADIO-HEAD PERSON (operator 2026-07-01)
+    assert "radio-head" in low
     assert ann.get("negative_prompt") and "baby" in ann["negative_prompt"]
     # a CHARACTER with the same setting-grounded line still passes via the LLM
     cast = [{"char_id": "c1", "portrait_prompt": "a flight controller"}]

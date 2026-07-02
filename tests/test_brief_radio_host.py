@@ -86,15 +86,31 @@ def test_host_prompt_carries_the_brief_form_noun():
     assert "space-station communications console" in p
 
 
-def test_host_prompt_is_adult_not_baby():
-    p = mbp.build_radio_host_prompt(_SPACE_META)
-    assert "adult" in p
-    assert "baby" not in p and "infant" not in p and "child" not in p
+def test_console_face_is_anthropomorphic_radio_no_human():
+    # MUSIC style (default): the RADIO is the host -- an anthropomorphic console
+    # with a dial-face, NOT a human presenter.
+    p = mbp.build_radio_host_prompt(_SPACE_META, style="console_face")
+    assert "dial" in p and "face" in p            # dial-face (has face/eyes tokens)
+    assert "human radio host" not in p            # never the old human host
+    assert "human" not in p and "person" not in p  # no human in a pure console
 
 
-def test_host_prompt_depicts_a_person():
-    # The one on-screen face -> the portrait person-guard must pass.
-    assert mbp._depicts_person(mbp.build_radio_host_prompt(_SPACE_META))
+def test_radio_head_person_is_a_figure_with_a_radio_head():
+    # ANNOUNCER style: a person whose HEAD is the radio set.
+    p = mbp.build_radio_host_prompt(_SPACE_META, style="radio_head_person")
+    assert "radio-head" in p and "HEAD IS" in p
+    assert "space-station communications console" in p   # brief-driven form
+    assert mbp._depicts_person(p)                 # a figure IS present
+
+
+def test_overtness_is_brief_driven():
+    # sci-fi brief -> overt cartoon face; a plain brief -> subtle.
+    overt = mbp.build_radio_host_prompt(_SPACE_META, style="console_face")
+    subtle = mbp.build_radio_host_prompt(
+        {"story_brief_terms": {"setting": ["a quiet village kitchen"]}},
+        style="console_face")
+    assert "cartoon" in overt
+    assert "subtle" in subtle and "cartoon" not in subtle
 
 
 def test_host_prompt_aspect_follows_slot():
@@ -109,9 +125,10 @@ def test_host_prompt_never_empty_on_bare_meta():
     assert mbp.build_radio_host_prompt({}).strip()
 
 
-def test_negative_prompt_constant_blocks_baby():
-    assert "baby" in mbp.RADIO_HOST_FACE_NEG
-    assert "child" in mbp.RADIO_HOST_FACE_NEG
+def test_negatives_by_style():
+    # console keeps humans OUT; radio-head keeps it an adult radio-head (no baby).
+    assert "human" in mbp.radio_host_negative("console_face")
+    assert "baby" in mbp.radio_host_negative("radio_head_person")
 
 
 # --------------------------------------------------------------------------- #
@@ -157,8 +174,10 @@ def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
     objs = {o["object_id"]: o for o in out["objects"]}
     rh = objs[mbp.RADIO_HOST_PORTRAIT_ID]
     assert rh["kind"] == "portrait" and rh["role"] == "music_visual"
+    # MUSIC -> anthropomorphic console face (brief-driven form), no human
     assert "space-station communications console" in rh["prompt"]
-    assert "baby" in rh["negative_prompt"]
+    assert "dial" in rh["prompt"] and "face" in rh["prompt"]
+    assert "human" in rh["negative_prompt"]        # console keeps humans OUT
     # aspect FOLLOWS the HuMo (music) slot -> WIDE dims (w > h), never pillarboxed
     assert rh["w"] > rh["h"]
 

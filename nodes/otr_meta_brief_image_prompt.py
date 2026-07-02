@@ -143,14 +143,41 @@ except ImportError:  # pragma: no cover -- flat test imports
         radio_form_from_meta, _RADIO_FORM_DEFAULT)
 
 
-#: Positive tokens locking the radio HOST to an ADULT presenter (the one
-#: on-screen face this feature grants). "No baby": FLUX otherwise drifts a bare
-#: "host" toward an infant/child, so an explicit adult token leads.
-RADIO_HOST_FACE_POS = ("adult, mature weathered face, clearly visible human "
-                       "face, seated presenting into the microphone")
-#: The matching NEGATIVE, populated on the still's existing ``negative_prompt``
-#: field (schemas.py; NO schema change) for the radio-host / announcer face.
-RADIO_HOST_FACE_NEG = "baby, infant, child, toddler, cartoon, doll, mannequin"
+#: HuMo radio-HOST FACE styling (operator look direction 2026-07-01). TWO looks,
+#: both give HuMo an animatable radio "face" (the dial/needle is the mouth):
+#:   style="console_face"  (MUSIC beats): an ANTHROPOMORPHIC RADIO CONSOLE whose
+#:     glowing tuning dial forms an expressive face -- dial-eyes + a radiating
+#:     needle-fan mouth. "The radio IS the host"; NO human present.
+#:   style="radio_head_person" (ANNOUNCER beats): a period-dressed presenter at a
+#:     microphone whose HEAD is the radio set, the dial + speaker grille forming
+#:     the animatable face.
+#: Overtness is BRIEF-DRIVEN (operator: "brief-driven mix"): subtle/period for
+#: noir/deco, more overt/playful for retro-futurist / sci-fi briefs.
+_RADIO_CONSOLE_FACE = ("its glowing tuning dial forming an expressive stylized "
+                       "face -- two round dial-eyes and a radiating needle-fan "
+                       "mouth, an anthropomorphic radio that hosts the broadcast")
+_RADIO_HEAD_PERSON = ("a radio-head presenter: a period-dressed figure seated at "
+                      "a vintage microphone whose HEAD IS %s, the glowing dial "
+                      "and speaker grille forming the expressive animatable face "
+                      "(dial eyes, a moving needle mouth)")
+#: Brief keywords that push the face OVERT (playful cartoon) vs subtle.
+_RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship",
+                          "sci-fi", "science fiction", "futuristic",
+                          "retro-futuristic", "atomic age", "galactic")
+#: Per-style negatives populated on the object row (schemas.py negative_prompt;
+#: NO schema change). console_face keeps humans OUT; radio_head keeps it an adult
+#: radio-head, never a baby / plain human head.
+RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
+RADIO_HEAD_PERSON_NEG = ("baby, infant, child, plain ordinary human head, "
+                         "normal human face instead of a radio")
+#: Back-compat alias (default = the music console look).
+RADIO_HOST_FACE_NEG = RADIO_CONSOLE_NEG
+
+
+def radio_host_negative(style: str = "console_face") -> str:
+    """The negative_prompt for a radio-host still by style."""
+    return (RADIO_HEAD_PERSON_NEG if style == "radio_head_person"
+            else RADIO_CONSOLE_NEG)
 
 #: The ONE animatable radio-HOST FACE object minted per episode under
 #: OTR_ENABLE_HUMO_HOSTS (its own object_id, NOT a cast char_id). render_driver
@@ -187,20 +214,43 @@ def _ltx_radio_face_enabled() -> bool:
     return os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
 
 
-def build_radio_host_prompt(meta, aspect: str = "portrait") -> str:
+def _radio_face_overtness(meta) -> str:
+    """Brief-driven overtness of the radio face (operator: 'brief-driven mix').
+    Retro-futurist / sci-fi briefs get a bold playful cartoon face; everything
+    else stays a subtle period-authentic dial-face. Pure."""
+    try:
+        try:
+            from ._otr_story_brief_helpers import _radio_form_haystack  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import _radio_form_haystack  # type: ignore
+        hay = _radio_form_haystack(meta)
+    except Exception:  # noqa: BLE001
+        hay = ""
+    return ("bold playful cartoon expression, clearly a face"
+            if any(k in hay for k in _RADIO_FACE_OVERT_KEYS)
+            else "subtle period-authentic dial-face")
+
+
+def build_radio_host_prompt(meta, aspect: str = "portrait",
+                            style: str = "console_face") -> str:
     """FULL prompt for the animatable radio-HOST FACE still (ONLY HuMo hosts).
 
-    A human host with a clearly visible ADULT face presenting AT the
-    brief-driven radio form (:func:`radio_form_from_meta`), framed for the HuMo
-    slot's ``aspect``, with era texture via :func:`get_era_tail` on the
-    ``portrait`` profile (no ambient palette bleed onto the face). Deterministic;
-    never empty. The matching negative (:data:`RADIO_HOST_FACE_NEG`) is populated
-    on the object row by the caller -- this returns the POSITIVE prompt only."""
+    ``style="console_face"`` (MUSIC beats): an ANTHROPOMORPHIC RADIO CONSOLE
+    (the brief-driven form) whose glowing dial forms an expressive face -- "the
+    radio IS the host", no human. ``style="radio_head_person"`` (ANNOUNCER
+    beats): a period presenter whose HEAD is the radio set. Both are brief-driven
+    (:func:`radio_form_from_meta`), overtness brief-driven
+    (:func:`_radio_face_overtness`), framed for the HuMo slot's ``aspect``, era
+    texture via :func:`get_era_tail` (portrait profile = no palette bleed).
+    Deterministic; never empty. The matching negative
+    (:func:`radio_host_negative`) is populated on the object row by the caller."""
     form = radio_form_from_meta(meta)
-    subject = ("a human radio host with a clearly visible adult face, "
-               "presenting at %s" % form)
-    prompt = ", ".join([subject, RADIO_HOST_FACE_POS,
-                        _style_anchor_for_aspect(aspect)])
+    overt = _radio_face_overtness(meta)
+    if style == "radio_head_person":
+        subject = "%s, %s" % (_RADIO_HEAD_PERSON % form, overt)
+    else:
+        subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE, overt)
+    prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
     try:
         try:
             from ._otr_story_brief_helpers import (  # type: ignore
@@ -208,7 +258,12 @@ def build_radio_host_prompt(meta, aspect: str = "portrait") -> str:
         except ImportError:  # pragma: no cover -- flat test imports
             from _otr_story_brief_helpers import (  # type: ignore
                 IMAGE_GRADE_TAIL, finish_visual_prompt)
-        prompt = finish_visual_prompt(meta, prompt, era_profile="portrait")
+        # STORY FLAIR (operator 2026-07-01: "all prompts respect the meta brief"):
+        # a radio console / radio-head is an OBJECT, not a bare human face, so it
+        # takes the FULL "still" era tail (story palette + atmosphere + lighting)
+        # -- the palette-strip "portrait" profile (BUG-LOCAL-113, for human faces)
+        # is NOT wanted here; a tense story should read as a tense-lit radio.
+        prompt = finish_visual_prompt(meta, prompt, era_profile="still")
         if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
             prompt = "%s, %s" % (prompt, IMAGE_GRADE_TAIL)
     except Exception:  # noqa: BLE001
@@ -874,13 +929,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # bypassed for this row (also saves an LLM call). The no-baby negative is
         # populated on the object row.
         if char.get("_synthetic_announcer"):
-            _aprompt = build_radio_host_prompt(meta, _aspect)
+            # ANNOUNCER -> a RADIO-HEAD PERSON (operator 2026-07-01).
+            _aprompt = build_radio_host_prompt(meta, _aspect,
+                                               style="radio_head_person")
             out[cid] = {
                 "prompt": _aprompt,
                 "prompt_hash": _content_hash(_aprompt),
                 "source": "announcer_template",
                 "_role": "announcer_visual",
-                "negative_prompt": RADIO_HOST_FACE_NEG,
+                "negative_prompt": radio_host_negative("radio_head_person"),
             }
             continue
         prompt = ""
@@ -1021,7 +1078,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     if _humo_hosts_enabled():
         _rh_aspect = (_role_aspects.get("music_visual")
                       or _role_aspects.get("announcer_visual") or "portrait")
-        _rh_prompt = build_radio_host_prompt(meta, _rh_aspect)
+        # MUSIC bookends -> the ANTHROPOMORPHIC RADIO CONSOLE face (operator 2026-07-01).
+        _rh_prompt = build_radio_host_prompt(meta, _rh_aspect, style="console_face")
         _rhw, _rhh = still_dims_for_aspect(_rh_aspect, PORTRAIT_W, PORTRAIT_H)
         objects.append({
             "object_id": RADIO_HOST_PORTRAIT_ID,
@@ -1030,7 +1088,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "w": _rhw, "h": _rhh,
             "prompt": _rh_prompt,
             "prompt_hash": _content_hash(_rh_prompt),
-            "negative_prompt": RADIO_HOST_FACE_NEG,
+            "negative_prompt": radio_host_negative("console_face"),
             "source": "radio_host_portrait",
         })
 
@@ -1044,7 +1102,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     if _ltx_radio_face_enabled():
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
-            _fprompt = build_radio_host_prompt(meta, "wide")
+            # Same per-role styling as HuMo hosts (operator 2026-07-01: "same for
+            # ltx audio in"): announcer -> radio-head person, music -> console face.
+            _abstyle = ("radio_head_person" if _abrole == "announcer_visual"
+                        else "console_face")
+            _fprompt = build_radio_host_prompt(meta, "wide", style=_abstyle)
             objects.append({
                 "object_id": _ltx_radio_face_object_id(_abrole),
                 "kind": "portrait",
@@ -1052,7 +1114,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "w": _fw, "h": _fh,
                 "prompt": _fprompt,
                 "prompt_hash": _content_hash(_fprompt),
-                "negative_prompt": RADIO_HOST_FACE_NEG,
+                "negative_prompt": radio_host_negative(_abstyle),
                 "source": "ltx_radio_face",
             })
 
