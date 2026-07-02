@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-07-02T20:36:32.691503+00:00",
+  "doc": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\docs\\2026-07-02-cloud-engines\\roundtable\\ideation_brief.md",
+  "prompt_tokens_est": 911,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.5-20260423",
+      "ok": true,
+      "prompt_tokens": 975,
+      "completion_tokens": 3591,
+      "cost_usd": 0.03712875
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview-20260219",
+      "ok": true,
+      "prompt_tokens": 1026,
+      "completion_tokens": 5313,
+      "cost_usd": 0.054412499999999996
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 1010,
+      "completion_tokens": 4808,
+      "cost_usd": 0.004622309999999999
+    }
+  ],
+  "total_cost_usd": 0.0962
+}
