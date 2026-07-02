@@ -364,15 +364,18 @@ class TestBuildUserPrompt:
         prompt = _build_user_prompt(req)
         assert "THEME: A signal from the void answers back." in prompt
 
-    def test_sfx_cue_block_renders_when_set(self):
-        # v4 Commit 2: beat.sfx_cue threaded as SOUND IN THE ROOM.
+    def test_sfx_cue_field_and_block_are_gone(self):
+        # rip-sfx-broll (2026-07-01): LineRequest.sfx_cue + the SOUND IN THE
+        # ROOM prompt block were removed with the sfx subsystem.
+        import dataclasses
+        field_names = {f.name for f in dataclasses.fields(LineRequest)}
+        assert "sfx_cue" not in field_names
         req = LineRequest(
             speaker="ALICE", intent="reveal", mood="tense", target_words=15,
             canon_header="x", last_lines=[],
-            sfx_cue="distant klaxon",
         )
         prompt = _build_user_prompt(req)
-        assert "SOUND IN THE ROOM: distant klaxon" in prompt
+        assert "SOUND IN THE ROOM" not in prompt
 
     def test_role_induction_responds_to_when_prev_speaker_set(self):
         req = LineRequest(
@@ -411,8 +414,9 @@ class TestBuildUserPrompt:
 
     def test_static_blocks_precede_variable_blocks_for_kv_cache(self):
         """STATIC = style + theme + canon + entities + cast + spine (cached prefix).
-        VARIABLE = current_beat + position + sfx + last_spoken + write_line
-                   (changes per call).
+        VARIABLE = current_beat + position + last_spoken + write_line
+                   (changes per call; SOUND IN THE ROOM removed 2026-07-01,
+                   rip-sfx-broll).
 
         For KV-cache reuse to hit, every STATIC element must appear
         BEFORE every VARIABLE element. This test pins that ordering
@@ -432,14 +436,12 @@ class TestBuildUserPrompt:
             theme="The voice on the wire is not who it claims to be.",
             current_beat_block="CURRENT BEAT\n  b002 ALICE (tense): reveal",
             position="complication, beat 1 of 2. Next phase: resolution.",
-            sfx_cue="distant klaxon",
             prev_speaker="BOB",
         )
         prompt = _build_user_prompt(req)
         static_blocks = ["STYLE:", "THEME:", "EPISODE CONTEXT",
                          "NAMED ENTITIES", "CAST", "OUTLINE:"]
         variable_blocks = ["CURRENT BEAT", "POSITION:",
-                           "SOUND IN THE ROOM",
                            "LAST SPOKEN (this scene):", "WRITE LINE"]
         static_positions = [prompt.find(b) for b in static_blocks]
         variable_positions = [prompt.find(b) for b in variable_blocks]
@@ -589,6 +591,9 @@ class TestTier1Regressions:
                     "traits": "curious",
                 },
                 {
+                    # rip-sfx-broll (2026-07-01): a music render-contract row
+                    # is SKIPPED even if a stale text value rides it -- the
+                    # legacy [SFX: ...] token is gone from the transcript.
                     "line_id": "b003", "char_id": "music_inter",
                     "speaker_role": "music_inter",
                     "text": "swelling strings",
@@ -605,15 +610,15 @@ class TestTier1Regressions:
         out = assemble_script_text_from_ledger(led_data)
         assert "[VOICE: ANNOUNCER, steady] Tonight on Old Time Radio..." in out
         assert "[VOICE: ALICE, curious] Did you hear that?" in out
-        assert "[SFX: swelling strings]" in out
+        assert "[SFX:" not in out
+        assert "swelling strings" not in out
         assert "[VOICE: BOB, worried] I heard it too." in out
-        # Order preserved
+        # Order preserved (3 voiced rows; the music row is skipped)
         parts = out.split("\n\n")
-        assert len(parts) == 4
+        assert len(parts) == 3
         assert parts[0].startswith("[VOICE: ANNOUNCER")
         assert parts[1].startswith("[VOICE: ALICE")
-        assert parts[2].startswith("[SFX:")
-        assert parts[3].startswith("[VOICE: BOB")
+        assert parts[2].startswith("[VOICE: BOB")
 
     def test_assemble_script_text_picks_up_post_loop_text_changes(self):
         # The whole point of Tier 1 #1/#2: a post-loop mutation of

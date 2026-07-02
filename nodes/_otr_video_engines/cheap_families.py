@@ -177,8 +177,12 @@ class _CheapFamilyBase:
 class StillMotionFamily(_CheapFamilyBase):
     name = "still_motion"
     family = "static_motion"
-    roles = ("scene_broll", "background_abstract", "announcer_visual")
-    default_roles = ("scene_broll",)
+    roles = ("announcer_visual", "music_visual", "character_video")
+    # rip-sfx-broll (2026-07-01): its only default role (scene_broll) was
+    # removed. still_motion stays the UNIVERSAL_FLOOR chain terminus --
+    # capability (text_prompt) keeps it eligible everywhere incl. the
+    # character OOM chain -- but no role auto-defaults to it now.
+    default_roles = ()
     required_inputs = ("text_prompt",)
     uses_still = True               # pan over a provided still when present
     accepts_still = True            # C1: mint the selected still (coverage gate) so
@@ -205,11 +209,10 @@ class StillPanFamily(_CheapFamilyBase):
     name = "still_pan"
     family = "static_image_gen"
     # A plain still needs only text_prompt (supplied by EVERY role), so it is the
-    # fast, universal "just a still" pick -- eligible in all five roles. BUG-LOCAL-401:
-    # music_visual + background_abstract were missing, so music_video_model='still_pan'
+    # fast, universal "just a still" pick -- eligible in all roles. BUG-LOCAL-401:
+    # music_visual was missing, so music_video_model='still_pan'
     # failed OTR_VideoDirector role validation even though a still is valid there.
-    roles = ("announcer_visual", "music_visual", "character_video",
-             "scene_broll", "background_abstract")
+    roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()              # selectable peer; not the in-stack default
     required_inputs = ("text_prompt",)
     commercial_clean = True         # own ffmpeg + the chosen still; no model license
@@ -229,8 +232,7 @@ class StillFlatFamily(_CheapFamilyBase):
     gate); ``_still_motion=False`` selects the flat hold over the pan."""
     name = "still_flat"
     family = "static_image_gen"
-    roles = ("announcer_visual", "music_visual", "character_video",
-             "scene_broll", "background_abstract")
+    roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()              # selectable peer; not an auto-default
     required_inputs = ("text_prompt",)
     commercial_clean = True         # own ffmpeg + the chosen still; no model license

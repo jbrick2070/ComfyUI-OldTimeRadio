@@ -93,8 +93,7 @@ def test_still_flat_registered_validated_all_roles():
     assert eng.commercial_clean is True
     assert getattr(eng, "accepts_still", False) is True   # coverage gate mints its still
     assert getattr(eng, "_still_motion", True) is False   # flat hold, not a pan
-    for role in ("announcer_visual", "music_visual", "character_video",
-                 "scene_broll", "background_abstract"):
+    for role in ("announcer_visual", "music_visual", "character_video"):
         assert role in eng.roles
     assert "still_flat" in vreg.all_engine_names()        # shows in the dropdown (C4)
 
@@ -124,15 +123,14 @@ def test_uses_still_flags():
 def test_still_pan_fits_all_roles_bug401():
     """BUG-LOCAL-401: still_pan is the fast 'just a still' pick and must be valid
     in EVERY video role -- it needs only text_prompt, which every role supplies.
-    A missing role tag (music_visual / background_abstract) made
+    A missing role tag (music_visual) made
     music_video_model='still_pan' fail OTR_VideoDirector validation at execute
     even though a still is perfectly valid for a music beat."""
     from nodes._otr_shared import role_compat as rc
     eng = vreg.get_engine("still_pan")
     desc = {"engine_id": "still_pan", "roles": tuple(eng.roles),
             "required_inputs": tuple(eng.required_inputs)}
-    for role in ("announcer_visual", "music_visual", "character_video",
-                 "scene_broll", "background_abstract"):
+    for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role), f"still_pan must fit role {role!r}"
 
 

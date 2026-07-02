@@ -78,5 +78,5 @@ def test_get_engine_unknown_raises_keyerror():
 def test_assert_usable_unknown_engine_fails_closed():
     with pytest.raises(vreg.EngineUnusable) as exc:
         vreg.assert_usable(
-            "definitely_not_a_real_engine", rc.Role.BACKGROUND_ABSTRACT.value)
+            "definitely_not_a_real_engine", rc.Role.CHARACTER_VIDEO.value)
     assert exc.value.reason is base.EngineUsabilityReason.MALFORMED_CONFIG

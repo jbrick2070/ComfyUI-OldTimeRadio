@@ -58,25 +58,22 @@ def test_still_parallax_source_identity_intact():
     assert "not real 3D" in eng.honest_label   # the honest 0-E label
 
 
-def test_still_parallax_fits_three_slots_not_background():
+def test_still_parallax_fits_every_surviving_slot():
     from nodes.otr_video_director import VIDEO_SLOT_ROLES
     eng = StillParallaxEngine()
     desc = {"engine_id": "still_parallax", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
+    # rip-sfx-broll (2026-07-01): every surviving slot's role supplies
+    # init_image, so the parallax engine fits them all; dead roles raise.
     for slot, slot_roles in VIDEO_SLOT_ROLES.items():
         fits = any(rc.engine_fits_role(desc, role) for role in slot_roles)
-        if slot_roles == ("background_abstract",):
-            # Route-A: the pure background_abstract_video_model slot supplies only
-            # text_prompt -- an init_image engine (still_parallax) cannot serve it.
-            assert not fits, slot
-        else:
-            assert fits, slot
-    for role in ("announcer_visual", "music_visual", "character_video",
-                 "scene_broll"):
+        assert fits, slot
+    for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role) is True
-    # background_abstract supplies ONLY text_prompt -- no still to warp, so
-    # the role is excluded fail-closed (and the engine does not list it).
-    assert rc.engine_fits_role(desc, "background_abstract") is False
+    import pytest as _pytest
+    for dead in ("scene_broll", "background_abstract"):
+        with _pytest.raises(rc.RoleCompatError):
+            rc.engine_fits_role(desc, dead)
 
 
 def test_still_parallax_assert_usable_model(monkeypatch, tmp_path):

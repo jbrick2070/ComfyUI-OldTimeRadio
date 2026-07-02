@@ -84,10 +84,13 @@ import _otr_soak_capstone as soak  # noqa: E402
 SUMMARY_PATH = os.path.join(_HERE, "coverage_sweep_summary.json")
 
 #: OTR_VideoDirector slot -> (profile role_overrides key, registry role token).
+#: rip-sfx-broll (2026-07-01): the character lane sweeps its DEDICATED
+#: character_visual key now (no longer hidden behind the legacy
+#: other_beats_visual fallback slot).
 SLOTS = (
     ("announcer_visual", "announcer_visual"),
     ("music_visual", "music_visual"),
-    ("other_beats_visual", "character_video"),
+    ("character_visual", "character_video"),
 )
 
 #: The CORE/BLOCKING Wan engines the GATE-A acceptance sweep must exercise --

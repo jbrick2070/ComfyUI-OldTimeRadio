@@ -1173,7 +1173,7 @@ def run_freeze_cascade(
 
     # D3 CI-only invariant (gated on OTR_TEST_MODE so production never crashes --
     # COERCE-NEVER-CRASH). NOT inside the sweep try/except above (that would
-    # swallow the AssertionError). Music/sfx rows are separate (not asserted).
+    # swallow the AssertionError). Music rows are separate (not asserted).
     import os as _os_d3
     if _os_d3.environ.get("OTR_TEST_MODE"):
         try:

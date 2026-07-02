@@ -16,12 +16,14 @@ def _read(name):
 
 
 class TestMusicPatch:
-    def test_non_voiced_takes_only_sfx_cue(self):
+    def test_non_voiced_rows_carry_no_text(self):
+        # rip-sfx-broll (2026-07-01): the sfx_cue carrier is GONE entirely --
+        # neither the S1-defeating intent fallback NOR the cue read exists;
+        # music render-contract rows are text="" by construction.
         src = _read("OTR_LedgerScriptWriter.py")
-        # the S1-defeating intent fallback is gone
         assert '(beat.sfx_cue or beat.intent or "")' not in src
-        # non-voiced text is the cue only
-        assert '(beat.sfx_cue or "").strip()' in src
+        assert "beat.sfx_cue" not in src
+        assert 'f"[SFX:' not in src   # the token f-string is gone (comments may narrate)
 
 
 class TestPromptHardening:

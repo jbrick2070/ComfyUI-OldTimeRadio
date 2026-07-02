@@ -48,10 +48,10 @@ from ._otr_shared import role_slots as _role_slots
 #: ledger ``speaker_role`` -> video role.
 #: BUG 1 (2026-06-20): ``"character"`` is the CANONICAL writer speaker_role for a
 #: dialogue line (set in OTR_LedgerScriptWriter / _otr_outline, compared in
-#: _otr_anti_loop / _otr_ledger_reviewer). It was MISSING here, so character beats
-#: fell through to ``background_abstract`` -> got pooled as other-beats and never
-#: minted a character still (the deleted 8bc5381 render_driver branch masked it by
-#: keying on the raw "character" string). "char_voice"/"dialogue" stay as aliases.
+#: _otr_anti_loop / _otr_ledger_reviewer). "char_voice"/"dialogue" stay as aliases.
+#: rip-sfx-broll (2026-07-01): the "sfx" entry + the _DEFAULT_VIDEO_ROLE
+#: fallback (background_abstract) were REMOVED with their roles -- an unmapped
+#: speaker_role now FAILS LOUD in :func:`_video_role_for_line` (NO FALLBACKS).
 SPEAKER_TO_VIDEO_ROLE = {
     "announcer": Role.ANNOUNCER_VISUAL.value,
     "music": Role.MUSIC_VISUAL.value,
@@ -61,15 +61,7 @@ SPEAKER_TO_VIDEO_ROLE = {
     "character": Role.CHARACTER_VIDEO.value,
     "char_voice": Role.CHARACTER_VIDEO.value,
     "dialogue": Role.CHARACTER_VIDEO.value,
-    # C3 (D4 fix, 2026-06-30): "sfx" is the writer's ONLY non-dialogue / non-announcer
-    # / non-music speaker_role (VALID_SPEAKER_ROLES = character/announcer/music_*/sfx).
-    # It used to fall through to background_abstract, so the scene_broll video slot was
-    # NEVER exercised. A sound-effect beat is an environmental/scene beat -> route it to
-    # scene_broll (b-roll of the scene) so scene_broll_video_model is reachable. Harmless
-    # if no sfx beats exist in a given episode; both roles pool as OTHER-BEATS.
-    "sfx": Role.SCENE_BROLL.value,
 }
-_DEFAULT_VIDEO_ROLE = Role.BACKGROUND_ABSTRACT.value
 
 #: Only these roles receive the M4 creative LLM derivation. Everything else is
 #: a cheap family (radio floor / abstract) and gets NO creative LLM call.
@@ -80,7 +72,17 @@ _FALLBACK_SETTING = "a vintage radio studio"
 
 def _video_role_for_line(line: dict) -> str:
     role = str((line or {}).get("speaker_role") or "").strip().lower()
-    return SPEAKER_TO_VIDEO_ROLE.get(role, _DEFAULT_VIDEO_ROLE)
+    mapped = SPEAKER_TO_VIDEO_ROLE.get(role)
+    if mapped is None:
+        raise ValueError(
+            f"OTR_ShotLock: line "
+            f"{str((line or {}).get('line_id') or '?')!r} carries unmapped "
+            f"speaker_role {role!r} (known: {tuple(SPEAKER_TO_VIDEO_ROLE)}). "
+            f"The 'sfx' role + the background_abstract default were removed "
+            f"2026-07-01 (rip-sfx-broll) -- NO FALLBACKS; regenerate the "
+            f"episode with the current writer."
+        )
+    return mapped
 
 
 # ---------------------------------------------------------------------------
@@ -326,15 +328,17 @@ def derive_opening_music_beat(ledger: dict, fps: int):
 
 
 def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
-    """Audio-derived per-beat ``target_frame_count`` + the Other-Beats budget.
+    """Audio-derived per-beat ``target_frame_count``.
 
     Frame counts come from CUMULATIVE audio SAMPLES -- ``frame_at(pos) =
     (pos*fps)//sample_rate`` -- so adjacent beats meet exactly (no double-count,
     no gap). When a beat carries only ``dur_s`` (no samples) it degrades to
-    ``round(dur_s*fps)``. Other-beats ``pool_n_loop`` clamps N to the number of
-    other-beats and WARNs. Returns ``{per_beat:{beat_id:frames}, total_frames,
-    other_beats_render_count, clip_mode, warnings}``. Pure; gated by the caller
-    on ``audio_done``.
+    ``round(dur_s*fps)``. Returns ``{per_beat:{beat_id:frames}, total_frames,
+    warnings}``. Pure; gated by the caller on ``audio_done``.
+
+    rip-sfx-broll (2026-07-01): the other-beats POOLING budget
+    (clip_mode / pool_n / other_beats_render_count) was removed with the
+    scene_broll / background_abstract roles -- every beat renders per-beat.
     """
     fps = int(fps) if fps else 25
     warnings: list = []
@@ -361,28 +365,9 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
 
     total_frames = sum(per_beat.values())
 
-    other = [
-        b for b in beats
-        if b["role"] in (Role.BACKGROUND_ABSTRACT.value, Role.SCENE_BROLL.value)
-    ]
-    clip_mode = ((policy or {}).get("other_beats") or {}).get("clip_mode") \
-        or "unique_per_beat"
-    pool_n = int(((policy or {}).get("other_beats") or {}).get("pool_n") or 0)
-    if clip_mode == "pool_n_loop":
-        render_count = min(pool_n, len(other)) if other else 0
-        if pool_n > len(other):
-            warnings.append(
-                f"pool_n={pool_n} exceeds other-beats count {len(other)}; "
-                f"clamped to {render_count} (no over-generation)"
-            )
-    else:
-        render_count = len(other)
-
     return {
         "per_beat": per_beat,
         "total_frames": total_frames,
-        "other_beats_render_count": render_count,
-        "clip_mode": clip_mode,
         "warnings": warnings,
     }
 
@@ -735,23 +720,12 @@ def build_execution_plan(beats, budget, creative, policy):
     } for role in roles_present]
     groups = _resolver.validate_execution_groups(groups)
 
-    # pool_n_loop: the OTHER-BEATS (background_abstract/scene_broll) SHARE N stills.
-    # Stamp still_pool_key=other_pool_{i mod N} over the SAME other-beats iteration
-    # the clip budget pooled (N = the capped other_beats_render_count) so the still
-    # a beat reuses == the clip it reuses; the still phase emitted other_pool_0..N-1
-    # and render_driver resolves the stamped key. unique_per_beat -> no stamp (the
-    # per-beat scene still is used).
-    _pool_N = (int(budget.get("other_beats_render_count") or 0)
-               if budget.get("clip_mode") == "pool_n_loop" else 0)
-    _OTHER_BEATS = (Role.BACKGROUND_ABSTRACT.value, Role.SCENE_BROLL.value)
-    _ob_i = 0
+    # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
+    # the scene_broll / background_abstract roles -- every beat renders
+    # per-beat with its own scene still (no still_pool_key stamping).
     shots = []
     for b in beats:
         cre = creative.get(b["beat_id"], {})
-        _still_pool_key = ""
-        if _pool_N and b["role"] in _OTHER_BEATS:
-            _still_pool_key = "other_pool_%d" % (_ob_i % _pool_N)
-            _ob_i += 1
         _timing = ({"start_s": b.get("_start_s", 0.0), "dur_s": b.get("dur_s")}
                    if b.get("_synthetic_open") else None)
         shots.append({
@@ -768,10 +742,6 @@ def build_execution_plan(beats, budget, creative, policy):
             # render driver's role-scoped behaviors (the LTX radio-open
             # prompt) read it; before this only group_id embedded the role.
             "role": b["role"],
-            # pool_n_loop: the shared pool still this other-beat reuses
-            # (other_pool_{i mod N}); render_driver prefers it over the per-beat
-            # scene still. Absent on unique_per_beat + non-other-beats (per-beat).
-            **({"still_pool_key": _still_pool_key} if _still_pool_key else {}),
             # Round 5 F5: the NORMALIZED char_id rides the shot row so the
             # render driver's portrait join never depends on the raw line
             # scheme (the announcer's 'announcer' -> cast row id case).
@@ -779,7 +749,8 @@ def build_execution_plan(beats, budget, creative, policy):
             "engine_id": engine_for(b["role"]),
             "profile_id": "",
             "family": "",
-            "strategy": {"mode": budget.get("clip_mode", "unique_per_beat")},
+            # Schema-stable constant post-pooling-rip (every beat is per-beat).
+            "strategy": {"mode": "unique_per_beat"},
             "request_seed": 0,
             "target_frame_count": int(budget["per_beat"].get(b["beat_id"], 0)),
             "render_request_hash": cre.get("request_hash", ""),
@@ -953,8 +924,6 @@ class OTRShotLock:
             "shots": shots,
             "clip_budget": {
                 "total_frames": budget["total_frames"],
-                "other_beats_render_count": budget["other_beats_render_count"],
-                "clip_mode": budget["clip_mode"],
             },
             "warnings": warnings,
         }
@@ -963,9 +932,7 @@ class OTRShotLock:
 
         report.append(f"shot_lock_revision={revision} beats={len(beats)} shots={len(shots)}")
         report.append(
-            f"clip_budget: total_frames={budget['total_frames']} "
-            f"other_beats_render={budget['other_beats_render_count']} "
-            f"mode={budget['clip_mode']}"
+            f"clip_budget: total_frames={budget['total_frames']}"
         )
         report.append(f"execution_groups={[g['group_id'] for g in groups]}")
         for w in warnings:

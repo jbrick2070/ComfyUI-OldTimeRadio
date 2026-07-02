@@ -832,8 +832,6 @@ class LineRequest:
     #       cast (Commit 2). When set, replaces single-speaker
     #       CHARACTER block with CAST. Falls back to
     #       `character_voice_card` when empty.
-    #   sfx_cue  `beat.sfx_cue` for this beat (Commit 2). Renders as
-    #       SOUND IN THE ROOM in the per-beat tail.
     #   position  "<phase>, beat N of M. Next phase: <next>." string
     #       (Commit 4). Replaces the generic per-phase ARC_PHASE_GUIDANCE
     #       one-liner with a position-specific directive. Falls back
@@ -845,7 +843,6 @@ class LineRequest:
     current_beat_block: str = ""
     theme: str = ""
     all_voice_cards: str = ""
-    sfx_cue: str = ""
     position: str = ""
     # LFC sprint commit 3, section 6.1 (2026-05-11). speaker_role lets
     # polish_line branch its system prompt -- character beats get
@@ -983,7 +980,7 @@ def render_outline_spine(outline_or_beats) -> str:
 
     Each beat renders as:
         b002 ALICE (curious): hears unusual signal in lab
-    Non-voiced beats (music_open/inter/close, sfx) drop the speaker
+    Non-voiced beats (music_open/inter/close) drop the speaker
     and mood and render compactly:
         b001 [music_open]: cold open
 
@@ -1044,7 +1041,7 @@ def render_current_beat(outline_or_beats, current_beat_id: str) -> str:
       "CURRENT BEAT\n  bNNN SPEAKER (mood): intent"
         for character / announcer beats
       "CURRENT BEAT\n  bNNN [role]: intent"
-        for music / sfx beats
+        for music beats
       "" when:
         - outline_or_beats is None / empty
         - current_beat_id is empty or does not match any row
@@ -1276,7 +1273,6 @@ def _build_user_prompt(req: LineRequest) -> str:
 
         CURRENT BEAT         (single spine row for the beat we write)
         POSITION             (Commit 4: phase, beat N of M, next phase)
-        SOUND IN THE ROOM    (Commit 2: beat.sfx_cue)
         LAST SPOKEN          (last_lines rolling window; scene-local
                               via Commit 3)
         WRITE LINE           (role induction + beat + mood + word count
@@ -1408,12 +1404,6 @@ def _build_user_prompt(req: LineRequest) -> str:
             parts.append(f"  {guidance}")
         else:
             parts.append(f"ARC PHASE: {req.arc_phase}")
-
-    # SOUND IN THE ROOM — Commit 2 in the v4 plan. Threaded from
-    # beat.sfx_cue so the line can react to the sound environment.
-    if req.sfx_cue:
-        parts.append("")
-        parts.append(f"SOUND IN THE ROOM: {req.sfx_cue}")
 
     # ===== Sprint 3 (2026-05-28): DRAMATIC FRAME (magnetic pole) =====
     # The block sits ABOVE the rolling window so the next_turn the
@@ -3734,7 +3724,8 @@ if __name__ == "__main__":
                      "15", "Speak now."):
         assert required in user_prompt, f"missing {required!r}"
     # Bare-bones request omits STYLE / THEME / OUTLINE / NAMED ENTITIES
-    # / CAST / CURRENT BEAT / POSITION / SOUND IN THE ROOM blocks.
+    # / CAST / CURRENT BEAT / POSITION blocks. SOUND IN THE ROOM was
+    # removed 2026-07-01 (rip-sfx-broll) -- assert it NEVER renders.
     for missing in ("STYLE:", "THEME:", "OUTLINE:", "NAMED ENTITIES",
                     "ALLOWED NAMES", "CAST", "CURRENT BEAT", "POSITION:",
                     "SOUND IN THE ROOM"):

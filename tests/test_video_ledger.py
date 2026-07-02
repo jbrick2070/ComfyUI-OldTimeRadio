@@ -41,7 +41,8 @@ from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 def test_video_hud_telemetry_from_ledger():
     """_parse_hud_data with a stub ledger produces the expected
     line-count fidelity: 2 character + 1 announcer dialogue items,
-    1 sfx item, music lines silently dropped.
+    music lines silently dropped (the sfx item type died with the sfx
+    subsystem, rip-sfx-broll 2026-07-01).
 
     Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
     from `plan` (legacy director-shaped dict) to explicit
@@ -85,9 +86,9 @@ def test_video_hud_telemetry_from_ledger():
 
     items = data["scenes"][0]["items"]
     item_types = [it["type"] for it in items]
-    # 1 announcer + 2 character lines = 3 dialogue items, 1 sfx item.
+    # 1 announcer + 2 character lines = 3 dialogue items; nothing else.
     assert item_types.count("dialogue") == 3
-    assert item_types.count("sfx") == 1
+    assert "sfx" not in item_types
     # music_open / music_close lines are intentionally NOT in items.
     assert "music" not in item_types
 
@@ -156,10 +157,11 @@ def test_video_treatment_writes_flat_list(tmp_path):
     assert "single-scene ledger" in content.lower()
 
     # Flat dialogue list -- check texts from the stub appear, but
-    # NO "── SCENE N ·" headers should show up.
+    # NO "── SCENE N ·" headers should show up. (The sfx cue line died
+    # with the sfx subsystem, rip-sfx-broll 2026-07-01.)
     assert "Get the kit out, fast." in content
     assert "On it." in content
-    assert "metal door slam" in content
+    assert "[SFX]" not in content
     assert "── SCENE" not in content, (
         "v2 treatment must not emit scene headers -- ledger has no "
         "scene_break markers"

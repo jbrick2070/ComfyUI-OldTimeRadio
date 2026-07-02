@@ -306,23 +306,6 @@ def _still_aspects_from_policy(policy_json):
     return {}
 
 
-def _other_beats_from_policy(policy_json):
-    """``{clip_mode, pool_n}`` from a director policy's ``other_beats`` map
-    (OTR_VideoDirector -> OTR_ImageDirector forwards it). In ``pool_n_loop`` the
-    still phase emits N pool stills the other-beats SHARE (matching the VIDEO clip
-    pool); a missing/malformed policy yields ``{}`` -> ``unique_per_beat`` (one
-    still per beat, legacy). Pure."""
-    try:
-        pol = json.loads(policy_json or "{}")
-        ob = pol.get("other_beats") if isinstance(pol, dict) else None
-        if isinstance(ob, dict):
-            return {"clip_mode": str(ob.get("clip_mode") or "unique_per_beat"),
-                    "pool_n": int(ob.get("pool_n") or 0)}
-    except (ValueError, TypeError):
-        pass
-    return {}
-
-
 #: 3D IMAGE STREAMS (2026-06-21) -- checked-in prompt scaffolds for the mesh
 #: fodder fork. The MESH FODDER still is what Hunyuan3D actually meshes, so it
 #: must be ONE isolated subject on a neutral plate (a cinematic scene still
@@ -392,28 +375,17 @@ def _iter_beat_lines(lines):
         yield str(ln.get("line_id") or f"beat_{i:04d}"), ln
 
 
-#: The OTHER-BEATS roles -- the only ones the pool_n_loop clip pool applies to
-#: (mirrors otr_shot_lock's other-beats = BACKGROUND_ABSTRACT + SCENE_BROLL).
-#: announcer/music/character_video are NEVER pooled (announcer/music are per-beat;
-#: character_video is a CHARACTER_BEARING_ROLE -> per-beat for continuity).
-_OTHER_BEATS_ROLES = ("background_abstract", "scene_broll")
-
-
-def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
+def derive_scene_still_targets(lines, fps: int = 25):
     """Still-spine ST-2: the SCENE-STILL targets derived from the LINES via pure
     helpers, never from ``video.shots`` (graph order: image gen runs BEFORE
     ShotLock). Returns ``(targets, warnings)``; each target is
     ``{beat_id, kind, role, source}``.
 
-    EVERY beat carries its OWN scene still EXCEPT the other-beats
-    (background_abstract / scene_broll) under ``other_beats={clip_mode,pool_n}`` =
-    ``pool_n_loop``: those emit exactly N POOL targets (``beat_id=other_pool_0..N-1``,
-    prompts from the first N other-beats lines, deterministic) which the M
-    other-beats SHARE -- ShotLock stamps ``still_pool_key=other_pool_{i mod N}`` on
-    the other-beats shots (the same loop math it uses for the clip pool) and
-    render_driver reads it. pool_n<=0 -> 0 other-beats stills (LOUD WARN);
-    pool_n>M -> M (clamped, no over-generation). announcer/music/character_video are
-    NEVER pooled.
+    EVERY beat carries its OWN scene still (rip-sfx-broll 2026-07-01: the
+    other-beats pool_n_loop POOLING died with the scene_broll /
+    background_abstract roles -- there is no shared still pool any more).
+    An unmapped speaker_role FAILS LOUD (NO FALLBACKS; the old
+    _DEFAULT_VIDEO_ROLE fallthrough is gone).
 
     The OPEN comes from the same pure helper ShotLock uses
     (``derive_opening_music_beat``). That helper needs the first line's
@@ -442,11 +414,11 @@ def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
 
     try:  # lazy: one source of truth for the open beat + the role map
         from .otr_shot_lock import (
-            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
             CHARACTER_BEARING_ROLES, derive_opening_music_beat)
     except ImportError:  # pragma: no cover -- flat test imports
         from otr_shot_lock import (  # type: ignore
-            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE, _DEFAULT_VIDEO_ROLE,
+            OPENING_MUSIC_BEAT_ID, SPEAKER_TO_VIDEO_ROLE,
             CHARACTER_BEARING_ROLES, derive_opening_music_beat)
 
     live = [ln for _bid, ln in _iter_beat_lines(lines)]
@@ -465,51 +437,36 @@ def derive_scene_still_targets(lines, fps: int = 25, other_beats=None):
         _add(OPENING_MUSIC_BEAT_ID, "scene_open", "music_visual",
              "scene_pretiming")
 
-    # Per-beat scene still for announcer/music/character beats (continuity); the
-    # OTHER-BEATS (background_abstract/scene_broll) are POOLED under pool_n_loop so
-    # they SHARE N stills (matching the VIDEO clip pool). The earlier
+    # Per-beat scene still for every beat (continuity). The earlier
     # announcer/music-only cut left dialogue beats with NO scene still -> the
-    # LTX-I2V MISSING-STILL LOUD degrade; now every per-beat role gets one and the
-    # other-beats get N pooled ones. The image dispatcher (accepts_still) is still
-    # the ONE place that decides whether a still is actually minted (visualizer /
-    # abstract floor -> 0); audio_driven_face (HuMo) keeps its PORTRAIT and ignores
-    # the scene still (render_driver family branch) but KEEPS one as OOM-fallback
-    # insurance (humo->still_motion needs a scene still). (open b000 added above.)
-    ob = other_beats if isinstance(other_beats, dict) else {}
-    pooling = (str(ob.get("clip_mode") or "unique_per_beat") == "pool_n_loop")
-    pool_n = int(ob.get("pool_n") or 0)
-    other_lines: list = []                   # (bid, role) other-beats, in order
+    # LTX-I2V MISSING-STILL LOUD degrade; now every role gets one per-beat.
+    # The image dispatcher (accepts_still) is still the ONE place that decides
+    # whether a still is actually minted (visualizer / abstract floor -> 0);
+    # audio_driven_face (HuMo) keeps its PORTRAIT and ignores the scene still
+    # (render_driver family branch) but KEEPS one as OOM-fallback insurance
+    # (humo->still_motion needs a scene still). (open b000 added above.)
     for bid, ln in _iter_beat_lines(lines):
-        role = SPEAKER_TO_VIDEO_ROLE.get(
-            str(ln.get("speaker_role") or "").strip().lower(),
-            _DEFAULT_VIDEO_ROLE)
-        if pooling and role in _OTHER_BEATS_ROLES:
-            other_lines.append((bid, role))     # pooled below, not per-beat
-        elif role in CHARACTER_BEARING_ROLES:
+        role_key = str(ln.get("speaker_role") or "").strip().lower()
+        role = SPEAKER_TO_VIDEO_ROLE.get(role_key)
+        if role is None:
+            # NO FALLBACKS (rip-sfx-broll 2026-07-01): never a bare .get()
+            # default -- an unmapped role (incl. the retired "sfx") is a
+            # producer bug / old ledger and fails LOUD here.
+            raise ValueError(
+                f"derive_scene_still_targets: line {bid!r} carries unmapped "
+                f"speaker_role {role_key!r} (known: "
+                f"{tuple(SPEAKER_TO_VIDEO_ROLE)}). The 'sfx' role was "
+                f"removed 2026-07-01 (rip-sfx-broll); regenerate the episode."
+            )
+        if role in CHARACTER_BEARING_ROLES:
             # BUG 1 (2026-06-20 operator directive): a CHARACTER beat gets a
             # per-beat 16:9 CHARACTER still (kind=scene_character) leading with the
             # character's appearance -- NOT a generic radio scene still and NOT the
-            # vertical portrait. Per-beat (never the pooled other_pool_x loop).
+            # vertical portrait.
             _add(bid, "scene_character", role, "scene_role_map",
                  char_id=str(ln.get("char_id") or ""))
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
-    if pooling and other_lines:
-        if pool_n <= 0:
-            warnings.append(
-                "other_beats clip_mode=pool_n_loop with pool_n=%d (<=0): emitting "
-                "ZERO other-beats pool stills (LOUD)" % pool_n)
-        else:
-            n = min(pool_n, len(other_lines))   # clamp -> no over-generation
-            if pool_n > len(other_lines):
-                warnings.append(
-                    "other_beats pool_n=%d exceeds other-beats count %d; clamped to "
-                    "%d pool still(s)" % (pool_n, len(other_lines), n))
-            for k in range(n):
-                # pool still k takes the k-th other-beat's prompt/role; ShotLock
-                # maps other-beat i -> other_pool_{i mod N} at render (shared/looped).
-                _add("other_pool_%d" % k, "scene_beat", other_lines[k][1],
-                     "scene_pool_loop")
     return targets, warnings
 
 
@@ -870,7 +827,7 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
                          consistency_gate_warn_only: bool = False, lines=None,
-                         fps: int = 25, still_aspects=None, other_beats=None,
+                         fps: int = 25, still_aspects=None,
                          mesh_fodder_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
@@ -1127,7 +1084,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     if lines:
         try:
             scene_targets, scene_warns = derive_scene_still_targets(
-                lines, fps=fps, other_beats=other_beats)
+                lines, fps=fps)
+        except ValueError:
+            # NO FALLBACKS (rip-sfx-broll 2026-07-01): an unmapped
+            # speaker_role (e.g. an old "sfx" ledger) is a hard error,
+            # never downgraded to a missing-stills warning.
+            raise
         except Exception as exc:  # noqa: BLE001 -- stills never kill prompts
             warnings.append(f"scene-still derivation failed ({exc}); "
                             "episode renders without scene stills (LOUD)")
@@ -1303,9 +1265,8 @@ class OTRMetaBriefImagePromptGen:
             consistency_gate_warn_only=bool(consistency_gate_warn_only),
             lines=lines,
             still_aspects=_still_aspects_from_policy(image_policy_json),
-            other_beats=_other_beats_from_policy(image_policy_json),
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
-        )  # aspects + other-beats + mesh-fodder roles ride in image_policy_json
+        )  # aspects + mesh-fodder roles ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []

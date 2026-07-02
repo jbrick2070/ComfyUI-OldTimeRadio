@@ -130,18 +130,16 @@ def _engine_id_from_pick(pick) -> str:
     return _LEGACY_ENGINE_ALIASES.get(bare, bare)
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
-#: Route-A: the ONE shared map (nodes/_otr_shared/role_slots.py) -- the three
-#: other-beats roles now own per-role slots (character_video_model /
-#: scene_broll_video_model / background_abstract_video_model); the legacy
-#: other_beats_video_model slot stays (migration fallback) and must still fit all
-#: three other-beats roles.
+#: The ONE shared map (nodes/_otr_shared/role_slots.py). rip-sfx-broll
+#: (2026-07-01): scene_broll_video_model / background_abstract_video_model were
+#: removed with their roles; the legacy other_beats_video_model slot stays as
+#: the character_video migration fallback.
 VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
 
-#: Sentinel default for the three per-role video COMBOs: leave a role unset and
-#: it inherits the legacy ``other_beats_video_model`` pick. The Director maps it
+#: Sentinel default for the character_video COMBO: leave it unset and it
+#: inherits the legacy ``other_beats_video_model`` pick. The Director maps it
 #: to engine_id "" so role_slots.engine_id_for_role falls back to other-beats.
 USE_OTHER_BEATS = "(use Other Beats default)"
-CLIP_MODES = ("unique_per_beat", "pool_n_loop")
 SEED_MODES = ("request_hash", "fixed")
 
 
@@ -162,7 +160,7 @@ def _video_model_combo() -> list:
 
 
 def _per_role_video_combo() -> list:
-    """The video COMBO for the three Route-A per-role slots: the
+    """The video COMBO for the character_video per-role slot: the
     :data:`USE_OTHER_BEATS` sentinel FIRST (the default -- inherit the Other
     Beats pick) then the full video list + custom sentinel."""
     return [USE_OTHER_BEATS] + _video_model_combo()
@@ -216,8 +214,8 @@ class OTRVideoDirector:
                 }),
                 "other_beats_video_model": (video, {
                     "tooltip": (
-                        "Video model for all OTHER beats (role C: character / "
-                        "scene b-roll / background)."
+                        "Legacy CHARACTER video fallback slot (role C). Used "
+                        "when character_video_model is left on its sentinel."
                     ),
                 }),
                 "announcer_image_model": (image, {
@@ -227,23 +225,7 @@ class OTRVideoDirector:
                     "tooltip": "Image source for music beats.",
                 }),
                 "other_beats_image_model": (image, {
-                    "tooltip": "Image source for other beats.",
-                }),
-                "other_beats_clip_mode": (list(CLIP_MODES), {
-                    "default": "pool_n_loop",
-                    "tooltip": (
-                        "unique_per_beat: one clip per beat (real-time). "
-                        "pool_n_loop (DEFAULT): render N unique clips + N stills, "
-                        "tile/loop them across the whole other-beats timeline "
-                        "(cheapest; N TOTAL renders, capped to the audio duration)."
-                    ),
-                }),
-                "other_beats_n": ("INT", {
-                    "default": 4, "min": 1, "max": 256,
-                    "tooltip": (
-                        "Pool size N for pool_n_loop (clamped to what the "
-                        "other-beats span actually uses; over-set -> warn)."
-                    ),
+                    "tooltip": "Image source for character beats (kept slot).",
                 }),
                 "fps": ("INT", {"default": 25, "min": 1, "max": 60}),
                 "canvas_w": ("INT", {"default": 832, "min": 16, "max": 7680}),
@@ -275,9 +257,11 @@ class OTRVideoDirector:
                         '{"other_beats_video_model": "my_engine"}.'
                     ),
                 }),
-                # Route-A per-role video models (2026-06-28 HuMo-14B promotion).
+                # Route-A per-role video model (2026-06-28 HuMo-14B promotion;
+                # rip-sfx-broll 2026-07-01 removed the scene_broll /
+                # background_abstract siblings with their roles).
                 # APPENDED here (after custom_models_json, before the forceInput
-                # gate_in) so they land at the END of node 87 widgets_values
+                # gate_in) so it lands at the END of node 87 widgets_values
                 # (BUG-LOCAL-097: never insert mid-list). Default = the
                 # USE_OTHER_BEATS sentinel -> inherit the Other Beats pick.
                 "character_video_model": (_per_role_video_combo(), {
@@ -286,20 +270,6 @@ class OTRVideoDirector:
                         "Video model for CHARACTER (face + audio) beats. Set to "
                         "humo_14B_169 for the 14B promotion; default inherits the "
                         "Other Beats pick."
-                    ),
-                }),
-                "scene_broll_video_model": (_per_role_video_combo(), {
-                    "default": USE_OTHER_BEATS,
-                    "tooltip": (
-                        "Video model for SCENE B-ROLL beats (text/still motion, "
-                        "no audio). Default inherits the Other Beats pick."
-                    ),
-                }),
-                "background_abstract_video_model": (_per_role_video_combo(), {
-                    "default": USE_OTHER_BEATS,
-                    "tooltip": (
-                        "Video model for BACKGROUND ABSTRACT beats (text prompt "
-                        "only). Default inherits the Other Beats pick."
                     ),
                 }),
                 "gate_in": ("STRING", {
@@ -321,12 +291,10 @@ class OTRVideoDirector:
     def direct(self, announcer_video_model, music_video_model,
                other_beats_video_model, announcer_image_model,
                music_image_model, other_beats_image_model,
-               other_beats_clip_mode, other_beats_n, fps, canvas_w, canvas_h,
+               fps, canvas_w, canvas_h,
                seed_mode, request_seed, allow_auto_fallback,
                episode_duration_target="auto", custom_models_json="{}",
                character_video_model=USE_OTHER_BEATS,
-               scene_broll_video_model=USE_OTHER_BEATS,
-               background_abstract_video_model=USE_OTHER_BEATS,
                gate_in=""):
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
@@ -341,30 +309,18 @@ class OTRVideoDirector:
             "music_video_model": _engine_id_from_pick(music_video_model),
             "other_beats_video_model": _engine_id_from_pick(other_beats_video_model),
         }
-        # Route-A per-role slots. The USE_OTHER_BEATS sentinel (or empty) emits
+        # Route-A character slot. The USE_OTHER_BEATS sentinel (or empty) emits
         # engine_id "" so role_slots.engine_id_for_role falls back to the legacy
         # other_beats pick (clean migration for old graphs + the lighter tiers).
-        for slot, pick in (
-            ("character_video_model", character_video_model),
-            ("scene_broll_video_model", scene_broll_video_model),
-            ("background_abstract_video_model", background_abstract_video_model),
-        ):
-            video_models[slot] = (
-                "" if str(pick) == USE_OTHER_BEATS
-                else _engine_id_from_pick(pick)
-            )
+        video_models["character_video_model"] = (
+            "" if str(character_video_model) == USE_OTHER_BEATS
+            else _engine_id_from_pick(character_video_model)
+        )
         resolved_video = {}
         for slot, picked in video_models.items():
             resolved_video[slot] = self._resolve_and_validate(
                 slot, picked, custom, descriptors, warnings
             )
-
-        # Clamp N (warn) -- the hard cap against the audio duration is applied
-        # later in OTR_ShotLock's audio-derived clip budget.
-        n = int(other_beats_n)
-        if n < 1:
-            warnings.append(f"other_beats_n {n} < 1; clamped to 1")
-            n = 1
 
         policy = {
             "policy_version": 1,
@@ -379,7 +335,6 @@ class OTRVideoDirector:
                 "music_image_model": music_image_model,
                 "other_beats_image_model": other_beats_image_model,
             },
-            "other_beats": {"clip_mode": other_beats_clip_mode, "pool_n": n},
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "allow_auto_fallback": bool(allow_auto_fallback),
@@ -405,12 +360,12 @@ class OTRVideoDirector:
     @staticmethod
     def _role_aspects(resolved_video):
         """Map each video ROLE to its SELECTED engine's ``render_aspect`` so
-        stills match their video engine. Route-A: one entry PER ROLE
-        (announcer_visual / music_visual / character_video / scene_broll /
-        background_abstract), each resolved through the shared per-role map (the
-        per-role slot, then the legacy other_beats fallback). Unknown / custom /
-        unresolved picks -> 'portrait' (the safe legacy look). Pure registry
-        read, no side effects."""
+        stills match their video engine. One entry PER ROLE
+        (announcer_visual / music_visual / character_video), each resolved
+        through the shared per-role map (the per-role slot, then the legacy
+        other_beats fallback for character). Unknown / custom / unresolved
+        picks -> 'portrait' (the safe legacy look). Pure registry read, no
+        side effects."""
         def _asp_for_role(role):
             eid = _role_slots.engine_id_for_role(resolved_video, role)
             try:
@@ -424,8 +379,6 @@ class OTRVideoDirector:
             "announcer_visual": _asp_for_role("announcer_visual"),
             "music_visual": _asp_for_role("music_visual"),
             "character_video": _asp_for_role("character_video"),
-            "scene_broll": _asp_for_role("scene_broll"),
-            "background_abstract": _asp_for_role("background_abstract"),
         }
 
     @staticmethod

@@ -45,19 +45,22 @@ def test_eligibility_is_capability_grounded(name, role):
             vreg.assert_usable(name, role)
 
 
-def test_matrix_is_not_flat_true():
-    """Sanity: the matrix has REAL exclusions (it is capability-grounded, not a
-    'fits everything' rubber stamp). Audio-driven + image-to-video engines must be
-    excluded from at least one role."""
-    excluded = 0
-    for name in _ENGINES:
-        desc = vreg.descriptor_for_engine(name)
-        if desc["required_inputs"] is None:
-            continue
-        for role in _ROLES:
-            if not rc.engine_fits_role(desc, role):
-                excluded += 1
-    assert excluded > 0, "capability matrix produced zero exclusions (flat True?)"
+def test_matrix_exclusion_machinery_still_bites():
+    """Sanity: the capability filter is not a rubber stamp. rip-sfx-broll
+    (2026-07-01): the input-poor roles (scene_broll/background_abstract) died,
+    so every SURVIVING role supplies the full vocabulary and every registered
+    engine fits everywhere -- real exclusions now come from (a) descriptors
+    requiring UNKNOWN tokens and (b) DEAD role tokens raising."""
+    # (a) an unknown required token is excluded fail-closed
+    bogus = {"engine_id": "needs_depth", "roles": tuple(_ROLES),
+             "required_inputs": ("depth_map",)}
+    for role in _ROLES:
+        assert rc.engine_fits_role(bogus, role) is False
+    # (b) a dead role raises through the same shared filter
+    ok = {"engine_id": "txt", "roles": tuple(_ROLES),
+          "required_inputs": ("text_prompt",)}
+    with pytest.raises(rc.RoleCompatError):
+        rc.engine_fits_role(ok, "background_abstract")
 
 
 def test_empty_required_inputs_fits_all_roles_via_capability_not_legacy():

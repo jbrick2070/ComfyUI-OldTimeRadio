@@ -106,18 +106,15 @@ def test_mesh_stage_roles_exactly_the_three_e5_slots():
     desc = {"engine_id": "mesh_stage", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
     from nodes.otr_video_director import VIDEO_SLOT_ROLES
+    # rip-sfx-broll (2026-07-01): every surviving slot's role supplies
+    # init_image, so mesh_stage fits them all; the dead roles raise.
     for slot, slot_roles in VIDEO_SLOT_ROLES.items():
         fits = any(rc.engine_fits_role(desc, role) for role in slot_roles)
-        if slot_roles == ("background_abstract",):
-            # Route-A: the pure background_abstract_video_model slot supplies only
-            # text_prompt -- an init_image engine (mesh_stage) cannot serve it.
-            assert not fits, slot
-        else:
-            assert fits, slot
-    assert rc.engine_fits_role(desc, "background_abstract") is False  # supplies no init_image
-    # capability-only (2026-06-22): mesh_stage (needs init_image) now ALSO fits
-    # scene_broll, which supplies a still -- additive; the roles whitelist is gone.
-    assert rc.engine_fits_role(desc, "scene_broll") is True
+        assert fits, slot
+    import pytest as _pytest
+    for dead in ("background_abstract", "scene_broll"):
+        with _pytest.raises(rc.RoleCompatError):
+            rc.engine_fits_role(desc, dead)
 
 
 def test_registry_mesh_stage_selectable_no_flag(monkeypatch):

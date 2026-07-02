@@ -32,7 +32,7 @@ Strict on shape, graceful on missing fields:
     half-degraded audio mid-soak.
   * ``cast_lookup`` / ``speaker_name`` / ``voice_preset`` degrade
     gracefully (return ``{}`` / ``"UNKNOWN"`` / ``None``) on missing
-    char_id so a stub ledger or a non-character line (announcer, sfx,
+    char_id so a stub ledger or a non-character line (announcer,
     music) doesn't blow up.
 
 (``production_plan_or_empty`` was deleted in voice-path-cleanbreak
@@ -136,7 +136,7 @@ def speaker_name(ledger: dict, line: dict) -> str:
     """Resolve a line's ``char_id`` to its cast ``name``.
 
     Returns ``"UNKNOWN"`` when the cast lookup misses or the line has no
-    ``char_id`` (e.g. announcer / sfx / music lines whose ``char_id`` is
+    ``char_id`` (e.g. announcer / music lines whose ``char_id`` is
     a role tag, not a real cast member).
     """
     char_id = (line or {}).get("char_id") or ""
@@ -199,21 +199,21 @@ def voice_assignments_from_cast(led: dict) -> dict:
 # S18.2 (IMP-20 part 2): post-freeze writeback §6.16 audit walker.
 # Optional string fields per _otr_ledger_freeze.py lines 37-39 must
 # be "" when unset, never null. Freeze enforces this at freeze time
-# but consumers (Bark, AudioGen, ProcSFX, MusicGen, SignalLostVideo)
-# stamp fields AFTER freeze; nothing was re-validating until this
-# walker. Promote to strict=True per consumer once the per-consumer
-# violation count stays at zero for two full pipeline runs.
+# but consumers (Bark, MusicGen, SignalLostVideo) stamp fields AFTER
+# freeze; nothing was re-validating until this walker. Promote to
+# strict=True per consumer once the per-consumer violation count
+# stays at zero for two full pipeline runs.
+# rip-sfx-broll (2026-07-01): the sfx_* writeback fields
+# (sfx_wav_path / sfx_engine / sfx_type / sfx_render_status) and
+# ALLOWED_SFX_RENDER_STATUS were DELETED with the sfx subsystem --
+# their producing nodes (AudioGen / ProcSFX) were retired long ago.
 _OPTIONAL_STRING_FIELDS = (
-    "sfx_wav_path",
-    "sfx_engine",
-    "sfx_type",
     "audio_wav_path",
     "audio_cache_key",
     "music_wav_path",
     "music_cache_key",
     "video_clip_path",
     "tts_skip_reason",
-    "sfx_render_status",
     # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field; walker enforces
     # its own enum (ALLOWED_MUSIC_RENDER_STATUS) below in addition to
     # the string-shape-not-None check.
@@ -221,48 +221,7 @@ _OPTIONAL_STRING_FIELDS = (
 )
 
 
-# C5 (S24, 2026-05-13): the enum the AudioGen + ProcSFX writeback
-# paths stamp on every line.lines[] sfx row.
-#
-#   ""                       -- unrendered (test fixtures, in-flight
-#                               ledgers, pre-render state).
-#   "ok"                     -- fresh generate, save confirmed.
-#   "ok_cache"               -- cache hit at resolve; audio loaded.
-#   "error"                  -- _save_wav returned False / disk failure.
-#   "fallback_silence"       -- transformers ImportError + the
-#                               allow_silence_fallback opt-in fired.
-#   "fallback_output_shape"  -- BUG-LOCAL-116 short-output case:
-#                               AudioGen returned < _min_samples;
-#                               silence padded; saved to
-#                               <cache_dir>/_fallback/ NOT canonical.
-#   "fallback_default_type"  -- ProcSFX resolver fell through to
-#                               "radio_tuning" without matching the
-#                               cue's tag content.
-#   "skipped"                -- consumer chose not to render (reserved
-#                               for future use; no producer stamps it
-#                               today, but the enum is wired so a
-#                               future skip-path doesn't break the
-#                               walker).
-#
-# Other fields in _OPTIONAL_STRING_FIELDS keep the string-shape-only
-# audit (only None counts as a violation). Only sfx_render_status
-# carries the enum check.
-ALLOWED_SFX_RENDER_STATUS: frozenset = frozenset({
-    "",
-    "ok",
-    "ok_cache",
-    "error",
-    "fallback_silence",
-    "fallback_output_shape",
-    "fallback_default_type",
-    "skipped",
-})
-
-# S25/MG-3 (BUG-LOCAL-213). MusicGen parity. Enum the music writeback
-# may stamp. Mirrors ALLOWED_SFX_RENDER_STATUS structure; the
-# fallback_default_type / skipped slots from the sfx enum don't apply
-# to MusicGen (no default-type fallback path; no consumer skips a cue
-# today).
+# S25/MG-3 (BUG-LOCAL-213). Enum the music writeback may stamp.
 #   ""                       -- unrendered / pre-render state
 #   "ok"                     -- fresh generate, save confirmed
 #   "ok_cache"               -- cache hit at resolve
@@ -291,12 +250,12 @@ def audit_post_freeze_writeback(
     Optional string fields per ``_otr_ledger_freeze.py`` lines 37-39:
     must be ``""`` when unset, never null. The §6.16 invariant is
     enforced at freeze time; consumers stamp after freeze and the
-    convention has historically drifted (ProcSFX wrote None on
+    convention has historically drifted (a consumer wrote None on
     disk-write failure until S18.1).
 
-    C5 (S24): for the ``sfx_render_status`` field the walker also
-    enforces membership in ``ALLOWED_SFX_RENDER_STATUS``. A typo like
-    ``"fallback_silnce"`` lands as a violation. Other 9 fields stay
+    For the ``music_render_status`` field the walker also enforces
+    membership in ``ALLOWED_MUSIC_RENDER_STATUS``. A typo like
+    ``"fallback_silnce"`` lands as a violation. Other fields stay
     string-shape-only -- only None is rejected; arbitrary string
     values are accepted because the producer-side enum hasn't been
     audited for them.
@@ -319,14 +278,6 @@ def audit_post_freeze_writeback(
                 violations.append(
                     f"line_id={lid!r} field {field!r} is None; "
                     f"§6.16 requires \"\" (empty string)."
-                )
-            elif field == "sfx_render_status" and val not in ALLOWED_SFX_RENDER_STATUS:
-                # C5 (S24): enum violation. A typo lands here instead
-                # of silently passing.
-                violations.append(
-                    f"line_id={lid!r} field {field!r} = {val!r} is "
-                    f"not in ALLOWED_SFX_RENDER_STATUS "
-                    f"({sorted(ALLOWED_SFX_RENDER_STATUS)!r})."
                 )
             elif field == "music_render_status" and val not in ALLOWED_MUSIC_RENDER_STATUS:
                 # S25/MG-3 (BUG-LOCAL-213): MusicGen parity enum. A
@@ -352,6 +303,5 @@ __all__ = [
     "voice_preset",
     "voice_assignments_from_cast",
     "audit_post_freeze_writeback",
-    "ALLOWED_SFX_RENDER_STATUS",
     "ALLOWED_MUSIC_RENDER_STATUS",
 ]

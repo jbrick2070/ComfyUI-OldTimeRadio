@@ -346,12 +346,13 @@ def test_build_request_from_shot_humo_keeps_portrait_canvas():
     assert (req["canvas"]["w"], req["canvas"]["h"]) == (480, 832)  # portrait kept
 
 
-def test_voice_audio_resolver_engine_fields_and_sfx_exclusion():
+def test_voice_audio_resolver_engine_fields_and_music_fallback():
     assert rd._voice_audio_for_line({"audio_wav_path": "a.wav"}) == "a.wav"
     assert rd._voice_audio_for_line({"indextts2_wav_path": "i.wav"}) == "i.wav"
     assert rd._voice_audio_for_line({"bark_wav_path": "b.wav"}) == "b.wav"
-    # sfx is never a face-driving voice; a music beat uses the music clip
-    assert rd._voice_audio_for_line({"sfx_wav_path": "s.wav"}) == ""
+    # a music beat's clip is the music fallback, never a face-driving voice
+    # in the generic *_wav_path sweep (the sfx_wav_path variant died with the
+    # sfx subsystem, rip-sfx-broll 2026-07-01)
     assert rd._voice_audio_for_line({"music_wav_path": "m.wav"}) == "m.wav"
     assert rd._voice_audio_for_line({}) == ""
 

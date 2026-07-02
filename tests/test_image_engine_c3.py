@@ -74,8 +74,8 @@ def test_qwen_image_role_filter_shared():
          "required_inputs": tuple(getattr(ireg.get_engine(n), "required_inputs", ()))}
         for n in ireg.all_engine_names()
     ]
-    # needs only text_prompt -> fits every role (incl. text-only background_abstract)
-    assert "qwen_image" in rc.filter_engines_for_role("background_abstract", descs)
+    # needs only text_prompt -> fits every surviving role
+    assert "qwen_image" in rc.filter_engines_for_role("announcer_visual", descs)
     assert "qwen_image" in rc.filter_engines_for_role("character_video", descs)
 
 

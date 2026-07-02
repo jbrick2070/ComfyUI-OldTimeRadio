@@ -240,11 +240,17 @@ def test_theme_cue_fanout_by_name(by_id, links_by_id):
 
 def test_scene_sequencer_audio_inputs(by_id, links_by_id):
     """SceneSequencer (3) tts_audio_clips <- CharacterVoices; announcer_audio_clips
-    <- Announcer; sfx_audio_clips left optional / None (node 15 dropped)."""
+    <- Announcer. rip-sfx-broll (2026-07-01): the sfx_audio_clips /
+    sfx_offset_ms inputs were REMOVED outright (they were never wired to a
+    producer), and script_json shifted up to the freed slot -- verify the
+    link landed on the right input NAME (slot semantics, r3 codex MF1)."""
     node = by_id[3]
     assert _src(links_by_id, _in_link(node, "tts_audio_clips")) == (81, 0)
     assert _src(links_by_id, _in_link(node, "announcer_audio_clips")) == (82, 0)
-    assert _in_link(node, "sfx_audio_clips") is None
+    names = [i.get("name") for i in node.get("inputs", [])]
+    assert "sfx_audio_clips" not in names
+    assert "sfx_offset_ms" not in names
+    assert _src(links_by_id, _in_link(node, "script_json")) == (62, 1)
 
 
 def test_done_gate_chain_orders_the_engines(by_id, links_by_id):

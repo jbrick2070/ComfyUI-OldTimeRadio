@@ -1,20 +1,25 @@
 """Route-A (2026-06-28 HuMo-14B promotion) CPU tests.
 
-Covers the per-sub-role video routing feature that promotes humo_14B_169 onto the
-character_video role while scene_broll / background_abstract ride lighter engines:
+REWRITTEN 2026-07-01 (rip-sfx-broll): the scene_broll / background_abstract
+roles + their per-role slots are GONE. Route-A now means: character_video owns
+its dedicated character_video_model slot (humo_14B_169 promotion) with the
+legacy other_beats_video_model slot as its EMPTY-SLOT migration fallback;
+unknown roles RAISE (NO FALLBACKS).
 
-* the ONE shared role->slot map (nodes/_otr_shared/role_slots.py) -- per-role slot
-  resolution + the legacy other_beats migration fallback;
+Covers:
+* the ONE shared role->slot map (nodes/_otr_shared/role_slots.py) -- per-role
+  slot resolution + the legacy other_beats migration fallback + loud raises;
 * the HuMo-14B VRAM frame cap (class override) + the exact-fit frame helper;
-* the end-to-end routing guarantee: OTR_VideoDirector emits per-role slots, every
-  role's resolved engine fits its role (role_compat), the policy carries per-role
-  aspects, and the image dispatcher still keeps the character still HuMo needs.
+* the end-to-end routing guarantee: OTR_VideoDirector emits per-role slots,
+  every role's resolved engine fits its role (role_compat), the policy carries
+  per-role aspects, and the image dispatcher still keeps the character still.
 """
 from __future__ import annotations
 
 import json
 
 import numpy as np
+import pytest
 
 from nodes._otr_shared import role_compat as rc
 from nodes._otr_shared import role_slots as rs
@@ -30,49 +35,50 @@ from nodes import otr_image_gen_dispatcher as disp
 # --------------------------------------------------------------------------- #
 def test_slot_for_role_per_role_split():
     assert rs.slot_for_role("character_video") == "character_video_model"
-    assert rs.slot_for_role("scene_broll") == "scene_broll_video_model"
-    assert rs.slot_for_role("background_abstract") == "background_abstract_video_model"
     assert rs.slot_for_role("announcer_visual") == "announcer_video_model"
     assert rs.slot_for_role("music_visual") == "music_video_model"
-    # unknown role tolerantly maps to the legacy slot (never raises)
-    assert rs.slot_for_role("not_a_role") == rs.LEGACY_OTHER_BEATS_SLOT
+    # rip-sfx-broll: unknown / dead roles RAISE (the silent legacy-slot map
+    # is gone -- NO FALLBACKS)
+    for dead in ("scene_broll", "background_abstract", "not_a_role"):
+        with pytest.raises(ValueError):
+            rs.slot_for_role(dead)
 
 
 def test_engine_id_for_role_reads_per_role_slot_first():
     vm = {
         "character_video_model": {"engine_id": "humo_14B_169"},
-        "scene_broll_video_model": {"engine_id": "wan_ti2v"},
-        "background_abstract_video_model": {"engine_id": "ltx_video"},
         "other_beats_video_model": {"engine_id": "humo_1.7B"},
     }
     assert rs.engine_id_for_role(vm, "character_video") == "humo_14B_169"
-    assert rs.engine_id_for_role(vm, "scene_broll") == "wan_ti2v"
-    assert rs.engine_id_for_role(vm, "background_abstract") == "ltx_video"
 
 
 def test_engine_id_for_role_legacy_fallback():
-    # An old policy with ONLY the legacy slot -> every other-beats role falls back.
+    # An old policy with ONLY the legacy slot -> character falls back.
     vm = {"other_beats_video_model": {"engine_id": "humo_1.7B"}}
-    for role in ("character_video", "scene_broll", "background_abstract"):
-        assert rs.engine_id_for_role(vm, role) == "humo_1.7B"
+    assert rs.engine_id_for_role(vm, "character_video") == "humo_1.7B"
     # an empty per-role slot ALSO falls back to the legacy pick
     vm2 = {"character_video_model": {"engine_id": ""},
            "other_beats_video_model": {"engine_id": "humo_1.7B"}}
     assert rs.engine_id_for_role(vm2, "character_video") == "humo_1.7B"
+    # the fallback is character-ONLY; a dead role raises before any lookup
+    with pytest.raises(ValueError):
+        rs.engine_id_for_role(vm, "scene_broll")
 
 
 def test_engine_id_for_role_accepts_bare_string_values():
-    vm = {"scene_broll_video_model": "wan_ti2v"}
-    assert rs.engine_id_for_role(vm, "scene_broll") == "wan_ti2v"
+    vm = {"character_video_model": "wan_ti2v"}
+    assert rs.engine_id_for_role(vm, "character_video") == "wan_ti2v"
 
 
 def test_video_slot_roles_has_per_role_and_legacy_slots():
     sr = rs.VIDEO_SLOT_ROLES
     assert sr["character_video_model"] == ("character_video",)
-    assert sr["scene_broll_video_model"] == ("scene_broll",)
-    assert sr["background_abstract_video_model"] == ("background_abstract",)
-    assert set(sr[rs.LEGACY_OTHER_BEATS_SLOT]) == {
-        "character_video", "scene_broll", "background_abstract"}
+    assert sr["announcer_video_model"] == ("announcer_visual",)
+    assert sr["music_video_model"] == ("music_visual",)
+    # legacy slot now serves the character lane ONLY
+    assert sr[rs.LEGACY_OTHER_BEATS_SLOT] == ("character_video",)
+    assert "scene_broll_video_model" not in sr
+    assert "background_abstract_video_model" not in sr
 
 
 # --------------------------------------------------------------------------- #
@@ -122,12 +128,9 @@ def _direct_policy():
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         other_beats_image_model="flux_gen1",
-        other_beats_clip_mode="pool_n_loop",
-        other_beats_n=4, fps=25, canvas_w=832, canvas_h=480,
+        fps=25, canvas_w=832, canvas_h=480,
         seed_mode="request_hash", request_seed=42, allow_auto_fallback=True,
         character_video_model="humo_14B_169 (16:9)",
-        scene_broll_video_model="wan_ti2v",
-        background_abstract_video_model="ltx_video",
     )
     return json.loads(pol_json)
 
@@ -135,14 +138,18 @@ def _direct_policy():
 def test_director_emits_per_role_video_models():
     vm = _direct_policy()["video_models"]
     assert vm["character_video_model"]["engine_id"] == "humo_14B_169"
-    assert vm["scene_broll_video_model"]["engine_id"] == "wan_ti2v"
-    assert vm["background_abstract_video_model"]["engine_id"] == "ltx_video"
+    assert "scene_broll_video_model" not in vm
+    assert "background_abstract_video_model" not in vm
+
+
+def test_director_policy_has_no_other_beats_pooling():
+    pol = _direct_policy()
+    assert "other_beats" not in pol
 
 
 def test_every_role_engine_fits_its_role():
     vm = _direct_policy()["video_models"]
-    for role in ("announcer_visual", "music_visual", "character_video",
-                 "scene_broll", "background_abstract"):
+    for role in ("announcer_visual", "music_visual", "character_video"):
         eid = rs.engine_id_for_role(vm, role)
         eng = vreg.get_engine(eid)
         desc = {"engine_id": eid, "roles": tuple(getattr(eng, "roles", ())),
@@ -152,8 +159,8 @@ def test_every_role_engine_fits_its_role():
 
 def test_policy_aspects_has_per_role_entries():
     aspects = _direct_policy()["aspects"]
-    assert set(aspects) == {"announcer_visual", "music_visual", "character_video",
-                            "scene_broll", "background_abstract"}
+    assert set(aspects) == {"announcer_visual", "music_visual",
+                            "character_video"}
     # humo_14B_169 is the wide tier -> the character still is minted 16:9.
     assert aspects["character_video"] == "wide"
 
@@ -163,11 +170,9 @@ def test_dispatcher_keeps_character_still_for_humo_14b():
     # an init_image, so _still_needed_for_role is True on character_video.
     pol = _direct_policy()
     assert disp._still_needed_for_role(pol, "character_video") is True
-    # background_abstract routes to ltx_video, which inherits accepts_still=True
-    # (MotionEngineBase) -> it CAN use the still (i2v), so one is generated.
-    assert disp._still_needed_for_role(pol, "background_abstract") is True
     # a role routed to an accepts_still=False engine (viz_green) skips the still.
     pol_vis = {"video_models": {"music_video_model": {"engine_id": "viz_green"}}}
     assert disp._still_needed_for_role(pol_vis, "music_visual") is False
-    # unknown role stays fail-safe (keep the still)
+    # unknown role stays fail-safe in the IMAGE phase (keep the still; the
+    # explicit ROLE_TO_VIDEO_SLOT guard runs before the loud resolver)
     assert disp._still_needed_for_role(pol, "not_a_role") is True

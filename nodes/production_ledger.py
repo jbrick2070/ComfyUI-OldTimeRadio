@@ -2,7 +2,7 @@
 nodes/production_ledger.py -- OTR Production Ledger (L2, write-only)
 
 Single-source-of-truth JSON record of everything an episode produced:
-cast, scenes, shots, beats, lines, sfx, music, and their positions on
+cast, scenes, shots, beats, lines, music, and their positions on
 the final audio timeline.
 
 Hierarchy:
@@ -31,7 +31,7 @@ Stages that populate the ledger (in pipeline order):
   LedgerScriptWriter DONE -> cast (voice_presets) + lines + meta.visual_plan
                              (replaces legacy ScriptWriter -> LLMDirector chain
                              retired in voice-path-cleanbreak S2)
-  SceneSequencer DONE  -> lines/sfx/music start_s + dur_s + beats (speaker turns)
+  SceneSequencer DONE  -> lines/music start_s + dur_s + beats (speaker turns)
   SignalLostVideo DONE -> episode_id (real title), final_audio_path,
                           final_video_path, total_episode_dur_s
 
@@ -87,16 +87,18 @@ _GIT_HEAD_CACHE: Optional[str] = None
 # left untouched so the legitimate announcer re-stamp is never fought.
 # ---------------------------------------------------------------------------
 
-#: char_id values that are NOT cast characters (the announcer + music/sfx render
+#: char_id values that are NOT cast characters (the announcer + music render
 #: contracts). A row carrying one of these is never coerced to "character".
+#: ("sfx" removed 2026-07-01, rip-sfx-broll -- old sfx ledgers fail loud at
+#: the freeze gate / role resolvers instead of riding a sentinel.)
 _NON_CHARACTER_CHAR_ID_SENTINELS: frozenset = frozenset({
-    "announcer", "music", "music_open", "music_close", "music_inter", "sfx",
+    "announcer", "music", "music_open", "music_close", "music_inter",
 })
 
 
 def cast_ids_from_ledger(ledger_data: Any) -> "set[str]":
     """Return the set of real CAST char_ids from a ledger dict's `cast` table,
-    MINUS the announcer / music / sfx sentinels. Defensive; never raises.
+    MINUS the announcer / music sentinels. Defensive; never raises.
 
     The announcer is NOT always keyed by the literal "announcer" char_id -- a
     real episode often stores it as an ordinary cast slot (e.g. char_id="c01",
@@ -130,7 +132,7 @@ def coerce_speaker_role_for_char_id(
     Returns ``(line, changed)``. Mutates ``line`` IN PLACE when it coerces and
     stamps a per-line ``compose_flags`` breadcrumb (the ledger ROW schema is
     FIXED -- there is NO per-line meta dict). No-op (changed=False) when: the row
-    is not a dict; char_id is empty / None / an announcer / music / sfx
+    is not a dict; char_id is empty / None / an announcer / music
     sentinel; char_id is not in ``cast_ids``; or the role is already
     "character". COERCE-NEVER-CRASH: any error -> (line, False)."""
     try:
@@ -770,7 +772,7 @@ class Ledger:
 
         `outline` must expose ``.beats`` (an iterable of Beat-like
         objects with beat_id / speaker / speaker_role / intent / mood
-        / target_words / arc_phase / sfx_cue attributes). Plain dicts
+        / target_words / arc_phase attributes). Plain dicts
         with the same fields also work for tests.
 
         Each beat produces ONE line row:
@@ -779,12 +781,11 @@ class Ledger:
             explicitly banned per synthesis §3 Phase 3)
           * char_id looked up from `char_id_by_name` for character
             beats; "announcer" for announcer beats; the speaker_role
-            string itself for music/sfx beats (matches existing writer
+            string itself for music beats (matches existing writer
             convention).
           * text starts EMPTY for voiced beats (the composer will fill
-            it via update_line_text). For non-voiced beats it's
-            stamped at init time from sfx_cue / intent verbatim --
-            those rows are complete from the moment they're born.
+            it via update_line_text) AND for music render-contract rows
+            (never transcript text -- rip-sfx-broll 2026-07-01).
           * speaker_role, arc_phase, compose_flags are additive Phase
             2A / Phase 0 fields stamped at init time so the schema is
             uniform across rows.
@@ -803,7 +804,6 @@ class Ledger:
             speaker = _safe_str(_g("speaker"))
             role = _safe_str(_g("speaker_role")) or "character"
             mood = _safe_str(_g("mood"))
-            sfx_cue = _safe_str(_g("sfx_cue"))
             intent = _safe_str(_g("intent"))
             arc_phase = _safe_str(_g("arc_phase"))
             # Script Doctor row fields (Sprint 3E, 2026-05-25): persist
@@ -833,7 +833,7 @@ class Ledger:
             # slot id rather than raw beat_id. Voiced beats carry a
             # `d\d{3}` id stamped by `stamp_dialogue_slot_ids`;
             # non-voiced beats (music_open / music_close /
-            # music_inter / sfx) stay None. The getattr default keeps
+            # music_inter) stay None. The getattr default keeps
             # the line schema additive -- pre-Sprint-1 outlines that
             # never ran through the stamper just produce None slots,
             # and the legacy compose path is byte-identical.
@@ -847,17 +847,15 @@ class Ledger:
             if is_spoken_role(role):
                 text = ""    # composer fills via update_line_text
             else:
-                # S1 (2026-06-22): non-spoken render-contract rows
-                # (music_open / music_inter / music_close / sfx) carry
-                # ONLY a genuine sfx_cue as text -- never the generic beat
-                # `intent`. The intent fallback was stamping filler like
-                # "Musical interlude bridging <phase>..." into the line
-                # text, which bled into the script transcript
-                # (assemble_script_text_from_ledger -> [SFX: ...]). The
-                # beat intent is still preserved separately in `beat_intent`
-                # below for any visual/music-prompt consumer. Music rows
-                # (no cue) become text="" ; real sfx cues are kept intact.
-                text = (sfx_cue or "").strip()
+                # S1 (2026-06-22) + rip-sfx-broll (2026-07-01): non-spoken
+                # render-contract rows (music_open / music_inter /
+                # music_close) NEVER carry transcript text -- the old
+                # intent fallback stamped filler like "Musical interlude
+                # bridging <phase>..." into the transcript, and the
+                # sfx_cue carrier died with the sfx subsystem. The beat
+                # intent is still preserved separately in `beat_intent`
+                # below for any visual/music-prompt consumer.
+                text = ""
             rows.append({
                 "line_id":       beat_id,
                 "shot_id":       None,
@@ -1291,7 +1289,9 @@ def assemble_script_text_from_ledger(led_data: dict) -> str:
     accumulates in `script_text_parts`:
       - character beat:  ``[VOICE: NAME, traits] <text>``
       - announcer beat:  ``[VOICE: ANNOUNCER, traits] <text>``
-      - music/sfx beat:  ``[SFX: <text>]``
+      - music beat:      skipped (render contract, no transcript text;
+        the legacy ``[SFX: ...]`` token was removed 2026-07-01,
+        rip-sfx-broll)
 
     Used as the post-loop authoritative source for slot-0 in BOTH the
     writer (after the news-wiring overlay patches `led.data['lines']`
@@ -1335,8 +1335,14 @@ def assemble_script_text_from_ledger(led_data: dict) -> str:
             parts.append(f"[VOICE: {name}, {traits}] {text}")
         elif role == "announcer":
             parts.append(f"[VOICE: ANNOUNCER, {traits}] {text}")
-        elif role in {"music_open", "music_close", "music_inter", "sfx"}:
-            parts.append(f"[SFX: {text}]")
+        elif role in {"music_open", "music_close", "music_inter"}:
+            # Music rows are render contracts, never transcript rows.
+            # By construction they carry text=="" (init stamps "" and
+            # the composer loop writes "") so this branch is
+            # unreachable for a fresh ledger; it exists to keep a
+            # stale text-bearing music row OUT of the transcript
+            # rather than emitting the retired [SFX:] token.
+            continue
         else:
             # Unknown role: keep the text visible to downstream
             # consumers tagged by role so a debug pass can spot it.

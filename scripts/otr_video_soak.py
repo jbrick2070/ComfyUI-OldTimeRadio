@@ -78,16 +78,15 @@ ENGINE_FAMILY = {
     "viz_green": "abstract",
 }
 
-#: (role, engine, family) rotation covering all 5 roles + the non-3D families.
-#: C0 2026-06-30: background_abstract + the 2nd announcer leg repointed from the
-#: retired abstract/station_card to surviving still families (kept in sync with
-#: render_driver._PROFILES).
+#: (role, engine, family) rotation covering the 3 roles + the non-3D families.
+#: rip-sfx-broll (2026-07-01): the scene_broll/background_abstract legs died
+#: with their roles (kept in sync with render_driver._PROFILES).
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
-    ("scene_broll", "still_motion", "static_motion"),
-    ("background_abstract", "still_flat", "static_image_gen"),
+    ("character_video", "still_motion", "static_motion"),
+    ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),
 )
 

@@ -39,8 +39,7 @@ class VizMxcCpuEngine:
     #: UI-sort metadata only (C2: capability is the eligibility rule). Listed in
     #: every role so the dropdown offers it everywhere; required_inputs=() makes it
     #: fit every role BY CAPABILITY.
-    roles = ("announcer_visual", "music_visual", "character_video",
-             "scene_broll", "background_abstract")
+    roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()                  # never an auto-default; explicit pick only
     commercial_clean = True             # own code + ffmpeg encode only
     requires_flag = None                # registry IS the menu; no flag gate

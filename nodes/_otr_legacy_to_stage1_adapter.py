@@ -524,7 +524,7 @@ def line_request_to_stage1_beat(
 
     Legacy Beat fields the writer constructs upstream:
         beat_id, speaker, speaker_role, intent, mood, target_words,
-        arc_phase, sfx_cue
+        arc_phase
 
     Args:
         legacy_beat: an outline Beat (pydantic) or a duck-typed object

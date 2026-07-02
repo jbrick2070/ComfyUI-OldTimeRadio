@@ -1,0 +1,73 @@
+# OTR HANDOFF LOG (append-only; newest at TOP)
+
+The running record of what each session DID. GO_FORWARD_PLAN.md holds the forward plan (lean);
+this holds the history so the plan can stay lean. One short entry per session. Deep detail lives
+in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
+
+---
+
+## 2026-07-01 -- RIP dead sfx subsystem + scene_broll/background_abstract + pooling (SHIPPED)
+Did: executed the rip contract (`kibitz-runs/2026-07-01-rip-sfx-broll/r2/final.md`; build plan
+kibitzed to convergence r3 wiring + r4 -- codex + claude-code panels, agy credit-dropped; folds in
+`docs/2026-07-01-rip-sfx-broll/BUILD_PLAN.md` + r3/r4 judgments). ONE atomic commit: speaker-role
+model -> 5 (sfx GONE: constant/Literal/prompt/sfx_cue field+ctors/SOUND IN THE ROOM/[SFX:] token/
+sentinels/G7+SFX_DUR/writeback fields/sequencer overlay+offset widgets/HUD+treatment branches);
+video Role enum -> 3 (announcer_visual/music_visual/character_video; scene_broll +
+background_abstract slots/widgets/aspects/profile keys/engine role-tuples ripped; legacy
+other_beats_video_model slot = character-only migration lane); other-beats pool_n_loop POOLING
+gone (per-beat budget/stills; still_pool_key reads deleted). NO FALLBACKS: 6 silent sites now
+raise (resolve_speaker_role, stamp_default_role, slot_for_role/engine_id_for_role,
+_video_role_for_line, derive_scene_still_targets, sequencer dispatch); old sfx ledgers rejected
+LOUD (freeze ALLOWED_SPEAKER_ROLES + every path). Workflow JSON same commit: node 87
+widgets_values 19->15 (wholesale; mid-list idx 6-7 + tail 17-18) + 4 dead inputs; node 3 sfx
+inputs + tail widget dropped + LINK 2 dst_slot 3->2 (script_json shift -- r3 codex catch);
+validator tombstones sfx_audio_clips/sfx_offset_ms; widget_mapping.json drops the 2 dead
+role_overrides. slot_matrix renamed (ALL_ROLES / build_all_role_profile, no aliases); soak
+producers + coverage-sweep updated (character lane explicit); scripts/_otr_patch_pool_default.py
+deleted. Tests: test_per_cue_sfx_dur.py + test_fixture_dur_s_audit.py deleted; ~30 files
+rewritten to the 3-role model; NEW tests/test_rip_sfx_broll_guard.py (12 guards incl. workflow
+pin + kept-widget + engines_for_role non-empty). Gates: suite 5916/0 (35 skip), Bug Bible 16/0,
+B7 in-suite green, workflow contract+round-trip+widget-count+link/slot audits pass.
+
+## 2026-07-01 -- migrated done-history out of GO_FORWARD_PLAN.md (lean-plan cleanup)
+Did: split GO_FORWARD into forward-only plan + this log (operator: "GO_FORWARD must be lean, point
+to sprint specs, not a change-log"). Updated the otr-handoff skill to append here instead of the
+big otr-build-tracker dashboard.
+Note: entries below this line are the ONE-TIME migration of shipped receipts that had accumulated
+in GO_FORWARD; going forward each session appends its own entry above.
+
+## 2026-07-01 -- brief-driven HuMo radio-host + ltx_audio_in A/B addendum (SHIPPED)
+Did: shipped the brief-driven radio-host feature (contract `docs/2026-07-01-brief-driven-radio-host/
+PLAN_HARDENED.md`, kibitz r1): deterministic `radio_form_from_meta` + `build_radio_host_prompt`
+(no LLM), repointed the 4 hardcoded-1940s surfaces, minted the toggle-gated `radio_host_portrait`
+object (seed-pinned, aspect-follow, no-baby neg), `OTR_ENABLE_HUMO_HOSTS` toggle (default OFF =
+byte-identical), skip-LLM synthetic announcer + widened `_passes_consistency`. Then the
+`OTR_LTX_RADIO_FACE` A/B addendum (wide radio-face stills + ltx_audio_in bookend init + HuMo-hosts
+precedence). Two follow-up fixes: HuMo host bookends use the ambient master-mix as audio_ref (was
+FamilyInputGap on b000); image-director `mesh_fodder_roles_from_video_policy` honors
+OTR_FORCE_ENGINE_MAP. LATER look-direction (operator eyeball): music HuMo -> anthropomorphic radio
+CONSOLE (dial-face), announcer HuMo -> RADIO-HEAD PERSON, overtness brief-driven, story-flair via
+full "still" era tail. Commits bb972ddf / 4cddb26c / ad48246d / 147e83cf / 4046a50c / 30e492d2 /
+14d5fbbf; suite 5943 + Bug Bible + B7 green; pushed v2.0-alpha.
+Note: a 6-leg 45-word visual soak driver (`scripts/_otr_visual_soak_6leg.py`, gitignored) was built
++ debugged (output-tree path fix + video-via-force-map); live GPU legs are operator-run.
+
+## 2026-06-30..2026-07-01 -- slot-audit C0-C5 + engine cleanup (SHIPPED, code)
+Did: C0 retired station_card + abstract engines (8f701a73); C1 accepts_still on StillPan/StillMotion
+(8f701a73); C2 VideoEngineRegistry capability routing (65c11bc1); C3 sfx->scene_broll route
+(96aa54dc); C4 eligibility matrix test (ca2ac0e8); C5 content_oracle + slot_matrix all-5-role
+profile (f5b78ac5). Plus: viz_mxc_mandala engine (8d90562a); still_parallax rip-out + visualizer->
+viz_green rename (2026-06-30); HuMo improve items 1/2/4/5 incl. _enforce_radio_is_host (2026-06-30);
+mesh_stage MIN-ACCEPT radio subject + adaptive camera (2026-06-30); E4 audio-reactive dropdown
+descriptor + VRAM-tier suffix (dfacea49). S-A..S-F coverage-soak: 7 of 11 sub-items already shipped
+(S-A 4e13a692, S-B eb8c3781, S-D 5a50fa40, S-E E5 9e4f3a33 + E6, S-F c6c50579, BUG-411 verified).
+REMAINING (open, forward): E1 no-fallback scaffolding migration, E2 deprecate allow_auto_fallback,
+E3-doc, S-C C1 audio_motion_profile, the live-GPU all-engines soak RUN.
+
+## 2026-06-13..2026-06-14 -- Wan + GATE-A sweep hardening (SHIPPED, code)
+Did: M1+M4 no-fallback + VRAM gate (9b2294b); M2+M3+M5 sweep --acceptance (0ab55bc); M6 assert_usable
+preflight (ec91a3c); M7 silent-clip ffprobe (f71edaa); S1+S5 (dfe9ab5); S7+S10 (f3a529f); M8+S2
+wan_ti2v engine built (bcbe05a). OPEN: M9 (CS-3 sequential residency) + S4 + S9 = live-GPU proofs;
+full --acceptance GREEN gated on the slow wan-music-bed leg (attended).
+
+(Older shipped history remains in `docs/GO_FORWARD_ARCHIVE.md`.)

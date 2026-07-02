@@ -138,6 +138,11 @@ FORBIDDEN_INPUT_SOCKETS = frozenset({
     "voice_map_json",         # Director's voice_assignments split-out
     "sfx_plan_json",          # Director's sfx_plan split-out
     "music_plan_json",        # Director's music_plan split-out
+    # rip-sfx-broll (2026-07-01): the SceneSequencer sfx overlay inputs
+    # were removed with the sfx subsystem (they were never wired to a
+    # producer). A stale workflow carrying them fails at validation.
+    "sfx_audio_clips",
+    "sfx_offset_ms",
 })
 
 

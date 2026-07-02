@@ -86,17 +86,17 @@ ENGINE_FAMILY = {
     "ltx_audio_in": "audio_conditioned_video",
 }
 
-#: The (role, engine, family) rotation covering all 5 roles + the non-3D
+#: The (role, engine, family) rotation covering the 3 roles + the non-3D
 #: families (kept identical to scripts/otr_video_soak so the GPU soak walks the
-#: same shape the shipped CPU harness proves).
+#: same shape the shipped CPU harness proves). rip-sfx-broll (2026-07-01):
+#: the scene_broll/background_abstract legs died with their roles; the still
+#: families keep coverage via the extra announcer legs.
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
     ("character_video", "wan_i2v", "image_to_video"),
-    ("scene_broll", "still_motion", "static_motion"),
-    # C0 2026-06-30: abstract + station_card retired -> repoint these soak legs to
-    # surviving still families that fit the role by capability (both mint via C1).
-    ("background_abstract", "still_flat", "static_image_gen"),
+    ("character_video", "still_motion", "static_motion"),
+    ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),
 )
 #: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
@@ -512,7 +512,7 @@ def _voice_audio_for_line(line):
         if line.get(k):
             return str(line[k])
     for k, v in line.items():
-        if v and str(k).endswith("wav_path") and not str(k).startswith(("sfx", "music")):
+        if v and str(k).endswith("wav_path") and not str(k).startswith("music"):
             return str(v)
     for k in ("music_wav_path", "clip_path", "video_clip_path"):
         if line.get(k):
@@ -558,9 +558,6 @@ _LTX_MOTION_PROMPT_BY_ROLE = {
                     "glowing. Oscilloscope dances to the rhythm. VU meters "
                     "bounce. Tubes pulse with the bass. Slow orbit around the "
                     "speaker."),
-    "sfx": ("Continuous shot, same console throughout. Snap zoom on the dial as "
-            "needle spikes hard. Tubes surge with electric arcs. Speaker grille "
-            "rattles violently. Quick whip-pan to the dial."),
 }
 #: BUG-LOCAL-112 char budget for the motion prompt (verb-only core + optional
 #: short brief fragment appended AFTER, dropped if it breaks the budget).
@@ -586,8 +583,6 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
         return (_open_key if _open_key in _LTX_MOTION_PROMPT_BY_ROLE
                 else "music_inter")
-    if "sfx" in role or sid.startswith("sfx") or "_sfx" in sid:
-        return "sfx"
     if role == "announcer_visual":
         return "announcer"
     if role == "music_visual":
@@ -823,14 +818,13 @@ def _ltx_radio_face_object_id(role: str) -> str:
     return "still_%s_radio_face_169" % str(role or "")
 
 #: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
-#: (announcer_visual / music_visual / character_video / scene_broll /
-#: background_abstract) to the LEDGER speaker_role vocabulary
-#: nodes._otr_speaker_role.is_never_humo_role actually checks (character /
-#: announcer / music_open / music_close / music_inter / sfx). Only ONE
-#: representative speaker_role per video role is needed -- all three MUSIC_*
-#: values are equally "never humo" in _NEVER_HUMO_ROLES, so MUSIC_OPEN stands
-#: in for music_visual. character_video / scene_broll / background_abstract
-#: have no entry -- they are never subject to this guard.
+#: (announcer_visual / music_visual / character_video) to the LEDGER
+#: speaker_role vocabulary nodes._otr_speaker_role.is_never_humo_role
+#: actually checks (character / announcer / music_open / music_close /
+#: music_inter). Only ONE representative speaker_role per video role is
+#: needed -- all three MUSIC_* values are equally "never humo" in
+#: _NEVER_HUMO_ROLES, so MUSIC_OPEN stands in for music_visual.
+#: character_video has no entry -- it is never subject to this guard.
 _VIDEO_ROLE_NEVER_HUMO_PROXY = {
     "announcer_visual": _SPEAKER_ROLE_ANNOUNCER,
     "music_visual": _SPEAKER_ROLE_MUSIC_OPEN,
@@ -1012,7 +1006,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # without the not-_requires_fodder guard this override would clobber the
         # clean fodder with the scene still and re-introduce the clay blob.
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
+        # (still_pool_key read removed 2026-07-01 with the pooling rip --
+        # every shot resolves its own per-beat still.)
+        _still = _still_index(ledger).get(str(_bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"
@@ -1043,7 +1039,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
+        _still = _still_index(ledger).get(str(_bid), "")
         # BUG 1 (2026-06-20 operator directive): still_pan / still_flat are
         # LANDSCAPE engines (render_aspect="wide") -- they NEVER condition on the
         # 832x1216 VERTICAL portrait. The 8bc5381 "_spk==character -> portrait"
@@ -1127,7 +1123,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if (str(shot.get("engine_id") or "") == "ltx_video"
             and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
         _bid = _beat_id_for_shot(shot)
-        _still = _still_index(ledger).get(str(shot.get("still_pool_key") or _bid), "")
+        _still = _still_index(ledger).get(str(_bid), "")
         if _still:
             init_image = _still
             init_source = "scene_still"
@@ -1425,8 +1421,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
     # THE EPISODE'S OWN BRIEF -- the source of the old episodes' scenic,
     # varied opens -- finished with the brief's era tail under the LTX char
-    # budget. Covers ALL roles (announcer/music opens AND scene_broll /
-    # background_abstract), killing the generic "a 1940s radio studio"
+    # budget. Covers ALL roles (announcer/music opens AND character),
+    # killing the generic "a 1940s radio studio"
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
@@ -1502,7 +1498,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 return ", ".join([str(t).strip() for t in (raw or [])
                                   if str(t).strip()][:n])
 
-            # Non-open text-engine roles (scene_broll etc.) keep the brief
+            # Non-open text-engine roles keep the brief
             # logline core + beat clauses; the announcer/music OPEN roles use
             # the motion-centric branch above (the i2v still carries the look).
             core = get_story_brief_ltx(_meta)
@@ -1917,7 +1913,7 @@ def parse_engine_override(spec: str) -> dict:
     """Parse ``OTR_FORCE_ENGINE_MAP`` (pure). Grammar: comma-separated
     ``role=engine`` pairs; the role ``*`` means EVERY shot regardless of role.
     Examples: ``*=ltx_video`` (the all-LTX episode);
-    ``character_video=wan_i2v,announcer_visual=humo,scene_broll=ltx_video``.
+    ``character_video=wan_i2v,announcer_visual=humo``.
     Unknown engines raise at parse time (fail-closed, before any render)."""
     out = {}
     for pair in (spec or "").split(","):

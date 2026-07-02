@@ -19,7 +19,7 @@ Pipeline (unchanged from v2.0 LPL):
     5. new_ledger + episode_canon + set_cast.
     6. Per-beat loop:
          - character / announcer → compose_line (uses creativity temp/top_p)
-         - non-voiced            → use beat.sfx_cue / beat.intent verbatim
+         - non-voiced (music_*)  → render-contract rows, text stays empty
     7. set_lines + speaker_role post-patch.
     8. Post-composition title regen (Jeffrey 2026-05-10): when the user
        left episode_title blank, ask the LLM to title the episode from
@@ -142,10 +142,11 @@ __all__ = ["OTR_LedgerScriptWriter"]
 
 VOICED_ROLES = {"character", "announcer"}
 """Speaker roles that produce spoken dialogue. These trigger an LLM
-compose_line call. Other roles (music_*, sfx) skip the LLM."""
+compose_line call. Other roles (music_*) skip the LLM."""
 
-NON_VOICED_ROLES = {"music_open", "music_close", "music_inter", "sfx"}
-"""Speaker roles that render as [SFX: ...] tokens with no LLM call."""
+NON_VOICED_ROLES = {"music_open", "music_close", "music_inter"}
+"""Speaker roles that are pure render contracts: no LLM call, no
+transcript text (the 'sfx' role was removed 2026-07-01, rip-sfx-broll)."""
 
 DEFAULT_TRAITS = "neutral"
 """Fallback traits string when a beat has no mood. Mirrors the
@@ -813,7 +814,7 @@ def _build_title_excerpt_set(
     how it lands.
 
     Splits on the blank-line-delimited token blocks produced by the
-    per-beat loop (each `[VOICE: ...]` / `[SFX: ...]` block is one
+    per-beat loop (each `[VOICE: ...]` block is one
     item joined by "\\n\\n"). Returns a dict with `opening_lines`,
     `middle_lines`, `ending_lines` strings; empty strings when the
     script is empty. Pure stdlib, never raises.
@@ -3840,7 +3841,7 @@ class OTR_LedgerScriptWriter:
             # not a character beat (the rare all-announcer / empty-cast case),
             # clear it on a COPY so NO contract is marked must_turn -- the
             # audit then reports the episode invalid (acceptable + rare)
-            # rather than pinning the turn on the announcer/music/sfx.
+            # rather than pinning the turn on the announcer/music rows.
             _sdc_char_slots = {
                 str(getattr(b, "dialogue_slot_id", "") or "").strip()
                 for b in _sdc_voiced_beats
@@ -4082,7 +4083,7 @@ class OTR_LedgerScriptWriter:
         # or "<phase>, beat N of M. Final phase." for the final phase.
         #
         # Tier 1 fix #3 (2026-05-11): EXCLUDE non-voiced beats (music
-        # markers, sfx) from phase_beats. A character beat surrounded
+        # markers) from phase_beats. A character beat surrounded
         # by two music_inter beats was reading "beat 3 of 5 in setup"
         # when 2 of the 5 had no dialogue — confusing to the model
         # and inconsistent with the user's mental model of POSITION.
@@ -4359,7 +4360,6 @@ class OTR_LedgerScriptWriter:
                 ),
                 theme=theme,
                 all_voice_cards=all_voice_cards_str,
-                sfx_cue=(beat.sfx_cue or "").strip(),
                 position=_position_for(beat),
                 # Sprint 5A (2026-05-25) -- per-speaker continuity slice
                 # rendered from the episode ContinuityState. Empty string
@@ -4798,19 +4798,17 @@ class OTR_LedgerScriptWriter:
                 # conversation context — listeners experience a scene
                 # break, so the composer should too. Lines from before
                 # the marker are wrong signal for what comes after.
-                if beat.speaker_role in {
-                    "music_open", "music_inter", "music_close",
-                }:
-                    last_lines.clear()
-                # S1 follow-up (2026-06-22): a non-voiced row's text takes ONLY a
-                # genuine sfx_cue, never the generic beat intent. The intent
-                # fallback was re-stamping music rows with their intent text here
-                # (overwriting the init_lines_from_outline S1 fix) -> it bled into
-                # the ledger + the [SFX: ...] transcript. music_inter (no cue) ->
-                # "" ; a real sfx_cue is preserved (render-contract desc).
-                cleaned = (beat.sfx_cue or "").strip()
+                # (All NON_VOICED_ROLES are music markers post
+                # rip-sfx-broll 2026-07-01.)
+                last_lines.clear()
+                # S1 (2026-06-22) + rip-sfx-broll (2026-07-01): music rows
+                # are pure render contracts -- no transcript text, ever.
+                # The old [SFX: ...] token emission died with the sfx_cue
+                # field; slot-0 authority is assemble_script_text_from_ledger
+                # post-loop, which skips empty-text rows.
+                cleaned = ""
                 cid = beat.speaker_role
-                token = f"[SFX: {cleaned}]"
+                token = ""
 
             else:
                 log.warning(
@@ -4852,7 +4850,12 @@ class OTR_LedgerScriptWriter:
                 },
             )
             led.save()
-            script_text_parts.append(token)
+            # rip-sfx-broll (2026-07-01): music render-contract rows emit
+            # an empty token -- skip it (the post-loop
+            # assemble_script_text_from_ledger is slot-0's authority and
+            # skips empty-text rows the same way).
+            if token:
+                script_text_parts.append(token)
 
         # --- I.5. News-wiring overlay (Phase 2B: operates on ledger) --
         # Two operations on `led.data["lines"]` AFTER the progressive
@@ -5938,8 +5941,7 @@ if __name__ == "__main__":
             "[VOICE: ANNOUNCER, neutral] Tonight, on Tales From Beyond.\n\n"
             "[VOICE: AEGEUS, tense] The signal -- it's repeating itself.\n\n"
             "[VOICE: PHOEBE, alarmed] That's impossible. The dish was "
-            "decommissioned six years ago.\n\n"
-            "[SFX: low rumble of static]"
+            "decommissioned six years ago."
         )
 
         # The scratchpad pass parses the title from the LAST line that

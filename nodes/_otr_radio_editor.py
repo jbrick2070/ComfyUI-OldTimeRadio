@@ -60,8 +60,8 @@ tree, file:line):
       target_words, dialogue_slot_id
   * ``speaker_role`` (nodes/production_ledger.py:716, :753-762, :1196)
     distinguishes VOICED beats ("character" / "announcer") from
-    NON-VOICED beats ("music_open" / "music_close" / "music_inter" /
-    "sfx"). The editor only ever touches voiced beats; SFX/music beats
+    NON-VOICED beats ("music_open" / "music_close" / "music_inter").
+    The editor only ever touches voiced beats; music beats
     are preserved by construction.
   * ``voice_preset`` lives on ``cast[]`` and on ``beats[]``
     (nodes/production_ledger.py:588, :646 via set_beats) -- NOT on a
@@ -220,10 +220,10 @@ _FRESH_PROSE_ACTIONS: frozenset = frozenset(
 # composer; the rest are non-voiced and complete at init.)
 VOICED_ROLES: frozenset = frozenset({"character", "announcer"})
 
-# Non-voiced (SFX / music) speaker_role values. Preserved by
+# Non-voiced (music) speaker_role values. Preserved by
 # construction -- the editor never sees or writes them.
 NON_VOICED_ROLES: frozenset = frozenset(
-    {"music_open", "music_close", "music_inter", "sfx"}
+    {"music_open", "music_close", "music_inter"}
 )
 
 # Ledger line-row keys that are render-contract BINDINGS. Guard 1
@@ -370,10 +370,10 @@ def _char_count(text: str) -> int:
 # ---------------------------------------------------------------------------
 #
 # The editor operates on the list of VOICED beats only (the dialogue
-# units it is allowed to reshape). Non-voiced SFX/music beats are
+# units it is allowed to reshape). Non-voiced music beats are
 # invisible to it and are preserved by construction. A "beat_index" in
 # a BeatEdit indexes THIS voiced view, not the raw ledger lines[] list
-# (which interleaves SFX/music rows). The mapping back to the raw rows
+# (which interleaves music rows). The mapping back to the raw rows
 # is kept so the apply step mutates the real ledger in place.
 
 
@@ -1086,7 +1086,7 @@ def apply_plan(
         MERGE_SHORT_LINES): add/remove dialogue units, re-index the
         affected span cleanly, and stamp every touched row
         needs_render_realign.
-      * SFX/music beats + all bindings are preserved by construction --
+      * Music beats + all bindings are preserved by construction --
         the editor only ever indexed the VOICED view, and this function
         only splices voiced rows; non-voiced rows are copied through
         untouched in their original positions.
@@ -1260,7 +1260,7 @@ def apply_plan(
             report["realigned_beat_ids"].append(rid)
 
     # --- Splice the new voiced list back into the full lines list,
-    # preserving every non-voiced (SFX/music) row in its original slot.
+    # preserving every non-voiced (music) row in its original slot.
     rebuilt = _splice_voiced(lines, voiced_positions, new_voiced)
     ledger["lines"] = rebuilt
     report["final_voiced_count"] = len(new_voiced)
@@ -1282,7 +1282,7 @@ def _splice_voiced(
     Strategy: walk the original list; emit non-voiced rows verbatim; at
     the position of the FIRST original voiced row, splice in the ENTIRE
     new voiced list; skip the remaining original voiced rows. This keeps
-    SFX/music bookends around the dialogue block intact (open music ->
+    music bookends around the dialogue block intact (open music ->
     dialogue -> inter -> dialogue -> close music) for the common case
     where voiced rows form contiguous runs, and is order-stable.
     """
@@ -2024,7 +2024,7 @@ if __name__ == "__main__":
                 {"char_id": "c02", "name": "ROY", "voice_preset": "bark:v2/en_speaker_9"},
             ],
             "lines": [
-                line("b000", "music_open", "music_open", "[SFX] organ swell"),
+                line("b000", "music_open", "music_open", "[MUSIC] organ swell"),
                 line(
                     "b001", "character", "c01",
                     "Roy, the harbor lights went dark an hour ago and nobody "
@@ -2047,7 +2047,7 @@ if __name__ == "__main__":
                     "And so our two friends step into the waiting dark.",
                     slot="d004",
                 ),
-                line("b900", "music_close", "music_close", "[SFX] closing theme"),
+                line("b900", "music_close", "music_close", "[MUSIC] closing theme"),
             ],
             "meta": {
                 "visual_plan": {
@@ -2088,7 +2088,7 @@ if __name__ == "__main__":
     _check("tier1 counted", rep["tier1_edits"] == 1 and rep["tier2_edits"] == 0)
 
     # --- Test 2: Tier-2 CUT reindexes + stamps needs_render_realign,
-    #     preserves the SFX/music bookends + bindings. -----------------
+    #     preserves the music bookends + bindings. -----------------
     print("[2] Tier-2 CUT_LINE (reindex + needs_render_realign)")
     led = _make_ledger()
     voiced0 = voiced_beats(led)
@@ -2363,7 +2363,7 @@ if __name__ == "__main__":
         filler = " ".join(["word"] * words_each)
         rows: List[Dict[str, Any]] = [
             {"line_id": "m0", "beat_id": "m0", "char_id": "music_open",
-             "speaker_role": "music_open", "text": "[SFX] open"}
+             "speaker_role": "music_open", "text": "[MUSIC] open"}
         ]
         for k in range(num_lines):
             t = " ".join(["word"] * 60) if (cap_bust and k == 0) else filler

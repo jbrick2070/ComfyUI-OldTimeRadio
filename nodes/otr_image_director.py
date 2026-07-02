@@ -58,9 +58,10 @@ ADD_CUSTOM = "+ Add Custom Model"
 IMAGE_SLOT_ROLES = {
     "announcer_image_model": ("announcer_visual",),
     "music_image_model": ("music_visual",),
-    "other_beats_image_model": (
-        "character_video", "scene_broll", "background_abstract",
-    ),
+    # rip-sfx-broll (2026-07-01): the other-beats image slot is KEPT --
+    # character stills ride it; the scene_broll / background_abstract
+    # pairings died with those roles.
+    "other_beats_image_model": ("character_video",),
 }
 SEED_MODES = ("request_hash", "fixed")
 #: Operator-confirmable default ceiling for FRESH (per_beat) generation; the hard
@@ -139,18 +140,15 @@ def three_d_locked_slots(video_policy: dict) -> set:
     via :func:`_is_3d_engine` when an engine's capability cannot be read
     (fail-closed, 3D plan section 3)."""
     vm = (video_policy or {}).get("video_models") or {}
-    # Route-A: each IMAGE slot is locked if ANY of its paired ROLES' video engine
-    # requires a mesh portrait. other_beats_image_model now pairs with the three
-    # per-role video slots (character / scene_broll / background_abstract), each
-    # resolved via the ONE shared map (per-role slot + legacy fallback).
+    # Each IMAGE slot is locked if ANY of its paired ROLES' video engine
+    # requires a mesh portrait. other_beats_image_model pairs with the
+    # character lane (rip-sfx-broll 2026-07-01 removed the scene_broll /
+    # background_abstract pairings), resolved via the ONE shared map
+    # (per-role slot + legacy fallback).
     img_slot_roles = {
         "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),
         "music_image_model": (_rc.Role.MUSIC_VISUAL.value,),
-        "other_beats_image_model": (
-            _rc.Role.CHARACTER_VIDEO.value,
-            _rc.Role.SCENE_BROLL.value,
-            _rc.Role.BACKGROUND_ABSTRACT.value,
-        ),
+        "other_beats_image_model": (_rc.Role.CHARACTER_VIDEO.value,),
     }
     locked = set()
     for img_slot, roles in img_slot_roles.items():
@@ -378,13 +376,8 @@ class OTRImageDirector:
             "video_models": (video_policy.get("video_models")
                              if isinstance(video_policy.get("video_models"), dict)
                              else {}),
-            # Other-beats clip plan {clip_mode, pool_n}, forwarded from
-            # OTR_VideoDirector so the still phase pools the other-beats stills to
-            # match the VIDEO clip pool (pool_n_loop -> N shared stills, not one per
-            # beat). {} -> unique_per_beat (one still per beat, legacy).
-            "other_beats": (video_policy.get("other_beats")
-                            if isinstance(video_policy.get("other_beats"), dict)
-                            else {}),
+            # (The other_beats {clip_mode, pool_n} passthrough died with the
+            # pooling rip, 2026-07-01 -- every beat is per-beat now.)
             # 3D image streams (2026-06-21): the IMAGE-prompt roles whose paired
             # video engine requires_mesh_fodder. MetaBrief forks those beats to a
             # clean mesh_fodder subject + a scene_background_plate (NOT one

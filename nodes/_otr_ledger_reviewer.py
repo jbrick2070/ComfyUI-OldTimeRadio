@@ -513,9 +513,9 @@ def _render_cast_contract_table(cast_rows: list[dict]) -> str:
         # against (-> spurious role_mismatch on character lines). A cast
         # member structurally IS a spoken role: ANNOUNCER by name, else a
         # character. Derive that canonical role (an explicit speaker_role, if
-        # ever present, wins). Cue roles (music_*/sfx) are line-level render
+        # ever present, wins). Cue roles (music_*) are line-level render
         # contracts, never cast members, so they never appear here -- the
-        # literal "migrate music/sfx to cue_type" was cut as schema-breaking.
+        # literal "migrate music to cue_type" was cut as schema-breaking.
         role = row.get("speaker_role") or (
             "announcer"
             if str(name).strip().upper() == "ANNOUNCER"
@@ -538,7 +538,7 @@ def _render_lines_for_audit(lines: list[dict]) -> str:
 
     STEP 2 (2026-06-22 story+cast fix, roundtable Option A): list ONLY
     spoken rows (character/announcer). The cast contract governs spoken
-    speakers; music_*/sfx cue rows are line-level render contracts with no
+    speakers; music_* cue rows are line-level render contracts with no
     cast entry, so feeding them to the cast auditor only invites spurious
     speaker_unknown / role_mismatch flags. `is_spoken_role` is the same
     canonical predicate the writer + ledger scrub use, so this drops no
@@ -703,7 +703,7 @@ except ImportError:  # pragma: no cover - standalone / test load
 
 # STEP 2 (2026-06-22 story+cast fix, roundtable Option A): the canonical
 # spoken-vs-cue predicate. The cast auditor judges only spoken rows
-# (character/announcer) against the locked cast contract; music_*/sfx cue
+# (character/announcer) against the locked cast contract; music_* cue
 # rows are line-level render contracts with no cast entry and must not be
 # audited (they would emit spurious speaker_unknown/role_mismatch).
 try:
@@ -859,7 +859,6 @@ def audit_cast_contract(
 _ALLOWED_SPEAKER_ROLES: frozenset[str] = frozenset({
     "character", "announcer",
     "music_open", "music_close", "music_inter",
-    "sfx",
 })
 
 
@@ -1243,7 +1242,7 @@ def _doctor_character_lines(candidate_ledger: dict) -> list[dict]:
     """Character-role dialogue lines only -- the Doctor's editable scope.
 
     Fix 4 (post-Phase-3 review, 2026-05-11): the Doctor sees ONLY
-    character-role beats. Announcer / music / sfx beats are locked
+    character-role beats. Announcer / music beats are locked
     structural content; showing them tempts the Doctor to invent edits
     the apply-time guard would reject anyway. Belt + suspenders -- the
     prompt filter is suspenders, the apply guard at `apply_doctor_edits`
@@ -1370,7 +1369,7 @@ def _render_doctor_edits_user_prompt(
     parts.append("")
     parts.append(
         "You are seeing ONLY character dialogue beats. Announcer "
-        "beats, music beats, and SFX beats are locked structural "
+        "beats and music beats are locked structural "
         "content and are NOT in your input. Do not propose edits "
         "referencing line_ids outside the list above, and do not edit "
         "a line absent from the flagged DIAGNOSIS list."
@@ -1724,7 +1723,7 @@ def run_script_doctor(
 
 # Wiring-review (Pass 2 doctor scope guard) per synthesis §3 Phase 3:
 # the Script Doctor only sees character-role beats and MUST NOT touch
-# announcer / music / sfx beats. Pre-apply guard rejects any edit
+# announcer / music beats. Pre-apply guard rejects any edit
 # targeting a non-character row -- it indicates the doctor invented
 # the line_id or hallucinated structural-scope. Log to
 # meta.reviewer_doctor_rejected_edits for forensics.

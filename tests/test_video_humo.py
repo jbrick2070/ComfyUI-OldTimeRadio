@@ -100,10 +100,11 @@ def test_humo_role_fit_audio_driven_face():
     # fit here; only character_video is both fit AND allowed.
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role) is True
-    # scene_broll has no audio_ref; background_abstract supplies only text ->
-    # both excluded fail-closed.
+    # rip-sfx-broll (2026-07-01): the dead roles are unknown tokens and raise.
+    import pytest as _pytest
     for role in ("scene_broll", "background_abstract"):
-        assert rc.engine_fits_role(desc, role) is False
+        with _pytest.raises(rc.RoleCompatError):
+            rc.engine_fits_role(desc, role)
     assert rc.filter_engines_for_role("character_video", [desc]) == ["humo"]
     assert rc.filter_engines_for_role("music_visual", [desc]) == ["humo"]
 

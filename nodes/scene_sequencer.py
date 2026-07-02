@@ -4,8 +4,8 @@ Scene Sequencer + Episode Assembler - Orchestrate the Full Radio Show
 
 Two nodes:
   1. SceneSequencer - Takes the L3 ledger and renders each line through
-     the appropriate TTS engine (Bark or Parler), inserts SFX/music
-     cues at the right moments, and outputs a scene. Features:
+     the appropriate TTS engine (Bark or Parler), passes music
+     cues through, and outputs a scene. Features:
      intelligent pacing (breath buffers, BEAT/PAUSE tags), continuous
      room tone bed, voice_assignments dispatch from the ledger's cast
      block.
@@ -254,7 +254,7 @@ def _level_dialogue_clip(clip_np):
     """Route a DIALOGUE clip through the active loudness mode.
 
     Default 'rms' -> perceived-loudness leveling (baked in). 'peak' escape
-    hatch -> legacy sample-peak. SFX never calls this (peak by construction).
+    hatch -> legacy sample-peak. Only dialogue clips route through here.
     """
     if _segment_loudnorm_mode() != "peak":
         params = _loudnorm_params()
@@ -591,7 +591,7 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
 
 
 class SceneSequencer:
-    """Render a script scene: TTS for each line, SFX cues, pauses."""
+    """Render a script scene: TTS for each line, music passthrough, pauses."""
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "sequence"
@@ -622,10 +622,6 @@ class SceneSequencer:
                                "character_name is ANNOUNCER. Keeps the Voice of God "
                                "bookends separated from the Bark character pool."
                 }),
-                "sfx_audio_clips": ("AUDIO", {
-                    "tooltip": "Pre-rendered SFX audio clips (from SFXGenerator batch). "
-                               "Matched to [SFX:] cues in script order."
-                }),
                 "start_line": ("INT", {
                     "default": 0, "min": 0, "max": 9999,
                     "tooltip": "First line to render (for chunked processing)"
@@ -639,15 +635,10 @@ class SceneSequencer:
                     "default": "bark",
                     "tooltip": "Default TTS engine when not specified in production plan"
                 }),
-                # v1.5 Phase 3: Time-Alignment Offset Pins
+                # v1.5 Phase 3: Time-Alignment Offset Pin
                 "dialogue_offset_ms": ("FLOAT", {
                     "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
                     "tooltip": "Shift all dialogue clips on the timeline (ms). "
-                               "Positive = delay, negative = advance."
-                }),
-                "sfx_offset_ms": ("FLOAT", {
-                    "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
-                    "tooltip": "Shift all SFX clips on the timeline (ms). "
                                "Positive = delay, negative = advance."
                 }),
             },
@@ -691,11 +682,11 @@ class SceneSequencer:
         return clips
 
     def sequence(self, script_json,
-                 tts_audio_clips=None, sfx_audio_clips=None,
+                 tts_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
                  default_tts="bark",  # kept: widget INPUT accepted by node contract; per-line TTS routing reads voice_assignments in the ledger, not this widget
-                 dialogue_offset_ms=0.0, sfx_offset_ms=0.0):
+                 dialogue_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         # Schema l3 (2026-04-28): track wall-clock for meta.phase_ms.scene_sequencer.
@@ -736,20 +727,17 @@ class SceneSequencer:
 
         # Extract pre-rendered clips from batched AUDIO inputs
         tts_clips = self._extract_clips_from_audio(tts_audio_clips)
-        sfx_clips = self._extract_clips_from_audio(sfx_audio_clips)
         announcer_clips = self._extract_clips_from_audio(announcer_audio_clips)
         tts_clip_idx = 0
-        sfx_clip_idx = 0
         announcer_clip_idx = 0
         log.info(
-            "[SceneSequencer] Pre-rendered clips: %d TTS, %d SFX, %d ANNOUNCER",
-            len(tts_clips), len(sfx_clips), len(announcer_clips),
+            "[SceneSequencer] Pre-rendered clips: %d TTS, %d ANNOUNCER",
+            len(tts_clips), len(announcer_clips),
         )
 
         # We accumulate silence/audio segments as numpy arrays
         sample_rate = 48000  # standardize output
         all_segments = []
-        sfx_timeline = []
         render_log = []
 
         # Canonical 1.0+ state tracking
@@ -759,12 +747,11 @@ class SceneSequencer:
 
         # v1.5 Phase 3: Convert TA offset from ms to samples
         dialogue_offset_samples = int(dialogue_offset_ms * sample_rate / 1000.0)
-        sfx_offset_samples = int(sfx_offset_ms * sample_rate / 1000.0)
-        if dialogue_offset_ms != 0.0 or sfx_offset_ms != 0.0:
-            _runtime_log(f"SceneSequencer: TA_Offset active: dialogue={dialogue_offset_ms:+.0f}ms, sfx={sfx_offset_ms:+.0f}ms")
+        if dialogue_offset_ms != 0.0:
+            _runtime_log(f"SceneSequencer: TA_Offset active: dialogue={dialogue_offset_ms:+.0f}ms")
 
         # Materialize the ledger lines list (no role filter -- Sequencer
-        # processes character / announcer / sfx via the dispatch below;
+        # processes character / announcer via the dispatch below;
         # music_* lines pass through with a forensic log line, no
         # segment / no stamp -- preserves the existing behavior where
         # Sequencer never handled music timing).
@@ -784,30 +771,36 @@ class SceneSequencer:
         # v2 ledger rewrite (Pattern 4): each entry now carries
         # line_id from the wire ledger so the write-back uses
         # patch_line_fields(led, line_id, ...) instead of fragile
-        # text-match. sfx_line_positions tracks the same data for
-        # sfx ledger.lines[] entries (sfx are first-class lines in
-        # the v2 ledger, not a separate ledger.sfx[] array).
+        # text-match.
         dialogue_positions: list[dict] = []
-        sfx_line_positions: list[dict] = []
 
         for i, item in enumerate(lines_to_render):
             # Ledger discriminator: speaker_role replaces the legacy
             # parser-list "type" tag. Mapping:
             #   character / announcer  -> dialogue branch
-            #   sfx                    -> sfx branch
             #   music_open / music_close / music_inter -> passthrough
             #     (no segment / no stamp -- Sequencer never handled
             #     music timing; EpisodeAssembler prepends opening_theme
             #     / closing_theme audio separately).
+            #   anything else -> RAISE (NO FALLBACKS, rip-sfx-broll
+            #     2026-07-01: the old silent default-to-dialogue path
+            #     let unknown roles ride the wrong bus; an old ledger
+            #     carrying speaker_role="sfx" fails LOUD here).
             speaker_role = item.get("speaker_role") or ""
             if speaker_role in ("character", "announcer"):
                 item_type = "dialogue"
-            elif speaker_role == "sfx":
-                item_type = "sfx"
             elif speaker_role in ("music_open", "music_close", "music_inter"):
                 item_type = "music"
             else:
-                item_type = "dialogue"  # defensive default; legacy parsers
+                raise ValueError(
+                    f"SceneSequencer: line "
+                    f"{str(item.get('line_id') or '?')!r} carries "
+                    f"unknown speaker_role {speaker_role!r} (valid: "
+                    f"character/announcer/music_open/music_close/"
+                    f"music_inter). The 'sfx' role was removed "
+                    f"2026-07-01 (rip-sfx-broll) -- regenerate the "
+                    f"episode; NO FALLBACKS."
+                )
             global_idx = start_line + i
 
             # S29: Interrupt check
@@ -836,23 +829,6 @@ class SceneSequencer:
                     f"[{global_idx}] MUSIC passthrough: {speaker_role}"
                 )
                 continue
-
-            elif item_type == "sfx":
-                desc = item.get("text", "") or "unknown sound"
-                if sfx_clip_idx < len(sfx_clips):
-                    clip_np, clip_sr = sfx_clips[sfx_clip_idx]
-                    sfx_segment = _resample_audio(clip_np, clip_sr, sample_rate)
-                    sfx_segment = _normalize_clip(sfx_segment, target_peak=0.85)
-                    sfx_clip_idx += 1
-                    # v1.5: Apply SFX TA_Offset
-                    sfx_pos = max(0, current_sample_pos + sfx_offset_samples)
-                    sfx_timeline.append((sfx_pos, sfx_segment, desc))
-                    render_log.append(f"[{global_idx}] SFX Overlay: {desc}")
-                else:
-                    render_log.append(f"[{global_idx}] SFX: {desc} (MISSING)")
-
-                # Add a tiny 0.1s breath to dialogue timeline to give SFX impact room
-                segment_np = np.zeros(int(sample_rate * 0.1), dtype=np.float32)
 
             elif item_type == "dialogue":
                 character_name = _OTRLC.speaker_name(led, item)
@@ -926,24 +902,12 @@ class SceneSequencer:
                         "start_s": float(current_sample_pos) / float(sample_rate),
                         "dur_s": float(seg_len) / float(sample_rate),
                     })
-                elif item_type == "sfx":
-                    # SFX cues are first-class lines in the v2 ledger
-                    # (speaker_role="sfx"). Track placement so the
-                    # write-back below stamps start_s + dur_s on the
-                    # ledger.lines[] sfx row -- replaces the legacy
-                    # ledger.sfx[] parallel-index walk.
-                    sfx_line_positions.append({
-                        "line_id": item.get("line_id"),
-                        "speaker_role": "sfx",
-                        "start_s": float(current_sample_pos) / float(sample_rate),
-                        "dur_s": float(seg_len) / float(sample_rate),
-                    })
                 current_sample_pos += seg_len
 
         # Log clip usage stats
         render_log.append(f"--- Audio units assembled: {len(all_segments)}")
 
-        # Concatenate all dialogue/SFX segments
+        # Concatenate all dialogue segments
         if all_segments:
             combined = np.concatenate(all_segments)
         else:
@@ -966,26 +930,6 @@ class SceneSequencer:
             
         combined = combined + final_bed
         render_log.append(f"--- Layered {len(env_timeline)} environment segments")
-
-        # -- SFX DUCKING & OVERLAY ------------------------------------------
-        max_sfx_end = 0
-        for start_pos, sfx_np, _ in sfx_timeline:
-            end_pos = start_pos + len(sfx_np)
-            if end_pos > max_sfx_end:
-                max_sfx_end = end_pos
-                
-        if max_sfx_end > len(combined):
-            pad = np.zeros(max_sfx_end - len(combined), dtype=np.float32)
-            combined = np.concatenate([combined, pad])
-            
-        if sfx_timeline:
-            render_log.append(f"--- Overlaying {len(sfx_timeline)} SFX cues with ducking")
-            for start_pos, sfx_np, desc in sfx_timeline:
-                end_pos = start_pos + len(sfx_np)
-                # Duck main mix (dialogue+bed) down to 70% underneath SFX
-                combined[start_pos:end_pos] *= 0.7
-                # Mix in SFX at 85% to prevent clipping
-                combined[start_pos:end_pos] += sfx_np * 0.85
 
         total_len = len(combined)
         total_sec = total_len / sample_rate
@@ -1045,32 +989,10 @@ class SceneSequencer:
                         if _OTRL.patch_line_fields(_led, _line_id, _fields):
                             _matched += 1
 
-                    # Stamp sfx line_ids in ledger.lines[] (v2 ledger:
-                    # sfx are first-class lines). Same Pattern 4 shape.
-                    _sfx_line_matched = 0
-                    for _spos in sfx_line_positions:
-                        _sfx_line_id = _spos.get("line_id")
-                        if not _sfx_line_id:
-                            continue
-                        _sfx_fields = {
-                            "start_s":       float(_spos["start_s"]),
-                            "dur_s":         float(_spos["dur_s"]),
-                            "start_s_space": "scene_audio",
-                            "speaker_role":  "sfx",
-                        }
-                        if _OTRL.patch_line_fields(_led, _sfx_line_id, _sfx_fields):
-                            _sfx_line_matched += 1
-
-                    # SFX-mirror walk + ledger.sfx[] write-back deleted
-                    # S27 (cleanbreak-tail Phase 3 / QA-6). After S26-A3
-                    # dropped the sfx[] schema scaffold, _led.get("sfx")
-                    # was always []; the `if _sfx_idx >= len(_ledger_sfx):
-                    # break` guard tripped on iteration 0 every run. The
-                    # walk + its mirror block had been a permanent no-op.
-                    # SFX placement now flows through ledger.lines[] rows
-                    # carrying speaker_role="sfx", which the dialogue_
-                    # positions + sfx_line_positions loops above already
-                    # patch in scene-audio space.
+                    # (The sfx line write-back died with the sfx role,
+                    # rip-sfx-broll 2026-07-01; the S27 note about the
+                    # deleted ledger.sfx[] mirror walk lives in git
+                    # history.)
 
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1081,10 +1003,9 @@ class SceneSequencer:
                     log.info(
                         "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
                         "gate=post_scene_sequencer dur=%.1fs "
-                        "lines_positioned=%d/%d sfx_lines_positioned=%d/%d",
+                        "lines_positioned=%d/%d",
                         _phase_ms, total_sec,
                         _matched, len(dialogue_positions),
-                        _sfx_line_matched, len(sfx_line_positions),
                     )
         except Exception as _meta_exc:
             log.warning(
@@ -1401,11 +1322,8 @@ class EpisodeAssembler:
                             # Only shift entries that are in
                             # scene-audio space (set by SceneSequencer
                             # write-back). Avoids double-shifting on
-                            # re-runs. SFX rows now live as lines[]
-                            # entries with speaker_role="sfx", so this
-                            # one loop covers dialogue + sfx together
-                            # (S27 / QA-6 swept the parallel sfx-array
-                            # shift below).
+                            # re-runs. One loop covers every positioned
+                            # lines[] row.
                             if (
                                 _ln.get("start_s_space") == "scene_audio"
                                 and isinstance(_ln.get("start_s"), (int, float))
@@ -1480,7 +1398,7 @@ class EpisodeAssembler:
                         # cues into ledger.lines[] with speaker_role so
                         # downstream visual coverage (post-BUG-129b:
                         # VideoComposite static-radio fill, since
-                        # music_*/sfx no longer dispatch to HuMo)
+                        # music_* no longer dispatches to HuMo)
                         # has the per-cue ledger entries to walk.
                         #
                         # 2026-04-30 round-robin hardening:
@@ -1639,7 +1557,7 @@ class EpisodeAssembler:
                         )
                         if _appended_music or _removed:
                             # (c) Sort the entire lines[] by start_s
-                            # so dialogue + announcer + sfx + music
+                            # so dialogue + announcer + music
                             # all walk in chronological order.  Lines
                             # without start_s sort to the end via a
                             # large fallback key (they shouldn't exist

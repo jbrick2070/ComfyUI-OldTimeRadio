@@ -16,21 +16,22 @@ from typing import Optional
 
 def make_stub_ledger(
     *,
-    with_sfx: bool = True,
     with_music: bool = True,
     title: Optional[str] = None,
     headline: Optional[str] = None,
 ) -> dict:
-    """Build a stub ledger dict covering character / announcer / sfx / music
-    speaker_roles.
+    """Build a stub ledger dict covering character / announcer / music
+    speaker_roles. (rip-sfx-broll 2026-07-01: the with_sfx flag + the sfx
+    row were removed with the sfx subsystem -- a speaker_role="sfx" row is
+    now an INVALID ledger by contract.)
 
     Default shape:
 
       cast  -> 2 entries (LEMMY c01, ASTRA c02), each with voice_preset
-      lines -> 6 entries when with_sfx=with_music=True:
+      lines -> 5 entries when with_music=True:
                  music_open, announcer, character (c01), character (c02),
-                 sfx, music_close.
-               4 entries when both flags are False.
+                 music_close.
+               3 entries when the flag is False.
 
     The cast is a LIST of dicts to match production_ledger.py's
     ``set_cast`` output (NOT a dict keyed by char_id).
@@ -110,20 +111,6 @@ def make_stub_ledger(
         "boundary":     "scene_1_open",
         "bark_wav_path": None,
     })
-    if with_sfx:
-        lines.append({
-            "line_id":      "b005",
-            "shot_id":      None,
-            "beat_id":      "b005",
-            "char_id":      "sfx",
-            "speaker_role": "sfx",
-            "text":         "metal door slam",
-            "traits":       "neutral",
-            "start_s":      10.6,
-            "dur_s":        0.8,
-            "boundary":     "scene_1_open",
-            "bark_wav_path": None,
-        })
     if with_music:
         lines.append({
             "line_id":      "b006",

@@ -99,36 +99,35 @@ def patched_sequencer_env(tmp_path):
 # Tests
 # ---------------------------------------------------------------------------
 
-def test_sequencer_processes_dialogue_and_sfx_skips_music(patched_sequencer_env):
-    """character / announcer / sfx lines stamped with start_s + dur_s +
+def test_sequencer_processes_dialogue_skips_music(patched_sequencer_env):
+    """character / announcer lines stamped with start_s + dur_s +
     start_s_space + speaker_role. music_open / music_close lines pass
-    through with NO start_s / dur_s set by Sequencer."""
+    through with NO start_s / dur_s set by Sequencer. (rip-sfx-broll
+    2026-07-01: the sfx lane -- clips, offset, overlay, write-back --
+    is GONE; an sfx row is now rejected LOUD, see the raise test below.)"""
     from nodes.scene_sequencer import SceneSequencer
 
-    led_in = make_stub_ledger()  # 6 lines: music_open, announcer, c01, c02, sfx, music_close
+    led_in = make_stub_ledger()  # 5 lines: music_open, announcer, c01, c02, music_close
     patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
     script_json = json.dumps(led_in)
 
     # Provide pre-rendered clips so the Bark fallback isn't needed:
-    # 2 character clips (b003, b004) for tts; 1 announcer clip (b002);
-    # 1 sfx clip (b005).
+    # 2 character clips (b003, b004) for tts; 1 announcer clip (b002).
     tts_audio = _make_audio(2)
     announcer_audio = _make_audio(1)
-    sfx_audio = _make_audio(1)
 
     SceneSequencer().sequence(
         script_json=script_json,
 
         tts_audio_clips=tts_audio,
         announcer_audio_clips=announcer_audio,
-        sfx_audio_clips=sfx_audio,
     )
 
     saved_led = patched_sequencer_env["led_disk"]
     by_id = {ln["line_id"]: ln for ln in saved_led["lines"]}
 
-    # Stamped: announcer b002, character b003, character b004, sfx b005.
-    for lid in ("b002", "b003", "b004", "b005"):
+    # Stamped: announcer b002, character b003, character b004.
+    for lid in ("b002", "b003", "b004"):
         row = by_id[lid]
         assert "start_s" in row and row["start_s"] is not None, (
             f"{lid} missing start_s"
@@ -144,7 +143,6 @@ def test_sequencer_processes_dialogue_and_sfx_skips_music(patched_sequencer_env)
     assert by_id["b002"]["speaker_role"] == "announcer"
     assert by_id["b003"]["speaker_role"] == "character"
     assert by_id["b004"]["speaker_role"] == "character"
-    assert by_id["b005"]["speaker_role"] == "sfx"
 
     # NOT stamped: music_open b001, music_close b006. Sequencer
     # explicitly passes through music lines; their start_s / dur_s
@@ -164,6 +162,29 @@ def test_sequencer_processes_dialogue_and_sfx_skips_music(patched_sequencer_env)
     assert "start_s_space" not in by_id["b006"], (
         "music_close should not have start_s_space stamped by Sequencer"
     )
+
+
+def test_sequencer_rejects_sfx_row_loud(patched_sequencer_env):
+    """NO FALLBACKS (rip-sfx-broll): an old ledger carrying a
+    speaker_role='sfx' row fails LOUD in the role dispatch instead of
+    riding the dialogue bus."""
+    import pytest
+    from nodes.scene_sequencer import SceneSequencer
+
+    led_in = make_stub_ledger()
+    led_in["lines"].append({
+        "line_id": "x005", "shot_id": None, "beat_id": "x005",
+        "char_id": "sfx", "speaker_role": "sfx", "text": "metal door slam",
+        "traits": "neutral", "start_s": None, "dur_s": None,
+        "boundary": None, "bark_wav_path": None,
+    })
+    patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
+    with pytest.raises(ValueError, match="sfx"):
+        SceneSequencer().sequence(
+            script_json=json.dumps(led_in),
+            tts_audio_clips=_make_audio(2),
+            announcer_audio_clips=_make_audio(1),
+        )
 
 def test_sequencer_stamps_by_line_id_with_duplicate_text(patched_sequencer_env):
     """Two character lines saying 'Okay.' with distinct line_ids. Both

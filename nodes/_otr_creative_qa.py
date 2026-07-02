@@ -587,7 +587,7 @@ def _self_test() -> int:
             {"line_id": "s00", "speaker_role": "music", "text": "[theme up]"},
             {"line_id": "l00", "speaker_role": "character", "char_id": "c01",
              "text": "The relay went dark at midnight."},
-            {"line_id": "x00", "speaker_role": "sfx", "text": "[static]"},
+            {"line_id": "x00", "speaker_role": "music_inter", "text": "[static]"},
             {"line_id": "l01", "speaker_role": "character", "char_id": "c02",
              "text": "Then someone cut the line on purpose."},
             {"line_id": "l02", "speaker_role": "character", "char_id": "c01",

@@ -359,6 +359,7 @@ class TestSelfVocativeBackstop:
         led = {
             "cast": [{"char_id": "c03", "name": "GULLIVER REEVES"}],
             "lines": [{"line_id": "b004", "char_id": "c03",
+                       "speaker_role": "character",
                        "text": "Gulliver, it's not just a machine."}],
         }
         with caplog.at_level(logging.WARNING):
@@ -370,6 +371,7 @@ class TestSelfVocativeBackstop:
             "cast": [{"char_id": "c02", "name": "HAYES VANCE"},
                      {"char_id": "c03", "name": "GULLIVER REEVES"}],
             "lines": [{"line_id": "b004", "char_id": "c02",
+                       "speaker_role": "character",
                        "text": "Gulliver, it's not just a machine."}],
         }
         with caplog.at_level(logging.WARNING):
@@ -439,6 +441,7 @@ class TestJoinHardening:
     def test_unknown_char_id_passes_through(self):
         led = {"cast": [{"char_id": "c01", "name": "ANNOUNCER"}],
                "lines": [{"line_id": "b001", "char_id": "c09",
+                          "speaker_role": "character",
                           "text": "Hello there."}]}
         assert _sl.extract_beats(led)[0]["char_id"] == "c09"
 

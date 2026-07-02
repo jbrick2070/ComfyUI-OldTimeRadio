@@ -136,20 +136,23 @@ def test_registry_allows_canonicalize_none(clean_video_registry):
 
 def test_role_compat_filter_shared():
     descs = [
-        {"engine_id": "abstract", "roles": ("background_abstract", "music_visual"),
+        {"engine_id": "abstract", "roles": ("music_visual",),
          "required_inputs": ()},
         {"engine_id": "humo", "roles": ("character_video", "announcer_visual"),
          "required_inputs": ("audio_ref", "init_image")},
-        {"engine_id": "ltx", "roles": ("scene_broll", "background_abstract"),
+        {"engine_id": "ltx", "roles": ("music_visual",),
          "required_inputs": ("text_prompt",)},
     ]
     # Capability-only (operator 2026-06-22): the per-engine `roles` list is NOT a
     # gate -- an engine fits every role whose inputs satisfy its required_inputs.
-    assert rc.filter_engines_for_role("background_abstract", descs) == ["abstract", "ltx"]
+    assert rc.filter_engines_for_role("announcer_visual", descs) == ["abstract", "humo", "ltx"]
     assert rc.filter_engines_for_role("character_video", descs) == ["abstract", "humo", "ltx"]
     assert rc.filter_engines_for_role("music_visual", descs) == ["abstract", "humo", "ltx"]
     with pytest.raises(rc.RoleCompatError):
         rc.filter_engines_for_role("not_a_role", descs)
+    # rip-sfx-broll (2026-07-01): the dead roles raise like any unknown token.
+    with pytest.raises(rc.RoleCompatError):
+        rc.filter_engines_for_role("background_abstract", descs)
 
 
 def test_role_compat_fail_closed_on_malformed():
@@ -157,13 +160,13 @@ def test_role_compat_fail_closed_on_malformed():
     EXCLUDED, not raised (fail-closed). A missing `roles` key is NO LONGER a
     failure -- eligibility is capability, not the whitelist (2026-06-22)."""
     descs = [
-        {"engine_id": "ok", "roles": ("background_abstract",), "required_inputs": ()},
-        {"engine_id": "bad_token", "roles": ("background_abstract",),
+        {"engine_id": "ok", "roles": ("music_visual",), "required_inputs": ()},
+        {"engine_id": "bad_token", "roles": ("music_visual",),
          "required_inputs": ("nonsense",)},  # unknown token -> excluded
         {"engine_id": "no_roles", "required_inputs": ()},  # no `roles` key is fine now
-        {"roles": ("background_abstract",), "required_inputs": ()},  # no engine_id -> skipped
+        {"roles": ("music_visual",), "required_inputs": ()},  # no engine_id -> skipped
     ]
-    assert rc.filter_engines_for_role("background_abstract", descs) == ["ok", "no_roles"]
+    assert rc.filter_engines_for_role("music_visual", descs) == ["ok", "no_roles"]
 
 
 # ---------------------------------------------------------------------------
@@ -245,17 +248,18 @@ def test_schema_extra_forbid_and_family_rules():
 
 
 def test_widget_vector_exact():
-    """Golden pin on the director's required widget order/names (drift guard)."""
+    """Golden pin on the director's required widget order/names (drift guard).
+    rip-sfx-broll (2026-07-01): other_beats_clip_mode / other_beats_n died
+    with the pooling; the 12-widget vector below matches node 87's
+    widgets_values[0:12] in the canonical workflow JSON."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "other_beats_video_model",
         "announcer_image_model", "music_image_model", "other_beats_image_model",
-        "other_beats_clip_mode", "other_beats_n", "fps", "canvas_w", "canvas_h",
+        "fps", "canvas_w", "canvas_h",
         "seed_mode", "request_seed", "allow_auto_fallback",
     ]
     assert "seed" not in req  # V-7: no widget literally named 'seed'
-    it = OTRVideoDirector.INPUT_TYPES()
-    assert it["required"]["other_beats_clip_mode"][0] == ["unique_per_beat", "pool_n_loop"]
 
 
 @pytest.mark.parametrize("cls", [OTRVideoProbe, OTRVideoDirector, OTRShotLock])
@@ -297,7 +301,8 @@ def test_probe_emits_usable_list(clean_video_registry):
     hc, us = json.loads(host), json.loads(usable)
     assert "ffmpeg" in hc and "cuda_available" in hc
     assert us["_all_registered"] == []  # empty registry in CW-1
-    assert "background_abstract" in us
+    assert "character_video" in us
+    assert "background_abstract" not in us  # dead role (rip-sfx-broll)
     assert isinstance(report, str) and "OTR_VideoProbe" in report
 
 
@@ -306,12 +311,13 @@ def test_director_policy_json_and_clamp(clean_video_registry):
         announcer_video_model=ADD_CUSTOM, music_video_model=ADD_CUSTOM,
         other_beats_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
         music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
-        other_beats_clip_mode="pool_n_loop", other_beats_n=8, fps=25,
+        fps=25,
         canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
         allow_auto_fallback=True,
     )
     policy = json.loads(out[0])
-    assert policy["other_beats"] == {"clip_mode": "pool_n_loop", "pool_n": 8}
+    # rip-sfx-broll (2026-07-01): the other_beats pooling plan is GONE.
+    assert "other_beats" not in policy
     assert policy["canvas"] == {"w": 832, "h": 480, "fps": 25}
     assert policy["video_models"]["announcer_video_model"]["custom"] is True
 
@@ -330,7 +336,7 @@ def test_director_fail_closed_incompatible_pick(clean_video_registry):
             music_video_model="needs_unknown",
             other_beats_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
             music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
-            other_beats_clip_mode="unique_per_beat", other_beats_n=8, fps=25,
+            fps=25,
             canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
             allow_auto_fallback=True,
         )
@@ -354,17 +360,18 @@ def test_clip_budget_no_double_count():
     assert budget["total_frames"] == 37 == sum(budget["per_beat"].values())
 
 
-def test_clip_budget_clamp_warning():
+def test_clip_budget_is_pure_per_beat():
+    # rip-sfx-broll (2026-07-01): the pooling budget (clip_mode / pool_n /
+    # other_beats_render_count) is GONE -- the budget is pure per-beat frames.
     beats = [
-        {"beat_id": f"o{i}", "role": "background_abstract", "char_id": "",
+        {"beat_id": f"o{i}", "role": "character_video", "char_id": "c1",
          "text": "", "samples": 1000, "sample_rate": 24000, "dur_s": None}
         for i in range(3)
     ]
-    budget = sl.compute_clip_budget(
-        beats, {"other_beats": {"clip_mode": "pool_n_loop", "pool_n": 8}}, 25,
-    )
-    assert budget["other_beats_render_count"] == 3
-    assert any("clamped" in w for w in budget["warnings"])
+    budget = sl.compute_clip_budget(beats, {}, 25)
+    assert set(budget) == {"per_beat", "total_frames", "warnings"}
+    assert len(budget["per_beat"]) == 3
+    assert budget["warnings"] == []
 
 
 def test_image_done_gate_serializes():
@@ -716,11 +723,10 @@ def test_clip_budget_sum_equals_episode_duration():
 
 
 def test_clip_budget_empty_script_radio_floor():
-    """Empty script -> radio-floor: zero frames, zero render count, NO abort.
+    """Empty script -> radio-floor: zero frames, NO abort.
     OTR_ShotLock still stamps a video section for an episode with no lines."""
     budget = sl.compute_clip_budget([], {}, 25)
     assert budget["total_frames"] == 0
-    assert budget["other_beats_render_count"] == 0
     assert budget["per_beat"] == {}
 
     led = json.dumps({"cast": [], "lines": [], "meta": {}})

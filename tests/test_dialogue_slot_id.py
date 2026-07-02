@@ -39,8 +39,9 @@ from nodes.production_ledger import Ledger
 
 
 def _outline_with_mixed_beats() -> Outline:
-    """Outline with announcer / character / music_inter / sfx / announcer
-    so stamping has every shape to test."""
+    """Outline with announcer / character / music_inter / music_close /
+    announcer so stamping has every shape to test. (rip-sfx-broll
+    2026-07-01: the sfx beat became a second non-voiced music beat.)"""
     beats = [
         OutlineBeat(
             beat_id="b001", speaker="ANNOUNCER", speaker_role="announcer",
@@ -63,10 +64,9 @@ def _outline_with_mixed_beats() -> Outline:
             arc_phase="complication",
         ),
         OutlineBeat(
-            beat_id="b005", speaker="NARRATOR", speaker_role="sfx",
-            intent="footsteps approach off-stage", target_words=5,
+            beat_id="b005", speaker="NARRATOR", speaker_role="music_close",
+            intent="closing sting under the resolution", target_words=5,
             mood="tense", arc_phase="complication",
-            sfx_cue="footsteps approach",
         ),
         OutlineBeat(
             beat_id="b006", speaker="ALICE", speaker_role="character",
@@ -187,7 +187,7 @@ def test_stamp_outline_slot_ids_assigns_in_voiced_order():
         ("b002", "character", "d002"),
         ("b003", "music_inter", None),
         ("b004", "character", "d003"),
-        ("b005", "sfx", None),
+        ("b005", "music_close", None),
         ("b006", "character", "d004"),
         ("b007", "announcer", "d005"),
     ]
@@ -268,7 +268,7 @@ def test_init_lines_from_outline_copies_dialogue_slot_id(tmp_path):
     assert by_beat["b002"]["dialogue_slot_id"] == "d002"
     assert by_beat["b003"]["dialogue_slot_id"] is None  # music_inter
     assert by_beat["b004"]["dialogue_slot_id"] == "d003"
-    assert by_beat["b005"]["dialogue_slot_id"] is None  # sfx
+    assert by_beat["b005"]["dialogue_slot_id"] is None  # music_close
     assert by_beat["b006"]["dialogue_slot_id"] == "d004"
     assert by_beat["b007"]["dialogue_slot_id"] == "d005"
 

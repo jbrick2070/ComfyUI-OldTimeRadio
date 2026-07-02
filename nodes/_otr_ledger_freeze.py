@@ -25,12 +25,12 @@ Cascade ADR).
 
 Schema mapping (ADR §6.16 reality-check vs L3 ledger):
     ADR §6.16 references `sfx_cues` / `music_cues` (plural lists) on
-    each line. The live L3 schema has scalar `sfx_cue` on outline
-    beats and on `LineRequest`, plus top-level `music` list on the
+    each line. The live L3 schema has a top-level `music` list on the
     ledger root. The legacy top-level `sfx` list was deleted in S26
-    (CD-3) -- sfx are now first-class lines[] rows with
-    `line.speaker_role == "sfx"`. The null-rejection invariants here
-    apply to the fields that actually exist:
+    (CD-3), and the whole sfx subsystem (the `sfx` speaker-role +
+    `sfx_cue` field) followed 2026-07-01 (rip-sfx-broll). The
+    null-rejection invariants here apply to the fields that actually
+    exist:
 
       * top-level `cast` / `lines` / `beats` / `scenes` / `shots`
         / `music` / `clips`  -- must be list, never null.
@@ -60,8 +60,6 @@ __all__ = [
     "ALLOWED_FREEZE_VERDICTS",
     "ALLOWED_SPEAKER_ROLES",
     "EXPECTED_SCHEMA_VERSION",
-    "SFX_DUR_MIN_S",
-    "SFX_DUR_MAX_S",
     "run_gap_audit",
     "phase_0_gap_audit_pre",
     "phase_10_gap_audit_post_and_freeze",
@@ -87,14 +85,15 @@ except Exception:  # pragma: no cover -- defensive fallback
 
 # Allowed values for line.speaker_role. Drawn from
 # `_otr_ledger_reviewer._ALLOWED_SPEAKER_ROLES`; kept local so this
-# module does not import the reviewer.
+# module does not import the reviewer. "sfx" REMOVED 2026-07-01
+# (rip-sfx-broll): an old ledger carrying speaker_role="sfx" now
+# fails the per-line invariant as a hard ERROR (Phase 10 raises).
 ALLOWED_SPEAKER_ROLES: frozenset[str] = frozenset({
     "character",
     "announcer",
     "music_open",
     "music_close",
     "music_inter",
-    "sfx",
 })
 
 
@@ -123,9 +122,9 @@ _REQUIRED_TOP_LEVEL_LISTS: tuple[str, ...] = (
     "beats",
     "scenes",
     "shots",
-    # S26-A3: legacy top-level "sfx" list removed from schema. sfx are
-    # first-class lines[] rows in v2. The line.speaker_role == "sfx"
-    # case is still part of ALLOWED_SPEAKER_ROLES above.
+    # S26-A3: legacy top-level "sfx" list removed from schema; the
+    # whole sfx subsystem followed 2026-07-01 (rip-sfx-broll) -- a
+    # speaker_role="sfx" line is now an invariant ERROR.
     "music",
     "clips",
 )
@@ -655,107 +654,23 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_meta_invariants(
             ledger_data, report.errors, report.warnings,
         )
-        _check_g7_sfx_dur_invariant(
-            ledger_data, report.errors, report.warnings,
-        )
         _check_g8_line_id_uniqueness(
             ledger_data, report.errors, report.warnings,
         )
     return report
 
 
-# G7 SFX duration bounds. Phase 0 collect / Phase 10 raise.
-#
-# Voice-path-cleanbreak Sprint 6.4 (2026-05-12): tightened from
-# (0.25, 12.0) to (0.5, 10.0) -- the consumer intersection of
-# AudioGen + ProcSFX. The writer's contract surface is now honest:
-# every dur_s that passes G7 renders at face value through every
-# consumer. Consumer-side clamps remain as belt-and-suspenders
-# guards; if those clamps ever fire, the writer has drifted from
-# G7 (a real bug, not a quality-window mismatch).
-#
-# G7 routing invariant (see docs/gates.md): dur_s is the writer's
-# contract surface. Each SFX line routes to exactly one renderer
-# based on shot_engine (or equivalent). Renderers apply their own
-# quality-window clamps on top; if those clamps ever fire, the
-# writer has drifted from G7.
-SFX_DUR_MIN_S = 0.5
-SFX_DUR_MAX_S = 10.0
-
-
-def _check_g7_sfx_dur_invariant(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G7 invariant (voice-path-cleanbreak Sprint 3, 2026-05-12).
-
-    SFX lines may carry an optional ``dur_s`` field set by the writer's
-    outline (per-cue duration override; AudioGen + ProcSFX honor it at
-    render time). When present, ``dur_s`` MUST fall within
-    ``[SFX_DUR_MIN_S, SFX_DUR_MAX_S]`` -- the practical generation
-    range. Out-of-bounds values are a writer contract violation.
-
-    Skips when:
-      - the line is not sfx-role (only sfx lines get the per-cue dur_s
-        treatment; dialogue + announcer lines have dur_s populated
-        POST-render by Bark / Kokoro and the value is the rendered
-        clip duration, not a target)
-      - ``dur_s`` is not numeric (already caught by per-line
-        type invariants)
-
-    S28 cleanbreak: dropped the "``dur_s`` is absent / None
-    (back-compat with older ledgers; default_duration applies)" skip.
-    Older flat-layout ledgers are extinct after S26's per-episode-
-    workspace cutover; the producer (find_clip_durations / upstream
-    timing in OTR_LedgerScriptWriter outline pass) always stamps
-    dur_s on every sfx line. Missing dur_s is now a hard validation
-    error.
-    """
-    lines = ledger_data.get("lines")
-    if not isinstance(lines, list):
-        return
-    bad: list[str] = []
-    missing: list[str] = []
-    for idx, line in enumerate(lines):
-        if not isinstance(line, dict):
-            continue
-        if line.get("speaker_role") != "sfx":
-            continue
-        dur = line.get("dur_s")
-        if dur is None:
-            # S28 cleanbreak: missing dur_s on sfx line is now a
-            # writer contract violation, not a tolerated back-compat
-            # shape. Producer always populates from outline pass.
-            line_id = line.get("line_id") or f"<idx {idx}>"
-            missing.append(line_id)
-            continue
-        if not isinstance(dur, (int, float)):
-            continue
-        if dur < SFX_DUR_MIN_S or dur > SFX_DUR_MAX_S:
-            line_id = line.get("line_id") or f"<idx {idx}>"
-            bad.append(f"{line_id}={dur}")
-    if missing:
-        errors.append(
-            f"G7: {len(missing)} sfx line(s) missing dur_s: "
-            f"{', '.join(missing)} (writer outline contract violation; "
-            f"producer must stamp target dur_s on every sfx line)"
-        )
-    if bad:
-        errors.append(
-            f"G7: {len(bad)} sfx line(s) have dur_s outside "
-            f"[{SFX_DUR_MIN_S}, {SFX_DUR_MAX_S}]: {', '.join(bad)} "
-            f"(writer outline contract violation; AudioGen + ProcSFX "
-            f"reject out-of-range cue durations)"
-        )
+# G7 (SFX per-cue dur_s bounds) DELETED 2026-07-01 (rip-sfx-broll):
+# the sfx speaker-role no longer exists, so there are no sfx lines to
+# bound. An old ledger carrying speaker_role="sfx" now fails the
+# per-line invariant (ALLOWED_SPEAKER_ROLES) as a hard ERROR instead.
 
 
 # G8 line_id uniqueness. Phase 0 collect / Phase 10 raise.
 #
 # Voice-path-cleanbreak Sprint 13.2 (2026-05-12): added per IMP-8
-# from the S6-S8 round-robin. ProcSFX's filename scheme
-# (proc_<sfx_type>_<line_id>_<perm>.wav) and every ledger write-back
-# path that stamps by line_id assume uniqueness. Without G8 enforcing
+# from the S6-S8 round-robin. Every ledger write-back
+# path that stamps by line_id assumes uniqueness. Without G8 enforcing
 # it, two lines with the same line_id silently overwrite each other
 # both on disk and in the ledger.
 
@@ -767,8 +682,8 @@ def _check_g8_line_id_uniqueness(
 ) -> None:
     """G8: line_id uniqueness across ledger.lines[].
 
-    The ProcSFX filename scheme and every ledger write-back path
-    (ledger.apply_line_timings, ledger.patch_line_fields, etc.) key
+    Every ledger write-back path
+    (ledger.apply_line_timings, ledger.patch_line_fields, etc.) keys
     by line_id. Duplicates produce silent overwrites in BOTH places:
     on disk the second render replaces the first wav, in the ledger
     the second patch_line_fields call clobbers the first row's
@@ -802,7 +717,7 @@ def _check_g8_line_id_uniqueness(
         errors.append(
             f"G8: {len(duplicates)} duplicate line_id(s) across "
             f"ledger.lines[]: {', '.join(sample)}{more}. "
-            f"ProcSFX filenames and ledger write-back paths key by "
+            f"Render filenames and ledger write-back paths key by "
             f"line_id; duplicates produce silent overwrites in BOTH "
             f"places. The writer must emit unique line_ids."
         )

@@ -604,9 +604,10 @@ def _build_reflection_input(led: Any) -> str:
             for ln in closing:
                 parts.append(f"  {_clean(_format_line(ln))}")
 
-    # Non-dialogue rows (SFX / MUSIC / ENV / SCENE markers) -- these
+    # Non-dialogue rows (MUSIC / ENV / SCENE markers) -- these
     # carry the sonic-architecture signal a visual brief should reflect.
-    non_dialogue_roles = {"sfx", "music", "env"}
+    # ("sfx" removed 2026-07-01, rip-sfx-broll.)
+    non_dialogue_roles = {"music", "env"}
     non_dialogue = [
         ln for ln in lines
         if (ln.get("speaker_role") or "").lower() in non_dialogue_roles

@@ -26,7 +26,7 @@ import re
 
 
 # Voiced roles that count for the post-assembly key_terms check.
-# music_* / sfx beats don't carry dialogue text -- excluded.
+# music_* beats don't carry dialogue text -- excluded.
 _VOICED_ROLES: frozenset[str] = frozenset({"character", "announcer"})
 
 
@@ -59,7 +59,7 @@ def post_assembly_keyterm_check(
       - all landed -> pass clean
 
     Only voiced lines (speaker_role in {character, announcer}) count.
-    music / sfx beats have no dialogue, so the term cannot land there.
+    music beats have no dialogue, so the term cannot land there.
     Match is case-insensitive (same as v1_validate in
     news_interpreter).
     """

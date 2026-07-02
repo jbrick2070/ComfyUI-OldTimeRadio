@@ -2,7 +2,9 @@
 
 The per-engine `roles` whitelist is no longer a gate -- eligibility is purely
 `required_inputs <= role_available_inputs` (operator 2026-06-22, model-agnostic).
-Deterministic, CPU-only.
+REWRITTEN 2026-07-01 (rip-sfx-broll): the scene_broll / background_abstract
+roles are GONE; every surviving role supplies the full input vocabulary and
+dead role tokens raise RoleCompatError. Deterministic, CPU-only.
 """
 
 import importlib
@@ -20,8 +22,8 @@ def _desc(required, roles=None):
 
 
 # Real declarations (grounded): wan's roles whitelist OMITS announcer_visual.
-WAN = _desc(("init_image",), roles=("scene_broll", "music_visual", "character_video"))
-LTX = _desc(("text_prompt",), roles=("scene_broll", "background_abstract", "music_visual"))
+WAN = _desc(("init_image",), roles=("music_visual", "character_video"))
+LTX = _desc(("text_prompt",), roles=("music_visual", "announcer_visual"))
 VIS = _desc(("audio_ref",), roles=("announcer_visual", "music_visual", "character_video"))
 C3D = _desc(("audio_ref", "init_image"), roles=("announcer_visual", "character_video"))
 
@@ -30,13 +32,14 @@ def test_wan_now_fits_announcer_despite_roles_omission():
     # THE live-wall fix: wan's roles omits announcer_visual, but it supplies init_image.
     assert rc.engine_fits_role(WAN, "announcer_visual") is True
     assert rc.engine_fits_role(WAN, "music_visual") is True
-    assert rc.engine_fits_role(WAN, "scene_broll") is True
     assert rc.engine_fits_role(WAN, "character_video") is True
 
 
-def test_wan_still_excluded_from_stillless_abstract():
-    # i2v needs a still; background_abstract supplies only text_prompt.
-    assert rc.engine_fits_role(WAN, "background_abstract") is False
+def test_dead_roles_raise_loud():
+    # rip-sfx-broll: scene_broll / background_abstract are unknown tokens now.
+    for dead in ("scene_broll", "background_abstract"):
+        with pytest.raises(rc.RoleCompatError):
+            rc.engine_fits_role(WAN, dead)
 
 
 def test_text_prompt_broll_fits_every_role():
@@ -45,31 +48,28 @@ def test_text_prompt_broll_fits_every_role():
 
 
 def test_audio_specials_only_fit_audio_supplying_roles():
+    # All three surviving roles supply audio_ref (per-beat master slice).
     assert rc.engine_fits_role(VIS, "announcer_visual") is True
     assert rc.engine_fits_role(VIS, "music_visual") is True
-    assert rc.engine_fits_role(VIS, "character_video") is True    # character_video supplies audio_ref
-    assert rc.engine_fits_role(VIS, "scene_broll") is False       # scene_broll has NO audio_ref
-    assert rc.engine_fits_role(VIS, "background_abstract") is False
+    assert rc.engine_fits_role(VIS, "character_video") is True
 
 
 def test_character_3d_needs_audio_and_still():
     assert rc.engine_fits_role(C3D, "announcer_visual") is True
     assert rc.engine_fits_role(C3D, "music_visual") is True
-    assert rc.engine_fits_role(C3D, "character_video") is True    # has audio_ref + init_image
-    assert rc.engine_fits_role(C3D, "scene_broll") is False       # no audio_ref
-    assert rc.engine_fits_role(C3D, "background_abstract") is False
+    assert rc.engine_fits_role(C3D, "character_video") is True
 
 
 def test_roles_whitelist_is_ignored():
     # a descriptor whose roles EXCLUDES a role still fits it by capability.
-    d = _desc(("text_prompt",), roles=("scene_broll",))
+    d = _desc(("text_prompt",), roles=("music_visual",))
     assert rc.engine_fits_role(d, "announcer_visual") is True
 
 
 def test_no_roles_key_fits_by_capability():
     d = _desc(("init_image",))  # no `roles` key at all -> must NOT fail-closed
     assert rc.engine_fits_role(d, "announcer_visual") is True
-    assert rc.engine_fits_role(d, "background_abstract") is False
+    assert rc.engine_fits_role(d, "character_video") is True
 
 
 def test_fail_closed():

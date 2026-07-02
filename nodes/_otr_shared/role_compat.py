@@ -2,9 +2,9 @@
 
 The model-agnostic platform offers, per role, a STATIC dropdown of every
 registered engine (V-6: the COMBO is the full registry). But not every engine
-fits every role -- an ``audio_driven_face`` engine needs an ``audio_ref`` that a
-``background_abstract`` beat does not supply. This module is the SINGLE source of
-that compatibility rule, imported identically by:
+fits every role -- an engine only fits where the role supplies every one of its
+``required_inputs``. This module is the SINGLE source of that compatibility
+rule, imported identically by:
 
 * ``OTR_VideoDirector`` -- to validate / annotate the user's per-role pick,
 * ``OTR_ShotLock`` -- to fail closed on an incompatible locked pick,
@@ -28,17 +28,19 @@ from typing import Iterable, TypedDict
 
 
 class Role(str, enum.Enum):
-    """The five video roles (policy menu-filter keys, not pipelines).
+    """The three video roles (policy menu-filter keys, not pipelines).
 
     Maps onto the user-facing per-role selectors: ``announcer_visual`` -> A,
-    ``music_visual`` -> B, and the three other-beats roles -> C.
+    ``music_visual`` -> B, ``character_video`` -> C. The former
+    ``scene_broll`` / ``background_abstract`` roles were RIPPED 2026-07-01
+    (rip-sfx-broll: proven to receive ZERO beats -- the only producer was the
+    dead ``sfx`` speaker-role plus a default fallback, both removed).
+    Unknown role tokens FAIL LOUD via :class:`RoleCompatError`.
     """
 
     ANNOUNCER_VISUAL = "announcer_visual"
     MUSIC_VISUAL = "music_visual"
     CHARACTER_VIDEO = "character_video"
-    SCENE_BROLL = "scene_broll"
-    BACKGROUND_ABSTRACT = "background_abstract"
 
 
 #: Request-level input tokens (shared verbatim with the schema vocabulary in
@@ -49,27 +51,23 @@ INPUT_TOKENS: frozenset = frozenset(
 
 
 #: What each role CAN supply to an engine. An engine is offered in a role only
-#: if every one of its ``required_inputs`` is available here. ``base_clip_ref``
-#: is available in the motion-bearing roles (a provider engine can supply a base
-#: clip); the pure-background role supplies only text.
+#: if every one of its ``required_inputs`` is available here. All three
+#: surviving roles carry a real beat with per-beat audio + a mintable still,
+#: so each supplies the full input vocabulary.
 ROLE_AVAILABLE_INPUTS: dict = {
     Role.ANNOUNCER_VISUAL.value: frozenset(
         {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}
     ),
     # MUSIC_VISUAL supplies audio_ref (the per-beat slice of the frozen master)
-    # so the LTX-AV ``ltx_av_music`` audio-reactive engine fits this role (M1,
-    # unconditional). The slice is sync-loose for music -- precision is the talk
-    # lane's job -- but the audio input is genuinely available here.
+    # so the LTX-AV audio-reactive engine fits this role (M1, unconditional).
+    # The slice is sync-loose for music -- precision is the talk lane's job --
+    # but the audio input is genuinely available here.
     Role.MUSIC_VISUAL.value: frozenset(
         {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}
     ),
     Role.CHARACTER_VIDEO.value: frozenset(
         {"text_prompt", "init_image", "audio_ref", "base_clip_ref"}
     ),
-    Role.SCENE_BROLL.value: frozenset(
-        {"text_prompt", "init_image", "base_clip_ref"}
-    ),
-    Role.BACKGROUND_ABSTRACT.value: frozenset({"text_prompt"}),
 }
 
 #: The canonical role names (single-sourced).

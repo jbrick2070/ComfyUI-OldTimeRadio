@@ -1,13 +1,13 @@
 """S13.2 -- G8 line_id uniqueness invariant tests.
 
-ProcSFX's filename scheme (``proc_<sfx_type>_<line_id>_<perm>.wav``)
-and every ledger write-back path (``apply_line_timings``,
-``patch_line_fields``, etc.) key by ``line_id``. Duplicates produce
-silent overwrites in BOTH places. G8 catches the duplication at
-freeze time -- before any render fires.
+Render filenames and every ledger write-back path
+(``apply_line_timings``, ``patch_line_fields``, etc.) key by
+``line_id``. Duplicates produce silent overwrites in BOTH places. G8
+catches the duplication at freeze time -- before any render fires.
 
 Phase 0 collects (warn-mode), Phase 10 raises FreezeAssertionError.
-The check is wired into ``run_gap_audit`` alongside G1-G7.
+The check is wired into ``run_gap_audit`` alongside the G1-G6 gates
+(G7 was deleted 2026-07-01 with the sfx subsystem, rip-sfx-broll).
 """
 from __future__ import annotations
 
@@ -32,8 +32,8 @@ def test_g8_unique_line_ids_pass():
          "speaker_role": "character", "text": "alpha", "traits": "calm"},
         {"line_id": "ln_002", "char_id": "c01",
          "speaker_role": "character", "text": "beta", "traits": "calm"},
-        {"line_id": "sfx_001", "char_id": "sfx",
-         "speaker_role": "sfx", "text": "alarm", "traits": "ambient"},
+        {"line_id": "mus_001", "char_id": "music_inter",
+         "speaker_role": "music_inter", "text": "", "traits": None},
     ])
     report = _LFC.run_gap_audit(led, label="test")
     g8_errors = [e for e in report.errors if "G8" in e]
@@ -141,10 +141,11 @@ def test_g8_handles_non_list_lines_defensively():
     assert not g8_errors
 
 
-def test_g8_runs_alongside_g7_independently():
-    """G7 and G8 are independent checks. A ledger with both a duplicate
-    line_id AND an out-of-bounds SFX dur_s should produce both errors
-    in a single run."""
+def test_g8_runs_alongside_role_invariant_independently():
+    """G8 and the per-line speaker_role invariant are independent checks.
+    A ledger with both a duplicate line_id AND a dead 'sfx' speaker_role
+    (rip-sfx-broll 2026-07-01: G7 was deleted; the role invariant is the
+    old-sfx-ledger gate now) produces BOTH errors in a single run."""
     led = _mk_minimal_ledger([
         {"line_id": "sfx_001", "char_id": "sfx",
          "speaker_role": "sfx", "text": "alarm", "dur_s": 25.0,
@@ -154,8 +155,10 @@ def test_g8_runs_alongside_g7_independently():
          "traits": "ambient"},
     ])
     report = _LFC.run_gap_audit(led, label="test")
-    g7_errors = [e for e in report.errors if "G7" in e]
+    role_errors = [e for e in report.errors
+                   if "speaker_role" in e and "sfx" in e]
     g8_errors = [e for e in report.errors if "G8" in e]
-    assert g7_errors and g8_errors, (
-        f"Expected both G7 and G8 errors. G7: {g7_errors}, G8: {g8_errors}"
+    assert role_errors and g8_errors, (
+        f"Expected both role + G8 errors. role: {role_errors}, "
+        f"G8: {g8_errors}"
     )

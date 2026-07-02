@@ -113,7 +113,7 @@ MAX_REROLL_CYCLES = 2
 # way (stopping at a non-voiced beat) and caps at this many.
 _REROLL_LAST_LINES_WINDOW = 3
 
-# Line roles that carry spoken audio. A non-voiced row (music / sfx
+# Line roles that carry spoken audio. A non-voiced row (music
 # marker) is a scene boundary for the `last_lines` reconstruction.
 _VOICED_ROLES = frozenset({"character", "announcer"})
 
@@ -289,7 +289,7 @@ def build_reroll_line_request(
     first-pass line had -- before this it rebuilt only arc_phase and lost the
     frame. A missing frame -> empty defaults (PD1).
 
-    `position`, `sfx_cue`, `current_beat_block` remain at their empty
+    `position` and `current_beat_block` remain at their empty
     defaults: those blocks would only be approximate reconstructions and
     the critic's `hint` (threaded separately as `reroll_hint`) already
     carries the actionable signal for a reroll. The phantom-name gate

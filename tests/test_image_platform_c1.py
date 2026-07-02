@@ -154,9 +154,14 @@ def test_image_role_filter_shared(clean_image_registry):
          "required_inputs": tuple(ireg.get_engine(n).required_inputs)}
         for n in ireg.all_engine_names()
     ]
-    # background_abstract supplies only text -> the audio-needing engine is out.
-    fit = rc.filter_engines_for_role("background_abstract", descs)
-    assert "txt" in fit and "needs_audio" not in fit
+    # rip-sfx-broll (2026-07-01): every surviving role supplies audio_ref, so
+    # the filter admits both engines; the SHARED-filter proof is that a dead
+    # role token raises through the same single code path.
+    fit = rc.filter_engines_for_role("character_video", descs)
+    assert "txt" in fit and "needs_audio" in fit
+    import pytest as _pytest
+    with _pytest.raises(rc.RoleCompatError):
+        rc.filter_engines_for_role("background_abstract", descs)
 
 
 #: Minimal VALID video policy for director calls with no 3D engine in play

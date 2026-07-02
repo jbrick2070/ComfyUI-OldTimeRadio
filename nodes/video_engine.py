@@ -1203,7 +1203,7 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
     Behavior change vs legacy: scene_break / environment / pause
     item-types don't exist in the v2 ledger schema, so the multi-scene
     structure collapses to a single pseudo-scene containing all
-    dialogue + sfx items from led.lines in ledger order. Cast is
+    dialogue items from led.lines in ledger order. Cast is
     enriched from led.cast (which has name + voice_preset per entry).
     """
     import time as _t
@@ -1263,7 +1263,6 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
     # so collapse to a single pseudo-scene. Items walk led.lines in
     # ledger order, dispatching by speaker_role:
     #   character / announcer  -> dialogue item
-    #   sfx                    -> sfx item
     #   music_open/close/inter -> skip (HUD never rendered "music"
     #                            items even under the legacy schema)
     items = []
@@ -1284,8 +1283,6 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
                 "text":   text,
                 "preset": cast_name_to_preset.get(char, ""),
             })
-        elif role == "sfx":
-            items.append({"type": "sfx", "text": text})
         # music_* speaker_roles intentionally skipped (no HUD handler).
 
     scenes = [{"scene_num": "1", "env": "", "items": items}] if items else []
@@ -1572,10 +1569,6 @@ class _TelemetryHUDRenderer:
                                       P * 3, y, RW - P * 4,
                                       self.f_body, CRT_WHITE, self._lhB)
                     y += P
-                elif kind == "sfx":
-                    d.text((P, y), f"[SFX]  {item.get('text','')[:80]}",
-                           fill=CRT_CYAN, font=self.f_body)
-                    y += self._lhB + P // 2
                 elif kind == "pause":
                     d.text((P, y), "[ . . . ]", fill=CRT_DARK, font=self.f_body)
                     y += self._lhB
@@ -1651,7 +1644,7 @@ def _write_story_treatment(out_path, episode_title, led,
     item-types don't exist in the v2 ledger schema. The treatment
     output loses scene-arc summary, scene headers, and environment
     descriptions in the FULL SCRIPT section. Replaces with a flat
-    list of dialogue + sfx in ledger order. Cast block is enriched
+    list of dialogue in ledger order. Cast block is enriched
     from led.cast (which carries name + voice_preset per entry).
     """
     try:
@@ -1887,20 +1880,19 @@ def _write_story_treatment(out_path, episode_title, led,
         # Scene arc / FULL SCRIPT under v2 ledger schema:
         # the ledger has no scene_break / environment / pause markers,
         # so we drop the scene-arc summary entirely and emit a flat
-        # list of dialogue + sfx in ledger order. This is a deliberate
+        # list of dialogue in ledger order. This is a deliberate
         # simplification (architect-approved 2026-05-09 Surprise #3).
         W_("SCENE ARC")
         W_(BAR)
         W_("  (single-scene ledger -- v2 schema does not carry scene_break "
            "/ environment / pause markers; arc summary collapsed to a flat "
-           "dialogue + sfx list below)")
+           "dialogue list below)")
         W_()
 
         d_count = sum(
             1 for ln in _OTRLC.iter_lines(led, roles={"character", "announcer"})
         )
-        s_count = sum(1 for ln in _OTRLC.iter_lines(led, roles={"sfx"}))
-        W_(f"FULL SCRIPT  ({d_count} dialogue  \u00b7  {s_count} sfx cues)")
+        W_(f"FULL SCRIPT  ({d_count} dialogue)")
         W_(BAR)
         for line in _OTRLC.iter_lines(led):
             role = line.get("speaker_role") or ""
@@ -1913,9 +1905,6 @@ def _write_story_treatment(out_path, episode_title, led,
                 vtag   = f"  [{preset}]" if preset else ""
                 W_(f"  {char}{vtag}")
                 W_(f"    {text}")
-                W_()
-            elif role == "sfx":
-                W_(f"  [SFX]  {text}")
                 W_()
             # music_* roles intentionally skipped from the printed
             # treatment (consistent with HUD's music skip behavior).
@@ -2059,8 +2048,8 @@ class SignalLostVideoRenderer:
         # v2 ledger consumer (Pattern 1): parse the wire input as a v2
         # ledger dict. load_ledger raises ValueError on the legacy
         # parser-list shape; Video is in the loud-fail group. By the
-        # time Video runs, every prior consumer (Bark/Kokoro/Sequencer
-        # /AudioGen/ProcSFX) has already validated ledger shape, so a
+        # time Video runs, every prior consumer (Bark/Kokoro/Sequencer)
+        # has already validated ledger shape, so a
         # legacy-list at this point is upstream-wiring failure, not a
         # silent-degrade case.
         #

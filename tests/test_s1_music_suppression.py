@@ -3,15 +3,14 @@ spoken or caption text.
 
 Root cause (pre-S1): production_ledger.init_lines_from_outline stamped a
 non-voiced row's `text` from `sfx_cue or intent`, so a music_inter beat
-(no sfx_cue) leaked its generic intent -- e.g. "Musical interlude bridging
-<phase> into the next phase." -- into the line text, which then bled into
-the writer's script transcript (assemble_script_text_from_ledger ->
-"[SFX: Musical interlude bridging ...]") and any transcript consumer.
+leaked its generic intent -- e.g. "Musical interlude bridging <phase> into
+the next phase." -- into the line text, which then bled into the writer's
+script transcript and any transcript consumer.
 
-S1 fix:
-  * production_ledger: non-voiced rows take ONLY a genuine sfx_cue as text;
-    the generic intent fallback is dropped (music rows -> text="").
-  * _otr_outline: the inserted music_inter beat carries a neutral intent.
+S1 fix (+ rip-sfx-broll 2026-07-01):
+  * production_ledger: non-voiced rows carry NO text at all (the sfx_cue
+    carrier and the [SFX:] transcript token died with the sfx subsystem);
+  * _otr_outline: the inserted music_inter beat carries a neutral intent;
   * _otr_ledger_scrub.is_spoken_role: the single canonical spoken-role test.
 
 These tests prove the suppression is robust even against a WORST-CASE
@@ -53,7 +52,7 @@ class TestIsSpokenRole:
         assert is_spoken_role("announcer") is True
 
     def test_non_voiced_roles_false(self):
-        for role in ("music_open", "music_inter", "music_close", "sfx"):
+        for role in ("music_open", "music_inter", "music_close"):
             assert is_spoken_role(role) is False
 
     def test_defensive_inputs_false(self):
@@ -69,7 +68,7 @@ class TestIsSpokenRole:
 
 def _outline_with_music_filler() -> Outline:
     """An outline whose music_inter beat carries a WORST-CASE leaked
-    filler intent, plus a real sfx beat with a genuine cue."""
+    filler intent."""
     beats = [
         Beat(beat_id="b001", speaker="ANNOUNCER", speaker_role="announcer",
              intent="open the episode", target_words=15, mood="welcoming",
@@ -83,10 +82,6 @@ def _outline_with_music_filler() -> Outline:
         Beat(beat_id="b004", speaker="BOB", speaker_role="character",
              intent="reveal the obstacle", target_words=25, mood="grave",
              arc_phase="complication"),
-        Beat(beat_id="b005", speaker="NARRATOR", speaker_role="sfx",
-             intent="footsteps approach off-stage", target_words=5,
-             mood="tense", arc_phase="complication",
-             sfx_cue="footsteps approach in the corridor"),
         Beat(beat_id="b006", speaker="ANNOUNCER", speaker_role="announcer",
              intent="close the episode", target_words=15, mood="reflective",
              arc_phase="resolution"),
@@ -135,12 +130,17 @@ class TestMaterialization:
         # Non-voiced rows never get a dialogue slot id.
         assert rows["b003"]["dialogue_slot_id"] is None
 
-    def test_real_sfx_cue_preserved(self, tmp_path):
-        led = _ledger(tmp_path)
-        led.init_lines_from_outline(_outline_with_music_filler())
-        rows = {r["beat_id"]: r for r in led.data["lines"]}
-        # A genuine sfx cue is a render contract -> stays as text.
-        assert rows["b005"]["text"] == "footsteps approach in the corridor"
+    def test_sfx_beats_cannot_exist_in_outline(self):
+        # rip-sfx-broll: the SpeakerRole Literal has no "sfx" member --
+        # pydantic rejects it at Beat construction (the outline CONTRACT
+        # is the first gate).
+        with pytest.raises(Exception):
+            Beat(beat_id="b005", speaker="NARRATOR", speaker_role="sfx",
+                 intent="footsteps approach off-stage", target_words=5,
+                 mood="tense", arc_phase="complication")
+
+    def test_beat_has_no_sfx_cue_field(self):
+        assert "sfx_cue" not in Beat.model_fields
 
     def test_voiced_slot_ids_unchanged(self, tmp_path):
         """S1 must not perturb the voiced dialogue_slot_id stamping."""
@@ -186,9 +186,8 @@ class TestTranscript:
         # The whole point of S1: no music filler reaches the transcript.
         assert "Musical interlude" not in transcript
         assert _FILLER not in transcript
-        # The music_inter row contributed NOTHING (empty text -> skipped).
-        assert transcript.count("[SFX:") == 1  # only the real sfx cue
-        assert "footsteps approach in the corridor" in transcript
+        # rip-sfx-broll: the [SFX:] token no longer exists at all.
+        assert "[SFX:" not in transcript
         # Voiced dialogue is intact.
         assert "Did you hear that signal?" in transcript
 

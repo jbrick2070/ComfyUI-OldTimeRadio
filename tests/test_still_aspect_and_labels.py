@@ -204,8 +204,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         other_beats_image_model="flux_gen1",
-        other_beats_clip_mode="unique_per_beat",
-        other_beats_n=8, fps=25, canvas_w=832, canvas_h=480,
+        fps=25, canvas_w=832, canvas_h=480,
         seed_mode="request_hash", request_seed=42, allow_auto_fallback=True,
     )
     policy = json.loads(out[0])

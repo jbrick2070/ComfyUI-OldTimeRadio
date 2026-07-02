@@ -48,7 +48,6 @@ class FakeBeat:
     intent: str = "speak"
     target_words: int = 25
     mood: str = "tense"
-    sfx_cue: Optional[str] = None
     arc_phase: Optional[str] = None
 
 
@@ -132,20 +131,22 @@ class TestInitLinesFromOutline:
         assert rows["b001"]["beat_intent"] == "cold open"
         assert rows["b005"]["beat_intent"] == "transition"
 
-    def test_non_voiced_row_keeps_real_sfx_cue(self, fresh_ledger):
-        # S1: a genuine sfx_cue IS a render contract and stays as text
-        # (only the generic intent fallback is dropped).
+    def test_non_voiced_rows_never_carry_text(self, fresh_ledger):
+        # rip-sfx-broll (2026-07-01): the sfx_cue carrier is GONE -- every
+        # non-voiced (music) row is a pure render contract with text=="",
+        # unconditionally.
         outline = FakeOutline(beats=[
-            FakeBeat("b001", "NARRATOR", "sfx", "door slams", 0, "tense",
-                     sfx_cue="a heavy steel door slams shut"),
+            FakeBeat("b001", "NARRATOR", "music_open", "cold open", 0,
+                     "tense"),
             FakeBeat("b002", "NARRATOR", "music_inter", "transition", 5,
                      "bold"),
         ])
         fresh_ledger.init_lines_from_outline(outline)
         rows = {r["beat_id"]: r for r in fresh_ledger.data["lines"]}
-        assert rows["b001"]["text"] == "a heavy steel door slams shut"
-        # music row with no cue -> suppressed.
+        assert rows["b001"]["text"] == ""
         assert rows["b002"]["text"] == ""
+        # the narrative intent is preserved separately for prompt consumers
+        assert rows["b001"]["beat_intent"] == "cold open"
 
     def test_speaker_role_and_arc_phase_stamped(self, fresh_ledger,
                                                  fake_outline_3acts):

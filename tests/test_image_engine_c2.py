@@ -58,8 +58,8 @@ def test_z_image_role_filter_shared():
          "required_inputs": tuple(getattr(ireg.get_engine(n), "required_inputs", ()))}
         for n in ireg.all_engine_names()
     ]
-    # needs only text_prompt -> fits every role (incl. text-only background_abstract)
-    assert "z_image_turbo" in rc.filter_engines_for_role("background_abstract", descs)
+    # needs only text_prompt -> fits every surviving role
+    assert "z_image_turbo" in rc.filter_engines_for_role("announcer_visual", descs)
     assert "z_image_turbo" in rc.filter_engines_for_role("character_video", descs)
 
 

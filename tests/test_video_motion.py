@@ -69,17 +69,14 @@ def test_registry_ltx_selectable_no_flag(monkeypatch):
     # ltx_audio_in). Registry IS the menu: it is SELECTABLE for all its roles with
     # NO flag gate.
     monkeypatch.delenv("OTR_ENABLE_LTX_VIDEO", raising=False)
-    for role in ("scene_broll", "background_abstract", "music_visual",
-                 "announcer_visual"):
+    for role in ("music_visual", "announcer_visual"):
         assert vreg.assert_usable("ltx_video", role) == "ltx_video"
 
 
 def test_registry_wan_selectable_no_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_WAN_I2V", raising=False)
-    for role in ("scene_broll", "music_visual", "character_video"):
+    for role in ("music_visual", "character_video"):
         assert vreg.assert_usable("wan_i2v", role) == "wan_i2v"
-    with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("wan_i2v", "background_abstract")  # role not served
 
 
 # --------------------------------------------------------------------------- #
@@ -93,7 +90,7 @@ def test_ltx_role_fit_text_to_video():
     # role supplies -> it fits ALL roles (the roles whitelist is no longer a gate).
     for role in rc.ROLES:
         assert rc.engine_fits_role(desc, role) is True
-    assert "ltx_video" in rc.filter_engines_for_role("background_abstract", [desc])
+    assert "ltx_video" in rc.filter_engines_for_role("music_visual", [desc])
     assert rc.filter_engines_for_role("announcer_visual", [desc]) == ["ltx_video"]
 
 
@@ -101,14 +98,12 @@ def test_wan_role_fit_image_to_video_needs_init_image():
     eng = vreg.get_engine("wan_i2v")
     desc = {"engine_id": "wan_i2v", "roles": eng.roles,
             "required_inputs": eng.required_inputs}
-    for role in ("scene_broll", "music_visual", "character_video"):
+    for role in ("music_visual", "character_video", "announcer_visual"):
         assert rc.engine_fits_role(desc, role) is True
     assert rc.filter_engines_for_role("character_video", [desc]) == ["wan_i2v"]
-    # Even if a role listed wan, role_compat excludes it when the role cannot
-    # supply init_image (background_abstract supplies only text_prompt).
-    forced = {"engine_id": "wan_i2v", "roles": ("background_abstract",),
-              "required_inputs": ("init_image",)}
-    assert rc.engine_fits_role(forced, "background_abstract") is False
+    # A dead role token raises through the shared filter (rip-sfx-broll).
+    with pytest.raises(rc.RoleCompatError):
+        rc.engine_fits_role(desc, "background_abstract")
 
 
 # --------------------------------------------------------------------------- #

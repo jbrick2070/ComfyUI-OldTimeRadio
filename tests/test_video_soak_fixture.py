@@ -40,8 +40,8 @@ def test_fixture_is_40_beats_all_roles_all_families():
     shots = section["shots"]
     assert len(shots) == 40 and section["video_revision"] == 1
     roles = {s["role"] for s in shots}
-    assert roles == {"announcer_visual", "music_visual", "character_video",
-                     "scene_broll", "background_abstract"}
+    # rip-sfx-broll (2026-07-01): the rotation covers the 3 surviving roles.
+    assert roles == {"announcer_visual", "music_visual", "character_video"}
     families = {s["family"] for s in shots}
     # lipsync_overlay is still a registered schema family but has NO engine after
     # the latentsync cleanbreak (2026-06-17), so the soak rotation -- which is

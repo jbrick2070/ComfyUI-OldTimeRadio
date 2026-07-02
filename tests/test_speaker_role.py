@@ -3,7 +3,10 @@ test_speaker_role.py
 ====================
 
 Coverage for the speaker_role taxonomy introduced 2026-04-30 as
-part of the ROADMAP P0 architecture lock (100% HuMo coverage).
+part of the ROADMAP P0 architecture lock, REWRITTEN 2026-07-01 for the
+rip-sfx-broll cleanbreak: the "sfx" role is GONE and the silent
+default-to-character fallbacks in resolve_speaker_role /
+stamp_default_role are now LOUD ValueErrors (NO FALLBACKS).
 """
 
 from __future__ import annotations
@@ -37,38 +40,42 @@ class TestRoleConstants:
         assert SR.SPEAKER_ROLE_MUSIC_OPEN == "music_open"
         assert SR.SPEAKER_ROLE_MUSIC_CLOSE == "music_close"
         assert SR.SPEAKER_ROLE_MUSIC_INTER == "music_inter"
-        assert SR.SPEAKER_ROLE_SFX == "sfx"
+
+    def test_sfx_constant_is_gone(self):
+        # rip-sfx-broll (2026-07-01): the constant itself was deleted.
+        assert not hasattr(SR, "SPEAKER_ROLE_SFX")
 
     def test_valid_roles_set_membership(self):
-        # All six constants must appear in VALID_SPEAKER_ROLES.
+        # All five constants must appear in VALID_SPEAKER_ROLES.
         for const_value in (
             SR.SPEAKER_ROLE_CHARACTER,
             SR.SPEAKER_ROLE_ANNOUNCER,
             SR.SPEAKER_ROLE_MUSIC_OPEN,
             SR.SPEAKER_ROLE_MUSIC_CLOSE,
             SR.SPEAKER_ROLE_MUSIC_INTER,
-            SR.SPEAKER_ROLE_SFX,
         ):
             assert const_value in SR.VALID_SPEAKER_ROLES
 
     def test_valid_roles_count_matches_constants(self):
-        # Guards against silently dropping a constant from the
-        # canonical tuple.
-        assert len(SR.VALID_SPEAKER_ROLES) == 6
+        # Guards against silently dropping OR re-adding a constant
+        # to the canonical tuple (sfx must never come back).
+        assert len(SR.VALID_SPEAKER_ROLES) == 5
+        assert "sfx" not in SR.VALID_SPEAKER_ROLES
 
     def test_canonical_order_first_is_character(self):
-        # character is the most common case and the safe default;
-        # keep it first so iteration / display starts there.
+        # character is the most common case; keep it first so
+        # iteration / display starts there.
         assert SR.VALID_SPEAKER_ROLES[0] == SR.SPEAKER_ROLE_CHARACTER
 
 
 # ---------------------------------------------------------------------------
-# resolve_speaker_role
+# resolve_speaker_role -- LOUD contract (no fallbacks)
 # ---------------------------------------------------------------------------
 
 class TestResolveSpeakerRole:
-    """Reads a line dict and returns the canonical role string,
-    defaulting to character on any ambiguity."""
+    """Reads a line dict and returns the canonical role string;
+    anything else RAISES (rip-sfx-broll NO-FALLBACKS conversion --
+    the historical silent default-to-character path is gone)."""
 
     @pytest.mark.parametrize("role", SR.VALID_SPEAKER_ROLES)
     def test_known_role_round_trips(self, role):
@@ -80,19 +87,20 @@ class TestResolveSpeakerRole:
             line = {"speaker_role": variant}
             assert SR.resolve_speaker_role(line) == SR.SPEAKER_ROLE_ANNOUNCER
 
-    def test_missing_field_defaults_to_character(self):
-        # Legacy lines (pre-2026-04-30) won't have speaker_role.
-        # They must default to "character" so existing behavior is
-        # preserved.
+    def test_missing_field_raises(self):
         line = {"text": "Hello", "speaker": "ALICE"}
-        assert SR.resolve_speaker_role(line) == SR.SPEAKER_ROLE_CHARACTER
+        with pytest.raises(ValueError):
+            SR.resolve_speaker_role(line)
 
-    def test_unknown_role_defaults_to_character(self):
-        # Future / typo'd values fall back to "character" so HuMo's
-        # portrait resolver kicks in (safer than rendering with the
-        # radio still for an ambiguous line).
-        line = {"speaker_role": "narrator-v3-experimental"}
-        assert SR.resolve_speaker_role(line) == SR.SPEAKER_ROLE_CHARACTER
+    def test_unknown_role_raises(self):
+        with pytest.raises(ValueError):
+            SR.resolve_speaker_role({"speaker_role": "narrator-v3-experimental"})
+
+    def test_old_sfx_ledger_rejected_loud(self):
+        # The rip's old-ledger gate: speaker_role="sfx" is a hard error.
+        with pytest.raises(ValueError) as exc:
+            SR.resolve_speaker_role({"line_id": "x00", "speaker_role": "sfx"})
+        assert "sfx" in str(exc.value)
 
     @pytest.mark.parametrize("hostile", [
         None, [], "not a dict", 42, 3.14, True, False, b"bytes",
@@ -101,11 +109,11 @@ class TestResolveSpeakerRole:
         {"speaker_role": []},
         {"speaker_role": ""},
     ])
-    def test_hostile_input_defaults_to_character(self, hostile):
-        # Builder must NEVER raise on garbage input -- a downstream
-        # ledger-renderer crash from a single weird line is a worse
-        # failure mode than rendering that line with a portrait.
-        assert SR.resolve_speaker_role(hostile) == SR.SPEAKER_ROLE_CHARACTER
+    def test_hostile_input_raises(self, hostile):
+        # NO FALLBACKS: garbage input is a producer bug and raises
+        # instead of being silently rendered as a character line.
+        with pytest.raises(ValueError):
+            SR.resolve_speaker_role(hostile)
 
 
 # ---------------------------------------------------------------------------
@@ -120,12 +128,8 @@ class TestRolePredicates:
     (defense-in-depth dead predicate). Routing is split into:
       - is_dialogue_role()   -> True for character only (HuMo with
                                 portrait)
-      - is_never_humo_role() -> True for music_*/sfx (skip HuMo;
-                                VideoComposite static-fill covers them)
-      - announcer            -> not dialogue, not never-humo: routes
-                                through portrait chain (HuMo if a
-                                portrait resolves, otherwise falls
-                                through to VideoComposite static-fill).
+      - is_never_humo_role() -> True for announcer + music_* (skip
+                                HuMo; radio-console coverage)
     """
 
     def test_character_is_dialogue_only(self):
@@ -149,22 +153,15 @@ class TestRolePredicates:
         SR.SPEAKER_ROLE_MUSIC_OPEN,
         SR.SPEAKER_ROLE_MUSIC_CLOSE,
         SR.SPEAKER_ROLE_MUSIC_INTER,
-        SR.SPEAKER_ROLE_SFX,
     ])
-    def test_never_humo_roles_include_announcer_music_and_sfx(self, role):
+    def test_never_humo_roles_include_announcer_and_music(self, role):
         # BUG-LOCAL-134 architecture (2026-05-01): announcer joins
-        # music_*/sfx in never-humo. The radio IS the host -- announcer
-        # voice plays under LTX-animated radio, no face render.
+        # music_* in never-humo. The radio IS the host -- announcer
+        # voice plays under the animated radio, no face render.
         assert SR.is_never_humo_role(role) is True
 
-    @pytest.mark.parametrize("role", [
-        SR.SPEAKER_ROLE_CHARACTER,
-    ])
-    def test_only_character_can_use_humo(self, role):
-        # BUG-LOCAL-134 architecture (2026-05-01): only character
-        # dialogue lines dispatch HuMo. Announcer/music/sfx all route
-        # through LTX with the radio still as I2V ref.
-        assert SR.is_never_humo_role(role) is False
+    def test_only_character_can_use_humo(self):
+        assert SR.is_never_humo_role(SR.SPEAKER_ROLE_CHARACTER) is False
 
     @pytest.mark.parametrize("role", [
         SR.SPEAKER_ROLE_MUSIC_OPEN,
@@ -177,20 +174,14 @@ class TestRolePredicates:
     @pytest.mark.parametrize("role", [
         SR.SPEAKER_ROLE_CHARACTER,
         SR.SPEAKER_ROLE_ANNOUNCER,
-        SR.SPEAKER_ROLE_SFX,
     ])
     def test_non_music_roles_arent_music(self, role):
         assert SR.is_music_role(role) is False
 
     def test_predicates_partition_valid_set_post_bug129(self):
-        # New routing partition (BUG-LOCAL-129b, 2026-05-01):
+        # Routing partition:
         #   character  -> dialogue (HuMo)
-        #   announcer  -> dialogue-eligible (HuMo if portrait, else
-        #                 falls through to VideoComposite)
-        #   music_*/sfx-> never-humo (VideoComposite static-fill)
-        # Every valid role lands in exactly one of: dialogue (only
-        # character), never-humo (music/sfx), or "humo-eligible"
-        # (announcer - the residual).
+        #   announcer + music_* -> never-humo (radio-console coverage)
         for role in SR.VALID_SPEAKER_ROLES:
             d = SR.is_dialogue_role(role)
             n = SR.is_never_humo_role(role)
@@ -199,36 +190,46 @@ class TestRolePredicates:
                 f"Role {role!r}: dialogue={d}, never_humo={n} -- "
                 f"contradictory."
             )
+            # Every valid role is exactly one of the two post-rip.
+            assert d or n, f"Role {role!r} unrouted"
             # is_radio_role() is always False post-BUG-129.
             assert SR.is_radio_role(role) is False
 
 
 # ---------------------------------------------------------------------------
-# stamp_default_role
+# stamp_default_role -- validate-or-raise (no backfill)
 # ---------------------------------------------------------------------------
 
 class TestStampDefaultRole:
-    """In-place backfill helper for legacy lines."""
+    """rip-sfx-broll: the legacy backfill (silently stamping
+    'character' over missing/invalid roles) is GONE. The helper now
+    validates + normalizes, raising on anything unmapped."""
 
-    def test_missing_field_gets_character(self):
+    def test_missing_field_raises(self):
         line = {"text": "Hello", "speaker": "ALICE"}
-        SR.stamp_default_role(line)
-        assert line["speaker_role"] == SR.SPEAKER_ROLE_CHARACTER
+        with pytest.raises(ValueError):
+            SR.stamp_default_role(line)
 
     def test_existing_valid_role_preserved(self):
         line = {"speaker_role": "announcer"}
         SR.stamp_default_role(line)
         assert line["speaker_role"] == "announcer"
 
-    def test_existing_invalid_role_overwritten(self):
-        # Garbage role gets normalized to "character" (the safe
-        # default).
-        line = {"speaker_role": "narrator-experimental"}
+    def test_valid_role_normalized_in_place(self):
+        line = {"speaker_role": "  MUSIC_OPEN  "}
         SR.stamp_default_role(line)
-        assert line["speaker_role"] == SR.SPEAKER_ROLE_CHARACTER
+        assert line["speaker_role"] == SR.SPEAKER_ROLE_MUSIC_OPEN
+
+    def test_invalid_role_raises(self):
+        with pytest.raises(ValueError):
+            SR.stamp_default_role({"speaker_role": "narrator-experimental"})
+
+    def test_sfx_role_raises(self):
+        with pytest.raises(ValueError):
+            SR.stamp_default_role({"speaker_role": "sfx"})
 
     def test_returns_same_dict_for_chaining(self):
-        line = {"text": "Hello"}
+        line = {"speaker_role": "character"}
         out = SR.stamp_default_role(line)
         assert out is line
 
@@ -237,22 +238,18 @@ class TestStampDefaultRole:
             with pytest.raises(TypeError):
                 SR.stamp_default_role(hostile)
 
-    def test_iterating_full_ledger(self):
-        # Realistic call shape: walk ledger.lines[] and backfill.
+    def test_iterating_full_ledger_of_valid_rows(self):
+        # Realistic call shape: walk ledger.lines[] and validate.
         lines = [
-            {"text": "Greetings, listeners.", "speaker": "ANNOUNCER"},
-            {"text": "Hello there.", "speaker": "ALICE"},
+            {"speaker_role": "announcer"},
+            {"speaker_role": "character"},
             {"speaker_role": "music_open"},
-            {"speaker_role": "garbled"},   # gets reset to character
-            {},                            # empty -- gets character
         ]
         for ln in lines:
             SR.stamp_default_role(ln)
         roles = [ln["speaker_role"] for ln in lines]
         assert roles == [
-            SR.SPEAKER_ROLE_CHARACTER,
+            SR.SPEAKER_ROLE_ANNOUNCER,
             SR.SPEAKER_ROLE_CHARACTER,
             SR.SPEAKER_ROLE_MUSIC_OPEN,
-            SR.SPEAKER_ROLE_CHARACTER,
-            SR.SPEAKER_ROLE_CHARACTER,
         ]

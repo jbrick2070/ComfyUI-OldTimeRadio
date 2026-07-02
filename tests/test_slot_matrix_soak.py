@@ -1,12 +1,13 @@
-"""C5 (2026-06-30) -- OFFLINE proof of the all-5-slots canonical-JSON soak.
+"""C5 (2026-06-30; 3-role rewrite 2026-07-01 rip-sfx-broll) -- OFFLINE proof of
+the all-slots canonical-JSON soak.
 
 The live GPU soak is gated, but its load-bearing wiring is proven here on the CPU:
 
-  * the REAL workflow (workflows/otr_scifi_16gb_full.json) is loaded and ALL FIVE
-    video slots are set INDEPENDENTLY via the capability-profile role_overrides ->
-    apply_profile patches the five OTR_VideoDirector video-model widgets BY NODE
-    TYPE (config/profiles/widget_mapping.json; no node ids), and NONE is left at
-    the legacy "(use Other Beats default)" sentinel;
+  * the REAL workflow (workflows/otr_scifi_16gb_full.json) is loaded and ALL
+    THREE video slots are set INDEPENDENTLY via the capability-profile
+    role_overrides -> apply_profile patches the OTR_VideoDirector video-model
+    widgets BY NODE TYPE (config/profiles/widget_mapping.json; no node ids),
+    and NONE is left at the legacy "(use Other Beats default)" sentinel;
   * every chosen engine is role_compat-ELIGIBLE for its slot (capability, C2/C4);
   * the per-beat CONTENT ORACLE catches the D2 dark floor + a frozen motion clip,
     and exempts static engines -- proven on real ffmpeg-rendered fixtures.
@@ -36,22 +37,17 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 CANONICAL = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 
-#: distinct, capability-eligible engine per slot (announcer/music use audio-driven
-#: engines; scene_broll/background can't supply audio_ref so they take a still).
+#: distinct, capability-eligible engine per slot.
 ROLE_ENGINES = {
     "announcer_visual": "humo_1.7B",
     "music_visual": "viz_green",
     "character_video": "humo_1.7B_169",
-    "scene_broll": "still_flat",
-    "background_abstract": "still_flat",
 }
 _OTHER_BEATS_SENTINEL = "(use Other Beats default)"
 _VIDEO_WIDGET = {
     "announcer_visual": "announcer_video_model",
     "music_visual": "music_video_model",
     "character_video": "character_video_model",
-    "scene_broll": "scene_broll_video_model",
-    "background_abstract": "background_abstract_video_model",
 }
 
 
@@ -61,13 +57,16 @@ def _load_canonical() -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# all-5-slots applied to the REAL workflow JSON
+# all-slots applied to the REAL workflow JSON
 # --------------------------------------------------------------------------- #
-def test_all_five_slots_set_on_canonical_json():
+def test_all_slots_set_on_canonical_json():
     base = load_profile("16gb_full")
-    profile = sm.build_all_five_role_profile(base, ROLE_ENGINES)
+    profile = sm.build_all_role_profile(base, ROLE_ENGINES)
     # legacy fallback key is gone (the soak must not route through other_beats)
     assert "other_beats_visual" not in profile["role_overrides"]
+    # dead keys are defensively scrubbed too (r3 fold)
+    assert "scene_broll_visual" not in profile["role_overrides"]
+    assert "background_abstract_visual" not in profile["role_overrides"]
     wf = wa.apply_profile(_load_canonical(), profile)
     schemas = wa.build_offline_schemas()
     vd = [n for n in wf["nodes"] if n.get("type") == "OTR_VideoDirector"]
@@ -89,19 +88,19 @@ def test_every_chosen_engine_is_capability_eligible():
 
 def test_builder_fills_missing_roles_with_baseline():
     base = load_profile("16gb_full")
-    profile = sm.build_all_five_role_profile(base, {})   # nothing specified
+    profile = sm.build_all_role_profile(base, {})   # nothing specified
     ro = profile["role_overrides"]
-    for role in sm.FIVE_ROLES:
+    for role in sm.ALL_ROLES:
         assert ro[sm.ROLE_TO_PROFILE_KEY[role]] == sm.DEFAULT_VIDEO_BASELINE
     # the baseline still fits every slot by capability (so an unset matrix is valid)
     desc = vreg.descriptor_for_engine(sm.DEFAULT_VIDEO_BASELINE)
-    for role in sm.FIVE_ROLES:
+    for role in sm.ALL_ROLES:
         assert rc.engine_fits_role(desc, role), role
 
 
 def test_eligibility_matrix_is_capability_grounded():
     matrix = sm.build_eligibility_matrix()
-    assert set(matrix) == set(sm.FIVE_ROLES)
+    assert set(matrix) == set(sm.ALL_ROLES)
     for role, names in matrix.items():
         for name in names:
             assert rc.engine_fits_role(vreg.descriptor_for_engine(name), role)

@@ -64,9 +64,11 @@ def test_role_fit_serves_bookends_and_character():
     assert role_compat.engine_fits_role(d, "music_visual")
     assert role_compat.engine_fits_role(d, "announcer_visual")
     assert role_compat.engine_fits_role(d, "character_video")
-    # scene_broll / background_abstract do not supply audio -> excluded by capability.
-    assert not role_compat.engine_fits_role(d, "scene_broll")
-    assert not role_compat.engine_fits_role(d, "background_abstract")
+    # rip-sfx-broll (2026-07-01): the dead roles are unknown tokens and raise.
+    import pytest as _pytest
+    for dead in ("scene_broll", "background_abstract"):
+        with _pytest.raises(role_compat.RoleCompatError):
+            role_compat.engine_fits_role(d, dead)
 
 
 def test_assert_usable_no_flag_gate(monkeypatch):

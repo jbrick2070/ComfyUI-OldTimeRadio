@@ -138,9 +138,9 @@ _COMFY_SLOT_WIDGETS = frozenset({
 # display list. Mirrors the openrouter/comfy admissibility escapes above.
 _VIDEO_DIRECTOR_WIDGETS = frozenset({
     "announcer_video_model", "music_video_model", "other_beats_video_model",
-    # Route-A per-role video slots (2026-06-28 HuMo-14B promotion).
-    "character_video_model", "scene_broll_video_model",
-    "background_abstract_video_model",
+    # Route-A per-role video slot (2026-06-28 HuMo-14B promotion;
+    # scene_broll/background_abstract removed 2026-07-01, rip-sfx-broll).
+    "character_video_model",
 })
 _IMAGE_DIRECTOR_WIDGETS = frozenset({
     "announcer_image_model", "music_image_model", "other_beats_image_model",

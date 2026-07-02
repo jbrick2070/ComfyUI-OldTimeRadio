@@ -199,7 +199,7 @@ _MAX_CHARS_PER_LINE: int = 400     # fixed char ceiling (Bark timing)
 _TOTAL_WORDS_HARD_CEILING: int = 1200  # whole-episode spoken-word runaway guard
 
 # Spoken roles whose text rides the TTS path and must be clean dialogue.
-# music / sfx rows are render contracts, not speech -- the scrub never
+# music rows are render contracts, not speech -- the scrub never
 # touches them (it never sees them as "spoken").
 _SPOKEN_ROLES: frozenset[str] = frozenset({"character", "announcer"})
 
@@ -209,7 +209,7 @@ def is_spoken_role(role: Any) -> bool:
 
     Canonical single source of truth for "does this row's `text` ride the
     TTS + caption track". Character / announcer rows are voiced; music_open /
-    music_inter / music_close / sfx rows are render contracts (S1: their
+    music_inter / music_close rows are render contracts (S1: their
     `text` must never carry generic beat intent into the spoken/caption
     track). Defensive against None / non-str input.
     """
@@ -856,7 +856,7 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
             continue
         role = str(row.get("speaker_role") or "character")
         if role not in _SPOKEN_ROLES:
-            # music / sfx rows are render contracts, not speech. Never touched.
+            # music rows are render contracts, not speech. Never touched.
             continue
         line_id = str(row.get("line_id") or row.get("beat_id") or f"<idx{i}>")
         cid = str(row.get("char_id") or "")

@@ -72,7 +72,6 @@ SpeakerRole = Literal[
     "music_open",
     "music_close",
     "music_inter",
-    "sfx",
 ]
 
 
@@ -93,7 +92,7 @@ class Beat(BaseModel):
         ...,
         min_length=1,
         max_length=40,
-        description="Character name in ALL CAPS, or 'NARRATOR' for music/sfx beats",
+        description="Character name in ALL CAPS, or 'NARRATOR' for music beats",
     )
     speaker_role: SpeakerRole = Field(
         ...,
@@ -116,11 +115,6 @@ class Beat(BaseModel):
         min_length=2,
         max_length=40,
         description="Tone descriptor, e.g. 'tense', 'wry', 'foreboding'",
-    )
-    sfx_cue: Optional[str] = Field(
-        default=None,
-        max_length=80,
-        description="Optional [SFX:] hint for the surrounding line",
     )
     arc_phase: str = Field(
         default="setup",
@@ -152,7 +146,7 @@ class Beat(BaseModel):
             "beats only (d001, d002, ...), stamped in voiced-beat "
             "declaration order by `stamp_dialogue_slot_ids` after "
             "outline assembly. None on non-voiced beats (music_open, "
-            "music_close, music_inter, sfx). Mirrors onto every "
+            "music_close, music_inter). Mirrors onto every "
             "ledger line via production_ledger.init_lines_from_outline "
             "so OTR_StoryRoomCommit can join StoryRoom dialogue rows "
             "to ledger lines by slot id rather than by raw beat_id. "
@@ -547,12 +541,11 @@ Schema:
   "beats":       array 4-32 of Beat objects:
                  {
                    "beat_id":      "b001", "b002", ... monotonic,
-                   "speaker":      ALL-CAPS name from Cast, or "NARRATOR" for music/sfx,
-                   "speaker_role": one of: character, announcer, music_open, music_close, music_inter, sfx,
+                   "speaker":      ALL-CAPS name from Cast, or "NARRATOR" for music beats,
+                   "speaker_role": one of: character, announcer, music_open, music_close, music_inter,
                    "intent":       one sentence (4-200 chars), narrative purpose only,
                    "target_words": int 3-80,
-                   "mood":         str 2-40,
-                   "sfx_cue":      str max 80 or null
+                   "mood":         str 2-40
                  }
 }
 
@@ -863,7 +856,7 @@ def validate_outline_against_budget(
     Returns None on pass. Returns an error string on the FIRST hard
     failure (suitable for the reroll-then-repair loop). Validator #1
     (total word drift) is WARN-only per §6.E -- never fails. Per
-    §6.G announcer + music + sfx beats are EXCLUDED from word and
+    §6.G announcer + music beats are EXCLUDED from word and
     per-phase budgets but are still counted by validators #6 / #7.
 
     S28 cleanbreak: budget is now required at OutlineRequest
@@ -1630,7 +1623,6 @@ def _assemble_outline(
         intent="Open the episode and orient the listener.",
         target_words=15,
         mood="welcoming",
-        sfx_cue=None,
         arc_phase=arc_phases[0],
     ))
 
@@ -1648,7 +1640,6 @@ def _assemble_outline(
                 intent=detail.intent,
                 target_words=allocation,
                 mood=detail.mood,
-                sfx_cue=None,
                 arc_phase=phase_name,
             ))
 
@@ -1672,7 +1663,6 @@ def _assemble_outline(
                 intent="Bridge to the next phase with music only.",
                 target_words=5,
                 mood="transitional",
-                sfx_cue=None,
                 arc_phase=phase_name,
             ))
 
@@ -1712,7 +1702,6 @@ def _assemble_outline(
         intent=_close_intent,
         target_words=15,
         mood="reflective",
-        sfx_cue=None,
         arc_phase=arc_phases[-1],
     ))
 
@@ -1748,7 +1737,7 @@ def stamp_dialogue_slot_ids(outline: "Outline") -> "Outline":
     Voiced determination on the Path A `Beat` schema: speaker_role in
     {"character", "announcer"}. Announcer bookends are voiced (Kokoro
     renders them) and therefore get a slot id. Non-voiced beats
-    (music_open / music_close / music_inter / sfx) keep
+    (music_open / music_close / music_inter) keep
     `dialogue_slot_id = None`.
 
     Mutates the outline's beats in place and returns the same Outline

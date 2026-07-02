@@ -263,16 +263,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: a portrait still fed to the wide render decapitates heads. A class attribute
     #: only (the sampler/sigma chain this file freezes is untouched).
     render_aspect = "wide"
-    # Generative motion b-roll / background / music visuals -- the roles whose
-    # only required input is a text prompt. ``announcer_visual`` GRANTED
+    # Generative motion music/announcer visuals -- the roles whose only
+    # required input is a text prompt. ``announcer_visual`` GRANTED
     # 2026-06-10 (production restore): the operator's radio OPEN renders the
     # period radio-station b-roll on the announcer beats INSTEAD of a
     # lip-synced face -- the deliberate "like before" look (the role supplies
     # text_prompt; LTX ignores the beat's audio_ref by family). A talking-face
     # announcer remains available by selecting humo on the OTR_VideoDirector
-    # announcer slot.
-    roles = ("scene_broll", "background_abstract", "music_visual",
-             "announcer_visual")
+    # announcer slot. (scene_broll/background_abstract removed 2026-07-01,
+    # rip-sfx-broll.)
+    roles = ("music_visual", "announcer_visual")
     # 2026-06-17: announcer + music DEFAULT moved to the audio-reactive LTX
     # audio-in lane (ltx_av_music). ltx_video stays SELECTABLE for these roles
     # (still listed in `roles`) but is no longer the in-stack default for any

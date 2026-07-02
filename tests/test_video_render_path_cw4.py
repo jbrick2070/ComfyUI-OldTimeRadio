@@ -195,20 +195,20 @@ def test_cheap_families_registered():
 
 def test_cheap_family_usable_and_role_filtered():
     # C2 (2026-06-30): eligibility is CAPABILITY. still_motion (text-only) fits
-    # background_abstract -- and in fact every role -- so it is usable there.
-    assert vreg.assert_usable("still_motion", "background_abstract") == "still_motion"
+    # every surviving role, so it is usable there.
+    assert vreg.assert_usable("still_motion", "character_video") == "still_motion"
     # the SHARED role filter (AS-1, capability) offers floors per their inputs
     descs = [
         {"engine_id": n, "roles": tuple(vreg.get_engine(n).roles),
          "required_inputs": tuple(getattr(vreg.get_engine(n), "required_inputs", ()))}
         for n in vreg.all_engine_names()
     ]
-    bg = rc.filter_engines_for_role("background_abstract", descs)
-    assert "still_motion" in bg                    # text-only floor fits bg by capability
-    # incompatible role fails closed BY CAPABILITY: visualizer needs audio_ref, which
-    # background_abstract (text-only) cannot supply -> refused.
-    with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("visualizer", "background_abstract")
+    cv = rc.filter_engines_for_role("character_video", descs)
+    assert "still_motion" in cv                    # text-only floor fits by capability
+    # rip-sfx-broll (2026-07-01): the input-poor roles are GONE; a dead role
+    # token raises through the same shared filter path.
+    with pytest.raises(rc.RoleCompatError):
+        rc.filter_engines_for_role("background_abstract", descs)
 
 
 def test_cheap_families_cold_import_clean():

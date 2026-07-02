@@ -327,58 +327,51 @@ class TestSceneStillObjects:
         # NOT pooled into an other_pool_* loop target
         assert not any(t["beat_id"].startswith("other_pool_") for t in targets)
 
-    def test_c3_sfx_speaker_role_maps_to_scene_broll(self):
-        """C3 (D4 fix, 2026-06-30): 'sfx' is the writer's only non-dialogue/
-        non-announcer/non-music speaker_role; it now routes to scene_broll (was
-        falling through to background_abstract) so the scene_broll video slot is
-        reachable. Verifies the map + the resolver."""
+    def test_sfx_speaker_role_rejected_loud(self):
+        """rip-sfx-broll (2026-07-01): the 'sfx' speaker_role + its
+        scene_broll mapping are GONE. The map has no sfx entry, the resolver
+        RAISES on it (old-ledger rejection), and every canonical writer
+        speaker_role resolves through the map."""
+        import pytest
         from nodes import otr_shot_lock as sl
         from nodes._otr_speaker_role import VALID_SPEAKER_ROLES
-        assert sl.SPEAKER_TO_VIDEO_ROLE.get("sfx") == "scene_broll"
-        assert sl._video_role_for_line({"speaker_role": "sfx"}) == "scene_broll"
-        # every canonical writer speaker_role now resolves to a real (non-default)
-        # video role EXCEPT none -- sfx was the last unmapped token.
+        assert "sfx" not in sl.SPEAKER_TO_VIDEO_ROLE
+        with pytest.raises(ValueError):
+            sl._video_role_for_line({"speaker_role": "sfx"})
         for tok in VALID_SPEAKER_ROLES:
             assert tok in sl.SPEAKER_TO_VIDEO_ROLE, tok
 
-    def test_pool_n_loop_pools_other_beats_stills(self):
-        # operator 2026-06-18: pool_n_loop -> the OTHER-BEATS (background_abstract/
-        # scene_broll) SHARE N pool stills (other_pool_0..N-1), NOT one per beat;
-        # announcer/music/character_video stay per-beat. 3 narration beats -> N=2.
+    def test_every_beat_is_per_beat_no_pooling(self):
+        # rip-sfx-broll (2026-07-01): the other-beats pool_n_loop pooling died
+        # with the scene_broll/background_abstract roles -- NO other_pool_*
+        # targets exist any more; every mapped beat gets its OWN still.
+        import inspect
         from nodes import otr_meta_brief_image_prompt as mbp
+        sig = inspect.signature(mbp.derive_scene_still_targets)
+        assert "other_beats" not in sig.parameters
         lines = [
             {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer",
              "start_s": 8.4, "dur_s": 4.0},
-            {"line_id": "b002", "speaker_role": "narration", "start_s": 12.4, "dur_s": 3.0},
-            {"line_id": "b003", "speaker_role": "narration", "start_s": 15.4, "dur_s": 3.0},
-            {"line_id": "b004", "speaker_role": "narration", "start_s": 18.4, "dur_s": 3.0},
+            {"line_id": "b002", "speaker_role": "character", "char_id": "c01",
+             "start_s": 12.4, "dur_s": 3.0},
             {"line_id": "b005", "speaker_role": "music_close", "char_id": "music_close",
              "start_s": 21.4, "dur_s": 4.0},
         ]
-        targets, _w = mbp.derive_scene_still_targets(
-            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 2})
+        targets, _w = mbp.derive_scene_still_targets(lines)
         bids = [t["beat_id"] for t in targets]
-        assert "b001" in bids and "b005" in bids          # announcer/music per-beat
-        for b in ("b002", "b003", "b004"):                # narration NOT per-beat
-            assert b not in bids
-        assert "other_pool_0" in bids and "other_pool_1" in bids
-        assert "other_pool_2" not in bids                 # capped at N=2
+        for b in ("b001", "b002", "b005"):
+            assert b in bids
+        assert not any(b.startswith("other_pool_") for b in bids)
 
-    def test_pool_n_loop_clamps_and_zero(self):
+    def test_unmapped_speaker_role_raises_loud(self):
+        # NO FALLBACKS: an unmapped role (the old _DEFAULT_VIDEO_ROLE
+        # fallthrough is gone) is a producer bug and raises.
+        import pytest
         from nodes import otr_meta_brief_image_prompt as mbp
-        lines = [{"line_id": "b00%d" % i, "speaker_role": "narration",
-                  "start_s": float(i), "dur_s": 1.0} for i in range(2)]
-        # pool_n > M -> clamp to M (2), no over-generation
-        t_big, w_big = mbp.derive_scene_still_targets(
-            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 9})
-        pool = [t["beat_id"] for t in t_big if t["beat_id"].startswith("other_pool_")]
-        assert pool == ["other_pool_0", "other_pool_1"]
-        assert any("exceeds" in w for w in w_big)
-        # pool_n <= 0 -> ZERO other-beats stills, LOUD
-        t_zero, w_zero = mbp.derive_scene_still_targets(
-            lines, other_beats={"clip_mode": "pool_n_loop", "pool_n": 0})
-        assert not any(t["beat_id"].startswith("other_pool_") for t in t_zero)
-        assert any("ZERO" in w for w in w_zero)
+        lines = [{"line_id": "b001", "speaker_role": "narration",
+                  "start_s": 1.0, "dur_s": 1.0}]
+        with pytest.raises(ValueError):
+            mbp.derive_scene_still_targets(lines)
 
     def test_pretiming_open_emitted_loud(self):
         """Pre-audio ledger (no start_s anywhere) still emits the open

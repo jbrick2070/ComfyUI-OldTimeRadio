@@ -55,7 +55,7 @@ class TestLoadLedger:
         out = _OTRLC.load_ledger(json.dumps(led_in))
         assert isinstance(out, dict)
         assert out["cast"][0]["char_id"] == "c01"
-        assert len(out["lines"]) == 6  # default with_sfx + with_music = True
+        assert len(out["lines"]) == 5  # default with_music=True (sfx row removed 2026-07-01)
 
     def test_legacy_list_input_raises_value_error(self):
         legacy = make_legacy_list()
@@ -104,10 +104,10 @@ class TestIterLines:
     def test_no_filter_yields_every_line(self):
         led = make_stub_ledger()
         out = list(_OTRLC.iter_lines(led))
-        assert len(out) == 6
+        assert len(out) == 5
         # Original order is preserved -- iter_lines is NOT a sort.
         assert [ln["line_id"] for ln in out] == [
-            "b001", "b002", "b003", "b004", "b005", "b006"
+            "b001", "b002", "b003", "b004", "b006"
         ]
 
     def test_character_role_filter_yields_dialogue_only(self):
@@ -200,7 +200,7 @@ class TestCastLookup:
 
     def test_none_char_id_returns_empty_dict(self):
         led = make_stub_ledger()
-        # Defensive: announcer/sfx/music line `char_id` is a role tag,
+        # Defensive: announcer/music line `char_id` is a role tag,
         # NOT a real cast member; passing None must degrade cleanly.
         assert _OTRLC.cast_lookup(led, None) == {}
 
@@ -261,11 +261,13 @@ class TestSpeakerName:
         )
         assert _OTRLC.speaker_name(led, line) == "UNKNOWN"
 
-    def test_sfx_line_returns_unknown(self):
+    def test_music_line_returns_unknown(self):
+        # music rows' `char_id` is the role tag, not a real cast member
+        # (the sfx variant of this test died with the sfx role, 2026-07-01).
         led = make_stub_ledger()
         line = next(
             ln for ln in led["lines"]
-            if ln.get("speaker_role") == "sfx"
+            if ln.get("speaker_role") == "music_open"
         )
         assert _OTRLC.speaker_name(led, line) == "UNKNOWN"
 

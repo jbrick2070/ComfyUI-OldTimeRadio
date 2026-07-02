@@ -23,9 +23,9 @@ def test_mesh_fodder_roles_from_video_policy():
         "music_video_model": {"engine_id": "mesh_stage"},
     }}
     roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
-    # other_beats drives character_video + the two other-beats roles; music too.
-    assert roles == {"character_video", "background_abstract", "scene_broll",
-                     "music_visual"}
+    # rip-sfx-broll (2026-07-01): the legacy other_beats slot drives ONLY the
+    # character lane now; music rides its own slot.
+    assert roles == {"character_video", "music_visual"}
     # announcer paired with ltx_video -> NOT fodder.
     assert "announcer_visual" not in roles
 
@@ -248,12 +248,14 @@ def test_announcer_beat_meshes_announcer_not_uncast(tmp_path):
 def test_fork_object_subject_id_matches_driver_convention():
     """Chunk 6: a no-character forked beat mints mesh_subject_id 'obj_<beat>',
     the SAME id render_driver stamps -> the mesh cache + the minted fodder
-    agree on the subject."""
+    agree on the subject. (rip-sfx-broll 2026-07-01: the roleless/
+    background_abstract fixture became an ANNOUNCER beat with NO char_id --
+    the surviving no-character lane.)"""
     payload, _w = mb.derive_image_prompts(
         [], _meta(),
-        lines=[{"line_id": "b007", "speaker_role": "", "text": "a sound",
-                "start_s": 1.0, "dur_s": 2.0}],
-        mesh_fodder_roles={"background_abstract"})
+        lines=[{"line_id": "b007", "speaker_role": "announcer",
+                "text": "a sound", "start_s": 1.0, "dur_s": 2.0}],
+        mesh_fodder_roles={"announcer_visual"})
     fodder = [o for o in payload["objects"]
               if o["kind"] == "mesh_fodder" and o["beat_id"] == "b007"]
     assert fodder, "no-character beat should mint object fodder"

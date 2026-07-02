@@ -145,8 +145,8 @@ def _build_render_plan_inner(
     lines = ledger_data.get("lines", []) or []
     cast_rows = ledger_data.get("cast", []) or []
 
-    # Pool: every CHARACTER line_id in ledger order. Announcer / music /
-    # sfx beats are visual coverage Sprint 6 does not gate -- they
+    # Pool: every CHARACTER line_id in ledger order. Announcer / music
+    # beats are visual coverage Sprint 6 does not gate -- they
     # follow their existing render rules in HuMo + VideoComposite.
     candidate_pool: list[str] = [
         str(ln.get("line_id"))

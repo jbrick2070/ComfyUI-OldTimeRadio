@@ -174,8 +174,7 @@ class StillParallaxEngine(_CheapFamilyBase):
     honest_label = ("2.5D depth parallax (DepthAnythingV2-SMALL over a still "
                     "-- not real 3D)")
     family = "static_motion"
-    roles = ("announcer_visual", "music_visual", "character_video",
-             "scene_broll")
+    roles = ("announcer_visual", "music_visual", "character_video")
     #: NEVER a default until the operator's look-QA promotes it (0-E gate).
     default_roles = ()
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)

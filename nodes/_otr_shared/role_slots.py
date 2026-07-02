@@ -1,11 +1,13 @@
-"""ONE shared role -> video-slot map (Route-A, 2026-06-28 HuMo-14B promotion).
+"""ONE shared role -> video-slot map (Route-A, 2026-06-28 HuMo-14B promotion;
+rip-sfx-broll 2026-07-01: scene_broll / background_abstract roles REMOVED).
 
 The legacy platform routed character / scene-broll / background-abstract beats
-through a SINGLE ``other_beats_video_model`` slot. The 14B promotion needs them
-SPLIT: ``character_video`` must ride ``humo_14B_169`` (face + audio, no
-fallbacks) while ``scene_broll`` / ``background_abstract`` ride lighter engines.
-This module is the SINGLE source of the role -> slot rule, imported identically
-by the four former duplicate maps so they cannot drift:
+through a SINGLE ``other_beats_video_model`` slot. Route-A split them; the
+2026-07-01 rip then removed the scene_broll / background_abstract roles
+outright (proven to receive ZERO beats), leaving ``character_video`` as the
+only former other-beats role. This module is the SINGLE source of the
+role -> slot rule, imported identically by the four former duplicate maps so
+they cannot drift:
 
 * ``OTR_VideoDirector`` (``VIDEO_SLOT_ROLES`` + ``_role_aspects``),
 * ``OTR_ShotLock`` (``build_execution_plan`` engine pick),
@@ -15,47 +17,45 @@ by the four former duplicate maps so they cannot drift:
 Dependency-free: stdlib + the :class:`Role` enum from :mod:`role_compat`. No
 torch / comfy / numpy at module scope (cold-import clean, V-12).
 
-Back-compatible (migration): a ``video_models`` policy that carries only the
-legacy ``other_beats_video_model`` slot still resolves -- the three other-beats
-roles fall back to it. That keeps every saved graph and the shipped profiles
-(16gb_full / 8gb_lite / cpu_floor ``role_overrides.other_beats_visual``) working
-until they are re-applied with the new per-role keys.
+Migration note: a ``video_models`` policy that carries only the legacy
+``other_beats_video_model`` slot still resolves for ``character_video`` --
+that ONE fallback is the documented Route-A migration lane for old profiles /
+saved graphs. It is an EMPTY-SLOT fallback only; an UNKNOWN role token always
+RAISES (NO FALLBACKS, rip-sfx-broll).
 """
 from __future__ import annotations
 
 from .role_compat import Role
 
-#: The slot the three other-beats roles shared before Route-A. Kept as the
-#: migration fallback so old profiles / saved graphs keep resolving.
+#: The slot the former other-beats roles shared before Route-A. Kept as the
+#: migration fallback so old profiles / saved graphs keep resolving the
+#: character lane.
 LEGACY_OTHER_BEATS_SLOT = "other_beats_video_model"
 
-#: The three roles that historically shared the legacy slot (migration scope).
+#: The former other-beats role(s) still allowed to fall back to the legacy
+#: slot when their dedicated slot is EMPTY (migration scope). Post-rip this is
+#: only ``character_video``.
 _OTHER_BEATS_ROLES = (
     Role.CHARACTER_VIDEO.value,
-    Role.SCENE_BROLL.value,
-    Role.BACKGROUND_ABSTRACT.value,
 )
 
-#: role -> its dedicated per-role video slot (Route-A). The SINGLE map the four
-#: consumers share.
+#: role -> its dedicated per-role video slot. The SINGLE map the four
+#: consumers share. Unknown roles are NOT mapped -- :func:`slot_for_role`
+#: raises on them.
 ROLE_TO_VIDEO_SLOT = {
     Role.ANNOUNCER_VISUAL.value: "announcer_video_model",
     Role.MUSIC_VISUAL.value: "music_video_model",
     Role.CHARACTER_VIDEO.value: "character_video_model",
-    Role.SCENE_BROLL.value: "scene_broll_video_model",
-    Role.BACKGROUND_ABSTRACT.value: "background_abstract_video_model",
 }
 
 #: video slot -> the role(s) it must be capability-compatible with (the
 #: fail-closed ``role_compat`` filter input). The inverse of
-#: :data:`ROLE_TO_VIDEO_SLOT`, PLUS the legacy slot, which must still fit all
-#: three other-beats roles (a legacy pick has to satisfy every role it serves).
+#: :data:`ROLE_TO_VIDEO_SLOT`, PLUS the legacy slot, which serves only the
+#: character lane now.
 VIDEO_SLOT_ROLES = {
     "announcer_video_model": ("announcer_visual",),
     "music_video_model": ("music_visual",),
     "character_video_model": ("character_video",),
-    "scene_broll_video_model": ("scene_broll",),
-    "background_abstract_video_model": ("background_abstract",),
     LEGACY_OTHER_BEATS_SLOT: _OTHER_BEATS_ROLES,
 }
 
@@ -66,17 +66,12 @@ PER_ROLE_VIDEO_SLOTS = (
     "announcer_video_model",
     "music_video_model",
     "character_video_model",
-    "scene_broll_video_model",
-    "background_abstract_video_model",
 )
 
-#: The three NEW per-role slots Route-A adds (the slots that did not exist before
-#: the split). OTR_VideoDirector appends widgets for these; the profile schema /
-#: applier / widget_mapping learn exactly these three.
+#: The per-role slot Route-A added that survives the 2026-07-01 rip (the
+#: scene_broll / background_abstract slots were removed with their roles).
 NEW_ROUTE_A_VIDEO_SLOTS = (
     "character_video_model",
-    "scene_broll_video_model",
-    "background_abstract_video_model",
 )
 
 
@@ -89,26 +84,38 @@ def _engine_id_of(entry) -> str:
 
 
 def slot_for_role(role: str) -> str:
-    """The dedicated per-role video slot for ``role`` (Route-A).
+    """The dedicated per-role video slot for ``role``.
 
-    An unknown role tolerantly maps to the legacy other-beats slot (the four
-    consumers historically defaulted there), never raises -- routing must not
-    crash a normal episode on an unexpected role label.
+    NO FALLBACKS (rip-sfx-broll, 2026-07-01): an unknown role RAISES
+    ``ValueError`` -- the historical silent map to the legacy other-beats
+    slot was exactly the kind of fallback that let dead roles ride along
+    unnoticed. A raise here names the bad token so the producer gets fixed.
     """
-    return ROLE_TO_VIDEO_SLOT.get(role, LEGACY_OTHER_BEATS_SLOT)
+    slot = ROLE_TO_VIDEO_SLOT.get(role)
+    if slot is None:
+        raise ValueError(
+            f"slot_for_role: unknown video role {role!r}; known roles: "
+            f"{tuple(ROLE_TO_VIDEO_SLOT)}. scene_broll/background_abstract "
+            f"were removed 2026-07-01 (rip-sfx-broll). NO FALLBACKS."
+        )
+    return slot
 
 
 def engine_id_for_role(video_models, role: str) -> str:
     """Resolve the engine id ``role`` should use from a ``video_models`` policy.
 
-    Reads the role's dedicated per-role slot first; if that slot is absent or
-    empty AND the role is one of the three other-beats roles, falls back to the
-    legacy ``other_beats_video_model`` slot (old profiles / saved graphs). Each
-    slot value may be a bare engine-id string or a ``{"engine_id": ...}`` dict.
+    The role is validated FIRST via :func:`slot_for_role` (unknown role ->
+    ``ValueError``, never a silent lane). Then reads the role's dedicated
+    per-role slot; if that slot is absent or EMPTY and the role is
+    ``character_video``, falls back to the legacy ``other_beats_video_model``
+    slot (old profiles / saved graphs -- the documented migration lane; this
+    is an empty-SLOT fallback, never an unknown-ROLE fallback). Each slot
+    value may be a bare engine-id string or a ``{"engine_id": ...}`` dict.
     Returns "" when nothing resolves (fail-open to the caller's own handling).
     """
+    slot = slot_for_role(role)  # raises on unknown role
     vm = video_models or {}
-    eid = _engine_id_of(vm.get(slot_for_role(role)))
+    eid = _engine_id_of(vm.get(slot))
     if eid:
         return eid
     if role in _OTHER_BEATS_ROLES:
