@@ -122,15 +122,40 @@ def test_half_distilled_lora_on_dev(ia2v_env):
 
 
 def test_guide_image_conditioning_chain(ia2v_env):
-    g = _graph(ia2v_env, w=832, h=480)
-    assert g["imagescale"]["inputs"]["image"] == W("loadimage", 0)
-    assert g["imagescale"]["inputs"]["width"] == 1248     # 832 * 1.5
-    assert g["imagescale"]["inputs"]["height"] == 720     # 480 * 1.5
-    assert g["resizelonger"]["inputs"]["longer_edge"] == 1536
-    assert g["preprocess"]["inputs"]["img_compression"] == 18
-    # BOTH inplace anchors condition on the SAME preprocessed guide
-    assert g["inplace_base"]["inputs"]["image"] == W("preprocess", 0)
-    assert g["inplace_refine"]["inputs"]["image"] == W("preprocess", 0)
+    # CANVAS-INDEPENDENT guide prep (lips-dont-talk root-cause fix): the
+    # canonical's FIXED 1920x1088 -> longer-edge 1536 keeps the guide SHARP
+    # (downscaled) at ANY render canvas; the old 1.5x-of-canvas version built
+    # a soft UPSCALED guide at 512x288 -- the production mouth prior killer.
+    for w, h in ((832, 480), (512, 288), (1280, 720)):
+        g = _graph(ia2v_env, w=w, h=h)
+        assert g["imagescale"]["inputs"]["image"] == W("loadimage", 0)
+        assert g["imagescale"]["inputs"]["width"] == 1920
+        assert g["imagescale"]["inputs"]["height"] == 1088
+        assert g["resizelonger"]["inputs"]["longer_edge"] == 1536
+        assert g["preprocess"]["inputs"]["img_compression"] == 18
+        # BOTH inplace anchors condition on the SAME preprocessed guide
+        assert g["inplace_base"]["inputs"]["image"] == W("preprocess", 0)
+        assert g["inplace_refine"]["inputs"]["image"] == W("preprocess", 0)
+
+
+def test_ia2v_render_canvas_defaults_canonical_native(ia2v_env, tmp_path,
+                                                      monkeypatch):
+    # operator quality catch: under the two-stage recipe the AV canvas
+    # defaults to the canonical-native 1280x720 (512x288 was single-pass
+    # VRAM math -> 2.9x upscale mush); single-pass recipes keep 512x288.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_announcer_open_shot(),
+                                     _ltx_ledger(tmp_path))
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1280, 720)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    req2 = rd.build_request_from_shot(_announcer_open_shot(),
+                                      _ltx_ledger(tmp_path))
+    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (512, 288)
 
 
 def test_videovae_split_survives_two_stage(ia2v_env):
@@ -171,3 +196,180 @@ def test_keep_set_keeps_lora(ia2v_env):
     rcfg = _recipe_config(RECIPE_IA2V)
     keep = ia2v_env._keep_set("decode", rcfg)
     assert keep == {"unet", "lora", "decode"}
+
+
+# --------------------------------------------------------------------------- #
+# TALKING prompt register (lips-dont-talk kibitz fix, 2026-07-02): probe P4
+# proved the scene/console register collapses articulation (4.15 -> 1.18);
+# P2 proved music cannot drive lips (register deliberately unchanged there).
+# --------------------------------------------------------------------------- #
+_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 80
+
+
+def _ltx_ledger(tmp_path):
+    s = tmp_path / "scene.png"
+    s.write_bytes(_PNG)
+    imgs = [{"object_id": "still_%s" % b, "kind": kind, "beat_id": b,
+             "path": str(s)}
+            for b, kind in (("b000", "scene_open"),
+                            ("b000_music_open", "scene_open"),
+                            ("b001", "scene_announcer"),
+                            ("b002", "scene_character"))]
+    return {"video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b000", "char_id": "",
+                       "start_s": 0.0, "dur_s": 2.0},
+                      {"line_id": "b001", "char_id": "announcer",
+                       "start_s": 2.0, "dur_s": 2.0},
+                      {"line_id": "b002", "char_id": "c01",
+                       "start_s": 4.0, "dur_s": 2.0}],
+            "images": {"images": imgs}}
+
+
+def _announcer_open_shot():
+    # a REAL announcer bookend (b001): has source lines, NOT the synthetic
+    # b000 music open -- _ltx_motion_role_key maps it to the "announcer"
+    # register (an empty-source_line_ids shot maps to music_open by design).
+    return {"shot_id": "shot_b001", "beat_id": "b001",
+            "engine_id": "ltx_audio_in", "role": "announcer_visual",
+            "family": "audio_conditioned_video", "target_frame_count": 25,
+            "source_line_ids": ["b001"], "char_id": "", "creative": {}}
+
+
+def _music_open_shot():
+    return {"shot_id": "shot_b000_music_open", "beat_id": "b000_music_open",
+            "engine_id": "ltx_audio_in", "role": "music_visual",
+            "family": "audio_conditioned_video", "target_frame_count": 25,
+            "source_line_ids": [], "char_id": "", "creative": {}}
+
+
+def _char_face_shot():
+    m4 = ("face visible, speaking to camera, 40s, Lead Astronomer. Face: "
+          "Oval, hooded eyes, aquiline nose, thin lips. Hair: short grey. "
+          "Wearing a rumpled observatory jumper over a checked shirt, "
+          + "x" * 700)
+    return {"shot_id": "shot_b002", "beat_id": "b002",
+            "engine_id": "ltx_audio_in", "role": "character_video",
+            "family": "audio_conditioned_video", "target_frame_count": 25,
+            "source_line_ids": ["b002"], "char_id": "c01",
+            "creative": {"text_prompt": m4, "source": "m4"}}
+
+
+def test_announcer_bookend_gets_talking_register(ia2v_env, tmp_path,
+                                                 monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    req = rd.build_request_from_shot(_announcer_open_shot(),
+                                     _ltx_ledger(tmp_path))
+    p = req["text_prompt"]
+    assert "lips opening and closing" in p and "in sync" in p
+    assert "Tuning dial needle" not in p          # console register replaced
+
+
+def test_music_bookend_keeps_console_register(ia2v_env, tmp_path, monkeypatch):
+    # P2: LTX cannot lip-sync to music -- the music bookends deliberately
+    # KEEP the console-motion register even under the talking recipe.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_music_open_shot(), _ltx_ledger(tmp_path))
+    assert "Dial whip-pans" in req["text_prompt"]
+    assert "lips" not in req["text_prompt"]
+
+
+def test_announcer_bookend_unchanged_on_single_pass_recipe(tmp_path,
+                                                           monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_announcer_open_shot(),
+                                     _ltx_ledger(tmp_path))
+    assert "Tuning dial needle" in req["text_prompt"]   # byte-unchanged
+    assert "lips" not in req["text_prompt"]
+
+
+def test_char_face_beat_gets_compact_talking_prompt(ia2v_env, tmp_path,
+                                                    monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
+    p = req["text_prompt"]
+    assert "lips opening and closing naturally in sync" in p
+    assert p.startswith("face visible, speaking to camera")
+    assert len(p) <= rd._LTX_MOTION_PROMPT_MAX
+    assert "xxxx" not in p                         # the 900-char wall is gone
+
+
+def test_announcer_with_m4_still_gets_talking_register(ia2v_env, tmp_path,
+                                                       monkeypatch):
+    # kibitz r2 must-fix: an announcer bookend carrying an M4 creative prompt
+    # must STILL swap to the talking register under ia2v (M4 outranked on
+    # announcer bookends only).
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    shot = _announcer_open_shot()
+    shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
+                                       "on the window", "source": "m4"}
+    req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
+    assert "lips opening and closing" in req["text_prompt"]
+    assert "rain on the window" not in req["text_prompt"]
+
+
+def test_announcer_with_m4_keeps_m4_on_single_pass_recipe(tmp_path,
+                                                          monkeypatch):
+    # kibitz r2 should-fix: M4 precedence on announcer bookends is UNTOUCHED
+    # for the single-pass recipes -- only ia2v outranks it.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    shot = _announcer_open_shot()
+    shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
+                                       "on the window", "source": "m4"}
+    req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
+    assert "rain on the window" in req["text_prompt"]
+    assert "lips opening and closing" not in req["text_prompt"]
+
+
+def test_char_face_no_m4_fallback_talks_under_ia2v(ia2v_env, tmp_path,
+                                                   monkeypatch):
+    # kibitz r3 must-fix: the ShotLock seam-gap fallback (char beat, NO M4)
+    # must be a TALKING prompt under ia2v, never the scene-register fallback.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    shot = _char_face_shot()
+    shot["creative"] = {}
+    req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
+    assert "lips opening and closing naturally in sync" in req["text_prompt"]
+
+
+def test_char_face_no_m4_fallback_unchanged_on_single_pass(tmp_path,
+                                                           monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    shot = _char_face_shot()
+    shot["creative"] = {}
+    req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
+    assert req["text_prompt"] == rd._CHAR_FACE_FALLBACK_PROMPT
+
+
+def test_char_face_beat_keeps_m4_on_single_pass_recipe(tmp_path, monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
+    p = req["text_prompt"]
+    assert "xxxx" in p                              # full M4 kept
+    assert "stable centered subject" in p           # composition clause kept

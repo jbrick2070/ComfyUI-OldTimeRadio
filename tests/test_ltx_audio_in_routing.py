@@ -108,6 +108,13 @@ def test_ltx_audio_in_character_beat_uses_wide_scene_character_still():
 # ---- canvas clamp + scene-prompt join ----------------------------------------
 
 def test_ltx_audio_in_clamps_to_vram_safe_av_canvas(monkeypatch):
+    # 512x288 is the SINGLE-PASS recipes' M0-safe clamp; under ia2v_canonical
+    # the default is the canonical-native 1280x720 (locked in
+    # test_ltx_av_ia2v_canonical.py::test_ia2v_render_canvas_defaults_...).
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
     req = rd.build_request_from_shot(
         _shot("ltx_audio_in", "music_visual"), _ledger())

@@ -230,9 +230,16 @@ _IA2V_LORA_STRENGTH = 0.5
 _IA2V_I2V_BASE_STRENGTH = 0.7      # motion pass: the still is a soft anchor
 _IA2V_I2V_REFINE_STRENGTH = 1.0    # detail pass: hard re-anchor
 _IA2V_BASE_SAMPLER = "euler_ancestral_cfg_pp"   # ancestral keeps motion alive
-#: Guide-image conditioning chain (scale 1.5x -> cap longer edge -> jpeg-ish
-#: compression 18): the canonical's guide texture prep.
-_IA2V_GUIDE_SCALE = 1.5
+#: Guide-image conditioning chain (canonical texture prep). CANVAS-INDEPENDENT
+#: (lips-dont-talk kibitz, probes P7/P8 vs production): the canonical scales
+#: the guide to a FIXED 1920x1088 then caps the longer edge at 1536 -- a
+#: sharp, DOWNSCALED guide at any render canvas. The first transplant scaled
+#: 1.5x the RENDER canvas instead, so a 512x288 production render built a
+#: 768x432 guide and UPSCALED it to 1536: a soft, double-resampled mouth
+#: prior (every probe articulated because the probe harness kept the fixed
+#: canonical numbers -- the engine did not).
+_IA2V_GUIDE_SCALE_W = 1920
+_IA2V_GUIDE_SCALE_H = 1088
 _IA2V_GUIDE_LONGER_EDGE = 1536
 _IA2V_GUIDE_COMPRESSION = 18
 #: Spatial latent upsampler x2 (folder key latent_upscale_models -- mapped in
@@ -379,6 +386,17 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return os.environ.get(
             "OTR_LTX_AV_DISTILLED_LORA",
             rcfg.get("lora_name", _LTX_AV_DISTILLED_LORA_DEFAULT))
+
+    def wants_talking_prompt(self):
+        """True when the active recipe is the canonical two-stage IA2V
+        lip-sync graph. The render driver consults THIS hook (never an env
+        string) to swap the bookend/character motion prompts to the TALKING
+        register -- probe P4 (2026-07-02, docs/2026-07-02-canonical-ia2v/)
+        measured the scene register collapsing articulation 4.15 -> 1.18 and
+        hallucinating on-video title text. RAISES on recipe misconfig (kibitz
+        r2: no silent double-swallow) -- the driver's caller catches + logs
+        LOUD, and assert_usable still hard-fails the render itself."""
+        return bool(_recipe_config(self._recipe())["two_stage"])
 
     # ---- recipe resolution (fail-loud; the recipe FOLLOWS THE MODEL) ----
     def _recipe(self):
@@ -789,8 +807,8 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
             "imagescale": {"class": "imagescale", "inputs": {
                 "image": W("loadimage", 0), "upscale_method": "lanczos",
-                "width": int(round(width * _IA2V_GUIDE_SCALE)),
-                "height": int(round(height * _IA2V_GUIDE_SCALE)),
+                "width": _IA2V_GUIDE_SCALE_W,
+                "height": _IA2V_GUIDE_SCALE_H,
                 "crop": "center"}},
             "resizelonger": {"class": "resizelonger", "inputs": {
                 "images": W("imagescale", 0),

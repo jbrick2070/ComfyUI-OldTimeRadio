@@ -228,14 +228,22 @@ def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
     assert "no microphone" not in p.lower()   # NEVER negations
 
 
-def test_humo_announcer_beat_keeps_radio_styling():
+def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
     # NOTE 2026-06-30: _enforce_radio_is_host redirects this fixture's
     # engine_id="humo" pick to "ltx_audio_in" before any prompt logic runs (an
     # announcer_visual beat can no longer stay on a HuMo-family engine -- "the
     # radio is the host"). The M4-verbatim-prompt handling below is IDENTICAL
     # on either engine for this exempt (announcer, gear-not-scrubbed) case, so
     # the assertions are unchanged; only the reason they hold has shifted.
+    # NOTE 2026-07-02 (lips-dont-talk): under ia2v_canonical the TALKING
+    # register now OUTRANKS M4 on announcer bookends -- this M4-verbatim
+    # contract belongs to the SINGLE-PASS recipes, so pin one (the ia2v
+    # behavior is locked in test_ltx_av_ia2v_canonical.py).
     from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     creative = {"text_prompt": ("vintage radio announcer at a chrome "
                                 "microphone, ON AIR sign"), "source": "llm"}
     shot = _face_shot("announcer_visual", creative)
@@ -256,7 +264,8 @@ def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
     assert "no " not in p.lower()                      # no negations
 
 
-def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console():
+def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
+        monkeypatch):
     """2026-06-30 HuMo-improve plan (reversing Route-A 2026-06-28, "the radio
     is the host"): render_driver._enforce_radio_is_host now redirects an
     announcer_visual pick of a HuMo-family engine to ltx_audio_in BEFORE any
@@ -265,8 +274,16 @@ def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console():
     this role). A beat with no M4 creative prompt therefore no longer falls to
     the old hardcoded "1940s radio studio" HuMo default: it flows through the
     pre-existing role-driven LTX motion-prompt path (_ltx_motion_role_key),
-    producing an animated RADIO-CONSOLE prompt -- never a human face."""
+    producing an animated RADIO-CONSOLE prompt -- never a human face.
+
+    2026-07-02 (lips-dont-talk): the console-motion contract belongs to the
+    SINGLE-PASS recipes; under ia2v_canonical this announcer bookend swaps to
+    the TALKING register (locked in test_ltx_av_ia2v_canonical.py)."""
     from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     shot = _face_shot("announcer_visual", {})
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
     assert shot["engine_id"] == "ltx_audio_in"              # redirected off HuMo

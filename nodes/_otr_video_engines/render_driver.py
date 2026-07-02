@@ -563,6 +563,53 @@ _LTX_MOTION_PROMPT_BY_ROLE = {
 #: short brief fragment appended AFTER, dropped if it breaks the budget).
 _LTX_MOTION_PROMPT_MAX = 240
 
+#: TALKING register for the ia2v_canonical recipe (lips-dont-talk kibitz,
+#: 2026-07-02). Probe-proven: the ia2v two-stage recipe animates what the
+#: prompt NARRATES; the console-motion register above steers motion into
+#: dials/tubes/dolly and the lips freeze (P4: motion 4.15 -> 1.18). The
+#: ANNOUNCER bookend swaps to this canonical-register talking prompt when the
+#: routed engine's recipe wants it (LtxAudioInEngine.wants_talking_prompt()).
+#: MUSIC bookends deliberately KEEP the console-motion register -- P2 proved
+#: LTX cannot lip-sync to music (motion 0.59); a talking prompt there would
+#: fight physics for nothing.
+#: VERBATIM the canonical wording (probe P8 2026-07-02: a paraphrased
+#: register scored HALF the canonical's articulation at identical params --
+#: 1.72 vs 3.32. The exact token pattern matters; do not "improve" it).
+_IA2V_TALKING_PROMPT_ANNOUNCER = (
+    "A vintage radio with a huge rubbery cartoon mouth is talking to the "
+    "viewer, its big grille-cloth lips opening and closing naturally in "
+    "sync with the speech, its round glass tuning-dial eyes glancing "
+    "subtly as it speaks. The radio sits still; static camera, warm "
+    "dramatic lighting.")
+#: Character-beat talking clause (appended to a COMPACT identity fragment;
+#: the 900-char M4 identity/scene wall drowned the speech tokens). Mirrors
+#: the canonical token pattern ("talking to the viewer ... opening and
+#: closing naturally in sync with the speech").
+_IA2V_TALKING_CLAUSE_CHARACTER = (
+    "is talking to the viewer, lips opening and closing naturally in sync "
+    "with the speech, subtle head and hand gestures. Static camera.")
+
+
+def _ia2v_talking_register_active(engine_id):
+    """True iff ``engine_id`` is the ltx_audio_in lane AND its active recipe
+    is the two-stage ia2v_canonical lip-sync graph (engine-owned decision --
+    the driver never parses recipe env strings). Any engine-side misconfig
+    returns False here and still fails LOUD at the engine's own gate."""
+    if str(engine_id or "") != "ltx_audio_in":
+        return False
+    try:
+        from .eng_ltx_av import LtxAudioInEngine
+        return bool(LtxAudioInEngine().wants_talking_prompt())
+    except Exception as exc:  # noqa: BLE001
+        # LOUD (kibitz r2): never silently fall back to the console register
+        # on a misconfig -- the engine's own gate still hard-fails the render,
+        # but the prompt-routing decision must be debuggable from the log.
+        _LOG.warning(
+            "[OTR.render_driver] IA2V talking-register probe failed (%s) -- "
+            "console register kept; the engine gate will surface the real "
+            "misconfig LOUD", exc)
+        return False
+
 
 def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     """Map an OTR shot role + beat id to a :data:`_LTX_MOTION_PROMPT_BY_ROLE`
@@ -1344,7 +1391,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # fit lever is recipe/quant, NOT resolution -- see eng_ltx_av._quant_label +
     # the per-beat PLAN log line + the bakeoff manifest), NOT a hardcoded MB here.
     if str(shot.get("engine_id") or "") == "ltx_audio_in":
-        _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", "512x288")
+        # ia2v_canonical canvas (lips-dont-talk kibitz + operator quality
+        # catch 2026-07-02): the 512x288 default was single-pass VRAM math;
+        # the two-stage recipe renders its MOTION pass at HALF canvas anyway
+        # and the canonical-native 1280x720 was live-proven on this box at
+        # 376 frames (P6/P7). 512x288 upscaled ~2.9x to the deliverable was
+        # the "really low quality" the operator flagged. Single-pass recipes
+        # keep the proven 512x288. Env-overridable either way.
+        _av_default = ("1280x720"
+                       if _ia2v_talking_register_active("ltx_audio_in")
+                       else "512x288")
+        _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", _av_default)
         try:
             _avw, _avh = (int(x) for x in _avc.lower().split("x", 1))
         except (ValueError, AttributeError):
@@ -1361,6 +1418,26 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     creative = shot.get("creative") or {}
     text_prompt = str(creative.get("text_prompt") or "")
     _fam = engine_family(str(shot.get("engine_id") or ""), "")
+    # ia2v TALKING register decision, computed ONCE per shot (kibitz r2: the
+    # helper instantiates an engine to ask the recipe -- cheap today, but
+    # three call sites x every shot invites a regression if the ctor ever
+    # grows weight; memoize the bool here and reuse it below).
+    _talking_register = _ia2v_talking_register_active(shot.get("engine_id"))
+    # ia2v TALKING register, ANNOUNCER precedence (kibitz r2 must-fix): an
+    # announcer bookend that happens to carry an M4 creative prompt would
+    # otherwise take the M4 branch below and the talking swap in the motion
+    # branch would never fire. Under the two-stage lip-sync recipe the
+    # talking register OUTRANKS M4 on announcer bookends -- clearing the
+    # text here routes the shot into the motion branch, whose announcer key
+    # swaps to _IA2V_TALKING_PROMPT_ANNOUNCER. Music bookends and every
+    # other engine keep M4 precedence untouched.
+    if (text_prompt and _shot_role == "announcer_visual"
+            and _talking_register):
+        _LOG.warning(
+            "[OTR.render_driver] IA2V TALKING register: announcer bookend %s "
+            "M4 prompt OUTRANKED by the lip-sync register (M4 kept for "
+            "non-ia2v engines)", shot.get("shot_id"))
+        text_prompt = ""
     # ROLE-driven (2026-06-26): the shared classifier also catches ltx_audio_in
     # CHARACTER beats (audio_conditioned_video family), so the gear scrub + the
     # char-fallback prompt + the scene-prompt EXCLUSION all apply to them exactly
@@ -1387,7 +1464,37 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # non-open person beats (announcer/music opens are radio-set objects, no
         # person). The dominant lever is OTR_LTX_I2V_STRENGTH (0.75 -> ~0.85);
         # this clause is the cheap, low-risk insurance alongside it.
-        if (str(shot.get("engine_id") or "").startswith("ltx")
+        # ia2v TALKING register (lips-dont-talk fix, 2026-07-02): a CHARACTER
+        # face beat on the two-stage recipe gets a COMPACT talking-forward
+        # prompt -- the ~900-char M4 identity/scene wall drowned the speech
+        # tokens (probe P4: scene-register prompts collapse articulation and
+        # can hallucinate on-video title text). Keep a short identity
+        # fragment (the M4's own opening clause), lead the motion with the
+        # talking clause, hard-cap at the proven 240-char budget. Every
+        # other engine (HuMo, wan, ltx_video) keeps the full M4 verbatim.
+        if _is_char_face_beat and _talking_register:
+            # fragment = the M4's first sentence; else last full CLAUSE under
+            # 120 chars (kibitz r2: comma-heavy identity openings have no
+            # period -- never hard-cut mid-word). Total is bounded by
+            # construction: 120 + 2 + len(clause)=114 = 236 <= the 240 budget
+            # (the old over-budget trimmer was dead code, removed).
+            _frag = text_prompt[:120]
+            if "." in _frag:
+                _frag = _frag.rsplit(".", 1)[0]
+            elif "," in _frag and len(text_prompt) > 120:
+                _frag = _frag.rsplit(",", 1)[0]
+            # r3 guard: a degenerate fragment (e.g. a lone separator) must
+            # never yield a leading-period prompt. The clause begins with
+            # "is talking..." so the fragment flows into it grammatically
+            # ("...Lead Astronomer is talking to the viewer, ...").
+            _frag = _frag.strip(" ,.") or "a person"
+            _talk = "%s %s" % (_frag, _IA2V_TALKING_CLAUSE_CHARACTER)
+            text_prompt = _talk
+            _LOG.warning(
+                "[OTR.render_driver] IA2V TALKING register: character beat "
+                "%s M4 wall -> compact talking prompt (%d chars)",
+                _beat_id_for_shot(shot), len(text_prompt))
+        elif (str(shot.get("engine_id") or "").startswith("ltx")
                 and _shot_role not in ("announcer_visual", "music_visual")):
             text_prompt = (text_prompt.rstrip().rstrip(",")
                            + ", stable centered subject, full face clearly "
@@ -1411,9 +1518,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "creative prompt (ShotLock seam gap) -- rendering on the "
                 "gear-free character fallback prompt (LOUD)",
                 _beat_id_for_shot(shot))
-            req["text_prompt"] = _CHAR_FACE_FALLBACK_PROMPT
-            _stamp_prompt_meta(req, "default_scrubbed",
-                               _CHAR_FACE_FALLBACK_PROMPT,
+            _cf_fallback = _CHAR_FACE_FALLBACK_PROMPT
+            if _talking_register:
+                # kibitz r3 must-fix: under the ia2v lip-sync recipe the
+                # scene-register fallback is exactly the prompt class probe
+                # P4 proved collapses articulation -- the seam-gap fallback
+                # must talk too.
+                _cf_fallback = ("close-up cinematic portrait of a person "
+                                "who %s" % _IA2V_TALKING_CLAUSE_CHARACTER)
+            req["text_prompt"] = _cf_fallback
+            _stamp_prompt_meta(req, "default_scrubbed", _cf_fallback,
                                beat=_beat_id_for_shot(shot))
         else:
             _stamp_prompt_meta(req, "default", req.get("text_prompt", ""),
@@ -1466,18 +1580,43 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _shot_role, shot.get("shot_id"), _is_synthetic_open)
             scene_prompt = (_LTX_MOTION_PROMPT_BY_ROLE.get(_motion_key)
                             or _LTX_MOTION_PROMPT_BY_ROLE["announcer"])
+            # ia2v TALKING register (lips-dont-talk fix, 2026-07-02): under
+            # the canonical two-stage recipe the ANNOUNCER bookend narrates
+            # TALKING so the audio conditioning has something to drive; the
+            # music bookends keep the console-motion register (P2: music
+            # cannot drive lips). Single-pass recipes byte-unchanged.
+            _talking_swap = (_motion_key == "announcer" and _talking_register)
+            if _talking_swap:
+                scene_prompt = _IA2V_TALKING_PROMPT_ANNOUNCER
+                _LOG.warning(
+                    "[OTR.render_driver] IA2V TALKING register: announcer "
+                    "bookend %s prompt swapped to the lip-sync register",
+                    shot.get("shot_id"))
             _meta = (ledger or {}).get("meta") or {}
             _terms = (_meta.get("story_brief_terms")
                       if isinstance(_meta, dict) else None) or {}
             _atmo = ", ".join([str(t).strip() for t in
                                (_terms.get("atmosphere") or [])
                                if str(t).strip()][:1])
-            if (_atmo and len(scene_prompt) + len(_atmo) + 7
+            # kibitz r2: the talking register stays PURE -- no atmosphere
+            # fragment rides the lip-sync prompt (mood tokens dilute the
+            # speech narration the recipe follows).
+            if (_atmo and not _talking_swap
+                    and len(scene_prompt) + len(_atmo) + 7
                     <= _LTX_MOTION_PROMPT_MAX):
                 scene_prompt = f"{scene_prompt} {_atmo} mood."
+            # kibitz r3 must-fix: the opt-in motion-clause override must NOT
+            # clobber the lip-sync register (same guard as the atmosphere
+            # append) -- an _otr_motion_clause entry on an announcer bookend
+            # would silently revert it to a non-talking prompt.
             _mc_override = _motion_clause_override(shot)
-            if _mc_override:
+            if _mc_override and not _talking_swap:
                 scene_prompt = _mc_override
+            elif _mc_override and _talking_swap:
+                _LOG.warning(
+                    "[OTR.render_driver] IA2V TALKING register: motion-clause "
+                    "override on announcer bookend %s IGNORED (lip-sync "
+                    "register outranks it)", shot.get("shot_id"))
             _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
                          "centric prompt (role=%s, %d chars): %.90s...",
                          _shot_role, shot.get("shot_id"), _motion_key,

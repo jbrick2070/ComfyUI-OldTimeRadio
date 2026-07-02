@@ -6,6 +6,40 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 (afternoon) -- LIPS-DONT-TALK kibitz: root causes probed, TALKING prompt register shipped; length dilution = the residual
+Did: operator sound-on verdict on the transplant proof ("lips don't talk") -> /kibitz
+(kibitz-runs/2026-07-02-lips-dont-talk/, r1-r3 run, panel = codex+antigravity+claude-code w/ my
+anchors) + a 6-probe empirical matrix on the WORKING canonical harness (one variable per run,
+scripts/_otr_canonical_ia2v_smoke.py env knobs): P1 production canvas 512x288 = TALKS (resolution
+EXONERATED); P2 music-only audio = DEAD 0.59 (LTX cannot lip-sync music -- operator's hunch
+confirmed; music bookends keep console-motion BY DESIGN); P3 241f@25fps = 2.37 (length halves
+motion); P4 production scene prompt = DEAD 1.18 + hallucinated on-video title text (THE KILLER);
+P5 misfired (face-forward still, hypothesis open); P6 376f = (this session's last probe).
+**SHIPPED: the IA2V TALKING prompt register** (render_driver + eng_ltx_av hook): announcer bookends
+swap to a canonical-register lip-sync prompt (M4 OUTRANKED on announcer under ia2v only;
+motion-clause override + atmosphere append guarded off; music register untouched per P2);
+char-face beats get a compact talking prompt (M4 first-clause fragment + talking clause, <=236
+chars; seam-gap no-M4 fallback talks too); engine hook wants_talking_prompt() raises-loud,
+driver catches once + memoizes per shot. 10 register tests + 2 legacy tests pinned to
+distilled_native; suite 5990/0 x2 (on the combined tree with cloud-S0 chunks), Bug Bible 16/0.
+**Live retest "Dialing Disaster" (proof4): PASS wiring** (6/6 ltx clips, 4 register swaps fired,
+obs verified) but motion still soft (0.99-1.45) -> probes CONTINUED and killed every parametric
+suspect: P6 (376f/15s, canonical rest) = 3.05 TALKS; P7 (512x288 + 376f COMBINED) = 3.32 TALKS.
+**The remaining production deltas were OURS, both fixed same chunk:** (1) P8 -- my PARAPHRASED
+register wording scored HALF the canonical's (1.72 vs 3.32, identical params) -> the announcer
+register is now the canonical text VERBATIM + the char clause mirrors its token pattern ("do not
+'improve' the wording" locked in a comment); (2) the engine's guide-image chain scaled 1.5x the
+RENDER canvas (at 512x288 -> a 768x432 guide UPSCALED to 1536 = soft double-resampled mouth prior;
+every probe passed because the harness kept the canonical FIXED 1920x1088) -> guide chain now
+canvas-INDEPENDENT (1920x1088 -> longer-edge 1536, verbatim). PLUS the operator quality catch
+(side-by-side docs/2026-07-02-canonical-ia2v/side_by_side_prod_vs_canonical.mp4): ia2v AV canvas
+default raised 512x288 -> 1280x720 (canonical-native; P6/P7 live-proven at 376f on this box;
+single-pass recipes keep 512x288; env-overridable). Legacy canvas-clamp + announcer-prompt tests
+pinned to distilled_native. Ops notes: the window handover killed proof3 mid-render (5 orphan
+pending_* dirs); a PS `-Encoding UTF8` rewrite BOM-stamped a test file (caught by the AST-scan
+test; stripped -- use [IO.File]::WriteAllText w/ UTF8Encoding($false), never Set-Content UTF8).
+Proof5 (all three fixes, 720p) rendering at handoff -- timing stats + NVML peak land in the log.
+
 ## 2026-07-02 (day) -- CANONICAL IA2V TRANSPLANT SHIPPED: ltx_audio_in lip-syncs on ia2v_canonical (new dev default)
 Did: operator reviewed the overnight NO-GO evidence + ordered the canonical arbiter: downloaded the
 comfy.org "LTX-2.3: Image Audio to Video" workflow, SMOKED IT IN ISOLATION on our box (flattened its

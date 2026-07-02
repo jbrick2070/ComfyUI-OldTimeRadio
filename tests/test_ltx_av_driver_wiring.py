@@ -51,6 +51,12 @@ def _shot(engine_id, role, **over):
 
 @pytest.mark.parametrize("engine", ["ltx_audio_in"])
 def test_render_canvas_clamped_to_m0_safe(engine, monkeypatch):
+    # 512x288 is the SINGLE-PASS M0-safe clamp; the ia2v_canonical default is
+    # the canonical-native 1280x720 (locked in test_ltx_av_ia2v_canonical.py).
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
     role = "music_visual"
     req = rd.build_request_from_shot(_shot(engine, role), _ledger())
