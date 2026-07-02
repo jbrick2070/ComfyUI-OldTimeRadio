@@ -6,6 +6,31 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 (day) -- CANONICAL IA2V TRANSPLANT SHIPPED: ltx_audio_in lip-syncs on ia2v_canonical (new dev default)
+Did: operator reviewed the overnight NO-GO evidence + ordered the canonical arbiter: downloaded the
+comfy.org "LTX-2.3: Image Audio to Video" workflow, SMOKED IT IN ISOLATION on our box (flattened its
+51-node subgraph to a raw API prompt; GGUF dev lane subbed for the unpublished fp8; our corrected
+appliance-mouth still + real announcer wav) -> 5s 1280x720 two-stage render in 177s with VIVID mouth
+articulation (a4bf2ba6; operator watched with sound: "perfect"). TRANSPLANTED node-for-node into
+eng_ltx_av as RECIPE_IA2V = the new DEV-family auto default (f03d2184): TWO-STAGE (motion at half
+canvas -> LTXVLatentUpsampler x2 -> audio re-concat -> 3-step 0.85->0 refine), LTXVImgToVideoInplace
+0.7/1.0 anchors, audio latent frozen under SolidMask(0), ancestral base + euler_cfg_pp refine,
+CropGuides refine-only, distilled-lora-384 @0.5 on dev (half-distilled keeps audio coupling), guide
+chain ImageScale(1.5x)->ResizeLonger(1536)->Preprocess(18); ia2v-on-distilled fails LOUD
+(double-distill); BUG-414 vae split preserved; i2v REQUIRED. 12 topology-lock tests
+(test_ltx_av_ia2v_canonical.py); suite 5934/0; Bug Bible 16/0. Smoke harness fixes (a494e336):
+prefix-resolve the decorated dropdown labels + patch the Route-A character_video_model widget (the
+saved JSON pins characters to humo_14B_169 -- first proof episode rendered 3/5 clips on HuMo until
+patched; NOT a routing bug, a 4th dropdown). LIVE PROOF PASS: "JWST's Gaze" 30w episode, histogram
+{ltx_audio_in: 6} across music/announcer/character, obs final verified, ~28.5min (vs ~27min
+old-recipe = speed wash; the win is articulation + upsampled sharpness at the same budget). Also
+answered the operator's process retro (what we missed: never smoked the vendor reference as a
+baseline; normalized the "AMBIENT" label; cut-list had no proof owner; behavioral acceptance beats
+structural). yaml: latent_upscale_models folder key added for headless boots. Weights staged:
+spatial-upscaler-x2-1.1 + distilled-lora-384 (Lightricks/LTX-2.3). NEXT (operator): watch
+proof_jwsts_gaze_ia2v.mp4 with sound; batch_face0_02 was skipped (GPU handover); consider a fresh
+120w overnight batch on the new recipe + retiring the OTR_LTX_RADIO_FACE A/B into default-on.
+
 ## 2026-07-02 -- talking-radio Sub-plan C: probe RAN, criterion says NO-GO on lip-sync; BUG-415 fixed; overnight batch running
 Did: ran the Sub-plan-C matched probe pair live (driver `scripts/_otr_talking_radio_night.py`,
 local per the `scripts/_*.py` ignore convention; durable evaluator
