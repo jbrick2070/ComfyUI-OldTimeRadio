@@ -251,7 +251,25 @@ buildable after S1+S3 with ONE new adapter:
   Wow-factor rationale: mesh = same object from every angle -> beat-to-
   beat identity locked (pure I2V drifts); true 3D parallax beats
   still_kenburns. Build cost = one 3D-gen adapter; everything else is
-  S1/S3 machinery. Rig/animate (Meshy) stays future-lane. B: Surface B (Comfy Cloud workflow) research flag
+  S1/S3 machinery. Rig/animate (Meshy) stays future-lane.
+
+  CHARACTER-BEAT VARIANT (operator, 2026-07-02): for character beats,
+  3D-render the ACTUAL CHARACTER, not the radio prop -- same chain with
+  the character portrait as the hero still. HARD PREREQUISITE: stills
+  must be MINTED 3D-READY -- image-to-3D quality is bounded by the
+  input still. S1 therefore gains a `portrait_mint_3d` prompt profile
+  in the existing character_description -> finish_visual_prompt chain,
+  applied when a beat is flagged for 3D: subject FULLY in frame
+  (bust/full-body), front or 3/4 neutral pose, clean separable
+  backdrop, even lighting, no occlusion/crop. Mint acceptance check
+  runs BEFORE any mesh credits are spent (fail-closed: un-mintable
+  still = stay 2D for that beat, LOUD ledger note). Enablers already in
+  catalog: Recraft remove/replace-background (clean silhouette) and the
+  single-image -> orthographic-multiview -> Tripo/Hunyuan multiview
+  pattern (proven in the comfy.org template catalog) for solid
+  character meshes from ONE minted still. Character meshes are the
+  strongest beat-to-beat identity lock in the whole plan; kling_lipsync
+  overlay supplies the mouth on the 3D-rendered face, rig-free. B: Surface B (Comfy Cloud workflow) research flag
 (`OTR_ENABLE_COMFY_CLOUD_WORKFLOWS=1` + recorded headless lifecycle
 smoke artifact required before any row registers; restores ace_step +
 chatterbox voice-continuity rows -- the third-row-per-lane path).
