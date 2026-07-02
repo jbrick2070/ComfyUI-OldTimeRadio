@@ -148,6 +148,138 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
 
 
 # --------------------------------------------------------------------------- #
+# Talking-radio kibitz r1 (Sub-plan B): the LTX-ONLY mouth-forward style
+# (style="ltx_radio_mouth") -- used ONLY by the OTR_LTX_RADIO_FACE still mint
+# (the init stills the EXISTING ltx_audio_in engine receives; no new video
+# model / path). The HuMo console_face / radio_head_person looks must stay
+# BYTE-UNCHANGED (goldens below, captured pre-split @ 5cce9c2).
+# --------------------------------------------------------------------------- #
+def test_ltx_radio_mouth_leads_with_prominent_mouth():
+    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="ltx_radio_mouth")
+    # explicit MOUTH token (contract acceptance), grille-mouth phrasing intact
+    assert "rubbery mouth" in p and "speaker grille" in p
+    assert "anthropomorphic radio" in p
+    # mouth-forward: the mouth clause precedes the eyes clause (FLUX weights
+    # earlier tokens more heavily)
+    assert p.index("mouth") < p.index("eyes")
+    # brief-driven form noun survives
+    assert "space-station communications console" in p
+    # a pure radio face: no human presenter in the positive prompt
+    assert "human" not in p and "person" not in p and "presenter" not in p
+
+
+def test_ltx_radio_mouth_negative_is_console_no_human():
+    # the mouth radio is a pure radio -> shares RADIO_CONSOLE_NEG (humans OUT;
+    # no baby line needed -- no person in frame)
+    assert mbp.radio_host_negative("ltx_radio_mouth") == mbp.RADIO_CONSOLE_NEG
+
+
+def test_ltx_radio_mouth_overtness_is_brief_driven():
+    overt = mbp.build_radio_host_prompt(_SPACE_META, style="ltx_radio_mouth")
+    subtle = mbp.build_radio_host_prompt(
+        {"story_brief_terms": {"setting": ["a quiet village kitchen"]}},
+        style="ltx_radio_mouth")
+    assert "cartoon" in overt
+    assert "subtle" in subtle and "cartoon" not in subtle
+
+
+#: GOLDENS captured from the PRE-split tree (HEAD 5cce9c2, 2026-07-02) via a
+#: live venv run of build_radio_host_prompt. These pin the HuMo host looks
+#: byte-for-byte: the ltx_radio_mouth split must NEVER drift them. Update ONLY
+#: on a deliberate, operator-approved HuMo look change.
+_GOLDEN_CONSOLE_PORTRAIT = (
+    "a sleek space-station communications console, its glowing tuning dial "
+    "forming an expressive stylized face -- two round dial-eyes and a "
+    "radiating needle-fan mouth, an anthropomorphic radio that hosts the "
+    "broadcast, bold playful cartoon expression, clearly a face, in-character "
+    "cinematic three-quarter portrait, full head and face clearly visible "
+    "with natural headroom above the head (never crop the top of the head), "
+    "period-accurate costume and environment, dramatic film lighting, cold "
+    "blue panel glow, cinematic, 35mm film look, subtle film grain, "
+    "volumetric lighting, anamorphic lens, heavy vignette, muted color "
+    "grade, sharp focus")
+_GOLDEN_CONSOLE_WIDE = (
+    "a sleek space-station communications console, its glowing tuning dial "
+    "forming an expressive stylized face -- two round dial-eyes and a "
+    "radiating needle-fan mouth, an anthropomorphic radio that hosts the "
+    "broadcast, bold playful cartoon expression, clearly a face, in-character "
+    "cinematic medium shot, head and shoulders, face clearly visible, "
+    "subject centred with natural headroom above the head (never crop the "
+    "top of the head), period-accurate costume and environment, dramatic "
+    "film lighting, cold blue panel glow, cinematic, 35mm film look, subtle "
+    "film grain, volumetric lighting, anamorphic lens, heavy vignette, muted "
+    "color grade, sharp focus")
+_GOLDEN_HEAD_PORTRAIT = (
+    "a radio-head presenter: a period-dressed figure seated at a vintage "
+    "microphone whose HEAD IS a sleek space-station communications console, "
+    "the glowing dial and speaker grille forming the expressive animatable "
+    "face (dial eyes, a moving needle mouth), bold playful cartoon "
+    "expression, clearly a face, in-character cinematic three-quarter "
+    "portrait, full head and face clearly visible with natural headroom "
+    "above the head (never crop the top of the head), period-accurate "
+    "costume and environment, dramatic film lighting, cold blue panel glow, "
+    "cinematic, 35mm film look, subtle film grain, volumetric lighting, "
+    "anamorphic lens, heavy vignette, muted color grade, sharp focus")
+_GOLDEN_HEAD_WIDE = (
+    "a radio-head presenter: a period-dressed figure seated at a vintage "
+    "microphone whose HEAD IS a sleek space-station communications console, "
+    "the glowing dial and speaker grille forming the expressive animatable "
+    "face (dial eyes, a moving needle mouth), bold playful cartoon "
+    "expression, clearly a face, in-character cinematic medium shot, head "
+    "and shoulders, face clearly visible, subject centred with natural "
+    "headroom above the head (never crop the top of the head), "
+    "period-accurate costume and environment, dramatic film lighting, cold "
+    "blue panel glow, cinematic, 35mm film look, subtle film grain, "
+    "volumetric lighting, anamorphic lens, heavy vignette, muted color "
+    "grade, sharp focus")
+_GOLDEN_BARE_CONSOLE_PORTRAIT = (
+    "a vintage tabletop tube radio receiver, its glowing tuning dial forming "
+    "an expressive stylized face -- two round dial-eyes and a radiating "
+    "needle-fan mouth, an anthropomorphic radio that hosts the broadcast, "
+    "subtle period-authentic dial-face, in-character cinematic three-quarter "
+    "portrait, full head and face clearly visible with natural headroom "
+    "above the head (never crop the top of the head), period-accurate "
+    "costume and environment, dramatic film lighting, timeless cinematic "
+    "aesthetic, cinematic, 35mm film look, subtle film grain, volumetric "
+    "lighting, anamorphic lens, heavy vignette, muted color grade, sharp "
+    "focus")
+
+
+def test_humo_console_face_prompts_byte_unchanged():
+    assert mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "console_face") == _GOLDEN_CONSOLE_PORTRAIT
+    assert mbp.build_radio_host_prompt(
+        _SPACE_META, "wide", "console_face") == _GOLDEN_CONSOLE_WIDE
+    assert mbp.build_radio_host_prompt(
+        {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
+
+
+def test_humo_radio_head_person_prompts_byte_unchanged():
+    assert mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "radio_head_person") == _GOLDEN_HEAD_PORTRAIT
+    assert mbp.build_radio_host_prompt(
+        _SPACE_META, "wide", "radio_head_person") == _GOLDEN_HEAD_WIDE
+
+
+def test_mint_split_ltx_mouth_humo_untouched(monkeypatch):
+    # BOTH toggles on at MINT time (precedence is a render_driver concern):
+    # the ltx radio-face stills carry the mouth style; the HuMo radio_host
+    # portrait and the announcer portrait row do NOT.
+    monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
+                                       lines=_bookend_lines())
+    objs = {o["object_id"]: o for o in out["objects"]}
+    for role in ("announcer_visual", "music_visual"):
+        assert "rubbery mouth" in objs["still_%s_radio_face_169" % role]["prompt"]
+    assert "rubbery" not in objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"]
+    assert objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"] == mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "console_face")     # the golden-pinned look
+    assert "rubbery" not in objs["announcer"]["prompt"]
+    assert "radio-head" in objs["announcer"]["prompt"]
+
+
+# --------------------------------------------------------------------------- #
 # Chunk 3: radio_host_portrait object mint (TOGGLE-GATED, seed-pinned, aspect)
 # --------------------------------------------------------------------------- #
 def _bookend_lines():

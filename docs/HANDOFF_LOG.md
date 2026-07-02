@@ -6,6 +6,24 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 -- talking-radio Sub-plan B: LTX-only mouth-forward still, SPLIT from HuMo (SHIPPED)
+Did: executed Sub-plan B of the talking-radio contract (`kibitz-runs/2026-07-01-talking-radio/r1/
+final.md`; order B->C->A). NEW style `ltx_radio_mouth` (`_RADIO_CONSOLE_MOUTH`) in
+nodes/otr_meta_brief_image_prompt.py: brief-driven form + PROMINENT rubbery grille-mouth right
+after the form noun (LTX-2.3 has no face detector -- it drives whatever reads as a mouth); used
+ONLY by the OTR_LTX_RADIO_FACE still mint, BOTH bookend roles (operator: the stills the EXISTING
+ltx_audio_in gets -- no new video model/path; supersedes the per-role HuMo-parity note). Negative =
+RADIO_CONSOLE_NEG (no human; no baby line -- no person in frame). HuMo looks UNTOUCHED
+(console_face/radio_head_person, incl. the announcer portrait row): pinned byte-for-byte by 5
+goldens captured live from the PRE-split tree @ 5cce9c2 (tests/test_brief_radio_host.py). Mint
+split test proves both toggles on => ltx stills carry the mouth, radio_host_portrait +
+announcer do NOT. test_ltx_radio_face_ab.py mint assertions deliberately updated to the mouth
+style. Default-off byte-identity untouched (flag-gated mint only). No workflow-JSON change
+(env-gated, no node/widget). Gates: suite 5922/0 (35 skip), Bug Bible 16/0, B7 in-suite green.
+NEXT = Sub-plan C: live one-beat probe (real /object_info capture, OTR_FORCE_ENGINE_MAP,
+OTR_LTX_RADIO_FACE=0/1 side-by-side, written transient-correlation criterion ->
+docs/2026-07-01-talking-radio/EYEBALL.md; GO/NO-GO operator-gated).
+
 ## 2026-07-01 -- RIP dead sfx subsystem + scene_broll/background_abstract + pooling (SHIPPED)
 Did: executed the rip contract (`kibitz-runs/2026-07-01-rip-sfx-broll/r2/final.md`; build plan
 kibitzed to convergence r3 wiring + r4 -- codex + claude-code panels, agy credit-dropped; folds in

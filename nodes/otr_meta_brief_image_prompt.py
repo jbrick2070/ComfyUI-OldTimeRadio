@@ -160,13 +160,29 @@ _RADIO_HEAD_PERSON = ("a radio-head presenter: a period-dressed figure seated at
                       "a vintage microphone whose HEAD IS %s, the glowing dial "
                       "and speaker grille forming the expressive animatable face "
                       "(dial eyes, a moving needle mouth)")
+#: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
+#: style="ltx_radio_mouth" is used ONLY by the OTR_LTX_RADIO_FACE still mint
+#: (the init stills the EXISTING ltx_audio_in bookend engine receives -- no new
+#: video model / path). NEVER used by the HuMo hosts: the console_face /
+#: radio_head_person looks above stay byte-unchanged (a mouth-tuned change
+#: could hurt HuMo face-readability -- the Codex MUST-FIX #4 split). LTX-2.3
+#: has no face/landmark detector; it drives whatever READS as a mouth, so the
+#: subject puts a PROMINENT rubbery grille-mouth right after the form noun
+#: (FLUX weights earlier tokens). Sub-plan C probes whether this actually
+#: lip-syncs; until then ltx_audio_in stays documented as AMBIENT motion.
+_RADIO_CONSOLE_MOUTH = ("%s whose wide speaker grille is a huge expressive "
+                        "rubbery mouth with full soft lips parted mid-speech, "
+                        "and whose two round tuning dials are its eyes -- a "
+                        "face-forward anthropomorphic radio, its face filling "
+                        "the frame")
 #: Brief keywords that push the face OVERT (playful cartoon) vs subtle.
 _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship",
                           "sci-fi", "science fiction", "futuristic",
                           "retro-futuristic", "atomic age", "galactic")
 #: Per-style negatives populated on the object row (schemas.py negative_prompt;
 #: NO schema change). console_face keeps humans OUT; radio_head keeps it an adult
-#: radio-head, never a baby / plain human head.
+#: radio-head, never a baby / plain human head. ltx_radio_mouth is a pure radio
+#: (no person in frame) so it SHARES RADIO_CONSOLE_NEG (no baby needed).
 RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
 RADIO_HEAD_PERSON_NEG = ("baby, infant, child, plain ordinary human head, "
                          "normal human face instead of a radio")
@@ -238,9 +254,12 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
     ``style="console_face"`` (MUSIC beats): an ANTHROPOMORPHIC RADIO CONSOLE
     (the brief-driven form) whose glowing dial forms an expressive face -- "the
     radio IS the host", no human. ``style="radio_head_person"`` (ANNOUNCER
-    beats): a period presenter whose HEAD is the radio set. Both are brief-driven
-    (:func:`radio_form_from_meta`), overtness brief-driven
-    (:func:`_radio_face_overtness`), framed for the HuMo slot's ``aspect``, era
+    beats): a period presenter whose HEAD is the radio set.
+    ``style="ltx_radio_mouth"`` (talking-radio kibitz r1): the LTX-ONLY
+    mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint -- leads
+    with the PROMINENT rubbery grille-mouth; never used by HuMo. All styles are
+    brief-driven (:func:`radio_form_from_meta`), overtness brief-driven
+    (:func:`_radio_face_overtness`), framed for the slot's ``aspect``, era
     texture via :func:`get_era_tail` (portrait profile = no palette bleed).
     Deterministic; never empty. The matching negative
     (:func:`radio_host_negative`) is populated on the object row by the caller."""
@@ -248,6 +267,8 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
     overt = _radio_face_overtness(meta)
     if style == "radio_head_person":
         subject = "%s, %s" % (_RADIO_HEAD_PERSON % form, overt)
+    elif style == "ltx_radio_mouth":
+        subject = "%s, %s" % (_RADIO_CONSOLE_MOUTH % form, overt)
     else:
         subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE, overt)
     prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
@@ -1059,11 +1080,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     if _ltx_radio_face_enabled():
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
-            # Same per-role styling as HuMo hosts (operator 2026-07-01: "same for
-            # ltx audio in"): announcer -> radio-head person, music -> console face.
-            _abstyle = ("radio_head_person" if _abrole == "announcer_visual"
-                        else "console_face")
-            _fprompt = build_radio_host_prompt(meta, "wide", style=_abstyle)
+            # Talking-radio kibitz r1 (2026-07-01, SUPERSEDES the earlier "same
+            # per-role styling as HuMo hosts" note): BOTH ltx bookend stills use
+            # the LTX-ONLY mouth-forward style. The radio IS the host for both
+            # bookend types, and ltx_audio_in (no face detector) needs the
+            # biggest, clearest mouth region to drive -- the Sub-plan-C probe
+            # lever. The HuMo console_face / radio_head_person looks themselves
+            # are byte-unchanged (the split); no new video model / path.
+            _fprompt = build_radio_host_prompt(meta, "wide",
+                                               style="ltx_radio_mouth")
             objects.append({
                 "object_id": _ltx_radio_face_object_id(_abrole),
                 "kind": "portrait",
@@ -1071,7 +1096,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "w": _fw, "h": _fh,
                 "prompt": _fprompt,
                 "prompt_hash": _content_hash(_fprompt),
-                "negative_prompt": radio_host_negative(_abstyle),
+                "negative_prompt": radio_host_negative("ltx_radio_mouth"),
                 "source": "ltx_radio_face",
             })
 

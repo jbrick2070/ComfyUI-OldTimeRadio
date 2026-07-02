@@ -59,12 +59,16 @@ def test_radio_face_stills_minted_wide_when_toggle_on(monkeypatch):
         assert o["kind"] == "portrait" and o["role"] == role
         assert o["w"] > o["h"], "must be WIDE (never a portrait -> pillarbox)"
         assert "space-station communications console" in o["prompt"]
-    # per-role styling matches the HuMo hosts: announcer=radio-head person,
-    # music=anthropomorphic console face (operator 2026-07-01 "same for ltx").
-    assert "radio-head" in objs["still_announcer_visual_radio_face_169"]["prompt"]
-    assert "baby" in objs["still_announcer_visual_radio_face_169"]["negative_prompt"]
-    assert "dial" in objs["still_music_visual_radio_face_169"]["prompt"]
-    assert "human" in objs["still_music_visual_radio_face_169"]["negative_prompt"]
+    # LTX-ONLY mouth-forward styling (talking-radio kibitz r1, SUPERSEDES the
+    # earlier per-role HuMo parity): BOTH bookend stills lead with the rubbery
+    # grille-mouth -- the radio IS the host -- and keep humans OUT
+    # (RADIO_CONSOLE_NEG; no baby line needed, no person in frame).
+    for role in ("announcer_visual", "music_visual"):
+        o = objs["still_%s_radio_face_169" % role]
+        assert "rubbery mouth" in o["prompt"]
+        assert "speaker grille" in o["prompt"]
+        assert "human" in o["negative_prompt"]
+        assert "baby" not in o["negative_prompt"]
 
 
 def test_radio_face_still_seed_is_pinned():
