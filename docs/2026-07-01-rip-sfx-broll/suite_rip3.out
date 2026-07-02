@@ -1,4 +1,4 @@
-﻿python.exe : [OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
+python.exe : [OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
 At line:1 char:114
 + ... 8 -Value 1; & 'C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python. ...
 +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
