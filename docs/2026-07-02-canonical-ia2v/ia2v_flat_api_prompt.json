@@ -158,7 +158,7 @@
     "318",
     0
    ],
-   "text": "A vintage radio with a huge rubbery cartoon mouth is talking to the viewer, its big grille-cloth lips opening and closing naturally in sync with the speech, its round glass tuning-dial eyes glancing subtly as it speaks. The radio sits still; static camera, warm dramatic lighting."
+   "text": "The radio is talking: its big rubbery lips open and close naturally in sync with the announcer's voice, its dial eyes glance subtly as it speaks. Static camera, the radio stays in place."
   }
  },
  "307": {
@@ -172,7 +172,7 @@
     "314",
     0
    ],
-   "frame_rate": 24
+   "frame_rate": 25
   }
  },
  "308": {
@@ -291,8 +291,8 @@
  "333": {
   "class_type": "SolidMask",
   "inputs": {
-   "width": 1280,
-   "height": 720,
+   "width": 512,
+   "height": 288,
    "value": 0
   }
  },
@@ -327,15 +327,15 @@
     "303",
     0
    ],
-   "fps": 24
+   "fps": 25
   }
  },
  "302": {
   "class_type": "EmptyLTXVLatentVideo",
   "inputs": {
-   "width": 640,
-   "height": 360,
-   "length": 121,
+   "width": 256,
+   "height": 144,
+   "length": 376,
    "batch_size": 1
   }
  },
@@ -346,7 +346,7 @@
     "9002",
     0
    ],
-   "duration": 5.0,
+   "duration": 15.0,
    "start_index": 0
   }
  },
