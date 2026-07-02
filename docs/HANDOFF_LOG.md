@@ -6,6 +6,31 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 (late afternoon) -- cloud-S0 REMAINDER SHIPPED: invoke_partner_node bridge + watchdog + gated smokes
+Did (baton from the cloud-engines window, per pass04 sec 3): **nodes/_otr_shared/cloud_media_invoke.py**
+(f9eed360) -- `invoke_partner_node(node_key, inputs, *, timeout_s, estimated_usd=0.0) -> PartnerResult`.
+Backend-owned asyncio loop thread (one daemon for all partner calls); session resolved INTERNALLY
+from the prompt context (comfy_execution.utils.get_executing_context -> .prompt_id at utils.py:18;
+`bind_prompt_id()` contextvar for headless smokes/tests -- never a parameter); pinned partner class
+imported straight off the row's import_path (no NODE_CLASS_MAPPINGS dependency); hidden auth
+injected per row + auth.kind (api_key_comfy_org vs auth_token_comfy_org; caller keys never
+overridden); watchdog loop ticks 5s, checks comfy interrupt (cancel -> INTERRUPTED) and emits a
+ProgressBar heartbeat every 20s (<=30s requirement); outputs normalized to a STREAMED temp file
+under session cache_root/partner_tmp (URL download chunked; save_to objects; audio dicts via
+soundfile -- torchaudio save is torchcodec-broken; image tensors via PIL) -> validate_partner_result.
+Honest budget settlement: provider-said-no codes RELEASE, ambiguous (TIMEOUT/INTERRUPTED/
+CORRUPT_OUTPUT) BILL the estimate; ledger_append on both paths. 23 offline tests
+(tests/test_cloud_media_invoke.py -- gate, auth injection, interrupt/timeout/heartbeat via seams,
+settlement, normalization, real yaml pin-table shape). **Live smokes built + gated**
+(scripts/otr_cloud_s0_smoke.py, exit 3 until operator sets OTR_RUN_CLOUD_SMOKE=1 +
+OTR_ENABLE_COMFY_CLOUD_MEDIA=1 + OTR_CLOUD_MEDIA_BUDGET_USD + OTR_COMFY_API_KEY): leg1 = recraft
+cheap-still auth proof; leg2 = kling avatar CONDITIONED by tests/fixtures/baseline_v1.5.wav (the
+whole-point proof). Suite 6015/0 + Bug Bible 16/0; pushed f9eed360 + c9b7fe7d, HEAD==origin, no
+BOM, AST clean. Proof #7 (ia2v 832x480 + warm still + talking register; prompt 4d4bade1, episode
+signal_lost_lab_race_against_time_20260702_150943) was mid-video-phase at entry write -- scoring
+lands in the next entry. Gotcha: the full suite POLLUTES repo-root otr_runtime.log while a render
+is in flight (same box, same file) -- read timestamps before declaring a server stalled.
+
 ## 2026-07-02 (afternoon) -- LIPS-DONT-TALK kibitz: root causes probed, TALKING prompt register shipped; length dilution = the residual
 Did: operator sound-on verdict on the transplant proof ("lips don't talk") -> /kibitz
 (kibitz-runs/2026-07-02-lips-dont-talk/, r1-r3 run, panel = codex+antigravity+claude-code w/ my
