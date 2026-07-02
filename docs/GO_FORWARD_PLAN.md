@@ -27,15 +27,21 @@ S0 PROGRESS (2026-07-02): chunks 1-3 SHIPPED + PUSHED, suite 5988/0 + Bug Bible 
   (`C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI`, override `OTR_COMFY_CORE_ROOT`); all async
   EXECUTE_NORMALIZED_ASYNC, all expose both auth hidden inputs; drift test = SUBPROCESS `--check`
   (in-process comfy import corrupts pytest teardown -- do not inline it) + 6 tests.
-S0 REMAINING: `invoke_partner_node` async bridge (backend-owned event loop, timeout, streaming
-download -> PartnerResult, watchdog heartbeat vs the executor progress/interrupt API = verify #9)
-+ smoke harness #1 (headless auth, cheap image node) + #2 (Kling audio-conditioning w/ checked-in
-WAV fixture) behind `OTR_RUN_CLOUD_SMOKE=1`. Operator prereqs before smokes: logged-in Comfy OR
-`OTR_COMFY_API_KEY`; `OTR_CLOUD_MEDIA_BUDGET_USD`; `OTR_ENABLE_COMFY_CLOUD_MEDIA=1`. NO existing
-render-path changes in S0; workflow JSON untouched until S4 (operator-gated).
+- c4 @ f9eed360 `nodes/_otr_shared/cloud_media_invoke.py` -- `invoke_partner_node(node_key,
+  inputs, *, timeout_s, estimated_usd) -> PartnerResult` (backend-owned loop thread; session from
+  prompt context / `bind_prompt_id()` headless; hidden-auth per row; 5s-tick watchdog w/ interrupt
+  cancel + 20s ProgressBar heartbeat; streamed temp downloads; release-vs-bill settlement) + 23
+  tests + GATED smoke harness `scripts/otr_cloud_s0_smoke.py` (leg1 recraft auth proof, leg2 Kling
+  avatar conditioned by `tests/fixtures/baseline_v1.5.wav`).
+S0 REMAINING: ONLY the live smoke RUNS -- operator must set `OTR_RUN_CLOUD_SMOKE=1`,
+`OTR_ENABLE_COMFY_CLOUD_MEDIA=1`, `OTR_CLOUD_MEDIA_BUDGET_USD`, and logged-in Comfy OR
+`OTR_COMFY_API_KEY` (all unset as of 2026-07-02 pm), then
+`python scripts/otr_cloud_s0_smoke.py --leg 1` / `--leg 2`. NO existing render-path changes in S0;
+workflow JSON untouched until S4 (operator-gated). NEXT CODE = S1 (stills lane: canonicalize_image
++ recraft/flux/nano adapters + portrait-mint gates).
 
-**CODE BATON 2026-07-02 (later):** the LTX-fixes coder window holds the code. Cloud S0 remainder
-queues behind it. QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
+**CODE BATON 2026-07-02 (later):** back with the LTX-fixes window; cloud S0 remainder BUILT there
+(c4 above). QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
 Tin-Toy Theatre -- plan `docs/2026-07-02-creative-formats/CREATIVE_FORMATS_PLAN.md`
 (kibitz-hardened; ideation record in docs/2026-07-02-cloud-engines/roundtable/ideas_synthesis.md).
 
