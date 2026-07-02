@@ -30,6 +30,18 @@ def test_mesh_fodder_roles_from_video_policy():
     assert "announcer_visual" not in roles
 
 
+def test_mesh_fodder_roles_honor_force_engine_map(monkeypatch):
+    # OTR_FORCE_ENGINE_MAP=*=mesh_stage forces mesh video at render time; the
+    # image phase must ALSO see it and fork fodder, else b000 FamilyInputGaps.
+    vp = {"video_models": {"other_beats_video_model": {"engine_id": "ltx_video"},
+                           "announcer_video_model": {"engine_id": "ltx_video"}}}
+    assert idir.mesh_fodder_roles_from_video_policy(vp) == []   # no force -> none
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=mesh_stage")
+    roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
+    assert "announcer_visual" in roles and "music_visual" in roles
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+
+
 def test_mesh_fodder_roles_empty_when_no_3d():
     vp = {"video_models": {"other_beats_video_model": {"engine_id": "ltx_video"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp) == []
