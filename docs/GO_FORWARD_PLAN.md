@@ -12,6 +12,19 @@
 
 ## 1. CURRENT STEP
 
+**CLOUD ENGINE LANES S0 (ACTIVE CODING WINDOW, operator "build" 2026-07-02).** Build doc =
+`docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md` @ 29b11e77 (4-round roundtable converged
++ operator amendment: audio reactivity DEFAULT-ON all video roles, mute = audited opt-down).
+S0 = control plane: `nodes/_otr_shared/cloud_media_backend.py` (session table / auth broker /
+budget state machine / error codes / rate limits) + billing cache + ledger + canonicalizer skeleton
++ `partner_nodes.yaml` pinning + live smokes #1/#2 behind `OTR_RUN_CLOUD_SMOKE=1` (operator-gated:
+needs logged-in Comfy or `OTR_COMFY_API_KEY` + `OTR_CLOUD_MEDIA_BUDGET_USD`). NO changes to
+existing render paths in S0; workflow JSON untouched until S4 (operator-gated). One coder window:
+THIS one, until S0 lands or hands off here.
+
+**Previously current (unchanged, operator-gated, NOT code):** All-engines x all-slots soak RUN +
+talking-radio (C) morning-eyeball GO/NO-GO -- see below.
+
 **All-engines x all-slots: CODE SHIPPED (slot-audit C0-C5) -- remaining = the live-GPU soak RUN.**
 Boot headless ComfyUI, load `otr_scifi_16gb_full.json`, apply the all-role profile
 (`slot_matrix.build_all_role_profile` -- 3 roles post rip-sfx-broll), render a leg per engine, run
