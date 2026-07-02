@@ -25,10 +25,12 @@ ACCEPTED (all folded into pass04_plan.md):
 - Per-row VIDEO DESCRIPTOR TABLE incl. must_strip_audio=True everywhere
   + fallback chains (GPT#6); reactivity gate location + exception
   concretized in OTR_ShotLock.validate (DS#3).
-- Reactivity goal NARROWED explicitly (talking enforced; music/b-roll
-  mute-allowed, operator-flippable via profile) (GPT#7; judge call
-  recorded -- operator may upgrade music_visual later at zero code
-  cost). optional_audio_ref CUT (GPT CUT-1).
+- Reactivity: GPT#7 offered enforce-everywhere vs narrow-the-goal; the
+  judge initially narrowed. OPERATOR DIRECTIVE (2026-07-02, post-
+  convergence) REVERSED it: reactivity is DEFAULT-ON for ALL video
+  roles; mute is an explicit audited opt-down (OTR_VIDEO_MUTE_OK_ROLES,
+  default empty; ledger stamps MUTE_OPT_DOWN). pass04_plan amended in
+  place. optional_audio_ref stays CUT (GPT CUT-1).
 - Both-flag-state tests w/ process isolation (GPT#9 + anchor#2).
 - CAPABILITIES concrete values + vram_class label deferred to consumer
   check (GPT#10; verify #13 -- neither "cloud" nor "cpu" is a verified

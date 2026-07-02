@@ -5,11 +5,13 @@ GOAL (amended, explicit): per modality 1 CHEAP + 1-2 BEST cloud rows
 (voice + music ship 1+1 on Surface A today -- ElevenLabs is the only
 partner TTS provider and Sonilo/Stability the music pair; third rows
 return via Appendix B when the Comfy-Cloud-workflow surface is proven).
-AUDIO-REACTIVE VIDEO (narrowed, operator-amendable): talking/announcer
-beats ENFORCED reactive; music/b-roll beats mute-allowed BY DEFAULT, and
-because kling_avatar/seedance_2 register for those roles too, the
-operator can flip music_visual to a reactive row in the cloud profile
-without a code change. Zero-local-GPU episodes via `--profile cloud`.
+AUDIO-REACTIVE VIDEO (OPERATOR AMENDMENT 2026-07-02, post-convergence):
+audio reactivity is DEFAULT-ON for EVERY video role -- talking/announcer,
+music_visual, AND b-roll all default to audio-reactive rows. Nothing
+reactive sits behind an off switch. `mute_only` rows (wan_i2v) remain
+REGISTERED as an explicit per-role OPT-DOWN the operator selects
+deliberately (cost control), never a silent default. Zero-local-GPU
+episodes via `--profile cloud`.
 
 ## 1. Rows ship from a CHECKED-IN pin, never live imports
 
@@ -111,16 +113,21 @@ requirement, normalized error codes (sec 1 list): per pass03 sec 3.
 
 `reactivity` values: `required_audio_ref | lipsync_overlay | mute_only`
 (`optional_audio_ref` CUT -- no shipped row used it; policy stays
-crisp). Gate LOCATION (concrete): `OTR_ShotLock.validate()` immediately
-after resolving the engine pick, raising
-`EngineUnusable(reason=INCOMPATIBLE_PROFILE)` with a message naming the
-role's required reactivity -- BEFORE any reservation (money) and before
-dispatch. Matrix tests cover all grounded video roles
-(announcer_visual, music_visual, character_video) x all shipped rows
-via the EXTENDED descriptors (`descriptor_for_engine` + the
-role_compat EngineDescriptor TypedDict + VideoEngine Protocol gain
-`reactivity` + `must_strip_audio` -- explicit protocol/TypedDict
-updates, tested).
+crisp). DEFAULT POLICY (operator amendment): ALL video roles require a
+reactive engine (`required_audio_ref` or `lipsync_overlay`) unless the
+role carries an EXPLICIT opt-down (`OTR_VIDEO_MUTE_OK_ROLES` env /
+profile field listing role names, default EMPTY). Gate LOCATION
+(concrete): `OTR_ShotLock.validate()` immediately after resolving the
+engine pick, raising `EngineUnusable(reason=INCOMPATIBLE_PROFILE)` with
+a message naming the role's required reactivity AND the opt-down knob
+-- BEFORE any reservation (money) and before dispatch. A `mute_only`
+engine resolves ONLY for roles named in the opt-down list; the ledger
+stamps `MUTE_OPT_DOWN <role>` so the choice is auditable. Matrix tests
+cover all grounded video roles (announcer_visual, music_visual,
+character_video) x all shipped rows x opt-down empty/populated via the
+EXTENDED descriptors (`descriptor_for_engine` + the role_compat
+EngineDescriptor TypedDict + VideoEngine Protocol gain `reactivity` +
+`must_strip_audio` -- explicit protocol/TypedDict updates, tested).
 
 VIDEO ROW DESCRIPTOR TABLE (nothing left for adapters to infer):
 | row | reactivity | must_strip_audio | required_inputs | fallback chain |
@@ -150,8 +157,15 @@ BEST. MUSIC: `cloud$ stability_audio` CHEAP-cand | `cloud$ sonilo_music`
 BEST. STILLS: `cloud$ recraft` CHEAP-cand | `cloud$ flux_pro` BEST |
 `cloud$ nano_banana_2` BEST (present in the live template catalog;
 S0 pin gates it like every row). VIDEO: per sec 5 table + role
-defaults: talking/announcer -> kling_avatar; music_visual + b-roll ->
-wan_i2v (mute; operator may flip to a reactive row via profile).
+defaults (ALL REACTIVE, operator amendment): talking/announcer ->
+kling_avatar; music_visual -> seedance_2 (audio-ref, driven by the
+theme/beat audio slice); b-roll/character beats -> seedance_2.
+wan_i2v ships as the mute OPT-DOWN row only (sec 5 knob). CHEAP-slot
+consequence: the cheapest REACTIVE row is what the cheap tier means
+for video now -- wan_i2v claims it ONLY if S0 proves Wan audio
+CONDITIONING (verify #5); otherwise the cheapest reactive row is
+whichever of seedance_2 / kling std-tier prices lower in the S0
+pricing table, and wan_i2v remains opt-down-only.
 Voice-preset table, licensing tri-state (pending=blocked), per-line
 granularity, ToS audit early-S0: per pass02/03. An operator-facing
 summary table (row, tier, surface, approx_cost, license status) is
