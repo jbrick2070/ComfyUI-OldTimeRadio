@@ -1,0 +1,348 @@
+pin_meta:
+  combo_options_excluded: true
+  comfyui_commit: bb131be9e83d2f773c90f1d6f1e4b248a498c8c5
+  generated_utc: '2026-07-02T19:38:15.506976+00:00'
+  generator: scripts/_otr_pin_partner_nodes.py
+  schema_version: pin-2026-07-02
+rows:
+  cloud_elevenlabs_flash:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/audio/ElevenLabs
+    class_name: ElevenLabsTextToSpeech
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_elevenlabs
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        apply_text_normalization: COMBO
+        language_code: STRING
+        model: COMFY_DYNAMICCOMBO_V3
+        output_format: COMBO
+        seed: INT
+        stability: FLOAT
+        text: STRING
+        voice: ELEVENLABS_VOICE
+    is_async: true
+    notes: CHEAP-cand voice; flash/turbo tier via params
+    provider_id: ELEVENLABS
+    return_types:
+    - AUDIO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_elevenlabs_tts:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/audio/ElevenLabs
+    class_name: ElevenLabsTextToSpeech
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_elevenlabs
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        apply_text_normalization: COMBO
+        language_code: STRING
+        model: COMFY_DYNAMICCOMBO_V3
+        output_format: COMBO
+        seed: INT
+        stability: FLOAT
+        text: STRING
+        voice: ELEVENLABS_VOICE
+    is_async: true
+    notes: BEST voice; premium voices via params
+    provider_id: ELEVENLABS
+    return_types:
+    - AUDIO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_flux_pro:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/BFL
+    class_name: Flux2ProImageNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_bfl
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        images: IMAGE
+      required:
+        height: INT
+        prompt: STRING
+        prompt_upsampling: BOOLEAN
+        seed: INT
+        width: INT
+    is_async: true
+    notes: BEST stills; prompt continuity w/ flux_gen1
+    provider_id: BFL
+    return_types:
+    - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_kling_avatar:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/Kling
+    class_name: KlingAvatarNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_kling
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        prompt: STRING
+      required:
+        image: IMAGE
+        mode: COMBO
+        seed: INT
+        sound_file: AUDIO
+    is_async: true
+    notes: talking default; reactivity=required_audio_ref
+    provider_id: KLING
+    return_types:
+    - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_kling_lipsync:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/Kling
+    class_name: KlingLipSyncAudioToVideoNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_kling
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        audio: AUDIO
+        video: VIDEO
+        voice_language: COMBO
+    is_async: true
+    notes: reactivity=lipsync_overlay
+    provider_id: KLING
+    return_types:
+    - VIDEO
+    - STRING
+    - STRING
+    seed_supported: false
+    selected_output: 0
+    status: OK
+  cloud_nano_banana_2:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/Gemini
+    class_name: GeminiNanoBanana2V2
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_gemini
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        system_prompt: STRING
+        temperature: FLOAT
+        top_p: FLOAT
+      required:
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt: STRING
+        response_modalities: COMBO
+        seed: INT
+    is_async: true
+    notes: BEST stills; reference-image consistency
+    provider_id: GEMINI
+    return_types:
+    - IMAGE
+    - STRING
+    - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_recraft:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/Recraft
+    class_name: RecraftTextToImageNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_recraft
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        negative_prompt: STRING
+        recraft_controls: RECRAFT_CONTROLS
+        recraft_style: RECRAFT_V3_STYLE
+      required:
+        n: INT
+        prompt: STRING
+        seed: INT
+        size: COMBO
+    is_async: true
+    notes: CHEAP-cand stills
+    provider_id: RECRAFT
+    return_types:
+    - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_seedance_2:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/ByteDance
+    class_name: ByteDance2ReferenceNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_bytedance
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        model: COMFY_DYNAMICCOMBO_V3
+        seed: INT
+        watermark: BOOLEAN
+    is_async: true
+    notes: music/b-roll reactive default; audio-ref + identity
+    provider_id: BYTEDANCE
+    return_types:
+    - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_sonilo_music:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/audio/Sonilo
+    class_name: SoniloTextToMusic
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_sonilo
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        duration: INT
+        prompt: STRING
+        seed: INT
+    is_async: true
+    notes: BEST music
+    provider_id: SONILO
+    return_types:
+    - AUDIO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_stability_audio:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/audio/Stability AI
+    class_name: StabilityTextToAudio
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_stability
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        duration: INT
+        seed: INT
+        steps: INT
+      required:
+        model: COMBO
+        prompt: STRING
+    is_async: true
+    notes: CHEAP-cand music
+    provider_id: STABILITY
+    return_types:
+    - AUDIO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_wan_i2v:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/Wan
+    class_name: Wan2ImageToVideoApi
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_wan
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        audio: AUDIO
+        last_frame: IMAGE
+      required:
+        first_frame: IMAGE
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt_extend: BOOLEAN
+        seed: INT
+        watermark: BOOLEAN
+    is_async: true
+    notes: mute_only OPT-DOWN row (operator amendment)
+    provider_id: WAN
+    return_types:
+    - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
