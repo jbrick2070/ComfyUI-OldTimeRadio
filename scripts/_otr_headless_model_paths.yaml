@@ -24,6 +24,10 @@ comfyui_desktop:
   embeddings: C:/ComfyUI-Models/embeddings/
   loras: C:/ComfyUI-Models/loras/
   upscale_models: C:/ComfyUI-Models/upscale_models/
+  # canonical IA2V two-stage (2026-07-02): core LatentUpscaleModelLoader reads
+  # folder key latent_upscale_models (nodes_hunyuan.py); without this mapping
+  # the LTX spatial upscaler enum is EMPTY on headless boots.
+  latent_upscale_models: C:/ComfyUI-Models/latent_upscale_models/
   vae: C:/ComfyUI-Models/vae/
   audio_encoders: C:/ComfyUI-Models/audio_encoders/
   model_patches: C:/ComfyUI-Models/model_patches/
