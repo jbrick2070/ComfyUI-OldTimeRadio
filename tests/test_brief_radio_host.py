@@ -175,12 +175,15 @@ def test_ltx_radio_mouth_negative_is_console_no_human():
 
 
 def test_ltx_radio_mouth_overtness_is_brief_driven():
+    # NOTE: the mouth constant itself says "cartoon appliance face" by design
+    # (material anchoring, 2026-07-02) -- so the overtness discriminator is
+    # the _radio_face_overtness PHRASE, not the bare "cartoon" token.
     overt = mbp.build_radio_host_prompt(_SPACE_META, style="ltx_radio_mouth")
     subtle = mbp.build_radio_host_prompt(
         {"story_brief_terms": {"setting": ["a quiet village kitchen"]}},
         style="ltx_radio_mouth")
-    assert "cartoon" in overt
-    assert "subtle" in subtle and "cartoon" not in subtle
+    assert "bold playful" in overt and "subtle period-authentic" not in overt
+    assert "subtle period-authentic" in subtle and "bold playful" not in subtle
 
 
 #: GOLDENS captured from the PRE-split tree (HEAD 5cce9c2, 2026-07-02) via a

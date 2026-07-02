@@ -170,11 +170,22 @@ _RADIO_HEAD_PERSON = ("a radio-head presenter: a period-dressed figure seated at
 #: subject puts a PROMINENT rubbery grille-mouth right after the form noun
 #: (FLUX weights earlier tokens). Sub-plan C probes whether this actually
 #: lip-syncs; until then ltx_audio_in stays documented as AMBIENT motion.
-_RADIO_CONSOLE_MOUTH = ("%s whose wide speaker grille is a huge expressive "
-                        "rubbery mouth with full soft lips parted mid-speech, "
-                        "and whose two round tuning dials are its eyes -- a "
-                        "face-forward anthropomorphic radio, its face filling "
-                        "the frame")
+#: MATERIAL-ANCHORED (live catch 2026-07-02, probe B): the image dispatcher
+#: has NO negative channel (stills mint from the POSITIVE prompt only), so
+#: the object-row "no human" negative is inert on the still engines -- the
+#: first live mint rendered a literal HUMAN face inside the radio. Anatomy
+#: words must therefore be bound to APPLIANCE materials in the positive
+#: itself (appliance face; lips molded from grille cloth; glass dial-eyes;
+#: cabinet fills the frame). No negation words -- image models ignore "no X"
+#: in a positive and the person guard greps for the bare tokens.
+_RADIO_CONSOLE_MOUTH = ("%s as a living cartoon appliance face: its wide "
+                        "woven speaker grille bends into a huge expressive "
+                        "rubbery mouth, big cartoon lips molded from grille "
+                        "cloth and wood, open mid-speech, and its two round "
+                        "glass tuning dials are its eyes -- a face-forward "
+                        "anthropomorphic radio made entirely of bakelite, "
+                        "wood, grille fabric and chrome, the radio cabinet "
+                        "itself filling the frame")
 #: Brief keywords that push the face OVERT (playful cartoon) vs subtle.
 _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship",
                           "sci-fi", "science fiction", "futuristic",
