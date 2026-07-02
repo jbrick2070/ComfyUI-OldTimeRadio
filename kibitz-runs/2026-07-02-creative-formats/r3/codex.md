@@ -1,0 +1,31 @@
+VERDICT: no. The plan has unresolved request-shape, headless/env propagation, and media-type seams that will fail before the format engines can render.
+
+MUST-FIX BEFORE BUILD:
+1. [1b FORMAT CONTEXT / 3 F1 / 4 F2] `format_ctx` is not wired into the real request path. `VideoRequest` currently forbids unknown fields and has no `format_ctx` field (`nodes/_otr_video_engines/schemas.py:78-81`, `139-173`), while `build_request_from_shot` only threads prompt/init/audio/timing/`conditioning_refs` (`nodes/_otr_video_engines/render_driver.py:1309-1316`, `1686-1704`). Concrete fix: add a typed `FormatContext` schema, store the manifest path in the patched ledger before node 92, and explicitly copy it into every format-engine `VideoRequest` in `build_request_from_shot`.
+
+2. [1 / 1b / 7] `visual_format` cannot reliably distinguish "explicit per-role pick" from "current default" with the current `OTR_VideoDirector` interface. `direct()` receives only raw widget strings and emits resolved `video_models`; it has no profile/default provenance (`nodes/otr_video_director.py:291-343`). Concrete fix: use an explicit sentinel such as `USE_VISUAL_FORMAT` for role slots, or add a policy field that records which slots were inherited vs user-pinned before applying `visual_format`.
+
+3. [1b REGISTRATION CHECKLIST] `format_composite` needs a first-class input contract, not just `required_inputs=()`. The current required-token vocabulary is only `text_prompt/init_image/audio_ref/base_clip_ref` (`nodes/_otr_video_engines/schemas.py:43-49`), and render-time satisfiability mirrors that list (`nodes/_otr_video_engines/render_driver.py:1710-1754`). If `format_ctx` is mandatory but invisible to role compatibility, manual selection of `fmt_evidence_board`/`fmt_tin_toy` can pass the director and fail in `render_clip`. Concrete fix: add `format_ctx` as a schema/token contract or make `assert_usable(request_template=...)` fail closed before render and hide these rows unless `visual_format != standard`.
+
+4. [3 F1-c / 4 F2-d] The Kling bridge media types are underspecified. The pinned row requires `video: VIDEO`, `audio: AUDIO`, and `voice_language: COMBO` (`nodes/_otr_shared/partner_nodes.yaml:135-154`), but `VideoRequest.audio_ref` is a path object and `base_clip_ref` is currently typed as a string (`nodes/_otr_video_engines/schemas.py:134-159`). There is also existing drift where `_provide_lipsync_base` writes `{"path": path}` into `base_clip_ref` (`nodes/_otr_video_engines/render_driver.py:1836-1839`). Concrete fix: define the S0 invoke bridge conversion from canonical mp4/wav paths to Comfy `VIDEO`/`AUDIO` objects, normalize `base_clip_ref` shape, and test the exact `cloud_kling_lipsync` call payload.
+
+5. [3 F1-c / 4 F2-d / Acceptance] Kling lipsync output must be stripped back to silent video before returning to the render driver. The canonical clip contract says `has_audio` is always false (`nodes/_otr_video_engines/schemas.py:217-223`), and directory clips enforce the same invariant (`nodes/_otr_video_engines/directory_clip.py:77-99`). Concrete fix: after each Kling lipsync/paste pass, produce the final composited clip with `-an` or equivalent and return `has_audio=False`; mux remains exclusively `OTR_MasterAudioMux`.
+
+6. [2 / 6 / 7] Headless cloud env propagation is missing from this plan. Cloud rows fail closed unless `OTR_ENABLE_COMFY_CLOUD_MEDIA=1`, credentials resolve, and `OTR_CLOUD_MEDIA_BUDGET_USD` allows reservation (`nodes/_otr_shared/cloud_media_backend.py:17-25`, `98-101`, `126-144`, `247-287`). Concrete fix: add acceptance-step preflight and launcher/soak env wiring for the cloud flag, credentials, budget, and Kling concurrency before any F1/F2 smoke.
+
+7. [4 F2-a/b / 5 V2] F2’s mesher interface is not yet buildable. The plan says "front and 3/4 minted as separate generations" then "concept sheet -> multiview -> mesh", but no pinned Tripo/Meshy row exists in `partner_nodes.yaml` as shown, and the existing local `mesh_stage` is a single-`init_image` local Hunyuan/Blender lane (`nodes/_otr_video_engines/eng_mesh_stage.py:313`, `671-682`). Concrete fix: pin the exact 3D row first, specify its multi-image input order and GLB output contract, then build the F2 adapter around that contract.
+
+SHOULD-FIX:
+1. [5 V1 / 4 F2] Reorder F2 so V1 is truly the first cheap kill-switch. Section 4 builds concept, mesh, stage, then mouth; section 5 says V1 is first. Concrete fix: run one minimal placeholder/known-GLB or single paid mesh plate through Kling before building the full F2 cache and 3-beat segment. [ASSUMPTION] This is intended to avoid spending mesh work before lipsync viability is known.
+
+2. [3 F1-a / 3 F1-c] The board manifest coordinate contract is incomplete. `cast[{char_id, portrait_hash, x,y,w,h}]` does not specify pixel units, origin, crop rounding, or whether coords are pre/post pan transform. Concrete fix: declare top-left pixel coordinates in the 4K board canvas, integer rounding policy, and paste scaling rules.
+
+3. [6] Cost/cache reporting must count per-line Kling calls, not just format rows. `RequestCacheKey` keys on params, input hashes, seed, and schema versions (`nodes/_otr_shared/cloud_media_cache.py:66-119`); the estimate report needs to include every lipsync input hash pair so cached vs billed calls are visible.
+
+OPTIONAL / NICE-TO-HAVE:
+1. [3 F1-a] Add a tiny board-manifest JSON schema and golden fixture before implementing the renderer.
+2. [4 F2-c] Record Blender version and camera preset hash in the per-plate manifest; the plan says this, but make it an assertion in the cache-hit test.
+
+CUT THESE (over-engineering):
+1. [3 Acceptance] Cut "re-run caching verified as a smoke ASSERTION ... not a separate gate" as worded. Keep one billing-ledger/cache assertion in the smoke, but do not create a separate bespoke cache gate for F1 if S0 cache tests already cover `RequestCacheKey`.
+2. [4 F2-e] Cut whole-episode tin-toy wiring from the MVP entirely. The plan already says character beats only; do not add dormant whole-episode switches until the 3-beat segment passes.

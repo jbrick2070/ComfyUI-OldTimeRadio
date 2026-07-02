@@ -34,6 +34,11 @@ WAV fixture) behind `OTR_RUN_CLOUD_SMOKE=1`. Operator prereqs before smokes: log
 `OTR_COMFY_API_KEY`; `OTR_CLOUD_MEDIA_BUDGET_USD`; `OTR_ENABLE_COMFY_CLOUD_MEDIA=1`. NO existing
 render-path changes in S0; workflow JSON untouched until S4 (operator-gated).
 
+**CODE BATON 2026-07-02 (later):** the LTX-fixes coder window holds the code. Cloud S0 remainder
+queues behind it. QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
+Tin-Toy Theatre -- plan `docs/2026-07-02-creative-formats/CREATIVE_FORMATS_PLAN.md`
+(kibitz-hardened; ideation record in docs/2026-07-02-cloud-engines/roundtable/ideas_synthesis.md).
+
 **Previously current (unchanged, operator-gated, NOT code):** All-engines x all-slots soak RUN +
 talking-radio (C) morning-eyeball GO/NO-GO -- see below.
 

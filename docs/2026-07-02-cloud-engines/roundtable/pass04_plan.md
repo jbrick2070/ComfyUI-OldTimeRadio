@@ -107,6 +107,13 @@ requirement, normalized error codes (sec 1 list): per pass03 sec 3.
   the same output-base path helper; COPIED into episodes; excluded from
   obs_publish by an explicit path allowlist IN obs_publish (named
   mechanism, not a comment).
+- ASSET PLACEMENT (operator directive 2026-07-02): EVERY asset an
+  episode consumes -- canonicalized outputs AND intermediates (meshes,
+  boards, crops, plates) -- materializes under `otr\episodes\<ep>\`;
+  cross-episode reusables are copied into EACH consuming episode. Only
+  the final published mp4 lives elsewhere (`otr\obs\`). The cache is
+  billing-dedup plumbing only: nothing serves from it, and losing it
+  costs money, never episode integrity.
 - Billing JSONL and production ledger linked by request_id (financial
   vs artistic truth), per pass03.
 
