@@ -66,6 +66,11 @@ VIDEO_DIRECTOR_SLOTS = (
     "announcer_video_model",
     "music_video_model",
     "other_beats_video_model",
+    # Route-A promotion widget (2026-06-28): the saved workflow pins CHARACTER
+    # face beats to humo_14B_169 -- an all-ltx smoke must patch it too, or the
+    # character beats silently render HuMo (caught live 2026-07-02: histogram
+    # {ltx_audio_in: 2, humo_14B_169: 3} on the ia2v proof episode).
+    "character_video_model",
 )
 IMAGE_DIRECTOR_SLOTS = (
     "announcer_image_model",
@@ -158,15 +163,28 @@ def _patch_writer_inputs(prompt: dict[str, Any], schemas: dict[str, Any],
 
 
 def _assert_combo_accepts(schemas: dict[str, Any], node_type: str,
-                          input_name: str, target: Any) -> None:
+                          input_name: str, target: Any) -> Any:
+    """Resolve ``target`` against the live catalog and return the EXACT enum
+    string. PREFIX match tolerated (2026-07-02): the per-role dropdown labels
+    grew decoration suffixes (aspect + VRAM tier, 2026-06-30) -- 'ltx_audio_in
+    (16:9)' now reads 'ltx_audio_in (16:9) (~13.7GB)'. Exact match wins;
+    otherwise the UNIQUE choice starting with ``target`` wins; anything else
+    fails LOUD."""
     inputs = _schema_inputs(schemas, node_type)
     _confirm_input(schemas, node_type, input_name)
     opts = _choices(inputs[input_name])
-    if opts is not None and target not in opts:
-        raise RuntimeError(
-            "%s.%s live catalog does not include %r; choices=%s"
-            % (node_type, input_name, target, opts)
-        )
+    if opts is None:
+        return target
+    if target in opts:
+        return target
+    pref = [c for c in opts
+            if isinstance(c, str) and c.startswith(str(target) + " ")]
+    if len(pref) == 1:
+        return pref[0]
+    raise RuntimeError(
+        "%s.%s live catalog does not include %r (prefix matches=%r); "
+        "choices=%s" % (node_type, input_name, target, pref, opts)
+    )
 
 
 def _patch_director_inputs(prompt: dict[str, Any],
@@ -178,18 +196,18 @@ def _patch_director_inputs(prompt: dict[str, Any],
     changes: list[str] = []
 
     for name in VIDEO_DIRECTOR_SLOTS:
-        _assert_combo_accepts(
+        resolved = _assert_combo_accepts(
             schemas, "OTR_VideoDirector", name, LTX_AUDIO_IN_PICK)
         before = dinputs.get(name)
-        dinputs[name] = LTX_AUDIO_IN_PICK
-        changes.append("%s %r -> %r" % (name, before, LTX_AUDIO_IN_PICK))
+        dinputs[name] = resolved
+        changes.append("%s %r -> %r" % (name, before, resolved))
 
     for name in IMAGE_DIRECTOR_SLOTS:
-        _assert_combo_accepts(
+        resolved = _assert_combo_accepts(
             schemas, "OTR_VideoDirector", name, Z_IMAGE_TURBO_PICK)
         before = dinputs.get(name)
-        dinputs[name] = Z_IMAGE_TURBO_PICK
-        changes.append("%s %r -> %r" % (name, before, Z_IMAGE_TURBO_PICK))
+        dinputs[name] = resolved
+        changes.append("%s %r -> %r" % (name, before, resolved))
 
     _confirm_input(schemas, "OTR_VideoDirector", "allow_auto_fallback")
     before_fallback = dinputs.get("allow_auto_fallback")
