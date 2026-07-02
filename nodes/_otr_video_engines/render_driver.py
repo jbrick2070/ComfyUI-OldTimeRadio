@@ -1392,13 +1392,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # the per-beat PLAN log line + the bakeoff manifest), NOT a hardcoded MB here.
     if str(shot.get("engine_id") or "") == "ltx_audio_in":
         # ia2v_canonical canvas (lips-dont-talk kibitz + operator quality
-        # catch 2026-07-02): the 512x288 default was single-pass VRAM math;
-        # the two-stage recipe renders its MOTION pass at HALF canvas anyway
-        # and the canonical-native 1280x720 was live-proven on this box at
-        # 376 frames (P6/P7). 512x288 upscaled ~2.9x to the deliverable was
-        # the "really low quality" the operator flagged. Single-pass recipes
-        # keep the proven 512x288. Env-overridable either way.
-        _av_default = ("1280x720"
+        # catch 2026-07-02): the 512x288 default was single-pass VRAM math
+        # and upscaled ~2.9x to the deliverable = the "really low quality"
+        # the operator flagged. Ladder walked LIVE: 1280x720 fails the /32
+        # grid gate (proof5b); 1280x704 BREACHED the 14.5GB ceiling in the
+        # full production pipeline (proof6: 14716 MB -- the isolation probes
+        # carried less resident state). 832x480 = 2.6x the old pixels, a
+        # 1.77x deliverable upscale, base 416x240 (all /32), and P1 proved
+        # articulation with a sharp guide at even smaller bases. Single-pass
+        # recipes keep the proven 512x288. Env-overridable either way.
+        _av_default = ("832x480"
                        if _ia2v_talking_register_active("ltx_audio_in")
                        else "512x288")
         _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", _av_default)

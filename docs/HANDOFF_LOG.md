@@ -38,7 +38,20 @@ single-pass recipes keep 512x288; env-overridable). Legacy canvas-clamp + announ
 pinned to distilled_native. Ops notes: the window handover killed proof3 mid-render (5 orphan
 pending_* dirs); a PS `-Encoding UTF8` rewrite BOM-stamped a test file (caught by the AST-scan
 test; stripped -- use [IO.File]::WriteAllText w/ UTF8Encoding($false), never Set-Content UTF8).
-Proof5 (all three fixes, 720p) rendering at handoff -- timing stats + NVML peak land in the log.
+CLOSING CHUNK (same afternoon): the canvas ladder walked LIVE -- 1280x720 FAILS the /32 grid gate
+(proof5b, LOUD); 1280x704 BREACHED the 14.5GB ceiling in the FULL pipeline (proof6: 14716 MB;
+isolation probes carried less resident state; episode killed by the guard at clip ~5, ~33min) ->
+**ia2v default = 832x480** (2.6x the old pixels, 1.77x deliverable upscale, base 416x240 all /32,
+tests updated). PLUS operator look direction (side-by-side: production reads DARK BLUE + murky):
+`ltx_radio_mouth` stills now SKIP the brief palette + grade tail ("cold blue panel glow" / "heavy
+vignette, muted color grade") and pin the canonical "warm dramatic lighting" (HuMo styles keep the
+brief tail; goldens intact; test_ltx_radio_mouth_still_is_warm_not_brief_blue). Kibitz r4
+CONVERGED (claude+codex; agy quota-dead) -- final.md in kibitz-runs/2026-07-02-lips-dont-talk/r4/
+(judgment log incl. rejected codex MF4 workflow-JSON ask -- node-87 picks are operator-owned).
+Proof7 (832x480 + warm still + all register fixes) launched detached at session end -- score the
+speech beats per final.md's verify-at-build (evaluator windows from the slice log; bar 2.0) and
+eyeball with sound. NEXT WINDOW: proof7 verdict -> if char beats still soft, run the portrait-vs-
+wide A/B then S4; then the queued cloud-S0 remainder (invoke bridge + smokes, see section 1).
 
 ## 2026-07-02 (day) -- CANONICAL IA2V TRANSPLANT SHIPPED: ltx_audio_in lip-syncs on ia2v_canonical (new dev default)
 Did: operator reviewed the overnight NO-GO evidence + ordered the canonical arbiter: downloaded the

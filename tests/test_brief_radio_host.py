@@ -168,6 +168,19 @@ def test_ltx_radio_mouth_leads_with_prominent_mouth():
     assert "human" not in p and "person" not in p and "presenter" not in p
 
 
+def test_ltx_radio_mouth_still_is_warm_not_brief_blue():
+    # operator look direction 2026-07-02 (side-by-side catch): the lip-sync
+    # still pins the canonical WARM look -- no brief palette ("cold blue
+    # panel glow"), no grade tail ("heavy vignette, muted color grade").
+    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="ltx_radio_mouth")
+    assert "warm dramatic lighting" in p
+    assert "cold blue" not in p
+    assert "heavy vignette" not in p and "muted color grade" not in p
+    # HuMo styles KEEP the brief-driven tail (golden-pinned elsewhere)
+    hp = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="console_face")
+    assert "cold blue panel glow" in hp
+
+
 def test_ltx_radio_mouth_negative_is_console_no_human():
     # the mouth radio is a pure radio -> shares RADIO_CONSOLE_NEG (humans OUT;
     # no baby line needed -- no person in frame)

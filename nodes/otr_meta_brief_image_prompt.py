@@ -283,6 +283,15 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
     else:
         subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE, overt)
     prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
+    if style == "ltx_radio_mouth":
+        # CANONICAL WARM LOOK (operator look direction 2026-07-02, the
+        # side-by-side catch: the brief palette -- e.g. "cold blue panel
+        # glow" -- plus the grade tail's "heavy vignette, muted color grade"
+        # rendered the talking-radio bookend DARK, BLUE and murky). The ltx
+        # lip-sync still skips the era palette AND the grade tail entirely
+        # and pins the canonical demo's lighting. HuMo styles below keep the
+        # full brief-driven tail (their goldens are byte-pinned).
+        return "%s, warm dramatic lighting" % prompt
     try:
         try:
             from ._otr_story_brief_helpers import (  # type: ignore

@@ -141,14 +141,14 @@ def test_guide_image_conditioning_chain(ia2v_env):
 def test_ia2v_render_canvas_defaults_canonical_native(ia2v_env, tmp_path,
                                                       monkeypatch):
     # operator quality catch: under the two-stage recipe the AV canvas
-    # defaults to the canonical-native 1280x720 (512x288 was single-pass
+    # defaults to 832x480 (VRAM-laddered live: 704p breached the 14.5GB ceiling in the full pipeline; 512x288 was single-pass
     # VRAM math -> 2.9x upscale mush); single-pass recipes keep 512x288.
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
-    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1280, 720)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (832, 480)
     monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
