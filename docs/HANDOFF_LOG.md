@@ -6,6 +6,26 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 (evening) -- PROOF7 SCORED (announcers SMASH, chars = init bug) -> S4 PORTRAIT INIT SHIPPED
+Did: proof7 (signal_lost_lab_race..., 31:19, obs_publish OK, byte-identical, peak ~13.3GB) scored on
+RAW clips w/ slice audio muxed (shot clips are SILENT by design -- mux-LAST -- the evaluator needs a
+temp AV mux): announcer 4.62/5.51 (canonical ref 3.32 -- the talking register + verbatim prompt +
+fixed guide chain fully land), music 3.29 (exempt), but characters 0.62/0.32/1.27 vs the >=2.0 bar.
+Driver log self-documented the residual: "conditioning on scene still (landscape; portrait never
+used)" -- chars init on WIDE scene stills (face too small to articulate). **Portrait-vs-wide A/B**
+(isolation harness, ONE variable, b002's exact slice + exact 202-char production prompt + 832x448):
+scene 0.57 (REPRODUCES production 0.62) vs portrait **2.86 lag 0** -- eyeballed frames show
+full-frame 16:9 center-crop, NO pillarbox (docs/2026-07-02-canonical-ia2v/pw_ab_*_frame.png).
+**S4 SHIPPED @ 820f6df3**: under the ia2v talking register a character_video ltx_audio_in beat
+inits on the cast PORTRAIT (init_source=character_portrait_ia2v, LOUD swap log + dims aspect
+guard); missing portrait fails LOUD (NO FALLBACK). The 2026-06-20 wide-never-portrait directive is
+superseded ONLY under RECIPE_IA2V (canvas-independent guide chain); bookends + single-pass recipes
+keep scene stills. 4 new tests; 2 legacy contracts re-pinned. Suite 6019/0 + Bug Bible 16/0.
+Verdict + scores + timing: docs/2026-07-02-canonical-ia2v/PROOF7_VERDICT.md; operator side-by-side
+side_by_side_proof4_vs_proof7_announcer.mp4. **Proof #8 launched** on the new code (fresh server,
+dev-unet env). OOPS note: my server reset's second kill pattern (`main.py`) was too broad and also
+killed the Comfy DESKTOP app backend -- relaunch the desktop app when next needed; headless fine.
+
 ## 2026-07-02 (late afternoon) -- cloud-S0 REMAINDER SHIPPED: invoke_partner_node bridge + watchdog + gated smokes
 Did (baton from the cloud-engines window, per pass04 sec 3): **nodes/_otr_shared/cloud_media_invoke.py**
 (f9eed360) -- `invoke_partner_node(node_key, inputs, *, timeout_s, estimated_usd=0.0) -> PartnerResult`.
