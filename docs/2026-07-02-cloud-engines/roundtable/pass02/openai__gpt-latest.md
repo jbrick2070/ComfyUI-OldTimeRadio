@@ -1,0 +1,67 @@
+<!-- requested_model: ~openai/gpt-latest | resolved_model: openai/gpt-5.5-20260423 -->
+
+VERDICT: no. The plan still has uncodeable interfaces (partner-node invocation/session auth/ledger/cache/profile overrides) and a gating/profile contradiction that will fail at runtime.
+
+MUST-FIX BEFORE BUILD:
+1. [2 IMPORT-GATED REGISTRATION + 6 Cloud capability profile] Cloud profile cannot enable import-gated rows if registration happens at module import time and `--profile cloud` is applied later. Existing registries are populated by adapter imports; if `OTR_ENABLE_COMFY_CLOUD_MEDIA` is not set before Python imports the engine packages, rows will not exist for `default_engine_for_role`/resolver. Concrete fix: require `OTR_ENABLE_COMFY_CLOUD_MEDIA=1` in the process environment before ComfyUI/node import for any cloud run, or implement an explicit late `load_cloud_adapters()` called before dropdown/resolver construction and tests. Document the exact order.
+
+2. [6 Cloud capability profile] “profile applier gains a per-role DEFAULT-OVERRIDE map consumed by `default_engine_for_role`” contradicts the grounded audio API: `default_engine_for_role(role)` takes only `role` and returns the adapter with `default_roles`. Changing it globally risks moving the local byte-identical default. Concrete fix: do not mutate registry defaults. Add a separate resolver, e.g. `resolve_default_engine_for_role(role: str, profile: str | None) -> str | None`, and update only profile-aware callers. Leave existing `default_engine_for_role(role)` byte-identical.
+
+3. [1 Surface A + 5 Adapters] “invoke bundled `comfy_api_nodes` node classes IN-PROCESS” is not implementable as specified. No callable contract is defined: class lookup, constructor args, `FUNCTION` name, hidden input passing, upload/download handling, return tuple decoding, async/job polling behavior, and exception mapping are all unspecified. Concrete fix: define a real wrapper interface, e.g. `invoke_partner_node(class_name: str, inputs: dict, hidden: ComfyAuth, *, timeout_s: int, cancel_token: CancelToken) -> PartnerResult`, and in S0 pin for each node: import path, `INPUT_TYPES`, function name, required/optional/hidden inputs, return slots, raw output shape, and whether execution is synchronous or job-backed. Until then adapters must not import hard-coded class names directly.
+
+4. [5 S0 schema pinning] `/object_info` cannot be assumed to provide “upload semantics, job lifecycle, error taxonomy.” ComfyUI object info normally describes node inputs/outputs; job IDs, polling URLs, cancellation, corrupt-output rules, and provider error classes are not guaranteed there. Concrete fix: split schema pinning into: `/object_info` for node input/output declarations, plus source-code/live-smoke metadata files for upload/download/job/cancel/error behavior. Make adapters validate only against fields actually captured.
+
+5. [2 AUTH BROKER] Session/auth data shape is missing and current grounded Comfy Credits backend uses module globals (`set_auth`, `_auth`, `_run_token_total`, `_slot_bindings`). That is unsafe for concurrent queued episodes and cannot satisfy “shared via session context.” [ASSUMPTION] ComfyUI may execute multiple queued jobs in one process. Concrete fix: define `CloudMediaSession` with `run_id`, `episode_id`, `auth_token`, `api_key`, budget state, ledger handle, cache root, cancellation token, and provider semaphores; pass it through dispatch calls. Do not use module-global auth/budget for media.
+
+6. [2 AUTH BROKER] Hidden input declaration is underspecified. The plan names `auth_token_comfy_org` / `api_key_comfy_org`, but not the actual ComfyUI `INPUT_TYPES` hidden declaration shape or the execute method parameters for voice/music/image/video nodes. Concrete fix: add exact signatures for every changed node, e.g. `INPUT_TYPES()["hidden"] = {"auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG", "api_key_comfy_org": "API_KEY_COMFY_ORG"}` only after verifying the real constants/names in the running ComfyUI install; then add a test that execute receives non-empty values on a logged-in and API-key configured server. If fallback config is allowed, specify the config key/env var and precedence.
+
+7. [2 BUDGET + POLICY MATRIX + 4 Curated rows] USD budget enforcement is not codeable without a cost quote model. Comfy credits/media providers may price per second, per image, per resolution, per character, or per job; the grounded `_otr_comfy_backend.py` only has token ceilings for LLM, not USD accounting. Concrete fix: define `CostQuote {provider, row_id, unit, unit_price_usd, quantity, estimated_usd, max_usd, pricing_source_version}` and require each adapter to implement `estimate_cost(request) -> CostQuote` before registration. Budget guard must reserve estimated spend before submit and reconcile actual spend after completion.
+
+8. [2 IDEMPOTENT BILLING CACHE] Cache key omits required inputs for still/video lanes. It lists `row id + prompt + params + audio-slice hash`; that misses init/reference image hashes, base clip hash, mask/control inputs, canvas/fps/duration/container, canonicalization version, provider schema version, adapter version, and ToS/model slug version. This can return the wrong paid asset. Concrete fix: define `CloudAssetKey` including row id, resolved provider/model slug, all normalized request params, all input asset content hashes, output contract version, adapter version, and canonicalizer version. Write cache entries atomically with a manifest and validate output before marking BILLED/CACHED.
+
+9. [3 Media canonicalization contract] No concrete function signatures or return types are given for canonicalization, but downstream needs paths, duration, metadata, and validation status. Concrete fix: define per-modality functions such as `canonicalize_audio(raw: PartnerResult, request: AudioRequest, session: CloudMediaSession) -> CanonicalAsset`, with `CanonicalAsset {path, sha256, media_type, duration_s, width, height, fps, codec/container, provider_job_id, cost_quote, actual_cost, validation_warnings}`. Require canonicalizers to fail closed on invalid media and never write partial assets into final episode paths.
+
+10. [2 Failure policy] Fallback chain can violate the zero-local-GPU acceptance. “cloud row -> cheaper cloud row -> local row if profile permits -> abort” is ambiguous on a `CUDA_VISIBLE_DEVICES=''` host: many local rows in the grounded video CAPABILITIES are `cpu_ok=False`. Concrete fix: fallback resolver must consult the active profile enable-set and `cpu_ok`/VRAM capability before selecting any local row. For `profile=cloud` on no-GPU hosts, default fallback should be cloud-only then abort unless an explicitly CPU-capable local engine is selected.
+
+11. [4 Curated rows] Hard-coded partner node class names are not build-safe before S0. Examples: `KlingAvatarNode`, `KlingLipSyncAudioToVideoNode`, `Wan2ImageToVideoApi`, `SoniloTextToMusic`, `StabilityTextToAudio`, `ElevenLabsTextToSpeech`. The plan itself says schemas are pinned later, so adapters cannot compile against these names yet. Concrete fix: in pass01 keep backing IDs as unresolved `node_class_name_candidate`; S0 must produce a checked `partner_nodes.yaml` from the live install, and adapter imports are generated/validated from that file. Any missing class drops the row at registration.
+
+12. [4 rows + release gate] `commercial_clean` is required but existing registry protocols only expose a boolean. The plan also has “candidate until S0 ToS audit,” which needs at least pending/blocked/clean states. A boolean cannot distinguish “unknown because audit not done” from “commercial allowed.” Concrete fix: add explicit row metadata such as `license_audit_status: Literal["pending","commercial_clean","noncommercial_blocked"]`; registration or release gate must treat `pending` as blocked for commercial runs. If the existing adapter protocol must stay boolean, derive `commercial_clean = license_audit_status == "commercial_clean"`.
+
+13. [5 Adapters + grounded CAPABILITIES] Cloud rows are not integrated with capability profile derivation. Grounding shows audio/video CAPABILITIES tables are consumed by `capability_profiles.py` to derive enable-sets. If cloud adapters register without CAPABILITIES rows, the cloud profile may not enable them or consistency tests may fail. Concrete fix: add CAPABILITIES entries for every registered cloud row with `vram_class="cloud" or "cpu"`, `vram_estimate_mb=0`, `cpu_ok=True`, `requires_sidecar=False`, and provider/model requirements, or update capability profile validation to explicitly handle cloud provider rows.
+
+14. [7 S0 CONTROL PLANE] “All cloud tests mocked in the no-network suite” conflicts with S0 smoke requirements that need real auth, Kling clip generation, pricing, and ToS verification. Concrete fix: split test classes: CI no-network mocked unit tests, plus operator/live-smoke tests marked and skipped unless `OTR_RUN_CLOUD_SMOKE=1` and credentials/budget are present. Acceptance for S0 must name which live tests are mandatory before promotion.
+
+SHOULD-FIX:
+1. [2 Rate limiting] “per-provider concurrency knob + serialization” lacks names/defaults and scope. Concrete fix: define env vars like `OTR_CLOUD_MAX_CONCURRENCY_KLING=1`, default global concurrency, semaphore keying by provider, and whether retries hold the semaphore.
+
+2. [2 cancellation] “cancels in-flight cloud jobs where the node class supports it” has no cancellable interface. Concrete fix: add optional `cancel(job_id) -> bool` to the backend provider metadata. If unsupported, ledger must record `ORPHANED_JOB` with provider, job id, submit timestamp, and estimated cost exposure.
+
+3. [2 Pre-run COST ESTIMATE] “rows x beat counts” is too crude for voice/music/video. Voice depends on character count/duration; video depends on seconds/resolution; image may depend on count/size. Concrete fix: build estimates from the actual planned request list after script segmentation and before first submit, not just beat counts.
+
+4. [3 voice/music] “duration trim/pad rules per line” is not enough for captions. Concrete fix: define tolerance values and whether padding is silence at head/tail; emit actual duration into line metadata so caption/delivery vectors can be validated.
+
+5. [3 video] `must_strip_audio` is mentioned but no row metadata schema owns it. Concrete fix: add `must_strip_audio: bool` and `reactivity: Literal["required_audio_ref","lipsync_overlay","mute_only","optional_audio_ref"]` to the video row metadata; canonicalizer enforces audio stripping based on that field.
+
+6. [4a VOICE] “preset -> curated stock-voice table” is underspecified. Concrete fix: define the table key shape, e.g. `{castlock_preset_id: {provider_voice_id, voice_name, commercial_clean, fallback_voice_id}}`, and fail closed when a preset has no audited mapping.
+
+7. [4d VIDEO] The reactivity matrix depends on role names and supplied tokens. Grounded video registry uses `role_compat.engine_fits_role` over `required_inputs`. Concrete fix: make every cloud video adapter declare `required_inputs` exactly (`("audio_ref",)`, `("init_image","audio_ref")`, etc.) and add matrix tests using `descriptor_for_engine`.
+
+8. [5 shared backend] Ledger schema is absent. Concrete fix: define append-only JSONL/SQLite fields: `run_id`, `episode_id`, `request_id`, `row_id`, `provider`, `provider_job_id`, `cache_key`, `status`, `estimated_usd`, `actual_usd`, `fallback_from`, `fallback_to`, `error_class`, timestamps, and output sha256.
+
+9. [5 shared backend] Large media hashing/download can blow memory if implemented naively. Concrete fix: require streaming downloads and streaming SHA-256; never read full video/audio into memory.
+
+10. [1 Surface B] Surface B is quarantined but still appears in curated rows. Concrete fix: registration for B rows must require both global cloud flag and `OTR_ENABLE_COMFY_CLOUD_WORKFLOWS=1` plus S0 smoke artifact; otherwise they should not enter dropdowns.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add a CLI `otr-cloud-doctor` that prints enabled flags, visible cloud rows, auth availability, credit/budget status, and pinned partner-node schema versions.
+- Add dry-run mode that builds request manifests, cache keys, and cost estimates without submitting jobs.
+- Store live-smoke artifacts under a separate diagnostics directory so failed S0 probes do not pollute episode caches.
+
+CUT THESE (over-engineering):
+1. [1 Surface B + 7 S0] Cut Surface B implementation from the first build. It is explicitly “UNPROVEN” and every B row has an A fallback. Keep only docs/research flags until Surface A lanes pass stills/voice/music/video.
+
+2. [2 cancellation] Cut provider cancellation from the initial implementation unless a provider exposes a verified cancel API in S0. Logging `ORPHANED_JOB` is sufficient for fail-closed local behavior and avoids inventing cancel hooks.
+
+3. [5 schema pinning] Cut “error taxonomy” pinning from `/object_info`; it is not a real source for provider runtime errors. Start with coarse normalized errors: auth, budget, retryable transport, provider rejected, timeout, corrupt output, unsupported schema.
+
+4. [4a Voice cloning] Keep `ElevenLabsInstantVoiceClone` deferred. It needs identity persistence, consent/ToS handling, per-voice cost, and cache invalidation; none is needed for the required per-line TTS lane.
