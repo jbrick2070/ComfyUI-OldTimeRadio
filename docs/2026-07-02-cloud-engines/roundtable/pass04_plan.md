@@ -5,13 +5,14 @@ GOAL (amended, explicit): per modality 1 CHEAP + 1-2 BEST cloud rows
 (voice + music ship 1+1 on Surface A today -- ElevenLabs is the only
 partner TTS provider and Sonilo/Stability the music pair; third rows
 return via Appendix B when the Comfy-Cloud-workflow surface is proven).
-AUDIO-REACTIVE VIDEO (OPERATOR AMENDMENT 2026-07-02, post-convergence):
-audio reactivity is DEFAULT-ON for EVERY video role -- talking/announcer,
-music_visual, AND b-roll all default to audio-reactive rows. Nothing
-reactive sits behind an off switch. `mute_only` rows (wan_i2v) remain
-REGISTERED as an explicit per-role OPT-DOWN the operator selects
-deliberately (cost control), never a silent default. Zero-local-GPU
-episodes via `--profile cloud`.
+AUDIO-REACTIVE VIDEO (OPERATOR AMENDMENTS 2026-07-02, post-convergence):
+#1 audio reactivity is DEFAULT-ON for EVERY video role -- automatic
+selection (profiles, defaults, fallbacks) always prefers reactive rows;
+nothing reactive sits behind an off switch. #2 UNIVERSAL-SLOT RULE: all
+video rows work in ALL 3 role slots -- an explicit operator pick of any
+row (including mute wan_i2v) in any slot is always honored, audited via
+ledger stamp, never blocked. Best experience by default, full freedom
+on explicit pick. Zero-local-GPU episodes via `--profile cloud`.
 
 ## 1. Rows ship from a CHECKED-IN pin, never live imports
 
@@ -113,19 +114,39 @@ requirement, normalized error codes (sec 1 list): per pass03 sec 3.
 
 `reactivity` values: `required_audio_ref | lipsync_overlay | mute_only`
 (`optional_audio_ref` CUT -- no shipped row used it; policy stays
-crisp). DEFAULT POLICY (operator amendment): ALL video roles require a
-reactive engine (`required_audio_ref` or `lipsync_overlay`) unless the
-role carries an EXPLICIT opt-down (`OTR_VIDEO_MUTE_OK_ROLES` env /
-profile field listing role names, default EMPTY). Gate LOCATION
-(concrete): `OTR_ShotLock.validate()` immediately after resolving the
-engine pick, raising `EngineUnusable(reason=INCOMPATIBLE_PROFILE)` with
-a message naming the role's required reactivity AND the opt-down knob
--- BEFORE any reservation (money) and before dispatch. A `mute_only`
-engine resolves ONLY for roles named in the opt-down list; the ledger
-stamps `MUTE_OPT_DOWN <role>` so the choice is auditable. Matrix tests
-cover all grounded video roles (announcer_visual, music_visual,
-character_video) x all shipped rows x opt-down empty/populated via the
-EXTENDED descriptors (`descriptor_for_engine` + the role_compat
+crisp). POLICY (operator amendments #1 2026-07-02 + #2 2026-07-02):
+
+- UNIVERSAL-SLOT RULE (#2): EVERY shipped video row is valid in EVERY
+  one of the 3 role slots (announcer_visual, music_visual,
+  character_video). Structurally guaranteed already: all surviving
+  roles supply every input token (role_compat C2), so any engine's
+  required_inputs are satisfiable in any slot. The reactivity gate
+  NEVER blocks an explicit operator pick.
+- REACTIVE-BY-DEFAULT (#1, scoped by #2 to AUTOMATIC selection only):
+  profile defaults, `resolve_default_engine_for_role`, and fallback
+  chains PREFER reactive rows (`required_audio_ref` or
+  `lipsync_overlay`) in every role -- best experience by default. A
+  `mute_only` row is chosen AUTOMATICALLY only when no reactive row is
+  usable, and that substitution is LOUD (ledger `MUTE_AUTO_FALLBACK
+  <role>`).
+- EXPLICIT PICK = the opt-down: an operator selecting a mute row in a
+  slot widget is honored as-is and stamped `MUTE_EXPLICIT_PICK <role>`
+  (auditable, never an error). `OTR_VIDEO_MUTE_OK_ROLES` remains ONLY
+  for HEADLESS/profile-driven runs (no widget to pick with): roles
+  listed there may take mute rows as their automatic default.
+- `OTR_ShotLock.validate()` still runs BEFORE reservation (money) and
+  dispatch, but its reactivity duty is now: verify the resolved row's
+  descriptor is coherent for the role (tokens satisfiable -- always
+  true for shipped rows), classify the pick (reactive | mute-explicit |
+  mute-auto), and emit the audit stamp. Hard `EngineUnusable` remains
+  for genuinely unusable rows (schema-drifted, flag-gated, license-
+  blocked) -- not for mute picks.
+
+Matrix tests: (a) UNIVERSAL-SLOT -- every shipped video row resolves
+and passes validate() in every role; (b) AUTO-DEFAULTS -- automatic
+selection yields a reactive row for every role when reactive rows are
+usable; (c) audit stamps for explicit-mute and auto-mute paths; all via
+the EXTENDED descriptors (`descriptor_for_engine` + role_compat
 EngineDescriptor TypedDict + VideoEngine Protocol gain `reactivity` +
 `must_strip_audio` -- explicit protocol/TypedDict updates, tested).
 
