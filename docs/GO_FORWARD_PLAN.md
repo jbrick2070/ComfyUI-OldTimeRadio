@@ -15,12 +15,24 @@
 **CLOUD ENGINE LANES S0 (ACTIVE CODING WINDOW, operator "build" 2026-07-02).** Build doc =
 `docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md` @ 29b11e77 (4-round roundtable converged
 + operator amendment: audio reactivity DEFAULT-ON all video roles, mute = audited opt-down).
-S0 = control plane: `nodes/_otr_shared/cloud_media_backend.py` (session table / auth broker /
-budget state machine / error codes / rate limits) + billing cache + ledger + canonicalizer skeleton
-+ `partner_nodes.yaml` pinning + live smokes #1/#2 behind `OTR_RUN_CLOUD_SMOKE=1` (operator-gated:
-needs logged-in Comfy or `OTR_COMFY_API_KEY` + `OTR_CLOUD_MEDIA_BUDGET_USD`). NO changes to
-existing render paths in S0; workflow JSON untouched until S4 (operator-gated). One coder window:
-THIS one, until S0 lands or hands off here.
+S0 PROGRESS (2026-07-02): chunks 1-3 SHIPPED + PUSHED, suite 5988/0 + Bug Bible green each chunk:
+- c1 @ 5a79a926 `nodes/_otr_shared/cloud_media_backend.py` (error taxonomy, auth broker, prompt_id
+  session table w/ leak sweep, budget state machine, provider semaphores, billing JSONL, mute-opt-
+  down knob) + 27 tests.
+- c2 @ 7d8c490f `cloud_media_cache.py` (RequestCacheKey pre-submit-only, atomic store, quarantine,
+  per-key locks) + `cloud_media_canonical.py` (PartnerResult/CanonicalAsset + S1/S2/S3 contracts)
+  + 14 tests.
+- c3 @ 44f36fdc+f3a97ea6 `scripts/otr_pin_partner_nodes.py` + CHECKED-IN
+  `nodes/_otr_shared/partner_nodes.yaml` -- 11/11 rows pinned from the LIVE core
+  (`C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI`, override `OTR_COMFY_CORE_ROOT`); all async
+  EXECUTE_NORMALIZED_ASYNC, all expose both auth hidden inputs; drift test = SUBPROCESS `--check`
+  (in-process comfy import corrupts pytest teardown -- do not inline it) + 6 tests.
+S0 REMAINING: `invoke_partner_node` async bridge (backend-owned event loop, timeout, streaming
+download -> PartnerResult, watchdog heartbeat vs the executor progress/interrupt API = verify #9)
++ smoke harness #1 (headless auth, cheap image node) + #2 (Kling audio-conditioning w/ checked-in
+WAV fixture) behind `OTR_RUN_CLOUD_SMOKE=1`. Operator prereqs before smokes: logged-in Comfy OR
+`OTR_COMFY_API_KEY`; `OTR_CLOUD_MEDIA_BUDGET_USD`; `OTR_ENABLE_COMFY_CLOUD_MEDIA=1`. NO existing
+render-path changes in S0; workflow JSON untouched until S4 (operator-gated).
 
 **Previously current (unchanged, operator-gated, NOT code):** All-engines x all-slots soak RUN +
 talking-radio (C) morning-eyeball GO/NO-GO -- see below.
