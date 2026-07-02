@@ -13,6 +13,7 @@ that the two legacy engines are GONE.
 """
 from __future__ import annotations
 
+import os
 import sys
 import types
 from pathlib import Path
@@ -146,10 +147,17 @@ def test_ltx_audio_in_videovae_is_split_enc_dec():
     stolen from the sampler -> the 6.84-vs-223 s/it sysmem-spill knife-edge. A
     future re-merge to one node silently reintroduces the leak; this locks it."""
     from nodes._otr_video_engines import wrapper_bridge as wb
-    eng = LtxAudioInEngine()
-    plan = {"text_prompt": "a vintage radio console", "seed": 1,
-            "target_frame_count": 49}
-    g = eng._build_graph(plan, 49, 512, 288, "voice.wav", "still.png")
+    # locks the SINGLE-PASS graph's split (the original 2026-06-26 contract);
+    # the ia2v_canonical two-stage split is locked in
+    # tests/test_ltx_av_ia2v_canonical.py.
+    os.environ["OTR_LTX_AV_RECIPE"] = "distilled_native"
+    try:
+        eng = LtxAudioInEngine()
+        plan = {"text_prompt": "a vintage radio console", "seed": 1,
+                "target_frame_count": 49}
+        g = eng._build_graph(plan, 49, 512, 288, "voice.wav", "still.png")
+    finally:
+        os.environ.pop("OTR_LTX_AV_RECIPE", None)
     # the leak signature -- a single shared "videovae" node -- must be GONE.
     assert "videovae" not in g, "single shared videovae reintroduces the VRAM leak"
     # two distinct VAELoader nodes (same class, different graph ids).

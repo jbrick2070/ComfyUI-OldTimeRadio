@@ -181,15 +181,26 @@ def _ltx_av_vram_reserve():
 #                     feeds the guider directly. The new DEFAULT daily driver.
 #   m0_base           ModelSamplingLTXV + LTXVScheduler + euler + cfg 3.0 +
 #                     strength 1.0, no LoRA. Legacy base pass, OVERRIDE-ONLY.
-# Selection: env OTR_LTX_AV_RECIPE (auto|sharp_lora|distilled_native|m0_base),
-# default "auto" -> derived from the OTR_LTX_AV_UNET basename family. The recipe
-# mirrors eng_ltx_video's distilled chain; that module is FROZEN and never imported
-# here, so the tiny helpers below are DUPLICATED on purpose (V-12 cold-import).
+# Selection: env OTR_LTX_AV_RECIPE (auto|ia2v_canonical|sharp_lora|
+# distilled_native|m0_base), default "auto" -> derived from the OTR_LTX_AV_UNET
+# basename family (dev -> ia2v_canonical since 2026-07-02; distilled-1.1 ->
+# distilled_native). The single-pass recipes mirror eng_ltx_video's distilled
+# chain; that module is FROZEN and never imported here, so the tiny helpers
+# below are DUPLICATED on purpose (V-12 cold-import).
 RECIPE_AUTO = "auto"
 RECIPE_SHARP_LORA = "sharp_lora"
 RECIPE_DISTILLED_NATIVE = "distilled_native"
 RECIPE_M0_BASE = "m0_base"
-_VALID_RECIPES = (RECIPE_SHARP_LORA, RECIPE_DISTILLED_NATIVE, RECIPE_M0_BASE)
+#: ia2v_canonical (2026-07-02, operator GO after the isolation smoke): the
+#: comfy.org "LTX-2.3: Image Audio to Video" LIP-SYNC recipe, transplanted
+#: node-for-node (docs/2026-07-02-canonical-ia2v/). TWO-STAGE: motion at half
+#: canvas, latent-upsample x2, audio re-concat, 3-step refine. The NEW dev
+#: -family default -- the single-pass recipes froze the grille-mouth (i2v
+#: strength 1.0 hard-pins the still; full distillation blunts audio coupling).
+RECIPE_IA2V = "ia2v_canonical"
+_VALID_RECIPES = (RECIPE_SHARP_LORA, RECIPE_DISTILLED_NATIVE, RECIPE_M0_BASE,
+                  RECIPE_IA2V)
+_RECIPE_MENU = "auto|ia2v_canonical|sharp_lora|distilled_native|m0_base"
 
 
 #: Distilled sigma schedule (ComfyUI-Goofer, GPU-proven on the RTX 5080). 8 steps;
@@ -206,6 +217,34 @@ _LTX_AV_DISTILLED_LORA_DEFAULT = os.path.join(
     "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
 _LTX_AV_DISTILLED_LORA_STRENGTH = 0.7
 
+# ---- ia2v_canonical constants (verbatim from the canonical graph; the live
+# ---- 2026-07-02 isolation smoke on OUR still is the ground truth) ----
+#: Refine ladder: 3 steps from 0.85 -- detail only, never re-decides motion.
+IA2V_REFINE_SIGMAS = (0.85, 0.7250, 0.4219, 0.0)
+#: The canonical uses the ORIGINAL (non-1.1) distilled-lora-384 at HALF
+#: strength on the DEV unet: half-distilled keeps dev's audio coupling while
+#: buying most of the distilled speed.
+_IA2V_LORA_NAME = os.path.join(
+    "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384.safetensors")
+_IA2V_LORA_STRENGTH = 0.5
+_IA2V_I2V_BASE_STRENGTH = 0.7      # motion pass: the still is a soft anchor
+_IA2V_I2V_REFINE_STRENGTH = 1.0    # detail pass: hard re-anchor
+_IA2V_BASE_SAMPLER = "euler_ancestral_cfg_pp"   # ancestral keeps motion alive
+#: Guide-image conditioning chain (scale 1.5x -> cap longer edge -> jpeg-ish
+#: compression 18): the canonical's guide texture prep.
+_IA2V_GUIDE_SCALE = 1.5
+_IA2V_GUIDE_LONGER_EDGE = 1536
+_IA2V_GUIDE_COMPRESSION = 18
+#: Spatial latent upsampler x2 (folder key latent_upscale_models -- mapped in
+#: scripts/_otr_headless_model_paths.yaml). Required ONLY by ia2v_canonical so
+#: the other recipes stay usable on installs lacking it.
+_FLOOR_UPSCALER = int(0.05 * _GiB)
+
+
+def _ia2v_upscale_model_name():
+    return os.environ.get("OTR_LTX_AV_UPSCALE_MODEL",
+                          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
+
 
 def _recipe_config(recipe):
     """Static per-recipe config consumed UNIFORMLY by _weight_paths /
@@ -219,15 +258,31 @@ def _recipe_config(recipe):
     if recipe == RECIPE_SHARP_LORA:
         return {"use_lora": True, "use_modelsampling": False, "manual_sigmas": True,
                 "sampler": _LTX_AV_SHARP_SAMPLER, "cfg": _LTX_AV_SHARP_CFG,
-                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH}
+                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH, "two_stage": False,
+                "lora_name": _LTX_AV_DISTILLED_LORA_DEFAULT,
+                "lora_strength": _LTX_AV_DISTILLED_LORA_STRENGTH}
     if recipe == RECIPE_DISTILLED_NATIVE:
         return {"use_lora": False, "use_modelsampling": False, "manual_sigmas": True,
                 "sampler": _LTX_AV_SHARP_SAMPLER, "cfg": _LTX_AV_SHARP_CFG,
-                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH}
+                "i2v_strength": _LTX_AV_SHARP_I2V_STRENGTH, "two_stage": False}
     if recipe == RECIPE_M0_BASE:
         return {"use_lora": False, "use_modelsampling": True, "manual_sigmas": False,
                 "sampler": "euler", "cfg": _LTX_AV_CFG,
-                "i2v_strength": _LTX_AV_I2V_STRENGTH}
+                "i2v_strength": _LTX_AV_I2V_STRENGTH, "two_stage": False}
+    if recipe == RECIPE_IA2V:
+        # the canonical comfy.org IA2V lip-sync recipe (2026-07-02 transplant):
+        # BASE (motion) = half canvas + Inplace i2v @0.7 + zero-masked audio
+        # latent + euler_ancestral_cfg_pp over the front-loaded 8-step ladder;
+        # REFINE (detail) = latent-upsample x2 + re-anchor @1.0 + audio
+        # re-concat + 3-step euler_cfg_pp with LTXVCropGuides.
+        return {"use_lora": True, "use_modelsampling": False, "manual_sigmas": True,
+                "sampler": _IA2V_BASE_SAMPLER, "cfg": _LTX_AV_SHARP_CFG,
+                "i2v_strength": _IA2V_I2V_BASE_STRENGTH, "two_stage": True,
+                "lora_name": _IA2V_LORA_NAME,
+                "lora_strength": _IA2V_LORA_STRENGTH,
+                "refine_sampler": _LTX_AV_SHARP_SAMPLER,
+                "refine_sigmas": IA2V_REFINE_SIGMAS,
+                "refine_strength": _IA2V_I2V_REFINE_STRENGTH}
     raise ValueError("unknown LTX-AV recipe %r" % recipe)
 
 
@@ -314,11 +369,16 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return os.environ.get("OTR_LTX_AV_AUDIO_VAE",
                               "ltx-2.3-22b-dev_audio_vae.safetensors")
 
-    def _distilled_lora_name(self):
-        """The distilled LoRA filename (sharp mode); env-overridable. Resolution +
-        floor are handled by _resolve('loras', ...) like the other artifacts."""
-        return os.environ.get("OTR_LTX_AV_DISTILLED_LORA",
-                              _LTX_AV_DISTILLED_LORA_DEFAULT)
+    def _distilled_lora_name(self, rcfg=None):
+        """The distilled LoRA filename; env-overridable. PER-RECIPE default:
+        sharp_lora keeps the 1.1 LoRA, ia2v_canonical uses the canonical
+        original-384 (@0.5, set in the recipe config). Resolution + floor are
+        handled by _resolve('loras', ...) like the other artifacts."""
+        if rcfg is None:
+            rcfg = _recipe_config(self._recipe())
+        return os.environ.get(
+            "OTR_LTX_AV_DISTILLED_LORA",
+            rcfg.get("lora_name", _LTX_AV_DISTILLED_LORA_DEFAULT))
 
     # ---- recipe resolution (fail-loud; the recipe FOLLOWS THE MODEL) ----
     def _recipe(self):
@@ -330,30 +390,44 @@ class _LtxAvBase(_MC.MotionEngineBase):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
                 "OTR_LTX_AV_SHARP is retired -- use OTR_LTX_AV_RECIPE="
-                "auto|sharp_lora|distilled_native|m0_base", kind="video")
+                + _RECIPE_MENU, kind="video")
         sel = os.environ.get("OTR_LTX_AV_RECIPE", RECIPE_AUTO).strip().lower()
+        base = os.path.basename(
+            str(self._unet_name() or "").replace("\\", "/")).lower()
         if sel != RECIPE_AUTO:
             if sel not in _VALID_RECIPES:
                 raise EngineUnusable(
                     self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "OTR_LTX_AV_RECIPE=%r invalid -- use "
-                    "auto|sharp_lora|distilled_native|m0_base" % sel, kind="video")
+                    "OTR_LTX_AV_RECIPE=%r invalid -- use %s"
+                    % (sel, _RECIPE_MENU), kind="video")
+            if sel == RECIPE_IA2V and base.startswith("ltx-2.3-22b-distilled"):
+                # the ia2v recipe stacks distilled-lora-384@0.5 on the unet; on
+                # an already-distilled unet that DOUBLE-DISTILLS -> mush. LOUD.
+                raise EngineUnusable(
+                    self.name, self.family,
+                    EngineUsabilityReason.MALFORMED_CONFIG,
+                    "OTR_LTX_AV_RECIPE=ia2v_canonical requires a DEV-family "
+                    "unet (got %r) -- the recipe's distilled LoRA on a "
+                    "distilled unet would double-distill" % base, kind="video")
             return sel
         return self._detect_recipe(self._unet_name())
 
     def _detect_recipe(self, unet_name):
         """auto: STRICT family match on the unet basename (lowercased). An
         unknown family RAISES (the operator sets OTR_LTX_AV_RECIPE) -- a name that
-        trips both tokens or neither is ambiguous and never silently resolved."""
+        trips both tokens or neither is ambiguous and never silently resolved.
+        DEV family -> ia2v_canonical (operator GO 2026-07-02: the canonical
+        lip-sync recipe is the dev default for ALL ltx_audio_in beats;
+        sharp_lora stays explicitly selectable)."""
         base = os.path.basename(str(unet_name or "").replace("\\", "/")).lower()
         if base.startswith("ltx-2.3-22b-distilled-1.1-"):
             return RECIPE_DISTILLED_NATIVE
         if base.startswith("ltx-2.3-22b-dev-"):
-            return RECIPE_SHARP_LORA
+            return RECIPE_IA2V
         raise EngineUnusable(
             self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
             "cannot auto-detect the LTX-AV recipe from unet %r -- set "
-            "OTR_LTX_AV_RECIPE=sharp_lora|distilled_native|m0_base" % base,
+            "OTR_LTX_AV_RECIPE=%s" % (base, _RECIPE_MENU),
             kind="video")
 
     @staticmethod
@@ -381,9 +455,18 @@ class _LtxAvBase(_MC.MotionEngineBase):
             ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
             ("audio VAE", _resolve("vae", self._audio_vae_name()), _FLOOR_AUDIO_VAE),
         ]
-        if _recipe_config(self._recipe())["use_lora"]:
+        rcfg = _recipe_config(self._recipe())
+        if rcfg["use_lora"]:
             paths.append(("distilled LoRA",
-                          _resolve("loras", self._distilled_lora_name()), _FLOOR_LORA))
+                          _resolve("loras", self._distilled_lora_name(rcfg)),
+                          _FLOOR_LORA))
+        if rcfg["two_stage"]:
+            # required ONLY by ia2v_canonical -- other recipes stay usable on
+            # installs lacking the spatial upscaler (Sub-plan-A contract rule).
+            paths.append(("latent spatial upscaler",
+                          _resolve("latent_upscale_models",
+                                   _ia2v_upscale_model_name()),
+                          _FLOOR_UPSCALER))
         return paths
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
@@ -484,13 +567,32 @@ class _LtxAvBase(_MC.MotionEngineBase):
         }
         rcfg = _recipe_config(self._recipe())
         if rcfg["use_lora"]:
-            # sharp_lora: the LoRA-wrapped unet feeds the guider; the fixed sigmas
-            # come from the in-adapter _SigmasFromValues injector.
+            # sharp_lora / ia2v_canonical: the LoRA-wrapped unet feeds the
+            # guider; fixed sigmas come from the in-adapter injector.
             cands["lora"] = ("LoraLoaderModelOnly",)
         if rcfg["use_modelsampling"]:
             # m0_base: ModelSamplingLTXV + LTXVScheduler (no LoRA, no manual sigmas).
             cands["modelsampling"] = ("ModelSamplingLTXV",)
             cands["sched"] = ("LTXVScheduler",)
+        if rcfg["two_stage"]:
+            # ia2v_canonical (2026-07-02 transplant): the canonical two-stage
+            # graph's extra classes -- required ONLY when the recipe is active.
+            cands["inplace_base"] = ("LTXVImgToVideoInplace",)
+            cands["inplace_refine"] = ("LTXVImgToVideoInplace",)
+            cands["solidmask"] = ("SolidMask",)
+            cands["noisemask"] = ("SetLatentNoiseMask",)
+            cands["upscale_loader"] = ("LatentUpscaleModelLoader",)
+            cands["upscaler"] = ("LTXVLatentUpsampler",)
+            cands["cropguides"] = ("LTXVCropGuides",)
+            cands["imagescale"] = ("ImageScale",)
+            cands["resizelonger"] = ("ResizeImagesByLongerEdge",)
+            cands["preprocess"] = ("LTXVPreprocess",)
+            cands["ksel_refine"] = ("KSamplerSelect",)
+            cands["noise_refine"] = ("RandomNoise",)
+            cands["sampler_refine"] = ("SamplerCustomAdvanced",)
+            cands["separate_base"] = ("LTXVSeparateAVLatent",)
+            cands["concat_refine"] = ("LTXVConcatAVLatent",)
+            cands["guider_refine"] = ("CFGGuider",)
         # distilled_native: adds NEITHER -- the distilled unet feeds the guider
         # directly + the in-adapter fixed sigmas (distillation baked into the GGUF).
         return cands
@@ -508,6 +610,9 @@ class _LtxAvBase(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         rcfg = _recipe_config(self._recipe())
+        if rcfg["two_stage"]:
+            return self._build_graph_ia2v(plan, length, width, height,
+                                          audio_name, image_name)
         positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
@@ -614,6 +719,159 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "temporal_overlap": decode_t_overlap}}
         return g
 
+    def _build_graph_ia2v(self, plan, length, width, height, audio_name,
+                          image_name):
+        """The canonical comfy.org LTX-2.3 IA2V TWO-STAGE lip-sync graph
+        (2026-07-02 transplant; spec = docs/2026-07-02-canonical-ia2v/
+        ia2v_flat_api_prompt.json, live-proven on OUR radio still).
+
+        STAGE A -- MOTION (half canvas): guide still -> ImageScale(1.5x) ->
+        ResizeImagesByLongerEdge(1536) -> LTXVPreprocess(18); planted IN-PLACE
+        (LTXVImgToVideoInplace, strength 0.7 -- a SOFT anchor so the audio can
+        actuate the mouth) into an EmptyLTXVLatentVideo at width/2 x height/2;
+        the audio latent rides FROZEN under SetLatentNoiseMask(SolidMask(0));
+        denoised by euler_ancestral_cfg_pp (ancestral = fresh noise each step,
+        keeps motion alive) over the front-loaded 8-step ladder (5 of 8 steps
+        in the top ~2.5%% of noise -- the motion-decision region).
+
+        STAGE B -- DETAIL (full canvas): separate -> LTXVLatentUpsampler x2 on
+        the VIDEO latent -> re-anchor the SAME preprocessed still at strength
+        1.0 -> RE-CONCAT stage A's AUDIO latent -> 3-step euler_cfg_pp refine
+        (0.85 -> 0; sharpness only, never re-decides motion) with conditioning
+        routed through LTXVCropGuides(base latent) -> separate -> tiled decode
+        (video only -- the audio latent is DROPPED; audio stays mux-LAST, V-1).
+
+        i2v is REQUIRED (still-required engine; NO FALLBACKS -- render_clip
+        raises before this builds when init_image is absent). Base noise =
+        the beat seed; refine noise = seed+1 (two independent, deterministic
+        streams -- the canonical used randomize/fixed, we keep C7-style
+        determinism per beat)."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        rcfg = _recipe_config(self._recipe())
+        if not image_name:
+            # defense at the build seam too (render_clip already gates): the
+            # canonical graph plants the still at BOTH stages -- no image means
+            # no graph, never a silent t2v downgrade. NO FALLBACKS.
+            raise _wb.GraphExecutionError(
+                "%s (ia2v_canonical) requires an init image for EVERY beat"
+                % self.name)
+        positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
+        negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        seed = int(plan.get("seed", 0) or 0)
+        cfg = rcfg["cfg"]
+        base_w, base_h = int(width) // 2, int(height) // 2  # exact canonical halving
+        g = {
+            "unet": {"class": "unet", "inputs": {"unet_name": self._unet_name()}},
+            "lora": {"class": "lora", "inputs": {
+                "model": W("unet", 0),
+                "lora_name": self._distilled_lora_name(rcfg),
+                "strength_model": rcfg["lora_strength"]}},
+            "te": {"class": "te", "inputs": {
+                "text_encoder": self._encoder_name(),
+                "ckpt_name": self._projection_ckpt(),
+                "device": os.environ.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
+            "pos": {"class": "pos", "inputs": {"text": positive, "clip": W("te", 0)}},
+            "neg": {"class": "neg", "inputs": {"text": negative, "clip": W("te", 0)}},
+            "cond": {"class": "cond", "inputs": {
+                "positive": W("pos", 0), "negative": W("neg", 0),
+                "frame_rate": float(self.target_fps)}},
+            "videovae_dec": {"class": "videovae",
+                             "inputs": {"vae_name": self._video_vae_name()}},
+            # encode-side VAE stays a SEPARATE node (BUG-414 split): its last
+            # consumer (inplace_refine) runs BEFORE the refine sampler, so
+            # free_after_use reclaims it ahead of both activation peaks.
+            "videovae_enc": {"class": "videovae",
+                             "inputs": {"vae_name": self._video_vae_name()}},
+            "audiovae": {"class": "audiovae",
+                         "inputs": {"vae_name": self._audio_vae_name()}},
+            # ---- guide-image conditioning chain (canonical texture prep) ----
+            "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
+            "imagescale": {"class": "imagescale", "inputs": {
+                "image": W("loadimage", 0), "upscale_method": "lanczos",
+                "width": int(round(width * _IA2V_GUIDE_SCALE)),
+                "height": int(round(height * _IA2V_GUIDE_SCALE)),
+                "crop": "center"}},
+            "resizelonger": {"class": "resizelonger", "inputs": {
+                "images": W("imagescale", 0),
+                "longer_edge": _IA2V_GUIDE_LONGER_EDGE}},
+            "preprocess": {"class": "preprocess", "inputs": {
+                "image": W("resizelonger", 0),
+                "img_compression": _IA2V_GUIDE_COMPRESSION}},
+            # ---- audio latent, FROZEN under a zero mask ----
+            "loadaudio": {"class": "loadaudio", "inputs": {"audio": audio_name}},
+            "audioenc": {"class": "audioenc", "inputs": {
+                "audio": W("loadaudio", 0), "audio_vae": W("audiovae", 0)}},
+            "solidmask": {"class": "solidmask", "inputs": {
+                "value": 0.0, "width": int(width), "height": int(height)}},
+            "noisemask": {"class": "noisemask", "inputs": {
+                "samples": W("audioenc", 0), "mask": W("solidmask", 0)}},
+            # ---- STAGE A: motion at half canvas ----
+            "emptylatent": {"class": "emptylatent", "inputs": {
+                "width": base_w, "height": base_h,
+                "length": int(length), "batch_size": 1}},
+            "inplace_base": {"class": "inplace_base", "inputs": {
+                "vae": W("videovae_enc", 0), "image": W("preprocess", 0),
+                "latent": W("emptylatent", 0),
+                "strength": rcfg["i2v_strength"], "bypass": False}},
+            "concat": {"class": "concat", "inputs": {
+                "video_latent": W("inplace_base", 0),
+                "audio_latent": W("noisemask", 0)}},
+            "guider": {"class": "guider", "inputs": {
+                "model": W("lora", 0), "positive": W("cond", 0),
+                "negative": W("cond", 1), "cfg": cfg}},
+            "sigmas": {"class": "sigmas",
+                       "inputs": {"values": list(LTX_DISTILLED_SIGMAS)}},
+            "ksel": {"class": "ksel",
+                     "inputs": {"sampler_name": rcfg["sampler"]}},
+            "noise": {"class": "noise", "inputs": {"noise_seed": seed}},
+            "sampler": {"class": "sampler", "inputs": {
+                "noise": W("noise", 0), "guider": W("guider", 0),
+                "sampler": W("ksel", 0), "sigmas": W("sigmas", 0),
+                "latent_image": W("concat", 0)}},
+            "separate_base": {"class": "separate_base",
+                              "inputs": {"av_latent": W("sampler", 0)}},
+            # ---- STAGE B: latent-upsample + re-anchor + audio re-concat ----
+            "upscale_loader": {"class": "upscale_loader", "inputs": {
+                "model_name": _ia2v_upscale_model_name()}},
+            "upscaler": {"class": "upscaler", "inputs": {
+                "samples": W("separate_base", 0),
+                "upscale_model": W("upscale_loader", 0),
+                "vae": W("videovae_enc", 0)}},
+            "inplace_refine": {"class": "inplace_refine", "inputs": {
+                "vae": W("videovae_enc", 0), "image": W("preprocess", 0),
+                "latent": W("upscaler", 0),
+                "strength": rcfg["refine_strength"], "bypass": False}},
+            "concat_refine": {"class": "concat_refine", "inputs": {
+                "video_latent": W("inplace_refine", 0),
+                "audio_latent": W("separate_base", 1)}},
+            "cropguides": {"class": "cropguides", "inputs": {
+                "positive": W("cond", 0), "negative": W("cond", 1),
+                "latent": W("separate_base", 0)}},
+            "guider_refine": {"class": "guider_refine", "inputs": {
+                "model": W("lora", 0), "positive": W("cropguides", 0),
+                "negative": W("cropguides", 1), "cfg": cfg}},
+            "sigmas_refine": {"class": "sigmas_refine", "inputs": {
+                "values": list(rcfg["refine_sigmas"])}},
+            "ksel_refine": {"class": "ksel_refine", "inputs": {
+                "sampler_name": rcfg["refine_sampler"]}},
+            "noise_refine": {"class": "noise_refine",
+                             "inputs": {"noise_seed": seed + 1}},
+            "sampler_refine": {"class": "sampler_refine", "inputs": {
+                "noise": W("noise_refine", 0), "guider": W("guider_refine", 0),
+                "sampler": W("ksel_refine", 0), "sigmas": W("sigmas_refine", 0),
+                "latent_image": W("concat_refine", 0)}},
+            "separate": {"class": "separate",
+                         "inputs": {"av_latent": W("sampler_refine", 0)}},
+        }
+        decode_t_size, decode_t_overlap = _decode_temporal_knobs()
+        g["decode"] = {"class": "decode", "inputs": {
+            "samples": W("separate", 0), "vae": W("videovae_dec", 0),
+            "tile_size": 512, "overlap": 64,
+            "temporal_size": decode_t_size,
+            "temporal_overlap": decode_t_overlap}}
+        return g
+
     # ---- residency ----
     def load(self):
         """Resolve the installed ComfyUI node classes (fail-closed NAMED if
@@ -645,6 +903,13 @@ class _LtxAvBase(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s (talk) requires init_image (got %r)"
                 % (self.name, plan["init_image"]))
+        if rcfg["two_stage"] and not plan["init_image"]:
+            # ia2v_canonical is i2v-ONLY: the canonical graph plants the still
+            # in-place at both stages. NO FALLBACKS -- a beat without a still
+            # is a hard error, never a silent t2v downgrade.
+            raise _wb.GraphExecutionError(
+                "%s (ia2v_canonical) requires init_image for EVERY beat "
+                "(got %r)" % (self.name, plan["init_image"]))
         classes = dict(getattr(self, "_classes", None)
                        or _wb.resolve_graph_classes(self._node_candidates()))
         if rcfg["manual_sigmas"]:
@@ -653,6 +918,10 @@ class _LtxAvBase(_MC.MotionEngineBase):
             # Fires for BOTH sharp_lora and distilled_native (both run the fixed
             # distilled sigmas) -- NOT just the LoRA path.
             classes.setdefault("sigmas", _SigmasFromValues)
+        if rcfg["two_stage"]:
+            # ia2v_canonical: the refine ladder is a SECOND in-adapter sigmas
+            # source (0.85 -> 0, 3 steps).
+            classes.setdefault("sigmas_refine", _SigmasFromValues)
         audio_name = _wb.stage_into_comfy_input(plan["audio_path"])
         # i2v on ANY init image (the talk face; the scene still for music/announcer)
         image_name = (_wb.stage_into_comfy_input(plan["init_image"])

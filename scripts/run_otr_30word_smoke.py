@@ -43,6 +43,7 @@ from nodes._otr_video_engines.eng_ltx_av import (  # noqa: E402
     RECIPE_SHARP_LORA,
     RECIPE_DISTILLED_NATIVE,
     RECIPE_M0_BASE,
+    RECIPE_IA2V,
 )
 from nodes._otr_video_engines import wrapper_bridge as wb  # noqa: E402
 
@@ -217,6 +218,16 @@ _RECIPE_GRAPH_EXPECT = {
         "present": ("modelsampling", "sched"),
         "absent": ("lora", "sigmas"),
         "guider_model": ("modelsampling", 0),
+    },
+    # ia2v_canonical (2026-07-02 transplant): the two-stage canonical lip-sync
+    # graph -- LoRA-wrapped dev unet, both sigma ladders, upsample + refine
+    # chain present; the single-pass i2v node + modelsampling/sched absent.
+    RECIPE_IA2V: {
+        "present": ("lora", "sigmas", "sigmas_refine", "upscaler",
+                    "inplace_base", "inplace_refine", "cropguides",
+                    "sampler_refine", "concat_refine", "noisemask"),
+        "absent": ("modelsampling", "sched", "i2v"),
+        "guider_model": ("lora", 0),
     },
 }
 

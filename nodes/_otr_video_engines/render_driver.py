@@ -1111,8 +1111,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         init_source = "ltx_radio_face"
         _LOG.warning(
             "[OTR.render_driver] LTX-RADIO-FACE (A/B): role=%s shot %s conditioning "
-            "ltx_audio_in on the WIDE radio-face still %s (AMBIENT motion, NOT "
-            "lip-sync)", _abrole, shot.get("shot_id"), os.path.basename(_fpath))
+            "ltx_audio_in on the WIDE radio-face still %s (LIP-SYNC under the "
+            "ia2v_canonical recipe since 2026-07-02; ambient-only on the "
+            "single-pass recipes)", _abrole, shot.get("shot_id"),
+            os.path.basename(_fpath))
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --

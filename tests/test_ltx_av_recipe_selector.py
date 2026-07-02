@@ -19,6 +19,7 @@ from nodes._otr_video_engines.eng_ltx_av import (
     RECIPE_SHARP_LORA,
     RECIPE_DISTILLED_NATIVE,
     RECIPE_M0_BASE,
+    RECIPE_IA2V,
 )
 
 DEV_UNET = "ltx-2.3-22b-dev-Q3_K_M.gguf"
@@ -39,10 +40,30 @@ def test_auto_distilled_filename_resolves_distilled_native(monkeypatch):
     assert LtxAudioInEngine()._recipe() == RECIPE_DISTILLED_NATIVE
 
 
-def test_auto_dev_filename_resolves_sharp_lora(monkeypatch):
+def test_auto_dev_filename_resolves_ia2v_canonical(monkeypatch):
+    # operator GO 2026-07-02: the canonical comfy.org lip-sync recipe is the
+    # DEV-family default for every ltx_audio_in beat (sharp_lora stays
+    # explicitly selectable below).
     _clean(monkeypatch)
     monkeypatch.setenv("OTR_LTX_AV_UNET", DEV_UNET)
+    assert LtxAudioInEngine()._recipe() == RECIPE_IA2V
+
+
+def test_sharp_lora_still_explicitly_selectable_on_dev(monkeypatch):
+    _clean(monkeypatch)
+    monkeypatch.setenv("OTR_LTX_AV_UNET", DEV_UNET)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "sharp_lora")
     assert LtxAudioInEngine()._recipe() == RECIPE_SHARP_LORA
+
+
+def test_ia2v_on_distilled_unet_raises_double_distill(monkeypatch):
+    # ia2v stacks distilled-lora-384@0.5 -- on an already-distilled unet that
+    # double-distills; the resolver must fail LOUD, never render mush.
+    _clean(monkeypatch)
+    monkeypatch.setenv("OTR_LTX_AV_UNET", DISTILLED_UNET)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
+    with pytest.raises(EngineUnusable):
+        LtxAudioInEngine()._recipe()
 
 
 def test_explicit_override_wins_over_filename(monkeypatch):
