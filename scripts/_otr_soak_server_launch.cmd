@@ -80,9 +80,20 @@ if /i "%2"=="FLOOR" (
   set OTR_ENABLE_HUMO=1
 )
 rem Marathon per-leg env injection: the playlist runner writes this file with
-rem extra `set X=Y` lines (engine override map, opt-in flags) and deletes it
-rem after the leg. Absent file = no-op.
-if exist "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd" call "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd"
+rem extra `set X=Y` lines (engine override map, opt-in flags). CONSUME-ONCE
+rem (root-cause fix 2026-07-02): a crashed leg used to ORPHAN this hook, and
+rem the orphan then silently forced its env (the caught case:
+rem OTR_FORCE_ENGINE_MAP=*=humo + OTR_ENABLE_HUMO_HOSTS=1) onto EVERY later
+rem headless boot -- an all-ltx probe rendered all-HuMo. One hook = ONE boot:
+rem echo it LOUD, call it, DELETE it. Absent file = no-op. (All writers --
+rem otr_run_leg.ps1 / _otr_soak_marathon.py / otr_3d_quick_tests.ps1 --
+rem re-write it per leg, so consume-once matches the intended lifecycle.)
+if exist "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd" (
+  echo [launch] consuming marathon extra-env hook ^(one boot only^):
+  type "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd"
+  call "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd"
+  del /q "%~dp0_otr_soak_capstone_results\_marathon_extra_env.cmd"
+)
 rem Optional %3 DEBUG (CS-4 diagnosis, 2026-06-11): comfy model-management
 rem logs at DEBUG show per-model partial load/unload sizes -- the residency
 rem attribution evidence. Same recipe otherwise.

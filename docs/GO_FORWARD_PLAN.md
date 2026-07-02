@@ -29,6 +29,16 @@ regenerated before reuse.
 **Opt-in feature SHIPPED (not part of the forward order):** brief-driven HuMo radio-host
 + `OTR_LTX_RADIO_FACE` A/B (default OFF, byte-identical). See HANDOFF_LOG.md.
 
+**TALKING-RADIO bookends via ltx_audio_in (opt-in track): B SHIPPED; C probe RAN 2026-07-02 night.**
+Contract: `kibitz-runs/2026-07-01-talking-radio/r1/final.md` (B->C->A, one window at a time).
+(B) `ltx_radio_mouth` LTX-only still split SHIPPED (HuMo looks golden-pinned; see HANDOFF_LOG).
+(C) live probe: matched `OTR_LTX_RADIO_FACE=0/1` pair + PRE-REGISTERED criterion in
+`docs/2026-07-01-talking-radio/EYEBALL.md`; driver `scripts/_otr_talking_radio_night.py` (also ran
+the operator overnight batch: 120w all-ltx_audio_in + 50/100w all-humo_1.7B_169). **GO/NO-GO =
+operator morning eyeball** of the probe pair + EYEBALL.md numbers. (A) LTX-AV two-stage latent
+upsampler builds ONLY on GO. Source-bank visual-style transplant stays OUT (research mode;
+docs live in `ComfyUI-OTR-UpstreamStoryLab\docs`).
+
 ---
 
 ## 1A. OPEN ITEMS (post-soak, priority order -- detail in the sprint specs, do not inline here)
