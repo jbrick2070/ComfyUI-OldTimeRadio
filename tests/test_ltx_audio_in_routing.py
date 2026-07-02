@@ -93,9 +93,16 @@ def test_ltx_audio_in_conditions_on_the_bookend_scene_still():
     assert req["asset_refs"]["init_image"] == still
 
 
-def test_ltx_audio_in_character_beat_uses_wide_scene_character_still():
+def test_ltx_audio_in_character_beat_uses_wide_scene_character_still(monkeypatch):
     # a CHARACTER ltx_audio_in beat conditions on the WIDE scene_character still
     # (render_aspect=wide), never the vertical portrait (the pillarbox bug).
+    # SINGLE-PASS contract: under ia2v_canonical the S4 portrait-init route
+    # supersedes this (test_ltx_av_ia2v_canonical.py::
+    # test_char_beat_inits_on_portrait_under_ia2v) -- pin distilled_native.
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     still = "C:/x/otr/episodes/ep/b003_scene_character.png"
     led = _ledger([{"kind": "scene_character", "beat_id": "b003",
                     "path": still}])

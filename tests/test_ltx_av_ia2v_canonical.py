@@ -215,6 +215,11 @@ def _ltx_ledger(tmp_path):
                             ("b000_music_open", "scene_open"),
                             ("b001", "scene_announcer"),
                             ("b002", "scene_character"))]
+    # cast portrait for c01 -- the S4 ia2v portrait-init route (2026-07-02)
+    p = tmp_path / "c01_portrait.png"
+    p.write_bytes(_PNG)
+    imgs.append({"object_id": "c01", "kind": "portrait", "path": str(p),
+                 "w": 832, "h": 1216})
     return {"video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b000", "char_id": "",
                        "start_s": 0.0, "dur_s": 2.0},
@@ -373,3 +378,61 @@ def test_char_face_beat_keeps_m4_on_single_pass_recipe(tmp_path, monkeypatch):
     p = req["text_prompt"]
     assert "xxxx" in p                              # full M4 kept
     assert "stable centered subject" in p           # composition clause kept
+
+
+# --------------------------------------------------------------------------- #
+# S4 PORTRAIT INIT (portrait-vs-wide A/B, 2026-07-02): scene-still init left
+# proof7 character speech beats at 0.62/0.32/1.27 while the isolation A/B on
+# the SAME audio+prompt scored scene 0.57 vs portrait 2.86 (lag 0). Under the
+# ia2v talking register a character beat conditions on the cast PORTRAIT.
+# --------------------------------------------------------------------------- #
+
+
+def test_char_beat_inits_on_portrait_under_ia2v(ia2v_env, tmp_path,
+                                                monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
+    obs = req["observability"]
+    assert obs["init_source"] == "character_portrait_ia2v"
+    assert obs["init_image"] == "c01_portrait.png"
+
+
+def test_char_beat_missing_portrait_fails_loud_under_ia2v(ia2v_env, tmp_path,
+                                                          monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    led = _ltx_ledger(tmp_path)
+    led["images"]["images"] = [im for im in led["images"]["images"]
+                               if im.get("kind") != "portrait"]
+    with pytest.raises(rd.RenderError, match="NO portrait"):
+        rd.build_request_from_shot(_char_face_shot(), led)
+
+
+def test_announcer_bookend_keeps_scene_still_under_ia2v(ia2v_env, tmp_path,
+                                                        monkeypatch):
+    # only CHARACTER beats reroute; the announcer bookend conditions on its
+    # (radio-face) scene still exactly as before.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_announcer_open_shot(),
+                                     _ltx_ledger(tmp_path))
+    obs = req["observability"]
+    assert obs["init_source"] == "scene_still"
+    assert obs["init_image"] == "scene.png"
+
+
+def test_char_beat_keeps_scene_still_on_single_pass_recipe(tmp_path,
+                                                           monkeypatch):
+    # the 2026-06-20 wide-engines-never-portrait directive HOLDS outside
+    # RECIPE_IA2V: pinned distilled_native keeps the scene-still init.
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
+    obs = req["observability"]
+    assert obs["init_source"] == "scene_still"
+    assert obs["init_image"] == "scene.png"

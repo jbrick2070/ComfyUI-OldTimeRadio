@@ -1098,7 +1098,49 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # (+ the 3D lane) -- the render_aspect="portrait" engines -- use the
         # vertical portrait. A missing still degrades to the cheap family's floor;
         # init_image is cleared so the portrait can NEVER leak into a wide frame.
-        if _still:
+        # S4 PORTRAIT INIT (2026-07-02, portrait-vs-wide A/B): under the ia2v
+        # TALKING register a CHARACTER speech beat conditions on the cast
+        # member's PORTRAIT, not the wide scene still -- the scene still
+        # leaves the face too small for the audio coupling to articulate
+        # (proof7 speech beats: scene-still chars 0.62/0.32/1.27 vs
+        # face-forward announcers 4.62/5.51; isolation A/B same audio+prompt:
+        # scene 0.57 vs portrait 2.86, lag 0). The 2026-06-20 "wide engines
+        # NEVER condition on the vertical portrait" directive is SUPERSEDED
+        # here ONLY under RECIPE_IA2V: its canvas-independent guide chain
+        # (fixed 1920x1088 center-crop -> longer-edge 1536) COVERS the wide
+        # canvas from a vertical portrait -- no pillarbox, no squash
+        # (eyeballed: docs/2026-07-02-canonical-ia2v/pw_ab_portrait_frame.png).
+        # Single-pass recipes keep the scene still; the directive holds there.
+        _s4_portrait = (
+            _eng == "ltx_audio_in"
+            and _role_of_shot(shot) == "character_video"
+            and _ia2v_talking_register_active(_eng))
+        if _s4_portrait:
+            if not portrait:
+                raise RenderError(
+                    "IA2V TALKING register: character beat %s (char %r) has "
+                    "NO portrait in the ledger -- NO FALLBACK to the wide "
+                    "scene still (face too small to lip-sync; proof7 A/B "
+                    "2026-07-02). Confirm the image phase minted the cast "
+                    "portrait." % (_bid, char_id))
+            # LOUD aspect guard: record the vertical still entering the wide
+            # canvas so any future pillarbox/squash regression is traceable.
+            _prow = next(
+                (im for im in (((ledger or {}).get("images") or {}).get("images") or [])
+                 if isinstance(im, dict) and str(im.get("path") or "") == portrait),
+                None)
+            _pw = int((_prow or {}).get("w") or 0)
+            _ph = int((_prow or {}).get("h") or 0)
+            init_image = portrait
+            init_source = "character_portrait_ia2v"
+            _LOG.warning(
+                "[OTR.render_driver] IA2V PORTRAIT INIT (S4): character beat "
+                "%s conditions on portrait %s (%sx%s; vertical enters the "
+                "canvas-independent 1920x1088 center-crop guide chain -- no "
+                "pillarbox under ia2v_canonical; scene still %s NOT used)",
+                _bid, os.path.basename(portrait), _pw or "?", _ph or "?",
+                os.path.basename(_still) if _still else "<absent>")
+        elif _still:
             init_image = _still
             init_source = "scene_still"
             _LOG.info(

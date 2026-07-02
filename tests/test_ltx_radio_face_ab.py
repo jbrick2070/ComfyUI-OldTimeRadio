@@ -160,10 +160,23 @@ def test_precedence_rejects_when_humo_hosts_also_on(tmp_path, monkeypatch):
 
 
 def test_on_does_not_touch_character_beat(tmp_path, monkeypatch):
-    # The A/B is announcer/music-only; a character ltx_audio_in beat is untouched.
+    # The A/B is announcer/music-only; a character ltx_audio_in beat never
+    # takes the radio face. Under the default ia2v recipe the S4 route owns
+    # the character init (cast portrait, 2026-07-02) -- so the fixture needs
+    # a cast portrait and the assertion pins the S4 source explicitly.
     monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _ltx_ledger(tmp_path, face_dims=(1472, 832))
-    shot = _ltx_shot(role="character_video")
+    p = tmp_path / "c01_portrait.png"
+    p.write_bytes(_PNG)
+    led["images"]["images"].append(
+        {"object_id": "c01", "kind": "portrait", "path": str(p),
+         "w": 832, "h": 1216})
+    led["lines"].append({"line_id": "b002", "char_id": "c01",
+                         "start_s": 2.0, "dur_s": 2.0})
+    shot = dict(_ltx_shot(role="character_video"),
+                shot_id="shot_b002", beat_id="b002",
+                source_line_ids=["b002"], char_id="c01")
     req = rd.build_request_from_shot(shot, led)
     assert req["observability"]["init_source"] != "ltx_radio_face"
+    assert req["observability"]["init_source"] == "character_portrait_ia2v"
