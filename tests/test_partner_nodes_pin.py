@@ -15,7 +15,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 YAML_PATH = REPO_ROOT / "nodes" / "_otr_shared" / "partner_nodes.yaml"
-PIN_SCRIPT = REPO_ROOT / "scripts" / "_otr_pin_partner_nodes.py"
+PIN_SCRIPT = REPO_ROOT / "scripts" / "otr_pin_partner_nodes.py"
 
 EXPECTED_ROW_IDS = {
     "cloud_elevenlabs_flash", "cloud_elevenlabs_tts",

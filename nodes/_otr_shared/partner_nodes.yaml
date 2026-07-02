@@ -1,8 +1,8 @@
 pin_meta:
   combo_options_excluded: true
   comfyui_commit: bb131be9e83d2f773c90f1d6f1e4b248a498c8c5
-  generated_utc: '2026-07-02T19:38:15.506976+00:00'
-  generator: scripts/_otr_pin_partner_nodes.py
+  generated_utc: '2026-07-02T19:46:03.608772+00:00'
+  generator: scripts/otr_pin_partner_nodes.py
   schema_version: pin-2026-07-02
 rows:
   cloud_elevenlabs_flash:
