@@ -63,15 +63,56 @@ of scope either way until C passes (Codex CUT #2).
 GO/NO-GO is OPERATOR-GATED: the numbers + clips below are evidence; Jeffrey's
 morning eyeball decides.
 
-## Results
+## Results (2026-07-02 ~01:50, analysis run same night)
 
-_(pending -- filled by the probe analysis after the pair renders)_
+Both legs rendered clean: 6/6 clips `ltx_audio_in`, obs finals exist
+(`night_results.jsonl`). Probe stamps: `probe_manifest_probe{A,B}*.json`.
+Eval JSONs: `probe_eval_open14s.json` (0-14s window) +
+`probe_eval_b001_announcer.json` (the CLEAN window: b001 announcer bookend,
+~9.6s+11.5s -- pure LTX clip, speech transients; the 0-14s window is
+contaminated by the procgen title blend on b000).
 
-| leg | obs mp4 | mouth-region r | verdict aid |
-|-----|---------|----------------|-------------|
-| probeA_face0 | pending | pending | control |
-| probeB_face1 | pending | pending | test |
+| leg | obs mp4 | b001 r (mouth motion vs onsets) | mouth motion mean | verdict aid |
+|-----|---------|--------------------------------|-------------------|-------------|
+| probeA_face0 | signal_lost_recorded_mysteries_20260702_005445_..._final.mp4 | **0.009** | 1.77 | control: ambient as expected |
+| probeB_face1 | signal_lost_jazz_code_cracker_20260702_012739_..._final.mp4 | **0.047** | 1.06 | r1 << 0.35; delta 0.037 << 0.15 |
 
-## Verdict
+**What the frames show** (`probeB_t10p5/t12/t15/t19p5.png`): the face-still
+bookend IS being animated with REAL mouth articulation -- closed (10.5s) ->
+open "oh" (12s) -> closed (15s) -> parted (19.5s), slow push-in -- so this is
+NOT pure drift. But the articulation runs on its OWN rhythm: correlation with
+the announcer's speech transients is ~zero on the very window where the voice
+plays. Classic "dubbed film" mouthing, not lip-sync. Criterion 1 partially
+holds (aperture changes), criterion 2 decisively FAILS, criterion 3 holds
+(control leg ambient).
 
-_(pending operator eyeball)_
+**Strengthening observation:** probe B's still was the PRE-material-fix mint
+-- a literal human face in the radio (`probe_face1_mouth_still.png`; see
+BUG-note in the d87f8fc5 commit). A human mouth is the STRONGEST mouth prior
+LTX could get; if the distilled recipe does not couple THAT to the audio, the
+corrected appliance grille-mouth (shipped d87f8fc5, live in the overnight
+batch_face1 legs) will not couple either.
+
+**Honest caveat / the one re-probe knob:** our recipe is
+`distilled-1.1 Q3_K_M / distilled_native / 8-step`. The official comfy.org
+LTX-2.3 lip-sync demo may lean on the DEV unet's fuller audio coupling. A
+re-probe is ONE env change on the same harness
+(`OTR_LTX_AV_UNET=ltx-2.3-22b-dev-Q3_K_M.gguf` -> sharp_lora recipe), at
+~1.4x step cost. NOT run tonight -- criterion + budget say stop at the
+pre-registered evidence.
+
+## Verdict (pre-registered criterion applied)
+
+**NO-GO on lip-sync as measured** -- r1 = 0.047 (threshold 0.35), delta =
+0.037 (threshold 0.15). Per the contract: keep the moving-console look;
+**HuMo stays the face path; Sub-plan A (upsampler) is NOT built.**
+"Retire OTR_ENABLE_HUMO_HOSTS" stays out of scope.
+
+**OPERATOR EYEBALL STILL DECIDES**: watch both obs mp4s (b001 segment,
+~10-21s). If the uncorrelated mouthing reads as charming "old-dub" talking
+radio and you want it as a LOOK (not lip-sync), say so -- that is a creative
+GO on the A/B toggle, separate from the technical lip-sync claim, and A can
+be revisited. If you want true sync, the dev-unet re-probe above is the next
+cheap step; otherwise HuMo hosts remain the talking path.
+
+_(operator: fill in your morning call here)_

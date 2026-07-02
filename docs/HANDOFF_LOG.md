@@ -6,6 +6,29 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 -- talking-radio Sub-plan C: probe RAN, criterion says NO-GO on lip-sync; BUG-415 fixed; overnight batch running
+Did: ran the Sub-plan-C matched probe pair live (driver `scripts/_otr_talking_radio_night.py`,
+local per the `scripts/_*.py` ignore convention; durable evaluator
+`scripts/otr_talking_radio_probe_eval.py` committed). Both legs green: 6/6 clips ltx_audio_in,
+obs finals exist (probeA face0 = recorded_mysteries, probeB face1 = jazz_code_cracker; 1
+freeze-gate auto-retry on B). Live /object_info captured (99 ltx classes; Sub-plan-A node
+candidates confirmed real). PRE-REGISTERED criterion applied (EYEBALL.md): the face-still bookend
+shows REAL mouth articulation (closed->open->closed frames) but ZERO transient correlation
+(b001 window r1=0.047 vs threshold 0.35; delta vs control 0.037 vs 0.15) => **NO-GO on lip-sync
+as measured; HuMo stays the face path; Sub-plan A NOT built** (contract). Caveats in EYEBALL.md:
+probe still was the strongest-possible mouth prior (see below), and the one cheap re-probe knob is
+the dev unet (OTR_LTX_AV_UNET) -- operator's morning eyeball may still take the uncorrelated
+mouthing as a LOOK (creative GO separate from lip-sync). TWO live catches fixed at root this night:
+**BUG-LOCAL-415** (crash-orphaned `_marathon_extra_env.cmd` forced `*=humo`+HUMO_HOSTS onto every
+headless boot -> probe A attempt 1 rendered all-HuMo; launcher now CONSUME-ONCE; promoted to Bug
+Bible 12.47 @ survival-guide 8911c43 w/ Three-File Contract) and the **ltx_radio_mouth HUMAN-FACE
+leak** (image dispatcher has NO negative channel -> "no human" negative inert -> z_image minted a
+literal screaming human face in the radio; positive now MATERIAL-ANCHORED, d87f8fc5). Operator
+overnight batch (his ask, running unattended as of ~01:50): 6x120w all-ltx_audio_in face1 (the
+CORRECTED appliance-mouth stills) + 2x120w face0 + 50w/100w all-humo_1.7B_169 (HUMO_HOSTS on);
+results stream to docs/2026-07-01-talking-radio/night_results.jsonl, finals to otr/obs.
+Gates: suite 5922/0 x2, Bug Bible 16/0, B7 in-suite; pushes 55e35468 + d87f8fc5 (+ bible 8911c43).
+
 ## 2026-07-02 -- talking-radio Sub-plan B: LTX-only mouth-forward still, SPLIT from HuMo (SHIPPED)
 Did: executed Sub-plan B of the talking-radio contract (`kibitz-runs/2026-07-01-talking-radio/r1/
 final.md`; order B->C->A). NEW style `ltx_radio_mouth` (`_RADIO_CONSOLE_MOUTH`) in

@@ -1,0 +1,16 @@
+{
+ "ambient_vs_lipsync_expectation": "ltx_audio_in is documented as AMBIENT motion (render_driver); this leg probes LIP-SYNC via the Sub-plan-B mouth-forward still. OTR_LTX_RADIO_FACE=0. A non-articulating grille on the face0 leg is EXPECTED behavior, not a broken render.",
+ "criterion_doc": "docs/2026-07-01-talking-radio/EYEBALL.md",
+ "tag": "probeA_face0",
+ "engine": "ltx_audio_in",
+ "words": 30,
+ "status": "success",
+ "pid": "b2c88f08-c2c7-4b1c-a01f-e4b1cc5866ac",
+ "obs": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_recorded_mysteries_20260702_005445_silent_procgen_blended_final.mp4",
+ "obs_exists": true,
+ "engine_histogram": {
+  "ltx_audio_in": 6
+ },
+ "clip_count": 6,
+ "attempts": 1
+}
