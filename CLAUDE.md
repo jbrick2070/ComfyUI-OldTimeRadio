@@ -46,6 +46,15 @@ IS my workflow.
   `python -c "..."` with nested quotes -- PowerShell mangles them; instead WRITE A TEMP `.py` file, run
   it, then delete it. `2>&1` makes stderr render as scary red text -- that is NOT a failure; check the
   exit code / output. Pipe noisy output through `Select-Object -Last N`.
+- **QUOTING / `$`-INTERPOLATION RULE (hard -- this bites EVERY session that ignores it):** any command
+  that would need NESTED quotes, backtick-escaped quotes (`` `" ``), a `$` variable inside a quoted
+  argument, a here-string fed to another program, or `cmd.exe /c "<...>"` -- DO NOT attempt it inline
+  and DO NOT iterate on escaping ("one more tweak" never works; PowerShell mangles `$var` and eats
+  quote layers). IMMEDIATELY write a temp LAUNCHER SCRIPT instead -- a `.ps1` (or `.py`/`.cmd`) written
+  via the FILE TOOLS (Write, not echo/Set-Content with its own quoting problem), with all variables and
+  quoting inside the script where they are literal and safe -- run it via
+  `powershell -ExecutionPolicy Bypass -File <tmp.ps1>` (or `Start-Process -FilePath`), then delete it.
+  First quoting error = STOP escaping, switch to the script. Zero exceptions.
 - **The ~60s MCP ceiling:** any single DC command that blocks longer (a `Start-Sleep` > ~45s, a big render
   loop, the full ~4200-test suite, a slow boot wait) TIMES OUT and orphans the process. Background it to a
   log and poll the log, or shrink the job (a test subset, fewer frames). DC itself is NOT flaky -- the
