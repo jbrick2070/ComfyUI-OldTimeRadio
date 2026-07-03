@@ -373,6 +373,81 @@ def test_unrecognized_output_type_is_corrupt(rig):
 
 
 # ---------------------------------------------------------------------------
+# V3 IO.ComfyNode partner contract -- hidden via PREPARE_CLASS_CLONE, NOT kwargs
+# (regression for: IdeogramV4.execute() got an unexpected keyword argument
+# 'api_key_comfy_org' -- every comfy_api_nodes partner is a V3 node)
+# ---------------------------------------------------------------------------
+
+
+class _V3HiddenHolder:
+    """Minimal stand-in for comfy_api's HiddenHolder: attribute access by
+    lowercase name resolves the value stored under the Hidden ENUM VALUE (the
+    uppercase TYPE) key, mirroring HiddenHolder.from_dict."""
+
+    _MAP = {
+        "unique_id": "UNIQUE_ID",
+        "api_key_comfy_org": "API_KEY_COMFY_ORG",
+        "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+        "comfy_usage_source": "COMFY_USAGE_SOURCE",
+    }
+
+    def __init__(self, hidden_inputs):
+        self._d = dict(hidden_inputs or {})
+
+    def __getattr__(self, name):
+        type_key = _V3HiddenHolder._MAP.get(name)
+        return self._d.get(type_key) if type_key else None
+
+
+class _FakeV3Node:
+    """Stands in for a V3 IO.ComfyNode partner: hidden is delivered via
+    PREPARE_CLASS_CLONE -> cls.hidden; execute() only ever sees real inputs."""
+
+    hidden = None
+    last_kwargs = None
+    captured_hidden = None
+    behavior = None
+
+    @classmethod
+    def PREPARE_CLASS_CLONE(cls, v3_data):
+        clone = type("FakeV3Clone", (cls,), {})
+        clone.hidden = _V3HiddenHolder((v3_data or {}).get("hidden_inputs"))
+        return clone
+
+    @classmethod
+    async def EXECUTE_NORMALIZED_ASYNC(cls, **kwargs):
+        _FakeV3Node.last_kwargs = kwargs
+        _FakeV3Node.captured_hidden = cls.hidden
+        return _FakeV3Node.behavior(kwargs)
+
+
+def test_v3_partner_hidden_via_clone_not_kwargs(monkeypatch, rig):
+    """The V3 fix: hidden auth/usage/id must reach the node via cls.hidden
+    (PREPARE_CLASS_CLONE), and execute() must receive ONLY the real inputs --
+    passing api_key_comfy_org as a kwarg is the exact bug that crashed cloud."""
+    monkeypatch.setattr(invoke, "_resolve_node_class", lambda row: _FakeV3Node)
+    _FakeV3Node.last_kwargs = None
+    _FakeV3Node.captured_hidden = None
+    _FakeV3Node.behavior = lambda kwargs: (str(rig["src"]),)
+
+    res = invoke.invoke_partner_node(
+        rig["node_key"], {"prompt": "radio"}, timeout_s=30, estimated_usd=0.10)
+    assert res["path"] == str(rig["src"])
+
+    kw = _FakeV3Node.last_kwargs
+    assert kw == {"prompt": "radio"}  # ONLY real inputs reach execute()
+    assert "api_key_comfy_org" not in kw
+    assert "unique_id" not in kw
+    assert "comfy_usage_source" not in kw
+
+    holder = _FakeV3Node.captured_hidden
+    assert holder is not None
+    assert holder.api_key_comfy_org == "test-key-123"
+    assert str(holder.unique_id).startswith("otr-cloud-")
+    assert holder.comfy_usage_source == invoke._USAGE_SOURCE
+
+
+# ---------------------------------------------------------------------------
 # Real pin table loads + shape (uses the checked-in yaml, no network)
 # ---------------------------------------------------------------------------
 

@@ -300,6 +300,16 @@ def _run_with_watchdog(coro, *, timeout_s: float, node_key: str) -> Any:
 async def _call_partner(row: dict, kwargs: dict) -> Any:
     node_cls = _resolve_node_class(row)
     fn_name = row.get("function", "")
+    # V3 IO.ComfyNode contract (comfy_api.latest._io): hidden inputs
+    # (api_key_comfy_org / auth_token_comfy_org / unique_id / comfy_usage_source)
+    # are NOT execute() kwargs -- the framework delivers them via
+    # PREPARE_CLASS_CLONE(v3_data) -> cls.hidden (a HiddenHolder). Passing them as
+    # kwargs makes execute() raise "unexpected keyword argument 'api_key_comfy_org'"
+    # (every comfy_api_nodes partner is a V3 node: Ideogram/Recraft/Flux/Kling/
+    # Seedream/Pixverse ...). Route hidden through the clone; only the real inputs
+    # go to EXECUTE_NORMALIZED_ASYNC. Legacy V1 nodes keep the kwargs path.
+    if hasattr(node_cls, "PREPARE_CLASS_CLONE"):
+        return await _call_partner_v3(node_cls, row, fn_name, kwargs)
     target = getattr(node_cls, fn_name, None)
     if target is None:
         raise CloudMediaError(
@@ -313,6 +323,38 @@ async def _call_partner(row: dict, kwargs: dict) -> Any:
     except Exception:
         bound = target  # classmethod/static or non-instantiable V3 class
     result = bound(**kwargs)
+    if inspect.isawaitable(result):
+        result = await result
+    return result
+
+
+async def _call_partner_v3(node_cls, row: dict, fn_name: str,
+                           kwargs: dict) -> Any:
+    """Invoke a V3 ``IO.ComfyNode`` partner: split the hidden inputs out of
+    kwargs (they must not reach ``execute()``), build a class clone whose
+    ``cls.hidden`` HiddenHolder carries them, and call the normalized entry with
+    only the real inputs. ``hidden_inputs`` is keyed by the Hidden ENUM VALUE
+    (the uppercase TYPE, e.g. ``API_KEY_COMFY_ORG``) per HiddenHolder.from_dict --
+    the pin's ``inputs.hidden`` maps each lowercase name -> that TYPE."""
+    hidden_map = (row.get("inputs") or {}).get("hidden") or {}  # name -> TYPE
+    hidden_inputs: dict = {}
+    real_inputs: dict = {}
+    for key, val in kwargs.items():
+        type_name = hidden_map.get(key)
+        if type_name is not None:
+            hidden_inputs[str(type_name)] = val
+        else:
+            real_inputs[key] = val
+    clone = node_cls.PREPARE_CLASS_CLONE({"hidden_inputs": hidden_inputs})
+    entry = fn_name or getattr(clone, "FUNCTION", "EXECUTE_NORMALIZED_ASYNC")
+    fn = getattr(clone, entry, None)
+    if fn is None:
+        raise CloudMediaError(
+            CloudErrorCode.UNSUPPORTED_SCHEMA,
+            f"pinned function {entry!r} missing on V3 node "
+            f"{row.get('class_name')!r}; re-pin the partner table",
+        )
+    result = fn(**real_inputs)
     if inspect.isawaitable(result):
         result = await result
     return result
