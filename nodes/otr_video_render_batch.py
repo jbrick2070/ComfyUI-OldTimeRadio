@@ -62,17 +62,24 @@ def _stamp_render_engines_meta(manifest, vram_peak_mb):
     """Stamp the per-role VIDEO engine map + histogram + VRAM peak + the E5
     recipe receipt into the production-ledger meta so the episode treatment /
     credits sheet reports exactly which engine + recipe rendered each beat.
-    Best-effort; never raises.
 
-    (The per-role IMAGE engine is already durable in ``ledger['images']`` --
-    each still row carries ``role`` + ``engine_id`` -- so only the VIDEO side
-    needs stamping here.)"""
+    S2 durable-persistence contract (credits enrichment 2026-07-03): this
+    stamp was previously best-effort (bare ``led.save()`` -- but ``save()``
+    returns None on failure and never raises, so a miss was SILENT and the
+    MOTION credit line would be missing at OTR_CreditsRoll time). Now routed
+    through ``stamp_durable``: LOUD LedgerStampError on save failure in
+    production; test-mode injects in-memory only.
+
+    (This node already operates on the SINGLETON (not a wire-parsed local
+    dict), so there is no local-to-singleton copy step here -- the payload is
+    handed straight to the stamp helper.)"""
     payload = _build_render_engines_payload(manifest, vram_peak_mb)
-    from .production_ledger import get_ledger
+    from .production_ledger import stamp_durable
 
-    led = get_ledger()
-    led.data.setdefault("meta", {})["render_engines"] = payload
-    led.save()
+    stamp_durable(
+        meta_updates={"render_engines": payload},
+        source="video_render_batch",
+    )
 
 
 class OTRVideoRenderBatch:
@@ -266,13 +273,13 @@ class OTRVideoRenderBatch:
             "prompt_diversity": diversity,
             "vram_peak_mb": ep.get("vram_peak_mb"), "trace": ep.get("trace"),
         }
-        # Forensic: stamp the per-role render-engine map + VRAM peak into the
-        # production-ledger meta for the episode treatment / credits sheet.
-        try:
-            _stamp_render_engines_meta(manifest, ep.get("vram_peak_mb"))
-        except Exception as _eng_exc:  # noqa: BLE001 -- never break the render
-            log.warning("[OTR_VideoRenderBatch] render_engines stamp skipped: %s",
-                        _eng_exc)
+        # Stamp the per-role render-engine map + VRAM peak into the
+        # production-ledger meta for the credits roll. S2 durable-persistence
+        # contract (credits enrichment 2026-07-03): this stamp is REQUIRED --
+        # OTR_CreditsRoll raises on a missing MOTION receipt, so a swallowed
+        # save failure here would just move the crash to mux time with less
+        # context. LedgerStampError propagates (no silent skip).
+        _stamp_render_engines_meta(manifest, ep.get("vram_peak_mb"))
         return (report, json.dumps(manifest, ensure_ascii=True, default=str),
                 "node_episode_report.json")
 

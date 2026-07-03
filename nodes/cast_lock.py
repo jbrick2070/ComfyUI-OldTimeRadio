@@ -191,6 +191,28 @@ class CastLock:
             report.append(f"voice routing repair: {_note}")
 
         report.insert(0, f"cast_lock_revision={revision} policy={cast_voice_policy}")
+
+        # S2 durable persistence (credits enrichment 2026-07-03): everything
+        # above stamped the LOCAL wire ledger (``led``), not the singleton --
+        # a bare get_ledger().save() would persist EMPTY/stale state. Copy the
+        # final cast (voice_ref_id / voice_engine / commercial_clean per
+        # entry -- the DELIVERED voices the credits roll must read) plus the
+        # CastLock-owned meta keys into the singleton and save LOUDLY
+        # (raises LedgerStampError on save failure; test-mode injects
+        # in-memory only).
+        from .production_ledger import stamp_durable
+        stamp_durable(
+            sections={"cast": led.get("cast") or []},
+            meta_updates={
+                k: meta[k] for k in (
+                    "cast_lock_revision", "cast_voice_policy",
+                    "delivery_profile_id", "delivery_profile_version",
+                    "voice_bank_id",
+                ) if k in meta
+            },
+            source="cast_lock",
+        )
+
         ledger_json = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         done = f"cast_lock:done:rev={revision}:policy={cast_voice_policy}"
         return (ledger_json, int(revision), "\n".join(report), done)

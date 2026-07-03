@@ -170,6 +170,18 @@ class StableAudioTheme:
 
             sr = int(getattr(adapter, "sample_rate", 44100) or 44100)
             cues = {slot: empty_audio_batch(sr) for slot in _CUE_SLOTS}
+        # S2 durable persistence (credits enrichment 2026-07-03): the music
+        # engine had NO durable provenance path -- node 83's ``done`` output
+        # is unlinked in the workflow JSON, so ``music:done:engine=...`` died
+        # on the wire and the credits roll had nothing to read. Stamp the
+        # delivered engine into the singleton meta and save LOUDLY (raises
+        # LedgerStampError on save failure; test-mode injects in-memory only).
+        from .production_ledger import stamp_durable
+        stamp_durable(
+            meta_updates={"music_engine": str(engine)},
+            source="music_theme",
+        )
+
         done = f"music:done:engine={engine}:cues={int(n_cues)}"
         return (
             cues["opening"], cues["closing"], cues["interstitial"],

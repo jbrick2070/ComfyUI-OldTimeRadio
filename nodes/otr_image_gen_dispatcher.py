@@ -671,6 +671,18 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _ie_meta = {}
         ledger["meta"] = _ie_meta
     _ie_meta["image_engines"] = {"by_role": img_hist, "image_revision": rev}
+    # S2 durable persistence (credits enrichment 2026-07-03): ``ledger`` here
+    # is the LOCAL wire-parsed dict -- the stamp above was wire-only, so the
+    # image-engine receipts died with the wire. Copy the images section + the
+    # image_engines meta into the production-ledger SINGLETON and save
+    # LOUDLY (raises LedgerStampError on save failure; test-mode injects
+    # in-memory only). The late OTR_CreditsRoll node reads THIS.
+    from .production_ledger import stamp_durable
+    stamp_durable(
+        sections={"images": ledger["images"]},
+        meta_updates={"image_engines": _ie_meta["image_engines"]},
+        source="image_dispatcher",
+    )
     # stills_manifest.json beside the episode stills (ST-3/W3): the durable
     # per-episode index of every still this dispatch materialized. Fail-soft.
     if ep_rows:

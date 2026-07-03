@@ -301,6 +301,61 @@ def peek_ledger() -> Optional["Ledger"]:
         return _CURRENT
 
 
+class LedgerStampError(RuntimeError):
+    """S2 durable-persistence contract (credits enrichment 2026-07-03):
+    a required credits stamp could not be persisted to the production
+    ledger singleton. LOUD by design -- the late OTR_CreditsRoll node can
+    only read what is on disk, so a silent save miss here becomes a
+    missing-receipt failure at mux time. Never catch-and-continue."""
+
+
+def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
+                  meta_updates: Optional[Dict[str, Any]] = None,
+                  source: str = "") -> Optional[str]:
+    """Copy credit-bearing sections from a LOCAL wire-parsed ledger dict
+    into the process SINGLETON and persist, LOUDLY.
+
+    S2 gotcha this exists for: CastLock and the image dispatcher stamp a
+    LOCAL dict parsed off the wire (``load_ledger(script_json)``), never
+    the singleton -- so a bare ``get_ledger().save()`` would persist the
+    singleton's EMPTY/stale state and silently drop the stamps. Callers
+    hand the updated sections here and this helper does the copy + save.
+
+    - ``sections``: top-level keys replaced wholesale on the singleton
+      (e.g. ``{"cast": [...]}``, ``{"images": {...}}``).
+    - ``meta_updates``: merged into ``data["meta"]`` (additive).
+    - Production: ``Ledger.save()`` returns ``None`` on failure and never
+      raises, so the return IS checked here and a ``None`` RAISES
+      ``LedgerStampError`` (Fable BUILD-BREAKER #3).
+    - Test mode (``OTR_TEST_MODE=1``): explicit injection path -- the
+      in-memory singleton copy still happens (tests can read it back) but
+      the disk save is skipped, so no placeholder ledgers leak into the
+      real output tree. Returns ``None`` in that case.
+    """
+    led = get_ledger()
+    for key, value in (sections or {}).items():
+        led.data[key] = value
+    if meta_updates:
+        meta = led.data.setdefault("meta", {})
+        if not isinstance(meta, dict):
+            meta = {}
+            led.data["meta"] = meta
+        meta.update(meta_updates)
+    if os.environ.get("OTR_TEST_MODE") == "1":
+        log.info("[Ledger] stamp_durable(%s): test-mode injection "
+                 "(in-memory only, disk save skipped)", source or "?")
+        return None
+    path = led.save()
+    if path is None:
+        raise LedgerStampError(
+            f"stamp_durable({source or '?'}): Ledger.save() returned None -- "
+            f"durable credits stamp NOT persisted (sections="
+            f"{sorted((sections or {}).keys())}, meta_keys="
+            f"{sorted((meta_updates or {}).keys())})"
+        )
+    return path
+
+
 def has_current_ledger() -> bool:
     """True iff a writer-produced ledger with at least one line row
     exists in the current process. Use this as the gate before any
