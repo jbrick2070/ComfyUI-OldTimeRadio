@@ -59,43 +59,17 @@ def test_dossier_has_story_spine_block():
     assert "protect the lab" in body and "ship the product" in body
 
 
-def test_dossier_has_render_engines_block_video_and_image():
-    dossier = ve._build_hud_dossier(_led())
-    body = "\n".join(
-        l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
-    assert "character_video" in body
-    assert "still_flat" in body                  # video engine per role
-    assert "z_image_turbo" in body               # image engine per role
-
-
-def test_dossier_image_engines_from_meta_primary():
-    # Credits fix 2026-06-21: the dispatcher stamps meta.image_engines.by_role
-    # (the ledger['images'] section is dropped before the credits read). The
-    # dossier must read meta FIRST so the per-slot image model shows.
-    led = _led()
-    led["images"] = {}                           # legacy section gone
-    led["meta"]["image_engines"] = {"by_role": {
-        "announcer_visual": {"flux_gen1": 2},
-        "music_visual": {"flux_gen1": 1},
-        "character_video": {"flux2_klein": 3},
-    }}
-    dossier = ve._build_hud_dossier(led)
-    body = "\n".join(
-        l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
-    assert "flux2_klein" in body                 # cast slot image model
-    assert "music_visual" in body                # music slot shows its model
-    assert "image" in body                       # image lines present
-
-
-def test_dossier_image_meta_takes_precedence_over_legacy():
-    led = _led()  # has legacy led['images'] with z_image_turbo
-    led["meta"]["image_engines"] = {"by_role": {
-        "character_video": {"flux2_klein": 3}}}
-    dossier = ve._build_hud_dossier(led)
-    body = "\n".join(
-        l for s in dossier if s["header"] == "RENDER ENGINES" for l in s["lines"])
-    assert "flux2_klein" in body                 # meta wins
-    assert "z_image_turbo" not in body           # legacy not used when meta present
+# RENDER ENGINES dossier tests RETIRED (credits enrichment 2026-07-03). The
+# per-role image/video engine receipts were ripped out of node-12's
+# _build_hud_dossier: they do not exist at node-12 time (it renders BEFORE the
+# image dispatcher 91 / video render batch 92, so the block only ever printed
+# stale/"(not recorded)" data). The receipts now render LATE from the DURABLE
+# ledger in OTR_CreditsRoll; the 3 relocated tests are the node's spec now:
+#   tests/test_credits_roll_spec.py::test_roll_has_motion_and_images_blocks_video_and_image
+#   tests/test_credits_roll_spec.py::test_roll_image_engines_from_meta_is_the_only_source
+#   (meta-primary + meta-over-legacy folded into the single "only source" test)
+# node-12's dossier keeps only what is TRUE at its early time (writer / story
+# spine / system / resolved-openrouter), covered by the tests below.
 
 
 def test_dossier_has_system_block_techie_stats():

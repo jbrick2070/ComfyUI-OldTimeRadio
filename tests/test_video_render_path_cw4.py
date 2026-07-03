@@ -281,29 +281,16 @@ def test_assemble_silent_timeline_frame_accurate_and_silent(tmp_path):
     assert count_audio_streams(str(out)) == 0        # V-1: always silent
 
 
-@needs_ffmpeg
-def test_assemble_extends_to_floor_for_credits_tail_bug410(tmp_path):
-    """BUG-LOCAL-410: when the procgen floor runs PAST the master mix (its
-    rolling-credits post-roll), the assembled silent video must extend to the
-    FULL floor length so the credits SCROLL survives -- NOT cap at the shorter
-    sibling ``*_master.wav``, which cut the scroll to the static title card."""
-    a = tmp_path / "a.mp4"
-    floor = tmp_path / "floor.mp4"
-    master = tmp_path / "ep_master.wav"      # sibling *_master.wav (the old cap source)
-    _silent_video(a, 1.0)
-    _silent_video(floor, 4.0)                # ~100 frames = master + ~2s credits post-roll
-    _sine(master, 2.0)                       # master mix SHORTER than the floor
-    manifest = {"fps": 25, "clips": [
-        {"shot_id": "s0", "target_frame_count": 25, "path": str(a), "exists": True},
-    ]}
-    out = tmp_path / "asm.mp4"
-    assemble_silent_timeline(manifest, str(floor), str(out), w=320, h=240, fps=25)
-    fl = count_video_frames(str(floor))
-    asm = count_video_frames(str(out))
-    # extends to the FLOOR (credits preserved), NOT the ~50-frame master cap
-    assert abs(asm - fl) <= 2, f"assembled {asm} != floor {fl} -- credits scroll cut (BUG-410)"
-    assert asm > 60, f"assembled {asm} capped near the 2s master -- BUG-410 regression"
-    assert count_audio_streams(str(out)) == 0
+# test_assemble_extends_to_floor_for_credits_tail_bug410 RETIRED (credits
+# enrichment 2026-07-03). Under the silent-tail model the composite no longer
+# extends PAST the master mix to the procgen floor to carry a credits scroll:
+# the unified credits roll is a SILENT tail appended LATE by OTR_CreditsRoll.
+# The composite now ends at the MASTER length (A/V-sync fill + looped-last-clip
+# closing-theme backdrop; see test_plan_timeline_segments_positions_by_start_s_
+# and_fills_to_master below). The looped-last-clip credits backdrop + silent
+# append contract moved to tests/test_credits_roll_spec.py
+# (test_backdrop_is_last_existing_clip_looped_never_black,
+#  test_append_credits_extends_body_and_stays_silent).
 
 
 @needs_ffmpeg

@@ -103,19 +103,29 @@ def _poll_interrupt():
 
 def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: str,
                      ffmpeg: str = "ffmpeg", fps: int = 25,
-                     duration_tol_frames: float = 1.0):
+                     duration_tol_frames: float = 1.0,
+                     declared_credits_tail_s: float = 0.0):
     """Mux the frozen master audio onto the silent video; FAIL CLOSED.
 
     Pure function (used by the node + tests). Steps: validate inputs -> duration
-    assert (video must NOT exceed audio by > 1/fps) BEFORE the mux -> ffmpeg
-    ``-map 0:v -map 1:a -c:v copy -c:a copy`` (NO ``-shortest``) -> assert the
-    output audio decodes identically to the master. Returns ``(out_path,
-    report_lines)``; raises ``ValueError`` on any gate failure (never produces a
-    silently-wrong episode).
+    assert (video must NOT exceed audio by > the credits-tail budget) BEFORE the
+    mux -> ffmpeg ``-map 0:v -map 1:a -c:v copy -c:a copy`` (NO ``-shortest``) ->
+    assert the output audio decodes identically to the master. Returns
+    ``(out_path, report_lines)``; raises ``ValueError`` on any gate failure
+    (never produces a silently-wrong episode).
 
     The gate permits ``a_dur > v_dur``: the master audio includes
     opening/closing themes that play over black frames before/after the drama
     clips; those seconds are not represented in the silent composite.
+
+    Credits-aware tail (credits enrichment 2026-07-03, silent-tail model):
+    when ``OTR_CreditsRoll`` appends a silent credits roll to the video tail it
+    DECLARES that roll's duration here via ``declared_credits_tail_s``. The
+    guard then permits ``v_dur <= a_dur + declared_credits_tail_s + tol`` -- the
+    intentional silent credits segment is expected, while anything BEYOND the
+    declared tail is still caught (a real frame-budget bug). When no roll is
+    declared (0), the legacy ``OTR_MAX_CREDITS_TAIL_S`` env ceiling applies.
+    The guard is never blind-widened past what the roll declares.
     """
     report: list = []
     fb = _ffmpeg_bin(ffmpeg)
@@ -137,26 +147,32 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     v_dur = _probe_float(silent_video_path, "v:0")
     a_dur = _probe_float(master_audio_path, "a:0")
     tol = float(duration_tol_frames) / float(fps or 25)
-    # BUG-LOCAL-410: the rolling-credits post-roll legitimately runs the VIDEO
-    # past the master audio -- the procgen floor renders ~20s of SCROLLING
-    # credits AFTER the closing theme ends, and they play in silence. Permit an
-    # intentional silent credits tail up to OTR_MAX_CREDITS_TAIL_S; still FAIL
-    # LOUD on gross drift (a real frame-budget bug that doubles the length). The
-    # audio stays byte-identical (-c:a copy of the master: the output audio
-    # STREAM is unchanged, only the container is longer; the SHA check below
-    # still proves it). The composite's own got==total frame-budget assert is
-    # the primary correctness guard; this bound is the final sanity ceiling.
-    max_tail_s = float(os.environ.get("OTR_MAX_CREDITS_TAIL_S", "45"))
+    # BUG-LOCAL-410 / credits enrichment 2026-07-03: the credits roll
+    # legitimately runs the VIDEO past the master audio -- OTR_CreditsRoll
+    # appends a SILENT scrolling-credits tail AFTER the body, and it plays in
+    # silence. The guard is CREDITS-AWARE: when the roll declares its duration
+    # (declared_credits_tail_s > 0) that IS the budget; otherwise the legacy
+    # OTR_MAX_CREDITS_TAIL_S env ceiling applies. Either way we still FAIL LOUD
+    # on gross drift BEYOND the declared/allowed tail (a real frame-budget bug
+    # that doubles the length) -- never blind-widened. The audio stays
+    # byte-identical (-c:a copy of the master: the output audio STREAM is
+    # unchanged, only the container is longer; the SHA check below still proves
+    # it). The CreditsRoll/composite frame budgets are the primary correctness
+    # guards; this bound is the final sanity ceiling.
+    declared = float(declared_credits_tail_s or 0.0)
+    env_ceiling = float(os.environ.get("OTR_MAX_CREDITS_TAIL_S", "45"))
+    max_tail_s = declared if declared > 0 else env_ceiling
+    tail_src = "declared" if declared > 0 else "env_ceiling"
     if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
         raise ValueError(
             f"OTR_MasterAudioMux: silent video {v_dur:.4f}s exceeds master audio "
-            f"{a_dur:.4f}s by > the credits-tail budget ({max_tail_s:.1f}s + "
-            f"{tol:.4f}s) -- likely a composite frame-budget bug, not the "
-            f"intended rolling-credits post-roll"
+            f"{a_dur:.4f}s by > the credits-tail budget ({max_tail_s:.1f}s "
+            f"[{tail_src}] + {tol:.4f}s) -- likely a composite/credits "
+            f"frame-budget bug, not the intended silent credits tail"
         )
     report.append(
         f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
-        f"tail_budget={max_tail_s:.1f}s OK")
+        f"tail_budget={max_tail_s:.1f}s ({tail_src}) OK")
 
     _poll_interrupt()
     # mux-LAST: copy both streams, NO -shortest.
@@ -269,6 +285,13 @@ class OTRMasterAudioMux:
                     "default": "",
                     "tooltip": "Final mp4 path. Empty -> <output>/otr/episodes/<stem>_final.mp4.",
                 }),
+                "declared_credits_tail_s": ("FLOAT", {
+                    "default": 0.0, "forceInput": True,
+                    "tooltip": "OTR_CreditsRoll's declared silent-credits tail "
+                               "duration. Makes the tail guard credits-aware "
+                               "(v <= a + declared + tol); 0 -> the "
+                               "OTR_MAX_CREDITS_TAIL_S env ceiling.",
+                }),
             },
         }
 
@@ -338,12 +361,13 @@ class OTRMasterAudioMux:
         return dst
 
     def mux(self, silent_video_path, master_audio_path, audio_done="", fps=25,
-            ffmpeg="ffmpeg", output_path=""):
+            ffmpeg="ffmpeg", output_path="", declared_credits_tail_s=0.0):
         master_audio_path = _reresolve_master_audio(master_audio_path)
         out = output_path.strip() or self._default_out(silent_video_path)
         try:
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
+                declared_credits_tail_s=float(declared_credits_tail_s or 0.0),
             )
             obs_copy = self._publish_to_obs(final)
             report.append("obs_publish OK -> " + obs_copy)

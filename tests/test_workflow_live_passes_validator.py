@@ -58,11 +58,12 @@ def test_production_workflow_visual_structure_pinned():
          stays a pass-through (False) so captions never double-burn;
       2. the LTX radio open: node 87 OTR_VideoDirector routes
          announcer_video_model AND music_video_model to ltx_video;
-      3. the rolling-credits stage: node 12 OTR_SignalLostVideo's procgen
-         (which carries the credits post-roll) feeds BOTH the composite base
-         (node 84) and the blend texture (node 93), and the chain runs
-         84 -> 86 -> 93 -> 85 so the credits-extended composite reaches the
-         terminal mux.
+      3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds BOTH
+         the composite base (node 84) and the blend texture (node 93), and the
+         chain runs 84 -> 86 -> 93 -> 95 -> 85: the late OTR_CreditsRoll (node
+         95, credits enrichment 2026-07-03) appends the unified SILENT credits
+         roll to node 93's output and declares its tail duration to the
+         credits-aware terminal mux (node 85).
 
     If any of these regress to headless-only defaults again, this fires.
     """
@@ -115,7 +116,16 @@ def test_production_workflow_visual_structure_pinned():
     assert links[265][1:5] == [12, 0, 93, 1]
     assert links[247][1:5] == [84, 0, 86, 0]   # composite -> caption node
     assert links[266][1:5] == [86, 0, 93, 0]   # caption -> blend source
-    assert links[250][1:5] == [93, 0, 85, 0]   # blend final -> terminal mux
+    # credits enrichment 2026-07-03: the late OTR_CreditsRoll (node 95) sits
+    # between the blend and the terminal mux -- 93 -> 95 -> 85. It appends the
+    # unified SILENT credits roll and declares its tail to the credits-aware mux.
+    assert links[250][1:5] == [93, 0, 95, 0]   # blend final -> credits roll
+    assert links[274][1:5] == [95, 0, 85, 0]   # credits roll -> terminal mux
+    assert links[275][1:5] == [92, 1, 95, 1]   # clip manifest -> credits roll
+    assert links[276][1:5] == [95, 1, 85, 6]   # declared credits tail -> mux
+    n95 = nodes[95]
+    assert n95["type"] == "OTR_CreditsRoll"
+    assert not n95.get("widgets_values"), "node 95 has zero widgets (two forceInputs)"
 
     # -- 4. the W4 image-before-video gate (still-spine ST-0.2) ---------------
     # OTR_ImageGenDispatcher.image_done (91 out 1) must reach the render

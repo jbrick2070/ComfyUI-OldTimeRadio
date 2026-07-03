@@ -1137,31 +1137,15 @@ def _build_hud_dossier(led):
     if sl:
         sections.append({"header": "STORY SPINE", "lines": sl})
 
-    # 4. RENDER ENGINES -- which engine rendered each role (video + image)
-    el = []
-    re_ = meta.get("render_engines") or {}
-    for role in sorted(re_.get("by_role") or {}):
-        engs = (re_.get("by_role") or {})[role] or {}
-        el.append("video  %-16s %s" % (role, ", ".join(
-            "%s x%d" % (e, n) for e, n in sorted(engs.items()))))
-    # IMAGE model per slot. PRIMARY source is meta.image_engines.by_role
-    # (the dispatcher stamps it there because the ledger['images'] section is
-    # dropped before the credits read -- operator credits fix 2026-06-21);
-    # fall back to the legacy ledger['images'] rows when meta is absent.
-    img_by_role = dict((meta.get("image_engines") or {}).get("by_role") or {})
-    if not img_by_role:
-        for r in ((led.get("images") or {}).get("images")) or []:
-            if not isinstance(r, dict):
-                continue
-            _role = str(r.get("role") or "?")
-            _e = str(r.get("engine_id") or "?")
-            img_by_role.setdefault(_role, {})
-            img_by_role[_role][_e] = img_by_role[_role].get(_e, 0) + 1
-    for role in sorted(img_by_role):
-        el.append("image  %-16s %s" % (role, ", ".join(
-            "%s x%d" % (e, n) for e, n in sorted((img_by_role[role] or {}).items()))))
-    if el:
-        sections.append({"header": "RENDER ENGINES", "lines": el})
+    # 4. RENDER ENGINES -- RIPPED (credits enrichment 2026-07-03). The per-role
+    # image/video engine receipts do NOT exist at node-12 time: this node
+    # (OTR_SignalLostVideo) renders BEFORE the image dispatcher (91) and the
+    # video render batch (92), so reading render_engines / image_engines here
+    # only ever printed stale/"(not recorded)" data. The unified receipt roll is
+    # now rendered LATE from the DURABLE ledger in OTR_CreditsRoll (see
+    # nodes/otr_credits_roll.py :: build_credits_sections -> MOTION / IMAGES).
+    # node-12's dossier keeps only what is TRUE at its early time (writer /
+    # story spine / system).
 
     # 5. SYSTEM -- techie-friendly host / CPU / RAM / GPU / VRAM / CUDA / torch
     # (operator 2026-06-20). Same source as the treatment; any unprobeable field
@@ -2189,88 +2173,20 @@ class SignalLostVideoRenderer:
 
         tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
         pcm = (audio_np * 32767).astype(np.int16)
-        # Use unique closing music for HUD post-roll instead of looping.
-        # Priority: closing_audio from MusicGen > gentle decay from episode tail.
+        # Credits-music loop RIPPED (credits enrichment 2026-07-03, silent-tail
+        # model). This base mp4's OWN audio track is stripped downstream by
+        # OTR_SilentComposite (V-1); the delivered episode audio is the frozen
+        # master muxed on LAST, and the credits roll is now a SILENT tail
+        # rendered late by OTR_CreditsRoll (which drops the closing-cue-under-
+        # credits music by the operator's silent-tail decision). The HUD
+        # post-roll frames still render (the reduced dossier / transcript
+        # easter egg); its audio is simply silence so this base mp4's own audio
+        # length matches its video length. The `closing_audio` input is now
+        # unused (dead-but-harmless, like `genre`).
         if _hud_frames > 0:
             hud_samples = int(_hud_frames / fps * sr)
-            if closing_audio is not None:
-                # -- Unique closing music from MusicGen --------------------
-                _cw = closing_audio["waveform"]
-                _csr = closing_audio["sample_rate"]
-                if _cw.dim() == 3:
-                    _c_np = _cw[0].mean(dim=0).cpu().numpy()
-                elif _cw.dim() == 2:
-                    _c_np = _cw.mean(dim=0).cpu().numpy()
-                else:
-                    _c_np = _cw.cpu().numpy()
-                # Resample to episode SR if needed
-                if _csr != sr:
-                    import scipy.signal as _sig
-                    _c_np = _sig.resample(
-                        _c_np, int(len(_c_np) * sr / _csr)
-                    ).astype(np.float32)
-                # If closing cue is shorter than the credits (HUD) duration, LOOP
-                # it to fill the whole credits instead of padding with silence
-                # (operator 2026-06-28: "the credits are sad with no audio"). Tile
-                # the cue with a short equal-power crossfade at each seam so there
-                # is no click, trim to the credits length, then a 2s fade-out at
-                # the very end. OTR_CREDITS_MUSIC_LOOP=0 restores the old
-                # fade-then-silence behaviour.
-                if len(_c_np) < hud_samples:
-                    if os.environ.get("OTR_CREDITS_MUSIC_LOOP", "1") != "1":
-                        fade_out = min(int(2 * sr), len(_c_np) // 2)
-                        _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
-                        _c_np = np.pad(_c_np, (0, hud_samples - len(_c_np)))
-                    else:
-                        _body = _c_np.astype(np.float32)
-                        _xf = int(min(0.25 * sr, len(_body) // 4))
-                        if _xf > 0:
-                            _out = _body.copy()
-                            while len(_out) < hud_samples:
-                                _a = _out[-_xf:] * np.linspace(1, 0, _xf, dtype=np.float32)
-                                _b = _body[:_xf] * np.linspace(0, 1, _xf, dtype=np.float32)
-                                _out = np.concatenate([_out[:-_xf], _a + _b, _body[_xf:]])
-                            _c_np = _out[:hud_samples]
-                        else:
-                            _reps = (hud_samples + len(_body) - 1) // max(1, len(_body))
-                            _c_np = np.tile(_body, _reps)[:hud_samples]
-                        fade_out = min(int(2 * sr), len(_c_np) // 2)
-                        _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
-                        log.info("[Video] Credits music: LOOPED closing cue to fill "
-                                 "%.1fs credits (seam crossfade)", hud_samples / sr)
-                else:
-                    _c_np = _c_np[:hud_samples]
-                    # Fade out last 2 seconds
-                    fade_out = min(int(2 * sr), hud_samples // 4)
-                    _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
-                hud_wave = _c_np * 0.45  # duck to 45% (louder than old 35% loop)
-                # Smooth 1-second crossfade from episode audio
-                join_in = min(sr, hud_samples)
-                hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
-                log.info("[Video] Credits music: unique MusicGen closing cue (%.1fs)",
-                         len(hud_wave) / sr)
-            else:
-                # -- Fallback: gentle one-shot decay from episode tail -----
-                # Take last ~10s, apply a long exponential fade-out so it
-                # decays naturally into silence. NO looping.
-                tail_len = min(len(audio_np), int(10 * sr))
-                tail_src = audio_np[-tail_len:].copy().astype(np.float32)
-                # Apply exponential decay over the entire tail
-                decay = np.exp(-np.linspace(0, 5, tail_len)).astype(np.float32)
-                tail_src *= decay
-                # Pad with silence to fill HUD duration
-                if len(tail_src) < hud_samples:
-                    tail_src = np.pad(tail_src, (0, hud_samples - len(tail_src)))
-                else:
-                    tail_src = tail_src[:hud_samples]
-                hud_wave = tail_src * 0.35
-                # Smooth join
-                join_in = min(sr, hud_samples)
-                hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
-                log.info("[Video] Credits music: episode tail decay (no loop, %.1fs)",
-                         len(hud_wave) / sr)
-            hud_pcm = np.clip(hud_wave * 32767, -32767, 32767).astype(np.int16)
-            pcm_out = np.concatenate([pcm, hud_pcm])
+            pcm_out = np.concatenate(
+                [pcm, np.zeros(hud_samples, dtype=np.int16)])
         else:
             pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
@@ -2399,23 +2315,14 @@ class SignalLostVideoRenderer:
                  out_path, size_mb, duration + (_hud_frames / fps), total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
-        # Forensic treatment enrichment: pull the per-role engine maps from the
-        # production-ledger singleton. The video engines are stamped into
-        # meta.render_engines by the render batch; the image engines live in
-        # ledger['images'] (each still row carries role + engine_id). The wire
-        # `led` here is the PRE-render freeze-cascade output, so these
-        # post-render facts are merged in for the credits sheet. Best-effort.
-        try:
-            from .production_ledger import get_ledger as _gl_treat
-            _sing_data = _gl_treat().data or {}
-            _sing_meta = _sing_data.get("meta") or {}
-            if _sing_meta.get("render_engines"):
-                led.setdefault("meta", {})["render_engines"] = \
-                    _sing_meta["render_engines"]
-            if _sing_data.get("images"):
-                led["images"] = _sing_data["images"]
-        except Exception as _enrich_exc:  # noqa: BLE001 -- never break the render
-            log.warning("[Video] treatment engine-enrich skipped: %s", _enrich_exc)
+        # Forensic treatment engine-enrich RIPPED (credits enrichment
+        # 2026-07-03). This merge pulled render_engines / images from the
+        # singleton into the wire `led` for the credits sheet -- but node 12
+        # runs BEFORE the image dispatcher (91) and the video render batch (92),
+        # so at this point the singleton has NO post-render receipts yet: the
+        # merge only ever grafted stale/empty maps. The engine receipts are now
+        # rendered LATE from the DURABLE ledger in OTR_CreditsRoll. The treatment
+        # sidecar below keeps only the story facts that are true at node-12 time.
 
         # Write story treatment companion file. v2 ledger consumer:
         # pass parsed led + voice_assignments/style/genre (Sprint 6.3

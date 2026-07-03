@@ -386,13 +386,15 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 emit("black", "", n, 0, r.get("shot_id"), r.get("engine_id"))
             cursor += n
     if target_total_frames is not None and int(target_total_frames) > cursor:
-        # Tail to the master length + the credits post-roll. The §4D floor layer
-        # lighten-blends the GREEN rolling credits on top; THIS segment is the
-        # BACKDROP behind them. BUG-410 look-QA follow-on: hold the LAST drama
-        # clip on screen (the 6/5 "credits over the scene" look) instead of the
-        # dark CRT telemetry card -- a short clip holds its last frame (tpad
-        # clone in _encode_segment), a long one plays its head. Fall back to the
-        # procgen END-slice / black when there is no real clip.
+        # Tail to the master length (the closing-theme region, A/V-sync). Hold
+        # the LAST drama clip on screen as the backdrop (operator 2026-06-17
+        # "credits over the scene" look): a short clip loops, a long one plays
+        # its head; fall back to the procgen END-slice / black when there is no
+        # real clip. NOTE (credits enrichment 2026-07-03): this fills only to the
+        # MASTER length; the credits POST-ROLL past the master (the old BUG-410
+        # floor-extend) is GONE -- the unified credits roll is now a SILENT tail
+        # appended LATE by OTR_CreditsRoll, which reproduces this looped-last-clip
+        # backdrop via plan_backdrop.
         tail_n = int(target_total_frames) - cursor
         _clip_rows = [r for r in rows if r.get("exists") and r.get("path")]
         if positioned:
@@ -401,10 +403,6 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         else:
             _last_clip = _clip_rows[-1] if _clip_rows else None
         if _last_clip is not None:
-            # LOOP the tail clip (operator 2026-06-17: "loop the ending video so
-            # it's not static") -- the short last drama clip REPEATS to fill the
-            # credits tail instead of tpad-cloning its final frame (the frozen
-            # image). The green rolling credits still ride on top.
             emit("clip", _last_clip.get("path"), tail_n, 0,
                  _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True,
                  bg_still_path=_last_clip.get("bg_still_path"))
@@ -686,23 +684,14 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     mft_total = int((manifest or {}).get("total_target_frames") or 0)
     target_total = mft_total if mft_total > 0 else None
     if floor_ok:
-        # PRODUCTION RESTORE (2026-06-10): the procgen base runs the FULL
-        # episode length -- opening theme pad + drama + the rolling-credits
-        # post-roll under the closing theme. The beats-only budget CUT the
-        # video at the last drama beat, so the credits roll vanished from the
-        # rewired chain. Extend the assembled length to the base duration so
-        # the tail segment (sliced from the procgen END by the planner)
-        # restores the credits. The mux gate stays safe: the base was rendered
-        # to the master mix length, so v_dur <= a_dur + tol still holds.
-        # The cap is the MASTER MIX duration -- NOT the base's video length
-        # (the procgen runs ~20s past the master with its own silent
-        # post-roll) and NOT the base's embedded audio either (the encoder
-        # silence-pads it to the video length; both live catches 2026-06-10:
-        # 123.5s video vs 103.6s master = the terminal mux REFUSED). The real
-        # master WAV lives in the base's sibling audio dir (the per-episode
-        # layout) -- probe the LONGEST *_master.wav there (a stub copy can
-        # coexist after the rename); fall back to the base audio stream, then
-        # the container. -1 frame headroom absorbs rounding.
+        # A/V-SYNC fill (production restore 2026-06-10): the composite is built
+        # to the MASTER MIX length so the beats line up under the master audio
+        # (opening theme pad + drama + closing theme). The tail segment holds the
+        # last drama clip as the closing-theme backdrop (planner, below). The cap
+        # is the MASTER MIX duration -- NOT the base's video length nor its
+        # embedded (silence-padded) audio. Probe the LONGEST *_master.wav in the
+        # base's sibling audio dir; fall back to the base audio stream, then the
+        # container. -1 frame headroom absorbs rounding.
         master_dur = 0.0
         try:
             import glob as _glob
@@ -722,24 +711,19 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                                    or base_total > target_total):
                 if target_total is not None:
                     report.append(
-                        "credits post-roll restored: tail %d -> %d frames "
-                        "(procgen end-slice under the closing theme)"
+                        "A/V-sync tail to master: %d -> %d frames "
+                        "(closing-theme backdrop)"
                         % (target_total, base_total))
                 target_total = base_total
-        # BUG-LOCAL-410: the master-mix cap above only carries the credits that
-        # fit UNDER the closing theme; the procgen floor renders ~20s MORE of
-        # SCROLLING credits past the master (the rolling-credits post-roll).
-        # Extend the assembled length to the floor's FULL video frame count so
-        # the scroll survives instead of being cut to the static title card.
-        # The mux now permits this intentional SILENT credits tail
-        # (OTR_MasterAudioMux: v <= a + OTR_MAX_CREDITS_TAIL_S); the audio stays
-        # byte-identical (the credits roll in silence after the theme ends).
-        if floor_frames > 0 and (target_total is None
-                                 or int(floor_frames) > int(target_total)):
-            report.append(
-                "BUG-410 credits scroll restored: tail %s -> %d frames "
-                "(full procgen post-roll)" % (target_total, int(floor_frames)))
-            target_total = int(floor_frames)
+        # CREDITS FLOOR-EXTEND RIPPED (credits enrichment 2026-07-03, BUG-410
+        # retired). This block USED to extend the composite PAST the master to
+        # the procgen floor's FULL frame count so ~20s of green rolling credits
+        # scrolled in silence after the closing theme (the second "credits
+        # organ", Fable BUILD-BREAKER #2). Under the silent-tail model the
+        # unified credits roll is appended LATE as a SILENT tail by
+        # OTR_CreditsRoll (which reproduces the looped-last-clip backdrop via
+        # plan_backdrop and DECLARES its duration to the credits-aware mux
+        # guard). The composite now ends at the MASTER length -- no floor-extend.
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)

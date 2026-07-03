@@ -311,6 +311,16 @@ _NODE_MODULES = {
     # =========================================================================
     "OTR_VideoRenderBatch":        (".nodes.otr_video_render_batch", "OTRVideoRenderBatch", " Video Render Batch (A-S7.5 in-process render)"),
 
+    # =========================================================================
+    # v2.0 late viewer-credits surface (credits enrichment 2026-07-03). Renders
+    # the ONE unified credits roll LATE (after nodes 91/92) from the durable
+    # ledger stamps (S2) + the clip manifest, appends it as a SILENT tail to
+    # node 93's output, and declares its tail duration to the mux (credits-aware
+    # guard). Wired 93 -> OTR_CreditsRoll -> 85; no fallbacks (missing receipt
+    # RAISES). See nodes/otr_credits_roll.py + GO_FORWARD_CREDITS.md.
+    # =========================================================================
+    "OTR_CreditsRoll":             (".nodes.otr_credits_roll",       "OTRCreditsRoll",       " CreditsRoll (late unified viewer credits, silent tail)"),
+
 
 }
 
