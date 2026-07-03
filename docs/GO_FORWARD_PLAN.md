@@ -1,6 +1,10 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-01 | branch v2.0-alpha | prod/main + tags operator-GATED.
+> Last updated 2026-07-02 night | branch v2.0-alpha | prod/main + tags operator-GATED.
+> NIGHT QUEUE IN FLIGHT (unattended): proof9c (S4b/c verdict, 768x416 -- see
+> HANDOFF_LOG 2026-07-02 night) -> 120w soak -> 30w soak, chained on the :8000
+> headless server. Morning window: score proof9c + QA both soaks FIRST
+> (session_handoff.md has the scoring recipe), then resume the order below.
 >
 > **LEAN + FORWARD-ONLY.** This doc holds the PLAN: current step, forward order, open items,
 > hard rules, and POINTERS to sprint specs. It does NOT record what got done -- that lives in
@@ -47,19 +51,21 @@ requires its ELEVENLABS_VOICE output) + versioned pricing stamp `docs/2026-07-02
 PRICING.md` (211cr=$1; voice ~$1.10/ep FLAT across tiers; per-line Kling lipsync ~$0.25-1.00 = the
 dominant cost) + prompt/param profiles doc (see below).
 
-**VIDEO TEAM -- READ THIS FIRST (2026-07-02 pm, codex-verified):** `eng_cloud_video.py` as landed
-emits kwargs (`image`/`prompt`/`audio`) that DO NOT EXIST in the pinned schemas -- it will fail
-closed at invoke. Ground truth = `nodes/_otr_shared/partner_nodes.yaml`: cloud_wan_i2v requires
-`first_frame`/`model`/`prompt_extend`/`seed`/`watermark` (NO text prompt; `audio` OPTIONAL);
-cloud_seedance_2's real inputs (reference images, audio) nest inside its DYNAMICCOMBO_V3 model
-schema and are NOT in the static pin -- the pinner gains a V3-expansion step before Seedance
-adapters can be written. A profile->schema CONFORMANCE TEST (every emitted kwarg declared in the
-yaml) ships with S1 and is the permanent guard. `canonicalize_video` as landed is GOOD and stays.
+**VIDEO TEAM warning (2026-07-02 pm, codex-verified) -- RESOLVED at a9440980 (same day, night):**
+the audited eng_cloud_video.py draft emitted unpinned kwargs; the SHIPPED commit folds every catch:
+cloud_wan_i2v sends EXACTLY `first_frame`/`model`/`prompt_extend`/`seed`/`watermark` (no prompt;
+audio not sent -- mute row); cloud_seedance_2 is an HONEST DARK ROW (raises loud) until the S1
+V3-expansion pin names its dynamic inputs; the kling pair's kwargs are all pinned; per-row
+conformance is test-locked in tests/test_cloud_video_adapters.py. STILL OWED AT S1: the generic
+profile->schema CONFORMANCE TEST (every emitted kwarg declared in the yaml) as the permanent guard.
+`canonicalize_video` is REAL now (strip + post-strip proof) -- see HANDOFF_LOG.
 
-**OPERATOR-CONFIRMED HOLD (2026-07-02, from operator mid-day): NO further video-cloud (S3) adapter
-coding, by any window/team.** S3 rides on S1 patterns + the smoke-proven bridge; order stands: live smokes
-(operator env, see S0 REMAINING) -> S1 STILLS (the next codable chunk for whoever holds the baton)
--> S3 video. An eager team takes S1, coordinated HERE, one window at a time.
+**S3 hold SUPERSEDED (operator, 2026-07-02 evening, voice: "code the cloud video plan... tagged to
+go forward"):** S3 CORE shipped @ a9440980 -- 4 rows registered dark + fail-closed, EMPTY
+default_roles (selectable picks only; never automatic). S3 FULL (reactive auto-defaults + ShotLock
+audit stamps + fallback chains + seedance/wan V3 expansion + live provider proof) still rides the
+original order: live smokes (operator env) -> S1 STILLS -> S3 full. One window at a time,
+coordinated HERE.
 
 QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
 Tin-Toy Theatre -- plan `docs/2026-07-02-creative-formats/CREATIVE_FORMATS_PLAN.md`
@@ -85,15 +91,16 @@ regenerated before reuse.
 **Opt-in feature SHIPPED (not part of the forward order):** brief-driven HuMo radio-host
 + `OTR_LTX_RADIO_FACE` A/B (default OFF, byte-identical). See HANDOFF_LOG.md.
 
-**TALKING-RADIO bookends via ltx_audio_in (opt-in track): B SHIPPED; C probe RAN 2026-07-02 night.**
-Contract: `kibitz-runs/2026-07-01-talking-radio/r1/final.md` (B->C->A, one window at a time).
-(B) `ltx_radio_mouth` LTX-only still split SHIPPED (HuMo looks golden-pinned; see HANDOFF_LOG).
-(C) live probe: matched `OTR_LTX_RADIO_FACE=0/1` pair + PRE-REGISTERED criterion in
-`docs/2026-07-01-talking-radio/EYEBALL.md`; driver `scripts/_otr_talking_radio_night.py` (also ran
-the operator overnight batch: 120w all-ltx_audio_in + 50/100w all-humo_1.7B_169). **GO/NO-GO =
-operator morning eyeball** of the probe pair + EYEBALL.md numbers. (A) LTX-AV two-stage latent
-upsampler builds ONLY on GO. Source-bank visual-style transplant stays OUT (research mode;
-docs live in `ComfyUI-OTR-UpstreamStoryLab\docs`).
+**TALKING-RADIO: RECIPE_IA2V is the dev-default lane; S4/S4b/S4c SHIPPED (2026-07-02).**
+The canonical comfy.org IA2V transplant reversed the C NO-GO (see HANDOFF_LOG + PROOF7_VERDICT.md
+in docs/2026-07-02-canonical-ia2v). Shipped since: talking prompt register, S4 portrait init, S4b
+face-forward portrait mint, S4c radio-face DEFAULT-ON for ia2v bookends (env A/B = single-pass
+only). VERDICT PENDING: proof9c (in the night queue) scores the full stack; character speech bar
+>= 2.0. NEXT LTX CODE = **S5** (operator ratified: port the two-stage HQ recipe to silent
+ltx_video; 2 LTX rows, NO ltx_lowvram; measured VRAM/time A/B on first live clip). Story-writer
+fixes are PARKED in the transplant repo (UpstreamStoryLab GO_FORWARD "DEFERRED STORY-LLM FIXES")
+-- NO production story-LLM changes until the refactor. Source-bank visual-style transplant stays
+OUT (research mode; docs in `ComfyUI-OTR-UpstreamStoryLab\docs`).
 
 ---
 

@@ -6,6 +6,17 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 ~19:10 -- HEAD (wrap commit) (v2.0-alpha) -- WRAP for a new chat
+Did: committed ia2v_flat_api_prompt.json at probe-final state; swept dead temp probes (this
+session's were already gone; pruned prior-session _tmp_* scripts, kept logs); verified the
+GO_FORWARD video-team kwargs warning is RESOLVED at a9440980 (wan exact pinned set, seedance
+honest dark row, kling pinned; generic conformance test still owed at S1) and stamped that +
+the operator-evening S3-hold supersession + the night queue into GO_FORWARD_PLAN.
+Current step: NIGHT QUEUE (proof9c 768x416 -> 120w soak -> 30w soak) unattended; morning = score
+proof9c + QA soaks, then S5 (silent-LTX HQ port) / cloud order (smokes -> S1 -> S3 full).
+Next: morning window runs otr-handoff RESUME, scores the queue per session_handoff.md.
+Commits: f9eed360 820f6df3 a415ad18 a9440980 + boot/doc/handoff commits through the wrap.
+
 ## 2026-07-02 (night) -- S4b/S4c SHIPPED + cloud-S3 CORE SHIPPED; proof9 in flight; story fix PARKED
 Did: **S4b+S4c @ a415ad18** (proof8 verdict: S4 routing fired but portraits were dark PROFILES --
 mouth invisible; + the faceless pinprick announcer): per-role `talking` map through
