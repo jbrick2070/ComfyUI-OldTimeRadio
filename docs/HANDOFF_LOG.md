@@ -6,6 +6,42 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 day -- TWO CLOUD/VIDEO ROOT CAUSES FOUND (operator review) -- FIX NEXT
+Context: operator wants a full CLOUD SOAK (all cloud video x ideo image, high/low pairing) + fix
+bugs so razzle etc render; wan PARKED. Desktop app (:8000, PID 55684, `main.py
+--feature-flag show_signin_button`) is logged in w/ 2,399 credits. Submitting to it via
+scripts/_otr_cloud_desktop_probe.py (no boot/kill -- never kill the Desktop).
+
+**BUG A (THE cloud blocker -- fix first).** Cloud auth FAILS EVEN WHEN LOGGED IN. Live proof
+(Desktop run, prompt executed 478s): `cloud_seedream_2 -> CloudMediaError: auth -- no
+credentials` at cloud_media_backend.resolve_auth (via otr_image_gen_dispatcher.dispatch_images
+-> eng_cloud_image.render_image -> invoke_partner_node -> get_or_create_session ->
+resolve_auth). ROOT CAUSE: the OTR nodes that PROGRAMMATICALLY invoke partner nodes
+(OTR_ImageGenDispatcher for images; OTR_VideoRenderBatch for video) do NOT declare the ComfyUI
+hidden-auth inputs `api_key_comfy_org`/`auth_token_comfy_org` in their INPUT_TYPES, so the
+logged-in server never injects the credentials into them -> resolve_auth finds nothing (env
+OTR_COMFY_API_KEY also unset). Grep: the hidden-auth tokens live only in cloud_media_invoke/
+cloud_media_backend (+ writer's OpenRouter path), NOT in the dispatch nodes. FIX: add the two
+hidden inputs to OTR_ImageGenDispatcher + OTR_VideoRenderBatch INPUT_TYPES, capture the injected
+values in dispatch()/execute, and thread them to invoke_partner_node/resolve_auth (contextvar or
+param). Then RESTART Desktop, regress, and re-run the probe. This unblocks EVERY cloud item
+(ideo/seedream/recraft/flux_pro/nano_banana + word_razzle/kling/seedance). /kibitz if the
+threading seam is non-obvious.
+
+**BUG B (video "not moving" -- separate).** Operator: heavy-engine finals show STILL frames, no
+motion. The final the operator watched is the LEGACY procgen video path: log shows
+`[Video] Starting render: ... 1920x1080 ... HUD 'SIGNAL LOST' ... Credits music ... nvenc ...
+signal_lost_*_silent_procgen_blended_final.mp4`. That legacy video_engine (HUD + rolling
+credits + scopes over the scene STILL) is what renders/ships -- the per-beat MOTION platform
+(OTR_VideoRenderBatch: ltx/humo motion clips) is NOT the base layer of the final. Overnight heavy
+legs DID burn GPU (ltx 99% 15min) = motion clips were rendered, but the compositor/final ships
+the procgen-blended still, not the motion. Trace: episode dir per-beat manifest (are the motion
+.mp4s there?) -> the blend/compositor step -> final mux; make the motion clips the base, procgen
+the overlay. Distinct from Bug A.
+Current step: cloud soak BLOCKED on Bug A (auth wiring). Next: implement Bug A fix + restart
+Desktop + re-run scripts/_otr_cloud_desktop_probe.py cloud_seedream_2 still_flat 30; then Bug B.
+Commits: none this turn (diagnosis only). Driver: scripts/_otr_cloud_desktop_probe.py (gitignored).
+
 ## 2026-07-03 night (overnight coder) -- SOAK BUG FIXED: Ollama daemon was down -> re-launched
 Did: FIRST soak run (nightmatrix_012410) FAILED ALL 10 legs -- every episode halted at node 1
 (OTR_LedgerScriptWriter / news_interpreter) with OllamaCallFailedError: ConnectionError on
