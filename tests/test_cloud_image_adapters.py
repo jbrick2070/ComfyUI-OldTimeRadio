@@ -84,7 +84,8 @@ def test_flux_pro_inputs(monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "1920x1080")
     ins = eci.FluxPro._partner_inputs(_req())
     assert set(ins) == {"prompt", "width", "height", "prompt_upsampling", "seed"}
-    assert ins["width"] == 1920 and ins["height"] == 1080
+    # BFL /32 snap: request 1920x1088 (1080 -> 1088); canonical crops to 1080.
+    assert ins["width"] == 1920 and ins["height"] == 1088
     assert ins["prompt_upsampling"] is False
 
 

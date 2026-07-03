@@ -226,10 +226,16 @@ class CloudFluxProImageEngine(_CloudImageBase):
         # pinned required: height INT, prompt STRING, prompt_upsampling BOOL,
         # seed INT, width INT.
         w, h = self._canvas_wh(request)
+        # BFL requires /32-aligned request dims; the 1080p cloud canvas (1920x1080)
+        # has 1080 % 32 = 24, so snap the REQUEST up to /32 (1920x1088). The
+        # canonical PNG still cover-crops to the true 1920x1080 in render_image, so
+        # the delivered still is exactly 1080p. Width 1920 is already /32.
+        w32 = max(32, (int(w) // 32) * 32)
+        h32 = max(32, ((int(h) + 31) // 32) * 32)
         return {
             "prompt": self._prompt(request),
-            "width": w,
-            "height": h,
+            "width": w32,
+            "height": h32,
             "prompt_upsampling": False,
             "seed": self._seed(request),
         }
