@@ -6,6 +6,23 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (later) -- HEAD b5ef58bc (v2.0-alpha) -- Sprint B S1 stills CORE shipped (B1-B5)
+Did: built the cloud stills lane. B3 canonicalize_image (real: validate_partner_result,
+require int w/h, PIL sRGB, scale-to-COVER+centre-crop to exact canvas, PNG, sha256).
+B1 eng_cloud_image.py = 4 adapters (cloud_recraft/flux_pro/nano_banana_2/seedream_2) on the
+reduced ImageEngine protocol, guarded __init__ import, cold-import clean; render_image ->
+invoke_partner_node -> canonicalize_image -> str(png_path). B4 cloud_model_ids.py single
+source for V3 model ids (resolve_model_id never forwards the placeholder). B2 one cpu
+CAPABILITIES row each (consistency invariant green). B5 tests/test_cloud_partner_conformance.py
+(billed-row coverage + emitted-kwargs-are-declared over image+video; elevenlabs/sonilo/
+stability xfail). B7 verified NO JSON CHANGE (ImageDirector combo is dynamic; engines
+auto-appear selectable, defaults stay flux_gen1). Suite 6089/0 + Bug Bible 16-pass + B7
+in-suite. New tests: test_cloud_image_adapters.py + test_cloud_partner_conformance.py.
+Current step: Sprint B S1 core DONE. NEXT = S1+1 ideo/ideo_word (operator priority) then B6.
+Next: ideo + ideo_word per docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md; then B6
+portrait-mint 3D gate (lower-urgency, 3D parked). Razzle Phase 0 = safe filler any time.
+Commits: b5ef58bc (pushed; HEAD==origin).
+
 ## 2026-07-03 -- HEAD 8de5862d (v2.0-alpha) -- Sprint A E1/E2 SHIPPED (atomic rip committed + pushed)
 Did: finished + committed the whole no-fallback rip as ONE atomic commit @ 8de5862d
 (push fast-forwarded b170e280..8de5862d; HEAD==origin, includes c2edd984 A4+A3b as

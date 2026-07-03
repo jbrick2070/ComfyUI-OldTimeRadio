@@ -19,20 +19,26 @@
 
 ## 1. CURRENT STEP
 
-**SPRINT A (E1/E2 no-fallback rip-out) SHIPPED @ 8de5862d.** The whole rip landed
-as ONE atomic commit (A1 render_driver scaffolding + fallback.py DELETE; A2 per-adapter
-fallback_engine=None; A3a/c/d/e director+Policy default False + widget audit + api-json
-regen; A4 test triage; A5 oracle verified). Suite 6057/0 + Bug Bible 16-pass + B7 5-pass;
-validator + JSON round-trip + widget audit (node-87 widget[11] allow_auto_fallback already
-False, no value change) + link integrity all green. HEAD==origin. NOTE: the prior window's
-`git rm` of fallback.py + test_video_fallback_chain_additive.py had NOT persisted (files were
-back at HEAD content); re-`git rm`'d in this commit -- that was the only real gap.
-**NEXT = Sprint B (S1 stills lane)** per `docs/2026-07-02-remaining-sprints/PLAN.md`
-(canonicalize_image + recraft/flux/nano/ideogram/seedream adapters + CAPABILITIES + B5
-conformance test + portrait-mint gate + B7 dropdown wiring). Order B(S1 stills) -> C(S3
-full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate (silent-vs-audio-in VRAM/time A/B) rides
-the next render window. S4x GO/NO-GO awaits the operator call on the proof9d
-marginal-headroom breach (PROOF9_VERDICT.md options a/b/c).
+**SPRINT A DONE @ 8de5862d** (E1/E2 no-fallback rip; details in HANDOFF_LOG/ARCHIVE).
+
+**SPRINT B S1 STILLS CORE SHIPPED @ b5ef58bc (2026-07-03).** B1-B5 landed:
+canonicalize_image (real, cover+crop to exact role canvas, sRGB PNG, sha256) + 4 cloud
+image adapters (cloud_recraft/cloud_flux_pro/cloud_nano_banana_2/cloud_seedream_2) on the
+reduced ImageEngine protocol (render_image -> invoke_partner_node -> canonicalize_image ->
+str(png_path)); B4 cloud_model_ids.py single-source V3 model-id resolver (never forwards the
+placeholder); B2 one cpu CAPABILITIES row each (consistency invariant green); B5
+profile->schema conformance test over the billed yaml rows (image+video covered;
+elevenlabs/sonilo/stability xfail pending their sprints). B7 = NO JSON CHANGE NEEDED (the
+ImageDirector combo is dynamic from all_engine_names(); the 4 engines auto-appear
+selectable, defaults stay flux_gen1). Suite 6089/0 + Bug Bible 16-pass + B7 in-suite.
+EMPTY default_roles (never automatic); no enable flag; per-row env-overridable estimated_usd.
+
+**SPRINT B REMAINING:** (a) B6 portrait-mint 3D pre-selection gate (touches the beat loop /
+character_description->finish_visual_prompt chain + ShotLock ordering; 3D lanes are PARKED so
+this is lower-urgency); (b) S1+1 = ideo + ideo_word engines per
+`docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` (NEXT CODE -- operator priority).
+Then order C(S3 full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate + S4x GO/NO-GO still await
+the operator (unchanged).
 
 **QUEUED (operator pickups 2026-07-03, ride BEHIND the forward order):** ideo_word family --
 (1) `docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` = the MAIN build, pulled in as
