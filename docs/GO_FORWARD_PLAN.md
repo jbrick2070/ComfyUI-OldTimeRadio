@@ -47,8 +47,17 @@ requires its ELEVENLABS_VOICE output) + versioned pricing stamp `docs/2026-07-02
 PRICING.md` (211cr=$1; voice ~$1.10/ep FLAT across tiers; per-line Kling lipsync ~$0.25-1.00 = the
 dominant cost) + prompt/param profiles doc (see below).
 
-**OPERATOR-CONFIRMED HOLD (2026-07-02, from operator mid-day): NO video-cloud (S3) coding yet, by
-any window/team.** S3 rides on S1 patterns + the smoke-proven bridge; order stands: live smokes
+**VIDEO TEAM -- READ THIS FIRST (2026-07-02 pm, codex-verified):** `eng_cloud_video.py` as landed
+emits kwargs (`image`/`prompt`/`audio`) that DO NOT EXIST in the pinned schemas -- it will fail
+closed at invoke. Ground truth = `nodes/_otr_shared/partner_nodes.yaml`: cloud_wan_i2v requires
+`first_frame`/`model`/`prompt_extend`/`seed`/`watermark` (NO text prompt; `audio` OPTIONAL);
+cloud_seedance_2's real inputs (reference images, audio) nest inside its DYNAMICCOMBO_V3 model
+schema and are NOT in the static pin -- the pinner gains a V3-expansion step before Seedance
+adapters can be written. A profile->schema CONFORMANCE TEST (every emitted kwarg declared in the
+yaml) ships with S1 and is the permanent guard. `canonicalize_video` as landed is GOOD and stays.
+
+**OPERATOR-CONFIRMED HOLD (2026-07-02, from operator mid-day): NO further video-cloud (S3) adapter
+coding, by any window/team.** S3 rides on S1 patterns + the smoke-proven bridge; order stands: live smokes
 (operator env, see S0 REMAINING) -> S1 STILLS (the next codable chunk for whoever holds the baton)
 -> S3 video. An eager team takes S1, coordinated HERE, one window at a time.
 

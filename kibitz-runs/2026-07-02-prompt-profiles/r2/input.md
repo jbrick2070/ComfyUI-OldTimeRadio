@@ -1,35 +1,4 @@
-# Cloud row prompt/param profiles -- v2 (codex kibitz pass folded)
-
-CODEX-PASS CORRECTIONS (2026-07-02, kibitz-runs/2026-07-02-prompt-
-profiles/): (1) SEED policy: NOT universal -- cloud_kling_lipsync pins
-seed_supported=false; exclude it from that row's profile, cache key,
-and ledger stamping. (2) NEGATIVE terms: only Recraft pins a
-negative_prompt input; every other row INLINES avoid-terms into the
-prompt, and the FINAL prompt (with inlined terms) is what enters the
-cache key. (3) kling 720p is a BASE-CLIP/canonicalization requirement
-(lipsync has no resolution input), enforced before the call. (4)
-flux_pro pins prompt_upsampling BOOLEAN -- set FALSE (the writer owns
-content); width/height + upsampling enter cache params. (5) COMBO
-option lists are excluded from the pin BY DESIGN -- exact size/
-resolution/model/output_format values are verify-at-adapter-build.
-(6) DYNAMICCOMBO_V3 DEPTH LIMIT (major): rows like cloud_seedance_2
-hide their REAL inputs (reference images, audio) inside the dynamic
-model schema -- static INPUT_TYPES pinning cannot see them. The
-pinner gains a V3-EXPANSION step at S1/S3 (resolve nested inputs per
-model choice); until then, V3-row profiles are DIRECTIONAL ONLY.
-(7) cloud_wan_i2v has NO text-prompt input (prompt_extend is a
-boolean; first_frame IMAGE required, audio OPTIONAL -- the audio-
-conditioning probe input exists!). (8) A PROFILE->SCHEMA CONFORMANCE
-TEST ships with S1: walk every profile row, assert every emitted
-kwarg is declared in partner_nodes.yaml (would have caught the
-eng_cloud_video.py kwarg drift immediately). (9) The _flash/_tts
-split is ONE adapter with a model selector (same class, same shape).
-Voice/stills tuning questions (stability ranges, quoted-text length,
-paste-target-driven resolution) -> OPERATOR-DEFERRED ("optimize
-later"), revisit after first live renders.
-
-# Cloud row prompt/param profiles -- draft (v1 below, corrected by the
-# block above where they conflict)
+# Cloud row prompt/param profiles -- draft for kibitz (2026-07-02)
 
 Goal: per-row prompt templates + parameter/seed policy so every Comfy
 credit buys maximum quality. Grounded in (a) the PINNED input schemas
