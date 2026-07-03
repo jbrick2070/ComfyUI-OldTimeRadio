@@ -6,10 +6,12 @@ Leg 2 -- the whole point: a Kling avatar clip actually CONDITIONED by
          episode audio (cloud_kling_avatar with the checked-in
          tests/fixtures/baseline_v1.5.wav + a radio still).
 
-Gated: refuses to run unless OTR_RUN_CLOUD_SMOKE=1. Also requires the
-operator prereqs (exit 3 names whichever is missing):
-    OTR_ENABLE_COMFY_CLOUD_MEDIA=1
-    OTR_CLOUD_MEDIA_BUDGET_USD=<ceiling, e.g. 2.00>
+Gated: refuses to run unless OTR_RUN_CLOUD_SMOKE=1 (a PAID smoke needs an
+explicit run gate; this is NOT the removed enable flag -- production runs
+gate on the dropdown pick alone, operator directive 2026-07-02). Also
+requires the operator prereqs (exit 3 names whichever is missing):
+    OTR_CLOUD_MEDIA_BUDGET_USD=<ceiling, e.g. 2.00>  (optional; unset =
+                               the $10 DEFAULT_BUDGET_USD safety cap)
     OTR_COMFY_API_KEY=<key>   (or a logged-in Comfy account when the
                                call runs inside the server; headless
                                needs the key)
@@ -46,10 +48,6 @@ def _gate() -> None:
     missing = []
     if os.environ.get("OTR_RUN_CLOUD_SMOKE", "").strip() != "1":
         missing.append("OTR_RUN_CLOUD_SMOKE=1")
-    if os.environ.get("OTR_ENABLE_COMFY_CLOUD_MEDIA", "").strip() != "1":
-        missing.append("OTR_ENABLE_COMFY_CLOUD_MEDIA=1")
-    if not os.environ.get("OTR_CLOUD_MEDIA_BUDGET_USD", "").strip():
-        missing.append("OTR_CLOUD_MEDIA_BUDGET_USD")
     if not os.environ.get("OTR_COMFY_API_KEY", "").strip():
         missing.append("OTR_COMFY_API_KEY (headless smoke needs the key)")
     if missing:

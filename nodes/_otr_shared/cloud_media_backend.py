@@ -15,10 +15,20 @@ partner_nodes.yaml pinning chunk and resolves its session through this
 table.
 
 Env surface (all read per session-create, never mutated mid-run):
-  OTR_ENABLE_COMFY_CLOUD_MEDIA    "1" enables cloud rows (resolver gate).
   OTR_COMFY_API_KEY               auth precedence #1 (headless).
-  OTR_CLOUD_MEDIA_BUDGET_USD      per-run USD ceiling (unset/0 = every
-                                  reserve fails closed with `budget`).
+  OTR_CLOUD_MEDIA_BUDGET_USD      per-run USD ceiling. UNSET = the
+                                  DEFAULT_BUDGET_USD safety cap (operator
+                                  directive 2026-07-02: the dropdown pick
+                                  IS the enable -- no hidden switch, so
+                                  the cap must not act as one). An
+                                  EXPLICIT 0 = every reserve fails closed
+                                  with `budget` (a deliberate spend-off).
+
+NOTE (operator directive 2026-07-02 evening): the OTR_ENABLE_COMFY_CLOUD_MEDIA
+opt-in flag was REMOVED -- same clean break as the OpenRouter lane's C6
+(OTR_ENABLE_OPENROUTER removal). Cloud rows run iff the user PICKS a
+"Comfy Cloud" entry in the video/image/TTS dropdowns; picking one without
+credentials fails LOUD at auth resolution naming all three sources.
   OTR_CLOUD_MEDIA_CACHE_DIR       cache root override.
   OTR_CLOUD_MAX_CONCURRENCY_<ID>  per-provider semaphore size.
   OTR_VIDEO_MUTE_OK_ROLES         comma list of roles allowed mute video
@@ -44,7 +54,7 @@ __all__ = [
     "CostQuote",
     "ReservationState",
     "CloudMediaSession",
-    "is_cloud_media_enabled",
+    "DEFAULT_BUDGET_USD",
     "mute_ok_roles",
     "resolve_auth",
     "get_or_create_session",
@@ -94,11 +104,10 @@ class CloudMediaError(RuntimeError):
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
-
-def is_cloud_media_enabled() -> bool:
-    """Global opt-in. Rows always REGISTER (registry IS the menu); the
-    profile resolver calls this and raises GATED_BY_FLAG when off."""
-    return os.environ.get("OTR_ENABLE_COMFY_CLOUD_MEDIA", "").strip().lower() in _TRUTHY
+#: Per-run USD safety cap when OTR_CLOUD_MEDIA_BUDGET_USD is unset.
+#: PRICING.md 2026-07-02: episode envelope ~$1.55 (Kling lipsync-heavy);
+#: $10 covers a heavy episode with headroom while still bounding a runaway.
+DEFAULT_BUDGET_USD = 10.0
 
 
 def mute_ok_roles() -> frozenset:
@@ -249,7 +258,12 @@ class CloudMediaSession:
             self.budget_ceiling_usd = float(budget_ceiling_usd)
         else:
             try:
-                self.budget_ceiling_usd = float(raw) if raw else 0.0
+                # UNSET -> DEFAULT_BUDGET_USD safety cap (the dropdown pick is
+                # the enable; the cap must not be a hidden switch). EXPLICIT
+                # "0" -> 0.0 -> every reserve fails closed (deliberate
+                # spend-off remains available).
+                self.budget_ceiling_usd = (
+                    float(raw) if raw else DEFAULT_BUDGET_USD)
             except ValueError:
                 raise CloudMediaError(
                     CloudErrorCode.MALFORMED_CONFIG,

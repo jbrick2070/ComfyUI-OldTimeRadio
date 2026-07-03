@@ -10,9 +10,12 @@ Four rows from the S0 pin table, invoked through the S0 bridge
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
 
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
-empty ``default_roles`` -- selectable, NEVER automatic. ``assert_usable``
-fails CLOSED (EngineUnusable) unless OTR_ENABLE_COMFY_CLOUD_MEDIA=1 AND
-ffmpeg is present (the canonicalizer strips provider audio). The reactive
+empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
+2026-07-02: the DROPDOWN PICK is the enable (no OTR_ENABLE_COMFY_CLOUD_MEDIA
+hidden switch -- same clean break as the OpenRouter C6 flag removal); a pick
+without credentials fails LOUD at auth resolution. ``assert_usable`` fails
+CLOSED (EngineUnusable) unless ffmpeg is present (the canonicalizer strips
+provider audio) and the pin row is OK. The reactive
 auto-default policy + ShotLock audit stamps + fallback chains land with S3
 FULL, after the operator's live smokes prove the bridge.
 
@@ -98,9 +101,9 @@ class _CloudVideoBase:
     roles: tuple = ()
     default_roles: tuple = ()            # NEVER automatic in S3-core
     commercial_clean = True              # partner API rows; ToS audit rides S0 docs
-    # C2-C6 registry-IS-the-menu: NO registered engine declares a flag --
-    # the OTR_ENABLE_COMFY_CLOUD_MEDIA gate lives in assert_usable (fail
-    # closed at RESOLVE, always visible in the menu).
+    # C2-C6 registry-IS-the-menu: NO registered engine declares a flag.
+    # Operator directive 2026-07-02: no hidden enable switch either -- the
+    # dropdown pick IS the enable; auth fails LOUD at invoke if missing.
     requires_flag = None
 
     # --- row identity (subclasses) ---
@@ -120,13 +123,11 @@ class _CloudVideoBase:
 
     # ---- render lifecycle -------------------------------------------------
     def assert_usable(self, host_caps, profile, request_template=None):
-        from .._otr_shared.cloud_media_backend import is_cloud_media_enabled
-        if not is_cloud_media_enabled():
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.GATED_BY_FLAG,
-                "cloud media is off -- set OTR_ENABLE_COMFY_CLOUD_MEDIA=1 "
-                "(plus OTR_CLOUD_MEDIA_BUDGET_USD + login/OTR_COMFY_API_KEY)",
-                kind="video")
+        # NO enable-flag check (operator directive 2026-07-02): the dropdown
+        # pick is the enable. Credentials resolve fail-closed at invoke time
+        # (resolve_auth names OTR_COMFY_API_KEY / logged-in Comfy hidden
+        # inputs) -- hidden auth only exists in the prompt context, so a
+        # resolve-time env check would wrongly block logged-in desktop users.
         import shutil
         if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
             raise EngineUnusable(

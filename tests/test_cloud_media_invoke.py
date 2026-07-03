@@ -63,8 +63,8 @@ class _RecordingNode:
 
 @pytest.fixture
 def rig(monkeypatch, tmp_path):
-    """Enabled cloud env + fake row + fake node class + bound prompt."""
-    monkeypatch.setenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", "1")
+    """Cloud env (no enable flag -- removed 2026-07-02) + fake row + fake
+    node class + bound prompt."""
     monkeypatch.setenv("OTR_CLOUD_MEDIA_BUDGET_USD", "5.00")
     monkeypatch.setenv("OTR_COMFY_API_KEY", "test-key-123")
     monkeypatch.setenv("OTR_CLOUD_MEDIA_CACHE_DIR", str(tmp_path / "cache"))
@@ -102,12 +102,24 @@ def _session(rig_data):
 # ---------------------------------------------------------------------------
 
 
-def test_gated_by_flag(monkeypatch, rig):
-    monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA")
+def test_no_enable_flag_gate(monkeypatch, rig):
+    """Operator directive 2026-07-02: the dropdown pick is the enable --
+    invoke must NOT gate on OTR_ENABLE_COMFY_CLOUD_MEDIA. With credentials
+    present the call proceeds regardless of the (removed) flag."""
+    monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", raising=False)
+    result = invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=5)
+    assert result["path"]
+
+
+def test_missing_credentials_fail_loud(monkeypatch, rig):
+    """A dropdown pick without ANY credentials fails LOUD at auth,
+    naming the sources (env key + hidden inputs)."""
+    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
+    backend.teardown_session(rig["prompt_id"])  # drop the keyed session
     with pytest.raises(CloudMediaError) as ei:
         invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=5)
-    assert ei.value.code is CloudErrorCode.GATED_BY_FLAG
-    assert "OTR_ENABLE_COMFY_CLOUD_MEDIA" in str(ei.value)
+    assert ei.value.code is CloudErrorCode.AUTH
+    assert "OTR_COMFY_API_KEY" in str(ei.value)
 
 
 def test_unknown_node_key(rig):

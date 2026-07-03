@@ -63,15 +63,11 @@ def test_reactivity_descriptors_match_pass04():
                (ecv.KlingAvatar, ecv.KlingLipsync, ecv.Seedance2, ecv.WanI2V))
 
 
-def test_assert_usable_fails_closed_without_flag(monkeypatch):
+def test_assert_usable_no_enable_flag(monkeypatch):
+    """Operator directive 2026-07-02: the dropdown pick is the enable --
+    assert_usable must NOT gate on OTR_ENABLE_COMFY_CLOUD_MEDIA (only
+    ffmpeg presence + a healthy pin row)."""
     monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", raising=False)
-    with pytest.raises(vreg.EngineUnusable) as ei:
-        ecv.KlingAvatar.assert_usable({}, {})
-    assert "OTR_ENABLE_COMFY_CLOUD_MEDIA" in str(ei.value)
-
-
-def test_assert_usable_passes_with_flag(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", "1")
     ecv.KlingAvatar.assert_usable({}, {})            # must not raise
 
 

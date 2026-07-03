@@ -37,13 +37,11 @@ def _clean_state(monkeypatch, tmp_path):
 # -- flags -----------------------------------------------------------------
 
 
-def test_flag_default_off():
-    assert cmb.is_cloud_media_enabled() is False
-
-
-def test_flag_on(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", "1")
-    assert cmb.is_cloud_media_enabled() is True
+def test_enable_flag_removed():
+    """Operator directive 2026-07-02: no hidden enable switch -- the
+    dropdown pick IS the enable (same clean break as OpenRouter C6)."""
+    assert not hasattr(cmb, "is_cloud_media_enabled")
+    assert "is_cloud_media_enabled" not in cmb.__all__
 
 
 def test_mute_ok_roles_default_empty():
@@ -161,10 +159,25 @@ def test_session_sweep_evicts_stale(capsys, monkeypatch):
 # -- budget state machine -----------------------------------------------------
 
 
-def test_budget_unset_fails_closed():
+def test_budget_unset_uses_default_safety_cap():
+    """Operator directive 2026-07-02: no hidden switch -- an unset budget
+    is the DEFAULT_BUDGET_USD safety cap, not a fail-closed off-switch."""
     import os
     os.environ.pop("OTR_CLOUD_MEDIA_BUDGET_USD", None)
     s = cmb.get_or_create_session("prompt-b0", hidden_api_key="k")
+    assert s.budget_ceiling_usd == cmb.DEFAULT_BUDGET_USD
+    rid = s.reserve(0.01)  # must NOT raise under the default cap
+    s.release(rid)
+    with pytest.raises(cmb.CloudMediaError) as ei:
+        s.reserve(cmb.DEFAULT_BUDGET_USD + 0.01)  # cap still ENFORCED
+    assert ei.value.code is cmb.CloudErrorCode.BUDGET
+
+
+def test_budget_explicit_zero_fails_closed():
+    """An EXPLICIT 0 remains a deliberate spend-off: every reserve fails."""
+    import os
+    os.environ["OTR_CLOUD_MEDIA_BUDGET_USD"] = "0"
+    s = cmb.get_or_create_session("prompt-b0z", hidden_api_key="k")
     with pytest.raises(cmb.CloudMediaError) as ei:
         s.reserve(0.01)
     assert ei.value.code is cmb.CloudErrorCode.BUDGET

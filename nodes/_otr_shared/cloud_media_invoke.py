@@ -42,7 +42,6 @@ from .cloud_media_backend import (
     CloudErrorCode,
     CloudMediaError,
     get_or_create_session,
-    is_cloud_media_enabled,
 )
 from .cloud_media_canonical import PartnerResult, validate_partner_result
 
@@ -569,11 +568,9 @@ def invoke_partner_node(node_key: str, inputs: dict, *,
     coroutine on the backend loop under the interrupt/heartbeat
     watchdog, and normalizes the output to a validated PartnerResult.
     """
-    if not is_cloud_media_enabled():
-        raise CloudMediaError(
-            CloudErrorCode.GATED_BY_FLAG,
-            "cloud media is off -- set OTR_ENABLE_COMFY_CLOUD_MEDIA=1",
-        )
+    # Operator directive 2026-07-02: NO hidden enable switch -- the user's
+    # dropdown pick is the enable. Auth resolves fail-closed downstream
+    # (resolve_auth names all three credential sources when missing).
     if timeout_s is None or timeout_s <= 0:
         raise CloudMediaError(CloudErrorCode.MALFORMED_CONFIG,
                               f"timeout_s must be > 0, got {timeout_s!r}")

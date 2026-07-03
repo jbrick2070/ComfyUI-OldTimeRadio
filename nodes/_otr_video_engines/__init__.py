@@ -155,8 +155,9 @@ except Exception:  # noqa: BLE001
 # / seedance_2 / wan_i2v via the S0 invoke_partner_node bridge, conformed by
 # canonicalize_video (provider audio ALWAYS stripped, strip-proven). Register
 # unconditionally (registry IS the menu) with EMPTY default_roles -- selectable
-# picks only; assert_usable fails CLOSED until OTR_ENABLE_COMFY_CLOUD_MEDIA=1
-# (+ budget + auth). Cold-import clean (torch/PIL/soundfile/bridge lazy).
+# picks only; NO enable flag (operator directive 2026-07-02: the dropdown pick
+# IS the enable; missing credentials fail LOUD at invoke-time auth).
+# Cold-import clean (torch/PIL/soundfile/bridge lazy).
 # Guarded so a packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
     from . import eng_cloud_video as _eng_cloud_video  # noqa: F401

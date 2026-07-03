@@ -354,9 +354,10 @@ CAPABILITIES = {
                                             "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
     # CLOUD partner video rows (S3 core, 2026-07-02, pass04 secs 5+7): the
     # render happens PROVIDER-SIDE, so the local class is cpu (zero VRAM);
-    # cpu_ok True (any box with ffmpeg + credits can run them). Gated at
-    # assert_usable on OTR_ENABLE_COMFY_CLOUD_MEDIA (registry-IS-the-menu:
-    # rows always REGISTER + show; resolve fails closed until enabled).
+    # cpu_ok True (any box with ffmpeg + credits can run them). NO enable
+    # flag (operator directive 2026-07-02): rows always REGISTER + show;
+    # the dropdown pick is the enable; missing credentials fail LOUD at
+    # invoke-time auth resolution.
     "cloud_kling_avatar": {"vram_class": "cpu", "vram_estimate_mb": 0,
                            "required_toolchain": None, "requires_sidecar": False,
                            "cpu_ok": True, "model_requirements": []},
