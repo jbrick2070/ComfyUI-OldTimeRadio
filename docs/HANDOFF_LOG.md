@@ -6,6 +6,31 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 (night) -- S4b/S4c SHIPPED + cloud-S3 CORE SHIPPED; proof9 in flight; story fix PARKED
+Did: **S4b+S4c @ a415ad18** (proof8 verdict: S4 routing fired but portraits were dark PROFILES --
+mouth invisible; + the faceless pinprick announcer): per-role `talking` map through
+VideoDirector->ImageDirector->MetaBrief; talking character portraits mint FACE-FORWARD frontal
+close-up + warm, era/grade tails skipped; OTR_LTX_RADIO_FACE A/B RETIRED into default-on under the
+ia2v register (mint + driver, fail-LOUD on a missing face still; env stays for single-pass). 10 new
+tests, 7 legacy contracts re-pinned. **Cloud-S3 CORE @ a9440980** (operator evening GO supersedes
+the mid-day hold): eng_cloud_video.py 4 rows dark+fail-closed (empty default_roles; assert_usable
+needs OTR_ENABLE_COMFY_CLOUD_MEDIA + ffmpeg) via the S0 bridge; canonicalize_video REAL (role
+canvas fit+pad, fps, h264/yuv420p/bt709, audio ALWAYS stripped w/ post-strip re-probe PROOF,
+actual_duration_s named-error, sha256); docs-window catches folded (wan: NO top-level prompt, exact
+pinned static set + OTR_CLOUD_WAN_MODEL; seedance: honest dark row until the S1 V3-expansion pin;
+kling pair fully codable). CAPABILITIES cpu rows; requires_flag=None (registry-IS-the-menu guard).
+**Operator holds honored**: director-note dialogue-leak fix REVERTED out of production and PARKED in
+UpstreamStoryLab GO_FORWARD "DEFERRED STORY-LLM FIXES" (7df7c80 there) -- NO story-LLM changes
+until the transplant. **LTX decision (operator ratified)**: 2 LTX rows, no ltx_lowvram (22B unet
+floor makes it illusory; 8GB = profiles); S5 = port the two-stage HQ recipe to silent ltx_video
+(task open, not started). Ops: proof9 attempt 1 died in the writer (env-less boot -> z_image
+FileNotFoundError; fixed w/ tracked scripts/otr_ia2v_server_boot.cmd), attempt 2 died on a
+zombie bad-env uv-python holding :8000 (ComfyUI main.py re-execs under uv -- the CHILD outlives a
+parent-only kill; kill by PORT OWNER), attempt 3 breached the VRAM ceiling (desktop backend
+relaunched, 4.1GB squatter -> killed; baseline 2.4GB, margin TIGHT at 832x448). proof9b launched
+~18:12 on the S4b/c code; S4c radio-face fired in production on b000 (log-proven). Suites: 6032/0
+-> 6059/0 + Bug Bible green each chunk.
+
 ## 2026-07-02 (evening) -- PROOF7 SCORED (announcers SMASH, chars = init bug) -> S4 PORTRAIT INIT SHIPPED
 Did: proof7 (signal_lost_lab_race..., 31:19, obs_publish OK, byte-identical, peak ~13.3GB) scored on
 RAW clips w/ slice audio muxed (shot clips are SILENT by design -- mux-LAST -- the evaluator needs a
