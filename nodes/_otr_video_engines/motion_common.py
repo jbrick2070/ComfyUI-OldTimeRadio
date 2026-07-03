@@ -32,28 +32,6 @@ import sys
 from .._otr_shared import gpu_residency as _GR
 from .registry import EngineUnusable, EngineUsabilityReason
 
-#: Machine-wide VRAM ceiling for the single resident heavy engine (A invariant).
-#: This constant is the 16 GB-box FALLBACK; runtime consumers read
-#: :func:`dynamic_vram_ceiling_mb` so a profile-stamped run (GATE B S1/S2:
-#: OTR_WorkflowValidator exports ``OTR_VRAM_CEILING_MB`` every execution, and
-#: headless launchers set it directly) tightens the budget WITHOUT a code edit.
-VRAM_CEILING_MB = 14500
-
-
-def dynamic_vram_ceiling_mb() -> int:
-    """The ACTIVE machine-wide VRAM ceiling, read at DISPATCH time (GATE B S1:
-    env > the 14500 fallback -- no graph introspection). Invalid env values
-    fall back LOUD-less to the constant (the validator already warned)."""
-    raw = (os.environ.get("OTR_VRAM_CEILING_MB") or "").strip()
-    if raw:
-        try:
-            val = int(raw)
-            if val > 0:
-                return val
-        except ValueError:
-            pass
-    return VRAM_CEILING_MB
-
 #: Aspect policies an init image may be fit into the canvas with (mirrors
 #: schemas.Canvas.aspect_policy). Each uses ONE uniform scale, so the aspect ratio
 #: is preserved; the forbidden behavior -- an implicit non-uniform stretch -- is
@@ -204,8 +182,10 @@ def assert_no_silent_stretch(plan, tol=0.02):
 
 
 # --------------------------------------------------------------------------- #
-# Mid-sampling NVML ceiling probe (PASS-PM: peak during render, not just
-# pre/post -- an additively-resident LoRA delta can breach mid-sample)
+# Mid-sampling NVML telemetry (PASS-PM: peak during render, not just pre/post --
+# an additively-resident LoRA delta shows up mid-sample). TELEMETRY ONLY: the
+# OOM budget is owned by the operator's tier JSON now, so there is no ceiling
+# assert -- the peak is sampled + logged, never enforced.
 # --------------------------------------------------------------------------- #
 def vram_used_mb():
     """Machine-wide VRAM used (MB) via the shared NVML probe, or ``None`` when
@@ -214,29 +194,6 @@ def vram_used_mb():
     if not _GR.nvml_available():
         return None
     return _GR.probe_used_mb()
-
-
-def assert_vram_within_ceiling(label="render", ceiling_mb=None):
-    """Mid-sampling NVML guard: assert machine-wide used VRAM has not breached the
-    single-heavy-engine ceiling DURING a render.
-
-    The GPU-smoke render loop calls this from inside the sampling callback (not
-    only at the pre/post boundary), because a LoRA delta is additively resident
-    and can push the peak past the ceiling mid-sample. A no-op when NVML is
-    unavailable (the CPU box -- the boundary settle-wait in ``teardown`` covers
-    that path). Raises ``RuntimeError`` on a breach; returns the used MB (or
-    ``None`` when NVML is absent).
-    """
-    if ceiling_mb is None:
-        ceiling_mb = dynamic_vram_ceiling_mb()   # env-at-dispatch (GATE B S1)
-    used = vram_used_mb()
-    if used is None:
-        return None
-    if used > int(ceiling_mb):
-        raise RuntimeError(
-            "VRAM ceiling breached mid-%s: %d MB > %d MB (single resident heavy "
-            "engine)" % (label, used, int(ceiling_mb)))
-    return used
 
 
 class VramPeakProbe:
@@ -280,19 +237,6 @@ class VramPeakProbe:
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         return self.peak_mb
-
-
-def assert_peak_within_ceiling(peak_mb, label="render", ceiling_mb=None):
-    """Assert a MEASURED render-window peak (from :class:`VramPeakProbe`) has not
-    breached the single-heavy-engine ceiling. A no-op when ``peak_mb`` is 0/falsy
-    (NVML absent -> nothing measured). Raises ``RuntimeError`` on a breach."""
-    if ceiling_mb is None:
-        ceiling_mb = dynamic_vram_ceiling_mb()
-    if peak_mb and int(peak_mb) > int(ceiling_mb):
-        raise RuntimeError(
-            "VRAM ceiling breached across %s window: %d MB > %d MB (single "
-            "resident heavy engine)" % (label, int(peak_mb), int(ceiling_mb)))
-    return peak_mb
 
 
 # --------------------------------------------------------------------------- #
@@ -368,27 +312,26 @@ def _cost_model_for(engine_name):
 
 
 def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
-                              canvas_w, canvas_h, engine_name, *,
-                              ceiling_mb=None):
+                              canvas_w, canvas_h, engine_name):
     """PREDICT the largest 4n+1 clip length an engine can render this beat without
     over-committing VRAM -- the clip-fill fix (GO_FORWARD 2026-06-18).
 
     Cost model: ``vram ~= overhead + per_frame_at_res * frames`` where
     ``per_frame_at_res`` scales the telemetry per-frame cost by the canvas pixel
-    area vs the reference. ``budget = min(free, ceiling) * margin``; the affordable
-    frame count is capped at the beat's audio-derived ``target_frame_count``,
-    floored at the engine's motion floor, and snapped to a valid 4n+1.
+    area vs the reference. ``budget = free * margin`` -- clamped on LIVE FREE VRAM
+    ONLY (no policy ceiling; the operator's tier JSON owns the OOM budget now).
+    The affordable frame count is capped at the beat's audio-derived
+    ``target_frame_count``, floored at the engine's motion floor, and snapped to a
+    valid 4n+1.
 
     ``free_vram_mb_value`` ``None`` / <= 0 (no NVML/torch -- the CPU box) -> trust
-    the target (the render-window NVML probe still gates the ceiling at render
-    time). The render then loop/ping-pong-extends this (possibly short) render up
-    to the full target, so a tight budget yields short MOTION, never a freeze.
-    Pure (no GPU read here -- the caller passes ``free_vram_mb()``); CPU-tested."""
+    the target. The render then loop/ping-pong-extends this (possibly short)
+    render up to the full target, so a tight budget yields short MOTION, never a
+    freeze. Pure (no GPU read here -- the caller passes ``free_vram_mb()``);
+    CPU-tested."""
     from . import wrapper_bridge as _wb
     target = max(1, int(target_frame_count or 1))
     floor = int(FRAME_MOTION_FLOOR.get(engine_name, _DEFAULT_MOTION_FLOOR))
-    if ceiling_mb is None:
-        ceiling_mb = dynamic_vram_ceiling_mb()
     # No live VRAM reading -> trust the audio-derived target (clamped to floor).
     if free_vram_mb_value is None or float(free_vram_mb_value) <= 0:
         return _wb.quantize_frames_4n1(target, min_frames=floor, max_frames=target)
@@ -399,7 +342,7 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
         margin = float(os.environ.get("OTR_VIDEO_BUDGET_MARGIN", _BUDGET_MARGIN))
     except (TypeError, ValueError):
         margin = _BUDGET_MARGIN
-    budget_mb = min(float(free_vram_mb_value), float(ceiling_mb)) * margin
+    budget_mb = float(free_vram_mb_value) * margin
     if per_frame_at_res <= 0:
         affordable = target
     else:
@@ -475,16 +418,17 @@ class MotionEngineBase:
 
     def teardown(self, prepared):
         """Detach every tracked patcher (V-4), drop residency, RELEASE the lease,
-        then bounded-wait for machine-wide VRAM below the ceiling. Idempotent +
-        never raises out of teardown. NEVER ``unload_all_models`` (V-4 / V-5)."""
+        then bounded stability-wait for machine-wide VRAM to settle (no ceiling --
+        the reclaim already happened; this just absorbs teardown latency).
+        Idempotent + never raises out of teardown. NEVER ``unload_all_models``
+        (V-4 / V-5)."""
         self._detach_patchers(prepared)
         self.unload()
         lease = (prepared or {}).get("lease")
         had_lease = lease is not None
         _GR.release(lease)
         if had_lease:
-            _GR.wait_until_below_mb(dynamic_vram_ceiling_mb(),
-                                    attempts=3, sleep_s=2.0)
+            _GR.wait_until_stable(attempts=3, sleep_s=2.0)
 
     @staticmethod
     def _detach_patchers(prepared):
@@ -504,13 +448,12 @@ class MotionEngineBase:
 
 
 __all__ = [
-    "VRAM_CEILING_MB", "dynamic_vram_ceiling_mb",
     "ASPECT_POLICIES", "DEFAULT_ASPECT_POLICY",
     "ISOLATION_IN_PROCESS", "ISOLATION_SIDECAR_REQUIRED",
     "ISOLATION_SIDECAR_OPTIONAL", "sageattention_patched",
     "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
-    "assert_vram_within_ceiling", "VramPeakProbe", "assert_peak_within_ceiling",
+    "VramPeakProbe",
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
     "compute_real_frame_budget", "MotionEngineBase",
 ]

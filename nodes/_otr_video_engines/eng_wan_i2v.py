@@ -314,9 +314,7 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not os.environ.get("OTR_TEST_MODE"):
             post_mb = _MC.vram_used_mb() or 0
             _LOG.info("[OTR video] wan_i2v VRAM render-phase peak %s MB / post %s "
-                      "MB (ceiling %s MB)", render_peak, post_mb,
-                      _MC.dynamic_vram_ceiling_mb())
-            _MC.assert_peak_within_ceiling(render_peak, "wan_i2v-render")
+                      "MB", render_peak, post_mb)
         return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):

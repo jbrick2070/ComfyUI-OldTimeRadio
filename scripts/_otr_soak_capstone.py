@@ -9,8 +9,10 @@ SilentComposite -> MasterAudioMux) end-to-end on the live headless ComfyUI
     still floor when heavy engines are OFF (--expect-floor);
   * audio byte-identical: independent ffmpeg PCM-SHA256 of the final mp4's
     audio stream == the frozen master WAV's PCM-SHA256;
-  * VRAM peak <= 14.5 GB, sampled machine-wide via pynvml during the run
-    (plus the driver's own vram_peak_mb from the render report);
+  * VRAM peak sampled machine-wide via pynvml during the run (plus the
+    driver's own vram_peak_mb from the render report), recorded as
+    telemetry -- the OOM budget is owned by the external per-hardware tier
+    JSON, not this soak;
   * run identity: every fact pinned to THIS run's prompt_id + episode slug
     (report mtime gated on this leg's start time -- orphan reports rejected).
 
@@ -63,7 +65,6 @@ EPISODES_DIR = os.path.join(SERVER_OUTPUT, "otr", "episodes")
 REPORT_PATH = os.path.join(SERVER_OUTPUT, "otr", "episodes", "_shared",
                            "state", "node_episode_report.json")
 RESULTS_DIR = os.path.join(_HERE, "_otr_soak_capstone_results")
-VRAM_CEILING_MB = 14.5 * 1024
 # Per-leg render poll ceiling. Env-overridable (OTR_SOAK_POLL_TIMEOUT_S): the
 # 14B wan_i2v lane now RENDERS for real (the flux/residue OOM fix, 2026-06-15)
 # instead of falling back to stills in seconds, so a full Wan episode's
@@ -633,30 +634,28 @@ def run_leg(leg: str, expect_floor: bool, expect_engine: str = "humo",
         ledger = json.load(f)
     fp = cast_style_fingerprint(ledger)
 
-    # V-3 gate: the ceiling applies to the VIDEO render phase (single resident
-    # heavy engine at inter-engine boundaries) -- the driver's vram_peak_mb is
-    # that machine-wide NVML measurement (nodes/vram_context_test pattern).
-    # The client-side whole-pipeline sample (which also spans the writer-LLM
-    # phase, NOT part of V-3) is recorded as informational context only.
+    # V-3 telemetry: the driver's vram_peak_mb is the machine-wide NVML
+    # measurement for the VIDEO render phase (nodes/vram_context_test
+    # pattern). The client-side whole-pipeline sample (which also spans the
+    # writer-LLM phase, NOT part of V-3) is recorded as informational context
+    # only. The OOM budget itself is owned by the external per-hardware tier
+    # JSON -- this soak only measures and records, it never gates on VRAM.
     driver_peak = resolve_driver_peak_mb(report)
     peaks = {"render_phase_driver_mb": driver_peak if driver_peak is not None
              else -1,
              "whole_run_nvml_machine_mb": vram.peak_mb,
              "nvml_samples": vram.samples}
     # M4 fail-closed (GO_FORWARD 4A): a missing / 0 / negative measurement is a
-    # GATE FAILURE, not a free pass -- the <=14.5 GB invariant cannot read GREEN
-    # without a real render-phase peak.
+    # GATE FAILURE, not a free pass -- the render-phase peak must be a real
+    # measurement (this guards measurement integrity, not a VRAM budget).
     if driver_peak is None:
         raise SoakFail(
             "V-3 render-phase VRAM peak MISSING or <=0 in the run report "
-            "(vram_peak_mb=%r) -- the <=14.5 GB invariant cannot pass without a "
-            "measurement (M4 fail-closed)" % report.get("vram_peak_mb"))
-    if driver_peak > VRAM_CEILING_MB:
-        raise SoakFail("V-3 render-phase VRAM peak %dMB > ceiling %dMB"
-                       % (driver_peak, VRAM_CEILING_MB))
-    print("[soak] V-3 render-phase VRAM peak OK: %dMB <= %.0fMB "
+            "(vram_peak_mb=%r) -- cannot pass without a real measurement "
+            "(M4 fail-closed)" % report.get("vram_peak_mb"))
+    print("[soak] V-3 render-phase VRAM peak (telemetry): %dMB "
           "(whole-run machine peak %dMB informational)"
-          % (driver_peak, VRAM_CEILING_MB, vram.peak_mb), flush=True)
+          % (driver_peak, vram.peak_mb), flush=True)
 
     result = {
         "leg": leg, "prompt_id": prompt_id, "episode_id": episode_id,

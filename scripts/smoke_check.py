@@ -27,7 +27,6 @@ AGENT_LOG   = BASE_DIR / "logs" / "agent_log.md"
 OVERRIDES   = BASE_DIR / "scripts" / "watcher_overrides.json"
 SCRIPTS_DIR = BASE_DIR / "scripts"
 
-VRAM_CEILING   = 14.5
 SHORT_DUR_SECS = 30
 MIN_FILE_MB    = 5
 STUCK_THRESHOLD = 5   # same title this many times = TITLE_STUCK

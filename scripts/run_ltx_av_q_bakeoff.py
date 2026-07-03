@@ -40,8 +40,9 @@ Stages (PLAN v5):
   Stage2 SAMPLER 2x2 {i2v 0.75/0.62} x {native/re-spaced sigmas} on the best decode.
   Stage3 CANVAS {640x384, 704x384} on the stage1+2 winner; reserve 4 -> 5-6 on spill.
 
-Per-leg gates (objective): ffprobe matches the manifest; peak VRAM <= 14500 (HARD); s/it
-<= 30 AND <= 2.5x the 512 baseline (LOAD-BEARING abort -- prevents the 223 s/it sysmem
+Per-leg gates (objective): ffprobe matches the manifest; peak VRAM recorded as telemetry
+only (no ceiling gate -- the OOM budget is owned by the external per-hardware tier JSON);
+s/it <= 30 AND <= 2.5x the 512 baseline (LOAD-BEARING abort -- prevents the 223 s/it sysmem
 spiral); scene-cuts gt(scene,0.20)=0; freezedetect(-55dB:d=0.12) 0 freezes >=0.12s OR
 >=75% reduction vs L0; temporal seam (dynamic indices) p99-luma jump <2.5 AND <=1.5x the
 local median, else rank by >=75% seam-reduction-vs-L0; sharpness (Stage 0 + Stage 3 only)
@@ -100,7 +101,6 @@ PORT = 8000
 
 FPS = 25.0
 STEPS = 8                       # 8-step distilled schedule (wall/steps s/it fallback)
-VRAM_CEILING_MB = 14500         # A invariant -- HARD fail above this
 SIT_ABS_CAP = 30.0              # s/it absolute ceiling (LOAD-BEARING abort)
 SIT_REL_CAP = 2.5               # s/it <= 2.5x the 512 baseline
 RESERVE_GB = 4.0                # production reserve (eng_ltx_av.py:90); step up on spill
@@ -205,7 +205,7 @@ def wait_ready(timeout_s=180):
 
 
 # --------------------------------------------------------------------------- #
-# NVML peak-VRAM sampler (live peak readable mid-render for the HARD ceiling abort)
+# NVML peak-VRAM sampler (live peak readable mid-render; recorded telemetry)
 # --------------------------------------------------------------------------- #
 class VramPeak:
     def __init__(self, interval=0.25):
@@ -597,12 +597,15 @@ def frames_from_clip(clip, sample=12):
 
 
 # --------------------------------------------------------------------------- #
-# poll with the LOAD-BEARING aborts (VRAM ceiling + s/it ceiling + wall cap)
+# poll with the LOAD-BEARING aborts (s/it ceiling + wall cap); VRAM is
+# telemetry-only (the OOM budget is owned by the external per-hardware tier
+# JSON, not this harness).
 # --------------------------------------------------------------------------- #
 def poll_with_abort(pid, server_log, slog_offset, vp, baseline_sit, baseline_wall):
-    """Poll /history to completion, aborting (reset_box -> kill) on: peak VRAM >
-    14500 (HARD); parsed s/it > max(30, 2.5*baseline); or wall > the per-leg hard
-    cap. Returns (status, reason, sit, pexec)."""
+    """Poll /history to completion, aborting (reset_box -> kill) on: parsed s/it
+    > max(30, 2.5*baseline); or wall > the per-leg hard cap. Returns (status,
+    reason, sit, pexec). Peak VRAM (``vp.peak_mb``) is sampled throughout and
+    recorded in the result -- never compared to a ceiling here."""
     import requests
     # the gate is s/it <= 30 AND <= 2.5x baseline -> abort if EITHER is exceeded
     rel_cap = (SIT_REL_CAP * baseline_sit) if baseline_sit else None
@@ -611,10 +614,6 @@ def poll_with_abort(pid, server_log, slog_offset, vp, baseline_sit, baseline_wal
     last_sit = None
     while True:
         wall = time.time() - t0
-        if vp.peak_mb and vp.peak_mb > VRAM_CEILING_MB:
-            reset_box()
-            return ("abort", "VRAM %.0fMB > %d ceiling" % (vp.peak_mb, VRAM_CEILING_MB),
-                    last_sit, None)
         with open(server_log, "r", encoding="utf-8", errors="replace") as f:
             f.seek(slog_offset)
             sl = f.read()
@@ -720,11 +719,10 @@ def run_render_leg(leg, baseline_sit, baseline_wall):
         if leg.get("sharpness"):
             result["sharpness_native"] = laplacian_variance(frames)
 
-        # gates
+        # gates (peak_vram_mb is recorded telemetry only -- no ceiling gate)
         peak = result["peak_vram_mb"]
         sitv = result["s_per_it"]
         gates = {
-            "vram_ok": (peak <= VRAM_CEILING_MB),
             "sit_abs_ok": (sitv <= SIT_ABS_CAP),
             "sit_rel_ok": (baseline_sit is None or sitv <= SIT_REL_CAP * baseline_sit),
             "scene_cuts_ok": (result["scene_cuts"] == 0),
@@ -791,7 +789,7 @@ def run_stage0(l0_clip):
 # --------------------------------------------------------------------------- #
 def _passes(r):
     g = r.get("gates", {})
-    return (r.get("status") == "ok" and g.get("vram_ok") and g.get("sit_abs_ok")
+    return (r.get("status") == "ok" and g.get("sit_abs_ok")
             and g.get("sit_rel_ok"))
 
 

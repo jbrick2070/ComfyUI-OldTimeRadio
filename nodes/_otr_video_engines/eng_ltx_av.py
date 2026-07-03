@@ -496,16 +496,16 @@ class _LtxAvBase(_MC.MotionEngineBase):
         5 av_dims on request_template.canvas (None tolerated)."""
         # BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
         _MC.assert_sage_not_patched(self.name, self.family)
-        # 3 -- NVML REQUIRED for the heaviest lane (grounded fail-open risk:
-        #      probe_used_mb()->0 makes the ceiling asserts no-op)
+        # 3 -- NVML REQUIRED for the heaviest lane: the VRAM peak telemetry +
+        #      the settle-wait need a live probe; fail closed rather than run an
+        #      unbounded heavy forward blind on a host we cannot measure.
         from .._otr_shared import gpu_residency as _GR
         if not _GR.nvml_available():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
-                "%s requires NVML to enforce the %d MB ceiling; NVML is "
-                "unavailable on this host (the LTX-AV lane fails closed rather "
-                "than run an unbounded heavy forward)"
-                % (self.name, _MC.dynamic_vram_ceiling_mb()), kind="video")
+                "%s requires NVML for VRAM telemetry; NVML is unavailable on "
+                "this host (the LTX-AV lane fails closed rather than run an "
+                "unbounded heavy forward blind)" % self.name, kind="video")
         # 3b -- recipe resolution FIRST (fail-loud BEFORE node/weight gating):
         #       a retired OTR_LTX_AV_SHARP, a bad OTR_LTX_AV_RECIPE, or an
         #       unrecognized unet family RAISES here, at the gate, never mid-render
@@ -990,10 +990,10 @@ class _LtxAvBase(_MC.MotionEngineBase):
             if results is not None:
                 self._retain_model_patchers(results, prepared)
             _wb.reclaim_idle_models(reason="%s post-decode" % self.name)
-        # Assert the MEASURED render-window peak (not the drained post-cleanup
-        # read) is within the ceiling, AFTER reclaim.
-        if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_peak_within_ceiling(peak, label="%s-render" % self.name)
+        # Telemetry: log the MEASURED render-window peak (VramPeakProbe). No
+        # ceiling enforcement -- the operator's tier JSON owns the OOM budget.
+        if peak:
+            _LOG.info("[%s] render-window VRAM peak: %d MB", self.name, int(peak))
         if images is None:                       # success path always sets images
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)

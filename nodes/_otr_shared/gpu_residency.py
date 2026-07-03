@@ -273,8 +273,30 @@ def wait_until_below_mb(threshold_mb: int, attempts: int = 3, sleep_s: float = 2
     return False
 
 
+def wait_until_stable(attempts: int = 3, sleep_s: float = 2.0, delta_mb: int = 256,
+                      device_index: int = 0) -> bool:
+    """Bounded THRESHOLD-AGNOSTIC settle-wait: re-probe machine-wide used VRAM
+    until it STOPS dropping (two consecutive reads within ``delta_mb``) -- absorbs
+    Windows teardown latency after a lease release / sidecar exit WITHOUT any
+    policy ceiling (the operator's tier JSON owns the OOM budget). Returns True
+    once stable, False if still settling after ``attempts`` (or NVML absent --
+    fail closed, the caller cannot prove the device settled)."""
+    if not nvml_available(device_index):
+        return False
+    attempts = max(1, int(attempts))
+    prev = probe_used_mb(device_index)
+    for i in range(attempts):
+        if i < attempts - 1:
+            time.sleep(max(0.0, float(sleep_s)))
+        cur = probe_used_mb(device_index)
+        if abs(int(prev) - int(cur)) <= int(delta_mb):
+            return True
+        prev = cur
+    return False
+
+
 __all__ = [
     "LeaseContext", "LeaseTimeout", "LeaseError",
     "acquire", "release", "probe_used_mb", "nvml_available",
-    "wait_until_below_mb", "is_held", "read_owner",
+    "wait_until_below_mb", "wait_until_stable", "is_held", "read_owner",
 ]

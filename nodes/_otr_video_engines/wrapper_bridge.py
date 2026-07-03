@@ -33,9 +33,6 @@ import subprocess
 
 _LOG = logging.getLogger("OTR.video.wrapper_bridge")
 
-#: Machine-wide VRAM ceiling for the single resident heavy engine (A invariant).
-VRAM_CEILING_MB = 14500
-
 #: The CanonicalClip pixel/colour contract the engines' canonicalize() emits.
 PIX_FMT = "yuv420p"
 COLOR_PRIMARIES = "bt709"
@@ -640,7 +637,7 @@ def stage_into_comfy_input(src_path, dst_name=None):
 
 
 __all__ = [
-    "VRAM_CEILING_MB", "PIX_FMT", "COLOR_PRIMARIES",
+    "PIX_FMT", "COLOR_PRIMARIES",
     "WrapperNodeMissing", "GraphExecutionError",
     "node_class_mappings", "resolve_node_class", "resolve_graph_classes",
     "Wire", "run_graph",

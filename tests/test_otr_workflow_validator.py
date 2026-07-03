@@ -219,7 +219,7 @@ class TestStampAssertion:
     def test_stamped_run_exports_env(self, monkeypatch):
         # Post-VRAM-rip: the validator exports ONLY the active-profile id +
         # snapshot hash -- the OOM budget is owned by the operator's tier JSON,
-        # so there is no OTR_VRAM_CEILING_MB export any more.
+        # so there is no VRAM-budget env export any more.
         import os
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host()))

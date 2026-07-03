@@ -78,7 +78,6 @@ def _passing_report(n=6):
     ep = _passing_episode(n)
     return {
         "meta": {"n_beats": n, "oom_shot_id": None, "oom_index": None},
-        "vram_ceiling_mb": 14500,
         "episode_1": copy.deepcopy(ep), "episode_2": copy.deepcopy(ep),
         "input_shot_count": n,
         "oom_contract": {"raised": True, "error_type": "RenderError",
@@ -95,7 +94,6 @@ def test_assert_soak_ok_passes_on_a_valid_report():
 @pytest.mark.parametrize("mutate", [
     lambda r: r["episode_1"].__setitem__("humo_rendered", 0),
     lambda r: r["episode_1"].__setitem__("audio_sha", "tampered"),
-    lambda r: r["episode_1"].__setitem__("vram_peak_mb", 15000),
     lambda r: r["episode_1"].__setitem__("all_clips_real", False),
     lambda r: r["episode_2"]["trace"].append({"shot_id": "x"}),
     # LOUD-failure contract: the forced OOM must RAISE RenderError.

@@ -2418,10 +2418,10 @@ def _episode_facts(ep, meta):
     }
 
 
-def assemble_report(meta, input_ledger, e1, e2, *, vram_ceiling_mb, elapsed_s,
+def assemble_report(meta, input_ledger, e1, e2, *, elapsed_s,
                     oom_contract=None):
     return {
-        "meta": meta, "vram_ceiling_mb": int(vram_ceiling_mb),
+        "meta": meta,
         "elapsed_s": round(float(elapsed_s), 1),
         "episode_1": _episode_facts(e1, meta),
         "episode_2": _episode_facts(e2, meta),
@@ -2443,7 +2443,6 @@ def assert_soak_ok(report):
     RenderError -- no trail matching, no decisions, no swap."""
     meta = report["meta"]
     n = meta["n_beats"]
-    ceiling = report["vram_ceiling_mb"]
     checks = []
     for tag in ("episode_1", "episode_2"):
         f = report[tag]
@@ -2468,13 +2467,9 @@ def assert_soak_ok(report):
             raise SoakError("%s: humo_14B_169 rendered on non-character_video "
                             "shot(s) %r -- per-role routing leak"
                             % (tag, f["humo_14B_169_misrouted"]))
-        if f["vram_peak_mb"] and f["vram_peak_mb"] > ceiling:
-            raise SoakError("%s: VRAM peak %d MB > ceiling %d MB"
-                            % (tag, f["vram_peak_mb"], ceiling))
         checks.append("%s: %d real clips; %d humo in-process renders; "
-                      "VRAM peak %s MB <= %d; frozen audio untouched"
-                      % (tag, n, f["humo_rendered"],
-                         f["vram_peak_mb"], ceiling))
+                      "VRAM peak %s MB (telemetry); frozen audio untouched"
+                      % (tag, n, f["humo_rendered"], f["vram_peak_mb"]))
     if report["episode_1"]["trace"] != report["episode_2"]["trace"]:
         raise SoakError("non-deterministic: the two episodes' render traces "
                         "(per-shot attempts + final engine) differ")
@@ -2491,15 +2486,14 @@ def assert_soak_ok(report):
     return checks
 
 
-def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None,
-                 vram_ceiling_mb=None):
+def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None):
     """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back
     (CLEAN fixture -- no forced OOM), then prove the NO-TRAIL LOUD-failure
     contract on a separate forced-OOM leg (``oom_index`` names the beat; the
     forced OOM must RAISE RenderError). Asserts every invariant and returns
     the structured report. Raises nothing itself -- failures are embedded
-    (never a fake pass)."""
-    ceiling = int(vram_ceiling_mb or _mc.dynamic_vram_ceiling_mb())
+    (never a fake pass). VRAM peak is recorded as telemetry -- no ceiling
+    enforcement (the operator's tier JSON owns the OOM budget)."""
     section, meta = build_soak_fixture(n_beats=n_beats, oom_index=None)
     ledger = build_full_ledger(section)
     t0 = time.time()
@@ -2524,7 +2518,7 @@ def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None,
             oom_contract = {"raised": True,
                             "error_type": type(exc).__name__,
                             "detail": str(exc).splitlines()[0][:200]}
-    report = assemble_report(meta, ledger, e1, e2, vram_ceiling_mb=ceiling,
+    report = assemble_report(meta, ledger, e1, e2,
                              elapsed_s=time.time() - t0,
                              oom_contract=(oom_contract
                                            if oom_index is not None else None))

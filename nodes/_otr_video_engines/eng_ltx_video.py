@@ -1154,8 +1154,6 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                              "decoded -- skipping mirror", len(frames))
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
-        if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_vram_within_ceiling(self.name + "-render")  # PASS-PM mid-render
         return {"out_path": path, "frame_count": n,
                 "ltx_loop_via_reverse": bool(loop_via_reverse)}
 
@@ -1217,8 +1215,6 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
                                                   self.target_fps)
-        if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_vram_within_ceiling(self.name + "-render")
         return {"out_path": path, "frame_count": n,
                 "ltx_recipe": RECIPE_HQ_TWO_STAGE,
                 "ltx_loop_via_reverse": bool(loop_via_reverse)}

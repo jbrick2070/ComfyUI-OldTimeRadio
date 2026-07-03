@@ -381,15 +381,10 @@ class HuMoEngine(_MC.MotionEngineBase):
         # Restore the proven HuMo VRAM discipline the refactor dropped: the frames
         # are on disk, so evict the umt5 CLIP + whisper encoders (BUG-291 detach
         # reclaim, the same the legacy free_otr_pipeline_residue used as
-        # inter-phase cleanup) so the resident stack drops back under the ceiling
-        # before the PASS-PM assert -- and so the next soak beat starts drained
-        # (no cross-beat accumulation). LOUD; no unload_all_models (V-4/V-5).
+        # inter-phase cleanup) so the resident stack drops back down before the
+        # next soak beat starts (no cross-beat accumulation). LOUD; no
+        # unload_all_models (V-4/V-5).
         _wb.reclaim_idle_models(reason="humo post-decode")
-        # PASS-PM: skip NVML ceiling in OTR_TEST_MODE because real VRAM (from a
-        # live ComfyUI instance loaded with a model) would falsely trip the guard
-        # when the fake-node test runs on the GPU box.
-        if not os.environ.get("OTR_TEST_MODE"):
-            _MC.assert_vram_within_ceiling("humo-render")
         return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):

@@ -282,23 +282,6 @@ def test_canonicalize_silent_bt709():
 
 
 # --------------------------------------------------------------------------- #
-# Mid-sampling NVML ceiling probe (PASS-PM)
-# --------------------------------------------------------------------------- #
-def test_assert_vram_within_ceiling(monkeypatch):
-    # NVML absent (CPU box) -> no-op, never raises.
-    monkeypatch.setattr(mc._GR, "nvml_available", lambda *a, **k: False)
-    assert mc.assert_vram_within_ceiling("ltx") is None
-    # NVML present + under the ceiling -> returns the reading.
-    monkeypatch.setattr(mc._GR, "nvml_available", lambda *a, **k: True)
-    monkeypatch.setattr(mc._GR, "probe_used_mb", lambda *a, **k: 10000)
-    assert mc.assert_vram_within_ceiling("ltx") == 10000
-    # NVML present + over the ceiling -> raises (a mid-sample breach).
-    monkeypatch.setattr(mc._GR, "probe_used_mb", lambda *a, **k: 15000)
-    with pytest.raises(RuntimeError):
-        mc.assert_vram_within_ceiling("ltx")
-
-
-# --------------------------------------------------------------------------- #
 # Cold-import + ASCII source (V-12 / CLAUDE.md)
 # --------------------------------------------------------------------------- #
 def test_cold_import_motion_adapters_no_heavy_libs():

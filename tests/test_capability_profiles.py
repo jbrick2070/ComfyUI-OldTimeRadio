@@ -277,30 +277,9 @@ def test_cross_validation_rejects_typoed_override_key():
 
 
 # ---------------------------------------------------------------------------
-# S1 -- dynamic VRAM ceiling (env-at-dispatch) + the cold-import gate
+# S1 -- the cold-import gate (the dynamic VRAM ceiling was ripped 2026-07-03:
+# the operator's tier JSON owns the OOM budget now, so there is no env ceiling)
 # ---------------------------------------------------------------------------
-def test_dynamic_ceiling_env_overrides_fallback(monkeypatch):
-    from nodes._otr_video_engines import motion_common as mc
-    monkeypatch.delenv("OTR_VRAM_CEILING_MB", raising=False)
-    assert mc.dynamic_vram_ceiling_mb() == 14500
-    monkeypatch.setenv("OTR_VRAM_CEILING_MB", "7300")
-    assert mc.dynamic_vram_ceiling_mb() == 7300
-    monkeypatch.setenv("OTR_VRAM_CEILING_MB", "not_a_number")
-    assert mc.dynamic_vram_ceiling_mb() == 14500
-    monkeypatch.setenv("OTR_VRAM_CEILING_MB", "-5")
-    assert mc.dynamic_vram_ceiling_mb() == 14500
-
-
-def test_vram_assert_reads_env_at_dispatch(monkeypatch):
-    from nodes._otr_video_engines import motion_common as mc
-    monkeypatch.setattr(mc, "vram_used_mb", lambda: 8000)
-    monkeypatch.setenv("OTR_VRAM_CEILING_MB", "7300")
-    with pytest.raises(RuntimeError, match="7300"):
-        mc.assert_vram_within_ceiling("test")
-    monkeypatch.delenv("OTR_VRAM_CEILING_MB", raising=False)
-    assert mc.assert_vram_within_ceiling("test") == 8000   # 14500 fallback
-
-
 def test_cold_import_gate_profile_layer_pulls_no_heavy_libs():
     """S1 BLOCKING cold-import gate: the capability layer + the VIDEO/IMAGE
     registry TABLE modules import with NO torch/transformers/diffusers/comfy

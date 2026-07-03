@@ -99,9 +99,6 @@ def test_assert_no_silent_stretch_rejects_nonuniform_plan():
 def test_vram_helpers_are_safe_without_nvml():
     v = mc.vram_used_mb()
     assert v is None or (isinstance(v, int) and v >= 0)
-    # a generous ceiling never raises whether NVML is present or absent
-    got = mc.assert_vram_within_ceiling(label="test", ceiling_mb=10 ** 9)
-    assert got is None or (isinstance(got, int) and got >= 0)
 
 
 # --------------------------------------------------------------------------- #

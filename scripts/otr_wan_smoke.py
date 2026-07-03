@@ -205,8 +205,8 @@ def main() -> int:
         print("\nFAIL: timed out")
     poller.stop()
     time.sleep(0.1)
-    print("[smoke] WHOLE-RUN NVML PEAK: %d MB (ceiling 14500)  %s"
-          % (poller.peak, "OK" if poller.peak <= 14500 else "BUSTS -> GGUF fallback"))
+    print("[smoke] WHOLE-RUN NVML PEAK: %d MB (telemetry only; the OOM budget "
+          "is owned by the external per-hardware tier JSON)" % poller.peak)
     return rc
 
 

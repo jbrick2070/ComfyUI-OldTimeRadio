@@ -26,7 +26,7 @@ from nodes._otr_video_engines import wrapper_bridge as wb
 # --------------------------------------------------------------------------- #
 def _clear_cost_env(monkeypatch):
     for k in ("OTR_VIDEO_COST_OVERHEAD_MB", "OTR_VIDEO_COST_PER_FRAME_MB",
-              "OTR_VIDEO_BUDGET_MARGIN", "OTR_VRAM_CEILING_MB"):
+              "OTR_VIDEO_BUDGET_MARGIN"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -39,10 +39,11 @@ def test_budget_none_free_trusts_target(monkeypatch):
 
 
 def test_budget_predicts_fewer_frames_under_pressure(monkeypatch):
-    # overhead 7000 + 185/frame @1472x832; budget = min(free,14500)*0.85.
-    # free 14775 -> 12325 budget -> (12325-7000)/185 = 28.7 -> 28 -> 4n+1 snap 29.
+    # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
+    # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
+    # free 14775 -> 12558.75 budget -> (12558.75-7000)/185 = 30 -> 4n+1 snap 33.
     _clear_cost_env(monkeypatch)
-    assert mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v") == 29
+    assert mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v") == 33
 
 
 def test_budget_motion_floor_wins_when_starved(monkeypatch):

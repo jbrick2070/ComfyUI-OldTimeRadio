@@ -20,10 +20,9 @@ Design rules
   across nested callers.
 - Log format is a single line, greppable, machine-parseable:
       VRAM_SNAPSHOT phase=<label> current_gb=<float> peak_gb=<float>
-  Ceiling cross events also emit a second warning line:
-      VRAM_CEILING_EXCEEDED phase=<label> peak_gb=<float> ceiling_gb=14.5
-- Ceiling is the same 14.5 GB real-world target documented in ROADMAP and
-  enforced in tests/vram_profile_test.py.
+  Pure telemetry -- no VRAM policy authority. The OOM budget is owned by the
+  operator's per-hardware tier JSON, so this module only records the
+  high-water mark; it never enforces a ceiling.
 
 Usage (from a node method)
 --------------------------
@@ -41,8 +40,6 @@ import os
 from datetime import datetime
 
 log = logging.getLogger("OTR")
-
-VRAM_CEILING_GB: float = 14.5
 
 # Runtime log path - same file the orchestrator uses. Kept local to this
 # module so callers do not have to thread a path through.
@@ -105,11 +102,6 @@ def vram_snapshot(label: str) -> dict:
             f"VRAM_SNAPSHOT phase={label} "
             f"current_gb={current_gb:.3f} peak_gb={peak_gb:.3f}"
         )
-        if peak_gb > VRAM_CEILING_GB:
-            _write_runtime_log(
-                f"VRAM_CEILING_EXCEEDED phase={label} "
-                f"peak_gb={peak_gb:.3f} ceiling_gb={VRAM_CEILING_GB:.1f}"
-            )
     except Exception as exc:
         log.debug("vram_snapshot(%s) failed: %s", label, exc)
     return result
@@ -170,13 +162,13 @@ def vram_sentinel(phase_label, max_entry_gb=6.0):
 
             if current_gb > max_entry_gb:
                 log.warning(
-                    "[VRAM_SENTINEL] %s: VRAM %.1f GB exceeds %.1f GB entry ceiling — "
+                    "[VRAM_SENTINEL] %s: VRAM %.1f GB exceeds %.1f GB entry threshold — "
                     "LLM weights may still be loaded. Forcing offload.",
                     phase_label, current_gb, max_entry_gb
                 )
                 _write_runtime_log(
                     f"VRAM_SENTINEL_TRIGGERED phase={phase_label} "
-                    f"current_gb={current_gb:.3f} ceiling_gb={max_entry_gb:.1f}"
+                    f"current_gb={current_gb:.3f} threshold_gb={max_entry_gb:.1f}"
                 )
                 force_vram_offload()
                 # Re-check after offload

@@ -228,12 +228,13 @@ def test_floor_length_honors_target_without_vram_read(monkeypatch):
 
 def test_floor_length_predicts_from_live_vram(monkeypatch):
     # With a live free-VRAM read the predictor bounds the target by the budget:
-    # overhead 7000 + 185/frame @1472x832; budget = min(free,14500)*0.85.
+    # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
+    # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
     _clear_floor_env(monkeypatch)
     from nodes._otr_video_engines import motion_common as mc
-    # ~5080 clean box: free ~14775 -> budget 12325 -> (12325-7000)/185 ~= 28 -> 29.
+    # ~5080 clean box: free ~14775 -> budget 12558.75 -> (12558.75-7000)/185 = 30 -> 33.
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 14775.0)
-    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 29
+    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 33
     # Tight VRAM (8 GB free) cannot fit even one frame past overhead -> the motion
     # floor (17) WINS (a beat always carries some motion; the render-window NVML
     # probe is the real over-budget guard).

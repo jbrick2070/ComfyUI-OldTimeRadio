@@ -124,11 +124,12 @@ def scan_treatment(path: str) -> list[str]:
     if size_mb > 500:
         flags.append(f"HUGE_FILE: {size_mb}MB -- possible runaway render")
 
-    # 8. VRAM
+    # 8. VRAM (telemetry only -- the OOM budget is owned by the external
+    # per-hardware tier JSON, not this scanner; record the peak, never gate).
     m = re.search(r"PEAKED AT ([\d.]+)GB", text)
     vram = float(m.group(1)) if m else 0
-    if vram > 14.5:
-        flags.append(f"VRAM_OVER: {vram}GB exceeds 14.5GB ceiling")
+    if vram > 0:
+        flags.append(f"VRAM_PEAK: {vram}GB (telemetry)")
 
     # 9. Character name drift (cast vs script body)
     char_line_counts: dict[str, int] = {}

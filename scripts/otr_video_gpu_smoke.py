@@ -84,12 +84,14 @@ def _minimal_request(init_image="", audio_ref="", text_prompt="", frames=13):
     }
 
 
-def attempt_render(eng, req, *, vram_ceiling):
+def attempt_render(eng, req):
     """Drive prepare -> render_clip -> canonicalize -> teardown; report honestly.
 
     The forward is the operator's GPU-smoke slice (NotImplementedError until
     wired) -- reported as such, NEVER a fake pass. On a real render it also
-    asserts the NVML VRAM ceiling and returns the canonical clip.
+    records the NVML VRAM usage (telemetry only -- no ceiling gate; the OOM
+    budget is owned by the external per-hardware tier JSON) and returns the
+    canonical clip.
     """
     prepared = None
     try:
@@ -104,9 +106,7 @@ def attempt_render(eng, req, *, vram_ceiling):
         raw = eng.render_clip(req, prepared)
         clip = eng.canonicalize(raw, req, {})
         used = _mc.vram_used_mb()
-        within = used is None or used <= int(vram_ceiling)
-        return {"status": "rendered", "clip": clip, "vram_used_mb": used,
-                "vram_within_ceiling": within}
+        return {"status": "rendered", "clip": clip, "vram_used_mb": used}
     except NotImplementedError as e:
         return {"status": "gpu_slice_not_implemented", "stage": "render_clip",
                 "detail": str(e).splitlines()[0]}
@@ -121,7 +121,7 @@ def attempt_render(eng, req, *, vram_ceiling):
 
 
 def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
-              frames=13, run_render=False, vram_ceiling=14500):
+              frames=13, run_render=False):
     """Run every CPU-checkable readiness probe for ``engine`` + (optionally) the
     live render attempt. Returns a structured report dict."""
     meta = ENGINES[engine]
@@ -169,7 +169,7 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
 
     used = _mc.vram_used_mb()
     add("nvml_vram", True,
-        "used=%s MB (ceiling %d)" % (used, vram_ceiling) if used is not None
+        "used=%s MB" % used if used is not None
         else "NVML unavailable (run on the 5080)")
 
     report = {"engine": engine, "kind": meta["kind"], "checks": checks}
@@ -178,8 +178,7 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
                                            "assert_usable"))
     if run_render:
         report["render_attempt"] = attempt_render(
-            eng, _minimal_request(init_image, audio_ref, text_prompt, frames),
-            vram_ceiling=vram_ceiling)
+            eng, _minimal_request(init_image, audio_ref, text_prompt, frames))
     return report
 
 
@@ -194,8 +193,8 @@ def _next_steps(engine):
         "<venv py> --json   (and --scan-custom-nodes)",
         "3. Implement + run the in-process forward (the NotImplementedError "
         "GPU slice): load + render_clip on the 5080.",
-        "4. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
-        "twice for determinism.",
+        "4. Re-run this probe with --run-render: check the recorded VRAM "
+        "telemetry, render twice for determinism.",
     ]
 
 
@@ -229,15 +228,13 @@ def main(argv=None) -> int:
     ap.add_argument("--run-render", action="store_true",
                     help="drive the adapter lifecycle (GPU slice reported "
                          "honestly; never faked)")
-    ap.add_argument("--vram-ceiling", type=int, default=14500)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     engines = list(ENGINES) if args.engine == "all" else [args.engine]
     reports = [run_smoke(e, init_image=args.init_image, audio_ref=args.audio_ref,
                          text_prompt=args.text_prompt, frames=args.frames,
-                         run_render=args.run_render,
-                         vram_ceiling=args.vram_ceiling)
+                         run_render=args.run_render)
                for e in engines]
     if args.json:
         print(_json.dumps(reports, indent=2, default=str))
