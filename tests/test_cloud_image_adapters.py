@@ -99,6 +99,27 @@ def test_seedream_inputs_resolve_model(monkeypatch):
     assert ins["model"] == "sd-test-model" and ins["watermark"] is False
 
 
+def test_ideo_registered_and_inputs(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_SPEED", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_EST_USD", raising=False)
+    assert ireg.is_registered("ideo")
+    assert eci.Ideo.node_key == "cloud_ideogram_v4"
+    assert tuple(eci.Ideo.default_roles) == ()
+    ins = eci.Ideo._partner_inputs(_req())
+    assert set(ins) == {"prompt", "rendering_speed", "resolution", "seed"}
+    assert ins["rendering_speed"] == "TURBO"          # v1 default = cheapest
+    assert eci.Ideo._est_usd() == 0.043               # TURBO price
+
+
+def test_ideogram_speed_price_map(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_EST_USD", raising=False)
+    monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_SPEED", "QUALITY")
+    assert eci.Ideo._est_usd() == 0.13
+    assert eci.Ideo._partner_inputs(_req())["rendering_speed"] == "QUALITY"
+    monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_EST_USD", "0.20")   # explicit override
+    assert eci.Ideo._est_usd() == 0.20
+
+
 # --------------------------------------------------------------------------- #
 # canonicalize_image (real PIL on a generated fixture)
 # --------------------------------------------------------------------------- #

@@ -148,6 +148,9 @@ CAPABILITIES = {
                             "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "cloud_seedream_2": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                          "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
+    "ideo": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+             "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

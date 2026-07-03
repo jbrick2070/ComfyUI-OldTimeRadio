@@ -63,6 +63,31 @@ def _timeout_s() -> float:
     return _efloat("OTR_CLOUD_IMAGE_TIMEOUT_S", 300.0)
 
 
+#: Ideogram rendering_speed -> per-image USD estimate (the pin carries no
+#: structured pricing; adapters must pass a numeric estimate). Values from
+#: PRICING.md / partner_nodes.yaml notes (TURBO 9.05cr -> QUALITY 27.16cr,
+#: 211cr = $1). v1 default speed = TURBO (cheapest). Env-overridable via
+#: OTR_CLOUD_IDEOGRAM_SPEED; unknown speeds fall back to the DEFAULT price.
+_IDEOGRAM_SPEED_PRICE = {"TURBO": 0.043, "DEFAULT": 0.086, "QUALITY": 0.13}
+_IDEOGRAM_DEFAULT_SPEED = "TURBO"
+
+
+def _ideogram_speed() -> str:
+    return (os.environ.get("OTR_CLOUD_IDEOGRAM_SPEED", "")
+            or _IDEOGRAM_DEFAULT_SPEED).upper()
+
+
+def _ideogram_est_usd() -> float:
+    env = os.environ.get("OTR_CLOUD_IDEOGRAM_EST_USD")
+    if env:
+        try:
+            return float(env)
+        except ValueError:
+            pass
+    return _IDEOGRAM_SPEED_PRICE.get(_ideogram_speed(),
+                                     _IDEOGRAM_SPEED_PRICE["DEFAULT"])
+
+
 def _req_get(request, key, default=None):
     if isinstance(request, dict):
         return request.get(key, default)
@@ -244,15 +269,45 @@ class CloudSeedream2ImageEngine(_CloudImageBase):
         }
 
 
+class CloudIdeoImageEngine(_CloudImageBase):
+    """Ideogram v4: PLAIN scene-still option for ANY slot (S1+1 `ideo`).
+
+    Ordinary scene stills through the existing scene-prompt path (the request
+    prompt already carries compose_still_prompt + NO_TEXT_CLAUSE) -- exactly
+    like the other S1 rows but Ideogram-flavored. The words-specialist
+    ``ideo_word`` (lyric_text / title_mood modes) is a SEPARATE engine; this one
+    adds no new prompt path. estimated_usd follows the rendering_speed price
+    map. (docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md, `ideo`.)"""
+
+    name = "ideo"
+    node_key = "cloud_ideogram_v4"
+
+    def _est_usd(self) -> float:
+        return _ideogram_est_usd()
+
+    def _partner_inputs(self, request):
+        # pinned required: prompt STRING, rendering_speed COMBO,
+        # resolution COMBO, seed INT.
+        return {
+            "prompt": self._prompt(request),
+            "rendering_speed": _ideogram_speed(),
+            "resolution": os.environ.get(
+                "OTR_CLOUD_IDEOGRAM_RESOLUTION", "1024x1024"),
+            "seed": self._seed(request),
+        }
+
+
 Recraft = CloudRecraftImageEngine()
 FluxPro = CloudFluxProImageEngine()
 NanoBanana2 = CloudNanoBanana2ImageEngine()
 Seedream2 = CloudSeedream2ImageEngine()
+Ideo = CloudIdeoImageEngine()
 
-for _eng in (Recraft, FluxPro, NanoBanana2, Seedream2):
+for _eng in (Recraft, FluxPro, NanoBanana2, Seedream2, Ideo):
     register(_eng)
 
 __all__ = [
     "CloudRecraftImageEngine", "CloudFluxProImageEngine",
     "CloudNanoBanana2ImageEngine", "CloudSeedream2ImageEngine",
+    "CloudIdeoImageEngine",
 ]

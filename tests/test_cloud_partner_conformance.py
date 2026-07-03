@@ -26,8 +26,8 @@ from nodes._otr_video_engines import registry as vreg
 
 # Rows with NO adapter yet -- each an EXPLICIT, reasoned xfail (nothing silent).
 KNOWN_UNADAPTERED = {
-    "cloud_ideogram_v4": "ships as ideo/ideo_word at S1+1 "
-                         "(docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md)",
+    # cloud_ideogram_v4 is now served by the `ideo` adapter (S1+1); ideo_word
+    # (words specialist, same node_key) lands next.
     "cloud_elevenlabs_tts": "Sprint D cloud TTS lane (xfail removed there)",
     "cloud_elevenlabs_flash": "Sprint D cloud TTS lane (xfail removed there)",
     "cloud_sonilo_music": "S2 cloud music lane",
