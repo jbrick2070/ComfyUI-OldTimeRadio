@@ -368,6 +368,10 @@ class OTRImageDirector:
             # (portrait vs 16:9) with one dropdown pick. {} -> portrait (legacy).
             "aspects": (video_policy.get("aspects")
                         if isinstance(video_policy.get("aspects"), dict) else {}),
+            # Per-role TALKING flag (S4b 2026-07-02), forwarded so MetaBrief
+            # mints FACE-FORWARD portraits for lip-sync lanes. {} -> legacy.
+            "talking": (video_policy.get("talking")
+                        if isinstance(video_policy.get("talking"), dict) else {}),
             # Per-role SELECTED video engine, forwarded so the image dispatcher can
             # SKIP a still whose video engine does not consume init_image (the
             # visualizer / abstract procedural floor). An all-procedural episode then

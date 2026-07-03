@@ -80,10 +80,16 @@ def test_ambient_audio_two_arg_backcompat():
 
 # ---- the STILL routing (the actual bug fix) ----------------------------------
 
-def test_ltx_audio_in_conditions_on_the_bookend_scene_still():
+def test_ltx_audio_in_conditions_on_the_bookend_scene_still(monkeypatch):
     # the music bookend's scene_open still is in the ledger (minted by the
     # dispatcher); ltx_audio_in must condition on it (init_source=scene_still),
     # NOT leave init_image='' (the pre-fix crash: "requires init_image (got '')").
+    # SINGLE-PASS contract: under ia2v the S4c radio-face default-on owns the
+    # bookend init instead -- pin distilled_native.
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     still = "C:/x/otr/episodes/ep/b000_scene_open.png"
     led = _ledger([{"kind": "scene_open", "beat_id": "b000_music_open",
                     "path": still}])
@@ -128,7 +134,13 @@ def test_ltx_audio_in_clamps_to_vram_safe_av_canvas(monkeypatch):
     assert (req["canvas"]["w"], req["canvas"]["h"]) == (512, 288)
 
 
-def test_ltx_audio_in_music_open_gets_a_composed_prompt():
+def test_ltx_audio_in_music_open_gets_a_composed_prompt(monkeypatch):
+    # single-pass pin (S4c: under ia2v the bookend also REQUIRES the wide
+    # radio-face still, out of scope for this prompt-composition contract).
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     shot = {"shot_id": "shot_b000_music_open", "engine_id": "ltx_audio_in",
             "role": "music_visual", "target_frame_count": 97,
             "render_request_hash": "cafe", "source_line_ids": []}

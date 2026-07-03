@@ -290,7 +290,12 @@ class TestRadioIsHostGuard:
         """End-to-end: build_request_from_shot (the REAL episode path) applies
         the redirect BEFORE any engine-keyed branch runs, so a HuMo-picked
         bookend is already ltx_audio_in by the time init_image/canvas/audio are
-        resolved -- proving the guard is WIRED IN, not just defined."""
+        resolved -- proving the guard is WIRED IN, not just defined. Since S4c
+        the redirected TALKING bookend then fails LOUD on the missing
+        radio-face still (this bare ledger mints none) -- which itself proves
+        the ordering: the engine-keyed face check only runs because the
+        redirect already stamped ltx_audio_in."""
+        import pytest
         ledger = {
             "video": {"fps": 25, "shots": [
                 {"shot_id": "shot_b000", "target_frame_count": 50}]},
@@ -301,7 +306,8 @@ class TestRadioIsHostGuard:
                 "engine_id": "humo", "family": "audio_driven_face",
                 "target_frame_count": 50, "source_line_ids": ["b000"],
                 "creative": {}}
-        rd.build_request_from_shot(shot, ledger)
+        with pytest.raises(rd.RenderError, match="radio-face"):
+            rd.build_request_from_shot(shot, ledger)
         assert shot["engine_id"] == "ltx_audio_in"
         assert shot["family"] == "audio_conditioned_video"
 

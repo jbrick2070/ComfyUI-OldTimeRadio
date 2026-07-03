@@ -414,9 +414,31 @@ def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
 
 
 def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypatch):
-    # Toggle OFF: the music bookend is redirected off HuMo (byte-identical) so the
-    # radio_host_portrait path never triggers.
+    # Toggle OFF: the music bookend is redirected off HuMo so the
+    # radio_host_portrait path never triggers. S4c (2026-07-02): the
+    # redirected ltx bookend now runs the TALKING register (default dev
+    # unet), which REQUIRES the wide radio-face still -- a ledger minted
+    # without one fails LOUD (never a silent faceless bookend again), but
+    # the redirect itself must already be stamped on the shot.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    led = _bookend_ledger(tmp_path, with_face=False)
+    shot = _humo_bookend_shot()
+    with pytest.raises(rd.RenderError, match="radio-face"):
+        rd.build_request_from_shot(shot, led)
+    assert shot["engine_id"] == "ltx_audio_in"     # redirect happened first
+
+
+def test_build_request_off_redirect_renders_on_single_pass(tmp_path, monkeypatch):
+    # The pre-S4c contract survives on the single-pass recipes: no talking
+    # register, no face requirement -- the redirected bookend renders from
+    # its scene still exactly as before.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     led = _bookend_ledger(tmp_path, with_face=False)
     shot = _humo_bookend_shot()
     rd.build_request_from_shot(shot, led)          # must NOT raise

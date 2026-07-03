@@ -1159,13 +1159,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # ADDENDUM A/B (OTR_LTX_RADIO_FACE, 2026-07-01, SEPARATE from the main
     # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER/MUSIC bookend,
     # OPTIONALLY swap the FACELESS brief-driven scene still for the WIDE radio-FACE
-    # still (option b). ltx does AMBIENT motion, NOT lip-sync -- the face breathes/
-    # drifts, it does not talk (HuMo remains the only true talking host). Default 0
-    # = faceless (the scene still resolved just above, unchanged). Applies ONLY when
-    # the FINAL routed bookend engine is ltx_audio_in. PRECEDENCE: if the main
-    # feature's OTR_ENABLE_HUMO_HOSTS is ON, HuMo owns the bookends -> this A/B is
-    # rejected LOUD (never a silent double-route).
-    if (os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
+    # still (option b). Under a SINGLE-PASS recipe ltx does AMBIENT motion, NOT
+    # lip-sync. Default 0 = faceless (the scene still resolved just above,
+    # unchanged). Applies ONLY when the FINAL routed bookend engine is
+    # ltx_audio_in. PRECEDENCE: if the main feature's OTR_ENABLE_HUMO_HOSTS is
+    # ON, HuMo owns the bookends -> this A/B is rejected LOUD (never a silent
+    # double-route).
+    # S4c (operator eyeball 2026-07-02, "should be talking lips?"): under the
+    # ia2v TALKING register the A/B is RETIRED into DEFAULT-ON -- the mouth
+    # face IS the host and the recipe lip-syncs it, so a bookend must never
+    # ship faceless again (the pinprick b005/b001 miss: env unset -> faceless
+    # scene still -> nothing to articulate). The env toggle still A/Bs the
+    # single-pass recipes only.
+    if ((os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
+         or _ia2v_talking_register_active("ltx_audio_in"))
             and str(shot.get("engine_id") or "") == "ltx_audio_in"
             and _is_never_humo_video_role(_role_of_shot(shot))):
         _abrole = _role_of_shot(shot)

@@ -220,6 +220,14 @@ def _ltx_ledger(tmp_path):
     p.write_bytes(_PNG)
     imgs.append({"object_id": "c01", "kind": "portrait", "path": str(p),
                  "w": 832, "h": 1216})
+    # WIDE radio-face stills -- S4c: talking bookends REQUIRE them (the
+    # OTR_LTX_RADIO_FACE A/B retired into default-on under ia2v).
+    f = tmp_path / "face.png"
+    f.write_bytes(_PNG)
+    for _r in ("announcer_visual", "music_visual"):
+        imgs.append({"object_id": "still_%s_radio_face_169" % _r,
+                     "kind": "portrait", "path": str(f),
+                     "w": 1472, "h": 832})
     return {"video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b000", "char_id": "",
                        "start_s": 0.0, "dur_s": 2.0},
@@ -409,17 +417,34 @@ def test_char_beat_missing_portrait_fails_loud_under_ia2v(ia2v_env, tmp_path,
         rd.build_request_from_shot(_char_face_shot(), led)
 
 
-def test_announcer_bookend_keeps_scene_still_under_ia2v(ia2v_env, tmp_path,
-                                                        monkeypatch):
-    # only CHARACTER beats reroute; the announcer bookend conditions on its
-    # (radio-face) scene still exactly as before.
+def test_announcer_bookend_takes_radio_face_by_default_under_ia2v(
+        ia2v_env, tmp_path, monkeypatch):
+    # S4c: under the talking register the bookend ALWAYS conditions on the
+    # WIDE radio-face still -- env toggle NOT required (operator eyeball
+    # 2026-07-02, the pinprick faceless-announcer miss).
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
     obs = req["observability"]
-    assert obs["init_source"] == "scene_still"
-    assert obs["init_image"] == "scene.png"
+    assert obs["init_source"] == "ltx_radio_face"
+    assert obs["init_image"] == "face.png"
+
+
+def test_announcer_bookend_missing_face_fails_loud_under_ia2v(
+        ia2v_env, tmp_path, monkeypatch):
+    # S4c fail-loud: a talking bookend with NO minted radio-face still is a
+    # hard error (the faceless proof8 announcer must never silently recur).
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    led = _ltx_ledger(tmp_path)
+    led["images"]["images"] = [
+        im for im in led["images"]["images"]
+        if not str(im.get("object_id", "")).endswith("_radio_face_169")]
+    with pytest.raises(rd.RenderError, match="radio-face"):
+        rd.build_request_from_shot(_announcer_open_shot(), led)
 
 
 def test_char_beat_keeps_scene_still_on_single_pass_recipe(tmp_path,

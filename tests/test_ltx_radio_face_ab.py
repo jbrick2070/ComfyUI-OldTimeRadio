@@ -119,6 +119,13 @@ def _ltx_shot(role="music_visual"):
 
 
 def test_off_ltx_bookend_uses_faceless_scene_still(tmp_path, monkeypatch):
+    # The env A/B is meaningful ONLY on the single-pass recipes since S4c
+    # (2026-07-02): under ia2v the talking register forces the face ON, so
+    # this OFF-contract pins distilled_native.
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
     led = _ltx_ledger(tmp_path, face_dims=(1472, 832))   # face present but ignored
     req = rd.build_request_from_shot(_ltx_shot(), led)

@@ -67,16 +67,27 @@ def test_render_canvas_clamped_to_m0_safe(engine, monkeypatch):
 
 
 def test_render_canvas_env_override(monkeypatch):
+    # single-pass pin (S4c: an ia2v bookend REQUIRES the radio-face still,
+    # out of scope for this canvas-env contract).
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     monkeypatch.setenv("OTR_LTX_AV_RENDER_CANVAS", "832x480")
     req = rd.build_request_from_shot(
         _shot("ltx_audio_in", "music_visual"), _ledger())
     assert (req["canvas"]["w"], req["canvas"]["h"]) == (832, 480)
 
 
-def test_ltx_audio_in_joins_scene_prompt_branch():
+def test_ltx_audio_in_joins_scene_prompt_branch(monkeypatch):
     # an ltx_audio_in OPEN shot with NO creative prompt gets a composed
     # motion/scene prompt (it joined the ltx_video/wan_i2v text-engine branch),
-    # never an empty text_prompt.
+    # never an empty text_prompt. Single-pass pin (S4c face requirement is
+    # exercised in test_ltx_av_ia2v_canonical.py).
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     shot = {"shot_id": "shot_b000_music_open", "engine_id": "ltx_audio_in",
             "role": "music_visual", "target_frame_count": 97,
             "render_request_hash": "cafe", "source_line_ids": []}

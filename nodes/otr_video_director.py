@@ -330,6 +330,11 @@ class OTRVideoDirector:
             # engine with ONE dropdown pick (portrait humo_1.7B vs wide
             # humo_1.7B_169). Opaque to everyone who does not size stills.
             "aspects": self._role_aspects(resolved_video),
+            # Per-role TALKING flag (S4b 2026-07-02): whether the selected
+            # engine lip-syncs (wants_talking_prompt, the ia2v register), so
+            # the image node mints FACE-FORWARD portraits for that lane --
+            # proof8 showed brief-styled profile portraits cannot drive lips.
+            "talking": self._role_talking(resolved_video),
             "image_models": {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
@@ -379,6 +384,27 @@ class OTRVideoDirector:
             "announcer_visual": _asp_for_role("announcer_visual"),
             "music_visual": _asp_for_role("music_visual"),
             "character_video": _asp_for_role("character_video"),
+        }
+
+    @staticmethod
+    def _role_talking(resolved_video):
+        """Map each video ROLE to whether its SELECTED engine renders TALKING
+        lip-sync (the engine's ``wants_talking_prompt`` hook -- the ia2v
+        register), so stills can be minted face-forward for that lane (S4b).
+        Hook errors resolve False here: the RENDER path stays the loud
+        enforcer of a misconfigured recipe; the director only styles stills."""
+        def _talk_for_role(role):
+            eid = _role_slots.engine_id_for_role(resolved_video, role)
+            try:
+                eng = _vreg.get_engine(eid)
+                fn = getattr(eng, "wants_talking_prompt", None)
+                return bool(fn()) if callable(fn) else False
+            except Exception:  # noqa: BLE001 -- unknown/misconfigured -> False
+                return False
+        return {
+            "announcer_visual": _talk_for_role("announcer_visual"),
+            "music_visual": _talk_for_role("music_visual"),
+            "character_video": _talk_for_role("character_video"),
         }
 
     @staticmethod

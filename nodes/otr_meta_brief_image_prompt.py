@@ -105,9 +105,28 @@ STYLE_ANCHOR_WIDE = ("in-character cinematic medium shot, head and shoulders, fa
                      "costume and environment, dramatic film lighting")
 
 
-def _style_anchor_for_aspect(aspect) -> str:
+#: TALKING-lane portrait anchor (S4b, 2026-07-02). The ia2v lip-sync recipe
+#: conditions character beats on the PORTRAIT (S4), and proof8 showed the
+#: brief-styled cinematic portrait (dark palette, profile/wide composition,
+#: tiny face) cannot drive lips -- the isolation A/B needed a bright,
+#: face-forward close-up (scene-init 0.57 vs face-forward 2.86). Mirrors the
+#: ltx_radio_mouth split that fixed the radio bookends: frontal, mouth
+#: visible, warm light; the era/grade/palette tails are SKIPPED for these
+#: portraits (see derive_image_prompts).
+STYLE_ANCHOR_TALKING = (
+    "in-character face-forward frontal close-up bust, looking directly at the "
+    "camera, the whole face and mouth clearly visible and unobstructed, the "
+    "face brightly lit and filling much of the frame, subject centred with "
+    "natural headroom above the head (never crop the top of the head), "
+    "period-accurate costume, warm dramatic lighting")
+
+
+def _style_anchor_for_aspect(aspect, talking=False) -> str:
     """Framing anchor for a still's aspect: head-and-shoulders for WIDE (16:9) so
-    the head is not cropped by the short frame, three-quarter for PORTRAIT."""
+    the head is not cropped by the short frame, three-quarter for PORTRAIT.
+    ``talking`` overrides both with the face-forward lip-sync anchor (S4b)."""
+    if talking:
+        return STYLE_ANCHOR_TALKING
     return STYLE_ANCHOR_WIDE if str(aspect).lower() == "wide" else STYLE_ANCHOR
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
@@ -347,6 +366,21 @@ def _still_aspects_from_policy(policy_json):
     return {}
 
 
+def _talking_roles_from_policy(policy_json):
+    """role -> bool from a director policy's ``talking`` map (S4b): whether the
+    role's SELECTED video engine lip-syncs (wants_talking_prompt / the ia2v
+    register). Same forwarding chain as ``aspects``; missing/malformed -> {}
+    (legacy portrait styling, exactly as before S4b). Pure."""
+    try:
+        pol = json.loads(policy_json or "{}")
+        talk = pol.get("talking") if isinstance(pol, dict) else None
+        if isinstance(talk, dict):
+            return {str(k): bool(v) for k, v in talk.items()}
+    except (ValueError, TypeError):
+        pass
+    return {}
+
+
 #: 3D IMAGE STREAMS (2026-06-21) -- checked-in prompt scaffolds for the mesh
 #: fodder fork. The MESH FODDER still is what Hunyuan3D actually meshes, so it
 #: must be ONE isolated subject on a neutral plate (a cinematic scene still
@@ -538,11 +572,13 @@ def announcer_line_char_ids(lines) -> list:
     return out
 
 
-def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrait") -> str:
+def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrait",
+                                  talking: bool = False) -> str:
     """Deterministic brief-composed portrait prompt -- NEVER empty.
 
     ``"{appearance}, {setting} setting, {style anchor}"`` with empty parts
     dropped; degrades to the style anchor alone if the brief + cast are bare.
+    ``talking`` swaps in the face-forward lip-sync anchor (S4b).
     """
     # Same key chain as _appearance_for_char incl. character_description
     # (2026-06-10): this fallback is what actually runs whenever the LLM is
@@ -558,26 +594,38 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
         parts.append(appearance)
     if setting:
         parts.append(f"{setting} setting")
-    parts.append(_style_anchor_for_aspect(aspect))
+    parts.append(_style_anchor_for_aspect(aspect, talking=talking))
     return ", ".join(parts)
 
 
 def _build_char_prompt_request(char: dict, meta: dict, setting: str,
-                               aspect: str = "portrait") -> str:
+                               aspect: str = "portrait",
+                               talking: bool = False) -> str:
     """The instruction handed to the writer LLM (temp=0) for one character.
 
     ``aspect`` ('wide'|'portrait') drives the framing clause so a 16:9 still asks
     for a head-and-shoulders shot (the head fits the short frame) while a portrait
     still keeps the three-quarter look -- both with explicit headroom so the top of
-    the head is never cropped (operator framing catch 2026-06-17)."""
+    the head is never cropped (operator framing catch 2026-06-17). ``talking``
+    (S4b) overrides both with the face-forward lip-sync framing: the ia2v
+    recipe drives the mouth on THIS still, so a profile / distant / dim face
+    is unusable (proof8 catch 2026-07-02)."""
     appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
-    framing = (
-        "head-and-shoulders medium framing, the subject centred with the FULL head "
-        "visible and headroom above the head so the top of the head is never cropped"
-        if str(aspect).lower() == "wide" else
-        "three-quarter framing showing the full head and upper body, with headroom "
-        "above the head so the top of the head is never cropped"
-    )
+    if talking:
+        framing = (
+            "face-forward frontal close-up bust looking DIRECTLY at the camera, "
+            "the whole face and mouth clearly visible and unobstructed (never a "
+            "profile, never turned away), the face brightly lit and filling much "
+            "of the frame, with headroom so the top of the head is never cropped"
+        )
+    else:
+        framing = (
+            "head-and-shoulders medium framing, the subject centred with the FULL head "
+            "visible and headroom above the head so the top of the head is never cropped"
+            if str(aspect).lower() == "wide" else
+            "three-quarter framing showing the full head and upper body, with headroom "
+            "above the head so the top of the head is never cropped"
+        )
     return (
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
         "line, no preamble) for this character. The image MUST depict the "
@@ -588,7 +636,7 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
         "photographic and period-consistent.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
-        f"style_anchor: {_style_anchor_for_aspect(aspect)}\n"
+        f"style_anchor: {_style_anchor_for_aspect(aspect, talking=talking)}\n"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
@@ -869,7 +917,7 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
                          consistency_gate_warn_only: bool = False, lines=None,
                          fps: int = 25, still_aspects=None,
-                         mesh_fodder_roles=None):
+                         mesh_fodder_roles=None, talking_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -916,6 +964,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _aspect = (still_aspects or {}).get(
             "announcer_visual" if char.get("_synthetic_announcer")
             else "character_video", "portrait")
+        # TALKING lane (S4b): a cast portrait whose character_video engine
+        # lip-syncs (the ia2v register) is the render INIT for the mouth --
+        # mint it face-forward + warm, and skip the era/grade tails below
+        # (mirrors the ltx_radio_mouth split that fixed the radio bookends).
+        # Synthetic announcers keep their radio-host path untouched.
+        _talking = bool((talking_roles or {}).get("character_video")) and (
+            not char.get("_synthetic_announcer"))
         # C1 + E (2026-07-01 brief-driven radio-host): the synthetic announcer /
         # radio-host prompt is BRIEF-DRIVEN and stamped DIRECTLY -- SKIP the LLM
         # refine. The refine instruction (_build_char_prompt_request: "Do not
@@ -941,7 +996,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         prompt = ""
         source = "template"
         if llm_fn is not None:
-            req = _build_char_prompt_request(char, meta, setting, _aspect)
+            req = _build_char_prompt_request(char, meta, setting, _aspect,
+                                             talking=_talking)
             for attempt in range(max_reseed + 1):
                 try:
                     raw = llm_fn(req)
@@ -956,7 +1012,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 if attempt < max_reseed:
                     warnings.append(f"empty image prompt for {cid}; reseed {attempt + 1}/{max_reseed}")
         if not prompt:
-            prompt = compose_image_prompt_fallback(meta, char, _aspect)
+            prompt = compose_image_prompt_fallback(meta, char, _aspect,
+                                                   talking=_talking)
             source = "template"
         # Story-consistency gate (schema assertion, v1). The synthetic
         # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM
@@ -970,7 +1027,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 warnings.append(msg + " (warn-only; kept)")
             else:
                 warnings.append(msg + "; fell back to template")
-                prompt = compose_image_prompt_fallback(meta, char)
+                prompt = compose_image_prompt_fallback(meta, char,
+                                                       talking=_talking)
                 source = "template_consistency"
         # PERSON GUARD (look-QA round 4, 2026-06-10): a portrait prompt that
         # depicts no person (the live "microphone under a lamp" catch for a
@@ -981,7 +1039,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             warnings.append(
                 f"image prompt for {cid} depicts no PERSON; fell back to "
                 f"the appearance template")
-            prompt = compose_image_prompt_fallback(meta, char)
+            prompt = compose_image_prompt_fallback(meta, char,
+                                                   talking=_talking)
             source = "template_person_guard"
         # GEAR SCRUB (round 5 operator directive): character portraits never
         # mention radio/mic/studio gear -- the tokens pull FLUX toward
@@ -996,37 +1055,47 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if _scrubbed != prompt:
                 warnings.append(
                     f"image prompt for {cid}: broadcast-gear tokens scrubbed")
-                prompt = _scrubbed or compose_image_prompt_fallback(meta, char)
+                prompt = _scrubbed or compose_image_prompt_fallback(
+                    meta, char, talking=_talking)
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
         # FINISH the prompt (gap-audit F3, 2026-06-10): era tail + film style
         # tail, restored from the deleted legacy composer. Runs AFTER the
         # consistency + person guards (finishing never re-triggers them) and
         # BEFORE the hash so the stamped hash matches the rendered prompt.
-        try:
+        # TALKING lane (S4b): SKIP both tails -- the era atmosphere + grade
+        # darken/mute the face exactly like the brief palette murked the
+        # radio still (proof8: near-black profile portraits, motion 0.23) --
+        # and end on the canonical warm light instead (idempotent; the
+        # talking anchor already carries it on the template path).
+        if _talking:
+            if "warm dramatic lighting" not in prompt:
+                prompt = f"{prompt}, warm dramatic lighting"
+        else:
             try:
-                from ._otr_story_brief_helpers import (  # type: ignore
-                    IMAGE_GRADE_TAIL, finish_visual_prompt)
-            except ImportError:  # pragma: no cover -- flat test imports
-                from _otr_story_brief_helpers import (  # type: ignore
-                    IMAGE_GRADE_TAIL, finish_visual_prompt)
-            # era_profile="portrait": never bleeds the episode's ambient
-            # colour palette into character faces (sci-fi = blue wash,
-            # period drama = red wash). Only the atmosphere mood line is
-            # safe; full palette is explicitly excluded (BUG-LOCAL-113).
-            prompt = finish_visual_prompt(meta, prompt,
-                                          era_profile="portrait")
-            # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
-            # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
-            # so a still_pan beat standing in for a HuMo portrait shows the same
-            # graded look as the scene stills/bookend (still_pan
-            # animates the minted PNG, so the PNG must carry the grade). The
-            # radio broadcast-distress tail stays scene-still-only (a person is
-            # not a radio set). Idempotent -- never duplicates.
-            if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
-                prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
-        except Exception:  # noqa: BLE001
-            pass
+                try:
+                    from ._otr_story_brief_helpers import (  # type: ignore
+                        IMAGE_GRADE_TAIL, finish_visual_prompt)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_story_brief_helpers import (  # type: ignore
+                        IMAGE_GRADE_TAIL, finish_visual_prompt)
+                # era_profile="portrait": never bleeds the episode's ambient
+                # colour palette into character faces (sci-fi = blue wash,
+                # period drama = red wash). Only the atmosphere mood line is
+                # safe; full palette is explicitly excluded (BUG-LOCAL-113).
+                prompt = finish_visual_prompt(meta, prompt,
+                                              era_profile="portrait")
+                # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
+                # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
+                # so a still_pan beat standing in for a HuMo portrait shows the same
+                # graded look as the scene stills/bookend (still_pan
+                # animates the minted PNG, so the PNG must carry the grade). The
+                # radio broadcast-distress tail stays scene-still-only (a person is
+                # not a radio set). Idempotent -- never duplicates.
+                if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
+                    prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
+            except Exception:  # noqa: BLE001
+                pass
         out[cid] = {
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
@@ -1097,7 +1166,14 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     # fed a pillarboxed portrait -- the exact trap the kibitz flagged. Per-role
     # object_id matches render_driver._ltx_radio_face_object_id; seed-pinned in the
     # dispatcher (shares the bookend seed). No-baby negative populated.
-    if _ltx_radio_face_enabled():
+    # S4c (operator eyeball 2026-07-02, "should be talking lips?"): the A/B is
+    # RETIRED into DEFAULT-ON for the ia2v talking lane -- when a bookend
+    # role's engine lip-syncs (talking_roles via the director policy), the
+    # radio-face still ALWAYS mints; the env toggle remains only for the
+    # single-pass (non-talking) recipes.
+    _talk = talking_roles or {}
+    if (_ltx_radio_face_enabled()
+            or any(_talk.get(r) for r in _LTX_RADIO_FACE_ROLES)):
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
             # Talking-radio kibitz r1 (2026-07-01, SUPERSEDES the earlier "same
@@ -1311,7 +1387,8 @@ class OTRMetaBriefImagePromptGen:
             lines=lines,
             still_aspects=_still_aspects_from_policy(image_policy_json),
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
-        )  # aspects + mesh-fodder roles ride in image_policy_json
+            talking_roles=_talking_roles_from_policy(image_policy_json),
+        )  # aspects + mesh-fodder + talking roles ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []
