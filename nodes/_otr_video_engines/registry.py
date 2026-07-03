@@ -352,6 +352,23 @@ CAPABILITIES = {
                      "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
                                             "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
                                             "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
+    # CLOUD partner video rows (S3 core, 2026-07-02, pass04 secs 5+7): the
+    # render happens PROVIDER-SIDE, so the local class is cpu (zero VRAM);
+    # cpu_ok True (any box with ffmpeg + credits can run them). Gated at
+    # assert_usable on OTR_ENABLE_COMFY_CLOUD_MEDIA (registry-IS-the-menu:
+    # rows always REGISTER + show; resolve fails closed until enabled).
+    "cloud_kling_avatar": {"vram_class": "cpu", "vram_estimate_mb": 0,
+                           "required_toolchain": None, "requires_sidecar": False,
+                           "cpu_ok": True, "model_requirements": []},
+    "cloud_kling_lipsync": {"vram_class": "cpu", "vram_estimate_mb": 0,
+                            "required_toolchain": None, "requires_sidecar": False,
+                            "cpu_ok": True, "model_requirements": []},
+    "cloud_seedance_2": {"vram_class": "cpu", "vram_estimate_mb": 0,
+                         "required_toolchain": None, "requires_sidecar": False,
+                         "cpu_ok": True, "model_requirements": []},
+    "cloud_wan_i2v": {"vram_class": "cpu", "vram_estimate_mb": 0,
+                      "required_toolchain": None, "requires_sidecar": False,
+                      "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

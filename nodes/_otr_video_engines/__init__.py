@@ -150,3 +150,15 @@ try:  # pragma: no cover - trivial guard
     from . import eng_viz_mandala as _eng_viz_mandala  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# CLOUD partner video rows (S3 core, 2026-07-02): kling_avatar / kling_lipsync
+# / seedance_2 / wan_i2v via the S0 invoke_partner_node bridge, conformed by
+# canonicalize_video (provider audio ALWAYS stripped, strip-proven). Register
+# unconditionally (registry IS the menu) with EMPTY default_roles -- selectable
+# picks only; assert_usable fails CLOSED until OTR_ENABLE_COMFY_CLOUD_MEDIA=1
+# (+ budget + auth). Cold-import clean (torch/PIL/soundfile/bridge lazy).
+# Guarded so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_cloud_video as _eng_cloud_video  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

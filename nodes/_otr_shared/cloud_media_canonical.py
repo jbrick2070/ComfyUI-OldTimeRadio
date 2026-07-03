@@ -109,9 +109,113 @@ def canonicalize_image(raw: PartnerResult, request: dict, session) -> CanonicalA
     _not_built_yet("image", "S1 (stills lane)")
 
 
-def canonicalize_video(raw: PartnerResult, request: dict, session) -> CanonicalAsset:
-    """S3. Role fps/res/container; provider audio ALWAYS stripped via
-    ffmpeg (must_strip_audio=True across shipped rows; master audio is
-    frozen upstream, mux is LAST); strip proof recorded in the cache
-    manifest."""
-    _not_built_yet("video", "S3 (video lane)")
+def _ffprobe_streams(path: str) -> dict:
+    """``{"video": [...], "audio": [...], "duration_s": float}`` via ffprobe.
+    Fail-closed CORRUPT_OUTPUT on any probe failure -- partial media never
+    proceeds."""
+    import json as _json
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-print_format", "json",
+             "-show_streams", "-show_format", str(path)],
+            capture_output=True, text=True, timeout=120)
+        if out.returncode != 0:
+            raise RuntimeError(out.stderr.strip()[-300:])
+        doc = _json.loads(out.stdout or "{}")
+    except CloudMediaError:
+        raise
+    except Exception as exc:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              f"ffprobe failed on {path}: {exc}")
+    streams = doc.get("streams") or []
+    dur_raw = ((doc.get("format") or {}).get("duration"))
+    try:
+        duration = float(dur_raw)
+    except (TypeError, ValueError):
+        # pass04 sec 6: actual_duration_s validators fail with a NAMED
+        # missing-field error on cloud runs -- never a silent None.
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"provider clip {path} has no format.duration "
+            f"(actual_duration_s unresolvable)")
+    return {
+        "video": [s for s in streams if s.get("codec_type") == "video"],
+        "audio": [s for s in streams if s.get("codec_type") == "audio"],
+        "duration_s": duration,
+    }
+
+
+def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
+    """S3 (2026-07-02). Conform a provider clip to the ROLE contract:
+
+    - provider audio ALWAYS stripped (``-an``; must_strip_audio=True across
+      shipped rows -- master audio is frozen upstream, mux is LAST), with a
+      POST-STRIP PROOF (re-probe: zero audio streams) recorded on the asset;
+    - role canvas (fit + pad, never distort) + role fps + h264/yuv420p/bt709
+      mp4 (the CanonicalClip container contract every local engine ships);
+    - ``actual_duration_s`` measured from the OUTPUT (named error when the
+      provider clip carries no duration);
+    - sha256 of the canonical bytes.
+
+    ``request`` supplies ``{"w", "h", "fps"}`` (all required, fail-closed) and
+    optionally ``out_path`` (default: a fresh mp4 beside the input with a
+    ``.canon.mp4`` suffix)."""
+    import hashlib
+    import subprocess
+    validated = validate_partner_result(dict(raw))
+    src = Path(validated["path"])
+    try:
+        w = int(request["w"])
+        h = int(request["h"])
+        fps = int(request["fps"])
+    except (KeyError, TypeError, ValueError):
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            "canonicalize_video request must carry integer w/h/fps "
+            f"(got {request!r})")
+    probe = _ffprobe_streams(str(src))
+    if not probe["video"]:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              f"provider clip {src} has no video stream")
+    out_path = Path(request.get("out_path") or
+                    src.with_suffix("")).with_suffix(".canon.mp4")
+    vf = (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
+          f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps={fps},format=yuv420p")
+    cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-an",
+           "-vf", vf, "-c:v", "libx264", "-preset", "medium",
+           "-colorspace", "bt709", "-color_primaries", "bt709",
+           "-color_trc", "bt709", "-movflags", "+faststart", str(out_path)]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if res.returncode != 0:
+            raise RuntimeError(res.stderr.strip()[-300:])
+    except CloudMediaError:
+        raise
+    except Exception as exc:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              f"ffmpeg conform failed for {src}: {exc}")
+    post = _ffprobe_streams(str(out_path))
+    if post["audio"]:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"audio strip FAILED: canonical {out_path} still carries "
+            f"{len(post['audio'])} audio stream(s)")
+    sha = hashlib.sha256()
+    with open(out_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha.update(chunk)
+    warnings = ()
+    if probe["audio"]:
+        warnings = (f"provider audio stripped ({len(probe['audio'])} "
+                    f"stream(s); strip proof: 0 in output)",)
+    return CanonicalAsset(
+        path=out_path,
+        sha256=sha.hexdigest(),
+        media_type="video",
+        duration_s=post["duration_s"],
+        width=w, height=h, fps=float(fps),
+        container="mp4",
+        provider_job_id=validated.get("provider_job_id"),
+        validation_warnings=warnings,
+    )
