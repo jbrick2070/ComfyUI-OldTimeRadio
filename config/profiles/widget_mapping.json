@@ -92,15 +92,6 @@
         ]
       ]
     },
-    "slot_overrides.sequencer_default_tts": {
-      "registry": "audio",
-      "targets": [
-        [
-          "OTR_SceneSequencer",
-          "default_tts"
-        ]
-      ]
-    },
     "features.burn_captions": {
       "registry": null,
       "targets": [

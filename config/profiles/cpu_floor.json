@@ -15,8 +15,7 @@
     "char_voice_engine": "bark",
     "announcer_voice_engine": "kokoro",
     "music_engine": "musicgen",
-    "video_render_engine": "still_motion",
-    "sequencer_default_tts": "bark"
+    "video_render_engine": "still_motion"
   },
   "features": {
     "burn_captions": true,

@@ -18,8 +18,7 @@
     "char_voice_engine": "indextts2",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "humo_1.7B",
-    "sequencer_default_tts": "bark"
+    "video_render_engine": "humo_1.7B"
   },
   "features": {
     "burn_captions": true,

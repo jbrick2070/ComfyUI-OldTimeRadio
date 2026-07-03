@@ -631,10 +631,6 @@ class SceneSequencer:
                     "tooltip": "Last line to render"
                 }),
                 "output_dir": ("STRING", {"default": ""}),
-                "default_tts": (["bark", "parler", "kokoro"], {
-                    "default": "bark",
-                    "tooltip": "Default TTS engine when not specified in production plan"
-                }),
                 # v1.5 Phase 3: Time-Alignment Offset Pin
                 "dialogue_offset_ms": ("FLOAT", {
                     "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
@@ -685,7 +681,6 @@ class SceneSequencer:
                  tts_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
-                 default_tts="bark",  # kept: widget INPUT accepted by node contract; per-line TTS routing reads voice_assignments in the ledger, not this widget
                  dialogue_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")

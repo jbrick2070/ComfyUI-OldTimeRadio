@@ -709,7 +709,7 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 - Node 1 `OTR_LedgerScriptWriter` -- see PRIORITY 2 (in progress; `optimization_profile` hidden 2026-05-23).
 - `OTR_LedgerFreezeCascade` -- ADV: enable_phase_7_audio_readiness, enable_phase_8_video_readiness. HIDE: vram_ceiling_gb.
-- `OTR_SceneSequencer` -- ADV: start_line, end_line, dialogue_offset_ms, sfx_offset_ms. HIDE: script_json (socket), output_dir, default_tts.
+- `OTR_SceneSequencer` -- ADV: start_line, end_line, dialogue_offset_ms, sfx_offset_ms. HIDE: script_json (socket), output_dir. (default_tts removed 2026-07-03 -- was a dead widget; per-line TTS routing is decided upstream off the canonical cast.)
 - `OTR_AudioEnhance` -- ADV: all 7 (target_sample_rate, spatial_width, haas_delay_ms, bass_warmth, lpf_cutoff_hz, tape_emulation, normalize_dbfs). Opportunity: collapse the 7 into one `audio_profile` preset combo, the way `creativity` collapses temp/top_p on node 1.
 - `OTR_EpisodeAssembler` -- ADV: opening_duration_sec, closing_duration_sec, crossfade_ms. HIDE: episode_title (duplicate of the writer's; resolve from ledger).
 - `OTR_BatchBarkGenerator` -- ADV: temperature. HIDE: script_json (socket).

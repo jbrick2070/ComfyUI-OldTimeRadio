@@ -188,6 +188,9 @@ def test_workflow_json_node87_matches_live_widget_model():
     names3 = [i.get("name") for i in n3["inputs"]]
     assert "sfx_audio_clips" not in names3
     assert "sfx_offset_ms" not in names3
-    assert len(n3["widgets_values"]) == 6
+    # 2026-07-03: dead default_tts widget removed (6 -> 5). Remaining widgets:
+    # script_json, start_line, end_line, output_dir, dialogue_offset_ms.
+    assert "default_tts" not in names3
+    assert len(n3["widgets_values"]) == 5
     lk2 = next(l for l in d["links"] if l[0] == 2)
     assert lk2[3] == 3 and lk2[4] == names3.index("script_json")
