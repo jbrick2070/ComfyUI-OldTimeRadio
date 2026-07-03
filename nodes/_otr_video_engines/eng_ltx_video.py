@@ -35,6 +35,15 @@ HARDCODED to the mini -- the #1 invariant; env knobs ignored in distilled mode);
 ``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots condition on their FULL-FRAME scene
 still (never a portrait), ``OTR_LTX_I2V_STRENGTH`` (ksampler mode only; distilled
 hardcodes 0.75).
+
+S5 (2026-07-02, operator ratified): ``OTR_LTX_VIDEO_RECIPE``
+(auto|hq_two_stage|single_pass, default auto = unet-family detection). On the
+DEV-family unet the SILENT two-stage HQ recipe (the ia2v_canonical transplant
+minus the whole audio lane) is the new default; ``single_pass`` is the frozen
+GGUF-mini behavior, byte-identical. TWO LTX rows total in the dropdowns
+(ltx_video + ltx_audio_in); NO ltx_lowvram (the 22B unet floor makes it
+illusory -- 8GB boxes ride profiles). Measured silent-vs-audio-in VRAM/time
+A/B on the first live clip is the S5 exit gate (GPU, operator-visible).
 """
 from __future__ import annotations
 
@@ -234,6 +243,56 @@ _LTX_DISTILLED_LORA_DEFAULT = os.path.join(
     "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
 _LTX_DISTILLED_LORA_STRENGTH = 0.7
 
+# --------------------------------------------------------------------------- #
+# S5 (2026-07-02, operator ratified): the SILENT two-stage HQ recipe -- the
+# ia2v_canonical transplant (eng_ltx_av RECIPE_IA2V, comfy.org "LTX-2.3:
+# Image Audio to Video") with the ENTIRE audio lane removed (no audio VAE /
+# encode / concat / separate / zero-mask -- clips here are silent by contract,
+# V-1 mux-LAST). TWO-STAGE: motion at half canvas (Inplace i2v @0.7 soft
+# anchor + euler_ancestral_cfg_pp over the front-loaded 8-step ladder) ->
+# latent-upsample x2 -> re-anchor @1.0 -> 3-step euler_cfg_pp refine with
+# LTXVCropGuides. Selection: env OTR_LTX_VIDEO_RECIPE
+# (auto|hq_two_stage|single_pass), default auto -> derived from the
+# OTR_LTX_VIDEO_UNET basename family, mirroring eng_ltx_av._detect_recipe
+# (dev -> hq_two_stage; distilled -> single_pass; unknown RAISES). The
+# single_pass recipe is the frozen GGUF-mini behavior, byte-identical.
+# eng_ltx_av stays a SEPARATE module (V-12) -- constants duplicated on purpose.
+# --------------------------------------------------------------------------- #
+RECIPE_AUTO = "auto"
+RECIPE_HQ_TWO_STAGE = "hq_two_stage"
+RECIPE_SINGLE_PASS = "single_pass"
+_VALID_RECIPES = (RECIPE_HQ_TWO_STAGE, RECIPE_SINGLE_PASS)
+_RECIPE_MENU = "auto|hq_two_stage|single_pass"
+
+#: Refine ladder (verbatim ia2v_canonical): 3 steps from 0.85 -- detail only,
+#: never re-decides motion.
+LTX_HQ_REFINE_SIGMAS = (0.85, 0.7250, 0.4219, 0.0)
+#: The HQ recipe uses the ORIGINAL (non-1.1) distilled-lora-384 at HALF
+#: strength on the DEV unet: half-distilled keeps dev's motion quality while
+#: buying most of the distilled speed (canonical transplant value).
+_LTX_HQ_LORA_DEFAULT = os.path.join(
+    "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384.safetensors")
+_LTX_HQ_LORA_STRENGTH = 0.5
+_LTX_HQ_I2V_BASE_STRENGTH = 0.7      # motion pass: the still is a soft anchor
+_LTX_HQ_I2V_REFINE_STRENGTH = 1.0    # detail pass: hard re-anchor
+_LTX_HQ_BASE_SAMPLER = "euler_ancestral_cfg_pp"  # ancestral keeps motion alive
+_LTX_HQ_REFINE_SAMPLER = "euler_cfg_pp"
+#: Guide-image conditioning chain (canonical texture prep) -- CANVAS-
+#: INDEPENDENT fixed numbers (the lips-dont-talk kibitz catch): scale the
+#: guide to 1920x1088 then cap the longer edge at 1536, at ANY render canvas.
+_LTX_HQ_GUIDE_SCALE_W = 1920
+_LTX_HQ_GUIDE_SCALE_H = 1088
+_LTX_HQ_GUIDE_LONGER_EDGE = 1536
+_LTX_HQ_GUIDE_COMPRESSION = 18
+#: Spatial latent upsampler x2 (folder key latent_upscale_models); required
+#: ONLY by hq_two_stage so single_pass stays usable on installs lacking it.
+_FLOOR_UPSCALER = int(0.05 * _GiB)
+
+
+def _ltx_hq_upscale_model_name():
+    return os.environ.get("OTR_LTX_VIDEO_UPSCALE_MODEL",
+                          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
+
 
 class _SigmasFromValues:
     """In-adapter graph node: a float32 SIGMAS tensor from literal values.
@@ -344,19 +403,32 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                               "ltx-2.3-22b-dev_video_vae.safetensors")
 
     def _weight_paths(self):
-        """(label, full_path, floor_bytes) for each required weight artifact:
-        GGUF unet, Gemma-3 text encoder, video VAE, distilled LoRA, projection
-        checkpoint. Mirrors eng_ltx_av._weight_paths (the proven GGUF lane)."""
-        lora_name, lora_path = self._distilled_lora_file()
-        return [
+        """(label, full_path, floor_bytes) for each required weight artifact,
+        RECIPE-AWARE (S5): common = GGUF unet, Gemma-3 text encoder, video VAE,
+        projection ckpt. single_pass adds the 1.1 distilled LoRA; hq_two_stage
+        adds the ORIGINAL 384 LoRA + the spatial latent upsampler (required
+        ONLY there so single_pass stays usable on installs lacking it)."""
+        paths = [
             ("transformer GGUF", _resolve("unet", self._unet_name()), _FLOOR_UNET),
             ("Gemma-3 text encoder",
              _resolve("text_encoders", self._encoder_name()), _FLOOR_ENCODER),
             ("video VAE", _resolve("vae", self._video_vae_name()), _FLOOR_VIDEO_VAE),
-            ("distilled LoRA", lora_path or _resolve("loras", lora_name), _FLOOR_LORA),
             ("projection ckpt",
              _resolve("checkpoints", self._projection_ckpt()), _FLOOR_PROJECTION_CKPT),
         ]
+        if self._recipe() == RECIPE_HQ_TWO_STAGE:
+            lora_name, lora_path = self._hq_lora_file()
+            paths.append(("HQ distilled LoRA (384)",
+                          lora_path or _resolve("loras", lora_name), _FLOOR_LORA))
+            paths.append(("latent spatial upscaler",
+                          _resolve("latent_upscale_models",
+                                   _ltx_hq_upscale_model_name()),
+                          _FLOOR_UPSCALER))
+        else:
+            lora_name, lora_path = self._distilled_lora_file()
+            paths.append(("distilled LoRA",
+                          lora_path or _resolve("loras", lora_name), _FLOOR_LORA))
+        return paths
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -369,6 +441,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         All fail-closed NAMED EngineUnusable so the manager's fallback catches it."""
         # BUG-070 SageAttention contamination (int8-PV aborts LTX silently)
         _MC.assert_sage_not_patched(self.name, self.family)
+        # 2b -- recipe resolution FIRST (S5, fail-loud BEFORE node/weight
+        #       gating): a bad OTR_LTX_VIDEO_RECIPE or an unrecognized unet
+        #       family RAISES here, at the gate, never mid-render (NO
+        #       FALLBACKS). _node_candidates + _weight_paths consult the same
+        #       resolver, so the graph cannot drift from the gate.
+        recipe = self._recipe()
         # 3 -- weights present + above the sanity floor (realpath -> broken
         #      symlinks fail)
         for label, path, floor in self._weight_paths():
@@ -385,11 +463,15 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                     self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                     "%s %s at %r is below the %d-byte floor (truncated/wrong "
                     "file?)" % (self.name, label, real, floor), kind="video")
-        # 4 -- node gate: every required ComfyUI class must resolve (lazy read)
+        # 4 -- node gate: every required ComfyUI class must resolve (lazy
+        #      read), on the ACTIVE recipe's candidate set (S5)
         from . import wrapper_bridge as _wb
         missing = []
         mapping = _wb.node_class_mappings()
-        for _logical, candidates in self._node_candidates().items():
+        active_cands = (self._node_candidates_hq()
+                        if recipe == RECIPE_HQ_TWO_STAGE
+                        else self._node_candidates())
+        for _logical, candidates in active_cands.items():
             try:
                 _wb.resolve_node_class(candidates, mapping)
             except Exception:  # noqa: BLE001 - collect every missing class
@@ -634,6 +716,220 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             cands["sampleradv"] = ("SamplerCustomAdvanced",)
         return cands
 
+    # ---- S5 recipe resolution (mirrors eng_ltx_av._recipe/_detect_recipe) ----
+    def _recipe(self):
+        """Resolve the ACTIVE recipe. Reads env EVERY call (a soak can flip
+        recipes per leg by swapping OTR_LTX_VIDEO_UNET / OTR_LTX_VIDEO_RECIPE).
+        auto -> unet-family detection; explicit invalid value RAISES (NO
+        FALLBACKS); hq_two_stage on a distilled unet RAISES (the HQ ladder
+        assumes the DEV unet -- full distillation blunts the refine)."""
+        sel = os.environ.get("OTR_LTX_VIDEO_RECIPE", RECIPE_AUTO).strip().lower()
+        base = os.path.basename(self._unet_name()).lower()
+        if sel != RECIPE_AUTO:
+            if sel not in _VALID_RECIPES:
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "OTR_LTX_VIDEO_RECIPE=%r invalid -- use %s"
+                    % (sel, _RECIPE_MENU), kind="video")
+            if sel == RECIPE_HQ_TWO_STAGE and base.startswith(
+                    "ltx-2.3-22b-distilled"):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "OTR_LTX_VIDEO_RECIPE=hq_two_stage requires a DEV-family "
+                    "unet; %r is distilled -- use single_pass or swap "
+                    "OTR_LTX_VIDEO_UNET" % base, kind="video")
+            return sel
+        return self._detect_recipe(self._unet_name())
+
+    def _detect_recipe(self, unet_name):
+        """auto: derive the recipe from the unet basename family. An unknown
+        family RAISES (the operator sets OTR_LTX_VIDEO_RECIPE) -- a name that
+        matches NO known family must never silently get a mismatched ladder."""
+        base = os.path.basename(unet_name).lower()
+        if base.startswith("ltx-2.3-22b-distilled"):
+            return RECIPE_SINGLE_PASS
+        if base.startswith("ltx-2.3-22b-dev"):
+            return RECIPE_HQ_TWO_STAGE
+        raise EngineUnusable(
+            self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+            "unrecognized LTX unet family %r -- set OTR_LTX_VIDEO_RECIPE=%s"
+            % (base, _RECIPE_MENU), kind="video")
+
+    def _hq_lora_file(self):
+        """(lora_name, abs_path) for the HQ recipe's half-strength LoRA (the
+        ORIGINAL non-1.1 384). Same search dirs as _distilled_lora_file."""
+        name = os.environ.get("OTR_LTX_HQ_LORA", _LTX_HQ_LORA_DEFAULT)
+        if not name:
+            return "", ""
+        cand_dirs = [os.path.join(_COMFY_ROOT, "models", "loras")]
+        hf_home = os.environ.get("HF_HOME", "")
+        if hf_home:
+            cand_dirs.append(os.path.join(os.path.dirname(hf_home), "loras"))
+        for d in cand_dirs:
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                return name, p
+        return name, ""
+
+    def _node_candidates_hq(self):
+        """The silent two-stage HQ graph's node candidates: the loaders +
+        conditioning from the base set, the guide-image chain, the Inplace
+        pair, the latent upsampler, CropGuides, and BOTH sampler chains.
+        NO audio classes (the whole point of the silent port)."""
+        return {
+            "unet": ("UnetLoaderGGUF",),
+            "lora": ("LoraLoaderModelOnly",),
+            "te": ("LTXAVTextEncoderLoader",),
+            "pos": ("CLIPTextEncode",),
+            "neg": ("CLIPTextEncode",),
+            "cond": ("LTXVConditioning",),
+            "videovae_dec": ("VAELoader",),
+            "videovae_enc": ("VAELoader",),
+            "loadimage": ("LoadImage",),
+            "imagescale": ("ImageScale",),
+            "resizelonger": ("ResizeImagesByLongerEdge",),
+            "preprocess": ("LTXVPreprocess",),
+            "emptylatent": ("EmptyLTXVLatentVideo",),
+            "inplace_base": ("LTXVImgToVideoInplace",),
+            "inplace_refine": ("LTXVImgToVideoInplace",),
+            "upscale_loader": ("LatentUpscaleModelLoader",),
+            "upscaler": ("LTXVLatentUpsampler",),
+            "cropguides": ("LTXVCropGuides",),
+            "ksel": ("KSamplerSelect",),
+            "noise": ("RandomNoise",),
+            "guider": ("CFGGuider",),
+            "sampler": ("SamplerCustomAdvanced",),
+            "ksel_refine": ("KSamplerSelect",),
+            "noise_refine": ("RandomNoise",),
+            "guider_refine": ("CFGGuider",),
+            "sampler_refine": ("SamplerCustomAdvanced",),
+            "decode": ("VAEDecodeTiled",),
+        }
+
+    def _build_graph_hq(self, plan, length, width, height, image_name):
+        """The SILENT two-stage HQ graph (S5 port of eng_ltx_av
+        _build_graph_ia2v, audio lane deleted):
+
+        STAGE A -- MOTION (half canvas): guide still -> ImageScale(1920x1088)
+        -> ResizeImagesByLongerEdge(1536) -> LTXVPreprocess(18); planted
+        IN-PLACE (strength 0.7, SOFT anchor) into an EmptyLTXVLatentVideo at
+        width/2 x height/2; denoised by euler_ancestral_cfg_pp over the
+        front-loaded 8-step ladder. The latent is PURE VIDEO -- no AV concat,
+        no separate, no zero-masked audio latent.
+
+        STAGE B -- DETAIL (full canvas): LTXVLatentUpsampler x2 -> re-anchor
+        the SAME preprocessed still at strength 1.0 -> 3-step euler_cfg_pp
+        refine (0.85 -> 0) with conditioning routed through
+        LTXVCropGuides(base latent) -> tiled decode. Silent by contract (V-1).
+
+        The init still is REQUIRED (NO FALLBACKS -- render_clip raises before
+        this builds when absent; defense at the build seam too). Base noise =
+        the beat seed; refine noise = seed+1 (two independent deterministic
+        streams, C7-style)."""
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        if not image_name:
+            raise _wb.GraphExecutionError(
+                "%s (hq_two_stage) requires an init image for EVERY beat -- "
+                "no image means no graph, never a silent t2v downgrade"
+                % self.name)
+        positive = plan.get("text_prompt") or "a cinematic scene"
+        negative = plan.get("negative_prompt") or os.environ.get(
+            "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        seed = int(plan.get("seed", 0) or 0)
+        lora_name, _lora_path = self._hq_lora_file()
+        base_w, base_h = int(width) // 2, int(height) // 2  # exact halving
+        g = {
+            "unet": {"class": "unet",
+                     "inputs": {"unet_name": self._unet_name()}},
+            "lora": {"class": "lora", "inputs": {
+                "model": W("unet", 0), "lora_name": lora_name,
+                "strength_model": _LTX_HQ_LORA_STRENGTH}},
+            "te": {"class": "te", "inputs": {
+                "text_encoder": self._encoder_name(),
+                "ckpt_name": self._projection_ckpt(),
+                "device": self._encoder_device()}},
+            "pos": {"class": "pos",
+                    "inputs": {"text": positive, "clip": W("te", 0)}},
+            "neg": {"class": "neg",
+                    "inputs": {"text": negative, "clip": W("te", 0)}},
+            "cond": {"class": "cond", "inputs": {
+                "positive": W("pos", 0), "negative": W("neg", 0),
+                "frame_rate": float(self.target_fps)}},
+            "videovae_dec": {"class": "videovae_dec",
+                             "inputs": {"vae_name": self._video_vae_name()}},
+            # encode-side VAE SEPARATE (BUG-414 split, ported): its last
+            # consumer (inplace_refine) runs BEFORE the refine sampler, so
+            # free_after_use reclaims it ahead of both activation peaks.
+            "videovae_enc": {"class": "videovae_enc",
+                             "inputs": {"vae_name": self._video_vae_name()}},
+            # ---- guide-image conditioning chain (canonical texture prep) ----
+            "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
+            "imagescale": {"class": "imagescale", "inputs": {
+                "image": W("loadimage", 0), "upscale_method": "lanczos",
+                "width": _LTX_HQ_GUIDE_SCALE_W,
+                "height": _LTX_HQ_GUIDE_SCALE_H,
+                "crop": "center"}},
+            "resizelonger": {"class": "resizelonger", "inputs": {
+                "images": W("imagescale", 0),
+                "longer_edge": _LTX_HQ_GUIDE_LONGER_EDGE}},
+            "preprocess": {"class": "preprocess", "inputs": {
+                "image": W("resizelonger", 0),
+                "img_compression": _LTX_HQ_GUIDE_COMPRESSION}},
+            # ---- STAGE A: motion at half canvas (pure video latent) ----
+            "emptylatent": {"class": "emptylatent", "inputs": {
+                "width": base_w, "height": base_h,
+                "length": int(length), "batch_size": 1}},
+            "inplace_base": {"class": "inplace_base", "inputs": {
+                "vae": W("videovae_enc", 0), "image": W("preprocess", 0),
+                "latent": W("emptylatent", 0),
+                "strength": _LTX_HQ_I2V_BASE_STRENGTH, "bypass": False}},
+            "guider": {"class": "guider", "inputs": {
+                "model": W("lora", 0), "positive": W("cond", 0),
+                "negative": W("cond", 1), "cfg": _LTX_DISTILLED_CFG}},
+            "sigmas": {"class": "sigmas",
+                       "inputs": {"values": list(LTX_DISTILLED_SIGMAS)}},
+            "ksel": {"class": "ksel",
+                     "inputs": {"sampler_name": _LTX_HQ_BASE_SAMPLER}},
+            "noise": {"class": "noise", "inputs": {"noise_seed": seed}},
+            "sampler": {"class": "sampler", "inputs": {
+                "noise": W("noise", 0), "guider": W("guider", 0),
+                "sampler": W("ksel", 0), "sigmas": W("sigmas", 0),
+                "latent_image": W("inplace_base", 0)}},
+            # ---- STAGE B: latent-upsample x2 + re-anchor + refine ----
+            "upscale_loader": {"class": "upscale_loader", "inputs": {
+                "model_name": _ltx_hq_upscale_model_name()}},
+            "upscaler": {"class": "upscaler", "inputs": {
+                "samples": W("sampler", 0),
+                "upscale_model": W("upscale_loader", 0),
+                "vae": W("videovae_enc", 0)}},
+            "inplace_refine": {"class": "inplace_refine", "inputs": {
+                "vae": W("videovae_enc", 0), "image": W("preprocess", 0),
+                "latent": W("upscaler", 0),
+                "strength": _LTX_HQ_I2V_REFINE_STRENGTH, "bypass": False}},
+            "cropguides": {"class": "cropguides", "inputs": {
+                "positive": W("cond", 0), "negative": W("cond", 1),
+                "latent": W("sampler", 0)}},
+            "guider_refine": {"class": "guider_refine", "inputs": {
+                "model": W("lora", 0), "positive": W("cropguides", 0),
+                "negative": W("cropguides", 1), "cfg": _LTX_DISTILLED_CFG}},
+            "sigmas_refine": {"class": "sigmas_refine", "inputs": {
+                "values": list(LTX_HQ_REFINE_SIGMAS)}},
+            "ksel_refine": {"class": "ksel_refine", "inputs": {
+                "sampler_name": _LTX_HQ_REFINE_SAMPLER}},
+            "noise_refine": {"class": "noise_refine",
+                             "inputs": {"noise_seed": seed + 1}},
+            "sampler_refine": {"class": "sampler_refine", "inputs": {
+                "noise": W("noise_refine", 0), "guider": W("guider_refine", 0),
+                "sampler": W("ksel_refine", 0), "sigmas": W("sigmas_refine", 0),
+                "latent_image": W("inplace_refine", 0)}},
+            "decode": {"class": "decode", "inputs": {
+                "samples": W("sampler_refine", 0), "vae": W("videovae_dec", 0),
+                "tile_size": 512, "overlap": 64,
+                "temporal_size": 4096, "temporal_overlap": 8}},
+        }
+        return g
+
     def _dims(self, request):
         """(width, height) from the request canvas with LTX landscape defaults."""
         get = request.get if isinstance(request, dict) else (
@@ -781,6 +1077,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested
+        recipe = self._recipe()
+        if recipe == RECIPE_HQ_TWO_STAGE:
+            return self._render_clip_hq(request, prepared, plan)
         use_i2v = self._use_i2v(request)
         # LK-1b: resolve the ACTIVE candidate set (sampler mode + LoRA
         # wiring are env/ckpt-dependent). A load()-time cache (or a test's
@@ -858,6 +1157,70 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         if not os.environ.get("OTR_TEST_MODE"):
             _MC.assert_vram_within_ceiling(self.name + "-render")  # PASS-PM mid-render
         return {"out_path": path, "frame_count": n,
+                "ltx_loop_via_reverse": bool(loop_via_reverse)}
+
+    def _render_clip_hq(self, request, prepared, plan):
+        """S5: drive ONE silent two-stage HQ clip (hq_two_stage recipe). The
+        init still is REQUIRED -- a missing/stale still raises LOUD (NO
+        FALLBACK to the text path: the HQ ladder anchors BOTH stages on the
+        still). Same length/dims/loop/encode/ceiling mechanics as the
+        single-pass path."""
+        from . import wrapper_bridge as _wb
+        from ._tmp import otr_engine_tmp_mp4
+        init_path = self._init_image_path(request)
+        if not (init_path and os.path.exists(init_path)):
+            raise _wb.GraphExecutionError(
+                "%s (hq_two_stage) requires an on-disk init image for every "
+                "beat; got %r -- fix the still mint upstream or select "
+                "OTR_LTX_VIDEO_RECIPE=single_pass (NO silent t2v downgrade)"
+                % (self.name, init_path))
+        classes = _wb.resolve_graph_classes(self._node_candidates_hq())
+        # BOTH sigma sources are in-adapter literals (not registered nodes);
+        # injected AFTER resolve. A test fake may pre-supply its own.
+        classes.setdefault("sigmas", _SigmasFromValues)
+        classes.setdefault("sigmas_refine", _SigmasFromValues)
+        width, height = self._dims(request)
+        length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
+        width = max(32, (width // 32) * 32)
+        height = max(32, (height // 32) * 32)
+        loop_via_reverse = self._loop_via_reverse()
+        if loop_via_reverse:
+            length = _ltx_loop_source_length(plan["target_frame_count"],
+                                             self.target_fps)
+            _LOG.warning("[eng_ltx_video] HQ loop_via_reverse ON: render "
+                         "src=%d -> mirror %d frames (target %d) @ %dx%d",
+                         length, 2 * length - 1, plan["target_frame_count"],
+                         width, height)
+        image_name = _wb.stage_into_comfy_input(init_path)
+        _LOG.warning(
+            "[eng_ltx_video] S5 HQ two-stage: base %dx%d -> upsample x2 -> "
+            "refine %dx%d, length %d, init %s (silent; recipe=hq_two_stage)",
+            width // 2, height // 2, width, height, length,
+            os.path.basename(init_path))
+        graph = self._build_graph_hq(plan, length, width, height, image_name)
+        results = _wb.run_graph(graph, classes, free_after_use=True,
+                                keep={"unet", "lora", "decode"})
+        images = results["decode"][0]
+        bucket = prepared.setdefault("patchers", self._patchers) \
+            if isinstance(prepared, dict) else self._patchers
+        model = results.get("lora", (None,))[0]
+        if model is not None and callable(getattr(model, "detach", None)) \
+                and id(model) not in {id(p) for p in bucket}:
+            bucket.append(model)
+        frames = _wb.images_to_uint8(images)
+        if loop_via_reverse:
+            if len(frames) >= 2:
+                frames = _boomerang_frames(frames)
+            else:
+                _LOG.warning("[eng_ltx_video] HQ loop_via_reverse: only %d "
+                             "frame(s) decoded -- skipping mirror", len(frames))
+        out_path = otr_engine_tmp_mp4("otr_ltx_")
+        path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
+                                                  self.target_fps)
+        if not os.environ.get("OTR_TEST_MODE"):
+            _MC.assert_vram_within_ceiling(self.name + "-render")
+        return {"out_path": path, "frame_count": n,
+                "ltx_recipe": RECIPE_HQ_TWO_STAGE,
                 "ltx_loop_via_reverse": bool(loop_via_reverse)}
 
     def canonicalize(self, raw, request, profile):

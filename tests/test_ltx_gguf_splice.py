@@ -132,7 +132,11 @@ def test_ksampler_honors_env_knobs(monkeypatch):
 
 
 # --- weight floors + resolver defaults (SPLICE_PLAN 12.5, 4A) -------------- #
-def test_weight_paths_five_artifacts():
+def test_weight_paths_five_artifacts(monkeypatch):
+    # S5 (2026-07-02): _weight_paths is RECIPE-AWARE. This test pins the
+    # frozen single_pass contract (5 artifacts); hq_two_stage (the dev-unet
+    # default) adds the spatial upscaler -- pinned in test_ltx_video_hq_recipe.
+    monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     wp = LtxVideoEngine()._weight_paths()
     labels = [w[0] for w in wp]
     assert len(wp) == 5

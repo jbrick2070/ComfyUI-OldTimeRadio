@@ -119,11 +119,13 @@ def test_ltx_assert_usable_sage_then_install(monkeypatch):
     with pytest.raises(vreg.EngineUnusable) as e2:
         eng.assert_usable(host_caps={}, profile={})
     assert e2.value.reason == vreg.EngineUsabilityReason.INCOMPATIBLE_PROFILE
-    # Sage clear but a weight absent -> MISSING_MODEL (still closed). The GGUF
-    # recipe resolves 5 artifacts; point the unet at a bogus name to force it.
+    # Sage clear but a weight absent -> MISSING_MODEL (still closed). The
+    # bogus name stays IN a recognized unet family (S5: recipe resolution runs
+    # BEFORE the weight gate and an UNKNOWN family raises MALFORMED_CONFIG --
+    # that path is pinned in test_ltx_video_hq_recipe).
     monkeypatch.delitem(sys.modules, "sageattention", raising=False)
     monkeypatch.delenv("OTR_SAGEATTENTION_PATCHED", raising=False)
-    monkeypatch.setenv("OTR_LTX_VIDEO_UNET", "_no_such_unet.gguf")
+    monkeypatch.setenv("OTR_LTX_VIDEO_UNET", "ltx-2.3-22b-dev-NO-SUCH.gguf")
     with pytest.raises(vreg.EngineUnusable) as e3:
         eng.assert_usable(host_caps={}, profile={})
     assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL

@@ -229,6 +229,10 @@ def test_wan_render_requires_init_image():
 def test_ltx_render_clip_to_silent_mp4(monkeypatch):
     # Base (non-loop) render mechanics: pin the boomerang OFF so frame_count is
     # the raw decode (the loop path has its own test below -- BUG-LOCAL-117d).
+    # S5: pin single_pass -- this test exercises the FROZEN GGUF-mini
+    # mechanics; the dev-unet auto default now routes to hq_two_stage (which
+    # requires an init still and has its own tests).
+    monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "off")
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
@@ -251,6 +255,8 @@ def test_ltx_render_clip_to_silent_mp4(monkeypatch):
 def test_ltx_render_clip_boomerang_default_on(monkeypatch):
     # BUG-LOCAL-117d: loop_via_reverse is the ltx_video DEFAULT -> render_clip
     # mirrors the decoded frames end-to-end (4 -> 2*4-1 = 7) through the encoder.
+    # S5: pin single_pass (frozen mechanics; hq_two_stage has its own tests).
+    monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
