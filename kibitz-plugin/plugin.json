@@ -1,0 +1,17 @@
+{
+  "name": "kibitz-plugin",
+  "version": "1.0.0",
+  "description": "Antigravity UI-driven Kibitz wrapper; the UI is the Antigravity lane and CLI fan-out is limited to Codex and Claude",
+  "author": {
+    "name": "Antigravity Partner",
+    "email": "jeffr@example.com"
+  },
+  "keywords": [
+    "kibitz",
+    "roundtable",
+    "antigravity-ui",
+    "review",
+    "codex",
+    "claude"
+  ]
+}
