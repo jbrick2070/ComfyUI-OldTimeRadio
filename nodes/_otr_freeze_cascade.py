@@ -667,7 +667,6 @@ def run_freeze_cascade(
     polish_generate_fn=None,
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
-    vram_ceiling_gb: float = 14.0,
     # Sprint 6 -- critic-to-render coupling widgets (cascade node
     # surface). Defaults match the node's INPUT_TYPES defaults so
     # existing callers / tests are unaffected (render_selection="all"
@@ -719,29 +718,20 @@ def run_freeze_cascade(
     """
     ledger_data = led.data
 
-    # ---- B2 fix (commit 12.1): VRAM watchdog at cascade entry ----
-    # Alarm plumbing only -- single measurement, warn on over-ceiling,
-    # continue regardless. Per-phase gating is follow-up wiring once
-    # soak data shows where the actual ceiling hits are.
+    # ---- VRAM telemetry at cascade entry (ADR 6.8) ----
+    # Single measurement stamped for forensics; no ceiling policy --
+    # the tier JSON the operator picks owns the OOM budget now.
     meta = ledger_data.setdefault("meta", {})
-    meta["lfc_vram_ceiling_gb"] = float(vram_ceiling_gb)
     try:
         from . import _otr_lfc_watchdog as _LFC_WD  # type: ignore
-        over_ceiling, current_gb = _LFC_WD.vram_over_ceiling(
-            ceiling_gb=float(vram_ceiling_gb),
-        )
+        current_gb = _LFC_WD._torch_vram_allocated_gb()
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[LFC] VRAM watchdog read failed at cascade entry: %s; "
+            "[LFC] VRAM read failed at cascade entry: %s; "
             "stamping 0.0 GB and proceeding", exc,
         )
-        over_ceiling, current_gb = False, 0.0
+        current_gb = 0.0
     meta["vram_at_cascade_entry_gb"] = float(current_gb)
-    if over_ceiling:
-        log.warning(
-            "[LFC] WARN VRAM at %.2f GB over %.2f ceiling; cascade "
-            "will proceed", current_gb, float(vram_ceiling_gb),
-        )
 
     # ---- Phase 0: deterministic warn-mode audit ----------
     started = _isoformat_utc_now()

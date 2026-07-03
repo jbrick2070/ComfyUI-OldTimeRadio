@@ -12,15 +12,15 @@ ADR section 6.5  Stats-based voice drift detection
   either the 40% word-count deviation rule OR the 60% vocab-
   diversity collapse rule (ADR thresholds).
 
-ADR section 6.8  VRAM watchdog
-  Before each LLM call, current allocated VRAM is checked against
-  the ceiling. Over-ceiling skips the phase with a warn log; the
-  cascade advances rather than crash. ALARM PLUMBING ONLY -- no
-  quantization / weight-streaming / FA chasing (per Jeffrey's
+ADR section 6.8  VRAM telemetry
+  `_torch_vram_allocated_gb` reads current CUDA-allocated VRAM as a
+  forensic sample stamped on meta at cascade entry. TELEMETRY ONLY --
+  no ceiling policy (the operator's tier JSON owns the OOM budget) and
+  no quantization / weight-streaming / FA chasing (per Jeffrey's
   feedback_no_vram_dragons memory).
 
 Both helpers are stateless. Tests cover the math without needing
-torch / a real GPU; the watchdog has a `_torch_vram_allocated_gb`
+torch / a real GPU; the reader has a `_torch_vram_allocated_gb`
 internal that returns 0.0 when torch is unimportable.
 
 Status: LFC sprint commit 12 of 14 (2026-05-11).
@@ -37,12 +37,10 @@ log = logging.getLogger("OTR.lfc_watchdog")
 
 __all__ = [
     "SpeakerStats",
-    "VRAM_DEFAULT_CEILING_GB",
     "DRIFT_WORD_COUNT_THRESHOLD",
     "DRIFT_VOCAB_DIVERSITY_THRESHOLD",
     "compute_speaker_stats",
     "flag_line_drift",
-    "vram_over_ceiling",
     "_torch_vram_allocated_gb",
 ]
 
@@ -50,9 +48,6 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-
-VRAM_DEFAULT_CEILING_GB: float = 14.0
 
 
 # ADR section 6.5 thresholds.
@@ -221,22 +216,3 @@ def _torch_vram_allocated_gb() -> float:
             "returning 0.0", exc,
         )
         return 0.0
-
-
-def vram_over_ceiling(
-    ceiling_gb: float = VRAM_DEFAULT_CEILING_GB,
-    *,
-    measure_fn=_torch_vram_allocated_gb,
-) -> tuple[bool, float]:
-    """Return (over_ceiling, current_gb).
-
-    The caller (LFC orchestrator) decides what to do on
-    `over_ceiling=True` -- typically skip the next phase and log.
-    Per Jeffrey's no-VRAM-dragons memory, this is ALARM PLUMBING
-    only. No quantization, no streaming, no FA chasing.
-
-    `measure_fn` is injectable for tests so the math can be
-    exercised without a live torch / GPU.
-    """
-    current = float(measure_fn())
-    return (current > ceiling_gb, current)

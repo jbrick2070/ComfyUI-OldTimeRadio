@@ -211,21 +211,6 @@ class OTR_LedgerFreezeCascade:
                         "Default ON."
                     ),
                 }),
-                "vram_ceiling_gb": ("FLOAT", {
-                    "default": 14.0,
-                    "min": 4.0,
-                    "max": 24.0,
-                    "step": 0.5,
-                    "tooltip": (
-                        "VRAM ceiling (GB) stamped on meta; entry-time "
-                        "check warns on over-ceiling. Per-phase "
-                        "skipping is follow-up wiring once soak data "
-                        "shows where the actual ceiling hits are. ADR "
-                        "section 6.8 caps at 14.0 GB on the 5080 "
-                        "Laptop (16 GB total, 0.5 GB margin under the "
-                        "14.5 GB usable cap)."
-                    ),
-                }),
                 # ---- Sprint 6 -- critic-to-render coupling --------
                 # These four widgets steer which lines BatchHumoRender
                 # renders downstream. The cascade computes the plan
@@ -299,7 +284,6 @@ class OTR_LedgerFreezeCascade:
         technical_model: str = "",
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
-        vram_ceiling_gb: float = 14.0,
         # Sprint 6 -- critic-to-render coupling widgets. Defaults match
         # the INPUT_TYPES defaults; the cascade stamps meta.render_plan
         # from these + the post-reroll critic report.
@@ -401,7 +385,6 @@ class OTR_LedgerFreezeCascade:
                 polish_generate_fn=polish_generate_fn,
                 enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
                 enable_phase_8_video_readiness=enable_phase_8_video_readiness,
-                vram_ceiling_gb=float(vram_ceiling_gb),
                 # Sprint 6 -- critic-to-render coupling.
                 render_selection=str(render_selection or "all"),
                 render_max_n=int(render_max_n or 0),

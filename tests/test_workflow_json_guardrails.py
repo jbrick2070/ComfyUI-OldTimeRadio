@@ -1045,13 +1045,15 @@ class TestCascadeB3Surface:
         )
 
     def test_cascade_widget_vector_trimmed_in_canonical_json(self):
-        """The 7 widgets deleted from cascade INPUT_TYPES (model_id +
-        6 phase toggles) must also be trimmed from `widgets_values`.
+        """The widgets deleted from cascade INPUT_TYPES (model_id +
+        6 phase toggles + vram_ceiling_gb) must also be trimmed from
+        `widgets_values`.
 
-        Sprint 6 (2026-05-25) added 4 critic-to-render coupling widgets,
-        so the post-B3 floor of 3 widgets grew to 7 (the same trim still
-        holds -- model_id + the 6 phase toggles stay deleted; the 4 new
-        slots are the Sprint 6 render-coupling widgets stacked on top).
+        Sprint 6 (2026-05-25) added 4 critic-to-render coupling widgets;
+        the 2026-07-03 VRAM rip then removed vram_ceiling_gb, so the
+        vector is 6: phase_7, phase_8, render_selection, render_max_n,
+        protagonist_only, manual_line_ids (the operator's tier JSON owns
+        the OOM budget now -- there is no hard-baked ceiling widget).
         """
         wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
         doc = _load_json(wf_path)
@@ -1060,27 +1062,25 @@ class TestCascadeB3Surface:
             if n.get("type") == "OTR_LedgerFreezeCascade"
         )
         wv = cascade.get("widgets_values", [])
-        assert len(wv) == 7, (
+        assert len(wv) == 6, (
             f"cascade widgets_values length drift: {len(wv)} "
-            f"(expected 7 post-Sprint-6: phase_7, phase_8, vram_ceiling, "
+            f"(expected 6 post-VRAM-rip: phase_7, phase_8, "
             f"render_selection, render_max_n, protagonist_only, "
             f"manual_line_ids)"
         )
         # 0 = enable_phase_7_audio_readiness  (bool)
         # 1 = enable_phase_8_video_readiness  (bool)
-        # 2 = vram_ceiling_gb                 (float)
-        # 3 = render_selection                (str: "all"|"dramatic_peaks_only")
-        # 4 = render_max_n                    (int)
-        # 5 = protagonist_only                (bool)
-        # 6 = manual_line_ids                 (str)
+        # 2 = render_selection                (str: "all"|"dramatic_peaks_only")
+        # 3 = render_max_n                    (int)
+        # 4 = protagonist_only                (bool)
+        # 5 = manual_line_ids                 (str)
         assert isinstance(wv[0], bool)
         assert isinstance(wv[1], bool)
-        assert isinstance(wv[2], (int, float))
-        assert isinstance(wv[3], str)
-        assert wv[3] in ("all", "dramatic_peaks_only")
-        assert isinstance(wv[4], (int, float))
-        assert isinstance(wv[5], bool)
-        assert isinstance(wv[6], str)
+        assert isinstance(wv[2], str)
+        assert wv[2] in ("all", "dramatic_peaks_only")
+        assert isinstance(wv[3], (int, float))
+        assert isinstance(wv[4], bool)
+        assert isinstance(wv[5], str)
 
 
 # ---------------------------------------------------------------------------
