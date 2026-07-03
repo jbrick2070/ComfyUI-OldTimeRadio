@@ -1,6 +1,7 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-02 late night | branch v2.0-alpha | prod/main + tags operator-GATED.
+> Last updated 2026-07-03 | branch v2.0-alpha @ 8de5862d | prod/main + tags operator-GATED.
+> SPRINT A (E1/E2 no-fallback rip-out) SHIPPED @ 8de5862d -- NEXT = Sprint B (S1 stills).
 > KIBITZ ARC CONVERGED on the remaining-sprints plan (r2/r3/r4 judged; BUILD-READY).
 > soak2 QA PASS (6/6 clips, obs final, no breach). proof9d 832x448 FAILED on a CLEAN
 > baseline -- MARGINAL breach 14506 > 14500 MB at shot_b002 (6MB over; zero headroom at
@@ -18,12 +19,29 @@
 
 ## 1. CURRENT STEP
 
-**NEXT CODE = SPRINT A (E1/E2 no-fallback rip-out)** per the kibitz-hardened
-`docs/2026-07-02-remaining-sprints/PLAN.md` (CONVERGED r2/r3/r4 -- the single build
-spec; order A -> B(S1 stills) -> C -> D(TTS) -> E(C1) -> F; Sprint A internal order
-A4 -> A3b -> A1+A2 ATOMIC -> A3a/c/d/e). S5 GPU exit gate (silent-vs-audio-in VRAM/time
-A/B) rides the next render window. S4x GO/NO-GO awaits the operator call on the
-proof9d marginal-headroom breach (PROOF9_VERDICT.md options a/b/c).
+**SPRINT A (E1/E2 no-fallback rip-out) SHIPPED @ 8de5862d.** The whole rip landed
+as ONE atomic commit (A1 render_driver scaffolding + fallback.py DELETE; A2 per-adapter
+fallback_engine=None; A3a/c/d/e director+Policy default False + widget audit + api-json
+regen; A4 test triage; A5 oracle verified). Suite 6057/0 + Bug Bible 16-pass + B7 5-pass;
+validator + JSON round-trip + widget audit (node-87 widget[11] allow_auto_fallback already
+False, no value change) + link integrity all green. HEAD==origin. NOTE: the prior window's
+`git rm` of fallback.py + test_video_fallback_chain_additive.py had NOT persisted (files were
+back at HEAD content); re-`git rm`'d in this commit -- that was the only real gap.
+**NEXT = Sprint B (S1 stills lane)** per `docs/2026-07-02-remaining-sprints/PLAN.md`
+(canonicalize_image + recraft/flux/nano/ideogram/seedream adapters + CAPABILITIES + B5
+conformance test + portrait-mint gate + B7 dropdown wiring). Order B(S1 stills) -> C(S3
+full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate (silent-vs-audio-in VRAM/time A/B) rides
+the next render window. S4x GO/NO-GO awaits the operator call on the proof9d
+marginal-headroom breach (PROOF9_VERDICT.md options a/b/c).
+
+**QUEUED (operator pickups 2026-07-03, ride BEHIND the forward order):** ideo_word family --
+(1) `docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` = the MAIN build, pulled in as
+S1+1 (`ideo` plain scene-still + `ideo_word` words-specialist IMAGE engine in
+nodes/_otr_image_engines/, lyric_text vs title_mood modes, worded cards NEVER pooled);
+(2) `docs/GO_FORWARD_NEXT/2026-07-02-ideo-word-razzle-vid.md` Phase 0 (--audit-i2v report-only
+on otr_pin_partner_nodes.py) = safe filler ANY time; Phase 1 GATED on S1 + ideo_word landing.
+Parked siblings (do NOT build): 2026-07-02-ideo-word-vid.md (NEEDS-DECISION),
+2026-07-02-ideo-word-3d-razzle.md (rejected, reference only).
 
 **OPERATOR DIRECTIVE 2026-07-02 late evening: NO FALLBACKS, NO AUTO-DEFAULTS, ANYWHERE.**
 The dropdown values SAVED in `workflows/otr_scifi_16gb_full.json` are the ONLY defaults.
@@ -142,9 +160,7 @@ OUT (research mode; docs in `ComfyUI-OTR-UpstreamStoryLab\docs`).
 Coverage-soak sprint spec (kibitz r1-r4 converged): `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
 The load-bearing OPEN items (7 of 11 sub-items already shipped -- see HANDOFF_LOG.md):
 
-- **E1/E2 = Sprint A of `docs/2026-07-02-remaining-sprints/PLAN.md` (kibitz-hardened; NEXT CODE).**
-  Real sites + test triage + atomic A1+A2 ordering all pinned THERE -- that doc supersedes the
-  older line-number notes here.
+- **E1/E2 = Sprint A -- SHIPPED @ 8de5862d** (no-fallback rip; see section 1 + HANDOFF_LOG).
 - **E3-doc -- edit THIS doc only.** station_card + abstract retired (C0). `still_motion` is NOT retired
   (it is UNIVERSAL_FLOOR + mesh_stage's fallback target) -- do not unregister it.
 - **E4 -- "which model" dropdown spell-out (DEFERRED, low priority).** Audio-reactive + VRAM-tier

@@ -6,6 +6,58 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 -- HEAD 8de5862d (v2.0-alpha) -- Sprint A E1/E2 SHIPPED (atomic rip committed + pushed)
+Did: finished + committed the whole no-fallback rip as ONE atomic commit @ 8de5862d
+(push fast-forwarded b170e280..8de5862d; HEAD==origin, includes c2edd984 A4+A3b as
+ancestor). Verified full suite 6057/0 + Bug Bible 16-pass + B7 5-pass. A3d: node-87
+widget[11] allow_auto_fallback audited = already False (no JSON value change needed);
+regenerated the untracked otr_scifi_16gb_full_api.json OFFLINE via build_offline_schemas
++ workflow_to_api_prompt (director carries allow_auto_fallback False by name). Validator
++ JSON round-trip + widget audit (15/15) + link integrity all green. A5:
+content_oracle.check_manifest reads only path/engine_id/frame_count -- needs no fallback
+trails. CAUGHT A REAL GAP: the prior window's `git rm` of nodes/_otr_shared/fallback.py
++ tests/test_video_fallback_chain_additive.py had NOT persisted (both back at HEAD content
+on disk; test_video_humo::test_no_fallback_module_and_no_chain was failing in isolation)
+-- re-`git rm`'d both in the shipped commit. Pinned-True tests (still_aspect:208,
+aseam:316/341/260) already consistent (pass deprecated True as ignored input) -- no change.
+Current step: Sprint A DONE. NEXT = Sprint B (S1 stills lane) per docs/2026-07-02-remaining-sprints/PLAN.md.
+Next: Sprint B S1 stills (canonicalize_image + cloud image adapters + B5 conformance + portrait-mint gate + B7 wiring); operator pickups QUEUED behind it: ideo_word family (ideogram-lyric-stills = S1+1; razzle-vid Phase 0 = safe filler).
+Commits: 8de5862d (pushed; HEAD==origin).
+
+## 2026-07-02 ~late -- HEAD c2edd984 (v2.0-alpha) -- Sprint A: A4+A3b PUSHED; A1+A2 rip CODED (uncommitted, suite verify pending)
+Did: A4 triage doc (docs/2026-07-02-remaining-sprints/A4_TRIAGE.md, grep-verified) +
+A3b Policy.allow_auto_fallback default False -- committed AND pushed @ c2edd984
+(suite 6075/0 + Bug Bible green). THEN coded the A1+A2 ATOMIC rip in the working
+tree (UNCOMMITTED -- do not lose): render_driver scaffolding ripped
+(FLOOR_NAMES/UNIVERSAL_FLOOR/SYNTH_FALLBACKS/EXPECTED_OOM_TRAIL/make_fallback_of/
+run_episode+render_shot+run_real_episode signatures lose fallback_of; soak verifier
+rewritten to the NO-TRAIL LOUD contract w/ oom_contract leg; RenderFloorError KEPT --
+it is the BUG-LOCAL-413 ltx-open strict guard, unrelated to chains);
+nodes/_otr_shared/fallback.py + tests/test_video_fallback_chain_additive.py git rm'd;
+retry_taxonomy action API + escalate_to_fallback field deleted (classification kept);
+scripts/otr_video_soak.py rewritten; scripts/otr_video_gpu_smoke.py demo/chain cut;
+fallback_engine=None on humo x2, ltx_video, mesh_stage, triposr, still_parallax,
+character_3d x3; schemas.py runtime_fallback_decisions = retained-slot-stamped-never
+comment; ~16 test files rewritten per A4_TRIAGE. Targeted 249/249 green. ALSO started
+A3a/c: director widget default False + deprecated labels + runtime IGNORES stale True
+w/ LOUD log + policy emits False always; test_route_a_14b_promotion.py:132 flipped.
+A full-suite run (a12b_suite.out) was IN FLIGHT when the window ended -- RE-RUN it,
+results unreliable (edits landed mid-run).
+Current step: SPRINT A -- finish A3a/c/d/e, then verify + commit the atomic chunk(s).
+Next: (1) full suite + Bug Bible; fix test_still_aspect_and_labels.py:208 +
+test_video_platform_aseam.py:316/:341 (+ check its :260 schema/default asserts);
+(2) A3d: audit widgets_values in workflows/otr_scifi_16gb_full.json -- set the
+OTR_VideoDirector allow_auto_fallback positional value to false IN THE SAME commit;
+regenerate (never hand-edit) the untracked otr_scifi_16gb_full_api.json; (3) A5:
+verify content_oracle.check_manifest requires no fallback trails; (4) commit AND push
+per green chunk; update GO_FORWARD + this log.
+Commits: c2edd984 + 47629f05 (CLAUDE.md quoting rule; accidentally swept the 2 staged
+rip deletions) + b170e280 (restores fallback.py + test_video_fallback_chain_additive.py
+so origin stays importable) -- all pushed, HEAD==origin @ b170e280. Working tree
+carries the uncommitted rip; the restored pair is PRESENT in the worktree again --
+`git rm nodes/_otr_shared/fallback.py tests/test_video_fallback_chain_additive.py`
+must ride the A1+A2 atomic commit (the rewritten tests assert the module is GONE).
+
 ## 2026-07-02 ~23:55 -- HEAD 5c5cdcfe+ (v2.0-alpha) -- kibitz arc CONVERGED + soak2 PASS + proof9d marginal breach
 Did: judged kibitz r2 (r2_plan.md), ran + judged r3 and r4 LIVE (codex+antigravity;
 operator dropped the claude CLI panelist mid-r4 -- panel is codex+AG from now on,
