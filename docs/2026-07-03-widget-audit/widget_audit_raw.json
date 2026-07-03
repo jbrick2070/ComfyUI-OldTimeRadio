@@ -1,0 +1,1748 @@
+[
+ {
+  "node_id": 63,
+  "class": "OTR_WorkflowValidator",
+  "title": "OTR_WorkflowValidator",
+  "mode": 0,
+  "n_widget_values": 6,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "workflow_json_path",
+    "section": "required",
+    "kind": "STRING",
+    "extra": null,
+    "refs_in_class_body": 9,
+    "refs_elsewhere_in_repo": 13,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "validate_anyway",
+    "section": "required",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 11,
+    "refs_elsewhere_in_repo": 11,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "strict_unknown_types",
+    "section": "required",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 18,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "profile_id",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 15,
+    "refs_elsewhere_in_repo": 72,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "master_hash",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 13,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "generated_by",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 1,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 1,
+  "class": "OTR_LedgerScriptWriter",
+  "title": "1. Story Writer (LPL v2.0)",
+  "mode": 0,
+  "n_widget_values": 25,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "episode_title",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 16,
+    "refs_elsewhere_in_repo": 151,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "target_words",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 350
+    },
+    "refs_in_class_body": 20,
+    "refs_elsewhere_in_repo": 472,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "num_characters",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 2
+    },
+    "refs_in_class_body": 17,
+    "refs_elsewhere_in_repo": 171,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "creative_writing_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 35,
+    "refs_elsewhere_in_repo": 132,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "technical_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 26,
+    "refs_elsewhere_in_repo": 132,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "custom_premise",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 20,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "include_act_breaks",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 10,
+    "refs_elsewhere_in_repo": 37,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "act_count",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 8,
+     "options_sample": [
+      "auto",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+     ]
+    },
+    "refs_in_class_body": 10,
+    "refs_elsewhere_in_repo": 129,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "style",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 59,
+    "refs_elsewhere_in_repo": 648,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "style_custom",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 11,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "creativity",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 81,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "perfect_run_spacesaver",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "min_p",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 0.05
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "repetition_penalty",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 1.03
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "max_new_tokens_cap",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 200
+    },
+    "refs_in_class_body": 9,
+    "refs_elsewhere_in_repo": 23,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "lemmy_cameo",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 7,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "use_exchange",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 9,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "enable_production_stage3_validators",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "news_briefs_required",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 18,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "openrouter_slot_a_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 46,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "openrouter_slot_b_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 35,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "comfy_slot_a_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 35,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "comfy_slot_b_model",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 34,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "refine_target_grade",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 5,
+     "options_sample": [
+      "Off",
+      "C+",
+      "B",
+      "B+",
+      "A"
+     ]
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 15,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "story_scaffold",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 3,
+     "options_sample": [
+      "auto",
+      "on",
+      "off"
+     ]
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 23,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 3,
+  "class": "OTR_SceneSequencer",
+  "title": "4. Scene Sequencer",
+  "mode": 0,
+  "n_widget_values": 6,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "script_json",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": "[]"
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 261,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "start_line",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 0
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "end_line",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 999
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "output_dir",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 48,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "default_tts",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 3,
+     "options_sample": [
+      "bark",
+      "parler",
+      "kokoro"
+     ]
+    },
+    "refs_in_class_body": 1,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "dialogue_offset_ms",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 0.0
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 4,
+  "class": "OTR_AudioEnhance",
+  "title": "5. Audio Enhance",
+  "mode": 0,
+  "n_widget_values": 7,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "target_sample_rate",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 48000
+    },
+    "refs_in_class_body": 12,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "spatial_width",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 0.3
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "haas_delay_ms",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 0.4
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "bass_warmth",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 0.1
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "lpf_cutoff_hz",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 16000.0
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "tape_emulation",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 4,
+     "options_sample": [
+      "off",
+      "subtle",
+      "medium",
+      "heavy"
+     ]
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "normalize_dbfs",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": -1.0
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 7,
+  "class": "OTR_EpisodeAssembler",
+  "title": "6. Episode Assembler",
+  "mode": 0,
+  "n_widget_values": 4,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "episode_title",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": "The Last Frequency"
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 175,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "opening_duration_sec",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 10.0
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "closing_duration_sec",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": {
+     "default": 8.0
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 0,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "crossfade_ms",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 500
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 4,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 12,
+  "class": "OTR_SignalLostVideo",
+  "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
+  "mode": 0,
+  "n_widget_values": 6,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "script_json",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": "[]"
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 259,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "news_used",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": "[]"
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 56,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "fps",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 24
+    },
+    "refs_in_class_body": 14,
+    "refs_elsewhere_in_repo": 559,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "resolution",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 5,
+     "options_sample": [
+      "1920x1080",
+      "1280x720",
+      "832x480",
+      "854x480",
+      "3840x2160"
+     ]
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 240,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "episode_title",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 21,
+    "refs_elsewhere_in_repo": 153,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "draw_scopes",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 2,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 62,
+  "class": "OTR_LedgerFreezeCascade",
+  "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
+  "mode": 0,
+  "n_widget_values": 6,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "enable_phase_7_audio_readiness",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 4,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "enable_phase_8_video_readiness",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 3,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "render_selection",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 19,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "render_max_n",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 6
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 25,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "protagonist_only",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 22,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "manual_line_ids",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 19,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 80,
+  "class": "OTR_CastLock",
+  "title": "1c. Cast Lock (v2 ledger authority)",
+  "mode": 0,
+  "n_widget_values": 4,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "voice_bank",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 16,
+    "refs_elsewhere_in_repo": 40,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "cast_voice_policy",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "delivery_profile",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 2,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "allow_voice_reuse",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 17,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 81,
+  "class": "OTR_BatchCharacterVoices",
+  "title": "3a. Character Voices (v2)",
+  "mode": 0,
+  "n_widget_values": 2,
+  "in_repo": false,
+  "widgets": [],
+  "flags": [
+   "CLASS_NOT_PARSED_IN_REPO (core/comfy or dynamic INPUT_TYPES)"
+  ]
+ },
+ {
+  "node_id": 82,
+  "class": "OTR_AnnouncerVoice",
+  "title": "3b. Announcer Voice (v2)",
+  "mode": 0,
+  "n_widget_values": 2,
+  "in_repo": false,
+  "widgets": [],
+  "flags": [
+   "CLASS_NOT_PARSED_IN_REPO (core/comfy or dynamic INPUT_TYPES)"
+  ]
+ },
+ {
+  "node_id": 83,
+  "class": "OTR_StableAudioTheme",
+  "title": "3c. Theme Music (v2)",
+  "mode": 0,
+  "n_widget_values": 2,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "engine",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 17,
+    "refs_elsewhere_in_repo": 2078,
+    "converted_to_input": false,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "stereo_policy",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 1,
+     "options_sample": [
+      "mono_safe"
+     ]
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 11,
+    "converted_to_input": false,
+    "notes": [
+     "single-option dropdown"
+    ],
+    "verdict": "SUSPECT"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 84,
+  "class": "OTR_SilentComposite",
+  "title": "9. Silent Composite (render -> one always-silent video)",
+  "mode": 0,
+  "n_widget_values": 5,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "canvas_w",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 1472
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 13,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "canvas_h",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 832
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 13,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "fps",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 25
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 556,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ffmpeg",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "ffmpeg"
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 686,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "output_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 76,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 85,
+  "class": "OTR_MasterAudioMux",
+  "title": "10. Master Audio Mux (terminal mux-LAST)",
+  "mode": 0,
+  "n_widget_values": 3,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "fps",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 25
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 609,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ffmpeg",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "ffmpeg"
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 697,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "output_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 75,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 86,
+  "class": "OTR_CaptionBurn",
+  "title": "9b. Caption Burn (SDH open captions on the silent video; default-OFF)",
+  "mode": 0,
+  "n_widget_values": 6,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "burn_captions",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "caption_style",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 9,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "fps",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 25
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 610,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ffmpeg",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "ffmpeg"
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 700,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ledger_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 83,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "output_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 76,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 87,
+  "class": "OTR_VideoDirector",
+  "title": "OTR_VideoDirector",
+  "mode": 0,
+  "n_widget_values": 12,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "announcer_video_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 34,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "music_video_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 34,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "character_video_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 53,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "announcer_image_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 23,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "music_image_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 26,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "other_beats_image_model",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 45,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "fps",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 25
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 612,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "canvas_w",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 832
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "canvas_h",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 480
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "seed_mode",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 20,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "request_seed",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 0
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 124,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "custom_models_json",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "{}"
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 88,
+  "class": "OTR_ImageDirector",
+  "title": "OTR_ImageDirector",
+  "mode": 0,
+  "n_widget_values": 7,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "announcer_granularity",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 1,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "music_granularity",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 1,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "other_beats_granularity",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 3,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "fresh_cap",
+    "section": "required",
+    "kind": "INT",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "seed_mode",
+    "section": "required",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 21,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "request_seed",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 0
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 124,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "custom_models_json",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "{}"
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 9,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 89,
+  "class": "OTR_MetaBriefImagePromptGen",
+  "title": "OTR_MetaBriefImagePromptGen",
+  "mode": 0,
+  "n_widget_values": 1,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "consistency_gate_warn_only",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 7,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 90,
+  "class": "OTR_ShotLock",
+  "title": "OTR_ShotLock",
+  "mode": 0,
+  "n_widget_values": 1,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "consistency_gate_warn_only",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 91,
+  "class": "OTR_ImageGenDispatcher",
+  "title": "OTR_ImageGenDispatcher",
+  "mode": 0,
+  "n_widget_values": 0,
+  "in_repo": true,
+  "widgets": [],
+  "flags": []
+ },
+ {
+  "node_id": 92,
+  "class": "OTR_VideoRenderBatch",
+  "title": "OTR_VideoRenderBatch",
+  "mode": 0,
+  "n_widget_values": 7,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "mode",
+    "section": "required",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 3,
+     "options_sample": [
+      "soak",
+      "single",
+      "episode"
+     ]
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 600,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "beats",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 40
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 1100,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "oom_index",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 20
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 68,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "frame_count",
+    "section": "required",
+    "kind": "INT",
+    "extra": {
+     "default": 25
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 219,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "engine",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "humo_1.7B"
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 2090,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "portrait_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 23,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "audio_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 59,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 93,
+  "class": "OTR_PostUpscaleProcgenBlend",
+  "title": "OTR_PostUpscaleProcgenBlend",
+  "mode": 0,
+  "n_widget_values": 13,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "source_mp4_path",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 21,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "procgen_mp4_path",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 15,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "blend_mode",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "blend_opacity",
+    "section": "optional",
+    "kind": "FLOAT",
+    "extra": null,
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 13,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ffmpeg",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "ffmpeg"
+    },
+    "refs_in_class_body": 12,
+    "refs_elsewhere_in_repo": 670,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "bypass",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": false
+    },
+    "refs_in_class_body": 6,
+    "refs_elsewhere_in_repo": 60,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "out_suffix",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "_procgen_blended"
+    },
+    "refs_in_class_body": 2,
+    "refs_elsewhere_in_repo": 7,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "shadow_crush_threshold",
+    "section": "optional",
+    "kind": "INT",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 2,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "green_only_overlay",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": null,
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 12,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "burn_captions",
+    "section": "optional",
+    "kind": "BOOLEAN",
+    "extra": {
+     "default": true
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 14,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "caption_style",
+    "section": "optional",
+    "kind": "dynamic-dropdown",
+    "extra": null,
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 8,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "scopes_mp4_path",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 1,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "audio_bars",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 2,
+     "options_sample": [
+      "bottom",
+      "off"
+     ]
+    },
+    "refs_in_class_body": 5,
+    "refs_elsewhere_in_repo": 2,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ },
+ {
+  "node_id": 94,
+  "class": "OTR_SceneAwareScopes",
+  "title": "OTR_SceneAwareScopes",
+  "mode": 0,
+  "n_widget_values": 5,
+  "in_repo": true,
+  "widgets": [
+   {
+    "name": "clip_manifest_json",
+    "section": "required",
+    "kind": "STRING",
+    "extra": {
+     "default": ""
+    },
+    "refs_in_class_body": 4,
+    "refs_elsewhere_in_repo": 10,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "out_w",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 1920
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 3,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "out_h",
+    "section": "optional",
+    "kind": "INT",
+    "extra": {
+     "default": 1080
+    },
+    "refs_in_class_body": 7,
+    "refs_elsewhere_in_repo": 3,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "ffmpeg",
+    "section": "optional",
+    "kind": "STRING",
+    "extra": {
+     "default": "ffmpeg"
+    },
+    "refs_in_class_body": 8,
+    "refs_elsewhere_in_repo": 698,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   },
+   {
+    "name": "landscape_bars",
+    "section": "optional",
+    "kind": "dropdown",
+    "extra": {
+     "n_options": 2,
+     "options_sample": [
+      "off",
+      "bottom"
+     ]
+    },
+    "refs_in_class_body": 3,
+    "refs_elsewhere_in_repo": 6,
+    "converted_to_input": true,
+    "verdict": "LIVE"
+   }
+  ],
+  "flags": []
+ }
+]
