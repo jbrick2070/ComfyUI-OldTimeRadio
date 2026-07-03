@@ -250,14 +250,14 @@ def test_schema_extra_forbid_and_family_rules():
 def test_widget_vector_exact():
     """Golden pin on the director's required widget order/names (drift guard).
     rip-sfx-broll (2026-07-01): other_beats_clip_mode / other_beats_n died
-    with the pooling; the 12-widget vector below matches node 87's
-    widgets_values[0:12] in the canonical workflow JSON."""
+    with the pooling; the 11-widget vector below matches node 87's
+    widgets_values[0:11] in the canonical workflow JSON."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "other_beats_video_model",
         "announcer_image_model", "music_image_model", "other_beats_image_model",
         "fps", "canvas_w", "canvas_h",
-        "seed_mode", "request_seed", "allow_auto_fallback",
+        "seed_mode", "request_seed",
     ]
     assert "seed" not in req  # V-7: no widget literally named 'seed'
 
@@ -313,7 +313,6 @@ def test_director_policy_json_and_clamp(clean_video_registry):
         music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
         fps=25,
         canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
-        allow_auto_fallback=True,
     )
     policy = json.loads(out[0])
     # rip-sfx-broll (2026-07-01): the other_beats pooling plan is GONE.
@@ -338,7 +337,6 @@ def test_director_fail_closed_incompatible_pick(clean_video_registry):
             music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
             fps=25,
             canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
-            allow_auto_fallback=True,
         )
 
 

@@ -97,13 +97,14 @@ def test_production_workflow_visual_structure_pinned():
         "announcer_video_model regressed off the viz_green default: %r" % wv87[0])
     assert wv87[1] == "viz_green", (
         "music_video_model regressed off the viz_green default: %r" % wv87[1])
-    # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15 (dropped
-    # other_beats_clip_mode/other_beats_n mid-list + the two dead per-role
-    # slots at the tail); character_video_model is the FINAL value now.
-    assert len(wv87) == 15, wv87
-    assert wv87[14] == "humo_14B_169", (
+    # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15; the deprecated
+    # allow_auto_fallback widget removal (2026-07-03, clean-UI directive) dropped
+    # it 15 -> 14 (slot 11 + its rogue input socket); character_video_model is the
+    # FINAL value now.
+    assert len(wv87) == 14, wv87
+    assert wv87[13] == "humo_14B_169", (
         "character_video_model must stay on the Route-A 14B motion lane: %r"
-        % wv87[14])
+        % wv87[13])
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

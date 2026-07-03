@@ -209,11 +209,6 @@ def _patch_director_inputs(prompt: dict[str, Any],
         dinputs[name] = resolved
         changes.append("%s %r -> %r" % (name, before, resolved))
 
-    _confirm_input(schemas, "OTR_VideoDirector", "allow_auto_fallback")
-    before_fallback = dinputs.get("allow_auto_fallback")
-    dinputs["allow_auto_fallback"] = False
-    changes.append(
-        "allow_auto_fallback %r -> False" % (before_fallback,))
     return changes
 
 

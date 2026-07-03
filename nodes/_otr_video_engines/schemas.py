@@ -127,11 +127,6 @@ class Quality(_Forbid):
 
 class Policy(_Forbid):
     mute_generated_audio: bool = True
-    #: DEPRECATED (operator directive 2026-07-02: NO FALLBACKS, NO AUTO-DEFAULTS).
-    #: Default False; the runtime IGNORES a stale True with a LOUD deprecation log
-    #: (Sprint A A3c) -- engine failure is a LOUD stop, never a swap. The field is
-    #: retained only so old serialized requests still parse.
-    allow_auto_fallback: bool = False
     strict_sync_required: bool = False
 
 

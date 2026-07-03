@@ -1,9 +1,9 @@
 """OTR_VideoDirector -- the per-role model-selection UI (A-S1/W1).
 
-Captures POLICY only (V-6): per-role video model + per-role image model, the
-Other-Beats clip mode, canvas/fps, seed mode, fallback policy. It emits ONE
-``video_policy_json`` STRING that ``OTR_ShotLock`` consumes -- an explicit string
-socket (testable, no hidden coupling).
+Captures POLICY only (V-6): per-role video model + per-role image model,
+canvas/fps, seed mode. It emits ONE ``video_policy_json`` STRING that
+``OTR_ShotLock`` consumes -- an explicit string socket (testable, no hidden
+coupling).
 
 Model-agnostic, no "primary": each per-role COMBO is the FULL static video
 registry + a ``+ Add Custom Model`` sentinel (V-6: the enum is the full list;
@@ -238,17 +238,6 @@ class OTRVideoDirector:
                     "default": 0, "min": 0, "max": 0xFFFFFFFF,
                     "tooltip": "Base seed (NOT named 'seed' on purpose, V-7).",
                 }),
-                # DEPRECATED (NO FALLBACKS, operator 2026-07-02): the fallback
-                # machinery is deleted; the runtime IGNORES a stale True with a
-                # LOUD deprecation log. Widget STAYS positional (BUG-LOCAL-097:
-                # never remove mid-list).
-                "allow_auto_fallback": ("BOOLEAN", {
-                    "default": False,
-                    "label_on": "true (deprecated -- ignored)",
-                    "label_off": "false (deprecated)",
-                    "tooltip": "(deprecated) NO FALLBACKS -- ignored; engine "
-                               "failure always fails LOUD.",
-                }),
             },
             "optional": {
                 "episode_duration_target": ("STRING", {
@@ -302,7 +291,7 @@ class OTRVideoDirector:
                other_beats_video_model, announcer_image_model,
                music_image_model, other_beats_image_model,
                fps, canvas_w, canvas_h,
-               seed_mode, request_seed, allow_auto_fallback,
+               seed_mode, request_seed,
                episode_duration_target="auto", custom_models_json="{}",
                character_video_model=USE_OTHER_BEATS,
                gate_in=""):
@@ -332,12 +321,6 @@ class OTRVideoDirector:
                 slot, picked, custom, descriptors, warnings
             )
 
-        if bool(allow_auto_fallback):
-            log.warning(
-                "[OTR_VideoDirector] DEPRECATED: allow_auto_fallback=True "
-                "IGNORED (NO FALLBACKS, operator directive 2026-07-02) -- the "
-                "fallback machinery is deleted; engine failure fails LOUD. "
-                "Re-save the workflow with the widget False to clear this.")
         policy = {
             "policy_version": 1,
             "video_models": resolved_video,
@@ -358,10 +341,6 @@ class OTRVideoDirector:
             },
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
-            # A3c (NO FALLBACKS, 2026-07-02): a stale True from an old saved
-            # graph is IGNORED with a LOUD deprecation log -- it must never
-            # resurrect the deleted fallback machinery. Always emitted False.
-            "allow_auto_fallback": False,
             "episode_duration_target": str(episode_duration_target or "auto"),
             "warnings": warnings,
         }
