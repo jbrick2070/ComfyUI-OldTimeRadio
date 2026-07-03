@@ -264,6 +264,12 @@ CAPABILITIES = {
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_pan": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # still_word (Sprint B, 2026-07-03): a still_flat sibling -- same CPU/ffmpeg
+    # flat-hold render (zero VRAM), the delta is the WORD/TITLE-driven prompt its
+    # base still is minted from (compose_still_word_prompt). Model-agnostic: any
+    # image engine mints the still. cpu class, cpu_ok True, no model assets.
+    "still_word": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "humo": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": False,
              "model_requirements": ["HuMo-17B"]},

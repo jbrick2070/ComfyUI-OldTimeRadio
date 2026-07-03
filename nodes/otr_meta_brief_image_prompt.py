@@ -440,6 +440,117 @@ def _mesh_fodder_roles_from_policy(policy_json):
     return set()
 
 
+def _still_word_roles_from_policy(policy_json):
+    """The set of image-prompt roles whose paired VIDEO engine is ``still_word``.
+
+    still_word is model-agnostic: the per-role video engine is ALREADY forwarded
+    in ``image_policy_json["video_models"]`` (OTR_ImageDirector, 2026-07-02), so
+    this reads it directly and resolves each role via the shared
+    ``role_slots.engine_id_for_role`` join (the SAME rule the director uses) --
+    no separate director-side precompute needed. A missing/malformed policy, or
+    a role_slots import failure in an odd flat-test context, yields an empty set
+    -> NO word/title branch (the legacy cinematic scene still). Pure, tolerant."""
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return set()
+    if not isinstance(pol, dict):
+        return set()
+    vm = pol.get("video_models")
+    if not isinstance(vm, dict):
+        return set()
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return set()
+    roles = set()
+    for role in _rs.ROLE_TO_VIDEO_SLOT:
+        try:
+            if str(_rs.engine_id_for_role(vm, role)) == "still_word":
+                roles.add(role)
+        except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
+            continue
+    return roles
+
+
+#: still_word (Sprint B, 2026-07-03) -- the model-agnostic word/title still.
+#: WORD mode (character_video / announcer_visual beats) renders the beat's spoken
+#: line as large, readable period typography -- a lyric/title CARD, so the words
+#: themselves ARE the image (NO_TEXT_CLAUSE is deliberately NOT appended). TITLE
+#: mode (music_visual beats) is an ABSTRACT picture evoking meta["episode_title"]
+#: with NO words (NO_TEXT_CLAUSE appended). Pure + deterministic + model-agnostic:
+#: it composes only the PROMPT string; whichever image engine the role's image
+#: slot selects mints it, and the still_word VIDEO engine holds it flat.
+_STILL_WORD_MUSIC_ROLE = "music_visual"
+_STILL_WORD_CARD_STYLE = (
+    "vintage typographic title card, the words rendered in large bold clean "
+    "legible period lettering, hand-set letterpress type, high contrast, "
+    "centered composition, letters sharp and fully readable")
+_STILL_WORD_TITLE_MOOD_STYLE = (
+    "abstract evocative mood image, atmospheric period illustration, symbolic "
+    "non-literal composition, no lettering")
+
+
+def _episode_title(meta) -> str:
+    """The episode title from meta (``episode_title`` -> ``title``), stripped.
+    Empty string when absent. Pure."""
+    m = meta if isinstance(meta, dict) else {}
+    return str(m.get("episode_title") or m.get("title") or "").strip()
+
+
+def _still_word_clean_line(beat_line: str) -> str:
+    """The spoken words for a word card: bracketed ``[stage direction]`` /
+    parenthetical ``(aside)`` scrubbed, a leading ``SPEAKER:`` label removed,
+    whitespace collapsed. Quotes / ellipsis / em-dash inside the words are KEPT
+    (they belong to the line). Pure."""
+    s = str(beat_line or "")
+    s = re.sub(r"\[[^\]]*\]", " ", s)                      # [stage direction]
+    s = re.sub(r"\([^)]*\)", " ", s)                        # (aside)
+    s = re.sub(r"^\s*[A-Z0-9 .'\-]{1,40}:\s+", "", s)       # leading SPEAKER:
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def compose_still_word_prompt(meta, role, beat_line):
+    """The still_word base-still prompt (see the module note above). Pure,
+    deterministic, MODEL-AGNOSTIC (no engine reference -- the composed prompt is
+    identical regardless of which image engine mints it). FAILS LOUD (raises
+    ``ValueError``, NO FALLBACK) on a blank spoken line (word mode) or a blank
+    episode title (music/title mode) -- both computed BEFORE any prompt hash."""
+    try:
+        from ._otr_story_brief_helpers import (  # type: ignore
+            get_era_tail, IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            get_era_tail, IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE)
+    _role = str(role or "")
+    era = (get_era_tail(meta, profile="still") or "").strip()
+    if _role == _STILL_WORD_MUSIC_ROLE:
+        title = _episode_title(meta)
+        if not title:
+            raise ValueError(
+                "compose_still_word_prompt: music-role still_word beat has a "
+                "BLANK episode title (meta['episode_title']/['title']) -- cannot "
+                "mint the abstract title still. NO FALLBACK.")
+        pieces = ['an abstract picture evoking "%s"' % title,
+                  _STILL_WORD_TITLE_MOOD_STYLE, era, IMAGE_GRADE_TAIL]
+        out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
+        return "%s, %s" % (out, NO_TEXT_CLAUSE)         # music title = NO words
+    # WORD mode (character_video / announcer_visual): the spoken line IS the card.
+    words = _still_word_clean_line(beat_line)
+    if not words:
+        raise ValueError(
+            "compose_still_word_prompt: %s still_word beat has a BLANK spoken "
+            "line after the stage-direction scrub (raw=%r) -- cannot mint the "
+            "word card. NO FALLBACK." % (_role or "word", beat_line))
+    pieces = ['a title card displaying the words "%s"' % words,
+              _STILL_WORD_CARD_STYLE, era, IMAGE_GRADE_TAIL]
+    return ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
+
+
 def _iter_beat_lines(lines):
     """(beat_id, line) pairs mirroring OTR_ShotLock's beat-id scheme exactly
     (line_id or beat_%04d over the NON-SKIPPED lines) so a still minted here
@@ -917,7 +1028,8 @@ def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
                          consistency_gate_warn_only: bool = False, lines=None,
                          fps: int = 25, still_aspects=None,
-                         mesh_fodder_roles=None, talking_roles=None):
+                         mesh_fodder_roles=None, talking_roles=None,
+                         still_word_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -1232,10 +1344,40 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                        for c in roster if isinstance(c, dict)}
         _line_by_beat = {bid: ln for bid, ln in _iter_beat_lines(lines)}
         _fodder_roles = set(mesh_fodder_roles or ())
+        _still_word_roles = set(still_word_roles or ())
         for tgt in scene_targets:
             _cid = str(tgt.get("char_id") or "")
             _src = tgt["source"]
             _bid = tgt["beat_id"]
+            if str(tgt.get("role") or "") in _still_word_roles:
+                # still_word (Sprint B, 2026-07-03): this beat's VIDEO engine is
+                # the model-agnostic still_word engine, so its base still is
+                # minted from a WORD/TITLE-driven prompt (char/announcer -> the
+                # beat's spoken line as a word card; music -> an abstract picture
+                # of the episode title, no words), NOT the cinematic scene
+                # composer. ONE scene-still object (identical shape to the normal
+                # branch, so _still_index picks it up); the delta is purely the
+                # prompt. Fail-LOUD (blank line / blank title raises) is inside
+                # compose_still_word_prompt. Image-model AGNOSTIC: only the PROMPT
+                # is set here; the role's chosen image engine mints it.
+                _ln = _line_by_beat.get(_bid, {})
+                _wprompt = compose_still_word_prompt(
+                    meta, str(tgt.get("role") or ""),
+                    str((_ln or {}).get("text") or ""))
+                _wobj = {
+                    "object_id": f"still_{_bid}",
+                    "kind": tgt["kind"],
+                    "role": tgt["role"],
+                    "beat_id": _bid,
+                    "w": sw, "h": sh,
+                    "prompt": _wprompt,
+                    "prompt_hash": _content_hash(_wprompt),
+                    "source": "still_word",
+                }
+                if _cid:
+                    _wobj["char_id"] = _cid
+                objects.append(_wobj)
+                continue
             if str(tgt.get("role") or "") in _fodder_roles:
                 # 3D IMAGE STREAMS FORK (2026-06-21): this beat's video engine
                 # requires clean mesh fodder, so mint TWO objects instead of one
@@ -1388,7 +1530,8 @@ class OTRMetaBriefImagePromptGen:
             still_aspects=_still_aspects_from_policy(image_policy_json),
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
             talking_roles=_talking_roles_from_policy(image_policy_json),
-        )  # aspects + mesh-fodder + talking roles ride in image_policy_json
+            still_word_roles=_still_word_roles_from_policy(image_policy_json),
+        )  # aspects + mesh-fodder + talking + still_word roles ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []

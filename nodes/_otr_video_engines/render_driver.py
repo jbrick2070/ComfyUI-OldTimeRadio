@@ -62,6 +62,10 @@ ENGINE_FAMILY = {
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala, pycairo (2026-06-30)
     "still_flat": "static_image_gen",
+    # still_word (Sprint B, 2026-07-03): a still_flat sibling (word/title still,
+    # held flat) -- same static_image_gen family, so it uses the explicit
+    # :1044 still-init branch below (NOT _SCENE_INIT_FAMILIES).
+    "still_word": "static_image_gen",
     # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
     # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
     "ltx_audio_in": "audio_conditioned_video",
@@ -1041,7 +1045,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # announcer/music BOOKENDS, scene_character for character beats), portrait
     # cleared so it can never leak into a wide frame. Unlike the cheap families it
     # has NO floor: a missing required still fails LOUD in render_clip (no fallbacks).
-    if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "ltx_audio_in"):
+    # still_word (Sprint B, 2026-07-03) JOINS still_pan/still_flat here: it is a
+    # static_image_gen flat-hold engine that conditions on the beat's minted scene
+    # still (which carries the word/title prompt from compose_still_word_prompt).
+    # Unlike still_pan/still_flat it has NO floor -- a missing still fails LOUD in
+    # its render_clip (_require_still), never a silent black card (no fallbacks).
+    if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _beat_id_for_shot(shot)
         _still = _still_index(ledger).get(str(_bid), "")
@@ -1111,9 +1120,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _LOG.warning(
                 "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
                 "has NO scene still in the ledger -- a cheap family (still_pan/still_flat) "
-                "synthesizes its dark floor; a still-REQUIRED engine (ltx_audio_in) "
-                "fails LOUD in render_clip (no fallbacks). Investigate the image "
-                "phase for beat %s.", _eng, _bid, _bid)
+                "synthesizes its dark floor; a still-REQUIRED engine (still_word/"
+                "ltx_audio_in) fails LOUD in render_clip (no fallbacks). Investigate "
+                "the image phase for beat %s.", _eng, _bid, _bid)
     # ADDENDUM A/B (OTR_LTX_RADIO_FACE, 2026-07-01, SEPARATE from the main
     # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER/MUSIC bookend,
     # OPTIONALLY swap the FACELESS brief-driven scene still for the WIDE radio-FACE

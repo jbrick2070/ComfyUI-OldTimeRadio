@@ -47,6 +47,13 @@ class _CheapFamilyBase:
     #: still) with a pan; False families always synthesize a procedural
     #: floor. Either way render_clip ALWAYS produces a valid silent clip.
     uses_still = False
+    #: When True a MISSING/absent base still is a LOUD failure (NO dark lavfi
+    #: floor fallback) instead of the synthesized slate. still_word sets this:
+    #: its whole contract is "hold the minted word/title still" -- a silent
+    #: black floor would swallow a mint failure exactly where it matters
+    #: (NO FALLBACKS, operator directive 2026-07-02). Default False keeps every
+    #: other cheap family's always-renders floor behavior byte-identical.
+    _require_still = False
 
     def load(self) -> None:  # cheap families hold no resident weights
         return None
@@ -135,6 +142,15 @@ class _CheapFamilyBase:
                 cmd = _wb.ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)
             else:
                 cmd = _wb.ffmpeg_still_static_cmd(still, out_path, w, h, fps, n)
+        elif self._require_still:
+            # NO FALLBACKS (operator 2026-07-02): a still-REQUIRED family
+            # (still_word) refuses the dark lavfi floor -- a missing base still
+            # is a mint failure and must be LOUD, never a silently-black clip.
+            raise RuntimeError(
+                "%s requires a base still but none was provided/exists "
+                "(asset_refs still/init_image=%r) -- refusing the dark floor "
+                "(NO FALLBACKS). The image phase must mint this beat's still "
+                "before the video render." % (self.name, still))
         else:
             cmd = _wb.ffmpeg_lavfi_floor_cmd(
                 out_path, w, h, fps, n, source=self._lavfi_source(w, h, fps))
@@ -242,6 +258,36 @@ class StillFlatFamily(_CheapFamilyBase):
     accepts_still = True            # mint the selected still for it (coverage gate)
 
 
+@register
+class StillWordFamily(_CheapFamilyBase):
+    """still_word: a ``still_flat`` SIBLING whose base still is minted from a
+    WORD/TITLE-driven prompt instead of the cinematic scene composer -- the
+    'the words ARE the picture' option (Sprint B, 2026-07-03, operator).
+
+    MODEL-AGNOSTIC by construction: the IMAGE engine that mints the base still
+    is chosen INDEPENDENTLY in the image dropdown; this VIDEO engine only holds
+    the minted still dead-flat (fit+pad, no crop -- identical render mechanics
+    to ``still_flat``). The ONLY delta vs still_flat is the PROMPT, composed
+    upstream by ``otr_meta_brief_image_prompt.compose_still_word_prompt``
+    (character/announcer beats -> the beat's spoken line as a readable word
+    card; music beats -> an abstract picture of the episode title, no words).
+
+    NO FALLBACKS: ``_require_still`` makes a missing base still fail LOUD in
+    render_clip -- never the dark floor -- because a black floor is exactly how
+    a word/title mint failure would hide. Selectable per role; never a default
+    (``default_roles=()``)."""
+    name = "still_word"
+    family = "static_image_gen"
+    roles = ("announcer_visual", "music_visual", "character_video")
+    default_roles = ()              # selectable peer; never an auto-default
+    required_inputs = ("text_prompt",)
+    commercial_clean = True         # own ffmpeg + the chosen still; no model license
+    uses_still = True               # display the provided (word/title) still...
+    _still_motion = False           # ...STATIC (flat hold, fit+pad, no crop)
+    accepts_still = True            # the image dispatcher mints its worded/title still
+    _require_still = True           # NO dark floor: a missing still fails LOUD
+
+
 __all__ = [
-    "StillMotionFamily", "StillPanFamily", "StillFlatFamily",
+    "StillMotionFamily", "StillPanFamily", "StillFlatFamily", "StillWordFamily",
 ]
