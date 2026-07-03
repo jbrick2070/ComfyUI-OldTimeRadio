@@ -1,8 +1,10 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 night | branch v2.0-alpha @ fe5a2b38 | prod/main + tags operator-GATED.
+> Last updated 2026-07-03 night | branch v2.0-alpha @ 097f44ad | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
+> still_word SHIPPED @ 097f44ad (suite 6114/0, Bug Bible 16, B7). NEXT CODE = word_razzle
+> (Phase 0 --audit-i2v first; docs/GO_FORWARD_NEXT/2026-07-02-ideo-word-razzle-vid.md).
 > SPRINT A + Sprint B S1 stills core + `ideo` SHIPPED.
 > KIBITZ ARC CONVERGED on the remaining-sprints plan (r2/r3/r4 judged; BUILD-READY).
 > soak2 QA PASS (6/6 clips, obs final, no breach). proof9d 832x448 FAILED on a CLEAN

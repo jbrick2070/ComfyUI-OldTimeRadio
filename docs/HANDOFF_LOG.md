@@ -6,6 +6,25 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 night (overnight coder) -- HEAD 097f44ad (v2.0-alpha) -- still_word SHIPPED
+Did: built still_word per docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md -- a
+model-agnostic still_flat-sibling VIDEO engine (StillWordFamily in cheap_families) whose
+base still is minted from a WORD/TITLE-driven prompt: character/announcer beats render the
+spoken beat line as a readable word card; music beats an abstract episode-title picture (no
+words). Registered in ALL sites: CAPABILITIES row, ENGINE_FAMILY, render_driver :1044
+still-init tuple, __init__ (self-registers via cheap_families), + composer branch
+(_still_word_roles_from_policy reads image_policy video_models via role_slots; pure
+compose_still_word_prompt fails LOUD on blank line/title). NO FALLBACKS: new _CheapFamilyBase
+_require_still flag makes still_word fail LOUD on a missing base still (never the dark floor);
+still_flat/pan unchanged (byte-identical floor). No workflow-JSON widget change (dynamic combo;
+selectable). New tests/test_still_word.py (18 tests). Suite 6114/0, Bug Bible 16, B7 in-suite;
+AST+no-BOM verified.
+Current step: still_word DONE + pushed. NEXT = word_razzle (animated variant) per
+docs/GO_FORWARD_NEXT/2026-07-02-ideo-word-razzle-vid.md (Phase 0 --audit-i2v first).
+Next: run the Phase 0 pin audit; if a promptable non-V3 cloud i2v row exists build Phase 1, else
+FAIL LOUD / kibitz. Then regress + push; THEN the overnight model-matrix soak.
+Commits: 097f44ad (pushed; HEAD==origin).
+
 ## 2026-07-03 night -- HEAD fe5a2b38 (v2.0-alpha) -- HAND OFF: CODE EVERYTHING FIRST, THEN the overnight soak
 Did: operator called a hand-off + CLARIFIED the order (code first, NOT soak first). Next
 window's mission, HARD order: (1) CODE the pending build items -- still_word (per
