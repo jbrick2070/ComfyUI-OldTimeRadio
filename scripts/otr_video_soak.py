@@ -1,26 +1,22 @@
 """A-S7.5 FULL-EPISODE soak harness -- the CPU portion (the GPU run is operator).
 
-The audio side's worst bugs (BUG-296/291/300) only ever surfaced under a
-full-episode soak, so A ships behind this test class: a synthetic 40-beat,
-all-roles / all-families episode with a FORCED mid-episode OOM on a
-``character_3d`` group, run end-to-end in ONE process, TWICE back-to-back.
+NO FALLBACKS (operator directive 2026-07-02: NO fallbacks / NO auto-defaults
+anywhere). The old CPU harness proved the fallback-chain restamp machinery;
+that machinery is RIPPED (Sprint A, E1). What this harness proves now:
 
-This module is the CPU half: it builds the fixture, then drives it through the
-SHIPPED A-S7 decision machinery (the retry taxonomy + the fallback-chain
-resolver + the durable LOUD ledger restamp) using an INJECTED fake renderer that
-simulates the OOM. It proves -- without a GPU -- that the episode completes with
-every beat producing a clip, that the character_3d group degrades
-``soak_oom_3d -> humo -> humo_1.7B -> still_motion`` (soak_oom_3d is a
-synthetic soak stub) to the always-succeeds radio floor with a LOUD
-restamp at the SAME ``video_revision``, that the frozen audio section is
-byte-identical before and after, and that two back-to-back runs are
-deterministic with no cross-episode carryover.
+* CLEAN legs: a synthetic 40-beat, all-roles / all-families episode driven
+  through an INJECTED fake renderer completes with every beat producing a clip,
+  the frozen audio section byte-identical before and after, and two
+  back-to-back runs deterministic with no cross-episode carryover.
+* LOUD-failure contract leg: a forced mid-episode OOM on the synthetic
+  ``soak_oom_3d`` character_3d stub PROPAGATES as a raise -- NO swap, NO
+  restamp, NO degradation trail. The soak asserts the raise.
 
-The LIVE GPU soak (the real OTR_VideoRenderBatch + the real engines on the 5080,
-VRAM <= 14.5 GB, render-twice pixels, the real audio byte-identical mux) is the
-operator gate that ships A -- ``--mode gpu`` prints those steps and refuses to
-report a pass (no faking). Cold-import clean (stdlib + the dep-free A-S7 shared
-modules). UTF-8, no BOM, ASCII-only source.
+The LIVE GPU soak (the real OTR_VideoRenderBatch + the real engines on the
+5080, VRAM <= 14.5 GB, render-twice pixels, the real audio byte-identical mux)
+is the operator gate -- ``--mode gpu`` prints those steps and refuses to report
+a pass (no faking). Cold-import clean (stdlib + the dep-free shared modules).
+UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -36,47 +32,17 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from nodes._otr_shared import retry_taxonomy as _rt  # noqa: E402
-from nodes._otr_shared.fallback import resolve_fallback_chain
-from nodes._otr_video_engines import registry as _vreg
-# Register the real engines so the real humo -> humo_1.7B -> still_motion
-# chain is walked (the character_3d -> humo hop is the synthetic B overlay).
-from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import cheap_families      # noqa: F401
+# Register the real engines (the fixture names real engine ids).
+from nodes._otr_video_engines import eng_humo            # noqa: E402,F401
+from nodes._otr_video_engines import cheap_families      # noqa: E402,F401
 
 _LOG = logging.getLogger("otr.video.soak")
 
 #: The M1 frozen master-audio PCM sha256 marker -- the soak threads this through
 #: an audio ledger section and asserts it is byte-identical after the run (the
-#: decision layer must never touch frozen audio). The real byte-identical proof
+#: render layer must never touch frozen audio). The real byte-identical proof
 #: is tests/test_audio_byte_identical.py + the GPU mux.
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
-
-#: engine_id -> family, for restamping a shot onto its fallback engine.
-ENGINE_FAMILY = {
-    "soak_oom_3d": "character_3d",       # synthetic soak stub (see make_fallback_of)
-    "humo": "audio_driven_face",
-    "humo_1.7B": "audio_driven_face",
-    "still_motion": "static_motion",
-    "still_parallax": "static_motion",
-    "ltx_video": "text_to_video",
-    "wan_i2v": "image_to_video",
-    "mesh_stage": "image_to_video",
-    # C0 2026-06-30: station_card + abstract retired (engines unregistered); the
-    # surviving still families carry static_image_gen. Keep in sync with
-    # render_driver.ENGINE_FAMILY.
-    "still_pan": "static_image_gen",
-    "still_flat": "static_image_gen",
-    # 2026-06-30: viz_mxc_cpu was a latent gap in this map (never added when it
-    # shipped); viz_mxc_mandala added in the SAME chunk it ships. Both are
-    # motion-exempt "abstract" -- no _PROFILES soak leg (the dedicated
-    # render-contract tests are the coverage), just kept in sync here.
-    "viz_mxc_cpu": "abstract",
-    "viz_mxc_mandala": "abstract",
-    # viz_green (renamed from "visualizer" 2026-06-30, item 2) was ALSO a latent
-    # gap in this map (never added) -- closed in the SAME chunk as the rename.
-    "viz_green": "abstract",
-}
 
 #: (role, engine, family) rotation covering the 3 roles + the non-3D families.
 #: rip-sfx-broll (2026-07-01): the scene_broll/background_abstract legs died
@@ -91,11 +57,11 @@ _PROFILES = (
 )
 
 #: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
-#: stand-in heavy character_3d engine) degrades to humo.
+#: stand-in heavy character_3d engine). Its forced OOM must RAISE -- there is
+#: no chain and no floor (NO FALLBACKS).
 _CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
 
-#: The heavy engines the soak forces to OOM on the character_3d shot so the
-#: chain walks all the way to the radio floor.
+#: The engines the LOUD-contract leg forces to OOM on the character_3d shot.
 OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
 
 
@@ -107,15 +73,14 @@ class SoakError(AssertionError):
     """A soak invariant was violated (the soak FAILED)."""
 
 
-def build_soak_fixture(n_beats: int = 40, oom_index: int = 20):
+def build_soak_fixture(n_beats: int = 40, oom_index=None):
     """Build a synthetic ``ledger['video']`` section + meta (pure).
 
-    ``n_beats`` shots cycle the role/family profiles (all 5 roles + 7 non-3D
-    families appear); the shot at ``oom_index`` is the forced-OOM character_3d
-    group. Returns ``(section, meta)`` where ``meta['oom_shot_id']`` names that
-    shot.
+    ``oom_index=None`` builds a CLEAN all-profiles fixture; an integer injects
+    the synthetic ``soak_oom_3d`` character_3d stub at that index for the
+    LOUD-failure contract leg. Returns ``(section, meta)``.
     """
-    if not 0 <= oom_index < n_beats:
+    if oom_index is not None and not 0 <= oom_index < n_beats:
         raise ValueError("oom_index %d out of range for %d beats"
                          % (oom_index, n_beats))
     shots = []
@@ -133,8 +98,9 @@ def build_soak_fixture(n_beats: int = 40, oom_index: int = 20):
             "degradation_trail": [],
         })
     section = {"video_revision": 1, "fps": 25, "shots": shots}
-    meta = {"oom_shot_id": "shot_%04d" % oom_index, "oom_index": oom_index,
-            "n_beats": n_beats}
+    meta = {"oom_shot_id": ("shot_%04d" % oom_index)
+            if oom_index is not None else None,
+            "oom_index": oom_index, "n_beats": n_beats}
     return section, meta
 
 
@@ -147,31 +113,10 @@ def build_full_ledger(section: dict) -> dict:
     }
 
 
-def make_fallback_of():
-    """Return a ``fallback_of(name) -> next | None`` over the REAL registry plus
-    the synthetic ``soak_oom_3d -> humo`` hop.
-
-    humo -> humo_1.7B -> still_motion come from the live adapters'
-    ``fallback_engine``; ``soak_oom_3d`` is a synthetic soak stub (NOT a real
-    engine -- the real 3D scaffolds were unregistered 2026-06-29, C3), so its hop
-    to humo is overlaid here. A floor engine returns ``None`` (terminal).
-    """
-    synth = {"soak_oom_3d": "humo"}
-
-    def fallback_of(name):
-        if name in synth:
-            return synth[name]
-        if _vreg.is_registered(name):
-            return getattr(_vreg.get_engine(name), "fallback_engine", None)
-        return None
-
-    return fallback_of
-
-
 class SoakRenderer:
     """An injected fake renderer: returns a clip, except it raises ``OomSignal``
-    for the target shot on any engine in ``oom_engines`` (forcing the chain to
-    walk to the radio floor). Records every call for determinism checks."""
+    for the target shot on any engine in ``oom_engines`` (the LOUD-failure
+    contract leg). Records every call for determinism checks."""
 
     def __init__(self, oom_shot_id=None, oom_engines=frozenset()):
         self.oom_shot_id = oom_shot_id
@@ -185,100 +130,75 @@ class SoakRenderer:
         return {"shot_id": shot_id, "engine_id": engine, "ok": True}
 
 
-def run_episode_soak(ledger: dict, *, fallback_of, renderer) -> dict:
-    """Drive one episode end-to-end through the A-S7 decision machinery (pure).
-
-    Deep-copies ``ledger`` (no input mutation / no carryover), renders every
-    shot, and on an ``OomSignal`` classifies (OOM -> HARD), walks the declared
-    fallback chain, restamps the shot row + appends a ``runtime_fallback_decisions``
-    record at the SAME ``video_revision``, and logs the LOUD swap -- until a clip
-    renders (the floor always succeeds). NEVER touches ``ledger['audio']``.
+def run_episode_soak(ledger: dict, *, renderer) -> dict:
+    """Drive one episode end-to-end (pure). NO FALLBACKS: each shot renders on
+    its selected engine EXACTLY as planned; a render failure PROPAGATES (the
+    caller asserts the raise on the LOUD-contract leg). Deep-copies ``ledger``
+    (no input mutation / no carryover) and NEVER touches ``ledger['audio']``.
     Returns ``{ledger, clips}``.
     """
     ledger = copy.deepcopy(ledger)
     section = ledger["video"]
-    rev = int(section["video_revision"])
     clips = {}
-    new_shots = []
     for shot in section["shots"]:
-        shot = dict(shot)
-        sid, bid = shot["shot_id"], shot["beat_id"]
-        chain = resolve_fallback_chain(shot["engine_id"], fallback_of)
-        rendered = None
-        for cand in chain:
-            try:
-                rendered = renderer.render(sid, cand)
-                break
-            except OomSignal:
-                nxt = fallback_of(cand)
-                if nxt is None:
-                    raise SoakError(
-                        "radio floor %r failed -- chain exhausted for %s"
-                        % (cand, sid))
-                _rt.classify(_rt.FailureKind.OOM)       # deterministic decision
-                rec = _rt.build_fallback_decision(
-                    shot_id=sid, beat_id=bid, from_engine=cand, to_engine=nxt,
-                    kind=_rt.FailureKind.OOM, video_revision=rev)
-                section = _rt.append_runtime_fallback_decision(section, rec)
-                shot = _rt.restamp_shot_row(
-                    shot, to_engine=nxt,
-                    to_family=ENGINE_FAMILY.get(nxt, shot["family"]),
-                    from_engine=cand, kind=_rt.FailureKind.OOM)
-                _LOG.warning(_rt.format_swap_log(rec))
-        clips[sid] = rendered
-        new_shots.append(shot)
-    section["shots"] = new_shots
-    ledger["video"] = section
+        sid = shot["shot_id"]
+        clips[sid] = renderer.render(sid, shot["engine_id"])
     return {"ledger": ledger, "clips": clips}
 
 
 def run_two_episode_soak(*, n_beats: int = 40, oom_index: int = 20) -> dict:
-    """Run the full episode end-to-end TWICE back-to-back (the A-S7.5 shape).
+    """Run the CLEAN episode end-to-end TWICE back-to-back, then the forced-OOM
+    LOUD-failure contract leg.
 
-    Both runs consume the SAME input ledger; ``run_episode_soak`` deep-copies it,
-    so neither run mutates the shared fixture (the no-carryover guarantee). Fresh
-    renderers each run. Returns both result ledgers + the render-call sequences
-    for the determinism check.
+    Both clean runs consume the SAME input ledger; ``run_episode_soak``
+    deep-copies it, so neither run mutates the shared fixture (the no-carryover
+    guarantee). Fresh renderers each run. The contract leg builds its own
+    fixture with the ``soak_oom_3d`` stub and asserts the forced OOM RAISES.
+    Returns both result ledgers + the render-call sequences + the contract
+    outcome.
     """
-    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=oom_index)
+    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=None)
     ledger = build_full_ledger(section)
-    fb = make_fallback_of()
-    r1 = SoakRenderer(meta["oom_shot_id"], OOM_ENGINES)
-    r2 = SoakRenderer(meta["oom_shot_id"], OOM_ENGINES)
-    e1 = run_episode_soak(ledger, fallback_of=fb, renderer=r1)
-    e2 = run_episode_soak(ledger, fallback_of=fb, renderer=r2)
+    r1 = SoakRenderer()
+    r2 = SoakRenderer()
+    e1 = run_episode_soak(ledger, renderer=r1)
+    e2 = run_episode_soak(ledger, renderer=r2)
+    # LOUD-failure contract leg (NO FALLBACKS): the forced OOM must RAISE.
+    oom_section, oom_meta = build_soak_fixture(n_beats=n_beats,
+                                               oom_index=oom_index)
+    oom_ledger = build_full_ledger(oom_section)
+    oom_renderer = SoakRenderer(oom_meta["oom_shot_id"], OOM_ENGINES)
+    contract = {"raised": False, "error_type": "", "detail": ""}
+    try:
+        run_episode_soak(oom_ledger, renderer=oom_renderer)
+    except OomSignal as exc:
+        contract = {"raised": True, "error_type": "OomSignal",
+                    "detail": str(exc)}
     return {"meta": meta, "input_ledger": ledger, "e1": e1, "e2": e2,
-            "render_calls_1": r1.calls, "render_calls_2": r2.calls}
-
-
-#: The expected character_3d degradation trail to the radio floor. This CPU
-#: harness's fake renderer raises at EVERY hop, so here the 3-hop trail pairs
-#: with 3 decisions (unlike render_driver's GPU soak, where humo->humo_1.7B is
-#: an intra-engine tier swap and only 2 decisions appear -- semantics
-#: preserved per the 3D plan 7.0 judge ruling).
-EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
-                      "humo_1.7B->still_motion (oom)"]
+            "render_calls_1": r1.calls, "render_calls_2": r2.calls,
+            "oom_contract": contract, "oom_input_ledger": oom_ledger,
+            "oom_meta": oom_meta}
 
 
 def _episode_facts(epresult: dict, meta: dict) -> dict:
     led = epresult["ledger"]
     sec = led["video"]
-    shots = {s["shot_id"]: s for s in sec["shots"]}
-    oom = shots[meta["oom_shot_id"]]
     return {
         "n_clips": len(epresult["clips"]),
         "all_clips": all(epresult["clips"].values()),
-        "oom_final_engine": oom["engine_id"],
-        "oom_trail": oom["degradation_trail"],
-        "decisions": sec.get("runtime_fallback_decisions", []),
         "video_revision": sec["video_revision"],
         "audio_sha": led["audio"]["master_audio_sha256"],
+        "trails": [s.get("degradation_trail") for s in sec["shots"]],
     }
 
 
 def assert_soak_ok(result: dict):
-    """Assert every A-S7.5 soak invariant; raise :class:`SoakError` on any
-    violation. Returns the list of passed-check descriptions for the report."""
+    """Assert every soak invariant; raise :class:`SoakError` on any violation.
+    Returns the list of passed-check descriptions for the report.
+
+    NO-TRAIL LOUD contract: the clean episodes complete deterministically with
+    empty degradation trails and untouched frozen audio; the forced-OOM leg
+    must have RAISED (never a swap)."""
     meta = result["meta"]
     n = meta["n_beats"]
     checks = []
@@ -288,56 +208,58 @@ def assert_soak_ok(result: dict):
         if f["n_clips"] != n or not f["all_clips"]:
             raise SoakError("%s: not every beat produced a clip (%d/%d)"
                             % (tag, f["n_clips"], n))
-        if f["oom_final_engine"] != "still_motion":
-            raise SoakError("%s: character_3d OOM did not converge to the radio "
-                            "floor (got %r)" % (tag, f["oom_final_engine"]))
-        if f["oom_trail"] != EXPECTED_OOM_TRAIL:
-            raise SoakError("%s: degradation trail %r != %r"
-                            % (tag, f["oom_trail"], EXPECTED_OOM_TRAIL))
-        if len(f["decisions"]) != 3:
-            raise SoakError("%s: expected 3 LOUD fallback decisions, got %d"
-                            % (tag, len(f["decisions"])))
-        for d in f["decisions"]:
-            if (d["failure_kind"] != "oom" or d["block_class"] != "hard"
-                    or d["video_revision"] != 1):
-                raise SoakError("%s: malformed fallback decision %r" % (tag, d))
+        if any(f["trails"][i] for i in range(len(f["trails"]))):
+            raise SoakError("%s: a degradation trail was stamped -- the "
+                            "fallback machinery is ripped; nothing may restamp"
+                            % tag)
         if f["audio_sha"] != FROZEN_AUDIO_SHA:
             raise SoakError("%s: frozen audio sha changed (%r) -- the soak must "
                             "never touch audio" % (tag, f["audio_sha"]))
         if f["video_revision"] != 1:
-            raise SoakError("%s: video_revision bumped to %r (a restamp stays at "
-                            "the same revision)" % (tag, f["video_revision"]))
-        checks.append("%s: %d beats, character_3d OOM->floor converged, 4 LOUD "
-                      "restamps @rev1, frozen audio untouched" % (tag, n))
-    if facts["episode-1"]["decisions"] != facts["episode-2"]["decisions"]:
-        raise SoakError("non-deterministic: the two episodes' fallback decisions "
-                        "differ")
+            raise SoakError("%s: video_revision bumped to %r (rendering never "
+                            "re-locks the plan)" % (tag, f["video_revision"]))
+        checks.append("%s: %d beats, all clips real, no trails, frozen audio "
+                      "untouched" % (tag, n))
     if result["render_calls_1"] != result["render_calls_2"]:
         raise SoakError("non-deterministic: the two episodes' render-call "
                         "sequences differ")
     # no carryover: the shared input fixture was not mutated by either run.
-    in_oom = {s["shot_id"]: s for s in
-              result["input_ledger"]["video"]["shots"]}[meta["oom_shot_id"]]
-    if in_oom["engine_id"] != "soak_oom_3d" or in_oom["degradation_trail"]:
-        raise SoakError("carryover: the input fixture was mutated by a run")
+    for s in result["input_ledger"]["video"]["shots"]:
+        if s["degradation_trail"]:
+            raise SoakError("carryover: the input fixture was mutated by a run")
     checks.append("determinism: two back-to-back episodes identical; input "
                   "fixture unmutated (no carryover)")
+    # LOUD-failure contract: the forced OOM raised; nothing restamped.
+    oc = result["oom_contract"]
+    if not oc.get("raised") or oc.get("error_type") != "OomSignal":
+        raise SoakError("LOUD-failure contract violated: the forced OOM did "
+                        "not raise (raised=%s error_type=%r) -- NO FALLBACKS"
+                        % (oc.get("raised"), oc.get("error_type")))
+    oom_in = {s["shot_id"]: s for s in
+              result["oom_input_ledger"]["video"]["shots"]}
+    oom_shot = oom_in[result["oom_meta"]["oom_shot_id"]]
+    if oom_shot["engine_id"] != "soak_oom_3d" or oom_shot["degradation_trail"]:
+        raise SoakError("LOUD-failure contract: the forced-OOM fixture was "
+                        "restamped (engine=%r trail=%r) -- a failure must "
+                        "never swap engines"
+                        % (oom_shot["engine_id"], oom_shot["degradation_trail"]))
+    checks.append("LOUD-failure contract: forced OOM raised OomSignal; no "
+                  "swap, no restamp, no trail")
     return checks
 
 
 GPU_GATE_MESSAGE = (
-    "A-S7.5 GPU soak is the OPERATOR gate that ships A -- the CPU harness "
-    "cannot certify it.\n"
+    "A-S7.5 GPU soak is the OPERATOR gate -- the CPU harness cannot certify "
+    "it.\n"
     "On the 5080, wire the live OTR_VideoRenderBatch + the real engines and run "
-    "this same 40-beat all-roles fixture end-to-end TWICE back-to-back, with:\n"
-    "  - a real mid-episode character_3d OOM -> humo -> humo_1.7B -> "
-    "still_motion convergence (LOUD restamp in the ledger);\n"
+    "the 40-beat all-roles fixture end-to-end TWICE back-to-back, with:\n"
+    "  - every beat rendering on its SELECTED engine (NO FALLBACKS -- a "
+    "failure raises RenderError LOUD and the run STOPS);\n"
     "  - VRAM peak <= 14.5 GB at every inter-engine boundary;\n"
     "  - render-twice determinism (identical per-shot request_hash);\n"
     "  - tests/test_audio_byte_identical.py GREEN (output audio PCM sha == the "
     "frozen master).\n"
-    "Then tag A-ship. This command exits non-zero so it is never mistaken for a "
-    "pass."
+    "This command exits non-zero so it is never mistaken for a pass."
 )
 
 
@@ -354,9 +276,9 @@ def main(argv=None) -> int:
     result = run_two_episode_soak(n_beats=args.beats, oom_index=args.oom_index)
     for c in assert_soak_ok(result):
         print("[PASS] " + c)
-    print("A-S7.5 CPU soak PASS: 2 episodes x %d beats; mid-episode character_3d "
-          "OOM converged to the radio floor; frozen audio untouched; "
-          "deterministic." % args.beats)
+    print("A-S7.5 CPU soak PASS: 2 clean episodes x %d beats deterministic; "
+          "forced OOM raised LOUD (no swap); frozen audio untouched."
+          % args.beats)
     return 0
 
 

@@ -331,9 +331,8 @@ class VideoLedgerSection(_Forbid):
     execution_groups: list[ExecutionGroup] = Field(default_factory=list)
     roles: dict = Field(default_factory=dict)
     shots: list[ShotRow] = Field(default_factory=list)
-    #: A-S7 durable audit trail: one record per in-render LOUD fallback swap
-    #: (see nodes/_otr_shared/retry_taxonomy.build_fallback_decision). Appended
-    #: at the SAME video_revision -- a fallback restamp is a within-revision
-    #: degradation, never a re-lock. Loose dicts (like ``roles``), not a nested
-    #: model, so the render node can append without a schema round-trip.
+    #: RETAINED SCHEMA SLOT, STAMPED NEVER (Sprint A rip, 2026-07-02): the
+    #: fallback machinery is deleted, so nothing appends here anymore. The slot
+    #: survives (always []) so old serialized ledgers still parse -- no schema
+    #: churn (A5).
     runtime_fallback_decisions: list = Field(default_factory=list)

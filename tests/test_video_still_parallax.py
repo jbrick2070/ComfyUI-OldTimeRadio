@@ -48,13 +48,13 @@ def test_still_parallax_unregistered_not_selectable():
 
 def test_still_parallax_source_identity_intact():
     # The source class is preserved (returns when re-enabled): DA-V2-SMALL
-    # depth parallax over an existing still, Apache-2.0, degrades to
-    # still_motion (matches mesh_stage/triposr's updated chain head).
+    # depth parallax over an existing still, Apache-2.0. NO FALLBACKS
+    # (2026-07-02): a failure raises LOUD, never degrades to still_motion.
     eng = StillParallaxEngine()
     assert eng.family == "static_motion" and eng.family in sc.FAMILIES
     assert eng.required_inputs == ("init_image",)
     assert eng.commercial_clean is True        # Apache-2.0 SMALL ckpt pinned
-    assert eng.fallback_engine == "still_motion"
+    assert eng.fallback_engine is None         # NO FALLBACKS: fail LOUD
     assert "not real 3D" in eng.honest_label   # the honest 0-E label
 
 
@@ -165,30 +165,20 @@ def test_render_clip_missing_still_raises_dependency_missing():
            "timing": {"target_frame_count": 3}, "asset_refs": {}}
     with pytest.raises(FileNotFoundError):
         eng.render_clip(req)
-    # The chain classifies it DEPENDENCY_MISSING -> LOUD skip to the floor.
+    # Classified DEPENDENCY_MISSING; NO FALLBACKS -- the shot fails LOUD.
     assert rd.classify_failure(FileNotFoundError("x")).name == "DEPENDENCY_MISSING"
 
 
 # --------------------------------------------------------------------------- #
 # Driver maps + capability row (BOTH copies; the 0-E wiring contract)
 # --------------------------------------------------------------------------- #
-def test_engine_family_removed_from_driver_kept_for_soak_audit():
+def test_engine_family_removed_from_driver():
     # item 2 rip-out (2026-06-30): dropped from render_driver's live
-    # ENGINE_FAMILY (no longer a real dispatch target) + FLOOR_NAMES was never
-    # its home (model-gated, not a floor). The historical-audit copy in
-    # otr_video_soak.ENGINE_FAMILY keeps its entry so old soak fixtures still
-    # classify correctly.
+    # ENGINE_FAMILY (no longer a real dispatch target). NO FALLBACKS
+    # (2026-07-02): the floor/chain machinery is gone entirely.
     assert "still_parallax" not in rd.ENGINE_FAMILY
-    assert "still_parallax" not in rd.FLOOR_NAMES
-    # A dangling fallback_engine self-heals to the radio floor (make_fallback_of
-    # contract: an unregistered name that is not a FLOOR_NAMES member falls
-    # through to UNIVERSAL_FLOOR).
-    assert rd.make_fallback_of()("still_parallax") == "still_motion"
-    soak_src = REPO_ROOT / "scripts" / "otr_video_soak.py"
-    spec = importlib.util.spec_from_file_location("otr_video_soak", soak_src)
-    soak = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(soak)
-    assert soak.ENGINE_FAMILY["still_parallax"] == "static_motion"   # audit-only
+    assert not hasattr(rd, "FLOOR_NAMES")
+    assert not hasattr(rd, "make_fallback_of")
 
 
 def test_canonical_clip_stamps_parallax():

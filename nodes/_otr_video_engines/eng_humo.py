@@ -16,11 +16,10 @@ never a default and fails CLOSED until the operator enables it AND the HuMo
 wrapper + checkpoints are installed and verified on the GPU box (the A-S6 smoke).
 No model is "primary" -- HuMo is one peer adapter among the motion engines.
 
-Fallback: a render-time failure degrades the 14B HuMo to its ``fallback_engine``
-(the lighter ``humo_1.7B`` tier), which degrades to the zero-VRAM
-``still_motion`` radio floor; the chain ``humo -> humo_1.7B -> still_motion``
-is acyclic and terminates (see
-``nodes/_otr_shared/fallback.py``). The audio that drives HuMo is the FROZEN
+NO FALLBACKS (operator directive 2026-07-02: NO fallbacks / NO auto-defaults
+anywhere): a render-time failure raises a named RenderError LOUD -- there is
+no degrade to the 1.7B tier and no still floor (``fallback_engine = None`` on
+every tier). The audio that drives HuMo is the FROZEN
 master; HuMo emits an ALWAYS-SILENT clip (``has_audio`` False) -- only
 ``OTR_MasterAudioMux`` ever adds audio (invariant V-1).
 
@@ -121,13 +120,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: the base; the humo_1.7B_169 variant overrides to 'wide' 832x480. The
     #: character still + composite canvas follow this (see _otr_shared.aspect).
     render_aspect = "portrait"
-    #: Family-degradation next hop. The 14B keystone degrades FIRST to the 1.7B
-    #: HuMo tier -- a real talking face that fits a tighter VRAM budget -- on an
-    #: OOM/VRAM (or any HARD) failure, ONLY then to the zero-VRAM still
-    #: floor: humo -> humo_1.7B -> still_motion (operator hard
-    #: auto-downgrade rule 2026-06-09; see nodes/_otr_shared/fallback.py). One
-    #: single-linked hop per engine; the LOUD restamp happens in the render node.
-    fallback_engine = "humo_1.7B"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
@@ -511,7 +504,7 @@ class HuMo17BEngine(HuMoEngine):
 
     name = "humo_1.7B"
     engine_version = "1"
-    fallback_engine = "still_motion"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
 
     def _ckpt_path(self):
         env = os.environ.get("OTR_HUMO_17B_CKPT")

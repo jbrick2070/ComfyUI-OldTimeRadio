@@ -32,7 +32,7 @@ def test_triposr_source_identity_intact():
     assert "audio_ref" not in eng.required_inputs   # no lip-sync
     assert eng.commercial_clean is True             # MIT
     assert eng.default_roles == ()
-    assert eng.fallback_engine == "still_motion"
+    assert eng.fallback_engine is None       # NO FALLBACKS (2026-07-02): fail LOUD
 
 
 def test_triposr_source_load_and_render_are_dark():

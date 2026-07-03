@@ -347,26 +347,24 @@ def test_char3d_render_clip_raises_not_implemented():
 
 
 # ---------------------------------------------------------------------------
-# Fallback: an unregistered 3D name still terminates at the radio floor
+# NO FALLBACKS (2026-07-02): the 3D scaffolds fail LOUD, never chain-to-humo
 # ---------------------------------------------------------------------------
 
-def test_char3d_source_declares_humo_fallback():
-    """The source classes keep fallback_engine='humo' (returns when built)."""
+def test_char3d_source_declares_no_fallback():
+    """NO FALLBACKS (2026-07-02): all three declare fallback_engine=None --
+    a character_3d failure (incl. OOM) raises a named error, never a swap."""
     for name in CHAR3D_ENGINES:
-        assert _eng(name).fallback_engine == "humo"
+        assert _eng(name).fallback_engine is None
 
 
-def test_char3d_unregistered_name_floors_directly():
-    """make_fallback_of resolves an UNREGISTERED 3D name straight to the
-    universal radio floor (it is not in the registry and not in the soak
-    overlay), so the chain still terminates LOUD rather than dangling."""
-    from nodes._otr_video_engines.render_driver import make_fallback_of, FLOOR_NAMES
-    from nodes._otr_video_engines import cheap_families  # noqa: F401 - registers floor
-
-    fallback_fn = make_fallback_of()
+def test_char3d_render_clip_raises_loud_named_error():
+    """The LOUD-failure contract per family: render_clip on the dark scaffolds
+    raises a NAMED NotImplementedError naming the engine -- no chain, no floor."""
+    import pytest as _pytest
     for name in CHAR3D_ENGINES:
-        nxt = fallback_fn(name)
-        assert nxt in FLOOR_NAMES, f"{name} did not floor: {nxt}"
+        with _pytest.raises(NotImplementedError) as exc:
+            _eng(name).render_clip({}, {})
+        assert name.split("_")[0] in str(exc.value) or "dark" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------

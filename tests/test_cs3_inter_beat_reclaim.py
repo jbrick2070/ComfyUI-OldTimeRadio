@@ -38,7 +38,7 @@ def _install(monkeypatch):
                "family": shot.get("family")}
         clip = {"clip_id": shot["shot_id"], "engine_id": shot["engine_id"],
                 "exists": True, "size": 1}
-        return clip, out, [], [shot["engine_id"]], 100
+        return clip, out, [shot["engine_id"]], 100
 
     monkeypatch.setattr(rd, "render_shot", fake_render_shot)
     monkeypatch.setattr(rd, "build_request",
@@ -52,7 +52,7 @@ def _inter_beat(reasons):
 
 def test_reclaim_on_engine_change(monkeypatch):
     reasons = _install(monkeypatch)
-    rd.run_episode(_ledger(["humo_1.7B", "ltx_video"]), fallback_of=rd.make_fallback_of())
+    rd.run_episode(_ledger(["humo_1.7B", "ltx_video"]))
     inter = _inter_beat(reasons)
     assert len(inter) == 1
     assert "humo_1.7B->ltx_video" in inter[0]
@@ -61,8 +61,7 @@ def test_reclaim_on_engine_change(monkeypatch):
 def test_no_reclaim_for_same_engine_run(monkeypatch):
     # humo x3 -- the resident stack is reused; NO inter-beat reclaim churn.
     reasons = _install(monkeypatch)
-    rd.run_episode(_ledger(["humo_1.7B", "humo_1.7B", "humo_1.7B"]),
-                   fallback_of=rd.make_fallback_of())
+    rd.run_episode(_ledger(["humo_1.7B", "humo_1.7B", "humo_1.7B"]))
     assert _inter_beat(reasons) == []
 
 
@@ -70,8 +69,7 @@ def test_reclaim_only_at_the_boundaries(monkeypatch):
     # ltx, ltx, humo, humo, wan -> reclaim only at ltx->humo and humo->wan.
     reasons = _install(monkeypatch)
     rd.run_episode(
-        _ledger(["ltx_video", "ltx_video", "humo_1.7B", "humo_1.7B", "wan_i2v"]),
-        fallback_of=rd.make_fallback_of())
+        _ledger(["ltx_video", "ltx_video", "humo_1.7B", "humo_1.7B", "wan_i2v"]))
     inter = _inter_beat(reasons)
     assert len(inter) == 2
     assert "ltx_video->humo_1.7B" in inter[0]
@@ -81,5 +79,5 @@ def test_reclaim_only_at_the_boundaries(monkeypatch):
 def test_first_beat_has_no_inter_beat_reclaim(monkeypatch):
     # A single beat -> the pre-render free runs, but no inter-beat reclaim.
     reasons = _install(monkeypatch)
-    rd.run_episode(_ledger(["wan_i2v"]), fallback_of=rd.make_fallback_of())
+    rd.run_episode(_ledger(["wan_i2v"]))
     assert _inter_beat(reasons) == []

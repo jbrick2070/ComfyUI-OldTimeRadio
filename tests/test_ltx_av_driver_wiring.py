@@ -1,9 +1,11 @@
 """M3 wiring tests for the LTX-AV lane in render_driver (CPU; no torch/forward).
 
-Locks the additive driver deltas: ENGINE_FAMILY + SYNTH_FALLBACKS entries, the
-VRAM-safe render-canvas clamp (the lane is M0-proven only at 512x288 -- the 22B
-A2V would blow the budget at the 480x832/1472x832 defaults), and the prompt-gate
+Locks the additive driver deltas: the ENGINE_FAMILY entry, the VRAM-safe
+render-canvas clamp (the lane is M0-proven only at 512x288 -- the 22B A2V would
+blow the budget at the 480x832/1472x832 defaults), and the prompt-gate
 membership (ltx_audio_in joins the text-engine scene-prompt branch).
+NO FALLBACKS (2026-07-02 rip): the SYNTH_FALLBACKS/chain checks are gone with
+the machinery.
 
 The two legacy LTX-AV engines (ltx_av_talk / ltx_av_music) were collapsed into
 the single ltx_audio_in engine; these tests reference only ltx_audio_in."""
@@ -17,24 +19,12 @@ def test_engine_family_entries():
     assert rd.engine_family("ltx_audio_in") == "audio_conditioned_video"
 
 
-def test_synth_fallbacks_terminate():
-    # ltx_audio_in is a no-fallback engine (fail loud): neither it nor the retired
-    # legacy names appear in SYNTH_FALLBACKS. The fallback_of chain (the soak
-    # harness's termination guard) degrades a no-declared-fallback engine to the
-    # universal radio floor and TERMINATES there -- never a cycle, never infinite.
-    assert "ltx_av_talk" not in rd.SYNTH_FALLBACKS
-    assert "ltx_av_music" not in rd.SYNTH_FALLBACKS
-    assert "ltx_audio_in" not in rd.SYNTH_FALLBACKS
-    fb = rd.make_fallback_of()
-    seen = set()
-    name = "ltx_audio_in"
-    for _ in range(12):
-        name = fb(name)
-        if name is None:
-            break
-        assert name not in seen, "fallback cycle at %s" % name
-        seen.add(name)
-    assert name is None, "ltx_audio_in chain did not terminate at the floor"
+def test_no_fallback_machinery_in_driver():
+    # NO FALLBACKS (2026-07-02): the chain machinery is ripped from the driver;
+    # ltx_audio_in (like every engine) fails LOUD.
+    for name in ("SYNTH_FALLBACKS", "make_fallback_of", "UNIVERSAL_FLOOR",
+                 "FLOOR_NAMES"):
+        assert not hasattr(rd, name)
 
 
 def _ledger():

@@ -323,10 +323,7 @@ class MeshStageEngine(_CheapFamilyBase):
     #: never required_inputs/uses_still (those also catch Wan/LTX/still engines).
     #: Any future single-image-subject 3D mesher declares it too.
     requires_mesh_fodder = True
-    #: E-5 LOUD fallback chain: mesh_stage -> still_motion (still_parallax
-    #: UNREGISTERED 2026-06-30, item 2 rip-out; the chain now degrades direct
-    #: to the radio floor via fallback_engine).
-    fallback_engine = "still_motion"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
 
     _selftest_passed = False            # E-6: cube probe gates the first use
 

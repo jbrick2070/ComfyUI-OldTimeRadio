@@ -50,14 +50,12 @@ string (no new enum value needed).
 ``load()`` raises NAMED RuntimeError (dark path -- no live forward yet).
 ``render_clip()`` raises NAMED NotImplementedError (dark -- the W7 forward).
 
-Fallback chain: all three declare ``fallback_engine = "humo"`` so the chain
-``triposg_talk -> humo -> humo_1.7B -> still_motion`` matches
-the ``render_driver.SYNTH_FALLBACKS`` overlay WITHOUT requiring a soak re-cert
-now. Trellis-first (chain A: ``trellis_talk -> humo``) defers with its lane.
+NO FALLBACKS (operator directive 2026-07-02): all three declare
+``fallback_engine = None`` -- a render-time failure (including OOM) raises a
+NAMED RenderError LOUD; there is no chain-to-humo and no still floor.
 
-VRAM ceiling (3D): 14 000 MB (``_VRAM_CEILING_MB_3D`` = 14_000) -- the
-sub-ceiling that leaves headroom for the HuMo audio-driven fallback. The
-ceiling is NOT enforced here (dark path); it is documented for Phase 5.
+VRAM ceiling (3D): 14 000 MB (``_VRAM_CEILING_MB_3D`` = 14_000) -- the 3D
+sub-ceiling. It is NOT enforced here (dark path); documented for Phase 5.
 
 Cold-import clean (V-12): this module imports only stdlib + the dep-free
 registry. No torch / diffusers / comfy at module scope. UTF-8, no BOM, ASCII.
@@ -254,8 +252,7 @@ class TripoSGTalkEngine:
     commercial_clean = True           # TripoSG: MIT license
     requires_flag = "OTR_ENABLE_TRIPOSG_TALK"
     engine_version = "1"
-    #: The v1 chain: triposg_talk -> humo (matches render_driver.SYNTH_FALLBACKS).
-    fallback_engine = "humo"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     #: 3D sub-ceiling (documented; enforced in the W7 render_clip).
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
     #: 3D capability (plan section 3): consumes a clean front-facing MESH
@@ -289,8 +286,7 @@ class TripoSGTalkEngine:
     def render_clip(self, request, prepared):
         raise NotImplementedError(
             "triposg_talk.render_clip: dark scaffold -- the W7 live forward "
-            "is not yet implemented; fallback_engine='humo' handles the chain "
-            "in assert_usable / render_driver fallback resolution"
+            "is not yet implemented; fails LOUD (NO FALLBACKS, 2026-07-02)"
         )
 
     def canonicalize(self, raw, request, profile):
@@ -323,8 +319,7 @@ class Hunyuan3DTalkEngine:
     commercial_clean = False          # Tencent HunyuanVideo-Talk -- verify-at-build
     requires_flag = "OTR_ENABLE_CHARACTER_3D"
     engine_version = "1"
-    #: Fallback B: hunyuan3d_talk -> humo (matches render_driver.SYNTH_FALLBACKS).
-    fallback_engine = "humo"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     #: 3D sub-ceiling (documented; enforced in Phase 5 render_clip).
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
     #: 3D capability (plan section 3): consumes a mesh portrait.
@@ -362,8 +357,7 @@ class Hunyuan3DTalkEngine:
     def render_clip(self, request, prepared):
         raise NotImplementedError(
             "hunyuan3d_talk.render_clip: dark scaffold -- Phase 5 live forward "
-            "not yet implemented; fallback_engine='humo' handles the chain in "
-            "assert_usable / render_driver fallback resolution"
+            "not yet implemented; fails LOUD (NO FALLBACKS, 2026-07-02)"
         )
 
     def canonicalize(self, raw, request, profile):
@@ -394,8 +388,7 @@ class TrellisTalkEngine:
     commercial_clean = True           # TRELLIS: MIT license
     requires_flag = "OTR_ENABLE_TRELLIS_TALK"
     engine_version = "1"
-    #: Fallback B: trellis_talk -> humo (chain A deferred to Phase 5).
-    fallback_engine = "humo"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     #: 3D sub-ceiling (documented; enforced in Phase 5 render_clip).
     vram_ceiling_mb = _VRAM_CEILING_MB_3D
     #: 3D capability (plan section 3): consumes a mesh portrait.
@@ -433,8 +426,7 @@ class TrellisTalkEngine:
     def render_clip(self, request, prepared):
         raise NotImplementedError(
             "trellis_talk.render_clip: dark scaffold -- Phase 5 live forward "
-            "not yet implemented; fallback_engine='humo' handles the chain in "
-            "assert_usable / render_driver fallback resolution"
+            "not yet implemented; fails LOUD (NO FALLBACKS, 2026-07-02)"
         )
 
     def canonicalize(self, raw, request, profile):

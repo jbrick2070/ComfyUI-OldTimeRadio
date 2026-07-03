@@ -169,8 +169,8 @@ class _CheapFamilyBase:
 # ``visualizer_rainbow`` fills the fun audio-reactive slot), and station_card was the
 # broken black card. Both are UNREGISTERED + their CAPABILITIES rows removed. The
 # family NAME "abstract" survives (visualizer is family="abstract"; the cheap-base
-# default + schemas.FAMILIES keep it). The chain floor terminus is UNIVERSAL_FLOOR =
-# "still_motion" (never was "abstract"), so retiring the engine leaves the floor intact.
+# default + schemas.FAMILIES keep it). NO FALLBACKS (2026-07-02, Sprint A): the
+# UNIVERSAL_FLOOR/chain machinery was RIPPED -- there is no floor terminus role.
 
 
 @register
@@ -179,9 +179,10 @@ class StillMotionFamily(_CheapFamilyBase):
     family = "static_motion"
     roles = ("announcer_visual", "music_visual", "character_video")
     # rip-sfx-broll (2026-07-01): its only default role (scene_broll) was
-    # removed. still_motion stays the UNIVERSAL_FLOOR chain terminus --
-    # capability (text_prompt) keeps it eligible everywhere incl. the
-    # character OOM chain -- but no role auto-defaults to it now.
+    # removed. NO FALLBACKS (2026-07-02, Sprint A): still_motion lost its
+    # UNIVERSAL_FLOOR role with the chain rip -- it stays a REGISTERED
+    # SELECTABLE engine (capability: text_prompt), but nothing degrades to it
+    # and no role auto-defaults to it.
     default_roles = ()
     required_inputs = ("text_prompt",)
     uses_still = True               # pan over a provided still when present

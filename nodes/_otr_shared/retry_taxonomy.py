@@ -4,36 +4,32 @@ Every video render-time failure is classified into one of two BLOCK CLASSES,
 and each class has a single deterministic action:
 
 * ``BlockClass.HARD`` -- renderability / safety-integrity failures. The chosen
-  engine cannot produce a usable clip for this shot, so the render node walks
-  the declared ``fallback_engine`` chain (humo -> humo_1.7B -> still_motion,
-  resolved by :mod:`nodes._otr_shared.fallback`) down to the zero-VRAM radio
-  floor, which always succeeds. The swap is LOUD: the node logs it and restamps
-  the ledger -- never a silent substitution (operator directive 2026-06-07).
-  ``dependency_missing`` / ``asset_missing`` / ``license_blocked`` /
-  ``invalid_dag`` fail fast and walk the chain; ``oom`` / ``timeout`` tear down
-  and re-resolve with zero retries; ``crash_before_load`` retries once;
-  ``corrupt_output`` retries once at the same seed then reseeds then walks;
-  ``transient_io`` does a small bounded retry. The episode never aborts (the
-  floor terminates every chain) and a beat is never dropped.
+  engine cannot produce a usable clip for this shot. NO FALLBACKS (operator
+  directive 2026-07-02: NO fallbacks / NO auto-defaults anywhere): a HARD
+  failure is a LOUD STOP -- the render driver raises a named RenderError; there
+  is NO engine swap, NO chain, NO floor. Per-kind retries on the SAME engine
+  remain: ``crash_before_load`` retries once; ``corrupt_output`` retries once
+  at the same seed then reseeds; ``transient_io`` does a small bounded retry;
+  everything else fails on the first attempt.
 
 * ``BlockClass.WARN`` -- subjective quality / coherence / NSFW gates (and the
-  A/V-sync guard). These WARN only: the already-rendered clip is RETAINED, a
-  warning is logged, and an optional in-render reseed / fallback may run, but a
-  WARN gate NEVER discards rendered output, NEVER aborts an episode, and NEVER
-  touches the frozen master audio. The offline NSFW frame-QC sampler is
-  DEFAULT-OFF and warn-only because SFW is an invariant. The A/V-sync guard does
-  a best-effort deterministic retime of the VIDEO frames (never the audio).
+  A/V-sync guard). These WARN only: the already-rendered clip is RETAINED and a
+  warning is logged; a WARN gate NEVER discards rendered output, NEVER aborts
+  an episode, and NEVER touches the frozen master audio. The offline NSFW
+  frame-QC sampler is DEFAULT-OFF and warn-only because SFW is an invariant.
+  The A/V-sync guard does a best-effort deterministic retime of the VIDEO
+  frames (never the audio).
 
 This mirrors the SHIPPED audio ``freeze_block_class`` structural/quality split
 (``nodes/_otr_freeze_cascade.py``) on the render surface, but is a separate
 module -- the frozen audio cascade is read-only and never imported here.
 
-The module is PURE and dependency-free (stdlib only): it classifies a failure,
-yields the deterministic :class:`RetryDecision`, and builds the durable ledger
-restamp + the LOUD swap-log records. The GPU-side mechanics (taskkill the
-sidecar tree, re-probe NVML, actually re-render on the fallback engine) live in
-the render node and are exercised at the A-S7.5 soak; everything here is
-testable on the CPU box. UTF-8, no BOM, ASCII-only source.
+The module is PURE and dependency-free (stdlib only): it classifies a failure
+and yields the deterministic :class:`RetryDecision`. The fallback-action API
+(build_fallback_decision / restamp_shot_row / append_runtime_fallback_decision
+/ format_swap_log) was DELETED in the Sprint A rip (2026-07-02); the ledger's
+``runtime_fallback_decisions`` schema slot survives but is stamped never.
+UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -121,19 +117,20 @@ def block_class_of(kind) -> "BlockClass":
 class RetryDecision:
     """The single deterministic action keyed to a failure's block class.
 
-    HARD decisions retry (per the kind) then ``escalate_to_fallback`` to the
-    next engine in the chain; WARN decisions ``keep_output`` and ``warn_only``.
-    The three guard flags ``discards_output`` / ``touches_audio`` /
-    ``aborts_episode`` are FALSE for every decision the taxonomy emits -- they
-    exist so a test (and :func:`assert_decision_invariants`) can prove no class
-    can ever drop a beat, mutate the frozen audio, or abort the episode.
+    HARD decisions retry (per the kind) on the SAME engine, then the render
+    driver raises LOUD (NO FALLBACKS, 2026-07-02 -- the escalate_to_fallback
+    flag was deleted with the chain machinery); WARN decisions ``keep_output``
+    and ``warn_only``. The three guard flags ``discards_output`` /
+    ``touches_audio`` / ``aborts_episode`` are FALSE for every decision the
+    taxonomy emits -- they exist so a test (and
+    :func:`assert_decision_invariants`) can prove no class can ever drop a
+    beat, mutate the frozen audio, or abort the episode.
     """
 
     kind: FailureKind
     block_class: BlockClass
     same_seed_retries: int = 0
     reseed_retries: int = 0
-    escalate_to_fallback: bool = True
     keep_output: bool = False
     retime: bool = False
     warn_only: bool = False
@@ -157,48 +154,40 @@ class RetryDecision:
 
 
 # The frozen per-kind policy table (the deterministic action map). HARD kinds
-# escalate to the fallback chain (keep_output False -- there is no usable clip);
-# WARN kinds keep the rendered clip and warn (escalate False by default; the
-# abort-only improvement gates are off).
+# retry per-kind on the SAME engine then fail LOUD (keep_output False -- there
+# is no usable clip; NO FALLBACKS); WARN kinds keep the rendered clip and warn.
 _HARD = BlockClass.HARD
 _WARN = BlockClass.WARN
 
 _POLICY: Dict[FailureKind, RetryDecision] = {
     FailureKind.DEPENDENCY_MISSING: RetryDecision(
-        FailureKind.DEPENDENCY_MISSING, _HARD, escalate_to_fallback=True),
+        FailureKind.DEPENDENCY_MISSING, _HARD),
     FailureKind.ASSET_MISSING: RetryDecision(
-        FailureKind.ASSET_MISSING, _HARD, escalate_to_fallback=True),
+        FailureKind.ASSET_MISSING, _HARD),
     FailureKind.LICENSE_BLOCKED: RetryDecision(
-        FailureKind.LICENSE_BLOCKED, _HARD, escalate_to_fallback=True),
+        FailureKind.LICENSE_BLOCKED, _HARD),
     FailureKind.INVALID_DAG: RetryDecision(
-        FailureKind.INVALID_DAG, _HARD, escalate_to_fallback=True),
+        FailureKind.INVALID_DAG, _HARD),
     FailureKind.OOM: RetryDecision(
-        FailureKind.OOM, _HARD, same_seed_retries=0, escalate_to_fallback=True),
+        FailureKind.OOM, _HARD, same_seed_retries=0),
     FailureKind.TIMEOUT: RetryDecision(
-        FailureKind.TIMEOUT, _HARD, same_seed_retries=0,
-        escalate_to_fallback=True),
+        FailureKind.TIMEOUT, _HARD, same_seed_retries=0),
     FailureKind.CRASH_BEFORE_LOAD: RetryDecision(
-        FailureKind.CRASH_BEFORE_LOAD, _HARD, same_seed_retries=1,
-        escalate_to_fallback=True),
+        FailureKind.CRASH_BEFORE_LOAD, _HARD, same_seed_retries=1),
     FailureKind.CORRUPT_OUTPUT: RetryDecision(
-        FailureKind.CORRUPT_OUTPUT, _HARD, same_seed_retries=1, reseed_retries=1,
-        escalate_to_fallback=True),
+        FailureKind.CORRUPT_OUTPUT, _HARD, same_seed_retries=1,
+        reseed_retries=1),
     FailureKind.TRANSIENT_IO: RetryDecision(
         FailureKind.TRANSIENT_IO, _HARD,
-        same_seed_retries=DEFAULT_TRANSIENT_IO_RETRIES,
-        escalate_to_fallback=True),
+        same_seed_retries=DEFAULT_TRANSIENT_IO_RETRIES),
     FailureKind.QUALITY: RetryDecision(
-        FailureKind.QUALITY, _WARN, escalate_to_fallback=False,
-        keep_output=True, warn_only=True),
+        FailureKind.QUALITY, _WARN, keep_output=True, warn_only=True),
     FailureKind.COHERENCE: RetryDecision(
-        FailureKind.COHERENCE, _WARN, escalate_to_fallback=False,
-        keep_output=True, warn_only=True),
+        FailureKind.COHERENCE, _WARN, keep_output=True, warn_only=True),
     FailureKind.NSFW: RetryDecision(
-        FailureKind.NSFW, _WARN, escalate_to_fallback=False,
-        keep_output=True, warn_only=True),
+        FailureKind.NSFW, _WARN, keep_output=True, warn_only=True),
     FailureKind.AV_SYNC: RetryDecision(
-        FailureKind.AV_SYNC, _WARN, escalate_to_fallback=False,
-        keep_output=True, retime=True),
+        FailureKind.AV_SYNC, _WARN, keep_output=True, retime=True),
 }
 
 
@@ -243,110 +232,11 @@ def assert_decision_invariants(decision: RetryDecision) -> RetryDecision:
     return decision
 
 
-# --------------------------------------------------------------------------- #
-# Durable ledger restamp + the LOUD swap-log (operator directive 2026-06-07:
-# every in-render fallback is LOUD -- log the swap + restamp the ledger, never
-# silent). All pure dict transforms; the render node persists them.
-# --------------------------------------------------------------------------- #
-def build_fallback_decision(
-    *,
-    shot_id: str,
-    beat_id: str,
-    from_engine: str,
-    to_engine: str,
-    kind,
-    video_revision: int,
-    attempt: int = 1,
-    detail: str = "",
-) -> dict:
-    """Build one ``runtime_fallback_decisions`` record (pure).
-
-    The record pins the SAME ``video_revision`` (a fallback restamp never bumps
-    the revision -- it is a within-revision degradation, not a re-lock) and
-    classifies the trigger by block class so the audit trail is self-describing.
-    """
-    k = FailureKind(kind)
-    return {
-        "shot_id": shot_id,
-        "beat_id": beat_id,
-        "from_engine": from_engine,
-        "to_engine": to_engine,
-        "failure_kind": k.value,
-        "block_class": block_class_of(k).value,
-        "video_revision": int(video_revision),
-        "attempt": int(attempt),
-        "detail": detail,
-    }
-
-
-def restamp_shot_row(shot_row: dict, *, to_engine: str, to_family: str,
-                     from_engine: str, kind) -> dict:
-    """Return a NEW shot-row dict degraded onto ``to_engine`` (pure).
-
-    Stamps ``engine_id`` / ``family`` to the fallback and appends a human-
-    readable hop to ``degradation_trail`` so the trail records the full chain.
-    Does not mutate the input and does not touch any revision counter.
-    """
-    k = FailureKind(kind)
-    out = dict(shot_row)
-    trail = list(out.get("degradation_trail") or [])
-    trail.append("%s->%s (%s)" % (from_engine, to_engine, k.value))
-    out["degradation_trail"] = trail
-    out["engine_id"] = to_engine
-    out["family"] = to_family
-    return out
-
-
-def append_runtime_fallback_decision(video_section: dict,
-                                     decision_record: dict) -> dict:
-    """Return a NEW ``ledger['video']`` section with the decision appended.
-
-    Fail-closed: the record's ``video_revision`` must equal the section's (a
-    fallback restamp stays at the SAME revision); a mismatch raises rather than
-    silently re-numbering. ``video_revision`` is left UNCHANGED.
-    """
-    sec_rev = int(video_section.get("video_revision", 1))
-    rec_rev = int(decision_record.get("video_revision", sec_rev))
-    if rec_rev != sec_rev:
-        raise ValueError(
-            "runtime_fallback_decision video_revision %d != section "
-            "video_revision %d (a restamp must stay at the same revision)"
-            % (rec_rev, sec_rev))
-    out = dict(video_section)
-    decisions = list(out.get("runtime_fallback_decisions") or [])
-    decisions.append(decision_record)
-    out["runtime_fallback_decisions"] = decisions
-    out["video_revision"] = sec_rev          # explicit: unchanged
-    return out
-
-
-def format_swap_log(decision_record: dict) -> str:
-    """Render the LOUD one-line swap log the render node emits on a fallback.
-
-    LOUD by contract (never a silent swap): names the shot/beat, the engine
-    swap, the classified reason, the captured failure detail (exception type +
-    first line, when present -- so a swallowed GraphExecutionError surfaces in
-    the log instead of only the reason code), and reaffirms the frozen audio is
-    untouched.
-    """
-    line = (
-        "[OTR video] LOUD FALLBACK: shot=%s beat=%s engine '%s' -> '%s' "
-        "reason=%s block_class=%s video_revision=%s (frozen audio untouched)"
-        % (
-            decision_record.get("shot_id"),
-            decision_record.get("beat_id"),
-            decision_record.get("from_engine"),
-            decision_record.get("to_engine"),
-            decision_record.get("failure_kind"),
-            decision_record.get("block_class"),
-            decision_record.get("video_revision"),
-        )
-    )
-    detail = decision_record.get("detail")
-    if detail:
-        line += " detail=%r" % (str(detail),)
-    return line
-
+# NO FALLBACKS (Sprint A rip, 2026-07-02): the fallback-action API
+# (build_fallback_decision / restamp_shot_row / append_runtime_fallback_decision
+# / format_swap_log) was DELETED with the chain machinery. The ledger's
+# runtime_fallback_decisions schema slot survives (stamped never, A5 -- no
+# schema churn); this module keeps ONLY the failure-classification role.
 
 __all__ = [
     "DEFAULT_TRANSIENT_IO_RETRIES",
@@ -358,8 +248,4 @@ __all__ = [
     "RetryDecision",
     "classify",
     "assert_decision_invariants",
-    "build_fallback_decision",
-    "restamp_shot_row",
-    "append_runtime_fallback_decision",
-    "format_swap_log",
 ]

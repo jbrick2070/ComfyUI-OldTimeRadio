@@ -6,9 +6,9 @@ exercises the COLD path: the adapter is registered + dark + gated, fails closed
 without the flag / install, tolerates SageAttention (unlike ltx_video -- HuMo's
 Sage stance is a GPU-smoke verify item, not a hard CPU gate), the portrait
 init_image aspect plan never stretches (480x832 native), the AS-3 lease is taken
-+ released, the pure request / clip helpers are deterministic, and the declared
-fallback chain humo -> humo_1.7B -> still_motion is acyclic and converges on
-the radio floor. The live load + the VRAM<=14.5 GB boundary + render-twice pixels
++ released, the pure request / clip helpers are deterministic, and NO FALLBACKS
+(2026-07-02 rip): both HuMo tiers declare fallback_engine=None -- a failure
+raises LOUD. The live load + the VRAM<=14.5 GB boundary + render-twice pixels
 are the A-S6 GPU smoke (operator), NOT covered here.
 """
 from __future__ import annotations
@@ -20,7 +20,6 @@ import types
 
 import pytest
 
-from nodes._otr_shared import fallback as fb
 from nodes._otr_shared import gpu_residency as gr
 from nodes._otr_shared import role_compat as rc
 from nodes._otr_video_engines import motion_common as mc
@@ -50,11 +49,10 @@ def test_humo_registered_and_dark():
     assert eng.roles == ("character_video",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
-    assert eng.fallback_engine == "humo_1.7B"      # 14B degrades to the 1.7B tier first
+    # NO FALLBACKS (2026-07-02): both tiers fail LOUD -- no tier degrade.
+    assert eng.fallback_engine is None
     assert "humo" in vreg.all_engine_names()       # in the full static dropdown
-    # The 1.7B tier degrades straight to the zero-VRAM still floor (latentsync
-    # removed 2026-06-17).
-    assert vreg.get_engine("humo_1.7B").fallback_engine == "still_motion"
+    assert vreg.get_engine("humo_1.7B").fallback_engine is None
 
 
 def test_humo_required_inputs_match_family_schema():
@@ -211,40 +209,18 @@ def test_humo_canonicalize_silent_bt709():
 
 
 # --------------------------------------------------------------------------- #
-# Fallback chain: humo -> humo_1.7B -> still_motion converges (A-S6 gate)
+# NO FALLBACKS (2026-07-02): the LOUD-failure contract replaces the chain
 # --------------------------------------------------------------------------- #
-def _registry_fallback_of(name):
-    """Single-hop lookup over the live registry (None when terminal/unknown)."""
-    if not vreg.is_registered(name):
-        return None
-    return getattr(vreg.get_engine(name), "fallback_engine", None)
-
-
-def test_humo_fallback_chain_converges_on_radio_floor():
-    chain = fb.resolve_fallback_chain("humo", _registry_fallback_of)
-    assert chain == ["humo", "humo_1.7B", "still_motion"]
-    # Terminus is the zero-VRAM radio floor: registered, static_motion, no flag.
+def test_no_fallback_module_and_no_chain():
+    """The chain resolver module is DELETED; both HuMo tiers declare None."""
+    with pytest.raises(ImportError):
+        __import__("nodes._otr_shared.fallback", fromlist=["fallback"])
+    for name in ("humo", "humo_1.7B"):
+        assert vreg.get_engine(name).fallback_engine is None
+    # still_motion survives as a REGISTERED SELECTABLE engine (no floor role).
     floor = vreg.get_engine("still_motion")
     assert floor.family == "static_motion"
-    assert getattr(floor, "requires_flag", None) is None
-    assert getattr(floor, "fallback_engine", None) is None       # terminal
-    assert fb.chain_terminates_at_floor(
-        "humo", _registry_fallback_of, {"still_motion"}) is True
-
-
-def test_fallback_resolver_pure_acyclic_and_bounded():
-    table = {"a": "b", "b": "c", "c": None}
-    assert fb.resolve_fallback_chain("a", table.get) == ["a", "b", "c"]
-    # A cycle is caught fail-closed (never an infinite walk).
-    cyc = {"a": "b", "b": "a"}
-    with pytest.raises(fb.FallbackCycleError):
-        fb.resolve_fallback_chain("a", cyc.get)
-    # A runaway (always a fresh name) is bounded by max_hops.
-    with pytest.raises(fb.FallbackChainError):
-        fb.resolve_fallback_chain("x0", lambda n: "x" + str(int(n[1:]) + 1),
-                                  max_hops=8)
-    with pytest.raises(ValueError):
-        fb.resolve_fallback_chain("", table.get)
+    assert getattr(floor, "fallback_engine", None) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -254,7 +230,6 @@ def test_cold_import_humo_no_heavy_libs():
     code = (
         "import sys;"
         "import nodes._otr_video_engines.eng_humo;"
-        "import nodes._otr_shared.fallback;"
         "heavy=[m for m in ('torch','transformers','diffusers') if m in sys.modules];"
         "print('HEAVY', heavy);"
         "sys.exit(1 if heavy else 0)"
@@ -265,8 +240,7 @@ def test_cold_import_humo_no_heavy_libs():
 
 
 def test_humo_source_is_ascii_no_em_dash():
-    for rel in ("nodes/_otr_video_engines/eng_humo.py",
-                "nodes/_otr_shared/fallback.py"):
+    for rel in ("nodes/_otr_video_engines/eng_humo.py",):
         src = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "—" not in src, f"em-dash forbidden in {rel} (CLAUDE.md)"
         src.encode("ascii")                          # ASCII-only source

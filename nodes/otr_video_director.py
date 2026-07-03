@@ -238,7 +238,17 @@ class OTRVideoDirector:
                     "default": 0, "min": 0, "max": 0xFFFFFFFF,
                     "tooltip": "Base seed (NOT named 'seed' on purpose, V-7).",
                 }),
-                "allow_auto_fallback": ("BOOLEAN", {"default": True}),
+                # DEPRECATED (NO FALLBACKS, operator 2026-07-02): the fallback
+                # machinery is deleted; the runtime IGNORES a stale True with a
+                # LOUD deprecation log. Widget STAYS positional (BUG-LOCAL-097:
+                # never remove mid-list).
+                "allow_auto_fallback": ("BOOLEAN", {
+                    "default": False,
+                    "label_on": "true (deprecated -- ignored)",
+                    "label_off": "false (deprecated)",
+                    "tooltip": "(deprecated) NO FALLBACKS -- ignored; engine "
+                               "failure always fails LOUD.",
+                }),
             },
             "optional": {
                 "episode_duration_target": ("STRING", {
@@ -322,6 +332,12 @@ class OTRVideoDirector:
                 slot, picked, custom, descriptors, warnings
             )
 
+        if bool(allow_auto_fallback):
+            log.warning(
+                "[OTR_VideoDirector] DEPRECATED: allow_auto_fallback=True "
+                "IGNORED (NO FALLBACKS, operator directive 2026-07-02) -- the "
+                "fallback machinery is deleted; engine failure fails LOUD. "
+                "Re-save the workflow with the widget False to clear this.")
         policy = {
             "policy_version": 1,
             "video_models": resolved_video,
@@ -342,7 +358,10 @@ class OTRVideoDirector:
             },
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
-            "allow_auto_fallback": bool(allow_auto_fallback),
+            # A3c (NO FALLBACKS, 2026-07-02): a stale True from an old saved
+            # graph is IGNORED with a LOUD deprecation log -- it must never
+            # resurrect the deleted fallback machinery. Always emitted False.
+            "allow_auto_fallback": False,
             "episode_duration_target": str(episode_duration_target or "auto"),
             "warnings": warnings,
         }

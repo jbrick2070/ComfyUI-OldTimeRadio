@@ -3,9 +3,10 @@
 New, self-contained tests for nodes/_otr_shared/retry_taxonomy.py focused on the
 DERIVED bits and fail-closed edges that complement
 tests/test_video_retry_taxonomy.py: the max_attempts arithmetic, string<->enum
-coercion in classify, the immutability of the pure dict transforms, and the
-assert_decision_invariants guard rejecting hand-built bad decisions. Pure stdlib
-+ the module under test. UTF-8, no BOM, ASCII-only, SFW.
+coercion in classify, and the assert_decision_invariants guard rejecting
+hand-built bad decisions. NO FALLBACKS (2026-07-02): the fallback-action API
+tests were deleted with the API. Pure stdlib + the module under test.
+UTF-8, no BOM, ASCII-only, SFW.
 """
 from __future__ import annotations
 
@@ -57,15 +58,15 @@ def test_every_classified_decision_honors_the_hard_invariants():
         assert d.aborts_episode is False
 
 
-def test_warn_decisions_keep_output_hard_decisions_escalate():
+def test_warn_decisions_keep_output_hard_decisions_stop_loud():
     for kind in rt.WARN_KINDS:
         d = rt.classify(kind)
         assert d.keep_output is True
-        assert d.escalate_to_fallback is False
     for kind in rt.HARD_KINDS:
         d = rt.classify(kind)
-        assert d.escalate_to_fallback is True
         assert d.warn_only is False
+        # NO FALLBACKS (2026-07-02): the escalate flag is deleted.
+        assert not hasattr(d, "escalate_to_fallback")
 
 
 def test_assert_decision_invariants_rejects_discard():
@@ -97,55 +98,8 @@ def test_assert_decision_invariants_rejects_warn_without_keep_output():
         rt.assert_decision_invariants(bad)
 
 
-def test_build_fallback_decision_pins_revision_and_block_class():
-    rec = rt.build_fallback_decision(
-        shot_id="shot_0007", beat_id="b007", from_engine="humo",
-        to_engine="humo_1.7B", kind=rt.FailureKind.OOM, video_revision=1)
-    assert rec["video_revision"] == 1
-    assert rec["block_class"] == rt.BlockClass.HARD.value
-    assert rec["failure_kind"] == "oom"
-    assert rec["from_engine"] == "humo" and rec["to_engine"] == "humo_1.7B"
-    assert rec["attempt"] == 1
-
-
-def test_append_runtime_fallback_decision_is_pure_and_revision_locked():
-    section = {"video_revision": 2, "runtime_fallback_decisions": []}
-    rec = rt.build_fallback_decision(
-        shot_id="s", beat_id="b", from_engine="humo", to_engine="humo_1.7B",
-        kind=rt.FailureKind.OOM, video_revision=2)
-    out = rt.append_runtime_fallback_decision(section, rec)
-    assert out is not section                        # new dict
-    assert section["runtime_fallback_decisions"] == []  # input unmutated
-    assert out["video_revision"] == 2                # revision unchanged
-    assert out["runtime_fallback_decisions"] == [rec]
-
-
-def test_append_runtime_fallback_decision_rejects_revision_mismatch():
-    section = {"video_revision": 2}
-    rec = rt.build_fallback_decision(
-        shot_id="s", beat_id="b", from_engine="humo", to_engine="humo_1.7B",
-        kind=rt.FailureKind.OOM, video_revision=3)
-    with pytest.raises(ValueError):
-        rt.append_runtime_fallback_decision(section, rec)
-
-
-def test_restamp_shot_row_is_pure_and_appends_trail():
-    row = {"engine_id": "humo", "family": "audio_driven_face"}
-    out = rt.restamp_shot_row(
-        row, to_engine="still_motion", to_family="static_motion",
-        from_engine="humo", kind=rt.FailureKind.OOM)
-    assert out is not row
-    assert row == {"engine_id": "humo", "family": "audio_driven_face"}
-    assert out["engine_id"] == "still_motion"
-    assert out["family"] == "static_motion"
-    assert out["degradation_trail"] == ["humo->still_motion (oom)"]
-
-
-def test_format_swap_log_is_loud_and_reaffirms_audio_untouched():
-    rec = rt.build_fallback_decision(
-        shot_id="shot_0020", beat_id="b020", from_engine="hunyuan3d_talk",
-        to_engine="humo", kind=rt.FailureKind.OOM, video_revision=1)
-    line = rt.format_swap_log(rec)
-    assert "LOUD FALLBACK" in line
-    assert "frozen audio untouched" in line
-    assert "hunyuan3d_talk" in line and "humo" in line
+def test_fallback_action_api_is_gone():
+    # NO FALLBACKS (Sprint A rip, 2026-07-02): the action API stays deleted.
+    for name in ("build_fallback_decision", "restamp_shot_row",
+                 "append_runtime_fallback_decision", "format_swap_log"):
+        assert not hasattr(rt, name)

@@ -2,45 +2,40 @@
 
 The live engine forwards (render_shot / run_episode / _render_one) are the GPU
 soak gate and never run in pytest -- exactly as the engine adapters' forwards
-don't. Here we prove the model-agnostic glue the driver is responsible for: the
-fallback resolution terminates at the radio floor for every engine, failures
-classify HARD, the fixture matches the shipped CPU-soak shape, requests are
-deterministic, and assert_soak_ok enforces every A-S7.5 invariant.
+don't. Here we prove the model-agnostic glue the driver is responsible for:
+NO FALLBACKS (2026-07-02 rip) -- no chain machinery exists and every registered
+video engine declares fallback_engine=None, failures classify HARD, the fixture
+matches the shipped CPU-soak shape, requests are deterministic, and
+assert_soak_ok enforces every A-S7.5 invariant (incl. the LOUD-failure
+contract).
 """
 import copy
 
 import pytest
 
-from nodes._otr_video_engines import cheap_families  # noqa: F401 (register floor)
+from nodes._otr_video_engines import cheap_families  # noqa: F401 (register)
 from nodes._otr_video_engines import eng_humo         # noqa: F401 (register humo)
 from nodes._otr_video_engines import eng_ltx_video      # noqa: F401 (register)
 from nodes._otr_video_engines import eng_wan_i2v        # noqa: F401 (register)
+from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_shared import retry_taxonomy as rt
-from nodes._otr_shared.fallback import resolve_fallback_chain
 
 
-def test_fallback_chain_character3d_converges_to_floor():
-    fb = rd.make_fallback_of()
-    # soak_oom_3d is the synthetic soak stub (C3 -- the real 3D scaffolds are
-    # unregistered): it resolves to humo via the overlay, then the registry walks
-    # humo -> humo_1.7B -> still_motion.
-    chain = resolve_fallback_chain("soak_oom_3d", fb)
-    assert chain == ["soak_oom_3d", "humo", "humo_1.7B", "still_motion"]
+def test_no_fallback_machinery_exists():
+    """Sprint A rip (2026-07-02): the chain machinery is GONE from the driver."""
+    for name in ("make_fallback_of", "FLOOR_NAMES", "UNIVERSAL_FLOOR",
+                 "SYNTH_FALLBACKS", "EXPECTED_OOM_TRAIL"):
+        assert not hasattr(rd, name), "%s must stay ripped (NO FALLBACKS)" % name
 
 
-def test_fallback_dangling_engine_gets_universal_floor():
-    fb = rd.make_fallback_of()
-    # ltx_video / wan_i2v declare no fallback_engine -> the driver appends the
-    # registered radio floor so the chain never dangles (survival BUG 12.23).
-    assert resolve_fallback_chain("ltx_video", fb) == ["ltx_video", "still_motion"]
-    assert resolve_fallback_chain("wan_i2v", fb) == ["wan_i2v", "still_motion"]
-
-
-def test_fallback_floor_is_terminal():
-    fb = rd.make_fallback_of()
-    assert fb("still_motion") is None
-    assert resolve_fallback_chain("still_motion", fb) == ["still_motion"]
+def test_every_registered_engine_declares_no_fallback():
+    for name in vreg.all_engine_names():
+        eng = vreg.get_engine(name)
+        assert getattr(eng, "fallback_engine", None) is None, (
+            "engine %r declares fallback_engine=%r -- NO FALLBACKS "
+            "(2026-07-02): every adapter must declare None"
+            % (name, eng.fallback_engine))
 
 
 def test_classify_failure_is_always_hard():
@@ -68,49 +63,44 @@ def test_build_request_is_deterministic_per_shot():
     assert a["audio_ref"] == {"path": "a.wav"}
 
 
-def _passing_episode(n, oom_sid):
-    decisions = [
-        {"shot_id": oom_sid, "from_engine": "soak_oom_3d",
-         "to_engine": "humo", "failure_kind": "oom", "block_class": "hard",
-         "video_revision": 1},
-        {"shot_id": oom_sid, "from_engine": "humo_1.7B",
-         "to_engine": "still_motion", "failure_kind": "oom",
-         "block_class": "hard", "video_revision": 1},
-    ]
+def _passing_episode(n):
     trace = [{"shot_id": "shot_%04d" % i, "attempts": ["x"],
               "final_engine": "x"} for i in range(n)]
     return {
         "n_clips": n, "all_clips_real": True,
-        "oom_final_engine": "still_motion", "oom_trail": rd.EXPECTED_OOM_TRAIL,
-        "decisions": decisions, "video_revision": 1,
+        "video_revision": 1,
         "audio_sha": rd.FROZEN_AUDIO_SHA, "humo_rendered": 2,
         "vram_peak_mb": 10000, "trace": trace, "clips": {},
     }
 
 
-def _passing_report(n=6, oom_sid="shot_0002"):
-    ep = _passing_episode(n, oom_sid)
+def _passing_report(n=6):
+    ep = _passing_episode(n)
     return {
-        "meta": {"n_beats": n, "oom_shot_id": oom_sid, "oom_index": 2},
+        "meta": {"n_beats": n, "oom_shot_id": None, "oom_index": None},
         "vram_ceiling_mb": 14500,
         "episode_1": copy.deepcopy(ep), "episode_2": copy.deepcopy(ep),
-        "input_oom_engine": "soak_oom_3d", "input_oom_trail": [],
+        "input_shot_count": n,
+        "oom_contract": {"raised": True, "error_type": "RenderError",
+                         "detail": "shot shot_0002 engine 'soak_oom_3d' ..."},
     }
 
 
 def test_assert_soak_ok_passes_on_a_valid_report():
     checks = rd.assert_soak_ok(_passing_report())
-    assert any("converged" in c for c in checks)
     assert any("determinism" in c for c in checks)
+    assert any("LOUD-failure contract" in c for c in checks)
 
 
 @pytest.mark.parametrize("mutate", [
     lambda r: r["episode_1"].__setitem__("humo_rendered", 0),
     lambda r: r["episode_1"].__setitem__("audio_sha", "tampered"),
-    lambda r: r["episode_1"].__setitem__("oom_final_engine", "humo"),
     lambda r: r["episode_1"].__setitem__("vram_peak_mb", 15000),
     lambda r: r["episode_1"].__setitem__("all_clips_real", False),
     lambda r: r["episode_2"]["trace"].append({"shot_id": "x"}),
+    # LOUD-failure contract: the forced OOM must RAISE RenderError.
+    lambda r: r["oom_contract"].__setitem__("raised", False),
+    lambda r: r["oom_contract"].__setitem__("error_type", "OomSignal"),
 ])
 def test_assert_soak_ok_rejects_violations(mutate):
     report = _passing_report()

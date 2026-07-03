@@ -337,7 +337,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # (still listed in `roles`) but is no longer the in-stack default for any
     # role -- so default_engine_for_role(announcer/music) resolves to ltx_av_music.
     default_roles = ()
-    fallback_engine = "still_motion"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     required_inputs = ("text_prompt",)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)

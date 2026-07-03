@@ -1,15 +1,14 @@
 """A-S7.5 CPU tests -- the full-episode soak fixture + harness (CPU portion).
 
-The soak drives a synthetic 40-beat, all-roles / all-families episode through the
-shipped A-S7 decision machinery TWICE back-to-back, forcing a mid-episode OOM on
-the character_3d group. These tests pin: the fixture shape (all roles + families,
-one character_3d group), that every beat produces a clip, that the character_3d
-group converges triposg_talk -> humo -> humo_1.7B ->
-still_motion (W7-pre: triposg_talk is the v1 3D lane) to the radio floor with
-LOUD restamps at the SAME video_revision, that the frozen
-audio section is byte-identical after the run, that two runs are deterministic
-with no carryover, and (negative control) that a floor that cannot render fails
-LOUDLY rather than passing silently. The live 5080 render is the operator gate.
+NO FALLBACKS (Sprint A rip, 2026-07-02): the decision machinery is gone. The
+soak drives a synthetic 40-beat, all-roles / all-families CLEAN episode through
+an injected fake renderer TWICE back-to-back, then proves the LOUD-failure
+contract on a separate forced-OOM leg. These tests pin: the fixture shape (all
+roles + families; the char3d stub only on the contract leg), that every clean
+beat produces a clip with NO degradation trail, that the frozen audio section
+is byte-identical after the run, that two runs are deterministic with no
+carryover, and that the forced OOM RAISES (never a swap, never a restamp).
+The live 5080 render is the operator gate.
 """
 from __future__ import annotations
 
@@ -33,27 +32,28 @@ SOAK = _load_soak()
 
 
 # --------------------------------------------------------------------------- #
-# fixture shape: all roles + families, one character_3d group
+# fixture shape: all roles + families; char3d stub only when oom_index is set
 # --------------------------------------------------------------------------- #
-def test_fixture_is_40_beats_all_roles_all_families():
-    section, meta = SOAK.build_soak_fixture(n_beats=40, oom_index=20)
+def test_clean_fixture_is_40_beats_all_roles_no_char3d():
+    section, meta = SOAK.build_soak_fixture(n_beats=40, oom_index=None)
     shots = section["shots"]
     assert len(shots) == 40 and section["video_revision"] == 1
     roles = {s["role"] for s in shots}
     # rip-sfx-broll (2026-07-01): the rotation covers the 3 surviving roles.
     assert roles == {"announcer_visual", "music_visual", "character_video"}
     families = {s["family"] for s in shots}
-    # lipsync_overlay is still a registered schema family but has NO engine after
-    # the latentsync cleanbreak (2026-06-17), so the soak rotation -- which is
-    # engine-backed -- no longer carries it.
-    # C0 2026-06-30: the "abstract" engine was retired, so the soak rotation no
-    # longer carries the "abstract" family (visualizer keeps the family name but is
-    # not in the engine-backed rotation). The remaining families are all covered.
     for fam in ("audio_driven_face", "image_to_video",
-                "text_to_video", "static_image_gen", "static_motion",
-                "character_3d"):
+                "text_to_video", "static_image_gen", "static_motion"):
         assert fam in families
-    char3d = [s for s in shots if s["family"] == "character_3d"]
+    # NO char3d stub on the clean fixture; no trail stamped anywhere.
+    assert not any(s["family"] == "character_3d" for s in shots)
+    assert all(s["degradation_trail"] == [] for s in shots)
+    assert meta["oom_shot_id"] is None
+
+
+def test_oom_fixture_injects_the_char3d_stub():
+    section, meta = SOAK.build_soak_fixture(n_beats=40, oom_index=20)
+    char3d = [s for s in section["shots"] if s["family"] == "character_3d"]
     assert len(char3d) == 1 and char3d[0]["shot_id"] == meta["oom_shot_id"]
     assert char3d[0]["engine_id"] == "soak_oom_3d"   # synthetic soak stub (C3)
 
@@ -64,35 +64,35 @@ def test_fixture_rejects_out_of_range_oom_index():
 
 
 # --------------------------------------------------------------------------- #
-# the soak: convergence + LOUD restamp + audio untouched
+# the soak: clean completion + LOUD-failure contract + audio untouched
 # --------------------------------------------------------------------------- #
 def test_two_episode_soak_passes_all_invariants():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
     checks = SOAK.assert_soak_ok(result)             # raises SoakError on failure
-    assert any("converged" in c for c in checks)
     assert any("determinism" in c for c in checks)
+    assert any("LOUD-failure contract" in c for c in checks)
 
 
-def test_character_3d_oom_converges_to_floor_with_three_restamps():
+def test_forced_oom_raises_and_never_restamps():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
-    sec = result["e1"]["ledger"]["video"]
-    oom = {s["shot_id"]: s for s in sec["shots"]}[result["meta"]["oom_shot_id"]]
-    assert oom["engine_id"] == "still_motion"      # converged to the radio floor
-    assert oom["family"] == "static_motion"
-    assert oom["degradation_trail"] == SOAK.EXPECTED_OOM_TRAIL
-    decisions = sec["runtime_fallback_decisions"]
-    # 3 hops now: triposg_talk -> humo -> humo_1.7B -> still_motion
-    assert len(decisions) == 3
-    assert all(d["failure_kind"] == "oom" and d["block_class"] == "hard"
-               and d["video_revision"] == 1 for d in decisions)
+    oc = result["oom_contract"]
+    assert oc["raised"] is True and oc["error_type"] == "OomSignal"
+    # the forced-OOM fixture is untouched: no swap, no trail, no restamp.
+    oom_in = {s["shot_id"]: s for s in
+              result["oom_input_ledger"]["video"]["shots"]}
+    oom_shot = oom_in[result["oom_meta"]["oom_shot_id"]]
+    assert oom_shot["engine_id"] == "soak_oom_3d"
+    assert oom_shot["degradation_trail"] == []
 
 
-def test_every_beat_renders_including_around_the_oom():
+def test_every_clean_beat_renders_with_no_trail():
     result = SOAK.run_two_episode_soak(n_beats=40, oom_index=20)
     clips = result["e1"]["clips"]
     assert len(clips) == 40 and all(clips.values())
-    assert clips["shot_0000"]["ok"] and clips["shot_0039"]["ok"]   # mid-episode OOM
-    assert clips["shot_0020"]["engine_id"] == "still_motion"     # the OOM beat
+    assert clips["shot_0000"]["ok"] and clips["shot_0039"]["ok"]
+    sec = result["e1"]["ledger"]["video"]
+    assert all(s["degradation_trail"] == [] for s in sec["shots"])
+    assert "runtime_fallback_decisions" not in sec
 
 
 def test_frozen_audio_is_byte_identical_after_soak():
@@ -109,27 +109,21 @@ def test_frozen_audio_is_byte_identical_after_soak():
 def test_two_runs_are_deterministic_and_leave_input_unmutated():
     result = SOAK.run_two_episode_soak(n_beats=24, oom_index=12)
     assert result["render_calls_1"] == result["render_calls_2"]
-    d1 = result["e1"]["ledger"]["video"]["runtime_fallback_decisions"]
-    d2 = result["e2"]["ledger"]["video"]["runtime_fallback_decisions"]
-    assert d1 == d2
     # the shared input fixture is never mutated by a run (no carryover).
-    in_shots = {s["shot_id"]: s
-                for s in result["input_ledger"]["video"]["shots"]}
-    oom_in = in_shots[result["meta"]["oom_shot_id"]]
-    assert oom_in["engine_id"] == "soak_oom_3d" and oom_in["degradation_trail"] == []
+    for s in result["input_ledger"]["video"]["shots"]:
+        assert s["degradation_trail"] == []
 
 
 # --------------------------------------------------------------------------- #
-# negative control: a floor that cannot render fails LOUDLY (no silent pass)
+# negative control: any mid-episode failure propagates (no silent pass)
 # --------------------------------------------------------------------------- #
-def test_floor_failure_raises_soakerror():
-    section, meta = SOAK.build_soak_fixture(n_beats=8, oom_index=4)
+def test_any_engine_failure_propagates_loud():
+    section, meta = SOAK.build_soak_fixture(n_beats=8, oom_index=None)
     ledger = SOAK.build_full_ledger(section)
-    fb = SOAK.make_fallback_of()
-    bad = SOAK.SoakRenderer(meta["oom_shot_id"],
-                            SOAK.OOM_ENGINES | {"still_motion"})
-    with pytest.raises(SOAK.SoakError):
-        SOAK.run_episode_soak(ledger, fallback_of=fb, renderer=bad)
+    # Force a failure on an ordinary clean beat: NO FALLBACKS means it raises.
+    bad = SOAK.SoakRenderer("shot_0000", {"humo"})
+    with pytest.raises(SOAK.OomSignal):
+        SOAK.run_episode_soak(ledger, renderer=bad)
 
 
 # --------------------------------------------------------------------------- #

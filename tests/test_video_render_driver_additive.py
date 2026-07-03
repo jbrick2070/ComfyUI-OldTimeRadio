@@ -2,10 +2,10 @@
 
 New, self-contained tests complementing tests/test_video_render_driver.py. The
 pure helpers (engine_family / build_full_ledger / build_soak_fixture range guard
-/ classify_failure kind map / make_fallback_of overlay) plus a CPU exercise of
+/ classify_failure kind map) plus a CPU exercise of
 the REAL render loop (run_episode) driven by STUB engines registered into a
-snapshot/restore registry: it proves a HARD failure RAISES LOUD (no fallbacks --
-operator 2026-06-16; no engine swap, no still floor), the frozen audio section is
+snapshot/restore registry: it proves a HARD failure RAISES LOUD (NO FALLBACKS --
+2026-07-02 directive; no engine swap, no still floor), the frozen audio section is
 never touched, the input ledger is not mutated, and a clean run is deterministic.
 No GPU, no model load. UTF-8, no BOM, ASCII-only, SFW.
 """
@@ -72,14 +72,6 @@ def test_classify_failure_specific_kind_mappings():
     assert rd.classify_failure(GraphExecutionError()) is rt.FailureKind.INVALID_DAG
     assert rd.classify_failure(RuntimeError("boom")) is (
         rt.FailureKind.CRASH_BEFORE_LOAD)
-
-
-def test_make_fallback_of_overlay_and_terminus():
-    fb = rd.make_fallback_of(synth={"custom_engine": "humo"})
-    assert fb("custom_engine") == "humo"
-    assert fb("soak_oom_3d") == "humo"                  # default synth soak-stub overlay
-    assert fb("still_motion") is None                 # floor is terminal
-    assert fb("zzz_not_registered_nonfloor") == rd.UNIVERSAL_FLOOR
 
 
 # --------------------------------------------------------------------------- #
@@ -152,24 +144,20 @@ def _two_shot_ledger():
     return rd.build_full_ledger(section)
 
 
-def _fb(name):
-    return {"stub_fail": "stub_ok"}.get(name)
-
-
 def test_run_episode_fails_loud_no_fallback(stub_registry):
-    # No fallbacks (operator 2026-06-16): the failing shot RAISES RenderError;
+    # NO FALLBACKS (2026-07-02 directive): the failing shot RAISES RenderError;
     # there is NO swap to stub_ok and NO still floor. The frozen input audio is
     # untouched (deep-copy transaction).
     ledger = _two_shot_ledger()
     with pytest.raises(rd.RenderError):
-        rd.run_episode(ledger, fallback_of=_fb)
+        rd.run_episode(ledger)
     assert ledger["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
 
 
 def test_run_episode_does_not_mutate_input_ledger(stub_registry):
     ledger = _two_shot_ledger()
     with pytest.raises(rd.RenderError):
-        rd.run_episode(ledger, fallback_of=_fb)
+        rd.run_episode(ledger)
     # the original ledger is deep-copied; its failing shot is untouched
     assert ledger["video"]["shots"][1]["engine_id"] == "stub_fail"
     assert ledger["video"]["shots"][1]["degradation_trail"] == []
@@ -182,8 +170,8 @@ def test_run_episode_is_deterministic(stub_registry):
         led = _two_shot_ledger()
         led["video"]["shots"][1]["engine_id"] = "stub_ok"
         return led
-    a = rd.run_episode(_ok(), fallback_of=_fb)
-    b = rd.run_episode(_ok(), fallback_of=_fb)
+    a = rd.run_episode(_ok())
+    b = rd.run_episode(_ok())
     assert a["trace"] == b["trace"]
     assert a["trace"][1]["attempts"] == ["stub_ok"]     # single attempt, no swap
     assert a["trace"][1]["final_engine"] == "stub_ok"
@@ -412,7 +400,7 @@ def test_run_episode_request_builder_overrides_default(record_registry):
         calls.append(shot["shot_id"])
         return rd.build_request_from_shot(shot, ledger, canvas=canvas)
 
-    rd.run_episode(led, fallback_of=rd.make_fallback_of(), request_builder=rb)
+    rd.run_episode(led, request_builder=rb)
     assert calls == ["shot_b001", "shot_b002"]   # the builder drove every shot
 
 
@@ -689,7 +677,7 @@ def test_family_input_gap_fails_loud(monkeypatch, stub_registry):
     req = rd.build_request(shot, {"init_image": "p.png", "audio_ref": "a.wav"},
                            25)
     with pytest.raises(rd.RenderError):
-        rd.render_shot(shot, req, video_revision=1)
+        rd.render_shot(shot, req)
 
 
 def test_family_changing_failure_is_loud_no_prune(stub_registry):
@@ -723,8 +711,7 @@ def test_family_changing_failure_is_loud_no_prune(stub_registry):
         ]})
     with pytest.raises(rd.RenderError):
         rd.run_episode(
-            led, fallback_of={"stub_3d_fail": "stub_ok"}.get,
-            assets={"init_image": "p.png", "audio_ref": "a.wav"})
+            led, assets={"init_image": "p.png", "audio_ref": "a.wav"})
     # the input fixture is untouched (deep-copy transaction)
     assert [g["group_id"] for g in led["video"]["execution_groups"]] \
         == ["grp_bg", "grp_char"]
@@ -748,7 +735,7 @@ def test_engine_failure_raises_loud(stub_registry):
              "target_frame_count": 25, "degradation_trail": []},
         ]})
     with pytest.raises(rd.RenderError):
-        rd.run_episode(led, fallback_of={"stub_fail": "stub_ok"}.get)
+        rd.run_episode(led)
 
 
 def test_provide_lipsync_base_non_overlay_noop(monkeypatch):

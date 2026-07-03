@@ -182,9 +182,7 @@ class StillParallaxEngine(_CheapFamilyBase):
     commercial_clean = True             # Apache-2.0 SMALL ckpt (pinned above)
     engine_version = "1"
     uses_still = True
-    #: Declared LOUD fallback (the chain would universal-floor here anyway;
-    #: declaring it keeps the degradation explicit + ledger-stampable).
-    fallback_engine = "still_motion"
+    fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
 
     def __init__(self):
         self._model = None

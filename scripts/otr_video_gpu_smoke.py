@@ -2,19 +2,18 @@
 ltx_video / wan_i2v) -- READY-to-run, never a fake pass.
 
 The heavy engines ship default-OFF / dark: their CPU adapters (assert_usable,
-the pure request build, canonicalize, the fallback wiring) are done, but the
-in-process / sidecar FORWARD is an intentional ``NotImplementedError`` GPU-smoke
-slice the operator finishes on the 5080. This probe automates everything that
-CAN be checked without faking the render: it runs the real dependency pilot,
-reads the opt-in flag, calls the real ``assert_usable`` (surfacing
-GATED_BY_FLAG / MISSING_MODEL / INCOMPATIBLE_PROFILE with the ckpt path), checks
-the SageAttention state (BUG-070), builds the real inference request, resolves
-the real fallback chain, probes machine-wide NVML VRAM, and prints a READY /
-NOT-READY verdict with the exact next steps. ``--run-render`` additionally drives
-the adapter lifecycle and reports the real outcome (the GPU slice raises
-NotImplementedError until the operator wires it -- reported honestly, never a
-pass). For humo it also demonstrates the LOUD humo -> humo_1.7B ->
-still_motion fallback restamp on a simulated OOM.
+the pure request build, canonicalize) are done, but the in-process / sidecar
+FORWARD is an intentional ``NotImplementedError`` GPU-smoke slice the operator
+finishes on the 5080. This probe automates everything that CAN be checked
+without faking the render: it runs the real dependency pilot, calls the real
+``assert_usable`` (surfacing GATED_BY_FLAG / MISSING_MODEL /
+INCOMPATIBLE_PROFILE with the ckpt path), checks the SageAttention state
+(BUG-070), builds the real inference request, probes machine-wide NVML VRAM,
+and prints a READY / NOT-READY verdict with the exact next steps.
+``--run-render`` additionally drives the adapter lifecycle and reports the real
+outcome (the GPU slice raises NotImplementedError until the operator wires it
+-- reported honestly, never a pass). NO FALLBACKS (operator directive
+2026-07-02): a render failure is a LOUD stop, never a swap.
 
 Run on the 5080 AFTER: install the wrapper + ckpts, set the engine's ckpt env,
 ``setx OTR_ENABLE_<ENGINE> 1``, restart ComfyUI. Cold-import clean; UTF-8, no
@@ -32,8 +31,6 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from nodes._otr_shared import retry_taxonomy as _rt          # noqa: E402
-from nodes._otr_shared.fallback import resolve_fallback_chain  # noqa: E402
 from nodes._otr_video_engines import motion_common as _mc     # noqa: E402
 from nodes._otr_video_engines import registry as _vreg        # noqa: E402
 # Register every engine + the cheap-family radio floor.
@@ -51,15 +48,15 @@ ENGINES = {
         "install": "HuMo wrapper + ckpts (umt5_xxl CLIP, wan_2.1 VAE, "
                    "whisper_large_v3 audio encoder, HuMo diffusion/LoRA); "
                    "set OTR_HUMO_CKPT",
-        "sage": "tolerated (verify on GPU)", "has_fallback": True},
+        "sage": "tolerated (verify on GPU)"},
     "ltx_video": {
         "kind": "in-process",
         "install": "LTX-Video wrapper + ckpt; set OTR_LTX_VIDEO_CKPT",
-        "sage": "MUST be clear (BUG-070 int8-PV abort)", "has_fallback": False},
+        "sage": "MUST be clear (BUG-070 int8-PV abort)"},
     "wan_i2v": {
         "kind": "in-process (sidecar under Sage)",
         "install": "Wan 2.2 I2V wrapper + ckpt; set OTR_WAN_I2V_CKPT",
-        "sage": "escalates to a cu128 sidecar", "has_fallback": False},
+        "sage": "escalates to a cu128 sidecar"},
 }
 
 
@@ -85,29 +82,6 @@ def _minimal_request(init_image="", audio_ref="", text_prompt="", frames=13):
         "seed_bundle": {"request_seed": 12345},
         "init_w": 480, "init_h": 832,
     }
-
-
-def _registry_fallback_of(name):
-    if _vreg.is_registered(name):
-        return getattr(_vreg.get_engine(name), "fallback_engine", None)
-    return None
-
-
-def demonstrate_humo_fallback():
-    """Walk + LOUD-restamp the real humo -> humo_1.7B -> still_motion chain on
-    a simulated OOM (CPU-real; proves the wiring the GPU OOM will trigger)."""
-    chain = resolve_fallback_chain("humo", _registry_fallback_of)
-    section = {"video_revision": 1, "shots": [], "runtime_fallback_decisions": []}
-    logs = []
-    for frm, to in zip(chain, chain[1:]):
-        rec = _rt.build_fallback_decision(
-            shot_id="smoke_shot", beat_id="b_smoke", from_engine=frm,
-            to_engine=to, kind=_rt.FailureKind.OOM, video_revision=1)
-        section = _rt.append_runtime_fallback_decision(section, rec)
-        logs.append(_rt.format_swap_log(rec))
-    return {"chain": chain, "logs": logs,
-            "converges_to_floor": chain[-1] == "still_motion",
-            "decisions": section["runtime_fallback_decisions"]}
 
 
 def attempt_render(eng, req, *, vram_ceiling):
@@ -179,10 +153,6 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
     sage = _mc.sageattention_patched()
     add("sage_state", True, "patched=%s (%s)" % (sage, meta["sage"]))
 
-    if meta["has_fallback"]:
-        chain = resolve_fallback_chain(engine, _registry_fallback_of)
-        add("fallback_chain", chain[-1] == "still_motion", " -> ".join(chain))
-
     try:
         if hasattr(eng, "_build_render_request"):
             built = eng._build_render_request(
@@ -206,8 +176,6 @@ def run_smoke(engine, *, init_image="", audio_ref="", text_prompt="",
     report["ready"] = all(c["ok"] for c in checks
                           if c["name"] in ("registered", "dep_pilot_import_clean",
                                            "assert_usable"))
-    if engine == "humo":
-        report["fallback_demo"] = demonstrate_humo_fallback()
     if run_render:
         report["render_attempt"] = attempt_render(
             eng, _minimal_request(init_image, audio_ref, text_prompt, frames),
@@ -227,9 +195,7 @@ def _next_steps(engine):
         "3. Implement + run the in-process forward (the NotImplementedError "
         "GPU slice): load + render_clip on the 5080.",
         "4. Re-run this probe with --run-render: assert VRAM <= 14.5 GB, render "
-        "twice for determinism%s."
-        % (" + exercise the humo -> humo_1.7B -> still_motion fallback"
-           if engine == "humo" else ""),
+        "twice for determinism.",
     ]
 
 
@@ -239,12 +205,6 @@ def print_report(report):
     for c in report["checks"]:
         print("  [%s] %-24s %s" % ("PASS" if c["ok"] else "FAIL",
                                     c["name"], c["detail"]))
-    if "fallback_demo" in report:
-        fd = report["fallback_demo"]
-        print("  fallback chain: %s (converges=%s)"
-              % (" -> ".join(fd["chain"]), fd["converges_to_floor"]))
-        for line in fd["logs"]:
-            print("    " + line)
     if "render_attempt" in report:
         ra = report["render_attempt"]
         print("  render attempt: status=%s stage=%s %s"

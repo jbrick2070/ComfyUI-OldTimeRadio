@@ -4,18 +4,18 @@ The A-S7 EXIT gate requires the package to pass the four canonical survival-guid
 failure-mode vectors. These run them against the model-agnostic video platform +
 the A-S7 retry / fallback / QC surface:
 
-* ghost-node (BUG 12.23, registration import gap) -- no engine's declared
-  ``fallback_engine`` is a ghost (every hop names a REGISTERED engine and the
-  chain terminates at a registered always-available radio floor); the A-S7
-  helpers add no ghost node mapping.
+* ghost-node (BUG 12.23, registration import gap) -- NO FALLBACKS (2026-07-02):
+  every registered engine declares ``fallback_engine = None`` (nothing may
+  reference another engine as a degrade target -- ghost or otherwise); the
+  A-S7 helpers add no ghost node mapping.
 * VRAM-leak (V-4 / BUG-291) -- the entire NEW video-platform surface never CALLS
   ``unload_all_models()`` (AST-checked, so docstring mentions do not count); the
-  OOM block_class tears down + walks the fallback with zero retries.
+  OOM block_class tears down with zero retries and fails LOUD.
 * widget-serialization (BUG-258) -- the A-S7 helper modules add no ComfyUI node
   or widget surface, so there is nothing new to mis-serialize.
 * pipe-deadlock (BUG 09.02) -- the retry taxonomy BOUNDS every retry (finite
-  attempts for every kind) and a timeout escalates with zero retries, so the
-  retry/fallback layer can never spin forever.
+  attempts for every kind) and a timeout stops with zero retries, so the
+  retry layer can never spin forever.
 
 All CPU; the live subprocess / ffmpeg behavior is the operator smoke, NOT here.
 """
@@ -26,9 +26,8 @@ import pathlib
 
 from nodes._otr_shared import nsfw_frame_qc as qc
 from nodes._otr_shared import retry_taxonomy as rt
-from nodes._otr_shared.fallback import resolve_fallback_chain
 from nodes._otr_video_engines import registry as vreg
-# Register every engine so the real fallback graph can be walked.
+# Register every engine so the no-fallback declarations can be checked.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import eng_ltx_video       # noqa: F401
 from nodes._otr_video_engines import eng_wan_i2v         # noqa: F401
@@ -60,25 +59,14 @@ def _calls_function(source: str, fn_name: str) -> bool:
 # --------------------------------------------------------------------------- #
 # ghost-node (BUG 12.23 -- registration import gap)
 # --------------------------------------------------------------------------- #
-def test_no_ghost_fallback_engine_references():
+def test_no_engine_declares_any_fallback_reference():
+    # NO FALLBACKS (2026-07-02): a non-None fallback_engine is a regression --
+    # it would be a ghost reference into deleted machinery (BUG 12.23 class).
     for name in vreg.all_engine_names():
         nxt = getattr(vreg.get_engine(name), "fallback_engine", None)
-        if nxt is not None:
-            assert vreg.is_registered(nxt), (
-                "engine %r declares fallback_engine %r which is not registered "
-                "(ghost reference, BUG 12.23)" % (name, nxt))
-
-
-def test_fallback_chains_resolve_to_a_registered_radio_floor():
-    def fallback_of(n):
-        return getattr(vreg.get_engine(n), "fallback_engine", None)
-    for start in ("humo", "humo_1.7B"):
-        chain = resolve_fallback_chain(start, fallback_of)
-        floor = chain[-1]
-        assert vreg.is_registered(floor)              # terminus is real
-        assert fallback_of(floor) is None             # and terminal
-        # an always-available radio floor has no opt-in flag.
-        assert getattr(vreg.get_engine(floor), "requires_flag", "x") is None
+        assert nxt is None, (
+            "engine %r declares fallback_engine %r -- the chain machinery is "
+            "deleted; every adapter must declare None" % (name, nxt))
 
 
 def test_a_s7_modules_register_no_ghost_node():
@@ -98,9 +86,9 @@ def test_new_platform_never_calls_unload_all_models():
         "unload_all_models(); offenders: %s" % offenders)
 
 
-def test_oom_block_class_tears_down_and_walks_fallback():
+def test_oom_block_class_tears_down_zero_retries():
     d = rt.classify(rt.FailureKind.OOM)
-    assert d.is_hard and d.escalate_to_fallback is True
+    assert d.is_hard
     assert d.same_seed_retries == 0 and d.reseed_retries == 0   # 0 retries
     assert d.touches_audio is False and d.aborts_episode is False
 
@@ -124,14 +112,12 @@ def test_every_retry_is_bounded_no_infinite_loop():
     for k in rt.FailureKind:
         d = rt.classify(k)
         assert 1 <= d.max_attempts < 100              # finite, bounded
-        if d.is_hard:
-            assert d.escalate_to_fallback is True     # always an escape hatch
 
 
-def test_timeout_escalates_with_zero_retries():
+def test_timeout_stops_with_zero_retries():
     d = rt.classify(rt.FailureKind.TIMEOUT)
     assert d.same_seed_retries == 0 and d.reseed_retries == 0
-    assert d.escalate_to_fallback is True             # hung render -> fallback
+    assert d.is_hard                                  # hung render -> LOUD stop
 
 
 if __name__ == "__main__":

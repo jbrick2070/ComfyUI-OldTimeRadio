@@ -2,21 +2,21 @@
 that ``OTR_VideoRenderBatch`` walks to ship Subproject A.
 
 For each shot the driver drives the registry engine lifecycle
-(``assert_usable -> prepare -> render_clip -> canonicalize -> teardown``) and, on
-a HARD failure, classifies it via the A-S7 retry taxonomy, walks the declared
-``fallback_engine`` chain (resolved by :mod:`nodes._otr_shared.fallback`), and
-restamps the ledger LOUDLY (log the swap + append a ``runtime_fallback_decisions``
-record at the SAME ``video_revision``) until a clip renders. Every chain is
-guaranteed to terminate at the registered radio floor (``still_motion``), so an
-episode NEVER aborts and a beat is NEVER dropped. The frozen ``ledger['audio']``
-section is read-only throughout (V-1 / the audio spine is frozen).
+(``assert_usable -> prepare -> render_clip -> canonicalize -> teardown``).
+NO FALLBACKS (operator directive 2026-07-02: NO fallbacks / NO auto-defaults
+anywhere): a HARD render failure is classified via the A-S7 retry taxonomy for
+the error message and then RAISES :class:`RenderError` LOUD -- there is NO
+engine swap, NO chain, NO still-image floor. The dropdown values saved in
+``workflows/otr_scifi_16gb_full.json`` are the ONLY defaults. The frozen
+``ledger['audio']`` section is read-only throughout (V-1 / the audio spine is
+frozen).
 
 In-process (V invariant: no HTTP server, no GraphBuilder): the heavy engines call
 ComfyUI wrapper node classes directly via :mod:`wrapper_bridge`, so this driver
 MUST run inside the ComfyUI process (``NODE_CLASS_MAPPINGS`` populated). The pure
-pieces (``make_fallback_of`` / ``classify_failure`` / the fixture builder /
-``assert_soak_ok``) are CPU-tested; the live render + the A-S7.5 GPU soak are the
-operator gate. UTF-8, no BOM, ASCII-only source.
+pieces (``classify_failure`` / the fixture builder / ``assert_soak_ok``) are
+CPU-tested; the live render + the A-S7.5 GPU soak are the operator gate.
+UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -32,8 +32,6 @@ import time
 
 from .._otr_shared import retry_taxonomy as _rt
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
-from .._otr_shared.fallback import resolve_fallback_chain
-from .._otr_shared.resolver import prune_orphaned_groups
 from .._otr_speaker_role import (
     SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
     SPEAKER_ROLE_MUSIC_OPEN as _SPEAKER_ROLE_MUSIC_OPEN,
@@ -44,31 +42,14 @@ from . import registry as _vreg
 
 _LOG = logging.getLogger("OTR.video.render_driver")
 
-#: The cheap radio-floor engine names (terminal; a chain ends here). NOTE
-#: (2026-06-18): "visualizer" (renamed viz_green 2026-06-30) was removed -- it
-#: graduated from a cheap floor stub to the real procedural CRT engine
-#: (eng_visualizer.py), which REQUIRES audio_ref + ffmpeg and so is NOT a
-#: guaranteed always-renders floor terminus.
-FLOOR_NAMES = frozenset({"still_motion", "still_pan", "still_flat"})
-#: The universal floor terminus appended to any engine whose declared chain
-#: would otherwise dangle (survival-guide BUG 12.23: no dangling fallback_engine
-#: -- every chain terminates at a registered radio floor that always renders).
-UNIVERSAL_FLOOR = "still_motion"
+# NO FALLBACKS (operator directive 2026-07-02): FLOOR_NAMES / UNIVERSAL_FLOOR /
+# SYNTH_FALLBACKS and the whole degrade-chain machinery were RIPPED (Sprint A,
+# E1). Engine failure = LOUD RenderError; still_motion remains a registered
+# SELECTABLE engine but has no floor role.
 
-#: Synthetic SOAK-stub fallback. ``soak_oom_3d`` is NOT a real engine -- it is the
-#: soak fixture's stand-in for a heavy character_3d-family engine, forced to OOM so
-#: the harness demonstrates the cross-engine restamp to humo -> humo_1.7B ->
-#: still_motion. (The real 3D scaffolds triposg_talk / hunyuan3d_talk /
-#: trellis_talk were UNREGISTERED 2026-06-29 (C3); their dead names are gone here.)
-SYNTH_FALLBACKS = {"soak_oom_3d": "humo"}
-# ltx_audio_in declares fallback_engine=None (NO FALLBACKS, 547671d) -> it gets NO
-# SYNTH_FALLBACKS entry; a failed render fails LOUD. (The deleted ltx_av_talk /
-# ltx_av_music had belt-and-braces entries; removed 2026-06-26 with the engines.)
-
-#: engine_id -> family, for restamping onto a fallback engine (covers the soak
-#: stub + the A/cheap engines).
+#: engine_id -> family (covers the soak stub + the A/cheap engines).
 ENGINE_FAMILY = {
-    "soak_oom_3d": "character_3d",       # synthetic soak stub (see SYNTH_FALLBACKS)
+    "soak_oom_3d": "character_3d",       # synthetic soak stub (forced-OOM leg)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
@@ -100,32 +81,27 @@ _PROFILES = (
     ("announcer_visual", "still_pan", "static_image_gen"),
 )
 #: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
-#: stand-in heavy character_3d engine) degrades to humo.
+#: stand-in heavy character_3d engine). Under NO FALLBACKS its forced OOM
+#: RAISES a named RenderError -- the soak asserts the raise (no trail).
 _CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
-#: The heavy engines the soak forces to OOM on the character_3d shot so the chain
-#: walks all the way to the radio floor.
+#: The heavy engines the soak forces to OOM on the character_3d shot -- the
+#: LOUD-failure contract leg asserts the resulting RenderError.
 OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
-#: The expected character_3d degradation trail to the radio floor.
-#: SEMANTICS TO PRESERVE (3D plan 7.0, judge ruling): the TRAIL lists 3 hops
-#: while assert_soak_ok expects exactly 2 LOUD OOM *decisions* -- the
-#: humo->humo_1.7B hop is an INTRA-ENGINE tier swap, not a restamp decision.
-#: The soak is green with this shape; keep the two constants consistent under
-#: the soak_oom_3d stub name, never "fix" one without the other.
-EXPECTED_OOM_TRAIL = ["soak_oom_3d->humo (oom)", "humo->humo_1.7B (oom)",
-                      "humo_1.7B->still_motion (oom)"]
 
 
 class OomSignal(RuntimeError):
     """Stand-in for a render-time CUDA OOM (a HARD failure) -- the soak forces it
-    on the mid-episode character_3d shot to walk the chain to the floor."""
+    on the mid-episode character_3d shot to prove the LOUD-raise contract."""
 
 
 class RenderFloorError(RuntimeError):
-    """The radio floor itself failed to render -- a chain genuinely exhausted
-    (the soak's negative control; should never happen with a working ffmpeg)."""
+    """A radio-open beat rendered on the procgen/still floor instead of an LTX
+    engine (BUG-LOCAL-413 strict mode -- see :func:`check_ltx_open_health`).
+    NOTE: despite the historical name, this has nothing to do with the deleted
+    fallback-chain floor machinery."""
 
 
 class RenderError(RuntimeError):
@@ -136,11 +112,10 @@ class RenderError(RuntimeError):
 
 
 class FamilyInputGap(RuntimeError):
-    """A fallback candidate's FAMILY requires request inputs this request
-    cannot satisfy (p3 down-chain shape, 3D plan 7.0): e.g. ``lipsync_overlay``
-    needs ``base_clip_ref`` that a ``character_3d`` request lacks. Classified
-    DEPENDENCY_MISSING -- the chain SKIPS the candidate LOUDLY to a compatible
-    floor instead of feeding a 3D request to a base-clip engine."""
+    """An engine's FAMILY requires request inputs this request cannot satisfy:
+    e.g. ``lipsync_overlay`` needs ``base_clip_ref`` that a ``character_3d``
+    request lacks. Classified DEPENDENCY_MISSING; NO FALLBACKS -- the shot
+    fails LOUD instead of feeding a mismatched request to the engine."""
 
 
 class SoakError(AssertionError):
@@ -150,28 +125,6 @@ class SoakError(AssertionError):
 # --------------------------------------------------------------------------- #
 # Pure helpers (CPU-tested)
 # --------------------------------------------------------------------------- #
-def make_fallback_of(synth=None):
-    """``fallback_of(name) -> next | None`` over the REAL registry + the synthetic
-    B overlay, guaranteeing termination at the radio floor (a dangling engine
-    with no declared fallback degrades to ``still_motion``)."""
-    overlay = dict(SYNTH_FALLBACKS)
-    if synth:
-        overlay.update(synth)
-
-    def fallback_of(name):
-        if name in overlay:
-            return overlay[name]
-        if _vreg.is_registered(name):
-            nxt = getattr(_vreg.get_engine(name), "fallback_engine", None)
-            if nxt:
-                return nxt
-        if name in FLOOR_NAMES:
-            return None
-        return UNIVERSAL_FLOOR
-
-    return fallback_of
-
-
 def classify_failure(exc):
     """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
     if isinstance(exc, OomSignal):
@@ -194,10 +147,15 @@ def engine_family(name, default=None):
     return default or "abstract"
 
 
-def build_soak_fixture(n_beats=40, oom_index=20):
+def build_soak_fixture(n_beats=40, oom_index=None):
     """Build a synthetic ``ledger['video']`` section + meta (pure; identical
-    shape to scripts/otr_video_soak.build_soak_fixture)."""
-    if not 0 <= oom_index < n_beats:
+    shape to scripts/otr_video_soak.build_soak_fixture).
+
+    ``oom_index=None`` (default since the 2026-07-02 NO-FALLBACKS rip) builds a
+    CLEAN all-profiles fixture; an integer injects the synthetic ``soak_oom_3d``
+    character_3d stub at that index for the LOUD-failure contract leg (the
+    forced OOM must RAISE a named RenderError -- no trail, no swap)."""
+    if oom_index is not None and not 0 <= oom_index < n_beats:
         raise ValueError("oom_index %d out of range for %d beats"
                          % (oom_index, n_beats))
     shots = []
@@ -1033,8 +991,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _eng_id, _bid, os.path.basename(_fodder), _subj or "?")
         else:
             # LOUD: no clean fodder minted -> do NOT silently mesh the scene
-            # still (the clay-blob bug). Keep the portrait/none init; the engine
-            # fallback chain (mesh_stage -> still_motion) degrades cleanly.
+            # still (the clay-blob bug). Keep the portrait/none init; NO
+            # FALLBACKS -- a mesh_stage render without usable inputs fails LOUD.
             init_source = "missing_mesh_fodder"
             _mesh_fodder_missing = True
             _LOG.warning(
@@ -1285,8 +1243,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # portrait previously surfaced only as eng_humo's fail-closed error
         # mid-render. Warn at the JOIN so the gap is visible upstream.
         _LOG.warning("[OTR.render_driver] talking-head shot %s char_id=%r has "
-                     "NO portrait-index entry -- HuMo will fail closed to its "
-                     "fallback chain", shot.get("shot_id"), char_id)
+                     "NO portrait-index entry -- HuMo will fail closed LOUD "
+                     "(NO FALLBACKS)", shot.get("shot_id"), char_id)
     audio = _voice_audio_for_line(line)
     # Per-beat audio fallback: slice the FROZEN master when no per-line wav.
     # The master is opened read-only by ffmpeg; the slice lands in a temp dir
@@ -1849,8 +1807,7 @@ def _provide_lipsync_base(engine_name, request):
     ``OTR_LSYNC_BASE_ENGINE`` names a provider (e.g. ``ltx_video``), render the
     base IN-LINE first and feed its path as ``base_clip_ref``. LOUD; additive;
     no env -> no behavior change. A base-render failure leaves base_clip_ref
-    unset so the overlay fails its own usability check and the normal LOUD
-    fallback chain runs."""
+    unset so the overlay fails its own usability check LOUD (NO FALLBACKS)."""
     if engine_family(engine_name, "") != "lipsync_overlay":
         return
     get = request.get if isinstance(request, dict) else (
@@ -1876,9 +1833,9 @@ def _provide_lipsync_base(engine_name, request):
                  base_req.get("shot_id"), base_engine)
     try:
         base_clip = _render_one(base_engine, base_req, force_oom=False)
-    except Exception as exc:              # noqa: BLE001 -- LOUD; chain handles it
+    except Exception as exc:              # noqa: BLE001 -- LOUD; the shot fails
         _LOG.warning("[OTR video] lipsync base render FAILED (%s: %s) -- the "
-                     "overlay will fail closed and walk its fallback chain",
+                     "overlay will fail closed LOUD (NO FALLBACKS)",
                      type(exc).__name__, str(exc).splitlines()[0][:160])
         return
     path = (base_clip or {}).get("path") or ""
@@ -1887,18 +1844,15 @@ def _provide_lipsync_base(engine_name, request):
         _LOG.warning("[OTR video] lipsync base ready: %s", path)
 
 
-def render_shot(shot, request, *, fallback_of=None, video_revision=1,
-                oom_engines=frozenset(), oom_shot_id=None):
+def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
-    2026-06-16, 'this is art, not a space shuttle'): a HARD render failure RAISES
-    :class:`RenderError` LOUD -- there is NO engine swap and NO still-image floor,
-    so a proven model path must prove itself. ``fallback_of`` / ``video_revision``
-    are accepted but ignored (the degrade chain is gone); a forced soak OOM simply
+    2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
+    fallbacks / NO auto-defaults directive): a HARD render failure RAISES
+    :class:`RenderError` LOUD -- there is NO engine swap and NO still-image
+    floor, so a proven model path must prove itself. A forced soak OOM simply
     raises loud like any other failure.
 
-    Returns ``(clip, shot, [], [engine], vram_used_mb)`` -- the empty decisions
-    list + single-element attempts keep the run_episode trace/return shape
-    stable."""
+    Returns ``(clip, shot, [engine], vram_used_mb)``."""
     sid = shot["shot_id"]
     eng = shot["engine_id"]
     out_shot = dict(shot)
@@ -1919,10 +1873,10 @@ def render_shot(shot, request, *, fallback_of=None, video_revision=1,
     # clip via VramPeakProbe) over the instantaneous post-render read, so the
     # episode report records the true render-phase peak; fall back when absent.
     clip_peak = clip.get("vram_peak_mb") if isinstance(clip, dict) else None
-    return clip, out_shot, [], [eng], (clip_peak or _mc.vram_used_mb())
+    return clip, out_shot, [eng], (clip_peak or _mc.vram_used_mb())
 
 
-def run_episode(ledger, *, fallback_of, oom_shot_id=None,
+def run_episode(ledger, *, oom_shot_id=None,
                 oom_engines=frozenset(), assets=None, frame_count=25,
                 canvas=None, request_builder=None):
     """Drive one episode end-to-end on REAL engines (deep-copies the ledger; the
@@ -1936,7 +1890,6 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
     + prompt request (see :func:`run_real_episode`)."""
     ledger = copy.deepcopy(ledger)
     section = ledger["video"]
-    rev = int(section["video_revision"])
     clips, new_shots, trace = {}, [], []
     vram_peak = 0
     # Stills-first VRAM discipline (operator 2026-06-12, "evict flux when all
@@ -1996,33 +1949,11 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             request = request_builder(shot, ledger, canvas=canvas)
         else:
             request = build_request(shot, assets, frame_count, canvas)
-        clip, out_shot, decisions, attempts, used = render_shot(
-            shot, request, fallback_of=fallback_of, video_revision=rev,
-            oom_engines=oom_engines, oom_shot_id=oom_shot_id)
-        for rec in decisions:
-            section = _rt.append_runtime_fallback_decision(section, rec)
-        # AS-2 resolver-prune wiring (3D plan 7.0 p3, code-verified gap:
-        # resolver.py shipped the orphaned-background prune but nothing called
-        # it): on a FAMILY-CHANGING fallback the planned execution group no
-        # longer runs as planned -- prune the degraded consumer's group id and
-        # cascade any provider thereby orphaned (the character_3d -> humo
-        # background case), in the SAME in-memory ledger transaction as the
-        # restamp + decision append. LOUD; groups absent = no-op (the soak
-        # fixture carries none).
-        if (decisions and out_shot.get("family") != shot.get("family")
-                and section.get("execution_groups")):
-            gid = str(out_shot.get("group_id") or "")
-            groups = section["execution_groups"]
-            if gid and any(g.get("group_id") == gid for g in groups):
-                pruned = prune_orphaned_groups(groups, [gid])
-                dropped = sorted({g["group_id"] for g in groups}
-                                 - {g["group_id"] for g in pruned})
-                section["execution_groups"] = pruned
-                _LOG.warning(
-                    "[OTR video] LOUD AS-2 PRUNE: shot %s family fallback "
-                    "%s->%s orphaned execution group(s) %s -- removed from "
-                    "the plan (same revision)", out_shot.get("shot_id"),
-                    shot.get("family"), out_shot.get("family"), dropped)
+        clip, out_shot, attempts, used = render_shot(
+            shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id)
+        # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
+        # raises RenderError; there are no runtime fallback decisions and no
+        # AS-2 family-change group prune (the family can never change here).
         clips[out_shot["shot_id"]] = clip
         new_shots.append(out_shot)
         row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
@@ -2053,12 +1984,12 @@ def run_episode(ledger, *, fallback_of, oom_shot_id=None,
             "vram_peak_mb": vram_peak}
 
 
-def run_real_episode(ledger, *, fallback_of=None, canvas=None,
+def run_real_episode(ledger, *, canvas=None,
                      master_audio_path=""):
     """Drive one REAL episode from a ShotLock-planned ledger: per-shot requests
     (character portrait + per-beat voice audio + the M4 prompt) via
-    :func:`build_request_from_shot`, the full registry fallback chain (NO forced
-    OOM), real per-shot assets. Returns the :func:`run_episode` result; the
+    :func:`build_request_from_shot`, NO forced OOM, NO FALLBACKS (a failed
+    engine raises LOUD), real per-shot assets. Returns the :func:`run_episode` result; the
     frozen audio section is untouched. The thin ``mode="episode"`` render node
     calls this inside the ComfyUI executor thread.
 
@@ -2098,8 +2029,7 @@ def run_real_episode(ledger, *, fallback_of=None, canvas=None,
     ledger = apply_engine_override(ledger)
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
-    return run_episode(ledger, fallback_of=fallback_of or make_fallback_of(),
-                       request_builder=rb, canvas=canvas)
+    return run_episode(ledger, request_builder=rb, canvas=canvas)
 
 
 def parse_engine_override(spec: str) -> dict:
@@ -2127,9 +2057,9 @@ def parse_engine_override(spec: str) -> dict:
 def apply_engine_override(ledger):
     """Experiment knob (operator ask 2026-06-09: the all-LTX / forced-engine
     episodes): when ``OTR_FORCE_ENGINE_MAP`` is set, re-route each planned
-    shot's ``engine_id``/``family`` by role BEFORE rendering, LOUDLY. The
-    fallback chains stay intact (a forced engine that fails still degrades to
-    the radio floor with the usual LOUD restamp). Returns the (possibly
+    shot's ``engine_id``/``family`` by role BEFORE rendering, LOUDLY. NO
+    FALLBACKS (2026-07-02): a forced engine that fails raises RenderError
+    LOUD -- there is no degrade to a floor. Returns the (possibly
     rewritten) ledger; a parse error logs LOUD and leaves the plan untouched
     (fail-safe: the production plan renders rather than aborting)."""
     spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
@@ -2448,20 +2378,10 @@ def _clip_summary(clip):
             "path": path, "exists": exists, "size": size}
 
 
-def _norm_decisions(section):
-    """Structural (path-free) view of the runtime_fallback_decisions for the
-    determinism compare + the audit."""
-    return [{k: d.get(k) for k in ("shot_id", "from_engine", "to_engine",
-                                   "failure_kind", "block_class",
-                                   "video_revision")}
-            for d in section.get("runtime_fallback_decisions", [])]
-
-
 def _episode_facts(ep, meta):
     led = ep["ledger"]
     sec = led["video"]
     shots = {s["shot_id"]: s for s in sec["shots"]}
-    oom = shots[meta["oom_shot_id"]]
     clips = {sid: _clip_summary(c) for sid, c in ep["clips"].items()}
     # Route-A (2026-06-28 HuMo-14B promotion): count the promoted 14B tier and
     # assert it ONLY rendered on character_video shots (face + audio role). The
@@ -2477,9 +2397,6 @@ def _episode_facts(ep, meta):
         "n_clips": len(ep["clips"]),
         "all_clips_real": all(c["exists"] and c["size"] > 0
                               for c in clips.values()),
-        "oom_final_engine": oom["engine_id"],
-        "oom_trail": oom["degradation_trail"],
-        "decisions": _norm_decisions(sec),
         "video_revision": sec["video_revision"],
         "audio_sha": led["audio"]["master_audio_sha256"],
         "humo_rendered": sum(1 for c in clips.values()
@@ -2492,25 +2409,29 @@ def _episode_facts(ep, meta):
     }
 
 
-def assemble_report(meta, input_ledger, e1, e2, *, vram_ceiling_mb, elapsed_s):
+def assemble_report(meta, input_ledger, e1, e2, *, vram_ceiling_mb, elapsed_s,
+                    oom_contract=None):
     return {
         "meta": meta, "vram_ceiling_mb": int(vram_ceiling_mb),
         "elapsed_s": round(float(elapsed_s), 1),
         "episode_1": _episode_facts(e1, meta),
         "episode_2": _episode_facts(e2, meta),
-        "input_oom_engine":
-            {s["shot_id"]: s for s in
-             input_ledger["video"]["shots"]}[meta["oom_shot_id"]]["engine_id"],
-        "input_oom_trail":
-            {s["shot_id"]: s for s in
-             input_ledger["video"]["shots"]}[meta["oom_shot_id"]]
-            ["degradation_trail"],
+        "input_shot_count": len(input_ledger["video"]["shots"]),
+        # NO-TRAIL LOUD contract (2026-07-02): the forced-OOM leg's outcome --
+        # {"raised": bool, "error_type": str, "detail": str} or None when the
+        # leg was not run.
+        "oom_contract": oom_contract,
     }
 
 
 def assert_soak_ok(report):
     """Assert every A-S7.5 GPU-soak invariant; raise :class:`SoakError` on any
-    violation. Returns the list of passed-check descriptions for the report."""
+    violation. Returns the list of passed-check descriptions for the report.
+
+    NO-TRAIL LOUD contract (2026-07-02 NO-FALLBACKS rip): the two CLEAN
+    episodes must produce every clip deterministically with the frozen audio
+    untouched, and the forced-OOM leg (when present) must have RAISED a named
+    RenderError -- no trail matching, no decisions, no swap."""
     meta = report["meta"]
     n = meta["n_beats"]
     ceiling = report["vram_ceiling_mb"]
@@ -2521,25 +2442,9 @@ def assert_soak_ok(report):
             raise SoakError("%s: not every beat produced a real on-disk clip "
                             "(%d/%d, all_real=%s)"
                             % (tag, f["n_clips"], n, f["all_clips_real"]))
-        if f["oom_final_engine"] != "still_motion":
-            raise SoakError("%s: character_3d OOM did not converge to the radio "
-                            "floor (got %r)" % (tag, f["oom_final_engine"]))
-        if f["oom_trail"] != EXPECTED_OOM_TRAIL:
-            raise SoakError("%s: OOM degradation trail %r != %r"
-                            % (tag, f["oom_trail"], EXPECTED_OOM_TRAIL))
-        oom_decisions = [d for d in f["decisions"]
-                         if d["shot_id"] == meta["oom_shot_id"]]
-        if len(oom_decisions) != 2:
-            raise SoakError("%s: expected 2 LOUD OOM decisions on the "
-                            "character_3d shot, got %d"
-                            % (tag, len(oom_decisions)))
-        for d in oom_decisions:
-            if (d["failure_kind"] != "oom" or d["block_class"] != "hard"
-                    or d["video_revision"] != 1):
-                raise SoakError("%s: malformed OOM decision %r" % (tag, d))
         if f["video_revision"] != 1:
-            raise SoakError("%s: video_revision bumped to %r (a restamp stays at "
-                            "the same revision)" % (tag, f["video_revision"]))
+            raise SoakError("%s: video_revision bumped to %r (rendering never "
+                            "re-locks the plan)" % (tag, f["video_revision"]))
         if f["audio_sha"] != FROZEN_AUDIO_SHA:
             raise SoakError("%s: frozen audio sha changed (%r) -- the render "
                             "driver must never touch audio" % (tag, f["audio_sha"]))
@@ -2557,45 +2462,63 @@ def assert_soak_ok(report):
         if f["vram_peak_mb"] and f["vram_peak_mb"] > ceiling:
             raise SoakError("%s: VRAM peak %d MB > ceiling %d MB"
                             % (tag, f["vram_peak_mb"], ceiling))
-        checks.append("%s: %d real clips; character_3d OOM->floor converged "
-                      "(%d LOUD restamps @rev1); %d humo in-process renders; "
+        checks.append("%s: %d real clips; %d humo in-process renders; "
                       "VRAM peak %s MB <= %d; frozen audio untouched"
-                      % (tag, n, len(oom_decisions), f["humo_rendered"],
+                      % (tag, n, f["humo_rendered"],
                          f["vram_peak_mb"], ceiling))
     if report["episode_1"]["trace"] != report["episode_2"]["trace"]:
         raise SoakError("non-deterministic: the two episodes' render traces "
                         "(per-shot attempts + final engine) differ")
-    if report["episode_1"]["decisions"] != report["episode_2"]["decisions"]:
-        raise SoakError("non-deterministic: the two episodes' fallback "
-                        "decisions differ")
-    # The fixture's character_3d shot is the synthetic soak_oom_3d stub (C3);
-    # this carryover check follows that id.
-    if (report["input_oom_engine"] != "soak_oom_3d"
-            or report["input_oom_trail"]):
-        raise SoakError("carryover: the shared input fixture was mutated")
-    checks.append("determinism: two back-to-back episodes identical "
-                  "(traces + decisions); input fixture unmutated (no carryover)")
+    checks.append("determinism: two back-to-back episodes identical (traces)")
+    oc = report.get("oom_contract")
+    if oc is not None:
+        if not oc.get("raised") or oc.get("error_type") != "RenderError":
+            raise SoakError(
+                "LOUD-failure contract violated: a forced OOM must RAISE "
+                "RenderError (got raised=%s error_type=%r) -- NO FALLBACKS"
+                % (oc.get("raised"), oc.get("error_type")))
+        checks.append("LOUD-failure contract: forced OOM raised RenderError "
+                      "(no swap, no trail)")
     return checks
 
 
 def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None,
                  vram_ceiling_mb=None):
-    """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back,
-    assert every invariant, and return the structured report. Raises
-    :class:`SoakError` on a violation (never a fake pass)."""
+    """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back
+    (CLEAN fixture -- no forced OOM), then prove the NO-TRAIL LOUD-failure
+    contract on a separate forced-OOM leg (``oom_index`` names the beat; the
+    forced OOM must RAISE RenderError). Asserts every invariant and returns
+    the structured report. Raises nothing itself -- failures are embedded
+    (never a fake pass)."""
     ceiling = int(vram_ceiling_mb or _mc.dynamic_vram_ceiling_mb())
-    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=oom_index)
+    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=None)
     ledger = build_full_ledger(section)
-    fb = make_fallback_of()
     t0 = time.time()
-    e1 = run_episode(ledger, fallback_of=fb, oom_shot_id=meta["oom_shot_id"],
-                     oom_engines=OOM_ENGINES, assets=assets,
-                     frame_count=frame_count)
-    e2 = run_episode(ledger, fallback_of=fb, oom_shot_id=meta["oom_shot_id"],
-                     oom_engines=OOM_ENGINES, assets=assets,
-                     frame_count=frame_count)
+    e1 = run_episode(ledger, assets=assets, frame_count=frame_count)
+    e2 = run_episode(ledger, assets=assets, frame_count=frame_count)
+    # LOUD-failure contract leg: a forced OOM on the synthetic character_3d
+    # stub must RAISE RenderError -- no swap, no restamp, no trail.
+    oom_contract = {"raised": False, "error_type": "", "detail": ""}
+    if oom_index is not None:
+        _n_oom = max(1, min(n_beats, oom_index + 1))
+        oom_section, oom_meta = build_soak_fixture(
+            n_beats=_n_oom, oom_index=min(oom_index, _n_oom - 1))
+        oom_ledger = build_full_ledger(oom_section)
+        try:
+            run_episode(oom_ledger, oom_shot_id=oom_meta["oom_shot_id"],
+                        oom_engines=OOM_ENGINES, assets=assets,
+                        frame_count=frame_count)
+        except RenderError as exc:
+            oom_contract = {"raised": True, "error_type": "RenderError",
+                            "detail": str(exc).splitlines()[0][:200]}
+        except Exception as exc:  # noqa: BLE001 -- report the wrong type honestly
+            oom_contract = {"raised": True,
+                            "error_type": type(exc).__name__,
+                            "detail": str(exc).splitlines()[0][:200]}
     report = assemble_report(meta, ledger, e1, e2, vram_ceiling_mb=ceiling,
-                             elapsed_s=time.time() - t0)
+                             elapsed_s=time.time() - t0,
+                             oom_contract=(oom_contract
+                                           if oom_index is not None else None))
     try:
         report["passed_checks"] = assert_soak_ok(report)
         report["ok"] = True
@@ -2651,10 +2574,11 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
 
 
 __all__ = [
-    "FLOOR_NAMES", "UNIVERSAL_FLOOR", "SYNTH_FALLBACKS", "ENGINE_FAMILY",
-    "OOM_ENGINES", "FROZEN_AUDIO_SHA", "EXPECTED_OOM_TRAIL",
-    "OomSignal", "RenderFloorError", "SoakError", "FamilyInputGap",
-    "make_fallback_of", "classify_failure", "engine_family",
+    "ENGINE_FAMILY",
+    "OOM_ENGINES", "FROZEN_AUDIO_SHA",
+    "OomSignal", "RenderError", "RenderFloorError", "SoakError",
+    "FamilyInputGap",
+    "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "SLICER_VERSION", "slice_cache_key", "curve_cache_key",
