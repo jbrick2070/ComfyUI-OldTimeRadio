@@ -1,19 +1,14 @@
 # OTR -- Project Operating Rules (Claude in Cowork)
-
 **Operator directives -- these win over any handoff, doc, or memory that disagrees.**
-
 - **Fix bugs properly, at the root cause -- never a shim or band-aid.** Don't wait for me to
   fix anything: make the fix yourself, without asking. If it works, it's fine.
 - **When genuinely torn between approaches, run the roundtable LIVE for convergence
   (ChatGPT + Gemini + DeepSeek).** Skip the dry-run / cost estimate -- just run it, pronto.
   You are the judge. Escalate to me only if the panel still leaves it unresolved.
 - This file is hard rules + the real Cowork operating model for this repo + hard-won gotchas.
-
 ## 0. WORKFLOW SOURCE OF TRUTH (hard)
-
 `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`
 IS my workflow.
-
 - ANY json / node / wiring / widget change MUST be made IN that file, in the SAME change as the code.
   Code that is not wired into this JSON is DEAD -- "your updates are for naught" (the 2026-06-13 §4D
   miss: a node + a new blend input shipped + tested but UNWIRED -> ran dormant in production).
@@ -26,9 +21,7 @@ IS my workflow.
   value slot AND gains an input with `"widget": {"name": ...}`.
 - After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + a link/widget audit
   (widget-count vs live INPUT_TYPES, every wired input-name in INPUT_TYPES, link referential integrity).
-
 ## 1. HOW COWORK ACTUALLY WORKS HERE (read this first)
-
 - **Two separate filesystems.** The file tools (Read / Write / Edit) operate on the REAL Windows files --
   that is your primary editor. **Desktop Commander** (`mcp__Desktop_Commander__*`) runs PowerShell on the
   same real Windows box -- use it for git, the venv python, tests, and process control. The
@@ -68,9 +61,7 @@ IS my workflow.
 - **One coder window in the code at a time** (serialize via `docs/GO_FORWARD_PLAN.md`). Two windows
   editing the same file -- especially the workflow JSON -- is how it gets corrupted.
 - Use **AskUserQuestion** for genuine operator decisions; use the **task list** for any multi-step work.
-
 ## 2. AUTONOMY / PRIME DIRECTIVE
-
 - NEVER ask me to run scripts, commands, or anything. YOU run it: Desktop Commander first; if DC can't,
   Windows MCP; then the filesystem tools. Never hand me a bat/cmd/PowerShell block and say "run this."
 - You can drive the 5080 GPU yourself -- spin up the headless ComfyUI API (port 8000) and run it; don't
@@ -78,9 +69,7 @@ IS my workflow.
 - If a senior pair-programmer would just do it, just do it. Stuck choosing between options? Roundtable
   2-3 panels (GPT + Gemini + DeepSeek) for opinions BEFORE asking me -- run it LIVE (skip the dry-run),
   you are the judge.
-
 ## 3. CODING DISCIPLINE
-
 - Keep coding until all sprints are done unless you genuinely need me.
 - Run the regression suite + the Bug Bible after EVERY code change (don't wait to be asked). Commit AND
   push per green chunk (section 7).
@@ -88,12 +77,9 @@ IS my workflow.
   scripts before committing). Keep handoff files current.
 - Names: never "dummy" -- use "placeholder", "stub", or a descriptive name ("dummy" makes me feel bad).
   SFW always. UTF-8, no BOM. Clean logs, meaningful names -- the reader matters.
-
 ## 4. RESET BEFORE EVERY HEADLESS RUN (hard)
-
 The soak/quick-smoke harness boots ONE server, runs all legs against it, and does NOT tear it down -- it
 sits RESIDENT holding ~60% VRAM. Never assume a prior run cleaned up. Before launching:
-
 - Kill SELECTIVELY by CommandLine (CIM) -- NOT a blanket `Stop-Process -Name python,pythonw`. A blanket
   python kill ALSO kills the Claude MCP extension pythons (Desktop Commander / computer-use) and severs
   your own tools mid-run. Use `Get-CimInstance Win32_Process -Filter "Name='python.exe'"` and kill the
@@ -103,9 +89,7 @@ sits RESIDENT holding ~60% VRAM. Never assume a prior run cleaned up. Before lau
 - Confirm `Get-NetTCPConnection -LocalPort 8000 -State Listen` is EMPTY and
   `nvidia-smi --query-gpu=memory.used --format=csv,noheader` dropped to the desktop baseline (~1.5 GB)
   before booting fresh.
-
 ## 5. HEADLESS BOOT + MONITORING GOTCHAS (2026-06-12 -- do not relose)
-
 - **A render that FINISHED leaves the server RESIDENT (~9-10 GB, 1% util) -- that is NOT a crash.** Before
   declaring a run dead, read the server log: `Prompt executed in HH:MM:SS` + `obs_publish OK` = it
   COMPLETED. The idle resident VRAM is the no-teardown behavior. (Misread twice 2026-06-12.)
@@ -120,12 +104,9 @@ sits RESIDENT holding ~60% VRAM. Never assume a prior run cleaned up. Before lau
 - **Launch the server via the .cmd as `-FilePath`, never `cmd.exe /c "<cmd>" "<log>"`.** The `/c`
   two-quoted-token rule eats the outer quotes -> mangled path -> ZERO log output. Use
   `Start-Process -FilePath $LAUNCHCMD -ArgumentList "`"$LOG`""`.
-
 ## 6. OUTPUT / ASSET PATHS (hard)
-
 Rendered episode assets are deliverables -- they do NOT live in tmp/scratch, and they are NEVER left in a
 swept dir to be moved later.
-
 - Every rendered asset (audio, frames, intermediate video) -> `otr\episodes\<ep>\`. The final published
   episode -> `otr\obs\` (what `obs_publish` targets; `obs_publish OK` in the log = it landed there).
 - Point the render at its canonical path the FIRST time. Never stage an asset in tmp "to move later" --
@@ -139,9 +120,7 @@ swept dir to be moved later.
   "finished but resident" server (section 5) from a real miss. Missing = STOP and report; do not continue.
 - Paths are relative to the repo root (`...\ComfyUI-OldTimeRadio\`). If `otr\` actually resolves to
   ComfyUI's real `output\` base on disk, use that base -- but the episodes/obs split holds either way.
-
 ## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
-
 - ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.
 - The operator eyeball gates TAGS and PROMOTIONS (`v2.0-alpha-stable`, prod, main, v2 release) -- NEVER
@@ -149,12 +128,9 @@ swept dir to be moved later.
 - This SUPERSEDES any "do not push until the eyeball passes" line written before 2026-06-10 evening.
 - A stable branch only exists if the operator explicitly declares one.
 - After every push verify: HEAD == origin, no 0-byte files, no BOM, AST parse on touched .py files.
-
 ## 8. ROUNDTABLE DEFAULTS (operator directive 2026-06-22)
-
 Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's stock
 "Claude is judge-only / panel only critiques" and "dry-run estimate first" defaults.
-
 - **Panel = 2-3 FRONTIER models per round** (GPT + Gemini + DeepSeek/Grok class; `~latest`
   aliases, record the resolved model in the manifest). Lean panel of genuinely different
   families beats many near-duplicates -- diversity is the point, correctness comes from the
@@ -172,3 +148,31 @@ Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's 
   passes never reach in practice.)
 - Artifacts under `docs/<YYYY-MM-DD>-<topic>/roundtable/` (pass00..passNN_plan.md +
   passNN_judgment.md), UTF-8 no BOM, ASCII where practical.
+## 9. MODEL ROUTING -- when to spend Fable (operator directive 2026-07-03)
+Fable is a scalpel, not a default. Spawn it ONLY when output quality depends on narrative
+judgment; keep everything mechanical off it. This is about WHICH MODEL a subagent runs --
+orthogonal to the filesystem rule in section 1 and the frontier roundtable panel in section 8
+(that panel is external cloud models via OpenRouter; this is the Fable model as a Cowork subagent).
+- **Use Fable for:** generative creative work where voice/taste matter -- story spine, character
+  interiority, dialogue passes, pitch-room ideation, style/tone calls. Divergent fanout when you
+  want real variance, not one answer (e.g. 3 subagents each pitching a different take on a scene --
+  only fan out on a genuine fork you'll actually select between). Judgment on already-generated
+  narrative -- "which brief holds together," "where does this arc sag."
+- **Do NOT use Fable for:** mechanical/deterministic work -- repo grep, mapping references, editing
+  JSON, validation, wiring checks, git. Route those to general-purpose / Explore, or just do them in
+  the main window. Also skip Fable for one-shot factual/structural questions with a single right answer.
+- **Keep the spawn count down:** batch context so each Fable call does a meaningful chunk (a whole
+  scene, not one line); gate the spawn on a real fork -- if you'd just take the first answer, use one
+  call or none.
+- **REALITY EXCEPTION -- Fable's grounded FAN-OUT audit DOES catch real code build-breakers the
+  mechanical panels miss (proven 2026-07-03).** On the VRAM-tier rip, a Fable end-to-end fan-out found
+  a CHUNK-ORDER KeyError (the workflow validator reads a profile key that was being removed mid-rip ->
+  every production render would KeyError) that BOTH codex and general-purpose review missed; it also did
+  the frame-budget arithmetic (29->33 frames) that broke two unlisted tests, and spotted a grep-invisible
+  hyphenated `--vram-ceiling` flag. So Fable is NOT only-narrative. Reserve it as the FINAL GATE on a
+  HIGH-STAKES, hard-to-unwind, production-touching STRUCTURAL change (a big rip/refactor about to be
+  executed / merged) -- ONE grounded pass, AFTER codex + general-purpose have gone first, when a missed
+  thread would break the build and cost a debugging-and-revert loop. This is the "insight" worth the
+  spend. It does NOT reopen Fable for ROUTINE review: everyday grep / wiring / validation / JSON still
+  defaults to general-purpose/Explore/codex. Fable = the expensive last set of eyes on the make-or-break,
+  not the default reviewer.
