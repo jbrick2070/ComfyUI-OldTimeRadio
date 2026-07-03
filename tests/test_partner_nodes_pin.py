@@ -26,6 +26,8 @@ EXPECTED_ROW_IDS = {
     # 2026-07-02 roster expansion:
     "cloud_ideogram_v4", "cloud_seedream_2",
     "cloud_elevenlabs_voice_selector",
+    # word_razzle Phase 1 (2026-07-03): animated word-card i2v (Pixverse).
+    "cloud_pixverse_i2v",
 }
 
 

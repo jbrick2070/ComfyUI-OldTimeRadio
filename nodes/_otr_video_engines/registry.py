@@ -376,6 +376,13 @@ CAPABILITIES = {
     "cloud_wan_i2v": {"vram_class": "cpu", "vram_estimate_mb": 0,
                       "required_toolchain": None, "requires_sidecar": False,
                       "cpu_ok": True, "model_requirements": []},
+    # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
+    # (Pixverse row cloud_pixverse_i2v). Provider-side render -> cpu class, zero
+    # VRAM, cpu_ok. Selectable; NO enable flag (dropdown pick is the enable;
+    # missing OTR_COMFY_API_KEY fails LOUD at invoke).
+    "word_razzle": {"vram_class": "cpu", "vram_estimate_mb": 0,
+                    "required_toolchain": None, "requires_sidecar": False,
+                    "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

@@ -194,12 +194,23 @@ class _CloudVideoBase:
             lambda k, d=None: getattr(seeds, k, d))
         return int(s_get("request_seed", 0) or 0)
 
+    def _init_image_ref(self, request):
+        """Resolve the init-image ref. Real ``render_driver.build_request()``
+        output carries it under ``asset_refs["init_image"]`` (the scene/word
+        still); older hand-built dict requests may put it TOP-LEVEL. Try
+        asset_refs FIRST, then top-level (the eng_humo resolution order). Pure."""
+        assets = _req_get(request, "asset_refs") or {}
+        a_get = assets.get if isinstance(assets, dict) else (
+            lambda k, d=None: getattr(assets, k, d))
+        return a_get("init_image") or _req_get(request, "init_image")
+
     def _init_image_input(self, request):
-        path = _ref_path(_req_get(request, "init_image"))
+        path = _ref_path(self._init_image_ref(request))
         if not path or not os.path.isfile(path):
             raise RuntimeError(
                 f"{self.name}: init_image missing/absent on disk ({path!r}) "
-                f"-- NO FALLBACK (required_inputs={self.required_inputs})")
+                f"-- NO FALLBACK (required_inputs={self.required_inputs}; "
+                f"checked asset_refs['init_image'] + top-level init_image)")
         return _load_image_tensor(path)
 
     def _audio_input(self, request):
@@ -311,15 +322,90 @@ class CloudWanI2VEngine(_CloudVideoBase):
         }
 
 
+# word_razzle Phase 1 (2026-07-03): the ANIMATED word-card cloud i2v engine.
+# Pixverse is the --audit-i2v Phase-0 pick (promptable, non-V3, required image
+# init + prompt + seed + duration_seconds + motion_mode). A word_razzle beat's
+# base still (a still_word / word-card still, or any scene still) is fed as the
+# init image; the engine adds a LIVING-POSTER world-motion prompt whose whole
+# job is to keep the lettering readable EVERY frame (the operator acceptance
+# bar). motion_mode / quality / duration_seconds are provider COMBOs (the pin
+# excludes option lists) so the adapter ships documented defaults, all
+# env-overridable -- the same discipline as the kling mode default. mute_only:
+# the provider audio is stripped (must_strip_audio); the master mix is frozen
+# upstream and muxed LAST. NO FALLBACK: a missing init still fails LOUD.
+_RAZZLE_MOTION_ENV = "OTR_CLOUD_RAZZLE_MOTION_PROMPT"
+_RAZZLE_MOTION_DEFAULT = (
+    "living period poster, gentle atmospheric motion around the lettering -- "
+    "drifting smoke, soft neon flicker, subtle parallax depth -- the words stay "
+    "crisp, sharp and fully legible in every frame, letterforms never warp, "
+    "melt or distort")
+_RAZZLE_NEG_ENV = "OTR_CLOUD_RAZZLE_NEG"
+_RAZZLE_NEG_DEFAULT = ("warped text, melting letters, distorted typography, "
+                       "illegible words, garbled text, flickering letters")
+
+
+class CloudWordRazzleEngine(_CloudVideoBase):
+    """word_razzle: animate a word-card still into a living period poster."""
+
+    name = "word_razzle"
+    node_key = "cloud_pixverse_i2v"
+    family = "image_to_video"
+    required_inputs = ("init_image", "text_prompt")
+    reactivity = "mute_only"
+
+    def _razzle_prompt(self, request) -> str:
+        """The world-motion + text-preservation prompt. The base motion clause
+        (env-overridable) LEADS; the beat's own text_prompt (scene/subject) is
+        appended so the animation matches the beat, never overriding the
+        readability directive."""
+        motion = os.environ.get(_RAZZLE_MOTION_ENV, "").strip() or _RAZZLE_MOTION_DEFAULT
+        beat = str(_req_get(request, "text_prompt") or "").strip()
+        return f"{motion}. {beat}".strip().rstrip(".") if beat else motion
+
+    def _duration_seconds(self, request) -> int:
+        """The provider duration (seconds). Derived from the beat's frame
+        target (timing.target_frame_count / fps) and clamped to Pixverse's
+        supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides."""
+        env = os.environ.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
+        if env:
+            try:
+                return int(env)
+            except ValueError:
+                pass
+        canvas = _req_get(request, "canvas") or {}
+        c_get = canvas.get if isinstance(canvas, dict) else (
+            lambda k, d=None: getattr(canvas, k, d))
+        fps = int(c_get("fps", 25) or 25) or 25
+        timing = _req_get(request, "timing") or {}
+        t_get = timing.get if isinstance(timing, dict) else (
+            lambda k, d=None: getattr(timing, k, d))
+        n = int(t_get("target_frame_count", 0) or 0)
+        secs = int(round(n / fps)) if n else 5
+        return 8 if secs > 5 else 5
+
+    def _partner_inputs(self, request):
+        return {
+            "image": self._init_image_input(request),
+            "prompt": self._razzle_prompt(request),
+            "negative_prompt": os.environ.get(_RAZZLE_NEG_ENV, "").strip()
+            or _RAZZLE_NEG_DEFAULT,
+            "motion_mode": os.environ.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
+            "quality": os.environ.get("OTR_CLOUD_PIXVERSE_QUALITY", "540p"),
+            "duration_seconds": self._duration_seconds(request),
+            "seed": self._seed(request),
+        }
+
+
 KlingAvatar = CloudKlingAvatarEngine()
 KlingLipsync = CloudKlingLipsyncEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
+WordRazzle = CloudWordRazzleEngine()
 
-for _eng in (KlingAvatar, KlingLipsync, Seedance2, WanI2V):
+for _eng in (KlingAvatar, KlingLipsync, Seedance2, WanI2V, WordRazzle):
     register(_eng)
 
 __all__ = [
     "CloudKlingAvatarEngine", "CloudKlingLipsyncEngine",
-    "CloudSeedance2Engine", "CloudWanI2VEngine",
+    "CloudSeedance2Engine", "CloudWanI2VEngine", "CloudWordRazzleEngine",
 ]

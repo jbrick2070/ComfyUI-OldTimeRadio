@@ -1,7 +1,7 @@
 pin_meta:
   combo_options_excluded: true
   comfyui_commit: bb131be9e83d2f773c90f1d6f1e4b248a498c8c5
-  generated_utc: '2026-07-03T00:52:50.437108+00:00'
+  generated_utc: '2026-07-03T08:11:28.358288+00:00'
   generator: scripts/otr_pin_partner_nodes.py
   schema_version: pin-2026-07-02
 rows:
@@ -244,6 +244,40 @@ rows:
     - IMAGE
     - STRING
     - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_pixverse_i2v:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/PixVerse
+    class_name: PixverseImageToVideoNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_pixverse
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        negative_prompt: STRING
+        pixverse_template: PIXVERSE_TEMPLATE
+      required:
+        duration_seconds: COMBO
+        image: IMAGE
+        motion_mode: COMBO
+        prompt: STRING
+        quality: COMBO
+        seed: INT
+    is_async: true
+    notes: word_razzle animated word-card i2v; motion_mode motion-strength; cheapest
+      passing seed row (Phase 0)
+    provider_id: PIXVERSE
+    return_types:
+    - VIDEO
     seed_supported: true
     selected_output: 0
     status: OK
