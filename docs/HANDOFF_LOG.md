@@ -6,6 +6,20 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 ~21:50 -- HEAD d9a659ce (v2.0-alpha) -- no-fallbacks directive + remaining-sprints plan + kibitz r2 launched
+Did: operator directive stamped @ d0463b8c (NO fallbacks / NO auto-defaults anywhere; the
+shipped workflow JSON dropdown values are the ONLY defaults; S3-full rescoped -- auto-defaults
++ fallback chains CUT; E1/E2 promoted to directive compliance). Wrote the remaining-sprints
+build plan @ d9a659ce (docs/2026-07-02-remaining-sprints/PLAN.md: A=E1/E2 -> B=S1 stills ->
+C=S3 remainder -> D=cloud TTS -> E=C1 audio_motion_profile -> F=creative formats). Launched
+kibitz r2 (full panel, detached) on that plan; MY ANCHOR is written
+(kibitz-runs/2026-07-02-remaining-sprints/r2/claude_anchor.md); panel outputs land in the same
+dir. Window wrapped before judging (context budget -- honest call, no rushed synthesis).
+Current step: judge kibitz r2 (ground panel claims vs code) -> run r3+r4 -> fold the hardened
+plan into GO_FORWARD -> then soak2 QA / proof9d / Sprint A (E1/E2).
+Next: fresh window resumes at "judge r2"; soak2 QA + proof9d still owed on the render side.
+Commits: d0463b8c d9a659ce (+ this entry).
+
 ## 2026-07-02 ~21:15 -- HEAD fb23d82d (v2.0-alpha) -- night queue scored + dropdown directive + S5
 Did: scored the night queue (PROOF9_VERDICT.md @ 4dd79dbe: proof9c FAILED on a VRAM-ceiling ops
 breach at 768x416 -- desktop squatter, no clips; 120w soak COMPLETED 6/6 + obs_publish OK and
