@@ -1,7 +1,8 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 | branch v2.0-alpha @ 8de5862d | prod/main + tags operator-GATED.
-> SPRINT A (E1/E2 no-fallback rip-out) SHIPPED @ 8de5862d -- NEXT = Sprint B (S1 stills).
+> Last updated 2026-07-03 night | branch v2.0-alpha @ e3292324 | prod/main + tags operator-GATED.
+> ACTIVE (operator, overnight): LIVE-GPU MODEL-MATRIX SOAK of 30-45w episodes -- see section 1.
+> SPRINT A + Sprint B S1 stills core + `ideo` SHIPPED. still_word BUILD-READY (behind the soak).
 > KIBITZ ARC CONVERGED on the remaining-sprints plan (r2/r3/r4 judged; BUILD-READY).
 > soak2 QA PASS (6/6 clips, obs final, no breach). proof9d 832x448 FAILED on a CLEAN
 > baseline -- MARGINAL breach 14506 > 14500 MB at shot_b002 (6MB over; zero headroom at
@@ -18,6 +19,31 @@
 ---
 
 ## 1. CURRENT STEP
+
+**ACTIVE = OVERNIGHT LIVE-GPU MODEL-MATRIX SOAK (operator directive 2026-07-03 night).**
+Render a WHOLE BUNCH of 30-45 word FULL-PIPELINE episodes sweeping the model matrix,
+autonomously, while the operator sleeps. Budget = ~2000 Comfy Cloud credits, ALL usable.
+- **Pass 1 = COHERENT same-model combos, NEWEST models first.** For each episode, the SAME
+  video model across all video roles + the SAME image model across all image roles -- NOT
+  mismatched. Start with the newest engines (e.g. the recent video engines + cloud stills like
+  cloud_flux_pro / nano_banana_2 / the just-shipped cloud image lane), then work down. Voice =
+  indextts2 (default) or bark. target_words 30-45.
+- **Later passes = deliberate MIXES** (cross-model role combos) once the coherent baselines pass.
+- **Watch CLOSELY + fix bugs LIVE.** Monitor each leg (server log: `Prompt executed`, `obs_publish
+  OK`; watchdog for stalls); on a failure, ROOT-CAUSE fix (no shims), re-run the suite + Bug Bible
+  + B7, commit AND push the green fix per chunk to v2.0-alpha. Keep going through the night.
+- **Discipline (CLAUDE.md):** RESET the box before EVERY headless run (SELECTIVE CIM kill, never a
+  blanket python kill -- it severs the MCP pythons; confirm :8000 empty + VRAM at baseline). LOAD
+  the REAL `workflows/otr_scifi_16gb_full.json`. Assets -> `otr/episodes/<ep>/`, final -> `otr/obs/`;
+  Test-Path the asset before declaring success. Single resident heavy <= 14.5 GB; audio byte-identical.
+- Harness: `scripts/queue_smoke.py` + `scripts/otr_api.py` (live 30w full run); the all-role /
+  matrix drivers under `scripts/` (coverage sweep + slot_matrix). Cloud rows need
+  `OTR_COMFY_API_KEY` (+ the cloud smoke gate where applicable). Log per-leg verdicts to a soak
+  summary + a HANDOFF_LOG entry at wrap.
+
+**still_word BUILD-READY (behind the soak):** `docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md`
+(model-agnostic still_flat-sibling video engine; kibitz r2 + roundtable converged). Build after
+the soak unless the operator redirects.
 
 **SPRINT A DONE @ 8de5862d** (E1/E2 no-fallback rip; details in HANDOFF_LOG/ARCHIVE).
 
