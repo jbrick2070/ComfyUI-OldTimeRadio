@@ -6,6 +6,21 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (credits-enrichment window) -- HEAD f00a8e8e (v2.0-alpha)
+Did: executed credits-enrichment S2 + the parallel scaffold lane per GO_FORWARD_CREDITS.md v4.
+- S2 @ 3e0003e8: stamp_durable()/LedgerStampError in production_ledger (local-to-singleton copy
+  + save()-None raises, OTR_TEST_MODE=1 = in-memory injection); call sites CastLock (cast+meta),
+  image dispatcher (images+meta.image_engines), stable_audio_theme (meta.music_engine, first
+  durable path), render batch (meta.render_engines, swallowing catch removed). 11 spec tests.
+- Scaffold @ f00a8e8e: nodes/otr_credits_roll.py UNWIRED+UNREGISTERED (no-fallback receipts,
+  declared silent tail, looped-last-clip backdrop, ffmpeg render+concat no source-copy, zero
+  widgets) + tests/test_credits_roll_spec.py (13 green; absorbs 3 dossier tests + bug410).
+- Suite 6098/0 + Bug Bible 16 green; pushed, HEAD==origin, no BOM, AST OK.
+Current step: credits enrichment S3+S1 ATOMIC slice (rip node-12 HUD + node-84 tail-fill,
+register+wire CreditsRoll 93->CR->85, credits-aware mux guard, test retirement, kibitz+Fable gate).
+Next: open the red window in a FRESH window off GO_FORWARD_CREDITS.md + KICKOFF.md.
+Commits: 3e0003e8, f00a8e8e (+ this docs handoff commit).
+
 ## 2026-07-03 day (later 3) -- TRUE 1080p cloud delivery SHIPPED (Fable-traced end-to-end)
 Did: implemented real 1080p for the CLOUD lane, Fable-reviewed twice (local, no credits).
 - `cloud_delivery_wh()` in cloud_media_canonical.py -- orientation-preserving 1080p cloud

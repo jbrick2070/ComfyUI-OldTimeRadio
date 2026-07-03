@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 night | branch v2.0-alpha @ c914321e | prod/main + tags operator-GATED.
+> Last updated 2026-07-03 (credits-enrichment window) | branch v2.0-alpha @ f00a8e8e | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -28,6 +28,28 @@
 ---
 
 ## 1. CURRENT STEP
+
+**ACTIVE (2026-07-03, operator kickoff) = CREDITS ENRICHMENT -- next slice: S3+S1 ATOMIC (the
+guaranteed-RED window).** Source of truth: `docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md`
+(v4, build-ready) + `KICKOFF.md`. DONE so far (pushed, HEAD==origin):
+- S2 durable singleton stamps @ 3e0003e8 (stamp_durable + LedgerStampError in production_ledger;
+  CastLock / image dispatcher / stable_audio_theme music_engine / render batch all under the loud
+  contract; tests/test_credits_s2_durable_stamps.py, 11 green). Suite 6098/0 + Bug Bible green.
+- OTR_CreditsRoll SCAFFOLD @ f00a8e8e (nodes/otr_credits_roll.py, UNWIRED + UNREGISTERED;
+  tests/test_credits_roll_spec.py 13 green -- absorbs the 3 dossier RENDER-ENGINES tests + bug410).
+NEXT = S3+S1 as ONE ATOMIC commit per GO_FORWARD_CREDITS §S3/orchestration step 3: rip node-12 HUD
+(dossier + credits-music loop + treatment merge 2402-2428) + rip node-84 tail-fill/loop-last-clip
+(otr_silent_composite :388-413, :690-741) + REGISTER OTR_CreditsRoll in root __init__.py (~:312
+table) + wire 93->CreditsRoll->85 in the JSON (rewire link 250, PRESERVE link 263, add manifest
+link from 92 slot 1 + declared-tail input on node 85) + make the mux guard CREDITS-AWARE
+(v_dur <= a_dur + declared_tail + tol; never blind-widen 45s) + retire test_hud_dossier_bug3 x3 +
+test_video_render_path_cw4.py::test_assemble_extends_to_floor_for_credits_tail_bug410 in the SAME
+commit + OTR_WorkflowValidator. S3 gate: full kibitz + Fable FINAL grounded pass BEFORE merge
+(CLAUDE.md §9). Then S0 (font +50% + budget), then S4 (footer :598 only). Frame-level live smoke
+per KICKOFF verification. Do NOT land rip and paste as separate commits.
+
+**Previously active (PARKED behind credits enrichment; resume after):
+CLOUD SOAK + Bug B (motion) + 1080p, below.**
 
 **ACTIVE (2026-07-03 day) = CLOUD SOAK + fix Bug B (motion) + 1080p, on the LOGGED-IN Desktop.**
 Cloud auth is UNBLOCKED: operator set `OTR_COMFY_API_KEY` at USER scope (len=72) -> headless
