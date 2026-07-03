@@ -166,17 +166,19 @@ def test_workflow_json_node87_matches_live_widget_model():
         d = json.load(f)
     n87 = next(n for n in d["nodes"] if n["id"] == 87)
     n3 = next(n for n in d["nodes"] if n["id"] == 3)
-    # 2026-07-03: allow_auto_fallback widget removed (clean-UI) -> 15 -> 14.
-    assert len(n87["widgets_values"]) == 14, n87["widgets_values"]
+    # 2026-07-03 clean-UI removals: allow_auto_fallback (15 -> 14) then the dead
+    # episode_duration_target (14 -> 13) widget+socket.
+    assert len(n87["widgets_values"]) == 13, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     assert not ({"other_beats_clip_mode", "other_beats_n",
                  "scene_broll_video_model",
                  "background_abstract_video_model"} & names87)
     assert "allow_auto_fallback" not in names87
+    assert "episode_duration_target" not in names87
     # the workflow pin IS the character default (no registry default_roles
     # owner for character_video -- r4 codex fold): pinned engine must be
     # registered or the inherit sentinel.
-    pin = n87["widgets_values"][13]
+    pin = n87["widgets_values"][12]
     from nodes._otr_video_engines import registry as vreg
     assert pin == "(use Other Beats default)" or vreg.is_registered(pin), pin
     # node 3: sfx overlay gone, script_json link landed on slot 2

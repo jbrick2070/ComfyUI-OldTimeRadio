@@ -240,13 +240,6 @@ class OTRVideoDirector:
                 }),
             },
             "optional": {
-                "episode_duration_target": ("STRING", {
-                    "default": "auto",
-                    "tooltip": (
-                        "Target episode length mm:ss, or 'auto' to derive from "
-                        "the frozen audio (the binding source of truth)."
-                    ),
-                }),
                 "custom_models_json": ("STRING", {
                     "multiline": True,
                     "default": "{}",
@@ -292,7 +285,7 @@ class OTRVideoDirector:
                music_image_model, other_beats_image_model,
                fps, canvas_w, canvas_h,
                seed_mode, request_seed,
-               episode_duration_target="auto", custom_models_json="{}",
+               custom_models_json="{}",
                character_video_model=USE_OTHER_BEATS,
                gate_in=""):
         warnings: list = []
@@ -341,7 +334,6 @@ class OTRVideoDirector:
             },
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
-            "episode_duration_target": str(episode_duration_target or "auto"),
             "warnings": warnings,
         }
         for w in warnings:
