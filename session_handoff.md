@@ -31,8 +31,14 @@ HEAD == origin @ 13de2a60 (verify). Suite 6059/0 + Bug Bible 16/0 at last push.
   log lines; clips at output\otr\episodes\pending_*\clips\. Bar: speech >=2.0
   (music exempt). Expect: face-forward portraits + radio-face bookends
   (S4c fired on b000, log-proven).
-- After scoring: launch ~2 unattended soaks (operator: "run a couple soaks"
-  before yoga) -- reuse the proof9b launch cmd with --words 120 then --words 30.
+- SOAKS ALREADY QUEUED (2026-07-02 ~18:28): proof9b breached the ceiling
+  (14659 > 14500; desktop-session baseline crept to ~2.9GB), so the server was
+  rebooted with OTR_LTX_AV_RENDER_CANVAS=768x416 (server-env, THIS boot only)
+  and proof9c relaunched at that canvas; a 120w soak (%TEMP%\soak1_120w.log)
+  and a 30w soak (%TEMP%\soak2_30w.log) are chained behind it in one detached
+  cmd. Morning window: score proof9c + QA both soaks (metric is roughly
+  scale-invariant; note the 768x416 canvas in any comparison), and consider a
+  permanent baseline-aware canvas step-down if the desktop keeps squatting.
 
 ## Ops gotchas burned tonight (do not relose)
 - ComfyUI main.py RE-EXECS itself under a uv-python CHILD: killing the venv
