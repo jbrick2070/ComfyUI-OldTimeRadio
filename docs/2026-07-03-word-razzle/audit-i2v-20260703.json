@@ -1,0 +1,4921 @@
+{
+  "audit_meta": {
+    "comfy_root": "C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI",
+    "comfyui_commit": "bb131be9e83d2f773c90f1d6f1e4b248a498c8c5",
+    "generated_utc": "2026-07-03T08:05:15.632024+00:00",
+    "generator": "scripts/otr_pin_partner_nodes.py --audit-i2v"
+  },
+  "counts": {
+    "passing": 36,
+    "v3_blocked": 29,
+    "video_classes": 91
+  },
+  "passing_rows": [
+    "comfy_api_nodes.nodes_bytedance.ByteDanceFirstLastFrameNode",
+    "comfy_api_nodes.nodes_bytedance.ByteDanceImageReferenceNode",
+    "comfy_api_nodes.nodes_bytedance.ByteDanceImageToVideoNode",
+    "comfy_api_nodes.nodes_grok.GrokVideoNode",
+    "comfy_api_nodes.nodes_kling.ImageToVideoWithAudio",
+    "comfy_api_nodes.nodes_kling.KlingAvatarNode",
+    "comfy_api_nodes.nodes_kling.KlingCameraControlI2VNode",
+    "comfy_api_nodes.nodes_kling.KlingImage2VideoNode",
+    "comfy_api_nodes.nodes_kling.KlingStartEndFrameNode",
+    "comfy_api_nodes.nodes_kling.MotionControl",
+    "comfy_api_nodes.nodes_kling.OmniProEditVideoNode",
+    "comfy_api_nodes.nodes_kling.OmniProVideoToVideoNode",
+    "comfy_api_nodes.nodes_ltxv.ImageToVideoNode",
+    "comfy_api_nodes.nodes_luma.LumaImageToVideoGenerationNode",
+    "comfy_api_nodes.nodes_luma.LumaRay32ImageToVideoNode",
+    "comfy_api_nodes.nodes_luma.LumaRay32KeyframesToVideoNode",
+    "comfy_api_nodes.nodes_minimax.MinimaxHailuoVideoNode",
+    "comfy_api_nodes.nodes_minimax.MinimaxImageToVideoNode",
+    "comfy_api_nodes.nodes_minimax.MinimaxSubjectToVideoNode",
+    "comfy_api_nodes.nodes_pixverse.PixverseImageToVideoNode",
+    "comfy_api_nodes.nodes_pixverse.PixverseTransitionVideoNode",
+    "comfy_api_nodes.nodes_runway.RunwayAleph2VideoToVideoNode",
+    "comfy_api_nodes.nodes_runway.RunwayFirstLastFrameNode",
+    "comfy_api_nodes.nodes_runway.RunwayImageToVideoNodeGen3a",
+    "comfy_api_nodes.nodes_runway.RunwayImageToVideoNodeGen4",
+    "comfy_api_nodes.nodes_sora.OpenAIVideoSora2",
+    "comfy_api_nodes.nodes_veo2.Veo3FirstLastFrameNode",
+    "comfy_api_nodes.nodes_veo2.Veo3VideoGenerationNode",
+    "comfy_api_nodes.nodes_veo2.VeoVideoGenerationNode",
+    "comfy_api_nodes.nodes_vidu.Vidu2ImageToVideoNode",
+    "comfy_api_nodes.nodes_vidu.Vidu2StartEndToVideoNode",
+    "comfy_api_nodes.nodes_vidu.ViduImageToVideoNode",
+    "comfy_api_nodes.nodes_vidu.ViduReferenceVideoNode",
+    "comfy_api_nodes.nodes_vidu.ViduStartEndToVideoNode",
+    "comfy_api_nodes.nodes_wan.WanImageToVideoApi",
+    "comfy_api_nodes.nodes_wan.WanReferenceVideoApi"
+  ],
+  "rows": [
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Beeble",
+      "class_name": "BeebleSwitchXVideoEdit",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.alpha_mode=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "reference_image",
+      "import_path": "comfy_api_nodes.nodes_beeble",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "reference_image": "IMAGE"
+        },
+        "required": {
+          "alpha_mode": "COMFY_DYNAMICCOMBO_V3",
+          "max_resolution": "COMBO",
+          "prompt": "STRING",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): required.alpha_mode=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_beeble.BeebleSwitchXVideoEdit",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Bria",
+      "class_name": "BriaRemoveVideoBackground",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_bria",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "background_color": "COMBO",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bria.BriaRemoveVideoBackground",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Bria",
+      "class_name": "BriaVideoGreenScreen",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_bria",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "green_shade": "COMBO",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bria.BriaVideoGreenScreen",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Bria",
+      "class_name": "BriaVideoReplaceBackground",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "background_image",
+      "import_path": "comfy_api_nodes.nodes_bria",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "background_image": "IMAGE",
+          "background_video": "VIDEO"
+        },
+        "required": {
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bria.BriaVideoReplaceBackground",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDance2FirstLastFrameNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "first_frame": "IMAGE",
+          "first_frame_asset_id": "STRING",
+          "last_frame": "IMAGE",
+          "last_frame_asset_id": "STRING"
+        },
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDance2FirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDance2ReferenceNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDance2ReferenceNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDance2TextToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDance2TextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDanceFirstLastFrameNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "camera_fixed": "BOOLEAN",
+          "generate_audio": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "first_frame": "IMAGE",
+          "last_frame": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDanceFirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDanceImageReferenceNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "images",
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "images": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDanceImageReferenceNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDanceImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "camera_fixed": "BOOLEAN",
+          "generate_audio": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "image": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDanceImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/ByteDance",
+      "class_name": "ByteDanceTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_bytedance",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "camera_fixed": "BOOLEAN",
+          "generate_audio": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_bytedance.ByteDanceTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Gemini",
+      "class_name": "GeminiVideoOmni",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_gemini",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_gemini.GeminiVideoOmni",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Grok",
+      "class_name": "GrokVideoEditNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_grok",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMBO",
+          "prompt": "STRING",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_grok.GrokVideoEditNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Grok",
+      "class_name": "GrokVideoExtendNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_grok",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_grok.GrokVideoExtendNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Grok",
+      "class_name": "GrokVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_grok",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "image": "IMAGE"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_grok.GrokVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Grok",
+      "class_name": "GrokVideoReferenceNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_grok",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_grok.GrokVideoReferenceNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/HitPaw",
+      "class_name": "HitPawVideoEnhance",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_hitpaw",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_hitpaw.HitPawVideoEnhance",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "ImageToVideoWithAudio",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "generate_audio": "BOOLEAN",
+          "mode": "COMBO",
+          "model_name": "COMBO",
+          "prompt": "STRING",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.ImageToVideoWithAudio",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": true,
+      "category": "partner/video/Kling",
+      "class_name": "KlingAvatarNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "prompt": "STRING"
+        },
+        "required": {
+          "image": "IMAGE",
+          "mode": "COMBO",
+          "seed": "INT",
+          "sound_file": "AUDIO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "AVATAR audio-exempt (supplies audio_ref 'sound_file')"
+      ],
+      "required_audio": "sound_file",
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingAvatarNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingCameraControlI2VNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "camera_control": "CAMERA_CONTROL",
+          "cfg_scale": "FLOAT",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingCameraControlI2VNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingCameraControlT2VNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "camera_control": "CAMERA_CONTROL",
+          "cfg_scale": "FLOAT",
+          "negative_prompt": "STRING",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingCameraControlT2VNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingDualCharacterVideoEffectNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image_left",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "effect_scene": "COMBO",
+          "image_left": "IMAGE",
+          "image_right": "IMAGE",
+          "mode": "COMBO",
+          "model_name": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingDualCharacterVideoEffectNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingFirstLastFrameNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "INT",
+          "end_frame": "IMAGE",
+          "first_frame": "IMAGE",
+          "generate_audio": "BOOLEAN",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingFirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingImage2VideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "cfg_scale": "FLOAT",
+          "duration": "COMBO",
+          "mode": "COMBO",
+          "model_name": "COMBO",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingImage2VideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingLipSyncAudioToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": false,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "audio": "AUDIO",
+          "video": "VIDEO",
+          "voice_language": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "requires AUDIO input 'audio'",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": "audio",
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingLipSyncAudioToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingLipSyncTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "text": "STRING",
+          "video": "VIDEO",
+          "voice": "COMBO",
+          "voice_speed": "FLOAT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingLipSyncTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingSingleImageVideoEffectNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "effect_scene": "COMBO",
+          "image": "IMAGE",
+          "model_name": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingSingleImageVideoEffectNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingStartEndFrameNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "cfg_scale": "FLOAT",
+          "end_frame": "IMAGE",
+          "mode": "COMBO",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingStartEndFrameNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "cfg_scale": "FLOAT",
+          "mode": "COMBO",
+          "negative_prompt": "STRING",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingVideoExtendNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "cfg_scale": "FLOAT",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "video_id": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingVideoExtendNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "KlingVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.multi_shot=COMFY_DYNAMICCOMBO_V3",
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "start_frame": "IMAGE"
+        },
+        "required": {
+          "generate_audio": "BOOLEAN",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "multi_shot": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.multi_shot=COMFY_DYNAMICCOMBO_V3, required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.KlingVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "MotionControl",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "reference_image",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "model": "COMBO"
+        },
+        "required": {
+          "character_orientation": "COMBO",
+          "keep_original_sound": "BOOLEAN",
+          "mode": "COMBO",
+          "prompt": "STRING",
+          "reference_image": "IMAGE",
+          "reference_video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.MotionControl",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "OmniProEditVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "reference_images",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "reference_images": "IMAGE",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "keep_original_sound": "BOOLEAN",
+          "model_name": "COMBO",
+          "prompt": "STRING",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.OmniProEditVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "OmniProFirstLastFrameNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [
+        "optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "end_frame",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "end_frame": "IMAGE",
+          "generate_audio": "BOOLEAN",
+          "reference_images": "IMAGE",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "storyboards": "COMFY_DYNAMICCOMBO_V3"
+        },
+        "required": {
+          "duration": "INT",
+          "first_frame": "IMAGE",
+          "model_name": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.OmniProFirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "OmniProImageToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [
+        "optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "reference_images",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "generate_audio": "BOOLEAN",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "storyboards": "COMFY_DYNAMICCOMBO_V3"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "model_name": "COMBO",
+          "prompt": "STRING",
+          "reference_images": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.OmniProImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "OmniProTextToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [
+        "optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "generate_audio": "BOOLEAN",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "storyboards": "COMFY_DYNAMICCOMBO_V3"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "model_name": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "dynamic V3 combo input(s): optional.storyboards=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.OmniProTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "OmniProVideoToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "reference_images",
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "reference_images": "IMAGE",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "keep_original_sound": "BOOLEAN",
+          "model_name": "COMBO",
+          "prompt": "STRING",
+          "reference_video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.OmniProVideoToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Kling",
+      "class_name": "TextToVideoWithAudio",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_kling",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "COMBO",
+          "generate_audio": "BOOLEAN",
+          "mode": "COMBO",
+          "model_name": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_kling.TextToVideoWithAudio",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/LTXV",
+      "class_name": "ImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration",
+        "fps"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_ltxv",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "generate_audio": "BOOLEAN"
+        },
+        "required": {
+          "duration": "COMBO",
+          "fps": "COMBO",
+          "image": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_ltxv.ImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/LTXV",
+      "class_name": "TextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration",
+        "fps"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_ltxv",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "generate_audio": "BOOLEAN"
+        },
+        "required": {
+          "duration": "COMBO",
+          "fps": "COMBO",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_ltxv.TextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaImageToVideoGenerationNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_image",
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "first_image": "IMAGE",
+          "last_image": "IMAGE",
+          "luma_concepts": "LUMA_CONCEPTS"
+        },
+        "required": {
+          "duration": "COMBO",
+          "loop": "BOOLEAN",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaImageToVideoGenerationNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32ExtendVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.direction=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "direction": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "source_generation_id": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "dynamic V3 combo input(s): required.direction=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32ExtendVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32ImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "end_frame": "IMAGE",
+          "start_frame": "IMAGE"
+        },
+        "required": {
+          "loop": "BOOLEAN",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32ImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32KeyframesToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration",
+        "keyframes"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "keyframes",
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "keyframes": "LUMA_RAY32_KEYFRAME",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32KeyframesToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32TextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "COMBO",
+          "loop": "BOOLEAN",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32TextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32VideoEditNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "strength": "COMBO",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32VideoEditNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaRay32VideoReframeNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO",
+        "STRING"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaRay32VideoReframeNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Luma",
+      "class_name": "LumaTextToVideoGenerationNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_luma",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "luma_concepts": "LUMA_CONCEPTS"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "COMBO",
+          "loop": "BOOLEAN",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_luma.LumaTextToVideoGenerationNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/MiniMax",
+      "class_name": "MinimaxHailuoVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame_image",
+      "import_path": "comfy_api_nodes.nodes_minimax",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "duration": "COMBO",
+          "first_frame_image": "IMAGE",
+          "prompt_optimizer": "BOOLEAN",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "prompt_text": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt_text",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_minimax.MinimaxHailuoVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/MiniMax",
+      "class_name": "MinimaxImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_minimax",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "seed": "INT"
+        },
+        "required": {
+          "image": "IMAGE",
+          "model": "COMBO",
+          "prompt_text": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt_text",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_minimax.MinimaxImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/MiniMax",
+      "class_name": "MinimaxSubjectToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "subject",
+      "import_path": "comfy_api_nodes.nodes_minimax",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "seed": "INT"
+        },
+        "required": {
+          "model": "COMBO",
+          "prompt_text": "STRING",
+          "subject": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt_text",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_minimax.MinimaxSubjectToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/MiniMax",
+      "class_name": "MinimaxTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_minimax",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "seed": "INT"
+        },
+        "required": {
+          "model": "COMBO",
+          "prompt_text": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt_text",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_minimax.MinimaxTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/PixVerse",
+      "class_name": "PixverseImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration_seconds"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_pixverse",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "negative_prompt": "STRING",
+          "pixverse_template": "PIXVERSE_TEMPLATE"
+        },
+        "required": {
+          "duration_seconds": "COMBO",
+          "image": "IMAGE",
+          "motion_mode": "COMBO",
+          "prompt": "STRING",
+          "quality": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_pixverse.PixverseImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/PixVerse",
+      "class_name": "PixverseTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration_seconds"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_pixverse",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "negative_prompt": "STRING",
+          "pixverse_template": "PIXVERSE_TEMPLATE"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration_seconds": "COMBO",
+          "motion_mode": "COMBO",
+          "prompt": "STRING",
+          "quality": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_pixverse.PixverseTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/PixVerse",
+      "class_name": "PixverseTransitionVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration_seconds"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_pixverse",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "negative_prompt": "STRING"
+        },
+        "required": {
+          "duration_seconds": "COMBO",
+          "first_frame": "IMAGE",
+          "last_frame": "IMAGE",
+          "motion_mode": "COMBO",
+          "prompt": "STRING",
+          "quality": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_pixverse.PixverseTransitionVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Runway",
+      "class_name": "RunwayAleph2VideoToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "keyframes"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "keyframes",
+      "import_path": "comfy_api_nodes.nodes_runway",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "keyframes": "RUNWAY_ALEPH2_KEYFRAME",
+          "prompt_images": "RUNWAY_ALEPH2_PROMPT_IMAGE"
+        },
+        "required": {
+          "prompt": "STRING",
+          "public_figure_threshold": "COMBO",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_runway.RunwayAleph2VideoToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Runway",
+      "class_name": "RunwayFirstLastFrameNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_runway",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "end_frame": "IMAGE",
+          "prompt": "STRING",
+          "ratio": "COMBO",
+          "seed": "INT",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_runway.RunwayFirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Runway",
+      "class_name": "RunwayImageToVideoNodeGen3a",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_runway",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "prompt": "STRING",
+          "ratio": "COMBO",
+          "seed": "INT",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_runway.RunwayImageToVideoNodeGen3a",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Runway",
+      "class_name": "RunwayImageToVideoNodeGen4",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "start_frame",
+      "import_path": "comfy_api_nodes.nodes_runway",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "COMBO",
+          "prompt": "STRING",
+          "ratio": "COMBO",
+          "seed": "INT",
+          "start_frame": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_runway.RunwayImageToVideoNodeGen4",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Sora",
+      "class_name": "OpenAIVideoSora2",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_sora",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "image": "IMAGE",
+          "seed": "INT"
+        },
+        "required": {
+          "duration": "COMBO",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "size": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_sora.OpenAIVideoSora2",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Topaz",
+      "class_name": "TopazVideoEnhance",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "interpolation_frame_rate",
+      "import_path": "comfy_api_nodes.nodes_topaz",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "dynamic_compression_level": "COMBO",
+          "interpolation_duplicate": "BOOLEAN",
+          "interpolation_duplicate_threshold": "FLOAT",
+          "interpolation_enabled": "BOOLEAN",
+          "interpolation_frame_rate": "INT",
+          "interpolation_model": "COMBO",
+          "interpolation_slowmo": "INT",
+          "upscaler_creativity": "COMBO"
+        },
+        "required": {
+          "upscaler_enabled": "BOOLEAN",
+          "upscaler_model": "COMBO",
+          "upscaler_resolution": "COMBO",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_topaz.TopazVideoEnhance",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Topaz",
+      "class_name": "TopazVideoEnhanceV2",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.upscaler_model=COMFY_DYNAMICCOMBO_V3",
+        "required.interpolation_model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_topaz",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "dynamic_compression_level": "COMBO"
+        },
+        "required": {
+          "interpolation_model": "COMFY_DYNAMICCOMBO_V3",
+          "upscaler_model": "COMFY_DYNAMICCOMBO_V3",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.upscaler_model=COMFY_DYNAMICCOMBO_V3, required.interpolation_model=COMFY_DYNAMICCOMBO_V3",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_topaz.TopazVideoEnhanceV2",
+      "schema_api": "v1",
+      "seed_supported": false
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Veo",
+      "class_name": "Veo3FirstLastFrameNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_veo2",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "first_frame": "IMAGE",
+          "generate_audio": "BOOLEAN",
+          "last_frame": "IMAGE",
+          "model": "COMBO",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_veo2.Veo3FirstLastFrameNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Veo",
+      "class_name": "Veo3VideoGenerationNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration_seconds"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_veo2",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "duration_seconds": "INT",
+          "enhance_prompt": "BOOLEAN",
+          "generate_audio": "BOOLEAN",
+          "image": "IMAGE",
+          "model": "COMBO",
+          "negative_prompt": "STRING",
+          "person_generation": "COMBO",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_veo2.Veo3VideoGenerationNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Veo",
+      "class_name": "VeoVideoGenerationNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration_seconds"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_veo2",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "duration_seconds": "INT",
+          "enhance_prompt": "BOOLEAN",
+          "image": "IMAGE",
+          "model": "COMBO",
+          "negative_prompt": "STRING",
+          "person_generation": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "aspect_ratio": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_veo2.VeoVideoGenerationNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu2ImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "INT",
+          "image": "IMAGE",
+          "model": "COMBO",
+          "movement_amplitude": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu2ImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu2ReferenceVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "audio": "BOOLEAN",
+          "duration": "INT",
+          "model": "COMBO",
+          "movement_amplitude": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "subjects": "COMFY_AUTOGROW_V3"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu2ReferenceVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu2StartEndToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "INT",
+          "end_frame": "IMAGE",
+          "first_frame": "IMAGE",
+          "model": "COMBO",
+          "movement_amplitude": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu2StartEndToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu2TextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "aspect_ratio": "COMBO",
+          "background_music": "BOOLEAN",
+          "duration": "INT",
+          "model": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu2TextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu3ImageToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "image": "IMAGE",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu3ImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu3StartEndToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "end_frame": "IMAGE",
+          "first_frame": "IMAGE",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu3StartEndToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "Vidu3TextToVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.Vidu3TextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduExtendVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "end_frame",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "end_frame": "IMAGE"
+        },
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt": "STRING",
+          "seed": "INT",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduExtendVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduImageToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "duration": "INT",
+          "movement_amplitude": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "image": "IMAGE",
+          "model": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduImageToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduMultiFrameVideoNode",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "frames"
+      ],
+      "dynamic_v3_inputs": [
+        "required.frames=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "start_image",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "frames": "COMFY_DYNAMICCOMBO_V3",
+          "model": "COMBO",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "start_image": "IMAGE"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.frames=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduMultiFrameVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduReferenceVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "images",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "movement_amplitude": "COMBO",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "images": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduReferenceVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduStartEndToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "duration": "INT",
+          "movement_amplitude": "COMBO",
+          "prompt": "STRING",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "end_frame": "IMAGE",
+          "first_frame": "IMAGE",
+          "model": "COMBO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduStartEndToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Vidu",
+      "class_name": "ViduTextToVideoNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_vidu",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "aspect_ratio": "COMBO",
+          "duration": "INT",
+          "movement_amplitude": "COMBO",
+          "resolution": "COMBO",
+          "seed": "INT"
+        },
+        "required": {
+          "model": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_vidu.ViduTextToVideoNode",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "HappyHorseImageToVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "first_frame",
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "first_frame": "IMAGE",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.HappyHorseImageToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "HappyHorseReferenceVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.HappyHorseReferenceVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "HappyHorseTextToVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.HappyHorseTextToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "HappyHorseVideoEditApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "video": "VIDEO",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.HappyHorseVideoEditApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "Wan2ImageToVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "last_frame",
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "audio": "AUDIO",
+          "last_frame": "IMAGE"
+        },
+        "required": {
+          "first_frame": "IMAGE",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt_extend": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.Wan2ImageToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "Wan2ReferenceVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.Wan2ReferenceVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "Wan2TextToVideoApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "audio": "AUDIO"
+        },
+        "required": {
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt_extend": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.Wan2TextToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "Wan2VideoContinuationApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": "last_frame",
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "last_frame": "IMAGE"
+        },
+        "required": {
+          "first_clip": "VIDEO",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "prompt_extend": "BOOLEAN",
+          "seed": "INT",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.Wan2VideoContinuationApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "Wan2VideoEditApi",
+      "contains_dynamic_v3": true,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [
+        "required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": false,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "audio_setting": "COMBO",
+          "model": "COMFY_DYNAMICCOMBO_V3",
+          "seed": "INT",
+          "video": "VIDEO",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "dynamic V3 combo input(s): required.model=COMFY_DYNAMICCOMBO_V3"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.Wan2VideoEditApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "WanImageToVideoApi",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "image",
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "audio": "AUDIO",
+          "duration": "INT",
+          "generate_audio": "BOOLEAN",
+          "negative_prompt": "STRING",
+          "prompt_extend": "BOOLEAN",
+          "resolution": "COMBO",
+          "seed": "INT",
+          "shot_type": "COMBO",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "image": "IMAGE",
+          "model": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.WanImageToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "WanReferenceVideoApi",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": true,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": "reference_videos",
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "duration": "INT",
+          "model": "COMBO",
+          "negative_prompt": "STRING",
+          "prompt": "STRING",
+          "reference_videos": "COMFY_AUTOGROW_V3",
+          "seed": "INT",
+          "shot_type": "COMBO",
+          "size": "COMBO",
+          "watermark": "BOOLEAN"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": true,
+      "prompt_kwarg": "prompt",
+      "reasons": [],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.WanReferenceVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/Wan",
+      "class_name": "WanTextToVideoApi",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [
+        "duration"
+      ],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": true,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wan",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {
+          "audio": "AUDIO",
+          "duration": "INT",
+          "generate_audio": "BOOLEAN",
+          "negative_prompt": "STRING",
+          "prompt_extend": "BOOLEAN",
+          "seed": "INT",
+          "shot_type": "COMBO",
+          "size": "COMBO",
+          "watermark": "BOOLEAN"
+        },
+        "required": {
+          "model": "COMBO",
+          "prompt": "STRING"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": "prompt",
+      "reasons": [
+        "no IMAGE-init input"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wan.WanTextToVideoApi",
+      "schema_api": "v1",
+      "seed_supported": true
+    },
+    {
+      "_limits_source": "unknown",
+      "api_node": true,
+      "audio_available_exempt": false,
+      "category": "partner/video/WaveSpeed",
+      "class_name": "WavespeedFlashVSRNode",
+      "contains_dynamic_v3": false,
+      "credits_per_second": null,
+      "duration_inputs": [],
+      "dynamic_v3_inputs": [],
+      "filters": {
+        "has_image_input": false,
+        "has_prompt": false,
+        "no_required_audio": true,
+        "non_v3": true,
+        "returns_video": true
+      },
+      "image_input": null,
+      "import_path": "comfy_api_nodes.nodes_wavespeed",
+      "inputs": {
+        "hidden": {
+          "api_key_comfy_org": "API_KEY_COMFY_ORG",
+          "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
+          "comfy_usage_source": "COMFY_USAGE_SOURCE",
+          "unique_id": "UNIQUE_ID"
+        },
+        "optional": {},
+        "required": {
+          "target_resolution": "COMBO",
+          "video": "VIDEO"
+        }
+      },
+      "max_duration_s": null,
+      "max_resolution": null,
+      "pass": false,
+      "prompt_kwarg": null,
+      "reasons": [
+        "no IMAGE-init input",
+        "no STRING prompt input",
+        "no seed input (flag, not a hard fail)"
+      ],
+      "required_audio": null,
+      "return_types": [
+        "VIDEO"
+      ],
+      "row": "comfy_api_nodes.nodes_wavespeed.WavespeedFlashVSRNode",
+      "schema_api": "v1",
+      "seed_supported": false
+    }
+  ],
+  "verdict": "CANDIDATE_FOUND"
+}

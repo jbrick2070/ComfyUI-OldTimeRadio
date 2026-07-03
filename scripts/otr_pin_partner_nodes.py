@@ -266,9 +266,246 @@ def check_against_yaml() -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# --audit-i2v (word_razzle Phase 0, 2026-07-03): REPORT-ONLY discovery of a
+# promptable, non-V3, image-to-video cloud row for the animated word card.
+# Walks the WHOLE live comfy_api_nodes catalog (CURATED_ROWS cannot discover
+# anything new), applies code-checkable filters per class, and writes a
+# machine-readable JSON report. NON-MUTATING (never touches partner_nodes.yaml).
+# The classifier (_classify_video_row) is PURE so the suite tests it with
+# synthetic schemas -- importing the comfy core inside pytest corrupts teardown
+# (same reason --check runs as a subprocess).
+# ---------------------------------------------------------------------------
+AUDIT_OUT_DIR = REPO_ROOT / "docs" / "2026-07-03-word-razzle"
+
+_STRING_TOKENS = {"STRING"}
+_IMAGE_TOKENS = {"IMAGE"}
+_AUDIO_TOKENS = {"AUDIO"}
+_VIDEO_TOKENS = {"VIDEO"}
+#: input NAME hints for an image-init when the token is not a bare IMAGE
+_IMAGE_NAME_HINTS = ("image", "frame", "reference", "init", "start", "first")
+_DURATION_NAME_HINTS = ("duration", "length", "fps", "frames", "seconds", "second")
+
+
+def _is_v3_token(tok) -> bool:
+    """A dynamic V3 combo token (model lists that only resolve at runtime --
+    the seedance_2 / wan_i2v blocker). Heuristic on the observable token
+    string: a bare V3/DYNAMIC marker. Combo option lists (pinned "COMBO") are
+    NOT v3 by themselves."""
+    s = str(tok).upper()
+    return ("DYNAMIC" in s and "V3" in s) or "DYNAMICCOMBO" in s
+
+
+def _classify_video_row(class_name, inputs, return_types):
+    """PURE audit classifier for one video-returning class.
+
+    ``inputs`` is ``{"required"/"optional"/"hidden": {name: token}}`` (the
+    :func:`_pin_inputs` shape). Returns the audit record fields: the exact
+    prompt kwarg NAME, the image-init NAME, a required-audio NAME (or None),
+    seed support, duration inputs, a ``contains_dynamic_v3`` flag, per-filter
+    pass/fail, an overall ``pass`` and human ``reasons``. kling-Avatar-style
+    classes are EXEMPT from the no-required-audio filter (they still SUPPLY
+    audio_ref -- music/spoken beats have audio) but are scored, not auto-passed.
+    """
+    req = inputs.get("required", {}) or {}
+    opt = inputs.get("optional", {}) or {}
+    allin = {**opt, **req}                     # required wins on name clash
+    rts = {str(t).upper() for t in (return_types or [])}
+
+    def _find_string_prompt():
+        cands = [n for n, t in allin.items() if str(t).upper() in _STRING_TOKENS]
+        for n in cands:
+            if n.lower() == "prompt":
+                return n
+        for n in cands:
+            if "prompt" in n.lower():
+                return n
+        return None
+
+    def _find_image():
+        for n, t in allin.items():
+            if str(t).upper() in _IMAGE_TOKENS:
+                return n
+        for n in allin:
+            if any(h in n.lower() for h in _IMAGE_NAME_HINTS):
+                return n
+        return None
+
+    prompt_kwarg = _find_string_prompt()
+    image_input = _find_image()
+    required_audio = next(
+        (n for n, t in req.items() if str(t).upper() in _AUDIO_TOKENS), None)
+    seed_supported = ("seed" in req) or ("seed" in opt)
+    duration_inputs = sorted(
+        n for n in allin if any(h in n.lower() for h in _DURATION_NAME_HINTS))
+    dyn_v3 = [f"{sec}.{n}={t}" for sec in ("required", "optional")
+              for n, t in (inputs.get(sec, {}) or {}).items() if _is_v3_token(t)]
+    contains_dynamic_v3 = bool(dyn_v3)
+    audio_exempt = "avatar" in class_name.lower()
+
+    filters = {
+        "returns_video": bool(_VIDEO_TOKENS & rts),
+        "has_image_input": image_input is not None,
+        "has_prompt": prompt_kwarg is not None,
+        "no_required_audio": (required_audio is None) or audio_exempt,
+        "non_v3": not contains_dynamic_v3,
+    }
+    reasons = []
+    if not filters["returns_video"]:
+        reasons.append("does not return VIDEO")
+    if not filters["has_image_input"]:
+        reasons.append("no IMAGE-init input")
+    if not filters["has_prompt"]:
+        reasons.append("no STRING prompt input")
+    if required_audio is not None and not audio_exempt:
+        reasons.append(f"requires AUDIO input '{required_audio}'")
+    if contains_dynamic_v3:
+        reasons.append("dynamic V3 combo input(s): " + ", ".join(dyn_v3))
+    if not seed_supported:
+        reasons.append("no seed input (flag, not a hard fail)")
+    if audio_exempt and required_audio is not None:
+        reasons.append(f"AVATAR audio-exempt (supplies audio_ref '{required_audio}')")
+    passed = all(filters.values())
+    return {
+        "class_name": class_name,
+        "return_types": list(return_types or []),
+        "inputs": inputs,
+        "prompt_kwarg": prompt_kwarg,
+        "image_input": image_input,
+        "required_audio": required_audio,
+        "audio_available_exempt": bool(audio_exempt and required_audio is not None),
+        "seed_supported": seed_supported,
+        "duration_inputs": duration_inputs,
+        "contains_dynamic_v3": contains_dynamic_v3,
+        "dynamic_v3_inputs": dyn_v3,
+        "max_duration_s": None, "max_resolution": None, "_limits_source": "unknown",
+        "credits_per_second": None,          # pricing comes from PRICING.md, not yaml
+        "filters": filters,
+        "pass": passed,
+        "reasons": reasons,
+    }
+
+
+def _audit_verdict(rows) -> str:
+    """PURE verdict from classified rows (the decision tree, testable without
+    the live core): a passing promptable non-V3 i2v row -> CANDIDATE_FOUND;
+    else any V3-blocked row -> BLOCKED_ON_V3_EXPANSION (waits on the S1
+    V3-expansion); else BLOCKED_NO_USABLE_ROW."""
+    if any(r.get("pass") for r in rows):
+        return "CANDIDATE_FOUND"
+    if any(r.get("contains_dynamic_v3") for r in rows):
+        return "BLOCKED_ON_V3_EXPANSION"
+    return "BLOCKED_NO_USABLE_ROW"
+
+
+def _iter_video_classes(module_cache):
+    """Yield ``(module_name, class_name, cls)`` for every class DEFINED in a
+    comfy_api_nodes module whose RETURN_TYPES contains VIDEO. Per-module import
+    failures are EXPECTED (partial env) -- logged + skipped, never fatal."""
+    seen = set()
+    for mod_name in _iter_api_node_modules():
+        try:
+            mod = importlib.import_module(mod_name)
+        except Exception as exc:              # noqa: BLE001 -- expected + logged
+            print(f"  [warn] import {mod_name} failed: {exc}")
+            continue
+        module_cache[mod_name] = mod
+        for cname in dir(mod):
+            cls = getattr(mod, cname, None)
+            if not inspect.isclass(cls):
+                continue
+            if getattr(cls, "__module__", "") != mod_name:
+                continue                      # skip re-exports
+            rt = getattr(cls, "RETURN_TYPES", None)
+            if not rt:
+                continue
+            try:
+                tokens = {str(t).upper() for t in rt}
+            except TypeError:
+                continue
+            if "VIDEO" not in tokens:
+                continue
+            key = (mod_name, cname)
+            if key in seen:
+                continue
+            seen.add(key)
+            yield mod_name, cname, cls
+
+
+def audit_i2v() -> dict:
+    """Walk the live catalog, classify every video-returning class, and return
+    the report dict. REPORT-ONLY; never mutates the yaml."""
+    sys.path.insert(0, str(COMFY_ROOT))
+    os.chdir(COMFY_ROOT)
+    module_cache: dict = {}
+    rows = []
+    for mod_name, cname, cls in _iter_video_classes(module_cache):
+        try:
+            input_types = cls.INPUT_TYPES()
+            inputs = _pin_inputs(input_types)
+            schema_api = "v1"
+        except Exception as exc:              # noqa: BLE001 -- V3/opaque schema
+            rows.append({
+                "row": f"{mod_name}.{cname}", "import_path": mod_name,
+                "class_name": cname, "schema_api": "v3_or_opaque",
+                "category": str(getattr(cls, "CATEGORY", "")),
+                "pass": False,
+                "reasons": [f"INPUT_TYPES() not introspectable: "
+                            f"{type(exc).__name__}: {exc}"],
+            })
+            continue
+        rec = _classify_video_row(cname, inputs, [str(t) for t in cls.RETURN_TYPES])
+        rec["row"] = f"{mod_name}.{cname}"
+        rec["import_path"] = mod_name
+        rec["schema_api"] = schema_api
+        rec["category"] = str(getattr(cls, "CATEGORY", ""))
+        rec["api_node"] = bool(getattr(cls, "API_NODE", False))
+        rows.append(rec)
+    passing = [r for r in rows if r.get("pass")]
+    v3_only = [r for r in rows if r.get("contains_dynamic_v3")]
+    verdict = _audit_verdict(rows)
+    return {
+        "audit_meta": {
+            "generated_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+            "comfyui_commit": _comfy_commit(),
+            "generator": "scripts/otr_pin_partner_nodes.py --audit-i2v",
+            "comfy_root": str(COMFY_ROOT),
+        },
+        "verdict": verdict,
+        "counts": {"video_classes": len(rows), "passing": len(passing),
+                   "v3_blocked": len(v3_only)},
+        "passing_rows": [r["row"] for r in passing],
+        "rows": sorted(rows, key=lambda r: r["row"]),
+    }
+
+
+def write_audit_report(report: dict) -> Path:
+    AUDIT_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d")
+    out = AUDIT_OUT_DIR / f"audit-i2v-{stamp}.json"
+    out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
+                   encoding="utf-8")
+    print(f"\nwrote {out}")
+    return out
+
+
+def audit_i2v_main() -> int:
+    report = audit_i2v()
+    write_audit_report(report)
+    print(f"\nVERDICT: {report['verdict']}  "
+          f"(video_classes={report['counts']['video_classes']}, "
+          f"passing={report['counts']['passing']}, "
+          f"v3_blocked={report['counts']['v3_blocked']})")
+    if report["passing_rows"]:
+        print("PASSING rows: " + ", ".join(report["passing_rows"]))
+    return 0
+
+
 def main(argv) -> int:
     if "--check" in argv:
         return check_against_yaml()
+    if "--audit-i2v" in argv:
+        return audit_i2v_main()
     rows = pin_all()
     write_yaml(rows)
     ok = sum(1 for r in rows.values() if r["status"] == "OK")
