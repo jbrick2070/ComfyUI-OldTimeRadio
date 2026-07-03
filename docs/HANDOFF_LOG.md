@@ -6,6 +6,23 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (later 3) -- HEAD 5b8923fc (v2.0-alpha) -- still_word RE-ARCHITECTURE + kibitz r2 + roundtable CONVERGED (build-ready; NO code yet)
+Did: operator pivoted the words feature (ideo_word -> `still_word`): a MODEL-AGNOSTIC VIDEO
+engine (still_flat sibling), base still minted by ANY chosen image model (decoupled), prompt
+branched by role (char/announcer word-driven from beat line; music abstract episode-title, no
+words; pooled-char DEFERRED -- pooling removed). Ran kibitz r1 (codex+antigravity) -> chose
+ideo_word-before-B6 + surfaced the role-vs-kind fork; operator resolved to still_word. Ran
+kibitz r2 (codex; antigravity credit-bug hangs silent, dropped per operator) + a roundtable
+frontier pass (Grok + Gemini; GPT empty-reasoned) ~$0.20. STRONG convergence, all grounded by
+me: render_driver ENGINE_FAMILY + :1044 still-init tuple must include still_word (else black/no
+still); composer reads image_policy["video_models"] via a _still_word_roles_from_policy helper
+(mesh_fodder_roles precedent) -- REJECTED grok's "add video_policy_json input" (already there);
+pure compose_still_word_prompt fail-LOUD (no LLM reuse); fail-LOUD no-floor; cut word_razzle to
+a name constant; register in 5 sites. Build-ready spec: docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md.
+Current step: still_word BUILD-READY -- awaiting operator GO to code.
+Next: build still_word per BUILD_PLAN.md (suite + Bug Bible + B7 + push per green chunk); then B6.
+Commits: 5b8923fc (kibitz r1 plan doc); this docs batch (BUILD_PLAN + r2 + roundtable pass00).
+
 ## 2026-07-03 (later 2) -- HEAD 1bf2a2d2 (v2.0-alpha) -- S1+1 `ideo` shipped; ideo_word + B6 next
 Did: added the plain `ideo` cloud Ideogram scene-still engine (node_key cloud_ideogram_v4,
 same S1 adapter pattern, no new prompt path) + rendering_speed->USD price map

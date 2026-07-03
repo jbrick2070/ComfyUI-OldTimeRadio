@@ -36,20 +36,26 @@ EMPTY default_roles (never automatic); no enable flag; per-row env-overridable e
 **S1+1 `ideo` SHIPPED @ 1bf2a2d2** (plain cloud Ideogram scene-still; node_key
 cloud_ideogram_v4; rendering_speed price map; off the conformance xfail list). Suite 6093/0.
 
-**SPRINT B REMAINING (NEXT CODE):** (a) **`ideo_word`** -- the words-specialist IMAGE engine
-(same node_key cloud_ideogram_v4), the meaty part of the S1+1 doc: a new `kind=lyric_card`
-path in the meta-brief image-prompt composer with TWO modes keyed by role -- `lyric_text`
-(character/announcer: deterministic first-clause/8-word excerpt helper + tests, BYPASSES
-NO_TEXT_CLAUSE, quoted-text shape) and `title_mood` (music_visual: wordless old-radio card
-from the procgen episode title + Meta brief, KEEPS no-text) -- + adapter(s) + CAPABILITIES +
-guarded import (same change) + cache_lookup/cache_store wiring + PROMPT_PROFILES.md tail
-extending the ideogram entry + title plumbing. Worded cards NEVER pooled. NOTE for the
-implementer: the B5 conformance `_engine_by_node_key()` map is node_key->ONE engine (last
-wins) -- when ideo_word joins `ideo` on cloud_ideogram_v4, make that test iterate ALL engines
-per node_key so both are conformance-checked. (b) **B6** portrait-mint 3D pre-selection gate
-(beat loop + character_description->finish_visual_prompt + ShotLock ordering; 3D lanes PARKED,
-lower-urgency). Then order C(S3 full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate + S4x GO/NO-GO
-still await the operator (unchanged).
+**NEXT CODE = `still_word` (BUILD-READY, kibitz r2 + roundtable converged 2026-07-03).**
+Operator RE-ARCHITECTED the words feature away from a cloud-Ideogram `ideo_word` IMAGE engine
+to a MODEL-AGNOSTIC VIDEO engine `still_word` (a still_flat sibling in cheap_families.py):
+selected per-role in the VIDEO dropdown; the base still is minted by ANY chosen image model
+(decoupled -- "don't fix the image model into the video options"); the delta vs still_flat is
+the PROMPT the base still is generated from -- char/announcer = word-driven from the beat
+script line, music = abstract episode-title picture (no words), pooled-char = DEFERRED
+(pooling removed 2026-07-01). `word_razzle` = animated variant (NAME CONSTANT ONLY in v1, no
+dark registered engine). FULL BUILD-READY SPEC + exact grounded sites (render_driver
+ENGINE_FAMILY + the :1044 still-init tuple; composer via image_policy["video_models"] +
+_still_word_roles_from_policy like mesh_fodder_roles; pure compose_still_word_prompt fail-LOUD;
+fail-LOUD no-floor; register in all 5 sites): `docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md`.
+Panel = codex (local) + Grok + Gemini (GPT empty-reasoned; antigravity credit-bug dropped);
+Cowork Claude anchor+judge; ~$0.20 roundtable spend. THEN (b) **B6** portrait-mint 3D
+pre-selection gate (3D lanes PARKED, lower-urgency). Then order C(S3 full) -> D(TTS) ->
+E(C1) -> F. S5 GPU exit gate + S4x GO/NO-GO still await the operator (unchanged).
+
+Conformance debt (fold into still_word or a follow-up): the B5
+`_engine_by_node_key()` map is node_key->ONE engine (last wins); if any two engines ever share
+a node_key, make it iterate ALL engines per node_key.
 
 **QUEUED (operator pickups 2026-07-03, ride BEHIND the forward order):** ideo_word family --
 (1) `docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` = the MAIN build, pulled in as
