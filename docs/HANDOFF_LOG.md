@@ -6,18 +6,21 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
-## 2026-07-03 night -- HEAD e3292324 (v2.0-alpha) -- HAND OFF to a new window for the OVERNIGHT MODEL-MATRIX SOAK
-Did: operator called a hand-off. Next window's mission = an autonomous overnight LIVE-GPU soak
-of MANY 30-45 word full-pipeline episodes across the model matrix (2000 Comfy credits, all
-usable). Pass 1 = COHERENT same-model-across-roles combos (same video + same image model per
-episode, NOT mismatched), NEWEST models first; voice indextts2/bark. Later = mixes. Watch
-closely, root-cause bug fixes live, suite+Bug Bible+B7 + push green per chunk. Reset the box
-(selective CIM kill) before every headless run; load the REAL otr_scifi_16gb_full.json; assets
--> otr/episodes/<ep>/, final -> otr/obs/; Test-Path before success. still_word stays BUILD-READY
-(docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md) behind the soak.
-Current step: OVERNIGHT MODEL-MATRIX SOAK (GO_FORWARD section 1).
-Next: reset box -> boot headless ComfyUI -> Pass-1 coherent-combo legs (newest first) -> monitor + fix.
-Commits: none this hand-off (docs baton committed at e3292324 prior).
+## 2026-07-03 night -- HEAD fe5a2b38 (v2.0-alpha) -- HAND OFF: CODE EVERYTHING FIRST, THEN the overnight soak
+Did: operator called a hand-off + CLARIFIED the order (code first, NOT soak first). Next
+window's mission, HARD order: (1) CODE the pending build items -- still_word (per
+docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md) + word_razzle (ANIMATED variant, BUILT now, not
+name-only) + any queued build-ready items, each wired into otr_scifi_16gb_full.json same-change;
+(2) REGRESS (suite + Bug Bible + B7); (3) PUSH green per chunk; (4) THEN the overnight LIVE-GPU
+SOAK of many 30-45w full-pipeline episodes across the model matrix (2000 Comfy credits), Pass 1 =
+COHERENT same-model-across-roles combos NEWEST-first, voice indextts2/bark, later mixes. GOLDEN
+RULES restated: NO fallbacks, NO hidden model promotion, every model works END-TO-END or FAILS
+LOUD + gets fixed (root cause); if hung up -> /kibitz for convergence. Reset box (selective CIM
+kill) before every headless run; load the REAL json; assets -> otr/episodes/<ep>/, final ->
+otr/obs/; Test-Path before success.
+Current step: CODE EVERYTHING (still_word + word_razzle + ...) -> regress -> push -> soak (GO_FORWARD section 1).
+Next: build still_word per BUILD_PLAN.md (start), then word_razzle; regress + push per green chunk.
+Commits: none this hand-off (docs baton).
 
 ## 2026-07-03 (later 3) -- HEAD 5b8923fc (v2.0-alpha) -- still_word RE-ARCHITECTURE + kibitz r2 + roundtable CONVERGED (build-ready; NO code yet)
 Did: operator pivoted the words feature (ideo_word -> `still_word`): a MODEL-AGNOSTIC VIDEO
