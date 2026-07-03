@@ -25,6 +25,16 @@ CONFORMANCE TEST). Order for the next window: (1) QA the 30w soak, (2) proof9d c
 832x448 re-run + score, (3) S1. S5 GPU exit gate (silent-vs-audio-in VRAM/time A/B on
 the first live clip) rides whichever render window comes first.
 
+**OPERATOR DIRECTIVE 2026-07-02 late evening: NO FALLBACKS, NO AUTO-DEFAULTS, ANYWHERE.**
+The dropdown values SAVED in `workflows/otr_scifi_16gb_full.json` are the ONLY defaults.
+Consequences: (a) S3 FULL is RESCOPED -- "reactive auto-defaults + fallback chains" are
+CUT from its scope (cloud rows stay selectable-only; remaining S3-full scope = ShotLock
+audit stamps + seedance/wan V3-expansion pins + live provider proof); (b) E1 (rip the
+fallback scaffolding out of render_driver: make_fallback_of/UNIVERSAL_FLOOR/SYNTH_FALLBACKS/
+EXPECTED_OOM_TRAIL) + E2 (kill allow_auto_fallback) are PROMOTED from tech debt to
+directive compliance -- engine failure = LOUD stop, never a swap; (c) no code-side
+default_engine_for_role may override the shipped JSON's widget values.
+
 **OPERATOR DIRECTIVE 2026-07-02 evening (SHIPPED @ cc349c1d): NO hidden cloud enable
 switch.** `OTR_ENABLE_COMFY_CLOUD_MEDIA` is REMOVED (same clean break as OpenRouter C6):
 the dropdown pick IS the enable; missing credentials fail LOUD at invoke-time auth
