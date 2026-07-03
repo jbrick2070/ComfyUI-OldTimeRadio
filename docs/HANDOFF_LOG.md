@@ -6,6 +6,23 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 day (later) -- CLOUD AUTH UNBLOCKED (key) -- HAND OFF for 1080p cloud soak + Bug B
+Did: operator set OTR_COMFY_API_KEY at USER scope (len=72). Proved auth resolves (scripts/
+otr_cloud_s0_smoke.py --leg1: old "no credentials" GONE; remaining nodes.MAX_RESOLUTION err is a
+standalone-harness artifact, not production). Built scripts/_otr_cloud_video_soak.py (cloud video
+x ideo, 30w, indextts2; boots headless per leg, folds the key into the per-leg env so the server
+inherits it; ensure_ollama preflight). Ran it: cv1 word_razzle x ideo verified rendering with auth
+OK. Operator then said STOP (wants 1080p, not the default 832x480) -> killed driver + :8000 server.
+Current step: cloud soak PAUSED at operator request; next window resumes at 1080p.
+Next (fresh window, Opus 4.8/high): (1) wire 1080p -- canvas 1920x1080 on OTR_VideoDirector
+(VERIFY canvas_w/canvas_h is patch-safe) + OTR_CLOUD_PIXVERSE_QUALITY=1080p (humo portrait
+excepted); relaunch _otr_cloud_video_soak.py. (2) Bug B: motion not in final (legacy procgen
+ships) -- trace manifest->compositor->mux, make motion the base. (3) fold kibitz r1 (codex+agy,
+kibitz-runs/2026-07-03-cloud-video-fixes/r1/) findings. Bug A auth code-wiring now OPTIONAL (env
+key solves it). Load the key each run: $env:OTR_COMFY_API_KEY=[Environment]::GetEnvironmentVariable(
+'OTR_COMFY_API_KEY','User'). Plan: docs/2026-07-03-cloud-video-fixes/PLAN.md.
+Commits: docs baton (this). Drivers gitignored (_otr_cloud_video_soak.py, _otr_cloud_desktop_probe.py).
+
 ## 2026-07-03 day -- TWO CLOUD/VIDEO ROOT CAUSES FOUND (operator review) -- FIX NEXT
 Context: operator wants a full CLOUD SOAK (all cloud video x ideo image, high/low pairing) + fix
 bugs so razzle etc render; wan PARKED. Desktop app (:8000, PID 55684, `main.py

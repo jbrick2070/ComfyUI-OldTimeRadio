@@ -29,6 +29,30 @@
 
 ## 1. CURRENT STEP
 
+**ACTIVE (2026-07-03 day) = CLOUD SOAK + fix Bug B (motion) + 1080p, on the LOGGED-IN Desktop.**
+Cloud auth is UNBLOCKED: operator set `OTR_COMFY_API_KEY` at USER scope (len=72) -> headless
+runs inherit it (load per-command: `$env:OTR_COMFY_API_KEY=[Environment]::GetEnvironmentVariable(
+'OTR_COMFY_API_KEY','User')`). Smoke leg1 proved auth resolves (old "no credentials" gone; the
+remaining `nodes.MAX_RESOLUTION` error is a STANDALONE-harness artifact, not production).
+CLOUD-VIDEO soak RUNNING detached: `scripts/_otr_cloud_video_soak.py` (word_razzle/kling_avatar/
+seedance_2/kling_lipsync x ideo image, 30w, indextts2) -> results in
+`scripts/_otr_soak_capstone_results/cloudvid_<stamp>/results.jsonl`, obs -> otr/obs. cv1
+word_razzle x ideo verified rendering (auth OK).
+OPEN, do next window:
+- **1080p (operator):** cloud video + stills at 1920x1080 (humo PORTRAIT excepted). Wire canvas_w/
+  canvas_h=1920/1080 on OTR_VideoDirector (VERIFY it's patch-safe / whitelist) + OTR_CLOUD_PIXVERSE_
+  QUALITY=1080p; kling has its own res tier. Current run is DEFAULT 832x480 (proves path, not 1080p).
+- **Bug B (motion not in final):** heavy-engine finals ship the LEGACY procgen video (video_engine
+  HUD/credits over the scene STILL), NOT the per-beat motion clips (OTR_VideoRenderBatch ltx/humo).
+  Trace episode dir manifest -> compositor blend -> final mux; make motion the BASE. See
+  docs/2026-07-03-cloud-video-fixes/PLAN.md.
+- **Bug A (auth code wiring):** now OPTIONAL (env key solves it) -- only for the pure-login-no-env
+  case: declare hidden api_key_comfy_org/auth_token_comfy_org on OTR_ImageGenDispatcher +
+  OTR_VideoRenderBatch. Plan + kibitz r1 (codex+agy, launched) in docs/2026-07-03-cloud-video-fixes/.
+- wan_i2v PARKED (ckpt missing).
+
+
+
 **ACTIVE = CODE EVERYTHING FIRST, THEN SOAK (operator directive 2026-07-03 night).**
 Order is HARD: (1) CODE -> (2) REGRESS -> (3) PUSH -> (4) SOAK. Do NOT soak until the code is
 built, green, and pushed.
