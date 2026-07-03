@@ -6,6 +6,26 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 night (overnight coder) -- HEAD c914321e (v2.0-alpha) -- word_razzle SHIPPED (Phase 0 audit + Phase 1 engine)
+Did: (Phase 0 @ 3843bbd0) added a non-mutating --audit-i2v mode to
+scripts/otr_pin_partner_nodes.py that walks the whole live comfy_api_nodes catalog for a
+promptable non-V3 image-to-video row; live run vs comfy bb131be9 -> VERDICT=CANDIDATE_FOUND
+(91 video classes, 36 passing, 29 V3-blocked). Pure classifier + verdict unit-tested
+(tests/test_audit_i2v.py, 12). Report checked in (docs/2026-07-03-word-razzle/). (Phase 1 @
+c914321e) built the word_razzle cloud i2v engine (eng_cloud_video, node_key
+cloud_pixverse_i2v -- the Phase-0 pick: image+prompt+seed+duration+motion_mode). Pinned the
+Pixverse row (15/15 OK, live drift --check green). LOAD-BEARING asset_refs fix: _init_image_input
+resolves asset_refs['init_image'] first then top-level (real build_request output) -- fixes ALL
+cloud i2v engines. Dark/selectable (empty default_roles, no enable flag); family=image_to_video
+routes scene-still init via _SCENE_INIT_FAMILIES (mirrors cloud_wan_i2v). tests/test_word_razzle.py
+(11) + EXPECTED_ROW_IDS. Suite 6142/0, Bug Bible 16, B7 in-suite.
+Current step: still_word + word_razzle DONE + pushed. NEXT = (4) the overnight model-matrix SOAK.
+Next: reset box, boot headless ComfyUI on the REAL otr_scifi_16gb_full.json, run 30-45w
+full-pipeline episodes Pass 1 = coherent same-model LOCAL combos newest-first, voice indextts2/bark;
+assets -> otr/episodes/<ep>/, final -> otr/obs/. Cloud rows (word_razzle etc.) fail LOUD without
+OTR_COMFY_API_KEY (unset this window) -- expected; the live word_razzle spike awaits the key.
+Commits: 3843bbd0 (Phase 0), c914321e (Phase 1) -- both pushed, HEAD==origin.
+
 ## 2026-07-03 night (overnight coder) -- HEAD 097f44ad (v2.0-alpha) -- still_word SHIPPED
 Did: built still_word per docs/2026-07-03-sprintb-remainder/BUILD_PLAN.md -- a
 model-agnostic still_flat-sibling VIDEO engine (StillWordFamily in cheap_families) whose
