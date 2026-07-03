@@ -88,6 +88,18 @@ CURATED_ROWS = {
                                "music/b-roll reactive default; audio-ref + identity"),
     "cloud_wan_i2v":          ("Wan2ImageToVideoApi", "WAN", 0,
                                "mute_only OPT-DOWN row (operator amendment)"),
+    # 2026-07-02 roster expansion (operator; pricing-driven tiers):
+    "cloud_ideogram_v4":      ("IdeogramV4", "IDEOGRAM", 0,
+                               "stills; best text rendering (posters/clues/"
+                               "signage, F1 synergy); rendering_speed spans "
+                               "TURBO 9.05cr -> QUALITY 27.16cr/image"),
+    "cloud_seedream_2":       ("ByteDanceSeedreamNodeV2", "BYTEDANCE", 0,
+                               "stills; cheapest stylization tier "
+                               "(~7.4-8.4cr/image)"),
+    "cloud_elevenlabs_voice_selector": ("ElevenLabsVoiceSelector",
+                               "ELEVENLABS", 0,
+                               "AUX helper, no billing; produces the "
+                               "ELEVENLABS_VOICE input the TTS row requires"),
 }
 
 AUTH_HIDDEN_NAMES = ("auth_token_comfy_org", "api_key_comfy_org")

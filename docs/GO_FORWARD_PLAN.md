@@ -41,7 +41,18 @@ workflow JSON untouched until S4 (operator-gated). NEXT CODE = S1 (stills lane: 
 + recraft/flux/nano adapters + portrait-mint gates).
 
 **CODE BATON 2026-07-02 (later):** back with the LTX-fixes window; cloud S0 remainder BUILT there
-(c4 above). QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
+(c4 above). c5 (docs window, 2026-07-02 pm): roster expanded to 14 pinned rows
+(+cloud_ideogram_v4, +cloud_seedream_2, +cloud_elevenlabs_voice_selector AUX -- the TTS row
+requires its ELEVENLABS_VOICE output) + versioned pricing stamp `docs/2026-07-02-cloud-engines/
+PRICING.md` (211cr=$1; voice ~$1.10/ep FLAT across tiers; per-line Kling lipsync ~$0.25-1.00 = the
+dominant cost) + prompt/param profiles doc (see below).
+
+**OPERATOR-CONFIRMED HOLD (2026-07-02, from operator mid-day): NO video-cloud (S3) coding yet, by
+any window/team.** S3 rides on S1 patterns + the smoke-proven bridge; order stands: live smokes
+(operator env, see S0 REMAINING) -> S1 STILLS (the next codable chunk for whoever holds the baton)
+-> S3 video. An eager team takes S1, coordinated HERE, one window at a time.
+
+QUEUED BEHIND cloud S1+S3: creative formats F1 Living Evidence Board + F2
 Tin-Toy Theatre -- plan `docs/2026-07-02-creative-formats/CREATIVE_FORMATS_PLAN.md`
 (kibitz-hardened; ideation record in docs/2026-07-02-cloud-engines/roundtable/ideas_synthesis.md).
 

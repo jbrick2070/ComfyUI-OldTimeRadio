@@ -1,7 +1,7 @@
 pin_meta:
   combo_options_excluded: true
   comfyui_commit: bb131be9e83d2f773c90f1d6f1e4b248a498c8c5
-  generated_utc: '2026-07-02T19:46:03.608772+00:00'
+  generated_utc: '2026-07-03T00:52:50.437108+00:00'
   generator: scripts/otr_pin_partner_nodes.py
   schema_version: pin-2026-07-02
 rows:
@@ -71,6 +71,27 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
+  cloud_elevenlabs_voice_selector:
+    api_node: false
+    auth_hidden_present: []
+    category: partner/audio/ElevenLabs
+    class_name: ElevenLabsVoiceSelector
+    function: EXECUTE_NORMALIZED
+    import_path: comfy_api_nodes.nodes_elevenlabs
+    inputs:
+      hidden: {}
+      optional: {}
+      required:
+        voice: COMBO
+    is_async: false
+    notes: AUX helper, no billing; produces the ELEVENLABS_VOICE input the TTS row
+      requires
+    provider_id: ELEVENLABS
+    return_types:
+    - ELEVENLABS_VOICE
+    seed_supported: false
+    selected_output: 0
+    status: OK
   cloud_flux_pro:
     api_node: true
     auth_hidden_present:
@@ -97,6 +118,36 @@ rows:
     is_async: true
     notes: BEST stills; prompt continuity w/ flux_gen1
     provider_id: BFL
+    return_types:
+    - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_ideogram_v4:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/Ideogram
+    class_name: IdeogramV4
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_ideogram
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        prompt: STRING
+        rendering_speed: COMBO
+        resolution: COMBO
+        seed: INT
+    is_async: true
+    notes: stills; best text rendering (posters/clues/signage, F1 synergy); rendering_speed
+      spans TURBO 9.05cr -> QUALITY 27.16cr/image
+    provider_id: IDEOGRAM
     return_types:
     - IMAGE
     seed_supported: true
@@ -253,6 +304,35 @@ rows:
     provider_id: BYTEDANCE
     return_types:
     - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_seedream_2:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/ByteDance
+    class_name: ByteDanceSeedreamNodeV2
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_bytedance
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt: STRING
+        seed: INT
+        watermark: BOOLEAN
+    is_async: true
+    notes: stills; cheapest stylization tier (~7.4-8.4cr/image)
+    provider_id: BYTEDANCE
+    return_types:
+    - IMAGE
     seed_supported: true
     selected_output: 0
     status: OK

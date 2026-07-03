@@ -23,6 +23,9 @@ EXPECTED_ROW_IDS = {
     "cloud_recraft", "cloud_flux_pro", "cloud_nano_banana_2",
     "cloud_kling_avatar", "cloud_kling_lipsync", "cloud_seedance_2",
     "cloud_wan_i2v",
+    # 2026-07-02 roster expansion:
+    "cloud_ideogram_v4", "cloud_seedream_2",
+    "cloud_elevenlabs_voice_selector",
 }
 
 
@@ -57,11 +60,18 @@ def test_ok_rows_are_complete(pin):
             assert field in row, f"{rid} missing {field}"
         assert row["selected_output"] < len(row["return_types"]), rid
         assert isinstance(row["seed_supported"], bool), rid
-        # auth broker design requirement: partner nodes expose BOTH
-        assert set(row["auth_hidden_present"]) == {
-            "auth_token_comfy_org", "api_key_comfy_org"}, rid
-        # all pinned partner nodes are async API nodes on this install
-        assert row["is_async"] is True, rid
+        if row.get("api_node"):
+            # auth broker design requirement: BILLED partner nodes
+            # expose BOTH auth hidden inputs and are async
+            assert set(row["auth_hidden_present"]) == {
+                "auth_token_comfy_org", "api_key_comfy_org"}, rid
+            assert row["is_async"] is True, rid
+        else:
+            # AUX helper rows (e.g. the ElevenLabs voice selector) are
+            # free local nodes: no billing, no auth requirement
+            assert "AUX" in row["notes"], (
+                f"{rid} is not an API node but not marked AUX -- "
+                f"either the pin drifted or the row is miscurated")
 
 
 def test_provider_ids_normalized(pin):
