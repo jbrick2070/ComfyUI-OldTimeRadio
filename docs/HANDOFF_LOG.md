@@ -6,6 +6,19 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (later 2) -- HEAD 1bf2a2d2 (v2.0-alpha) -- S1+1 `ideo` shipped; ideo_word + B6 next
+Did: added the plain `ideo` cloud Ideogram scene-still engine (node_key cloud_ideogram_v4,
+same S1 adapter pattern, no new prompt path) + rendering_speed->USD price map
+(TURBO/DEFAULT/QUALITY, env-overridable) + cpu CAPABILITIES row + tests; removed
+cloud_ideogram_v4 from the conformance KNOWN_UNADAPTERED xfail (now served). Suite 6093/0 +
+Bug Bible 16-pass. Docs baton for S1 core was baedc63d.
+Current step: Sprint B -- `ideo` done. NEXT = `ideo_word` (words specialist) then B6.
+Next: ideo_word = kind=lyric_card composer path (lyric_text vs title_mood modes) + excerpt
+helper + tests + cache wiring + PROMPT_PROFILES tail + title plumbing + adapter/CAPS/guarded
+import (docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md). When it joins `ideo` on
+cloud_ideogram_v4, make the B5 _engine_by_node_key map iterate ALL engines per node_key.
+Commits: 1bf2a2d2 (pushed; HEAD==origin).
+
 ## 2026-07-03 (later) -- HEAD b5ef58bc (v2.0-alpha) -- Sprint B S1 stills CORE shipped (B1-B5)
 Did: built the cloud stills lane. B3 canonicalize_image (real: validate_partner_result,
 require int w/h, PIL sRGB, scale-to-COVER+centre-crop to exact canvas, PNG, sha256).

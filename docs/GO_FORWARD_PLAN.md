@@ -33,12 +33,23 @@ ImageDirector combo is dynamic from all_engine_names(); the 4 engines auto-appea
 selectable, defaults stay flux_gen1). Suite 6089/0 + Bug Bible 16-pass + B7 in-suite.
 EMPTY default_roles (never automatic); no enable flag; per-row env-overridable estimated_usd.
 
-**SPRINT B REMAINING:** (a) B6 portrait-mint 3D pre-selection gate (touches the beat loop /
-character_description->finish_visual_prompt chain + ShotLock ordering; 3D lanes are PARKED so
-this is lower-urgency); (b) S1+1 = ideo + ideo_word engines per
-`docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` (NEXT CODE -- operator priority).
-Then order C(S3 full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate + S4x GO/NO-GO still await
-the operator (unchanged).
+**S1+1 `ideo` SHIPPED @ 1bf2a2d2** (plain cloud Ideogram scene-still; node_key
+cloud_ideogram_v4; rendering_speed price map; off the conformance xfail list). Suite 6093/0.
+
+**SPRINT B REMAINING (NEXT CODE):** (a) **`ideo_word`** -- the words-specialist IMAGE engine
+(same node_key cloud_ideogram_v4), the meaty part of the S1+1 doc: a new `kind=lyric_card`
+path in the meta-brief image-prompt composer with TWO modes keyed by role -- `lyric_text`
+(character/announcer: deterministic first-clause/8-word excerpt helper + tests, BYPASSES
+NO_TEXT_CLAUSE, quoted-text shape) and `title_mood` (music_visual: wordless old-radio card
+from the procgen episode title + Meta brief, KEEPS no-text) -- + adapter(s) + CAPABILITIES +
+guarded import (same change) + cache_lookup/cache_store wiring + PROMPT_PROFILES.md tail
+extending the ideogram entry + title plumbing. Worded cards NEVER pooled. NOTE for the
+implementer: the B5 conformance `_engine_by_node_key()` map is node_key->ONE engine (last
+wins) -- when ideo_word joins `ideo` on cloud_ideogram_v4, make that test iterate ALL engines
+per node_key so both are conformance-checked. (b) **B6** portrait-mint 3D pre-selection gate
+(beat loop + character_description->finish_visual_prompt + ShotLock ordering; 3D lanes PARKED,
+lower-urgency). Then order C(S3 full) -> D(TTS) -> E(C1) -> F. S5 GPU exit gate + S4x GO/NO-GO
+still await the operator (unchanged).
 
 **QUEUED (operator pickups 2026-07-03, ride BEHIND the forward order):** ideo_word family --
 (1) `docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md` = the MAIN build, pulled in as
