@@ -4,75 +4,164 @@
   "managed": {
     "role_overrides.announcer_visual": {
       "registry": "video",
-      "targets": [["OTR_VideoDirector", "announcer_video_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "announcer_video_model"
+        ]
+      ]
     },
     "role_overrides.music_visual": {
       "registry": "video",
-      "targets": [["OTR_VideoDirector", "music_video_model"]]
-    },
-    "role_overrides.other_beats_visual": {
-      "registry": "video",
-      "targets": [["OTR_VideoDirector", "other_beats_video_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "music_video_model"
+        ]
+      ]
     },
     "role_overrides.character_visual": {
       "registry": "video",
-      "targets": [["OTR_VideoDirector", "character_video_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "character_video_model"
+        ]
+      ]
     },
     "role_overrides.announcer_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "announcer_image_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "announcer_image_model"
+        ]
+      ]
     },
     "role_overrides.music_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "music_image_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "music_image_model"
+        ]
+      ]
     },
     "role_overrides.other_beats_image": {
       "registry": "image",
-      "targets": [["OTR_VideoDirector", "other_beats_image_model"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "other_beats_image_model"
+        ]
+      ]
     },
     "slot_overrides.char_voice_engine": {
       "registry": "audio",
-      "targets": [["OTR_BatchCharacterVoices", "engine"]]
+      "targets": [
+        [
+          "OTR_BatchCharacterVoices",
+          "engine"
+        ]
+      ]
     },
     "slot_overrides.announcer_voice_engine": {
       "registry": "audio",
-      "targets": [["OTR_AnnouncerVoice", "engine"]]
+      "targets": [
+        [
+          "OTR_AnnouncerVoice",
+          "engine"
+        ]
+      ]
     },
     "slot_overrides.music_engine": {
       "registry": "audio",
-      "targets": [["OTR_StableAudioTheme", "engine"]]
+      "targets": [
+        [
+          "OTR_StableAudioTheme",
+          "engine"
+        ]
+      ]
     },
     "slot_overrides.video_render_engine": {
       "registry": "video",
-      "targets": [["OTR_VideoRenderBatch", "engine"]]
+      "targets": [
+        [
+          "OTR_VideoRenderBatch",
+          "engine"
+        ]
+      ]
     },
     "slot_overrides.sequencer_default_tts": {
       "registry": "audio",
-      "targets": [["OTR_SceneSequencer", "default_tts"]]
+      "targets": [
+        [
+          "OTR_SceneSequencer",
+          "default_tts"
+        ]
+      ]
     },
     "features.burn_captions": {
       "registry": null,
-      "targets": [["OTR_PostUpscaleProcgenBlend", "burn_captions"]]
+      "targets": [
+        [
+          "OTR_PostUpscaleProcgenBlend",
+          "burn_captions"
+        ]
+      ]
     },
     "features.caption_style": {
       "registry": null,
-      "targets": [["OTR_PostUpscaleProcgenBlend", "caption_style"]]
+      "targets": [
+        [
+          "OTR_PostUpscaleProcgenBlend",
+          "caption_style"
+        ]
+      ]
     },
     "seed_policy.request_seed": {
       "registry": null,
-      "targets": [["OTR_VideoDirector", "request_seed"], ["OTR_ImageDirector", "request_seed"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "request_seed"
+        ],
+        [
+          "OTR_ImageDirector",
+          "request_seed"
+        ]
+      ]
     },
     "seed_policy.seed_mode": {
       "registry": null,
-      "targets": [["OTR_VideoDirector", "seed_mode"], ["OTR_ImageDirector", "seed_mode"]]
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "seed_mode"
+        ],
+        [
+          "OTR_ImageDirector",
+          "seed_mode"
+        ]
+      ]
     }
   },
   "emit_only": {
     "workflow_json_path": {
       "registry": null,
-      "targets": [["OTR_WorkflowValidator", "workflow_json_path"]]
+      "targets": [
+        [
+          "OTR_WorkflowValidator",
+          "workflow_json_path"
+        ]
+      ]
     }
   },
-  "exempt_node_types": ["OTR_LedgerScriptWriter"],
-  "never_patch_widget_names": ["seed", "noise_seed"]
+  "exempt_node_types": [
+    "OTR_LedgerScriptWriter"
+  ],
+  "never_patch_widget_names": [
+    "seed",
+    "noise_seed"
+  ]
 }

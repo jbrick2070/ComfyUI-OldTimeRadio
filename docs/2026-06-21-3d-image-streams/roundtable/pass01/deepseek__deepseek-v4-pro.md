@@ -1,33 +1,27 @@
 <!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro-20260423 -->
 
-VERDICT: no. Critical design gaps (missing prompt templates, unresolved subject selection, integration points between image fork, render driver, and composite) make it unbuildable as-is.
+VERDICT: no. The plan is missing critical specifications: subject selection for non-character beats, fork location, composite modifications, prompt templates, and aspect reconciliation. Without these, the build cannot proceed.
 
 MUST-FIX BEFORE BUILD:
-1. [Composite Opaque Placement] The plan states the mesh must be placed opaquely, not ghosted, but provides no design for the composite change. The current `_silent_procgen_blended_final` ghosts the mesh. Without specifying how the composite will use the background plate and place the mesh opaquely (e.g., alpha-composite over plate), the entire visual goal is unimplementable. Concrete fix: add a design section detailing the composite pipeline modification, including how the background plate path from the manifest replaces the current ghosted background, and ensure the composite logic respects straight-alpha.
-
-2. [Prompt Templates Missing] The “Prompt templates” open question is unanswered. The plan relies on mesh-fodder and background-plate prompts that must “reliably yield isolated subjects” and “subject-free plates,” but no concrete strings, negative prompts, or validation against the listed image engines (flux_gen1, z_image_turbo, flux2_klein, lumina_image) are provided. Without tested templates, the core fix (improved 3D fodder) remains speculative. Concrete fix: provide exact prompt scaffolds (including negative prompts) proven on each supported engine, with example outputs, before build.
-
-3. [Subject Selection Unresolved] The plan asks how to choose the 3D subject when the slot has no character (announcer/music), whether to use a story-object, and how objects are identified in the ledger. This is an open question with no resolution, leaving the fork logic undefined for non-character beats. Concrete fix: decide subject selection rules – e.g., use `char_id` if present; if absent, look for a `story_object_id` field on the shot or fall back to a generic placeholder object; document the ledger field(s) used.
-
-4. [Ledger Taxonomy and Render-Driver Integration] The plan proposes adding `mesh_fodder` and `background_plate` kinds but never specifies how the render driver and composite will read them. Currently `build_request_from_shot` assigns `init_image` from scene still for `image_to_video` family; that must change to use the mesh fodder. The composite manifest builder (`build_clip_manifest`) extracts `bg_still_path` from `_still_index`, which only finds `scene_*` kinds. Concrete fix: define:
-   - The exact `kind` strings (`mesh_fodder`, `background_plate`) and their ledger row structure (include `beat_id`, `char_id`).
-   - In `build_request_from_shot`, for engines requiring mesh fodder (detected via new capability), set `init_image` to the path of the `mesh_fodder` row for the beat (lookup by beat_id and kind).
-   - In `build_clip_manifest`, for `mesh_stage` rows, set `bg_still_path` to the `background_plate` row path (lookup by beat_id and kind).
-
-5. [Dispatcher Skip for Background Plate] The dispatcher’s `_still_needed_for_role` checks only the video engine’s consumption of stills. A background plate is not consumed by the video engine; it would be skipped, making the plate never generate. Concrete fix: either bypass `_still_needed_for_role` for kinds `background_plate` or extend the dispatcher to unconditionally generate any object whose kind is `background_plate` when the beat’s video engine requires a mesh (as indicated by the new capability field).
-
-6. [Mesh Cache Key for Non-Character Subjects] `mesh_cache_key` uses `character_id`. If the subject is an object (e.g., artifact), a generic or empty `character_id` will cause cache collisions. Concrete fix: extend `mesh_cache_key` to accept a `subject_id` that defaults to `character_id` but can be set to an object identifier, ensuring unique cache keys per distinct object.
+1. [Open questions / Subject selection] The plan does not define how the mesh fodder subject is chosen for beats without a character (announcer/music slots). Without a subject, no mesh fodder can be generated, causing the 3D engine to fail. Fix: define a rule—e.g., if no char_id and no story-object register, the beat must not use a 3D engine; the image stage should fall back to a single 2D image, and the video phase should use a non-3D engine for that beat.
+2. [Open questions / Fork location] The fork location is undecided. The image stage must be modified to produce two images for 3D beats, but the seam is not chosen. Fix: select OTR_ImageDirector (or another component that has access to engine capabilities) and define the interface for issuing two image generation requests per beat.
+3. [Design / Aspect reconciliation] The mesh fodder and background plate require different aspect ratios (portrait vs. 16:9), but the plan does not specify how to request these from the image engines. Fix: define exact dimensions (e.g., 832×1216 for fodder, 1472×832 for plate) and ensure the image engines can produce them; add aspect parameters to the image generation request.
+4. [Design / Composite change] The plan states the composite must place the subject opaquely instead of ghosting, but does not detail the changes to `_silent_procgen_blended_final` or the composite engine. Fix: specify the composite modification—e.g., use straight-alpha compositing without blending for 3D clips, or introduce a new composite mode.
+5. [Design / Prompt templates] The plan relies on prompt scaffolds that “reliably yield isolated subjects + subject-free plates” but provides none. Without proven prompts, the generated images may not meet requirements. Fix: develop and test prompt templates for mesh fodder (isolated subject) and background plate (subject-free environment) on the target image engines, and include them in the design.
+6. [Design / Engine capability flag] The plan says gating on engine capability, but the current engine code (eng_mesh_stage.py) lacks a flag like `requires_mesh_portrait`. Fix: add a capability attribute (e.g., `requires_mesh_fodder = True`) to MeshStageEngine and any other 3D engines, and implement the check in the chosen fork location.
+7. [Design / Ledger taxonomy] The plan proposes `mesh_fodder` and `background_plate` kinds but does not specify how the video phase will consume them. `build_request_from_shot` and `build_clip_manifest` must be updated. Fix: update `build_request_from_shot` to set `init_image` to the mesh_fodder image for engines with `requires_mesh_fodder`, and update `build_clip_manifest` to set `bg_still_path` to the background_plate image for those beats.
+8. [Design / Fallback handling] If mesh fodder generation fails, the video phase would receive no init_image, causing a hard failure. The plan does not address this. Fix: define fallback behavior—e.g., if mesh fodder generation fails, fall back to generating a single 2D image and mark the beat to use a non-3D engine; or in the video phase, if init_image is missing, the engine should fail closed and walk its fallback chain.
 
 SHOULD-FIX:
-7. [Aspect Reconciliation Documentation] The plan notes mesh fodder wants near-square/portrait, plate wants 16:9. Ensure that the prompt generator emits `w`/`h` fields consistent with these goals, and the dispatcher passes them through. Already feasible, but explicitly document the expected dimensions.
-
-8. [Capability Field Definition] Define a proper `requires_mesh_portrait` (boolean) class attribute on the engine and gate all fork decisions (prompt generation, dispatcher, render driver) on it, never on engine name. This is the “gate on capability” invariant.
+- Specify the exact aspect ratios and dimensions for mesh fodder and background plate, and validate that the image engines support them.
+- Include a migration strategy for existing cached meshes (old cinematic-portrait meshes must be invalidated).
+- Detail how the background plate will be passed to the composite (e.g., via manifest field `bg_still_path` or a new field).
+- Clarify how the image stage will know the planned engine for each beat (reading the video section of the ledger) and ensure the video section is available at image stage time.
 
 OPTIONAL / NICE-TO-HAVE:
-- None identified given the current state; basic completeness is required first.
+- Provide an environment variable to override the mesh fodder subject for testing.
+- Add a debug mode to visualize the mesh fodder and background plate.
 
 CUT THESE (over-engineering):
-- Nothing clearly over-engineered; generating two targeted images per 3D beat appears necessary to fix the documented blob issue.
-
-[ASSUMPTION] The plan assumes the composite pipeline can be altered to support opaque placement; no evidence of feasibility is provided.
-[ASSUMPTION] The plan assumes the validated image engines can produce the mesh fodder and background plate as described with the yet-undefined prompts.
+- The “story-object register” for subject selection is premature if not yet implemented. The initial implementation can rely on char_id only; announcer/music slots can fall back to a generic subject or be excluded from 3D.
+- The extensive discussion of mesh cache key mechanics is already handled in the code; no need to re-specify.

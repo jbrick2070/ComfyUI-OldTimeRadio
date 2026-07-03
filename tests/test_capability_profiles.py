@@ -277,7 +277,7 @@ def test_cross_validation_green_for_committed_tiers(tier):
 
 def test_cross_validation_rejects_disabled_engine():
     profile = copy.deepcopy(cp.load_profile("cpu_floor"))
-    profile["role_overrides"]["other_beats_visual"] = "humo"  # GPU-only on a CPU floor
+    profile["role_overrides"]["character_visual"] = "humo"  # GPU-only on a CPU floor
     with pytest.raises(cp.ProfileError, match="requires_cuda"):
         cp.cross_validate_profile(profile, cp.load_widget_mapping(), _declarations_by_registry())
 
@@ -343,21 +343,17 @@ def test_two_heavy_roles_still_validate():
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
-    # 2026-06-28 (operator): the 16gb master DEFAULTS the three visible video
-    # slots to viz_green (renamed from visualizer 2026-06-30, item 2) -- the
-    # working/clean default (no GPU, no FLUX since viz_green ignores
-    # init_image, no gated HuMo). The three per-role sub-slots
-    # (character / scene_broll / background_abstract) are OMITTED from the profile
-    # so they inherit other_beats (the sentinel on the master); they exist only as
-    # advanced explicit overrides. humo_14B_169 / humo_1.7B stay registered +
-    # selectable.
+    # 2026-06-28 (operator): the 16gb master defaults announcer/music video to
+    # viz_green (the working/clean default -- no GPU, no FLUX since viz_green
+    # ignores init_image, no gated HuMo) and pins CHARACTER to humo_14B_169
+    # (2026-07-03: character is a first-class slot). humo_1.7B stays registered.
     assert profile["role_overrides"]["announcer_visual"] == "viz_green"
-    assert profile["role_overrides"]["other_beats_visual"] == "viz_green"
+    assert profile["role_overrides"]["character_visual"] == "humo_14B_169"
     # Force TWO heavy roles to keep the static two-heavy regression green (single-
     # heavy residency is wrapper_bridge's RUNTIME invariant, never a static profile
     # rejection).
     profile["role_overrides"]["announcer_visual"] = "humo_14B_169"        # force heavy
-    profile["role_overrides"]["other_beats_visual"] = "humo"             # force heavy
+    profile["role_overrides"]["music_visual"] = "humo"                   # force heavy
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
     assert "ltx_audio_in" in enabled and "humo" in enabled

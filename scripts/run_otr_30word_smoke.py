@@ -65,11 +65,10 @@ RENDER_BATCH_NODE_ID = "92"
 VIDEO_DIRECTOR_SLOTS = (
     "announcer_video_model",
     "music_video_model",
-    "other_beats_video_model",
-    # Route-A promotion widget (2026-06-28): the saved workflow pins CHARACTER
-    # face beats to humo_14B_169 -- an all-ltx smoke must patch it too, or the
-    # character beats silently render HuMo (caught live 2026-07-02: histogram
-    # {ltx_audio_in: 2, humo_14B_169: 3} on the ia2v proof episode).
+    # CHARACTER is a first-class slot (2026-07-03: other_beats retired). The saved
+    # workflow pins character face beats to humo_14B_169 -- an all-ltx smoke must
+    # patch it too, or character beats silently render HuMo (caught live
+    # 2026-07-02: histogram {ltx_audio_in: 2, humo_14B_169: 3} on the ia2v proof).
     "character_video_model",
 )
 IMAGE_DIRECTOR_SLOTS = (
@@ -431,11 +430,11 @@ def _build_prompt(words: int) -> tuple[dict[str, Any], list[str]]:
     if DIRECTOR_NODE_ID in prompt:
         dinputs = prompt[DIRECTOR_NODE_ID].get("inputs", {})
         changes.append(
-            "director video announcer=%r music=%r other=%r"
+            "director video announcer=%r music=%r character=%r"
             % (
                 dinputs.get("announcer_video_model"),
                 dinputs.get("music_video_model"),
-                dinputs.get("other_beats_video_model"),
+                dinputs.get("character_video_model"),
             )
         )
         changes.append(

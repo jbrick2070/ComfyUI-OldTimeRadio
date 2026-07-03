@@ -54,8 +54,8 @@ def test_slot_maps_have_no_dead_roles_or_slots():
     }
     assert "scene_broll_video_model" not in RS.VIDEO_SLOT_ROLES
     assert "background_abstract_video_model" not in RS.VIDEO_SLOT_ROLES
-    # the legacy slot survives as the character migration lane ONLY
-    assert RS.VIDEO_SLOT_ROLES[RS.LEGACY_OTHER_BEATS_SLOT] == ("character_video",)
+    # NO legacy other_beats video slot (2026-07-03 consolidation)
+    assert "other_beats_video_model" not in RS.VIDEO_SLOT_ROLES
     assert set(SM.ROLE_TO_PROFILE_KEY) == set(SM.ALL_ROLES)
     assert "scene_broll" not in SM.ALL_ROLES
     assert "background_abstract" not in SM.ALL_ROLES
@@ -96,9 +96,10 @@ def test_slot_for_role_and_engine_id_raise_on_dead_roles():
             RS.slot_for_role(dead)
         with pytest.raises(ValueError):
             RS.engine_id_for_role({}, dead)
-    # the kept empty-slot migration lane still resolves character via legacy
-    vm = {"other_beats_video_model": "still_flat"}
-    assert RS.engine_id_for_role(vm, "character_video") == "still_flat"
+    # NO FALLBACK (2026-07-03): the legacy other_beats migration lane is gone --
+    # an empty character slot resolves to "".
+    assert RS.engine_id_for_role(
+        {"other_beats_video_model": "still_flat"}, "character_video") == ""
 
 
 def test_shot_lock_video_role_raises_on_sfx():
@@ -146,12 +147,13 @@ def test_video_director_keeps_other_beats_image_and_drops_dead_widgets():
     from nodes.otr_video_director import OTRVideoDirector
     it = OTRVideoDirector.INPUT_TYPES()
     req, opt = it["required"], it.get("optional", {})
-    assert "other_beats_image_model" in req                  # decision-locked KEEP
-    assert "other_beats_video_model" in req                  # legacy char lane KEEP
+    assert "other_beats_image_model" in req                  # decision-locked KEEP (image side)
+    # 2026-07-03: other_beats_video retired; character is a first-class video slot
+    assert "other_beats_video_model" not in req and "other_beats_video_model" not in opt
+    assert "character_video_model" in req
     for dead in ("other_beats_clip_mode", "other_beats_n",
                  "scene_broll_video_model", "background_abstract_video_model"):
         assert dead not in req and dead not in opt, dead
-    assert "character_video_model" in opt
 
 
 def test_registry_offers_engines_for_all_three_roles():
@@ -166,21 +168,22 @@ def test_workflow_json_node87_matches_live_widget_model():
         d = json.load(f)
     n87 = next(n for n in d["nodes"] if n["id"] == 87)
     n3 = next(n for n in d["nodes"] if n["id"] == 3)
-    # 2026-07-03 clean-UI removals: allow_auto_fallback (15 -> 14) then the dead
-    # episode_duration_target (14 -> 13) widget+socket.
-    assert len(n87["widgets_values"]) == 13, n87["widgets_values"]
+    # 2026-07-03 clean-UI: allow_auto_fallback (15->14), episode_duration_target
+    # (14->13), then the other_beats_video consolidation (13->12; character
+    # promoted to video slot 3 = widgets index 2).
+    assert len(n87["widgets_values"]) == 12, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     assert not ({"other_beats_clip_mode", "other_beats_n",
                  "scene_broll_video_model",
                  "background_abstract_video_model"} & names87)
     assert "allow_auto_fallback" not in names87
     assert "episode_duration_target" not in names87
-    # the workflow pin IS the character default (no registry default_roles
-    # owner for character_video -- r4 codex fold): pinned engine must be
-    # registered or the inherit sentinel.
-    pin = n87["widgets_values"][12]
+    assert "other_beats_video_model" not in names87
+    # character_video_model is now video slot 3 (widgets index 2); the pinned
+    # engine must be a registered engine (no inherit sentinel any more).
+    pin = n87["widgets_values"][2]
     from nodes._otr_video_engines import registry as vreg
-    assert pin == "(use Other Beats default)" or vreg.is_registered(pin), pin
+    assert vreg.is_registered(pin), pin
     # node 3: sfx overlay gone, script_json link landed on slot 2
     names3 = [i.get("name") for i in n3["inputs"]]
     assert "sfx_audio_clips" not in names3

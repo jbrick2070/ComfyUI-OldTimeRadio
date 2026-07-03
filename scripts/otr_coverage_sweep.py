@@ -176,7 +176,7 @@ def enumerate_options():
 def profile_for(slot_key: str, engine: str) -> dict:
     profile = copy.deepcopy(load_profile("16gb_full"))
     profile["role_overrides"][slot_key] = engine
-    if slot_key == "other_beats_visual":
+    if slot_key == "character_visual":
         # node 92's render default tracks the character engine so the live
         # render path and the OTR_VideoDirector policy agree.
         profile["slot_overrides"]["video_render_engine"] = engine

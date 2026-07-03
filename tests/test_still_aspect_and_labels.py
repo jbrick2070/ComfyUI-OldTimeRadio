@@ -79,11 +79,11 @@ def test_mesh_portrait_3d_engines_are_portrait():
 # --------------------------------------------------------------------------- #
 # _role_aspects mapping (VideoDirector -> ImageDirector -> MetaBrief still dims)
 # --------------------------------------------------------------------------- #
-def _resolved(announcer, music, other):
+def _resolved(announcer, music, character):
     return {
         "announcer_video_model": {"engine_id": announcer},
         "music_video_model": {"engine_id": music},
-        "other_beats_video_model": {"engine_id": other},
+        "character_video_model": {"engine_id": character},
     }
 
 
@@ -200,7 +200,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
     out = vd.OTRVideoDirector().direct(
         announcer_video_model="ltx_video (16:9)",
         music_video_model="humo_1.7B_169 (16:9)",
-        other_beats_video_model="humo_1.7B (portrait)",
+        character_video_model="humo_1.7B (portrait)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         other_beats_image_model="flux_gen1",
@@ -210,7 +210,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
     policy = json.loads(out[0])
     assert policy["video_models"]["announcer_video_model"]["engine_id"] == "ltx_video"
     assert policy["video_models"]["music_video_model"]["engine_id"] == "humo_1.7B_169"
-    assert policy["video_models"]["other_beats_video_model"]["engine_id"] == "humo_1.7B"
+    assert policy["video_models"]["character_video_model"]["engine_id"] == "humo_1.7B"
     assert policy["aspects"]["announcer_visual"] == "wide"
     assert policy["aspects"]["music_visual"] == "wide"
     assert policy["aspects"]["character_video"] == "portrait"

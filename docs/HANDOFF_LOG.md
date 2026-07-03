@@ -6,6 +6,61 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 day (later 3) -- TRUE 1080p cloud delivery SHIPPED (Fable-traced end-to-end)
+Did: implemented real 1080p for the CLOUD lane, Fable-reviewed twice (local, no credits).
+- `cloud_delivery_wh()` in cloud_media_canonical.py -- orientation-preserving 1080p cloud
+  DELIVERY canvas (land 1920x1080 / port 1080x1920, env OTR_CLOUD_VIDEO_CANVAS[_PORTRAIT] +
+  OTR_CLOUD_STILL_CANVAS[_PORTRAIT]). eng_cloud_video.canonicalize + eng_cloud_image._canvas_wh
+  now conform to it (NOT the smaller per-family request canvas that was downscaling the clip).
+- THE make-or-break (Fable r1): node 84 OTR_SilentComposite was hardwired 1472x832 in
+  otr_scifi_16gb_full.json -> every cloud clip downscaled at composite. BUMPED to 1920x1080
+  (surgical unique-substring replace; procgen node 12 already 1920x1080 -> now 1:1). Fable r2
+  traced the whole chain: composite/scopes(94)/blend(93)/captions(86)/mux(85) all native 1080p
+  1:1, mux -c:v copy + audio byte-identical assert intact, RTXUpscale not in graph -> no fails.
+- pixverse quality default 540p->1080p; canonicalize_video -crf 18; flux_pro request snapped
+  to /32 (1920x1088, canonical crops to 1080p) for the BFL schema. Grounded + REJECTED Fable's
+  "ideo resolution invalid" claim -- ideo minted live with resolution=1024x1024 (passthrough).
+- Tests: 5 cloud_delivery_wh unit tests + updated flux_pro/render_image asserts. Suite 6148/0
+  + Bug Bible 16 green. PUSHED ffa832a9 (1080p) + 6725b5f9 (flux /32).
+Current step: matrix soak still BLOCKED on Comfy Cloud credits (Payment Required after 4
+word_razzle 1080p clips; Desktop shows 11,846 but the API-key path drained/differs).
+Next: operator adds/verifies credits -> relaunch scripts/_otr_cloud_matrix_soak.py 0 (now delivers
+TRUE 1080p). The soak empirically validates the remaining cloud IMAGE engines at 1920x1080
+(Fable OPTIMIZE/verify list: recraft size->1820x1024 native 16:9; kling mode->pro for 1080p;
+nano_banana_2/seedream_2 model-as-dict -- UNVERIFIED, confirm live not speculatively). Bug B
+(motion-not-in-final) still open.
+Commits: ffa832a9, 6725b5f9 (+ dd15f815 the V3 auth fix earlier this session).
+
+## 2026-07-03 day (later 2) -- CLOUD BLOCKER ROOT-CAUSED + FIXED; matrix soak halts on CREDITS
+Did: found THE cloud blocker (not a flake): the invoke bridge passed hidden auth
+(api_key_comfy_org) as an execute() kwarg, but every comfy_api_nodes partner
+(IdeogramV4/Recraft/FluxPro/NanoBanana/Seedream/Pixverse/Kling) is a V3 IO.ComfyNode
+whose hidden is delivered via PREPARE_CLASS_CLONE -> cls.hidden (HiddenHolder), never
+kwargs -> "IdeogramV4.execute() got an unexpected keyword argument 'api_key_comfy_org'".
+FIX @ dd15f815: cloud_media_invoke._call_partner routes V3 nodes through PREPARE_CLASS_CLONE
+(hidden keyed by the Hidden ENUM VALUE from the pin's inputs.hidden name->TYPE map); only
+real inputs reach EXECUTE_NORMALIZED_ASYNC. Legacy V1 nodes keep the kwargs path. Added
+test_v3_partner_hidden_via_clone_not_kwargs. Suite 6143/0 + Bug Bible 16 green, PUSHED.
+Also: kibitz r1 (codex, grounded) on the 1080p change -- cloud res is FOUR surfaces
+(provider tier / request canvas / canonical clip / composite); OTR_CLOUD_PIXVERSE_QUALITY
+sets only the provider tier, then canonicalize_video (cloud_media_canonical.py:265) scales
+the clip to the REQUEST canvas (1472x832 for word_razzle) -> quality knob alone does NOT
+deliver 1080p; must NOT reach 1080p via OTR_VIDEO_LANDSCAPE_CANVAS (still/viz/floor locals
+read it). Locals are VRAM-safe (ltx/humo/ltx_av have fixed per-family overrides in
+render_driver:1394-1428). Built scripts/_otr_cloud_matrix_soak.py (14 legs: 4 cloud video
+x ideo + 5 cloud image x {still_word,still_motion}). LIVE PROOF the fix works: ideo stills
+minted across all beats + word_razzle Pixverse clips b000-b003 rendered end-to-end, no crash,
+14.4GB free. Leg HALTED at b004: cloud_pixverse_i2v "Payment Required: add credits to your
+account" -- Comfy Cloud is OUT OF CREDITS (account issue, NOT a bug). Soak stopped (all legs
+need cloud credits).
+Current step: OPERATOR must top up Comfy Cloud credits, then relaunch the matrix.
+Next: (op tops up) -> `$env:OTR_COMFY_API_KEY=[Environment]::GetEnvironmentVariable(
+'OTR_COMFY_API_KEY','User'); python scripts\_otr_cloud_matrix_soak.py 0` -> watch, root-cause
+any per-engine failure, rerun. THEN true-1080p delivery = a cloud-video-only canonical canvas
+1920x1080 (codex r1) wired without touching OTR_VIDEO_LANDSCAPE_CANVAS. Bug B (motion not the
+base of the final) still open. Drivers gitignored.
+Commits: dd15f815 (V3 hidden-auth fix + test).
+
 ## 2026-07-03 day (later) -- CLOUD AUTH UNBLOCKED (key) -- HAND OFF for 1080p cloud soak + Bug B
 Did: operator set OTR_COMFY_API_KEY at USER scope (len=72). Proved auth resolves (scripts/
 otr_cloud_s0_smoke.py --leg1: old "no credentials" GONE; remaining nodes.MAX_RESOLUTION err is a

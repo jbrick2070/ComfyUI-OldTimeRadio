@@ -267,7 +267,7 @@ def test_3d_granularity_lock_per_beat_raises(clean_image_registry,
     clean_video_registry._registry.clear()
     clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
     video_policy = json.dumps({"video_models": {
-        "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
+        "character_video_model": {"engine_id": "mesh3d", "custom": False},
     }})
     with pytest.raises(ValueError, match="per_object"):
         OTRImageDirector().direct(**_direct_kwargs(
@@ -285,7 +285,7 @@ def test_3d_granularity_lock_per_object_passes(clean_image_registry,
     clean_video_registry._registry.clear()
     clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
     video_policy = json.dumps({"video_models": {
-        "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
+        "character_video_model": {"engine_id": "mesh3d", "custom": False},
     }})
     out = OTRImageDirector().direct(**_direct_kwargs(
         video_policy_json=video_policy))
@@ -331,7 +331,7 @@ def test_unregistered_video_engine_fails_closed(clean_image_registry,
     ireg.register(_img_stub(name="flux_gen1"))
     clean_video_registry._registry.clear()
     video_policy = json.dumps({"video_models": {
-        "other_beats_video_model": {"engine_id": "ghost_engine", "custom": True},
+        "character_video_model": {"engine_id": "ghost_engine", "custom": True},
     }})
     with pytest.raises(ValueError, match="ghost_engine"):
         OTRImageDirector().direct(**_direct_kwargs(
@@ -352,7 +352,7 @@ def test_char3d_family_without_capability_fails_closed(clean_image_registry,
         family="character_3d", required_inputs=("audio_ref", "init_image"),
     )
     video_policy = json.dumps({"video_models": {
-        "other_beats_video_model": {"engine_id": "old3d", "custom": False},
+        "character_video_model": {"engine_id": "old3d", "custom": False},
     }})
     with pytest.raises(ValueError, match="requires_mesh_portrait"):
         OTRImageDirector().direct(**_direct_kwargs(
@@ -370,7 +370,7 @@ def test_char3d_engine_locks_via_capability(clean_image_registry,
     clean_video_registry._registry.clear()
     clean_video_registry._registry["mesh3d"] = _mesh3d_stub()
     locked = three_d_locked_slots({"video_models": {
-        "other_beats_video_model": {"engine_id": "mesh3d", "custom": False},
+        "character_video_model": {"engine_id": "mesh3d", "custom": False},
     }})
     assert "other_beats_image_model" in locked
 
@@ -380,7 +380,7 @@ def test_non_3d_engine_does_not_lock():
     family locks nothing (capability default False)."""
     from nodes._otr_video_engines import eng_humo  # noqa: F401
     locked = three_d_locked_slots({"video_models": {
-        "other_beats_video_model": {"engine_id": "humo", "custom": False},
+        "character_video_model": {"engine_id": "humo", "custom": False},
     }})
     assert locked == set()
 
@@ -481,8 +481,8 @@ def _np_pixels(val):
 def test_still_needed_for_role_gates_on_video_engine_init_image():
     # viz_green ignores init_image -> still NOT needed; wan_ti2v consumes
     # init_image -> still needed.
-    pol_vis = {"video_models": {"other_beats_video_model": {"engine_id": "viz_green"}}}
-    pol_wan = {"video_models": {"other_beats_video_model": {"engine_id": "wan_ti2v"}}}
+    pol_vis = {"video_models": {"character_video_model": {"engine_id": "viz_green"}}}
+    pol_wan = {"video_models": {"character_video_model": {"engine_id": "wan_ti2v"}}}
     assert disp._still_needed_for_role(pol_vis, "character_video") is False
     assert disp._still_needed_for_role(pol_wan, "character_video") is True
 
@@ -491,10 +491,10 @@ def test_still_needed_for_role_fails_safe():
     # no video_models / unknown role / unknown engine -> keep the still (legacy)
     assert disp._still_needed_for_role({}, "character_video") is True
     assert disp._still_needed_for_role(
-        {"video_models": {"other_beats_video_model": {"engine_id": "viz_green"}}},
+        {"video_models": {"character_video_model": {"engine_id": "viz_green"}}},
         "not_a_role") is True
     assert disp._still_needed_for_role(
-        {"video_models": {"other_beats_video_model": {"engine_id": "nope_engine"}}},
+        {"video_models": {"character_video_model": {"engine_id": "nope_engine"}}},
         "character_video") is True
 
 
@@ -544,7 +544,7 @@ def test_still_needed_honors_force_engine_map(monkeypatch):
     ignores. Without the env, humo still consumes its init still (unchanged)."""
     import nodes._otr_video_engines  # noqa: F401  self-register the engines
     policy = {"video_models": {
-        "other_beats_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
+        "character_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     assert disp._still_needed_for_role(policy, "character_video") is True
     # force ALL roles to the mandala (accepts_still=False) -> still NOT needed
@@ -584,7 +584,7 @@ def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, 
         "video_models": {
             "announcer_video_model": {"engine_id": "viz_green"},
             "music_video_model": {"engine_id": "viz_green"},
-            "other_beats_video_model": {"engine_id": "viz_green"}},
+            "character_video_model": {"engine_id": "viz_green"}},
         "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(
         _pobj("c1", "a spacer, station", "ph1", role="character_video"),
@@ -610,7 +610,7 @@ def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_regi
     ledger = {"episode_id": "ep_wan", "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {
         "image_models": {"other_beats_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": {"other_beats_video_model": {"engine_id": "wan_ti2v"}},
+        "video_models": {"character_video_model": {"engine_id": "wan_ti2v"}},
         "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"

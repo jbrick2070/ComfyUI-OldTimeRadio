@@ -249,12 +249,12 @@ def test_schema_extra_forbid_and_family_rules():
 
 def test_widget_vector_exact():
     """Golden pin on the director's required widget order/names (drift guard).
-    rip-sfx-broll (2026-07-01): other_beats_clip_mode / other_beats_n died
-    with the pooling; the 11-widget vector below matches node 87's
-    widgets_values[0:11] in the canonical workflow JSON."""
+    2026-07-03: three first-class video slots (announcer/music/CHARACTER) --
+    other_beats_video retired, character promoted to slot 3. The 11-widget vector
+    below matches node 87's widgets_values[0:11] in the canonical workflow JSON."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
-        "announcer_video_model", "music_video_model", "other_beats_video_model",
+        "announcer_video_model", "music_video_model", "character_video_model",
         "announcer_image_model", "music_image_model", "other_beats_image_model",
         "fps", "canvas_w", "canvas_h",
         "seed_mode", "request_seed",
@@ -309,7 +309,7 @@ def test_probe_emits_usable_list(clean_video_registry):
 def test_director_policy_json_and_clamp(clean_video_registry):
     out = OTRVideoDirector().direct(
         announcer_video_model=ADD_CUSTOM, music_video_model=ADD_CUSTOM,
-        other_beats_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
+        character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
         music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
         fps=25,
         canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
@@ -333,7 +333,7 @@ def test_director_fail_closed_incompatible_pick(clean_video_registry):
         OTRVideoDirector().direct(
             announcer_video_model="needs_unknown",  # requires an input no role supplies
             music_video_model="needs_unknown",
-            other_beats_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
+            character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
             music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
             fps=25,
             canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
@@ -555,9 +555,8 @@ def test_shotlock_end_to_end_stamps_video_section():
     policy = json.dumps({
         "video_models": {"announcer_video_model": {"engine_id": "", "custom": False},
                          "music_video_model": {"engine_id": "", "custom": False},
-                         "other_beats_video_model": {"engine_id": "", "custom": False}},
+                         "character_video_model": {"engine_id": "", "custom": False}},
         "canvas": {"w": 832, "h": 480, "fps": 25},
-        "other_beats": {"clip_mode": "unique_per_beat", "pool_n": 8},
     })
     patched, rev, report, done, episode_id = OTRShotLock().lock(
         json.dumps(led), audio_done="audio:done", video_policy_json=policy,

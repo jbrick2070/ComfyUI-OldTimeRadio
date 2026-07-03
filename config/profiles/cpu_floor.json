@@ -11,7 +11,7 @@
   "role_overrides": {
     "announcer_visual": "still_flat",
     "music_visual": "viz_green",
-    "other_beats_visual": "still_motion"
+    "character_visual": "still_motion"
   },
   "slot_overrides": {
     "char_voice_engine": "bark",

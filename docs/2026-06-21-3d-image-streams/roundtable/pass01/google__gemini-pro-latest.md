@@ -1,25 +1,19 @@
 <!-- requested_model: ~google/gemini-pro-latest | resolved_model: google/gemini-3.1-pro-preview-20260219 -->
 
-VERDICT: no. The design fundamentally misunderstands what image `mesh_stage` is currently receiving, and the proposed gating capability does not exist on the engine.
+VERDICT: no. The design assumes `mesh_stage` currently receives the portrait and that adding new image kinds will automatically route them, but `render_driver.py` currently feeds `mesh_stage` the 16:9 scene still, and will ignore any new `mesh_fodder` kind without explicit wiring.
 
 MUST-FIX BEFORE BUILD:
-1. [Problem] The premise that `mesh_stage` receives the per-character PORTRAIT is false. Because its family is `image_to_video`, `render_driver.py`'s `_SCENE_INIT_FAMILIES` logic overrides `init_image` with the SCENE STILL. This is why Hunyuan meshes the whole room.
-   Fix: In `render_driver.py` `build_request_from_shot`, bypass the `_SCENE_INIT_FAMILIES` override for engines that declare `getattr(eng, "requires_mesh_portrait", False)`, and feed them the new `mesh_fodder` image instead.
-2. [The design] The design proposes gating the fork on the `requires_mesh_portrait` capability to avoid hardcoding engine names, but `MeshStageEngine` in `eng_mesh_stage.py` does not declare this attribute. The gate will fail-closed.
-   Fix: Add `requires_mesh_portrait = True` to the `MeshStageEngine` class definition in `eng_mesh_stage.py`.
-3. [Ledger images taxonomy] If the background plate is given `kind="background_plate"`, `render_driver.py`'s `_still_index` will ignore it because it strictly filters for `kind.startswith("scene_")`. The composite will receive no `bg_still_path` and fall back to black.
-   Fix: Name the new kind `scene_background_plate` so `_still_index` picks it up, or update `_still_index` to explicitly match `background_plate`.
-4. [Ledger images taxonomy] `_still_index` maps `beat_id` to a single path. If the image prompter mints both a `scene_still` and a `scene_background_plate` for the same beat, `_still_index` will blindly return whichever appears last in the ledger array (a race condition).
-   Fix: Ensure 3D beats mint ONLY the background plate (no generic `scene_still`), or update `_still_index` to prioritize `scene_background_plate` over `scene_still`.
+1. [Problem] False premise: `mesh_stage` does NOT receive the portrait. Because its family is `image_to_video`, `render_driver.py` (`build_request_from_shot`) overwrites `init_image` with the 16:9 scene still via `_SCENE_INIT_FAMILIES`. This is the actual root cause of Hunyuan3D meshing the whole room. Fix: Update `render_driver.py` to bypass the `_SCENE_INIT_FAMILIES` override for `mesh_stage`, routing the new fodder image to `init_image` instead.
+2. [Ledger images taxonomy] `render_driver.py` currently only extracts `_portrait_index` and `_still_index`. A newly minted `mesh_fodder` kind will be silently ignored. Fix: Add a `_fodder_index` helper to `render_driver.py` and modify `build_request_from_shot` to assign it to `init_image` when the engine is `mesh_stage`.
+3. [Where does the fork live?] The design proposes gating the fork on `requires_mesh_portrait` or `character_3d` capability. `MeshStageEngine` lacks `requires_mesh_portrait` and its family is explicitly `image_to_video` (not `character_3d`). The fork will never trigger. Fix: Add `requires_mesh_portrait = True` to `MeshStageEngine` in `eng_mesh_stage.py`.
+4. [BACKGROUND PLATE] `build_clip_manifest` in `render_driver.py` populates `bg_still_path` using `_still_index(ledger)`, which only matches `kind.startswith("scene_")`. A new `background_plate` kind will be ignored, leaving the composite with a black background. Fix: Mint the background plate with a kind like `scene_plate` so `_still_index` catches it, OR update `_still_index` to match `background_plate`.
+5. [Subject selection] Announcer/music beats have no `char_id`. If the fork doesn't synthesize a subject, `init_image` will be empty and `mesh_stage` will crash (`FileNotFoundError` in `render_clip`). Fix: The prompt generator must synthesize a story-object (e.g., "vintage microphone") for non-character 3D beats, ensuring a `mesh_fodder` image is always minted.
 
 SHOULD-FIX:
-1. [Subject selection] Announcer and music slots have an empty `char_id`. If they route to `mesh_stage`, looking up `mesh_fodder` by `char_id` will yield nothing.
-   Fix: For non-character beats, key the `mesh_fodder` on `beat_id` or a story object ID, and update `render_driver.py` to fall back to `beat_id` when resolving the fodder.
-2. [Where does the fork live?] The fork must live in `OTR_MetaBriefImagePromptGen`. If `OTR_ImageDirector` handled it, it would have to synthesize the distinct prompts without the LLM context.
-   Fix: Implement the fork in `OTR_MetaBriefImagePromptGen` so it can use the LLM to generate the specialized "mesh fodder" and "background plate" prompts.
+6. [Aspect] The design notes mesh fodder wants a near-square/portrait aspect. `cv_encode` in `eng_mesh_stage.py` hardcodes `"crop": "center"`. Fix: Ensure the image generator mints the `mesh_fodder` in a square or portrait aspect (e.g., 1024x1024) so the subject isn't clipped by the center crop.
 
 OPTIONAL / NICE-TO-HAVE:
-- [Aspect] `mesh_stage` renders at 1472x832 because it is not in `_face_excl`. This is fine for the 3D stage, but ensure the `mesh_fodder` image prompt explicitly requests a square or portrait aspect ratio so Hunyuan3D gets an isolated subject.
+- Cache key migration: Since `mesh_cache_key` uses the content hash of the input image (`portrait_sha256`), switching the input to `mesh_fodder` automatically changes the hash. No explicit cache migration is needed; old blobs will just be orphaned safely.
 
 CUT THESE (over-engineering):
-1. [Mesh cache] "Keep cache keys distinct (the fodder must not collide...)": Extra cache key logic is unnecessary. `otr_image_gen_dispatcher.py`'s `request_cache_key` already includes the `kind` parameter, so passing `kind="mesh_fodder"` automatically isolates the cache key from the cinematic portrait.
+- None. The stream split is strictly necessary to prevent Hunyuan3D from fusing the subject and environment into a single blob.

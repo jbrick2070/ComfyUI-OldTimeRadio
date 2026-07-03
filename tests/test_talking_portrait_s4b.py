@@ -52,8 +52,7 @@ def test_video_director_role_talking_map():
     resolved = {
         "announcer_video_model": {"engine_id": "ltx_audio_in"},
         "music_video_model": {"engine_id": "ltx_audio_in"},
-        "other_beats_video_model": {"engine_id": "ltx_audio_in"},
-        "character_video_model": {"engine_id": ""},
+        "character_video_model": {"engine_id": "ltx_audio_in"},
     }
     talk = OTRVideoDirector._role_talking(resolved)
     assert set(talk) == {"announcer_visual", "music_visual",
@@ -70,8 +69,7 @@ def test_video_director_role_talking_false_on_single_pass(monkeypatch):
     resolved = {
         "announcer_video_model": {"engine_id": "ltx_audio_in"},
         "music_video_model": {"engine_id": "ltx_audio_in"},
-        "other_beats_video_model": {"engine_id": "ltx_audio_in"},
-        "character_video_model": {"engine_id": ""},
+        "character_video_model": {"engine_id": "ltx_audio_in"},
     }
     talk = OTRVideoDirector._role_talking(resolved)
     assert talk["character_video"] is False

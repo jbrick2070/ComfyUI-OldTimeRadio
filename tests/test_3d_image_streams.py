@@ -18,13 +18,13 @@ from nodes import otr_meta_brief_image_prompt as mb
 # --------------------------------------------------------------------------- #
 def test_mesh_fodder_roles_from_video_policy():
     vp = {"video_models": {
-        "other_beats_video_model": {"engine_id": "mesh_stage"},
+        "character_video_model": {"engine_id": "mesh_stage"},
         "announcer_video_model": {"engine_id": "ltx_video"},
         "music_video_model": {"engine_id": "mesh_stage"},
     }}
     roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
-    # rip-sfx-broll (2026-07-01): the legacy other_beats slot drives ONLY the
-    # character lane now; music rides its own slot.
+    # character rides its own slot; music rides its own slot (2026-07-03: no
+    # legacy other_beats slot).
     assert roles == {"character_video", "music_visual"}
     # announcer paired with ltx_video -> NOT fodder.
     assert "announcer_visual" not in roles
@@ -33,7 +33,7 @@ def test_mesh_fodder_roles_from_video_policy():
 def test_mesh_fodder_roles_honor_force_engine_map(monkeypatch):
     # OTR_FORCE_ENGINE_MAP=*=mesh_stage forces mesh video at render time; the
     # image phase must ALSO see it and fork fodder, else b000 FamilyInputGaps.
-    vp = {"video_models": {"other_beats_video_model": {"engine_id": "ltx_video"},
+    vp = {"video_models": {"character_video_model": {"engine_id": "ltx_video"},
                            "announcer_video_model": {"engine_id": "ltx_video"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp) == []   # no force -> none
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=mesh_stage")
@@ -43,10 +43,10 @@ def test_mesh_fodder_roles_honor_force_engine_map(monkeypatch):
 
 
 def test_mesh_fodder_roles_empty_when_no_3d():
-    vp = {"video_models": {"other_beats_video_model": {"engine_id": "ltx_video"}}}
+    vp = {"video_models": {"character_video_model": {"engine_id": "ltx_video"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp) == []
     # unknown/custom engine is tolerantly NOT-fodder (never raises).
-    vp2 = {"video_models": {"other_beats_video_model": {"engine_id": "not_a_real_engine"}}}
+    vp2 = {"video_models": {"character_video_model": {"engine_id": "not_a_real_engine"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp2) == []
 
 

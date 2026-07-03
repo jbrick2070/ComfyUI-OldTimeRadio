@@ -130,16 +130,10 @@ def _engine_id_from_pick(pick) -> str:
     return _LEGACY_ENGINE_ALIASES.get(bare, bare)
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
-#: The ONE shared map (nodes/_otr_shared/role_slots.py). rip-sfx-broll
-#: (2026-07-01): scene_broll_video_model / background_abstract_video_model were
-#: removed with their roles; the legacy other_beats_video_model slot stays as
-#: the character_video migration fallback.
+#: The ONE shared map (nodes/_otr_shared/role_slots.py). Three first-class video
+#: slots -- announcer / music / character (2026-07-03: the legacy other_beats
+#: video slot + its migration fallback were retired; character is its own slot).
 VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
-
-#: Sentinel default for the character_video COMBO: leave it unset and it
-#: inherits the legacy ``other_beats_video_model`` pick. The Director maps it
-#: to engine_id "" so role_slots.engine_id_for_role falls back to other-beats.
-USE_OTHER_BEATS = "(use Other Beats default)"
 SEED_MODES = ("request_hash", "fixed")
 
 
@@ -157,13 +151,6 @@ def _video_model_combo() -> list:
     :func:`_engine_id_from_pick`, and a bare legacy value still resolves)."""
     names = list(_vreg.all_engine_names())
     return [_label_for(n) for n in names] + [ADD_CUSTOM]
-
-
-def _per_role_video_combo() -> list:
-    """The video COMBO for the character_video per-role slot: the
-    :data:`USE_OTHER_BEATS` sentinel FIRST (the default -- inherit the Other
-    Beats pick) then the full video list + custom sentinel."""
-    return [USE_OTHER_BEATS] + _video_model_combo()
 
 
 def _image_model_combo() -> list:
@@ -212,10 +199,10 @@ class OTRVideoDirector:
                 "music_video_model": (video, {
                     "tooltip": "Video model for MUSIC beats (role B).",
                 }),
-                "other_beats_video_model": (video, {
+                "character_video_model": (video, {
                     "tooltip": (
-                        "Legacy CHARACTER video fallback slot (role C). Used "
-                        "when character_video_model is left on its sentinel."
+                        "Video model for CHARACTER beats (face + audio, role C). "
+                        "Shipped default humo_14B_169 (the Route-A 14B lane)."
                     ),
                 }),
                 "announcer_image_model": (image, {
@@ -246,22 +233,7 @@ class OTRVideoDirector:
                     "tooltip": (
                         "When a role is set to '+ Add Custom Model', map the "
                         "role key to a custom engine id here, e.g. "
-                        '{"other_beats_video_model": "my_engine"}.'
-                    ),
-                }),
-                # Route-A per-role video model (2026-06-28 HuMo-14B promotion;
-                # rip-sfx-broll 2026-07-01 removed the scene_broll /
-                # background_abstract siblings with their roles).
-                # APPENDED here (after custom_models_json, before the forceInput
-                # gate_in) so it lands at the END of node 87 widgets_values
-                # (BUG-LOCAL-097: never insert mid-list). Default = the
-                # USE_OTHER_BEATS sentinel -> inherit the Other Beats pick.
-                "character_video_model": (_per_role_video_combo(), {
-                    "default": USE_OTHER_BEATS,
-                    "tooltip": (
-                        "Video model for CHARACTER (face + audio) beats. Set to "
-                        "humo_14B_169 for the 14B promotion; default inherits the "
-                        "Other Beats pick."
+                        '{"character_video_model": "my_engine"}.'
                     ),
                 }),
                 "gate_in": ("STRING", {
@@ -281,12 +253,11 @@ class OTRVideoDirector:
 
     # ------------------------------------------------------------------ #
     def direct(self, announcer_video_model, music_video_model,
-               other_beats_video_model, announcer_image_model,
+               character_video_model, announcer_image_model,
                music_image_model, other_beats_image_model,
                fps, canvas_w, canvas_h,
                seed_mode, request_seed,
                custom_models_json="{}",
-               character_video_model=USE_OTHER_BEATS,
                gate_in=""):
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
@@ -299,20 +270,22 @@ class OTRVideoDirector:
         video_models = {
             "announcer_video_model": _engine_id_from_pick(announcer_video_model),
             "music_video_model": _engine_id_from_pick(music_video_model),
-            "other_beats_video_model": _engine_id_from_pick(other_beats_video_model),
+            "character_video_model": _engine_id_from_pick(character_video_model),
         }
-        # Route-A character slot. The USE_OTHER_BEATS sentinel (or empty) emits
-        # engine_id "" so role_slots.engine_id_for_role falls back to the legacy
-        # other_beats pick (clean migration for old graphs + the lighter tiers).
-        video_models["character_video_model"] = (
-            "" if str(character_video_model) == USE_OTHER_BEATS
-            else _engine_id_from_pick(character_video_model)
-        )
         resolved_video = {}
         for slot, picked in video_models.items():
             resolved_video[slot] = self._resolve_and_validate(
                 slot, picked, custom, descriptors, warnings
             )
+        # NO FALLBACKS (operator 2026-07-03): every video role must resolve to a
+        # real engine. An empty NON-custom slot fails LOUD here (never a silent
+        # lane); an '+ Add Custom Model' pick stays a warning (declare-later).
+        for role, slot in _role_slots.ROLE_TO_VIDEO_SLOT.items():
+            rv = resolved_video.get(slot, {})
+            if not rv.get("engine_id") and not rv.get("custom"):
+                raise ValueError(
+                    "OTR_VideoDirector: video role %r (slot %r) resolved to an "
+                    "EMPTY engine. Pick a model -- NO FALLBACK." % (role, slot))
 
         policy = {
             "policy_version": 1,

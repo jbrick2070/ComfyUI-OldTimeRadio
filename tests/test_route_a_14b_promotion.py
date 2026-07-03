@@ -52,17 +52,15 @@ def test_engine_id_for_role_reads_per_role_slot_first():
     assert rs.engine_id_for_role(vm, "character_video") == "humo_14B_169"
 
 
-def test_engine_id_for_role_legacy_fallback():
-    # An old policy with ONLY the legacy slot -> character falls back.
-    vm = {"other_beats_video_model": {"engine_id": "humo_1.7B"}}
-    assert rs.engine_id_for_role(vm, "character_video") == "humo_1.7B"
-    # an empty per-role slot ALSO falls back to the legacy pick
-    vm2 = {"character_video_model": {"engine_id": ""},
-           "other_beats_video_model": {"engine_id": "humo_1.7B"}}
-    assert rs.engine_id_for_role(vm2, "character_video") == "humo_1.7B"
-    # the fallback is character-ONLY; a dead role raises before any lookup
+def test_engine_id_for_role_no_fallback():
+    # NO FALLBACK (2026-07-03 consolidation): an empty character slot resolves to
+    # "" -- there is no legacy other_beats slot to fall back to.
+    assert rs.engine_id_for_role(
+        {"character_video_model": {"engine_id": ""}}, "character_video") == ""
+    assert rs.engine_id_for_role({}, "character_video") == ""
+    # a dead role still raises before any lookup
     with pytest.raises(ValueError):
-        rs.engine_id_for_role(vm, "scene_broll")
+        rs.engine_id_for_role({}, "scene_broll")
 
 
 def test_engine_id_for_role_accepts_bare_string_values():
@@ -70,13 +68,13 @@ def test_engine_id_for_role_accepts_bare_string_values():
     assert rs.engine_id_for_role(vm, "character_video") == "wan_ti2v"
 
 
-def test_video_slot_roles_has_per_role_and_legacy_slots():
+def test_video_slot_roles_has_three_per_role_slots():
     sr = rs.VIDEO_SLOT_ROLES
     assert sr["character_video_model"] == ("character_video",)
     assert sr["announcer_video_model"] == ("announcer_visual",)
     assert sr["music_video_model"] == ("music_visual",)
-    # legacy slot now serves the character lane ONLY
-    assert sr[rs.LEGACY_OTHER_BEATS_SLOT] == ("character_video",)
+    # NO legacy other_beats video slot (2026-07-03 consolidation)
+    assert "other_beats_video_model" not in sr
     assert "scene_broll_video_model" not in sr
     assert "background_abstract_video_model" not in sr
 
@@ -124,7 +122,6 @@ def _direct_policy():
     pol_json, = vd.OTRVideoDirector().direct(
         announcer_video_model="ltx_audio_in (16:9)",
         music_video_model="ltx_audio_in (16:9)",
-        other_beats_video_model="humo_1.7B",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         other_beats_image_model="flux_gen1",
