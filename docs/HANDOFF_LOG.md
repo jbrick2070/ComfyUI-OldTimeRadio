@@ -6,6 +6,23 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 night (overnight coder) -- SOAK BUG FIXED: Ollama daemon was down -> re-launched
+Did: FIRST soak run (nightmatrix_012410) FAILED ALL 10 legs -- every episode halted at node 1
+(OTR_LedgerScriptWriter / news_interpreter) with OllamaCallFailedError: ConnectionError on
+http://localhost:11434 ("actively refused"). ROOT CAUSE: the local Ollama daemon was NOT running
+(:11434 empty, no ollama.exe process) -- the gemma-4-12b writer is LOCAL-only and correctly
+fail-LOUD (no cloud fallback, by design). FIX (operational, not code): started
+`ollama serve` (C:\Users\jeffr\AppData\Local\Programs\Ollama\ollama.exe; model
+hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M already pulled, 7.2GB) + warmed it (200 in 7.7s).
+Re-launched the soak (nightmatrix_030028, driver2 PID in nightmatrix_driver2.pid): m01 ltx_audio_in
+now PAST the writer (0 Ollama errors, cast locked, 5 beats stamped, VRAM ~10GB into the video
+phase). HARDENED the driver with an ensure_ollama() preflight (starts the daemon if :11434 is down
+before each leg) so a dropped daemon self-heals. OPERATOR/next-window RULE: the gemma writer needs
+`ollama serve` running -- if all legs die at node 1 on :11434, start it.
+Current step: SOAK RE-RUNNING healthy (driver2, nightmatrix_030028). Watch results.jsonl + otr/obs.
+Next: monitor legs; m10 word_razzle still LOUD-fails (no OTR_COMFY_API_KEY). Later passes = mixes.
+Commits: none (Ollama fix is operational; driver is gitignored throwaway).
+
 ## 2026-07-03 night (overnight coder) -- HEAD 932450f0 (v2.0-alpha) -- SOAK LAUNCHED (detached, running)
 Did: CODE PHASE COMPLETE (still_word 097f44ad + word_razzle Phase0 3843bbd0 / Phase1 c914321e,
 all pushed, suite 6142/0, Bug Bible 16). Then launched the overnight model-matrix SOAK detached:
