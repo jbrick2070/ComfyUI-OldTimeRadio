@@ -271,6 +271,19 @@ F2: concept stills + ONE mesh mint per character (+ kling per line);
 Blender renders free. Both ride the S0 budget guard / billing cache /
 ledger; the estimate report gains format-specific rows.
 
+## 6b. Quality gates (OPERATOR-RATIFIED 2026-07-02 -- no more doc passes)
+
+The review arc is CLOSED at r4 convergence. No fifth document pass.
+1. V1 FIRST: cheap empirical probes for the 13 verify-at-build items
+   (kibitz-runs/2026-07-02-creative-formats/r4/final.md).
+2. After the F1 engine ships: ONE codex-only kibitz on the REAL DIFF.
+3. After F2 ships: ONE codex-only kibitz on the real diff.
+4. A fresh DeepSeek/Grok roundtable ONLY if build reality opens a
+   genuinely new design fork (e.g. V1 fails and the mouth architecture
+   needs rethinking).
+Rationale: signal exhaustion, not cost -- remaining unknowns are
+runtime/probe problems, not paper problems.
+
 ## 7. Sequencing
 
 Coder window (LTX fixes) holds the code baton NOW. Cloud S0 remainder
