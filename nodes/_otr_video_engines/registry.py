@@ -228,9 +228,6 @@ __all__.append("EngineCore")
 # its own row here; zero profile edits.
 #
 # Keys per row (validated by capability_profiles.validate_declaration):
-#   vram_class          cpu | light | medium | heavy (GPU residency class)
-#   vram_estimate_mb    DRAFT estimates pending operator probe runs (Lever-1
-#                       register) -- policy-grade, not benchmark-grade.
 #   required_toolchain  None, or "cu128_toolkit" (source builds; operator-
 #                       blocked per the 3D plan -- keeps hunyuan/trellis dark).
 #   requires_sidecar    True when the engine runs in an isolated sidecar venv.
@@ -243,49 +240,49 @@ CAPABILITIES = {
     # menu"): both engines were UNREGISTERED (abstract redundant with visualizer;
     # station_card the broken black card), and the registry-consistency invariant
     # forbids a CAPABILITIES row without a registered engine.
-    "still_motion": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "still_motion": {"required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # viz_green (renamed from "visualizer" 2026-06-30, item 2; old saved values
     # resolve via otr_video_director._LEGACY_ENGINE_ALIASES).
-    "viz_green": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "viz_green": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # viz_mxc_cpu (2026-06-30): the OTR rainbow visualizer -- pure numpy/PIL/ffmpeg,
     # no GPU/shaders. required_toolchain None (a GL/torch toolchain would disable it on
     # every shipped profile). GPU shader tier (viz_mxc_gpu) is a deferred separate row.
-    "viz_mxc_cpu": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "viz_mxc_cpu": {"required_toolchain": None,
                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # viz_mxc_mandala (2026-06-30): Cosmic Radio Mandala -- pycairo vector CPU
     # painter, no GPU/shaders. required_toolchain None: pycairo is NOT in
     # requirements.video.txt (lazy-imported + probed by assert_usable so a box
     # without system libcairo never breaks any OTHER engine's install).
-    "viz_mxc_mandala": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "viz_mxc_mandala": {"required_toolchain": None,
                         "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "still_flat": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "still_flat": {"required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "still_pan": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "still_pan": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # still_word (Sprint B, 2026-07-03): a still_flat sibling -- same CPU/ffmpeg
     # flat-hold render (zero VRAM), the delta is the WORD/TITLE-driven prompt its
     # base still is minted from (compose_still_word_prompt). Model-agnostic: any
     # image engine mints the still. cpu class, cpu_ok True, no model assets.
-    "still_word": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "still_word": {"required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "humo": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+    "humo": {"required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": False,
              "model_requirements": ["HuMo-17B"]},
-    "humo_1.7B": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+    "humo_1.7B": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["HuMo-1.7B"]},
     # Same 1.7B checkpoint as humo_1.7B, just rendered 16:9 832x480 (~ same pixel
     # budget as the 480x832 portrait) -> identical VRAM class / estimate.
-    "humo_1.7B_169": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+    "humo_1.7B_169": {"required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": False,
                       "model_requirements": ["HuMo-1.7B"]},
     # Same 14B checkpoint as humo (the 2026-06-09 keystone), rendered 16:9 832x480
     # (~ same pixel budget as the 480x832 portrait) -> identical heavy VRAM class.
     # The 14B's latents match wan_2.1_vae so it is colour-correct -- the 1.7B blue
     # cast does NOT apply -- giving the operator the 06-09 quality in the 16:9 look.
-    "humo_14B_169": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+    "humo_14B_169": {"required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": False,
                      "model_requirements": ["HuMo-17B"]},
     # GGUF splice (2026-06-15): the production LTX video recipe is the frozen
@@ -294,7 +291,7 @@ CAPABILITIES = {
     # battle adopted Q3_K_M as the default quant: measured per-clip peak ~14.8 GB
     # (at the 14.5 GB ceiling, 2.2x faster, no decode offload); Q4_K_S was ~15.8 GB
     # = over. commercial_clean (Apache GGUF + LTX-2 Community model) set True.
-    "ltx_video": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+    "ltx_video": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["ltx-2.3-22b-dev-gguf",
                                          "ltx-2.3-distilled-lora", "gemma-3-12b",
@@ -302,34 +299,29 @@ CAPABILITIES = {
     # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out): no CAPABILITIES
     # row while dark -- see nodes/_otr_video_engines/__init__.py.
     # mesh_stage (0-E easy on-ramp): hy3d-2mv core-node mesher (in-process,
-    # compile-free) + headless portable Blender stage. vram_estimate is a
-    # DRAFT pending the E-1 probe on the 5080; Blender renders AFTER the
+    # compile-free) + headless portable Blender stage. Blender renders AFTER the
     # BUG-291 reclaim barrier so the classes never co-reside. Tencent
     # community license (E-7 record gates default-on).
     # A4 audit 2026-06-11: the all-in-one hy3d checkpoint EMBEDS the DINO
     # image encoder + ShapeVAE -- no separate clip-vision requirement.
-    "mesh_stage": {"vram_class": "medium", "vram_estimate_mb": 8000,
-                   "required_toolchain": None, "requires_sidecar": False,
+    "mesh_stage": {"required_toolchain": None, "requires_sidecar": False,
                    "cpu_ok": False,
                    "model_requirements": ["hunyuan3d-dit-v2-mv",
                                           "blender-portable"]},
-    # S1: vram_estimate raised 14000 -> 14500. The 14499 MB bare-/prompt smoke
-    # was WITHOUT free_after_use, which is LOAD-BEARING -- eng_wan_i2v.render_clip
-    # passes free_after_use=True so umt5-fp8 + the 14B fp8 UNET do not co-reside
-    # through the sampler on the 16 GB card; that mitigation is MANDATORY, not
-    # optional. S5: model_requirements is the real Wan 2.2 I2V asset id (was the
-    # stale wan2.1 label; the engine ckpt default is wan2.2-i2v.safetensors).
-    "wan_i2v": {"vram_class": "heavy", "vram_estimate_mb": 14500, "required_toolchain": None,
+    # eng_wan_i2v.render_clip passes free_after_use=True so umt5-fp8 + the 14B
+    # fp8 UNET do not co-reside through the sampler on the 16 GB card; that
+    # mitigation is MANDATORY, not optional. S5: model_requirements is the real
+    # Wan 2.2 I2V asset id (was the stale wan2.1 label; the engine ckpt default
+    # is wan2.2-i2v.safetensors).
+    "wan_i2v": {"required_toolchain": None,
                 "requires_sidecar": False, "cpu_ok": False,
                 "model_requirements": ["wan2.2-i2v"]},
-    # S2 (GO_FORWARD 4A): the 8GB-tier Wan2.2 TI2V-5B sibling. medium class /
-    # ~8000 MB DRAFT -- the 5B GGUF UNET is ~3.6 GB but the umt5 text-encode + the
-    # Wan2.2 VAE decode push the render-phase peak higher; verify on the 8GB probe
-    # / the Phase-2 measured peak and tighten. model_requirements is the real 5B
-    # asset id. Apache-2.0 (commercial-clean); built 2026-06-14 after the live
-    # /object_info node-class capture (the registry-consistency invariant forbids a
-    # row without a registered engine, so this lands WITH eng_wan_ti2v).
-    "wan_ti2v": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
+    # S2 (GO_FORWARD 4A): the 8GB-tier Wan2.2 TI2V-5B sibling. model_requirements
+    # is the real 5B asset id. Apache-2.0 (commercial-clean); built 2026-06-14
+    # after the live /object_info node-class capture (the registry-consistency
+    # invariant forbids a row without a registered engine, so this lands WITH
+    # eng_wan_ti2v).
+    "wan_ti2v": {"required_toolchain": None,
                  "requires_sidecar": False, "cpu_ok": False,
                  "model_requirements": ["wan2.2-ti2v-5b"]},
     # triposg_talk / triposr / hunyuan3d_talk / trellis_talk CAPABILITIES rows
@@ -339,49 +331,37 @@ CAPABILITIES = {
     # registered engine. Restore the row WITH the @register + package import in
     # the SAME change when a real forward ships.
     # LTX-AV (audio-input) lane -- the LTX-2.3 22B audio-conditioned engines.
-    # vram_estimate is the M0-MEASURED Q3_K_M peak (13688 MB at 512x288x97, 8
-    # steps, Gemma-3 encoder offloaded to CPU via device=cpu) -- under the 14500
-    # ceiling; the audio VAE adds ~340 MB at the floor. Q4_K_S (15594 MB) is OVER
-    # and is a quality step-up only if the ceiling is relaxed / run solo. Both
-    # engines run in-process and are DEFAULT-OFF / dark (OTR_ENABLE_LTX_AV).
+    # Both engines run in-process and are DEFAULT-OFF / dark (OTR_ENABLE_LTX_AV).
     # SHARP build-out (2026-06-17): the default recipe adds the distilled LoRA +
     # the projection ckpt (LTXAVTextEncoderLoader reads it) -> listed here + gated
-    # in eng_ltx_av._weight_paths. Estimate stays 14000 (the free_after_use engine
-    # path frees the Gemma encoder before the unet+decode peak; verify on the soak).
+    # in eng_ltx_av._weight_paths.
     # ltx_audio_in (2026-06-26): the ONE audio-in lane -- one engine
     # for music + announcer + character (I2V on whatever still + the shot audio,
-    # music or voice). Same LTX-2.3 22B audio weights / heavy class / OTR_ENABLE_LTX_AV
+    # music or voice). Same LTX-2.3 22B audio weights / OTR_ENABLE_LTX_AV
     # gate as the talk/music pair; accepts_still=True so the bookend still is minted.
-    "ltx_audio_in": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                     "required_toolchain": None, "requires_sidecar": False,
+    "ltx_audio_in": {"required_toolchain": None, "requires_sidecar": False,
                      "cpu_ok": False,
                      "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
                                             "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
                                             "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
     # CLOUD partner video rows (S3 core, 2026-07-02, pass04 secs 5+7): the
-    # render happens PROVIDER-SIDE, so the local class is cpu (zero VRAM);
-    # cpu_ok True (any box with ffmpeg + credits can run them). NO enable
-    # flag (operator directive 2026-07-02): rows always REGISTER + show;
-    # the dropdown pick is the enable; missing credentials fail LOUD at
-    # invoke-time auth resolution.
-    "cloud_kling_avatar": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                           "required_toolchain": None, "requires_sidecar": False,
+    # render happens PROVIDER-SIDE (zero local VRAM); cpu_ok True (any box with
+    # ffmpeg + credits can run them). NO enable flag (operator directive
+    # 2026-07-02): rows always REGISTER + show; the dropdown pick is the enable;
+    # missing credentials fail LOUD at invoke-time auth resolution.
+    "cloud_kling_avatar": {"required_toolchain": None, "requires_sidecar": False,
                            "cpu_ok": True, "model_requirements": []},
-    "cloud_kling_lipsync": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                            "required_toolchain": None, "requires_sidecar": False,
+    "cloud_kling_lipsync": {"required_toolchain": None, "requires_sidecar": False,
                             "cpu_ok": True, "model_requirements": []},
-    "cloud_seedance_2": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                         "required_toolchain": None, "requires_sidecar": False,
+    "cloud_seedance_2": {"required_toolchain": None, "requires_sidecar": False,
                          "cpu_ok": True, "model_requirements": []},
-    "cloud_wan_i2v": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                      "required_toolchain": None, "requires_sidecar": False,
+    "cloud_wan_i2v": {"required_toolchain": None, "requires_sidecar": False,
                       "cpu_ok": True, "model_requirements": []},
     # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
-    # (Pixverse row cloud_pixverse_i2v). Provider-side render -> cpu class, zero
-    # VRAM, cpu_ok. Selectable; NO enable flag (dropdown pick is the enable;
-    # missing OTR_COMFY_API_KEY fails LOUD at invoke).
-    "word_razzle": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                    "required_toolchain": None, "requires_sidecar": False,
+    # (Pixverse row cloud_pixverse_i2v). Provider-side render, cpu_ok. Selectable;
+    # NO enable flag (dropdown pick is the enable; missing OTR_COMFY_API_KEY
+    # fails LOUD at invoke).
+    "word_razzle": {"required_toolchain": None, "requires_sidecar": False,
                     "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")

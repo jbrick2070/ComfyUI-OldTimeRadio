@@ -43,7 +43,6 @@ __all__ = [
     "availability",
     "enabled_engines",
     "cross_validate_profile",
-    "VRAM_CLASS_RANK",
 ]
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -59,8 +58,6 @@ class ProfileError(ValueError):
 # ---------------------------------------------------------------------------
 # S0 -- profile shape
 # ---------------------------------------------------------------------------
-VRAM_CLASS_RANK = {"cpu": 0, "light": 1, "medium": 2, "heavy": 3}
-
 _PLATFORMS = ("any", "win", "mac")
 _DEVICE_BACKENDS = ("cuda", "cpu")  # mps deliberately absent in v1 (parked)
 _STATUSES = ("shipping", "draft")
@@ -72,10 +69,8 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "status": (True, lambda v: v in _STATUSES, f"one of {_STATUSES}"),
     "platform": (True, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
     "device_backend": (True, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
-    "vram_budget_mb": (True, lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 0, "int >= 0"),
     "toolchains": (True, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
     "allow_sidecars": (True, lambda v: isinstance(v, bool), "bool"),
-    "max_model_class": (True, lambda v: v in VRAM_CLASS_RANK, f"one of {tuple(VRAM_CLASS_RANK)}"),
     "role_overrides": (True, lambda v: _is_str_dict(v), "dict[str, str]"),
     "slot_overrides": (True, lambda v: _is_str_dict(v), "dict[str, str]"),
     "features": (True, lambda v: isinstance(v, dict), "dict"),
@@ -239,8 +234,6 @@ def load_widget_mapping(path: Optional[str] = None) -> dict:
 # S1 -- capability declarations + the derived enable-set
 # ---------------------------------------------------------------------------
 _DECL_KEYS = {
-    "vram_class": lambda v: v in VRAM_CLASS_RANK,
-    "vram_estimate_mb": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 0,
     "required_toolchain": lambda v: v is None or (isinstance(v, str) and bool(v)),
     "requires_sidecar": lambda v: isinstance(v, bool),
     "cpu_ok": lambda v: isinstance(v, bool),
@@ -253,8 +246,6 @@ REASON_OK = "ok"
 REASON_REQUIRES_CUDA = "requires_cuda"
 REASON_MISSING_TOOLCHAIN = "missing_toolchain"
 REASON_SIDECARS_DISABLED = "sidecars_disabled"
-REASON_CLASS_OVER_CAP = "model_class_over_cap"
-REASON_VRAM_OVER_BUDGET = "vram_over_budget"
 
 
 def validate_declaration(name: str, decl: Any, source: str = "<registry>") -> dict:
@@ -275,26 +266,17 @@ def validate_declaration(name: str, decl: Any, source: str = "<registry>") -> di
 
 def _fit_reason(decl: dict, profile: dict) -> str:
     """Why does (or doesn't) ONE engine declaration fit ONE profile?
-    Per-engine fit ONLY -- never co-residency (that is a runtime invariant)."""
-    if profile["device_backend"] == "cpu":
-        # On a CPU floor there is no VRAM economy at all: the only question
-        # is whether the engine can run on CPU. Class/budget checks are
-        # GPU-residency concepts and do not apply.
-        if not decl["cpu_ok"]:
-            return REASON_REQUIRES_CUDA
-        if decl["required_toolchain"] and decl["required_toolchain"] not in profile["toolchains"]:
-            return REASON_MISSING_TOOLCHAIN
-        if decl["requires_sidecar"] and not profile["allow_sidecars"]:
-            return REASON_SIDECARS_DISABLED
-        return REASON_OK
+    Per-engine fit ONLY -- CUDA / toolchain / sidecar gating, never a VRAM
+    tier or budget (the operator's tier JSON owns the OOM budget now) and
+    never co-residency (that is a runtime invariant)."""
+    if profile["device_backend"] == "cpu" and not decl["cpu_ok"]:
+        # On a CPU floor the only question is whether the engine can run on
+        # CPU at all -- there is no GPU residency to gate.
+        return REASON_REQUIRES_CUDA
     if decl["required_toolchain"] and decl["required_toolchain"] not in profile["toolchains"]:
         return REASON_MISSING_TOOLCHAIN
     if decl["requires_sidecar"] and not profile["allow_sidecars"]:
         return REASON_SIDECARS_DISABLED
-    if VRAM_CLASS_RANK[decl["vram_class"]] > VRAM_CLASS_RANK[profile["max_model_class"]]:
-        return REASON_CLASS_OVER_CAP
-    if decl["vram_estimate_mb"] > profile["vram_budget_mb"]:
-        return REASON_VRAM_OVER_BUDGET
     return REASON_OK
 
 

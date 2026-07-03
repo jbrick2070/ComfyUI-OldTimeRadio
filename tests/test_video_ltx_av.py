@@ -47,8 +47,6 @@ def test_capabilities_row_present():
     assert "ltx_audio_in" in registry.CAPABILITIES
     assert "ltx_av_talk" not in registry.CAPABILITIES
     assert "ltx_av_music" not in registry.CAPABILITIES
-    # M0-measured Q3_K_M peak is under the 14500 ceiling
-    assert registry.CAPABILITIES["ltx_audio_in"]["vram_estimate_mb"] <= 14500
 
 
 def _desc(engine_cls):

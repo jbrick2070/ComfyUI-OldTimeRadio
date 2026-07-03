@@ -4,10 +4,8 @@
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
-  "vram_budget_mb": 7300,
   "toolchains": [],
   "allow_sidecars": false,
-  "max_model_class": "medium",
   "role_overrides": {
     "announcer_visual": "still_flat",
     "music_visual": "viz_green",

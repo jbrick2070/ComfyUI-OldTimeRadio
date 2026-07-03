@@ -273,11 +273,11 @@ class WorkflowValidator:
         """The S2 startup assertion: a STAMPED workflow must match the
         committed profile AND the detected host reality, else the prompt
         ABORTS with a reason -> suggestion table (no cuda -> cpu_floor;
-        VRAM < 10 GB -> 8gb_lite; mac -> cpu_floor). ACTIVE whenever
-        profile_id is non-empty; ``validate_anyway`` can NEVER skip it.
-        On pass, exports the runtime env (every execution -- stale values
-        from a previous prompt are overwritten; an operator-set conflicting
-        ceiling warns LOUD and the SMALLER value wins)."""
+        mac -> cpu_floor). ACTIVE whenever profile_id is non-empty;
+        ``validate_anyway`` can NEVER skip it. On pass, exports the active
+        profile id (every execution -- stale values from a previous prompt
+        are overwritten). The VRAM OOM budget is owned by the operator's
+        tier JSON now, so no ceiling is exported."""
         from ._otr_shared.capability_profiles import ProfileError, load_profile
         try:
             profile = load_profile(profile_id)
@@ -294,15 +294,6 @@ class WorkflowValidator:
                 f"profile {profile_id!r} requires CUDA but this host has none"
                 + (" (mac)" if host["platform"] == "mac" else "")
                 + f" -> suggested tier: {suggestion}")
-        elif (profile["device_backend"] == "cuda"
-              and host["vram_mb"]
-              and host["vram_mb"] < int(profile["vram_budget_mb"])):
-            suggestion = ("8gb_lite" if host["vram_mb"] >= 7_300
-                          else "cpu_floor")
-            problems.append(
-                f"profile {profile_id!r} budgets "
-                f"{profile['vram_budget_mb']} MB VRAM but this host reports "
-                f"{host['vram_mb']} MB -> suggested tier: {suggestion}")
         if profile["platform"] not in ("any", host["platform"]):
             problems.append(
                 f"profile {profile_id!r} targets platform "
@@ -316,21 +307,8 @@ class WorkflowValidator:
 
         # Runtime export -- EVERY execution, not "if unset" (a long-running
         # server persists env across prompts; stale values are overwritten).
-        budget = int(profile["vram_budget_mb"])
-        ceiling = budget
-        cur = (os.environ.get("OTR_VRAM_CEILING_MB") or "").strip()
-        if cur:
-            try:
-                cur_i = int(cur)
-            except ValueError:
-                cur_i = None
-            if cur_i is not None and cur_i != budget:
-                ceiling = min(cur_i, budget)
-                log.warning(
-                    "OTR_WorkflowValidator: OTR_VRAM_CEILING_MB=%s conflicts "
-                    "with profile %r budget %d -- the SMALLER value (%d) "
-                    "wins (LOUD)", cur, profile_id, budget, ceiling)
-        os.environ["OTR_VRAM_CEILING_MB"] = str(ceiling)
+        # The VRAM OOM budget is owned by the operator's tier JSON now, so the
+        # validator no longer exports a ceiling -- only the active profile id.
         os.environ["OTR_ACTIVE_PROFILE"] = profile_id
         snapshot_hash = ""
         try:
@@ -341,7 +319,7 @@ class WorkflowValidator:
         except OSError:
             pass
         os.environ["OTR_SNAPSHOT_HASH"] = snapshot_hash
-        msg = (f"stamp OK: profile={profile_id} ceiling={ceiling}MB "
+        msg = (f"stamp OK: profile={profile_id} "
                f"snapshot_sha={snapshot_hash[:12] or 'n/a'}"
                + (f" generated_by={generated_by}" if generated_by else ""))
         log.info("OTR_WorkflowValidator: %s (master_hash=%s)",

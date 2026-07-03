@@ -4,10 +4,8 @@
   "status": "draft",
   "platform": "any",
   "device_backend": "cpu",
-  "vram_budget_mb": 0,
   "toolchains": [],
   "allow_sidecars": false,
-  "max_model_class": "cpu",
   "role_overrides": {
     "announcer_visual": "still_flat",
     "music_visual": "viz_green",

@@ -39,7 +39,7 @@ def test_all_cloud_rows_registered_with_capabilities():
     for name in _CLOUD_ROWS:
         assert vreg.is_registered(name), name
         row = vreg.CAPABILITIES[name]
-        assert row["vram_class"] == "cpu" and row["cpu_ok"] is True
+        assert row["cpu_ok"] is True
 
 
 def test_cloud_rows_never_default():

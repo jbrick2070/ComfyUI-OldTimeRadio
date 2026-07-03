@@ -217,17 +217,18 @@ class TestStampAssertion:
         assert "OTR_ACTIVE_PROFILE" not in __import__("os").environ
 
     def test_stamped_run_exports_env(self, monkeypatch):
+        # Post-VRAM-rip: the validator exports ONLY the active-profile id +
+        # snapshot hash -- the OOM budget is owned by the operator's tier JSON,
+        # so there is no OTR_VRAM_CEILING_MB export any more.
         import os
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host()))
-        monkeypatch.delenv("OTR_VRAM_CEILING_MB", raising=False)
         monkeypatch.delenv("OTR_ACTIVE_PROFILE", raising=False)
         monkeypatch.delenv("OTR_SNAPSHOT_HASH", raising=False)
         node = WorkflowValidator()
         (msg,) = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
                                profile_id="16gb_full")
         assert "stamp OK" in msg
-        assert os.environ["OTR_VRAM_CEILING_MB"] == "14500"
         assert os.environ["OTR_ACTIVE_PROFILE"] == "16gb_full"
         assert len(os.environ["OTR_SNAPSHOT_HASH"]) == 64
 
@@ -236,14 +237,6 @@ class TestStampAssertion:
                             staticmethod(lambda: _host(has_cuda=False)))
         node = WorkflowValidator()
         with pytest.raises(ValueError, match="cpu_floor"):
-            node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                          profile_id="16gb_full")
-
-    def test_low_vram_aborts_suggesting_8gb_lite(self, monkeypatch):
-        monkeypatch.setattr(WorkflowValidator, "_detect_host",
-                            staticmethod(lambda: _host(vram_mb=8192)))
-        node = WorkflowValidator()
-        with pytest.raises(ValueError, match="8gb_lite"):
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
                           profile_id="16gb_full")
 
@@ -262,16 +255,6 @@ class TestStampAssertion:
         with pytest.raises(ValueError, match="16gb_full"):
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
                           profile_id="no_such_tier")
-
-    def test_conflicting_smaller_operator_ceiling_wins(self, monkeypatch):
-        import os
-        monkeypatch.setattr(WorkflowValidator, "_detect_host",
-                            staticmethod(lambda: _host()))
-        monkeypatch.setenv("OTR_VRAM_CEILING_MB", "8000")
-        node = WorkflowValidator()
-        node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                      profile_id="16gb_full")
-        assert os.environ["OTR_VRAM_CEILING_MB"] == "8000"   # smaller wins
 
     def test_is_changed_varies_on_stamp(self):
         a = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,

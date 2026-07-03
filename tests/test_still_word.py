@@ -41,7 +41,7 @@ def test_still_word_registered_engine():
 def test_still_word_capabilities_row():
     assert "still_word" in vreg.CAPABILITIES
     row = vreg.CAPABILITIES["still_word"]
-    assert row["vram_class"] == "cpu" and row["cpu_ok"] is True
+    assert row["cpu_ok"] is True
     # the registry-consistency invariant (CAPABILITIES == registered engines).
     assert set(vreg.CAPABILITIES) == set(vreg.all_engine_names())
 

@@ -94,16 +94,13 @@ def test_unknown_top_level_key_rejected():
 
 def test_missing_required_key_rejected():
     bad = copy.deepcopy(cp.load_profile("16gb_full"))
-    del bad["vram_budget_mb"]
+    del bad["toolchains"]
     with pytest.raises(cp.ProfileError, match="missing required key"):
         cp.validate_profile_shape(bad)
 
 
 @pytest.mark.parametrize("key,value,match", [
     ("device_backend", "mps", "device_backend"),       # mps parked in v1
-    ("max_model_class", "enormous", "max_model_class"),
-    ("vram_budget_mb", -1, "vram_budget_mb"),
-    ("vram_budget_mb", True, "vram_budget_mb"),
     ("platform", "linux", "platform"),
     ("status", "experimental", "status"),
 ])
@@ -226,30 +223,28 @@ def test_all_declarations_validate():
 def test_declaration_unknown_key_rejected():
     with pytest.raises(cp.ProfileError, match="unknown key"):
         cp.validate_declaration("x", {
-            "vram_class": "light", "vram_estimate_mb": 1, "required_toolchain": None,
+            "required_toolchain": None,
             "requires_sidecar": False, "cpu_ok": True, "model_requirements": [],
             "speed": "fast",
         })
 
 
 def test_availability_reason_codes():
+    # Post-VRAM-rip: fit is CUDA / toolchain / sidecar ONLY -- no VRAM tier or
+    # budget gating (the operator's tier JSON owns the OOM budget now).
     decls = {
-        "gpu_heavy": {"vram_class": "heavy", "vram_estimate_mb": 14000,
-                      "required_toolchain": None, "requires_sidecar": False,
+        "gpu_heavy": {"required_toolchain": None, "requires_sidecar": False,
                       "cpu_ok": False, "model_requirements": []},
-        "side": {"vram_class": "medium", "vram_estimate_mb": 5000,
-                 "required_toolchain": None, "requires_sidecar": True,
+        "side": {"required_toolchain": None, "requires_sidecar": True,
                  "cpu_ok": False, "model_requirements": []},
-        "compiled": {"vram_class": "light", "vram_estimate_mb": 100,
-                     "required_toolchain": "cu128_toolkit", "requires_sidecar": False,
+        "compiled": {"required_toolchain": "cu128_toolkit", "requires_sidecar": False,
                      "cpu_ok": False, "model_requirements": []},
-        "procgen": {"vram_class": "cpu", "vram_estimate_mb": 0,
-                    "required_toolchain": None, "requires_sidecar": False,
+        "procgen": {"required_toolchain": None, "requires_sidecar": False,
                     "cpu_ok": True, "model_requirements": []},
     }
     lite = cp.load_profile("8gb_lite")
     avail = cp.availability(lite, decls)
-    assert avail["gpu_heavy"] == cp.REASON_CLASS_OVER_CAP
+    assert avail["gpu_heavy"] == cp.REASON_OK          # no VRAM cap -> fits
     assert avail["side"] == cp.REASON_SIDECARS_DISABLED
     assert avail["compiled"] == cp.REASON_MISSING_TOOLCHAIN
     assert avail["procgen"] == cp.REASON_OK
@@ -258,14 +253,6 @@ def test_availability_reason_codes():
     avail = cp.availability(floor, decls)
     assert avail["gpu_heavy"] == cp.REASON_REQUIRES_CUDA
     assert avail["procgen"] == cp.REASON_OK
-
-
-def test_vram_budget_excludes_over_budget_engine():
-    decls = {"chunky": {"vram_class": "medium", "vram_estimate_mb": 9000,
-                        "required_toolchain": None, "requires_sidecar": False,
-                        "cpu_ok": False, "model_requirements": []}}
-    lite = cp.load_profile("8gb_lite")  # budget 7300
-    assert cp.availability(lite, decls)["chunky"] == cp.REASON_VRAM_OVER_BUDGET
 
 
 @pytest.mark.parametrize("tier", TIERS)

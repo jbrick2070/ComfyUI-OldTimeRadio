@@ -4,10 +4,8 @@
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",
-  "vram_budget_mb": 14500,
   "toolchains": [],
   "allow_sidecars": true,
-  "max_model_class": "heavy",
   "role_overrides": {
     "announcer_visual": "viz_green",
     "music_visual": "viz_green",

@@ -101,14 +101,13 @@ assert_usable = _IMAGE_REGISTRY.assert_usable
 # GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
 # adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
 # the per-profile enable-set -- never hand-listed per profile. A new engine
-# ships its own row here; zero profile edits. vram_estimate_mb values are
-# DRAFT estimates pending operator probe runs.
+# ships its own row here; zero profile edits.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
-    "flux_gen1": {"vram_class": "heavy", "vram_estimate_mb": 12000, "required_toolchain": None,
+    "flux_gen1": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["flux.1-dev"]},
-    "flux2_klein": {"vram_class": "medium", "vram_estimate_mb": 8000, "required_toolchain": None,
+    "flux2_klein": {"required_toolchain": None,
                     "requires_sidecar": False, "cpu_ok": False,
                     "model_requirements": ["flux.2-klein"]},
     # hidream_i1 CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
@@ -119,10 +118,10 @@ CAPABILITIES = {
     # steady diffusion+VAE residency is ~7 GB (TE offloads before sampling) and
     # the render-window resident peak read ~12.2 GB, well under the 14.5 GB
     # ceiling. The engine's render_image reclaims after decode (single-resident).
-    "lumina_image": {"vram_class": "medium", "vram_estimate_mb": 7000, "required_toolchain": None,
+    "lumina_image": {"required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": False,
                      "model_requirements": ["lumina-image-2"]},
-    "qwen_image": {"vram_class": "heavy", "vram_estimate_mb": 14000, "required_toolchain": None,
+    "qwen_image": {"required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": False,
                    "model_requirements": ["qwen-image"]},
     # sd35_large CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
@@ -130,26 +129,24 @@ CAPABILITIES = {
     # invariant forbids a row without a registered engine.
     # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
     # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
-    # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down. The
-    # policy estimate is the steady residency, which fits the 8GB tier budget.
-    "z_image_turbo": {"vram_class": "medium", "vram_estimate_mb": 5000, "required_toolchain": None,
+    # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down.
+    "z_image_turbo": {"required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": False,
                       "model_requirements": ["z-image-turbo"]},
     # Cloud partner STILLS (S1 stills lane 2026-07-03): no local weights, no
     # VRAM, CPU-side (the provider does the compute; canonicalize_image is a
-    # pure PIL op). vram_class "cpu" so they fit every profile including the
-    # CPU floor; the registry-consistency invariant (test_capability_profiles
+    # pure PIL op). The registry-consistency invariant (test_capability_profiles
     # :217) requires ONE row per registered engine and vice versa.
-    "cloud_recraft": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "cloud_recraft": {"required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_flux_pro": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "cloud_flux_pro": {"required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_nano_banana_2": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "cloud_nano_banana_2": {"required_toolchain": None,
                             "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_seedream_2": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "cloud_seedream_2": {"required_toolchain": None,
                          "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
-    "ideo": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+    "ideo": {"required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")

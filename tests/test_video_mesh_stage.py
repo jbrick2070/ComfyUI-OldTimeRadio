@@ -322,10 +322,9 @@ def test_engine_family_map_and_no_fallback():
     assert not hasattr(rd, "make_fallback_of")
 
 
-def test_capability_row_draft_probe_pending():
+def test_capability_row_present():
     row = vreg.CAPABILITIES["mesh_stage"]
     assert row["cpu_ok"] is False              # the mesher needs the GPU
-    assert row["vram_class"] == "medium"       # DRAFT pending the E-1 probe
     assert row["required_toolchain"] is None   # compile-free core nodes
     assert row["requires_sidecar"] is False    # in-process (NOT the cu128 lane)
     assert "hunyuan3d-dit-v2-mv" in row["model_requirements"]

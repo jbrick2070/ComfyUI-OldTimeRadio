@@ -17,10 +17,6 @@ from nodes._otr_video_engines import eng_wan_i2v  # noqa: F401  (register adapte
 from nodes._otr_video_engines import eng_wan_ti2v  # noqa: F401  (register adapter)
 
 
-def test_wan_i2v_vram_estimate_is_conservative_14500():
-    assert vreg.CAPABILITIES["wan_i2v"]["vram_estimate_mb"] == 14500
-
-
 def test_wan_i2v_model_requirement_is_wan22_not_stale_wan21():
     reqs = vreg.CAPABILITIES["wan_i2v"]["model_requirements"]
     assert reqs == ["wan2.2-i2v"]
@@ -38,10 +34,8 @@ def test_wan_ti2v_row_present_and_registered():
     assert "wan_ti2v" in vreg.all_engine_names()
 
 
-def test_wan_ti2v_row_is_medium_class_8gb_tier():
+def test_wan_ti2v_row_capabilities():
     row = vreg.CAPABILITIES["wan_ti2v"]
-    assert row["vram_class"] == "medium"
-    assert row["vram_estimate_mb"] == 8000
     assert row["required_toolchain"] is None
     assert row["requires_sidecar"] is False
     assert row["cpu_ok"] is False
