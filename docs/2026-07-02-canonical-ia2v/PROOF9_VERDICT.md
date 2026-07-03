@@ -59,3 +59,30 @@ is UNPROVEN until a clean 832x448 re-run.
 
 ## 30w soak (soak2): in flight at scoring time (~23 min elapsed, GPU 15.9GB active).
 QA it on land: final in otr\obs + 6/6 clips + no ceiling breach + audio byte-identical.
+
+## soak2 QA (2026-07-02 late night): PASS
+70.9 min, 6/6 clips (ltx_audio_in), final in otr\obs
+(signal_lost_reflections_in_ruins_20260702_204449_..._final.mp4, 46.6MB @ 21:13),
+no ceiling breach (BUG-098 tripwire loads 7.74GiB <= 11GiB), VRAM back to ~2.1GB.
+
+## proof9d (2026-07-02 late night): FAILED -- MARGINAL ceiling breach on a CLEAN baseline
+
+Re-run executed per #1: box reset by PORT OWNER, fresh otr_ia2v_server_boot.cmd boot,
+baseline 1431 MiB (well under 2.5GB), default 832x448. Episode "Philadelphia's Echoes":
+writer + stills fine; pre-render residue free reported 14.33 GB free; shot_b002
+(character, ltx_audio_in) died LOUD:
+
+    VRAM ceiling breached across ltx_audio_in-render window: 14506 MB > 14500 MB
+
+This is NOT the squatter (baseline was clean). The overage is 6 MB (0.04%) --
+ltx_audio_in char shots at 832x448 sit essentially AT the ceiling with zero headroom;
+any baseline above ~1.4GB or minor allocator jitter tips it. proof7 passed this canvas,
+so headroom has eroded since (suspects: S4/S4b portrait-init chain, lora stack).
+
+S4x GO/NO-GO remains OPEN. Operator decision needed, options:
+(a) a small measured headroom fix (e.g. free the z_image stack harder before the first
+    heavy window) then re-run at 832x448;
+(b) score at a slightly smaller canvas with a clean baseline and keep bars
+    canvas-relative (the 120w soak's ~3x relative lift stands as the interim verdict);
+(c) raise the ceiling tolerance (NOT recommended -- the 14.5GB invariant is hard).
+No code changed; the LOUD no-fallback stop behaved exactly as designed.

@@ -6,6 +6,20 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 ~23:55 -- HEAD 5c5cdcfe+ (v2.0-alpha) -- kibitz arc CONVERGED + soak2 PASS + proof9d marginal breach
+Did: judged kibitz r2 (r2_plan.md), ran + judged r3 and r4 LIVE (codex+antigravity;
+operator dropped the claude CLI panelist mid-r4 -- panel is codex+AG from now on,
+Cowork Claude = anchor+judge); folded ALL survivors into docs/2026-07-02-remaining-sprints/
+PLAN.md -- CONVERGED, BUILD-READY (key r4 catches: A1+A2 must be atomic; no
+character_image_model slot exists; audio CAPABILITIES+__init__ import in D3; B5 filters
+api_node rows; loudness ref UNRESOLVED in code). soak2 QA PASS (6/6 clips, obs final
+46.6MB, no breach). proof9d 832x448 re-run on a CLEAN 1.4GB baseline FAILED MARGINALLY
+(14506>14500 MB at shot_b002 ltx_audio_in; 6MB over, zero headroom at this canvas) --
+verdict + operator options appended to PROOF9_VERDICT.md; no code changed.
+Current step: SPRINT A (E1/E2 rip) per the hardened PLAN.md; S4x GO/NO-GO = operator call.
+Next: operator picks proof9d option (a/b/c); coder window starts Sprint A (A4 triage first).
+Commits: this docs/kibitz batch (see git log).
+
 ## 2026-07-02 ~21:50 -- HEAD d9a659ce (v2.0-alpha) -- no-fallbacks directive + remaining-sprints plan + kibitz r2 launched
 Did: operator directive stamped @ d0463b8c (NO fallbacks / NO auto-defaults anywhere; the
 shipped workflow JSON dropdown values are the ONLY defaults; S3-full rescoped -- auto-defaults

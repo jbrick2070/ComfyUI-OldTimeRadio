@@ -1,8 +1,7 @@
 # OTR Remaining Sprints -- build plan under the NO-FALLBACKS / dropdown-only-defaults directive
 
-Date: 2026-07-02 late evening; kibitz r2/r3/r4 hardened same night -- CONVERGED
-(judgments in kibitz-runs/2026-07-02-remaining-sprints/{r2/r2_plan.md, r3/r3_plan.md,
-r4/final.md}). Branch v2.0-alpha. Suite 6075/0. BUILD-READY; Sprint A is next code.
+Date: 2026-07-02 late evening; r2-hardened 2026-07-03 (kibitz r2 judged -- see
+kibitz-runs/2026-07-02-remaining-sprints/r2/r2_plan.md). Branch v2.0-alpha. Suite 6075/0.
 Governs: everything left to CODE. Testing/soak/eyeball gates are out of scope here.
 
 ## 0. STANDING DIRECTIVES (operator, 2026-07-02 -- override anything below that disagrees)
@@ -18,11 +17,6 @@ Governs: everything left to CODE. Testing/soak/eyeball gates are out of scope he
 
 ## Sprint A -- E1/E2: rip the fallback scaffolding (PROMOTED, do first)
 
-**Internal build order (r4-corrected): A4 -> A3b (Policy default False) -> A1+A2 as ONE
-ATOMIC CHUNK -> A3a/c/d/e.** (r3's A2-before-A1 was wrong: make_fallback_of maps a
-None-fallback engine to UNIVERSAL_FLOOR at :170, so setting adapters to None does NOT
-stop the floor swap until the driver machinery is ripped in the same change.)
-
 - **A1 render_driver rip.** Remove FLOOR_NAMES(:52) / UNIVERSAL_FLOOR(:56) /
   SYNTH_FALLBACKS(:63) / EXPECTED_OOM_TRAIL(:117) / make_fallback_of(:153), the
   run_episode consumer (:2101), the soak verifier + fixture builder (:2527/:2589),
@@ -30,16 +24,7 @@ stop the floor swap until the driver machinery is ripped in the same change.)
   `scripts/otr_video_soak.py` (its own make_fallback_of:150, EXPECTED_OOM_TRAIL:259,
   trail assert :294). run_gpu_soak/assert_soak_ok become NO-TRAIL LOUD contracts:
   a forced OOM must RAISE a named RenderError and the soak asserts the raise --
-  no trail matching. ALSO in scope (r3): `nodes/_otr_shared/fallback.py`
-  (resolve_fallback_chain, the AS-2 resolver) is DELETED with its consumers
-  rewritten (render_driver, scripts/otr_video_soak.py, scripts/otr_video_gpu_smoke.py,
-  tests/test_video_fallback_chain_additive.py, tests/test_video_retry_taxonomy.py,
-  tests/test_video_survival_guide_vectors.py; retry_taxonomy KEEPS its
-  non-fallback failure-classification role; its fallback-action API --
-  escalate_to_fallback, build_fallback_decision, restamp_shot_row,
-  append_runtime_fallback_decision, format_swap_log -- is DELETED or deprecated,
-  ledger schema intact per A5). Update
-  stale fallback comments/logs at render_driver :1035-1037/:1287-1289/:1880-1882.
+  no trail matching.
 - **A2 per-adapter fallback_engine = None.** `fallback_engine` is a live class
   attribute across the fleet: eng_humo.py:130 ("humo_1.7B") + :514 ("still_motion"),
   eng_ltx_video.py:340, eng_mesh_stage.py:329, eng_triposr.py:121,
@@ -59,17 +44,13 @@ stop the floor swap until the driver machinery is ripped in the same change.)
   in the SAME change; (e) update the pinned True in test_route_a_14b_promotion.py:132,
   test_still_aspect_and_labels.py:208, test_video_platform_aseam.py:316/:341
   (+ the :260 schema list). scripts/run_otr_30word_smoke.py's False-patch
-  (:212-216) becomes a harmless no-op -- keep. The repo-root
-  otr_scifi_16gb_full_api.json is an UNTRACKED probe artifact -- do not
-  hand-edit; REGENERATE after A3.
+  (:212-216) becomes a harmless no-op -- keep.
 - **A4 test triage BEFORE the rip.** Consumers to split keep-rewrite vs delete:
   test_cs3_inter_beat_reclaim.py:55/65/74/84, test_ltx_av_driver_wiring.py:25-28,
   test_video_character_3d.py:360-369, test_video_mesh_stage.py:320,
   test_video_render_driver.py:24/33/41/84, test_video_render_driver_additive.py:77-82/415,
-  test_video_soak_fixture.py:82/128, test_video_still_parallax.py:177-186,
-  PLUS (r3): test_video_humo.py:53/:57/:216-232 (asserts fallback_engine values
-  + chain convergence) and test_video_mesh_stage.py:68. Some pin valid
-  non-fallback behavior that must SURVIVE the rewrite. Add per-family
+  test_video_soak_fixture.py:82/128, test_video_still_parallax.py:177-186. Some
+  pin valid non-fallback behavior that must SURVIVE the rewrite. Add per-family
   LOUD-failure contract tests.
 - **A5 ledger.** Keep fallback restamp fields (stamped never) -- no schema churn.
   Verify-at-build: content_oracle.check_manifest must not REQUIRE fallback trails.
@@ -90,29 +71,14 @@ stop the floor swap until the driver machinery is ripped in the same change.)
   mirroring the video signature: (raw, request, session), request carries
   {"w","h","format":"PNG"}; sRGB; sha256 kept (uniform CanonicalAsset); named
   CloudMediaError codes. Called INSIDE the adapter's render_image (the image
-  dispatcher has no canonicalize hook). r3 pins: (a) it WRITES a real PNG to
-  disk (transcode JPEG/WEBP provider output); (b) the adapter returns
-  str(asset.path); (c) the file exists and clears the dispatcher's minimum PNG
-  bytes before _coerce_pixels reads it; (d) the adapter's prepare(None, None,
-  None) must not crash (the dispatcher calls it with three Nones; auth/budget
-  live in the invoke bridge, not prepare); (e) EVERY cloud invocation passes a
-  nonzero per-row estimated_usd (the bridge defaults to 0.0 and reserves exactly
-  that -- the budget machine is inert without it).
-- **B4 V3/COMBO resolution (single source of truth).** Resolved model IDs live
-  in checked-in config/adapter constants (env-overridable) for ALL V3 rows
-  (nano_banana_2, seedream_2, elevenlabs x2, seedance, wan); passing the literal
-  "COMFY_DYNAMICCOMBO_V3" placeholder downstream is a build error; never a live
-  COMBO scrape at render time; resolved kwargs asserted by the conformance test.
+  dispatcher has no canonicalize hook).
+- **B4 V3/COMBO resolution.** Explicit per-adapter model value (env/config
+  pinned, e.g. nano_banana_2 model: COMFY_DYNAMICCOMBO_V3 @ yaml:236) -- never a
+  live COMBO scrape at render time; emitted kwargs INCLUDED in the conformance test.
 - **B5 conformance test (owed since the video-team warning).** Parametrize over
   partner_nodes.yaml ROWS (14), not adapter modules: every kwarg an adapter emits
-  must be declared in its pinned row schema; a row without an adapter carries an
-  EXPLICIT xfail entry, and Sprint D's definition-of-done includes REMOVING the
-  ElevenLabs xfails for cloud_elevenlabs_tts + cloud_elevenlabs_flash only
-  (nothing stays permanently masked). r4: the test DISTINGUISHES billed adapter
-  rows from AUX helper rows (filter on api_node -- the voice_selector is
-  api_node:false with no hidden auth and never gets an adapter). Covers video +
-  image + future TTS. (Inverse check CUT -- redundant with the CAPABILITIES
-  invariant.) Full path everywhere: nodes/_otr_shared/partner_nodes.yaml.
+  must be declared in its pinned row schema; a row without an adapter is flagged
+  (xfail-listed until its sprint). Covers video + image + future TTS.
 - **B6 portrait-mint gate (PRE-SELECTION GATE, not a fallback).** `portrait_mint_3d`
   prompt profile in the character_description -> finish_visual_prompt chain
   (subject fully in frame, front/3-4 neutral pose, clean backdrop, even light).
@@ -121,20 +87,15 @@ stop the floor swap until the driver machinery is ripped in the same change.)
   NON-SELECTION. The gate does NOT duplicate the budget machine
   (cloud_media_backend owns spend). If 3D was explicitly dropdown-selected and
   the mint is rejected, that is a FAILURE -- fail LOUD (directive).
-  Verify-at-build (r3): the gate point in the beat loop must PRECEDE engine
-  selection (ShotLock) -- if selection happens first the gate becomes a swap.
-- **B7 wiring.** Stills dropdowns IN `workflows/otr_scifi_16gb_full.json` in the
-  SAME change; validator + widget audit after. r4: there are exactly THREE image
-  slots (announcer/music/other_beats -- otr_image_director.py:58-64); character
-  stills route through other_beats_image_model. Do NOT add a character_image_model
-  slot -- no new widget, no schema churn.
+- **B7 wiring.** Stills dropdowns (announcer/music/other/character image models)
+  IN `workflows/otr_scifi_16gb_full.json` in the SAME change; validator +
+  widget audit after.
 
 ## Sprint C -- S3 remainder (rescoped by the directive)
 
 - CUT: reactive auto-defaults; fallback chains. (Directive.)
 - KEEP: ShotLock audit stamps for cloud rows -- stamp `provider_id`,
-  `estimated_usd_cap`, `is_cloud=True` on cloud video shot rows (observability-
-  only; consumed by nothing yet); seedance_2 +
+  `estimated_usd_cap`, `is_cloud=True` on cloud video shot rows; seedance_2 +
   wan V3-expansion pins (un-dark seedance; wan gains its pinned prompt path if
   the V3 pin exposes one); live provider proof rides the operator smokes.
 
@@ -143,19 +104,12 @@ stop the floor swap until the driver machinery is ripped in the same change.)
 - **D1 PREREQUISITE: canonicalize_audio** (S2 stub @ cloud_media_canonical.py:99):
   soundfile load, resample 44.1kHz, downmix per stereo_policy, loudness matched
   to the existing local reference, +/-250ms per-line tolerance w/ head/tail
-  silence padding, actual_duration_s to line metadata. r4: the code's
-  LOUDNESS_REFERENCE_SOURCE (:40) is explicitly UNRESOLVED -- D1 must resolve it
-  to the local lane's real loudness handling (candidate: scene_sequencer's
-  _loudness_normalize_clip / -16 dBFS active RMS -- VERIFY, do not assume) and
-  add a test proving cloud clips match the local reference.
-- **D2 ELEVENLABS_VOICE resolution (r3-pinned).** The voice_selector row is NOT
-  routed through invoke_partner_node (it declares no hidden auth input;
-  _inject_hidden_inputs RAISES for such rows -- cloud_media_invoke.py:331-336).
-  The TTS adapter resolves the selector class locally, executes it in-process,
-  UNWRAPS the returned tuple ([0]), and passes the ELEVENLABS_VOICE object as a
-  pre-resolved input kwarg to the billed TTS invoke; the bridge's input
-  marshaling must accept non-file custom types. The selector's voice COMBO value
-  comes from the profile row's default_params (env-overridable per B4).
+  silence padding, actual_duration_s to line metadata.
+- **D2 ELEVENLABS_VOICE resolution.** The TTS rows need `voice: ELEVENLABS_VOICE`
+  (yaml:32/:65) produced by the AUX voice_selector row (yaml:74-91); the invoke
+  bridge is file-centric and cannot pass a raw voice object. Resolve the
+  voice_selector node class locally (_resolve_node_class on the pinned row) and
+  execute in-process to produce the voice input; verify exact mechanics at build.
   model: COMFY_DYNAMICCOMBO_V3 resolved per B4.
 - **D3 registration surface (all in the SAME change).** Adapter in
   nodes/_otr_audio_engines/ against the FROZEN AudioEngine protocol (per-line
@@ -163,20 +117,10 @@ stop the floor swap until the driver machinery is ripped in the same change.)
   WAV contract as bark/kokoro/indextts2) + profile rows in
   config/audio_engine_profiles.yaml + `_LEGACY_FIRST_ENGINES` additions
   (char_voice + announcer_voice -- nodes/_otr_engine_profiles.py:42; dropdowns
-  build from THIS map, adapter registration alone does not surface rows; r3:
-  APPEND to the END of both tuples -- index 0 is the shipped default and stays
-  indextts2/kokoro) + JSON widget audit + (r4) the adapter IMPORT in
-  nodes/_otr_audio_engines/__init__.py (the import IS the registration surface)
-  + CAPABILITIES rows in nodes/_otr_audio_engines/registry.py:185
-  (test_capability_profiles asserts CAPABILITIES == _REGISTRY on the audio side
-  too). default_roles = (); registers unconditionally (no requires_flag). NO new widget in the static shell (V-11);
-  the voice dropdown is an existing widget whose option list grows.
-  **Return contract (r3):** the voice seam expects generate_voice() to return an
-  AUDIO dict {"waveform": tensor, "sample_rate": int} packed by pack_audio_batch
-  (_otr_voice_node_common.py:559/:565/:581) -- the adapter calls
-  canonicalize_audio then LOADS the canonical WAV back into that dict; duration
-  metadata is stamped separately, never the return value. Nonzero estimated_usd
-  per B3(e).
+  build from THIS map, adapter registration alone does not surface rows) + JSON
+  widget audit. default_roles = (); registers unconditionally (no requires_flag).
+  NO new widget in the static shell (V-11); the voice dropdown is an existing
+  widget whose option list grows.
 - **D4 has_audio clarification.** has_audio is a VIDEO-side field (schemas.py:237);
   cloud TTS only feeds the per-line WAV contract; the audio spine is untouched
   (test_audio_byte_identical stays green).
@@ -184,17 +128,11 @@ stop the floor swap until the driver machinery is ripped in the same change.)
 ## Sprint E -- S-C C1: shared audio_motion_profile
 
 - **E1 schema.** Typed AudioMotionProfile model added to VideoRequest (which
-  extends _Forbid -- unknown keys REJECTED, schemas.py:78/:139). The field is
-  REQUIRED (no None default); every fixture constructing VideoRequest updates in
-  the SAME change (verify no serialized-request cache exists). Engines fail LOUD
-  if the field is absent -- never recompute (drift guard).
-- **E2 compute point + carrier (r3).** Computed ONCE in run_real_episode (where
-  master_audio_path exists), stamped into ledger["video"]["audio_motion_profile"];
-  BOTH request builders emit it: build_request (render_driver.py:225, the
-  soak/test path) and build_request_from_shot (:972, the episode path).
-  Soak/test paths construct an EXPLICIT named test-fixture profile (a visible
-  constant in the fixture) -- production paths fail LOUD on a missing profile;
-  nothing is silently defaulted at render time.
+  extends _Forbid -- unknown keys REJECTED, schemas.py:78/:139, so a schema field
+  is REQUIRED). Engines fail LOUD if the field is absent -- never recompute
+  (drift guard).
+- **E2 compute point.** Computed ONCE in run_episode before the beat loop;
+  stamped into the request in build_request_from_shot (render_driver.py:972 area).
 - **E3 v1 metrics (TRIMMED).** duration, rms, peak, onset (transient-peak count
   over threshold), silence ratio -- numpy/torch only, NO librosa/new deps.
   brightness / dynamic-range / speech-vs-music DEFERRED to C2 with the first
@@ -211,18 +149,8 @@ stop the floor swap until the driver machinery is ripped in the same change.)
 A (E1/E2) -> B (S1) -> C (S3 remainder) -> D (TTS) -> E (C1) -> F. GPU gates (soak2 QA,
 proof9d, S5 A/B, live smokes) interleave on render windows and do not block CPU coding.
 
-## Cloud failure policy (r3)
-
-v1 is LOUD STOP / NO RETRY -- intentional and directive-consistent (a transient
-provider failure is a failure; the bridge classifies RETRYABLE_TRANSPORT but does
-not retry). A bounded transport-only retry is a possible LATER opt-in, out of
-scope for these sprints.
-
 ## Open verify-at-build
 
 - content_oracle.check_manifest fallback-trail requirements (A5).
-- B6 gate-vs-ShotLock call order in the beat loop.
-- fallback.py rip vs retry_taxonomy classification split (A1).
-- ELEVENLABS_VOICE custom-type marshaling through the invoke bridge (D2).
+- ELEVENLABS_VOICE local-execution mechanics (D2).
 - seedance_2 V3-expansion pin dynamic inputs (Sprint C).
-- No serialized VideoRequest cache exists on disk (E1).

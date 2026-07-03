@@ -1,13 +1,12 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-02 late evening | branch v2.0-alpha | prod/main + tags operator-GATED.
-> NIGHT QUEUE SCORED (see PROOF9_VERDICT.md in docs/2026-07-02-canonical-ia2v):
-> proof9c FAILED (VRAM ceiling ops breach at 768x416 -- desktop squatter; no clips);
-> 120w soak COMPLETED + scored as the interim S4x verdict (chars ~3x relative
-> articulation lift; the 2.0 bar is CANVAS-SPECIFIC -- metric NOT scale-invariant);
-> 30w soak was still rendering at wrap (~55 min in) -- QA IT FIRST next window
-> (final in otr\obs + 6/6 clips + no breach), then proof9d clean 832x448 re-run
-> (kill the desktop squatter; baseline <=~2.5GB) for the final S4x GO/NO-GO.
+> Last updated 2026-07-02 late night | branch v2.0-alpha | prod/main + tags operator-GATED.
+> KIBITZ ARC CONVERGED on the remaining-sprints plan (r2/r3/r4 judged; BUILD-READY).
+> soak2 QA PASS (6/6 clips, obs final, no breach). proof9d 832x448 FAILED on a CLEAN
+> baseline -- MARGINAL breach 14506 > 14500 MB at shot_b002 (6MB over; zero headroom at
+> this canvas). S4x GO/NO-GO = OPERATOR DECISION (options in PROOF9_VERDICT.md).
+> Kibitz panel change (operator): claude CLI DROPPED -- panel = codex + antigravity;
+> Cowork Claude is anchor + judge.
 >
 > **LEAN + FORWARD-ONLY.** This doc holds the PLAN: current step, forward order, open items,
 > hard rules, and POINTERS to sprint specs. It does NOT record what got done -- that lives in
@@ -19,11 +18,12 @@
 
 ## 1. CURRENT STEP
 
-**NEXT CODE = S1 STILLS LANE** (canonicalize_image + recraft/flux_pro/nano_banana_2
-adapters + portrait-mint gates incl. `portrait_mint_3d` + the generic profile->schema
-CONFORMANCE TEST). Order for the next window: (1) QA the 30w soak, (2) proof9d clean
-832x448 re-run + score, (3) S1. S5 GPU exit gate (silent-vs-audio-in VRAM/time A/B on
-the first live clip) rides whichever render window comes first.
+**NEXT CODE = SPRINT A (E1/E2 no-fallback rip-out)** per the kibitz-hardened
+`docs/2026-07-02-remaining-sprints/PLAN.md` (CONVERGED r2/r3/r4 -- the single build
+spec; order A -> B(S1 stills) -> C -> D(TTS) -> E(C1) -> F; Sprint A internal order
+A4 -> A3b -> A1+A2 ATOMIC -> A3a/c/d/e). S5 GPU exit gate (silent-vs-audio-in VRAM/time
+A/B) rides the next render window. S4x GO/NO-GO awaits the operator call on the
+proof9d marginal-headroom breach (PROOF9_VERDICT.md options a/b/c).
 
 **OPERATOR DIRECTIVE 2026-07-02 late evening: NO FALLBACKS, NO AUTO-DEFAULTS, ANYWHERE.**
 The dropdown values SAVED in `workflows/otr_scifi_16gb_full.json` are the ONLY defaults.
@@ -142,12 +142,9 @@ OUT (research mode; docs in `ComfyUI-OTR-UpstreamStoryLab\docs`).
 Coverage-soak sprint spec (kibitz r1-r4 converged): `docs/2026-06-29-coverage-soak/SPRINT_PLAN.md`.
 The load-bearing OPEN items (7 of 11 sub-items already shipped -- see HANDOFF_LOG.md):
 
-- **E1 -- no-fallback scaffolding migration (NOT STARTED, load-bearing).** `make_fallback_of(` still
-  live (`render_driver.py:1800/2288`); `FLOOR_NAMES`/`UNIVERSAL_FLOOR`/`SYNTH_FALLBACKS`/
-  `EXPECTED_OOM_TRAIL` still used; `eng_character_3d.py` refs the chain. No-fallback is a standing
-  operator directive.
-- **E2 -- deprecate `allow_auto_fallback` in place (NOT STARTED).** `otr_video_director.py:228` still a
-  plain BOOLEAN passed through (:354); force false + relabel.
+- **E1/E2 = Sprint A of `docs/2026-07-02-remaining-sprints/PLAN.md` (kibitz-hardened; NEXT CODE).**
+  Real sites + test triage + atomic A1+A2 ordering all pinned THERE -- that doc supersedes the
+  older line-number notes here.
 - **E3-doc -- edit THIS doc only.** station_card + abstract retired (C0). `still_motion` is NOT retired
   (it is UNIVERSAL_FLOOR + mesh_stage's fallback target) -- do not unregister it.
 - **E4 -- "which model" dropdown spell-out (DEFERRED, low priority).** Audio-reactive + VRAM-tier
