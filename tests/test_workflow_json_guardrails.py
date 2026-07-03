@@ -1046,11 +1046,11 @@ class TestCascadeB3Surface:
 
     def test_cascade_widget_vector_trimmed_in_canonical_json(self):
         """The widgets deleted from cascade INPUT_TYPES (model_id +
-        6 phase toggles + vram_ceiling_gb) must also be trimmed from
-        `widgets_values`.
+        6 phase toggles + the ripped VRAM-ceiling widget) must also be
+        trimmed from `widgets_values`.
 
         Sprint 6 (2026-05-25) added 4 critic-to-render coupling widgets;
-        the 2026-07-03 VRAM rip then removed vram_ceiling_gb, so the
+        the 2026-07-03 VRAM rip then removed the ceiling widget, so the
         vector is 6: phase_7, phase_8, render_selection, render_max_n,
         protagonist_only, manual_line_ids (the operator's tier JSON owns
         the OOM budget now -- there is no hard-baked ceiling widget).
