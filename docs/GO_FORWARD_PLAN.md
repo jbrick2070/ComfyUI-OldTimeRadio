@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 (credits-enrichment window) | branch v2.0-alpha @ f00a8e8e | prod/main + tags operator-GATED.
+> Last updated 2026-07-03 (credits-enrichment S3+S1 SHIPPED) | branch v2.0-alpha @ 20a669de | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -29,24 +29,27 @@
 
 ## 1. CURRENT STEP
 
-**ACTIVE (2026-07-03, operator kickoff) = CREDITS ENRICHMENT -- next slice: S3+S1 ATOMIC (the
-guaranteed-RED window).** Source of truth: `docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md`
-(v4, build-ready) + `KICKOFF.md`. DONE so far (pushed, HEAD==origin):
-- S2 durable singleton stamps @ 3e0003e8 (stamp_durable + LedgerStampError in production_ledger;
-  CastLock / image dispatcher / stable_audio_theme music_engine / render batch all under the loud
-  contract; tests/test_credits_s2_durable_stamps.py, 11 green). Suite 6098/0 + Bug Bible green.
-- OTR_CreditsRoll SCAFFOLD @ f00a8e8e (nodes/otr_credits_roll.py, UNWIRED + UNREGISTERED;
-  tests/test_credits_roll_spec.py 13 green -- absorbs the 3 dossier RENDER-ENGINES tests + bug410).
-NEXT = S3+S1 as ONE ATOMIC commit per GO_FORWARD_CREDITS §S3/orchestration step 3: rip node-12 HUD
-(dossier + credits-music loop + treatment merge 2402-2428) + rip node-84 tail-fill/loop-last-clip
-(otr_silent_composite :388-413, :690-741) + REGISTER OTR_CreditsRoll in root __init__.py (~:312
-table) + wire 93->CreditsRoll->85 in the JSON (rewire link 250, PRESERVE link 263, add manifest
-link from 92 slot 1 + declared-tail input on node 85) + make the mux guard CREDITS-AWARE
-(v_dur <= a_dur + declared_tail + tol; never blind-widen 45s) + retire test_hud_dossier_bug3 x3 +
-test_video_render_path_cw4.py::test_assemble_extends_to_floor_for_credits_tail_bug410 in the SAME
-commit + OTR_WorkflowValidator. S3 gate: full kibitz + Fable FINAL grounded pass BEFORE merge
-(CLAUDE.md §9). Then S0 (font +50% + budget), then S4 (footer :598 only). Frame-level live smoke
-per KICKOFF verification. Do NOT land rip and paste as separate commits.
+**ACTIVE (2026-07-03) = CREDITS ENRICHMENT -- S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON
+recompact, + 20a669de Fable-gate fix). NEXT: LIVE frame-level smoke -> S0 -> S4.** Source of truth:
+`docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md` (v4) + `KICKOFF.md`. DONE (pushed, HEAD==origin):
+- S2 durable singleton stamps @ 3e0003e8; OTR_CreditsRoll SCAFFOLD @ f00a8e8e.
+- **S3+S1 ATOMIC @ 5f510ebe:** registered OTR_CreditsRoll; ripped node-12 RENDER-ENGINES dossier
+  section + HUD credits-music loop (->silence pad) + too-early treatment engine-enrich; ripped node-84
+  BUG-410 floor-extend-past-master ONLY (kept the master-mix A/V-sync cap + looped-last-clip tail);
+  wired 93->95->85 (node 95; link 250 rewired, new 274/275/276; declared-tail input node 85 slot 6);
+  credits-AWARE mux guard (v <= a + declared_tail + tol); retired the 4 moved tests + updated the
+  93->95->85 visual pin. Suite 6108/0, Bug Bible 16, B7 green.
+- **GATE (CLAUDE.md §9):** grounded general-purpose review (0 breakers) + Fable FINAL gate -- Fable
+  caught a real deliverable-path bug (mux _default_out didn't peel "_with_credits"); FIXED @ 20a669de.
+  NOTE: the formal codex+antigravity kibitz was NOT run (general-purpose+Fable used) -- operator may
+  run it before promotion. Non-blocker flagged: cast_voice_slots isn't durably stamped, so the credits
+  CAST speech_signature quote is silently omitted (cosmetic; fold into S0/a follow-up).
+NEXT = (a) LIVE frame-level smoke on a SHORT + LONG episode: last frame is a credit frame (not black),
+video ends with the roll, body audio byte-identical, no mux ValueError on the long roll, final in
+otr/obs carries the credits tail. Also the operator's 30-45w e2e matrix (local flux+ltx_audio_in +
+cloud legs; OTR_COMFY_API_KEY SET len=72; cloud voice TTS w/ indextts2/chatterbox fallback). Then
+(b) S0 (font +50% + credits-aware duration budget; fold in the cast_voice_slots signature), then
+(c) S4 (footer :598 only).
 
 **Previously active (PARKED behind credits enrichment; resume after):
 CLOUD SOAK + Bug B (motion) + 1080p, below.**

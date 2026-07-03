@@ -6,6 +6,32 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (credits-enrichment S3+S1 atomic) -- HEAD 20a669de (v2.0-alpha)
+Did: landed the S3+S1 ATOMIC slice per GO_FORWARD_CREDITS.md v4 -- the guaranteed-RED window.
+- Registered OTR_CreditsRoll (__init__.py). RIPPED (video_engine.py): RENDER-ENGINES section from
+  _build_hud_dossier (kept writer/story/system/resolved); the HUD credits-music loop -> SILENCE pad
+  (closing_audio now unused-but-declared); the too-early treatment engine-enrich merge.
+- Node-84 (otr_silent_composite.py): ripped ONLY the BUG-410 floor-extend-PAST-master; KEPT the
+  master-mix A/V-sync cap + looped-last-clip closing-theme tail (I over-ripped first, caught by the
+  positioned-fills-to-master test, reverted to the minimal rip).
+- Mux (otr_master_audio_mux.py): credits-AWARE guard -- new FLOAT forceInput declared_credits_tail_s
+  (node 85 slot 6); permits v <= a + declared + tol (declared>0) else the OTR_MAX_CREDITS_TAIL_S env
+  ceiling; byte-identical assert intact.
+- Workflow JSON: node 95 OTR_CreditsRoll; link 250 rewired 93->95; new links 274 (95->85 video), 275
+  (92.1 manifest->95), 276 (95->85 declared tail slot6). last_node_id=95 last_link_id=276. (Re-compacted
+  the JSON to ComfyUI single-line after an indent=2 pass -- commit fade23c3.)
+- Retired the 4 moved tests IN the same slice (3 dossier RENDER-ENGINES + bug410 floor-extend);
+  updated the visual-structure pin to 93->95->85. Suite 6108/0, Bug Bible 16, B7 green.
+- GATE (CLAUDE.md §9): grounded general-purpose review (0 breakers) THEN Fable FINAL gate -- Fable
+  caught a REAL deliverable-path bug (mux _default_out didn't peel "_with_credits" -> final would land
+  in otr/episodes/<...>_with_credits/, failing the §6 Test-Path). FIXED + regression test @ 20a669de.
+Current step: credits enrichment -- LIVE frame-level smoke (short+long, obs credits proof) IN PROGRESS,
+  then S0 (font +50% + credits-aware duration budget), then S4 (footer :598). Formal codex+antigravity
+  kibitz NOT run (general-purpose+Fable gate used instead) -- operator may run it before promotion.
+Next: run the operator's 30-45w e2e matrix (local flux+ltx_audio_in + cloud legs; key is SET len=72;
+  cloud voice TTS w/ indextts2/chatterbox fallback) -> confirm otr/obs carries the new silent credits tail.
+Commits: 5f510ebe, fade23c3, 20a669de.
+
 ## 2026-07-03 (credits-enrichment window) -- HEAD f00a8e8e (v2.0-alpha)
 Did: executed credits-enrichment S2 + the parallel scaffold lane per GO_FORWARD_CREDITS.md v4.
 - S2 @ 3e0003e8: stamp_durable()/LedgerStampError in production_ledger (local-to-singleton copy
