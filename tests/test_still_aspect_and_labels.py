@@ -115,25 +115,10 @@ def test_role_aspects_unknown_engine_falls_back_portrait():
 # Goal B -- label <-> id round-trip (display-only, value-safe)
 # --------------------------------------------------------------------------- #
 def test_label_suffix_is_aspect_derived():
-    assert vd._label_for("humo") == "humo (portrait) (~13.7GB)"
-    assert vd._label_for("humo_1.7B") == "humo_1.7B (portrait) (~6.8GB)"
-    assert vd._label_for("humo_1.7B_169") == "humo_1.7B_169 (16:9) (~6.8GB)"
-    assert vd._label_for("ltx_video") == "ltx_video (16:9) (~13.7GB)"
-
-
-def test_label_vram_tier_suffix_is_registry_derived():
-    # 2026-06-30 item 5: the VRAM-tier suffix is COMPUTED from CAPABILITIES'
-    # vram_estimate_mb, never a hand-maintained per-engine string.
-    assert vreg.vram_tier_label("humo_1.7B") == " (~6.8GB)"
-    assert vreg.vram_tier_label("not_a_real_engine") == ""     # unknown -> none
-
-
-def test_label_zero_vram_engine_gets_no_vram_suffix():
-    # A CPU-tier engine (vram_estimate_mb=0) needs no VRAM caveat -- the bare
-    # label (plus any aspect suffix) round-trips unchanged, preserving the
-    # back-compat contract for old saved graphs.
-    assert vreg.vram_tier_label("still_flat") == ""
-    assert vreg.CAPABILITIES["still_flat"]["vram_estimate_mb"] == 0
+    assert vd._label_for("humo") == "humo (portrait)"
+    assert vd._label_for("humo_1.7B") == "humo_1.7B (portrait)"
+    assert vd._label_for("humo_1.7B_169") == "humo_1.7B_169 (16:9)"
+    assert vd._label_for("ltx_video") == "ltx_video (16:9)"
 
 
 def test_label_descriptor_suffix_is_family_derived():
@@ -152,8 +137,8 @@ def test_label_descriptor_suffix_is_family_derived():
 
 
 def test_descriptor_label_still_round_trips_to_bare_id():
-    # The descriptor suffix starts with ' (' so it strips with the aspect/VRAM
-    # suffixes -> the saved value stays the bare engine id.
+    # The descriptor suffix starts with ' (' so it strips with the aspect
+    # suffix -> the saved value stays the bare engine id.
     for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"):
         assert vd._engine_id_from_pick(vd._label_for(name)) == name
 

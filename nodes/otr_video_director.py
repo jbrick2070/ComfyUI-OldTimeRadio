@@ -87,20 +87,17 @@ def _descriptor_suffix(engine_id) -> str:
 
 def _label_for(engine_id) -> str:
     """The dropdown LABEL for an engine id:
-    ``'<id><aspect suffix><vram tier suffix><descriptor suffix>'`` (e.g.
-    ``'humo_1.7B (portrait) (~6.8GB)'`` or
-    ``'viz_green (16:9) (audio-reactive, no scene image)'``). The VRAM-tier suffix
-    (2026-06-30 item 5) is auto-derived from the registry CAPABILITIES table
-    (:func:`_vreg.vram_tier_label`); the descriptor suffix (2026-07-01 E4) is
-    auto-derived from the engine's family/``accepts_still``
-    (:func:`_descriptor_suffix`) -- BOTH never hand-maintained, same contract as
+    ``'<id><aspect suffix><descriptor suffix>'`` (e.g.
+    ``'humo_1.7B (portrait)'`` or
+    ``'viz_green (16:9) (audio-reactive, no scene image)'``). The descriptor
+    suffix (2026-07-01 E4) is auto-derived from the engine's family/``accepts_still``
+    (:func:`_descriptor_suffix`) -- never hand-maintained, same contract as
     the aspect suffix. Every suffix starts with ``' ('`` so
     :func:`_engine_id_from_pick`'s first-``' ('``-truncation strips them all
-    together; a zero-VRAM, no-aspect, no-descriptor engine still round-trips to
+    together; a no-aspect, no-descriptor engine still round-trips to
     the bare id."""
-    return "%s%s%s%s" % (engine_id, _aspect_suffix(engine_id),
-                         _vreg.vram_tier_label(engine_id),
-                         _descriptor_suffix(engine_id))
+    return "%s%s%s" % (engine_id, _aspect_suffix(engine_id),
+                       _descriptor_suffix(engine_id))
 
 
 #: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that
