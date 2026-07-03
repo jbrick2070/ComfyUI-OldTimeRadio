@@ -6,6 +6,25 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 night (overnight coder) -- HEAD 932450f0 (v2.0-alpha) -- SOAK LAUNCHED (detached, running)
+Did: CODE PHASE COMPLETE (still_word 097f44ad + word_razzle Phase0 3843bbd0 / Phase1 c914321e,
+all pushed, suite 6142/0, Bug Bible 16). Then launched the overnight model-matrix SOAK detached:
+scripts/_otr_night_matrix_soak.py (a clone of the proven _otr_visual_soak_6leg harness) -- Pass 1
+COHERENT same-model legs, NEWEST video first, force-map video + flux2_klein image + indextts2/bark
+voice, 35w/2ch. 10 legs: m01 ltx_audio_in, m02 ltx_video, m03 humo_14B_169, m04 humo_1.7B_169,
+m05 wan_i2v, m06 still_word, m07 viz_green, m08 ltx_audio_in+bark, m09 humo_1.7B_169+bark,
+m10 word_razzle (cloud -> LOUD-fails without OTR_COMFY_API_KEY, expected). ONE fresh server per leg
+(selective :8000 kill), assets -> otr/episodes/<ep>/, final -> otr/obs/, obs Test-Path gate + 1 retry.
+VERIFIED LIVE: m01 booted, profile applied, writer patched (gemma 35w), prompt c6d97cbe QUEUED,
+rendering. Driver PID in docs/2026-07-03-word-razzle/nightmatrix_driver.pid.
+MONITOR: results -> scripts/_otr_soak_capstone_results/nightmatrix_20260703_012410/{soak.log,results.jsonl,server_*.log};
+obs finals -> C:\Users\jeffr\Documents\ComfyUI\output\otr\obs. Driver stdout ->
+docs/2026-07-03-word-razzle/nightmatrix_driver.out.
+Current step: SOAK RUNNING detached (code done+pushed). Next window: monitor results.jsonl + obs;
+on any leg NO-obs, read server_<leg>.log, root-cause (golden rules), re-regress+push; later passes =
+deliberate MIXES. word_razzle live spike awaits OTR_COMFY_API_KEY.
+Commits: 097f44ad 3843bbd0 c914321e (+ baton 2229b761/932450f0) -- all pushed, HEAD==origin.
+
 ## 2026-07-03 night (overnight coder) -- HEAD c914321e (v2.0-alpha) -- word_razzle SHIPPED (Phase 0 audit + Phase 1 engine)
 Did: (Phase 0 @ 3843bbd0) added a non-mutating --audit-i2v mode to
 scripts/otr_pin_partner_nodes.py that walks the whole live comfy_api_nodes catalog for a

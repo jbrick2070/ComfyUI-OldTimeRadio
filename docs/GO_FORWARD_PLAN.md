@@ -5,9 +5,12 @@
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
 > (CANDIDATE_FOUND, 36 rows) + Phase 1 engine @ c914321e (Pixverse cloud i2v, dark/selectable).
-> Suite 6142/0, Bug Bible 16, B7. CODE PHASE DONE -> NOW RUNNING (4) the overnight SOAK.
-> NOTE: OTR_COMFY_API_KEY UNSET this window -> cloud rows (word_razzle) FAIL LOUD at invoke
-> (expected); the live word_razzle spike + soak cloud legs await the key.
+> Suite 6142/0, Bug Bible 16, B7. CODE PHASE DONE. (4) SOAK LAUNCHED + RUNNING DETACHED:
+> scripts/_otr_night_matrix_soak.py (10 newest-model legs, force-map video + flux2 image +
+> indextts2/bark, 35w). m01 ltx_audio_in verified rendering. MONITOR:
+> scripts/_otr_soak_capstone_results/nightmatrix_20260703_012410/results.jsonl + otr/obs.
+> NOTE: OTR_COMFY_API_KEY UNSET -> cloud legs (m10 word_razzle) FAIL LOUD at invoke (expected);
+> the live word_razzle spike + soak cloud legs await the key.
 > SPRINT A + Sprint B S1 stills core + `ideo` SHIPPED.
 > KIBITZ ARC CONVERGED on the remaining-sprints plan (r2/r3/r4 judged; BUILD-READY).
 > soak2 QA PASS (6/6 clips, obs final, no breach). proof9d 832x448 FAILED on a CLEAN
