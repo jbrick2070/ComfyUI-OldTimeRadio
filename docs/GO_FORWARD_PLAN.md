@@ -1,10 +1,13 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-02 night | branch v2.0-alpha | prod/main + tags operator-GATED.
-> NIGHT QUEUE IN FLIGHT (unattended): proof9c (S4b/c verdict, 768x416 -- see
-> HANDOFF_LOG 2026-07-02 night) -> 120w soak -> 30w soak, chained on the :8000
-> headless server. Morning window: score proof9c + QA both soaks FIRST
-> (session_handoff.md has the scoring recipe), then resume the order below.
+> Last updated 2026-07-02 late evening | branch v2.0-alpha | prod/main + tags operator-GATED.
+> NIGHT QUEUE SCORED (see PROOF9_VERDICT.md in docs/2026-07-02-canonical-ia2v):
+> proof9c FAILED (VRAM ceiling ops breach at 768x416 -- desktop squatter; no clips);
+> 120w soak COMPLETED + scored as the interim S4x verdict (chars ~3x relative
+> articulation lift; the 2.0 bar is CANVAS-SPECIFIC -- metric NOT scale-invariant);
+> 30w soak was still rendering at wrap (~55 min in) -- QA IT FIRST next window
+> (final in otr\obs + 6/6 clips + no breach), then proof9d clean 832x448 re-run
+> (kill the desktop squatter; baseline <=~2.5GB) for the final S4x GO/NO-GO.
 >
 > **LEAN + FORWARD-ONLY.** This doc holds the PLAN: current step, forward order, open items,
 > hard rules, and POINTERS to sprint specs. It does NOT record what got done -- that lives in
@@ -16,7 +19,26 @@
 
 ## 1. CURRENT STEP
 
-**CLOUD ENGINE LANES S0 (ACTIVE CODING WINDOW, operator "build" 2026-07-02).** Build doc =
+**NEXT CODE = S1 STILLS LANE** (canonicalize_image + recraft/flux_pro/nano_banana_2
+adapters + portrait-mint gates incl. `portrait_mint_3d` + the generic profile->schema
+CONFORMANCE TEST). Order for the next window: (1) QA the 30w soak, (2) proof9d clean
+832x448 re-run + score, (3) S1. S5 GPU exit gate (silent-vs-audio-in VRAM/time A/B on
+the first live clip) rides whichever render window comes first.
+
+**OPERATOR DIRECTIVE 2026-07-02 evening (SHIPPED @ cc349c1d): NO hidden cloud enable
+switch.** `OTR_ENABLE_COMFY_CLOUD_MEDIA` is REMOVED (same clean break as OpenRouter C6):
+the dropdown pick IS the enable; missing credentials fail LOUD at invoke-time auth
+(naming OTR_COMFY_API_KEY / logged-in hidden inputs); budget unset = $10 DEFAULT_BUDGET_USD
+safety cap (explicit 0 = deliberate spend-off). This SUPERSEDES every "flag OFF/ON" test/
+acceptance line in pass04 sec 8 -- S1 builds on the no-flag reality. The S0 live smokes
+now need only auth (+ OTR_RUN_CLOUD_SMOKE=1, the paid-run gate for the script).
+
+**S5 SHIPPED @ fb23d82d (2026-07-02 late evening):** silent two-stage HQ recipe in
+eng_ltx_video (OTR_LTX_VIDEO_RECIPE auto|hq_two_stage|single_pass; dev-unet auto default;
+init still required fail-LOUD; single_pass frozen byte-identical; 2 LTX rows, NO
+ltx_lowvram). REMAINING = the GPU A/B exit gate above.
+
+**CLOUD ENGINE LANES S0 (context; operator "build" 2026-07-02).** Build doc =
 `docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md` @ 29b11e77 (4-round roundtable converged
 + operator amendment: audio reactivity DEFAULT-ON all video roles, mute = audited opt-down).
 S0 PROGRESS (2026-07-02): chunks 1-3 SHIPPED + PUSHED, suite 5988/0 + Bug Bible green each chunk:
@@ -37,9 +59,9 @@ S0 PROGRESS (2026-07-02): chunks 1-3 SHIPPED + PUSHED, suite 5988/0 + Bug Bible 
   cancel + 20s ProgressBar heartbeat; streamed temp downloads; release-vs-bill settlement) + 23
   tests + GATED smoke harness `scripts/otr_cloud_s0_smoke.py` (leg1 recraft auth proof, leg2 Kling
   avatar conditioned by `tests/fixtures/baseline_v1.5.wav`).
-S0 REMAINING: ONLY the live smoke RUNS -- operator must set `OTR_RUN_CLOUD_SMOKE=1`,
-`OTR_ENABLE_COMFY_CLOUD_MEDIA=1`, `OTR_CLOUD_MEDIA_BUDGET_USD`, and logged-in Comfy OR
-`OTR_COMFY_API_KEY` (all unset as of 2026-07-02 pm), then
+S0 REMAINING: ONLY the live smoke RUNS -- operator must set `OTR_RUN_CLOUD_SMOKE=1` and
+`OTR_COMFY_API_KEY` (budget optional -- unset = the $10 default cap; the enable flag is
+REMOVED per the 2026-07-02 directive above), then
 `python scripts/otr_cloud_s0_smoke.py --leg 1` / `--leg 2`. NO existing render-path changes in S0;
 workflow JSON untouched until S4 (operator-gated). NEXT CODE = S1 (stills lane: canonicalize_image
 + recraft/flux/nano adapters + portrait-mint gates).
@@ -95,9 +117,10 @@ regenerated before reuse.
 The canonical comfy.org IA2V transplant reversed the C NO-GO (see HANDOFF_LOG + PROOF7_VERDICT.md
 in docs/2026-07-02-canonical-ia2v). Shipped since: talking prompt register, S4 portrait init, S4b
 face-forward portrait mint, S4c radio-face DEFAULT-ON for ia2v bookends (env A/B = single-pass
-only). VERDICT PENDING: proof9c (in the night queue) scores the full stack; character speech bar
->= 2.0. NEXT LTX CODE = **S5** (operator ratified: port the two-stage HQ recipe to silent
-ltx_video; 2 LTX rows, NO ltx_lowvram; measured VRAM/time A/B on first live clip). Story-writer
+only). VERDICT (2026-07-02 late evening, PROOF9_VERDICT.md): PROVISIONAL PASS on direction --
+the 120w soak (S4 fired, log-proven) lifted characters ~3x relative to the announcer anchor,
+but the 2.0 bar is CANVAS-SPECIFIC; final GO/NO-GO = proof9d clean 832x448 re-run. **S5 SHIPPED
+@ fb23d82d** (silent HQ two-stage in eng_ltx_video; GPU A/B exit gate owed). Story-writer
 fixes are PARKED in the transplant repo (UpstreamStoryLab GO_FORWARD "DEFERRED STORY-LLM FIXES")
 -- NO production story-LLM changes until the refactor. Source-bank visual-style transplant stays
 OUT (research mode; docs in `ComfyUI-OTR-UpstreamStoryLab\docs`).

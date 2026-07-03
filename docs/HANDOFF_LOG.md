@@ -6,6 +6,21 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-02 ~21:15 -- HEAD fb23d82d (v2.0-alpha) -- night queue scored + dropdown directive + S5
+Did: scored the night queue (PROOF9_VERDICT.md @ 4dd79dbe: proof9c FAILED on a VRAM-ceiling ops
+breach at 768x416 -- desktop squatter, no clips; 120w soak COMPLETED 6/6 + obs_publish OK and
+scored as the interim S4x verdict -- chars ~3x relative lift vs the announcer anchor; the motion
+metric is NOT scale-invariant so the 2.0 bar is canvas-specific). SHIPPED the operator dropdown
+directive @ cc349c1d (cloud enable flag REMOVED -- the dropdown pick IS the enable; auth fails
+LOUD at invoke; budget unset = $10 default cap, explicit 0 = spend-off). SHIPPED S5 @ fb23d82d
+(silent two-stage HQ recipe in eng_ltx_video, unet-family auto-detect, 16 new topology tests).
+Suites 6059/0 -> 6075/0 + Bug Bible green per chunk; all pushed, HEAD==origin. Operator opened a
+parallel IDEAS window (docs-only, docs/GO_FORWARD_NEXT/).
+Current step: QA the 30w soak (~55 min in at wrap) -> proof9d clean 832x448 re-run -> S1 stills
+lane (+ the S5 silent-vs-audio-in GPU A/B on the first render window).
+Next: QA soak2, reset the box (kill the desktop squatter; baseline <=2.5GB), proof9d, then S1.
+Commits: 4dd79dbe cc349c1d fb23d82d (+ this docs commit).
+
 ## 2026-07-02 ~19:10 -- HEAD (wrap commit) (v2.0-alpha) -- WRAP for a new chat
 Did: committed ia2v_flat_api_prompt.json at probe-final state; swept dead temp probes (this
 session's were already gone; pruned prior-session _tmp_* scripts, kept logs); verified the
