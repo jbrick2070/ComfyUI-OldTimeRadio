@@ -135,6 +135,19 @@ CAPABILITIES = {
     "z_image_turbo": {"vram_class": "medium", "vram_estimate_mb": 5000, "required_toolchain": None,
                       "requires_sidecar": False, "cpu_ok": False,
                       "model_requirements": ["z-image-turbo"]},
+    # Cloud partner STILLS (S1 stills lane 2026-07-03): no local weights, no
+    # VRAM, CPU-side (the provider does the compute; canonicalize_image is a
+    # pure PIL op). vram_class "cpu" so they fit every profile including the
+    # CPU floor; the registry-consistency invariant (test_capability_profiles
+    # :217) requires ONE row per registered engine and vice versa.
+    "cloud_recraft": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                      "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_flux_pro": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                       "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_nano_banana_2": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                            "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_seedream_2": {"vram_class": "cpu", "vram_estimate_mb": 0, "required_toolchain": None,
+                         "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

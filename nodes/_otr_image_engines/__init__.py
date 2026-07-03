@@ -71,3 +71,14 @@ try:  # pragma: no cover - trivial guard
     from . import flux2_klein as _flux2_klein  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): recraft / flux_pro
+# / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
+# engines. Register unconditionally with EMPTY default_roles (selectable, never
+# automatic; the dropdown pick is the enable). Cold-import clean (the bridge /
+# canonicalizer / PIL import lazily inside render_image); own guard so a quirk
+# never blocks the local adapters above.
+try:  # pragma: no cover - trivial guard
+    from . import eng_cloud_image as _eng_cloud_image  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

@@ -103,10 +103,92 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session) -> CanonicalA
     _not_built_yet("audio", "S2 (voice + music lane)")
 
 
-def canonicalize_image(raw: PartnerResult, request: dict, session) -> CanonicalAsset:
-    """S1. Exact role canvas, sRGB PNG; portrait-hash / in-character
-    checks re-run on cloud output."""
-    _not_built_yet("image", "S1 (stills lane)")
+def canonicalize_image(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
+    """S1 (2026-07-03). Conform a provider still to the ROLE canvas:
+
+    - decode the provider image (PNG/JPEG/WEBP -- the bridge already streamed
+      it to a temp file) and force sRGB RGB (drop alpha / ICC quirks);
+    - resize to the EXACT role canvas WITHOUT distortion: scale-to-COVER then
+      centre-crop to ``w x h`` (stills get Ken-Burns panned by still_pan /
+      still_flat downstream, so a fill -- never letterbox bars -- is the right
+      conform for a background/portrait plate);
+    - re-encode a real sRGB PNG on disk (the dispatcher's ``_coerce_pixels``
+      reads a ``.png`` PATH and enforces a minimum byte floor);
+    - sha256 of the canonical bytes.
+
+    ``request`` supplies ``{"w", "h"}`` (both required, fail-closed) and
+    optionally ``format`` (default ``"PNG"``) + ``out_path`` (default: a fresh
+    png beside the input with a ``.canon.png`` suffix). ``session`` is accepted
+    for signature parity with the audio/video canonicalizers but is unused here
+    (image conform is a pure pixel op)."""
+    import hashlib
+    validated = validate_partner_result(dict(raw))
+    src = Path(validated["path"])
+    try:
+        w = int(request["w"])
+        h = int(request["h"])
+    except (KeyError, TypeError, ValueError):
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            "canonicalize_image request must carry integer w/h "
+            f"(got {request!r})")
+    if w <= 0 or h <= 0:
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"canonicalize_image needs positive w/h (got {w}x{h})")
+    fmt = str(request.get("format") or "PNG").upper()
+    if fmt != "PNG":
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"canonicalize_image only emits PNG (got format={fmt!r})")
+    out_path = Path(request.get("out_path") or
+                    src.with_suffix("")).with_suffix(".canon.png")
+    try:
+        from PIL import Image
+        with Image.open(str(src)) as im:
+            im = im.convert("RGB")          # sRGB, drop alpha/palette/ICC
+            src_w, src_h = im.size
+            if src_w <= 0 or src_h <= 0:
+                raise CloudMediaError(
+                    CloudErrorCode.CORRUPT_OUTPUT,
+                    f"provider image {src} decoded to a zero dimension")
+            # scale-to-COVER: the larger ratio fills the canvas, centre-crop
+            # the overflow -> exact w x h, no distortion, no bars.
+            scale = max(w / src_w, h / src_h)
+            new_w = max(w, int(round(src_w * scale)))
+            new_h = max(h, int(round(src_h * scale)))
+            im = im.resize((new_w, new_h), Image.LANCZOS)
+            left = (new_w - w) // 2
+            top = (new_h - h) // 2
+            im = im.crop((left, top, left + w, top + h))
+            im.save(str(out_path), format="PNG")
+    except CloudMediaError:
+        raise
+    except Exception as exc:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              f"image conform failed for {src}: {exc}")
+    if not out_path.is_file() or out_path.stat().st_size == 0:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"canonical image not written or empty: {out_path}")
+    sha = hashlib.sha256()
+    with open(out_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha.update(chunk)
+    warnings = ()
+    if (src_w, src_h) != (w, h):
+        warnings = (f"provider still {src_w}x{src_h} conformed to "
+                    f"{w}x{h} (cover+crop)",)
+    return CanonicalAsset(
+        path=out_path,
+        sha256=sha.hexdigest(),
+        media_type="image",
+        duration_s=None,
+        width=w, height=h, fps=None,
+        container="png",
+        provider_job_id=validated.get("provider_job_id"),
+        validation_warnings=warnings,
+    )
 
 
 def _ffprobe_streams(path: str) -> dict:
