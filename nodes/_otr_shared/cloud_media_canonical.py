@@ -15,6 +15,7 @@ LOUDNESS_REFERENCE_SOURCE documents where it must come from.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, TypedDict
@@ -30,7 +31,34 @@ __all__ = [
     "canonicalize_audio",
     "canonicalize_image",
     "canonicalize_video",
+    "cloud_delivery_wh",
 ]
+
+
+def cloud_delivery_wh(request_w, request_h, *, land_env, port_env,
+                      land_default="1920x1080", port_default="1080x1920"):
+    """The TRUE 1080p cloud DELIVERY canvas (orientation-preserving), env-overridable.
+
+    The provider clip/still is conformed to THIS canvas by ``canonicalize_*`` -- NOT
+    the smaller per-family request canvas (which would DOWNSCALE a 1080p provider
+    output, e.g. word_razzle's 1472x832 request -> a 1472x832 clip). CLOUD-LANE ONLY:
+    no local engine reads this, so locals keep their own render resolution
+    (kibitz-grounded 2026-07-03). Portrait is chosen when the request canvas is
+    TALLER than wide (rh > rw) -- the cloud analogue of "HuMo portrait excepted from
+    the landscape bump". Unknown / zero request -> landscape default.
+    """
+    try:
+        rw, rh = int(request_w or 0), int(request_h or 0)
+    except (TypeError, ValueError):
+        rw = rh = 0
+    portrait = rh > rw > 0
+    spec = (os.environ.get(port_env, port_default) if portrait
+            else os.environ.get(land_env, land_default))
+    try:
+        parts = str(spec).lower().split("x", 1)
+        return (max(1, int(parts[0])), max(1, int(parts[1])))
+    except (ValueError, IndexError, AttributeError):
+        return (1080, 1920) if portrait else (1920, 1080)
 
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).
 CANONICALIZER_VERSION = 1
@@ -265,7 +293,7 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     vf = (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
           f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps={fps},format=yuv420p")
     cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-an",
-           "-vf", vf, "-c:v", "libx264", "-preset", "medium",
+           "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
            "-colorspace", "bt709", "-color_primaries", "bt709",
            "-color_trc", "bt709", "-movflags", "+faststart", str(out_path)]
     try:

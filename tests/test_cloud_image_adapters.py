@@ -10,7 +10,7 @@ import pytest
 
 from nodes._otr_shared.cloud_media_backend import CloudErrorCode, CloudMediaError
 from nodes._otr_shared.cloud_media_canonical import (
-    CanonicalAsset, canonicalize_image)
+    CanonicalAsset, canonicalize_image, cloud_delivery_wh)
 from nodes._otr_image_engines import eng_cloud_image as eci
 from nodes._otr_image_engines import registry as ireg
 
@@ -77,10 +77,14 @@ def test_recraft_inputs():
     assert ins["n"] == 1 and ins["seed"] == 7
 
 
-def test_flux_pro_inputs():
+def test_flux_pro_inputs(monkeypatch):
+    # TRUE 1080p cloud stills (2026-07-03): _canvas_wh now conforms to the cloud
+    # delivery canvas (orientation-preserving), so a landscape role request mints
+    # at 1920x1080 -- flux_pro natively requests that from the provider.
+    monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "1920x1080")
     ins = eci.FluxPro._partner_inputs(_req())
     assert set(ins) == {"prompt", "width", "height", "prompt_upsampling", "seed"}
-    assert ins["width"] == 832 and ins["height"] == 448
+    assert ins["width"] == 1920 and ins["height"] == 1080
     assert ins["prompt_upsampling"] is False
 
 
@@ -193,6 +197,9 @@ def test_render_image_returns_canonical_png_path(tmp_path, monkeypatch):
 
     import nodes._otr_shared.cloud_media_invoke as cmi
     monkeypatch.setattr(cmi, "invoke_partner_node", _fake_invoke)
+    # TRUE 1080p cloud stills: the canonical PNG conforms to the cloud delivery
+    # canvas (landscape 1920x1080 here), NOT the raw role-request 640x360.
+    monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "1920x1080")
     out = eci.Recraft.render_image(_req(width=640, height=360), {})
     assert isinstance(out, str) and out.endswith(".canon.png")
     assert Path(out).is_file()
@@ -200,4 +207,41 @@ def test_render_image_returns_canonical_png_path(tmp_path, monkeypatch):
     assert captured["estimated_usd"] > 0     # budget machine needs nonzero
     from PIL import Image
     with Image.open(out) as im:
-        assert im.size == (640, 360)
+        assert im.size == (1920, 1080)
+
+
+# --------------------------------------------------------------------------- #
+# cloud_delivery_wh -- the TRUE-1080p orientation-preserving cloud canvas
+# --------------------------------------------------------------------------- #
+
+
+def test_cloud_delivery_wh_landscape_default(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_STILL_CANVAS", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_STILL_CANVAS_PORTRAIT", raising=False)
+    assert cloud_delivery_wh(1472, 832, land_env="OTR_CLOUD_STILL_CANVAS",
+                             port_env="OTR_CLOUD_STILL_CANVAS_PORTRAIT") == (1920, 1080)
+
+
+def test_cloud_delivery_wh_portrait(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_STILL_CANVAS_PORTRAIT", raising=False)
+    # rh > rw -> portrait branch
+    assert cloud_delivery_wh(480, 832, land_env="OTR_CLOUD_STILL_CANVAS",
+                             port_env="OTR_CLOUD_STILL_CANVAS_PORTRAIT") == (1080, 1920)
+
+
+def test_cloud_delivery_wh_square_and_zero_are_landscape():
+    # square (rh not > rw) and zero/unknown both fall to landscape default
+    assert cloud_delivery_wh(1024, 1024, land_env="A", port_env="B") == (1920, 1080)
+    assert cloud_delivery_wh(0, 0, land_env="A", port_env="B") == (1920, 1080)
+
+
+def test_cloud_delivery_wh_env_override(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_VIDEO_CANVAS", "1280x720")
+    assert cloud_delivery_wh(1472, 832, land_env="OTR_CLOUD_VIDEO_CANVAS",
+                             port_env="OTR_CLOUD_VIDEO_CANVAS_PORTRAIT") == (1280, 720)
+
+
+def test_cloud_delivery_wh_bad_env_falls_back(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "not-a-size")
+    assert cloud_delivery_wh(1472, 832, land_env="OTR_CLOUD_STILL_CANVAS",
+                             port_env="OTR_CLOUD_STILL_CANVAS_PORTRAIT") == (1920, 1080)

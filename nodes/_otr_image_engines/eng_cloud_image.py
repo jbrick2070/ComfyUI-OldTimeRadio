@@ -157,11 +157,18 @@ class _CloudImageBase:
                    or _req_get(request, "request_seed") or 0)
 
     def _canvas_wh(self, request):
-        w = (_req_get(request, "width") or _req_get(request, "w")
-             or _eint(_DEF_W_ENV, _DEF_W))
-        h = (_req_get(request, "height") or _req_get(request, "h")
-             or _eint(_DEF_H_ENV, _DEF_H))
-        return int(w), int(h)
+        w = int(_req_get(request, "width") or _req_get(request, "w")
+                or _eint(_DEF_W_ENV, _DEF_W))
+        h = int(_req_get(request, "height") or _req_get(request, "h")
+                or _eint(_DEF_H_ENV, _DEF_H))
+        # TRUE 1080p cloud stills (operator 2026-07-03): conform to a real 1080p
+        # canvas (orientation taken from the role's request canvas), NOT the
+        # ~832x480 / 1472x832 role canvas. CLOUD-LANE ONLY -- a LOCAL video engine
+        # that later consumes this still remaps it into its own render canvas
+        # (no VRAM impact). Env OTR_CLOUD_STILL_CANVAS[_PORTRAIT].
+        from .._otr_shared.cloud_media_canonical import cloud_delivery_wh
+        return cloud_delivery_wh(w, h, land_env="OTR_CLOUD_STILL_CANVAS",
+                                 port_env="OTR_CLOUD_STILL_CANVAS_PORTRAIT")
 
     def _est_usd(self) -> float:
         return _efloat(self.est_usd_env, self.est_usd_default)
@@ -170,9 +177,10 @@ class _CloudImageBase:
         raise NotImplementedError
 
     def render_image(self, request, prepared=None):
-        """Mint ONE still via the partner node + conform to the role canvas;
-        return the canonical PNG PATH (dispatcher reads a .png path). Fails LOUD
-        -- NO fallback (directive)."""
+        """Mint ONE still via the partner node + conform to the cloud 1080p
+        delivery canvas (orientation-preserving, cloud-lane only; see
+        _canvas_wh); return the canonical PNG PATH (dispatcher reads a .png
+        path). Fails LOUD -- NO fallback (directive)."""
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
         from .._otr_shared.cloud_media_canonical import canonicalize_image
         inputs = self._partner_inputs(request)

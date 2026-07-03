@@ -161,14 +161,23 @@ class _CloudVideoBase:
             timeout_s=_timeout_s(), estimated_usd=_est_usd())
 
     def canonicalize(self, raw, request, profile):
-        from .._otr_shared.cloud_media_canonical import canonicalize_video
+        from .._otr_shared.cloud_media_canonical import (
+            canonicalize_video, cloud_delivery_wh)
         canvas = _req_get(request, "canvas") or {}
         c_get = canvas.get if isinstance(canvas, dict) else (
             lambda k, d=None: getattr(canvas, k, d))
+        rw = int(c_get("w", 0) or 0)
+        rh = int(c_get("h", 0) or 0)
+        # TRUE 1080p cloud delivery (operator 2026-07-03): conform the provider
+        # clip to a real 1080p canvas, NOT the smaller per-family request canvas
+        # (canonicalize_video otherwise downscales the provider's 1080p output to
+        # e.g. 1472x832). Orientation-preserving + CLOUD-LANE ONLY -- locals keep
+        # their own render res. Env OTR_CLOUD_VIDEO_CANVAS[_PORTRAIT].
+        tw, th = cloud_delivery_wh(
+            rw, rh, land_env="OTR_CLOUD_VIDEO_CANVAS",
+            port_env="OTR_CLOUD_VIDEO_CANVAS_PORTRAIT")
         asset = canonicalize_video(raw, {
-            "w": int(c_get("w", 0) or 0),
-            "h": int(c_get("h", 0) or 0),
-            "fps": int(c_get("fps", 25) or 25),
+            "w": tw, "h": th, "fps": int(c_get("fps", 25) or 25),
         })
         frame_count = int(round((asset.duration_s or 0.0) * (asset.fps or 0.0)))
         return {
@@ -390,7 +399,7 @@ class CloudWordRazzleEngine(_CloudVideoBase):
             "negative_prompt": os.environ.get(_RAZZLE_NEG_ENV, "").strip()
             or _RAZZLE_NEG_DEFAULT,
             "motion_mode": os.environ.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
-            "quality": os.environ.get("OTR_CLOUD_PIXVERSE_QUALITY", "540p"),
+            "quality": os.environ.get("OTR_CLOUD_PIXVERSE_QUALITY", "1080p"),
             "duration_seconds": self._duration_seconds(request),
             "seed": self._seed(request),
         }
