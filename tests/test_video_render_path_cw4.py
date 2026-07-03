@@ -107,6 +107,24 @@ def test_master_audio_mux_is_output_node():
     assert "audio_done" in it["optional"]            # gate mirrors audio_done
 
 
+def test_master_audio_mux_default_out_peels_credits_suffix(monkeypatch, tmp_path):
+    """Credits enrichment 2026-07-03: OTR_CreditsRoll appends "_with_credits" to
+    node 93's "_procgen_blended" stem before the mux. _default_out must peel ALL
+    the post-chain suffixes so the final lands in the episode's OWN folder
+    otr/episodes/<ep>/ (§6 canonical-path contract), not a spurious
+    <...>_procgen_blended_with_credits/ dir."""
+    import types
+    monkeypatch.setitem(sys.modules, "folder_paths", types.SimpleNamespace(
+        get_output_directory=lambda: str(tmp_path)))
+    node = OTRMasterAudioMux()
+    got = node._default_out(str(tmp_path / "ep042_procgen_blended_with_credits.mp4"))
+    ep_dir = os.path.join(str(tmp_path), "otr", "episodes", "ep042")
+    assert os.path.dirname(got) == ep_dir, got
+    # legacy (no credits) input still resolves to the same episode folder
+    got2 = node._default_out(str(tmp_path / "ep042_procgen_blended.mp4"))
+    assert os.path.dirname(got2) == ep_dir, got2
+
+
 @needs_ffmpeg
 def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     """OUTPUT HYGIENE (2026-06-09): the muxed FINAL episode mp4 is the

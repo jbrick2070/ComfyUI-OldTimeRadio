@@ -308,10 +308,13 @@ class OTRMasterAudioMux:
         # OUTPUT HYGIENE (operator directive 2026-06-09): the final lands in
         # the episode's OWN folder under otr/episodes/<ep>/ (the obs copy is
         # the only file outside it). <ep> = the input stem minus the known
-        # post-chain suffixes (the blend stage appends "_procgen_blended").
+        # post-chain suffixes. The chain appends OUTERMOST-LAST, so peel in that
+        # order: OTR_CreditsRoll appends "_with_credits" (credits enrichment
+        # 2026-07-03), the blend stage "_procgen_blended", the composite
+        # "_silent". Order matters -- the loop strips each suffix once.
         stem = os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
         ep = stem
-        for suffix in ("_procgen_blended", "_silent"):
+        for suffix in ("_with_credits", "_procgen_blended", "_silent"):
             if ep.endswith(suffix):
                 ep = ep[: -len(suffix)]
         out_dir = os.path.join(root, "otr", "episodes", ep)
