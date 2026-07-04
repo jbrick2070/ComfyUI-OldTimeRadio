@@ -1,0 +1,16 @@
+VERDICT: build-ready as-is? no. Multiple sequencing/compilation failures and a backwards-compatibility breaking change exist in the current plan.
+
+MUST-FIX BEFORE BUILD:
+1. [C1 / C2] Fallback Rip-out vs Soak Gutting Ordering: The fallback rip-out in C1 proposes removing the fallback system (including `make_fallback_of`, parameter threading, and decisions) before C2 removes the soak symbols. However, `run_gpu_soak` and `assert_soak_ok` in `nodes/_otr_video_engines/render_driver.py` (lines 2204, 2225) and `scripts/otr_video_soak.py` explicitly depend on `make_fallback_of()` and fallback decisions. Ripping these symbols out in C1 while leaving the soak code intact will break the build immediately. Fix: Merge C1 and C2, or remove all soak code from `render_driver.py` and delete `scripts/otr_video_soak.py` concurrently in C1.
+2. [C3] Unspecified Announcer Cheap Default: Retiring `station_card` in C3 leaves `announcer_visual`'s cheap default unassigned in the code. This results in the registry defaulting to `ltx_audio_in` (a heavy GPU engine, line 856 of `nodes/_otr_video_engines/eng_ltx_av.py`), which will fail cross-validation on `cpu_floor` tier since it lacks CUDA. Fix: Explicitly add `default_roles = ("announcer_visual",)` to `StillFlatFamily` in `nodes/_otr_video_engines/cheap_families.py` to serve as the default announcer card look.
+3. [C3] Legacy Engine Dropdown Alias Crash: In `nodes/otr_video_director.py` (line 71), `_LEGACY_ENGINE_ALIASES` maps `"still_kenburns": "still_motion"`. Since `still_motion` is retired in C3, this alias now points to an unregistered engine, which will cause saved workflows or ledgers using `still_kenburns` or `still_motion` to crash on load. Fix: Re-map `"still_kenburns"` to `"still_pan"`, and map the retired `"still_motion"` to `"still_pan"` in `_LEGACY_ENGINE_ALIASES`.
+4. [C4] Widget Index-Shift Mismatch in Other Workflows: Removing the required widget `allow_auto_fallback` in `nodes/otr_video_director.py` (line 216) shifts the indices of all subsequent optional widgets. While the plan addresses the master JSON (`otr_scifi_16gb_full.json`), it fails to coordinate updating other committed workflows in `workflows/` that contain `OTR_VideoDirector` nodes (e.g., `workflows/ltx_av_bakeoff_gguf.json` [ASSUMPTION]). They will load their saved values into incorrect shifted widget fields and crash. Fix: Sweep all workflow files in `workflows/` using `OTR_VideoDirector` and remove the serialized value of `allow_auto_fallback` from their `widgets_values` array to align indices.
+
+SHOULD-FIX:
+1. [C3] Profile Slot Override Mismatches: The capability profiles `config/profiles/8gb_lite.json` (line 23) and `config/profiles/cpu_floor.json` (line 20) override `slot_overrides.video_render_engine` to `"still_motion"`. Because C3 retires `"still_motion"`, these overrides will fail `cross_validate_profile` validation. Fix: Update `slot_overrides.video_render_engine` to `"still_pan"` in both profile JSON files.
+
+OPTIONAL / NICE-TO-HAVE:
+1. [C5] Dispatcher Output Verification: Node-91 (`OTR_ImageGenDispatcher`)'s `image_done` output is a formatted string token (`image:done:rev={rev} made={made} reused={reused}`). The replay test script should parse this string for `made` and `reused` counts rather than asserting on direct dictionary keys.
+
+CUT THESE (over-engineering):
+None.

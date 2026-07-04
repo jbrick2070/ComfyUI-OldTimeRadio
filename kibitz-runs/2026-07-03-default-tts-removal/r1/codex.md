@@ -1,0 +1,18 @@
+VERDICT: yes-with-fixes -- the removal arc is coherent for the canonical workflow, but the plan has a false validation precondition and a routine-work process bloat issue.
+
+MUST-FIX BEFORE BUILD:
+1. [§3] The "no 0-byte files" gate is not executable as written because the repo already contains 0-byte files before this change, including `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\255`, `...\agy_debug.log`, `...\agy_hello.txt`, `...\test_ci.out`, and `...\_otr_latentsync_worker.err`. Concrete fix: either make zero-byte cleanup a separate explicit preflight, or scope this gate to touched/committed files for this prune.
+2. [Header / Grounding] Cut the Fable confirmation pass. This is described as a "Routine dead-widget prune", and `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\CLAUDE.md:151-178` says Fable is not for routine grep/wiring/validation/JSON work. Concrete fix: rely on deterministic validation only.
+3. [§1 / §4] Scope the "No behavioral change" claim. It is true for the canonical workflow if node 3 is updated, but removing `default_tts` from `SceneSequencer.sequence(...)` changes the public node call surface for any stale saved graph/API prompt still passing that input; the node is exported at `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\__init__.py:160`, the param exists at `nodes\scene_sequencer.py:684-689`, and the canonical workflow currently carries the promoted input at `workflows\otr_scifi_16gb_full.json:1`. Concrete fix: state the compatibility boundary explicitly: this migration covers `workflows\otr_scifi_16gb_full.json`; external/stale workflows with `default_tts` must be re-saved or migrated. [ASSUMPTION]
+
+SHOULD-FIX:
+1. [§1] The routing explanation leans on "ledger `voice_assignments`" as if it is the current stored authority. `nodes\_otr_ledger_consumers.py:164-184` says `voice_assignments` is a derived legacy shape from canonical `led["cast"]`. Concrete fix: reword the rationale to "SceneSequencer does not read `default_tts`; upstream voice nodes and cast-derived routing decide the engines."
+2. [§2.5] Grepping only `tests/` misses at least one live script reference: `scripts\_otr_overnight_story_soak.py:200-202` still documents not touching `sequencer_default_tts`. Concrete fix: add a repo-wide post-removal grep for `default_tts|sequencer_default_tts` and either delete or update that stale live-script comment.
+3. [§3] "Profile-applier dry pass" is underspecified. The fail-closed behavior comes from `nodes\_otr_workflow_apply.py:467-473`, and profile validation comes from `nodes\_otr_shared\capability_profiles.py:298-340`. Concrete fix: name the exact gate: apply all committed profiles through `apply_profile`, then run `cross_validate_profile` for all tiers.
+
+OPTIONAL / NICE-TO-HAVE:
+- [§1] Keep the `parler` note only as context. It is grounded by the lack of a Parler import in `nodes\_otr_audio_engines\__init__.py:26-36`, but it is not needed to justify removing an unread widget.
+
+CUT THESE (scope / over-engineering):
+1. [Header / Grounding] Fable confirmation pass -- safe to cut because this is deterministic dead-widget removal and CLAUDE.md explicitly routes routine wiring/JSON validation away from Fable.
+2. [§6] ROADMAP/doc-history dependence -- safe to cut from the build arc because live behavior is determined by `nodes\scene_sequencer.py`, `config\profiles\*.json`, `config\profiles\widget_mapping.json`, and `workflows\otr_scifi_16gb_full.json`; historical ROADMAP agreement does not make the build safer.

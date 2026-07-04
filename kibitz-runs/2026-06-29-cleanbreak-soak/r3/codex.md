@@ -1,0 +1,28 @@
+VERDICT: no. C5’s replay boundary is underspecified and internally inconsistent; the planned legs can mutate policy without mutating the already-planned ledger/prompts, so components will not test the engines they claim to test.
+
+MUST-FIX BEFORE BUILD:
+1. [C5 REPLAY] Boundary set is wrong/inconsistent. The plan says image_gen boundary and “verify node-91 ran,” but names the real tail as 92 -> 84 -> 86 -> 93 -> 85. In the real workflow, node 91 feeds node 92 via links 260 and 267, and node 92 feeds 84/94 via 261/271: `workflows/otr_scifi_16gb_full.json`. Concrete fix: define the replay DAG explicitly as `{91,92,84,86,93,85}` if image generation is in scope. Do not include 12/7 as live nodes; bake their STRING outputs. Node 94 needs AUDIO from node 7, so either bake `scopes_mp4_path` into node 93 and exclude 94, or add an explicit audio-loader path for 94. Current node 94 input 0 is AUDIO, not a path string: `workflows/otr_scifi_16gb_full.json`.
+
+2. [C5 MATRIX/REPLAY] Engine-slot patches will not reach the components that already consumed the policy. Node 90 creates `patched_ledger_json` from `video_policy_json`; node 89 creates `image_prompts_json` from `image_policy_json`; node 91 later consumes all three. Capturing at node 91 means ShotLock and prompt generation are already done. If a leg changes video/image selections but only patches dispatcher inputs, node 92 will still render the captured `ledger.video.shots`, and node 91 may use stale prompt dimensions/objects. See workflow links 251/252/254/255/257/258 and dispatcher use of prompt `w/h` at `nodes/otr_image_gen_dispatcher.py:416-548`. Concrete fix: for each leg, either include/re-run nodes 88/89/90 with baked literals, or patch `script_json.video.shots`, `image_policy_json.video_models/image_models`, and regenerated `image_prompts_json` as one atomic bundle.
+
+3. [C5 ACCEPTANCE] Node-91 observability is not actually persisted. `OTR_ImageGenDispatcher.dispatch` returns `(patched, image_done, report)` but writes no state report today: `nodes/otr_image_gen_dispatcher.py:757-773`. Because node 91 is not an OUTPUT_NODE (`nodes/otr_image_gen_dispatcher.py:714-716`), `outputs.keys()` cannot prove it ran; the plan says not to use that, but then relies on `image_done`, `made>0`, and `reused==0` without a durable source. Concrete fix: add a dispatcher output forensic file under the same state dir as node 92, e.g. `node_image_report.json` containing `image_done`, made/reused counts, image engine histogram, and the final ledger meta.
+
+4. [C5 ACCEPTANCE] Audio identity cannot be “once at bake” if node 85 runs per leg. Node 85 is the mux/publish OUTPUT_NODE and writes a new final from `silent_video_path` + `master_audio_path`: `nodes/otr_master_audio_mux.py:245-340`. Existing capstone correctly compares final PCM against an on-disk master per run: `scripts/_otr_soak_capstone.py:575-612`. Concrete fix: either cut node 85 from this visual-only replay and assert baked master untouched, or keep node 85 and rehash each leg’s final audio against the baked master.
+
+5. [C5 EXECUTED SET] The current precedent only tracks OUTPUT_NODEs, not all executed nodes. `scripts/otr_visual_smoke.py:256-274` derives executed nodes from `history_entry.outputs`, which would see 92/93/94/85 but not 84/86/91. The plan requires exact boundary execution including non-output nodes. Concrete fix: implement executed-node detection from ComfyUI history/status messages or add explicit durable sentinels per non-output boundary node; do not reuse `outputs.keys()` semantics.
+
+SHOULD-FIX:
+1. [C3] Remove retired engine names from `ENGINE_FAMILY` in the same chunk as unregistering them. C3 says retire `abstract`, `station_card`, and `still_motion`, but `render_driver.ENGINE_FAMILY` still maps those names: `nodes/_otr_video_engines/render_driver.py:65-78`. Concrete fix: update that map with the registry retirement so force-map/family stamping cannot reference dead engines.
+
+2. [C5 DISPATCHER-INPUT CAPTURE] Specify the state path authority. Node 92 writes `node_episode_input.json` through `_otr_paths.otr_state_dir`: `nodes/otr_video_render_batch.py:215-224`. Concrete fix: make the dispatcher capture use the same `otr_state_dir()` path, not a literal or relative `state/`.
+
+3. [C5 CACHE CLEAR] Define the exact cache clear target. The dispatcher cache is embedded in `ledger["images"]["cache_index"]` and `ledger["images"]["images"]`: `nodes/otr_image_gen_dispatcher.py:379-381` and `625-631`. Concrete fix: clear those fields in the pre-dispatch `script_json` fed to node 91; do not clear only the node-92 captured ledger after dispatch.
+
+4. [C4] Include `tests/debug_prompt.json` in the allow_auto_fallback rebaseline sweep or explicitly classify it as disposable. It still contains `allow_auto_fallback`: `tests/debug_prompt.json` via repository search. Concrete fix: update or delete the fixture with the same schema change.
+
+OPTIONAL / NICE-TO-HAVE:
+- Add a small preflight that prints the exact per-leg API prompt node IDs and every baked literal replacing links 246/249/263/265/271/273 before queueing. This makes accidental writer/audio fan-in checkable.
+
+CUT THESE (over-engineering):
+1. [C5] Cut dashboard/merge plumbing from this build path. The plan already defers it; keep it deferred until the replay DAG and acceptance sentinels are proven.
+2. [C5] Cut “executed set == boundary set” if it requires fragile ComfyUI internals. A stronger smaller gate is: prompt contains only allowed node IDs; no inputs link outside that set; durable sentinels prove node 91 and node 92 ran; final artifacts exist.

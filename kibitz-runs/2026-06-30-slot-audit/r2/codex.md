@@ -1,0 +1,25 @@
+VERDICT: yes-with-fixes. The direction is implementable, but F1/F5/F4 as written will leave at least one still engine black and will make the oracle fail valid static/procedural cases.
+
+MUST-FIX BEFORE BUILD:
+1. [F1] Adding `accepts_still = True` is not sufficient for `station_card`: `StationCardFamily` has `uses_still = True` in `nodes/_otr_video_engines/cheap_families.py:185-191`, but `render_driver` explicitly excludes `station_card` from the static-image scene-still binding in `nodes/_otr_video_engines/render_driver.py:910-918`. Concrete fix: make render request binding derive from `accepts_still`/`uses_still` instead of hard-coding `("still_pan", "still_flat", "ltx_audio_in")`, or explicitly include `station_card` in that branch and add an init-source trace test.
+
+2. [F2] “Route `engine_registry_base.engines_for_role` and `assert_usable` through `role_compat.engine_fits_role`” is underspecified and will be easy to code wrong. `engine_fits_role` accepts a descriptor dict with `required_inputs`, not an adapter object (`nodes/_otr_shared/role_compat.py:107-131`), while `EngineRegistry` currently iterates adapter instances and gates only on `roles` (`nodes/_otr_shared/engine_registry_base.py:169-185`, `:193-218`). Concrete fix: add a private descriptor builder in `EngineRegistry`, call `engine_fits_role(descriptor, role)`, preserve default-role sorting, and wrap `RoleCompatError` into `EngineUnusable` so the public `assert_usable` contract stays intact.
+
+3. [F4/F6] The current soak scripts only cover three slots and still enumerate via the stale registry role gate. `_otr_cov_runner.py` defines `VIDEO_SLOTS` as announcer/music/character only and builds profiles only for those plus legacy `other_beats_visual` (`scripts/_otr_cov_runner.py:50-53`, `:92-101`); `otr_coverage_sweep.py` has the same three-slot `SLOTS` and uses `vreg.engines_for_role(role)` (`scripts/otr_coverage_sweep.py:86-91`, `:160-170`). Concrete fix: replace enumeration with `all_engine_names()` + `role_compat.engine_fits_role` over all five roles, and emit profile overrides for `character_visual`, `scene_broll_visual`, and `background_abstract_visual` using existing mappings in `config/profiles/widget_mapping.json`.
+
+4. [F5] The “frame variance” oracle will fail the intended `still_flat` behavior. `StillFlatFamily` is explicitly a dead-flat static hold with `_still_motion = False` (`nodes/_otr_video_engines/cheap_families.py:224-241`). Concrete fix: split the oracle by engine/family: luma/non-floor and source-still presence for static stills; temporal variance only for motion engines such as `still_pan`, `still_motion`, `wan_i2v`, LTX, etc.
+
+5. [F5] The required `scene_*` ledger-row invariant cannot apply to engines that intentionally ignore stills. `VisualizerEngine` declares `accepts_still = False` (`nodes/_otr_video_engines/eng_visualizer.py:44-49`), and the dispatcher intentionally skips still generation when `_still_needed_for_role` is false (`nodes/otr_image_gen_dispatcher.py:307-339`, `:431-441`). Concrete fix: assert the ledger row only when the selected engine consumes a still per `engine_consumes_still`, or when render-driver behavior requires a scene still for that engine.
+
+SHOULD-FIX:
+1. [F1/F5] The planned test “`engine_consumes_still` True for every still-carrier engine” only proves the image dispatcher will mint a still; it does not prove the render request uses it. The actual row lookup happens in `_still_index` and render request construction (`nodes/_otr_video_engines/render_driver.py:414-440`, `:895-904`, `:928-958`). Add an integration-level unit test asserting `init_source == "scene_still"` for each still-consuming engine.
+
+2. [F2] Update comments/tests that still describe role membership as the rejection reason. Example: `tests/test_video_motion.py:77-82` says `wan_i2v` rejects `background_abstract` because “role not served”; after F2 the real reason is capability mismatch (`init_image` unavailable), not `roles`. This matters because future text-only engines should pass roles they do not list.
+
+3. [F4] Keep `apply_profile_to_workflow` as the profile path, but avoid hard-coding “node-87” in new code. The applier already patches by node type through `widget_mapping.json` and rejects raw node ids (`nodes/_otr_workflow_apply.py:444-479`; `config/profiles/widget_mapping.json` maps `OTR_VideoDirector` widgets). Hard-coding node ids reintroduces the drift class the applier was written to avoid.
+
+OPTIONAL / NICE-TO-HAVE:
+1. [F2/F6] Add a small shared helper like `descriptor_for_engine(engine_id)` in the video registry so director, registry, sweep, and tests do not each rebuild `{engine_id, roles, required_inputs}` by hand.
+
+CUT THESE (over-engineering):
+1. [F5] Cut unconditional frame-variance checking. It is actively wrong for `still_flat` and redundant for the core bug once the ledger-row + `init_source=scene_still` + non-dark luma checks prove the selected still was consumed.
