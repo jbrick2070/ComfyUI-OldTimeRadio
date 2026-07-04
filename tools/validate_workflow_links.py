@@ -27,6 +27,14 @@ from typing import Any, Iterable
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = REPO_ROOT / "workflows"
 INIT_PATH = REPO_ROOT / "__init__.py"
+# The v2 audio/casting nodes (OTR_CastLock / OTR_BatchCharacterVoices /
+# OTR_AnnouncerVoice / OTR_StableAudioTheme, workflow nodes 80-83) are NOT in
+# __init__._NODE_MODULES as a dict literal -- __init__ merges them dynamically
+# from nodes/_otr_class_registry.new_node_modules_table(). A pure AST parse of
+# __init__.py therefore cannot see them, so --strict-types false-flagged nodes
+# 80-83 as "not in NODE_CLASS_MAPPINGS" even though runtime registration is fine
+# (2026-07-04 widget-audit standalone fix). Parse the registry statically too.
+REGISTRY_PATH = REPO_ROOT / "nodes" / "_otr_class_registry.py"
 
 
 # Forbidden-pattern catalogue for source-side audits.
@@ -78,6 +86,33 @@ def load_node_class_mappings() -> set[str]:
                         for k in node.value.keys:
                             if isinstance(k, ast.Constant) and isinstance(k.value, str):
                                 keys.add(k.value)
+    # Dynamically-merged v2 audio nodes (registry, nodes 80-83): union the keys
+    # declared as NewNodeSpec("KEY", ...) in _otr_class_registry.py so
+    # --strict-types matches the real runtime NODE_CLASS_MAPPINGS.
+    keys |= load_registry_keys()
+    return keys
+
+
+def load_registry_keys() -> set[str]:
+    """AST-extract the node-type keys the package registers dynamically from
+    nodes/_otr_class_registry.new_node_modules_table().
+
+    Each new node is declared as ``NewNodeSpec("OTR_...", ...)`` whose first
+    positional arg is the permanent NODE_CLASS_MAPPINGS key. Parse them without
+    importing the module (no ComfyUI / torch dependency)."""
+    keys: set[str] = set()
+    if not REGISTRY_PATH.exists():
+        return keys
+    tree = ast.parse(REGISTRY_PATH.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = (func.id if isinstance(func, ast.Name)
+                    else func.attr if isinstance(func, ast.Attribute) else "")
+            if name == "NewNodeSpec" and node.args:
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    keys.add(first.value)
     return keys
 
 

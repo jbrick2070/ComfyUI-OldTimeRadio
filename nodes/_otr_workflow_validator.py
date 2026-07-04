@@ -351,15 +351,26 @@ class WorkflowValidator:
         try:
             from .. import NODE_CLASS_MAPPINGS as _NCM  # type: ignore
         except (ImportError, ValueError):
-            # Test environment: import the package root directly.
-            try:
-                import importlib
-                _pkg = importlib.import_module(
-                    "custom_nodes.ComfyUI-OldTimeRadio"
-                )
-                _NCM = getattr(_pkg, "NODE_CLASS_MAPPINGS", {})
-            except Exception:
-                _NCM = {}
+            # Standalone / test context: the parent package is NOT resolvable by
+            # a dotted module name. The on-disk package dir is
+            # "ComfyUI-OldTimeRadio" -- the hyphen is an illegal Python
+            # identifier, so importlib.import_module("custom_nodes.ComfyUI-Old"
+            # "TimeRadio") could NEVER succeed and always fell through to an
+            # empty mapping (silently no-opping the contract + widget-drift
+            # checks outside the ComfyUI app). Resolve the already-loaded OTR
+            # package from sys.modules by its NODE_CLASS_MAPPINGS attribute --
+            # works regardless of how the package name was registered
+            # (2026-07-04 widget-audit standalone fix).
+            import sys
+            _NCM = {}
+            for _mod in list(sys.modules.values()):
+                _cand = getattr(_mod, "NODE_CLASS_MAPPINGS", None)
+                if isinstance(_cand, dict) and any(
+                    isinstance(_k, str) and _k.startswith("OTR_")
+                    for _k in _cand
+                ):
+                    _NCM = _cand
+                    break
 
         workflow = _load_workflow(workflow_json_path)
         # Raises a WorkflowValidationError subclass on first failure.

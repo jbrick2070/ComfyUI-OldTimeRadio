@@ -65,6 +65,21 @@ def test_modules_table_shape_matches_init_convention():
         assert display_name == NEW_NODE_SPECS[key].display_name
 
 
+def test_strict_types_cli_includes_dynamic_registry_keys():
+    """The link-validator CLI resolves NODE_CLASS_MAPPINGS keys via a pure AST
+    parse (no ComfyUI / torch import). Nodes 80-83 are merged dynamically from
+    this registry (not a dict literal in __init__.py), so the CLI must union
+    them or ``--strict-types`` false-flags them as missing (2026-07-04
+    widget-audit standalone fix)."""
+    from tools.validate_workflow_links import (
+        load_node_class_mappings,
+        load_registry_keys,
+    )
+
+    assert load_registry_keys() == _EXPECTED_KEYS
+    assert _EXPECTED_KEYS <= load_node_class_mappings()
+
+
 def test_new_keys_do_not_collide_with_existing_literal_registrations():
     init_path = pathlib.Path(__file__).resolve().parent.parent / "__init__.py"
     text = init_path.read_text(encoding="utf-8")
