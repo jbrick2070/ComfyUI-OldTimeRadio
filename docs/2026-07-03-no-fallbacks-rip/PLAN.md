@@ -244,6 +244,28 @@ VERDICT: SOUND. It CONFIRMS R1 was safe + refines the R2/R3 map. Grounded surviv
 - `test_still_spine_helpers.py::test_st4_still_index_and_family_init` (:724-733) —
   missing scene still must RAISE, not fall back to the `"portrait"` init source.
 
+## H0. R3 DESIGN DECIDED (operator 2026-07-03) — explicit writer_fallback, no silent template
+Fable split the writer soft-fails into (Class 1) model->template SILENT swaps and
+(Class 2) defensive polish catches. Operator's resolution (better than pure
+hard-fail): the objection is to HIDDEN swaps, not to a chosen fallback. So:
+
+- NEW visible widget `writer_fallback` on the writer node: `[fail_hard | <a
+  specific backup LLM>]`, DEFAULT = `fail_hard`. Add it to INPUT_TYPES + the
+  workflow JSON (source of truth, CLAUDE.md §0) in the same change.
+- The 5 CLASS-1 sites (news degrade, title, announcer-outro, news-coda, character
+  portrait): when the PRIMARY writer LLM fails/returns junk -> if a backup LLM is
+  chosen, RETRY on it -> if the backup ALSO fails (or writer_fallback=fail_hard),
+  FAIL LOUD (named). The canned templates are REMOVED -- no silent filler EVER.
+- CLASS 2 defensive polish catches: KEPT, but each must be LOUD (ledger + log
+  stamp) so a skipped enhancement is never silent (Fable).
+- DELETE dead `_bark_health_check` + `_bark_health_check_for_cast`.
+
+Build order: (R3a) find the central writer LLM-invoke seam + add the
+fallback-then-hard-fail wrapper gated on writer_fallback; (R3b) remove the 5
+template fallbacks -> route through the wrapper; (R3c) Class-2 loud-stamp audit +
+dead-code delete; workflow JSON widget in the same change; invert the mapped
+tests; Fable gate before merge (§9).
+
 ## H. R3 grounded map (agy 2026-07-03, Claude-grounded) + scope split
 Two CLASSES of R3 site, which matters for scope:
 
