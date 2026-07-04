@@ -56,3 +56,30 @@ def test_default_bank_leaves_provider_voice_id_unset():
                               cast, "default", False, [])
     assert cast[0].get("provider_voice_id") in (None, ""), \
         "local (default) bank must NOT stamp a provider_voice_id"
+
+
+# --------------------------------------------------------------------------- #
+# ONE-KNOB (2026-07-04): only the VOICE ENGINE is a knob; CastLock's voice_bank
+# never has to be touched. A cast row stamped with a LOCAL voice_ref_id (bank left
+# on default) but rendered on elevenlabs must auto-resolve a gender-matched
+# provider voice_id in the dispatch -- parity with how every local engine already
+# shares the default bank (bark never needed CastLock changed).
+# --------------------------------------------------------------------------- #
+def test_provider_voice_id_auto_resolves_when_bank_left_local():
+    from nodes._otr_voice_node_common import _resolve_provider_voice_id
+    f = {"char_id": "c02", "gender": "female", "voice_ref_id": "vz_caro_davy"}
+    m = {"char_id": "c03", "gender": "male", "voice_ref_id": "vz_donor_kditz"}
+    pf = _resolve_provider_voice_id("elevenlabs", f, 12345)
+    pm = _resolve_provider_voice_id("elevenlabs", m, 12345)
+    assert pf and pm, "an elevenlabs char must auto-resolve a provider voice_id"
+    assert pf == _resolve_provider_voice_id("elevenlabs", f, 12345), \
+        "resolution must be deterministic per character (C7)"
+    assert pf != pm, "distinct characters must get distinct voices"
+
+
+def test_provider_voice_id_none_for_local_engine():
+    from nodes._otr_voice_node_common import _resolve_provider_voice_id
+    # a LOCAL engine has no provider id -> None; the clone-ref path handles it,
+    # and the change is inert for the whole local lane.
+    assert _resolve_provider_voice_id(
+        "indextts2", {"char_id": "c02", "gender": "female"}, 1) is None

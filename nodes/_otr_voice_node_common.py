@@ -128,6 +128,55 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
     return path if (path and os.path.exists(path)) else None
 
 
+def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
+    """The provider voice_id for a CLOUD voice engine (e.g. elevenlabs) + cast row
+    when CastLock stamped none -- i.e. the operator changed only the VOICE ENGINE
+    and left the CastLock voice_bank on a LOCAL bank (so the cast carries a local
+    voice_ref_id, not a provider id). Resolve a gender-matched voice from the
+    ENGINE's OWN pool here, the SAME deterministic per-character CASTING the
+    clone-ref path does -- so the voice engine is the SINGLE knob (parity with how
+    every LOCAL engine already shares the default bank). This is casting a REAL
+    per-character voice, NOT a fallback: no voice is inherited from another
+    character/engine, and an engine with NO pool still yields None -> the adapter
+    fails loud. Never raises."""
+    try:
+        from ._otr_voice_bank import (
+            assign_voice_for_slot, filter_by_quality_tier, load_voice_bank,
+        )
+        bank, _ = load_voice_bank()
+        bank = tuple(filter_by_quality_tier(bank))
+    except Exception:  # noqa: BLE001
+        return None
+    entry = None
+    vrid = cast.get("voice_ref_id")
+    if vrid:
+        entry = next(
+            (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None)
+    if entry is None:
+        gender = str(cast.get("gender") or "").strip().lower()
+        if gender:
+            try:
+                entry = assign_voice_for_slot(
+                    role=role, engine=engine,
+                    char_id=str(cast.get("char_id") or ""), gender=gender,
+                    timbre=tuple(cast.get("timbre") or ()),
+                    age_band=str(cast.get("age_band") or ""),
+                    episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+                )
+            except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
+                entry = None
+        if entry is None:
+            import random as _random
+            role_cands = [e for e in bank if e.engine == engine and role in e.roles]
+            cands = sorted(
+                role_cands or [e for e in bank if e.engine == engine],
+                key=lambda e: e.voice_ref_id)
+            if cands:
+                _seed = f"{episode_seed}_{cast.get('char_id', '')}_provid"
+                entry = _random.Random(_seed).choice(cands)
+    return getattr(entry, "provider_voice_id", "") or None
+
+
 # --------------------------------------------------------------------------- #
 # Pure helpers (no IO at import; engines are self-contained per_line / clip)
 # --------------------------------------------------------------------------- #
@@ -450,6 +499,16 @@ class OTRVoiceNodeBase:
                 # resolves, we FAIL LOUD below (no-fallback rip 2026-07-03) -- a
                 # cloning engine NEVER silently renders on bark.
                 voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
+            # ONE-KNOB (2026-07-04): a cloud PROVIDER-voice engine (voice_ref_field
+            # == "provider_voice_id", e.g. elevenlabs) whose cast row has NO provider
+            # id -- the operator changed only the VOICE ENGINE and left CastLock's
+            # voice_bank on a LOCAL bank. Resolve a gender-matched voice_id from the
+            # ENGINE's own pool here (deterministic per-character casting, parity with
+            # the clone-ref path above), so the voice engine is the SINGLE knob and
+            # CastLock never has to be touched. A missing pool -> None -> the adapter
+            # still fails loud (no silent inherit of another voice).
+            if getattr(adapter, "voice_ref_field", "") == "provider_voice_id" and not voice_ref:
+                voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=self.ROLE)
             # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
             # char -> voice_ref_id -> ref basename -> engine -> alpha ->
             # delivery version/state/source -> seed. Render_log line + runtime
