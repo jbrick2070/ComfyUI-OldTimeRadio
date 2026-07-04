@@ -149,7 +149,7 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
 #: honored -- announcer stills render on the announcer slot, music/open stills
 #: on the music slot; character portraits + character-associated scene stills on
 #: the character slot). Renamed 2026-07-03: the old catch-all image slot
-#: is now character_image_model (scene_broll + background roles were ripped
+#: is now character_image_model (retired_role_a + background roles were ripped
 #: 2026-07-01, so it serves only the character_video lane).
 _ROLE_TO_IMAGE_SLOT = {
     "announcer_visual": "announcer_image_model",

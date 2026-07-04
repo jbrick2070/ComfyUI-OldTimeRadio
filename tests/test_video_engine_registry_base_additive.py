@@ -36,16 +36,16 @@ class _StubEngine:
 def _reg():
     r = base.EngineRegistry(kind="video")
     r.register(_StubEngine(
-        "floor", roles=("scene_broll", "background_abstract"),
-        default_roles=("background_abstract",)))
+        "floor", roles=("retired_role_a", "retired_role_b"),
+        default_roles=("retired_role_b",)))
     r.register(_StubEngine(
-        "fancy", roles=("scene_broll",), requires_flag="OTR_ENABLE_FANCY"))
+        "fancy", roles=("retired_role_a",), requires_flag="OTR_ENABLE_FANCY"))
     return r
 
 
 def test_register_returns_adapter_and_records_instance():
     r = base.EngineRegistry(kind="video")
-    eng = _StubEngine("e1", roles=("scene_broll",))
+    eng = _StubEngine("e1", roles=("retired_role_a",))
     assert r.register(eng) is eng
     assert r.is_registered("e1")
     assert r.get_engine("e1") is eng
@@ -56,7 +56,7 @@ def test_register_accepts_a_class_and_instantiates_it():
 
     class _Cls:
         name = "cls_eng"
-        roles = ("scene_broll",)
+        roles = ("retired_role_a",)
         default_roles = ()
         requires_flag = None
         commercial_clean = True
@@ -79,41 +79,41 @@ def test_get_engine_unknown_raises_keyerror():
 
 def test_all_engine_names_sorted():
     r = base.EngineRegistry(kind="video")
-    r.register(_StubEngine("zeta", roles=("scene_broll",)))
-    r.register(_StubEngine("alpha", roles=("scene_broll",)))
+    r.register(_StubEngine("zeta", roles=("retired_role_a",)))
+    r.register(_StubEngine("alpha", roles=("retired_role_a",)))
     assert r.all_engine_names() == ["alpha", "zeta"]
 
 
 def test_engines_for_role_sorts_by_name_when_no_default():
     r = _reg()
-    # both serve scene_broll; neither is default there -> sorted by name
-    assert r.engines_for_role("scene_broll") == ["fancy", "floor"]
-    # background_abstract: only floor serves it
-    assert r.engines_for_role("background_abstract") == ["floor"]
+    # both serve retired_role_a; neither is default there -> sorted by name
+    assert r.engines_for_role("retired_role_a") == ["fancy", "floor"]
+    # retired_role_b: only floor serves it
+    assert r.engines_for_role("retired_role_b") == ["floor"]
 
 
 def test_engines_for_role_puts_default_engine_ahead():
     r = base.EngineRegistry(kind="video")
     r.register(_StubEngine(
-        "bbb", roles=("scene_broll",), default_roles=("scene_broll",)))
-    r.register(_StubEngine("aaa", roles=("scene_broll",)))
+        "bbb", roles=("retired_role_a",), default_roles=("retired_role_a",)))
+    r.register(_StubEngine("aaa", roles=("retired_role_a",)))
     # bbb is the default for the role -> sorts first despite the later name
-    assert r.engines_for_role("scene_broll") == ["bbb", "aaa"]
+    assert r.engines_for_role("retired_role_a") == ["bbb", "aaa"]
 
 
 def test_default_engine_for_role():
     r = _reg()
-    assert r.default_engine_for_role("background_abstract") == "floor"
-    assert r.default_engine_for_role("scene_broll") is None
+    assert r.default_engine_for_role("retired_role_b") == "floor"
+    assert r.default_engine_for_role("retired_role_a") is None
 
 
 def test_assert_usable_default_engine_ok():
-    assert _reg().assert_usable("floor", "background_abstract") == "floor"
+    assert _reg().assert_usable("floor", "retired_role_b") == "floor"
 
 
 def test_assert_usable_unregistered_is_malformed_config():
     with pytest.raises(base.EngineUnusable) as exc:
-        _reg().assert_usable("ghost", "scene_broll")
+        _reg().assert_usable("ghost", "retired_role_a")
     assert exc.value.reason is base.EngineUsabilityReason.MALFORMED_CONFIG
 
 
@@ -128,12 +128,12 @@ def test_assert_usable_optin_without_flag_is_selectable(monkeypatch):
     # NO flag gate -- validation is the operator's manual process, never a code
     # gate. The (vestigial) requires_flag no longer gates selectability.
     monkeypatch.delenv("OTR_ENABLE_FANCY", raising=False)
-    assert _reg().assert_usable("fancy", "scene_broll") == "fancy"
+    assert _reg().assert_usable("fancy", "retired_role_a") == "fancy"
 
 
 def test_assert_usable_optin_with_flag_set_ok(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_FANCY", "1")
-    assert _reg().assert_usable("fancy", "scene_broll") == "fancy"
+    assert _reg().assert_usable("fancy", "retired_role_a") == "fancy"
 
 
 def test_engine_unusable_carries_classified_fields():

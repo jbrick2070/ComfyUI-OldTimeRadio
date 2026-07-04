@@ -22,8 +22,8 @@ from typing import Optional
 #: role_compat role token -> profile role_overrides KEY (whose widget_mapping
 #: target is the matching OTR_VideoDirector per-role video model widget). These are
 #: the THREE independent slots; no legacy catch-all fallback is present (the soak
-#: must not use one). scene_broll_visual /
-#: background_abstract_visual were removed 2026-07-01 with their roles.
+#: must not use one). retired_role_a_visual /
+#: retired_role_b_visual were removed 2026-07-01 with their roles.
 ROLE_TO_PROFILE_KEY: dict = {
     "announcer_visual": "announcer_visual",
     "music_visual": "music_visual",

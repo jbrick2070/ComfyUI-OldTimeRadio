@@ -266,11 +266,11 @@ class TestRadioIsHostGuard:
         assert shot["engine_id"] == "viz_green"
         assert shot["family"] == "abstract"
 
-    def test_scene_broll_and_background_abstract_are_not_gated(self):
+    def test_retired_role_a_and_retired_role_b_are_not_gated(self):
         # These roles cannot supply audio_ref in the first place (role_compat),
         # so HuMo could never land here in practice -- confirm the guard is
         # still correctly scoped to only the two bookend roles either way.
-        for role in ("scene_broll", "background_abstract"):
+        for role in ("retired_role_a", "retired_role_b"):
             shot = {"shot_id": "s", "beat_id": "b", "role": role,
                     "engine_id": "humo", "family": "audio_driven_face"}
             rd._enforce_radio_is_host(shot)
@@ -283,7 +283,7 @@ class TestRadioIsHostGuard:
         assert rd._is_never_humo_video_role("announcer_visual") is True
         assert rd._is_never_humo_video_role("music_visual") is True
         assert rd._is_never_humo_video_role("character_video") is False
-        assert rd._is_never_humo_video_role("scene_broll") is False
+        assert rd._is_never_humo_video_role("retired_role_a") is False
         assert rd._is_never_humo_video_role("not_a_role") is False
 
     def test_build_request_from_shot_applies_guard_before_engine_keyed_logic(self):

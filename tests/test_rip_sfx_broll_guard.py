@@ -93,7 +93,7 @@ def test_stamp_default_role_raises_instead_of_backfilling():
 
 
 def test_slot_for_role_and_engine_id_raise_on_dead_roles():
-    for dead in ("scene_broll", "background_abstract", "sfx", "bogus"):
+    for dead in ("retired_role_a", "retired_role_b", "sfx", "bogus"):
         with pytest.raises(ValueError):
             RS.slot_for_role(dead)
         with pytest.raises(ValueError):

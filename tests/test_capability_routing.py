@@ -2,7 +2,7 @@
 
 The per-engine `roles` whitelist is no longer a gate -- eligibility is purely
 `required_inputs <= role_available_inputs` (operator 2026-06-22, model-agnostic).
-REWRITTEN 2026-07-01 (rip-sfx-broll): the scene_broll / background_abstract
+REWRITTEN 2026-07-01 (rip-sfx-broll): the retired_role_a / retired_role_b
 roles are GONE; every surviving role supplies the full input vocabulary and
 dead role tokens raise RoleCompatError. Deterministic, CPU-only.
 """
@@ -36,8 +36,8 @@ def test_wan_now_fits_announcer_despite_roles_omission():
 
 
 def test_dead_roles_raise_loud():
-    # rip-sfx-broll: scene_broll / background_abstract are unknown tokens now.
-    for dead in ("scene_broll", "background_abstract"):
+    # rip-sfx-broll: retired_role_a / retired_role_b are unknown tokens now.
+    for dead in ("retired_role_a", "retired_role_b"):
         with pytest.raises(rc.RoleCompatError):
             rc.engine_fits_role(WAN, dead)
 

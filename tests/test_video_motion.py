@@ -103,7 +103,7 @@ def test_wan_role_fit_image_to_video_needs_init_image():
     assert rc.filter_engines_for_role("character_video", [desc]) == ["wan_i2v"]
     # A dead role token raises through the shared filter (rip-sfx-broll).
     with pytest.raises(rc.RoleCompatError):
-        rc.engine_fits_role(desc, "background_abstract")
+        rc.engine_fits_role(desc, "retired_role_b")
 
 
 # --------------------------------------------------------------------------- #

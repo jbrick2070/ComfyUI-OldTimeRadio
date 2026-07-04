@@ -50,7 +50,7 @@ from ._otr_shared import role_slots as _role_slots
 #: dialogue line (set in OTR_LedgerScriptWriter / _otr_outline, compared in
 #: _otr_anti_loop / _otr_ledger_reviewer). "char_voice"/"dialogue" stay as aliases.
 #: rip-sfx-broll (2026-07-01): the "sfx" entry + the _DEFAULT_VIDEO_ROLE
-#: fallback (background_abstract) were REMOVED with their roles -- an unmapped
+#: fallback (retired_role_b) were REMOVED with their roles -- an unmapped
 #: speaker_role now FAILS LOUD in :func:`_video_role_for_line` (NO FALLBACKS).
 SPEAKER_TO_VIDEO_ROLE = {
     "announcer": Role.ANNOUNCER_VISUAL.value,
@@ -78,7 +78,7 @@ def _video_role_for_line(line: dict) -> str:
             f"OTR_ShotLock: line "
             f"{str((line or {}).get('line_id') or '?')!r} carries unmapped "
             f"speaker_role {role!r} (known: {tuple(SPEAKER_TO_VIDEO_ROLE)}). "
-            f"The 'sfx' role + the background_abstract default were removed "
+            f"The 'sfx' role + the retired_role_b default were removed "
             f"2026-07-01 (rip-sfx-broll) -- NO FALLBACKS; regenerate the "
             f"episode with the current writer."
         )
@@ -338,7 +338,7 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
 
     rip-sfx-broll (2026-07-01): the POOLING budget
     (clip_mode / pool_n / character_render_count) was removed with the
-    scene_broll / background_abstract roles -- every beat renders per-beat.
+    retired_role_a / retired_role_b roles -- every beat renders per-beat.
     """
     fps = int(fps) if fps else 25
     warnings: list = []
@@ -734,7 +734,7 @@ def build_execution_plan(beats, budget, creative, policy):
     groups = _resolver.validate_execution_groups(groups)
 
     # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
-    # the scene_broll / background_abstract roles -- every beat renders
+    # the retired_role_a / retired_role_b roles -- every beat renders
     # per-beat with its own scene still (no still_pool_key stamping).
     shots = []
     for b in beats:

@@ -112,7 +112,7 @@ def test_mesh_stage_roles_exactly_the_three_e5_slots():
         fits = any(rc.engine_fits_role(desc, role) for role in slot_roles)
         assert fits, slot
     import pytest as _pytest
-    for dead in ("background_abstract", "scene_broll"):
+    for dead in ("retired_role_b", "retired_role_a"):
         with _pytest.raises(rc.RoleCompatError):
             rc.engine_fits_role(desc, dead)
 

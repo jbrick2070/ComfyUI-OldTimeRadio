@@ -32,7 +32,7 @@ class Role(str, enum.Enum):
 
     Maps onto the user-facing per-role selectors: ``announcer_visual`` -> A,
     ``music_visual`` -> B, ``character_video`` -> C. The former
-    ``scene_broll`` / ``background_abstract`` roles were RIPPED 2026-07-01
+    ``retired_role_a`` / ``retired_role_b`` roles were RIPPED 2026-07-01
     (rip-sfx-broll: proven to receive ZERO beats -- the only producer was the
     dead ``sfx`` speaker-role plus a default fallback, both removed).
     Unknown role tokens FAIL LOUD via :class:`RoleCompatError`.

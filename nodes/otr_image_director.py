@@ -59,7 +59,7 @@ IMAGE_SLOT_ROLES = {
     "announcer_image_model": ("announcer_visual",),
     "music_image_model": ("music_visual",),
     # rip-sfx-broll (2026-07-01): the character image slot is KEPT --
-    # character stills ride it; the scene_broll / background_abstract
+    # character stills ride it; the retired_role_a / retired_role_b
     # pairings died with those roles.
     "character_image_model": ("character_video",),
 }
@@ -142,8 +142,8 @@ def three_d_locked_slots(video_policy: dict) -> set:
     vm = (video_policy or {}).get("video_models") or {}
     # Each IMAGE slot is locked if ANY of its paired ROLES' video engine
     # requires a mesh portrait. character_image_model pairs with the
-    # character lane (rip-sfx-broll 2026-07-01 removed the scene_broll /
-    # background_abstract pairings), resolved via the ONE shared map
+    # character lane (rip-sfx-broll 2026-07-01 removed the retired_role_a /
+    # retired_role_b pairings), resolved via the ONE shared map
     # (per-role slot only).
     img_slot_roles = {
         "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),

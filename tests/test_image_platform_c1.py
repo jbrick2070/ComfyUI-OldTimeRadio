@@ -161,7 +161,7 @@ def test_image_role_filter_shared(clean_image_registry):
     assert "txt" in fit and "needs_audio" in fit
     import pytest as _pytest
     with _pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("background_abstract", descs)
+        rc.filter_engines_for_role("retired_role_b", descs)
 
 
 #: Minimal VALID video policy for director calls with no 3D engine in play
@@ -208,7 +208,7 @@ def test_image_director_fail_closed_incompatible_pick(clean_image_registry):
     clean_image_registry._registry.clear()
     # capability-only (2026-06-22): a genuine incompatibility is a required input
     # NO role supplies (an unknown token) -> fits no role -> fail closed, no swap.
-    ireg.register(_img_stub(name="needs_unknown", roles=("background_abstract",),
+    ireg.register(_img_stub(name="needs_unknown", roles=("retired_role_b",),
                             required_inputs=("depth_map",)))
     with pytest.raises(ValueError):
         OTRImageDirector().direct(**_direct_kwargs(

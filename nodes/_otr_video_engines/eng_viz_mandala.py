@@ -14,7 +14,7 @@ glue was cut for v1 (PIL roundtrip reuses the SAME machinery as
 
 AUDIO-OPTIONAL (``required_inputs=()``): reacts to audio where present and
 idles a slow mandala on silence -- ALSO the no-image floor for
-scene_broll/background (fits every role by capability, C2). ``accepts_still=
+retired_role_a/background (fits every role by capability, C2). ``accepts_still=
 False`` -> mints NO still, so it never triggers an image model on a non-audio
 slot. has_audio is always False (only OTR_MasterAudioMux adds audio,
 test_audio_byte_identical invariant). NO FALLBACKS (fallback_engine=None);

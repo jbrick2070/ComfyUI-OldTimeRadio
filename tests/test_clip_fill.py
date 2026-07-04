@@ -146,7 +146,7 @@ def test_persist_moves_clip_to_episode_clips_dir(monkeypatch, tmp_path):
         "clips": {"shot_b001": {"type": "video", "path": str(src),
                                  "engine_id": "wan_ti2v"}},
         "ledger": {"video": {"shots": [
-            {"shot_id": "shot_b001", "role": "scene_broll",
+            {"shot_id": "shot_b001", "role": "retired_role_a",
              "engine_id": "wan_ti2v"}]}},
     }
     rd.persist_episode_clips(result, "ep")
@@ -154,7 +154,7 @@ def test_persist_moves_clip_to_episode_clips_dir(monkeypatch, tmp_path):
     assert os.path.dirname(new_path) == str(clips_dir)
     assert os.path.isfile(new_path)
     assert not src.exists()                  # moved, not copied
-    assert "scene_broll" in os.path.basename(new_path)
+    assert "retired_role_a" in os.path.basename(new_path)
     assert "wan_ti2v" in os.path.basename(new_path)
 
 

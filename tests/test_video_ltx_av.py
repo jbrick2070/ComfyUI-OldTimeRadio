@@ -64,7 +64,7 @@ def test_role_fit_serves_bookends_and_character():
     assert role_compat.engine_fits_role(d, "character_video")
     # rip-sfx-broll (2026-07-01): the dead roles are unknown tokens and raise.
     import pytest as _pytest
-    for dead in ("scene_broll", "background_abstract"):
+    for dead in ("retired_role_a", "retired_role_b"):
         with _pytest.raises(role_compat.RoleCompatError):
             role_compat.engine_fits_role(d, dead)
 

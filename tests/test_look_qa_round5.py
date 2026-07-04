@@ -217,7 +217,7 @@ class TestPerBeatScenePrompts:
         req = _rd.build_request_from_shot(
             _shot("shot_b001", "announcer_visual"), led)
         # OPEN roles now stamp motion_role (the brief+beat path is for non-open
-        # text-engine roles like scene_broll).
+        # text-engine roles like retired_role_a).
         assert req["observability"]["prompt_source"] == "motion_role"
         assert len(req["observability"]["prompt_sha8"]) == 8
         assert req["observability"]["prompt_chars"] == len(req["text_prompt"])

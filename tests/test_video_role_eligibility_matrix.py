@@ -5,9 +5,9 @@ each of the 5 video roles, is eligible IFF it fits the role BY CAPABILITY
 (``role_compat.engine_fits_role`` on the shared ``descriptor_for_engine``) -- NOT
 a flat ``True``, and NOT the legacy per-engine ``roles`` whitelist (the D1 drift
 C2 killed). Capability-grounded exclusions ARE expected: text-only floors fit all
-5 roles, audio-driven engines are excluded from background_abstract / scene_broll
+5 roles, audio-driven engines are excluded from retired_role_b / retired_role_a
 (which cannot supply ``audio_ref``), image-to-video engines are excluded from
-background_abstract (no ``init_image``).
+retired_role_b (no ``init_image``).
 
 This is an eligibility/contract test only -- it never renders (no GPU, no model
 load) and does not duplicate the canonical-render coverage (that is C5's soak).
@@ -47,7 +47,7 @@ def test_eligibility_is_capability_grounded(name, role):
 
 def test_matrix_exclusion_machinery_still_bites():
     """Sanity: the capability filter is not a rubber stamp. rip-sfx-broll
-    (2026-07-01): the input-poor roles (scene_broll/background_abstract) died,
+    (2026-07-01): the input-poor roles (retired_role_a/retired_role_b) died,
     so every SURVIVING role supplies the full vocabulary and every registered
     engine fits everywhere -- real exclusions now come from (a) descriptors
     requiring UNKNOWN tokens and (b) DEAD role tokens raising."""
@@ -60,7 +60,7 @@ def test_matrix_exclusion_machinery_still_bites():
     ok = {"engine_id": "txt", "roles": tuple(_ROLES),
           "required_inputs": ("text_prompt",)}
     with pytest.raises(rc.RoleCompatError):
-        rc.engine_fits_role(ok, "background_abstract")
+        rc.engine_fits_role(ok, "retired_role_b")
 
 
 def test_empty_required_inputs_fits_all_roles_via_capability_not_legacy():
@@ -82,11 +82,11 @@ def test_missing_required_inputs_falls_back_to_legacy_roles():
     fail-soft case -- it is gated by the legacy ``roles`` whitelist."""
     reg = vreg.VideoEngineRegistry("video_c4")
     reg.register(types.SimpleNamespace(
-        name="legacyish", roles=("scene_broll",), default_roles=(),
+        name="legacyish", roles=("retired_role_a",), default_roles=(),
         commercial_clean=True, requires_flag=None, family="abstract"))
     # required_inputs attr is ABSENT -> None -> legacy gate
-    assert reg.engines_for_role("scene_broll") == ["legacyish"]
+    assert reg.engines_for_role("retired_role_a") == ["legacyish"]
     assert reg.engines_for_role("character_video") == []
-    assert reg.assert_usable("legacyish", "scene_broll") == "legacyish"
+    assert reg.assert_usable("legacyish", "retired_role_a") == "legacyish"
     with pytest.raises(vreg.EngineUnusable):
         reg.assert_usable("legacyish", "character_video")

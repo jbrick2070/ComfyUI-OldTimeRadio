@@ -194,7 +194,7 @@ class StillMotionFamily(_CheapFamilyBase):
     name = "still_motion"
     family = "static_motion"
     roles = ("announcer_visual", "music_visual", "character_video")
-    # rip-sfx-broll (2026-07-01): its only default role (scene_broll) was
+    # rip-sfx-broll (2026-07-01): its only default role (retired_role_a) was
     # removed. NO FALLBACKS (2026-07-02, Sprint A): still_motion lost its
     # UNIVERSAL_FLOOR role with the chain rip -- it stays a REGISTERED
     # SELECTABLE engine (capability: text_prompt), but nothing degrades to it

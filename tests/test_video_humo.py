@@ -77,7 +77,7 @@ def test_registry_humo_selectable_no_flag(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"
-    for role in ("scene_broll", "background_abstract"):
+    for role in ("retired_role_a", "retired_role_b"):
         with pytest.raises(vreg.EngineUnusable):
             vreg.assert_usable("humo", role)               # role not served
 
@@ -100,7 +100,7 @@ def test_humo_role_fit_audio_driven_face():
         assert rc.engine_fits_role(desc, role) is True
     # rip-sfx-broll (2026-07-01): the dead roles are unknown tokens and raise.
     import pytest as _pytest
-    for role in ("scene_broll", "background_abstract"):
+    for role in ("retired_role_a", "retired_role_b"):
         with _pytest.raises(rc.RoleCompatError):
             rc.engine_fits_role(desc, role)
     assert rc.filter_engines_for_role("character_video", [desc]) == ["humo"]

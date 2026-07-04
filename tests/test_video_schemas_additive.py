@@ -20,7 +20,7 @@ def _canvas():
 
 def _req(**over):
     base = dict(
-        request_id="r1", shot_id="shot_0001", role="background_abstract",
+        request_id="r1", shot_id="shot_0001", role="retired_role_b",
         family_hint="abstract", profile_id="p1",
         timing=sc.Timing(), canvas=_canvas(),
     )

@@ -4,7 +4,7 @@ New, self-contained tests for nodes/_otr_shared/role_compat.py exercising the
 pure functions directly (the platform integration is covered in
 tests/test_video_platform_aseam.py). REWRITTEN 2026-07-01 (rip-sfx-broll):
 the Role enum is exactly {announcer_visual, music_visual, character_video};
-the scene_broll / background_abstract roles are GONE and unknown/dead role
+the retired_role_a / retired_role_b roles are GONE and unknown/dead role
 tokens raise RoleCompatError. Pure stdlib + the module under test. UTF-8, no
 BOM, ASCII, SFW.
 """
@@ -51,7 +51,7 @@ def test_role_available_inputs_unknown_raises():
         rc.role_available_inputs("no_such_role")
 
 
-@pytest.mark.parametrize("dead", ["scene_broll", "background_abstract", "sfx"])
+@pytest.mark.parametrize("dead", ["retired_role_a", "retired_role_b", "sfx"])
 def test_dead_roles_raise_role_compat_error(dead):
     # rip-sfx-broll: the removed roles are UNKNOWN tokens now -- the string
     # keys were deleted from ROLE_AVAILABLE_INPUTS with the enum members, so

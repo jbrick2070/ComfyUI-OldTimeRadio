@@ -76,7 +76,7 @@ class TestGetOpenSubject:
 
     def test_pure_and_total(self):
         # never raises, never empty, on any junk input (meta optional)
-        for role in ("", None, "scene_broll", 7):
+        for role in ("", None, "retired_role_a", 7):
             for syn in (True, False):
                 assert helpers.get_open_subject(role, syn)
 
@@ -306,7 +306,7 @@ class TestSceneStillObjects:
         """BUG 1 (2026-06-20): the writer's CANONICAL dialogue speaker_role is
         'character' (not 'char_voice') -- it must resolve to character_video and
         get a per-beat scene_character still, NOT fall through to a pooled
-        background_abstract other-beat. This was the live-render miss."""
+        retired_role_b other-beat. This was the live-render miss."""
         from nodes import otr_meta_brief_image_prompt as mbp
         from nodes.otr_shot_lock import SPEAKER_TO_VIDEO_ROLE
         assert SPEAKER_TO_VIDEO_ROLE.get("character") == "character_video"
@@ -329,7 +329,7 @@ class TestSceneStillObjects:
 
     def test_sfx_speaker_role_rejected_loud(self):
         """rip-sfx-broll (2026-07-01): the 'sfx' speaker_role + its
-        scene_broll mapping are GONE. The map has no sfx entry, the resolver
+        retired_role_a mapping are GONE. The map has no sfx entry, the resolver
         RAISES on it (old-ledger rejection), and every canonical writer
         speaker_role resolves through the map."""
         import pytest
@@ -572,7 +572,7 @@ class TestDispatcherStillSpine:
             ("eng_m", "music_image_model", False)
         assert disp.resolve_engine_for_role(policy, "character_video") == \
             ("eng_o", "character_image_model", False)
-        assert disp.resolve_engine_for_role(policy, "scene_broll") == \
+        assert disp.resolve_engine_for_role(policy, "retired_role_a") == \
             ("eng_o", "character_image_model", False)
 
     def test_slot_absent_uses_character_default(self):

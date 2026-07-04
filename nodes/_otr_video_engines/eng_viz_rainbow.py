@@ -9,7 +9,7 @@ mystique), painted via :func:`nodes._otr_shared.scope_draw.paint_rainbow_frame`.
 
 AUDIO-OPTIONAL (``required_inputs=()``): reacts to audio where present
 (announcer/music/character) and idles a procedural rainbow on silence -- so it is
-ALSO the no-image floor for scene_broll/background (fits every role by capability,
+ALSO the no-image floor for retired_role_a/background (fits every role by capability,
 C2). ``accepts_still=False`` -> it mints NO still, so it never triggers an image
 model on a non-audio slot. has_audio is always False (only OTR_MasterAudioMux adds
 audio, test_audio_byte_identical invariant). NO FALLBACKS (fallback_engine=None);

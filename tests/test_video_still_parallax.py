@@ -5,7 +5,7 @@ still_parallax is no longer imported/selectable (the mesh_stage / triposr
 fallback chains now degrade directly to still_motion, not via this engine).
 The SOURCE class stays on disk (it returns when re-enabled) and keeps its
 identity: the fail-closed usability ladder (local model snapshot), the
-role_compat fit (all three OTR_VideoDirector slots; background_abstract
+role_compat fit (all three OTR_VideoDirector slots; retired_role_b
 excluded -- no still to warp), and the PURE parallax math (deterministic,
 frame-0 identity, depth-weighted shift, edge clamp, no-stretch cover box) all
 still apply via DIRECT instantiation. The live depth inference + look-QA is
@@ -71,7 +71,7 @@ def test_still_parallax_fits_every_surviving_slot():
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert rc.engine_fits_role(desc, role) is True
     import pytest as _pytest
-    for dead in ("scene_broll", "background_abstract"):
+    for dead in ("retired_role_a", "retired_role_b"):
         with _pytest.raises(rc.RoleCompatError):
             rc.engine_fits_role(desc, dead)
 

@@ -147,8 +147,8 @@ def test_scene_open_motion_and_budget(monkeypatch):
     assert len(p) <= 240
     # NON-open text-engine role still composes from the brief within budget,
     # ending on the camera/no-text clauses.
-    broll = dict(shot, shot_id="shot_b002", role="scene_broll",
-                 group_id="grp_scene_broll")
+    broll = dict(shot, shot_id="shot_b002", role="retired_role_a",
+                 group_id="grp_retired_role_a")
     p3 = rd.build_request_from_shot(broll, ledger)["text_prompt"]
     assert p3.endswith("no on-screen text"), p3
     assert len(p3) <= 242
@@ -196,8 +196,8 @@ def test_ltx_scene_prompt_uses_still_profile_tail(monkeypatch):
     still_tail = sbh.get_era_tail(meta, profile="still")
     ledger = {"meta": meta, "lines": []}
     shot = {"shot_id": "shot_b009", "source_line_ids": [],
-            "role": "scene_broll", "engine_id": "ltx_video",
-            "group_id": "grp_scene_broll", "target_frame_count": 50,
+            "role": "retired_role_a", "engine_id": "ltx_video",
+            "group_id": "grp_retired_role_a", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
     p = req["text_prompt"]
@@ -310,15 +310,15 @@ def test_gear_scrub_regex_lockstep_with_image_prompt_module():
     assert rd._scrub_gear(sample) == mbp._scrub_gear_words(sample)
 
 
-def test_scene_broll_on_ltx_no_longer_generic(monkeypatch):
-    """GPT#8: a no-creative scene_broll shot on ltx_video gets the brief
+def test_retired_role_a_on_ltx_no_longer_generic(monkeypatch):
+    """GPT#8: a no-creative retired_role_a shot on ltx_video gets the brief
     core, not the generic '1940s radio studio' default."""
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     ledger = {"meta": _OK_META, "lines": []}
     shot = {"shot_id": "shot_b009", "source_line_ids": [],
-            "role": "scene_broll", "engine_id": "ltx_video",
-            "group_id": "grp_scene_broll", "target_frame_count": 50,
+            "role": "retired_role_a", "engine_id": "ltx_video",
+            "group_id": "grp_retired_role_a", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
     assert "1940s radio studio" not in req["text_prompt"]

@@ -54,7 +54,7 @@ def test_classifier_does_not_capture_other_engines():
     # audio + prompt routing is untouched by the role wiring.
     assert rd._is_character_face_beat(_shot("ltx_video", "character_video")) is False
     assert rd._is_character_face_beat(_shot("wan_i2v", "character_video")) is False
-    assert rd._is_character_face_beat(_shot("still_pan", "scene_broll")) is False
+    assert rd._is_character_face_beat(_shot("still_pan", "retired_role_a")) is False
 
 
 # ---- the ambient-master-audio gate ------------------------------------------

@@ -249,7 +249,7 @@ def test_fork_object_subject_id_matches_driver_convention():
     """Chunk 6: a no-character forked beat mints mesh_subject_id 'obj_<beat>',
     the SAME id render_driver stamps -> the mesh cache + the minted fodder
     agree on the subject. (rip-sfx-broll 2026-07-01: the roleless/
-    background_abstract fixture became an ANNOUNCER beat with NO char_id --
+    retired_role_b fixture became an ANNOUNCER beat with NO char_id --
     the surviving no-character lane.)"""
     payload, _w = mb.derive_image_prompts(
         [], _meta(),

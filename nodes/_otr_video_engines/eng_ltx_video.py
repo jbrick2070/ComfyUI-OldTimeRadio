@@ -329,7 +329,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # lip-synced face -- the deliberate "like before" look (the role supplies
     # text_prompt; LTX ignores the beat's audio_ref by family). A talking-face
     # announcer remains available by selecting humo on the OTR_VideoDirector
-    # announcer slot. (scene_broll/background_abstract removed 2026-07-01,
+    # announcer slot. (retired_role_a/retired_role_b removed 2026-07-01,
     # rip-sfx-broll.)
     roles = ("music_visual", "announcer_visual")
     # 2026-06-17: announcer + music DEFAULT moved to the audio-reactive LTX

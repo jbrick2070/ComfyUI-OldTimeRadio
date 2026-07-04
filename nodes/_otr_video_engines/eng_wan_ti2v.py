@@ -96,7 +96,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     render_aspect = "wide"
     # FLEXIBLE (operator 2026-06-18): eligible for EVERY role -- role_compat is the
     # real gate (it admits wan_ti2v only where the role supplies the required
-    # init_image: announcer/music/character/scene_broll do; the pure background_
+    # init_image: announcer/music/character/retired_role_a do; the pure background_
     # abstract floor does not, so it's correctly excluded there). Opening `roles`
     # lets the operator pick wan_ti2v for the announcer slot (it animates that beat's
     # selected still); the required_inputs check still prevents a truly broken pick.

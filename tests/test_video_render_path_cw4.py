@@ -226,7 +226,7 @@ def test_cheap_family_usable_and_role_filtered():
     # rip-sfx-broll (2026-07-01): the input-poor roles are GONE; a dead role
     # token raises through the same shared filter path.
     with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("background_abstract", descs)
+        rc.filter_engines_for_role("retired_role_b", descs)
 
 
 def test_cheap_families_cold_import_clean():

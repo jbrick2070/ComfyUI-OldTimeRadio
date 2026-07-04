@@ -1,5 +1,5 @@
 """ONE shared role -> video-slot map (Route-A, 2026-06-28 HuMo-14B promotion;
-rip-sfx-broll 2026-07-01: scene_broll / background_abstract roles REMOVED;
+rip-sfx-broll 2026-07-01: retired_role_a / retired_role_b roles REMOVED;
 2026-07-03: the legacy catch-all video slot + its migration fallback
 RETIRED -- three first-class video slots only).
 
@@ -52,7 +52,7 @@ PER_ROLE_VIDEO_SLOTS = (
 )
 
 #: The per-role slot Route-A added that survives the 2026-07-01 rip (the
-#: scene_broll / background_abstract slots were removed with their roles).
+#: retired_role_a / retired_role_b slots were removed with their roles).
 NEW_ROUTE_A_VIDEO_SLOTS = (
     "character_video_model",
 )
@@ -78,7 +78,7 @@ def slot_for_role(role: str) -> str:
     if slot is None:
         raise ValueError(
             f"slot_for_role: unknown video role {role!r}; known roles: "
-            f"{tuple(ROLE_TO_VIDEO_SLOT)}. scene_broll/background_abstract "
+            f"{tuple(ROLE_TO_VIDEO_SLOT)}. retired_role_a/retired_role_b "
             f"were removed 2026-07-01 (rip-sfx-broll). NO FALLBACKS."
         )
     return slot

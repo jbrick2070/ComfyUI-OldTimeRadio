@@ -80,7 +80,7 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
     # Animate a still into motion -- the roles that can supply an init image
-    # (music visual, character). (scene_broll/background_abstract removed
+    # (music visual, character). (retired_role_a/retired_role_b removed
     # 2026-07-01, rip-sfx-broll.)
     roles = ("music_visual", "character_video")
     default_roles = ()

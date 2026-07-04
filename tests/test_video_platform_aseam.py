@@ -113,11 +113,11 @@ def test_video_registry_register_and_assert_usable(clean_video_registry):
     # C2 (2026-06-30): eligibility is CAPABILITY. A text-only engine fits EVERY real
     # role (every role supplies text_prompt), so the rejection case must be an engine
     # whose required input the role cannot supply: an audio-driven engine is refused
-    # by background_abstract (which supplies only text_prompt, no audio_ref).
+    # by retired_role_b (which supplies only text_prompt, no audio_ref).
     vreg.register(_stub_engine(name="talker", roles=("character_video",),
                                required_inputs=("audio_ref", "init_image")))
     with pytest.raises(vreg.EngineUnusable):
-        vreg.assert_usable("talker", "background_abstract")  # role can't supply audio_ref
+        vreg.assert_usable("talker", "retired_role_b")  # role can't supply audio_ref
     with pytest.raises(vreg.EngineUnusable):
         vreg.assert_usable("missing", "text_to_video")  # not registered
 
@@ -152,7 +152,7 @@ def test_role_compat_filter_shared():
         rc.filter_engines_for_role("not_a_role", descs)
     # rip-sfx-broll (2026-07-01): the dead roles raise like any unknown token.
     with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("background_abstract", descs)
+        rc.filter_engines_for_role("retired_role_b", descs)
 
 
 def test_role_compat_fail_closed_on_malformed():
@@ -217,7 +217,7 @@ def test_schema_extra_forbid_and_family_rules():
     from pydantic import ValidationError
 
     ok = sc.VideoRequest(
-        request_id="r", shot_id="s", role="background_abstract",
+        request_id="r", shot_id="s", role="retired_role_b",
         family_hint="text_to_video", profile_id="p", text_prompt="hello",
         timing=sc.Timing(), canvas=sc.Canvas(w=832, h=480, fps=25),
     )
@@ -302,7 +302,7 @@ def test_probe_emits_usable_list(clean_video_registry):
     assert "ffmpeg" in hc and "cuda_available" in hc
     assert us["_all_registered"] == []  # empty registry in CW-1
     assert "character_video" in us
-    assert "background_abstract" not in us  # dead role (rip-sfx-broll)
+    assert "retired_role_b" not in us  # dead role (rip-sfx-broll)
     assert isinstance(report, str) and "OTR_VideoProbe" in report
 
 
@@ -347,7 +347,7 @@ def test_clip_budget_no_double_count():
     beats = [
         {"beat_id": "b1", "role": "character_video", "char_id": "c1", "text": "hi",
          "samples": 24000, "sample_rate": 24000, "dur_s": None},
-        {"beat_id": "b2", "role": "background_abstract", "char_id": "", "text": "",
+        {"beat_id": "b2", "role": "retired_role_b", "char_id": "", "text": "",
          "samples": 12000, "sample_rate": 24000, "dur_s": None},
     ]
     budget = sl.compute_clip_budget(beats, {}, 25)
@@ -532,7 +532,7 @@ def test_3d_expression_not_in_mesh_key():
 
 def test_cheap_family_no_creative_llm_call():
     led = {"cast": [], "lines": [], "meta": {}}
-    beats = [{"beat_id": "b1", "role": "background_abstract", "char_id": "",
+    beats = [{"beat_id": "b1", "role": "retired_role_b", "char_id": "",
               "text": "", "samples": None, "sample_rate": None, "dur_s": 1.0}]
     calls = {"n": 0}
 
@@ -749,9 +749,9 @@ def test_clip_budget_sum_equals_episode_duration():
     beats = [
         {"beat_id": "b1", "role": "character_video", "char_id": "c1", "text": "a",
          "samples": 30000, "sample_rate": sr, "dur_s": None},
-        {"beat_id": "b2", "role": "scene_broll", "char_id": "", "text": "b",
+        {"beat_id": "b2", "role": "retired_role_a", "char_id": "", "text": "b",
          "samples": 18000, "sample_rate": sr, "dur_s": None},
-        {"beat_id": "b3", "role": "background_abstract", "char_id": "", "text": "",
+        {"beat_id": "b3", "role": "retired_role_b", "char_id": "", "text": "",
          "samples": 6000, "sample_rate": sr, "dur_s": None},
     ]
     budget = sl.compute_clip_budget(beats, {}, fps)

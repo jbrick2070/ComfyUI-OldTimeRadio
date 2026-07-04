@@ -79,7 +79,7 @@ def test_classify_failure_specific_kind_mappings():
 # --------------------------------------------------------------------------- #
 class _StubBase:
     family = "abstract"
-    roles = ("background_abstract",)
+    roles = ("retired_role_b",)
     default_roles = ()
     commercial_clean = True
     requires_flag = None
@@ -134,10 +134,10 @@ def stub_registry():
 
 def _two_shot_ledger():
     section = {"video_revision": 1, "fps": 25, "shots": [
-        {"shot_id": "shot_0000", "beat_id": "b0", "role": "background_abstract",
+        {"shot_id": "shot_0000", "beat_id": "b0", "role": "retired_role_b",
          "engine_id": "stub_ok", "family": "abstract", "group_id": "g0",
          "target_frame_count": 25, "degradation_trail": []},
-        {"shot_id": "shot_0001", "beat_id": "b1", "role": "background_abstract",
+        {"shot_id": "shot_0001", "beat_id": "b1", "role": "retired_role_b",
          "engine_id": "stub_fail", "family": "abstract", "group_id": "g1",
          "target_frame_count": 25, "degradation_trail": []},
     ]}
@@ -483,8 +483,8 @@ def test_parse_engine_override_grammar():
     m = rd.parse_engine_override("*=ltx_video")
     assert m == {"*": "ltx_video"}
     m = rd.parse_engine_override(
-        "character_video=humo, scene_broll=ltx_video")
-    assert m == {"character_video": "humo", "scene_broll": "ltx_video"}
+        "character_video=humo, retired_role_a=ltx_video")
+    assert m == {"character_video": "humo", "retired_role_a": "ltx_video"}
     with pytest.raises(ValueError):
         rd.parse_engine_override("character_video")          # no '='
     with pytest.raises(ValueError):
@@ -635,7 +635,7 @@ def test_built_character_3d_request_is_schema_valid():
     assert "init_w" not in req and "init_h" not in req
     # the soak/global-assets builder is schema-valid too
     soak_req = rd.build_request(
-        {"shot_id": "shot_0003", "role": "scene_broll",
+        {"shot_id": "shot_0003", "role": "retired_role_a",
          "engine_id": "still_motion", "family": "static_motion"},
         {"init_image": "p.png", "audio_ref": "a.wav"}, 25)
     VideoRequest.model_validate(soak_req)
@@ -730,7 +730,7 @@ def test_engine_failure_raises_loud(stub_registry):
         ],
         "shots": [
             {"shot_id": "shot_0000", "beat_id": "b0",
-             "role": "background_abstract", "engine_id": "stub_fail",
+             "role": "retired_role_b", "engine_id": "stub_fail",
              "family": "abstract", "group_id": "g0",
              "target_frame_count": 25, "degradation_trail": []},
         ]})

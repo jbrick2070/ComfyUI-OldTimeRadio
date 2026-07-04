@@ -74,7 +74,7 @@ ENGINE_FAMILY = {
 #: The (role, engine, family) rotation covering the 3 roles + the non-3D
 #: families (kept identical to scripts/otr_video_soak so the GPU soak walks the
 #: same shape the shipped CPU harness proves). rip-sfx-broll (2026-07-01):
-#: the scene_broll/background_abstract legs died with their roles; the still
+#: the retired_role_a/retired_role_b legs died with their roles; the still
 #: families keep coverage via the extra announcer legs.
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
