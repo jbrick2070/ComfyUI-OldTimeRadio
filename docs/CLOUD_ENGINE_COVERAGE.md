@@ -32,10 +32,10 @@ before it made any cloud call). So bookend positions are N/A for face engines.
 | engine | announcer_image | music_image | character_image | evidence |
 |--------|-----------------|-------------|-----------------|----------|
 | ideo (ideogram_v4) | **PASS** | **PASS** | **PASS** | cv1 2026-07-04: all image roles=ideo, stills minted, obs signal_lost_the_vibecode_loop_...final.mp4 |
-| recraft | UNTESTED | UNTESTED | UNTESTED | adapter shipped (B1 @b5ef58bc); no live run |
-| flux_pro | UNTESTED | UNTESTED | UNTESTED | adapter shipped (B1); no live run |
-| nano_banana_2 | UNTESTED | UNTESTED | UNTESTED | adapter shipped (B1); no live run |
-| seedream_2 | UNTESTED | UNTESTED | UNTESTED | adapter shipped (B1); no live run |
+| recraft | -- | -- | **PASS** | live 2026-07-04: minted c02+c03 character portraits |
+| flux_pro | **PASS** | -- | -- | live 2026-07-04: minted the announcer portrait |
+| nano_banana_2 | -- | **FIXED** (retest) | -- | model must be the DYNAMICCOMBO_V3 DICT {model: slug} not a bare slug (Gemini node reads model["model"]); fixed @606dc7f1 |
+| seedream_2 | UNTESTED | UNTESTED | UNTESTED | adapter shipped; ByteDance node model:str (NOT a dict -- different from Gemini); no live run |
 | ideogram (ideo_word words-specialist) | UNTESTED | UNTESTED | UNTESTED | plain `ideo` PASS; words-variant not yet run |
 
 ## CLOUD VIDEO  (positions: announcer_visual, music_visual, character_video)
