@@ -315,6 +315,31 @@ drama :3900/:3932; tension-ramp :4210; next-turn :4264; a5-fields :4308.
 Dead code to DELETE (both scopes): _bark_health_check + _bark_health_check_for_cast
 (story_orchestrator.py:649/:691, no callers).
 
+## H2. agy STRAGGLER SWEEP (operator-run 2026-07-03) — +7 hidden sites, Claude-triaged
+The set is bigger than 3. agy found 7 more hidden LLM->template swaps. My triage:
+
+CLEAR RIP (a writer LLM fails/returns junk -> canned template/pool ships as if AI):
+- announcer-outro (mine) `_otr_line_composer.py ~3519-3662`.
+- news-coda floor (mine) `_otr_line_composer.py ~3446-3457`.
+- portrait 3-tier (mine) `otr_meta_brief_image_prompt.py ~1113-1156`.
+- announcer-intro SAFE-OPEN validation fail -> `fallback_safe_open` `_otr_line_composer.py:3213/3216`.
+- announcer-intro NORMAL validation fail -> `fallback_announcer_intro(brief)` `_otr_line_composer.py:3256/3262`.
+- dramatic-state technical-slot call fails -> `_fallback_state` `_otr_dramatic_state_llm.py:537/543`.
+- char-SCENE prompt: `llm_fn` fails/empty/non-person -> deterministic `compose_still_prompt`
+  `otr_meta_brief_image_prompt.py:814/842`.
+
+JUDGMENT — operator call (borderline; NOT plainly "a model failed -> canned prose"):
+- J1 announcer-intro EMPTY-brief -> `fallback_announcer_intro("")` (`_otr_line_composer.py:3223/3228`).
+  This is a NO-INPUT case (no brief), not an LLM failure. Rip = the empty brief must
+  hard-fail upstream; keep = an empty brief is a legit "nothing to write" path.
+- J2 outline Stage-2 speaker-assignment retries EXHAUSTED -> `_deterministic_phase_skeleton`
+  round-robin (`_otr_outline.py:2013/2025`). STRUCTURAL fallback (who-speaks-when), not
+  canned prose. Rip = LLM speaker-assign fail stops the episode; keep = round-robin is a
+  functional structural default.
+- J3 dramatic-state `structured_call` IMPORT fails -> `_fallback_state`
+  (`_otr_dramatic_state_llm.py:509/511`). IMPORT failure = env/dep problem, not a model
+  failure. Rip = feature-unavailable hard-fails; keep = import guard is infra, not a swap.
+
 **R3 test-inversion checklist (invert in the SAME commit):**
 - `test_announcer_passes.py::test_compose_announcer_outro_llm_raises_falls_back` +
   `::test_compose_announcer_outro_multiline_output_falls_back` (:355-384) — assert
