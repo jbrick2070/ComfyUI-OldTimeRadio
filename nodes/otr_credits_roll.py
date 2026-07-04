@@ -927,8 +927,13 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
         cmd = [
             _ffmpeg_bin(), "-y",
             "-stream_loop", "-1", "-i", backdrop_path,
-            "-i", base_png,
-            "-i", scroll_png,
+            # base + scroll are STILLS: they MUST be looped image inputs at the clip
+            # fps so each carries an advancing per-frame timestamp. Fed as a plain
+            # `-i <png>` they are a SINGLE frame at t=0, so the col-3 crop y-expr
+            # (which scrolls on `t`) is frozen at y=0 -> the blank top pad, and the
+            # whole scroll column renders empty for the entire roll (the shipped bug).
+            "-loop", "1", "-framerate", f"{fps}", "-i", base_png,
+            "-loop", "1", "-framerate", f"{fps}", "-i", scroll_png,
             "-filter_complex",
             (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
              f"crop={w}:{h},eq=brightness=-0.32,fps={fps}[bg];"

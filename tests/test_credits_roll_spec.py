@@ -411,6 +411,46 @@ def test_col3_text_scrolls_even_for_short_episode(tmp_path):
         "col 3 text did not scroll (static-crop / overflow-only regression)"
 
 
+def test_scroll_still_inputs_are_looped_timed(monkeypatch, tmp_path):
+    """Regression (shipped-obs bug 2026-07-04): col 3 rendered BLANK the whole roll
+    because base_png/scroll_png were fed as plain single-frame `-i <png>` inputs.
+    A single still is one frame at t=0, so the col-3 crop y-expr (which scrolls on
+    `t`) was frozen at y=0 = the blank top pad. They MUST be LOOPED, fps-timed image
+    inputs so `t` advances. Capture the render argv and assert `-loop 1 -framerate`
+    precedes each still input -- a guard the fade-masked motion test above missed."""
+    backdrop = tmp_path / "clip.mp4"
+    _silent_video(backdrop, 1.0)                       # real ffmpeg, BEFORE the patch
+    seen = {}
+    real_run = cr.subprocess.run
+
+    def _spy(cmd, *a, **k):
+        if isinstance(cmd, (list, tuple)) and any(
+                isinstance(c, str) and c.endswith(".scroll.png") for c in cmd):
+            seen["cmd"] = [str(c) for c in cmd]
+            with open(cmd[-1], "wb") as fh:            # satisfy the size>0 check
+                fh.write(b"\x00" * 32)
+
+            class _R:
+                returncode = 0
+                stderr = ""
+            return _R()
+        return real_run(cmd, *a, **k)
+
+    monkeypatch.setattr(cr.subprocess, "run", _spy)
+    cr.render_credits_clip(_layout(), str(backdrop), str(tmp_path / "credits.mp4"),
+                           w=1280, h=720, fps=25.0)
+    cmd = seen["cmd"]
+    for suffix in (".base.png", ".scroll.png"):
+        idxs = [j for j, c in enumerate(cmd) if c.endswith(suffix)]
+        assert idxs, "no %s input in the ffmpeg argv" % suffix
+        j = idxs[0]
+        assert cmd[j - 1] == "-i", "%s not an -i input" % suffix
+        window = cmd[max(0, j - 6):j]
+        assert "-loop" in window and "-framerate" in window, (
+            "%s is not looped/fps-timed -> the col-3 scroll would FREEZE "
+            "(single frame at t=0). argv window=%r" % (suffix, window))
+
+
 def test_classic_roll_distance_includes_viewport():
     """Guard the model regression: the roll distance is content_h + view_h (the
     canvas is padded view_h top AND bottom) so col 3 ALWAYS rolls and nothing is
