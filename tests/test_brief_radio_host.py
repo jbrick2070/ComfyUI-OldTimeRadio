@@ -414,7 +414,7 @@ def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
 
 
 def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypatch):
-    # Toggle OFF: the music bookend is redirected off HuMo so the
+    # Toggle OFF: the announcer bookend is redirected off HuMo so the
     # radio_host_portrait path never triggers. S4c (2026-07-02): the
     # redirected ltx bookend now runs the TALKING register (default dev
     # unet), which REQUIRES the wide radio-face still -- a ledger minted
@@ -423,7 +423,7 @@ def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypat
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
     led = _bookend_ledger(tmp_path, with_face=False)
-    shot = _humo_bookend_shot()
+    shot = _humo_bookend_shot(role="announcer_visual")
     with pytest.raises(rd.RenderError, match="radio-face"):
         rd.build_request_from_shot(shot, led)
     assert shot["engine_id"] == "ltx_audio_in"     # redirect happened first

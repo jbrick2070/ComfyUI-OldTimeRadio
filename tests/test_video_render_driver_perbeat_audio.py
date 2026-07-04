@@ -302,7 +302,7 @@ class TestRadioIsHostGuard:
             "lines": [{"line_id": "b000"}],
             "images": {"images": []},
         }
-        shot = {"shot_id": "shot_b000", "beat_id": "b000", "role": "music_visual",
+        shot = {"shot_id": "shot_b000", "beat_id": "b000", "role": "announcer_visual",
                 "engine_id": "humo", "family": "audio_driven_face",
                 "target_frame_count": 50, "source_line_ids": ["b000"],
                 "creative": {}}
