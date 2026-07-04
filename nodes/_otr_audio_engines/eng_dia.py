@@ -61,7 +61,8 @@ class DiaEngine:
     sample_rate = 44100      # Descript Audio Codec; must match char_dia_v1
     requires_voice_ref = True
     voice_ref_kind = "wav_path"
-    missing_ref_fallback = "bark"
+    # NO-FALLBACK (operator 2026-07-03): a ref-less line FAILS LOUD, never bark.
+    missing_ref_fallback = None
 
     def __init__(self):
         self._proc = None

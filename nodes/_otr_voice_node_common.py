@@ -23,25 +23,17 @@ import os
 log = logging.getLogger("OTR")
 
 # Voice-CLONING engines that REQUIRE a per-character reference WAV declare it via
-# adapter metadata (base.AudioEngineAdapter): requires_voice_ref=True plus
-# missing_ref_fallback="bark". When such an engine is selected but a char_voice
-# line has no usable voice_ref_path (preserve_ledger did not assign a clip ref, or
-# no reference clips are installed on disk), the per-line path renders that line on
-# the fallback engine (bark preset voices) so the episode always renders -- audio
-# is king (PD1). Branching on metadata (not a hard-coded engine-name tuple) means a
-# NEW cloning engine -- chatterbox / dia / xtts / cosyvoice -- slots in by setting
-# those attributes on its adapter, with ZERO changes here (casting MUST-FIX #6).
+# adapter metadata (base.AudioEngineAdapter): requires_voice_ref=True. When such an
+# engine is selected but a char_voice line has no usable voice_ref (no clip ref
+# assigned, or no reference clips installed on disk), the per-line path FAILS LOUD
+# with a named EngineUnusable(MISSING_MODEL) -- NO bark fallback (no-fallback rip,
+# operator 2026-07-03). A missing reference is a casting/install defect to fix, not
+# something to paper over. Branching on metadata (not a hard-coded engine-name
+# tuple) means a NEW cloning engine slots in by setting requires_voice_ref on its
+# adapter, with ZERO changes here.
 def _engine_requires_voice_ref(adapter) -> bool:
     """True iff ``adapter`` is a voice-cloning engine needing a reference WAV."""
     return bool(getattr(adapter, "requires_voice_ref", False))
-
-
-def _engine_missing_ref_fallback(adapter):
-    """Name of the engine to render a line on when a cloning engine has no usable
-    reference (e.g. ``"bark"``), or None to render no fallback (let the forward
-    fail closed). Reads adapter metadata so the dispatch never hard-codes a name.
-    """
-    return getattr(adapter, "missing_ref_fallback", None) or None
 
 
 def _resolve_ref_to_disk(ref_path):
@@ -80,8 +72,9 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
     voice_ref_id (not the path), so the per-line path can arrive with no
     voice_ref_path even when a bank ref applies. Resolve it here: prefer the
     cast's voice_ref_id, else assign one deterministically by gender. Returns an
-    absolute path ONLY if the file exists on disk; None -> the caller's bark
-    fallback renders the line. Never raises (a bad bank just means bark)."""
+    absolute path ONLY if the file exists on disk; None -> the caller FAILS LOUD
+    (no-fallback rip: a cloning engine with no resolvable ref raises, never bark).
+    Never raises itself (a bad bank just yields None -> the caller's raise)."""
     try:
         from ._otr_voice_bank import (
             assign_voice_for_slot, filter_by_quality_tier, load_voice_bank,
@@ -281,7 +274,6 @@ class OTRVoiceNodeBase:
         adapter = None
         sr_hint = 24000
         n_clips = 0
-        self._bark_fallback_active = None
         try:
             engine = assert_usable(engine, self.ROLE)  # FAIL CLOSED (6-class)
             adapter = get_engine(engine)
@@ -302,13 +294,6 @@ class OTRVoiceNodeBase:
         finally:
             # I-7: free single-engine residency in finally, BEFORE 'done'.
             self._teardown(adapter)
-            # If _render_per_line loaded a bark fallback adapter and an exception
-            # skipped its normal post-loop unload, tear it down here so a failed
-            # render cannot leave Bark resident (GPT-5.5 roundtable, grounded).
-            _fb = getattr(self, "_bark_fallback_active", None)
-            if _fb is not None:
-                self._teardown(_fb)
-                self._bark_fallback_active = None
 
         if audio_out is None:
             from ._otr_resolved_request import empty_audio_batch
@@ -328,8 +313,9 @@ class OTRVoiceNodeBase:
         canonical empty batch with no model load.
         """
         from . import _otr_ledger_consumers as _OTRLC
-        from ._otr_audio_engines import pack_audio_batch
-        from ._otr_audio_utils import resample_audio
+        from ._otr_audio_engines import (
+            EngineUnusable, EngineUsabilityReason, pack_audio_batch,
+        )
         from ._otr_engine_profiles import (
             assert_model_available, assert_token_for_profile, require_resolver,
         )
@@ -384,10 +370,6 @@ class OTRVoiceNodeBase:
         if callable(begin):
             begin(meta)
         clips: list = []
-        # Lazy bark fallback adapter (2026-06-04): loaded only if a voice-cloning
-        # char engine (indextts2 / chatterbox) hits a line with no usable
-        # reference clip. Torn down after the loop.
-        _bark_fb = None
         log_lines: list = [
             f"{self.ROLE}: rendering {len(lines)} lines on '{engine}' "
             f"(profile {profile.profile_id})"
@@ -418,28 +400,22 @@ class OTRVoiceNodeBase:
                     log.debug("[OTR] delivery derive failed: %s", _e)
                     delivery_vector, _dv_source = None, "error"
             prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
-            # PD1 robustness (2026-06-22): a beat with NO spoken content -- e.g. a
-            # stage-direction-only line like "(pauses, then flips the switch)" --
-            # cleans to empty `prepared` text. Handing a per-line voice worker
-            # empty text crashes some engines (IndexTTS2: torch.cat() over zero
-            # audio chunks -> the whole render dies before publish) and yields
-            # garbage in others. Emit a short SILENCE for this beat and skip the
-            # engine call -- engine-agnostic, so it future-proofs every approved
-            # model. The stage direction was never dialogue; the beat keeps its
-            # slot and the episode ships.
+            # NO-FALLBACK (operator 2026-07-03): a beat that cleans to EMPTY text
+            # (a stage-direction-only line like "(flips the switch)") must NEVER be
+            # silently rendered as silence -- that hid a writer/ledger defect. The
+            # writer must not emit voiced lines with no spoken content (a pre-freeze
+            # assert guards this), and the ledger carries no stage-direction voice
+            # role today. If one still reaches the voice gate, FAIL LOUD naming the
+            # line so it is fixed, never papered over with a silent clip. (Routing a
+            # stage-direction beat to a dedicated non-voice media engine is parked in
+            # docs/ROADMAP_IDEAS.md -- re-add the role to the ledger then.)
             if not str(prepared or "").strip():
-                _sil_msg = (
+                raise ValueError(
                     f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} "
-                    f"has no spoken content (stage-direction-only?) -> emitting "
-                    f"silence, skipping the voice worker"
+                    f"cleans to EMPTY spoken text (stage-direction-only?). No "
+                    f"silent-clip fallback (no-fallback rip) -- the writer must not "
+                    f"emit voiced lines with no dialogue. Original text: {text!r}"
                 )
-                log_lines.append(_sil_msg)
-                log.warning("[OTR voice P-OBS] %s", _sil_msg)
-                import torch as _torch
-                _n = max(1, int(sr * 0.30))
-                clips.append({"waveform": _torch.zeros(1, _n),
-                              "sample_rate": int(sr)})
-                continue
             request = build_resolved_request(
                 role=self.ROLE,
                 engine_name=engine,
@@ -460,30 +436,27 @@ class OTRVoiceNodeBase:
             )
             # G1: per-engine external seed reduced from the stable line seed.
             engine_seed = _seed_to_int64(engine, request.stable_line_seed)
-            # Graceful ref-clip fallback (2026-06-04): a voice-CLONING char engine
-            # (voice_ref_field == "voice_ref_path", e.g. indextts2 / chatterbox)
-            # cannot synthesize without a per-character reference WAV. If this cast
-            # row carries none (preserve_ledger does not assign clip refs, and/or
-            # no reference clips are installed on disk), render THIS line with bark
-            # (preset voices, no ref clip) using the cast's replayed voice_preset,
-            # so the episode never hard-fails on a missing voice reference -- audio
-            # is king (PD1). The clone engine engages automatically once a usable
-            # voice_ref_path is present. Bark is loaded once, lazily.
+            # Ref-clip resolution (no-fallback rip 2026-07-03): a voice-CLONING char
+            # engine (voice_ref_field == "voice_ref_path", e.g. indextts2 /
+            # chatterbox) cannot synthesize without a per-character reference WAV.
+            # We resolve the cast row's OWN ref below; if none resolves, the line
+            # FAILS LOUD (no bark fallback). A valid ref is left byte-identical.
             if _engine_requires_voice_ref(adapter) and voice_ref:
-                # A non-empty but STALE ref (the file is gone) must fall through
-                # to resolution + fallback, not be shipped to the worker (which
-                # would hard-fail "ref_clip missing") -- PD1. A valid ref is left
-                # untouched (the adapter resolves it) so shipped paths are
-                # byte-identical; only a missing-on-disk ref is nulled.
+                # A non-empty but STALE ref (the file is gone) must fall through to
+                # resolution, not be shipped to the worker (which would hard-fail
+                # "ref_clip missing"). A valid ref is left untouched (the adapter
+                # resolves it) so shipped paths are byte-identical; only a
+                # missing-on-disk ref is nulled -> re-resolved or fails loud below.
                 _disk = _resolve_ref_to_disk(voice_ref)
                 if not (_disk and os.path.exists(_disk)):
                     voice_ref = None
             if _engine_requires_voice_ref(adapter) and not voice_ref:
                 # preserve_ledger / CastLock-stamps-only-the-id: resolve an
                 # on-disk reference WAV from voice_ref_id or by gender so the
-                # clone engine clones a real voice. None -> fallback below.
+                # clone engine clones a REAL voice for THIS character. If none
+                # resolves, we FAIL LOUD below (no-fallback rip 2026-07-03) -- a
+                # cloning engine NEVER silently renders on bark.
                 voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
-            fb_name = _engine_missing_ref_fallback(adapter)
             # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
             # char -> voice_ref_id -> ref basename -> engine -> alpha ->
             # delivery version/state/source -> seed. Render_log line + runtime
@@ -511,45 +484,20 @@ class OTRVoiceNodeBase:
             )
             log_lines.append(_pobs)
             log.info("[OTR voice P-OBS] %s", _pobs)
-            if (self.ROLE in ("char_voice", "announcer_voice")
-                    and _engine_requires_voice_ref(adapter)
-                    and not voice_ref and fb_name):
-                if _bark_fb is None:
-                    from ._otr_audio_engines import get_engine as _get_engine
-                    _bark_fb = _get_engine(fb_name)
-                    _bark_fb.load()
-                    self._bark_fallback_active = _bark_fb
-                    log_lines.append(
-                        f"{self.ROLE}: WARNING engine '{engine}' has no reference "
-                        f"clip for one or more lines; rendering those on "
-                        f"'{fb_name}' (preset voices). Install {engine} reference "
-                        f"WAVs (or set cast_voice_policy=auto_registry) to enable it."
-                    )
-                bark_seed = _seed_to_int64(fb_name, request.stable_line_seed)
-                _pobs_fb = (
-                    f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} -> "
-                    f"FALLBACK engine={fb_name} preset="
-                    f"{voice_preset or 'v2/en_speaker_6'} (no usable ref for "
-                    f"'{engine}') delivery=omitted seed={bark_seed}"
+            # NO-FALLBACK (operator 2026-07-03): a cloning engine that reached this
+            # line with no usable voice reference FAILS LOUD -- it never silently
+            # renders on bark. The old bark missing-ref net is retired; a missing
+            # reference is a casting/install defect the operator must fix, surfaced
+            # here as a NAMED EngineUnusable (MISSING_MODEL) naming the char/line.
+            if _engine_requires_voice_ref(adapter) and not voice_ref:
+                raise EngineUnusable(
+                    engine, self.ROLE, EngineUsabilityReason.MISSING_MODEL,
+                    f"no usable voice reference for cloning engine '{engine}' on "
+                    f"line={line_id or occ} char={char_id or '-'} "
+                    f"(voice_ref_id={voice_ref_id or '-'}). Install the engine's "
+                    f"reference WAVs or cast a voice with a resolvable ref -- there "
+                    f"is NO bark fallback (no-fallback rip).",
                 )
-                log_lines.append(_pobs_fb)
-                log.warning("[OTR voice P-OBS] %s", _pobs_fb)
-                with deterministic_inference(bark_seed, warn_only=True):
-                    audio = _bark_fb.generate_voice(
-                        prepared, voice_preset or "v2/en_speaker_6", None, bark_seed,
-                    )
-                # Mixed-rate fix (BUG-LOCAL voice): bark renders at its native
-                # rate (24000), but this batch packs at the primary engine's sr
-                # (e.g. indextts2 22050). Downsample the fallback clip to sr so
-                # pack_audio_batch's single-rate contract holds -- otherwise a
-                # cast that mixes ref'd (indextts2) and ref-less (bark fallback)
-                # characters crashes with "mixed sample rates [22050, 24000]".
-                # Primary-engine clips are never touched (C7 bit-exact);
-                # resample_audio is deterministic CPU (scipy.resample_poly, I-11).
-                if int(audio.get("sample_rate", sr)) != sr:
-                    audio = resample_audio(audio, sr)
-                clips.append(audio)
-                continue
             # G1: scope strict-determinism + seed/restore every RNG around the
             # single forward (I-2/C-2). warn_only=True keeps the process default
             # non-strict so a nondeterministic CUDA op cannot crash the opt-in
@@ -572,12 +520,6 @@ class OTRVoiceNodeBase:
                 log_lines.append(_sr_msg)
                 log.warning("[OTR voice P-OBS] %s", _sr_msg)
             clips.append(audio)
-        if _bark_fb is not None:
-            try:
-                _bark_fb.unload()
-            except Exception:  # noqa: BLE001 -- teardown must not mask the render
-                pass
-        self._bark_fallback_active = None
         packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
         n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
         log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")

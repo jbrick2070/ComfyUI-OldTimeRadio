@@ -57,11 +57,12 @@ class IndexTTS2Engine:
     interface = "per_line"
     sample_rate = 22050
     # Model-agnostic dispatch metadata (replaces the old _OTR_CLONE_ENGINES
-    # tuple): a clone engine needs a per-character reference WAV; a char_voice
-    # line with no usable ref renders on bark so the episode always renders (PD1).
+    # tuple): a clone engine needs a per-character reference WAV. NO-FALLBACK
+    # (operator 2026-07-03): a char_voice line with no usable ref now FAILS LOUD
+    # (named EngineUnusable in the dispatch) -- it never silently renders on bark.
     requires_voice_ref = True
     voice_ref_kind = "wav_path"
-    missing_ref_fallback = "bark"
+    missing_ref_fallback = None
 
     def __init__(self):
         self._proc = None

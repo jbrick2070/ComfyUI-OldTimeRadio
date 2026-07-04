@@ -50,11 +50,12 @@ class AudioEngineAdapter:
     # Voice-reference policy (model-agnostic dispatch -- replaces the old
     # _OTR_CLONE_ENGINES name tuple). A voice-CLONING engine sets
     # requires_voice_ref=True so the dispatch resolves a per-character reference
-    # WAV for it and, when none is available for a char_voice line, renders that
-    # line on missing_ref_fallback (PD1: the episode always renders).
-    # voice_ref_kind documents what the reference is ("wav_path" for clip-cloning
-    # engines). Non-clone engines keep these defaults and are never sent down the
-    # ref-resolution / fallback path.
+    # WAV for it and, when none is available for a char_voice line, FAILS LOUD
+    # (no-fallback rip 2026-07-03 -- no bark fallback). voice_ref_kind documents
+    # what the reference is ("wav_path" for clip-cloning engines).
+    # missing_ref_fallback is retired: it stays None on every engine (a missing
+    # ref raises). Non-clone engines keep these defaults and are never sent down
+    # the ref-resolution path.
     requires_voice_ref: bool = False
     voice_ref_kind: Optional[str] = None
     missing_ref_fallback: Optional[str] = None

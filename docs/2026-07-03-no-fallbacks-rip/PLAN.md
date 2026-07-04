@@ -199,3 +199,20 @@ REJECTED / SCOPED OUT:
 Next gate: the LIMITED internal Fable pass runs as the FINAL grounded gate on the
 EXECUTED R1 audio-voice diff (CLAUDE.md §9 — after codex, right before merge), not
 on this doc. Antigravity (agy) manual review is queued (AGY_MANUAL_PROMPT.md).
+
+## F. R1 EXECUTED + Fable gate (2026-07-03)
+R1 shipped (bark missing-ref net + _resolve_clone_ref_path-None + cast_lock
+preset-synthesis + orphan-reassign + kokoro voice-id swap + stage-direction
+silence all -> named loud raises; announcer reroute KEPT). Full suite 6140 + Bug
+Bible green; 6 pinning tests inverted to assert the raises. Fable final gate =
+**SHIP** (no build-breakers; no dangling refs; happy path byte-safe; announcer
+reroute still reached; kokoro imports in scope).
+
+**R1c — NEXT rip target (Fable caught, inventory missed):**
+`scene_sequencer.py:846-866` has a SURVIVING silent **"Inline-Bark fallback"** —
+when pre-rendered clip counts run short the sequencer inline-generates bark. Happy
+path is unaffected (counts match), but it contradicts the global no-fallback
+directive. Pinned by `test_sequencer_ledger.py:293`. Rip it next (fail loud on a
+clip-count shortfall). Also a legacy-graph note: ledgers with no
+`meta.cast_contract.cast_seed` now raise VoiceCastingError unconditionally
+(intended — not a regression).

@@ -122,24 +122,22 @@ def test_casting_response_accepts_verbose_voice_preset():
 # --------------------------------------------------------------------------- #
 # CastLock STEP-3 two-lane refine
 # --------------------------------------------------------------------------- #
-def test_castlock_two_lane_stamps_clone_id_on_repaired_row():
-    from nodes.cast_lock import CastLock
+def test_castlock_missing_preset_row_fails_loud():
+    # NO-FALLBACK (2026-07-03): a character row missing voice_preset is a casting
+    # defect -> CastLock RAISES VoiceCastingError. The old two-lane repair (stamp a
+    # v2/en_speaker_* fallback identity + a same-gender clone id) is RETIRED.
+    import pytest
 
-    # A character row missing voice_preset -> the repair fires.
+    from nodes.cast_lock import CastLock
+    from nodes._otr_voice_bank import VoiceCastingError
+
     cast = [
         {"char_id": "c01", "name": "ANNOUNCER", "voice_preset": "bf_emma"},
         {"char_id": "c02", "name": "ALICE", "gender": "female"},  # no preset
     ]
-    notes = CastLock._resolve_character_voices_fail_soft(
-        cast, lines=[], voice_bank="default")
-    alice = cast[1]
-    # Bark fallback identity always stamped.
-    assert str(alice.get("voice_preset") or "").startswith("v2/en_speaker_")
-    # The real bank + resolver yield a cloner engine ("default" -> indextts2),
-    # so a same-gender clone identity is stamped too.
-    assert alice.get("voice_ref_id"), "two-lane clone identity not stamped"
-    assert alice.get("voice_engine")
-    assert any("two-lane" in n for n in notes)
+    with pytest.raises(VoiceCastingError, match="no voice_preset"):
+        CastLock._resolve_character_voices_fail_soft(
+            cast, lines=[], voice_bank="default")
 
 
 def test_castlock_two_lane_leaves_voiced_rows_untouched():

@@ -40,12 +40,15 @@ def test_chatterbox_and_dia_registered_with_roles():
 
 
 def test_clone_engines_declare_ref_metadata():
+    # NO-FALLBACK (2026-07-03): clone engines still REQUIRE a ref WAV, but a
+    # missing ref now FAILS LOUD in the dispatch -- there is NO bark fallback, so
+    # missing_ref_fallback is None on every cloning engine.
     from nodes import _otr_audio_engines as AE
     for name in ("indextts2", "chatterbox", "dia"):
         e = AE.get_engine(name)
         assert e.requires_voice_ref is True
         assert e.voice_ref_kind == "wav_path"
-        assert e.missing_ref_fallback == "bark"
+        assert e.missing_ref_fallback is None
 
 
 def test_non_clone_engines_do_not_require_ref():
@@ -336,14 +339,15 @@ def test_stale_ref_resolves_to_a_nonexistent_path():
     assert (p is None) or (not os.path.exists(p))
 
 
-def test_announcer_clone_engine_can_fall_back():
-    # chatterbox serves announcer_voice + requires_voice_ref + missing_ref_fallback
-    # -> the dispatch fallback guard must admit announcer_voice (not char-only) so
-    # a ref-less announcer render still produces audio (PD1).
+def test_announcer_clone_engine_fails_loud_without_ref():
+    # NO-FALLBACK (2026-07-03): chatterbox serves announcer_voice + requires a ref;
+    # a ref-less announcer render now FAILS LOUD (no bark fallback), so
+    # missing_ref_fallback is None. The dispatch raises EngineUnusable for the
+    # ref-less line rather than producing bark audio.
     from nodes import _otr_audio_engines as AE
     cbx = AE.get_engine("chatterbox")
     assert "announcer_voice" in cbx.roles
-    assert cbx.requires_voice_ref is True and cbx.missing_ref_fallback == "bark"
+    assert cbx.requires_voice_ref is True and cbx.missing_ref_fallback is None
 
 
 # --- delivery-vector wiring: robust projections (QA roundtable) ------------ #

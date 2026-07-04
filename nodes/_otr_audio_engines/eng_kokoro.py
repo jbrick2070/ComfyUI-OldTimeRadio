@@ -157,21 +157,19 @@ class KokoroEngine:
             )
         # LOCAL-ONLY voice guard (capstone soak catch 2026-06-09): a cast row
         # reached kokoro carrying a NON-kokoro voice ref (an indextts2 bank id,
-        # e.g. 'vz_donor_*'); KPipeline then tried to DOWNLOAD voices/<id>.pt
-        # from HF mid-render and 404-aborted the whole episode. Fail SOFT +
-        # LOUD instead: a voice id with no local .pt is swapped for the seeded
-        # per-episode announcer voice (which begin_episode preflighted on
-        # disk). Never a mid-render hub fetch (V-9 / C-7).
+        # e.g. 'vz_donor_*'); KPipeline would then try to DOWNLOAD voices/<id>.pt
+        # from HF mid-render and 404-abort the whole episode. NO-FALLBACK (operator
+        # 2026-07-03): FAIL LOUD instead of swapping to the seeded episode voice --
+        # a non-kokoro id in the kokoro slot is a casting defect the operator must
+        # fix, never a silent voice swap (and still never a mid-render hub fetch).
         if not os.path.exists(_kokoro_voice_path(voice_id)):
-            import logging
-            _fallback = self._episode_voice or _pick_announcer_voice("")
-            logging.getLogger("OTR").warning(
-                "[eng_kokoro] LOUD voice swap: ref %r has no local voice file "
-                "at %s (a non-kokoro bank id leaked into the kokoro slot?) -- "
-                "rendering with the seeded episode voice %r instead; never "
-                "downloading mid-render (V-9)",
-                voice_id, _kokoro_voice_path(voice_id), _fallback)
-            voice_id = _fallback
+            raise EngineUnusable(
+                self.name, "announcer_voice", EngineUsabilityReason.MISSING_MODEL,
+                "kokoro voice %r has no local voice file at %s (a non-kokoro bank "
+                "id leaked into the kokoro slot?). NO voice-swap fallback "
+                "(no-fallback rip) -- cast a real kokoro voice; never downloads "
+                "mid-render (V-9)." % (voice_id, _kokoro_voice_path(voice_id)),
+            )
         self.load()
         segments = []
         for _, _, audio_data in self._pipeline(

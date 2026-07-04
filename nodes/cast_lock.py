@@ -177,19 +177,20 @@ class CastLock:
         meta["delivery_profile_version"] = DELIVERY_PROFILE_VERSION
         meta["voice_bank_id"] = voice_bank
 
-        # STEP 3 (revised per operator 2026-06-22): node-80 OUTPUT voice
+        # STEP 3 (NO-FALLBACK rip, operator 2026-07-03): node-80 OUTPUT voice
         # resolution. The cast presets have now been assigned (replay + optional
         # auto_registry); guarantee -- BEFORE the ledger leaves CastLock for the
         # TTS nodes -- that no speaker_role='character' line reaches node 81
-        # (OTR_BatchCharacterVoices) without a resolvable voice. FAIL-SOFT: never
-        # abort the episode (PD1); resolve a voice relative to the selected model
-        # (engine-agnostic identity), re-route mis-stamped announcer lines, and
-        # reassign true orphans. Runs UNCONDITIONALLY, independent of cast_seed.
+        # (OTR_BatchCharacterVoices) without a resolvable voice. FAIL LOUD: a
+        # preset-less character row or a true orphan RAISES VoiceCastingError (no
+        # synthesized-identity / orphan-reassign fallback); the ONLY repair kept is
+        # re-routing a mis-stamped announcer line (a routing correction, not a
+        # fallback). Runs UNCONDITIONALLY, independent of cast_seed.
         for _note in self._resolve_character_voices_fail_soft(
             cast, led.get("lines") or [], voice_bank=voice_bank
         ):
-            log.warning("[CastLock] voice routing repair: %s", _note)
-            report.append(f"voice routing repair: {_note}")
+            log.warning("[CastLock] announcer reroute: %s", _note)
+            report.append(f"announcer reroute: {_note}")
 
         report.insert(0, f"cast_lock_revision={revision} policy={cast_voice_policy}")
 
@@ -348,66 +349,29 @@ class CastLock:
         return int(digest, 16) % n
 
     @staticmethod
-    def _fallback_voice_identity(char_id: str, used: set) -> str:
-        """A deterministic, collision-free voice IDENTITY for a character cast
-        row that reached CastLock without one. ``voice_preset`` is the
-        ENGINE-AGNOSTIC identity every approved adapter (bark / indextts2 /
-        chatterbox / dia / kokoro) resolves its actual voice from, so a bark
-        ``v2/en_speaker_*`` identity is a valid universal fallback for ALL of
-        them. Keyed on char_id -> the SAME character always gets the SAME voice.
-        """
-        base = CastLock._stable_index(char_id, 10)
-        for k in range(10):
-            cand = f"v2/en_speaker_{(base + k) % 10}"
-            if cand not in used:
-                return cand
-        i = 0
-        while True:  # >10 unvoiced rows: extend the namespace deterministically
-            cand = f"v2/en_speaker_{(base + i) % 10}_{i // 10}"
-            if cand not in used:
-                return cand
-            i += 1
-
-    @staticmethod
-    def _resolve_two_lane_engine(voice_bank):
-        """VC chunk 2: resolve (char_engine, bank_entries) for the two-lane
-        refine, fail-soft. Returns (None, None) when no bank-backed cloner engine
-        applies (e.g. bark_legacy / kokoro_builtin, or a missing bank) so the
-        repaired row keeps only its bark voice_preset identity."""
-        try:
-            from ._otr_voice_bank import load_voice_bank
-
-            bank_entries, _sha = load_voice_bank()
-            engine = CastLock._resolve_char_engine(voice_bank, bank_entries)
-            return engine, bank_entries
-        except Exception:  # noqa: BLE001 -- no/broken bank -> bark stays identity
-            return None, None
-
-    @staticmethod
     def _resolve_character_voices_fail_soft(cast, lines, voice_bank="default") -> list:
-        """STEP 3 (revised per operator 2026-06-22): NEVER abort the episode on a
-        missing character voice -- RESOLVE one relative to the selected model
-        (PD1: audio is king). Future-proofed for ALL approved voice engines:
-        ``voice_preset`` is the engine-agnostic identity each adapter maps from.
+        """STEP 3 (NO-FALLBACK rip, operator 2026-07-03): guarantee every
+        speaker_role='character' line reaches node-81 with a resolvable voice, or
+        FAIL LOUD. The name is retained for the call site; behavior is now fail-loud.
 
-        The earlier fail-CLOSED version raised a ValueError, which crashed a real
-        episode at node-80 on a single mis-stamped announcer-close line
-        (speaker_role='character', char_id='announcer', no cast voice). Replaced
-        with LOUD, deterministic repairs -- never a crash:
-          1. A non-ANNOUNCER character cast row missing a voice_preset gets a
-             deterministic engine-agnostic fallback identity (the seedless /
-             unmatched-replay case).
-          2. A speaker_role=='character' LINE whose char_id is the announcer
-             marker (or names the ANNOUNCER) is a MIS-STAMPED announcer line ->
-             re-stamp speaker_role='announcer' so it routes to OTR_AnnouncerVoice
-             (the selected announcer model, engine-resolved, no cast preset).
-          3. A character LINE whose char_id matches no voiced character cast row
-             (a true orphan) inherits a deterministic voiced character so it
-             still speaks with a real voice from the selected model.
+        Two behaviors:
+          * (ROUTING -- KEPT) a speaker_role=='character' LINE whose char_id is the
+            announcer marker (or names the ANNOUNCER) is a MIS-STAMPED announcer
+            line -> re-stamp speaker_role='announcer' so it routes to
+            OTR_AnnouncerVoice. This is a routing CORRECTION, not a fallback.
+          * (FAIL LOUD) a non-ANNOUNCER character cast row with no voice_preset, OR
+            a character LINE whose char_id matches no voiced cast row (a true
+            orphan), RAISES VoiceCastingError. The old fail-soft repairs
+            (synthesize a v2/en_speaker_* identity; reassign an orphan to another
+            character) are RETIRED -- a missing/orphan voice is a writer/casting
+            defect the operator must fix, never papered over (no silent swap).
 
-        Mutates cast rows + line dicts in place. Returns LOUD repair notes for
-        the cast report. NEVER raises (cue rows / announcer lines are untouched).
+        Mutates line dicts in place for the announcer reroute only. Returns LOUD
+        routing notes for the cast report. RAISES VoiceCastingError on any
+        unvoiceable character row/line.
         """
+        from ._otr_voice_bank import VoiceCastingError
+
         rows_by_id: dict = {}
         announcer_ids: set = {"announcer"}
         char_rows: list = []  # non-ANNOUNCER character cast rows, in order
@@ -423,52 +387,19 @@ class CastLock:
 
         notes: list = []
 
-        # VC chunk 2 (two-lane identity): the repaired row below gets a bark
-        # voice_preset (universal fallback identity); ALSO give it a real
-        # same-gender voice_ref_id from the active cloner engine's bank so a
-        # cloner render does not silently degrade to bark. Resolved once,
-        # fail-soft. Scoped to the repair path only (rows missing a preset), so
-        # normal cloner-cast rows -- which already carry voice_ref_id -- are
-        # untouched (byte-safe for the golden).
-        char_engine, bank_entries = CastLock._resolve_two_lane_engine(voice_bank)
-
-        # (1) every character cast row carries a voice IDENTITY.
-        used = {
-            str(r.get("voice_preset")) for r in char_rows
-            if isinstance(r.get("voice_preset"), str)
-            and str(r.get("voice_preset")).strip()
-        }
+        # (1) FAIL LOUD: every non-ANNOUNCER character cast row MUST carry a voice
+        # identity by now (replay + optional auto_registry stamped it). A row with
+        # none is a casting defect -- raise, never synthesize a fallback identity.
         for row in char_rows:
             preset = row.get("voice_preset")
             if isinstance(preset, str) and preset.strip():
                 continue
             cid = str(row.get("char_id") or "")
-            fb = CastLock._fallback_voice_identity(cid, used)
-            row["voice_preset"] = fb
-            used.add(fb)
-            notes.append(
-                f"cast {cid!r} had no voice_preset -> deterministic fallback "
-                f"identity {fb!r} (engine-agnostic; resolved per selected model)"
+            raise VoiceCastingError(
+                f"character cast row {cid!r} reached CastLock with no voice_preset "
+                f"-- casting must assign one. NO synthesized fallback identity "
+                f"(no-fallback rip)."
             )
-            # Two-lane refine: stamp a same-gender clone identity too (only when
-            # the row lacks one and a cloner engine + bank are available).
-            if char_engine and not str(row.get("voice_ref_id") or "").strip():
-                try:
-                    from ._otr_voice_bank import same_gender_voice_ref_for_preset
-
-                    vrid = same_gender_voice_ref_for_preset(
-                        fb, char_engine, bank=bank_entries,
-                        gender_hint=str(row.get("gender") or ""),
-                    )
-                except Exception:  # noqa: BLE001 -- bark identity already stamped
-                    vrid = ""
-                if vrid:
-                    row["voice_ref_id"] = vrid
-                    row["voice_engine"] = char_engine
-                    notes.append(
-                        f"cast {cid!r} two-lane -> clone identity "
-                        f"{vrid!r} ({char_engine}, same-gender bank ref)"
-                    )
 
         voiced_char_ids = sorted(
             str(r.get("char_id") or "") for r in char_rows
@@ -476,7 +407,7 @@ class CastLock:
             and str(r.get("voice_preset")).strip()
         )
 
-        # (2)+(3) repair character LINES that cannot resolve a voice.
+        # (2 KEPT: routing) + (3 FAIL LOUD: orphan) over character LINES.
         for ln in lines or []:
             if not isinstance(ln, dict):
                 continue
@@ -498,18 +429,12 @@ class CastLock:
                     f"line {lid!r} char_id={cid!r}: mis-stamped announcer line "
                     f"-> re-routed to OTR_AnnouncerVoice (announcer model)"
                 )
-            elif voiced_char_ids:
-                pick = voiced_char_ids[CastLock._stable_index(lid, len(voiced_char_ids))]
-                ln["char_id"] = pick
-                notes.append(
-                    f"line {lid!r} char_id={cid!r}: orphan with no voice -> "
-                    f"reassigned to voiced character {pick!r} (selected model)"
-                )
-            else:
-                notes.append(
-                    f"line {lid!r} char_id={cid!r}: no voiced character available "
-                    f"-> left for the node-81 engine fallback"
-                )
+                continue
+            raise VoiceCastingError(
+                f"character line {lid!r} char_id={cid!r} has no voiced cast row "
+                f"(true orphan). NO orphan-reassignment fallback (no-fallback rip) "
+                f"-- the writer/casting must give this line a real voiced character."
+            )
         return notes
 
     # ------------------------------------------------------------------ #

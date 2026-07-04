@@ -129,11 +129,14 @@ def test_voice_passes_when_character_lines_have_presets():
     assert out[1] == 1  # locked, no repair needed
 
 
-def test_seedless_missing_preset_gets_fallback_not_crash():
-    """A character cast row with no voice_preset (seedless ledger) is REPAIRED
-    with a deterministic engine-agnostic fallback identity -- never a crash
-    (PD1)."""
+def test_seedless_missing_preset_fails_loud():
+    """NO-FALLBACK (2026-07-03): a character cast row with no voice_preset is a
+    casting defect -- CastLock RAISES VoiceCastingError instead of synthesizing a
+    deterministic v2/en_speaker_* fallback identity."""
+    import pytest
+
     from nodes.cast_lock import CastLock
+    from nodes._otr_voice_bank import VoiceCastingError
 
     cast = [
         {"char_id": "c1", "name": "MONTY", "gender": "male"},  # no voice_preset
@@ -143,12 +146,9 @@ def test_seedless_missing_preset_gets_fallback_not_crash():
         {"line_id": "l001", "speaker_role": "character", "char_id": "c1",
          "text": "We move at dawn."},
     ]
-    out = CastLock().lock(script_json=_ledger_with_lines(cast, lines),
-                          cast_voice_policy="preserve_ledger")
-    assert out[1] == 1  # locked, no crash
-    led = _last_ledger(out)
-    c1 = next(r for r in led["cast"] if r["char_id"] == "c1")
-    assert c1["voice_preset"] and str(c1["voice_preset"]).startswith("v2/")
+    with pytest.raises(VoiceCastingError, match="no voice_preset"):
+        CastLock().lock(script_json=_ledger_with_lines(cast, lines),
+                        cast_voice_policy="preserve_ledger")
 
 
 def test_announcer_lines_and_cue_rows_untouched():
@@ -190,30 +190,22 @@ def test_misstamped_announcer_line_reroutes_to_announcer():
     assert b018["speaker_role"] == "announcer"   # re-routed
 
 
-def test_orphan_character_line_reassigned_to_voiced_character():
-    """A character line whose char_id matches no cast row inherits a
-    deterministic voiced character -- no crash."""
+def test_orphan_character_line_fails_loud():
+    """NO-FALLBACK (2026-07-03): a character line whose char_id matches no voiced
+    cast row is a true orphan -- CastLock RAISES VoiceCastingError instead of
+    reassigning it to another voiced character."""
+    import pytest
+
     from nodes.cast_lock import CastLock
+    from nodes._otr_voice_bank import VoiceCastingError
 
     lines = [
         {"line_id": "l009", "speaker_role": "character", "char_id": "c99",
          "text": "Who am I?"},
     ]
-    out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
-                          cast_voice_policy="preserve_ledger")
-    assert out[1] == 1  # locked, no crash
-    led = _last_ledger(out)
-    l009 = next(ln for ln in led["lines"] if ln["line_id"] == "l009")
-    assert l009["char_id"] in ("c1", "c2")       # a voiced character
-    assert l009["speaker_role"] == "character"
-
-
-def test_fallback_voice_identity_is_deterministic():
-    """Same char_id -> same fallback identity (determinism invariant)."""
-    from nodes.cast_lock import CastLock
-    a = CastLock._fallback_voice_identity("c42", set())
-    b = CastLock._fallback_voice_identity("c42", set())
-    assert a == b and a.startswith("v2/en_speaker_")
+    with pytest.raises(VoiceCastingError, match="orphan"):
+        CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                        cast_voice_policy="preserve_ledger")
 
 
 def test_revision_increments_from_existing_meta():

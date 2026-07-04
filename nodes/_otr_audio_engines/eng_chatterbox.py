@@ -55,11 +55,12 @@ class ChatterboxEngine:
     # FIXED 24000 (NOT a dynamic m.sr): _render_per_line packs at the profile
     # rate and pack_audio_batch raises on any clip whose rate differs.
     sample_rate = 24000
-    # Model-agnostic dispatch metadata (clone engine -> needs a ref WAV; a
-    # ref-less char_voice line renders on bark so the episode always renders).
+    # Model-agnostic dispatch metadata (clone engine -> needs a ref WAV). NO-
+    # FALLBACK (operator 2026-07-03): a ref-less char_voice line FAILS LOUD (named
+    # EngineUnusable in the dispatch) -- it never silently renders on bark.
     requires_voice_ref = True
     voice_ref_kind = "wav_path"
-    missing_ref_fallback = "bark"
+    missing_ref_fallback = None
 
     def __init__(self):
         self._proc = None
