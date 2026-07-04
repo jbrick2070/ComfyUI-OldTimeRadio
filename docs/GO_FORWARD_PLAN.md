@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (NO-FALLBACK RIP: R3 9-site set COMPLETE + Fable SHIP) | branch v2.0-alpha @ a11d8605 | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (NO-FALLBACK RIP: ALL 10 sites COMPLETE + Fable SHIP) | branch v2.0-alpha @ 432cb576 | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -54,19 +54,17 @@ DONE + pushed to v2.0-alpha this arc (all suite 6138-6142 + Bug Bible green, 0 r
   char-scene fail-loud test added. Suite 6139/0, Bug Bible 16. Fable §9 = SHIP (all 4 portrait tiers
   RAISE confirmed correct; happy-path dormant; no surviving swallow).
 
-**R3 9-SITE SET COMPLETE.** All originally-scoped no-fallback sites (chunks 1-3) are ripped + green +
-pushed. NEXT (operator decision -- surfaced by the grounded review + Fable gate):
-- **NEW 10th site candidate: `otr_shot_lock.py derive_creative_directives`** has the SAME
-  model->template fallback shape (`template_consistency` / person-anchor template / empty-reseed
-  template; docstring still says "Never raises ... -> template"). It was OUT of the explicit 9-site
-  set. It is LESS bad than the ripped sites (warns + ledger-stamps `source`, per-beat flavor not the
-  identity anchor) and is test-pinned (test_look_qa_round5 + test_video_platform_aseam), so ripping it
-  needs its own re-baseline. RIP as R3-chunk-4, or DEFER to a ShotLock audit sprint? -> operator call.
+**NO-FALLBACK RIP COMPLETE -- ALL 10 SITES RIPPED + GREEN + Fable SHIP.** chunks 1-3 (audio/image/
+casting/writer) + chunk-4 (`otr_shot_lock.derive_creative_directives`, the 10th site operator ordered
+ripped). Every attempted-model failure across the stack now fails LOUD with a named raise carrying
+"no-fallback rip"; the deterministic template survives ONLY as the `llm_fn=None` 100%-local lane +
+`consistency_gate_warn_only` keep. Suite 6141/0, Bug Bible 16. Chunk-4 @26b236e6 + @432cb576.
+KEPT (NOT fallbacks, unchanged): title->outline.title (primary AI title), news degrade (gated by
+news_briefs_required toggle), J2 outline speaker round-robin (structural), the "no news input" degrade,
+the shared `_resolve_writer_llm` None-on-load-fail seam (same in both lanes; out of scope, flag if reopened).
 - Nit (fold into any future edit of that block): `otr_meta_brief_image_prompt.py` gear-scrub template
   rebuild ~:1219 omits `_aspect` (portrait-aspect rebuild); pre-existing, practically unreachable.
-KEPT (NOT fallbacks, unchanged): title->outline.title (primary AI title), news degrade (gated by
-news_briefs_required toggle), J2 outline speaker round-robin (structural), the "no news input" degrade.
-With the 10th site deferred, the PARKED credits-enrichment (below) resumes.
+**NEXT = resume the PARKED credits-enrichment (below): the LIVE frame-level smoke (S3+S1 shipped).**
 
 **Previously active (still open, resume after the rip): CREDITS ENRICHMENT --
 S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON

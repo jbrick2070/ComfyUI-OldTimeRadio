@@ -6,6 +6,30 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (NO-FALLBACK RIP: R3-chunk-4 ShotLock + Fable SHIP -- ALL 10 SITES COMPLETE) -- HEAD 432cb576 (v2.0-alpha)
+Did (operator ordered "rip it all" -> ripped the 10th site the chunk-3 reviews surfaced; suite 6141/0
++ Bug Bible 16, pushed HEAD==origin):
+- @26b236e6 `otr_shot_lock.py derive_creative_directives` (the per-beat video-directive path): empty/
+  unparseable directive after reseeds -> raise iff a writer LLM was attempted (`llm_fn is not None`);
+  story-consistency/person gate fail on an LLM prompt (`source=="llm"`) -> raise; `llm_fn=None` keeps
+  the legit local template lane; `consistency_gate_warn_only=True` now KEEPS the AI prompt (was a
+  soft-logged template swap). Docstring updated. Tests inverted (test_video_platform_aseam empty-reseed
+  + consistency; test_look_qa_round5 object-only/no-person) + llm_fn=None keep test added.
+- @432cb576 Fable-gate followups: (1) REAL robustness fix -- the reseed loop broke on ANY non-empty
+  parse, so a partial batch reply (14/15 beats) aborted with retries UNSPENT; now breaks only on full
+  coverage (+ test_passpm_partial_batch_spends_reseeds_then_raises); (2) stale widget tooltip + M4
+  section header ("template fallback; never aborts") updated to the no-fallback reality; (3) comment on
+  the deliberate image-lane divergence (person guard folded into the combined gate; subject anchor is
+  the compensating control).
+- Gates: Fable §9 on chunk-4 = SHIP (happy-path never raises; caller :931 doesn't swallow;
+  _resolve_writer_llm None -> template lane intact; warn_only change correct; faithful image-lane mirror;
+  even verified workflows/otr_scifi_16gb_full.json ships warn_only=false so prod gets the loud raise).
+  No workflow-JSON change (tooltip is a STRING in INPUT_TYPES, not a positional widget value).
+Current step: NO-FALLBACK RIP COMPLETE (all 10 sites). NEXT = resume the PARKED credits-enrichment
+LIVE frame-level smoke (S3+S1 shipped @5f510ebe); then S0 -> S4.
+Next: credits-enrichment LIVE frame smoke on a SHORT + LONG episode.
+Commits: 26b236e6 432cb576 (+ GO_FORWARD/HANDOFF docs).
+
 ## 2026-07-04 (NO-FALLBACK RIP: R3-chunk-3 image+casting + Fable SHIP -- 9-site set COMPLETE) -- HEAD a11d8605 (v2.0-alpha)
 Did (closes the R3 arc's originally-scoped 9 sites; every chunk suite 6139/0 + Bug Bible 16, pushed
 HEAD==origin):
