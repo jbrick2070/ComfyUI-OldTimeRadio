@@ -147,7 +147,10 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
 
 #: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
 #: honored -- announcer stills render on the announcer slot, music/open stills
-#: on the music slot; characters + scene b-roll + background on other_beats).
+#: on the music slot; character portraits + character-associated scene stills on
+#: the character slot). Renamed 2026-07-03: the old catch-all other_beats_image_model
+#: is now character_image_model (scene_broll + background roles were ripped
+#: 2026-07-01, so it serves only the character_video lane).
 _ROLE_TO_IMAGE_SLOT = {
     "announcer_visual": "announcer_image_model",
     "music_visual": "music_image_model",
@@ -160,31 +163,30 @@ def resolve_engine_for_role(image_policy, role):
     NO-FALLBACK (operator 2026-07-03), E8-precise: a NAMED role (announcer_visual /
     music_visual) whose dedicated slot is PRESENT in the policy but explicitly
     EMPTY is an operator config error -> FAIL LOUD; never silently substitute the
-    general other_beats model for a slot the operator deliberately exposed and left
+    general character model for a slot the operator deliberately exposed and left
     blank. An ABSENT dedicated slot is different -- the role simply has no special
-    model configured, so it uses other_beats (a DEFAULT, not a silent model swap;
-    still flagged ``fallback_used=True`` for observability)."""
+    model configured, so it uses the character slot (a DEFAULT, not a silent model
+    swap; still flagged ``fallback_used=True`` for observability)."""
     models = (image_policy or {}).get("image_models") or {}
-    slot = _ROLE_TO_IMAGE_SLOT.get(str(role or ""), "other_beats_image_model")
+    slot = _ROLE_TO_IMAGE_SLOT.get(str(role or ""), "character_image_model")
 
     def _eid(entry):
         if isinstance(entry, dict):
             return str(entry.get("engine_id") or "")
         return str(entry or "")
 
-    if slot != "other_beats_image_model" and slot in models and not _eid(models.get(slot)):
+    if slot != "character_image_model" and slot in models and not _eid(models.get(slot)):
         raise ValueError(
             f"image slot {slot!r} for role {role!r} is PRESENT but EMPTY -- pick a "
-            f"model for it (or remove the slot to use the general other_beats "
-            f"model). NO silent fallback to other_beats_image_model (no-fallback "
-            f"rip)."
+            f"model for it (or remove the slot to use the general character_image_"
+            f"model). NO silent fallback (no-fallback rip)."
         )
 
     engine_id = _eid(models.get(slot))
     if engine_id:
         return engine_id, slot, False
-    fb = _eid(models.get("other_beats_image_model"))
-    return fb, slot, slot != "other_beats_image_model" and bool(fb)
+    fb = _eid(models.get("character_image_model"))
+    return fb, slot, slot != "character_image_model" and bool(fb)
 
 
 def _assert_not_path(prompt: str) -> None:
@@ -500,7 +502,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         if fell_back:
             warnings.append(
                 f"{oid}: image slot {slot} empty; fell back to "
-                "other_beats_image_model (LOUD)")
+                "character_image_model (LOUD)")
         if not engine_id:
             warnings.append(f"{oid}: no image engine selected; skipped (fail-closed)")
             continue

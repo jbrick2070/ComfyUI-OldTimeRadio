@@ -147,7 +147,7 @@ def test_video_director_keeps_other_beats_image_and_drops_dead_widgets():
     from nodes.otr_video_director import OTRVideoDirector
     it = OTRVideoDirector.INPUT_TYPES()
     req, opt = it["required"], it.get("optional", {})
-    assert "other_beats_image_model" in req                  # decision-locked KEEP (image side)
+    assert "character_image_model" in req                  # decision-locked KEEP (image side)
     # 2026-07-03: other_beats_video retired; character is a first-class video slot
     assert "other_beats_video_model" not in req and "other_beats_video_model" not in opt
     assert "character_video_model" in req

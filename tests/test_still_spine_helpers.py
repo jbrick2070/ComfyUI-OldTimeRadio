@@ -555,23 +555,23 @@ class TestDispatcherStillSpine:
         policy = {"image_models": {
             "announcer_image_model": {"engine_id": "eng_a"},
             "music_image_model": {"engine_id": "eng_m"},
-            "other_beats_image_model": {"engine_id": "eng_o"},
+            "character_image_model": {"engine_id": "eng_o"},
         }}
         assert disp.resolve_engine_for_role(policy, "announcer_visual") == \
             ("eng_a", "announcer_image_model", False)
         assert disp.resolve_engine_for_role(policy, "music_visual") == \
             ("eng_m", "music_image_model", False)
         assert disp.resolve_engine_for_role(policy, "character_video") == \
-            ("eng_o", "other_beats_image_model", False)
+            ("eng_o", "character_image_model", False)
         assert disp.resolve_engine_for_role(policy, "scene_broll") == \
-            ("eng_o", "other_beats_image_model", False)
+            ("eng_o", "character_image_model", False)
 
     def test_slot_absent_uses_other_beats_default(self):
         # E8 (no-fallback rip): an ABSENT dedicated slot is a legitimate default
         # (the role has no special model) -> other_beats, flagged for observability.
         from nodes import otr_image_gen_dispatcher as disp
         policy = {"image_models": {
-            "other_beats_image_model": {"engine_id": "eng_o"}}}
+            "character_image_model": {"engine_id": "eng_o"}}}
         eid, slot, fell = disp.resolve_engine_for_role(policy, "music_visual")
         assert (eid, slot, fell) == ("eng_o", "music_image_model", True)
 
@@ -583,7 +583,7 @@ class TestDispatcherStillSpine:
         from nodes import otr_image_gen_dispatcher as disp
         policy = {"image_models": {
             "music_image_model": {"engine_id": ""},          # present, empty
-            "other_beats_image_model": {"engine_id": "eng_o"}}}
+            "character_image_model": {"engine_id": "eng_o"}}}
         with pytest.raises(ValueError, match="PRESENT but EMPTY"):
             disp.resolve_engine_for_role(policy, "music_visual")
 
@@ -639,7 +639,7 @@ class TestDispatcherStillSpine:
             ledger = {"episode_id": "ep_scene", "cast": []}
             policy = {"image_models": {
                 "music_image_model": {"engine_id": "flux_gen1"},
-                "other_beats_image_model": {"engine_id": "flux_gen1"}},
+                "character_image_model": {"engine_id": "flux_gen1"}},
                 "seed": {"mode": "request_hash", "request_seed": 3}}
             payload = {"version": 1, "objects": [{
                 "object_id": "still_b000_music_open", "kind": "scene_open",
@@ -896,7 +896,7 @@ class TestDispatcherStillSpine:
                 required_inputs=("text_prompt",), engine_version="1")
             ledger = {"cast": [{"char_id": "c1", "name": "X"}]}
             policy = {"image_models": {
-                "other_beats_image_model": {"engine_id": "flux_gen1"}},
+                "character_image_model": {"engine_id": "flux_gen1"}},
                 "seed": {"request_seed": 0}}
             payload = {"version": 1, "objects": [{
                 "object_id": "c1", "kind": "portrait",

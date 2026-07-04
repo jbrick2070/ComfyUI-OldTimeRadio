@@ -124,7 +124,7 @@ def _direct_policy():
         music_video_model="ltx_audio_in (16:9)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
-        other_beats_image_model="flux_gen1",
+        character_image_model="flux_gen1",
         fps=25, canvas_w=832, canvas_h=480,
         seed_mode="request_hash", request_seed=42,
         character_video_model="humo_14B_169 (16:9)",

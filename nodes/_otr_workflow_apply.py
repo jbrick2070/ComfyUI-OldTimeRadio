@@ -141,7 +141,7 @@ _VIDEO_DIRECTOR_WIDGETS = frozenset({
     "announcer_video_model", "music_video_model", "character_video_model",
 })
 _IMAGE_DIRECTOR_WIDGETS = frozenset({
-    "announcer_image_model", "music_image_model", "other_beats_image_model",
+    "announcer_image_model", "music_image_model", "character_image_model",
 })
 
 

@@ -255,7 +255,7 @@ def test_widget_vector_exact():
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "character_video_model",
-        "announcer_image_model", "music_image_model", "other_beats_image_model",
+        "announcer_image_model", "music_image_model", "character_image_model",
         "fps", "canvas_w", "canvas_h",
         "seed_mode", "request_seed",
     ]
@@ -310,7 +310,7 @@ def test_director_policy_json_and_clamp(clean_video_registry):
     out = OTRVideoDirector().direct(
         announcer_video_model=ADD_CUSTOM, music_video_model=ADD_CUSTOM,
         character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
-        music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
+        music_image_model="Flux (gen 1)", character_image_model="Flux (gen 1)",
         fps=25,
         canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
     )
@@ -334,7 +334,7 @@ def test_director_fail_closed_incompatible_pick(clean_video_registry):
             announcer_video_model="needs_unknown",  # requires an input no role supplies
             music_video_model="needs_unknown",
             character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
-            music_image_model="Flux (gen 1)", other_beats_image_model="Flux (gen 1)",
+            music_image_model="Flux (gen 1)", character_image_model="Flux (gen 1)",
             fps=25,
             canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
         )

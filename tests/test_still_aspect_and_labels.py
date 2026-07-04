@@ -188,7 +188,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
         character_video_model="humo_1.7B (portrait)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
-        other_beats_image_model="flux_gen1",
+        character_image_model="flux_gen1",
         fps=25, canvas_w=832, canvas_h=480,
         seed_mode="request_hash", request_seed=42,
     )

@@ -208,7 +208,7 @@ class OTRVideoDirector:
                 "music_image_model": (image, {
                     "tooltip": "Image source for music beats.",
                 }),
-                "other_beats_image_model": (image, {
+                "character_image_model": (image, {
                     "tooltip": "Image source for character beats (kept slot).",
                 }),
                 "fps": ("INT", {"default": 25, "min": 1, "max": 60}),
@@ -251,7 +251,7 @@ class OTRVideoDirector:
     # ------------------------------------------------------------------ #
     def direct(self, announcer_video_model, music_video_model,
                character_video_model, announcer_image_model,
-               music_image_model, other_beats_image_model,
+               music_image_model, character_image_model,
                fps, canvas_w, canvas_h,
                seed_mode, request_seed,
                custom_models_json="{}",
@@ -300,7 +300,7 @@ class OTRVideoDirector:
             "image_models": {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
-                "other_beats_image_model": other_beats_image_model,
+                "character_image_model": character_image_model,
             },
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},

@@ -61,7 +61,7 @@ IMAGE_SLOT_ROLES = {
     # rip-sfx-broll (2026-07-01): the other-beats image slot is KEPT --
     # character stills ride it; the scene_broll / background_abstract
     # pairings died with those roles.
-    "other_beats_image_model": ("character_video",),
+    "character_image_model": ("character_video",),
 }
 SEED_MODES = ("request_hash", "fixed")
 #: Operator-confirmable default ceiling for FRESH (per_beat) generation; the hard
@@ -141,14 +141,14 @@ def three_d_locked_slots(video_policy: dict) -> set:
     (fail-closed, 3D plan section 3)."""
     vm = (video_policy or {}).get("video_models") or {}
     # Each IMAGE slot is locked if ANY of its paired ROLES' video engine
-    # requires a mesh portrait. other_beats_image_model pairs with the
+    # requires a mesh portrait. character_image_model pairs with the
     # character lane (rip-sfx-broll 2026-07-01 removed the scene_broll /
     # background_abstract pairings), resolved via the ONE shared map
     # (per-role slot + legacy fallback).
     img_slot_roles = {
         "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),
         "music_image_model": (_rc.Role.MUSIC_VISUAL.value,),
-        "other_beats_image_model": (_rc.Role.CHARACTER_VIDEO.value,),
+        "character_image_model": (_rc.Role.CHARACTER_VIDEO.value,),
     }
     locked = set()
     for img_slot, roles in img_slot_roles.items():
@@ -330,7 +330,7 @@ class OTRImageDirector:
         vp_images = vp_images if isinstance(vp_images, dict) else {}
         picks = {}
         for slot in ("announcer_image_model", "music_image_model",
-                     "other_beats_image_model"):
+                     "character_image_model"):
             vp_pick = vp_images.get(slot)
             if isinstance(vp_pick, str) and vp_pick.strip():
                 picks[slot] = vp_pick
@@ -348,7 +348,7 @@ class OTRImageDirector:
         granularity = {
             "announcer_image_model": announcer_granularity,
             "music_image_model": music_granularity,
-            "other_beats_image_model": other_beats_granularity,
+            "character_image_model": other_beats_granularity,
         }
         locked = three_d_locked_slots(video_policy)
         granularity = enforce_3d_granularity_lock(granularity, locked, warnings)

@@ -52,7 +52,7 @@
       "targets": [
         [
           "OTR_VideoDirector",
-          "other_beats_image_model"
+          "character_image_model"
         ]
       ]
     },

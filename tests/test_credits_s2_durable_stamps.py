@@ -144,7 +144,7 @@ def test_image_dispatcher_stamps_singleton(fresh_singleton, tmp_path):
         ledger = {"episode_id": "ep_s2_img",
                   "cast": [{"char_id": "c1", "name": "BABA"}]}
         policy = {"image_models":
-                  {"other_beats_image_model": {"engine_id": "flux_gen1"}},
+                  {"character_image_model": {"engine_id": "flux_gen1"}},
                   "seed": {"request_seed": 0}, "granularity": {}}
         prompts = {"version": 1, "objects": [{
             "object_id": "c1", "kind": "portrait", "role": "character_video",
