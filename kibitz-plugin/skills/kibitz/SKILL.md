@@ -25,10 +25,11 @@ When you (Antigravity UI) are the active driver and are asked to run a Kibitz ro
    ```bash
    python C:\Users\jeffr\.codex\skills\kibitz\scripts\kibitz.py --doc <plan.md> --round r1 --repo <repo> --driver agy
    ```
-6. **Round Selection**:
+6. **Claude CLI spend tier**: If the user wants cheaper/faster or deeper Claude review, set `KIBITZ_CLAUDE_BUDGET=low|medium|high|plan` before the command. Default `medium` keeps the normal Sonnet/high lane; `high` opts into Opus/max. This is a Kibitz-controlled tier, not native Claude auto-routing.
+7. **Round Selection**:
    - For `r2`, `r3`, and `r4`, change only the `--round` value (e.g., `--round r2`).
    - Run all 4 rounds in order: r1 (high-level) -> r2 (coding plan) -> r3 (wiring) -> r4 (convergence).
-7. **If the user asks for an Antigravity CLI reviewer**:
+8. **If the user asks for an Antigravity CLI reviewer**:
    - Do not launch it from this plugin. Explain that Antigravity is already present through the UI driver, then continue with Codex + Claude Code unless the user explicitly moves the work to a non-UI Kibitz context.
 
 ## Step-by-Step Loop
