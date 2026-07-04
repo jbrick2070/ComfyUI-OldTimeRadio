@@ -2303,7 +2303,19 @@ class OTR_LedgerScriptWriter:
                     _refine_prior_critique=prior_critique,
                     _refine_forced_cast_seed=forced_seed,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception as _rexc:  # noqa: BLE001
+                # NO-FALLBACK rip (2026-07-03): a CASTING failure is fatal on ANY
+                # refine pass, not just pass 0. The cast is deterministic per
+                # forced_seed (one seed for all passes), so a naming/cast failure
+                # is a hard failure -- never silently drop the pass and ship an
+                # earlier one, which would hide a failed naming LLM. Other
+                # transient compose hiccups keep the pass-skip resilience below.
+                try:
+                    from . import _otr_casting as _CASTMOD
+                except ImportError:  # pragma: no cover -- flat test imports
+                    import _otr_casting as _CASTMOD  # type: ignore
+                if isinstance(_rexc, _CASTMOD.CastingFailedError):
+                    raise
                 if i == 0:
                     raise   # pass-0 failure == the existing LOUD writer failure
                 log.warning("[refine] pass %d compose failed; skipping", i)
