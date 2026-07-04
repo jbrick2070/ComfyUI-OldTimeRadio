@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 (credits-enrichment S3+S1 SHIPPED) | branch v2.0-alpha @ 20a669de | prod/main + tags operator-GATED.
+> Last updated 2026-07-03 (NO-FALLBACK RIP in progress; cloud voice+music shipped) | branch v2.0-alpha @ 1d8f7e2b | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -29,7 +29,33 @@
 
 ## 1. CURRENT STEP
 
-**ACTIVE (2026-07-03) = CREDITS ENRICHMENT -- S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON
+**ACTIVE (2026-07-03 latest) = STACK-WIDE NO-FALLBACK RIP.** Operator directive: every model
+failure FAILS THE EPISODE LOUD (named raise), never a silent swap/canned-template. Source of truth +
+full grounded site map + kibitz/agy/Sonnet/Fable reconciliation: `docs/2026-07-03-no-fallbacks-rip/PLAN.md`.
+DONE + pushed to v2.0-alpha this arc (all suite 6138-6142 + Bug Bible green, 0 regressions):
+- Cloud voice (ElevenLabs @925438e2) + cloud music (Sonilo @c7da53b1) -- built fail-loud (cloud
+  excluded from rank_chain auto-select). writer_fallback backup-LLM dropdown ROADMAPPED (ROADMAP_IDEAS.md).
+- R1 @822cb0c9 (audio-voice: bark missing-ref net + cast_lock fail_soft->fail_loud KEEP announcer
+  reroute + kokoro voice-id swap + stage-direction silence) -- Fable-gated.
+- R1c @2d4cd864 (scene_sequencer inline-Bark clip-shortfall -> raise; Fable-caught).
+- R2 @f07b837d (image: empty named-slot raise [E8-precise] + scene-still-missing raise).
+- RENAME @31c2a473 (other_beats_image_model -> character_image_model; widget+JSON+profiles+tests;
+  validator green -- the slot is character-only after scene_broll/background were ripped 2026-07-01).
+- R3-chunk-1 @de6af8c2 (dramatic-state import-fail + LLM call-fail -> raise; kept no-news-input path).
+- R3-chunk-2 @1d8f7e2b (announcer intro/outro/coda LLM->template swaps -> raise; F3-hedge KEEPS the
+  AI line not a template; retired the NEWS_CODA_POOL floor; 16 tests inverted across 5 files).
+NEXT (R3-chunk-3, then the arc closes): rip `otr_meta_brief_image_prompt.py` -- portrait 3-tier
+(tier-2 LLM-empty->template is a clean rip; tiers 3/4 consistency-gate + PERSON-GUARD need the same
+"keep the AI output vs raise" judgment as the outro F3 case -- the person-guard exists so a faceless
+prompt doesn't starve the audio-driven-face engine, so do NOT blind-rip it) + the char-scene prompt
+(:814->842). Then `_otr_casting.py:1345` (Sonnet's straggler: LLM naming-fail silently keeps the
+RNG-pool name -> raise). Then the FABLE GATE on the whole R3 diff before it's merged (§9). agy/Sonnet
+confirmed the ~50 other writer except-blocks are clean (skip cosmetic / operator-gated only). KEPT
+(NOT fallbacks): title->outline.title (primary AI title), news degrade (gated by news_briefs_required
+toggle), J2 outline speaker round-robin (structural, no prose), the "genuinely no news input" degrade.
+
+**Previously active (still open, resume after the rip): CREDITS ENRICHMENT --
+S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON
 recompact, + 20a669de Fable-gate fix). NEXT: LIVE frame-level smoke -> S0 -> S4.** Source of truth:
 `docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md` (v4) + `KICKOFF.md`. DONE (pushed, HEAD==origin):
 - S2 durable singleton stamps @ 3e0003e8; OTR_CreditsRoll SCAFFOLD @ f00a8e8e.

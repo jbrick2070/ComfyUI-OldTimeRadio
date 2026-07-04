@@ -6,6 +6,32 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (stack-wide NO-FALLBACK RIP: cloud audio + R1/R1c/R2/rename + R3 chunks 1-2) -- HEAD 1d8f7e2b (v2.0-alpha)
+Did (long single-arc session; operator directive: every model failure fails LOUD, never a silent
+swap/canned-template). Source of truth = docs/2026-07-03-no-fallbacks-rip/PLAN.md. All chunks suite
+6138-6142 + Bug Bible 16 green, 0 regressions, pushed HEAD==origin per chunk:
+- CLOUD AUDIO built fail-loud: ElevenLabs TTS adapter @925438e2 + Sonilo music @c7da53b1 (generate ->
+  invoke_partner_node -> canonicalize_audio RMS -16dBFS; fail-loud/no-fallback; cloud EXCLUDED from
+  rank_chain auto-select). writer_fallback backup-LLM dropdown ROADMAPPED (docs/ROADMAP_IDEAS.md).
+- R1 @822cb0c9 audio-voice (bark missing-ref net + cast_lock fail_soft->fail_loud [KEEP announcer
+  reroute, E2] + kokoro voice-id swap + stage-direction silence). Fable-gated SHIP.
+- R1c @2d4cd864 scene_sequencer inline-Bark clip-shortfall -> raise (Fable caught this straggler).
+- R2 @f07b837d image (empty named-slot raise E8-precise + scene-still-missing -> raise).
+- RENAME @31c2a473 other_beats_image_model -> character_image_model (13 files: ImageDirector/
+  VideoDirector INPUT_TYPES + dispatcher + _otr_workflow_apply + workflow JSON + widget_mapping + 7
+  test files; live validator green; slot is character-only post scene_broll rip).
+- R3-chunk-1 @de6af8c2 dramatic-state (import-fail + LLM call-fail -> raise; kept no-news-input path).
+- R3-chunk-2 @1d8f7e2b announcer intro/outro/coda LLM->template swaps -> raise (F3-hedge KEEPS the AI
+  line; retired the NEWS_CODA_POOL floor; 16 tests inverted across 5 files).
+- Gates used: kibitz r2 (Codex + Claude anchor) + operator agy runs + a Sonnet cross-audit (found the
+  _otr_casting.py:1345 straggler) + 3 Fable passes. Dead bark-health delete DEFERRED (fragile
+  test_cast_fuzzy_consolidate regex-extraction bounded by the bark def -- needs a dedent-bounded fix).
+Current step: R3-chunk-3 -- rip otr_meta_brief_image_prompt.py (portrait 3-tier: tier-2 clean rip;
+tiers 3/4 consistency+PERSON-GUARD need keep-AI-vs-raise judgment, do NOT blind-rip [face engine]) +
+char-scene prompt + _otr_casting.py:1345, THEN the Fable gate on the whole R3 diff.
+Next: portrait file rip (careful with the person-guard), then casting-naming, then Fable-gate + merge.
+Commits: 925438e2 c7da53b1 (+docs) 822cb0c9 2d4cd864 f07b837d 31c2a473 de6af8c2 1d8f7e2b (+several docs).
+
 ## 2026-07-03 (credits overlay redesign + music-still fix + ElevenLabs S0 start) -- HEAD 055dffbe (v2.0-alpha)
 Did (multi-thread session after the S3+S1 credits atomic slice):
 - CREDITS OVERLAY REDESIGN @ a0224438: operator rejected the single rolling roll; rebuilt
