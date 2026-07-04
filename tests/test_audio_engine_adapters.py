@@ -31,9 +31,9 @@ def test_music_role_has_stable_audio():
     assert "stable_audio_music" in AE.engines_for_role("music")
 
 
-def test_no_sfx_role_registered():
-    # SFX is deliberately excluded from the v2 audio-engine infrastructure.
-    assert AE.engines_for_role("sfx") == []
+def test_unknown_role_has_no_engines():
+    # A role outside the v2 audio-engine set resolves to no engines.
+    assert AE.engines_for_role("retired_role_c") == []
 
 
 def test_chatterbox_serves_both_voice_roles():

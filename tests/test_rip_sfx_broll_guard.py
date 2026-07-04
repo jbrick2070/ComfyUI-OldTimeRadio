@@ -25,15 +25,13 @@ _WF = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
 
 
 # ---------------------------------------------------------------------------
-# (a) speaker-role model: 5 roles, no sfx
+# (a) speaker-role model: exactly five roles
 # ---------------------------------------------------------------------------
 
-def test_valid_speaker_roles_has_no_sfx_and_exactly_five():
-    assert "sfx" not in SR.VALID_SPEAKER_ROLES
+def test_valid_speaker_roles_are_exactly_five():
     assert SR.VALID_SPEAKER_ROLES == (
         "character", "announcer", "music_open", "music_close", "music_inter",
     )
-    assert not hasattr(SR, "SPEAKER_ROLE_SFX")
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +91,7 @@ def test_stamp_default_role_raises_instead_of_backfilling():
 
 
 def test_slot_for_role_and_engine_id_raise_on_dead_roles():
-    for dead in ("retired_role_a", "retired_role_b", "sfx", "bogus"):
+    for dead in ("retired_role_a", "retired_role_b", "retired_role_c", "bogus"):
         with pytest.raises(ValueError):
             RS.slot_for_role(dead)
         with pytest.raises(ValueError):
