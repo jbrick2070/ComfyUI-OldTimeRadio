@@ -71,16 +71,16 @@ class TestComposeOpenFlagOn:
         assert "KEEPER" in usermsg and "MARA" in usermsg
         assert "a fog-bound lighthouse" in usermsg
 
-    def test_fallback_is_also_script_brief_free(self):
+    def test_safe_open_validation_fail_fails_loud(self):
+        # NO-FALLBACK (2026-07-03): a too-short safe-open reply fails the char band
+        # -> RAISES; no deterministic safe-open template ships.
+        import pytest
         cap = []
-        # too-short reply fails the char band -> deterministic safe fallback
-        res = LC.compose_announcer_intro(
-            creative_fn=_make_fn("Hush.", cap),
-            script_brief=_SPOILER, story_scaffold=True, safe_open_brief=_SB,
-        )
-        assert res.compose_flags == ("announcer_intro_fallback", "open_safe_fallback")
-        assert "SPOILER" not in res.text and "sank" not in res.text.lower()
-        assert "fog-bound lighthouse" in res.text.lower()
+        with pytest.raises(RuntimeError, match="no-fallback"):
+            LC.compose_announcer_intro(
+                creative_fn=_make_fn("Hush.", cap),
+                script_brief=_SPOILER, story_scaffold=True, safe_open_brief=_SB,
+            )
 
     def test_no_brief_falls_through_to_original_path(self):
         # story_scaffold on but no safe_open_brief -> the guard requires BOTH,

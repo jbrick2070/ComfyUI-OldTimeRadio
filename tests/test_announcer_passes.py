@@ -259,33 +259,30 @@ def test_compose_announcer_intro_happy_path():
     assert _INTRO_BRIEF in user_msg
 
 
-def test_compose_announcer_intro_empty_brief_skips_llm():
+def test_compose_announcer_intro_empty_brief_fails_loud():
+    # NO-FALLBACK (2026-07-03): an empty brief FAILS LOUD; no canned intro template.
+    import pytest
     fn = _make_creative_fn(_GOOD_INTRO)
-    res = _LC.compose_announcer_intro(creative_fn=fn, script_brief="")
-    assert res.compose_flags == ("announcer_intro_fallback",)
-    assert "SIGNAL LOST" in res.text
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        _LC.compose_announcer_intro(creative_fn=fn, script_brief="")
     assert fn.calls == [], "no LLM call should fire with an empty brief"
 
 
-def test_compose_announcer_intro_llm_raises_falls_back():
+def test_compose_announcer_intro_llm_raises_fails_loud():
+    # NO-FALLBACK (2026-07-03): a failed intro LLM RAISES; no canned template.
+    import pytest
     fn = _make_creative_fn(RuntimeError("backend exploded"))
-    res = _LC.compose_announcer_intro(
-        creative_fn=fn, script_brief=_INTRO_BRIEF,
-    )
-    assert res.compose_flags == ("announcer_intro_fallback",)
-    assert "SIGNAL LOST" in res.text
-    # The brief still seeds the deterministic fallback.
-    assert _INTRO_BRIEF.rstrip(".") in res.text
+    with pytest.raises(RuntimeError):
+        _LC.compose_announcer_intro(creative_fn=fn, script_brief=_INTRO_BRIEF)
 
 
-def test_compose_announcer_intro_invalid_output_falls_back():
-    # Too short to clear the intro min-char band -> fallback.
+def test_compose_announcer_intro_invalid_output_fails_loud():
+    # NO-FALLBACK (2026-07-03): output too short to clear the min-char band ->
+    # validation fails -> RAISES (no canned template).
+    import pytest
     fn = _make_creative_fn("Hello.")
-    res = _LC.compose_announcer_intro(
-        creative_fn=fn, script_brief=_INTRO_BRIEF,
-    )
-    assert res.compose_flags == ("announcer_intro_fallback",)
-    assert "SIGNAL LOST" in res.text
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        _LC.compose_announcer_intro(creative_fn=fn, script_brief=_INTRO_BRIEF)
 
 
 def test_compose_announcer_intro_handles_no_stop_loader():
@@ -339,48 +336,42 @@ def test_compose_announcer_outro_happy_path():
     assert _GOOD_INTRO in user_msg
 
 
-def test_compose_announcer_outro_empty_briefs_skips_llm():
+def test_compose_announcer_outro_empty_briefs_fails_loud():
+    # NO-FALLBACK (2026-07-03): empty brief AND close -> FAILS LOUD, no template.
+    import pytest
     fn = _make_creative_fn(_GOOD_OUTRO)
-    res = _LC.compose_announcer_outro(
-        creative_fn=fn,
-        script_brief="",
-        news_close_brief="",
-        intro_text=_GOOD_INTRO,
-    )
-    assert res.compose_flags == ("announcer_outro_fallback",)
-    assert "SIGNAL LOST" in res.text
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        _LC.compose_announcer_outro(
+            creative_fn=fn, script_brief="", news_close_brief="",
+            intro_text=_GOOD_INTRO,
+        )
     assert fn.calls == []
 
 
-def test_compose_announcer_outro_llm_raises_falls_back():
+def test_compose_announcer_outro_llm_raises_fails_loud():
+    # NO-FALLBACK (2026-07-03): a failed outro LLM RAISES; no canned template.
+    import pytest
     fn = _make_creative_fn(RuntimeError("backend exploded"))
-    res = _LC.compose_announcer_outro(
-        creative_fn=fn,
-        script_brief=_INTRO_BRIEF,
-        news_close_brief=_CLOSE_BRIEF,
-        intro_text=_GOOD_INTRO,
-    )
-    assert res.compose_flags == ("announcer_outro_fallback",)
-    assert "SIGNAL LOST" in res.text
-    # The close brief seeds the deterministic fallback.
-    assert _CLOSE_BRIEF.rstrip(".") in res.text
+    with pytest.raises(RuntimeError):
+        _LC.compose_announcer_outro(
+            creative_fn=fn, script_brief=_INTRO_BRIEF,
+            news_close_brief=_CLOSE_BRIEF, intro_text=_GOOD_INTRO,
+        )
 
 
-def test_compose_announcer_outro_multiline_output_falls_back():
-    # A multi-line read is a framing failure for a one-line close;
-    # validate_announcer_line rejects it and the fallback fires.
+def test_compose_announcer_outro_multiline_output_fails_loud():
+    # NO-FALLBACK (2026-07-03): a multi-line read fails one-line validation ->
+    # RAISES (no canned template).
+    import pytest
     fn = _make_creative_fn(
         "First line of the closing read.\n"
         "Second line of the closing read."
     )
-    res = _LC.compose_announcer_outro(
-        creative_fn=fn,
-        script_brief=_INTRO_BRIEF,
-        news_close_brief=_CLOSE_BRIEF,
-        intro_text="",
-    )
-    assert res.compose_flags == ("announcer_outro_fallback",)
-    assert "SIGNAL LOST" in res.text
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        _LC.compose_announcer_outro(
+            creative_fn=fn, script_brief=_INTRO_BRIEF,
+            news_close_brief=_CLOSE_BRIEF, intro_text="",
+        )
 
 
 def test_compose_announcer_outro_strips_leaked_label_then_validates():
@@ -490,27 +481,19 @@ def test_bug255_news_close_brief_reaches_closing_line():
     assert _CLOSE_BRIEF in outro_user_msg
 
 
-def test_bug255_outro_fallback_still_lands_on_closing_line():
-    """Even when the outro LLM pass fails, a deterministic close must
-    land on the closing line -- the narrative bookend is never missing.
-    """
-    ledger = {"lines": [
-        _ledger_row("b001", "announcer", "intro text here"),
-        _ledger_row("b002", "character", "A line of dialogue."),
-        _ledger_row("b003", "announcer", "placeholder outro"),
-    ]}
+def test_bug255_outro_llm_failure_fails_loud():
+    """NO-FALLBACK (2026-07-03): when the outro LLM fails, the episode FAILS LOUD
+    -- it no longer lands a deterministic canned close. The narrative bookend is
+    guaranteed by STOPPING the run on failure, not by shipping filler text."""
+    import pytest
     outro_fn = _make_creative_fn(RuntimeError("backend down"))
-    outro_res = _LC.compose_announcer_outro(
-        creative_fn=outro_fn,
-        script_brief=_INTRO_BRIEF,
-        news_close_brief=_CLOSE_BRIEF,
-        intro_text="intro text here",
-    )
-    assert outro_res.compose_flags == ("announcer_outro_fallback",)
-    assert _LED.patch_line_text(ledger, "b003", outro_res.text)
-    closing = ledger["lines"][-1]
-    assert "SIGNAL LOST" in closing["text"]
-    assert closing["text"] != "placeholder outro"
+    with pytest.raises(RuntimeError):
+        _LC.compose_announcer_outro(
+            creative_fn=outro_fn,
+            script_brief=_INTRO_BRIEF,
+            news_close_brief=_CLOSE_BRIEF,
+            intro_text="intro text here",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -3208,25 +3208,20 @@ def compose_announcer_intro(
                 creative_repo_id, len(validated),
             )
             return LineResult(text=validated, compose_flags=("announcer_intro",))
-        log.warning(
-            "[OTR_AnnouncerPass] safe-open pass failed validation (model=%s, "
-            "raw=%r); using deterministic safe fallback", creative_repo_id, raw,
-        )
-        return LineResult(
-            text=fallback_safe_open(safe_open_brief),
-            compose_flags=("announcer_intro_fallback", "open_safe_fallback"),
+        raise RuntimeError(
+            "[OTR_AnnouncerPass] safe-open announcer intro LLM failed validation "
+            "(model=%s, raw=%r). NO deterministic-template fallback (no-fallback "
+            "rip 2026-07-03) -- a failed announcer-intro LLM stops the episode; it "
+            "never silently ships a canned open line." % (creative_repo_id, raw)
         )
     # LLM slot: creative -- announcer intro is a narrative framing
     # pass; routed through the writer's creative_writing_model slot.
     brief = clean_one_line(script_brief or "", max_chars=0)
     if not brief:
-        log.warning(
-            "[OTR_AnnouncerPass] intro: empty script_brief; "
-            "using deterministic fallback",
-        )
-        return LineResult(
-            text=fallback_announcer_intro(""),
-            compose_flags=("announcer_intro_fallback",),
+        raise RuntimeError(
+            "[OTR_AnnouncerPass] announcer intro: EMPTY script_brief -- a "
+            "brief-less episode is already broken upstream. NO canned-template "
+            "fallback (no-fallback rip 2026-07-03); fix the missing brief."
         )
     messages = [
         {"role": "system", "content": _ANNOUNCER_INTRO_SYSTEM},
@@ -3253,14 +3248,10 @@ def compose_announcer_intro(
         return LineResult(
             text=validated, compose_flags=("announcer_intro",),
         )
-    log.warning(
-        "[OTR_AnnouncerPass] intro pass failed validation "
-        "(model=%s, raw=%r); using deterministic fallback",
-        creative_repo_id, raw,
-    )
-    return LineResult(
-        text=fallback_announcer_intro(brief),
-        compose_flags=("announcer_intro_fallback",),
+    raise RuntimeError(
+        "[OTR_AnnouncerPass] announcer intro LLM failed validation (model=%s, "
+        "raw=%r). NO deterministic-template fallback (no-fallback rip 2026-07-03) "
+        "-- a failed announcer-intro LLM stops the episode." % (creative_repo_id, raw)
     )
 
 
@@ -3431,29 +3422,15 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
             return LineResult(
                 text=_assemble(bridge), compose_flags=(flag,) + _coda_extra)
 
-    # 3) deterministic fallback floor -- stable hash (NOT builtin hash()).
-    h = int(hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(), 16)
-    # S2 (2026-06-28): the floor is an arc_shape-keyed CURATED bridge (a
-    # tale-toned pivot validated by validate_news_coda_bridge) in place of the
-    # generic NEWS_CODA_POOL prefix. Unknown arc_shape OR zero valid templates =>
-    # legacy pool below.
-    if arc_shape:
-        _arc = _NEWS_CODA_ARC_BRIDGES.get(arc_shape)
-        if _arc:
-            _valid = [b for b in _arc if validate_news_coda_bridge(b)[0]]
-            if _valid:
-                _bridge = _valid[h % len(_valid)]
-                return LineResult(
-                    text=_assemble(_bridge),
-                    compose_flags=(
-                        "news_coda_fallback", "news_coda_bridge_invalid",
-                        "news_coda_arc_bridge") + _coda_extra,
-                )
-    prefix = NEWS_CODA_POOL[h % len(NEWS_CODA_POOL)]
-    return LineResult(
-        text=clean_one_line(f"{prefix} {fact}", max_chars=_CODA_TOTAL_MAX),
-        compose_flags=("news_coda_fallback", "news_coda_bridge_invalid")
-        + _coda_extra,
+    # 3) NO-FALLBACK (operator 2026-07-03): both LLM bridge attempts failed. The
+    # old deterministic floor (arc-keyed curated bridge, else a sha256(cast_seed)
+    # pick from NEWS_CODA_POOL) silently shipped a CANNED transition as the spoken
+    # news-coda. FAIL LOUD instead -- a failed writer LLM stops the episode; it
+    # never ships a pool-picked bridge as if the model wrote it.
+    raise RuntimeError(
+        "[OTR_AnnouncerPass] news-coda bridge LLM failed both attempts. NO "
+        "deterministic pool/arc-bridge fallback (no-fallback rip 2026-07-03) -- "
+        "fix the model/prompt; a canned bridge must not ship as spoken content."
     )
 
 
@@ -3512,15 +3489,10 @@ def compose_announcer_outro(
     close = clean_one_line(news_close_brief or "", max_chars=0)
     intro = clean_one_line(intro_text or "", max_chars=0)
     if not brief and not close:
-        log.warning(
-            "[OTR_AnnouncerPass] outro: empty script_brief and "
-            "news_close_brief; using deterministic fallback",
-        )
-        fb = (_resolved_outro_fallback(ending_change, close)
-              if resolved else fallback_announcer_outro(close))
-        return LineResult(
-            text=fb,
-            compose_flags=("announcer_outro_fallback",),
+        raise RuntimeError(
+            "[OTR_AnnouncerPass] announcer outro: EMPTY script_brief AND "
+            "news_close_brief -- no context to write the close from (broken "
+            "upstream). NO canned-template fallback (no-fallback rip 2026-07-03)."
         )
     user_parts: list[str] = []
     if brief:
@@ -3592,13 +3564,18 @@ def compose_announcer_outro(
                     text=validated2,
                     compose_flags=("announcer_outro_resolved_recomposed",),
                 )
+            # NO-FALLBACK (2026-07-03): the LLM produced a VALID line (it just
+            # hedges) -- that is a quality miss, NOT an LLM failure, so we keep the
+            # AI-written close rather than swapping in a canned deterministic
+            # template. Mirrors the S2 thesis path just below (keep the validated
+            # close, log the residual). No canned text ships.
             log.warning(
-                "[OTR_AnnouncerPass] outro still hedged after recompose; "
-                "using the deterministic resolved fallback (F3).",
+                "[OTR_AnnouncerPass] outro still hedged after recompose; keeping "
+                "the AI-written (hedging) close -- NO deterministic template.",
             )
             return LineResult(
-                text=_resolved_outro_fallback(ending_change, close),
-                compose_flags=("announcer_outro_resolved_fallback",),
+                text=validated,
+                compose_flags=("announcer_outro", "outro_residual_hedge"),
             )
         # S2 (story-quality R2): a close that STATES a moral / lesson /
         # news-summary instead of showing a concrete final image is flat.
@@ -3649,16 +3626,10 @@ def compose_announcer_outro(
         return LineResult(
             text=validated, compose_flags=("announcer_outro",),
         )
-    log.warning(
-        "[OTR_AnnouncerPass] outro pass failed validation "
-        "(model=%s, raw=%r); using deterministic fallback",
-        creative_repo_id, raw,
-    )
-    fb = (_resolved_outro_fallback(ending_change, close)
-          if resolved else fallback_announcer_outro(close))
-    return LineResult(
-        text=fb,
-        compose_flags=("announcer_outro_fallback",),
+    raise RuntimeError(
+        "[OTR_AnnouncerPass] announcer outro LLM failed validation (model=%s, "
+        "raw=%r). NO deterministic-template fallback (no-fallback rip 2026-07-03) "
+        "-- a failed announcer-outro LLM stops the episode." % (creative_repo_id, raw)
     )
 
 

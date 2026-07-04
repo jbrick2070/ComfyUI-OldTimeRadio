@@ -34,29 +34,13 @@ def test_every_arc_bridge_validates():
             assert ok, f"{arc} bridge fails validate_news_coda_bridge: {b!r}"
 
 
-def test_v2_fallback_ships_curated_arc_bridge():
-    res = compose_news_coda(
-        creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-        cast_seed=7, arc_shape="betrayal")
-    assert "news_coda_arc_bridge" in res.compose_flags
-    # the shipped text opens with one of the curated betrayal bridges (+ ":")
-    starts = [b for b in _NEWS_CODA_ARC_BRIDGES["betrayal"]
-              if res.text.startswith(b)]
-    assert starts, f"coda did not open with a betrayal arc bridge: {res.text!r}"
-    assert _BRIEF.split()[0] in res.text  # the real fact is appended
-
-
-def test_unknown_arc_shape_falls_back_to_legacy():
-    res = compose_news_coda(
-        creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-        cast_seed=7, arc_shape="not_a_real_arc")
-    assert "news_coda_arc_bridge" not in res.compose_flags
-    assert any(res.text.startswith(p) for p in NEWS_CODA_POOL)
-
-
-def test_arc_selection_deterministic_by_cast_seed():
-    kw = dict(creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-              arc_shape="heist")
-    a = compose_news_coda(cast_seed=3, **kw).text
-    b = compose_news_coda(cast_seed=3, **kw).text
-    assert a == b  # same seed -> same curated bridge
+def test_coda_both_attempts_rejected_fails_loud():
+    # NO-FALLBACK (2026-07-03): when both bridge attempts are rejected the coda
+    # RAISES; the curated arc-bridge / NEWS_CODA_POOL floor is RETIRED -- it no
+    # longer silently ships a canned bridge as the spoken transition. (The bridge
+    # DATA + validators are still exercised by test_every_arc_bridge_validates.)
+    import pytest
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        compose_news_coda(
+            creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
+            cast_seed=7, arc_shape="betrayal")

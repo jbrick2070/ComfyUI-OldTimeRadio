@@ -241,14 +241,16 @@ class TestF3EndingAwareOutro:
         assert res.compose_flags == ("announcer_outro_resolved_recomposed",)
         assert "remains to be seen" not in res.text.lower()
 
-    def test_resolved_persistent_hedge_falls_back(self):
+    def test_resolved_persistent_hedge_keeps_ai_line(self):
+        # NO-FALLBACK (2026-07-03): after a recompose the close STILL hedges, but it
+        # is a VALID AI-written line (a quality miss, not an LLM failure), so it is
+        # KEPT -- no canned resolved-template swap. Flagged for observability.
         def mock(messages, **kw):
             return "Whether she was right remains to be seen tonight, friends."
 
         res = _outro(mock, ending_change=_RESOLVED)
-        assert res.compose_flags == ("announcer_outro_resolved_fallback",)
-        assert "remains to be seen" not in res.text.lower()
-        assert "vial is opened" in res.text.lower()
+        assert res.compose_flags == ("announcer_outro", "outro_residual_hedge")
+        assert "remains to be seen" in res.text.lower()  # the AI line is kept as-is
 
     def test_unresolved_hedge_is_allowed(self):
         def mock(messages, **kw):
