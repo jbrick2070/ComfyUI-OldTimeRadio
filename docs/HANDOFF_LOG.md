@@ -18,11 +18,19 @@ Did (operator overnight mission = get cloud engines + credits GREEN e2e; priorit
 - LAUNCHED cv1 (scripts/_otr_cloud_video_soak.py) = word_razzle video x ideo image, 30w, indextts2: ideo stills
   ALL minted (cloud IMAGE + auth OK), now running word_razzle -> cloud_pixverse_i2v per shot (slow cloud i2v).
   This ALSO live-validates the credits col-3 fix (episode ends with the credits tail).
-NEXT (this session, gated on cv1 freeing :8000): live ElevenLabs VOICE leg (bank=elevenlabs_cloud, char_voice=
-elevenlabs) + Sonilo MUSIC leg -- confirm the actual cloud TTS/music calls render e2e; Sonilo 422 = likely a
-min-duration floor vs the 12/8/4s cues -> if reproduced, adapter floor+trim fix (docs/2026-07-04-elevenlabs-cast-
-voice/PLAN.md Part B). Then the image-engine sweep (recraft/flux_pro/nano_banana_2/seedream_2/ideogram) + 800w
-all-visualizer credits runs. Commits: 3c7ae1f1 (docs), fae7081f (elevenlabs pool).
+LIVE RESULTS (this session):
+- cv1 word_razzle x ideo 30w = PASS (obs: signal_lost_the_vibecode_loop_..._with_credits_final.mp4). Cloud
+  IMAGE (ideo) + cloud VIDEO (word_razzle/pixverse i2v) render e2e. cv2 kling_avatar = FAIL, NO obs (root-cause TBD).
+- CREDITS col-3 fix VALIDATED on cv1's real final: col3 bright-px 11778/5121/65 across the roll (was 0). Scrolls.
+- ElevenLabs VOICE = WORKING LIVE (new _otr_cloud_audio_babysit.py, DIRECT-submit: apply_profile
+  char_voice_engine=elevenlabs + patch_widget_by_name node 80 voice_bank=elevenlabs_cloud -- the run_leg
+  extra_patches CREATIVE WHITELIST refuses voice_bank/engine; must set them direct like _otr_chatterbox_smoke).
+  P-OBS proof: c02->el_laura(FGY2WhTYpPnrIDTdsKH5), c03->el_george(JBFqnCBsd6RMkjVDRZzb) engine=elevenlabs, real
+  provider ids, ZERO 401/422/no-provider errors; announcer stays kokoro. Episode finishing (local viz_green video).
+NEXT: Sonilo MUSIC leg (node 83 engine=sonilo, direct patch) -- reproduce the 422 (likely min-duration floor vs
+4/8/12s cues) then adapter floor+trim (PLAN.md Part B). Then image-engine sweep + 800w all-visualizer credits runs.
+HARNESS: scripts/_otr_cloud_audio_babysit.py (direct-submit; boots per leg via _otr_soak_marathon, key per-command).
+Commits: 3c7ae1f1 (docs), fae7081f (elevenlabs pool).
 
 ## 2026-07-04 (overnight) -- HEAD b89a30ca (v2.0-alpha) -- CREDITS COL-3 BLANK-SCROLL ROOT-CAUSED + FIXED + PUSHED
 Did: operator-reported obs bug -- the SIGNAL LOST console cols 1-2 render but COL 3 (the scrolling
