@@ -47,7 +47,7 @@
         ]
       ]
     },
-    "role_overrides.other_beats_image": {
+    "role_overrides.char_beats_image": {
       "registry": "image",
       "targets": [
         [

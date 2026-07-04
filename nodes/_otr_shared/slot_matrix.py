@@ -33,9 +33,9 @@ ROLE_TO_PROFILE_KEY: dict = {
 #: The role_compat role tokens, in canonical order.
 ALL_ROLES: tuple = tuple(ROLE_TO_PROFILE_KEY.keys())
 
-#: The three per-role IMAGE override keys (announcer / music / other-beats image --
-#: the other-beats image slot is KEPT: character stills ride it).
-IMAGE_KEYS: tuple = ("announcer_image", "music_image", "other_beats_image")
+#: The three per-role IMAGE override keys (announcer / music / char_beats image --
+#: the char_beats image slot carries the character stills).
+IMAGE_KEYS: tuple = ("announcer_image", "music_image", "char_beats_image")
 
 #: Named baselines for the slots NOT under test: a still video carrier that fits
 #: every role + always renders, and the gen-1 image engine.

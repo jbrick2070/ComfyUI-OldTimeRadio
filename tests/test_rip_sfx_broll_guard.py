@@ -140,10 +140,10 @@ def test_ledger_freeze_rejects_sfx_row_as_error():
 
 
 # ---------------------------------------------------------------------------
-# (d) KEPT surfaces: other_beats image slot + registry eligibility + wf pin
+# (d) KEPT surfaces: char_beats image slot + registry eligibility + wf pin
 # ---------------------------------------------------------------------------
 
-def test_video_director_keeps_other_beats_image_and_drops_dead_widgets():
+def test_video_director_keeps_char_beats_image_and_drops_dead_widgets():
     from nodes.otr_video_director import OTRVideoDirector
     it = OTRVideoDirector.INPUT_TYPES()
     req, opt = it["required"], it.get("optional", {})

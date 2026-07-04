@@ -74,7 +74,7 @@ VIDEO_DIRECTOR_SLOTS = (
 IMAGE_DIRECTOR_SLOTS = (
     "announcer_image_model",
     "music_image_model",
-    "other_beats_image_model",
+    "character_image_model",
 )
 
 
@@ -438,11 +438,11 @@ def _build_prompt(words: int) -> tuple[dict[str, Any], list[str]]:
             )
         )
         changes.append(
-            "director images announcer=%r music=%r other=%r"
+            "director images announcer=%r music=%r char_beats=%r"
             % (
                 dinputs.get("announcer_image_model"),
                 dinputs.get("music_image_model"),
-                dinputs.get("other_beats_image_model"),
+                dinputs.get("character_image_model"),
             )
         )
     if RENDER_BATCH_NODE_ID in prompt:

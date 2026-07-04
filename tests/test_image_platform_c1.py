@@ -173,7 +173,7 @@ def test_image_director_policy_json_and_seed(clean_image_registry):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     out = OTRImageDirector().direct(**_direct_kwargs(
-        other_beats_granularity="per_beat", request_seed=7))
+        char_beats_granularity="per_beat", request_seed=7))
     policy = json.loads(out[0])
     assert policy["image_models"]["music_image_model"]["engine_id"] == "flux_gen1"
     assert policy["seed"]["request_seed"] == 7
@@ -238,7 +238,7 @@ def _direct_kwargs(**over):
         pass  # malformed payload passes through for the fail-closed tests
     kw = dict(
         announcer_granularity="per_object",
-        music_granularity="per_object", other_beats_granularity="per_object",
+        music_granularity="per_object", char_beats_granularity="per_object",
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
         video_policy_json=vp_raw,
     )
@@ -271,7 +271,7 @@ def test_3d_granularity_lock_per_beat_raises(clean_image_registry,
     }})
     with pytest.raises(ValueError, match="per_object"):
         OTRImageDirector().direct(**_direct_kwargs(
-            other_beats_granularity="per_beat",
+            char_beats_granularity="per_beat",
             video_policy_json=video_policy))
 
 

@@ -579,9 +579,9 @@ class TestDispatcherStillSpine:
         assert disp.resolve_engine_for_role(policy, "scene_broll") == \
             ("eng_o", "character_image_model", False)
 
-    def test_slot_absent_uses_other_beats_default(self):
+    def test_slot_absent_uses_char_beats_default(self):
         # E8 (no-fallback rip): an ABSENT dedicated slot is a legitimate default
-        # (the role has no special model) -> other_beats, flagged for observability.
+        # (the role has no special model) -> char_beats, flagged for observability.
         from nodes import otr_image_gen_dispatcher as disp
         policy = {"image_models": {
             "character_image_model": {"engine_id": "eng_o"}}}
@@ -590,7 +590,7 @@ class TestDispatcherStillSpine:
 
     def test_slot_present_but_empty_fails_loud(self):
         # E8 (no-fallback rip): a named slot PRESENT but explicitly EMPTY is a
-        # config error -> RAISE, never silently fall back to other_beats.
+        # config error -> RAISE, never silently fall back to char_beats.
         import pytest
 
         from nodes import otr_image_gen_dispatcher as disp
