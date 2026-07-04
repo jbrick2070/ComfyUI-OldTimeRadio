@@ -100,7 +100,8 @@ def test_radio_head_person_is_a_figure_with_a_radio_head():
     p = mbp.build_radio_host_prompt(_SPACE_META, style="radio_head_person")
     assert "radio-head" in p and "HEAD IS" in p
     assert "space-station communications console" in p   # brief-driven form
-    assert mbp._depicts_person(p)                 # a figure IS present
+    # (person/face DETECTOR removed 2026-07-04 -- the prompt is verified by its
+    # radio-head + brief-form tokens above, not by an automated person analyzer.)
 
 
 def test_overtness_is_brief_driven():

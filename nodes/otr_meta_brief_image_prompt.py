@@ -825,13 +825,9 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
                 prompt = cand
                 source = "char_scene_llm"
                 break
-    # Person guard + gear scrub (a beat still MUST show the character, never a
-    # radio booth) -- identical discipline to the portrait path. A discarded
-    # LLM prompt here leaves prompt="" -> the fail-loud gate below.
-    if prompt and not _depicts_person(prompt):
-        warnings.append(f"char-scene prompt for {cid} depicts no PERSON; "
-                        f"discarding the LLM output")
-        prompt = ""
+    # Person/face analysis REMOVED (operator directive 2026-07-04): no person
+    # detector discards or annotates a beat still. The gear scrub below still runs;
+    # an EMPTY LLM return still fails loud at the gate further down.
     if prompt:
         scrubbed = _scrub_gear_words(prompt)
         if scrubbed != prompt:
@@ -964,18 +960,10 @@ def _compose_background_plate_prompt(meta, setting) -> str:
 #: Person-evidence vocabulary for the portrait guard: an accepted prompt that
 #: matches NONE of these almost certainly depicts scenery/objects (the
 #: "microphone, no person" live catch, look-QA round 4) -> template fallback.
-_PERSON_WORDS = re.compile(
-    r"\b(face|faces|person|man|woman|portrait|eyes|hair|head|gentleman|lady|"
-    r"his|her|he|she|year-old|years old|beard|jaw|brow|cheek|smile|"
-    r"expression|wearing|suit|uniform|coat|engineer|worker|officer|host|"
-    r"announcer|operator|controller|captain|doctor|detective|pilot|"
-    r"scientist|reporter|narrator|figure)\b",
-    re.IGNORECASE)
-
-
-def _depicts_person(prompt: str) -> bool:
-    """True when the prompt carries any person-evidence token."""
-    return bool(_PERSON_WORDS.search(prompt or ""))
+# Person/face DETECTOR removed (operator directive 2026-07-04): the _PERSON_WORDS
+# regex + _depicts_person() analyzer that grep-gated portraits and beat stills are
+# gone. Face quality is QA'd visually by the operator reviewing the derived
+# prompts, not analyzed here.
 
 
 #: Broadcast-gear vocabulary (round 5 operator directive 2026-06-10): CHARACTER
@@ -1173,28 +1161,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     "%s failed the story-consistency gate (%s) -- NO template "
                     "fallback (no-fallback rip 2026-07-03)." % (cid, msg)
                 )
-        # PERSON GUARD (look-QA round 4, 2026-06-10): a portrait prompt that
-        # depicts no person (the live "microphone under a lamp" catch for a
-        # cast character) falls back to the template, which LEADS with the
-        # writer's physical character description. Always enforced -- a
-        # face-less init_image also starves the audio-driven-face engine.
-        if not _depicts_person(prompt):
-            if source != "llm":
-                # The deterministic template depicts no person -- unexpected, but
-                # not a model swap; keep it loud (template is the primary output).
-                warnings.append(
-                    f"image prompt for {cid} depicts no PERSON (template path; kept)")
-            else:
-                # The LLM prompt depicts no person: a faceless init starves the
-                # audio-driven-face engine. The person guard's protection is
-                # PRESERVED -- but as a LOUD raise, not a silent template swap
-                # (no-fallback rip 2026-07-03).
-                raise RuntimeError(
-                    "[OTR_ImagePrompt] portrait: the writer LLM visual prompt for "
-                    "%s depicts no PERSON -- a faceless init starves the audio-"
-                    "driven-face engine; NO template fallback (no-fallback rip "
-                    "2026-07-03)." % cid
-                )
+        # Person/face analysis REMOVED (operator directive 2026-07-04): no
+        # automated person detector gates or annotates the portrait. The operator
+        # crafts the prompts and QAs faces visually by reviewing them; a token-grep
+        # face check earns nothing and previously failed builds / burned credits.
+        # The prompt flows straight to the gear scrub + finisher below.
         # GEAR SCRUB (round 5 operator directive): character portraits never
         # mention radio/mic/studio gear -- the tokens pull FLUX toward
         # equipment (the c01 giant-mic catch). The ANNOUNCER keeps his radio

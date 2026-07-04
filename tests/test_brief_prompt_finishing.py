@@ -82,25 +82,29 @@ def test_image_prompt_hash_matches_finished_prompt():
     assert entry["prompt_hash"] == mbp._content_hash(entry["prompt"])
 
 
-def test_image_person_guard_then_finish_no_retrigger():
-    """NO-FALLBACK rip (2026-07-03): a no-person LLM prompt now FAILS LOUD at the
-    person guard (a faceless init starves the audio-driven-face engine) -- no
-    silent template swap. The llm_fn=None template lane still finishes cleanly."""
+def test_image_no_person_analyzer_render_proceeds():
+    """Operator directive 2026-07-04: the person/face DETECTOR is RIPPED OUT -- a
+    no-person LLM portrait is neither failed nor annotated; it flows straight
+    through (the image/video engines accept a faceless init; the operator QAs faces
+    visually by reviewing prompts). Non-fail regression guard: nobody re-adds an
+    automated person analyzer to the render path."""
     cast = [{"char_id": "c1", "name": "KEEPER",
              "character_description": "60s, weathered face, oilskin coat"}]
-    # Passes the CONSISTENCY gate (shares "lighthouse" with the setting) but
-    # carries no person-evidence -> the person guard now RAISES.
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        mbp.derive_image_prompts(
-            cast, _OK_META,
-            llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
-    # The template LANE (llm_fn=None) leads with the appearance + finishes; the
-    # tails never re-trigger the person guard.
-    out, _warns = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
+    # No person-evidence, but shares "lighthouse" with the setting so the SEPARATE
+    # consistency gate is satisfied -> kept, NOT raised, NOT swapped.
+    out, _warns = mbp.derive_image_prompts(
+        cast, _OK_META,
+        llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
     entry = mbp.objects_by_id(out)["c1"]
-    assert entry["source"].startswith("template")
-    assert "weathered face" in entry["prompt"]        # template led
-    assert "lantern glow" in entry["prompt"]          # finished after guard
+    assert entry["source"].startswith("llm")          # LLM prompt kept, not swapped
+    assert "lighthouse" in entry["prompt"].lower()    # the authored prompt survived
+    assert "lantern glow" in entry["prompt"]          # tails still finished
+    # The template LANE (llm_fn=None) leads with the appearance + finishes.
+    out2, _warns2 = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
+    entry2 = mbp.objects_by_id(out2)["c1"]
+    assert entry2["source"].startswith("template")
+    assert "weathered face" in entry2["prompt"]       # template led
+    assert "lantern glow" in entry2["prompt"]          # finished
 
 
 def test_shotlock_m4_prompt_hash_matches_finished_prompt():

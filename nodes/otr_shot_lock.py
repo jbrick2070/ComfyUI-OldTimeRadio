@@ -408,27 +408,10 @@ def _prompt_is_consistent(text_prompt: str, appearance: str, setting: str) -> bo
     return appearance_ok and setting_ok
 
 
-#: Person-anchor vocabulary (round 5 F3): a talking-head prompt must show the
-#: character. Checked on the UNANCHORED candidate (the LLM's contribution),
-#: within a bounded head, so the anchor itself can never satisfy the guard.
-_PERSON_TOKENS = ("face", "portrait", "speaking", "camera", "close-up",
-                  "mid-shot")
-_PERSON_GUARD_HEAD = 160
-
-
-def _person_anchor_ok(text_prompt: str, appearance: str) -> bool:
-    """True when the prompt's HEAD (first ``_PERSON_GUARD_HEAD`` chars) carries
-    a core appearance token AND a person/framing token -- the b002 lesson: a
-    prompt that describes props/scenery without the character lets HuMo walk
-    away from the init portrait. Pure; character-bearing beats only."""
-    if not text_prompt:
-        return False
-    head = text_prompt[:_PERSON_GUARD_HEAD].lower()
-    appearance_ok = (not appearance) or any(
-        tok in head for tok in _core_tokens(appearance)
-    )
-    person_ok = any(tok in head for tok in _PERSON_TOKENS)
-    return appearance_ok and person_ok
+# Person-anchor DETECTOR removed (operator directive 2026-07-04): no automated
+# person/face analyzer gates the talking-head prompt. The _subject_anchor below
+# is prompt COMPOSITION (it always leads with face/framing tokens); face QUALITY
+# is QA'd visually by the operator reviewing prompts, not grep-gated here.
 
 
 def _subject_anchor(appearance: str) -> str:
@@ -617,31 +600,23 @@ def derive_creative_directives(
             # composed-directives path leads with the appearance by
             # construction, and the deterministic template IS the sanctioned
             # fallback -- both get the anchor regardless.
-            _person_ok = (not llm_text
-                          or _person_anchor_ok(text_prompt, appearance))
-            if not (_prompt_is_consistent(text_prompt, appearance, setting)
-                    and _person_ok):
+            # Person/face analysis REMOVED (operator directive 2026-07-04): no
+            # person-anchor detector gates or annotates the prompt. The
+            # _subject_anchor prepended below still leads every talking-head prompt
+            # with face/framing tokens (prompt COMPOSITION, not analysis), and the
+            # operator QAs faces visually. Only the story-consistency gate remains
+            # -- it fails loud on an attempted-LLM miss (no-fallback rip 2026-07-04);
+            # consistency_gate_warn_only keeps the AI prompt.
+            if not _prompt_is_consistent(text_prompt, appearance, setting):
                 msg = (f"consistency gate for beat {b['beat_id']}: prompt missing "
-                       f"cast/setting trait or person anchor")
+                       f"cast/setting trait")
                 if consistency_gate_warn_only or source != "llm":
-                    # warn-only toggle keeps the AI prompt; or this is the
-                    # deterministic template lane (no LLM to blame) -> keep + warn.
-                    # NB divergence from the image lane (derive_image_prompts),
-                    # where the PERSON guard is a separate ALWAYS-enforced raise:
-                    # here person + consistency share one gate, so warn-only also
-                    # tolerates a faceless prompt. The subject anchor prepended
-                    # below (_subject_anchor) is the compensating control -- every
-                    # rendered prompt still leads with face/framing tokens.
                     warnings.append(msg + " (kept; warn-only or template path)")
                 else:
-                    # The writer LLM prompt failed the story-consistency/person
-                    # gate -> fail loud, no template swap (no-fallback rip
-                    # 2026-07-04). A faceless talking-head prompt also starves the
-                    # audio-driven-face engine, so this raise preserves that guard.
                     raise RuntimeError(
                         "[OTR_ShotLock] derive_creative_directives: the writer LLM "
-                        "prompt for beat %s failed the story-consistency/person "
-                        "gate -- NO template fallback (no-fallback rip 2026-07-04)."
+                        "prompt for beat %s failed the story-consistency gate -- NO "
+                        "template fallback (no-fallback rip 2026-07-04)."
                         % b["beat_id"]
                     )
             # The subject anchor leads EVERY talking-head prompt path (llm,

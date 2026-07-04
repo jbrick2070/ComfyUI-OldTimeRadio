@@ -266,12 +266,8 @@ class TestPromptDiversityStatus:
 # --------------------------------------------------------------------------- #
 
 class TestPersonAnchor:
-    def test_person_anchor_ok_requires_face_token_in_head(self):
-        app = "a stocky engineer in a grey work shirt"
-        good = "the stocky engineer, face visible, gripping the rail"
-        bad = "fingers dancing across the console, sparks flying"
-        assert _sl._person_anchor_ok(good, app)
-        assert not _sl._person_anchor_ok(bad, app)
+    # (person-anchor DETECTOR removed 2026-07-04 -- test_person_anchor_ok_* deleted;
+    # the _subject_anchor prompt COMPOSITION below is what remains and is tested.)
 
     def test_subject_anchor_leads_with_face_tokens(self):
         a = _sl._subject_anchor("a stocky engineer in a grey shirt")
@@ -284,9 +280,10 @@ class TestPersonAnchor:
 
     def test_object_only_llm_prompt_raises(self):
         """NO-FALLBACK rip (2026-07-04): the b002 shape -- an LLM prompt describing
-        PROPS without the person (no person anchor) -- now FAILS LOUD instead of
-        swapping to the anchored template. A faceless prompt starves the
-        audio-driven-face engine, so the raise preserves that guard loudly."""
+        PROPS without the cast trait -- FAILS LOUD at the story-CONSISTENCY gate
+        (missing the 'stocky engineer' appearance token), not swapping to the
+        anchored template. (The person/face DETECTOR was removed 2026-07-04; this
+        prompt still raises because it also drops the cast trait -> consistency.)"""
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
