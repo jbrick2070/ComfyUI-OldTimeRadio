@@ -507,11 +507,16 @@ def derive_news_dramatic_state(
         try:
             from ._otr_structured_call import structured_call as sc  # type: ignore
         except Exception as exc:  # noqa: BLE001
-            log.warning("[B1] structured_call import failed (%r); fallback", exc)
-            state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
-            if isinstance(meta, dict):
-                meta["dramatic_state_source"] = "fallback_import_error"
-            return state
+            # NO-FALLBACK (operator 2026-07-03): an IMPORT failure here means the
+            # dramatic-state feature's own code cannot load -- a broken install /
+            # missing dependency, not a "no news" case. FAIL LOUD; never silently
+            # ship a stock templated dramatic skeleton that steers the episode.
+            raise RuntimeError(
+                "[B1] dramatic-state: structured_call could not be imported "
+                "(%r). NO templated-state fallback (no-fallback rip) -- fix the "
+                "install/dependency; a broken feature must not silently downgrade "
+                "the storytelling." % (exc,)
+            ) from exc
 
     try:
         llm = sc(
@@ -534,13 +539,14 @@ def derive_news_dramatic_state(
             meta["dramatic_state_source"] = "llm"
         log.info("[B1] news-derived DramaticState built from the LLM.")
         return state
-    except Exception as exc:  # noqa: BLE001 -- never break audio
-        log.warning(
-            "[B1] news-derived DramaticState LLM path failed (%s: %s); "
-            "using the deterministic news-templated fallback.",
-            type(exc).__name__, str(exc)[:200],
-        )
-        state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
-        if isinstance(meta, dict):
-            meta["dramatic_state_source"] = "fallback"
-        return state
+    except Exception as exc:  # LLM failure -> FAIL LOUD (no-fallback rip 2026-07-03)
+        # A failed/timed-out/junk writer LLM call STOPS the episode; it never
+        # silently ships the deterministic news-templated dramatic skeleton as if
+        # the model wrote it. (The genuine "no news input at all" path above still
+        # uses _fallback_state -- that is a no-input case, not a model failure.)
+        raise RuntimeError(
+            "[B1] news-derived DramaticState LLM path failed (%s: %s). NO "
+            "deterministic-templated fallback (no-fallback rip) -- a failed writer "
+            "LLM stops the episode; fix the model/prompt/slot." % (
+                type(exc).__name__, str(exc)[:200])
+        ) from exc

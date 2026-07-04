@@ -67,9 +67,12 @@ def test_news_grounded_llm_wants_are_used():
     _assert_no_default_boilerplate(state)
 
 
-def test_generic_valid_wants_are_rejected_then_fallback():
-    # Schema-valid but with NO news term anywhere -> post-validator rejects
-    # every attempt -> structured_call exhausts -> deterministic fallback.
+def test_generic_valid_wants_are_rejected_then_fails_loud():
+    # NO-FALLBACK (2026-07-03): schema-valid but with NO news term -> post-validator
+    # rejects every attempt -> structured_call exhausts -> the LLM path FAILS LOUD
+    # (RuntimeError). It never silently ships the deterministic news-templated state.
+    import pytest
+
     meta = {"news": {
         "key_terms": ["ancient dna"],
         "script_brief": "Scientists recover ancient DNA from a bone.",
@@ -80,16 +83,11 @@ def test_generic_valid_wants_are_rejected_then_fallback():
         "dramatic_question": "Will the principals make the costly choice in time?",
         "ending_change": "The situation closes meaningfully different.",
     }
-    state = B1.derive_news_dramatic_state(
-        meta=meta, cast_rows=[{"name": "Edna"}, {"name": "Marcus"}],
-        voice_slot_ids=_voice_slots(), slot_fn=_slot_returning(generic),
-    )
-    assert state.character_a_wants != state.character_b_wants
-    # the fallback is templated on the news term, not the generic LLM output
-    blob = " ".join([state.character_a_wants, state.character_b_wants,
-                     state.dramatic_question, state.ending_change]).lower()
-    assert "ancient dna" in blob
-    _assert_no_default_boilerplate(state)
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        B1.derive_news_dramatic_state(
+            meta=meta, cast_rows=[{"name": "Edna"}, {"name": "Marcus"}],
+            voice_slot_ids=_voice_slots(), slot_fn=_slot_returning(generic),
+        )
 
 
 def test_news_none_uses_templated_fallback_and_seeds_key_terms():
@@ -107,28 +105,32 @@ def test_news_none_uses_templated_fallback_and_seeds_key_terms():
     _assert_no_default_boilerplate(state)
 
 
-def test_brief_only_seeds_key_term_from_noun_phrase():
+def test_brief_only_seeds_key_term_then_fails_loud():
+    # The brief's noun-phrase key-term seeding still happens (before the LLM call);
+    # then a junk LLM response FAILS LOUD (no-fallback rip) instead of degrading.
+    import pytest
+
     meta = {"news": {"key_terms": [], "script_brief":
                      "A coastal town debates a new tidal energy project."}}
-    state = B1.derive_news_dramatic_state(
-        meta=meta, cast_rows=[], voice_slot_ids=_voice_slots(),
-        slot_fn=_slot_returning("garbage"),  # force fallback
-    )
-    assert meta["news"]["key_terms"], "key_terms seeded from the brief"
-    assert state.character_a_wants != state.character_b_wants
-    _assert_no_default_boilerplate(state)
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        B1.derive_news_dramatic_state(
+            meta=meta, cast_rows=[], voice_slot_ids=_voice_slots(),
+            slot_fn=_slot_returning("garbage"),
+        )
+    assert meta["news"]["key_terms"], "key_terms seeded from the brief before the loud fail"
 
 
-def test_malformed_llm_output_degrades_to_fallback_never_raises():
+def test_malformed_llm_output_fails_loud():
+    # NO-FALLBACK (2026-07-03): malformed/junk LLM output RAISES -- it no longer
+    # degrades to the deterministic news-templated fallback.
+    import pytest
+
     meta = {"news": {"key_terms": ["the reactor"], "script_brief": "x"}}
-    state = B1.derive_news_dramatic_state(
-        meta=meta, cast_rows=[], voice_slot_ids=_voice_slots(),
-        slot_fn=_slot_returning("{ broken json"),
-    )
-    assert state.character_a_wants != state.character_b_wants
-    assert "the reactor" in " ".join([
-        state.character_a_wants, state.character_b_wants,
-        state.dramatic_question, state.ending_change]).lower()
+    with pytest.raises(RuntimeError, match="no-fallback"):
+        B1.derive_news_dramatic_state(
+            meta=meta, cast_rows=[], voice_slot_ids=_voice_slots(),
+            slot_fn=_slot_returning("{ broken json"),
+        )
 
 
 def test_fallback_wants_are_opposed_for_all_templates():
@@ -138,9 +140,11 @@ def test_fallback_wants_are_opposed_for_all_templates():
         assert term in a and term in b
 
 
-def test_deterministic_for_same_inputs():
+def test_no_news_fallback_deterministic_for_same_inputs():
+    # The KEPT no-news-input path (news absent -> fallback_no_news) is still
+    # deterministic. (The LLM-call-fail fallback is gone -> fails loud, tested above.)
     def _run():
-        meta = {"news": {"key_terms": ["the reactor"], "script_brief": "x"}}
+        meta = {}  # no news / no brief -> the kept no-input fallback fires
         return B1.derive_news_dramatic_state(
             meta=meta, cast_rows=[], voice_slot_ids=_voice_slots(),
             slot_fn=_slot_returning("garbage"),

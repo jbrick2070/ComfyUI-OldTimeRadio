@@ -432,21 +432,23 @@ class TestF8ArcShape:
             ending_change="x stays partly unknown")
         assert pv_n(distinct) is None
 
-    def test_derive_fallback_uses_shape_and_stamps_meta(self):
+    def test_derive_llm_failure_fails_loud_after_stamping_shape(self):
+        # NO-FALLBACK (2026-07-03): a failing dramatic-state LLM call RAISES; it no
+        # longer degrades to the news-templated fallback. arc_shape is still stamped
+        # into meta (before the LLM call) as a side effect.
+        import pytest
+
         meta = {"news": {"key_terms": ["the vial"],
                          "script_brief": "a sealed vial holds a strain"}}
 
         def boom(**kw):
             raise RuntimeError("no llm in test")
 
-        ds = derive_news_dramatic_state(
-            meta=meta,
-            cast_rows=[{"name": "EDNA"}, {"name": "PETER"}],
-            voice_slot_ids=["d001", "d002", "d003", "d004"],
-            slot_fn=None, structured_call_fn=boom, arc_shape="slow_dread",
-        )
+        with pytest.raises(RuntimeError, match="no-fallback"):
+            derive_news_dramatic_state(
+                meta=meta,
+                cast_rows=[{"name": "EDNA"}, {"name": "PETER"}],
+                voice_slot_ids=["d001", "d002", "d003", "d004"],
+                slot_fn=None, structured_call_fn=boom, arc_shape="slow_dread",
+            )
         assert meta["arc_shape"] == "slow_dread"
-        assert meta["dramatic_state_source"] == "fallback"
-        blob = (ds.character_a_wants + ds.character_b_wants
-                + ds.dramatic_question + ds.ending_change).lower()
-        assert "the vial" in blob
