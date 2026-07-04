@@ -261,7 +261,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
             "(meta.cast_contract.cast_seed / meta.episode_seed)")
     ledger_grid = []
     ledger_grid.append(("VRAM:", "%s of %s" % (
-        _fmt_gib(ren.get("vram_peak_mb")), (sysd.get("gpu_vram") or "GPU"))))
+        _fmt_gib(ren.get("vram_peak_mb")), (sysd.get("vram") or "GPU"))))
     if frames and fps:
         ledger_grid.append(("FRAMES:", "%s @ %s fps · %s clips"
                             % (frames, fps, clip_count)))
@@ -272,9 +272,14 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         img.get("image_revision"), ren.get("video_revision"))))
     col1.append(("grid", {"header": "[ PRODUCTION LEDGER ]", "rows": ledger_grid}))
 
-    # [ SYSTEM ] -- soft probe block
+    # [ SYSTEM ] -- soft probe block. Operator 2026-07-03 / roundtable R1: SYSTEM
+    # moves OUT of static col 1 INTO the TOP of the col-3 scroll (below), so the
+    # scroll carries "all the same details as the old right panel". Built here
+    # (sysd is in scope), prepended to col3_flow. Col 1 keeps title / MODELS /
+    # [PRODUCTION LEDGER] / footer -- it gains room, no duplication.
     sys_grid = [
-        ("Host:", sysd.get("host") or sysd.get("os") or "(unknown)"),
+        ("Host:", "%s · %s" % (sysd.get("hostname") or "?",
+                               sysd.get("os") or "(unknown)")),
         ("CPU:", sysd.get("cpu") or "(unknown)"),
         ("RAM:", sysd.get("ram") or "(unknown)"),
         ("GPU:", sysd.get("gpu") or "(unknown)"),
@@ -282,7 +287,6 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
             sysd.get("cuda") or "?", sysd.get("torch") or "?",
             sysd.get("python") or "?")),
     ]
-    col1.append(("grid", {"header": "[ SYSTEM ]", "rows": sys_grid}))
 
     # --- COL 2 -------------------------------------------------------------
     cast = _require(led, "cast", "ledger")
@@ -330,7 +334,11 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     col2 = {"cast_rows": cast_rows, "writer_grid": writer_grid}
 
     # --- COL 3 (scrolls) ---------------------------------------------------
+    # Order: [ SYSTEM ] -> [ STORY SPINE ] -> full [ CLASSIFIED TRANSCRIPT ] ->
+    # >> SOURCE INTERCEPT -> >> DIAGNOSTIC. SYSTEM leads (operator/R1: the scroll
+    # carries all the same details as the old right panel).
     flow = []
+    flow.append(("system", {"header": "[ SYSTEM ]", "rows": sys_grid}))
     # STORY SPINE
     spine = []
     news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
@@ -693,14 +701,17 @@ def _scroll_render_ops(d, flow, col_w, h, *, measure):
             d.text((x, yy), s, fill=fill, font=font)
 
     for kind, block in flow:
-        if kind == "spine":
+        if kind in ("system", "spine"):
+            # bracket header + dim-label / bright-value grid (SYSTEM leads the
+            # scroll; STORY SPINE follows -- same shape).
+            _lw = _sc(110, h) if kind == "spine" else _sc(72, h)
             T(0, y, block["header"], fh1, _rgba(_TEAL))
             y += _fh(fh1) + _sc(8, h)
             for label, val in block["rows"]:
                 T(0, y, label, fgrid, _rgba(_GREEN, _A_LABEL))
-                lines = _wrap(d, val, fgrid, col_w - _sc(110, h))
+                lines = _wrap(d, val, fgrid, col_w - _lw)
                 for i, ln in enumerate(lines):
-                    T(_sc(110, h), y + i * _fh(fgrid), ln, fgrid, _rgba(_BRIGHT))
+                    T(_lw, y + i * _fh(fgrid), ln, fgrid, _rgba(_BRIGHT))
                 y += _fh(fgrid) * len(lines) + _sc(6, h)
             y += _sc(24, h)
         elif kind == "transcript":
@@ -788,20 +799,24 @@ def _scanlines(base):
 # =========================================================================== #
 # Duration + backdrop
 # =========================================================================== #
-def compute_credits_duration_s(scroll_px: int, view_h: int,
+def compute_credits_duration_s(roll_px: int, view_h: int,
                                pps: float = _SCROLL_PPS) -> tuple:
-    """Returns (dur_s, effective_pps). The col-3 scroll drives the tail; if the
-    natural duration exceeds the ceiling we SPEED UP (never truncate)."""
+    """Returns (dur_s, effective_pps) for the CLASSIC credits roll.
+
+    ``roll_px`` = the full travel distance of the col-3 canvas (content_h +
+    view_h): the content enters from BELOW the viewport and fully exits above
+    it, so EVERY line passes through the viewport -- nothing is ever clipped,
+    and it ALWAYS rolls regardless of transcript length (roundtable R1: the old
+    overflow-only ``content_h - view_h`` model left short episodes static +
+    clipped). Over the ceiling -> SPEED UP (never truncate)."""
     if pps <= 0:
         raise CreditsDataError(f"pps must be > 0 (got {pps})")
-    scroll_px = max(0, int(scroll_px))
-    dur = _LEAD_HOLD_S + scroll_px / pps + _TAIL_HOLD_S
+    roll_px = max(1, int(roll_px))
+    dur = _LEAD_HOLD_S + roll_px / pps + _TAIL_HOLD_S
     eff = pps
-    if dur > _MAX_HOLD_S and scroll_px > 0:
-        eff = scroll_px / max(1.0, _MAX_HOLD_S - _LEAD_HOLD_S - _TAIL_HOLD_S)
+    if dur > _MAX_HOLD_S:
+        eff = roll_px / max(1.0, _MAX_HOLD_S - _LEAD_HOLD_S - _TAIL_HOLD_S)
         dur = _MAX_HOLD_S
-    if scroll_px == 0:
-        dur = _LEAD_HOLD_S + _TAIL_HOLD_S + 6.0     # static readable hold
     return (round(dur, 3), eff)
 
 
@@ -868,23 +883,25 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
     col3_x = _sc(_COL3_X, h)
     col3_y = _sc(_COL3_VIEW_Y, h)
     view_h = min(_sc(_COL3_VIEW_H, h), h - col3_y - _sc(40, h))
-    # A short script (canvas < viewport) is the STATIC case -- pad the canvas up
-    # to view_h so the ffmpeg crop window is always valid (crop can't exceed the
-    # source height). scroll_px then resolves to 0 (no scroll, readable hold).
-    if scroll_img.height < view_h:
-        from PIL import Image as _Image
-        _pad = _Image.new("RGBA", (scroll_img.width, view_h), (0, 0, 0, 0))
-        _pad.paste(scroll_img, (0, 0))
-        scroll_img = _pad
-    scroll_px = max(0, scroll_img.height - view_h)
-    dur, eff_pps = compute_credits_duration_s(scroll_px, view_h)
+    # CLASSIC ROLL (roundtable R1 fix): pad the scroll canvas view_h transparent
+    # at TOP and BOTTOM so the content ENTERS from below the viewport and EXITS
+    # above the top -- EVERY line passes through the viewport, nothing is ever
+    # clipped, and it ALWAYS rolls regardless of transcript length. The crop
+    # window travels y = 0 .. roll_px where roll_px = content_h + view_h.
+    from PIL import Image as _Image
+    _padded = _Image.new(
+        "RGBA", (scroll_img.width, scroll_img.height + 2 * view_h), (0, 0, 0, 0))
+    _padded.paste(scroll_img, (0, view_h))
+    scroll_img = _padded
+    roll_px = scroll_img.height - view_h            # = content_h + view_h
+    dur, eff_pps = compute_credits_duration_s(roll_px, view_h)
 
     base_png = out_path + ".base.png"
     scroll_png = out_path + ".scroll.png"
     base_img.convert("RGBA").save(base_png)
     scroll_img.convert("RGBA").save(scroll_png)
     try:
-        yexpr = "clip((t-%.3f)*%.4f\\,0\\,%d)" % (_LEAD_HOLD_S, eff_pps, scroll_px)
+        yexpr = "clip((t-%.3f)*%.4f\\,0\\,%d)" % (_LEAD_HOLD_S, eff_pps, roll_px)
         fade_out_st = max(0.0, dur - _FADE_OUT_S)
         cmd = [
             _ffmpeg_bin(), "-y",
@@ -895,7 +912,12 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
             (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
              f"crop={w}:{h},eq=brightness=-0.32,fps={fps}[bg];"
              f"[bg][1:v]overlay=0:0[b1];"
-             f"[2:v]crop={_sc(_COL3_W, h)}:{view_h}:0:'{yexpr}'[sc];"
+             # The crop y-expr scrolls per-frame (this ffmpeg evaluates crop x/y
+             # per frame; proven by the text-scroll test). The REAL fix is the
+             # classic-roll model above (roll_px = content_h + view_h): a large,
+             # length-independent travel so col 3 ALWAYS visibly rolls and nothing
+             # is clipped (the old overflow-only model left short episodes static).
+             f"[2:v]crop=w={_sc(_COL3_W, h)}:h={view_h}:x=0:y='{yexpr}'[sc];"
              f"[b1][sc]overlay={col3_x}:{col3_y}[cv];"
              f"[cv]fade=t=in:st=0:d={_FADE_IN_S:.2f},"
              f"fade=t=out:st={fade_out_st:.2f}:d={_FADE_OUT_S:.2f}[v]"),

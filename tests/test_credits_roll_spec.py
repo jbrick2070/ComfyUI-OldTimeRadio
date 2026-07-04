@@ -219,16 +219,28 @@ def test_writer_config_block():
 # --------------------------------------------------------------------------- #
 # COL 3 -- scroll flow: spine + FULL transcript + intercept + diagnostic
 # --------------------------------------------------------------------------- #
-def test_col3_flow_has_spine_full_transcript_intercept_diagnostic():
+def test_col3_flow_system_spine_full_transcript_intercept_diagnostic():
     lay = _layout()
     kinds = [k for k, _ in lay["col3_flow"]]
-    assert kinds == ["spine", "transcript", "intercept", "diagnostic"]
+    # SYSTEM now LEADS the scroll (operator/R1: all the same details in the scroll)
+    assert kinds == ["system", "spine", "transcript", "intercept", "diagnostic"]
+    system = dict(lay["col3_flow"])["system"]
+    assert any("CPU" in r[0] for r in system["rows"])   # SYSTEM in the scroll
+    assert any("GPU" in r[0] for r in system["rows"])
     spine = dict(lay["col3_flow"])["spine"]
     assert "protect the lab" in _flat(spine) and "ship the product" in _flat(spine)
     transcript = dict(lay["col3_flow"])["transcript"]
     # FULL transcript -- every dialogue line present, nothing dropped
     assert len(transcript["lines"]) == 3
     assert "expose my sources" in _flat(transcript["lines"])
+
+
+def test_system_left_col1_static_dashboard():
+    lay = _layout()
+    # SYSTEM must NOT be duplicated in the static col 1 anymore.
+    col1_headers = [b.get("header", "") for k, b in lay["col1"] if k == "grid"]
+    assert not any("SYSTEM" in h for h in col1_headers)
+    assert any("PRODUCTION LEDGER" in h for h in col1_headers)   # ledger stays
 
 
 def test_diagnostic_is_seeded_and_never_fabricates_a_number():
@@ -329,6 +341,49 @@ def test_append_extends_body_and_stays_silent(tmp_path):
     assert _count_audio_streams(str(out)) == 0
     total = _count_frames(str(out))
     assert total == pytest.approx(50 + dur * 25.0, abs=8)
+
+
+@needs_ffmpeg
+def test_col3_text_scrolls_even_for_short_episode(tmp_path):
+    """The real-obs bug: col 3 was STATIC + clipped on a short episode. Classic
+    roll must ALWAYS scroll. Render over a CONSTANT gray backdrop so any change in
+    the col-3 region is TEXT motion (not the looped backdrop that masked the bug),
+    and assert two in-scroll times differ -- for the SHORT fixture transcript."""
+    import hashlib
+    from PIL import Image
+    backdrop = tmp_path / "clip.mp4"
+    _silent_video(backdrop, 1.0, size="1280x720")      # constant gray
+    out = tmp_path / "credits.mp4"
+    dur = cr.render_credits_clip(_layout(), str(backdrop), str(out),
+                                 w=1280, h=720, fps=25.0)
+
+    def col3_hash(ts):
+        f = tmp_path / ("f_%.2f.png" % ts)
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", "%.2f" % ts,
+                        "-i", str(out), "-frames:v", "1", str(f)], check=True)
+        im = Image.open(f).convert("RGB")
+        x = cr._sc(cr._COL3_X, 720)
+        reg = im.crop((x, cr._sc(cr._COL3_VIEW_Y, 720), im.width, 720 - 40))
+        return hashlib.sha1(reg.tobytes()).hexdigest()
+
+    t_early = cr._LEAD_HOLD_S + 2.0
+    t_mid = min(dur - cr._TAIL_HOLD_S - 2.0, t_early + 6.0)
+    assert col3_hash(t_early) != col3_hash(t_mid), \
+        "col 3 text did not scroll (static-crop / overflow-only regression)"
+
+
+def test_classic_roll_distance_includes_viewport():
+    """Guard the model regression: the roll distance is content_h + view_h (the
+    canvas is padded view_h top AND bottom) so col 3 ALWAYS rolls and nothing is
+    clipped -- NOT the old overflow-only content_h - view_h that left short
+    episodes static. A tiny canvas still yields a roll_px >= view_h."""
+    view_h = 600
+    # content 100px tall -> padded 100+1200 -> roll_px = 1300 - 600 = 700 > view_h
+    assert cr.compute_credits_duration_s(100 + view_h, view_h)[0] > \
+        cr._LEAD_HOLD_S + cr._TAIL_HOLD_S
+    # duration scales with content (longer transcript -> longer roll)
+    assert cr.compute_credits_duration_s(5000, view_h)[0] > \
+        cr.compute_credits_duration_s(500, view_h)[0]
 
 
 def test_append_raises_never_source_copies(tmp_path):
