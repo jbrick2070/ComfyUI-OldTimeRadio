@@ -336,7 +336,7 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
     ``round(dur_s*fps)``. Returns ``{per_beat:{beat_id:frames}, total_frames,
     warnings}``. Pure; gated by the caller on ``audio_done``.
 
-    rip-sfx-broll (2026-07-01): the other-beats POOLING budget
+    rip-sfx-broll (2026-07-01): the POOLING budget
     (clip_mode / pool_n / character_render_count) was removed with the
     scene_broll / background_abstract roles -- every beat renders per-beat.
     """

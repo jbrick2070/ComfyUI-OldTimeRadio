@@ -7,7 +7,7 @@ The live GPU soak is gated, but its load-bearing wiring is proven here on the CP
     THREE video slots are set INDEPENDENTLY via the capability-profile
     role_overrides -> apply_profile patches the OTR_VideoDirector video-model
     widgets BY NODE TYPE (config/profiles/widget_mapping.json; no node ids),
-    and NONE is left at the legacy "(use Other Beats default)" sentinel;
+    and NONE is left at a stale inherit sentinel;
   * every chosen engine is role_compat-ELIGIBLE for its slot (capability, C2/C4);
   * the per-beat CONTENT ORACLE catches the D2 dark floor + a frozen motion clip,
     and exempts static engines -- proven on real ffmpeg-rendered fixtures.
@@ -43,7 +43,6 @@ ROLE_ENGINES = {
     "music_visual": "viz_green",
     "character_video": "humo_1.7B_169",
 }
-_OTHER_BEATS_SENTINEL = "(use Other Beats default)"
 _VIDEO_WIDGET = {
     "announcer_visual": "announcer_video_model",
     "music_visual": "music_video_model",
@@ -78,7 +77,6 @@ def test_all_slots_set_on_canonical_json():
         widget = _VIDEO_WIDGET[role]
         got = vals[slots.index(widget)]
         assert got == engine, (role, widget, got)
-        assert got != _OTHER_BEATS_SENTINEL, role          # no legacy fallback
 
 
 def test_image_keys_are_exactly_the_three():

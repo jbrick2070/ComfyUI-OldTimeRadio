@@ -70,7 +70,7 @@ def slot_for_role(role: str) -> str:
     """The dedicated per-role video slot for ``role``.
 
     NO FALLBACKS (rip-sfx-broll, 2026-07-01): an unknown role RAISES
-    ``ValueError`` -- the historical silent map to the legacy other-beats
+    ``ValueError`` -- the historical silent map to the legacy catch-all
     slot was exactly the kind of fallback that let dead roles ride along
     unnoticed. A raise here names the bad token so the producer gets fixed.
     """

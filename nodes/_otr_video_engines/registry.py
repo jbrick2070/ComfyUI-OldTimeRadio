@@ -1,6 +1,6 @@
 """Pluggable video-engine registry -- the model-agnostic video superstructure.
 
-Each video *role* -- announcer visual (A), music visual (B), other-beats visual
+Each video *role* -- announcer visual (A), music visual (B), character visual
 (C: character / scene b-roll / background) -- picks its engine from this shared
 registry instead of being hardcoded to one model. Adapters self-register on
 import; the ``OTR_VideoDirector`` builds its per-role dropdown from the FULL

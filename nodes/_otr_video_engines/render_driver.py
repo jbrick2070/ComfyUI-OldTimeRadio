@@ -907,7 +907,7 @@ def _cumulative_beat_start(ledger, shot, fps):
     (``target_frame_count``/fps -- ShotRow has no start_s/dur_s, extra=forbid).
     Returns the clock at THIS shot. Bounded + deterministic; clamped >= 0; 0.0 if
     the shot is not found (slice the head -- still bounded, never the whole
-    master). NOTE: pooled/looped other-beats may not be exactly true to the beat
+    master). NOTE: pooled/looped beats may not be exactly true to the beat
     count -- accepted (operator's call)."""
     shots = ((ledger or {}).get("video") or {}).get("shots") or []
     lines = _line_index(ledger)

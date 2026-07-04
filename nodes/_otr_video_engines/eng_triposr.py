@@ -108,7 +108,7 @@ class TripoSREngine:
     #: engines. It is NOT a requires_mesh_portrait character mesher (those are the
     #: eng_character_3d talkers), so it does NOT get the portrait still-feed.
     render_aspect = "wide"
-    # Mirrors mesh_stage: a static mesher can fill the music/announcer/other-beats
+    # Mirrors mesh_stage: a static mesher can fill the music/announcer/character
     # visual slots (it needs only an init_image, supplied by every role).
     roles = ("music_visual", "announcer_visual", "character_video")
     default_roles = ()

@@ -16,7 +16,7 @@ nodes/_otr_video_engines/__init__.py and carries no ``@register`` decorator,
 so it is NOT selectable and direct imports do not re-register it. The class
 stays on disk (it returns when re-enabled) and still serves the three
 OTR_VideoDirector slots that can supply a still (announcer / music /
-other-beats via character_video + scene_broll -- background_abstract only
+character via character_video + scene_broll -- background_abstract only
 supplies text, so role_compat excludes it fail-closed) via DIRECT
 instantiation.
 

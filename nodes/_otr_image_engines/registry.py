@@ -1,6 +1,6 @@
 """Pluggable image-engine registry -- the model-agnostic image superstructure (C1).
 
-Each image *role* -- announcer image (A), music image (B), other-beats/character
+Each image *role* -- announcer image (A), music image (B), character
 image (C) -- picks its engine from this shared registry instead of being
 hardcoded to Flux. Adapters self-register on import; ``OTR_ImageDirector`` builds
 its per-role dropdown from the FULL static registry (V-6) and filters by role

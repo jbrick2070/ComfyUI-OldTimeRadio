@@ -58,7 +58,7 @@ ADD_CUSTOM = "+ Add Custom Model"
 IMAGE_SLOT_ROLES = {
     "announcer_image_model": ("announcer_visual",),
     "music_image_model": ("music_visual",),
-    # rip-sfx-broll (2026-07-01): the other-beats image slot is KEPT --
+    # rip-sfx-broll (2026-07-01): the character image slot is KEPT --
     # character stills ride it; the scene_broll / background_abstract
     # pairings died with those roles.
     "character_image_model": ("character_video",),

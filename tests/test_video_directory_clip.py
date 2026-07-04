@@ -284,7 +284,7 @@ def test_build_clip_manifest_stamps_mesh_stage_plate(tmp_path):
 
 def test_segment_carries_bg_still_path():
     """The planner propagates a clip row's bg_still_path into its segment dict
-    (the field is dead-on-arrival without this); other beats carry ''."""
+    (the field is dead-on-arrival without this); other roles carry ''."""
     plate = "C:/plate.png"
     m = {"fps": FPS, "total_target_frames": N_FRAMES, "clips": [{
         "order": 0, "shot_id": "b001", "engine_id": "mesh_stage",

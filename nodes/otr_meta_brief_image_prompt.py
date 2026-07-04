@@ -568,7 +568,7 @@ def derive_scene_still_targets(lines, fps: int = 25):
     ``{beat_id, kind, role, source}``.
 
     EVERY beat carries its OWN scene still (rip-sfx-broll 2026-07-01: the
-    other-beats pool_n_loop POOLING died with the scene_broll /
+    pool_n_loop POOLING died with the scene_broll /
     background_abstract roles -- there is no shared still pool any more).
     An unmapped speaker_role FAILS LOUD (NO FALLBACKS; the old
     _DEFAULT_VIDEO_ROLE fallthrough is gone).

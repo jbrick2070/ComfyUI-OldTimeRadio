@@ -111,7 +111,7 @@ class Canvas(_Forbid):
 
 class Strategy(_Forbid):
     #: ``unique_per_beat`` (one clip per beat) -- the only live mode since the
-    #: other-beats ``pool_n_loop`` pooling was removed 2026-07-01
+    #: the ``pool_n_loop`` pooling was removed 2026-07-01
     #: (rip-sfx-broll). pool_key/pool_size are retained schema slots (always
     #: None from ShotLock) so old serialized requests still parse.
     mode: str = "unique_per_beat"
