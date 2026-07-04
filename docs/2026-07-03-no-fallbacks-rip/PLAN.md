@@ -244,27 +244,45 @@ VERDICT: SOUND. It CONFIRMS R1 was safe + refines the R2/R3 map. Grounded surviv
 - `test_still_spine_helpers.py::test_st4_still_index_and_family_init` (:724-733) —
   missing scene still must RAISE, not fall back to the `"portrait"` init source.
 
-## H0. R3 DESIGN DECIDED (operator 2026-07-03) — explicit writer_fallback, no silent template
+## H0. R3 DECISION (operator 2026-07-03, SIMPLIFIED) — hard-fail now, writer_fallback roadmapped
 Fable split the writer soft-fails into (Class 1) model->template SILENT swaps and
-(Class 2) defensive polish catches. Operator's resolution (better than pure
-hard-fail): the objection is to HIDDEN swaps, not to a chosen fallback. So:
+(Class 2) defensive polish catches. FINAL operator call: the explicit
+`writer_fallback` backup-LLM dropdown is ROADMAPPED (docs/ROADMAP_IDEAS.md) -- the
+LLM-invoke code is clean so it's a small future add. For NOW, R3 is a SIMPLE RIP:
 
-- NEW visible widget `writer_fallback` on the writer node: `[fail_hard | <a
-  specific backup LLM>]`, DEFAULT = `fail_hard`. Add it to INPUT_TYPES + the
-  workflow JSON (source of truth, CLAUDE.md §0) in the same change.
 - The 5 CLASS-1 sites (news degrade, title, announcer-outro, news-coda, character
-  portrait): when the PRIMARY writer LLM fails/returns junk -> if a backup LLM is
-  chosen, RETRY on it -> if the backup ALSO fails (or writer_fallback=fail_hard),
-  FAIL LOUD (named). The canned templates are REMOVED -- no silent filler EVER.
-- CLASS 2 defensive polish catches: KEPT, but each must be LOUD (ledger + log
-  stamp) so a skipped enhancement is never silent (Fable).
-- DELETE dead `_bark_health_check` + `_bark_health_check_for_cast`.
+  portrait): when the writer LLM fails/returns junk, FAIL LOUD (named raise). The
+  canned templates are REMOVED -- "if the LLM fails the whole thing fails"
+  (operator, fine with it). No backup, no template.
+- CLASS 2 defensive polish catches: KEPT (they are computation hiccups, not LLM
+  failures), but each must be LOUD (ledger + log stamp) so a skipped enhancement is
+  never silent (Fable).
+- DELETE dead `_bark_health_check` + `_bark_health_check_for_cast` (+ the shared
+  `_bark_test_presets` helper + `_BARK_HEALTH_*` globals -- self-contained, no
+  external callers).
 
-Build order: (R3a) find the central writer LLM-invoke seam + add the
-fallback-then-hard-fail wrapper gated on writer_fallback; (R3b) remove the 5
-template fallbacks -> route through the wrapper; (R3c) Class-2 loud-stamp audit +
-dead-code delete; workflow JSON widget in the same change; invert the mapped
-tests; Fable gate before merge (§9).
+This is a pure rip (like R1/R2), NOT a feature build. Invert the mapped tests in
+the same commit; Fable gate before merge (§9).
+
+**GROUNDING CORRECTIONS (Claude, executing 2026-07-03) — the true rip set is 3, not 5:**
+- TITLE is NOT a hidden canned-template swap. `OTR_LedgerScriptWriter.py:5247-5257`:
+  when the post-composition title REGEN returns empty it falls back to
+  `outline.title` -- which is itself the PRIMARY AI-generated title from the outline
+  pass, not canned filler. The regen is an optional enhancement; falling back to the
+  already-AI outline title is Class-2-like. KEEP (do NOT hard-fail the episode over
+  an optional title-improvement pass).
+- NEWS is operator-GATED: `news_briefs_required` (visible widget, DEFAULT True)
+  already HARD-HALTS on news failure (:2939). The :2956 degrade only runs when the
+  operator explicitly set the toggle False -- an intentional, visible opt-in. KEEP.
+- TRUE Class-1 hidden canned-template swaps to RIP = **3**: announcer-outro
+  (_otr_line_composer.py ~3519-3524/3600-3602/3657-3662), news-coda floor
+  (_otr_line_composer.py ~3446-3457), character portrait 3-tier
+  (otr_meta_brief_image_prompt.py derive_image_prompts ~1113-1156).
+- DEAD-CODE delete (_bark_health_* cluster) is DEFERRED: `test_cast_fuzzy_consolidate.py`
+  regex-extracts `_consolidate_similar_cast_rows` bounded by the NEXT `def ` -- which
+  is the bark cluster. Deleting it makes the regex over-run into module-level code
+  (collection error). Fix the test's extraction to be dedent-bounded FIRST, then
+  delete. (agy straggler sweep AGY_PROMPT_R3_STRAGGLERS.md running to finalize the set.)
 
 ## H. R3 grounded map (agy 2026-07-03, Claude-grounded) + scope split
 Two CLASSES of R3 site, which matters for scope:
