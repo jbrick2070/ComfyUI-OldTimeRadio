@@ -6,6 +6,35 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 02:03 -- HEAD 82f39a23 (v2.0-alpha) -- WIDGET-SURFACE CLEANUP BUILD COMPLETE (overnight, all 4 items)
+Did: executed the whole widget-cleanup build unattended off WIDGET_SURFACE_AUDIT.md v2; every chunk
+suite 6142/0 + Bug Bible 16 + strict-types exit 0, committed AND pushed HEAD==origin:
+- Batch 1 @364a9278: removed single-option widget SURFACES (node 80 delivery_profile + 81/82/83
+  stereo_policy); kwargs KEPT (neutral/mono_safe, still validated+stamped); JSON widgets_values trimmed
+  positionally (80->3, 81/82/83->1); 5 widget-vector tests + 2 docstrings updated. test_audio_byte_
+  identical stayed green (Batch 1 tripwire).
+- Batch 2 @f18746ce: tooltip-only, no renames -- FreezeCascade protagonist_only (manual_line_ids
+  supersede note) + VideoRenderBatch mode/engine/oom_index/beats/frame_count mode-conditional docs.
+- Standalone @268e7352: validate_workflow_links.py --strict-types now unions the dynamic
+  new_node_modules_table() keys (AST parse of _otr_class_registry) -> fixes the nodes 80-83 false-flag
+  (exit 0); _otr_workflow_validator.py hyphenated importlib fallback (could never resolve) replaced by a
+  sys.modules scan; new regression test in test_class_registry.py.
+- Batch 3 @82f39a23: caption SINGLE-OWNER migration to node 86 (chain 84->93->86->95->85). Node 93 caption
+  path fully stripped (INPUT_TYPES+blend() sig, widgets 13->11, scopes L273 dst 11->9, captions_ass_path
+  pinned None, _resolve_captions_ass + dead helpers/constants removed; bars two-pass untouched). Node 86:
+  burn ON, _resolve_ledger_path strips _procgen_blended + sibling-audio glob fallback, _default_out beside
+  input (otr/episodes/<ep>/), OTR_BURN_CAPTIONS env-only enable CUT. widget_mapping retargeted to
+  OTR_CaptionBurn. JSON links rewired with full referential-integrity validation. Tests inverted (validator
+  / procgen / caption_burn). GATES: grounded general-purpose review (SHIP, 0 breakers) + Fable §9 final gate
+  (SHIP -- traced 6 lanes w/ live probes: production caption burn triple-covered, mux duration guard holds,
+  zero positional drift). Non-blocking nits: N1 typing.Optional import; N2 node-93 stamps the uncaptioned
+  blend into ledger.final_video_path; N3 stale node-93 caption log strings.
+Current step: WIDGET-SURFACE CLEANUP BUILD COMPLETE. NEXT = PARKED credits-enrichment LIVE frame smoke
+(S3+S1 shipped @5f510ebe) -> S0 -> S4.
+Next: credits-enrichment LIVE frame smoke (SHORT+LONG, obs credits tail) -- operator gated. Operator is
+handling the Comfy Cloud model hard-fails himself; the model-matrix SOAK is DEFERRED by operator directive.
+Commits: 364a9278 f18746ce 268e7352 82f39a23 (+ this docs baton).
+
 ## 2026-07-04 (WIDGET-SURFACE AUDIT v2 -- read-only analysis arc; docs only) -- HEAD b36dda88 (v2.0-alpha)
 Did:
 - Free static widget inventory (AST + consumption grep) of otr_scifi_16gb_full.json: 23 nodes, ~125 widgets, ZERO dead, zero positional drift; raw JSONs in docs/2026-07-03-widget-audit/.

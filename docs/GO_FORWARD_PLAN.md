@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (widget-audit v2 CONVERGED; overnight widget-cleanup build handed to Opus-high) | branch v2.0-alpha @ b36dda88 | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 02:03 (WIDGET-SURFACE CLEANUP BUILD COMPLETE -- all 4 items shipped+pushed) | branch v2.0-alpha @ 82f39a23 | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -29,24 +29,29 @@
 
 ## 1. CURRENT STEP
 
-**ACTIVE (2026-07-04, OVERNIGHT, Opus-high window) = WIDGET-SURFACE CLEANUP BUILD.** Source of
-truth: `docs/2026-07-03-widget-audit/WIDGET_SURFACE_AUDIT.md` (v2, fully converged: codex x4 +
-antigravity x2 + sonnet + Claude judge; @ b36dda88). Operator decisions LOCKED: caption owner =
-NODE 86 (finish CW-4); captions = clean on/off feature (widget + profiles, env-only enablement CUT).
-Execute in order, commit+push per green chunk, suite + Bug Bible after every chunk:
-1. Batch 1 -- surface-only removal (stereo_policy x3 + delivery_profile; exact vectors in the doc;
-   kwargs KEPT; test + docstring updates listed). ~95% confidence.
-2. Batch 2 -- tooltip-only (NO key renames -- permanently cut).
-3. Standalone -- fix validate_workflow_links.py --strict-types (include new_node_modules_table()
-   keys statically) + the _otr_workflow_validator.py:352-362 illegal-dotted-path fallback.
-4. Batch 3 -- caption 86-owner migration, ALL 6 items in the doc atomically (rewire
-   84->93->86->95->85, _procgen_blended + sibling-audio resolver port, _default_out path fix,
-   profile/mapping retarget, node 93 caption-path strip 13->11, test inversions). Then the §9
-   FABLE FINAL GATE (one grounded pass) BEFORE declaring Batch 3 done -- if Fable finds a breaker,
-   fix and re-gate; if unresolvable, STOP and leave for the operator.
-CAUTION: the overnight model-matrix SOAK may still be RESIDENT (section below) -- reset per
-CLAUDE.md section 4 before any headless verification render; none is required for these batches.
-After all four: refresh this section to point back to CREDITS ENRICHMENT (LIVE frame-level smoke).
+**WIDGET-SURFACE CLEANUP BUILD -- COMPLETE (2026-07-04 02:03 @ 82f39a23).** All four items shipped +
+pushed to v2.0-alpha; suite 6142/0 + Bug Bible 16 + strict-types exit 0 per chunk (HANDOFF_LOG
+2026-07-04 02:03). Source of truth was `docs/2026-07-03-widget-audit/WIDGET_SURFACE_AUDIT.md` v2.
+- Batch 1 @364a9278 -- surface-only removal (node 80 delivery_profile + 81/82/83 stereo_policy);
+  kwargs KEPT byte-identical (neutral/mono_safe); test_audio_byte_identical stayed green.
+- Batch 2 @f18746ce -- tooltips only (protagonist_only supersede note + VideoRenderBatch mode-
+  conditional docs); no renames.
+- Standalone @268e7352 -- strict-types CLI unions the dynamic registry keys (nodes 80-83 false-flag
+  fixed) + _otr_workflow_validator hyphen dotted-path fallback replaced by a sys.modules scan.
+- Batch 3 @82f39a23 -- caption single-owner migration to node 86 (chain 84->93->86->95->85); node 93
+  caption path stripped (13->11 widgets, scopes L273 dst 11->9); env-only enablement CUT; mapping
+  retargeted. Grounded general-purpose review + Fable §9 gate BOTH SHIP.
+NON-BLOCKING follow-ups from the Fable gate (fold into a later pass, none gate anything): N1 restore
+`from typing import Optional` in otr_post_upscale_procgen_blend.py; N2 node 93 stamps
+ledger.final_video_path with the now-UNcaptioned blend (restamp at 86/85 for truthfulness); N3 stale
+node-93 caption log strings.
+
+**NEXT (operator-gated) = resume the PARKED credits-enrichment LIVE frame-level smoke** (S3+S1 shipped
+@5f510ebe) on a SHORT + LONG episode: last frame is a credit frame, body audio byte-identical, no mux
+ValueError on the long roll, final in otr/obs carries the credits tail; then S0 -> S4. Source of truth:
+`docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md` (v4). NOTE: the operator is handling the
+Comfy Cloud model hard-fails himself -- the model-matrix SOAK is DEFERRED by operator directive
+(2026-07-04). Reset the box per CLAUDE.md section 4 before any headless render.
 
 **Previously active = STACK-WIDE NO-FALLBACK RIP (COMPLETE).** Operator directive: every model
 failure FAILS THE EPISODE LOUD (named raise), never a silent swap/canned-template. Source of truth +
