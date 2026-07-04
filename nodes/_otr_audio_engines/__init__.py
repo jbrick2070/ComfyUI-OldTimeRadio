@@ -37,7 +37,7 @@ from . import (  # noqa: E402,F401
 
 # Cloud engines (dropdown-opt-in; Comfy Cloud via invoke_partner_node; never a
 # default). Cloud-audio campaign 2026-07-03.
-from . import eng_cloud_elevenlabs  # noqa: E402,F401
+from . import eng_cloud_elevenlabs, eng_cloud_sonilo  # noqa: E402,F401
 
 __all__ = [
     "AudioEngine",

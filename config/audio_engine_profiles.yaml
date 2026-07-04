@@ -293,3 +293,33 @@ profiles:
     billing_category: tts
     canonicalizer: audio
     error_policy: fail_loud
+
+  # --- cloud Sonilo MUSIC (cloud-audio S5, 2026-07-03; dropdown-opt-in, Comfy
+  # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);
+  # fail-loud, no local fallback. Provider-native duration; ONE music profile maps
+  # to all cue types (open/close/inter), stamped per-episode as meta.music_engine
+  # (C9). ---
+  - profile_id: music_sonilo_cloud_v1
+    role: music
+    engine: sonilo
+    commercial_clean: true          # Sonilo library service, ToS commercial-clean
+    model_path: ""
+    model_sha256: ""
+    default_params: {}
+    allowed_voice_banks: []
+    engine_impl_version: "1"
+    sample_rate: 44100
+    requires_hf_token: false
+    rank: 50                        # opt-in; local engines rank ahead
+    is_default: false
+    runtime: cloud
+    needs_ref_clip: false
+    caps: {emotion_vector: false, duration_control: true}   # provider-native duration
+    license_state: clean
+    warn_text: ""
+    partner_row: cloud_sonilo_music
+    provider_id: sonilo
+    auth_required: true
+    billing_category: music
+    canonicalizer: audio
+    error_policy: fail_loud

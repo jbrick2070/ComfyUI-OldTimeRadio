@@ -24,6 +24,8 @@ def test_load_resolver_and_source_hash():
         "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
         # cloud ElevenLabs voice (cloud-audio S1, 2026-07-03)
         "char_elevenlabs_cloud_v1", "announcer_elevenlabs_cloud_v1",
+        # cloud Sonilo music (cloud-audio S5, 2026-07-03)
+        "music_sonilo_cloud_v1",
     }
 
 

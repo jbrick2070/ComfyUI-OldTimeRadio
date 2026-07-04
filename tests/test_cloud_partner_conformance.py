@@ -30,10 +30,10 @@ KNOWN_UNADAPTERED = {
     # cloud_ideogram_v4 is now served by the `ideo` adapter (S1+1); ideo_word
     # (words specialist, same node_key) lands next.
     # cloud_elevenlabs_tts is now served by the `elevenlabs` adapter (cloud-audio
-    # S1, 2026-07-03) -- xfail REMOVED here.
+    # S1, 2026-07-03); cloud_sonilo_music by the `sonilo` adapter (cloud-audio S5,
+    # 2026-07-03) -- both xfails REMOVED here.
     "cloud_elevenlabs_flash": "same class, no separate adapter (tier via params)",
-    "cloud_sonilo_music": "S5 cloud music lane",
-    "cloud_stability_audio": "S5 cloud music lane (documented, not wired)",
+    "cloud_stability_audio": "documented next music candidate, no adapter (CHEAP-cand)",
 }
 
 # Adapters whose _partner_inputs cannot build OFFLINE (honest dark row, or needs

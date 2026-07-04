@@ -209,4 +209,6 @@ CAPABILITIES = {
     # cpu_floor tier; the "cost" is credits + auth, enforced at invoke, not VRAM).
     "elevenlabs": {"required_toolchain": None, "requires_sidecar": False,
                    "cpu_ok": True, "model_requirements": []},
+    "sonilo": {"required_toolchain": None, "requires_sidecar": False,
+               "cpu_ok": True, "model_requirements": []},
 }
