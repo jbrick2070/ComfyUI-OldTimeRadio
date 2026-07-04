@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-03 (NO-FALLBACK RIP in progress; cloud voice+music shipped) | branch v2.0-alpha @ 1d8f7e2b | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (NO-FALLBACK RIP: R3 9-site set COMPLETE + Fable SHIP) | branch v2.0-alpha @ a11d8605 | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -44,15 +44,29 @@ DONE + pushed to v2.0-alpha this arc (all suite 6138-6142 + Bug Bible green, 0 r
 - R3-chunk-1 @de6af8c2 (dramatic-state import-fail + LLM call-fail -> raise; kept no-news-input path).
 - R3-chunk-2 @1d8f7e2b (announcer intro/outro/coda LLM->template swaps -> raise; F3-hedge KEEPS the
   AI line not a template; retired the NEWS_CODA_POOL floor; 16 tests inverted across 5 files).
-NEXT (R3-chunk-3, then the arc closes): rip `otr_meta_brief_image_prompt.py` -- portrait 3-tier
-(tier-2 LLM-empty->template is a clean rip; tiers 3/4 consistency-gate + PERSON-GUARD need the same
-"keep the AI output vs raise" judgment as the outro F3 case -- the person-guard exists so a faceless
-prompt doesn't starve the audio-driven-face engine, so do NOT blind-rip it) + the char-scene prompt
-(:814->842). Then `_otr_casting.py:1345` (Sonnet's straggler: LLM naming-fail silently keeps the
-RNG-pool name -> raise). Then the FABLE GATE on the whole R3 diff before it's merged (§9). agy/Sonnet
-confirmed the ~50 other writer except-blocks are clean (skip cosmetic / operator-gated only). KEPT
-(NOT fallbacks): title->outline.title (primary AI title), news degrade (gated by news_briefs_required
-toggle), J2 outline speaker round-robin (structural, no prose), the "genuinely no news input" degrade.
+- **R3-chunk-3 COMPLETE + Fable SHIP** @74433163 (image lane) + @4ac329f2 (refine-loop) + @a11d8605
+  (stale-comment fix): `otr_meta_brief_image_prompt.py` portrait 4 tiers (tier-2 empty / consistency
+  gate / person-guard / gear-scrub-empty) + `_compose_char_scene_prompt` now RAISE when the prompt
+  came from the LLM (`source=="llm"` / `llm_fn` attempted); `llm_fn=None` keeps the legit local
+  template lane; `consistency_gate_warn_only=True` keeps. `_otr_casting.py _apply_llm_slot_fill`
+  (opt-in `llm_slot_fill`) raises CastValidationLLMError on both fail paths. Made effective through
+  the writer `_refine_loop` (was swallowing casting errors on refine pass>=1). Tests inverted +
+  char-scene fail-loud test added. Suite 6139/0, Bug Bible 16. Fable §9 = SHIP (all 4 portrait tiers
+  RAISE confirmed correct; happy-path dormant; no surviving swallow).
+
+**R3 9-SITE SET COMPLETE.** All originally-scoped no-fallback sites (chunks 1-3) are ripped + green +
+pushed. NEXT (operator decision -- surfaced by the grounded review + Fable gate):
+- **NEW 10th site candidate: `otr_shot_lock.py derive_creative_directives`** has the SAME
+  model->template fallback shape (`template_consistency` / person-anchor template / empty-reseed
+  template; docstring still says "Never raises ... -> template"). It was OUT of the explicit 9-site
+  set. It is LESS bad than the ripped sites (warns + ledger-stamps `source`, per-beat flavor not the
+  identity anchor) and is test-pinned (test_look_qa_round5 + test_video_platform_aseam), so ripping it
+  needs its own re-baseline. RIP as R3-chunk-4, or DEFER to a ShotLock audit sprint? -> operator call.
+- Nit (fold into any future edit of that block): `otr_meta_brief_image_prompt.py` gear-scrub template
+  rebuild ~:1219 omits `_aspect` (portrait-aspect rebuild); pre-existing, practically unreachable.
+KEPT (NOT fallbacks, unchanged): title->outline.title (primary AI title), news degrade (gated by
+news_briefs_required toggle), J2 outline speaker round-robin (structural), the "no news input" degrade.
+With the 10th site deferred, the PARKED credits-enrichment (below) resumes.
 
 **Previously active (still open, resume after the rip): CREDITS ENRICHMENT --
 S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON

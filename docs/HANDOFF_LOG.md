@@ -6,6 +6,34 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (NO-FALLBACK RIP: R3-chunk-3 image+casting + Fable SHIP -- 9-site set COMPLETE) -- HEAD a11d8605 (v2.0-alpha)
+Did (closes the R3 arc's originally-scoped 9 sites; every chunk suite 6139/0 + Bug Bible 16, pushed
+HEAD==origin):
+- @74433163 image lane: `otr_meta_brief_image_prompt.py` -- portrait 4 tiers (tier-2 empty /
+  story-consistency gate / person-guard / gear-scrub-empty) + `_compose_char_scene_prompt` now RAISE
+  a named RuntimeError("... no-fallback rip 2026-07-03") when the prompt came from the writer LLM
+  (`source=="llm"` / `_llm_attempted`). `llm_fn=None` keeps the legit deterministic local template
+  lane (NOT a fallback); `consistency_gate_warn_only=True` keeps + logs. Contract docstring updated.
+- @74433163 casting: `_otr_casting.py _apply_llm_slot_fill` (opt-in `name_mode=="llm_slot_fill"`)
+  raises CastValidationLLMError on BOTH fail paths (generate_fn raises; validation not-ok) instead of
+  silently keeping the deterministic RNG-pool names. (Ctor is (attempts,name) -> tag in the attempt str.)
+- @4ac329f2 refine-loop: the grounded general-purpose review caught that the writer `_refine_loop`
+  (OTR_LedgerScriptWriter.py:2306) swallowed the casting raise on refine pass>=1 (E4 outer-catch),
+  making the casting rip inert in refine-ON + llm_slot_fill. Narrowed the catch to re-raise
+  CastingFailedError unconditionally (cast deterministic per forced_seed); kept transient pass-skip.
+- @a11d8605 fixed the now-stale lock_cast comment (Fable followup).
+- Tests: inverted the pinned fallbacks in the SAME commit (test_image_platform_c1 reseed+consistency,
+  test_brief_prompt_finishing person-guard, test_cast_llm_naming both R8 paths) + ADDED a char-scene
+  fail-loud test; kept the llm_fn=None keep tests. No workflow-JSON change (pure runtime rip).
+- Gates: grounded general-purpose review (found + fixed the refine-loop swallow) + Fable §9 = SHIP
+  (all 4 portrait tiers RAISE confirmed correct vs the F3-keep precedent; happy-path dormant; no
+  surviving swallow). agy+Sonnet review packet: docs/2026-07-03-no-fallbacks-rip/R3_CHUNK3_REVIEW_PROMPT.md.
+Current step: R3 9-site set COMPLETE. NEXT = operator decision on the NEW 10th site candidate
+`otr_shot_lock.py derive_creative_directives` (same model->template shape; test-pinned, needs its own
+re-baseline) -- rip as R3-chunk-4 or defer to a ShotLock audit. With it deferred, credits-enrichment resumes.
+Next: operator ruling on the shot-lock sibling; then the parked credits-enrichment LIVE frame smoke.
+Commits: 74433163 4ac329f2 a11d8605 (+ GO_FORWARD/HANDOFF docs).
+
 ## 2026-07-03 (stack-wide NO-FALLBACK RIP: cloud audio + R1/R1c/R2/rename + R3 chunks 1-2) -- HEAD 1d8f7e2b (v2.0-alpha)
 Did (long single-arc session; operator directive: every model failure fails LOUD, never a silent
 swap/canned-template). Source of truth = docs/2026-07-03-no-fallbacks-rip/PLAN.md. All chunks suite
