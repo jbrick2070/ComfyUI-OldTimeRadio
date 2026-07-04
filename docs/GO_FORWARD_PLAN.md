@@ -1,6 +1,11 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (overnight -- CREDITS col-3 + ELEVENLABS voice pool FIXED+PUSHED; cloud-video soak running) | branch v2.0-alpha @ fae7081f | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (overnight -- CREDITS col-3 + ELEVENLABS voice + SONILO music ALL FIXED+PROVEN LIVE) | branch v2.0-alpha @ 8f146394 | prod/main + tags operator-GATED.
+> DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
+> (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
+> completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
+> sweep (recraft/flux_pro/nano_banana_2/seedream_2/ideogram); 800w all-visualizer credits run. Live cloud legs
+> use scripts/_otr_cloud_audio_babysit.py (direct submit; voice_bank/node-83 music engine via patch_widget_by_name).
 > SHIPPED this session: credits col-3 scroll @b89a30ca (loop/fps-time still inputs); ElevenLabs cast-voice
 > POOL @fae7081f (21 premade voices w/ provider_voice_id -> CastLock stamps gender-matched ids under the
 > elevenlabs_cloud bank; verified MARGOT->Laura / DOLPH->Charlie; suite 6146/0). IN-FLIGHT: cv1 word_razzle

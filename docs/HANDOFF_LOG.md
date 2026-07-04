@@ -27,10 +27,21 @@ LIVE RESULTS (this session):
   extra_patches CREATIVE WHITELIST refuses voice_bank/engine; must set them direct like _otr_chatterbox_smoke).
   P-OBS proof: c02->el_laura(FGY2WhTYpPnrIDTdsKH5), c03->el_george(JBFqnCBsd6RMkjVDRZzb) engine=elevenlabs, real
   provider ids, ZERO 401/422/no-provider errors; announcer stays kokoro. Episode finishing (local viz_green video).
-NEXT: Sonilo MUSIC leg (node 83 engine=sonilo, direct patch) -- reproduce the 422 (likely min-duration floor vs
-4/8/12s cues) then adapter floor+trim (PLAN.md Part B). Then image-engine sweep + 800w all-visualizer credits runs.
-HARNESS: scripts/_otr_cloud_audio_babysit.py (direct-submit; boots per leg via _otr_soak_marathon, key per-command).
-Commits: 3c7ae1f1 (docs), fae7081f (elevenlabs pool).
+- Sonilo MUSIC = FIXED + PROVEN LIVE E2E (@8f146394). Reproduced the 422 on the authenticated headless server
+  (NOT auth -- a request rejection): the theme cues (12/8/4s) are BELOW Sonilo's service min duration (node
+  widget min=1 is only a UI bound). Fix: eng_cloud_sonilo.generate_clip requests max(dur, floor) with
+  OTR_SONILO_MIN_DURATION_S (default 30, env-tunable, 0=off) and TRIMS back to the cue length (cue identity +
+  mix byte-unchanged). LIVE: all 3 cues cleared at floor=30, episode COMPLETED -> obs
+  signal_lost_breath_of_the_cosmos_..._with_credits_final.mp4. New tests/test_cloud_sonilo_floor.py +
+  test_cloud_sonilo_adapter raw-forwarding tests pin floor=0. Suite 6149/0, Bug Bible 16.
+SESSION NET (all pushed, HEAD 8f146394==origin): credits col-3 scroll (b89a30ca), ElevenLabs cast-voice pool
+(fae7081f), Sonilo floor (8f146394) -- all root-caused + verified LIVE. cv1 word_razzle x ideo = obs PASS
+(cloud image+video). cv2 kling_avatar = FAIL (root-cause TBD). 
+NEXT: cv2 kling root-cause; image-engine sweep (recraft/flux_pro/nano_banana_2/seedream_2/ideogram); 800w
+all-visualizer credits run (showcases the col-3 scroll fix on a long transcript).
+HARNESS: scripts/_otr_cloud_audio_babysit.py (direct-submit per leg; managed engines via apply_profile, the
+CastLock voice_bank/node-83 music engine via patch_widget_by_name -- run_leg's extra_patches whitelist REFUSES them).
+Commits: 3c7ae1f1 (docs), fae7081f (elevenlabs pool), bd1394eb (docs), 8f146394 (sonilo floor).
 
 ## 2026-07-04 (overnight) -- HEAD b89a30ca (v2.0-alpha) -- CREDITS COL-3 BLANK-SCROLL ROOT-CAUSED + FIXED + PUSHED
 Did: operator-reported obs bug -- the SIGNAL LOST console cols 1-2 render but COL 3 (the scrolling
