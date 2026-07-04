@@ -244,6 +244,37 @@ VERDICT: SOUND. It CONFIRMS R1 was safe + refines the R2/R3 map. Grounded surviv
 - `test_still_spine_helpers.py::test_st4_still_index_and_family_init` (:724-733) —
   missing scene still must RAISE, not fall back to the `"portrait"` init source.
 
+## H. R3 grounded map (agy 2026-07-03, Claude-grounded) + scope split
+Two CLASSES of R3 site, which matters for scope:
+
+MODEL->TEMPLATE fallbacks (a MODEL failed -> silent template/degrade; the faithful
+"no model fallbacks" targets):
+- news degrade: OTR_LedgerScriptWriter.py:2939 (required->halt) + :2956 (optional
+  ->meta['news']=None, degrade to raw seed). Test: test_news_briefs_required.py.
+- title template fallback: LedgerScriptWriter.py:5251-5252 (regen empty->outline.title)
+  + the swallowing catch :978-984 (_generate_title_from_script returns ""). Test:
+  test_writer_title_scratchpad.py.
+- announcer-outro template: _otr_line_composer.py:3519-3524/3600-3602/3657-3662
+  (catch :3652). Tests: test_announcer_passes.py::test_compose_announcer_outro_
+  llm_raises_falls_back + ::_multiline_output_falls_back.
+- news-coda template floor: _otr_line_composer.py:3446-3457. Test:
+  test_announcer_kill2_c3.py (retries_then_floor / floor_deterministic / varies).
+- character portrait 3-tier: otr_meta_brief_image_prompt.py derive_image_prompts
+  :1113-1156 (contract says "Never raises; never emits an empty prompt", :1045).
+  Tests: test_image_platform_c1.py::test_meta_brief_prompt_temp0_hash_reseed_
+  fallback + ::test_meta_brief_consistency_gate_fallback;
+  test_brief_prompt_finishing.py::test_image_person_guard_then_finish_no_retrigger.
+
+DEFENSIVE-COMPUTATION soft-fails (a helper computation errored -> skip an
+ENHANCEMENT; NOT a model swap -- ripping these makes the writer abort on any
+transient hiccup): body_score-never-fails :1603-1659 + its swallowing caller
+:4689-4700 ("# never break audio"); contract :3169; pitch :3209; grammar :3409;
+crisis-telemetry :3494; L1/L2 :3513; arc-shape :3666; dramatic-state :3715; slot-
+drama :3900/:3932; tension-ramp :4210; next-turn :4264; a5-fields :4308.
+
+Dead code to DELETE (both scopes): _bark_health_check + _bark_health_check_for_cast
+(story_orchestrator.py:649/:691, no callers).
+
 **R3 test-inversion checklist (invert in the SAME commit):**
 - `test_announcer_passes.py::test_compose_announcer_outro_llm_raises_falls_back` +
   `::test_compose_announcer_outro_multiline_output_falls_back` (:355-384) — assert
