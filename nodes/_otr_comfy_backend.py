@@ -291,7 +291,14 @@ def clear_auth() -> None:
 
 def _bearer() -> str | None:
     """The credential to send. A configured Comfy API key wins over the
-    session bearer (it works on non-whitelisted hosts too)."""
+    session bearer (it works on non-whitelisted hosts too).
+
+    API-KEY-RESPECTFUL (2026-07-04): the Comfy Credits LLM chat proxy authenticates
+    ONLY via ComfyUI's own injected credential (the writer's hidden inputs
+    auth_token_comfy_org / api_key_comfy_org). We do NOT repurpose the media-lane
+    OTR_COMFY_API_KEY here -- it is rejected by the chat proxy (HTTP 401) and mixing
+    key surfaces confuses users. Headless cloud LLM = the OpenRouter own-key lane;
+    Comfy Credits LLM = the logged-in Desktop app."""
     return _auth.get("api_key") or _auth.get("auth_token")
 
 
