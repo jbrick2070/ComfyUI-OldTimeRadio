@@ -204,25 +204,30 @@ def test_llm_names_gender_mismatch_is_repaired(monkeypatch):
             assert tag in (r["gender"], "unisex", "unknown"), (r["char_id"], r["name"], r["gender"])
 
 
-def test_r8_fallback_to_deterministic_on_invalid(monkeypatch):
-    pool_cast, _ = _lock(1)
-    pool_names = {r["char_id"]: r["name"] for r in pool_cast}
+def test_r8_invalid_llm_naming_raises(monkeypatch):
+    """NO-FALLBACK rip (2026-07-03): the OPT-IN llm_slot_fill naming pass that
+    returns un-validatable output now FAILS LOUD -- no silent keep of the
+    deterministic RNG-pool names (the :1352 validation path)."""
     monkeypatch.setenv("OTR_NAME_MODE", "llm_slot_fill")
-    llm_cast, meta = _lock(1, generate_fn=_make_llm("not json at all"))
-    assert meta["llm_naming_applied"] is False
-    assert meta.get("llm_naming_fallback_reason")
-    for r in llm_cast:
-        assert r["name"] == pool_names[r["char_id"]]
+    with pytest.raises(_OTRC.CastValidationLLMError, match="no-fallback rip"):
+        _lock(1, generate_fn=_make_llm("not json at all"))
 
 
-def test_r8_fallback_keeps_coherence(monkeypatch):
-    """Even on fallback the cast stays coherent -- the deterministic names are
-    the S2-repaired pool fill."""
+def test_r8_naming_llm_raise_is_loud(monkeypatch):
+    """NO-FALLBACK rip (2026-07-03): a naming generate_fn that RAISES also fails
+    loud (the :1345 path), not a silent deterministic keep. The per-slot cast
+    description call still returns valid JSON so the deterministic cast builds
+    first; only the Pass-1 naming call blows up."""
     monkeypatch.setenv("OTR_NAME_MODE", "llm_slot_fill")
-    cast, _ = _lock(0, generate_fn=_make_llm("garbage"))  # seed 0 = known-incoherent pre-S2
-    for r in _open(cast):
-        if r["gender"] in ("male", "female"):
-            assert _POOLS.gender_of_first_name(r["name"]) in (r["gender"], "unisex", "unknown")
+
+    def _boom(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        content = messages[0]["content"] if messages else ""
+        if "JSON array" in content:
+            raise RuntimeError("naming model unavailable")
+        return json.dumps({"character_description": "A steady operator."})
+
+    with pytest.raises(_OTRC.CastValidationLLMError, match="no-fallback rip"):
+        _lock(1, generate_fn=_boom)
 
 
 # ---------------------------------------------------------------------------

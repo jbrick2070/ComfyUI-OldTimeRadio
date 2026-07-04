@@ -806,7 +806,12 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     prompt = ""
     source = "char_scene_template"
     said = str((line or {}).get("text") or "").strip()
-    if llm_fn is not None and said:
+    # A writer LLM present AND a spoken line = the LLM lane was ATTEMPTED; if it
+    # then fails/returns junk we FAIL LOUD rather than swap to the deterministic
+    # composer (no-fallback rip 2026-07-03). llm_fn=None (no writer LLM) or a
+    # dialogue-less beat is the legit template lane, not a failure.
+    _llm_attempted = llm_fn is not None and bool(said)
+    if _llm_attempted:
         req = _build_char_scene_request(ce, meta, setting, line)
         for attempt in range(max_reseed + 1):
             try:
@@ -821,10 +826,11 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
                 source = "char_scene_llm"
                 break
     # Person guard + gear scrub (a beat still MUST show the character, never a
-    # radio booth) -- identical discipline to the portrait path.
+    # radio booth) -- identical discipline to the portrait path. A discarded
+    # LLM prompt here leaves prompt="" -> the fail-loud gate below.
     if prompt and not _depicts_person(prompt):
         warnings.append(f"char-scene prompt for {cid} depicts no PERSON; "
-                        f"fell back to the character template")
+                        f"discarding the LLM output")
         prompt = ""
     if prompt:
         scrubbed = _scrub_gear_words(prompt)
@@ -838,7 +844,16 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
         from _otr_story_brief_helpers import (  # type: ignore
             compose_still_prompt)
     if not prompt:
-        # Deterministic fallback: a character (not a radio booth), wide framing.
+        if _llm_attempted:
+            raise RuntimeError(
+                "[OTR_ImagePrompt] char-scene: the writer LLM produced no usable "
+                "PERSON prompt for %s (empty / non-person / all-gear after %d "
+                "reseeds) -- NO deterministic template fallback (no-fallback rip "
+                "2026-07-03); a failed char-scene LLM stops the episode."
+                % (cid, max_reseed)
+            )
+        # No writer LLM (or a dialogue-less beat): the deterministic per-character
+        # scene composer is the PRIMARY local-lane output, not a fallback.
         return (compose_still_prompt(meta, kind="scene_character",
                                      role="character_video", char_entry=ce),
                 source)
@@ -1042,8 +1057,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     ``compose_still_prompt``) and skip the person guard entirely.
 
     Portrait path: LLM (temp=0, injected or lazily resolved) refines each;
-    empty/unparseable -> reseed -> deterministic fallback. ``prompt_hash`` is
-    taken AFTER the call. Never raises; never emits an empty prompt.
+    empty/unparseable -> reseed. NO-FALLBACK (rip 2026-07-03): when a writer LLM
+    was ATTEMPTED (``llm_fn`` present) and it produces no usable prompt, or the
+    prompt fails the story-consistency gate / person guard / gear scrub, this
+    FAILS LOUD (RuntimeError) rather than swapping in the deterministic template.
+    ``llm_fn=None`` (no writer LLM configured) is the legit template lane, not a
+    failure, and never raises. ``prompt_hash`` is taken AFTER the call.
     Returns ``(payload, warnings)``.
 
     ``lines`` (optional, the frozen ledger lines, READ-ONLY): announcer
@@ -1124,6 +1143,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 if attempt < max_reseed:
                     warnings.append(f"empty image prompt for {cid}; reseed {attempt + 1}/{max_reseed}")
         if not prompt:
+            if llm_fn is not None:
+                raise RuntimeError(
+                    "[OTR_ImagePrompt] portrait: the writer LLM produced no "
+                    "usable prompt for %s after %d reseeds -- NO deterministic "
+                    "template fallback (no-fallback rip 2026-07-03); a failed "
+                    "portrait LLM stops the episode." % (cid, max_reseed)
+                )
+            # No writer LLM configured: the deterministic template IS the primary
+            # local-lane portrait, not a fallback.
             prompt = compose_image_prompt_fallback(meta, char, _aspect,
                                                    talking=_talking)
             source = "template"
@@ -1135,25 +1163,38 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         gate_setting = "" if char.get("_synthetic_announcer") else setting
         if not _passes_consistency(prompt, appearance, gate_setting):
             msg = f"image prompt for {cid} missing appearance/setting trait"
-            if consistency_gate_warn_only:
-                warnings.append(msg + " (warn-only; kept)")
+            if consistency_gate_warn_only or source != "llm":
+                # warn-only toggle, OR the deterministic template itself (no LLM
+                # to blame) -- keep the prompt, log loud. Not a model swap.
+                warnings.append(msg + " (kept; warn-only or template path)")
             else:
-                warnings.append(msg + "; fell back to template")
-                prompt = compose_image_prompt_fallback(meta, char,
-                                                       talking=_talking)
-                source = "template_consistency"
+                raise RuntimeError(
+                    "[OTR_ImagePrompt] portrait: the writer LLM visual prompt for "
+                    "%s failed the story-consistency gate (%s) -- NO template "
+                    "fallback (no-fallback rip 2026-07-03)." % (cid, msg)
+                )
         # PERSON GUARD (look-QA round 4, 2026-06-10): a portrait prompt that
         # depicts no person (the live "microphone under a lamp" catch for a
         # cast character) falls back to the template, which LEADS with the
         # writer's physical character description. Always enforced -- a
         # face-less init_image also starves the audio-driven-face engine.
         if not _depicts_person(prompt):
-            warnings.append(
-                f"image prompt for {cid} depicts no PERSON; fell back to "
-                f"the appearance template")
-            prompt = compose_image_prompt_fallback(meta, char,
-                                                   talking=_talking)
-            source = "template_person_guard"
+            if source != "llm":
+                # The deterministic template depicts no person -- unexpected, but
+                # not a model swap; keep it loud (template is the primary output).
+                warnings.append(
+                    f"image prompt for {cid} depicts no PERSON (template path; kept)")
+            else:
+                # The LLM prompt depicts no person: a faceless init starves the
+                # audio-driven-face engine. The person guard's protection is
+                # PRESERVED -- but as a LOUD raise, not a silent template swap
+                # (no-fallback rip 2026-07-03).
+                raise RuntimeError(
+                    "[OTR_ImagePrompt] portrait: the writer LLM visual prompt for "
+                    "%s depicts no PERSON -- a faceless init starves the audio-"
+                    "driven-face engine; NO template fallback (no-fallback rip "
+                    "2026-07-03)." % cid
+                )
         # GEAR SCRUB (round 5 operator directive): character portraits never
         # mention radio/mic/studio gear -- the tokens pull FLUX toward
         # equipment (the c01 giant-mic catch). The ANNOUNCER keeps his radio
@@ -1167,6 +1208,14 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if _scrubbed != prompt:
                 warnings.append(
                     f"image prompt for {cid}: broadcast-gear tokens scrubbed")
+                if not _scrubbed and source == "llm":
+                    # An LLM prompt that is ENTIRELY broadcast-gear tokens is a
+                    # model miss -- fail loud, no template swap (no-fallback rip).
+                    raise RuntimeError(
+                        "[OTR_ImagePrompt] portrait: the writer LLM visual prompt "
+                        "for %s was ENTIRELY broadcast-gear tokens -- NO template "
+                        "fallback (no-fallback rip 2026-07-03)." % cid
+                    )
                 prompt = _scrubbed or compose_image_prompt_fallback(
                     meta, char, talking=_talking)
         if char.get("_synthetic_announcer"):

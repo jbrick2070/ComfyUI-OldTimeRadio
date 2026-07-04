@@ -507,6 +507,19 @@ class TestSceneStillObjects:
         assert s2["prompt"].startswith("a stocky foreman")
         assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
 
+    def test_character_scene_still_llm_failure_raises(self):
+        """NO-FALLBACK rip (2026-07-03): when a writer LLM is ATTEMPTED for a
+        spoken beat and returns nothing usable, the char-scene path FAILS LOUD --
+        no silent swap to the deterministic scene_character composer. (llm_fn=None
+        stays the legit template lane, covered above.)"""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{"char_id": "c01", "appearance": "a stocky foreman"}]
+        lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c01",
+                  "text": "The reactor is failing!", "start_s": 1.0, "dur_s": 2.0}]
+        with pytest.raises(RuntimeError, match="no-fallback rip"):
+            mbp.derive_image_prompts(
+                cast, _meta_ok(), llm_fn=lambda _p: "", lines=lines)
+
     def test_portrait_carries_cinematic_grade_bug411(self):
         """BUG-411 consistency (operator 2026-06-14): portraits now carry the
         same cinematic GRADE tail as the scene stills, so a still_pan beat in

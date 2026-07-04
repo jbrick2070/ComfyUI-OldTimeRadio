@@ -416,19 +416,23 @@ def test_meta_brief_prompt_temp0_hash_reseed_fallback():
     cast = [{"char_id": "c1", "name": "BABA", "portrait_prompt": "a tall weathered spacer"}]
     meta = {"story_brief_terms": {"setting": ["a derelict orbital station"]}}
 
-    # "lined face" keeps the person guard satisfied (look-QA round 4): a
-    # portrait prompt with NO person-evidence now falls back to template.
+    # "lined face" keeps the person guard satisfied (look-QA round 4).
     good = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "a tall weathered spacer, lined face, station, photographic")
     p = _by_id(good)["c1"]
     assert p["source"] == "llm" and p["prompt_hash"]
     assert p["kind"] == "portrait" and p["w"] == 832 and p["h"] == 1216
 
-    # empty LLM -> reseed -> deterministic template (NEVER empty)
-    empties = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "")
-    p2 = _by_id(empties)["c1"]
+    # NO-FALLBACK rip (2026-07-03): an ATTEMPTED writer LLM (llm_fn present) that
+    # returns empty after every reseed now FAILS LOUD -- no template swap.
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "")
+
+    # llm_fn=None is the legit template LANE (not a failure): deterministic,
+    # never empty, hash taken AFTER the call.
+    templ = mbp.derive_image_prompts(cast, meta, llm_fn=None)
+    p2 = _by_id(templ)["c1"]
     assert p2["source"].startswith("template") and p2["prompt"]
     assert "spacer" in p2["prompt"] and "station" in p2["prompt"]
-    # hash is taken AFTER the call (matches the final prompt text)
     import hashlib
     expect = hashlib.sha256(json.dumps(p2["prompt"], ensure_ascii=True,
                             sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -447,9 +451,17 @@ def test_meta_brief_appearance_by_char_id():
 def test_meta_brief_consistency_gate_fallback():
     cast = [{"char_id": "c1", "name": "X", "portrait_prompt": "scarred veteran"}]
     meta = {"story_brief_terms": {"setting": ["a neon market"]}}
-    # LLM returns a prompt missing both appearance + setting -> gate -> template
-    out, warns = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "totally unrelated text")
-    assert _by_id(out)["c1"]["source"] == "template_consistency"
+    # NO-FALLBACK rip (2026-07-03): an LLM prompt that fails the story-consistency
+    # gate now FAILS LOUD (default warn_only=False) -- no template_consistency swap.
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "totally unrelated text")
+    # consistency_gate_warn_only=True keeps the AI prompt (operator toggle): the
+    # prompt fails the gate but still depicts a PERSON, so it is logged + kept.
+    out, warns = mbp.derive_image_prompts(
+        cast, meta,
+        llm_fn=lambda _p: "a weathered man in a long coat, face visible",
+        consistency_gate_warn_only=True)
+    assert _by_id(out)["c1"]["source"] == "llm"
     assert any("missing appearance/setting" in w for w in warns)
 
 

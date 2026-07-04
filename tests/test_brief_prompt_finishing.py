@@ -12,6 +12,8 @@ from __future__ import annotations
 import pathlib
 import sys
 
+import pytest
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -81,20 +83,24 @@ def test_image_prompt_hash_matches_finished_prompt():
 
 
 def test_image_person_guard_then_finish_no_retrigger():
-    """A no-person LLM prompt falls back to the template, THEN gets finished;
-    the tails never re-trigger the guard."""
+    """NO-FALLBACK rip (2026-07-03): a no-person LLM prompt now FAILS LOUD at the
+    person guard (a faceless init starves the audio-driven-face engine) -- no
+    silent template swap. The llm_fn=None template lane still finishes cleanly."""
     cast = [{"char_id": "c1", "name": "KEEPER",
              "character_description": "60s, weathered face, oilskin coat"}]
-    # The stub passes the CONSISTENCY gate (shares "lighthouse" with the
-    # setting) but carries no person-evidence -> only the person guard fires.
-    out, warns = mbp.derive_image_prompts(
-        cast, _OK_META,
-        llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
+    # Passes the CONSISTENCY gate (shares "lighthouse" with the setting) but
+    # carries no person-evidence -> the person guard now RAISES.
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        mbp.derive_image_prompts(
+            cast, _OK_META,
+            llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
+    # The template LANE (llm_fn=None) leads with the appearance + finishes; the
+    # tails never re-trigger the person guard.
+    out, _warns = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
     entry = mbp.objects_by_id(out)["c1"]
-    assert entry["source"] == "template_person_guard"
+    assert entry["source"].startswith("template")
     assert "weathered face" in entry["prompt"]        # template led
     assert "lantern glow" in entry["prompt"]          # finished after guard
-    assert any("depicts no PERSON" in w for w in warns)
 
 
 def test_shotlock_m4_prompt_hash_matches_finished_prompt():

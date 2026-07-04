@@ -1326,10 +1326,13 @@ def _apply_llm_slot_fill(
     *, generate_fn, news_seed, style, cast_seed, meta,
 ):
     """Overlay LLM names + texture onto the finished deterministic cast. ONE
-    creative-slot call, NO retry (per the sprint plan); on ANY failure the
-    deterministic (S2-coherent) names stand -- they are the guaranteed-coherent
-    backstop. A successful LLM name still passes the same gender-coherence repair
-    as S2 (isolated rng), so the result is always coherent in strict mode.
+    creative-slot call, NO retry (per the sprint plan). This lane is OPT-IN
+    (name_mode == "llm_slot_fill"); NO-FALLBACK rip (2026-07-03): when the naming
+    LLM is selected and it fails (raises) or returns un-validatable output, this
+    FAILS LOUD (CastValidationLLMError) rather than silently keeping the
+    deterministic RNG-pool names -- a failed naming LLM stops the episode. A
+    successful LLM name still passes the same gender-coherence repair as S2
+    (isolated rng), so the result is always coherent in strict mode.
     """
     meta["name_mode"] = "llm_slot_fill"
     plan = _CASTPLAN.build_cast_plan(
@@ -1342,17 +1345,26 @@ def _apply_llm_slot_fill(
             [{"role": "user", "content": prompt}],
             temperature=0.7, max_new_tokens=400,
         )
-    except Exception as exc:  # noqa: BLE001 -- loader/LLM varies; fall back
-        meta["llm_naming_applied"] = False
-        meta["llm_naming_fallback_reason"] = (
-            f"generate_fn raised: {type(exc).__name__}")
-        return cast
+    except Exception as exc:  # noqa: BLE001 -- loader/LLM varies
+        # NO-FALLBACK rip (2026-07-03): opt-in naming LLM failure = LOUD stop,
+        # not a silent keep of the deterministic RNG-pool names.
+        raise CastValidationLLMError(
+            [("", f"llm_slot_fill naming generate_fn raised "
+                  f"({type(exc).__name__}: {exc}) -- NO deterministic-name "
+                  "fallback (no-fallback rip 2026-07-03); a failed naming LLM "
+                  "stops the episode.")],
+            "llm_slot_fill",
+        ) from exc
     items = _extract_json_list(raw)
     result = _CASTVAL.validate_pass1(items if items is not None else raw, plan)
     if not result.ok:
-        meta["llm_naming_applied"] = False
-        meta["llm_naming_fallback_reason"] = result.reason
-        return cast
+        raise CastValidationLLMError(
+            [(str(raw)[:200], f"llm_slot_fill naming output failed validation "
+                              f"({result.reason}) -- NO deterministic-name "
+                              "fallback (no-fallback rip 2026-07-03); a failed "
+                              "naming LLM stops the episode.")],
+            "llm_slot_fill",
+        )
     # Gender-coherence repair on the LLM names (the LLM may not honour gender).
     rate = _otr_cast_env.cross_gender_rate()
     gender_by_id = {s.char_id: s.gender for s in plan}
