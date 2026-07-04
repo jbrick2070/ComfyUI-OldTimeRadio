@@ -252,10 +252,13 @@ class CloudNanoBanana2ImageEngine(_CloudImageBase):
     def _partner_inputs(self, request):
         # pinned required: model DYNAMICCOMBO_V3, prompt STRING,
         # response_modalities COMBO, seed INT. model resolves via the single
-        # source of truth (never the placeholder).
+        # source of truth (never the placeholder). A DYNAMICCOMBO_V3 value is a
+        # DICT (the Gemini node reads model["model"] + optional images/files),
+        # NOT a bare slug -- passing a string raises "string indices must be
+        # integers" in nodes_gemini.execute.
         from .._otr_shared.cloud_model_ids import resolve_model_id
         return {
-            "model": resolve_model_id(self.node_key),
+            "model": {"model": resolve_model_id(self.node_key)},
             "prompt": self._prompt(request),
             "response_modalities": os.environ.get(
                 "OTR_CLOUD_NANO_MODALITIES", "Image"),

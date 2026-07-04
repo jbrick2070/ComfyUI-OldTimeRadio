@@ -92,7 +92,10 @@ def test_nano_banana_inputs_resolve_model(monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL", "nb-test-model")
     ins = eci.NanoBanana2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "response_modalities", "seed"}
-    assert ins["model"] == "nb-test-model"
+    # DYNAMICCOMBO_V3 value is a DICT -- the Gemini node reads model["model"]
+    # (a bare slug raises "string indices must be integers"). ByteDance seedream
+    # differs (model: str) -- see test_seedream_inputs_resolve_model below.
+    assert ins["model"] == {"model": "nb-test-model"}
     assert ins["model"] != "COMFY_DYNAMICCOMBO_V3"
 
 
