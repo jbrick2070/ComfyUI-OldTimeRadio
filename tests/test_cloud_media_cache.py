@@ -162,10 +162,43 @@ def test_validate_partner_result_fails_closed(tmp_path):
                                  "content_type": "image/png"})
 
 
-def test_canonicalizers_are_contracts_not_impls(tmp_path):
-    p = tmp_path / "a.wav"
-    p.write_bytes(b"RIFF")
-    raw = validate_partner_result({"path": str(p),
-                                   "content_type": "audio/wav"})
-    with pytest.raises(NotImplementedError):
-        canonicalize_audio(raw, {}, session=None)
+def test_canonicalize_audio_conforms_wav_and_reuses_local_rms(tmp_path):
+    """C8 (cloud-audio S0): canonicalize_audio decodes -> 44.1k WAV and matches
+    loudness by REUSING the local RMS leveler (scene_sequencer, -16 dBFS target,
+    NOT LUFS). A quiet tone must be BOOSTED toward the target; the output is a
+    real WAV CanonicalAsset with a duration."""
+    import math
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        pytest.skip("ffmpeg/ffprobe required")
+
+    src = tmp_path / "quiet.wav"                       # -30 dBFS tone (below -16)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
+                    "-i", "sine=frequency=220:duration=1.0", "-af", "volume=-30dB",
+                    "-ar", "24000", "-ac", "1", str(src)], check=True)
+    raw = validate_partner_result({"path": str(src), "content_type": "audio/wav"})
+    asset = canonicalize_audio(raw, {"sample_rate": 44100,
+                                     "stereo_policy": "mono"}, session=None)
+    assert asset.media_type == "audio" and asset.container == "wav"
+    assert asset.path.is_file() and asset.duration_s and asset.duration_s > 0.9
+
+    def _rms_dbfs(path):
+        raw_pcm = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(path), "-map", "0:a",
+             "-f", "f32le", "-ac", "1", "-ar", "44100", "-"],
+            capture_output=True).stdout
+        import numpy as np
+        x = np.frombuffer(raw_pcm, dtype=np.float32)
+        r = float(np.sqrt(np.mean(x * x))) if x.size else 0.0
+        return 20.0 * math.log10(max(r, 1e-10))
+
+    before, after = _rms_dbfs(src), _rms_dbfs(asset.path)
+    assert after > before + 3.0                       # quiet tone was boosted
+    assert after <= -12.0                              # toward -16 dBFS, peak-safe
+
+
+def test_canonicalize_audio_missing_result_raises():
+    with pytest.raises(CloudMediaError):
+        canonicalize_audio({"path": "/nope/missing.wav",
+                            "content_type": "audio/wav"}, {}, session=None)

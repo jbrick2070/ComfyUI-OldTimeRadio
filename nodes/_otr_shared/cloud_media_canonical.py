@@ -63,9 +63,16 @@ def cloud_delivery_wh(request_w, request_h, *, land_env, port_env,
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).
 CANONICALIZER_VERSION = 1
 
-#: verify-at-build #11 -- S2 must point this at the local lane's real
-#: loudness handling (constant/module), not a fresh LUFS convention.
-LOUDNESS_REFERENCE_SOURCE = "UNRESOLVED: locate existing local-lane loudness reference (S2)"
+#: RESOLVED (cloud-audio S0/C8, 2026-07-03): the local lane's real loudness
+#: handling is scene_sequencer's per-segment RMS leveling (NOT a LUFS
+#: convention): every dialogue/cue clip is single-gain leveled toward
+#: OTR_SEGMENT_TARGET_RMS_DBFS (default -16.0 dBFS), peak-safe, via
+#: ``scene_sequencer._loudness_normalize_clip`` with ``_loudnorm_params()``.
+#: canonicalize_audio reuses that EXACT gain so a cloud WAV sits at the same
+#: perceived loudness as a local line going into OTR_EpisodeAssembler.
+LOUDNESS_REFERENCE_SOURCE = (
+    "nodes.scene_sequencer._loudness_normalize_clip / _loudnorm_params "
+    "(per-segment RMS leveling, target OTR_SEGMENT_TARGET_RMS_DBFS=-16.0 dBFS)")
 
 
 class PartnerResult(TypedDict):
@@ -124,11 +131,98 @@ def _not_built_yet(modality: str, sprint: str):
     )
 
 
-def canonicalize_audio(raw: PartnerResult, request: dict, session) -> CanonicalAsset:
-    """S2. WAV 44.1kHz, stereo_policy channels, loudness matched to the
-    existing local reference, +/-250ms per-line tolerance w/ head/tail
-    silence padding, actual_duration_s emitted to line metadata."""
-    _not_built_yet("audio", "S2 (voice + music lane)")
+def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
+    """S0/C8 (cloud-audio 2026-07-03). Conform a provider audio result to the
+    local lane's contract so a cloud WAV drops into OTR_EpisodeAssembler exactly
+    like a local line:
+
+    - decode (any provider container) -> resample to ``sample_rate`` (default
+      44100) -> ``stereo_policy`` channels, via ffmpeg (robust to mp3/wav/etc);
+    - **loudness matched by REUSING the existing local RMS leveler** (NOT a fresh
+      LUFS convention -- operator chose RMS): the SAME single peak-safe gain
+      ``scene_sequencer._loudness_normalize_clip`` applies toward
+      ``_loudnorm_params()`` (target -16 dBFS). No re-implementation.
+    - +/-250ms per-line tolerance: when ``request['target_duration_s']`` is given
+      and the clip is shorter within tolerance, pad TAIL silence to the slot
+      (never trims within tolerance);
+    - emit ``actual_duration_s`` (as ``duration_s``) for the line metadata.
+
+    ``request`` keys: ``sample_rate`` (default 44100), ``stereo_policy``
+    ("stereo"|"mono", default stereo), optional ``target_duration_s`` +
+    ``out_path``. ``session`` is accepted for signature parity (unused here)."""
+    import hashlib
+    import shutil
+    import subprocess
+    import numpy as np
+
+    validated = validate_partner_result(dict(raw))
+    src = validated["path"]
+    sr = int(request.get("sample_rate") or 44100)
+    ch = 1 if str(request.get("stereo_policy") or "stereo").lower() == "mono" else 2
+
+    ffmpeg = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
+        or shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              "ffmpeg not found -- cannot canonicalize audio")
+
+    dec = subprocess.run(
+        [ffmpeg, "-v", "error", "-i", str(src), "-ar", str(sr), "-ac", str(ch),
+         "-f", "f32le", "-"], capture_output=True)
+    if dec.returncode != 0 or not dec.stdout:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            "audio decode failed: %r" % (dec.stderr[-300:],))
+    flat = np.frombuffer(dec.stdout, dtype=np.float32).copy()
+    audio = flat.reshape(-1, ch) if ch == 2 else flat
+
+    # --- loudness: reuse the EXISTING local RMS leveler (no re-code) ---
+    warnings: list = []
+    try:
+        from ..scene_sequencer import (_loudness_normalize_clip,  # type: ignore
+                                        _loudnorm_params)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from scene_sequencer import (_loudness_normalize_clip,  # type: ignore
+                                     _loudnorm_params)
+    mono = audio if ch == 1 else audio.mean(axis=1)
+    if mono.size and float(np.abs(mono).max()) > 0.0:
+        leveled = _loudness_normalize_clip(mono, **_loudnorm_params())
+        j = int(np.argmax(np.abs(mono)))
+        gain = float(leveled[j] / mono[j]) if mono[j] != 0 else 1.0
+        audio = (audio * gain).astype(np.float32)
+
+    # --- +/-250ms tolerance: pad TAIL silence up to the slot (never trim) ---
+    target = request.get("target_duration_s")
+    if target is not None:
+        cur = audio.shape[0] / float(sr)
+        deficit = float(target) - cur
+        if 0.0 < deficit <= 0.25 + 1e-6:
+            pad_n = int(round(deficit * sr))
+            sil = (np.zeros((pad_n, ch), np.float32) if ch == 2
+                   else np.zeros(pad_n, np.float32))
+            audio = np.concatenate([audio, sil], axis=0)
+        elif abs(deficit) > 0.25:
+            warnings.append(
+                "duration %.3fs vs target %.3fs exceeds +/-250ms tolerance"
+                % (cur, float(target)))
+
+    out_path = Path(request.get("out_path") or (str(src) + ".canon.wav"))
+    enc = subprocess.run(
+        [ffmpeg, "-y", "-v", "error", "-f", "f32le", "-ar", str(sr),
+         "-ac", str(ch), "-i", "-", "-c:a", "pcm_s16le", str(out_path)],
+        input=audio.astype(np.float32).tobytes(), capture_output=True)
+    if enc.returncode != 0 or not out_path.is_file() or out_path.stat().st_size == 0:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            "audio encode failed: %r" % (enc.stderr[-300:],))
+
+    actual = audio.shape[0] / float(sr)
+    sha = hashlib.sha256(out_path.read_bytes()).hexdigest()
+    return CanonicalAsset(
+        path=out_path, sha256=sha, media_type="audio",
+        duration_s=round(actual, 3), width=None, height=None, fps=None,
+        container="wav", provider_job_id=validated.get("provider_job_id"),
+        validation_warnings=tuple(warnings))
 
 
 def canonicalize_image(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
