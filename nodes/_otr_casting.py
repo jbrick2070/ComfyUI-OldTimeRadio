@@ -1733,9 +1733,10 @@ def lock_cast(
 
     meta: dict = {}
     # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the finished,
-    # already-coherent deterministic cast. Runs BEFORE the structural-token
-    # guard so a bad LLM name is still rejected; on any failure the
-    # deterministic (S2-repaired) names stand.
+    # already-coherent deterministic cast. Runs BEFORE the structural-token guard
+    # so a bad LLM name is still rejected. NO-FALLBACK rip (2026-07-03): on a
+    # naming-LLM failure this RAISES CastValidationLLMError -- it no longer keeps
+    # the deterministic RNG-pool names (this lane is opt-in via name_mode).
     if name_mode == "llm_slot_fill":
         cast = _apply_llm_slot_fill(
             cast, ensemble_slots, voice_by_char_id, age_by_char_id,
