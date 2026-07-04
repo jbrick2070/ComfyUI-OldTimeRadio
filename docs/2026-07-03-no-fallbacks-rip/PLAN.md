@@ -328,7 +328,16 @@ CLEAR RIP (a writer LLM fails/returns junk -> canned template/pool ships as if A
 - char-SCENE prompt: `llm_fn` fails/empty/non-person -> deterministic `compose_still_prompt`
   `otr_meta_brief_image_prompt.py:814/842`.
 
-JUDGMENT — operator call (borderline; NOT plainly "a model failed -> canned prose"):
+JUDGMENT — RESOLVED (operator via Fable 2026-07-03, "I don't like canned text"):
+- J1 empty-brief intro template -> **RIP** (it IS canned text; a missing brief = broken upstream).
+- J2 outline speaker round-robin -> **KEEP** (structural speaking-ORDER only; NO canned prose;
+  keep loud). Not in the rip set.
+- J3 dramatic-state IMPORT-fail template -> **RIP** (broken install should crash loud; the
+  templated state steers stock episodes). BUT keep the nearby "genuinely no news input"
+  degrade (it is a no-input path, not a failure).
+FINAL R3 rip set = 9 sites (7 clear + J1 + J3). Keep J2 + the no-news-input degrade.
+
+JUDGMENT — original notes (borderline; NOT plainly "a model failed -> canned prose"):
 - J1 announcer-intro EMPTY-brief -> `fallback_announcer_intro("")` (`_otr_line_composer.py:3223/3228`).
   This is a NO-INPUT case (no brief), not an LLM failure. Rip = the empty brief must
   hard-fail upstream; keep = an empty brief is a legit "nothing to write" path.
