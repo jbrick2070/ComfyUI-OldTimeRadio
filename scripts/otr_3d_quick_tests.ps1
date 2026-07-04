@@ -1,6 +1,6 @@
 <#
   otr_3d_quick_tests.ps1 -- DECOUPLED 3D smoke (operator-directed 2026-06-12).
-  one 30-word FULL-episode test per 0-E 3D engine, on the other_beats
+  one 30-word FULL-episode test per 0-E 3D engine, on the character
   (character) slot. Does NOT wait for the 27-leg coverage sweep.
 
   Boots a FRESH headless ComfyUI on :8000 (current code), then runs the 0-E
@@ -11,7 +11,7 @@
   Engine: mesh_stage (hy3d-2mv mesh + Blender headless). still_parallax was
   retired 2026-06-30 (item 2 rip-out, UNREGISTERED) and dropped from this
   list. humo_1.7B stays the default for the non-3D character beats; the 3D
-  engine under test owns other_beats_visual.
+  engine under test owns character_visual.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -72,7 +72,7 @@ Remove-Item $EXTRAENV -ErrorAction SilentlyContinue   # flags are in the server 
 # 2. Run each 3D engine, easiest first, on the character slot.
 $env:PYTHONPATH = $COMFYBASE
 foreach($eng in $ENGINES){
-  $leg = "other_beats_visual_$eng"
+  $leg = "character_visual_$eng"
   $log  = Join-Path $REPO ("scripts\otr_3d_quick_{0}.log" -f $eng)
   $elog = Join-Path $REPO ("scripts\otr_3d_quick_{0}.err.log" -f $eng)
   Dig "=== TEST $eng (leg $leg) START ==="

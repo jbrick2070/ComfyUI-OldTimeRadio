@@ -48,17 +48,19 @@ def test_role_enum_is_exactly_the_three_roles():
     assert set(RC.ROLES) == {r.value for r in RC.Role}
 
 
-def test_slot_maps_have_no_dead_roles_or_slots():
+def test_slot_maps_are_exactly_the_three_roles_and_slots():
     assert set(RS.ROLE_TO_VIDEO_SLOT) == {
         "announcer_visual", "music_visual", "character_video",
     }
-    assert "scene_broll_video_model" not in RS.VIDEO_SLOT_ROLES
-    assert "background_abstract_video_model" not in RS.VIDEO_SLOT_ROLES
-    # NO legacy other_beats video slot (2026-07-03 consolidation)
-    assert "other_beats_video_model" not in RS.VIDEO_SLOT_ROLES
+    # closed sets -- exactly three first-class video slots / roles, so ANY stray
+    # slot or role leaking back in fails the equality (stronger than absence checks)
+    assert set(RS.VIDEO_SLOT_ROLES) == {
+        "announcer_video_model", "music_video_model", "character_video_model",
+    }
     assert set(SM.ROLE_TO_PROFILE_KEY) == set(SM.ALL_ROLES)
-    assert "scene_broll" not in SM.ALL_ROLES
-    assert "background_abstract" not in SM.ALL_ROLES
+    assert set(SM.ALL_ROLES) == {
+        "announcer_visual", "music_visual", "character_video",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -96,10 +98,10 @@ def test_slot_for_role_and_engine_id_raise_on_dead_roles():
             RS.slot_for_role(dead)
         with pytest.raises(ValueError):
             RS.engine_id_for_role({}, dead)
-    # NO FALLBACK (2026-07-03): the legacy other_beats migration lane is gone --
-    # an empty character slot resolves to "".
+    # NO FALLBACK (2026-07-03): the legacy migration lane is gone -- an empty
+    # character slot resolves to "" and a stray unknown slot is ignored.
     assert RS.engine_id_for_role(
-        {"other_beats_video_model": "still_flat"}, "character_video") == ""
+        {"retired_video_slot": "still_flat"}, "character_video") == ""
 
 
 def test_shot_lock_video_role_raises_on_sfx():
@@ -140,20 +142,20 @@ def test_ledger_freeze_rejects_sfx_row_as_error():
 
 
 # ---------------------------------------------------------------------------
-# (d) KEPT surfaces: char_beats image slot + registry eligibility + wf pin
+# (d) KEPT surfaces: character image slot + registry eligibility + wf pin
 # ---------------------------------------------------------------------------
 
-def test_video_director_keeps_char_beats_image_and_drops_dead_widgets():
+def test_video_director_keeps_the_three_model_widgets():
     from nodes.otr_video_director import OTRVideoDirector
     it = OTRVideoDirector.INPUT_TYPES()
     req, opt = it["required"], it.get("optional", {})
-    assert "character_image_model" in req                  # decision-locked KEEP (image side)
-    # 2026-07-03: other_beats_video retired; character is a first-class video slot
-    assert "other_beats_video_model" not in req and "other_beats_video_model" not in opt
-    assert "character_video_model" in req
-    for dead in ("other_beats_clip_mode", "other_beats_n",
-                 "scene_broll_video_model", "background_abstract_video_model"):
-        assert dead not in req and dead not in opt, dead
+    all_widgets = set(req) | set(opt)
+    # the per-role MODEL widgets are EXACTLY these six (3 video + 3 image); a
+    # closed check -- any legacy/dead model widget leaking back in fails it.
+    assert {w for w in all_widgets if str(w).endswith("_model")} == {
+        "announcer_video_model", "music_video_model", "character_video_model",
+        "announcer_image_model", "music_image_model", "character_image_model",
+    }
 
 
 def test_registry_offers_engines_for_all_three_roles():
@@ -168,17 +170,19 @@ def test_workflow_json_node87_matches_live_widget_model():
         d = json.load(f)
     n87 = next(n for n in d["nodes"] if n["id"] == 87)
     n3 = next(n for n in d["nodes"] if n["id"] == 3)
-    # 2026-07-03 clean-UI: allow_auto_fallback (15->14), episode_duration_target
-    # (14->13), then the other_beats_video consolidation (13->12; character
-    # promoted to video slot 3 = widgets index 2).
+    # 2026-07-03 clean-UI: the node settled at 12 widgets (allow_auto_fallback,
+    # episode_duration_target, and the legacy catch-all video slot were removed;
+    # character promoted to video slot 3 = widgets index 2).
     assert len(n87["widgets_values"]) == 12, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
-    assert not ({"other_beats_clip_mode", "other_beats_n",
-                 "scene_broll_video_model",
-                 "background_abstract_video_model"} & names87)
+    # the per-role MODEL widgets are EXACTLY the six live ones -- a closed check
+    # that catches any legacy model widget leaking back into the canonical JSON.
+    assert {n for n in names87 if str(n).endswith("_model")} == {
+        "announcer_video_model", "music_video_model", "character_video_model",
+        "announcer_image_model", "music_image_model", "character_image_model",
+    }
     assert "allow_auto_fallback" not in names87
     assert "episode_duration_target" not in names87
-    assert "other_beats_video_model" not in names87
     # character_video_model is now video slot 3 (widgets index 2); the pinned
     # engine must be a registered engine (no inherit sentinel any more).
     pin = n87["widgets_values"][2]

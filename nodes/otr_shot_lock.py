@@ -337,7 +337,7 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
     warnings}``. Pure; gated by the caller on ``audio_done``.
 
     rip-sfx-broll (2026-07-01): the other-beats POOLING budget
-    (clip_mode / pool_n / other_beats_render_count) was removed with the
+    (clip_mode / pool_n / character_render_count) was removed with the
     scene_broll / background_abstract roles -- every beat renders per-beat.
     """
     fps = int(fps) if fps else 25
@@ -714,7 +714,7 @@ def build_execution_plan(beats, budget, creative, policy):
     video_models = (policy or {}).get("video_models") or {}
 
     def engine_for(role):
-        # Route-A: per-role video slot with the legacy other_beats fallback
+        # Route-A: per-role video slot with the legacy character fallback
         # (ONE shared map; nodes/_otr_shared/role_slots.py).
         return _role_slots.engine_id_for_role(video_models, role)
 

@@ -2,7 +2,7 @@
 item 4), powered by the GATE B S2 applier.
 
 Every engine option in the VIDEO dropdowns (announcer_visual / music_visual /
-other_beats) renders a 30-word FULL episode on the live server, one leg per
+character) renders a 30-word FULL episode on the live server, one leg per
 (slot, engine), via an EPHEMERAL capability profile applied by the ONE applier
 -- never a hand-coded patch list. Options are ENUMERATED FROM THE REGISTRY
 (intersected with enabled(16gb_full)); engines outside the enable-set
@@ -86,7 +86,7 @@ SUMMARY_PATH = os.path.join(_HERE, "coverage_sweep_summary.json")
 #: OTR_VideoDirector slot -> (profile role_overrides key, registry role token).
 #: rip-sfx-broll (2026-07-01): the character lane sweeps its DEDICATED
 #: character_visual key now (no longer hidden behind the legacy
-#: other_beats_visual fallback slot).
+#: character_visual fallback slot).
 SLOTS = (
     ("announcer_visual", "announcer_visual"),
     ("music_visual", "music_visual"),

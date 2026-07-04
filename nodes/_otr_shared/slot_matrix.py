@@ -5,7 +5,7 @@ The slot-audit soak must drive the REAL workflow (workflows/otr_scifi_16gb_full.
 with ALL video roles set INDEPENDENTLY -- announcer / music / character -- via the
 capability-profile role_overrides, so the applier patches each OTR_VideoDirector
 video widget (by node TYPE through ``config/profiles/widget_mapping.json``, never a
-node id). It must NEVER lean on the legacy ``other_beats_visual`` fallback for
+node id). It must NEVER lean on a legacy catch-all fallback for
 character (that fallback is exactly what masked the per-slot drift the sprint
 fixed).
 
@@ -21,8 +21,8 @@ from typing import Optional
 
 #: role_compat role token -> profile role_overrides KEY (whose widget_mapping
 #: target is the matching OTR_VideoDirector per-role video model widget). These are
-#: the THREE independent slots; ``other_beats_visual`` is deliberately ABSENT (it is
-#: the legacy fallback the soak must not use). scene_broll_visual /
+#: the THREE independent slots; no legacy catch-all fallback is present (the soak
+#: must not use one). scene_broll_visual /
 #: background_abstract_visual were removed 2026-07-01 with their roles.
 ROLE_TO_PROFILE_KEY: dict = {
     "announcer_visual": "announcer_visual",
@@ -33,23 +33,17 @@ ROLE_TO_PROFILE_KEY: dict = {
 #: The role_compat role tokens, in canonical order.
 ALL_ROLES: tuple = tuple(ROLE_TO_PROFILE_KEY.keys())
 
-#: The three per-role IMAGE override keys (announcer / music / char_beats image --
-#: the char_beats image slot carries the character stills).
-IMAGE_KEYS: tuple = ("announcer_image", "music_image", "char_beats_image")
+#: The three per-role IMAGE override keys (announcer / music / character image --
+#: the character image slot carries the character stills).
+IMAGE_KEYS: tuple = ("announcer_image", "music_image", "character_image")
 
 #: Named baselines for the slots NOT under test: a still video carrier that fits
 #: every role + always renders, and the gen-1 image engine.
 DEFAULT_VIDEO_BASELINE = "still_flat"
 DEFAULT_IMAGE_BASELINE = "flux_gen1"
 
-#: Dead profile keys defensively STRIPPED from any profile passed through the
-#: builder (a user-customized profile may still carry them; the applier would
-#: fail loud on them post-rip, so scrub here).
-_DEAD_ROLE_OVERRIDE_KEYS = (
-    "other_beats_visual",
-    "scene_broll_visual",
-    "background_abstract_visual",
-)
+# (No dead-key scrubber: retired role_overrides keys now fail LOUD at
+# apply_profile -- clean break, no silent scrub.)
 
 
 def build_all_role_profile(base_profile: dict, role_engines: Optional[dict] = None,
@@ -59,19 +53,16 @@ def build_all_role_profile(base_profile: dict, role_engines: Optional[dict] = No
     """A DEEP COPY of ``base_profile`` with ALL THREE video role keys set.
 
     ``role_engines`` maps a role_compat role token (see :data:`ALL_ROLES`) to the
-    engine for that slot; any role absent falls to ``video_baseline``. The legacy
-    ``other_beats_visual`` key AND the dead scene_broll_visual /
-    background_abstract_visual keys are REMOVED so nothing routes through a
-    fallback or a dead override. The three image slots default to
+    engine for that slot; any role absent falls to ``video_baseline``. Retired
+    role_overrides keys are no longer scrubbed -- they fail LOUD at apply
+    (clean break). The three image slots default to
     ``image_baseline`` (override per key via ``image_engines``). Pure -- never
     touches the graph; the applier does that."""
     role_engines = role_engines or {}
     image_engines = image_engines or {}
     profile = copy.deepcopy(base_profile)
     ro = profile.setdefault("role_overrides", {})
-    # Set the three INDEPENDENT video slots; drop the legacy fallback + dead keys.
-    for dead in _DEAD_ROLE_OVERRIDE_KEYS:
-        ro.pop(dead, None)
+    # Set the three INDEPENDENT video slots (retired keys fail loud at apply).
     for role in ALL_ROLES:
         ro[ROLE_TO_PROFILE_KEY[role]] = role_engines.get(role, video_baseline)
     for key in IMAGE_KEYS:

@@ -24,7 +24,7 @@ def test_mesh_fodder_roles_from_video_policy():
     }}
     roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
     # character rides its own slot; music rides its own slot (2026-07-03: no
-    # legacy other_beats slot).
+    # legacy catch-all slot).
     assert roles == {"character_video", "music_visual"}
     # announcer paired with ltx_video -> NOT fodder.
     assert "announcer_visual" not in roles

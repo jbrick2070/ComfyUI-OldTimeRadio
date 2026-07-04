@@ -148,7 +148,7 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
 #: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
 #: honored -- announcer stills render on the announcer slot, music/open stills
 #: on the music slot; character portraits + character-associated scene stills on
-#: the character slot). Renamed 2026-07-03: the old catch-all other_beats_image_model
+#: the character slot). Renamed 2026-07-03: the old catch-all image slot
 #: is now character_image_model (scene_broll + background roles were ripped
 #: 2026-07-01, so it serves only the character_video lane).
 _ROLE_TO_IMAGE_SLOT = {
@@ -366,7 +366,7 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     if str(role) not in _role_slots.ROLE_TO_VIDEO_SLOT:
         return True
     # Route-A: resolve the role's video engine via the ONE shared map (per-role
-    # slot, then the legacy other_beats fallback) so character_video correctly
+    # slot, then the legacy character fallback) so character_video correctly
     # reads character_video_model (humo_14B_169 consumes the still it requires).
     eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
     if not eng_id:
@@ -489,7 +489,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                      "still generated", oid, role)
             continue
         # Slot resolution per OBJECT role (ST-3: the ImageDirector slots
-        # finally honored); empty named slot -> other_beats fallback, LOUD.
+        # finally honored); empty named slot -> character fallback, LOUD.
         engine_id, slot, fell_back = resolve_engine_for_role(image_policy, role)
         # BUG-LOCAL-405 (per-role image selection): LOUD trace of how each
         # object's role resolved to a policy slot + engine, so an unexpected

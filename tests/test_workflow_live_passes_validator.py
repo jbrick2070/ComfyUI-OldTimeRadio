@@ -106,7 +106,7 @@ def test_production_workflow_visual_structure_pinned():
         "music_video_model regressed off the viz_green default: %r" % wv87[1])
     # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15; clean-UI removals
     # (2026-07-03) dropped allow_auto_fallback (15->14), episode_duration_target
-    # (14->13), then consolidated other_beats_video -> character promoted to video
+    # (14->13), then consolidated the legacy catch-all video slot -> character promoted to video
     # slot 3 (13->12; character_video_model is widgets index 2 now).
     assert len(wv87) == 12, wv87
     assert wv87[2] == "humo_14B_169", (

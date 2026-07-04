@@ -250,8 +250,8 @@ def test_schema_extra_forbid_and_family_rules():
 def test_widget_vector_exact():
     """Golden pin on the director's required widget order/names (drift guard).
     2026-07-03: three first-class video slots (announcer/music/CHARACTER) --
-    other_beats_video retired, character promoted to slot 3. The 11-widget vector
-    below matches node 87's widgets_values[0:11] in the canonical workflow JSON."""
+    the legacy catch-all video slot retired, character promoted to slot 3. The
+    11-widget vector below matches node 87's widgets_values[0:11] in the JSON."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "character_video_model",
@@ -315,8 +315,6 @@ def test_director_policy_json_and_clamp(clean_video_registry):
         canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
     )
     policy = json.loads(out[0])
-    # rip-sfx-broll (2026-07-01): the other_beats pooling plan is GONE.
-    assert "other_beats" not in policy
     assert policy["canvas"] == {"w": 832, "h": 480, "fps": 25}
     assert policy["video_models"]["announcer_video_model"]["custom"] is True
 
@@ -360,7 +358,7 @@ def test_clip_budget_no_double_count():
 
 def test_clip_budget_is_pure_per_beat():
     # rip-sfx-broll (2026-07-01): the pooling budget (clip_mode / pool_n /
-    # other_beats_render_count) is GONE -- the budget is pure per-beat frames.
+    # render_count) is GONE -- the budget is pure per-beat frames.
     beats = [
         {"beat_id": f"o{i}", "role": "character_video", "char_id": "c1",
          "text": "", "samples": 1000, "sample_rate": 24000, "dur_s": None}

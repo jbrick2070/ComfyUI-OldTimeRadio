@@ -1,6 +1,6 @@
 """ONE shared role -> video-slot map (Route-A, 2026-06-28 HuMo-14B promotion;
 rip-sfx-broll 2026-07-01: scene_broll / background_abstract roles REMOVED;
-2026-07-03: the legacy ``other_beats_video_model`` slot + its migration fallback
+2026-07-03: the legacy catch-all video slot + its migration fallback
 RETIRED -- three first-class video slots only).
 
 There are exactly THREE video roles/slots -- announcer, music, character -- each
@@ -17,7 +17,7 @@ torch / comfy / numpy at module scope (cold-import clean, V-12).
 
 NO FALLBACKS (operator directive 2026-07-03): character_video resolves ONLY via
 its dedicated ``character_video_model`` slot. The old empty-slot fallback to a
-legacy ``other_beats_video_model`` slot is GONE -- an empty character slot
+legacy catch-all video slot is GONE -- an empty character slot
 resolves to "" and the Director fails LOUD; an unknown role token always RAISES.
 """
 from __future__ import annotations
@@ -90,7 +90,7 @@ def engine_id_for_role(video_models, role: str) -> str:
     The role is validated FIRST via :func:`slot_for_role` (unknown role ->
     ``ValueError``, never a silent lane). Then reads the role's dedicated
     per-role slot. NO FALLBACK (operator 2026-07-03): the old empty-slot
-    fallback to a legacy ``other_beats_video_model`` slot is gone. Each slot
+    fallback to a legacy catch-all video slot is gone. Each slot
     value may be a bare engine-id string or a ``{"engine_id": ...}`` dict.
     Returns "" when the slot is absent/empty (the Director fails LOUD on that).
     """

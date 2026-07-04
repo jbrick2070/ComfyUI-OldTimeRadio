@@ -137,7 +137,7 @@ _COMFY_SLOT_WIDGETS = frozenset({
 # the applier validates these widgets against the FULL registry, not the gated
 # display list. Mirrors the openrouter/comfy admissibility escapes above.
 _VIDEO_DIRECTOR_WIDGETS = frozenset({
-    # Three first-class video slots (2026-07-03: other_beats retired).
+    # Three first-class video slots (2026-07-03: legacy catch-all video slot retired).
     "announcer_video_model", "music_video_model", "character_video_model",
 })
 _IMAGE_DIRECTOR_WIDGETS = frozenset({

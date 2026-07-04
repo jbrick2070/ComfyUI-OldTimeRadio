@@ -128,7 +128,7 @@ def _engine_id_from_pick(pick) -> str:
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
 #: The ONE shared map (nodes/_otr_shared/role_slots.py). Three first-class video
-#: slots -- announcer / music / character (2026-07-03: the legacy other_beats
+#: slots -- announcer / music / character (2026-07-03: the legacy catch-all
 #: video slot + its migration fallback were retired; character is its own slot).
 VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
 SEED_MODES = ("request_hash", "fixed")
@@ -328,7 +328,7 @@ class OTRVideoDirector:
         stills match their video engine. One entry PER ROLE
         (announcer_visual / music_visual / character_video), each resolved
         through the shared per-role map (the per-role slot, then the legacy
-        other_beats fallback for character). Unknown / custom / unresolved
+        character fallback for character). Unknown / custom / unresolved
         picks -> 'portrait' (the safe legacy look). Pure registry read, no
         side effects."""
         def _asp_for_role(role):

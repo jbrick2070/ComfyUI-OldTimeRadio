@@ -1,6 +1,6 @@
 # CODING PLAN -- retire the last live `other_beats*` IMAGE surfaces -> `character*`
 
-> SUPERSEDED TOKEN NOTE (2026-07-04): the third image role token is **char_beats**, not `character`. This doc has been updated to `char_beats_image` / `char_beats_granularity`. The image MODEL widget stays `character_image_model` (separate already-done migration).
+> SUPERSEDED TOKEN NOTE (2026-07-04): the third image role token is **character**, not `character`. This doc has been updated to `character_image` / `character_granularity`. The image MODEL widget stays `character_image_model` (separate already-done migration).
 
 
 Date: 2026-07-04  Branch: v2.0-alpha
@@ -13,7 +13,7 @@ Role model = announcer / music / **character**. Video already migrated (`charact
 `character_visual`); the image MODEL widget was renamed 2026-07-03 -> `character_image_model` (code +
 workflow JSON node 87 both carry it). What was left behind: the role KEY `other_beats_image`, one
 granularity WIDGET `other_beats_granularity`, and a scatter of soak/smoke scripts. Result: a
-`char_beats_image` role_override errors "no widget-mapping entry", and several scripts query a widget
+`character_image` role_override errors "no widget-mapping entry", and several scripts query a widget
 that no longer exists. Finish the migration. **Pure rename, no behavior change.**
 
 ## 1. ALREADY DONE -- DO NOT TOUCH
@@ -34,10 +34,10 @@ that no longer exists. Finish the migration. **Pure rename, no behavior change.*
 `apply_profile` (`nodes/_otr_workflow_apply.py:468-473`) fails LOUD on any profile key with no
 widget-mapping entry, so every producer of the KEY must move together.
 
-### A. Role/profile KEY: `other_beats_image` -> `char_beats_image`
+### A. Role/profile KEY: `other_beats_image` -> `character_image`
 - `nodes/_otr_shared/slot_matrix.py:38` `IMAGE_KEYS` (+ :36-37 comment).
 - `config/profiles/widget_mapping.json:50` KEY `role_overrides.other_beats_image` ->
-  `role_overrides.char_beats_image`. TARGET widget stays `character_image_model` (unchanged).
+  `role_overrides.character_image`. TARGET widget stays `character_image_model` (unchanged).
 - Checked-in profiles: `16gb_full.json:15`, `8gb_lite.json:14`.
 - Scripts carrying the key: `_otr_yoga_soak:38`, `_otr_visual_soak_6leg:48`, `_otr_talking_radio_night:198`,
   `_otr_overnight_story_soak:198`, `_otr_overnight_420_soak:8,146` (incl. the line-8 comment),
@@ -45,9 +45,9 @@ widget-mapping entry, so every producer of the KEY must move together.
   `_otr_cov_runner:49`, `_otr_cloud_audio_babysit:89`, `_otr_cloud_matrix_soak:41`, `_otr_cloud_video_soak:42`.
 - **SILENT-DROP TRAP -- `scripts/_otr_combo_soak.py:83`** passes `image_engines={"other_beats_image": ...}`
   into `slot_matrix.build_all_role_profile()`. If not renamed with `IMAGE_KEYS`, the character override
-  is SILENTLY dropped to `DEFAULT_IMAGE_BASELINE` (no crash). Rename the dict key to `char_beats_image`.
+  is SILENTLY dropped to `DEFAULT_IMAGE_BASELINE` (no crash). Rename the dict key to `character_image`.
 
-### B. Granularity WIDGET: `other_beats_granularity` -> `char_beats_granularity`
+### B. Granularity WIDGET: `other_beats_granularity` -> `character_granularity`
 All FIVE move in ONE commit or ComfyUI raises `TypeError` (INPUT_TYPES names are passed to `direct()`
 as kwargs by INPUT name):
 1. `nodes/otr_image_director.py:253` INPUT_TYPES key.
@@ -64,7 +64,7 @@ Already broken vs the live JSON; rename to `character_image_model`:
 ## 3. WORKFLOW JSON (hard -- §0)  node 88 = OTR_ImageDirector
 - Grounded shape: node 88 `input[4]` = `{"localized_name":"other_beats_granularity",
   "name":"other_beats_granularity","type":"COMBO","widget":{"name":"other_beats_granularity"},"link":null}`.
-  Rename ALL THREE name fields -> `char_beats_granularity` (`localized_name`, `name`, `widget.name`).
+  Rename ALL THREE name fields -> `character_granularity` (`localized_name`, `name`, `widget.name`).
 - `widgets_values` = `["per_object","per_object","per_object",15,"request_hash",42,"{}"]`; granularity
   value is index 2 and is POSITIONAL -- the rename touches only `inputs[]` name strings, so the value
   list is UNTOUCHED (BUG-LOCAL-097 safe). `link` is null -- no link-integrity impact.
@@ -87,10 +87,10 @@ scripts are ignored while `run_otr_30word_smoke.py` is tracked). Consequence:
 - **Clean break, NO runtime shim (LOCKED).** codex + agy + Fable each confirmed the only on-disk
   persisters of `other_beats_image` are the three checked-in profiles (all in scope); no external
   profile corpus exists. `apply_profile` fails loud on any stray stale key -- correct behavior.
-- **New regression:** assert `slot_matrix.IMAGE_KEYS == ("announcer_image","music_image","char_beats_image")`
+- **New regression:** assert `slot_matrix.IMAGE_KEYS == ("announcer_image","music_image","character_image")`
   and `"other_beats_image"` absent (covers the silent-drop; `test_slot_matrix_soak` checks only video keys).
 - **New workflow audit:** assert node 88 input[4] `localized_name` == `name` == `widget.name` ==
-  `otr_image_director` INPUT_TYPES key == `direct()` kwarg == `char_beats_granularity`, AND
+  `otr_image_director` INPUT_TYPES key == `direct()` kwarg == `character_granularity`, AND
   `widgets_values[2] == "per_object"` unchanged (complements `test_workflow_json_guardrails.py`).
 - **Test refs to update:** `test_image_platform_c1.py:176,241,274`; guard
   `test_rip_sfx_broll_guard.py:143-146` (name + "KEPT" comment); `test_still_spine_helpers.py:582,584,593`

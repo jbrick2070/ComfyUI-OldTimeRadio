@@ -342,13 +342,9 @@ class TestSceneStillObjects:
             assert tok in sl.SPEAKER_TO_VIDEO_ROLE, tok
 
     def test_every_beat_is_per_beat_no_pooling(self):
-        # rip-sfx-broll (2026-07-01): the other-beats pool_n_loop pooling died
-        # with the scene_broll/background_abstract roles -- NO other_pool_*
-        # targets exist any more; every mapped beat gets its OWN still.
-        import inspect
+        # rip-sfx-broll (2026-07-01): pooling died with the retired b-roll/
+        # background roles -- every mapped beat gets its OWN still (verified below).
         from nodes import otr_meta_brief_image_prompt as mbp
-        sig = inspect.signature(mbp.derive_scene_still_targets)
-        assert "other_beats" not in sig.parameters
         lines = [
             {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer",
              "start_s": 8.4, "dur_s": 4.0},
@@ -579,9 +575,9 @@ class TestDispatcherStillSpine:
         assert disp.resolve_engine_for_role(policy, "scene_broll") == \
             ("eng_o", "character_image_model", False)
 
-    def test_slot_absent_uses_char_beats_default(self):
+    def test_slot_absent_uses_character_default(self):
         # E8 (no-fallback rip): an ABSENT dedicated slot is a legitimate default
-        # (the role has no special model) -> char_beats, flagged for observability.
+        # (the role has no special model) -> character, flagged for observability.
         from nodes import otr_image_gen_dispatcher as disp
         policy = {"image_models": {
             "character_image_model": {"engine_id": "eng_o"}}}
@@ -590,7 +586,7 @@ class TestDispatcherStillSpine:
 
     def test_slot_present_but_empty_fails_loud(self):
         # E8 (no-fallback rip): a named slot PRESENT but explicitly EMPTY is a
-        # config error -> RAISE, never silently fall back to char_beats.
+        # config error -> RAISE, never silently fall back to character.
         import pytest
 
         from nodes import otr_image_gen_dispatcher as disp

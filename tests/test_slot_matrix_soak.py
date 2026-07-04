@@ -62,11 +62,12 @@ def _load_canonical() -> dict:
 def test_all_slots_set_on_canonical_json():
     base = load_profile("16gb_full")
     profile = sm.build_all_role_profile(base, ROLE_ENGINES)
-    # legacy fallback key is gone (the soak must not route through other_beats)
-    assert "other_beats_visual" not in profile["role_overrides"]
-    # dead keys are defensively scrubbed too (r3 fold)
-    assert "scene_broll_visual" not in profile["role_overrides"]
-    assert "background_abstract_visual" not in profile["role_overrides"]
+    # exactly the three video + three image role keys -- a closed set (no legacy
+    # catch-all / b-roll / background keys leak in)
+    assert set(profile["role_overrides"]) == {
+        "announcer_visual", "music_visual", "character_visual",
+        "announcer_image", "music_image", "character_image",
+    }
     wf = wa.apply_profile(_load_canonical(), profile)
     schemas = wa.build_offline_schemas()
     vd = [n for n in wf["nodes"] if n.get("type") == "OTR_VideoDirector"]
@@ -80,41 +81,39 @@ def test_all_slots_set_on_canonical_json():
         assert got != _OTHER_BEATS_SENTINEL, role          # no legacy fallback
 
 
-def test_image_keys_are_char_beats_not_other_beats():
-    # 2026-07-04 rename: the third image role key is char_beats_image, never other_beats_image
-    # (guards the silent-drop path in build_all_role_profile).
-    assert sm.IMAGE_KEYS == ("announcer_image", "music_image", "char_beats_image")
-    assert "other_beats_image" not in sm.IMAGE_KEYS
+def test_image_keys_are_exactly_the_three():
+    # 2026-07-04 rename: the third image role key is character_image (guards the
+    # silent-drop path in build_all_role_profile).
+    assert sm.IMAGE_KEYS == ("announcer_image", "music_image", "character_image")
 
 
-def test_canonical_json_char_beats_granularity_widget():
-    # node 88 (OTR_ImageDirector) granularity widget renamed to char_beats_granularity:
+def test_canonical_json_character_granularity_widget():
+    # node 88 (OTR_ImageDirector) granularity widget renamed to character_granularity:
     # all three name fields agree, the value stays positional, and the code side matches.
     import inspect
     wf = _load_canonical()
     n88 = next(n for n in wf["nodes"] if n.get("id") == 88)
     assert n88.get("type") == "OTR_ImageDirector"
-    inp = next(i for i in n88["inputs"] if i.get("name") == "char_beats_granularity")
-    assert inp["localized_name"] == "char_beats_granularity"
-    assert inp["widget"]["name"] == "char_beats_granularity"
+    inp = next(i for i in n88["inputs"] if i.get("name") == "character_granularity")
+    assert inp["localized_name"] == "character_granularity"
+    assert inp["widget"]["name"] == "character_granularity"
     assert n88["widgets_values"][2] == "per_object"          # positional value unchanged
     from nodes.otr_image_director import OTRImageDirector
-    assert "char_beats_granularity" in OTRImageDirector.INPUT_TYPES()["required"]
+    assert "character_granularity" in OTRImageDirector.INPUT_TYPES()["required"]
     sig = inspect.signature(OTRImageDirector().direct)
-    assert "char_beats_granularity" in sig.parameters
-    assert "other_beats_granularity" not in sig.parameters
+    assert "character_granularity" in sig.parameters
 
 
-def test_char_beats_image_override_flows_and_stale_key_is_dropped():
-    # silent-drop guard (build_all_role_profile loop over IMAGE_KEYS): a char_beats_image
-    # override must LAND; a stale other_beats_image key is ignored and the slot falls to the
-    # baseline -- which is exactly why the rename must move producers + IMAGE_KEYS together.
+def test_character_image_override_flows_and_stale_key_is_dropped():
+    # silent-drop guard (build_all_role_profile loop over IMAGE_KEYS): a character_image
+    # override must LAND; an unknown/stale image key is ignored and the slot falls to
+    # the baseline -- why the rename must move producers + IMAGE_KEYS together.
     base = load_profile("16gb_full")
-    ok = sm.build_all_role_profile(base, {}, image_engines={"char_beats_image": "z_image_turbo"})
-    assert ok["role_overrides"]["char_beats_image"] == "z_image_turbo"
-    stale = sm.build_all_role_profile(base, {}, image_engines={"other_beats_image": "z_image_turbo"})
-    assert stale["role_overrides"]["char_beats_image"] == sm.DEFAULT_IMAGE_BASELINE
-    assert "other_beats_image" not in stale["role_overrides"]
+    ok = sm.build_all_role_profile(base, {}, image_engines={"character_image": "z_image_turbo"})
+    assert ok["role_overrides"]["character_image"] == "z_image_turbo"
+    stale = sm.build_all_role_profile(base, {}, image_engines={"legacy_image_key": "z_image_turbo"})
+    assert stale["role_overrides"]["character_image"] == sm.DEFAULT_IMAGE_BASELINE
+    assert "legacy_image_key" not in stale["role_overrides"]
 
 
 def test_every_chosen_engine_is_capability_eligible():

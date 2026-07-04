@@ -12,7 +12,7 @@
     "character_visual": "humo_14B_169",
     "announcer_image": "flux_gen1",
     "music_image": "flux_gen1",
-    "char_beats_image": "flux_gen1"
+    "character_image": "flux_gen1"
   },
   "slot_overrides": {
     "char_voice_engine": "indextts2",

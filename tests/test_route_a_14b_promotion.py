@@ -1,14 +1,13 @@
 """Route-A (2026-06-28 HuMo-14B promotion) CPU tests.
 
-REWRITTEN 2026-07-01 (rip-sfx-broll): the scene_broll / background_abstract
-roles + their per-role slots are GONE. Route-A now means: character_video owns
-its dedicated character_video_model slot (humo_14B_169 promotion) with the
-legacy other_beats_video_model slot as its EMPTY-SLOT migration fallback;
+REWRITTEN 2026-07-01 (rip-sfx-broll): the two retired b-roll/background roles
++ their per-role slots are GONE. Route-A now means: character_video owns
+its dedicated character_video_model slot (humo_14B_169 promotion);
 unknown roles RAISE (NO FALLBACKS).
 
 Covers:
 * the ONE shared role->slot map (nodes/_otr_shared/role_slots.py) -- per-role
-  slot resolution + the legacy other_beats migration fallback + loud raises;
+  slot resolution + loud raises on unknown roles;
 * the HuMo-14B VRAM frame cap (class override) + the exact-fit frame helper;
 * the end-to-end routing guarantee: OTR_VideoDirector emits per-role slots,
   every role's resolved engine fits its role (role_compat), the policy carries
@@ -37,9 +36,9 @@ def test_slot_for_role_per_role_split():
     assert rs.slot_for_role("character_video") == "character_video_model"
     assert rs.slot_for_role("announcer_visual") == "announcer_video_model"
     assert rs.slot_for_role("music_visual") == "music_video_model"
-    # rip-sfx-broll: unknown / dead roles RAISE (the silent legacy-slot map
+    # rip-sfx-broll: unknown / retired roles RAISE (the silent legacy-slot map
     # is gone -- NO FALLBACKS)
-    for dead in ("scene_broll", "background_abstract", "not_a_role"):
+    for dead in ("retired_broll_role", "retired_background_role", "not_a_role"):
         with pytest.raises(ValueError):
             rs.slot_for_role(dead)
 
@@ -47,20 +46,20 @@ def test_slot_for_role_per_role_split():
 def test_engine_id_for_role_reads_per_role_slot_first():
     vm = {
         "character_video_model": {"engine_id": "humo_14B_169"},
-        "other_beats_video_model": {"engine_id": "humo_1.7B"},
+        "retired_video_slot": {"engine_id": "humo_1.7B"},
     }
     assert rs.engine_id_for_role(vm, "character_video") == "humo_14B_169"
 
 
 def test_engine_id_for_role_no_fallback():
     # NO FALLBACK (2026-07-03 consolidation): an empty character slot resolves to
-    # "" -- there is no legacy other_beats slot to fall back to.
+    # "" -- there is no legacy catch-all slot to fall back to.
     assert rs.engine_id_for_role(
         {"character_video_model": {"engine_id": ""}}, "character_video") == ""
     assert rs.engine_id_for_role({}, "character_video") == ""
-    # a dead role still raises before any lookup
+    # a retired/unknown role still raises before any lookup
     with pytest.raises(ValueError):
-        rs.engine_id_for_role({}, "scene_broll")
+        rs.engine_id_for_role({}, "retired_role")
 
 
 def test_engine_id_for_role_accepts_bare_string_values():
@@ -73,10 +72,11 @@ def test_video_slot_roles_has_three_per_role_slots():
     assert sr["character_video_model"] == ("character_video",)
     assert sr["announcer_video_model"] == ("announcer_visual",)
     assert sr["music_video_model"] == ("music_visual",)
-    # NO legacy other_beats video slot (2026-07-03 consolidation)
-    assert "other_beats_video_model" not in sr
-    assert "scene_broll_video_model" not in sr
-    assert "background_abstract_video_model" not in sr
+    # exactly three first-class video slots -- a closed set that catches ANY
+    # stray/legacy slot leaking back in (stronger than per-name absence checks)
+    assert set(sr) == {
+        "character_video_model", "announcer_video_model", "music_video_model",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -135,13 +135,10 @@ def _direct_policy():
 def test_director_emits_per_role_video_models():
     vm = _direct_policy()["video_models"]
     assert vm["character_video_model"]["engine_id"] == "humo_14B_169"
-    assert "scene_broll_video_model" not in vm
-    assert "background_abstract_video_model" not in vm
-
-
-def test_director_policy_has_no_other_beats_pooling():
-    pol = _direct_policy()
-    assert "other_beats" not in pol
+    # exactly the three per-role video-model slots (closed set)
+    assert set(vm) == {
+        "announcer_video_model", "music_video_model", "character_video_model",
+    }
 
 
 def test_every_role_engine_fits_its_role():

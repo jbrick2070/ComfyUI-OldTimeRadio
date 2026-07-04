@@ -65,7 +65,7 @@ RENDER_BATCH_NODE_ID = "92"
 VIDEO_DIRECTOR_SLOTS = (
     "announcer_video_model",
     "music_video_model",
-    # CHARACTER is a first-class slot (2026-07-03: other_beats retired). The saved
+    # CHARACTER is a first-class slot (2026-07-03: character retired). The saved
     # workflow pins character face beats to humo_14B_169 -- an all-ltx smoke must
     # patch it too, or character beats silently render HuMo (caught live
     # 2026-07-02: histogram {ltx_audio_in: 2, humo_14B_169: 3} on the ia2v proof).
@@ -438,7 +438,7 @@ def _build_prompt(words: int) -> tuple[dict[str, Any], list[str]]:
             )
         )
         changes.append(
-            "director images announcer=%r music=%r char_beats=%r"
+            "director images announcer=%r music=%r character=%r"
             % (
                 dinputs.get("announcer_image_model"),
                 dinputs.get("music_image_model"),

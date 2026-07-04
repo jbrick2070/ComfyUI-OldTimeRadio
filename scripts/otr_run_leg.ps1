@@ -17,10 +17,10 @@
 
   Usage:
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_run_leg.ps1 `
-        -Leg other_beats_visual_ltx_video
+        -Leg character_visual_ltx_video
 #>
 param(
-    [string]$Leg = 'other_beats_visual_ltx_video',
+    [string]$Leg = 'character_visual_ltx_video',
     [string]$StrengthI2V = '0.6',
     [string[]]$ExtraEnv = @(),
     [int]$StallSeconds = 300,

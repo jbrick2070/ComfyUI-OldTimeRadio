@@ -173,7 +173,7 @@ def test_image_director_policy_json_and_seed(clean_image_registry):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     out = OTRImageDirector().direct(**_direct_kwargs(
-        char_beats_granularity="per_beat", request_seed=7))
+        character_granularity="per_beat", request_seed=7))
     policy = json.loads(out[0])
     assert policy["image_models"]["music_image_model"]["engine_id"] == "flux_gen1"
     assert policy["seed"]["request_seed"] == 7
@@ -238,7 +238,7 @@ def _direct_kwargs(**over):
         pass  # malformed payload passes through for the fail-closed tests
     kw = dict(
         announcer_granularity="per_object",
-        music_granularity="per_object", char_beats_granularity="per_object",
+        music_granularity="per_object", character_granularity="per_object",
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
         video_policy_json=vp_raw,
     )
@@ -271,7 +271,7 @@ def test_3d_granularity_lock_per_beat_raises(clean_image_registry,
     }})
     with pytest.raises(ValueError, match="per_object"):
         OTRImageDirector().direct(**_direct_kwargs(
-            char_beats_granularity="per_beat",
+            character_granularity="per_beat",
             video_policy_json=video_policy))
 
 
@@ -616,7 +616,7 @@ def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, 
 
 
 def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_registry, tmp_path):
-    # other_beats video = wan_ti2v (consumes init_image) -> the still IS generated.
+    # character video = wan_ti2v (consumes init_image) -> the still IS generated.
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_wan", "cast": [{"char_id": "c1", "name": "BABA"}]}

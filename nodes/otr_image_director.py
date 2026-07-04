@@ -250,7 +250,7 @@ class OTRImageDirector:
                 # only the granularity / fresh-cap / seed policy.
                 "announcer_granularity": (gran, {"default": "per_object"}),
                 "music_granularity": (gran, {"default": "per_object"}),
-                "char_beats_granularity": (gran, {
+                "character_granularity": (gran, {
                     "default": "per_object",
                     "tooltip": (
                         "per_object: one image reused per character/prop "
@@ -311,7 +311,7 @@ class OTRImageDirector:
 
     # ------------------------------------------------------------------ #
     def direct(self, announcer_granularity,
-               music_granularity, char_beats_granularity, fresh_cap,
+               music_granularity, character_granularity, fresh_cap,
                seed_mode, request_seed, video_policy_json="",
                custom_models_json="{}", gate_in=""):
         warnings: list = []
@@ -348,7 +348,7 @@ class OTRImageDirector:
         granularity = {
             "announcer_image_model": announcer_granularity,
             "music_image_model": music_granularity,
-            "character_image_model": char_beats_granularity,
+            "character_image_model": character_granularity,
         }
         locked = three_d_locked_slots(video_policy)
         granularity = enforce_3d_granularity_lock(granularity, locked, warnings)
@@ -380,7 +380,7 @@ class OTRImageDirector:
             "video_models": (video_policy.get("video_models")
                              if isinstance(video_policy.get("video_models"), dict)
                              else {}),
-            # (The other_beats {clip_mode, pool_n} passthrough died with the
+            # (The character {clip_mode, pool_n} passthrough died with the
             # pooling rip, 2026-07-01 -- every beat is per-beat now.)
             # 3D image streams (2026-06-21): the IMAGE-prompt roles whose paired
             # video engine requires_mesh_fodder. MetaBrief forks those beats to a

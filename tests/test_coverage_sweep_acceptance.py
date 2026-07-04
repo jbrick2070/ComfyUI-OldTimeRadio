@@ -122,21 +122,21 @@ def test_exit_one_fail_is_red():
 
 
 def test_exit_acceptance_green_when_both_core_wan_pass():
-    results = [_leg("sweep_other_beats_visual_wan_i2v"),
-               _leg("sweep_other_beats_visual_wan_ti2v"),
+    results = [_leg("sweep_character_visual_wan_i2v"),
+               _leg("sweep_character_visual_wan_ti2v"),
                _leg("sweep_music_visual_visualizer")]
     assert sweep.sweep_exit_code(results, acceptance=True) == 0
 
 
 def test_exit_acceptance_red_when_wan_ti2v_absent():
     # Today's reality: wan_ti2v unbuilt -> acceptance is RED by construction.
-    results = [_leg("sweep_other_beats_visual_wan_i2v"),
+    results = [_leg("sweep_character_visual_wan_i2v"),
                _leg("sweep_music_visual_visualizer")]
     assert sweep.sweep_exit_code(results, acceptance=True) == 1
 
 
 def test_exit_acceptance_red_when_wan_i2v_absent():
-    results = [_leg("sweep_other_beats_visual_wan_ti2v"),
+    results = [_leg("sweep_character_visual_wan_ti2v"),
                _leg("sweep_music_visual_visualizer")]
     assert sweep.sweep_exit_code(results, acceptance=True) == 1
 
@@ -150,7 +150,7 @@ def test_exit_non_acceptance_green_without_any_wan():
 def test_exit_wan_i2v_token_does_not_match_wan_ti2v_leg():
     # Guard the substring match: a wan_ti2v-only result must NOT satisfy the
     # wan_i2v requirement.
-    results = [_leg("sweep_other_beats_visual_wan_ti2v")]
+    results = [_leg("sweep_character_visual_wan_ti2v")]
     assert sweep.sweep_exit_code(results, acceptance=True) == 1
 
 
@@ -179,10 +179,10 @@ def test_strict_fallback_exit_needs_no_wan_engine():
     # is GREEN (no wan_i2v/wan_ti2v required), an empty run is RED. (Leg names
     # are opaque fixture strings here; still_parallax/visualizer renamed
     # still_motion/viz_green 2026-06-30, item 2.)
-    non_wan = [_leg("sweep_other_beats_visual_still_motion"),
+    non_wan = [_leg("sweep_character_visual_still_motion"),
                _leg("sweep_music_visual_viz_green")]
     assert sweep.sweep_exit_code(non_wan, acceptance=False) == 0
     assert sweep.sweep_exit_code([], acceptance=False) == 1
     # A silent fallback would surface as a SOAK_FAIL leg (M1 raised) -> RED.
-    fell = [_leg("sweep_other_beats_visual_still_motion", "SOAK_FAIL")]
+    fell = [_leg("sweep_character_visual_still_motion", "SOAK_FAIL")]
     assert sweep.sweep_exit_code(fell, acceptance=False) == 1
