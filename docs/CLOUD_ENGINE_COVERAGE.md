@@ -49,6 +49,38 @@ before it made any cloud call). So bookend positions are N/A for face engines.
 
 ---
 
+## 100% ALL-CLOUD PATH -- recipe + the ONE remaining blocker (2026-07-04)
+
+GOAL: one episode where EVERY generative engine is cloud. Status of the pieces:
+- cloud IMAGE (ideo PROVEN; cloud_nano_banana_2 config applies clean) -- headless OK.
+- cloud VIDEO (word_razzle PROVEN on all roles) -- headless OK.
+- cloud VOICE (elevenlabs PROVEN) -- headless OK.
+- cloud MUSIC (sonilo PROVEN) -- headless OK.
+- cloud LLM (Comfy Credits) -- **BLOCKED headless.** The writer's Comfy Credits lane
+  auths via HIDDEN node inputs (auth_token_comfy_org) that only the logged-in DESKTOP
+  UI injects; a headless /prompt gets `ComfyCreditsConfigError: No Comfy credential`.
+  The media engines work headless because invoke_partner_node pulls auth from
+  OTR_COMFY_API_KEY -- the writer's Comfy Credits path does NOT do that env fallback.
+  FIX OPTIONS: (a) run the all-cloud episode from the Desktop app (logged in); or
+  (b) code: give the writer's Comfy Credits path an OTR_COMFY_API_KEY env fallback like
+  the media lane (then it runs headless).
+
+EXACT all-cloud config (harness leg `all_cloud_llm`, or set these in the Desktop UI):
+- writer node 1: creative_writing_model=`comfy:slot-a`, technical_model=`comfy:slot-b`,
+  comfy_slot_a_model=`google/gemini-3.5-flash`, comfy_slot_b_model=`google/gemini-3.5-flash`;
+  env `OTR_ENABLE_COMFY_CREDITS=1`. (Comfy models: anthropic/claude-opus-4.7,
+  openai/gpt-5.5-pro, google/gemini-3.5-flash, x-ai/grok-4.20, deepseek/deepseek-v4-pro...)
+- image role_overrides: `announcer_image`/`music_image`/`other_beats_image` = `cloud_nano_banana_2`
+  (NOTE naming drift: the profile role key is `other_beats_image`, NOT `character_image` --
+  the rename only touched the VIDEO widget `character_image_model`. Cleanup item.)
+- video: `OTR_FORCE_ENGINE_MAP=*=word_razzle` (+ `OTR_LTX_RADIO_FACE=0`).
+- voice: slot_overrides char_voice_engine=`elevenlabs` + node 80 voice_bank=`elevenlabs_cloud`.
+- music: node 83 engine=`sonilo`.
+
+RULE (kling lesson): face/avatar VIDEO engines (kling_avatar, seedance) must be scoped to
+`character_video` ONLY (`OTR_FORCE_ENGINE_MAP=character_video=<engine>`); on bookends they
+trip the RADIO-IS-HOST redirect -> ltx_audio_in -> radio-face-still-missing RenderError.
+
 ## OPEN / NEXT
 - CLOUD IMAGE sweep: recraft, flux_pro, nano_banana_2, seedream_2, ideogram-words (force image roles; video=still_word fast, audio local).
 - CLOUD VIDEO: confirm kling_avatar on character_video; seedance_2 needs the V3-expansion pin before it can be tested.
