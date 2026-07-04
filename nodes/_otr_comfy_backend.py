@@ -73,34 +73,23 @@ DEFAULT_CHAT_PATH = "/proxy/openrouter/api/v1/chat/completions"
 # claude-opus-4.7 on Comfy's curated list (the own-key OpenRouter lane uses
 # 4.8) -- so the Comfy lane carries its own creative default.
 COMFY_RECOMMENDED_CREATIVE_DEFAULT = "anthropic/claude-opus-4.7"
-COMFY_RECOMMENDED_TECHNICAL_DEFAULT = "deepseek/deepseek-v4-pro"
+COMFY_RECOMMENDED_TECHNICAL_DEFAULT = "google/gemini-3.5-flash"
 
-# The pinned ComfyUI OpenRouter partner-node catalog (docs.comfy.org,
-# 2026-06-01). "The more options the better" -- the full curated list is
-# offered in both slot pickers. Bump this list when ComfyUI's partner
-# catalog changes (there is no public list endpoint to fetch it from).
+# CURATED (operator directive 2026-07-04): ONE recognizable, NON-REASONING model
+# per major brand, ordered cheapest -> premium. Reasoning models (deepseek-*-pro,
+# perplexity sonar-reasoning/deep-research, *-thinking, gpt-5.5-pro, qwen *-max)
+# are DELIBERATELY EXCLUDED -- they return empty / no-choices / time out on the
+# writer's STRUCTURED-JSON slot calls (proven 2026-07-04: perplexity/sonar-
+# reasoning-pro upstream-502'd the news_interpreter; the technical DEFAULT was
+# also on a reasoning deepseek-v4-pro). Keep the writer's JSON path on
+# text-completion models. gemini-3.5-flash is LIVE-PROVEN (Desktop, 2026-07-04).
 COMFY_LLM_MODELS: tuple[str, ...] = (
-    "anthropic/claude-opus-4.7",
-    "openai/gpt-5.5-pro",
-    "openai/gpt-5.5",
-    "google/gemini-3.5-flash",
-    "x-ai/grok-4.20",
-    "x-ai/grok-4.3",
-    "deepseek/deepseek-v4-pro",
-    "deepseek/deepseek-v4-flash",
-    "deepseek/deepseek-v3.2",
-    "qwen/qwen3.6-max-preview",
-    "qwen/qwen3.6-plus",
-    "qwen/qwen3.6-flash",
-    "mistralai/mistral-large-2512",
-    "mistralai/mistral-medium-3-5",
-    "z-ai/glm-4.6",
-    "z-ai/glm-5",
-    "moonshotai/kimi-k2.6",
-    "moonshotai/kimi-k2-thinking",
-    "perplexity/sonar-pro",
-    "perplexity/sonar-reasoning-pro",
-    "perplexity/sonar-deep-research",
+    "google/gemini-3.5-flash",        # Gemini   -- LOW/cheap, fast, PROVEN 2026-07-04
+    "deepseek/deepseek-v3.2",         # DeepSeek -- cheap general chat (NON-reasoning)
+    "mistralai/mistral-large-2512",   # Mistral  -- mid, capable general model
+    "x-ai/grok-4.20",                 # Grok     -- mid
+    "openai/gpt-5.5",                 # ChatGPT  -- upper-mid (the non-pro, non-reasoning tier)
+    "anthropic/claude-opus-4.7",      # Claude   -- UPPER, strongest writer (creative default)
 )
 
 # Cost-guard defaults (mirror the OpenRouter lane). Prepaid credits already
