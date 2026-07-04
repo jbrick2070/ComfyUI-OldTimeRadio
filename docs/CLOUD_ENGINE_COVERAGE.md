@@ -56,7 +56,12 @@ GOAL: one episode where EVERY generative engine is cloud. Status of the pieces:
 - cloud VIDEO (word_razzle PROVEN on all roles) -- headless OK.
 - cloud VOICE (elevenlabs PROVEN) -- headless OK.
 - cloud MUSIC (sonilo PROVEN) -- headless OK.
-- cloud LLM (Comfy Credits) -- **BLOCKED headless.** The writer's Comfy Credits lane
+- cloud LLM (Comfy Credits) -- **PROVEN from the DESKTOP app 2026-07-04** (slot A
+  google/gemini-3.5-flash wrote the style-picker, auth injected, credit-billed OK).
+  GOTCHA: keep the TECHNICAL slot (comfy_slot_b_model) OFF reasoning models --
+  `perplexity/sonar-reasoning-pro` hit an upstream 502 (returns no choices / times out);
+  use a fast non-reasoning model (google/gemini-3.5-flash or deepseek/deepseek-v4-flash).
+  Still **BLOCKED headless** (see below). The writer's Comfy Credits lane
   auths via HIDDEN node inputs (auth_token_comfy_org) that only the logged-in DESKTOP
   UI injects; a headless /prompt gets `ComfyCreditsConfigError: No Comfy credential`.
   The media engines work headless because invoke_partner_node pulls auth from
