@@ -216,3 +216,40 @@ directive. Pinned by `test_sequencer_ledger.py:293`. Rip it next (fail loud on a
 clip-count shortfall). Also a legacy-graph note: ledgers with no
 `meta.cast_contract.cast_seed` now raise VoiceCastingError unconditionally
 (intended — not a regression).
+
+## G. r2 agy round (Antigravity manual panelist, grounded by Claude 2026-07-03)
+Operator ran the agy manual review (AGY_MANUAL_PROMPT.md); Claude grounded it.
+VERDICT: SOUND. It CONFIRMS R1 was safe + refines the R2/R3 map. Grounded survivors:
+
+- **[CONFIRMED, 2 panels] E4 body_score swallow — exact caller.** Ripping
+  `_otr_body_score` (OTR_LedgerScriptWriter.py:1603-1659) to raise is INERT: the
+  caller at `OTR_LedgerScriptWriter.py:4689-4700` wraps the reroll block in
+  `except Exception as _bg_exc:  # never break audio` and keeps the original line.
+  R3 MUST narrow that catch (or let a WriterValidationFailure propagate).
+- **[CONFIRMED] Dead bark health checks — DELETE, don't refactor.**
+  `_bark_health_check` (story_orchestrator.py:649) + `_bark_health_check_for_cast`
+  (:691) have NO live callers (only self-referential docstrings). Delete both in
+  R3 rather than spend rip/test effort (supersedes plan item #9's "rip").
+- **[CONFIRMED] R1 was safe because the writer produces valid casts.**
+  `lock_cast` (OTR_LedgerScriptWriter.py:3005) guarantees every cast row a valid
+  preset and maps lines only to existing cast IDs by construction — so the R1
+  cast_lock fail-loud raises stay dormant on real episodes. NOTE: `repair_orphans`
+  (_otr_cast_repair.py:194) is UNWIRED (no caller), so post-R1 any LLM dialogue-tag
+  DRIFT that invents an orphan now fails loud as VoiceCastingError (was: silent
+  reassign to another character). This is the intended no-fallback outcome.
+
+**R2 test-inversion checklist (invert in the SAME commit, never delete):**
+- `test_still_spine_helpers.py::test_slot_fallback_is_flagged` (:569-574) — empty
+  `music_visual` slot must RAISE, not return `fell=True`.
+- `test_still_spine_helpers.py::test_st4_still_index_and_family_init` (:724-733) —
+  missing scene still must RAISE, not fall back to the `"portrait"` init source.
+
+**R3 test-inversion checklist (invert in the SAME commit):**
+- `test_announcer_passes.py::test_compose_announcer_outro_llm_raises_falls_back` +
+  `::test_compose_announcer_outro_multiline_output_falls_back` (:355-384) — assert
+  the raise, not `announcer_outro_fallback`.
+- `test_image_platform_c1.py::test_meta_brief_prompt_temp0_hash_reseed_fallback`
+  (:427) + `::test_meta_brief_consistency_gate_fallback` (:451) — empty/inconsistent
+  LLM visual prompt must RAISE, not remap to the template.
+- `test_brief_prompt_finishing.py::test_image_person_guard_then_finish_no_retrigger`
+  (:90-97) — non-person prompt must RAISE, not return `template_person_guard`.
