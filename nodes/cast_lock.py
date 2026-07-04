@@ -36,7 +36,8 @@ log = logging.getLogger("OTR")
 # the cast to the COMMERCIAL-CLEAN cloner (chatterbox MIT, then dia Apache) and
 # EXCLUDES the non-commercial indextts2 -- the release-safe cast (2026-06-18
 # voice-engine roundtable). "default" is unchanged (indextts2 first = quality).
-_VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin")
+_VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin",
+                "elevenlabs_cloud")  # cloud ElevenLabs voice pool (S2), 2026-07-03
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 

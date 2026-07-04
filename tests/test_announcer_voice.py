@@ -93,7 +93,9 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
 
     it = A.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
-    assert engines == ["kokoro", "chatterbox"]
+    # elevenlabs (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- selectable but
+    # never the default; index 0 stays the byte-identical kokoro.
+    assert engines == ["kokoro", "chatterbox", "elevenlabs"]
     assert it["required"]["engine"][1]["default"] == "kokoro"
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     assert list(A.INPUT_TYPES()["required"]["engine"][0]) == engines

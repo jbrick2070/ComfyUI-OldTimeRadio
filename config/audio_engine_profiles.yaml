@@ -239,3 +239,57 @@ profiles:
     caps: {duration_control: true}
     license_state: clean            # SA3 community license: commercial OK (verify exact model S6)
     warn_text: ""
+
+  # --- cloud ElevenLabs voice (cloud-audio 2026-07-03; dropdown-opt-in, Comfy
+  # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);
+  # fail-loud, no local fallback. Voice identity is the provider_voice_id on the
+  # cast entry (C3), resolved from the elevenlabs_cloud bank (S2 pool). ---
+  - profile_id: char_elevenlabs_cloud_v1
+    role: char_voice
+    engine: elevenlabs
+    commercial_clean: true          # library premade voices, ToS-clean (S2 pool)
+    model_path: ""
+    model_sha256: ""
+    default_params: {stability: 0.5}
+    allowed_voice_banks: [elevenlabs_cloud]
+    engine_impl_version: "1"
+    sample_rate: 44100
+    requires_hf_token: false
+    rank: 50                        # opt-in; local engines rank ahead
+    is_default: false
+    runtime: cloud
+    needs_ref_clip: false
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
+    partner_row: cloud_elevenlabs_tts
+    provider_id: elevenlabs
+    auth_required: true
+    billing_category: tts
+    canonicalizer: audio
+    error_policy: fail_loud
+
+  - profile_id: announcer_elevenlabs_cloud_v1
+    role: announcer_voice
+    engine: elevenlabs
+    commercial_clean: true
+    model_path: ""
+    model_sha256: ""
+    default_params: {stability: 0.5}
+    allowed_voice_banks: [elevenlabs_cloud]
+    engine_impl_version: "1"
+    sample_rate: 44100
+    requires_hf_token: false
+    rank: 50
+    is_default: false
+    runtime: cloud
+    needs_ref_clip: false
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
+    partner_row: cloud_elevenlabs_tts
+    provider_id: elevenlabs
+    auth_required: true
+    billing_category: tts
+    canonicalizer: audio
+    error_policy: fail_loud

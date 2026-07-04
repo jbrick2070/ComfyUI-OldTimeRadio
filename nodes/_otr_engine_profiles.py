@@ -48,8 +48,10 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # char_voice PROMOTED 2026-06-04: indextts2 (Path B oop_venv worker) is the
     # shipped default; chatterbox + dia (both Path B sidecars) + bark are
     # selectable. Index 0 stays indextts2 -> byte-identical default combo.
-    "char_voice": ("indextts2", "chatterbox", "dia", "bark", "kokoro"),
-    "announcer_voice": ("kokoro", "chatterbox"),
+    # elevenlabs (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- index 0 stays the
+    # byte-identical default; a cloud pick is never automatic (C2).
+    "char_voice": ("indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs"),
+    "announcer_voice": ("kokoro", "chatterbox", "elevenlabs"),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
     "music": ("stable_audio_3", "musicgen", "stable_audio_music"),
@@ -246,9 +248,18 @@ class EngineProfileResolver:
         return profile
 
     def rank_chain(self, role: str) -> List["EngineProfile"]:
-        """Profiles serving ``role`` sorted by ``rank`` ascending (lowest rank =
-        highest priority), ``profile_id`` breaking ties for stability."""
-        return sorted(self.for_role(role), key=lambda p: (p.rank, p.profile_id))
+        """LOCAL profiles serving ``role`` sorted by ``rank`` ascending (lowest
+        rank = highest priority), ``profile_id`` breaking ties for stability.
+
+        CLOUD profiles (``runtime == "cloud"``) are EXCLUDED: this chain is the
+        AUTOMATIC auto-selection / fallback ladder, and a cloud engine must never
+        be picked automatically -- it costs credits + requires auth, so a silent
+        fallback to it would violate the no-silent-spend / fail-loud contract. A
+        cloud engine is reachable ONLY by an explicit dropdown selection, which
+        routes through ``resolve_casting_plan`` (``profile_for``), not this chain.
+        """
+        local = [p for p in self.for_role(role) if p.runtime != "cloud"]
+        return sorted(local, key=lambda p: (p.rank, p.profile_id))
 
     def role_default(self, role: str) -> Optional["EngineProfile"]:
         """The profile flagged ``is_default`` for ``role`` (lowest rank wins if

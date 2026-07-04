@@ -16,22 +16,24 @@ Two invariants over ``nodes/_otr_shared/partner_nodes.yaml``:
    live comfy_api type offline are listed in KNOWN_NONBUILDABLE (the video
    suite pins those separately).
 
-Covers video + image today; the ElevenLabs xfails come off in Sprint D.
+Covers video + image + cloud audio (the ElevenLabs TTS adapter, cloud-audio S1).
 """
 import pytest
 
 from nodes._otr_shared.cloud_media_invoke import partner_rows
 from nodes._otr_image_engines import registry as ireg
 from nodes._otr_video_engines import registry as vreg
+from nodes._otr_audio_engines import registry as areg
 
 # Rows with NO adapter yet -- each an EXPLICIT, reasoned xfail (nothing silent).
 KNOWN_UNADAPTERED = {
     # cloud_ideogram_v4 is now served by the `ideo` adapter (S1+1); ideo_word
     # (words specialist, same node_key) lands next.
-    "cloud_elevenlabs_tts": "Sprint D cloud TTS lane (xfail removed there)",
-    "cloud_elevenlabs_flash": "Sprint D cloud TTS lane (xfail removed there)",
-    "cloud_sonilo_music": "S2 cloud music lane",
-    "cloud_stability_audio": "S2 cloud music lane",
+    # cloud_elevenlabs_tts is now served by the `elevenlabs` adapter (cloud-audio
+    # S1, 2026-07-03) -- xfail REMOVED here.
+    "cloud_elevenlabs_flash": "same class, no separate adapter (tier via params)",
+    "cloud_sonilo_music": "S5 cloud music lane",
+    "cloud_stability_audio": "S5 cloud music lane (documented, not wired)",
 }
 
 # Adapters whose _partner_inputs cannot build OFFLINE (honest dark row, or needs
@@ -48,7 +50,9 @@ def _billed_rows():
 
 
 def _engine_by_node_key():
-    """node_key -> engine object across BOTH cloud registries."""
+    """node_key -> engine object across ALL cloud registries (image + video +
+    audio). The audio registry exposes its map as ``_REGISTRY`` (name -> engine),
+    the image/video registries via ``all_engine_names()`` + ``get_engine()``."""
     out = {}
     for reg in (ireg, vreg):
         for name in reg.all_engine_names():
@@ -56,6 +60,10 @@ def _engine_by_node_key():
             nk = getattr(eng, "node_key", None)
             if nk:
                 out[nk] = eng
+    for eng in areg._REGISTRY.values():           # cloud-audio adapters (elevenlabs)
+        nk = getattr(eng, "node_key", None)
+        if nk:
+            out[nk] = eng
     return out
 
 

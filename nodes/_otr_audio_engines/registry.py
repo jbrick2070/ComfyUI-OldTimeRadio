@@ -204,4 +204,9 @@ CAPABILITIES = {
                            "cpu_ok": False, "model_requirements": ["stable-audio-open"]},
     "stable_audio_3": {"required_toolchain": None, "requires_sidecar": False,
                        "cpu_ok": False, "model_requirements": ["stable-audio-open-3"]},
+    # Cloud engines (cloud-audio 2026-07-03): no local model/sidecar/GPU -- they
+    # run on Comfy Cloud via invoke_partner_node, so cpu_ok=True (usable on the
+    # cpu_floor tier; the "cost" is credits + auth, enforced at invoke, not VRAM).
+    "elevenlabs": {"required_toolchain": None, "requires_sidecar": False,
+                   "cpu_ok": True, "model_requirements": []},
 }
