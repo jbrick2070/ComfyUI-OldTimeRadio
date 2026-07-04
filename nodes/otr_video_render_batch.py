@@ -44,6 +44,12 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             "use_lora": clip.get("use_lora"),
             "render_canvas": clip.get("render_canvas"),
             "vram_peak_mb": clip.get("vram_peak_mb"),
+            # family = the engine's render family (audio_driven_face / text_to_video /
+            # image_to_video ...) -- the human-readable suffix the credits MODELS.VIDEO
+            # rows show (e.g. "humo . audio-driven face"). Sourced from the manifest
+            # clip row (render_driver stamps clip["family"]); None on engines that
+            # don't stamp it (the None IS the receipt, never a fallback).
+            "family": clip.get("family"),
         }
         per_clip.append({"shot_id": clip.get("shot_id"), "role": role,
                          "delivered_engine": eng, **receipt})

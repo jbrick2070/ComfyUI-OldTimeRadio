@@ -1,34 +1,28 @@
-"""OTR_CreditsRoll -- the ONE late viewer-credits surface (credits enrichment
-2026-07-03, GO_FORWARD_CREDITS.md v4).
+"""OTR_CreditsRoll -- the ONE late viewer-credits surface, rendered as the
+operator's 3-column SIGNAL LOST console (credits enrichment 2026-07-03, redesign
+per docs/2026-07-03-credits-enrichment/CREDITS_OVERLAY_BUILD_PLAN.md).
 
-SCAFFOLD STATUS: this file is UNWIRED until the S3+S1 atomic slice lands
-(93 -> OTR_CreditsRoll -> 85 in workflows/otr_scifi_16gb_full.json, link 263
-preserved). Unwired code is inert; the spec tests in
-tests/test_credits_roll_spec.py are this node's contract.
+WIRED 93 -> OTR_CreditsRoll (node 95) -> 85. Renders the COMPLETE viewer credits
+LATE, from post-render truth: the DURABLE production-ledger singleton (S2 stamps)
++ the clip manifest (node 92 slot 1). Appended as a SILENT tail to node 93's
+output; the video ENDS at credit-end.
 
-Why this node exists: node 12 (OTR_SignalLostVideo) renders BEFORE the image
-dispatcher (91) and the video render batch (92), so at node-12 time the
-engine/image/delivered-voice receipts do not exist -- today's blank voices and
-"(not recorded)". This node renders the COMPLETE viewer roll LATE, from
-post-render truth: the DURABLE production-ledger singleton (S2 stamps) + the
-clip manifest (node 92 slot 1).
+Presentation model (operator lock 2026-07-03):
+- COLUMNS 1 + 2 are a STATIC dashboard (title / MODELS / [PRODUCTION LEDGER] /
+  [SYSTEM]  |  CAST & VOICES / [WRITER-LLM-CONFIG]) -- held the whole time.
+- COLUMN 3 SCROLLS the full narrative (STORY SPINE -> full CLASSIFIED TRANSCRIPT
+  -> SOURCE INTERCEPT -> DIAGNOSTIC). NOTHING is dropped; the whole script rolls.
+  The credits-tail DURATION follows the col-3 scroll length and is DECLARED to the
+  credits-aware mux (node 85) so its guard permits it.
 
-Hard contracts (operator directives):
-- NO FALLBACKS. Missing manifest / ledger receipt / render / concat failure
-  RAISES before mux. No source-copy, no quiet "(not recorded)" placeholder.
-  (Node 93 was rejected as a host precisely because of its source-copy-on-
-  ffmpeg-failure fallback.)
-- SILENT-TAIL audio model: the master audio stays body-length; the credits
-  clip is appended as SILENT video; the video ENDS at credit-end. This node
-  DECLARES its tail duration to the mux (node 85) so the 45s guard becomes
-  credits-AWARE (guard permits v_dur <= a_dur + declared_tail + tol) -- the
-  guard is never blind-widened.
-- LOOK CONTRACT (operator 2026-06-17, BUG-410): the backdrop under the roll
-  is the LAST drama clip LOOPED -- never credits-over-black.
-- COLOR DECISION (stated per plan S3): captions/bars burn at node 93 BEFORE
-  the append, so this clip escapes the green-only channel crush and MAY be
-  full-color. We KEEP the green CRT credits look BY CHOICE -- aesthetic
-  continuity with the episode body -- not by pipeline force.
+Hard contracts:
+- NO FALLBACKS. A missing RECEIPT (title/style/cast/engines/seed/commit) RAISES
+  CreditsDataError before mux. Only probe fields ([SYSTEM]/VRAM) and pure in-world
+  flavor text may be soft; frozen story facts (spine/news) are omitted-if-absent,
+  never a quiet "(not recorded)".
+- LOOK CONTRACT (operator 2026-06-17): the backdrop under the console is the LAST
+  drama clip LOOPED (plan_backdrop), darkened; the radial console panel is
+  composited at partial alpha so the clip ghosts through (never credits-over-black).
 """
 from __future__ import annotations
 
@@ -41,38 +35,81 @@ import subprocess
 log = logging.getLogger("OldTimeRadio")
 
 # --------------------------------------------------------------------------- #
-# Roll geometry / look constants. S0 owns the +50% type pass: it sets
-# _CREDITS_FONT_SCALE to 1.5 and rescales _CREDITS_SCROLL_PPS so the taller
-# roll stays inside the (credits-aware) duration budget.
+# Palette (from the operator's Credits Overlay design). RGB.
 # --------------------------------------------------------------------------- #
-_CREDITS_FONT_SCALE = 1.0
-_CREDITS_SCROLL_PPS = 65.0          # px/s the roll climbs (S0 rescales)
-_CREDITS_MARGIN_X = 72
-_CREDITS_HEADER_PT = 34             # pre-scale; multiplied by the scale
-_CREDITS_BODY_PT = 24
-_CREDITS_LINE_GAP = 10
-_CREDITS_SECTION_GAP = 46
-# Green-CRT-by-choice palette (full RGB is available post-93; see COLOR
-# DECISION above). Hierarchy by green intensity survives even if a future
-# rewire pushes this through the green-only blend.
-_COL_HEADER = (255, 255, 255)
-_COL_BODY = (110, 255, 140)
-_COL_DIM = (70, 200, 105)
+_TEAL = (94, 234, 212)          # #5eead4 -- hero / headers
+_GREEN = (74, 222, 128)         # #4ade80 -- base / labels
+_BRIGHT = (187, 247, 208)       # #bbf7d0 -- bright values / body
+_SUB = (167, 243, 208)          # #a7f3d0 -- sub-headers
+_BG_A = (36, 16, 23)            # #241017 radial center (warm)
+_BG_B = (10, 13, 10)            # #0a0d0a
+_BG_C = (5, 7, 5)               # #050705 outer
+_NEON = [(255, 45, 107), (192, 38, 211), (37, 99, 235), (14, 165, 233)]
+
+# alpha tiers
+_A_LABEL = 140
+_A_TAG = 140
+_A_MICRO = 110
+_A_FOOTER = 120
+_A_RULE = 51
+
+# --------------------------------------------------------------------------- #
+# Geometry (1920x1080 reference; scaled by h/1080 for other sizes).
+# --------------------------------------------------------------------------- #
+_REF_H = 1080
+_MARGIN_L = 56
+_MARGIN_TOP = 48
+_COL1_X, _COL1_W = 56, 598
+_COL2_X, _COL2_W = 742, 424
+_COL3_X, _COL3_W = 1256, 608
+_RULE1_X, _RULE2_X = 698, 1210
+_COL3_VIEW_Y = 128
+_COL3_VIEW_H = 908
+
+# scroll / hold (seconds)
+_SCROLL_PPS = 60.0
+_LEAD_HOLD_S = 3.0
+_TAIL_HOLD_S = 4.0
+_MAX_HOLD_S = 120.0             # ceiling -> speed up, never truncate
+_FADE_IN_S = 0.6
+_FADE_OUT_S = 0.8
+
+# font point sizes @1080 (tiers). Auto-scaled by h.
+_PT_HERO_MAX = 76
+_PT_HERO_MIN = 48
+_PT_H1 = 28
+_PT_H2 = 22
+_PT_SUBHEAD = 18
+_PT_NAME = 22
+_PT_SPEAKER = 19
+_PT_BODY = 20
+_PT_GRID = 16
+_PT_GRIDL = 18
+_PT_TAG = 15
+_PT_MICRO = 14
+_PT_FOOTER = 15
 
 
 class CreditsDataError(RuntimeError):
-    """A required credits receipt is missing from the durable ledger / the
-    clip manifest, or the roll could not be rendered/appended. LOUD by
-    design -- the no-fallback contract forbids a quiet placeholder."""
+    """A required credits receipt is missing / unrenderable. LOUD by design --
+    the no-fallback contract forbids a quiet placeholder."""
+
+
+def _require(container, key, source):
+    v = (container or {}).get(key)
+    if v is None or v == "" or v == {} or v == []:
+        raise CreditsDataError(
+            f"required credits receipt missing: {source}.{key} -- the durable "
+            f"stamp for it never landed (no-fallback: refusing a placeholder)")
+    return v
 
 
 # --------------------------------------------------------------------------- #
-# Declared source paths (codex OPTIONAL #2: date / GPU / git SHA must each
-# have a declared source -- no ad-hoc reads sprinkled through the renderer).
+# Declared sources (date / GPU / git -- each has a declared source, no ad-hoc)
 # --------------------------------------------------------------------------- #
 def _git_short_sha() -> str:
-    """Repo-file read (.git/HEAD -> ref), no subprocess. Raises
-    CreditsDataError when unresolvable -- the SEED/COMMIT line is a receipt."""
+    """Repo-file read (.git/HEAD -> ref). Raises when unresolvable (the
+    COMMIT line is a receipt)."""
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     head_path = os.path.join(repo, ".git", "HEAD")
     try:
@@ -97,75 +134,161 @@ def _git_short_sha() -> str:
             f"git short SHA unresolvable from {head_path!r}: {exc}") from exc
 
 
-def _gpu_name() -> str:
-    """Declared source: the shared system-spec probe (same source the
-    treatment uses)."""
-    from ._otr_sys_specs import collect_system_specs
-    return str((collect_system_specs() or {}).get("gpu") or "").strip() \
-        or "(unknown GPU)"
+def _sys_specs() -> dict:
+    try:
+        from ._otr_sys_specs import collect_system_specs
+        return collect_system_specs() or {}
+    except Exception:  # noqa: BLE001 -- probe block, degrades to "(unknown)"
+        return {}
 
 
-# --------------------------------------------------------------------------- #
-# Receipts -> roll sections (the relocated dossier spec lives here now)
-# --------------------------------------------------------------------------- #
-def _require(container, key, source):
-    v = (container or {}).get(key)
-    if v is None or v == "" or v == {} or v == []:
-        raise CreditsDataError(
-            f"required credits receipt missing: {source}.{key} -- the S2 "
-            f"durable stamp for it never landed (no-fallback: refusing to "
-            f"print a placeholder)")
-    return v
+# =========================================================================== #
+# DATA -> LAYOUT (the durable-receipt reader). Every block is (label, value,
+# tier) tuples the renderers two-tone. No-fallback on receipts.
+# =========================================================================== #
+_FAMILY_PRETTY = {
+    "audio_driven_face": "audio-driven face",
+    "text_to_video": "text-to-video",
+    "image_to_video": "image-to-video",
+    "audio_conditioned_video": "audio-in video",
+    "static_image_gen": "still",
+}
 
 
-def _engine_hist_lines(by_role: dict) -> list:
-    lines = []
+def _fam(family) -> str:
+    f = str(family or "").strip()
+    return _FAMILY_PRETTY.get(f, f.replace("_", " ")) if f else ""
+
+
+def _hist_rows(by_role: dict) -> list:
+    """(role, 'eng1, eng2 x2') rows in role order."""
+    rows = []
     for role in sorted(by_role or {}):
         engs = by_role[role] or {}
-        lines.append("%-18s %s" % (role, ", ".join(
-            "%s x%d" % (e, n) for e, n in sorted(engs.items()))))
-    return lines
+        val = ", ".join("%s%s" % (e, "" if n == 1 else " x%d" % n)
+                        for e, n in sorted(engs.items()))
+        rows.append((role, val))
+    return rows
 
 
-def build_credits_sections(led: dict) -> list:
-    """The viewer roll data, from the DURABLE ledger (S2 stamps). Returns
-    ``[{"header": str, "lines": [str, ...]}, ...]`` in roll order.
+def _video_role_rows(render_engines: dict) -> list:
+    """(role, engine, family-suffix) for the MODELS.VIDEO block. The family
+    suffix comes from by_engine[eng]['family'] (S-B stamp)."""
+    by_role = render_engines.get("by_role") or {}
+    by_engine = render_engines.get("by_engine") or {}
+    rows = []
+    for role in sorted(by_role):
+        engs = by_role[role] or {}
+        eng = sorted(engs)[0] if engs else "?"
+        fam = _fam((by_engine.get(eng) or {}).get("family"))
+        rows.append((role, eng, fam))
+    return rows
 
-    NO-FALLBACK: every receipt-bearing block RAISES CreditsDataError when its
-    source is missing. meta.image_engines is the ONLY image source (the S2
-    durable stamp) -- the legacy ledger['images'] row-scan fallback from the
-    node-12 dossier is deliberately NOT reproduced (cleanbreak). Story facts
-    (news) render only when present; they are frozen-ledger facts, not
-    receipts."""
+
+def _recipe_suffix(render_engines: dict, eng: str) -> str:
+    r = (render_engines.get("by_engine") or {}).get(eng) or {}
+    bits = []
+    if r.get("recipe"):
+        bits.append(str(r["recipe"]))
+    if r.get("quant"):
+        bits.append(str(r["quant"]))
+    if r.get("use_lora"):
+        bits.append("lora")
+    if r.get("render_canvas"):
+        bits.append(str(r["render_canvas"]))
+    return " · ".join(bits)
+
+
+def _fmt_gib(mb) -> str:
+    try:
+        return "%.1f GiB" % (float(mb) / 1024.0)
+    except (TypeError, ValueError):
+        return "(unknown)"
+
+
+_DIAGNOSTICS = [
+    ">> DIAGNOSTIC: CARRIER RE-ACQUIRED. {vram} PEAK CONTAINED. RESIDUAL HUM WITHIN TOLERANCE.",
+    ">> DIAGNOSTIC: TRANSCRIPT SEALED. {ncast} VOICES ACCOUNTED FOR. NO UNLISTED SPEAKERS DETECTED.",
+    ">> DIAGNOSTIC: SIGNAL DEGRADED GRACEFULLY. NOTHING FOLLOWED US OUT.",
+    ">> DIAGNOSTIC: PLAYBACK COMPLETE. THE FREQUENCY REMEMBERS.",
+    ">> DIAGNOSTIC: TAPE ENDS. THE HISS KEEPS TALKING.",
+]
+
+
+def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
+    """The console layout from the DURABLE ledger (S2 stamps). Returns a dict
+    with hero/subtitle + col1_blocks + col2_blocks + col3_flow. RAISES on any
+    missing receipt (no-fallback)."""
     if not isinstance(led, dict) or not led:
         raise CreditsDataError("durable ledger missing/empty at credits time")
     meta = led.get("meta")
     if not isinstance(meta, dict) or not meta:
         raise CreditsDataError("durable ledger has no meta at credits time")
+    manifest = manifest if isinstance(manifest, dict) else {}
 
-    sections: list = []
+    # --- hero / subtitle (title tweak: episode title is the HERO) -----------
+    title = str(_require(meta, "episode_title", "meta")).strip()
+    style = str(_require(meta, "style", "meta")).strip()
 
-    # WRITTEN BY
+    # --- COL 1 -------------------------------------------------------------
     gp = meta.get("gen_params_initial") or {}
-    creative = gp.get("creative_writing_model") or meta.get(
-        "creative_writing_model")
-    technical = gp.get("technical_model") or meta.get("technical_model")
-    if not creative or not technical:
-        raise CreditsDataError(
-            "required credits receipt missing: writer models "
-            "(meta.gen_params_initial.creative_writing_model / "
-            "technical_model)")
-    sections.append({"header": "WRITTEN BY", "lines": [
-        f"{creative}", f"(technical: {technical})"]})
+    ren = _require(meta, "render_engines", "meta")
+    img = _require(meta, "image_engines", "meta")
+    music = _require(meta, "music_engine", "meta")
 
-    # CAST & VOICES -- from CastLock's DELIVERED stamp (voice_ref_id /
-    # voice_engine per entry; bark-preset engines stamp voice_preset). The
-    # PLANNED meta.voice_cast_decision is NOT credited from (CastLock can
-    # fall closed past it).
+    col1 = []
+    # MODELS
+    models = {"header": "MODELS", "tag": "GENERATIVE STACK · THIS EPISODE",
+              "img_rev": (img.get("image_revision")),
+              "vid_rev": (ren.get("video_revision")),
+              "image_rows": _hist_rows(img.get("by_role") or {}),
+              "video_rows": _video_role_rows(ren),
+              "video_suffix": {r[1]: _recipe_suffix(ren, r[1])
+                               for r in _video_role_rows(ren)},
+              "music": str(music)}
+    col1.append(("models", models))
+
+    # [ PRODUCTION LEDGER ]
+    sysd = _sys_specs()
+    frames = manifest.get("total_target_frames")
+    fps = manifest.get("fps")
+    clip_count = manifest.get("clip_count") or len(manifest.get("clips") or [])
+    seed = (meta.get("cast_contract") or {}).get("cast_seed",
+                                                 meta.get("episode_seed"))
+    if seed is None:
+        raise CreditsDataError(
+            "required credits receipt missing: cast seed "
+            "(meta.cast_contract.cast_seed / meta.episode_seed)")
+    ledger_grid = []
+    ledger_grid.append(("VRAM:", "%s of %s" % (
+        _fmt_gib(ren.get("vram_peak_mb")), (sysd.get("gpu_vram") or "GPU"))))
+    if frames and fps:
+        ledger_grid.append(("FRAMES:", "%s @ %s fps · %s clips"
+                            % (frames, fps, clip_count)))
+    ledger_grid.append(("SEED:", "cast %s%s" % (
+        seed, " (%s)" % gp.get("seed_source") if gp.get("seed_source") else "")))
+    ledger_grid.append(("COMMIT:", _git_short_sha()))
+    ledger_grid.append(("REV:", "img %s · vid %s" % (
+        img.get("image_revision"), ren.get("video_revision"))))
+    col1.append(("grid", {"header": "[ PRODUCTION LEDGER ]", "rows": ledger_grid}))
+
+    # [ SYSTEM ] -- soft probe block
+    sys_grid = [
+        ("Host:", sysd.get("host") or sysd.get("os") or "(unknown)"),
+        ("CPU:", sysd.get("cpu") or "(unknown)"),
+        ("RAM:", sysd.get("ram") or "(unknown)"),
+        ("GPU:", sysd.get("gpu") or "(unknown)"),
+        ("CUDA:", "%s · torch %s · Python %s" % (
+            sysd.get("cuda") or "?", sysd.get("torch") or "?",
+            sysd.get("python") or "?")),
+    ]
+    col1.append(("grid", {"header": "[ SYSTEM ]", "rows": sys_grid}))
+
+    # --- COL 2 -------------------------------------------------------------
     cast = _require(led, "cast", "ledger")
     voice_slots = (meta.get("cast_voice_slots")
                    if isinstance(meta.get("cast_voice_slots"), dict) else {})
-    cl = []
+    cast_rows = []
     for entry in cast:
         if not isinstance(entry, dict):
             continue
@@ -176,88 +299,530 @@ def build_credits_sections(led: dict) -> list:
         if not ref or not eng:
             raise CreditsDataError(
                 f"cast entry {name or '?'} has no delivered voice stamp "
-                f"(voice_ref_id/voice_preset + voice_engine) -- CastLock's "
-                f"S2 durable stamp is the required source")
-        line = f"{name} .... {eng} · {ref}"
+                f"(voice_ref_id/voice_preset + voice_engine)")
         sig = str(((voice_slots.get(str(entry.get("char_id") or "")) or {})
                    ).get("speech_signature") or "").strip()
-        if sig:
-            line += f'  "{sig}"'
-        cl.append(line)
-    if not cl:
+        cast_rows.append({"name": name, "line": "%s · %s" % (eng, ref),
+                          "sig": sig})
+    if not cast_rows:
         raise CreditsDataError("cast is empty at credits time")
-    sections.append({"header": "CAST & VOICES", "lines": cl})
 
-    # IMAGES -- meta.image_engines (S2 durable stamp) is the ONLY source.
-    img = _require(meta, "image_engines", "meta")
-    sections.append({"header": "IMAGES",
-                     "lines": _engine_hist_lines(img.get("by_role") or {})
-                     or ["(no stills dispatched this episode)"]})
-
-    # MOTION -- meta.render_engines (singleton-native stamp, now LOUD).
-    ren = _require(meta, "render_engines", "meta")
-    sections.append({"header": "MOTION",
-                     "lines": _engine_hist_lines(ren.get("by_role") or {})
-                     or _engine_hist_lines(
-                         {"(all)": ren.get("histogram") or {}})})
-
-    # MUSIC -- meta.music_engine (S2; the node-83 done wire is unlinked).
-    music = _require(meta, "music_engine", "meta")
-    sections.append({"header": "MUSIC",
-                     "lines": [f"{music} · closing cue looped"]})
-
-    # NEWS SEED -- frozen-ledger story fact (optional, not a receipt).
-    news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
-    brief = str(news.get("script_brief") or "").strip()
-    if brief:
-        sections.append({"header": "NEWS SEED", "lines": [brief]})
-
-    # SEED / COMMIT -- declared sources only.
-    seed = (meta.get("cast_contract") or {}).get("cast_seed",
-                                                 meta.get("episode_seed"))
-    if seed is None:
+    creative = gp.get("creative_writing_model") or meta.get("creative_writing_model")
+    technical = gp.get("technical_model") or meta.get("technical_model")
+    if not creative or not technical:
         raise CreditsDataError(
-            "required credits receipt missing: cast seed "
-            "(meta.cast_contract.cast_seed / meta.episode_seed)")
-    sections.append({"header": "SEED / COMMIT",
-                     "lines": [f"cast seed {seed} · {_git_short_sha()}"]})
+            "required credits receipt missing: writer models "
+            "(meta.gen_params_initial.creative_writing_model / technical_model)")
+    writer_grid = [("Creative (A):", str(creative)),
+                   ("Technical (B):", str(technical))]
+    if meta.get("slot_transitions") is not None:
+        writer_grid.append(("Slot routing:", "%s A<->B transition(s)"
+                            % meta.get("slot_transitions")))
+    if gp.get("creativity"):
+        writer_grid.append(("Creativity:", str(gp.get("creativity"))))
+    if gp.get("temperature") is not None or gp.get("top_p") is not None:
+        writer_grid.append(("Temp / top_p:", "%s / %s" % (
+            gp.get("temperature"), gp.get("top_p"))))
+    if gp.get("target_words") is not None:
+        writer_grid.append(("Words:", "target %s / actual %s (char %s / ann %s)" % (
+            gp.get("target_words"), meta.get("total_word_count"),
+            meta.get("character_word_count"), meta.get("announcer_word_count"))))
+    col2 = {"cast_rows": cast_rows, "writer_grid": writer_grid}
 
-    return sections
+    # --- COL 3 (scrolls) ---------------------------------------------------
+    flow = []
+    # STORY SPINE
+    spine = []
+    news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
+    ds = (meta.get("dramatic_state")
+          if isinstance(meta.get("dramatic_state"), dict) else {})
+    if news.get("script_brief"):
+        spine.append(("Premise:", str(news["script_brief"])))
+    if ds.get("dramatic_question"):
+        spine.append(("Question:", str(ds["dramatic_question"])))
+    if ds.get("character_a_wants"):
+        spine.append(("A wants:", str(ds["character_a_wants"])))
+    if ds.get("character_b_wants"):
+        spine.append(("B wants:", str(ds["character_b_wants"])))
+    if ds.get("ending_change"):
+        spine.append(("Ending:", str(ds["ending_change"])))
+    if spine:
+        flow.append(("spine", {"header": "[ STORY SPINE ]", "rows": spine}))
+
+    # CLASSIFIED TRANSCRIPT (full)
+    ref_by_char = {str(e.get("char_id") or ""): (
+        e.get("voice_ref_id") or e.get("voice_preset") or "")
+        for e in cast if isinstance(e, dict)}
+    dialog = []
+    try:
+        from . import _otr_ledger_consumers as _OTRLC
+        for line in _OTRLC.iter_lines(led):
+            role = line.get("speaker_role") or ""
+            text = (line.get("text") or "").strip()
+            if not text or role not in ("character", "announcer"):
+                continue
+            spk = _OTRLC.speaker_name(led, line)
+            voice = ref_by_char.get(str(line.get("char_id") or ""), "")
+            dialog.append({"speaker": spk, "voice": voice, "text": text})
+    except Exception as exc:  # noqa: BLE001 -- transcript is a durable-ledger read
+        raise CreditsDataError(
+            "transcript unreadable from durable ledger lines: %s" % exc) from exc
+    flow.append(("transcript",
+                 {"header": "[ CLASSIFIED TRANSCRIPT ]",
+                  "tag": "EPISODE // %s · SCENE 1" % title.upper(),
+                  "lines": dialog}))
+
+    # SOURCE INTERCEPT (news, optional)
+    if news.get("script_brief"):
+        flow.append(("intercept",
+                     {"text": ">> SOURCE INTERCEPT: %s" % news["script_brief"]}))
+
+    # DIAGNOSTIC (seeded, no fabricated numbers)
+    try:
+        idx = int(seed) % len(_DIAGNOSTICS)
+    except (TypeError, ValueError):
+        idx = 0
+    diag = _DIAGNOSTICS[idx].format(
+        vram=_fmt_gib(ren.get("vram_peak_mb")), ncast=len(cast_rows))
+    flow.append(("diagnostic", {"text": diag}))
+
+    return {
+        "hero": title.upper(),
+        "subtitle": "SIGNAL LOST",
+        "subtitle_tag": "EPISODE TREATMENT",
+        "meta_strip": "%s · %dx%d · %s" % (
+            style, w, h, _today()),
+        "col1": col1,
+        "col2": col2,
+        "col3_flow": flow,
+        "footer_l": "Made with OTR v2.0-alpha — 100%% generated",
+        "footer_c": ">> voices from the CastLock final stamp — "
+                    "delivered, not planned.",
+    }
+
+
+def _today() -> str:
+    import time
+    return time.strftime("%Y-%m-%d")
+
+
+# =========================================================================== #
+# PIL rendering
+# =========================================================================== #
+_FONT_CACHE: dict = {}
+
+
+def _load_font(pt: int):
+    """Resolve a monospace truetype at ``pt`` via absolute font paths (bare
+    names do not resolve reliably). Cached. RAISES if nothing resolves --
+    no-fallback: a point-size-less bitmap hero is unacceptable (Fable risk #3)."""
+    from PIL import ImageFont
+    key = int(pt)
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    fd = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+    for path in (
+        os.path.join(fd, "JetBrainsMono-Bold.ttf"),
+        os.path.join(fd, "consola.ttf"),
+        os.path.join(fd, "cour.ttf"),
+        os.path.join(fd, "lucon.ttf"),
+        "JetBrainsMono-Bold.ttf", "consola.ttf", "cour.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "DejaVuSansMono.ttf",
+    ):
+        try:
+            f = ImageFont.truetype(path, key)
+            _FONT_CACHE[key] = f
+            return f
+        except Exception:  # noqa: BLE001
+            continue
+    raise CreditsDataError(
+        "no monospace truetype font resolved -- refusing to render a "
+        "point-size-less bitmap hero (no-fallback)")
+
+
+def _fw(draw, s, font) -> int:
+    try:
+        return int(draw.textlength(s, font=font))
+    except Exception:  # noqa: BLE001
+        return len(s) * font.size
+
+
+def _fh(font) -> int:
+    return int(font.size * 1.28)
+
+
+def _sc(pt: int, h: int) -> int:
+    return max(8, int(round(pt * h / _REF_H)))
+
+
+def _rgba(rgb, a=255):
+    return (rgb[0], rgb[1], rgb[2], a)
+
+
+def _wrap(draw, text, font, max_w):
+    words, lines, cur = text.split(), [], ""
+    for wd in words:
+        t = (cur + " " + wd).strip()
+        if _fw(draw, t, font) <= max_w or not cur:
+            cur = t
+        else:
+            lines.append(cur)
+            cur = wd
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
+def _autoshrink_pt(draw, text, max_w, hi, lo, mkfont):
+    pt = hi
+    while pt > lo and _fw(draw, text, mkfont(pt)) > max_w:
+        pt -= 2
+    return max(lo, pt)
+
+
+def _draw_grid(draw, x, y, header, rows, h, *, label_w=None):
+    """Bracket header + dim-label/bright-value rows. Returns new y."""
+    from PIL import ImageFont  # noqa: F401
+    fh = _load_font(_sc(_PT_H2, h))
+    draw.text((x, y), header, fill=_rgba(_TEAL), font=fh)
+    y += _fh(fh) + _sc(6, h)
+    fg = _load_font(_sc(_PT_GRID, h))
+    lw = label_w if label_w is not None else _sc(96, h)
+    for label, value in rows:
+        draw.text((x, y), label, fill=_rgba(_GREEN, _A_LABEL), font=fg)
+        for i, ln in enumerate(_wrap(draw, str(value), fg, _COL_W_FOR(x, h) - lw)):
+            draw.text((x + lw, y + i * _fh(fg)), ln, fill=_rgba(_BRIGHT), font=fg)
+        y += _fh(fg) * max(1, len(_wrap(draw, str(value), fg,
+                                        _COL_W_FOR(x, h) - lw))) + _sc(4, h)
+    return y + _sc(14, h)
+
+
+def _COL_W_FOR(x, h):
+    sx = h / _REF_H
+    if x < _RULE1_X * sx:
+        return int(_COL1_W * sx)
+    if x < _RULE2_X * sx:
+        return int(_COL2_W * sx)
+    return int(_COL3_W * sx)
+
+
+def render_static_base(layout: dict, w: int, h: int):
+    """The full static console frame (bg + neon + cols 1-2 + footers +
+    scanlines). Column 3 is left as background; the scroll canvas overlays it.
+    Returns a PIL RGBA image (w x h)."""
+    from PIL import Image, ImageDraw, ImageFilter
+    sx = h / _REF_H
+
+    # --- radial background ---
+    base = _radial_bg(w, h)
+
+    # --- neon accent bar ---
+    bar = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(bar)
+    bx, bw = int(1832 * sx), int(30 * sx)
+    by, bh = int(54 * sx), int(520 * sx)
+    for i in range(bh):
+        t = i / max(1, bh - 1)
+        col = _neon_lerp(t)
+        bd.line([(bx, by + i), (bx + bw, by + i)], fill=col + (200,))
+    bar = bar.filter(ImageFilter.GaussianBlur(int(26 * sx)))
+    base = Image.alpha_composite(base, Image.blend(
+        Image.new("RGBA", (w, h), (0, 0, 0, 0)), bar, 0.5))
+
+    # --- text layer (cols 1-2 + footers) ---
+    txt = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(txt)
+
+    x1, top = int(_COL1_X * sx), int(_MARGIN_TOP * sx)
+    y = _draw_col1(d, x1, top, layout, w, h)
+    # col1 footer (bottom)
+    ff = _load_font(_sc(_PT_FOOTER, h))
+    d.text((x1, h - int(56 * sx)), layout["footer_l"] % (), fill=_rgba(_TEAL, 200),
+           font=ff)
+
+    x2 = int(_COL2_X * sx)
+    _draw_col2(d, x2, top, layout, w, h)
+    d.text((x2, h - int(56 * sx)), layout["footer_c"], fill=_rgba(_GREEN, _A_FOOTER),
+           font=ff)
+
+    # column rules
+    for rx in (_RULE1_X, _RULE2_X):
+        d.line([(int(rx * sx), top), (int(rx * sx), h - int(40 * sx))],
+               fill=_rgba(_GREEN, _A_RULE), width=1)
+
+    base = _compose_glow(base, txt)
+    base = _scanlines(base)
+    return base
+
+
+def _draw_col1(d, x, top, layout, w, h):
+    sx = h / _REF_H
+    y = top
+    # hero (auto-shrink to col1 width)
+    hero = layout["hero"]
+    hero_pt = _autoshrink_pt(d, hero, int(_COL1_W * sx),
+                             _sc(_PT_HERO_MAX, h), _sc(_PT_HERO_MIN, h),
+                             lambda p: _load_font(p))
+    fh = _load_font(hero_pt)
+    d.text((x, y), hero, fill=_rgba(_TEAL), font=fh)
+    y += _fh(fh)
+    # subtitle "SIGNAL LOST" at 50%
+    fs = _load_font(max(8, hero_pt // 2))
+    d.text((x, y), layout["subtitle"], fill=_rgba(_TEAL), font=fs)
+    ft = _load_font(_sc(_PT_TAG, h))
+    d.text((x + _fw(d, layout["subtitle"], fs) + _sc(16, h),
+            y + (_fh(fs) - _fh(ft))), layout["subtitle_tag"],
+           fill=_rgba(_GREEN, _A_TAG), font=ft)
+    y += _fh(fs) + _sc(6, h)
+    ffine = _load_font(_sc(_PT_FOOTER, h))
+    d.text((x, y), layout["meta_strip"], fill=_rgba(_BRIGHT, 150), font=ffine)
+    y += _fh(ffine) + _sc(24, h)
+
+    for kind, block in layout["col1"]:
+        if kind == "models":
+            y = _draw_models(d, x, y, block, w, h)
+        elif kind == "grid":
+            y = _draw_grid(d, x, y, block["header"], block["rows"], h)
+    return y
+
+
+def _draw_models(d, x, y, m, w, h):
+    sx = h / _REF_H
+    fh1 = _load_font(_sc(_PT_H1, h))
+    d.text((x, y), m["header"], fill=_rgba(_TEAL), font=fh1)
+    y += _fh(fh1)
+    ftag = _load_font(_sc(_PT_TAG, h))
+    d.text((x, y), m["tag"], fill=_rgba(_GREEN, _A_TAG), font=ftag)
+    y += _fh(ftag) + _sc(14, h)
+    fsub = _load_font(_sc(_PT_SUBHEAD, h))
+    fbody = _load_font(_sc(_PT_BODY, h))
+    fmicro = _load_font(_sc(_PT_MICRO, h))
+    colw = int(_COL1_W * sx)
+
+    def _row(label, value, suffix=""):
+        d.text((x, cur_y[0]), label, fill=_rgba(_GREEN, _A_LABEL), font=fbody)
+        vx = x + colw - _fw(d, value + (("  " + suffix) if suffix else ""), fbody)
+        d.text((vx, cur_y[0]), value, fill=_rgba(_BRIGHT), font=fbody)
+        if suffix:
+            d.text((vx + _fw(d, value + "  ", fbody), cur_y[0] + _sc(3, h)),
+                   suffix, fill=_rgba(_GREEN, _A_MICRO), font=fmicro)
+        cur_y[0] += _fh(fbody) + _sc(3, h)
+
+    cur_y = [y]
+    # IMAGE
+    d.text((x, cur_y[0]), "IMAGE", fill=_rgba(_SUB), font=fsub)
+    if m.get("img_rev") is not None:
+        d.text((x + _fw(d, "IMAGE  ", fsub), cur_y[0] + _sc(3, h)),
+               "REV %s" % m["img_rev"], fill=_rgba(_GREEN, _A_MICRO), font=fmicro)
+    cur_y[0] += _fh(fsub) + _sc(4, h)
+    for role, val in (m["image_rows"] or [("stills", "(none)")]):
+        _row(role, val)
+    cur_y[0] += _sc(8, h)
+    # VIDEO
+    d.text((x, cur_y[0]), "VIDEO", fill=_rgba(_SUB), font=fsub)
+    d.text((x + _fw(d, "VIDEO  ", fsub), cur_y[0] + _sc(3, h)),
+           "%d RENDER ROLES" % len(m["video_rows"]),
+           fill=_rgba(_GREEN, _A_MICRO), font=fmicro)
+    cur_y[0] += _fh(fsub) + _sc(4, h)
+    for role, eng, fam in m["video_rows"]:
+        _row(role, eng, ("· " + fam) if fam else "")
+    cur_y[0] += _sc(8, h)
+    # MUSIC
+    d.text((x, cur_y[0]), "MUSIC", fill=_rgba(_SUB), font=fsub)
+    cur_y[0] += _fh(fsub) + _sc(4, h)
+    _row("theme", m["music"], "· closing cue looped")
+    return cur_y[0] + _sc(16, h)
+
+
+def _draw_col2(d, x, top, layout, w, h):
+    sx = h / _REF_H
+    col2 = layout["col2"]
+    y = top
+    fh1 = _load_font(_sc(_PT_H1, h))
+    d.text((x, y), "CAST & VOICES", fill=_rgba(_TEAL), font=fh1)
+    y += _fh(fh1)
+    ftag = _load_font(_sc(_PT_TAG, h))
+    d.text((x, y), "DELIVERED VOICE · PERSISTENT", fill=_rgba(_GREEN, _A_TAG),
+           font=ftag)
+    y += _fh(ftag) + _sc(18, h)
+    fname = _load_font(_sc(_PT_NAME, h))
+    fline = _load_font(_sc(_PT_SPEAKER, h))
+    for c in col2["cast_rows"]:
+        d.text((x, y), c["name"], fill=_rgba(_BRIGHT), font=fname)
+        y += _fh(fname)
+        line = c["line"] + (('  "%s"' % c["sig"]) if c["sig"] else "")
+        d.text((x, y), line, fill=_rgba(_GREEN, 150), font=fline)
+        y += _fh(fline) + _sc(14, h)
+    y += _sc(12, h)
+    d.line([(x, y), (x + int(_COL2_W * sx), y)], fill=_rgba(_GREEN, 40), width=1)
+    y += _sc(18, h)
+    y = _draw_grid(d, x, y, "[ WRITER / LLM CONFIG ]", col2["writer_grid"], h,
+                   label_w=_sc(150, h))
+    return y
+
+
+def render_scroll_canvas(flow: list, col_w: int, h: int):
+    """The tall col-3 content strip (STORY SPINE -> full transcript -> intercept
+    -> diagnostic). Returns a PIL RGBA image (col_w x content_h)."""
+    from PIL import Image, ImageDraw
+    # measure by drawing to a throwaway, then render for real
+    tmp = Image.new("RGBA", (col_w, 8), (0, 0, 0, 0))
+    md = ImageDraw.Draw(tmp)
+    total = _scroll_height(md, flow, col_w, h)
+    img = Image.new("RGBA", (col_w, max(total, 8)), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    _scroll_draw(d, flow, col_w, h)
+    return _compose_glow(Image.new("RGBA", img.size, (0, 0, 0, 0)), img)
+
+
+def _scroll_render_ops(d, flow, col_w, h, *, measure):
+    """Shared walk; when measure=True only advances y (draw is a no-op)."""
+    sx = h / _REF_H
+    y = 0
+    fh1 = _load_font(_sc(_PT_H1, h))
+    ftag = _load_font(_sc(_PT_TAG, h))
+    fspk = _load_font(_sc(_PT_SPEAKER, h))
+    fbody = _load_font(_sc(_PT_BODY, h))
+    fgrid = _load_font(_sc(_PT_GRID, h))
+    ffoot = _load_font(_sc(_PT_FOOTER, h))
+
+    def T(x, yy, s, font, fill):
+        if not measure:
+            d.text((x, yy), s, fill=fill, font=font)
+
+    for kind, block in flow:
+        if kind == "spine":
+            T(0, y, block["header"], fh1, _rgba(_TEAL))
+            y += _fh(fh1) + _sc(8, h)
+            for label, val in block["rows"]:
+                T(0, y, label, fgrid, _rgba(_GREEN, _A_LABEL))
+                lines = _wrap(d, val, fgrid, col_w - _sc(110, h))
+                for i, ln in enumerate(lines):
+                    T(_sc(110, h), y + i * _fh(fgrid), ln, fgrid, _rgba(_BRIGHT))
+                y += _fh(fgrid) * len(lines) + _sc(6, h)
+            y += _sc(24, h)
+        elif kind == "transcript":
+            T(0, y, block["header"], fh1, _rgba(_TEAL))
+            y += _fh(fh1)
+            T(0, y, block["tag"], ftag, _rgba(_GREEN, _A_TAG))
+            y += _fh(ftag) + _sc(18, h)
+            for ln in block["lines"]:
+                head = ln["speaker"] + (
+                    "  [%s]" % ln["voice"] if ln["voice"] else "")
+                T(0, y, head, fspk, _rgba(_TEAL))
+                y += _fh(fspk) + _sc(2, h)
+                for wl in _wrap(d, ln["text"], fbody, col_w):
+                    T(0, y, wl, fbody, _rgba(_BRIGHT))
+                    y += _fh(fbody)
+                y += _sc(14, h)
+            y += _sc(18, h)
+        elif kind in ("intercept", "diagnostic"):
+            for wl in _wrap(d, block["text"], ffoot, col_w):
+                T(0, y, wl, ffoot, _rgba(_GREEN, _A_FOOTER))
+                y += _fh(ffoot)
+            y += _sc(16, h)
+    return y
+
+
+def _scroll_height(d, flow, col_w, h):
+    return _scroll_render_ops(d, flow, col_w, h, measure=True)
+
+
+def _scroll_draw(d, flow, col_w, h):
+    _scroll_render_ops(d, flow, col_w, h, measure=False)
 
 
 # --------------------------------------------------------------------------- #
-# Duration (the declared credits tail) + backdrop plan
+# compositing primitives
 # --------------------------------------------------------------------------- #
-def compute_roll_duration_s(roll_px: int, viewport_h: int,
-                            scroll_pps: float = _CREDITS_SCROLL_PPS) -> float:
-    """Content-driven roll duration: the tall canvas enters from the bottom
-    and fully exits the top. THIS number is what the node declares to the
-    mux guard (credits-aware: v_dur <= a_dur + declared_tail + tol)."""
-    if scroll_pps <= 0:
-        raise CreditsDataError(f"scroll_pps must be > 0 (got {scroll_pps})")
-    return (float(roll_px) + float(viewport_h)) / float(scroll_pps)
+def _radial_bg(w, h):
+    from PIL import Image
+    import numpy as np
+    sw, sh = 480, 270
+    yy, xx = np.mgrid[0:sh, 0:sw].astype("float32")
+    cx, cy = sw * 0.82, sh * 0.42
+    r = np.sqrt(((xx - cx) / (sw * 1.2)) ** 2 + ((yy - cy) / (sh * 0.9)) ** 2)
+    r = np.clip(r / 0.62, 0.0, 1.0)
+    a, b, c = (np.array(_BG_A, "float32"), np.array(_BG_B, "float32"),
+               np.array(_BG_C, "float32"))
+    t1 = np.clip(r / 0.44, 0, 1)[..., None]
+    mid = a * (1 - t1) + b * t1
+    t2 = np.clip((r - 0.44) / 0.56, 0, 1)[..., None]
+    out = mid * (1 - t2) + c * t2
+    arr = np.dstack([out.astype("uint8"),
+                     np.full((sh, sw, 1), 255, "uint8")])
+    small = Image.fromarray(arr, "RGBA")
+    return small.resize((w, h), Image.BILINEAR)
+
+
+def _neon_lerp(t):
+    stops = [(0.0, _NEON[0]), (0.38, _NEON[1]), (0.72, _NEON[2]), (1.0, _NEON[3])]
+    for i in range(len(stops) - 1):
+        t0, c0 = stops[i]
+        t1, c1 = stops[i + 1]
+        if t <= t1:
+            f = (t - t0) / max(1e-6, t1 - t0)
+            return tuple(int(c0[j] + (c1[j] - c0[j]) * f) for j in range(3))
+    return _NEON[-1]
+
+
+def _compose_glow(base, text_layer):
+    from PIL import Image, ImageFilter
+    glow = text_layer.filter(ImageFilter.GaussianBlur(6))
+    out = Image.alpha_composite(base, Image.blend(
+        Image.new("RGBA", base.size, (0, 0, 0, 0)), glow, 0.45))
+    return Image.alpha_composite(out, text_layer)
+
+
+def _scanlines(base):
+    from PIL import Image, ImageDraw
+    sl = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sl)
+    for y in range(0, base.size[1], 4):
+        sd.line([(0, y), (base.size[0], y)], fill=(0, 0, 0, 66))
+    return Image.alpha_composite(base, sl)
+
+
+# =========================================================================== #
+# Duration + backdrop
+# =========================================================================== #
+def compute_credits_duration_s(scroll_px: int, view_h: int,
+                               pps: float = _SCROLL_PPS) -> tuple:
+    """Returns (dur_s, effective_pps). The col-3 scroll drives the tail; if the
+    natural duration exceeds the ceiling we SPEED UP (never truncate)."""
+    if pps <= 0:
+        raise CreditsDataError(f"pps must be > 0 (got {pps})")
+    scroll_px = max(0, int(scroll_px))
+    dur = _LEAD_HOLD_S + scroll_px / pps + _TAIL_HOLD_S
+    eff = pps
+    if dur > _MAX_HOLD_S and scroll_px > 0:
+        eff = scroll_px / max(1.0, _MAX_HOLD_S - _LEAD_HOLD_S - _TAIL_HOLD_S)
+        dur = _MAX_HOLD_S
+    if scroll_px == 0:
+        dur = _LEAD_HOLD_S + _TAIL_HOLD_S + 6.0     # static readable hold
+    return (round(dur, 3), eff)
 
 
 def plan_backdrop(clip_manifest: dict) -> dict:
-    """LOOK CONTRACT (operator 2026-06-17 / BUG-410, relocated from node 84's
-    tail-fill planner): the roll rides over the LAST existing drama clip,
-    LOOPED -- never over black. Returns the manifest row. RAISES when the
-    manifest has no usable clip (credits-over-black would bounce at eyeball;
-    no-fallback means we stop the render instead)."""
+    """LOOK CONTRACT (operator 2026-06-17 / BUG-410): the console rides over the
+    LAST existing drama clip, LOOPED. RAISES when the manifest has no usable clip
+    (credits-over-black is a bounce)."""
     rows = [r for r in ((clip_manifest or {}).get("clips") or [])
             if isinstance(r, dict) and r.get("exists") and r.get("path")]
     if not rows:
         raise CreditsDataError(
             "clip manifest has no existing clip to loop under the credits "
-            "roll (look contract: credits-over-black is a bounce)")
+            "console (look contract: credits-over-black is a bounce)")
     if any(r.get("start_s") is not None for r in rows):
         return max(rows, key=lambda r: float(r.get("start_s") or 0.0))
     return rows[-1]
 
 
-# --------------------------------------------------------------------------- #
-# Rendering + append (ffmpeg; every failure RAISES)
-# --------------------------------------------------------------------------- #
+# =========================================================================== #
+# ffmpeg render + append (every failure RAISES; no source-copy)
+# =========================================================================== #
 def _ffmpeg_bin() -> str:
     p = shutil.which("ffmpeg")
     if not p:
@@ -276,111 +841,87 @@ def _probe_video(path: str) -> dict:
     out = subprocess.run(
         [_ffprobe_bin(), "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height,r_frame_rate",
-         "-of", "json", path],
+         "-show_entries", "format=duration", "-of", "json", path],
         capture_output=True, text=True)
     if out.returncode != 0:
         raise CreditsDataError(f"ffprobe failed on {path!r}: {out.stderr}")
-    st = (json.loads(out.stdout or "{}").get("streams") or [{}])[0]
+    data = json.loads(out.stdout or "{}")
+    st = (data.get("streams") or [{}])[0]
     num, _, den = str(st.get("r_frame_rate") or "25/1").partition("/")
     fps = float(num) / float(den or 1)
-    return {"w": int(st.get("width") or 0), "h": int(st.get("height") or 0),
-            "fps": fps}
-
-
-def _load_font(pt: int):
-    from PIL import ImageFont
-    for name in ("consola.ttf", "cour.ttf", "DejaVuSansMono.ttf"):
-        try:
-            return ImageFont.truetype(name, pt)
-        except Exception:  # noqa: BLE001
-            continue
-    return ImageFont.load_default()
-
-
-def render_roll_canvas(sections: list, width: int,
-                       font_scale: float = _CREDITS_FONT_SCALE):
-    """Pre-render the whole roll as ONE tall RGBA canvas (transparent bg;
-    ffmpeg overlays + scrolls it). Returns the PIL image. Pure -- no I/O."""
-    from PIL import Image, ImageDraw
-
-    h_pt = max(8, int(round(_CREDITS_HEADER_PT * font_scale)))
-    b_pt = max(8, int(round(_CREDITS_BODY_PT * font_scale)))
-    f_head = _load_font(h_pt)
-    f_body = _load_font(b_pt)
-    gap = int(round(_CREDITS_LINE_GAP * font_scale))
-    sgap = int(round(_CREDITS_SECTION_GAP * font_scale))
-
-    # measure
-    total = sgap
-    for sec in sections:
-        total += h_pt + gap
-        total += len(sec["lines"]) * (b_pt + gap)
-        total += sgap
-    total += sgap
-
-    img = Image.new("RGBA", (width, max(total, 8)), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    y = sgap
-    for sec in sections:
-        d.text((_CREDITS_MARGIN_X, y), sec["header"],
-               fill=_COL_HEADER + (255,), font=f_head)
-        y += h_pt + gap
-        for line in sec["lines"]:
-            d.text((_CREDITS_MARGIN_X + 24, y), line,
-                   fill=_COL_BODY + (255,), font=f_body)
-            y += b_pt + gap
-        y += sgap
-    return img
-
-
-def render_credits_clip(sections: list, backdrop_path: str, out_path: str,
-                        *, w: int, h: int, fps: float,
-                        scroll_pps: float = _CREDITS_SCROLL_PPS,
-                        font_scale: float = _CREDITS_FONT_SCALE) -> float:
-    """Render the SILENT credits clip: the tall roll canvas scrolling over the
-    LOOPED backdrop clip (look contract), encoded to match the body (h264
-    yuv420p, same w/h/fps, no audio stream). Returns the clip duration in
-    seconds (== the declared credits tail). RAISES on any failure."""
-    canvas = render_roll_canvas(sections, w, font_scale)
-    dur = compute_roll_duration_s(canvas.height, h, scroll_pps)
-
-    png = out_path + ".roll.png"
-    canvas.save(png)
     try:
-        # backdrop loops for the whole roll; darken slightly for legibility;
-        # the roll overlays climbing at scroll_pps.
+        dur = float((data.get("format") or {}).get("duration") or 0.0)
+    except (TypeError, ValueError):
+        dur = 0.0
+    return {"w": int(st.get("width") or 0), "h": int(st.get("height") or 0),
+            "fps": fps, "duration": dur}
+
+
+def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
+                        *, w: int, h: int, fps: float) -> float:
+    """Render the SILENT credits console clip: static base (cols 1-2) + the
+    scrolling col-3 canvas, over the LOOPED darkened backdrop, with a fade in/out.
+    Returns the clip duration (== declared credits tail). RAISES on any failure."""
+    base_img = render_static_base(layout, w, h)
+    scroll_img = render_scroll_canvas(layout["col3_flow"],
+                                      _sc(_COL3_W, h), h)
+    col3_x = _sc(_COL3_X, h)
+    col3_y = _sc(_COL3_VIEW_Y, h)
+    view_h = min(_sc(_COL3_VIEW_H, h), h - col3_y - _sc(40, h))
+    # A short script (canvas < viewport) is the STATIC case -- pad the canvas up
+    # to view_h so the ffmpeg crop window is always valid (crop can't exceed the
+    # source height). scroll_px then resolves to 0 (no scroll, readable hold).
+    if scroll_img.height < view_h:
+        from PIL import Image as _Image
+        _pad = _Image.new("RGBA", (scroll_img.width, view_h), (0, 0, 0, 0))
+        _pad.paste(scroll_img, (0, 0))
+        scroll_img = _pad
+    scroll_px = max(0, scroll_img.height - view_h)
+    dur, eff_pps = compute_credits_duration_s(scroll_px, view_h)
+
+    base_png = out_path + ".base.png"
+    scroll_png = out_path + ".scroll.png"
+    base_img.convert("RGBA").save(base_png)
+    scroll_img.convert("RGBA").save(scroll_png)
+    try:
+        yexpr = "clip((t-%.3f)*%.4f\\,0\\,%d)" % (_LEAD_HOLD_S, eff_pps, scroll_px)
+        fade_out_st = max(0.0, dur - _FADE_OUT_S)
         cmd = [
             _ffmpeg_bin(), "-y",
             "-stream_loop", "-1", "-i", backdrop_path,
-            "-i", png,
+            "-i", base_png,
+            "-i", scroll_png,
             "-filter_complex",
-            (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=decrease,"
-             f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,"
-             f"eq=brightness=-0.25,fps={fps}[bg];"
-             f"[bg][1:v]overlay=x=0:y='{h}-t*{scroll_pps}':shortest=0[v]"),
+            (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
+             f"crop={w}:{h},eq=brightness=-0.32,fps={fps}[bg];"
+             f"[bg][1:v]overlay=0:0[b1];"
+             f"[2:v]crop={_sc(_COL3_W, h)}:{view_h}:0:'{yexpr}'[sc];"
+             f"[b1][sc]overlay={col3_x}:{col3_y}[cv];"
+             f"[cv]fade=t=in:st=0:d={_FADE_IN_S:.2f},"
+             f"fade=t=out:st={fade_out_st:.2f}:d={_FADE_OUT_S:.2f}[v]"),
             "-map", "[v]", "-an",
             "-t", f"{dur:.3f}",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
-            "-crf", "19", out_path,
+            "-crf", "18", out_path,
         ]
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out_path) \
                 or os.path.getsize(out_path) == 0:
             raise CreditsDataError(
-                f"credits clip render failed (rc={r.returncode}): "
-                f"{(r.stderr or '')[-800:]}")
+                f"credits console render failed (rc={r.returncode}): "
+                f"{(r.stderr or '')[-1000:]}")
     finally:
-        try:
-            os.remove(png)
-        except OSError:
-            pass
+        for p in (base_png, scroll_png):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
     return dur
 
 
 def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
-    """Concat body + credits (both silent video, matching params) via the
-    concat demuxer, stream-copy. NO source-copy fallback: any failure RAISES
-    (this is exactly the node-93 fallback we refused to inherit)."""
+    """Concat body + credits (both silent, matching params) via the concat
+    demuxer, stream-copy. NO source-copy fallback: any failure RAISES."""
     if not os.path.exists(body_path):
         raise CreditsDataError(f"body video missing: {body_path!r}")
     if not os.path.exists(credits_path):
@@ -407,13 +948,13 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
     return out_path
 
 
-# --------------------------------------------------------------------------- #
-# The terminal node (wired at S3: 93 -> OTR_CreditsRoll -> 85)
-# --------------------------------------------------------------------------- #
+# =========================================================================== #
+# The terminal node (wired 93 -> OTR_CreditsRoll -> 85)
+# =========================================================================== #
 class OTRCreditsRoll:
-    """Registered as ``OTR_CreditsRoll`` (registration lands with the S3
-    wiring slice). Appends the late viewer roll to node 93's output and hands
-    the mux (85) the video path + the DECLARED credits-tail duration."""
+    """Registered as ``OTR_CreditsRoll``. Appends the late SIGNAL LOST console
+    to node 93's output and hands the mux (85) the video path + the DECLARED
+    credits-tail duration (credits-aware guard)."""
 
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "roll"
@@ -446,31 +987,34 @@ class OTRCreditsRoll:
                 f"clip_manifest_json unparseable: {exc}") from exc
 
         led = get_ledger()
-        sections = build_credits_sections(led.data)
+        vp = _probe_video(video_path)
+        w = vp["w"] or 1920
+        h = vp["h"] or 1080
+        layout = build_credits_layout(led.data, w=w, h=h, manifest=manifest)
         backdrop = plan_backdrop(manifest)
 
-        vp = _probe_video(video_path)
         base, ext = os.path.splitext(video_path)
         credits_clip = base + "_credits" + (ext or ".mp4")
         out = base + "_with_credits" + (ext or ".mp4")
 
         tail_s = render_credits_clip(
-            sections, str(backdrop["path"]), credits_clip,
-            w=vp["w"], h=vp["h"], fps=vp["fps"])
+            layout, str(backdrop["path"]), credits_clip,
+            w=w, h=h, fps=vp["fps"])
         append_credits(video_path, credits_clip, out)
 
         report = json.dumps({
             "ok": True, "declared_credits_tail_s": round(tail_s, 3),
-            "sections": [s["header"] for s in sections],
-            "backdrop_shot": backdrop.get("shot_id"),
-            "output": out}, ensure_ascii=True)
-        log.info("[OTR_CreditsRoll] appended %.1fs roll (backdrop=%s) -> %s",
-                 tail_s, backdrop.get("shot_id"), out)
+            "hero": layout["hero"], "cols": [len(layout["col1"]),
+                                             len(layout["col3_flow"])],
+            "backdrop_shot": backdrop.get("shot_id"), "output": out},
+            ensure_ascii=True)
+        log.info("[OTR_CreditsRoll] appended %.1fs console (hero=%r backdrop=%s) "
+                 "-> %s", tail_s, layout["hero"], backdrop.get("shot_id"), out)
         return (out, float(tail_s), report)
 
 
 __all__ = [
-    "OTRCreditsRoll", "CreditsDataError", "build_credits_sections",
-    "compute_roll_duration_s", "plan_backdrop", "render_roll_canvas",
-    "render_credits_clip", "append_credits",
+    "OTRCreditsRoll", "CreditsDataError", "build_credits_layout",
+    "compute_credits_duration_s", "plan_backdrop", "render_static_base",
+    "render_scroll_canvas", "render_credits_clip", "append_credits",
 ]

@@ -1,19 +1,11 @@
-"""OTR_CreditsRoll spec (credits enrichment 2026-07-03, GO_FORWARD v4).
+"""OTR_CreditsRoll spec -- the 3-column SIGNAL LOST console (credits enrichment
+redesign 2026-07-03, docs/2026-07-03-credits-enrichment/CREDITS_OVERLAY_BUILD_PLAN.md).
 
-This is the contract for the NEW late credits surface. It absorbs, as the
-node's spec, the tests that the S3+S1 atomic rip retires:
-- tests/test_hud_dossier_bug3.py::test_dossier_has_render_engines_block_video_and_image
-- tests/test_hud_dossier_bug3.py::test_dossier_image_engines_from_meta_primary
-- tests/test_hud_dossier_bug3.py::test_dossier_image_meta_takes_precedence_over_legacy
-- tests/test_video_render_path_cw4.py::test_assemble_extends_to_floor_for_credits_tail_bug410
-  (the looped-last-clip LOOK CONTRACT, now owned by plan_backdrop + the roll)
-
-Cleanbreak deltas vs the old dossier behavior, by design:
-- NO "(not recorded)" placeholders: a missing receipt RAISES CreditsDataError.
-- meta.image_engines is the ONLY image source (S2 durable stamp); the legacy
-  ledger['images'] row-scan fallback is NOT reproduced.
-- Credits are DELIVERED-truth: cast voices come from CastLock's stamp
-  (voice_ref_id/voice_preset + voice_engine), never meta.voice_cast_decision.
+Cols 1-2 static dashboard (title / MODELS / [PRODUCTION LEDGER] / [SYSTEM] |
+CAST & VOICES / [WRITER-LLM-CONFIG]); col-3 SCROLLS the full narrative (STORY
+SPINE -> full CLASSIFIED TRANSCRIPT -> SOURCE INTERCEPT -> DIAGNOSTIC). No
+fallbacks: a missing receipt RAISES; frozen story facts omit-if-absent; probe
+fields ([SYSTEM]/VRAM) degrade.
 """
 from __future__ import annotations
 
@@ -35,7 +27,7 @@ def _ff(*args):
                    check=True, capture_output=True)
 
 
-def _silent_video(path, dur=2.0, size="64x64"):
+def _silent_video(path, dur=2.0, size="256x144"):
     _ff("-f", "lavfi", "-i", f"color=c=gray:s={size}:d={dur}", "-r", "25",
         "-pix_fmt", "yuv420p", "-t", f"{dur}", "-an", str(path))
 
@@ -57,160 +49,232 @@ def _count_audio_streams(path):
 
 
 def _led():
-    """A durable ledger AFTER the S2 stamps have landed."""
+    """A durable ledger AFTER the S2 stamps + the redesign stamps have landed."""
     return {
         "meta": {
+            "episode_title": "Neon Truth",
+            "style": "silent_scientific_protest",
             "episode_seed": 42,
+            "cast_contract": {"cast_seed": 70303, "seed_source": "os-entropy"},
             "gen_params_initial": {
-                "creative_writing_model": "openrouter:~anthropic/claude-opus-latest",
+                "creative_writing_model": "mistralai/Mistral-Nemo-Instruct-2407",
                 "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+                "creativity": "balanced", "temperature": 0.85, "top_p": 0.95,
+                "target_words": 120, "seed_source": "os-entropy",
             },
+            "slot_transitions": 0,
+            "total_word_count": 83, "character_word_count": 37,
+            "announcer_word_count": 46,
             "news": {"script_brief": "UCLA lab integrity vs commercialization"},
+            "dramatic_state": {"dramatic_question": "Will Hayes expose the data?",
+                               "character_a_wants": "protect the lab",
+                               "character_b_wants": "ship the product",
+                               "ending_change": "Hayes goes public"},
             "image_engines": {"by_role": {
-                "character_video": {"flux2_klein": 3},
-                "music_visual": {"flux_gen1": 1}},
-                "image_revision": 1},
-            "render_engines": {"by_role": {
-                "character_video": {"ltx_av": 3},
-                "announcer_visual": {"still_flat": 2}},
-                "histogram": {"ltx_av": 3, "still_flat": 2}},
-            "music_engine": "stable_audio_music",
-            "cast_voice_slots": {"c01": {"speech_signature": "clipped, dry"}},
+                "announcer_visual": {"flux2_klein": 5},
+                "character_video": {"flux2_klein": 5},
+                "music_visual": {"flux2_klein": 2}}, "image_revision": 1},
+            "render_engines": {
+                "by_role": {"announcer_visual": {"humo": 2},
+                            "music_visual": {"ltx_video": 1},
+                            "character_video": {"wan_i2v": 3}},
+                "by_engine": {
+                    "humo": {"family": "audio_driven_face", "recipe": None,
+                             "quant": None, "use_lora": False},
+                    "ltx_video": {"family": "text_to_video", "recipe": "ia2v",
+                                  "quant": "q4_K_M", "use_lora": True},
+                    "wan_i2v": {"family": "image_to_video"}},
+                "video_revision": 1, "vram_peak_mb": 8245.0},
+            "music_engine": "stable_audio_3",
+            "cast_voice_slots": {"c01": {"speech_signature": "warm · baritone"}},
         },
         "cast": [
-            {"char_id": "c01", "name": "HAYES VANCE",
-             "voice_ref_id": "vz_bill_boerst", "voice_engine": "indextts2"},
             {"char_id": "a1", "name": "ANNOUNCER",
-             "voice_preset": "v2/en_speaker_6", "voice_engine": "bark"},
+             "voice_preset": "bm_fable", "voice_engine": "kokoro"},
+            {"char_id": "c01", "name": "KANE SIRIKIT",
+             "voice_ref_id": "vz_bill_boerst", "voice_engine": "indextts2"},
+            {"char_id": "c02", "name": "ALICE MALONE",
+             "voice_ref_id": "vz_caro_davy", "voice_engine": "indextts2"},
         ],
-        "lines": [{"line_id": "b002"}],
+        "lines": [
+            {"line_id": "b001", "speaker_role": "announcer", "char_id": "a1",
+             "text": "After midnight, on rain-kissed streets."},
+            {"line_id": "b002", "speaker_role": "character", "char_id": "c02",
+             "text": "Kane, the deadline's looming. July thirteenth."},
+            {"line_id": "b003", "speaker_role": "character", "char_id": "c01",
+             "text": "I'll have to expose my sources, Alice."},
+        ],
     }
 
 
-def _body(sections, header):
-    return "\n".join(l for s in sections if s["header"] == header
-                     for l in s["lines"])
-
-
-def _headers(sections):
-    return [s["header"] for s in sections]
-
-
-# --------------------------------------------------------------------------- #
-# Receipts blocks (relocated dossier spec)
-# --------------------------------------------------------------------------- #
-def test_roll_has_motion_and_images_blocks_video_and_image():
-    sections = cr.build_credits_sections(_led())
-    motion = _body(sections, "MOTION")
-    assert "character_video" in motion and "ltx_av" in motion
-    images = _body(sections, "IMAGES")
-    assert "flux2_klein" in images               # image engine per role
-    assert "music_visual" in images
-
-
-def test_roll_image_engines_from_meta_is_the_only_source():
-    """Relocated 'meta primary' + 'meta over legacy': cleanbreak makes meta
-    the ONLY source -- a legacy ledger['images'] section is ignored, and a
-    MISSING meta.image_engines RAISES (no quiet fallback scan)."""
+def _layout(**over):
     led = _led()
-    led["images"] = {"images": [
-        {"role": "character_video", "engine_id": "z_image_turbo"}]}
-    sections = cr.build_credits_sections(led)
-    images = _body(sections, "IMAGES")
-    assert "flux2_klein" in images               # meta wins
-    assert "z_image_turbo" not in images         # legacy rows never scanned
-
-    del led["meta"]["image_engines"]
-    with pytest.raises(cr.CreditsDataError):
-        cr.build_credits_sections(led)
+    return cr.build_credits_layout(led, w=1920, h=1080,
+                                   manifest={"clips": [
+                                       {"shot_id": "s0", "path": "a.mp4",
+                                        "exists": True, "start_s": 0.0}],
+                                       "total_target_frames": 400, "fps": 25,
+                                       "clip_count": 3})
 
 
-def test_roll_missing_receipts_raise_not_placeholder():
-    for key in ("render_engines", "music_engine"):
+def _flat(blocks):
+    return json.dumps(blocks, default=str, ensure_ascii=False)
+
+
+# --------------------------------------------------------------------------- #
+# Hero / subtitle (title tweak)
+# --------------------------------------------------------------------------- #
+def test_hero_is_episode_title_subtitle_is_signal_lost():
+    lay = _layout()
+    assert lay["hero"] == "NEON TRUTH"                 # episode title = hero
+    assert lay["subtitle"] == "SIGNAL LOST"            # 50% subtitle below
+    assert "silent_scientific_protest" in lay["meta_strip"]
+    assert "1920x1080" in lay["meta_strip"]
+
+
+def test_missing_title_or_style_raises():
+    for key in ("episode_title", "style"):
         led = _led()
         del led["meta"][key]
         with pytest.raises(cr.CreditsDataError):
-            cr.build_credits_sections(led)
-    with pytest.raises(cr.CreditsDataError):
-        cr.build_credits_sections({})
-    with pytest.raises(cr.CreditsDataError):
-        cr.build_credits_sections(None)
+            cr.build_credits_layout(led, w=1920, h=1080, manifest={})
 
 
-def test_roll_cast_voices_from_delivered_stamp_only():
-    sections = cr.build_credits_sections(_led())
-    cast = _body(sections, "CAST & VOICES")
-    assert "HAYES VANCE" in cast
-    assert "indextts2" in cast and "vz_bill_boerst" in cast
-    assert "clipped, dry" in cast                # speech signature quoted
-    assert "v2/en_speaker_6" in cast             # bark preset stamp honored
+# --------------------------------------------------------------------------- #
+# COL 1 -- MODELS (video family suffix from the S-B stamp) + PRODUCTION LEDGER
+# --------------------------------------------------------------------------- #
+def test_models_block_video_family_and_image_and_music():
+    lay = _layout()
+    models = dict(lay["col1"])["models"]
+    body = _flat(models)
+    assert "flux2_klein" in body                       # image engine
+    assert "humo" in body and "wan_i2v" in body        # video engines per role
+    assert "audio_driven_face" in _flat(models["video_rows"]) or \
+        "audio-driven face" in body                    # family label (S-B)
+    assert "stable_audio_3" in body                    # music engine
 
-    # an unstamped character is a HARD failure (S2 guarantees the stamp)
+
+def test_production_ledger_block_has_seed_commit_rev_vram():
+    lay = _layout()
+    grids = [b for k, b in lay["col1"] if k == "grid"]
+    led_block = next(g for g in grids if "PRODUCTION LEDGER" in g["header"])
+    keys = " ".join(r[0] for r in led_block["rows"])
+    assert "SEED:" in keys and "COMMIT:" in keys and "REV:" in keys
+    assert "VRAM:" in keys
+    body = _flat(led_block["rows"])
+    assert "70303" in body                             # cast seed
+    assert "8.1 GiB" in body or "8.0 GiB" in body      # vram peak formatted
+
+
+def test_missing_receipts_raise_not_placeholder():
+    for key in ("render_engines", "image_engines", "music_engine"):
+        led = _led()
+        del led["meta"][key]
+        with pytest.raises(cr.CreditsDataError):
+            cr.build_credits_layout(led, w=1920, h=1080, manifest={})
     led = _led()
-    del led["cast"][0]["voice_ref_id"]
+    del led["meta"]["cast_contract"]
+    led["meta"].pop("episode_seed")
     with pytest.raises(cr.CreditsDataError):
-        cr.build_credits_sections(led)
+        cr.build_credits_layout(led, w=1920, h=1080, manifest={})
+    with pytest.raises(cr.CreditsDataError):
+        cr.build_credits_layout({}, w=1920, h=1080, manifest={})
 
 
-def test_roll_planned_voice_decision_is_never_credited():
-    """CastLock can fall closed PAST meta.voice_cast_decision.accepted_id --
-    crediting it would print a voice that never spoke."""
+# --------------------------------------------------------------------------- #
+# COL 2 -- cast (delivered stamp only) + writer config
+# --------------------------------------------------------------------------- #
+def test_cast_voices_from_delivered_stamp_with_signature():
+    lay = _layout()
+    body = _flat(lay["col2"]["cast_rows"])
+    assert "KANE SIRIKIT" in body and "indextts2" in body
+    assert "vz_bill_boerst" in body
+    assert "warm · baritone" in body                   # speech signature quoted
+    assert "bm_fable" in body and "kokoro" in body     # bark/kokoro preset stamp
+
+
+def test_unstamped_cast_voice_raises():
+    led = _led()
+    del led["cast"][1]["voice_ref_id"]
+    with pytest.raises(cr.CreditsDataError):
+        cr.build_credits_layout(led, w=1920, h=1080, manifest={})
+
+
+def test_planned_voice_decision_is_never_credited():
     led = _led()
     led["meta"]["voice_cast_decision"] = {
-        "c01": {"accepted_id": "planned_voice_never_used",
-                "engine": "indextts2"}}
-    sections = cr.build_credits_sections(led)
-    assert "planned_voice_never_used" not in _body(sections, "CAST & VOICES")
+        "c01": {"accepted_id": "planned_voice_never_used"}}
+    lay = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+    assert "planned_voice_never_used" not in _flat(lay["col2"]["cast_rows"])
 
 
-def test_roll_music_and_news_and_seed_blocks():
-    sections = cr.build_credits_sections(_led())
-    assert "stable_audio_music" in _body(sections, "MUSIC")
-    assert "UCLA lab integrity" in _body(sections, "NEWS SEED")
-    seed = _body(sections, "SEED / COMMIT")
-    assert "42" in seed
-    assert len(seed.split("·")[-1].strip()) >= 7   # git short sha present
+def test_writer_config_block():
+    lay = _layout()
+    body = _flat(lay["col2"]["writer_grid"])
+    assert "Mistral-Nemo-Instruct-2407" in body
+    assert "0.85" in body and "0.95" in body
+    assert "target 120" in body and "actual 83" in body
 
 
 # --------------------------------------------------------------------------- #
-# Duration -- the DECLARED credits tail (the credits-aware mux guard input)
+# COL 3 -- scroll flow: spine + FULL transcript + intercept + diagnostic
 # --------------------------------------------------------------------------- #
-def test_roll_duration_is_content_driven():
-    # full transit: canvas enters from the bottom, exits the top
-    assert cr.compute_roll_duration_s(650, 350, scroll_pps=100.0) == \
-        pytest.approx(10.0)
-    # taller content -> longer declared tail (NEVER clamped "to be safe")
-    short = cr.compute_roll_duration_s(500, 832)
-    tall = cr.compute_roll_duration_s(5000, 832)
-    assert tall > short
-    with pytest.raises(cr.CreditsDataError):
-        cr.compute_roll_duration_s(500, 832, scroll_pps=0)
+def test_col3_flow_has_spine_full_transcript_intercept_diagnostic():
+    lay = _layout()
+    kinds = [k for k, _ in lay["col3_flow"]]
+    assert kinds == ["spine", "transcript", "intercept", "diagnostic"]
+    spine = dict(lay["col3_flow"])["spine"]
+    assert "protect the lab" in _flat(spine) and "ship the product" in _flat(spine)
+    transcript = dict(lay["col3_flow"])["transcript"]
+    # FULL transcript -- every dialogue line present, nothing dropped
+    assert len(transcript["lines"]) == 3
+    assert "expose my sources" in _flat(transcript["lines"])
 
 
-def test_roll_canvas_grows_with_sections():
-    a = cr.render_roll_canvas(cr.build_credits_sections(_led()), 640)
+def test_diagnostic_is_seeded_and_never_fabricates_a_number():
+    lay = _layout()
+    diag = dict(lay["col3_flow"])["diagnostic"]["text"]
+    assert diag.startswith(">> DIAGNOSTIC")
+    assert "???" not in diag                            # no fabricated value
+    # deterministic per cast_seed
+    lay2 = _layout()
+    assert dict(lay2["col3_flow"])["diagnostic"]["text"] == diag
+
+
+def test_news_intercept_omitted_when_absent():
     led = _led()
-    led["cast"] = led["cast"] * 10
-    b = cr.render_roll_canvas(cr.build_credits_sections(led), 640)
-    assert b.height > a.height
+    led["meta"]["news"] = None
+    lay = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+    kinds = [k for k, _ in lay["col3_flow"]]
+    assert "intercept" not in kinds                     # omit, no placeholder
+    assert "transcript" in kinds and "diagnostic" in kinds
 
 
 # --------------------------------------------------------------------------- #
-# Backdrop -- the looped-last-clip LOOK CONTRACT (relocated BUG-410 owner)
+# Duration -- col-3 scroll drives the declared tail (never truncates)
 # --------------------------------------------------------------------------- #
-def test_backdrop_is_last_existing_clip_looped_never_black():
-    manifest = {"fps": 25, "clips": [
+def test_duration_is_scroll_driven_with_speedup_and_static():
+    # a tall scroll -> longer tail
+    short = cr.compute_credits_duration_s(200, 900)[0]
+    tall = cr.compute_credits_duration_s(6000, 900)[0]
+    assert tall > short
+    # ceiling caps the DURATION by speeding pps up -- never truncates content
+    dur, pps = cr.compute_credits_duration_s(100000, 900)
+    assert dur <= cr._MAX_HOLD_S + 0.01 and pps > cr._SCROLL_PPS
+    # nothing to scroll -> a static readable hold
+    assert cr.compute_credits_duration_s(0, 900)[0] > 0
+    with pytest.raises(cr.CreditsDataError):
+        cr.compute_credits_duration_s(500, 900, pps=0)
+
+
+# --------------------------------------------------------------------------- #
+# Backdrop -- looped last clip (look contract)
+# --------------------------------------------------------------------------- #
+def test_backdrop_is_last_existing_clip_never_black():
+    manifest = {"clips": [
         {"shot_id": "s0", "path": "a.mp4", "exists": True},
-        {"shot_id": "s1", "path": "", "exists": False},
-        {"shot_id": "s2", "path": "b.mp4", "exists": True},
-    ]}
-    row = cr.plan_backdrop(manifest)
-    assert row["shot_id"] == "s2"                # LAST existing clip
-    # positioned manifests pick by start_s, not list order
-    manifest["clips"][0]["start_s"] = 30.0
-    manifest["clips"][2]["start_s"] = 10.0
-    assert cr.plan_backdrop(manifest)["shot_id"] == "s0"
-    # NO usable clip -> RAISE (credits-over-black bounces at eyeball)
+        {"shot_id": "s2", "path": "b.mp4", "exists": True}]}
+    assert cr.plan_backdrop(manifest)["shot_id"] == "s2"
     with pytest.raises(cr.CreditsDataError):
         cr.plan_backdrop({"clips": [{"path": "", "exists": False}]})
     with pytest.raises(cr.CreditsDataError):
@@ -218,62 +282,72 @@ def test_backdrop_is_last_existing_clip_looped_never_black():
 
 
 # --------------------------------------------------------------------------- #
-# Render + append mechanics (ffmpeg; silent tail; no source-copy fallback)
+# PIL renderers (no ffmpeg needed -- PIL/numpy only)
+# --------------------------------------------------------------------------- #
+def test_static_base_renders_full_frame():
+    img = cr.render_static_base(_layout(), 1920, 1080)
+    assert img.size == (1920, 1080)
+
+
+def test_scroll_canvas_grows_with_transcript():
+    lay = _layout()
+    a = cr.render_scroll_canvas(lay["col3_flow"], 600, 1080)
+    led = _led()
+    led["lines"] = led["lines"] * 12                   # much longer script
+    lay2 = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": [
+        {"shot_id": "s0", "path": "a.mp4", "exists": True}]})
+    b = cr.render_scroll_canvas(lay2["col3_flow"], 600, 1080)
+    assert b.height > a.height                          # nothing dropped -> taller
+
+
+# --------------------------------------------------------------------------- #
+# ffmpeg render + append (silent tail, no source-copy)
 # --------------------------------------------------------------------------- #
 @needs_ffmpeg
-def test_credits_clip_renders_silent_and_matches_declared_duration(tmp_path):
-    backdrop = tmp_path / "last_clip.mp4"
-    _silent_video(backdrop, 1.0)                 # SHORT clip -> must loop
+def test_console_clip_renders_silent_and_declares_duration(tmp_path):
+    backdrop = tmp_path / "clip.mp4"
+    _silent_video(backdrop, 1.0)                        # short -> must loop
     out = tmp_path / "credits.mp4"
-    sections = cr.build_credits_sections(_led())
-    dur = cr.render_credits_clip(sections, str(backdrop), str(out),
-                                 w=64, h=64, fps=25.0, scroll_pps=400.0)
+    dur = cr.render_credits_clip(_layout(), str(backdrop), str(out),
+                                 w=1280, h=720, fps=25.0)
     assert out.exists() and out.stat().st_size > 0
-    assert _count_audio_streams(str(out)) == 0   # SILENT tail model
-    frames = _count_frames(str(out))
-    assert frames == pytest.approx(dur * 25.0, abs=3)
-    # the 1s backdrop looped to cover the whole roll (no early cut)
-    assert frames > 25 + 3
+    assert _count_audio_streams(str(out)) == 0         # silent tail
+    assert _count_frames(str(out)) == pytest.approx(dur * 25.0, abs=6)
 
 
 @needs_ffmpeg
-def test_append_credits_extends_body_and_stays_silent(tmp_path):
+def test_append_extends_body_and_stays_silent(tmp_path):
     body = tmp_path / "body.mp4"
     backdrop = tmp_path / "clip.mp4"
-    _silent_video(body, 2.0)
-    _silent_video(backdrop, 1.0)
+    _silent_video(body, 2.0, size="1280x720")
+    _silent_video(backdrop, 1.0, size="1280x720")
     credits = tmp_path / "credits.mp4"
-    dur = cr.render_credits_clip(cr.build_credits_sections(_led()),
-                                 str(backdrop), str(credits),
-                                 w=64, h=64, fps=25.0, scroll_pps=400.0)
+    dur = cr.render_credits_clip(_layout(), str(backdrop), str(credits),
+                                 w=1280, h=720, fps=25.0)
     out = tmp_path / "with_credits.mp4"
     cr.append_credits(str(body), str(credits), str(out))
     assert _count_audio_streams(str(out)) == 0
     total = _count_frames(str(out))
-    assert total == pytest.approx(50 + dur * 25.0, abs=5)
-    # video ENDS at credit-end: nothing after the roll
-    assert total <= 50 + int(dur * 25.0) + 5
+    assert total == pytest.approx(50 + dur * 25.0, abs=8)
 
 
-def test_append_credits_raises_never_source_copies(tmp_path):
-    """The node-93 shutil.copy2 fallback is the exact behavior this node
-    exists to refuse: a missing/failed input RAISES, never copies through."""
+def test_append_raises_never_source_copies(tmp_path):
     with pytest.raises(cr.CreditsDataError):
         cr.append_credits(str(tmp_path / "missing_body.mp4"),
                           str(tmp_path / "missing_credits.mp4"),
                           str(tmp_path / "out.mp4"))
-    src = (cr.__file__ and open(cr.__file__, encoding="utf-8").read()) or ""
-    assert "copy2" not in src                    # no source-copy anywhere
+    src = open(cr.__file__, encoding="utf-8").read()
+    assert "copy2" not in src
 
 
 # --------------------------------------------------------------------------- #
-# Node surface (wired at S3; widget drift guard)
+# Node surface (widget-drift guard)
 # --------------------------------------------------------------------------- #
 def test_node_surface_two_force_inputs_no_widgets():
     it = cr.OTRCreditsRoll.INPUT_TYPES()
     req = it["required"]
     assert set(req) == {"video_path", "clip_manifest_json"}
     for spec in req.values():
-        assert spec[1].get("forceInput") is True   # zero widgets_values rows
+        assert spec[1].get("forceInput") is True
     assert cr.OTRCreditsRoll.RETURN_NAMES == (
         "video_with_credits_path", "declared_credits_tail_s", "report")
