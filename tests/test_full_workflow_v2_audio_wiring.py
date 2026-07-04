@@ -184,7 +184,9 @@ def test_widget_vectors_exact(by_id):
     """
     mapping = _new_class_mapping()
     # CastLock (80): intentional index-workflow override (see docstring).
-    assert by_id[80]["widgets_values"] == ["default", "auto_registry", "neutral", True]
+    # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); the
+    # "neutral" kwarg default still applies + is validated/stamped by lock().
+    assert by_id[80]["widgets_values"] == ["default", "auto_registry", True]
     for key, nid in NEW_NODE_IDS.items():
         if nid == 80:
             continue

@@ -176,9 +176,10 @@ def build_engine_combo(role, fallback) -> list:
 def voice_input_types(role, fallback) -> dict:
     """The shared INPUT_TYPES for a v2 voice node (1a / 1b).
 
-    forceInput sockets carry no widget; the only serialized widgets are
-    ``engine`` and ``stereo_policy``; there is no ``seed``-named widget and no
-    ``model_id`` widget (CLAUDE.md rule 6).
+    forceInput sockets carry no widget; the only serialized widget is
+    ``engine`` (``stereo_policy`` is no longer surfaced -- single option
+    "mono_safe"; the ``generate()`` kwarg still defaults to "mono_safe"); there
+    is no ``seed``-named widget and no ``model_id`` widget (CLAUDE.md rule 6).
     """
     engines = build_engine_combo(role, fallback)
     return {
@@ -223,14 +224,6 @@ def voice_input_types(role, fallback) -> dict:
                     "Optional ordering signal. Wire an upstream 'done' here to "
                     "force this node to run after it. Optional on the first "
                     "chain node; the audio chain binds it node->node."
-                ),
-            }),
-            "stereo_policy": (["mono_safe"], {
-                "default": "mono_safe",
-                "tooltip": (
-                    "Channel policy for the per-line path. 'mono_safe' "
-                    "downmixes to mono so the mono assembly chain stays "
-                    "byte-identical to the legacy engines."
                 ),
             }),
         },

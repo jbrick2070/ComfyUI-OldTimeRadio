@@ -84,7 +84,9 @@ def test_input_types_widget_vector_exact():
     all_keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "seed" not in all_keys
     assert "gate_in" in it.get("optional", {})
-    assert _serialized_slots(it) == ["engine", "stereo_policy"]
+    # stereo_policy surface removed 2026-07-04 (widget-audit Batch 1); single
+    # option "mono_safe" -- the generate() kwarg still defaults to "mono_safe".
+    assert _serialized_slots(it) == ["engine"]
     assert "done" in A.RETURN_NAMES
 
 

@@ -116,14 +116,6 @@ class StableAudioTheme:
                         "here to force this node to run after it."
                     ),
                 }),
-                "stereo_policy": (["mono_safe"], {
-                    "default": "mono_safe",
-                    "tooltip": (
-                        "Channel policy for the clip path. 'mono_safe' "
-                        "downmixes Stable Audio's native stereo to mono so the "
-                        "mono assembly chain stays byte-identical."
-                    ),
-                }),
             },
         }
 

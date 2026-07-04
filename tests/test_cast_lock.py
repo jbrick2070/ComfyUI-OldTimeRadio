@@ -59,8 +59,10 @@ def test_input_types_widget_surface():
     for key in ("script_json", "gate_in"):
         spec = it.get("required", {}).get(key) or it.get("optional", {}).get(key)
         assert spec is not None and spec[1].get("forceInput") is True, key
+    # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); single
+    # option "neutral" -- the lock() kwarg still defaults + is validated/stamped.
     assert _serialized_slots(it) == [
-        "voice_bank", "cast_voice_policy", "delivery_profile", "allow_voice_reuse",
+        "voice_bank", "cast_voice_policy", "allow_voice_reuse",
     ]
     for name in ("ledger_json", "cast_lock_revision", "cast_report", "done"):
         assert name in CastLock.RETURN_NAMES

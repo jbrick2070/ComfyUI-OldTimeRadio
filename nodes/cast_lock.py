@@ -15,10 +15,12 @@ Casting (I-4): the new caster runs on its own seeded RNG, disjoint from the
 legacy cast RNG. ``preserve_ledger`` (default) re-casts nothing; ``auto_registry``
 assigns references from the selected voice bank.
 
-E.4: the widgets are exactly ``voice_bank`` / ``cast_voice_policy`` /
-``delivery_profile`` / ``allow_voice_reuse`` -- no ``voice_engine_mode``,
-``deterministic_inference`` or ``model_id`` widget. Import-time is
-side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
+E.4: the surfaced widgets are exactly ``voice_bank`` / ``cast_voice_policy`` /
+``allow_voice_reuse`` -- ``delivery_profile`` is no longer surfaced (single
+option "neutral" in v2; the ``lock()`` kwarg still defaults to "neutral" and is
+validated + stamped) -- no ``voice_engine_mode``, ``deterministic_inference`` or
+``model_id`` widget. Import-time is side-effect-free (C-5). UTF-8, no BOM,
+ASCII-only source.
 """
 from __future__ import annotations
 
@@ -59,13 +61,9 @@ class CastLock:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # C-5: no IO. Delivery list is a tiny pure call; fall back hard-coded.
-        try:
-            from ._otr_delivery_profiles import available_delivery_profiles
-
-            delivery = available_delivery_profiles() or ["neutral"]
-        except Exception:  # noqa: BLE001
-            delivery = ["neutral"]
+        # C-5: no IO. Import-time side-effect-free. delivery_profile is no longer
+        # a surfaced widget (single option "neutral" in v2); lock() keeps the
+        # kwarg default and still validates + stamps it.
         return {
             "required": {
                 "script_json": ("STRING", {
@@ -97,10 +95,6 @@ class CastLock:
                         "(byte-safe default). auto_registry: assign voice "
                         "references from the bank with the deterministic caster."
                     ),
-                }),
-                "delivery_profile": (delivery, {
-                    "default": delivery[0],
-                    "tooltip": "Delivery profile id (only 'neutral' ships in v2).",
                 }),
                 "allow_voice_reuse": ("BOOLEAN", {
                     "default": False,
