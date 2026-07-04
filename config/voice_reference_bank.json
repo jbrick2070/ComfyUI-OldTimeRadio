@@ -2381,6 +2381,346 @@
       "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_phil_chenevert.wav",
       "ref_sha256": "53ebacd17becad2558407d18a6209f87b433a9ccec3a97d21e2e94cd5ba78ed8",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "el_roger",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:CwhRBWXzGAHq8TQ4Fs17",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "CwhRBWXzGAHq8TQ4Fs17"
+    },
+    {
+      "voice_ref_id": "el_sarah",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice",
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:EXAVITQu4vr4xnSDxMaL",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "EXAVITQu4vr4xnSDxMaL"
+    },
+    {
+      "voice_ref_id": "el_laura",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:FGY2WhTYpPnrIDTdsKH5",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "FGY2WhTYpPnrIDTdsKH5"
+    },
+    {
+      "voice_ref_id": "el_charlie",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "australian"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:IKne3meq5aSn9XLyUdCD",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "IKne3meq5aSn9XLyUdCD"
+    },
+    {
+      "voice_ref_id": "el_george",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "british"
+      ],
+      "roles": [
+        "char_voice",
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:JBFqnCBsd6RMkjVDRZzb",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "voice_ref_id": "el_callum",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:N2lVS1w4EtoT3dr4eOWO",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "N2lVS1w4EtoT3dr4eOWO"
+    },
+    {
+      "voice_ref_id": "el_river",
+      "engine": "elevenlabs",
+      "gender": "neutral",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:SAz9YHcvj6GT2YYXdXww",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "SAz9YHcvj6GT2YYXdXww"
+    },
+    {
+      "voice_ref_id": "el_harry",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:SOYHLrjzK2X1ezoPC6cr",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "SOYHLrjzK2X1ezoPC6cr"
+    },
+    {
+      "voice_ref_id": "el_liam",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:TX3LPaxmHKxFdv7VOQHJ",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "TX3LPaxmHKxFdv7VOQHJ"
+    },
+    {
+      "voice_ref_id": "el_alice",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:Xb7hH8MSUJpSbSDYk0k2",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "Xb7hH8MSUJpSbSDYk0k2"
+    },
+    {
+      "voice_ref_id": "el_matilda",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:XrExE9yKIg1WjnnlVkGX",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "XrExE9yKIg1WjnnlVkGX"
+    },
+    {
+      "voice_ref_id": "el_will",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:bIHbv24MWmeRgasZH58o",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "bIHbv24MWmeRgasZH58o"
+    },
+    {
+      "voice_ref_id": "el_jessica",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:cgSgspJ2msm6clMCkdW9",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "cgSgspJ2msm6clMCkdW9"
+    },
+    {
+      "voice_ref_id": "el_eric",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:cjVigY5qzO86Huf0OWal",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "cjVigY5qzO86Huf0OWal"
+    },
+    {
+      "voice_ref_id": "el_bella",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:hpp4J3VqNfWAUOO0d1Us",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "hpp4J3VqNfWAUOO0d1Us"
+    },
+    {
+      "voice_ref_id": "el_chris",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:iP95p4xoKVk53GoZ742B",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "iP95p4xoKVk53GoZ742B"
+    },
+    {
+      "voice_ref_id": "el_brian",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice",
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:nPczCjzI2devNBz1zQrb",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "nPczCjzI2devNBz1zQrb"
+    },
+    {
+      "voice_ref_id": "el_daniel",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:onwK4e9ZLuTAKqWW03F9",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "onwK4e9ZLuTAKqWW03F9"
+    },
+    {
+      "voice_ref_id": "el_lily",
+      "engine": "elevenlabs",
+      "gender": "female",
+      "timbre": [
+        "british"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:pFZP5JQG7iQjIQuC4Bku",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "pFZP5JQG7iQjIQuC4Bku"
+    },
+    {
+      "voice_ref_id": "el_adam",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice",
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:pNInz6obpgDQGcFmaJgB",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "pNInz6obpgDQGcFmaJgB"
+    },
+    {
+      "voice_ref_id": "el_bill",
+      "engine": "elevenlabs",
+      "gender": "male",
+      "timbre": [
+        "american"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:elevenlabs:pqHfZKP75CvOlQylNhV4",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "provider_voice_id": "pqHfZKP75CvOlQylNhV4"
     }
   ]
 }
