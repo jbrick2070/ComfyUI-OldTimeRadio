@@ -294,6 +294,39 @@ def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
         "expected 0 because all 3 character lines had pre-rendered clips"
     )
 
+def test_sequencer_clip_shortfall_fails_loud(patched_sequencer_env):
+    """NO-FALLBACK (2026-07-03): fewer pre-rendered voice clips than dialogue
+    lines is a clip-count shortfall -> SceneSequencer RAISES ValueError instead of
+    inline-generating Bark filler for the un-clipped line."""
+    from nodes.scene_sequencer import SceneSequencer
+
+    led_in = {
+        "meta":  {"title": "SHORTFALL", "news_seed": {"headline": "x"}},
+        "cast": [
+            {"char_id": "c01", "name": "ALPHA",
+             "voice_preset": "v2/en_speaker_3", "line_count": 3, "word_count": 6},
+        ],
+        "lines": [
+            {"line_id": f"L{i:03d}", "char_id": "c01", "speaker_role": "character",
+             "text": f"Line number {i}.", "traits": "neutral",
+             "start_s": None, "dur_s": None,
+             "boundary": None, "bark_wav_path": None}
+            for i in range(3)
+        ],
+    }
+    patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
+    script_json = json.dumps(led_in)
+
+    # Only TWO clips for THREE character lines -> the third line has no clip.
+    tts_audio = _make_audio(2)
+
+    with pytest.raises(ValueError, match="no pre-rendered voice clip"):
+        SceneSequencer().sequence(
+            script_json=script_json,
+            tts_audio_clips=tts_audio,
+        )
+
+
 def test_sequencer_legacy_list_raises(patched_sequencer_env):
     """Legacy parser-list shape -> load_ledger ValueError surfaces.
     Sequencer is in the loud-fail group."""

@@ -527,8 +527,10 @@ def _chunk_text_for_bark(text, max_len=180):
 def _generate_bark_for_line(text, voice_preset, temperature=0.7):
     """Generate TTS audio for a single dialogue line using Bark.
 
-    Returns (audio_np_1d, sample_rate).  Handles chunking internally.
-    Reuses the bark_tts module's model cache so the model loads once.
+    RETIRED as a live path (no-fallback rip 2026-07-03): the sequencer no longer
+    inline-generates Bark on a clip-count shortfall (it fails loud instead). This
+    helper is retained only because its Bark-lib helper chain is shared; it has no
+    live caller in the sequencer. Returns (audio_np_1d, sample_rate).
     """
     import torch
 
@@ -844,26 +846,23 @@ class SceneSequencer:
                     tts_clip_idx += 1
                     render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
                 else:
-                    # Inline-Bark fallback (no pre-rendered clip available).
-                    # This is the only branch that consumes preset; validate
-                    # cast.voice_preset here so the announcer + Bark-clip
-                    # paths above don't trip on Kokoro-namespace presets.
-                    # Gate 3 mirror -- Gate 1 (writer) + Gate 2 (G6) catch
-                    # this upstream in production runs.
-                    preset = _OTRLC.voice_preset(led, item)
-                    if not preset or not str(preset).startswith("v2/"):
-                        raise ValueError(
-                            f"SceneSequencer: cast.voice_preset missing or "
-                            f"non-v2/* for character {character_name!r} "
-                            f"(line_id={item.get('line_id')!r}, "
-                            f"char_id={item.get('char_id')!r}, got {preset!r}). "
-                            f"Writer cast-lock contract violation."
-                        )
-                    log.info(f"[SceneSequencer] Inline Bark [{global_idx}] {character_name}")
-                    bark_np, bark_sr = _generate_bark_for_line(line, preset)
-                    segment_np = _resample_audio(bark_np, bark_sr, sample_rate)
-                    segment_np = _level_dialogue_clip(segment_np)
-                    render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
+                    # NO-FALLBACK (operator 2026-07-03): a dialogue line with NO
+                    # pre-rendered clip is a clip-count SHORTFALL (the voice nodes
+                    # emitted fewer clips than there are dialogue lines) -- a
+                    # pipeline defect. FAIL LOUD naming the line + the counts; never
+                    # silently inline-generate Bark filler. The old inline-Bark
+                    # fallback is RETIRED (_generate_bark_for_line is no longer
+                    # called from the sequencer).
+                    raise ValueError(
+                        f"SceneSequencer: no pre-rendered voice clip for dialogue "
+                        f"line {item.get('line_id')!r} (character {character_name!r}, "
+                        f"char_id={item.get('char_id')!r}, announcer={is_announcer}). "
+                        f"Clip-count shortfall: announcer {announcer_clip_idx}/"
+                        f"{len(announcer_clips)}, character {tts_clip_idx}/"
+                        f"{len(tts_clips)} consumed. NO inline-Bark fallback "
+                        f"(no-fallback rip) -- the voice nodes must render one clip "
+                        f"per dialogue line; fix the upstream clip count."
+                    )
 
                 current_character_name = character_name
 
