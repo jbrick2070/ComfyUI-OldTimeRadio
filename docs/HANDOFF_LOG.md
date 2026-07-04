@@ -6,6 +6,38 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-03 (credits overlay redesign + music-still fix + ElevenLabs S0 start) -- HEAD 055dffbe (v2.0-alpha)
+Did (multi-thread session after the S3+S1 credits atomic slice):
+- CREDITS OVERLAY REDESIGN @ a0224438: operator rejected the single rolling roll; rebuilt
+  OTR_CreditsRoll as the 3-column SIGNAL LOST console per the operator's design prototype
+  (docs/Credits Overlay - plain.html; spec+plan in docs/2026-07-03-credits-enrichment/
+  CREDITS_OVERLAY_{DESIGN,BUILD_PLAN}.md). Cols 1-2 STATIC dashboard (episode-title HERO +
+  SIGNAL LOST 50% subtitle; MODELS w/ family suffix; [PRODUCTION LEDGER] vram/frames/seed/commit/rev;
+  [SYSTEM]; CAST & VOICES delivered; [WRITER/LLM CONFIG]); COL3 SCROLLS the full narrative (STORY
+  SPINE + full transcript + SOURCE INTERCEPT + DIAGNOSTIC, nothing dropped; duration = scroll length
+  declared to the credits-aware mux). radial bg/neon/glow/scanlines; no-fallback. Added the per-engine
+  family stamp to render_engines.by_engine (otr_video_render_batch). 20 spec tests rewritten. Design
+  hardened by 3 Fable passes (code-ready plan + delta + creative "make it better"). Preview PNG looks
+  faithful (docs/2026-07-03-credits-enrichment/credits_console_preview.png). Suite 6116/0 + Bug Bible 16.
+- MUSIC-STILL LIP FIX @ b1fecb6f: ltx_audio_in radio-face talking still is ANNOUNCER-ONLY; the music
+  bookend stays faceless (render_driver: gated _is_never_humo_video_role -> == "announcer_visual") so
+  ltx doesn't lip-sync a mouth to music. test_ltx_radio_face_ab updated.
+- ELEVENLABS/CLOUD-MUSIC S0 START @ 055dffbe (per docs/2026-07-03-elevenlabs-tts/BUILD_PLAN.md +
+  CODER_KICKOFF.md): C1 (cloud runtime + EngineProfile cloud fields partner_row/provider_id/
+  auth_required/billing_category/canonicalizer/error_policy + fail_loud validation) + C3 (threaded
+  provider_voice_id through _otr_voice_bank dataclass/loader, cast_lock _stamp, schema; additive,
+  local unchanged). Suite 6116/0 + Bug Bible 16.
+Current step: (a) ElevenLabs S0 REMAINDER = C8 (build canonicalize_audio + resolve the local-lane
+  loudness reference, cloud_media_canonical.py:127/:68) + the V3 ElevenLabs re-pin (regenerates
+  partner_nodes.yaml -- run image/video conformance same chunk). Then S1..S7. (b) Credits overlay
+  live-validation via the yoga soak (below).
+Next: finish S0 C8 + re-pin; then S1 (elevenlabs adapter).
+Soak: LAUNCHED scripts/_otr_yoga_soak.py (operator's yoga run + the credits LIVE smoke): y1 viz_mxc_cpu
+  (rainbow) 800w -> y2 viz_mxc_mandala 800w -> y3 cloud ideo+still_word 30w. Results ->
+  scripts/_otr_soak_capstone_results/yoga_<stamp>/results.jsonl, finals -> otr/obs (must carry the
+  NEW 3-column console). Running unattended.
+Commits: b1fecb6f, a0224438, 055dffbe.
+
 ## 2026-07-03 (credits-enrichment S3+S1 atomic) -- HEAD 20a669de (v2.0-alpha)
 Did: landed the S3+S1 ATOMIC slice per GO_FORWARD_CREDITS.md v4 -- the guaranteed-RED window.
 - Registered OTR_CreditsRoll (__init__.py). RIPPED (video_engine.py): RENDER-ENGINES section from
