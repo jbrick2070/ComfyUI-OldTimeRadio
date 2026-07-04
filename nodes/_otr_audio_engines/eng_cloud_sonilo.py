@@ -24,6 +24,7 @@ inside ``generate_clip``; module scope is the adapter contract only.
 from __future__ import annotations
 
 import logging
+import os
 
 from .registry import register
 
@@ -35,6 +36,20 @@ _USD_PER_60S = 0.15
 _MUSIC_TIMEOUT_S = 240.0
 #: the pinned partner row (partner_nodes.yaml) this adapter drives.
 _PARTNER_ROW = "cloud_sonilo_music"
+
+
+def _sonilo_min_duration_s() -> int:
+    """Sonilo's service floor: the provider 422-rejects the OTR theme cues
+    (opening 12s / closing 8s / interstitial 4s) as too short even though the
+    node's widget min is 1 (that is only a UI bound, not the service minimum).
+    We REQUEST at least this many seconds and TRIM back to the cue's canonical
+    length (below), so cue identity + the downstream mix are unchanged. Tunable
+    via OTR_SONILO_MIN_DURATION_S so the exact floor can be dialed in without a
+    code change; 0 disables the floor (raw cue duration)."""
+    try:
+        return max(0, int(os.environ.get("OTR_SONILO_MIN_DURATION_S", "30")))
+    except (TypeError, ValueError):
+        return 30
 
 
 def estimate_music_usd(duration_s) -> float:
@@ -93,22 +108,40 @@ class SoniloCloudMusic:
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
         from .._otr_shared.cloud_media_canonical import canonicalize_audio
 
+        # Sonilo 422-rejects sub-floor cue durations (opening 12 / closing 8 /
+        # interstitial 4 s). REQUEST at least the floor, then TRIM back to the
+        # cue's canonical length so cue identity + the mix are unchanged.
+        floor = _sonilo_min_duration_s()
+        req_dur = max(dur, floor) if floor else dur
+        if req_dur != dur:
+            log.info("[sonilo] cue %ss below service floor %ss -> requesting %ss, "
+                     "trimming back to %ss", dur, floor, req_dur, dur)
+
         inputs = {
             "prompt": str(prompt),
-            "duration": dur,                        # provider-native seconds (INT)
+            "duration": req_dur,                    # provider-native seconds (INT)
             "seed": int(seed or 0),
         }
         result = invoke_partner_node(
             _PARTNER_ROW, inputs,
             timeout_s=_MUSIC_TIMEOUT_S,
-            estimated_usd=estimate_music_usd(dur))
+            estimated_usd=estimate_music_usd(req_dur))  # bill what we request
 
         # Stereo music matched to the LOCAL music lane (RMS -16 dBFS) + 44.1k WAV.
         canon = canonicalize_audio(
             result, {"sample_rate": self.sample_rate, "stereo_policy": "stereo"},
             session=None)
 
-        return self._wav_to_audio(str(canon.path))
+        audio = self._wav_to_audio(str(canon.path))
+        # TRIM to the canonical cue length (sample-accurate) so the padded floor
+        # request never changes the delivered cue.
+        if req_dur > dur:
+            sr = int(audio.get("sample_rate", self.sample_rate) or self.sample_rate)
+            n = int(round(dur * sr))
+            wav = audio["waveform"]
+            if wav.shape[-1] > n > 0:
+                audio = {"waveform": wav[..., :n].contiguous(), "sample_rate": sr}
+        return audio
 
     @staticmethod
     def _wav_to_audio(path: str) -> dict:

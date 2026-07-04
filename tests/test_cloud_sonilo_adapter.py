@@ -59,6 +59,9 @@ def test_registered_as_sonilo():
 
 def test_prompt_duration_seed_forwarded(monkeypatch, tmp_path):
     cap = {}
+    # isolate RAW forwarding from the min-duration floor (floor is tested in
+    # test_cloud_sonilo_floor.py); floor=0 => the cue duration passes through.
+    monkeypatch.setenv("OTR_SONILO_MIN_DURATION_S", "0")
     _install_seams(monkeypatch, tmp_path, cap)
     eng = areg.get_engine("sonilo")
     out = eng.generate_clip("melancholy analog synth, 1962 radio drama", 11.6, seed=42)
@@ -91,6 +94,7 @@ def test_cost_estimate_is_per_cue_scale():
 
 def test_estimated_usd_is_forwarded_to_invoke(monkeypatch, tmp_path):
     cap = {}
+    monkeypatch.setenv("OTR_SONILO_MIN_DURATION_S", "0")   # isolate from the floor
     _install_seams(monkeypatch, tmp_path, cap)
     eng = areg.get_engine("sonilo")
     eng.generate_clip("interstitial sting", 6, seed=1)
