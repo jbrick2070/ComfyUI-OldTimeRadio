@@ -57,9 +57,9 @@ BROADCAST CONVENTION
   scene-setting, and stakes. Close with one paragraph of NARRATOR
   outro that lands the moral or the lingering question.
 - Stage directions go in [square brackets] and are functional only:
-  [SOUND: door creaks open], [MUSIC: ominous brass sting], [SFX:
-  distant thunder]. Never describe character emotion in stage
-  directions; show emotion through the line itself.
+  [SOUND: door creaks open], [MUSIC: ominous brass sting]. Never
+  describe character emotion in stage directions; show emotion through
+  the line itself.
 - Every spoken line is tagged CHARACTER:dialogue. The tag is one
   uppercase word, optionally with one period for "MR." or "DR." style
   honorifics: NARRATOR, MONTGOMERY, DR. KASKE, MISS WELLS. Do NOT use

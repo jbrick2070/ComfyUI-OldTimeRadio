@@ -39,6 +39,17 @@ def test_system_prompt_mentions_core_period_anchors():
         assert token in OTR_PERIOD_SYSTEM_PROMPT, f"missing anchor token: {token!r}"
 
 
+def test_system_prompt_never_solicits_sfx():
+    # 2026-07-04: SFX generation is retired -- no enabled writer prompt may
+    # instruct the LLM to emit [SFX:] stage directions. A hallucinated [SFX:] is
+    # still defensively stripped before TTS, but nothing should ASK for one.
+    assert "[SFX:" not in OTR_PERIOD_SYSTEM_PROMPT
+    assert "[SFX" not in OTR_PERIOD_SYSTEM_PROMPT
+    # the assembled few-shot prompt (system + user) must not reintroduce it
+    _sys, _user = render_prompt("a test premise")
+    assert "[SFX" not in _sys and "[SFX" not in _user
+
+
 def test_system_prompt_forbids_modern_words():
     """The prompt must explicitly forbid the most common modern slang
     that breaks the period."""
