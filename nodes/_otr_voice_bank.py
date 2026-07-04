@@ -92,6 +92,11 @@ class VoiceBankEntry:
     # ("lead_safe", "nasal_risk").
     quality_tier: str = ""
     style_tags: Tuple[str, ...] = ()
+    # Cloud-audio campaign 2026-07-03 (C3): the provider's own voice identifier
+    # (e.g. ElevenLabs voice_id). Threaded end-to-end so cloud casting resolves
+    # from adapter metadata, NOT a disk sentinel. Empty for every local
+    # (ref-clip / preset) engine -- behavior unchanged until a cloud bank ships.
+    provider_voice_id: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -168,6 +173,7 @@ def _entry_from_dict(d: dict) -> VoiceBankEntry:
         commercial_clean=bool(d["commercial_clean"]),
         quality_tier=str(d.get("quality_tier") or ""),
         style_tags=tuple(str(t) for t in (d.get("style_tags") or [])),
+        provider_voice_id=str(d.get("provider_voice_id") or ""),   # C3
     )
 
 

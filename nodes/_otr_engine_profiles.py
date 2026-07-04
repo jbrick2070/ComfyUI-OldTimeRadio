@@ -32,8 +32,13 @@ PROFILE_SCHEMA_VERSION = "1"
 _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 
 # Sprint 1: validated value sets for the new declarative profile metadata.
-_VALID_RUNTIMES = {"in_graph", "oop_venv"}
+# "cloud" (cloud-audio campaign 2026-07-03, C1): a partner-node engine invoked via
+# invoke_partner_node (ElevenLabs TTS / Sonilo music) -- dispatch runs through the
+# adapter, not profile.runtime, but the runtime tag must validate.
+_VALID_RUNTIMES = {"in_graph", "oop_venv", "cloud"}
 _VALID_LICENSE_STATES = {"", "clean", "gated", "unknown"}
+# error_policy for cloud engines -- fail-loud, never a silent local fallback.
+_VALID_ERROR_POLICIES = {"", "fail_loud"}
 
 # Hardcoded engine order per role for INPUT_TYPES (C-5: never empty combo, stable
 # across flags, no IO). Index 0 is the shipped default for the role: char_voice and
@@ -84,11 +89,24 @@ class EngineProfile(BaseModel):
     # dispatch (which stays on the engine-level default until promotion S6). ---
     rank: int = 100                  # fallback priority; lower = tried first
     is_default: bool = False         # scope/logical default for the role
-    runtime: str = "in_graph"        # in_graph | oop_venv (Path B worker)
+    runtime: str = "in_graph"        # in_graph | oop_venv (Path B worker) | cloud
     needs_ref_clip: bool = False     # reference-clip identity engines
     caps: dict = Field(default_factory=dict)
     license_state: str = ""          # blank -> derive from commercial_clean
     warn_text: str = ""              # non-blocking notice emitted when gated
+
+    # --- Cloud-audio campaign 2026-07-03 (C1): declarative cloud-engine metadata
+    # (additive; blank defaults keep every existing row valid). Populated only on
+    # runtime="cloud" profiles (ElevenLabs TTS / Sonilo music). These describe the
+    # partner-node invoke contract; they do NOT change the byte-identical default
+    # dispatch (the cloud engine is dropdown-opt-in, never a default). ---
+    partner_row: str = ""            # pinned partner_nodes.yaml key (e.g. cloud_elevenlabs_tts)
+    provider_id: str = ""            # provider label (elevenlabs / sonilo)
+    required_param_defaults: dict = Field(default_factory=dict)
+    auth_required: bool = False      # cloud engines need OTR_COMFY_API_KEY (fail-loud)
+    billing_category: str = ""       # cost-estimator category (tts / music)
+    canonicalizer: str = ""          # canonicalize_audio variant to run on the result
+    error_policy: str = ""           # "" | fail_loud (cloud = fail_loud, no local fallback)
 
     @model_validator(mode="after")
     def _validate_metadata(self):
@@ -102,6 +120,21 @@ class EngineProfile(BaseModel):
                 f"profile '{self.profile_id}': license_state "
                 f"'{self.license_state}' not in {sorted(_VALID_LICENSE_STATES)}"
             )
+        if self.error_policy not in _VALID_ERROR_POLICIES:
+            raise ValueError(
+                f"profile '{self.profile_id}': error_policy "
+                f"'{self.error_policy}' not in {sorted(_VALID_ERROR_POLICIES)}"
+            )
+        # cloud runtime demands the fail-loud contract + a partner row.
+        if self.runtime == "cloud":
+            if self.error_policy != "fail_loud":
+                raise ValueError(
+                    f"profile '{self.profile_id}': runtime=cloud requires "
+                    f"error_policy=fail_loud (no silent local fallback)")
+            if not self.partner_row:
+                raise ValueError(
+                    f"profile '{self.profile_id}': runtime=cloud requires a "
+                    f"partner_row (the pinned partner_nodes.yaml key)")
         return self
 
 

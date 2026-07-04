@@ -70,6 +70,10 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Whiny-fix P2b ADDITIVE curation tags, e.g. lead_safe / nasal_risk. Consumed by the deterministic tier pre-filter (filter_by_quality_tier); never reweights scores."
+    },
+    "provider_voice_id": {
+      "type": "string",
+      "description": "Cloud-audio campaign 2026-07-03 (C3) ADDITIVE: the provider's own voice identifier (e.g. ElevenLabs voice_id) for cloud (partner-node) engines. Threaded end-to-end so cloud casting resolves from adapter metadata, not a disk sentinel. Empty/absent for every local (ref-clip/preset) engine."
     }
   }
 }

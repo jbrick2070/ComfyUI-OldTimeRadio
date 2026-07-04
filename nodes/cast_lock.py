@@ -652,6 +652,14 @@ class CastLock:
         entry["voice_ref_id"] = ref.voice_ref_id
         entry["voice_engine"] = ref.engine
         entry["commercial_clean"] = bool(ref.commercial_clean)
+        # C3 (cloud-audio 2026-07-03): carry the provider voice id for cloud
+        # (ElevenLabs) casting -- ONLY when present, so local (ref-clip/preset)
+        # cast entries stay byte-identical. The durable cast stamp copies the
+        # whole cast section (production_ledger.stamp_durable), so this survives
+        # to the admission gate + OTR_CreditsRoll.
+        pvid = getattr(ref, "provider_voice_id", "") or ""
+        if pvid:
+            entry["provider_voice_id"] = pvid
 
     @staticmethod
     def _resolve_char_engine(voice_bank, bank_entries):
