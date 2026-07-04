@@ -102,24 +102,10 @@ were BUILT no-fallback from the start — this rip is about the LOCAL model lane
    a mid-render model swap. The operator's "latest / only-valid-models" directive
    applies to the CLOUD model dropdowns, not the local engine rank-chain.
 
-## C2. NEW workstream (operator 2026-07-03) — valid-models-only dropdowns (R5)
+## C2. NEW workstream (operator 2026-07-03) — valid-models-only dropdowns
 The OpenRouter model list AND the Comfy cloud model dropdowns must expose ONLY
-real, currently-valid models. Dead / stale model ids must not appear. Tracked
-separately from the fallback rip (R5).
-
-**Default = PARK a "latest" alias (operator 2026-07-03).** The four slot widgets
-(`openrouter_slot_a_model`, `openrouter_slot_b_model`, `comfy_slot_a_model`,
-`comfy_slot_b_model`) currently default to a `(enable ...)` placeholder that would
-hard-fail if left unset. Decision: PARK a **"latest"** alias entry as the default —
-a selectable dropdown value that resolves to the newest valid model at run time —
-instead of the fail-on-unset placeholder. So the box-fresh default is "latest",
-plus the ~last-3 real version pins as explicit picks (the model-gone backstop, C-2).
-
-**Operator note / open tension:** ideally there'd be a CHEAP dynamic call to fetch
-the live valid-model list so "latest" always resolves to a real current id. Since a
-live per-run model-list fetch costs an API call + latency, "latest" is a PARKED
-alias resolved from a cached/pinned map (refreshed occasionally), not a live call on
-every episode. A cheap dynamic refresh (periodic/cached) is the nice-to-have.
+real, currently-valid models, and DEFAULT to a dynamic **"latest"** alias. Dead /
+stale model ids must not appear. Tracked separately from the fallback rip (R5).
 
 ---
 
@@ -136,66 +122,3 @@ every episode. A cheap dynamic refresh (periodic/cached) is the nice-to-have.
 
 Every RIP replaces a silent swap with a NAMED loud raise (EngineUnusable /
 ValueError / RenderError) — never a bare `raise`. UTF-8, no BOM, SFW.
-
----
-
-## E. r2 kibitz hardening (Codex panel + Claude anchor, grounded 2026-07-03)
-
-Codex ran read-only against the real files; Claude wrote the anchor and grounded
-every claim. ACCEPTED (CONFIRMED against code):
-
-- **E1 [enum taxonomy].** There is NO `MISSING_REF` in `EngineUsabilityReason`
-  (values: GATED_BY_FLAG, MISSING_MODEL, MISSING_HF_TOKEN, INCOMPATIBLE_PROFILE,
-  NONCOMMERCIAL_BLOCKED, MALFORMED_CONFIG). The missing-ref fail-loud raise uses
-  `EngineUnusable(engine, role, EngineUsabilityReason.MISSING_MODEL, detail="no
-  usable voice reference for cloning engine <engine>: <char/line>")` — NOT an
-  invented enum value.
-- **E2 [split, do not blanket-rip `_resolve_character_voices_fail_soft`].** It
-  bundles THREE behaviors (`cast_lock.py:387-513`): (3a) missing-preset synthesis
-  [FALLBACK → RIP], (3b) mis-stamped-announcer REROUTING [CORRECTNESS routing, NOT
-  a fallback → KEEP, move out], (3c) true-orphan reassignment [FALLBACK → RIP].
-  Raise loud ONLY for a true character row still unvoiceable after CastLock; keep
-  3b. Rename the function after (the `_fail_soft` name becomes false).
-- **E3 [stale R3 citations — RE-GROUND before coding].** `story_orchestrator.py`
-  is 2711 lines; the plan's `:4100-5393` news/title/outro/portrait citations are
-  WRONG (inventory subagent hallucinated them). Real homes: writer soft-fails +
-  outro in `OTR_LedgerScriptWriter.py`; line/body scoring in `_otr_line_composer.py`;
-  character portrait fallback in `otr_meta_brief_image_prompt.py:derive_image_prompts`
-  (contract literally says "never raises; never emits an empty prompt" — update the
-  contract + callers/tests). R3 MUST re-grep every LLM-lane target before touching it.
-- **E4 [`_otr_body_score` raise is inert unless the caller catch is narrowed].**
-  The reroll/score block is wrapped in `except Exception` that keeps the original
-  line. Ripping body_score to raise does nothing until that catch is narrowed to
-  the LLM reroll call only. Same "swallowed by an outer catch" risk applies to the
-  contract/pitch/grammar soft-fails — check each call site's surrounding catch.
-- **E5 [no `ValidationError`].** The writer imports no project-local
-  `ValidationError`; pydantic's is not a generic message exception. Use `ValueError`
-  or a new named `WriterValidationFailure`, raised `... from exc`.
-- **E6 [collapse R1a+R1b into ONE audio-voice commit].** cast_lock repair FEEDS the
-  voice nodes; ripping the bark net (R1a) alone makes a repaired-orphan path raise
-  before R1b lands, breaking the intermediate suite. Ship the bark-net + cast_lock
-  + kokoro + stage-direction rips as one green commit.
-- **E7 [stage-direction: add a WRITER-side assert too].** Failing only at the voice
-  gate is late — the writer scrub keeps original text when stripping would empty the
-  line, so parenthetical-only text can still flow. Add a pre-freeze assert for
-  voiced lines emptied by the scrub; keep the TTS-side raise as defense-in-depth.
-- **E8 [image slot raise — define "explicit"].** `resolve_engine_for_role` treats
-  absent-key / empty-dict / empty-string alike. Define explicit-but-unresolved as
-  `slot in image_policy["image_models"]` AND `_eid(models[slot]) == ""` → raise
-  there; define absent-key behavior separately.
-- **E9 [verify `_bark_health_check_for_cast` has a caller].** It is defined in
-  `story_orchestrator.py` but grep finds no writer call — verify it is live before
-  spending R3 time ripping it.
-
-REJECTED / SCOPED OUT:
-- **Workflow-JSON audit in R4:** CUT for R1-R3 (runtime-behavior rips change no
-  node input/widget). It applies ONLY to the R5 dropdown work (which does change
-  widget values). Moved to R5.
-- **C2 valid-model dropdowns not implementable "live":** confirmed — there is no
-  live catalog source and V3 combos are excluded from the pin. Resolved by the
-  operator's "park a latest" alias (cached, not a per-run live fetch); R5 defines
-  the refresh source. Keep C2 OUT of R1-R4.
-
-Next gate: the LIMITED internal Fable pass runs as the FINAL grounded gate on the
-EXECUTED R1 audio-voice diff (CLAUDE.md §9 — after codex, right before merge), not
-on this doc. Antigravity (agy) manual review is queued (AGY_MANUAL_PROMPT.md).
