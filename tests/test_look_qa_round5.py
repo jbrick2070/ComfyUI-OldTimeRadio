@@ -282,7 +282,11 @@ class TestPersonAnchor:
         a = _sl._subject_anchor("x" * 400)
         assert len(a) < 200
 
-    def test_object_only_llm_prompt_falls_to_anchored_template(self):
+    def test_object_only_llm_prompt_raises(self):
+        """NO-FALLBACK rip (2026-07-04): the b002 shape -- an LLM prompt describing
+        PROPS without the person (no person anchor) -- now FAILS LOUD instead of
+        swapping to the anchored template. A faceless prompt starves the
+        audio-driven-face engine, so the raise preserves that guard loudly."""
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
@@ -290,17 +294,12 @@ class TestPersonAnchor:
                          "portrait_prompt": "a stocky engineer in grey"}],
                "lines": []}
         meta = {"story_brief_terms": {"setting": ["foundry"]}}
-        # the b002 shape: an LLM prompt describing PROPS without the person
         llm = (lambda prompt:
                '[{"beat_id": "b1", "expression": "", "motion": "", '
                '"camera": "", "text_prompt": "fingers dancing across the '
                'console, sparks flying over the foundry floor"}]')
-        creative, warnings = _sl.derive_creative_directives(
-            beats, meta, led, llm_fn=llm)
-        tp = creative["b1"]["text_prompt"]
-        assert tp.startswith("face visible, speaking to camera")
-        assert creative["b1"]["source"] == "template_consistency"
-        assert any("person anchor" in w for w in warnings)
+        with pytest.raises(RuntimeError, match="no-fallback rip"):
+            _sl.derive_creative_directives(beats, meta, led, llm_fn=llm)
 
     def test_person_grounded_llm_prompt_kept_and_anchored(self):
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,

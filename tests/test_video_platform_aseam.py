@@ -415,7 +415,10 @@ def test_shotlock_derives_orphans_from_beat():
     assert "grim resolve" in c["text_prompt"] and "spacer" in c["text_prompt"]
 
 
-def test_passpm_empty_json_reseed_then_template():
+def test_passpm_empty_json_reseed_then_raises():
+    """NO-FALLBACK rip (2026-07-04): an ATTEMPTED derivation LLM that collapses to
+    empty after every reseed now FAILS LOUD -- no deterministic-template swap. The
+    reseed loop still runs (initial + max_reseed) before the raise."""
     led = _char_ledger()
     calls = {"n": 0}
 
@@ -423,16 +426,23 @@ def test_passpm_empty_json_reseed_then_template():
         calls["n"] += 1
         return ""  # always collapses
 
-    creative, warns = sl.derive_creative_directives(
-        _char_beat("hello there"), led["meta"], led, llm_fn=empty_llm, max_reseed=2,
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        sl.derive_creative_directives(
+            _char_beat("hello there"), led["meta"], led, llm_fn=empty_llm,
+            max_reseed=2,
+        )
+    assert calls["n"] == 3  # initial + 2 reseeds ran before the raise
+
+
+def test_passpm_no_llm_is_template_lane():
+    """llm_fn=None is the legit local template lane (NOT a failure): deterministic
+    prompt, anchor-led, finished, never raises."""
+    led = _char_ledger()
+    creative, _warns = sl.derive_creative_directives(
+        _char_beat("hello there"), led["meta"], led, llm_fn=None,
     )
     c = creative["b1"]
-    assert c["source"] in ("template", "template_consistency")
-    # Gap-audit F3 (2026-06-10): prompts are FINISHED (era tail + film style
-    # tail) after the gates and before the hash. Round 5 F3 (2026-06-10
-    # evening): the SUBJECT ANCHOR now LEADS every talking-head prompt
-    # (face/framing tokens first -- the b002 no-person catch); the template
-    # follows the anchor as the prompt's body.
+    assert c["source"] == "template"
     _template = sl._deterministic_template(
         "a tall weathered spacer with a scar", "a derelict orbital station",
         "hello there",
@@ -443,11 +453,12 @@ def test_passpm_empty_json_reseed_then_template():
     from nodes._otr_story_brief_helpers import STYLE_TAIL_DEFAULT
     assert c["text_prompt"].endswith(STYLE_TAIL_DEFAULT)
     assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])
-    assert calls["n"] == 3  # initial + 2 reseeds
-    assert any("reseed" in w for w in warns)
 
 
-def test_story_consistency_gate_warns_and_falls_back():
+def test_story_consistency_gate_warn_only_keeps_else_raises():
+    """NO-FALLBACK rip (2026-07-04): a hallucinated (inconsistent/faceless) LLM
+    prompt FAILS LOUD by default; consistency_gate_warn_only=True KEEPS the AI
+    prompt (operator toggle) instead of swapping to the deterministic template."""
     led = _char_ledger()
 
     def halluc_llm(_prompt):
@@ -455,13 +466,19 @@ def test_story_consistency_gate_warns_and_falls_back():
         return json.dumps([{"beat_id": "b1", "expression": "x",
                             "text_prompt": "bright sunny flower meadow"}])
 
+    # default (warn_only=False): the LLM prompt fails the gate -> raise loud
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        sl.derive_creative_directives(
+            _char_beat(), led["meta"], led, llm_fn=halluc_llm)
+
+    # warn_only=True keeps the AI prompt (source stays "llm"), logs the miss
     creative, warns = sl.derive_creative_directives(
         _char_beat(), led["meta"], led, llm_fn=halluc_llm,
         consistency_gate_warn_only=True,
     )
     c = creative["b1"]
-    assert c["source"] == "template_consistency"
-    assert "spacer" in c["text_prompt"]
+    assert c["source"] == "llm"
+    assert "spacer" in c["text_prompt"]   # via the subject anchor
     assert any("consistency gate" in w for w in warns)
 
 

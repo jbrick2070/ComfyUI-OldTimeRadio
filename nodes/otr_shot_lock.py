@@ -529,9 +529,13 @@ def derive_creative_directives(
     is ``{expression, motion, camera, text_prompt, source, prompt_hash}``.
     Cheap-family beats are skipped entirely (NO llm call). ``llm_fn`` is a
     ``callable(prompt:str) -> str`` (injectable for tests); when None it is
-    resolved lazily from the writer's slot and, if unavailable, the deterministic
-    template carries every beat. Collapse guard: empty/unparseable/truncated ->
-    reseed up to ``max_reseed`` -> template. Never raises; never touches audio.
+    resolved lazily from the writer's slot and, if unavailable (llm_fn stays
+    None), the deterministic template carries every beat -- the legit local lane.
+    NO-FALLBACK (rip 2026-07-04): when a writer LLM WAS attempted and it yields
+    no usable directive after ``max_reseed`` reseeds, OR the LLM prompt fails the
+    story-consistency/person gate, this FAILS LOUD (RuntimeError) instead of
+    swapping to the deterministic template; ``consistency_gate_warn_only`` keeps
+    the AI prompt. Never touches audio.
     """
     warnings: list = []
     char_beats = [b for b in beats if b["role"] in CHARACTER_BEARING_ROLES]
@@ -582,7 +586,20 @@ def derive_creative_directives(
                     ) if p
                 )
                 source = "llm"
+            elif llm_fn is not None:
+                # A writer LLM WAS attempted but produced no usable directive for
+                # this beat after all reseeds -> fail loud (no-fallback rip
+                # 2026-07-04); no silent deterministic-template swap.
+                raise RuntimeError(
+                    "[OTR_ShotLock] derive_creative_directives: the writer LLM "
+                    "produced no usable directive for beat %s after %d reseeds -- "
+                    "NO deterministic template fallback (no-fallback rip "
+                    "2026-07-04); a failed derivation LLM stops the episode."
+                    % (b["beat_id"], max_reseed)
+                )
             else:
+                # No writer LLM configured (llm_fn None): the deterministic
+                # template IS the primary local lane, not a fallback.
                 text_prompt = _deterministic_template(appearance, setting, b["text"])
                 source = "template"
                 d = {k: "" for k in _DIRECTIVE_KEYS}
@@ -598,14 +615,23 @@ def derive_creative_directives(
                           or _person_anchor_ok(text_prompt, appearance))
             if not (_prompt_is_consistent(text_prompt, appearance, setting)
                     and _person_ok):
-                level = "WARN" if consistency_gate_warn_only else "FAIL-CLOSED"
-                warnings.append(
-                    f"consistency gate {level} for beat {b['beat_id']}: prompt "
-                    f"missing cast/setting trait or person anchor; using "
-                    f"template fallback"
-                )
-                text_prompt = _deterministic_template(appearance, setting, b["text"])
-                source = "template_consistency"
+                msg = (f"consistency gate for beat {b['beat_id']}: prompt missing "
+                       f"cast/setting trait or person anchor")
+                if consistency_gate_warn_only or source != "llm":
+                    # warn-only toggle keeps the AI prompt; or this is the
+                    # deterministic template lane (no LLM to blame) -> keep + warn.
+                    warnings.append(msg + " (kept; warn-only or template path)")
+                else:
+                    # The writer LLM prompt failed the story-consistency/person
+                    # gate -> fail loud, no template swap (no-fallback rip
+                    # 2026-07-04). A faceless talking-head prompt also starves the
+                    # audio-driven-face engine, so this raise preserves that guard.
+                    raise RuntimeError(
+                        "[OTR_ShotLock] derive_creative_directives: the writer LLM "
+                        "prompt for beat %s failed the story-consistency/person "
+                        "gate -- NO template fallback (no-fallback rip 2026-07-04)."
+                        % b["beat_id"]
+                    )
             # The subject anchor leads EVERY talking-head prompt path (llm,
             # composed, template): face/framing tokens first, bounded
             # appearance after -- prepended AFTER the gates, BEFORE finishing.
