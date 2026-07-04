@@ -6,6 +6,22 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (CREDITS closeout verification pass -- no code change; tail-chain documented) -- HEAD e346eeb4 (v2.0-alpha)
+Did (operator-requested wrap-up of the credits-module change; the tree was already CLEAN -- the credits
+S3+S1 work @5f510ebe was committed+pushed in a prior session, so nothing pending to commit):
+- Ran the full suite (6141 passed / 0 failed) + Bug Bible (16) -- green.
+- Verified the credits change is IN the REAL workflows/otr_scifi_16gb_full.json (node 95 OTR_CreditsRoll
+  present, not a copy): JSON round-trip OK, no BOM; link-validator exit 0 (the 4 --strict-types reports
+  for legacy audio node types 80-83 are pre-existing baseline, unrelated to credits).
+- TAIL-CHAIN (verified): 12 SignalLostVideo -> 84 SilentComposite -> 86 CaptionBurn -> 93
+  PostUpscaleProcgenBlend -> 95 CreditsRoll -> 85 MasterAudioMux (mux-LAST); 95 also feeds a FLOAT
+  declared credits-tail into 85 slot 6 (credits-aware mux guard). Documented in GO_FORWARD.
+- HEAD==origin (e346eeb4 pre-doc); no 0-byte / no BOM / AST-OK on all 10 touched .py this session.
+Current step: STOOD DOWN. No-fallback rip COMPLETE; credits change verified in-tree. A separate window
+takes the read-only widget-audit re-verification pass next (two windows must not be in the code at once).
+Next: (other window) widget audit; then resume credits LIVE frame smoke.
+Commits: docs-only (GO_FORWARD tail-chain closeout + this entry).
+
 ## 2026-07-04 (NO-FALLBACK RIP: R3-chunk-4 ShotLock + Fable SHIP -- ALL 10 SITES COMPLETE) -- HEAD 432cb576 (v2.0-alpha)
 Did (operator ordered "rip it all" -> ripped the 10th site the chunk-3 reviews surfaced; suite 6141/0
 + Bug Bible 16, pushed HEAD==origin):

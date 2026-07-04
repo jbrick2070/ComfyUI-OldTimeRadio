@@ -69,7 +69,20 @@ the shared `_resolve_writer_llm` None-on-load-fail seam (same in both lanes; out
 **Previously active (still open, resume after the rip): CREDITS ENRICHMENT --
 S3+S1 ATOMIC SHIPPED @ 5f510ebe (+ fade23c3 JSON
 recompact, + 20a669de Fable-gate fix). NEXT: LIVE frame-level smoke -> S0 -> S4.** Source of truth:
-`docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md` (v4) + `KICKOFF.md`. DONE (pushed, HEAD==origin):
+`docs/2026-07-03-credits-enrichment/GO_FORWARD_CREDITS.md` (v4) + `KICKOFF.md`.
+
+**TAIL-CHAIN ORDER (closeout-verified 2026-07-04 against the REAL workflows/otr_scifi_16gb_full.json --
+round-trip OK, no BOM, link-validator exit 0, suite 6141/0 + Bug Bible 16):** the video tail is
+`12 SignalLostVideo -> 84 OTR_SilentComposite -> 86 OTR_CaptionBurn -> 93 OTR_PostUpscaleProcgenBlend
+-> 95 OTR_CreditsRoll -> 85 OTR_MasterAudioMux` (terminal mux-LAST). Credits (node 95) sits AFTER the
+upscale/procgen blend (93) and is the LAST video stage before the master mux (85). Wiring: L266
+86->93[0]; L250 93->95[0]; L275 92 VideoRenderBatch[1]->95[1]; L274 95[0]->85[0] (video); L276 95[1]->85[6]
+(FLOAT declared credits tail -> the credits-aware mux guard). Node 95 present in the real JSON (not a copy).
+NOTE: the link-validator's 4 `--strict-types` reports (node types 80-83 legacy audio: CastLock/
+BatchCharacterVoices/AnnouncerVoice/StableAudioTheme not in NODE_CLASS_MAPPINGS) are PRE-EXISTING baseline,
+unrelated to credits; link integrity is clean (exit 0) and the workflow-validator suite is green.
+
+DONE (pushed, HEAD==origin):
 - S2 durable singleton stamps @ 3e0003e8; OTR_CreditsRoll SCAFFOLD @ f00a8e8e.
 - **S3+S1 ATOMIC @ 5f510ebe:** registered OTR_CreditsRoll; ripped node-12 RENDER-ENGINES dossier
   section + HUD credits-music loop (->silence pad) + too-early treatment engine-enrich; ripped node-84
