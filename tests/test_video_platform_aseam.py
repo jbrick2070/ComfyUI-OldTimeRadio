@@ -434,6 +434,33 @@ def test_passpm_empty_json_reseed_then_raises():
     assert calls["n"] == 3  # initial + 2 reseeds ran before the raise
 
 
+def test_passpm_partial_batch_spends_reseeds_then_raises():
+    """NO-FALLBACK rip (2026-07-04): a PARTIAL batch reply (one beat missing) must
+    spend its FULL reseed budget before the missing beat hits the fail-loud raise
+    -- the reseed loop breaks only on full coverage, not any non-empty parse."""
+    led = _char_ledger()
+    beats = [
+        {"beat_id": "b1", "role": "character_video", "char_id": "c1",
+         "text": "first", "samples": None, "sample_rate": None, "dur_s": 1.0},
+        {"beat_id": "b2", "role": "character_video", "char_id": "c1",
+         "text": "second", "samples": None, "sample_rate": None, "dur_s": 1.0},
+    ]
+    calls = {"n": 0}
+
+    def partial_llm(_prompt):
+        calls["n"] += 1
+        # only ever answers b1 -- b2 is always missing from the batch reply
+        return json.dumps([{"beat_id": "b1", "expression": "", "motion": "",
+                            "camera": "",
+                            "text_prompt": "a tall weathered spacer with a scar, "
+                                           "facing the camera, on the station"}])
+
+    with pytest.raises(RuntimeError, match="no-fallback rip"):
+        sl.derive_creative_directives(
+            beats, led["meta"], led, llm_fn=partial_llm, max_reseed=2)
+    assert calls["n"] == 3  # the partial reply spent the full reseed budget
+
+
 def test_passpm_no_llm_is_template_lane():
     """llm_fn=None is the legit local template lane (NOT a failure): deterministic
     prompt, anchor-led, finished, never raises."""

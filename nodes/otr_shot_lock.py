@@ -373,7 +373,9 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# M4 per-beat creative derivation (LLM -> deterministic-template fallback)
+# M4 per-beat creative derivation (LLM; NO-FALLBACK -- fail loud on an attempted
+# writer-LLM failure; the deterministic template is the lane ONLY when no writer
+# LLM is configured. no-fallback rip 2026-07-04)
 # ---------------------------------------------------------------------------
 
 _DIRECTIVE_KEYS = ("expression", "motion", "camera")
@@ -563,7 +565,11 @@ def derive_creative_directives(
                     warnings.append(f"derivation llm_fn raised ({exc}); reseed {attempt}")
                     raw = ""
                 directives = _parse_directives(raw, expected)
-                if directives:
+                # Break only on FULL batch coverage -- a partial reply (e.g. 14 of
+                # 15 beats) must spend its remaining reseed budget rather than let
+                # the one missing beat hit the fail-loud raise below with retries
+                # unused (no-fallback rip 2026-07-04).
+                if directives and all(bid in directives for bid in expected):
                     break
                 if attempt < max_reseed:
                     warnings.append(
@@ -620,6 +626,12 @@ def derive_creative_directives(
                 if consistency_gate_warn_only or source != "llm":
                     # warn-only toggle keeps the AI prompt; or this is the
                     # deterministic template lane (no LLM to blame) -> keep + warn.
+                    # NB divergence from the image lane (derive_image_prompts),
+                    # where the PERSON guard is a separate ALWAYS-enforced raise:
+                    # here person + consistency share one gate, so warn-only also
+                    # tolerates a faceless prompt. The subject anchor prepended
+                    # below (_subject_anchor) is the compensating control -- every
+                    # rendered prompt still leads with face/framing tokens.
                     warnings.append(msg + " (kept; warn-only or template path)")
                 else:
                     # The writer LLM prompt failed the story-consistency/person
@@ -857,9 +869,10 @@ class OTRShotLock:
                 "consistency_gate_warn_only": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "M4 story-consistency gate: warn-only vs fail-closed on "
-                        "a missing cast/setting trait. Either way the episode "
-                        "still renders (template fallback); never aborts."
+                        "M4 story-consistency gate. Default (fail-closed): an "
+                        "inconsistent/faceless writer-LLM prompt ABORTS the "
+                        "episode loud (no-fallback rip 2026-07-04). warn-only: "
+                        "keep the AI prompt and log the miss instead of aborting."
                     ),
                 }),
                 "gate_in": ("STRING", {
