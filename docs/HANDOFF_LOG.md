@@ -6,6 +6,24 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (overnight, cont.) -- HEAD fae7081f (v2.0-alpha) -- ELEVENLABS CAST-VOICE POOL FIXED + PUSHED; cloud babysit RUNNING
+Did (operator overnight mission = get cloud engines + credits GREEN e2e; priority 11labs + Sonilo cast mapping):
+- ElevenLabs "no provider_voice_id" root cause = the voice bank had ZERO elevenlabs rows, so CastLock never
+  stamped a provider id. Fix @fae7081f: added the 21 premade ElevenLabs voices (GROUND TRUTH from the installed
+  comfy_api_nodes/nodes_elevenlabs.py ELEVENLABS_VOICES) as bank rows carrying provider_voice_id; cloud
+  ref_path/ref_sha256 sentinels (adapter requires_voice_ref=False so no disk check). 13m/7f/1n -> caster gender
+  match. Verified: CastLock auto_registry under `elevenlabs_cloud` stamps MARGOT(f)->Laura, DOLPH(m)->Charlie;
+  `default` bank stamps NONE (local byte-identical). New tests/test_cloud_elevenlabs_cast.py. Suite 6146/0, Bug Bible 16.
+- Box was clean (killed by operator): :8000 empty, VRAM 2.4GB, OTR_COMFY_API_KEY len=72, Ollama 200.
+- LAUNCHED cv1 (scripts/_otr_cloud_video_soak.py) = word_razzle video x ideo image, 30w, indextts2: ideo stills
+  ALL minted (cloud IMAGE + auth OK), now running word_razzle -> cloud_pixverse_i2v per shot (slow cloud i2v).
+  This ALSO live-validates the credits col-3 fix (episode ends with the credits tail).
+NEXT (this session, gated on cv1 freeing :8000): live ElevenLabs VOICE leg (bank=elevenlabs_cloud, char_voice=
+elevenlabs) + Sonilo MUSIC leg -- confirm the actual cloud TTS/music calls render e2e; Sonilo 422 = likely a
+min-duration floor vs the 12/8/4s cues -> if reproduced, adapter floor+trim fix (docs/2026-07-04-elevenlabs-cast-
+voice/PLAN.md Part B). Then the image-engine sweep (recraft/flux_pro/nano_banana_2/seedream_2/ideogram) + 800w
+all-visualizer credits runs. Commits: 3c7ae1f1 (docs), fae7081f (elevenlabs pool).
+
 ## 2026-07-04 (overnight) -- HEAD b89a30ca (v2.0-alpha) -- CREDITS COL-3 BLANK-SCROLL ROOT-CAUSED + FIXED + PUSHED
 Did: operator-reported obs bug -- the SIGNAL LOST console cols 1-2 render but COL 3 (the scrolling
 story spine + full CLASSIFIED TRANSCRIPT + source intercept + diagnostic) was BLANK the whole ~49s roll.

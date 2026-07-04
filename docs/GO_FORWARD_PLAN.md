@@ -1,6 +1,13 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (overnight -- CREDITS COL-3 BLANK-SCROLL FIXED + PUSHED) | branch v2.0-alpha @ b89a30ca | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (overnight -- CREDITS col-3 + ELEVENLABS voice pool FIXED+PUSHED; cloud-video soak running) | branch v2.0-alpha @ fae7081f | prod/main + tags operator-GATED.
+> SHIPPED this session: credits col-3 scroll @b89a30ca (loop/fps-time still inputs); ElevenLabs cast-voice
+> POOL @fae7081f (21 premade voices w/ provider_voice_id -> CastLock stamps gender-matched ids under the
+> elevenlabs_cloud bank; verified MARGOT->Laura / DOLPH->Charlie; suite 6146/0). IN-FLIGHT: cv1 word_razzle
+> x ideo 30w (ideo stills minted OK/auth OK; word_razzle->cloud_pixverse_i2v per shot, healthy). IMMEDIATE
+> NEXT (gated on the server freeing): LIVE ElevenLabs VOICE leg (bank=elevenlabs_cloud, char_voice=elevenlabs)
+> + Sonilo MUSIC leg -- Sonilo 422 likely a min-duration floor vs 12/8/4s cues (adapter floor+trim per
+> docs/2026-07-04-elevenlabs-cast-voice/PLAN.md Part B). THEN image-engine sweep + 800w all-visualizer credits runs.
 > ACTIVE (operator overnight mission): root-cause+fix all Comfy Cloud engine hard-fails + the scrolling-
 > script credits bug, babysit-iterate to GREEN on 30w full-pipeline episodes; finals in otr/obs. NO
 > fallbacks, no hidden promotion; root-cause fixes; /kibitz (codex) if hung up; box reset per headless run.
