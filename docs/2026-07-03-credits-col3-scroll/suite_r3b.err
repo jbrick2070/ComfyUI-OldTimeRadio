@@ -1,0 +1,2 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

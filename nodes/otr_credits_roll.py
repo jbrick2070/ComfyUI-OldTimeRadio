@@ -277,12 +277,21 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     # scroll carries "all the same details as the old right panel". Built here
     # (sysd is in scope), prepended to col3_flow. Col 1 keeps title / MODELS /
     # [PRODUCTION LEDGER] / footer -- it gains room, no duplication.
+    _cpu = sysd.get("cpu") or "(unknown)"
+    if sysd.get("cpu_cores"):
+        _cpu += " (%s)" % sysd["cpu_cores"]
+    _ram = sysd.get("ram") or "(unknown)"
+    if sysd.get("ram_peak"):
+        _ram += " (peak %s)" % sysd["ram_peak"]
+    _gpu = sysd.get("gpu") or "(unknown)"
+    if sysd.get("vram"):
+        _gpu += " (%s)" % sysd["vram"]
     sys_grid = [
         ("Host:", "%s · %s" % (sysd.get("hostname") or "?",
                                sysd.get("os") or "(unknown)")),
-        ("CPU:", sysd.get("cpu") or "(unknown)"),
-        ("RAM:", sysd.get("ram") or "(unknown)"),
-        ("GPU:", sysd.get("gpu") or "(unknown)"),
+        ("CPU:", _cpu),
+        ("RAM:", _ram),
+        ("GPU:", _gpu),
         ("CUDA:", "%s · torch %s · Python %s" % (
             sysd.get("cuda") or "?", sysd.get("torch") or "?",
             sysd.get("python") or "?")),
@@ -824,12 +833,16 @@ def plan_backdrop(clip_manifest: dict) -> dict:
     """LOOK CONTRACT (operator 2026-06-17 / BUG-410): the console rides over the
     LAST existing drama clip, LOOPED. RAISES when the manifest has no usable clip
     (credits-over-black is a bounce)."""
+    # Exclude DIRECTORY clips (3D mesh_stage writes a frame directory, not an
+    # mp4): ffmpeg `-stream_loop -1 -i <dir>` would crash. kibitz R3. (not-isdir
+    # keeps non-existent fixture paths usable while rejecting real directories.)
     rows = [r for r in ((clip_manifest or {}).get("clips") or [])
-            if isinstance(r, dict) and r.get("exists") and r.get("path")]
+            if isinstance(r, dict) and r.get("exists") and r.get("path")
+            and not os.path.isdir(str(r.get("path")))]
     if not rows:
         raise CreditsDataError(
-            "clip manifest has no existing clip to loop under the credits "
-            "console (look contract: credits-over-black is a bounce)")
+            "clip manifest has no loopable (file) clip to ride under the credits "
+            "console (look contract: credits-over-black / directory clip is a bounce)")
     if any(r.get("start_s") is not None for r in rows):
         return max(rows, key=lambda r: float(r.get("start_s") or 0.0))
     return rows[-1]
@@ -839,16 +852,24 @@ def plan_backdrop(clip_manifest: dict) -> dict:
 # ffmpeg render + append (every failure RAISES; no source-copy)
 # =========================================================================== #
 def _ffmpeg_bin() -> str:
-    p = shutil.which("ffmpeg")
+    # Honor OTR_FFMPEG (the sibling video nodes' config path) before PATH, so
+    # credits never fail on a box where ffmpeg is configured but not on PATH.
+    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
+    p = (cand if (cand and (os.path.isfile(cand) or shutil.which(cand)))
+         else shutil.which("ffmpeg"))
     if not p:
-        raise CreditsDataError("ffmpeg not on PATH -- cannot render credits")
+        raise CreditsDataError(
+            "ffmpeg not found (OTR_FFMPEG / PATH) -- cannot render credits")
     return p
 
 
 def _ffprobe_bin() -> str:
-    p = shutil.which("ffprobe")
+    cand = (os.environ.get("OTR_FFPROBE") or "").strip()
+    p = (cand if (cand and (os.path.isfile(cand) or shutil.which(cand)))
+         else shutil.which("ffprobe"))
     if not p:
-        raise CreditsDataError("ffprobe not on PATH -- cannot render credits")
+        raise CreditsDataError(
+            "ffprobe not found (OTR_FFPROBE / PATH) -- cannot render credits")
     return p
 
 

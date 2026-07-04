@@ -243,6 +243,28 @@ def test_system_left_col1_static_dashboard():
     assert any("PRODUCTION LEDGER" in h for h in col1_headers)   # ledger stays
 
 
+def test_system_block_carries_full_detail_and_correct_sysd_keys(monkeypatch):
+    """kibitz R3: the scroll SYSTEM block must carry ALL the detail (host / cpu +
+    cores / ram + peak / gpu + vram / cuda / torch / python) and read the RIGHT
+    collect_system_specs keys (hostname, vram, cpu_cores, ram_peak) -- a
+    regression back to host / gpu_vram or dropped fields fails here."""
+    monkeypatch.setattr(cr, "_sys_specs", lambda: {
+        "hostname": "SENTINEL_HOST", "os": "SENTINEL_OS",
+        "cpu": "SENTINEL_CPU", "cpu_cores": "SENTINEL_CORES",
+        "ram": "SENTINEL_RAM", "ram_peak": "SENTINEL_PEAK",
+        "gpu": "SENTINEL_GPU", "vram": "SENTINEL_VRAM",
+        "cuda": "13.0", "torch": "2.10", "python": "3.12"})
+    lay = _layout()
+    sysblock = _flat(dict(lay["col3_flow"])["system"])
+    for s in ("SENTINEL_HOST", "SENTINEL_CPU", "SENTINEL_CORES", "SENTINEL_RAM",
+              "SENTINEL_PEAK", "SENTINEL_GPU", "SENTINEL_VRAM"):
+        assert s in sysblock, s
+    # the PRODUCTION LEDGER VRAM total reads the "vram" key (not "gpu_vram")
+    grids = [b for k, b in lay["col1"] if k == "grid"]
+    led_block = next(g for g in grids if "PRODUCTION LEDGER" in g["header"])
+    assert "SENTINEL_VRAM" in _flat(led_block["rows"])
+
+
 def test_diagnostic_is_seeded_and_never_fabricates_a_number():
     lay = _layout()
     diag = dict(lay["col3_flow"])["diagnostic"]["text"]
@@ -291,6 +313,23 @@ def test_backdrop_is_last_existing_clip_never_black():
         cr.plan_backdrop({"clips": [{"path": "", "exists": False}]})
     with pytest.raises(cr.CreditsDataError):
         cr.plan_backdrop({})
+
+
+def test_backdrop_excludes_directory_clips(tmp_path):
+    """kibitz R3: a 3D frame-DIRECTORY clip must NOT be chosen as the loop
+    backdrop (ffmpeg -stream_loop -i <dir> crashes). Pick the file instead;
+    raise if the only clip is a directory."""
+    d = tmp_path / "frames_dir"
+    d.mkdir()
+    f = tmp_path / "clip.mp4"
+    f.write_bytes(b"x")
+    manifest = {"clips": [
+        {"shot_id": "s0", "path": str(f), "exists": True},
+        {"shot_id": "s1", "path": str(d), "exists": True}]}   # dir is "last"
+    assert cr.plan_backdrop(manifest)["shot_id"] == "s0"       # the file, not the dir
+    with pytest.raises(cr.CreditsDataError):
+        cr.plan_backdrop({"clips": [
+            {"shot_id": "s1", "path": str(d), "exists": True}]})
 
 
 # --------------------------------------------------------------------------- #
