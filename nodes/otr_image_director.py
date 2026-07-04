@@ -144,7 +144,7 @@ def three_d_locked_slots(video_policy: dict) -> set:
     # requires a mesh portrait. character_image_model pairs with the
     # character lane (rip-sfx-broll 2026-07-01 removed the scene_broll /
     # background_abstract pairings), resolved via the ONE shared map
-    # (per-role slot + legacy fallback).
+    # (per-role slot only).
     img_slot_roles = {
         "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),
         "music_image_model": (_rc.Role.MUSIC_VISUAL.value,),

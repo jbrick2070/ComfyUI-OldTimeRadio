@@ -362,11 +362,11 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
         return True                       # legacy policy: dispatch every still
     # Unknown role -> keep the still (fail-safe), matching the legacy
     # _ROLE_TO_VIDEO_SLOT.get(role) -> None -> True behaviour. engine_id_for_role
-    # tolerantly maps an unknown role to the legacy slot, so guard explicitly.
+    # raises ValueError on an unknown role, so guard explicitly.
     if str(role) not in _role_slots.ROLE_TO_VIDEO_SLOT:
         return True
     # Route-A: resolve the role's video engine via the ONE shared map (per-role
-    # slot, then the legacy character fallback) so character_video correctly
+    # slot only) so character_video correctly
     # reads character_video_model (humo_14B_169 consumes the still it requires).
     eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
     if not eng_id:

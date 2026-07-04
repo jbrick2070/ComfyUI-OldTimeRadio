@@ -327,8 +327,7 @@ class OTRVideoDirector:
         """Map each video ROLE to its SELECTED engine's ``render_aspect`` so
         stills match their video engine. One entry PER ROLE
         (announcer_visual / music_visual / character_video), each resolved
-        through the shared per-role map (the per-role slot, then the legacy
-        character fallback for character). Unknown / custom / unresolved
+        through the shared per-role map (the dedicated per-role slot only). Unknown / custom / unresolved
         picks -> 'portrait' (the safe legacy look). Pure registry read, no
         side effects."""
         def _asp_for_role(role):

@@ -714,7 +714,7 @@ def build_execution_plan(beats, budget, creative, policy):
     video_models = (policy or {}).get("video_models") or {}
 
     def engine_for(role):
-        # Route-A: per-role video slot with the legacy character fallback
+        # Route-A: dedicated per-role video slot only (empty resolves empty / fails loud)
         # (ONE shared map; nodes/_otr_shared/role_slots.py).
         return _role_slots.engine_id_for_role(video_models, role)
 
