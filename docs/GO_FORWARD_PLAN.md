@@ -1,6 +1,16 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 02:03 (WIDGET-SURFACE CLEANUP BUILD COMPLETE -- all 4 items shipped+pushed) | branch v2.0-alpha @ 82f39a23 | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (overnight -- CREDITS COL-3 BLANK-SCROLL FIXED + PUSHED) | branch v2.0-alpha @ b89a30ca | prod/main + tags operator-GATED.
+> ACTIVE (operator overnight mission): root-cause+fix all Comfy Cloud engine hard-fails + the scrolling-
+> script credits bug, babysit-iterate to GREEN on 30w full-pipeline episodes; finals in otr/obs. NO
+> fallbacks, no hidden promotion; root-cause fixes; /kibitz (codex) if hung up; box reset per headless run.
+> CREDITS COL-3 = DONE @b89a30ca: base/scroll stills were single-frame `-i png` -> scroll crop y-expr froze
+> at t=0 (blank top pad); fixed with `-loop 1 -framerate <fps>` so `t` advances. Suite 6143/0 + Bug Bible 16.
+> NEXT = (a) live 800w all-local all-visualizer render to confirm the roll on a real otr/obs final; (b) the
+> cloud-engine e2e sweep (ideo image -> others; word_razzle/kling/seedance video; ElevenLabs voice; Sonilo
+> music) with OTR_COMFY_API_KEY per-command. Sonilo NOTE (proven this session): a headless port / the MCP
+> /prompt get 401 on cloud calls (no login injected) -- only the Desktop UI or OTR_COMFY_API_KEY authenticates;
+> the operator's live Sonilo 422 is a request rejection (not auth), likely a duration floor vs the 12/8/4s cues.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0

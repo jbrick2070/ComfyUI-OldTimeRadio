@@ -6,6 +6,27 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (overnight) -- HEAD b89a30ca (v2.0-alpha) -- CREDITS COL-3 BLANK-SCROLL ROOT-CAUSED + FIXED + PUSHED
+Did: operator-reported obs bug -- the SIGNAL LOST console cols 1-2 render but COL 3 (the scrolling
+story spine + full CLASSIFIED TRANSCRIPT + source intercept + diagnostic) was BLANK the whole ~49s roll.
+- Root cause is NOT data: the frozen episode ledger has all col-3 data (5 lines + meta.news +
+  dramatic_state + engines); render_scroll_canvas produces a full 608x1504 canvas (589k opaque px).
+  render_credits_clip fed base_png/scroll_png as plain single-image `-i <png>` -> ONE frame at t=0 ->
+  the col-3 crop y-expr (which scrolls on `t`) froze at y=0 = the blank top pad, repeated for the roll.
+- Fix @b89a30ca: `-loop 1 -framerate <fps>` on BOTH still inputs so `t` advances and the scroll animates.
+  Silent video only; the returned declared credits-tail duration is unchanged, so the credits-aware mux
+  guard (95->85 slot 6) + byte-identical audio are intact. Verified: harness col-3 bright-px 0/0/0 ->
+  9k/17k/6k across the roll; mid-roll frame shows the full transcript scrolling, cols 1-2 intact. Added a
+  deterministic argv-capture regression (test_scroll_still_inputs_are_looped_timed) -- the existing motion
+  test was masked by the fade-in brightness delta and missed the frozen path. Suite 6143/0, Bug Bible 16.
+Current step: credits col-3 FIXED (code+regress, pushed HEAD==origin). NEXT = the operator's overnight
+mission continues: (a) a live 800w all-local all-visualizer episode to confirm the roll on a real otr/obs
+final; (b) the cloud-engine e2e sweep (ideo image -> recraft/flux_pro/nano_banana_2/seedream_2/ideogram;
+word_razzle/kling/seedance video; ElevenLabs voice; Sonilo music) with OTR_COMFY_API_KEY loaded per-command
++ box reset (selective CIM kill) before every headless run; root-cause each hard-fail, no fallbacks.
+Next: 800w all-local credits validation render.
+Commits: b89a30ca.
+
 ## 2026-07-04 02:03 -- HEAD 82f39a23 (v2.0-alpha) -- WIDGET-SURFACE CLEANUP BUILD COMPLETE (overnight, all 4 items)
 Did: executed the whole widget-cleanup build unattended off WIDGET_SURFACE_AUDIT.md v2; every chunk
 suite 6142/0 + Bug Bible 16 + strict-types exit 0, committed AND pushed HEAD==origin:
