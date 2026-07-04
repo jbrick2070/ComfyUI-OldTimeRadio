@@ -1006,10 +1006,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "Investigate the image phase fork for this beat.",
                 _eng_id, _bid, _subj or char_id, init_image and "portrait" or "none")
     # Family-based init selection (still-spine ST-4 / W6): static_motion +
-    # image_to_video shots drift/animate the beat's SCENE STILL (the 6/5
-    # look); a missing still falls back to today's behavior LOUD -- never a
-    # silent empty init into a fail-closed engine. audio_driven_face keeps
-    # the portrait; text engines are unchanged (LTX text-only by design).
+    # image_to_video shots drift/animate the beat's SCENE STILL (the 6/5 look).
+    # NO-FALLBACK (operator 2026-07-03): a missing scene still for these families
+    # FAILS LOUD -- it never silently degrades to the pre-spine portrait init (a
+    # scene beat would then show the wrong image). audio_driven_face keeps the
+    # portrait by design (not in _SCENE_INIT_FAMILIES); fodder engines are excluded
+    # by the guard; text engines are unchanged (LTX text-only by design).
     if _family in _SCENE_INIT_FAMILIES and not _requires_fodder:
         # NB: mesh_stage is family=image_to_video (IN _SCENE_INIT_FAMILIES), so
         # without the not-_requires_fodder guard this override would clobber the
@@ -1022,11 +1024,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_image = _still
             init_source = "scene_still"
         else:
-            _LOG.warning(
-                "[OTR.render_driver] LOUD: %s-family shot %s beat %s has NO "
-                "scene still in the ledger -- falling back to the pre-spine "
-                "init (%s)", _family, shot.get("shot_id"), _bid,
-                init_source)
+            raise ValueError(
+                "[OTR.render_driver] %s-family shot %s beat %s has NO scene still "
+                "in the ledger. NO portrait-init fallback (no-fallback rip) -- a "
+                "scene-init family MUST have its per-beat scene still minted "
+                "upstream; fix the image dispatcher / ledger." % (
+                    _family, shot.get("shot_id"), _bid)
+            )
     # FIX1 / BUG-LOCAL-403 (opener centre BLACK): still_pan is family
     # "static_image_gen" -- in NEITHER _SCENE_INIT_FAMILIES nor the ltx_video
     # branch -- so an opener that picks still_pan for the music slot kept

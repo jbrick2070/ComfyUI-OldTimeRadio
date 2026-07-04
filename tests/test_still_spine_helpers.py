@@ -566,12 +566,26 @@ class TestDispatcherStillSpine:
         assert disp.resolve_engine_for_role(policy, "scene_broll") == \
             ("eng_o", "other_beats_image_model", False)
 
-    def test_slot_fallback_is_flagged(self):
+    def test_slot_absent_uses_other_beats_default(self):
+        # E8 (no-fallback rip): an ABSENT dedicated slot is a legitimate default
+        # (the role has no special model) -> other_beats, flagged for observability.
         from nodes import otr_image_gen_dispatcher as disp
         policy = {"image_models": {
             "other_beats_image_model": {"engine_id": "eng_o"}}}
         eid, slot, fell = disp.resolve_engine_for_role(policy, "music_visual")
         assert (eid, slot, fell) == ("eng_o", "music_image_model", True)
+
+    def test_slot_present_but_empty_fails_loud(self):
+        # E8 (no-fallback rip): a named slot PRESENT but explicitly EMPTY is a
+        # config error -> RAISE, never silently fall back to other_beats.
+        import pytest
+
+        from nodes import otr_image_gen_dispatcher as disp
+        policy = {"image_models": {
+            "music_image_model": {"engine_id": ""},          # present, empty
+            "other_beats_image_model": {"engine_id": "eng_o"}}}
+        with pytest.raises(ValueError, match="PRESENT but EMPTY"):
+            disp.resolve_engine_for_role(policy, "music_visual")
 
     def test_seed_request_hash_per_object(self):
         from nodes import otr_image_gen_dispatcher as disp
@@ -721,16 +735,17 @@ class TestDispatcherStillSpine:
         assert req["observability"]["init_source"] == "portrait"
         monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
 
-        # missing scene still -> LOUD fallback to the pre-spine init
+        # NO-FALLBACK (2026-07-03): a scene-init family with a MISSING scene still
+        # now RAISES -- it never silently degrades to the pre-spine portrait init.
+        import pytest
+
         ledger2 = {k: (dict(v) if isinstance(v, dict) else v)
                    for k, v in ledger.items()}
         ledger2["images"] = {"images": [
             {"object_id": "c01", "kind": "portrait", "char_id": "c01",
              "path": str(portrait)}]}
-        req = rd.build_request_from_shot(
-            shot("wan_i2v", "image_to_video"), ledger2)
-        assert req["observability"]["init_source"] == "portrait"   # fell back, stamped truthfully
-        assert req["asset_refs"]["init_image"] == str(portrait)
+        with pytest.raises(ValueError, match="NO scene still"):
+            rd.build_request_from_shot(shot("wan_i2v", "image_to_video"), ledger2)
 
     def test_mesh_fodder_routing_skips_scene_still(self, tmp_path):
         """3D-image-streams chunk 2: a requires_mesh_fodder engine (mesh_stage,

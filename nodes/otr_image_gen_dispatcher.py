@@ -155,9 +155,15 @@ _ROLE_TO_IMAGE_SLOT = {
 
 
 def resolve_engine_for_role(image_policy, role):
-    """``(engine_id, slot_name, fallback_used)`` for an object role. An empty
-    named slot falls back to ``other_beats_image_model`` (the caller warns
-    LOUD); never raises."""
+    """``(engine_id, slot_name, fallback_used)`` for an object role.
+
+    NO-FALLBACK (operator 2026-07-03), E8-precise: a NAMED role (announcer_visual /
+    music_visual) whose dedicated slot is PRESENT in the policy but explicitly
+    EMPTY is an operator config error -> FAIL LOUD; never silently substitute the
+    general other_beats model for a slot the operator deliberately exposed and left
+    blank. An ABSENT dedicated slot is different -- the role simply has no special
+    model configured, so it uses other_beats (a DEFAULT, not a silent model swap;
+    still flagged ``fallback_used=True`` for observability)."""
     models = (image_policy or {}).get("image_models") or {}
     slot = _ROLE_TO_IMAGE_SLOT.get(str(role or ""), "other_beats_image_model")
 
@@ -165,6 +171,14 @@ def resolve_engine_for_role(image_policy, role):
         if isinstance(entry, dict):
             return str(entry.get("engine_id") or "")
         return str(entry or "")
+
+    if slot != "other_beats_image_model" and slot in models and not _eid(models.get(slot)):
+        raise ValueError(
+            f"image slot {slot!r} for role {role!r} is PRESENT but EMPTY -- pick a "
+            f"model for it (or remove the slot to use the general other_beats "
+            f"model). NO silent fallback to other_beats_image_model (no-fallback "
+            f"rip)."
+        )
 
     engine_id = _eid(models.get(slot))
     if engine_id:
