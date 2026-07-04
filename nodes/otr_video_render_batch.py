@@ -103,13 +103,32 @@ class OTRVideoRenderBatch:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mode": (["soak", "single", "episode"], {"default": "soak"}),
-                "beats": ("INT", {"default": 40, "min": 1, "max": 400}),
-                "oom_index": ("INT", {"default": 20, "min": 0, "max": 399}),
-                "frame_count": ("INT", {"default": 25, "min": 1, "max": 240}),
+                "mode": (["soak", "single", "episode"], {"default": "soak", "tooltip": (
+                    "Run mode. 'episode' is the production path (renders one REAL "
+                    "per-beat clip per shot from patched_ledger_json). 'soak' and "
+                    "'single' are diagnostic harness modes -- some widgets below are "
+                    "read ONLY in a specific mode (see engine / oom_index)."
+                )}),
+                "beats": ("INT", {"default": 40, "min": 1, "max": 400, "tooltip": (
+                    "Diagnostic harness only (mode=soak): synthetic beat count. "
+                    "Ignored in mode=episode (beats come from the planned ledger)."
+                )}),
+                "oom_index": ("INT", {"default": 20, "min": 0, "max": 399, "tooltip": (
+                    "Diagnostic harness only -- read ONLY in mode=soak (the beat index "
+                    "at which to inject a simulated OOM for fallback-trail testing). "
+                    "Inert in mode=single and mode=episode."
+                )}),
+                "frame_count": ("INT", {"default": 25, "min": 1, "max": 240, "tooltip": (
+                    "Diagnostic harness only (mode=soak): per-clip frame count. "
+                    "Ignored in mode=episode (per-shot frame budget is planned upstream)."
+                )}),
             },
             "optional": {
-                "engine": ("STRING", {"default": "humo_1.7B"}),
+                "engine": ("STRING", {"default": "humo_1.7B", "tooltip": (
+                    "Diagnostic harness only -- read ONLY in mode=single (forces the "
+                    "single engine to render). Inert in mode=soak and mode=episode "
+                    "(episode routes each beat by its planned per-role engine)."
+                )}),
                 "portrait_path": ("STRING", {"default": ""}),
                 "audio_path": ("STRING", {"default": ""}),
                 "patched_ledger_json": ("STRING", {

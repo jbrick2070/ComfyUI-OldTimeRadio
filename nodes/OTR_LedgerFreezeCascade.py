@@ -249,7 +249,10 @@ class OTR_LedgerFreezeCascade:
                         "Sprint 6 -- restrict the render plan to the "
                         "protagonist's lines (the character with the "
                         "most CHARACTER-role beats, ties broken by "
-                        "cast-roster order). Default OFF."
+                        "cast-roster order). Default OFF. NOTE: "
+                        "manual_line_ids (below), when non-empty, "
+                        "silently supersedes this toggle -- the explicit "
+                        "line_id list wins over the protagonist filter."
                     ),
                 }),
                 "manual_line_ids": ("STRING", {
