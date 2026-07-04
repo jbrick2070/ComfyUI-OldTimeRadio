@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (NO-FALLBACK RIP: ALL 10 sites COMPLETE + Fable SHIP) | branch v2.0-alpha @ 432cb576 | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (widget-audit v2 CONVERGED; overnight widget-cleanup build handed to Opus-high) | branch v2.0-alpha @ b36dda88 | prod/main + tags operator-GATED.
 > ACTIVE (operator, overnight): CODE EVERYTHING FIRST (still_word + word_razzle + pending build
 > items) -> regress -> push, THEN the 30-45w model-matrix SOAK -- see section 1.
 > still_word SHIPPED @ 097f44ad. word_razzle SHIPPED: Phase 0 audit @ 3843bbd0
@@ -29,7 +29,26 @@
 
 ## 1. CURRENT STEP
 
-**ACTIVE (2026-07-03 latest) = STACK-WIDE NO-FALLBACK RIP.** Operator directive: every model
+**ACTIVE (2026-07-04, OVERNIGHT, Opus-high window) = WIDGET-SURFACE CLEANUP BUILD.** Source of
+truth: `docs/2026-07-03-widget-audit/WIDGET_SURFACE_AUDIT.md` (v2, fully converged: codex x4 +
+antigravity x2 + sonnet + Claude judge; @ b36dda88). Operator decisions LOCKED: caption owner =
+NODE 86 (finish CW-4); captions = clean on/off feature (widget + profiles, env-only enablement CUT).
+Execute in order, commit+push per green chunk, suite + Bug Bible after every chunk:
+1. Batch 1 -- surface-only removal (stereo_policy x3 + delivery_profile; exact vectors in the doc;
+   kwargs KEPT; test + docstring updates listed). ~95% confidence.
+2. Batch 2 -- tooltip-only (NO key renames -- permanently cut).
+3. Standalone -- fix validate_workflow_links.py --strict-types (include new_node_modules_table()
+   keys statically) + the _otr_workflow_validator.py:352-362 illegal-dotted-path fallback.
+4. Batch 3 -- caption 86-owner migration, ALL 6 items in the doc atomically (rewire
+   84->93->86->95->85, _procgen_blended + sibling-audio resolver port, _default_out path fix,
+   profile/mapping retarget, node 93 caption-path strip 13->11, test inversions). Then the §9
+   FABLE FINAL GATE (one grounded pass) BEFORE declaring Batch 3 done -- if Fable finds a breaker,
+   fix and re-gate; if unresolvable, STOP and leave for the operator.
+CAUTION: the overnight model-matrix SOAK may still be RESIDENT (section below) -- reset per
+CLAUDE.md section 4 before any headless verification render; none is required for these batches.
+After all four: refresh this section to point back to CREDITS ENRICHMENT (LIVE frame-level smoke).
+
+**Previously active = STACK-WIDE NO-FALLBACK RIP (COMPLETE).** Operator directive: every model
 failure FAILS THE EPISODE LOUD (named raise), never a silent swap/canned-template. Source of truth +
 full grounded site map + kibitz/agy/Sonnet/Fable reconciliation: `docs/2026-07-03-no-fallbacks-rip/PLAN.md`.
 DONE + pushed to v2.0-alpha this arc (all suite 6138-6142 + Bug Bible green, 0 regressions):

@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (WIDGET-SURFACE AUDIT v2 -- read-only analysis arc; docs only) -- HEAD b36dda88 (v2.0-alpha)
+Did:
+- Free static widget inventory (AST + consumption grep) of otr_scifi_16gb_full.json: 23 nodes, ~125 widgets, ZERO dead, zero positional drift; raw JSONs in docs/2026-07-03-widget-audit/.
+- Kibitz 4-round arc (codex gpt-5.5 x4) + antigravity manual x2 + operator-run sonnet, Claude anchor+judge: converged build plan in WIDGET_SURFACE_AUDIT.md v2 (Batch 1 surface removal, Batch 2 tooltips, Batch 3 caption 86-owner migration incl. tail rewire 84->93->86->95->85, strict-types = CLI artifact).
+- Operator locked: caption owner = node 86; captions = on/off feature; renames permanently cut; batch 4 (alias dedupe) retracted.
+Current step: WIDGET-SURFACE CLEANUP BUILD (overnight, Opus-high window) -- GO_FORWARD section 1.
+Next: Batch 1 first commit.
+Commits: 116f43ff, b36dda88 (docs only).
+
 ## 2026-07-04 (CREDITS closeout verification pass -- no code change; tail-chain documented) -- HEAD e346eeb4 (v2.0-alpha)
 Did (operator-requested wrap-up of the credits-module change; the tree was already CLEAN -- the credits
 S3+S1 work @5f510ebe was committed+pushed in a prior session, so nothing pending to commit):
