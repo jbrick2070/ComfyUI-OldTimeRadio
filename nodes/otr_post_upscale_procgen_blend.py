@@ -57,16 +57,11 @@ if _NODES_DIR not in sys.path:
 
 from _otr_paths import otr_audio_dir, otr_obs_dir  # noqa: E402
 
-try:
-    from _otr_captions import build_ass_from_ledger  # noqa: E402
-except Exception:  # pragma: no cover -- captions optional; never block a render
-    build_ass_from_ledger = None  # type: ignore
+# NOTE: the SDH caption builder import (build_ass_from_ledger) was removed here in
+# the 2026-07-04 widget-audit Batch 3 -- captions migrated to node 86
+# OTR_CaptionBurn. This node no longer builds or burns captions.
 
 log = logging.getLogger(__name__)
-
-
-def _env_truthy(name: str) -> bool:
-    return str(os.environ.get(name, "")).strip().lower() in ("1", "true", "yes", "on")
 
 
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
@@ -83,54 +78,11 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     return (p.name, str(p.parent))
 
 
-def _resolve_captions_ass(source_mp4: Path, style: str = "") -> tuple[Optional[str], str]:
-    """Build the SDH .ass for this episode. Returns (ass_path, message).
-
-    Best-effort: any failure returns (None, reason) and the caller proceeds
-    with an un-captioned blend -- captions never block the deliverable.
-    ``style`` is the caller-resolved preset (widget value, env-overridden);
-    empty falls back to sdh_standard. Margin comes from OTR_CAPTION_MARGIN_V
-    (default 90). The episode id is the source stem; the ledger is resolved
-    via otr_audio_dir(), falling back to the in-flight ledger singleton.
-    """
-    if build_ass_from_ledger is None:
-        return (None, "caption builder unavailable (_otr_captions import failed)")
-    # Episode id = the source stem MINUS the post-chain suffixes (capstone
-    # production fix 2026-06-10): the blend's source is now the per-episode
-    # "<slug>_silent.mp4" (or "..._procgen_blended.mp4"), so the raw stem
-    # resolved "<slug>_silent_ledger.json" -- which never exists -- and
-    # captions only worked when the SAME-process in-flight singleton happened
-    # to point at this episode. A ComfyUI Desktop render misses entirely.
-    episode_id = source_mp4.stem
-    for _suffix in ("_procgen_blended", "_silent"):
-        if episode_id.endswith(_suffix):
-            episode_id = episode_id[: -len(_suffix)]
-    ledger = otr_audio_dir(episode_id) / f"{episode_id}_ledger.json"
-    if not ledger.is_file():
-        # Layout-relative fallback: the source lives INSIDE the episode folder
-        # (otr/episodes/<slug>/...), so its sibling audio/ dir carries the
-        # ledger regardless of which output root the server pinned.
-        sib = source_mp4.parent / "audio"
-        cands = sorted(sib.glob("*_ledger.json")) if sib.is_dir() else []
-        if cands:
-            ledger = cands[0]
-    if not ledger.is_file():
-        try:
-            from . import _otr_ledger as _OTRL  # type: ignore
-        except ImportError:  # pragma: no cover
-            import _otr_ledger as _OTRL  # type: ignore
-        alt = _OTRL.in_flight_ledger_path()
-        if alt is not None and Path(alt).is_file():
-            ledger = Path(alt)
-        else:
-            return (None, f"ledger not found for {episode_id}")
-    style = (style or "").strip() or "sdh_standard"
-    try:
-        margin_v = int(os.environ.get("OTR_CAPTION_MARGIN_V", "90") or 90)
-    except ValueError:
-        margin_v = 90
-    out_path, report = build_ass_from_ledger(ledger, style=style, margin_v=margin_v)
-    return (out_path, report)
+# SDH caption resolution (_resolve_captions_ass) was REMOVED here in the
+# 2026-07-04 widget-audit Batch 3: caption ownership migrated to node 86
+# OTR_CaptionBurn, which ports this same suffix-strip + sibling-audio ledger
+# resolution into its own _resolve_ledger_path. This node no longer resolves or
+# burns captions.
 
 # BUG-LOCAL-096 (2026-05-04 EVENING): default bumped from "lighten"
 # at 0.5 to "screen" at 1.0 to bring procgen colors at full intensity.
@@ -157,9 +109,8 @@ def _resolve_captions_ass(source_mp4: Path, style: str = "") -> tuple[Optional[s
 _DEFAULT_BLEND_MODE = "screen"
 _DEFAULT_BLEND_OPACITY = 1.0
 _DEFAULT_GREEN_ONLY = True
-# SDH open-caption widgets (P4). Clean master is the default -> captions OFF.
-_CAPTION_STYLE_CHOICES = ["sdh_standard", "otr_crt"]
-_DEFAULT_CAPTION_STYLE = "sdh_standard"
+# SDH caption constants removed 2026-07-04 (widget-audit Batch 3): caption
+# ownership migrated to node 86 OTR_CaptionBurn (which defines its own).
 # BUG-LOCAL-103 (2026-05-04 LATE EVENING): pre-blend shadow crush.
 # Pixel inspection of a procgen mp4 dark region (signal_lost_echo_in_stasis
 # 0:22, 99% of frame is luminance < 32) showed the "black" background is
@@ -820,31 +771,14 @@ class PostUpscaleProcgenBlend:
                         "(0,255,0) collapses to (255,255,255)."
                     ),
                 }),
-                # SDH open captions (P4). APPENDED AT THE END per BUG-LOCAL-097
-                # (widgets_values is positional -- only ever append). These two
-                # are now the tail; do not insert anything after them without
-                # also extending the workflow JSON widgets_values + validator.
-                "burn_captions": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": (
-                        "Burn SDH open captions into the final 1080p output. "
-                        "Default ON = accessible delivery. Turn OFF for a clean "
-                        "master (festival/archival). When ON: "
-                        "white dialogue on an opaque box, bold-white speaker "
-                        "labels with a subtle pastel outline (color is never the "
-                        "speaker cue -- color-blind safe), synced from the ledger "
-                        "line timing. Audio stays -c:a copy (byte-identical). "
-                        "Env OTR_BURN_CAPTIONS=1 also forces this on."
-                    ),
-                }),
-                "caption_style": (_CAPTION_STYLE_CHOICES, {
-                    "default": _DEFAULT_CAPTION_STYLE,
-                    "tooltip": (
-                        "Caption style preset. 'sdh_standard' (default): Arial, "
-                        "white-on-black-box, accessibility master. 'otr_crt': "
-                        "green-CRT themed variant. Env OTR_CAPTION_STYLE overrides."
-                    ),
-                }),
+                # SDH open captions REMOVED from node 93 (2026-07-04 widget-audit
+                # Batch 3): caption ownership migrated to node 86 OTR_CaptionBurn,
+                # which now sits AFTER this blend (chain 84 -> 93 -> 86 -> 95 -> 85).
+                # The blend no longer burns captions -- see blend() where
+                # captions_ass_path is pinned None. widgets_values is positional
+                # (BUG-LOCAL-097): the two tail caption widgets were removed
+                # together and the JSON widgets_values (13 -> 11) + the scopes
+                # input index (11 -> 9) were updated in the SAME commit.
                 # §4D scene-aware scopes (APPENDED LAST per BUG-LOCAL-097: a new
                 # input only ever goes at the end -- widgets_values is
                 # positional). Path to OTR_SceneAwareScopes' scopes_only.mp4.
@@ -898,8 +832,6 @@ class PostUpscaleProcgenBlend:
         out_suffix: str = "_procgen_blended",
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
         green_only_overlay: bool = _DEFAULT_GREEN_ONLY,
-        burn_captions: bool = True,
-        caption_style: str = _DEFAULT_CAPTION_STYLE,
         scopes_mp4_path: str = "",
         audio_bars: str = "bottom",
     ):
@@ -985,17 +917,14 @@ class PostUpscaleProcgenBlend:
                 "unavailable (%s); proceeding", _exc,
             )
 
-        # SDH open captions (P4): enabled by the burn_captions widget OR the
-        # OTR_BURN_CAPTIONS env (env forces on for headless delivery). Clean
-        # master is the default (OFF). Style precedence: OTR_CAPTION_STYLE env
-        # overrides the caption_style widget. Best-effort -- a caption failure
-        # NEVER blocks the blend.
+        # SDH open captions were MIGRATED OUT of this blend to node 86
+        # OTR_CaptionBurn (2026-07-04 widget-audit Batch 3): CaptionBurn now runs
+        # AFTER this node (chain 84 -> 93 -> 86 -> 95 -> 85) and is the single
+        # caption owner. The blend therefore NEVER burns captions -- captions_ass_
+        # path stays None so the shared ffmpeg cmd builders take their no-caption
+        # path (bars two-pass and everything else byte-identical to the prior
+        # no-caption render).
         captions_ass_path = None
-        if bool(burn_captions) or _env_truthy("OTR_BURN_CAPTIONS"):
-            style = str(os.environ.get("OTR_CAPTION_STYLE", "") or caption_style).strip()
-            captions_ass_path, cap_msg = _resolve_captions_ass(src, style=style)
-            log.info("[PostUpscaleProcgenBlend] captions: %s", cap_msg)
-            report_lines.append(f"captions: {cap_msg}")
 
         src_dims = _probe_dims(src, ffmpeg=ffmpeg)
         if src_dims:

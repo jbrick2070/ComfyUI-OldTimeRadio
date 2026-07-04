@@ -57,13 +57,19 @@ def test_caption_burn_default_off_passthrough():
     assert "passthrough" in report.lower()
 
 
-def test_caption_burn_env_on_but_no_ledger_passthrough(monkeypatch, tmp_path):
+def test_caption_burn_env_does_not_enable(monkeypatch, tmp_path):
+    # 2026-07-04 widget-audit Batch 3: the OTR_BURN_CAPTIONS env-only enable path
+    # was CUT -- captions are a widget + capability-profile on/off feature only.
+    # With the widget OFF, the env must NOT force captions on: it stays a
+    # clean-master passthrough (no ffmpeg, no ledger resolution attempted).
     monkeypatch.setenv("OTR_BURN_CAPTIONS", "1")
     vid = tmp_path / "ep_silent.mp4"
-    vid.write_bytes(b"\x00\x00")            # not a real mp4; no ledger resolvable
+    vid.write_bytes(b"\x00\x00")            # not a real mp4
     out, report = OTRCaptionBurn().burn(str(vid), burn_captions=False, ledger_path="")
-    # forced on by env, but no timed ledger -> passthrough (captions never block)
     assert out == str(vid)
+    # "clean master" proves the env did NOT force the burn on (an env-forced run
+    # would instead report "no timed ledger").
+    assert "clean master" in report.lower()
     assert "passthrough" in report.lower()
 
 

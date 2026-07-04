@@ -53,17 +53,19 @@ def test_production_workflow_visual_structure_pinned():
     carry the episode's full visual structure, so a ComfyUI Desktop render
     matches the prior quality bar. Pins the three restored pieces:
 
-      1. burned-in SDH captions: node 93 OTR_PostUpscaleProcgenBlend owns the
-         final burn (burn_captions=True, sdh_standard); node 86 OTR_CaptionBurn
-         stays a pass-through (False) so captions never double-burn;
+      1. burned-in SDH captions: node 86 OTR_CaptionBurn OWNS the burn
+         (burn_captions=True, sdh_standard) and now sits AFTER the procgen blend
+         (2026-07-04 widget-audit Batch 3 -- single caption owner); node 93
+         OTR_PostUpscaleProcgenBlend no longer carries the burn_captions /
+         caption_style widgets;
       2. the LTX radio open: node 87 OTR_VideoDirector routes
          announcer_video_model AND music_video_model to ltx_video;
       3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds BOTH
          the composite base (node 84) and the blend texture (node 93), and the
-         chain runs 84 -> 86 -> 93 -> 95 -> 85: the late OTR_CreditsRoll (node
-         95, credits enrichment 2026-07-03) appends the unified SILENT credits
-         roll to node 93's output and declares its tail duration to the
-         credits-aware terminal mux (node 85).
+         chain runs 84 -> 93 -> 86 -> 95 -> 85: captions (node 86) burn BEFORE
+         the late OTR_CreditsRoll (node 95, credits enrichment 2026-07-03), which
+         appends the unified SILENT credits roll and declares its tail duration to
+         the credits-aware terminal mux (node 85).
 
     If any of these regress to headless-only defaults again, this fires.
     """
@@ -71,20 +73,24 @@ def test_production_workflow_visual_structure_pinned():
     nodes = {n["id"]: n for n in wf["nodes"]}
     links = {l[0]: l for l in wf["links"]}
 
-    # -- 1. caption ownership ------------------------------------------------
+    # -- 1. caption ownership (86-owner migration, 2026-07-04 widget-audit) ----
     n93 = nodes[93]
     assert n93["type"] == "OTR_PostUpscaleProcgenBlend"
     wv93 = n93["widgets_values"]
-    # preserved-mode vector: [src, pgn, blend_mode, opacity, ffmpeg, bypass,
-    #                         out_suffix, crush, green_only, burn, style]
-    assert wv93[9] is True, "node 93 burn_captions must stay ON (the owner)"
-    assert wv93[10] == "sdh_standard", "caption style regressed"
+    # post-migration vector (11): [src, pgn, blend_mode, opacity, ffmpeg, bypass,
+    #                              out_suffix, crush, green_only, scopes, audio_bars]
+    assert len(wv93) == 11, (
+        "node 93 widgets_values must be 11 (caption widgets removed): %r" % wv93)
     assert wv93[5] is False, "node 93 bypass must stay OFF"
+    n93_input_names = [i.get("name") for i in n93["inputs"]]
+    assert ("burn_captions" not in n93_input_names
+            and "caption_style" not in n93_input_names), (
+        "node 93 must NOT carry caption widgets -- ownership moved to node 86")
     n86 = nodes[86]
     assert n86["type"] == "OTR_CaptionBurn"
-    assert n86["widgets_values"][0] is False, (
-        "node 86 must stay a pass-through -- 93 owns the burn (double-burn "
-        "guard)")
+    assert n86["widgets_values"][0] is True, (
+        "node 86 OTR_CaptionBurn now OWNS the burn (burn_captions must be ON)")
+    assert n86["widgets_values"][1] == "sdh_standard", "node 86 caption style regressed"
 
     # -- 2. the LTX radio open ------------------------------------------------
     n87 = nodes[87]
@@ -114,12 +120,14 @@ def test_production_workflow_visual_structure_pinned():
         "texture (265); got %r" % sorted(out12))
     assert links[246][1:5] == [12, 0, 84, 0]
     assert links[265][1:5] == [12, 0, 93, 1]
-    assert links[247][1:5] == [84, 0, 86, 0]   # composite -> caption node
-    assert links[266][1:5] == [86, 0, 93, 0]   # caption -> blend source
-    # credits enrichment 2026-07-03: the late OTR_CreditsRoll (node 95) sits
-    # between the blend and the terminal mux -- 93 -> 95 -> 85. It appends the
-    # unified SILENT credits roll and declares its tail to the credits-aware mux.
-    assert links[250][1:5] == [93, 0, 95, 0]   # blend final -> credits roll
+    assert links[247][1:5] == [84, 0, 93, 0]   # composite -> blend source
+    assert links[266][1:5] == [93, 0, 86, 0]   # blend -> caption node
+    assert links[273][1:5] == [94, 0, 93, 9]   # scopes -> blend (dst_slot 11->9 post strip)
+    # credits enrichment 2026-07-03 + 86-owner migration 2026-07-04: the chain is
+    # 84 -> 93 -> 86 -> 95 -> 85. Captions (node 86) burn BEFORE the credits roll
+    # (node 95) so the *_with_credits concat is never re-encoded and captions land
+    # on dialogue only. OTR_CreditsRoll stays terminal-before-mux.
+    assert links[250][1:5] == [86, 0, 95, 0]   # caption final -> credits roll
     assert links[274][1:5] == [95, 0, 85, 0]   # credits roll -> terminal mux
     assert links[275][1:5] == [92, 1, 95, 1]   # clip manifest -> credits roll
     assert links[276][1:5] == [95, 1, 85, 6]   # declared credits tail -> mux

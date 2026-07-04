@@ -10,7 +10,8 @@ It burns the SDH ``.ass`` (built by the surviving ``nodes/_otr_captions.py``
 ``build_ass_from_ledger``) onto the SILENT video stream only -- it NEVER touches
 audio (audio is added LAST by MasterAudioMux with ``-c:a copy``), so the
 byte-identical audio spine is untouched. Default-OFF ("clean master" is the
-default); enable via the ``burn_captions`` widget OR ``OTR_BURN_CAPTIONS=1``.
+default); enable via the ``burn_captions`` widget (set by the capability
+profiles -- the env-only enable path was CUT in the 2026-07-04 widget-audit).
 When OFF (or on any caption-build failure) it PASSES THE INPUT THROUGH
 unchanged -- captions never block the deliverable.
 
@@ -32,10 +33,6 @@ log = logging.getLogger("OTR")
 
 _CAPTION_STYLE_CHOICES = ["sdh_standard", "otr_crt"]
 _DEFAULT_CAPTION_STYLE = "sdh_standard"
-
-
-def _env_truthy(name: str) -> bool:
-    return str(os.environ.get(name, "")).strip().lower() in ("1", "true", "yes", "on")
 
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
@@ -72,8 +69,12 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
     stem -- otr_audio_dir(stem)/<stem>_ledger.json, falling back to the in-flight
     ledger singleton (mirrors the legacy _resolve_captions_ass). Lazy imports."""
     stem = Path(video_path).stem
-    # strip our pipeline suffixes so the stem matches the episode id
-    for suf in ("_silent", "_captioned", "_final", "_blend"):
+    # strip our pipeline suffixes so the stem matches the episode id. The
+    # 86-owner migration (2026-07-04 widget-audit) moved CaptionBurn to AFTER the
+    # procgen blend (node 93), so the incoming video is now
+    # "<slug>_procgen_blended.mp4" -- strip that suffix too (ported from the
+    # legacy blend node's resolver).
+    for suf in ("_procgen_blended", "_silent", "_captioned", "_final", "_blend"):
         if stem.endswith(suf):
             stem = stem[: -len(suf)]
     try:
@@ -84,6 +85,17 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
         cand = Path(otr_audio_dir(stem)) / f"{stem}_ledger.json"
         if cand.is_file():
             return str(cand)
+    except Exception:  # noqa: BLE001
+        pass
+    # Layout-relative fallback (ported from otr_post_upscale_procgen_blend): the
+    # video lives INSIDE the per-episode folder (otr/episodes/<slug>/...), so its
+    # sibling audio/ dir carries the ledger no matter which output root the
+    # server pinned.
+    try:
+        sib = Path(video_path).resolve().parent / "audio"
+        cands = sorted(sib.glob("*_ledger.json")) if sib.is_dir() else []
+        if cands:
+            return str(cands[0])
     except Exception:  # noqa: BLE001
         pass
     try:
@@ -159,7 +171,7 @@ class OTRCaptionBurn:
             "optional": {
                 "burn_captions": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Burn SDH open captions into the video. Default OFF (clean master). OTR_BURN_CAPTIONS=1 also forces on.",
+                    "tooltip": "Burn SDH open captions into the video. Default OFF (clean master); enabled by the capability profile. Node 86 is the single caption owner.",
                 }),
                 "caption_style": (_CAPTION_STYLE_CHOICES, {"default": _DEFAULT_CAPTION_STYLE}),
                 "fps": ("INT", {"default": 25, "min": 1, "max": 120}),
@@ -181,6 +193,15 @@ class OTRCaptionBurn:
         return True
 
     def _default_out(self, video_path: str) -> str:
+        # Write the captioned mp4 BESIDE the input video. The 86-owner input is
+        # node 93's "<slug>_procgen_blended.mp4" inside otr/episodes/<ep>/, so the
+        # captioned twin lands in that same per-episode folder -- never the flat
+        # episodes root (2026-07-04 widget-audit). Fall back to otr/episodes only
+        # when the input path carries no resolvable directory.
+        stem = os.path.splitext(os.path.basename(video_path or "episode"))[0]
+        in_dir = os.path.dirname(os.path.abspath(video_path)) if video_path else ""
+        if in_dir and os.path.isdir(in_dir):
+            return os.path.join(in_dir, f"{stem}_captioned.mp4")
         try:
             import folder_paths  # type: ignore
             root = folder_paths.get_output_directory()
@@ -188,13 +209,15 @@ class OTRCaptionBurn:
             root = "."
         out_dir = os.path.join(root, "otr", "episodes")
         os.makedirs(out_dir, exist_ok=True)
-        stem = os.path.splitext(os.path.basename(video_path or "episode"))[0]
         return os.path.join(out_dir, f"{stem}_captioned.mp4")
 
     def burn(self, video_path, burn_captions=False, caption_style=_DEFAULT_CAPTION_STYLE,
              fps=25, ffmpeg="ffmpeg", ledger_path="", output_path="", gate_in=""):
-        # Default-OFF clean master: pass the input through untouched.
-        if not (bool(burn_captions) or _env_truthy("OTR_BURN_CAPTIONS")):
+        # Default-OFF clean master: pass the input through untouched. Enablement is
+        # the burn_captions widget (set by capability profiles) ONLY -- the
+        # env-only path was CUT (2026-07-04 widget-audit: captions are a clean
+        # widget + profile on/off feature; node 86 is the single owner).
+        if not bool(burn_captions):
             return (video_path, "OTR_CaptionBurn: captions OFF (clean master) -- passthrough")
         style = str(os.environ.get("OTR_CAPTION_STYLE", "") or caption_style).strip() or _DEFAULT_CAPTION_STYLE
         led = ledger_path.strip() or _resolve_ledger_path(video_path) or ""

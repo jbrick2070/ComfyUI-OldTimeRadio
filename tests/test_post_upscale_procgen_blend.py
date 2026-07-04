@@ -156,11 +156,15 @@ def test_ass_filter_arg_returns_basename_and_parent():
 
 # -- P4: caption widgets + node<->JSON widget-vector contract --------------
 
-def test_caption_widgets_present(node):
-    opt = node.INPUT_TYPES()["optional"]
-    assert "burn_captions" in opt and "caption_style" in opt
-    assert opt["burn_captions"][1]["default"] is True  # accessible-by-default
-    assert "sdh_standard" in opt["caption_style"][0]
+def test_caption_widgets_removed(node):
+    # 2026-07-04 widget-audit Batch 3: caption ownership migrated to node 86
+    # OTR_CaptionBurn (chain 84 -> 93 -> 86 -> 95 -> 85); node 93 no longer
+    # exposes the burn_captions / caption_style widgets or burns captions.
+    it = node.INPUT_TYPES()
+    opt = it["optional"]
+    req = it.get("required", {})
+    assert "burn_captions" not in opt and "caption_style" not in opt
+    assert "burn_captions" not in req and "caption_style" not in req
 
 
 def test_default_blend_opacity_is_full_strength(node):
