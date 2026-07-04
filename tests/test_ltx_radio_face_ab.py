@@ -92,7 +92,10 @@ def test_radio_face_off_is_byte_identical_to_no_toggle(monkeypatch):
 # --------------------------------------------------------------------------- #
 # A2: render_driver ltx_audio_in bookend init branch
 # --------------------------------------------------------------------------- #
-def _ltx_ledger(tmp_path, face_dims=None, scene=True):
+def _ltx_ledger(tmp_path, face_dims=None, scene=True, face_role="announcer_visual"):
+    # Operator directive 2026-07-03: the talking radio-face is ANNOUNCER-ONLY, so
+    # the face still is minted for the announcer bookend; a music bookend keeps
+    # the faceless scene still.
     imgs = []
     if scene:
         s = tmp_path / "scene.png"
@@ -102,7 +105,7 @@ def _ltx_ledger(tmp_path, face_dims=None, scene=True):
     if face_dims is not None:
         f = tmp_path / "face.png"
         f.write_bytes(_PNG)
-        imgs.append({"object_id": "still_music_visual_radio_face_169",
+        imgs.append({"object_id": "still_%s_radio_face_169" % face_role,
                      "kind": "portrait", "path": str(f),
                      "w": face_dims[0], "h": face_dims[1]})
     return {"video": {"video_revision": 1, "shots": []},
@@ -133,13 +136,28 @@ def test_off_ltx_bookend_uses_faceless_scene_still(tmp_path, monkeypatch):
     assert req["observability"]["init_image"] == "scene.png"
 
 
-def test_on_ltx_bookend_uses_wide_radio_face_still(tmp_path, monkeypatch):
+def test_on_announcer_bookend_uses_wide_radio_face_still(tmp_path, monkeypatch):
+    # ANNOUNCER-ONLY (operator 2026-07-03): the announcer bookend takes the wide
+    # talking radio-face still under the A/B (or the ia2v talking register).
     monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _ltx_ledger(tmp_path, face_dims=(1472, 832))
-    req = rd.build_request_from_shot(_ltx_shot(), led)
+    req = rd.build_request_from_shot(_ltx_shot(role="announcer_visual"), led)
     assert req["observability"]["init_source"] == "ltx_radio_face"
     assert req["observability"]["init_image"] == "face.png"
+
+
+def test_on_music_bookend_stays_faceless(tmp_path, monkeypatch):
+    # Operator directive 2026-07-03: the MUSIC bookend NEVER takes the radio-face
+    # still -- ltx_audio_in would lip-sync a mouth to the music. It keeps the
+    # faceless scene still even with the toggle ON (and even if a music face
+    # still happens to exist in the ledger).
+    monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    led = _ltx_ledger(tmp_path, face_dims=(1472, 832), face_role="music_visual")
+    req = rd.build_request_from_shot(_ltx_shot(role="music_visual"), led)
+    assert req["observability"]["init_source"] == "scene_still"
+    assert req["observability"]["init_image"] == "scene.png"
 
 
 def test_on_fails_loud_when_face_still_absent(tmp_path, monkeypatch):
@@ -147,7 +165,7 @@ def test_on_fails_loud_when_face_still_absent(tmp_path, monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _ltx_ledger(tmp_path, face_dims=None)          # no face row
     with pytest.raises(rd.RenderError):
-        rd.build_request_from_shot(_ltx_shot(), led)
+        rd.build_request_from_shot(_ltx_shot(role="announcer_visual"), led)
 
 
 def test_on_fails_loud_when_face_still_is_portrait(tmp_path, monkeypatch):
@@ -155,7 +173,7 @@ def test_on_fails_loud_when_face_still_is_portrait(tmp_path, monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _ltx_ledger(tmp_path, face_dims=(832, 1216))   # PORTRAIT -> pillarbox trap
     with pytest.raises(rd.RenderError):
-        rd.build_request_from_shot(_ltx_shot(), led)
+        rd.build_request_from_shot(_ltx_shot(role="announcer_visual"), led)
 
 
 def test_precedence_rejects_when_humo_hosts_also_on(tmp_path, monkeypatch):
@@ -163,7 +181,7 @@ def test_precedence_rejects_when_humo_hosts_also_on(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _ltx_ledger(tmp_path, face_dims=(1472, 832))
     with pytest.raises(rd.RenderError):
-        rd.build_request_from_shot(_ltx_shot(), led)
+        rd.build_request_from_shot(_ltx_shot(role="announcer_visual"), led)
 
 
 def test_on_does_not_touch_character_beat(tmp_path, monkeypatch):

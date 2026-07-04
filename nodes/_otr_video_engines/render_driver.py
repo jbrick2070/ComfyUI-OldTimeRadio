@@ -1138,10 +1138,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # ship faceless again (the pinprick b005/b001 miss: env unset -> faceless
     # scene still -> nothing to articulate). The env toggle still A/Bs the
     # single-pass recipes only.
+    # OPERATOR DIRECTIVE 2026-07-03: the MUSIC bookend stays FACELESS. This swap
+    # is now ANNOUNCER-ONLY. ltx_audio_in is audio-conditioned, so feeding a
+    # radio-FACE still on a MUSIC beat makes the ia2v lip-sync graph articulate a
+    # mouth to the MUSIC (wrong -- music has no speech; "ltx makes the lips move
+    # so we don't need them"). Music keeps the faceless scene still resolved just
+    # above -> no mouth to animate. Only the ANNOUNCER bookend gets the talking
+    # radio-face. (This narrows the S4c default-on note above to announcer only.)
     if ((os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
          or _ia2v_talking_register_active("ltx_audio_in"))
             and str(shot.get("engine_id") or "") == "ltx_audio_in"
-            and _is_never_humo_video_role(_role_of_shot(shot))):
+            and _role_of_shot(shot) == "announcer_visual"):
         _abrole = _role_of_shot(shot)
         if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
             raise RenderError(
