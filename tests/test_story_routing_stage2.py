@@ -48,6 +48,9 @@ def _bank_row(**over):
 def _pipe_row(**over):
     row = {
         "story_pipeline_id": "tpipe", "label": "T Pipe", "executable": False,
+        # Chunk 3: required bool -- synthetic rows default to the
+        # non-contract lane (tests that need it flip it explicitly).
+        "requires_source_contract": False,
         "declared_seams": [],
         "passes": [{"pass_id": "p1", "slot": "creative", "seam_refs": [],
                     "description": "d"}],

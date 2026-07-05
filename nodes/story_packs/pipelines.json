@@ -5,6 +5,7 @@
       "story_pipeline_id": "legacy_many_pass",
       "label": "Legacy Many-Pass (production writer)",
       "executable": false,
+      "requires_source_contract": true,
       "declared_seams": [],
       "passes": [
         {"pass_id": "source_interpret", "slot": "technical", "seam_refs": [], "description": "Source brain -> briefs (science: news_interpreter.build_news_briefs; generated content fields, not templates)."},
@@ -31,6 +32,7 @@
       "story_pipeline_id": "simple_4_prompt_experimental",
       "label": "Simple 4-Prompt Experimental",
       "executable": false,
+      "requires_source_contract": false,
       "declared_seams": [
         "pass_1_creative_story",
         "pass_2_creative_ledger_fill",

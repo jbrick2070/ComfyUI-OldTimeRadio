@@ -135,6 +135,13 @@ from . import _otr_story_routing as _otr_story_routing
 # (resolve_visual_style, beside the bank gate). Same lazy/stdlib posture.
 from . import _otr_visual_styles as _otr_visual_styles
 
+# Lane-enablement chunk 3 (2026-07-05): the source-payload contract layer --
+# the bank's fetcher/interpreter ids resolve to registered callables
+# (fail-loud; a bank without a built lane raises SourceContractMissingError,
+# never a silent slide into the science path). Stdlib-only + lazy wrapper
+# imports -- safe at module-import time, same posture as the routing import.
+from . import _otr_source_payload as _otr_source_payload
+
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
 # reflection call site below the K.5 visual_plan stamp. Module-level
@@ -1355,7 +1362,7 @@ def _resolve_inputs(
         # Custom premise path: synthesize the same dict shape RSS
         # would produce so news_interpreter sees a uniform article
         # surface no matter how the story entered the writer.
-        news_article = {
+        news_article = _otr_source_payload.validate_source_payload({
             "headline":  "",
             "summary":   "",
             "full_text": custom,
@@ -1363,7 +1370,7 @@ def _resolve_inputs(
             "date":      "",
             "link":      "",
             "seed_text": custom,
-        }
+        }, origin="_resolve_inputs custom_premise")
         news_seed = custom
         seed_source = "custom_premise"
     else:
@@ -1385,11 +1392,27 @@ def _resolve_inputs(
         # == technical) the two ids are identical so the fix is a
         # no-op at runtime; in differing-slots config (S32 forward)
         # this is load-bearing.
-        news_article = _fetch_rss_seed_or_die(
-            rss_style_slug, technical_model,
+        # Chunk 3 (2026-07-05): the fetch routes through the bank's declared
+        # fetcher contract (science_news -> science_rss -> the verbatim
+        # _fetch_rss_seed_or_die call, byte-identical). A bank without a
+        # built fetcher lane raises SourceContractMissingError LOUD here --
+        # never a silent slide into the science path. Resolution sits OUTSIDE
+        # any try/except by design (no swallow).
+        _fetch_bank = _otr_story_routing.get_bank(source_bank or "science_news")
+        _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
+        news_article = _otr_source_payload.validate_source_payload(
+            _fetch_entry.fetch(
+                bank=_fetch_bank,
+                style_slug=rss_style_slug,
+                technical_model=technical_model,
+            ),
+            origin=(
+                f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
+                f"fetcher={_fetch_bank.fetcher!r})"
+            ),
         )
         news_seed = news_article["seed_text"]
-        seed_source = "rss_fetch"
+        seed_source = _fetch_entry.seed_source
 
     return {
         "news_seed":            news_seed,
@@ -2602,7 +2625,9 @@ class OTR_LedgerScriptWriter:
         # and _resolve_inputs (RSS fetch): a non-runnable source_bank pick
         # fails ONCE, LOUD and CHEAP, with zero side effects. bank.runnable is
         # the ONLY runtime gate; unknown id = UnknownBankError (no fallback).
-        _otr_story_routing.require_runnable_bank(source_bank)
+        # Chunk 3: the returned bank row is BOUND -- D.2.5 resolves the
+        # bank's interpreter contract from it (r2 codex M1).
+        _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
         # Stage 3C visual-style gate -- beside the bank gate, same zero-side-
         # effect contract: an unknown visual_style id raises
         # UnknownVisualStyleError here, before ANY story work (no fallback).
@@ -2770,7 +2795,6 @@ class OTR_LedgerScriptWriter:
         from . import _otr_ledger as _OTRL
         from . import _otr_casting as _OTRCAST
         from . import _otr_style_picker as _OTRSP
-        from . import news_interpreter as _OTRNI
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
         from . import _otr_continuity as _OTRCONT
@@ -3003,6 +3027,13 @@ class OTR_LedgerScriptWriter:
         # LLM call fails; this is a "warn-and-continue" boundary, not
         # a hard fail.
         article = resolved["news_article"]
+        # Chunk 3 (2026-07-05): the interpretation routes through the bank's
+        # declared interpreter contract (science_news -> news_interpreter ->
+        # the verbatim build_news_briefs call, byte-identical). Resolution
+        # sits OUTSIDE the try by design (a missing/unknown contract raises
+        # SourceContractMissingError/UnknownInterpreterError LOUD -- never
+        # caught by the degrade branch below).
+        _interp = _otr_source_payload.resolve_interpreter(_source_bank_row)
         try:
             # LLM slot: technical -- news_interpreter emits GBNF +
             # pydantic-validated briefs (V0-V3 schema). Structured-
@@ -3011,23 +3042,29 @@ class OTR_LedgerScriptWriter:
             # (here). One transition when the two slot ids differ.
             # build_news_briefs runs every V0-V3 sub-pass on the
             # technical slot -- structured-output JSON.
-            # S32 B6: helper_context attribution.
+            # S32 B6: helper_context attribution. Label string KEPT
+            # ("build_news_briefs") -- meta["slot_calls_by_helper"]
+            # telemetry stays byte-identical across the chunk-3 reroute.
             with slot_scheduler.helper_context("build_news_briefs"):
-                briefs = _OTRNI.build_news_briefs(
+                briefs = _interp(
+                    bank=_source_bank_row,
+                    payload=article,
                     technical_fn=technical_generate_fn,
-                    full_text=article.get("full_text", ""),
-                    headline=article.get("headline", ""),
-                    summary=article.get("summary", ""),
-                    outlet=article.get("source", ""),
-                    pub_date=article.get("date", ""),
                     style=resolved["style"],
-                    # The `seed` widget was removed (BUG-LOCAL-269/270
-                    # follow-up); a constant keeps the news-interpreter
-                    # cache key stable across the seed dimension.
-                    seed=0,
                     model_id=str(resolved["technical_model"]),
                 )
-            meta["news"] = briefs.model_dump()
+            # Contract enforcement: validates the direct attrs AND the dump
+            # (single model_dump() call, inside the validator); a violation
+            # raises SourcePayloadContractError which the except below does
+            # NOT catch -- contract bugs propagate hard, never degrade.
+            meta["news"] = _otr_source_payload.validate_interpreter_result(
+                briefs,
+                origin=(
+                    f"run() D.2.5 interpret "
+                    f"(bank={_source_bank_row.source_bank_id!r}, "
+                    f"interpreter={_source_bank_row.interpreter!r})"
+                ),
+            )
             casting_brief = briefs.casting_brief
             script_brief = briefs.script_brief
             key_terms_tuple: tuple[str, ...] = tuple(briefs.key_terms)
@@ -3036,7 +3073,12 @@ class OTR_LedgerScriptWriter:
                 "%d key_terms in %d attempt(s)",
                 len(briefs.key_terms), briefs.attempts,
             )
-        except _OTRNI.NewsInterpreterError as exc:
+        except _otr_source_payload.SourceInterpretError as exc:
+            # Chunk 3: the contract wrapper chains the underlying failure as
+            # __cause__ (science: NewsInterpreterError). Stamp AND re-raise
+            # from the CAUSE so the science halt surface stays byte-identical
+            # (r1 M1 + r2 codex M2).
+            _halt_exc = exc.__cause__ if exc.__cause__ is not None else exc
             # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27 directive:
             # "news brief must write -- if it doesn't, the whole
             # workflow needs to stop and re-roll news until it works
@@ -3078,16 +3120,19 @@ class OTR_LedgerScriptWriter:
                 )
                 # Stamp the failure on meta before raising so the
                 # operator (or a future re-queue heuristic) can see
-                # what the failed brief was.
+                # what the failed brief was. Chunk 3: stamp + re-raise
+                # the UNDERLYING failure (_halt_exc = __cause__ when
+                # present) -- science stamps/surfaces
+                # "NewsInterpreterError: ..." exactly as pre-chunk-3.
                 meta["news"] = None
                 meta["news_briefs_halt_reason"] = (
-                    f"{type(exc).__name__}: {exc}"
+                    f"{type(_halt_exc).__name__}: {_halt_exc}"
                 )
                 try:
                     led.save()
                 except Exception:  # noqa: BLE001
                     pass
-                raise
+                raise _halt_exc
             log.warning(
                 "[OTR_LedgerScriptWriter] news_interpreter FAILED after "
                 "all attempts: %s -- news_briefs_required=False; "

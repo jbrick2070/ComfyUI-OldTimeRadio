@@ -31,6 +31,9 @@ from ._otr_story_pack import (
     load_pack_with_seams,
 )
 from . import _otr_story_pack as _sp
+# Chunk 3 (source-payload contracts): stdlib-only at import, zero I/O -- safe
+# top-level (the lazy posture is test-pinned on both edges).
+from . import _otr_source_payload as _osp
 
 _STORY_PACKS_ROOT = Path(__file__).resolve().parent / "story_packs"
 _BANKS_FILENAME = "banks.json"
@@ -79,6 +82,10 @@ class StoryPipeline:
     executable: bool  # metadata-only; NEVER a runtime gate
     declared_seams: frozenset
     passes: "tuple[PipelinePass, ...]"
+    # Chunk 3: does this pipeline's execution path consume the bank's
+    # fetcher/interpreter source-payload contract? VALIDATION-time metadata
+    # only (sweep rule), never consulted at run time -- same law as executable.
+    requires_source_contract: bool = False
     notes: "tuple[str, ...]" = ()
 
 
@@ -179,7 +186,7 @@ _BANK_KEYS = frozenset({
 
 _PIPELINE_KEYS = frozenset({
     "story_pipeline_id", "label", "executable", "declared_seams",
-    "passes", "notes",
+    "passes", "requires_source_contract", "notes",
 })
 
 _PASS_KEYS = frozenset({"pass_id", "slot", "seam_refs", "description"})
@@ -231,6 +238,11 @@ def _parse_pipeline(obj: dict, origin: str) -> StoryPipeline:
     executable = obj.get("executable")
     if not isinstance(executable, bool):
         raise RegistryValidationError(f"{origin}: executable must be a bool")
+    requires_source_contract = obj.get("requires_source_contract")
+    if not isinstance(requires_source_contract, bool):
+        raise RegistryValidationError(
+            f"{origin}: requires_source_contract must be a bool"
+        )
     declared_raw = obj.get("declared_seams")
     if not isinstance(declared_raw, list):
         raise RegistryValidationError(f"{origin}: declared_seams must be a list")
@@ -269,13 +281,15 @@ def _parse_pipeline(obj: dict, origin: str) -> StoryPipeline:
             seam_refs=seam_refs,
             description=_require_str(p, "description", porigin),
         ))
-    notes = tuple(obj.get("notes", []))
+    # notes is a defaulted field: validate list-of-str ONLY when present.
+    notes = _require_str_list(obj, "notes", origin) if "notes" in obj else ()
     return StoryPipeline(
         story_pipeline_id=pipe_id,
         label=_require_str(obj, "label", origin),
         executable=executable,
         declared_seams=declared,
         passes=tuple(passes),
+        requires_source_contract=requires_source_contract,
         notes=notes,
     )
 
@@ -371,6 +385,44 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
                 f"{origin}: required_seams {missing} absent from default pack "
                 f"{default_path.name}"
             )
+        # Chunk 3 source-payload contract rules (after the precedence check so
+        # bank.default_story_pipeline is already proven consistent). IDS ONLY
+        # -- never executes wrapper bodies (lazy law).
+        # (a) Dangling non-empty ids are typos -- loud, on EVERY bank.
+        if bank.fetcher and bank.fetcher not in _osp.registered_fetcher_ids():
+            raise RegistryValidationError(
+                f"{origin}: fetcher {bank.fetcher!r} is not registered in "
+                f"_otr_source_payload (registered: "
+                f"{sorted(_osp.registered_fetcher_ids())})"
+            )
+        if (bank.interpreter
+                and bank.interpreter not in _osp.registered_interpreter_ids()):
+            raise RegistryValidationError(
+                f"{origin}: interpreter {bank.interpreter!r} is not registered "
+                f"in _otr_source_payload (registered: "
+                f"{sorted(_osp.registered_interpreter_ids())})"
+            )
+        # (b) A runnable bank must have a REAL execution lane: either its
+        # pipeline consumes the source-payload contract and both ids are
+        # declared (registered per (a)), or the pipeline brings its own runner
+        # (executable=true -- a validation-time read; the "executable is never
+        # a RUNTIME gate" law stands).
+        if bank.runnable:
+            pipe = pipelines[bank.default_story_pipeline]
+            if pipe.requires_source_contract:
+                if not bank.fetcher or not bank.interpreter:
+                    raise RegistryValidationError(
+                        f"{origin}: runnable bank on source-contract pipeline "
+                        f"{pipe.story_pipeline_id!r} must declare BOTH fetcher "
+                        f"and interpreter (lane-enablement checklist 4b item 3)"
+                    )
+            elif not pipe.executable:
+                raise RegistryValidationError(
+                    f"{origin}: runnable bank on non-source-contract pipeline "
+                    f"{pipe.story_pipeline_id!r} requires that pipeline's "
+                    f"runner to exist (executable=true); flipping runnable "
+                    f"without a lane is forbidden"
+                )
 
 
 def _ensure_loaded() -> _Registry:
