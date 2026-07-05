@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (late night) -- TOTAL-COVERAGE CHUNK A2 SHIPPED (motion registers + object/plate look + emblem + provenance) -- v2.0-alpha
+Did:
+- @c265d48a (pushed, HEAD==origin): motion registers pack-routed IN build_request_from_shot (style resolved once per shot OUTSIDE any swallow; exact-key indexing; the :1656 silent or-announcer fallback RETIRED per r2 codex S3; _ltx_motion_role_key env check on the static _MOTION_REGISTER_KEYS set; pack value FIRST then _talking_swap -- the P8 verbatim ia2v talking prompt outranks every pack, hostile-pack no-leak test). RADIO_OBJECT/PLATE geometry-vs-look splits + the emblem {base} template at the real fallback (music/announcer keep radio_form). ADDITIVE provenance: visual_style + prompt_field_source on the 4 scene-family image objects + request observability + the run_episode trace allowlist. 17-golden pre/post capture through the REAL builder = byte-identical (only the additive obs key differs).
+- +25 tests (test_visual_styles_a2.py). Suite 6519/0, Bug Bible 16-pass, workflow JSON untouched.
+Current step: TOTAL-COVERAGE chunk B (author the 4 non-default pack voices + forced-meta delta tests per surface; delta tests replace TestDormantDefaults).
+Next: chunk B, then C (still_word pack ownership).
+Commits: c265d48a (pushed) + docs.
+
 ## 2026-07-05 (night) -- TOTAL-COVERAGE CHUNK A1 SHIPPED (schema v2 + image lane) -- v2.0-alpha
 Did:
 - @2b4a481a (pushed, HEAD==origin): visual-style TOTAL-COVERAGE chunk A1 per STAGE3_TOTAL_COVERAGE_SUBPLAN v5. Schema v2 loader (11 str + 4 dict fields; {form}/{base}-once + mouth-vocab + 240-char motion + forbidden-terms-over-all-leaves lints; v1 pack fails LOUD naming path + "upgrade to v2"); ALL 5 packs v2 (sci_fi extraction BYTE-IDENTICAL -- 34-golden pre/post venv capture; non-defaults dormant sci-fi defaults). Image-lane re-routes: STYLE_ANCHOR* -> *_GEOMETRY + pack look; build_radio_host_prompt style->radio_host_style rename + pack subjects on all 3 arms (vstyle= threading); portrait_instruction_look + scene_instruction_look (only-when-non-empty); get_open_subject pack templates (announcer_visual->"announcer"); derive_image_prompts resolves style ONCE at entry. +54 tests incl. AST guards (fixture reads banned, style= threading pinned); 3B pins v1->v2 same commit.

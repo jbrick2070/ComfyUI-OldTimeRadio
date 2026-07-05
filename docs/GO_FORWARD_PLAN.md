@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (TOTAL-COVERAGE CHUNK A1 SHIPPED) | branch v2.0-alpha HEAD 2b4a481a + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> Last updated 2026-07-05 (TOTAL-COVERAGE CHUNKS A1+A2 SHIPPED) | branch v2.0-alpha HEAD c265d48a + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -79,26 +79,30 @@ PROMOTED from "deferred" to an ORDERED build item, queued immediately after
 lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
 needs promptable engines selectable/selected for announcer/music video roles.
 
-**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk A2 (video/mesh lane:
-motion registers via build_request_from_shot + radio_object/plate look + emblem
-fallback re-routes + provenance keys).**
+**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk B (author the 9+2
+field set in the 4 non-default packs -- anime/cartoon/paper_origami/
+archival_documentary voices -- + forced-meta delta tests per surface +
+per-surface negative-vocab smokes; r1 codex OPT).**
 Plan of record: `docs/multimodal-story-schema/STAGE3_TOTAL_COVERAGE_SUBPLAN.md`
 (v5 FINAL -- kibitz r1-r4 CONVERGED 2026-07-05, codex+antigravity panel, Claude
 anchor+judge; artifacts `kibitz-runs/2026-07-05-style-total-coverage/`). Build
-order A1 DONE -> A2 -> B (author the 4 non-default packs + delta tests) -> C
-(still_word pack ownership). Commit+push per green chunk. The r4 header block
-in the sub-plan is the authoritative schema inventory.
+order A1+A2 DONE -> B -> C (still_word pack ownership). Commit+push per green
+chunk. The r4 header block in the sub-plan is the authoritative schema
+inventory. Chunk-B delta tests must assert every authored field CHANGED from
+the A1 sci-fi defaults (replacing test_visual_styles_a1 TestDormantDefaults).
 
-**CHUNK A1 SHIPPED @2b4a481a (2026-07-05, pushed HEAD==origin):** schema v2
-loader (11 str + 4 dict fields, template/mouth-vocab/240-char/forbidden-terms
-lints, v1 pack fails LOUD "upgrade to v2"); ALL 5 packs upgraded to v2 (sci_fi
-= extracted literals BYTE-IDENTICAL, 34-golden pre/post capture proved it;
-non-defaults carry dormant sci-fi defaults until chunk B); image-lane re-routes
-(STYLE_ANCHOR* -> *_GEOMETRY + pack look; build_radio_host_prompt kwarg renamed
-radio_host_style + 3 arms read pack subjects; portrait/scene instruction look;
-get_open_subject pack templates; derive_image_prompts resolves ONCE at entry,
-vstyle threaded). +54 tests (test_visual_styles_a1.py) incl. AST guards; 3B
-pins re-pointed v2. Suite 6494/0, Bug Bible 16, workflow JSON untouched.
+**CHUNK A1 SHIPPED @2b4a481a + CHUNK A2 SHIPPED @c265d48a (2026-07-05, pushed
+HEAD==origin):** A1 = schema v2 loader (11 str + 4 dict fields, full lint set,
+v1 pack fails LOUD "upgrade to v2") + ALL 5 packs v2 (sci_fi extraction
+byte-identical; non-defaults dormant sci-fi defaults) + image-lane re-routes
+(anchors geometry-vs-look, radio_host_style rename + pack subjects,
+instruction looks, open-subject templates, resolve-once vstyle threading).
+A2 = motion registers pack-routed in build_request_from_shot (exact-key, the
+silent or-announcer fallback RETIRED, static env key set, probe-locked ia2v
+talking prompt outranks every pack) + radio_object/plate look splits + emblem
+{base} template + ADDITIVE provenance (visual_style + prompt_field_source on
+the 4 scene-family image objects + request observability + trace allowlist).
+Suites 6494/0 -> 6519/0, Bug Bible 16, workflow JSON untouched both chunks.
 
 LANE-ENABLEMENT CHUNK 3 SHIPPED @d7ea448c (2026-07-05): the banks'
 fetcher/interpreter ids are LIVE routing coordinates (`nodes/_otr_source_payload.py`;
