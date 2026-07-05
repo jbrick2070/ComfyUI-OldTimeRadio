@@ -69,14 +69,14 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = STAGE 3 CHUNK 3A (loader + sci_fi_radio + chokepoint routing,
-byte-identical).** Sub-plan of record: `docs/multimodal-story-schema/STAGE3_SUBPLAN.md`
-(v5 FINAL -- kibitz r1-r4 CONVERGED 2026-07-05; r3 = codex + a 3-lens Sonnet grounded
-fan-out per operator; all 4 reviewers independently caught the mesh_fodder swallow seam).
-Chunks: 3A (routing, byte-identical) -> 3B (4 packs, addressable/dormant) -> 3C (widget
-slot 26, GATED, the 2C playbook). v1 slice = tails + allow_radio_tails ONLY; geometry
-anchors + subjects + motion registers + still_word typography stay Python (section 8
-checklist). STAGE 2 is COMPLETE.
+**CURRENT STEP = STAGE 3 CHUNK 3B (author the 4 non-default packs, addressable/DORMANT).**
+Sub-plan of record: `docs/multimodal-story-schema/STAGE3_SUBPLAN.md` (v5 FINAL -- kibitz
+r1-r4 CONVERGED 2026-07-05; r3 = codex + a 3-lens Sonnet grounded fan-out per operator).
+**3A SHIPPED @4f611cb3** (suite 6294/0, Bug Bible 16): `nodes/_otr_visual_styles.py`
+lazy fail-loud loader + `nodes/visual_styles/sci_fi_radio.json` byte-identical; ALL tail
+reads pack-routed (incl. mesh_fodder + still_word); SIX composer seams de-swallowed;
+47 tests incl. 3 AST guards. Then 3C (widget slot 26, GATED, the 2C playbook). v1 slice
+= tails + allow_radio_tails ONLY (section 8 checklist for the rest). STAGE 2 COMPLETE.
 
 **2C SHIPPED 2026-07-05 @78bee5d5** (kibitz r1-r4 CONVERGED, codex panel --
 antigravity credit-bugged/dropped -- Claude anchor+judge; artifacts + plan of

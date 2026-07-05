@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (session 3c) -- STAGE 3 CHUNK 3A SHIPPED (visual-style loader + byte-identical routing) -- v2.0-alpha
+Did:
+- 3A @4f611cb3 (pushed, HEAD==origin): _otr_visual_styles.py (stdlib, lazy, frozen dataclass, sweep, typed errors, v1 schema pin, style_id regex+path coordinate, forbidden-terms load lint, _clear_caches) + visual_styles/sci_fi_radio.json byte-identical to the extraction-fixture constants.
+- Routed ALL tail reads through the pack (finish_visual_prompt/compose_still_prompt/get_era_tail gain style=; radio-host, portrait finish, char-scene, background plate, mesh_fodder, still_word) and DE-SWALLOWED the six composer seams (ImportError-only shims; style errors raise).
+- 47 new tests (byte-identity matrix, fail-loud through every composer entry, loader matrix, lazy pin, 3 AST guards); the 5 pre-existing tail-pin test files pass UNCHANGED (they are the fixture, per the r3 plan).
+Current step: STAGE 3 CHUNK 3B (anime/cartoon/paper_origami/archival_documentary packs, addressable/dormant until 3C).
+Next: 3B then 3C (widget slot 26, gated).
+Commits: 4f611cb3 (pushed).
+
 ## 2026-07-05 (session 3b) -- STAGE 3 SUB-PLAN HARDENED (kibitz r1-r4 + Sonnet fan-out) -- v2.0-alpha
 Did:
 - Explore-agent grounded site map of every hard-coded visual-style prompt site (tails, anchors, motion registers, seam chokepoints).
