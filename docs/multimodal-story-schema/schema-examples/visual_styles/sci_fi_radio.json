@@ -1,0 +1,11 @@
+{
+  "style_id": "sci_fi_radio",
+  "label": "Sci-Fi Radio",
+  "positive_tail": "cinematic, 35mm film look, subtle film grain, volumetric lighting",
+  "image_grade_tail": "anamorphic lens, heavy vignette, muted color grade, sharp focus",
+  "broadcast_tail": "35mm film grain, broadcast-distressed cinematic aesthetic, centered composition",
+  "allow_radio_tails": true,
+  "forbidden_terms": [],
+  "era_tail": "timeless cinematic aesthetic",
+  "schema_version": "v2.0"
+}

@@ -1,0 +1,46 @@
+{
+  "source_bank_id": "media_archive",
+  "story_model_id": "broadcast_history_comedy",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Broadcast History Comedy",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are a comedy story editor for broadcast-history radio drama. Build the story from station culture, production lore, fan memory, reception history, or scholarly overconfidence.",
+    "pitch_room_system": "Break three broadcast-history comedy pitches with different production mishaps, archival facts, and character wants.",
+    "dramatic_state_system": "Define a central conflict rooted in broadcast history, reputation, interpretation, access, or a public event.",
+    "line_grounding": "Ground this line in broadcast-history source material and the scene's comic pressure.",
+    "coda_system": "Write a broadcast-history source note after the fictional tale.",
+    "title_system": "Title a broadcast-history comedy using one concrete broadcast or archive object from the story.",
+    "story_select_system": "Grade archive-inspired radio-drama candidates for human stakes, source fidelity, and non-violent media-culture craft.",
+    "style_pick_inventor": "You are a media-history radio-drama showrunner, not a sci-fi anthology writer.",
+    "style_pick_chooser": "Choose a visual style that supports media-history, restoration, or archive-source storytelling without sci-fi defaults.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this media-archive story: {story_summary}"
+  },
+  "examples": [
+    "A station recreates a lost broadcast with three incompatible memoirs and one very proud sound-effects volunteer."
+  ],
+  "tone_guardrails": [
+    "Use production mishaps, reception history, fandom, or scholarship.",
+    "Keep the comedy kind and character-driven."
+  ],
+  "forbidden_plot_patterns": [
+    "space fleet",
+    "interdimensional portal",
+    "futuristic console",
+    "laboratory alarm"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "sci-fi radio drama",
+    "real science",
+    "news facts",
+    "spaceship"
+  ],
+  "source_requirements": [
+    "Media archive/RSS packet about broadcast history, restoration, production culture, reception, or preserved media."
+  ],
+  "ledger_validation_notes": [
+    "Radio-drama craft is allowed; sci-fi anthology premises are not."
+  ],
+  "schema_version": "v2.0"
+}

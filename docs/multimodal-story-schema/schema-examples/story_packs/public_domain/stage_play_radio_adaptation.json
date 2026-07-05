@@ -1,0 +1,44 @@
+{
+  "source_bank_id": "public_domain_story",
+  "story_model_id": "stage_play_radio_adaptation",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Stage Play Radio Adaptation",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are adapting a public-domain stage play scene into radio drama. Preserve character names, relationships, scene turns, and ending.",
+    "pitch_room_system": "Generate radio adaptation plans for the same play scene, not new plots.",
+    "dramatic_state_system": "Define conflict from the play's scene and character wants.",
+    "line_grounding": "Ground this line in the play text and scene turn.",
+    "coda_system": "Write a source attribution/adaptation note for the play scene.",
+    "title_system": "Title the radio adaptation from a concrete source detail.",
+    "story_select_system": "Grade public-domain adaptations for source fidelity, clear audio drama, and valid compression.",
+    "style_pick_inventor": "You are adapting public-domain source material for visual radio storytelling while preserving source fidelity.",
+    "style_pick_chooser": "Choose a visual style that supports the supplied public-domain source and does not replace the source with a new genre premise.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this public-domain adaptation: {story_summary}"
+  },
+  "examples": [
+    "A public-domain play scene becomes radio drama by making stage action audible through dialogue and sound."
+  ],
+  "tone_guardrails": [
+    "Preserve character names and relations.",
+    "Use announcer/narrator only where needed for audibility."
+  ],
+  "forbidden_plot_patterns": [
+    "renamed characters",
+    "replaced setting without adaptation mode",
+    "changed scene outcome"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "news facts",
+    "news report",
+    "RSS"
+  ],
+  "source_requirements": [
+    "Manifest with play title, act/scene metadata, and public-domain text."
+  ],
+  "ledger_validation_notes": [
+    "Cast mapping should preserve source speakers where practical."
+  ],
+  "schema_version": "v2.0"
+}

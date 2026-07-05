@@ -1,0 +1,25 @@
+{
+  "packet_version": 1,
+  "source_bank_id": "science_news",
+  "source_mode": "fixture",
+  "source_kind": "article",
+  "source_label": "Science news fixture",
+  "rights_status": "unknown",
+  "source_title": "A New Sensor Finds Hidden Patterns In Ocean Currents",
+  "source_author": "",
+  "source_url": "https://example.invalid/science/ocean-current-sensor",
+  "source_hash": "fixture-science-news-001",
+  "source_text_ref": "",
+  "source_summary": "Researchers test a new sensor network that reveals subtle ocean-current changes before storms.",
+  "raw_text": "Fixture only. Represents the current science/news source bank without network access.",
+  "fixture_casting_brief": "Science/news fixture casting brief.",
+  "fixture_script_brief": "",
+  "fixture_close_brief": "Science note: fixture close brief.",
+  "fixture_key_terms": [
+    "science",
+    "sensor",
+    "ocean"
+  ],
+  "fixture_fidelity_rules": [],
+  "schema_version": "v2.0"
+}

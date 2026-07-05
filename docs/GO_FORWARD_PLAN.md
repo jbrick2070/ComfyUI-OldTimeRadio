@@ -51,28 +51,28 @@
 
 ## 1. CURRENT STEP
 
-**JSON PROMPT EXTRACTION -- PARKED (operator directive 2026-07-04). Do NOT build it yet.** The
-Sprint-3 item-1 "big LLM prompt update" was explored as a py->JSON prompt EXTRACTION. Two decisions,
-both operator-final:
-1. The two-repo "transplant" shape (sibling lab `ComfyUI-OTR-UpstreamStoryLab` + `production_mirror/`
-   + bridge artifact) is REJECTED -- unanimous kibitz gut-check (Fable + analytical + anchor, HIGH):
-   the mirror is a drift-tax, the bridge is pure indirection, and a cross-repo Phase B cannot honor
-   CLAUDE.md's same-commit / workflow-JSON-source-of-truth / one-window rules.
-   (`docs/2026-07-04-json-prompt-transplant/kibitz/arch_decision_JUDGMENT.md`).
-2. Operator does NOT want any new in-repo package / folder / change-control hierarchy for this yet
-   (no `story_lab/`, no pack registry, no extraction scaffolding). So there is NOTHING to migrate:
-   the story-LLM prompts STAY as Python constants in `nodes/` exactly as they are today. Phase A
-   never touched production, so OTR is unchanged and nothing is stranded. The sibling repo is PARKED
-   as a throwaway scratch sandbox (its extraction analysis + Phase B architecture docs live there if
-   the pack system is ever revived) -- it is NEVER a production dependency.
+**MULTI-MODAL STORY SCHEMA -- IN-REPO BUILD (operator GO 2026-07-04). Plan of record:
+`docs/multimodal-story-schema/BUILD_PLAN.md`.** Sprint-3 item-1 is now the full multi-modal vision,
+built HERE (one repo), clean-break, NO fallbacks/tracebacks (breakage-in-progress is accepted; but
+tests move with the schema so the suite stays GREEN per chunk). The two-repo "transplant" shape was
+rejected (unanimous kibitz, HIGH -- `docs/2026-07-04-json-prompt-transplant/kibitz/arch_decision_JUDGMENT.md`);
+the sibling lab's DESIGN came over (`docs/multimodal-story-schema/design-reference/` +
+`schema-examples/`), its parallel package/registry/bridge scaffolding did NOT. Build into existing
+`nodes/` -- NO new top-level package.
 
-**When/if the JSON-pack idea is revived, the shape is: minimal, IN-REPO, inside existing `nodes/`,
-no new package hierarchy** -- not the transplant scaffolding. Until the operator asks, this line is
-DONE-by-decision; do not start it.
+VISION: multiple STORY PATHS (public-domain / media-archive RSS / simple-4-LLM / existing sci-fi) all
+filling the SAME ledger with different content+logic, PLUS a VISUAL STYLE switch (scifi/anime/origami)
+that rewrites ONLY downstream visual prompts. Law: JSON owns content, Python owns validation/routing/
+execution, fail-loud on unknown id.
 
-**CURRENT STEP = resume the production forward work** (the cloud-engine e2e sweep + model-matrix
-soak + credits/voice/music mission in the header above / section 2). The JSON-prompt line is closed
-for now.
+STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + extract current sci-fi
+prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
+schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
+
+**CURRENT STEP = STAGE 1.** Write Stage 1's hardened sub-plan (pack schema + loader + seam list +
+where packs live under `nodes/`), then code it clean-break, regression+Bug Bible per chunk, workflow
+JSON edits same-commit + re-validate, commit+push per green chunk. The lab already did this py-work
+once (in the parked sibling branch `phase-a-scratch`) -- reference it, re-do it in-repo.
 
 Prev step: WIDGET-SURFACE CLEANUP BUILD -- COMPLETE @82f39a23 (history in `docs/HANDOFF_LOG.md`).
 - Batch 1 @364a9278 -- surface-only removal (node 80 delivery_profile + 81/82/83 stereo_policy);

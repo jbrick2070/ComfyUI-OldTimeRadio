@@ -1,0 +1,46 @@
+{
+  "source_bank_id": "media_archive",
+  "story_model_id": "happy_archive_mystery",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Happy Archive Mystery",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are a radio-drama story editor for upbeat archive mysteries. Make the mystery a puzzle of memory, provenance, labeling, credit, or rediscovery, not menace.",
+    "pitch_room_system": "Break three happy archive mysteries from the same source item. Each pitch should center a different clue, missing context, or rediscovered voice.",
+    "dramatic_state_system": "Define a central question rooted in incomplete archive context and an upbeat human need.",
+    "line_grounding": "Ground this line in the archive clues and scene premise.",
+    "coda_system": "Write a brief preservation/source note that celebrates discovery or restored context.",
+    "title_system": "Title an upbeat archive mystery from a concrete clue or recovered object in the story.",
+    "story_select_system": "Grade archive-inspired radio-drama candidates for human stakes, source fidelity, and non-violent media-culture craft.",
+    "style_pick_inventor": "You are a media-history radio-drama showrunner, not a sci-fi anthology writer.",
+    "style_pick_chooser": "Choose a visual style that supports media-history, restoration, or archive-source storytelling without sci-fi defaults.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this media-archive story: {story_summary}"
+  },
+  "examples": [
+    "A misfiled reel reveals the forgotten voice behind a beloved station jingle."
+  ],
+  "tone_guardrails": [
+    "Use mystery as puzzle and memory, not danger.",
+    "Let discovery, recognition, or repair create an upbeat ending."
+  ],
+  "forbidden_plot_patterns": [
+    "violent conspiracy",
+    "horror haunting",
+    "body-count mystery",
+    "lab containment"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "real science",
+    "news facts",
+    "alien",
+    "spaceship"
+  ],
+  "source_requirements": [
+    "Media archive/RSS packet with a recoverable context, credit, label, or provenance puzzle."
+  ],
+  "ledger_validation_notes": [
+    "Ending should restore context or recognition without horror/conspiracy drift."
+  ],
+  "schema_version": "v2.0"
+}

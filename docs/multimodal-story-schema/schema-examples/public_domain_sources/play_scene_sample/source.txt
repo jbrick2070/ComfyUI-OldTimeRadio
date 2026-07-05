@@ -1,0 +1,1 @@
+Placeholder public-domain play scene text for loader tests.

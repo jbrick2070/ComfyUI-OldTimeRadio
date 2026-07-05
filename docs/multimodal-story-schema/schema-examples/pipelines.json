@@ -1,0 +1,45 @@
+{
+  "schema_version": "v2.0",
+  "pipelines": [
+    {
+      "schema_version": "v2.0",
+      "story_pipeline_id": "legacy_many_pass",
+      "label": "Legacy Many-Pass (production writer)",
+      "executable_in_lab": false,
+      "passes": [
+        {"pass_id": "source_interpret", "slot": "technical", "seam_refs": [], "description": "Source brain -> briefs (science: news_interpreter.build_news_briefs; generated content fields, not templates)."},
+        {"pass_id": "style_pick_inventor", "slot": "creative", "seam_refs": ["style_pick_inventor"], "description": "Descriptor inventor (writer D.2 pass 1)."},
+        {"pass_id": "style_pick_chooser", "slot": "technical", "seam_refs": ["style_pick_chooser", "style_pick_chooser_user_template"], "description": "Descriptor chooser (writer D.2 pass 2)."},
+        {"pass_id": "outline", "slot": "creative", "seam_refs": ["outline_system"], "description": "Macro/phase/beat outline passes."},
+        {"pass_id": "pitch_room", "slot": "creative", "seam_refs": ["pitch_room_system"], "description": "Divergent pitch generation."},
+        {"pass_id": "story_select", "slot": "technical", "seam_refs": ["story_select_system"], "description": "Candidate grading/selection."},
+        {"pass_id": "dramatic_state", "slot": "creative", "seam_refs": ["dramatic_state_system"], "description": "Central-conflict derivation."},
+        {"pass_id": "casting", "slot": "creative", "seam_refs": [], "description": "Cast craft (shared radio craft; casting_brief is interpreter output)."},
+        {"pass_id": "line_compose", "slot": "creative", "seam_refs": ["line_grounding"], "description": "Per-beat line composition."},
+        {"pass_id": "announcer_coda", "slot": "creative", "seam_refs": ["coda_system"], "description": "Coda per coda_mode; science implementation is compose_news_coda."},
+        {"pass_id": "title_regen", "slot": "creative", "seam_refs": ["title_system"], "description": "Late-binding title regeneration (blank episode_title only)."},
+        {"pass_id": "story_brief_reflection", "slot": "technical", "seam_refs": [], "description": "meta.story_brief reflection pass (writer :5438, K.5.5). NOT pack-overridable in v1; bridge path must not require it."}
+      ],
+      "notes": [
+        "DESCRIPTIVE ONLY: the production writer owns the real sequence; this list is stamping/audit metadata (kibitz r1).",
+        "Slot roles document which engine slot each pass uses; engine ids are resolved at runtime from production widgets and stamped by production."
+      ]
+    },
+    {
+      "schema_version": "v2.0",
+      "story_pipeline_id": "simple_4_prompt_experimental",
+      "label": "Simple 4-Prompt Experimental",
+      "executable_in_lab": true,
+      "passes": [
+        {"pass_id": "pass_1_creative_story", "slot": "creative", "seam_refs": ["pass_1_creative_story"], "description": "Complete source-grounded story; no JSON output."},
+        {"pass_id": "pass_2_creative_ledger_fill", "slot": "creative", "seam_refs": ["pass_2_creative_ledger_fill"], "description": "Fill the production ledger shape from the story."},
+        {"pass_id": "pass_3_technical_schema_cleanup", "slot": "technical", "seam_refs": ["pass_3_technical_schema_cleanup"], "description": "Repair schema: required fields, enums, ids."},
+        {"pass_id": "pass_4_technical_ledger_audit", "slot": "technical", "seam_refs": ["pass_4_technical_ledger_audit"], "description": "Consistency audit; if the ledger cannot be made valid, fail loudly naming this pass."}
+      ],
+      "notes": [
+        "Visible experiment, never a fallback: failure NEVER routes to legacy_many_pass.",
+        "Adaptive cleanup is documentation-only (kibitz r1 cut): no schema, no allowlist code, nothing loads it."
+      ]
+    }
+  ]
+}

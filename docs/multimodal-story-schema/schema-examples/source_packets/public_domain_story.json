@@ -1,0 +1,29 @@
+{
+  "packet_version": 1,
+  "source_bank_id": "public_domain_story",
+  "source_mode": "fixture",
+  "source_kind": "book_chapter",
+  "source_label": "Public-domain book chapter fixture",
+  "rights_status": "public_domain",
+  "source_title": "Book Chapter Sample",
+  "source_author": "Public Domain Author",
+  "source_url": "",
+  "source_hash": "fixture-public-domain-book-chapter-v1",
+  "source_text_ref": "fixtures/public_domain_sources/book_chapter_sample/source.txt",
+  "source_summary": "A public-domain chapter fixture for testing faithful radio adaptation, chapter digest, and source attribution logic.",
+  "raw_text": "A public-domain chapter sample supplies named characters, a clear sequence of turns, and an ending that the radio adaptation must preserve.",
+  "fixture_casting_brief": "Preserve the named characters, relationships, major turns, and ending from Book Chapter Sample by Public Domain Author.",
+  "fixture_script_brief": "",
+  "fixture_close_brief": "Source attribution: adapted from Book Chapter Sample by Public Domain Author, public-domain source material.",
+  "fixture_key_terms": [
+    "public domain",
+    "book_chapter",
+    "Book Chapter Sample"
+  ],
+  "fixture_fidelity_rules": [
+    "Preserve named characters from the supplied source.",
+    "Preserve the major turns and ending unless the source is marked as an excerpt.",
+    "Do not replace the source with an unrelated original plot."
+  ],
+  "schema_version": "v2.0"
+}

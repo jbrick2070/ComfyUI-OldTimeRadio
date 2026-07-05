@@ -1,0 +1,15 @@
+{
+  "style_id": "paper_origami",
+  "label": "Paper Origami",
+  "positive_tail": "folded paper diorama, papercraft texture, handmade paper edges",
+  "image_grade_tail": "",
+  "broadcast_tail": "",
+  "allow_radio_tails": false,
+  "forbidden_terms": [
+    "photorealistic",
+    "cinematic 35mm",
+    "film grain"
+  ],
+  "era_tail": "",
+  "schema_version": "v2.0"
+}
