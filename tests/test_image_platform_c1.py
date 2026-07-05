@@ -1153,6 +1153,36 @@ def test_dispatch_persists_radio_host_style_fresh_and_cache_hit(
         r.get("radio_host_style") == "console_face" for r in ann_rows)
 
 
+def test_dispatch_persists_still_word_provenance(clean_image_registry, tmp_path):
+    """still_word v2 (2026-07-04): the LOCKED lettering + backdrop family must
+    survive image dispatch onto the ledger row for operator QA -- fresh AND
+    cache-hit."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_test", "cast": []}
+    policy = {"image_models": {
+                  "character_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}, "granularity": {}}
+    obj = {"object_id": "still_b001", "kind": "scene_open",
+           "role": "character_video", "beat_id": "b001", "char_id": "c01",
+           "w": 1472, "h": 832, "prompt": "a title card displaying the words \"Go.\"",
+           "prompt_hash": "ph-w", "source": "still_word",
+           "lettering_style": "heavy condensed sans-serif capitals, tightly spaced",
+           "backdrop_family": "noir"}
+    led, _d, _r, _w = disp.dispatch_images(
+        ledger, policy, _payload(obj), gen_fn=lambda _req: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir")
+    fresh = next(i for i in led["images"]["images"]
+                 if i["object_id"] == "still_b001")
+    assert fresh.get("backdrop_family") == "noir"
+    assert "capitals" in fresh.get("lettering_style", "")
+    led2, _d2, _r2, _w2 = disp.dispatch_images(
+        led, policy, _payload(obj), gen_fn=lambda _req: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir")
+    rows = [i for i in led2["images"]["images"] if i["object_id"] == "still_b001"]
+    assert rows and all(r.get("backdrop_family") == "noir" for r in rows)
+
+
 # --------------------------------------------------------------------------- #
 # Operator ticket 2026-06-11: stale pending_* stills dir -- mux-style re-resolve
 # --------------------------------------------------------------------------- #

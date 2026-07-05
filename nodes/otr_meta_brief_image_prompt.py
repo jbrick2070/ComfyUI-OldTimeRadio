@@ -542,7 +542,14 @@ def _still_word_roles_from_policy(policy_json):
     ``role_slots.engine_id_for_role`` join (the SAME rule the director uses) --
     no separate director-side precompute needed. A missing/malformed policy, or
     a role_slots import failure in an odd flat-test context, yields an empty set
-    -> NO word/title branch (the legacy cinematic scene still). Pure, tolerant."""
+    -> NO word/title branch (the legacy cinematic scene still). Pure, tolerant.
+
+    OTR_FORCE_ENGINE_MAP seam (r3): the render-time override rewrites the engine
+    BEFORE render, and the still dispatcher honors it for still-consumption; so a
+    run that FORCES a role to still_word must ALSO mint the word/title prompt (else
+    it renders legacy SCENE prompts on a word card). Resolve the EFFECTIVE engine
+    via ``_effective_engine_after_force_map`` before the compare. Env-unset (no
+    force map) -> the resolver returns the id unchanged -> byte-identical."""
     try:
         pol = json.loads(policy_json or "{}")
     except (ValueError, TypeError):
@@ -562,7 +569,20 @@ def _still_word_roles_from_policy(policy_json):
     roles = set()
     for role in _rs.ROLE_TO_VIDEO_SLOT:
         try:
-            if str(_rs.engine_id_for_role(vm, role)) == "still_word":
+            eng_id = str(_rs.engine_id_for_role(vm, role))
+            # Honor OTR_FORCE_ENGINE_MAP (its OWN try so an import failure falls
+            # back to the unforced id -- never silently eaten by the outer except).
+            try:
+                try:
+                    from .otr_image_gen_dispatcher import (  # type: ignore
+                        _effective_engine_after_force_map)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from otr_image_gen_dispatcher import (  # type: ignore
+                        _effective_engine_after_force_map)
+                eng_id = str(_effective_engine_after_force_map(role, eng_id))
+            except Exception:  # noqa: BLE001 -- unforced run stays byte-identical
+                pass
+            if eng_id == "still_word":
                 roles.add(role)
         except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
             continue

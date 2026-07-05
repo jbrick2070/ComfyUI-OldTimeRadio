@@ -319,6 +319,25 @@ def test_roles_from_policy_empty_when_absent():
                                      {"engine_id": "ltx_video"}}})) == set()
 
 
+def test_force_map_into_still_word_included(monkeypatch):
+    # r3 seam: a run that FORCES a role to still_word must mint word cards.
+    policy = json.dumps({"video_models": {
+        "character_video_model": {"engine_id": "ltx_video"}}})
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    assert ip._still_word_roles_from_policy(policy) == set()      # unforced
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=still_word")
+    assert ip._still_word_roles_from_policy(policy) == {"character_video"}
+
+
+def test_force_map_away_from_still_word_excluded(monkeypatch):
+    policy = json.dumps({"video_models": {
+        "character_video_model": {"engine_id": "still_word"}}})
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    assert ip._still_word_roles_from_policy(policy) == {"character_video"}
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    assert ip._still_word_roles_from_policy(policy) == set()
+
+
 # --------------------------------------------------------------------------- #
 # render_clip -- NO dark floor (fail LOUD when the base still is missing)
 # --------------------------------------------------------------------------- #

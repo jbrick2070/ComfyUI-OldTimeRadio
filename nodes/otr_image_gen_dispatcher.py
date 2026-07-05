@@ -475,6 +475,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # style rides onto the dispatched ledger row so the render-side guard can
         # fail CLOSED on a faceless still about to feed a HuMo announcer init.
         radio_host_style = str(obj.get("radio_host_style") or "")
+        # still_word v2 (2026-07-04): the LOCKED per-episode lettering + backdrop
+        # family propagate onto the row for operator QA.
+        lettering_style = str(obj.get("lettering_style") or "")
+        backdrop_family = str(obj.get("backdrop_family") or "")
         prompt = str(obj.get("prompt") or "")
         prompt_hash = str(obj.get("prompt_hash") or "")
         obj_w = int(obj.get("w") or 0)
@@ -564,6 +568,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     fresh["beat_id"] = beat_id
                 if radio_host_style:
                     fresh["radio_host_style"] = radio_host_style
+                if lettering_style:
+                    fresh["lettering_style"] = lettering_style
+                if backdrop_family:
+                    fresh["backdrop_family"] = backdrop_family
                 images.append(fresh)
                 ep_rows.append(fresh)
                 reused += 1
@@ -667,6 +675,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             row["beat_id"] = beat_id
         if radio_host_style:
             row["radio_host_style"] = radio_host_style
+        if lettering_style:
+            row["lettering_style"] = lettering_style
+        if backdrop_family:
+            row["backdrop_family"] = backdrop_family
         # 3D image streams (2026-06-21): carry the mesh subject identity onto the
         # row (additive) so the mesh cache keys on a STABLE per-subject id (the
         # mesh_fodder file), not the per-beat still hash. Absent on non-3D rows.
