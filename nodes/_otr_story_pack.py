@@ -87,8 +87,15 @@ class StoryPack:
 
 _KNOWN_FIELDS = frozenset(StoryPack.__dataclass_fields__.keys())
 
-# Load-once cache keyed by resolved absolute path.
+# Load-once cache keyed by resolved absolute path (STRICT production-only
+# validation -- load_pack).
 _PACK_CACHE: "dict[str, StoryPack]" = {}
+
+# Stage 2: SEPARATE cache for pipeline-seam-aware loads, keyed by
+# (resolved path, extra_seams). Sharing _PACK_CACHE would poison the strict
+# path: a pack cached under a permissive seam union would later satisfy a
+# strict load_pack call without re-validation (kibitz r2 M1).
+_PACK_CACHE_WITH_SEAMS: "dict[tuple[str, frozenset], StoryPack]" = {}
 
 
 def _reject_dup_keys(pairs):
@@ -102,7 +109,8 @@ def _reject_dup_keys(pairs):
     return seen
 
 
-def _validate(data: dict, origin: str) -> StoryPack:
+def _validate(data: dict, origin: str,
+              extra_seams: frozenset = frozenset()) -> StoryPack:
     if not isinstance(data, dict):
         raise StoryPackValidationError(f"{origin}: top-level JSON must be an object")
 
@@ -130,11 +138,12 @@ def _validate(data: dict, origin: str) -> StoryPack:
     stages = data["prompt_stages"]
     if not isinstance(stages, dict):
         raise StoryPackValidationError(f"{origin}: prompt_stages must be an object")
+    allowed_seams = PRODUCTION_SEAM_ALLOWLIST | extra_seams
     for seam, value in stages.items():
-        if seam not in PRODUCTION_SEAM_ALLOWLIST:
+        if seam not in allowed_seams:
             raise UnknownSeamError(
                 f"{origin}: unknown seam {seam!r}; "
-                f"allowed: {sorted(PRODUCTION_SEAM_ALLOWLIST)}"
+                f"allowed: {sorted(allowed_seams)}"
             )
         if not isinstance(value, str) or not value.strip():
             raise StoryPackValidationError(
@@ -154,13 +163,8 @@ def _validate(data: dict, origin: str) -> StoryPack:
     return StoryPack(**data)
 
 
-def load_pack(path) -> StoryPack:
-    """Load + validate a story pack, fail-loud, cached by absolute path."""
-    p = Path(path)
-    key = str(p.resolve())
-    cached = _PACK_CACHE.get(key)
-    if cached is not None:
-        return cached
+def _read_pack_data(p: Path) -> dict:
+    """Read + JSON-parse a pack file fail-loud (shared by both loaders)."""
     try:
         text = p.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
@@ -170,11 +174,44 @@ def load_pack(path) -> StoryPack:
     except UnicodeDecodeError as exc:
         raise StoryPackParseError(f"story pack {p} is not valid UTF-8: {exc}") from exc
     try:
-        data = json.loads(text, object_pairs_hook=_reject_dup_keys)
+        return json.loads(text, object_pairs_hook=_reject_dup_keys)
     except json.JSONDecodeError as exc:
         raise StoryPackParseError(f"malformed JSON in story pack {p}: {exc}") from exc
-    pack = _validate(data, str(p))
+
+
+def load_pack(path) -> StoryPack:
+    """Load + validate a story pack, fail-loud, cached by absolute path.
+
+    STRICT: prompt_stages keys must be production-allowlisted. A pack carrying
+    pipeline-declared seams (e.g. simple_4) RAISES here by design -- routing
+    goes through load_pack_with_seams."""
+    p = Path(path)
+    key = str(p.resolve())
+    cached = _PACK_CACHE.get(key)
+    if cached is not None:
+        return cached
+    pack = _validate(_read_pack_data(p), str(p))
     _PACK_CACHE[key] = pack
+    return pack
+
+
+def load_pack_with_seams(path, extra_seams: frozenset) -> StoryPack:
+    """Stage 2 routing loader: validate prompt_stages against
+    PRODUCTION_SEAM_ALLOWLIST | extra_seams (the pack's pipeline-declared
+    seams). SEPARATE cache keyed (path, extra_seams) so the strict load_pack
+    cache is never poisoned by a permissive load. Sole sanctioned production
+    caller: nodes/_otr_story_routing.py (test-pinned)."""
+    if not isinstance(extra_seams, frozenset):
+        raise StoryPackValidationError(
+            f"extra_seams must be a frozenset, got {type(extra_seams).__name__}"
+        )
+    p = Path(path)
+    key = (str(p.resolve()), extra_seams)
+    cached = _PACK_CACHE_WITH_SEAMS.get(key)
+    if cached is not None:
+        return cached
+    pack = _validate(_read_pack_data(p), str(p), extra_seams=extra_seams)
+    _PACK_CACHE_WITH_SEAMS[key] = pack
     return pack
 
 

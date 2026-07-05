@@ -1,0 +1,37 @@
+{
+  "source_bank_id": "public_domain_story",
+  "story_model_id": "faithful_radio_adaptation",
+  "story_pipeline_id": "legacy_many_pass",
+  "schema_version": "v2.0",
+  "label": "Faithful Radio Adaptation",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "line_composer_system": "You are a radio-drama line composer adapting public-domain source text. Ground every character line in the source text and the current scene: preserve the source's named characters, their wants, its major turns, and its ending. Compression is allowed -- merge adjacent scenes around the core decision point, convert narration into character action or dialogue -- but replacement is not: never invent connective events, characters, or endings the source does not contain. Faithfulness outranks novelty. Voice period-appropriate radio drama: spoken dialogue only, no stage directions, no narration inside character lines.",
+    "coda_system": "Write a closing source attribution note for the announcer. Name the public-domain source work and author, note that this episode is an adaptation, and briefly describe what was preserved from the original. Warm, factual, spoken-radio register. This is an attribution/adaptation note, not a real-news report."
+  },
+  "examples": [
+    "A chapter adaptation preserves its original protagonist, conflict, and ending while compressing narration into audio scenes."
+  ],
+  "tone_guardrails": [
+    "Faithfulness outranks novelty.",
+    "Compression is allowed; replacement is not."
+  ],
+  "forbidden_plot_patterns": [
+    "invented protagonist",
+    "changed ending",
+    "unrelated framing story"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "real science",
+    "news facts",
+    "news report",
+    "RSS"
+  ],
+  "source_requirements": [
+    "Manifest with public-domain rights status and source text files."
+  ],
+  "ledger_validation_notes": [
+    "Adaptation trace should record preserved turns and compression choices."
+  ]
+}

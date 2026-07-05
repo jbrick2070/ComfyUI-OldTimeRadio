@@ -209,7 +209,8 @@ def test_only_sanctioned_consumer_uses_loader():
     """Stage 1b wires exactly ONE production consumer: the creative prompt
     router (line_composer_system). Any OTHER production file consuming the loader
     is unexpected and must be reviewed (catches accidental scope creep)."""
-    allowed = {"_otr_story_pack.py", "_otr_creative_prompt_router.py"}
+    allowed = {"_otr_story_pack.py", "_otr_creative_prompt_router.py",
+               "_otr_story_routing.py"}
     offenders = []
     for py in (REPO / "nodes").rglob("*.py"):
         if py.name in allowed:
@@ -218,6 +219,22 @@ def test_only_sanctioned_consumer_uses_loader():
         if "_otr_story_pack" in text or "get_pack_prompt" in text:
             offenders.append(str(py.relative_to(REPO)))
     assert not offenders, f"unexpected loader consumers beyond {allowed}: {offenders}"
+
+
+def test_load_pack_with_seams_sole_caller_is_routing():
+    """The permissive loader (load_pack_with_seams) must have EXACTLY ONE
+    production caller: the routing layer. Anywhere else it would bypass the
+    strict production-seam admission control."""
+    offenders = []
+    for py in (REPO / "nodes").rglob("*.py"):
+        if py.name in {"_otr_story_pack.py", "_otr_story_routing.py"}:
+            continue
+        text = py.read_text(encoding="utf-8", errors="replace")
+        if "load_pack_with_seams" in text:
+            offenders.append(str(py.relative_to(REPO)))
+    assert not offenders, (
+        f"load_pack_with_seams called outside _otr_story_routing.py: {offenders}"
+    )
 
 
 # -- (f) Stage 1b wiring: router sources the seam from the pack -------------
@@ -238,22 +255,22 @@ def test_stage1b_router_sources_line_composer_from_pack(pack):
     assert out_outline is O._SYSTEM_PROMPT
 
 
-def test_stage1b_router_fail_loud_on_missing_pack(monkeypatch):
-    """No fallback at the router: if the science pack is missing, resolving the
-    migrated seam RAISES (never silently reverts to a Python constant)."""
+def test_stage1b_router_fail_loud_on_missing_pack(monkeypatch, tmp_path):
+    """No fallback at the router: if the routing registry / science pack is
+    missing, resolving the migrated seam RAISES (never silently reverts to a
+    Python constant). Stage 2: routed via _otr_story_routing, so we point the
+    routing layer at an empty story_packs root."""
     from nodes import _otr_creative_prompt_router as router
     from nodes import _otr_model_catalog as cat
+    from nodes import _otr_story_routing as routing
 
-    sp._PACK_CACHE.clear()
-    monkeypatch.setattr(
-        router, "_SCIENCE_PACK_PATH",
-        REPO / "nodes" / "story_packs" / "science_news" / "__missing__.json",
-    )
+    routing._clear_caches()
+    monkeypatch.setattr(routing, "_STORY_PACKS_ROOT", tmp_path / "story_packs")
     modern = next(m.repo_id for m in cat.CURATED_LLM_MODELS
                   if m.prompt_profile == "modern")
-    with pytest.raises(sp.StoryPackError):
+    with pytest.raises(routing.StoryRoutingError):
         router.resolve_creative_system_prompt(modern, "line_composer_system")
-    sp._PACK_CACHE.clear()
+    routing._clear_caches()
 
 
 # -- (g) Stage 2 precondition: NO swallow around the outline resolver -------

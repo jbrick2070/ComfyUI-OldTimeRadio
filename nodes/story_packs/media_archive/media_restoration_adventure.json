@@ -1,0 +1,43 @@
+{
+  "source_bank_id": "media_archive",
+  "story_model_id": "media_restoration_adventure",
+  "story_pipeline_id": "legacy_many_pass",
+  "schema_version": "v2.0",
+  "label": "Media Restoration Adventure",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "line_composer_system": "You are a radio-drama line composer for warm, non-violent archive-restoration adventures. Compose each character line grounded in the archive material and the current scene's premise: damaged media, missing context, preservation labor, provenance, and the human meaning of recovery. Keep stakes warm, human, and non-violent; build suspense from fragile media, missing context, deadlines, or institutional pressure, never from futuristic danger. The archive object is culturally meaningful; conflicts resolve through a human choice about the archive object, never through technological magic. Voice period-appropriate radio drama: spoken dialogue only, no stage directions, no narration inside character lines.",
+    "coda_system": "Write a closing archive source note for the announcer. Turn from the fictional tale to the real preservation, provenance, or media-history material behind it: name the archive object or collection, why its recovery matters, and what listeners can take away about media history. Warm, factual, spoken-radio register. This is a source attribution note, not a real-news report."
+  },
+  "examples": [
+    "A brittle transcription disc forces a small station archivist to choose between a public anniversary broadcast and patient restoration."
+  ],
+  "tone_guardrails": [
+    "Center preservation, recovery, cataloging, damaged media, or rediscovery.",
+    "Keep stakes warm, human, and non-violent.",
+    "Make the archive object culturally meaningful."
+  ],
+  "forbidden_plot_patterns": [
+    "futuristic mission plot",
+    "twist anthology ending",
+    "generic experiment emergency",
+    "spaceship rescue",
+    "laboratory containment breach"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "sci-fi radio drama",
+    "real science",
+    "news facts",
+    "spaceship",
+    "mission control",
+    "laboratory containment"
+  ],
+  "source_requirements": [
+    "Media archive/RSS packet with title, source, body or summary, URL, and source hash."
+  ],
+  "ledger_validation_notes": [
+    "Close should be an archive source note, not a real-news report.",
+    "meta.news may mirror values only for compatibility."
+  ]
+}

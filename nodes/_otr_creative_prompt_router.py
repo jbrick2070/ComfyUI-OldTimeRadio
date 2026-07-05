@@ -38,7 +38,6 @@ baseline is unchanged either way.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Literal
 
 from . import _otr_model_catalog
@@ -47,7 +46,8 @@ from ._otr_line_composer import (
 )
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
 from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
-from ._otr_story_pack import get_pack_prompt, load_pack
+from ._otr_story_pack import get_pack_prompt
+from ._otr_story_routing import resolve_story_pack
 
 
 Phase = Literal[
@@ -73,14 +73,15 @@ _MODERN_BY_PHASE: dict[str, str] = {
 # object-identity is intentionally not preserved for a pack-sourced phase, so the
 # audio C7 contract now holds by VALUE, not object reference.
 #
-# Only `line_composer_system` is migrated in Stage 1b. `outline` stays on its
-# constant (its downstream `resolved is _SYSTEM_PROMPT` sentinel in _otr_outline
-# depends on object identity). The fixed science-pack path is the single
-# transitional binding; Stage 2 replaces it with source_bank -> pack-coordinate routing.
-_SCIENCE_PACK_PATH = (
-    Path(__file__).resolve().parent
-    / "story_packs" / "science_news" / "science_news_default.json"
-)
+# Only `line_composer_system` is migrated. `outline` stays on its constant (its
+# downstream `resolved is _SYSTEM_PROMPT` sentinel in _otr_outline depends on
+# object identity).
+#
+# Stage 2: the pack is resolved through the ROUTING layer
+# (resolve_story_pack via banks.json), no fixed path. The literal
+# "science_news" bank binding is STILL transitional: threading the workflow
+# `source_bank` selection through to this call is chunk 2C.
+_SCIENCE_BANK_ID = "science_news"
 _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "line_composer_system": "line_composer_system",
 }
@@ -121,9 +122,9 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
         return OTR_PERIOD_SYSTEM_PROMPT
     seam = _PHASE_TO_PACK_SEAM.get(phase)
     if seam is not None:
-        # Byte-identical to _MODERN_BY_PHASE[phase]; sourced from the science
-        # story pack so JSON owns the prompt content. Fail-loud if missing.
-        return get_pack_prompt(load_pack(_SCIENCE_PACK_PATH), seam)
+        # Byte-identical to _MODERN_BY_PHASE[phase]; routed through banks.json
+        # so JSON owns the prompt content. Fail-loud on unknown bank/model/seam.
+        return get_pack_prompt(resolve_story_pack(_SCIENCE_BANK_ID), seam)
     return _MODERN_BY_PHASE[phase]
 
 
