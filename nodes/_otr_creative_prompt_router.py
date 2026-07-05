@@ -53,6 +53,13 @@ from ._otr_outline import (
     _MACRO_SYSTEM_PROMPT as _MODERN_OUTLINE_MACRO_SYSTEM,
     _PHASE_SYSTEM_PROMPT as _MODERN_OUTLINE_PHASE_SYSTEM,
 )
+# Lane-enablement chunk 2 (2026-07-05): the exchange static system prompt is
+# pack-routed; the constant remains as the science extraction fixture
+# (byte-identity pinned). _otr_compose_exchange is stdlib-pure (no imports
+# from this package), so this import cannot cycle.
+from ._otr_compose_exchange import (
+    EXCHANGE_SYSTEM_PROMPT as _MODERN_EXCHANGE_SYSTEM,
+)
 from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
 from ._otr_story_pack import get_pack_prompt
 from ._otr_story_routing import resolve_story_pack
@@ -66,6 +73,10 @@ Phase = Literal[
     "outline_macro_system",
     "outline_phase_system",
     "outline_beat_system",
+    # Lane chunk 2: the Build-4 grouped-exchange static system prompt
+    # (pack-routed; dynamic craft bullets stay Python-owned in
+    # _otr_compose_exchange.build_exchange_prompt).
+    "exchange_system",
 ]
 
 
@@ -80,6 +91,7 @@ _MODERN_BY_PHASE: dict[str, str] = {
     "outline_macro_system": _MODERN_OUTLINE_MACRO_SYSTEM,
     "outline_phase_system": _MODERN_OUTLINE_PHASE_SYSTEM,
     "outline_beat_system":  _MODERN_OUTLINE_BEAT_SYSTEM,
+    "exchange_system":      _MODERN_EXCHANGE_SYSTEM,
 }
 
 
@@ -105,6 +117,9 @@ _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "outline_macro_system": "outline_macro_system",
     "outline_phase_system": "outline_phase_system",
     "outline_beat_system":  "outline_beat_system",
+    # Lane chunk 2 (2026-07-05): the exchange seam. A bank whose pack
+    # lacks it fails LOUD at get_pack_prompt (lane-enablement item).
+    "exchange_system":      "exchange_system",
 }
 
 

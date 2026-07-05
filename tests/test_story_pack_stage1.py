@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_story_pack as sp
+from nodes import _otr_compose_exchange as EX
 from nodes import _otr_line_composer as L
 from nodes import _otr_outline as O
 from nodes import _otr_style_picker as S
@@ -22,7 +23,7 @@ PACK_PATH = REPO / "nodes" / "story_packs" / "science_news" / "science_news_defa
 
 EXPECTED_SEAMS = frozenset({
     "outline_macro_system", "outline_phase_system", "outline_beat_system",
-    "line_composer_system", "coda_system",
+    "line_composer_system", "exchange_system", "coda_system",
     "announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system",
     "style_pick_inventor_system", "style_pick_inventor_user",
     "style_pick_chooser_system", "style_pick_chooser_user",
@@ -36,6 +37,9 @@ def _expected_live() -> "dict[str, str]":
         "outline_phase_system": O._PHASE_SYSTEM_PROMPT,
         "outline_beat_system": O._BEAT_SYSTEM_PROMPT,
         "line_composer_system": L._SYSTEM_PROMPT,
+        # Lane chunk 2: the exchange STATIC portion (dynamic craft bullets
+        # stay Python-owned in build_exchange_prompt).
+        "exchange_system": EX.EXCHANGE_SYSTEM_PROMPT,
         # coda is the UNCONDITIONAL runtime join (_otr_line_composer.py:3407).
         "coda_system": L._NEWS_CODA_SYSTEM + L._NEWS_CODA_SYSTEM_V2_EXAMPLES,
         "announcer_intro_system": L._ANNOUNCER_INTRO_SYSTEM,

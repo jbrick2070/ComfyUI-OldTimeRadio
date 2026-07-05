@@ -4618,6 +4618,21 @@ class OTR_LedgerScriptWriter:
         _ex_use: bool = bool(resolved.get("use_exchange", False))
         _ex_lines_by_beat_id: dict[str, str] = {}
         if _ex_use:
+            # Lane-enablement chunk 2 (2026-07-05): the exchange STATIC
+            # system prompt resolves from the bank's pack seam via the
+            # router's repo=None lane. DELIBERATELY OUTSIDE the PD1
+            # try/except below: a pack/seam failure (a bank without the
+            # exchange_system seam) must FAIL THE EPISODE LOUD, never be
+            # swallowed into a silent legacy fallback (no-fallback law;
+            # Fable forward-note pattern from chunk 1). Science is
+            # byte-identical (pack == EXCHANGE_SYSTEM_PROMPT, test-pinned).
+            from ._otr_creative_prompt_router import (
+                resolve_creative_system_prompt as _resolve_ex_prompt,
+            )
+            _ex_system: str = _resolve_ex_prompt(
+                None, phase="exchange_system",
+                source_bank_id=resolved["source_bank"],  # lane chunk 2
+            )
             try:
                 from ._otr_compose_exchange import (
                     run_exchange_prepass as _run_ex_prepass,
@@ -4636,6 +4651,7 @@ class OTR_LedgerScriptWriter:
                         list(_ex_cast),
                         generate_fn=creative_generate_fn,
                         tier_a_check=_ex_tier_a,
+                        system_prompt=_ex_system,  # lane chunk 2
                     )
                 meta["exchange_prepass_audit"] = {
                     "beats_composed": len(_ex_lines_by_beat_id),

@@ -29,6 +29,10 @@ PRODUCTION_SEAM_ALLOWLIST = frozenset({
     "outline_phase_system",
     "outline_beat_system",
     "line_composer_system",
+    # Lane-enablement chunk 2 (2026-07-05): the Build-4 grouped-exchange
+    # static system prompt (use_exchange). Science extraction fixture =
+    # _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT (byte-identity pinned).
+    "exchange_system",
     "coda_system",
     "announcer_intro_system",
     "announcer_intro_safe_system",

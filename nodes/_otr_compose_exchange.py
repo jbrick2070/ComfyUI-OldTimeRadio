@@ -194,6 +194,25 @@ DEFAULT_N: int = 1
 exchange tuning is explicitly deferred in the plan). Kept as a parameter
 so the integration can experiment without an API change."""
 
+# Lane-enablement chunk 2 (2026-07-05): the STATIC portion of the exchange
+# system prompt, extracted so the seam can be pack-routed. This constant is
+# the SCIENCE EXTRACTION FIXTURE (byte-identity pinned against the science
+# pack's `exchange_system` seam by tests/test_exchange_seam_lane2.py) and
+# the default when no pack-routed prompt is injected. The two dynamic craft
+# bullets (grounding clause + soft nudge) are appended by
+# build_exchange_prompt at assembly time -- they are Python-owned behavior,
+# not bank content.
+EXCHANGE_SYSTEM_PROMPT: str = (
+    "You write old-time-radio drama dialogue. Write an EXCHANGE "
+    "between the speakers below -- naturalistic, with subtext.\n\n"
+    "Craft rules:\n"
+    "  - Characters should not answer each other too directly.\n"
+    "  - At least one line avoids the real question.\n"
+    "  - At least one line reveals pressure through a concrete "
+    "object or action, not by naming the feeling.\n"
+    "  - Do NOT summarize the situation. Do NOT explain the theme.\n"
+)
+
 # Soft hygiene nudge ONLY -- NOT a gate (critique 7). Listed in the
 # prompt so the model avoids them; never enforced in code here.
 FORBIDDEN_GENERIC_WORDS: Tuple[str, ...] = (
@@ -296,6 +315,7 @@ def build_exchange_prompt(
     cast: Sequence[Any],
     *,
     failure_reasons: Optional[Sequence[str]] = None,
+    system_prompt: Optional[str] = None,
 ) -> List[dict]:
     """Build the chat messages for one exchange over a 2-3 slot group.
 
@@ -312,6 +332,12 @@ def build_exchange_prompt(
         failure_reasons: on the REPAIR pass, the Tier-A failure strings
             from the first attempt are appended so the rewrite is
             targeted. None on the first attempt.
+        system_prompt: the STATIC system-prompt portion. None (default)
+            uses EXCHANGE_SYSTEM_PROMPT (the science extraction fixture).
+            The writer injects the bank's pack-routed `exchange_system`
+            seam here (lane-enablement chunk 2) -- this module stays
+            import-free of the routing layer by design. The two dynamic
+            craft bullets are always appended after it.
 
     Returns:
         chat messages (list of {"role", "content"}) for generate_fn.
@@ -381,17 +407,14 @@ def build_exchange_prompt(
         + ". (Guidance, not a hard rule.)"
     )
 
+    # Lane chunk 2: static portion is injectable (pack-routed by the writer);
+    # None keeps the module constant -- byte-identical assembly either way
+    # when the injected value equals the constant (science lane, test-pinned).
+    base = EXCHANGE_SYSTEM_PROMPT if system_prompt is None else system_prompt
     system = (
-        "You write old-time-radio drama dialogue. Write an EXCHANGE "
-        "between the speakers below -- naturalistic, with subtext.\n\n"
-        "Craft rules:\n"
-        "  - Characters should not answer each other too directly.\n"
-        "  - At least one line avoids the real question.\n"
-        "  - At least one line reveals pressure through a concrete "
-        "object or action, not by naming the feeling.\n"
-        "  - Do NOT summarize the situation. Do NOT explain the theme.\n"
-        f"  - {grounding_clause}\n"
-        f"  - {soft_nudge}\n"
+        base
+        + f"  - {grounding_clause}\n"
+        + f"  - {soft_nudge}\n"
     )
 
     fmt = (
@@ -520,6 +543,7 @@ def _run_once(
     temperature: float,
     max_new_tokens: int,
     failure_reasons: Optional[Sequence[str]],
+    system_prompt: Optional[str],
 ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """One generate + parse cycle. Returns (parsed_or_None, parse_error).
 
@@ -536,6 +560,7 @@ def _run_once(
         prior_lines,
         cast,
         failure_reasons=failure_reasons,
+        system_prompt=system_prompt,
     )
     # LLM slot: creative
     # Reason: exchange dialogue rendering is creative-axis work (rule 6).
@@ -562,6 +587,7 @@ def compose_exchange(
     n: int = DEFAULT_N,
     temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
+    system_prompt: Optional[str] = None,
 ) -> ExchangeResult:
     """Compose one exchange over a 2-3 voiced beat group.
 
@@ -590,6 +616,9 @@ def compose_exchange(
         n: candidates per attempt (default 1; kept for future best-of-N).
             With n>1 the first parsed candidate that passes Tier-A wins;
             if none pass, the last parsed candidate's reasons drive repair.
+        system_prompt: static system-prompt portion (lane chunk 2); None
+            uses EXCHANGE_SYSTEM_PROMPT. Threaded to build_exchange_prompt
+            on both the first attempt and the repair pass.
 
     Returns:
         ExchangeResult. Only "ok" / "ok_repaired" results are safe to
@@ -620,6 +649,7 @@ def compose_exchange(
             temperature=temperature,
             max_new_tokens=max_new_tokens,
             failure_reasons=None,
+            system_prompt=system_prompt,
         )
         result.attempts += 1
         if parsed is None:
@@ -659,6 +689,7 @@ def compose_exchange(
         temperature=temperature,
         max_new_tokens=max_new_tokens,
         failure_reasons=last_reasons,
+        system_prompt=system_prompt,
     )
     result.attempts += 1
     result.repaired = True
@@ -893,6 +924,7 @@ def run_exchange_prepass(
     reserved_speakers: Sequence[str] = ("ANNOUNCER",),
     temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
+    system_prompt: Optional[str] = None,
 ) -> Dict[str, str]:
     """Compose voiced beat groups as exchanges; return {beat_id: text}.
 
@@ -909,6 +941,11 @@ def run_exchange_prepass(
     prior_window: how many already-composed display lines to feed the
     next group as scene context. Composed lines accumulate as the prepass
     advances so later groups see earlier dialogue.
+
+    system_prompt: static system-prompt portion (lane chunk 2). The writer
+    resolves the bank's pack-routed `exchange_system` seam and injects it
+    here; None uses EXCHANGE_SYSTEM_PROMPT (science fixture). This module
+    never imports the routing layer -- injection preserves its purity.
 
     Returns {beat_id: text} for beats whose group composed cleanly. Pure
     given the injected generate_fn + tier_a_check.
@@ -972,6 +1009,7 @@ def run_exchange_prepass(
                 tier_a_check=tier_a_check,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
+                system_prompt=system_prompt,
             )
             if res.status not in ("ok", "ok_repaired"):
                 continue

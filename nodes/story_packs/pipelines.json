@@ -16,6 +16,7 @@
         {"pass_id": "dramatic_state", "slot": "creative", "seam_refs": [], "description": "Central-conflict derivation (prompt not pack-sourced yet)."},
         {"pass_id": "casting", "slot": "creative", "seam_refs": [], "description": "Cast craft (shared radio craft; casting_brief is interpreter output)."},
         {"pass_id": "line_compose", "slot": "creative", "seam_refs": ["line_composer_system"], "description": "Per-beat line composition."},
+        {"pass_id": "exchange_compose", "slot": "creative", "seam_refs": ["exchange_system"], "description": "Build-4 grouped-exchange prepass (use_exchange); static system prompt pack-routed, dynamic craft bullets Python-owned."},
         {"pass_id": "announcer_intro_outro", "slot": "creative", "seam_refs": ["announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system"], "description": "Announcer intro/outro."},
         {"pass_id": "announcer_coda", "slot": "creative", "seam_refs": ["coda_system"], "description": "Coda per bank coda_mode; science implementation is compose_news_coda."},
         {"pass_id": "title_regen", "slot": "creative", "seam_refs": [], "description": "Late-binding title regeneration (prompt not pack-sourced yet)."},
