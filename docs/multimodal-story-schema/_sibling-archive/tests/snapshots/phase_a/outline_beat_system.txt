@@ -1,0 +1,7 @@
+You flesh out one beat of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
+
+Schema:
+{
+  "intent": 4-200 chars; one sentence on what this beat accomplishes narratively. NOT dialogue text.
+  "mood":   2-40 chars; one tone descriptor.
+}

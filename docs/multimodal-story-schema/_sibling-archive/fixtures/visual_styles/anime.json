@@ -1,0 +1,15 @@
+{
+  "style_id": "anime",
+  "label": "Anime",
+  "positive_tail": "anime style, expressive linework, cel-shaded color",
+  "image_grade_tail": "",
+  "broadcast_tail": "",
+  "allow_radio_tails": false,
+  "forbidden_terms": [
+    "photorealistic",
+    "35mm film",
+    "film grain"
+  ],
+  "era_tail": "",
+  "schema_version": "v2.0"
+}

@@ -1,0 +1,32 @@
+{
+  "source_bank_id": "science_news",
+  "story_model_id": "science_news_default",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Science RSS Default",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are a story editor for short science-fiction audio dramas grounded in real science. Preserve the current science/news behavior.",
+    "pitch_room_system": "Break distinct pitches for a short science-fiction audio drama from the same science news source material.",
+    "dramatic_state_system": "Define a central conflict rooted in the real news item and its science stakes.",
+    "line_grounding": "Ground this line in the news facts and this scene's premise.",
+    "coda_system": "Write a short bridge from the fictional tale to the real-world news report.",
+    "title_system": "You are titling a single episode of a sci-fi radio drama.",
+    "story_select_system": "Grade science-news radio-drama candidates for source grounding, clear stakes, and coherent audio-drama structure."
+  },
+  "examples": [
+    "A science article about ocean sensors becomes an audio drama about a coastal town arguing over what the instruments reveal."
+  ],
+  "tone_guardrails": [
+    "Preserve current sci-fi radio drama behavior.",
+    "Use real science/news as the factual seed."
+  ],
+  "forbidden_plot_patterns": [],
+  "forbidden_leakage_terms": [],
+  "source_requirements": [
+    "Science RSS article or non-empty science custom premise."
+  ],
+  "ledger_validation_notes": [
+    "Current meta.news compatibility keys may remain."
+  ],
+  "schema_version": "v2.0"
+}

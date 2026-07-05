@@ -1,0 +1,45 @@
+{
+  "source_bank_id": "public_domain_story",
+  "story_model_id": "storybook_puppet_show",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Storybook Puppet Show",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are adapting public-domain story material as a gentle, playful radio puppet-show style episode. Preserve the source's named characters, major turns, and ending.",
+    "pitch_room_system": "Generate gentle adaptation approaches, not unrelated parody.",
+    "dramatic_state_system": "Define conflict from the source's simple wants and obstacles.",
+    "line_grounding": "Ground this line in the source text and playful scene premise.",
+    "coda_system": "Write a warm source attribution/adaptation note.",
+    "title_system": "Title the storybook adaptation with a source-grounded playful detail.",
+    "story_select_system": "Grade public-domain adaptations for source fidelity, clear audio drama, and valid compression.",
+    "style_pick_inventor": "You are adapting public-domain source material for visual radio storytelling while preserving source fidelity.",
+    "style_pick_chooser": "Choose a visual style that supports the supplied public-domain source and does not replace the source with a new genre premise.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this public-domain adaptation: {story_summary}"
+  },
+  "examples": [
+    "A public-domain children's story becomes a gentle radio puppet-show episode without changing its ending."
+  ],
+  "tone_guardrails": [
+    "Family-friendly and whimsical.",
+    "Keep character voices clear.",
+    "Preserve the source ending unless the manifest marks an excerpt."
+  ],
+  "forbidden_plot_patterns": [
+    "cynical parody",
+    "horror turn",
+    "changed moral"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "news facts",
+    "real news",
+    "RSS"
+  ],
+  "source_requirements": [
+    "Manifest with public-domain story text and excerpt/full-source mode."
+  ],
+  "ledger_validation_notes": [
+    "Visual style may be cartoon or origami later, but story fidelity remains source-driven."
+  ],
+  "schema_version": "v2.0"
+}

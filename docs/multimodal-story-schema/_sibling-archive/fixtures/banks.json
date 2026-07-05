@@ -1,0 +1,119 @@
+{
+  "schema_version": "v2.0",
+  "banks": [
+    {
+      "source_bank_id": "science_news",
+      "label": "Sci-Fi Science News",
+      "dropdown_label": "Sci-Fi Science News",
+      "source_kind": "article",
+      "interpreter": "fixture_science_news",
+      "fetcher": "science_rss",
+      "default_story_model": "science_news_default",
+      "default_visual_style": "sci_fi_radio",
+      "default_story_pipeline": "legacy_many_pass",
+      "defaults": {
+        "story_form_label": "science-fiction audio drama",
+        "source_material_label": "Science story",
+        "source_develop_verb": "extrapolate dramatically from this science story",
+        "source_grounding_label": "news facts",
+        "key_terms_label": "NEWS KEY TERMS",
+        "close_brief_label": "closing news read",
+        "title_form_label": "sci-fi radio drama",
+        "coda_mode": "real_news_report"
+      },
+      "required_seams": [
+        "outline_system",
+        "pitch_room_system",
+        "dramatic_state_system",
+        "line_grounding",
+        "coda_system",
+        "title_system"
+      ],
+      "runnable": true,
+      "guide_ref": ""
+    },
+    {
+      "source_bank_id": "media_archive",
+      "label": "Media RSS / Archive",
+      "dropdown_label": "Media RSS / Archive",
+      "source_kind": "archive_item",
+      "interpreter": "fixture_media_archive",
+      "fetcher": "",
+      "default_story_model": "media_restoration_adventure",
+      "default_visual_style": "archival_documentary",
+      "default_story_pipeline": "legacy_many_pass",
+      "defaults": {
+        "story_form_label": "archive-inspired radio drama",
+        "source_material_label": "Media archive item",
+        "source_develop_verb": "build a fictional story from this archive/media-history material",
+        "source_grounding_label": "archive material",
+        "key_terms_label": "ARCHIVE KEY TERMS",
+        "close_brief_label": "archive source note",
+        "title_form_label": "archive-inspired radio drama",
+        "coda_mode": "archive_source_note"
+      },
+      "required_seams": [
+        "outline_system",
+        "pitch_room_system",
+        "story_select_system",
+        "dramatic_state_system",
+        "line_grounding",
+        "coda_system",
+        "title_system",
+        "style_pick_inventor",
+        "style_pick_chooser"
+      ],
+      "runnable": true,
+      "guide_ref": ""
+    },
+    {
+      "source_bank_id": "public_domain_story",
+      "label": "Public Domain",
+      "dropdown_label": "Public Domain",
+      "source_kind": "public_domain_source",
+      "interpreter": "fixture_public_domain",
+      "fetcher": "",
+      "default_story_model": "faithful_radio_adaptation",
+      "default_visual_style": "archival_documentary",
+      "default_story_pipeline": "legacy_many_pass",
+      "defaults": {
+        "story_form_label": "public-domain radio adaptation",
+        "source_material_label": "Public-domain source text",
+        "source_develop_verb": "adapt this source while preserving its characters, turns, and ending",
+        "source_grounding_label": "source text",
+        "key_terms_label": "SOURCE KEY TERMS",
+        "close_brief_label": "source attribution note",
+        "title_form_label": "public-domain radio adaptation",
+        "coda_mode": "source_attribution"
+      },
+      "required_seams": [
+        "outline_system",
+        "pitch_room_system",
+        "story_select_system",
+        "dramatic_state_system",
+        "line_grounding",
+        "coda_system",
+        "title_system",
+        "style_pick_inventor",
+        "style_pick_chooser"
+      ],
+      "runnable": true,
+      "guide_ref": ""
+    },
+    {
+      "source_bank_id": "custom_source_bank",
+      "label": "+ Add Your Own",
+      "dropdown_label": "+ Add Your Own",
+      "source_kind": "custom",
+      "interpreter": "",
+      "fetcher": "",
+      "default_story_model": "simple_4_prompt_experimental",
+      "default_visual_style": "sci_fi_radio",
+      "default_story_pipeline": "simple_4_prompt_experimental",
+      "defaults": {},
+      "required_seams": [],
+      "runnable": false,
+      "guide_ref": "Create and validate a custom schema, source packet, and story pack first. Guide: CUSTOM_SOURCE_BANK_GUIDE.md"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-04 (overnight -- CREDITS col-3 + ELEVENLABS voice + SONILO music ALL FIXED+PROVEN LIVE) | branch v2.0-alpha @ 8f146394 | prod/main + tags operator-GATED.
+> Last updated 2026-07-04 (session -- July-4 code-ready sprints shipped; MULTI-MODAL STORY SCHEMA build plan landed in-repo; sibling transplant repo archived+nuked) | branch v2.0-alpha (tip; see HANDOFF_LOG) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine

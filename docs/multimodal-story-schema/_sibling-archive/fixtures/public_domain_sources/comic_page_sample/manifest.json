@@ -1,0 +1,18 @@
+{
+  "source_id": "comic_page_sample",
+  "source_bank_id": "public_domain_story",
+  "source_kind": "comic",
+  "title": "Comic Page Sample",
+  "author": "Public Domain Artist",
+  "publication_year": 1905,
+  "rights_status": "public_domain",
+  "source_url": "",
+  "text_files": ["pages/page_001.txt"],
+  "image_files": [],
+  "adaptation_mode": "comic_panel_radio_adaptation",
+  "required_fidelity": [
+    "preserve page order",
+    "preserve named characters",
+    "translate visual action into audio beats"
+  ]
+}

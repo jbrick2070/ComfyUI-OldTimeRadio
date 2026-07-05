@@ -1,0 +1,45 @@
+{
+  "source_bank_id": "public_domain_story",
+  "story_model_id": "comic_panel_radio_adaptation",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Comic Panel Radio Adaptation",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are adapting public-domain comic panels into radio drama. Preserve page order, named characters, visible action, and ending while translating visual beats into sound and dialogue.",
+    "pitch_room_system": "Generate adaptation approaches for turning panels into audio beats; do not invent a replacement story.",
+    "dramatic_state_system": "Define the central conflict from the comic's panel sequence and character actions.",
+    "line_grounding": "Ground this line in the panel/page source and the current audio beat.",
+    "coda_system": "Write a source attribution note for the comic/page excerpt.",
+    "title_system": "Title the adaptation using a source-grounded visual or action detail.",
+    "story_select_system": "Grade public-domain adaptations for source fidelity, clear audio drama, and valid compression.",
+    "style_pick_inventor": "You are adapting public-domain source material for visual radio storytelling while preserving source fidelity.",
+    "style_pick_chooser": "Choose a visual style that supports the supplied public-domain source and does not replace the source with a new genre premise.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this public-domain adaptation: {story_summary}"
+  },
+  "examples": [
+    "A comic page gag becomes a sequence of dialogue, sound effects, and announcer cues without showing text on screen."
+  ],
+  "tone_guardrails": [
+    "Translate visuals into audio events.",
+    "Preserve page and panel order.",
+    "Do not replace source characters."
+  ],
+  "forbidden_plot_patterns": [
+    "ignoring page order",
+    "invented replacement cast",
+    "changed punchline"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "real science",
+    "news facts",
+    "RSS"
+  ],
+  "source_requirements": [
+    "Manifest with page text and optional image references."
+  ],
+  "ledger_validation_notes": [
+    "Adaptation trace should store page ids and panel references."
+  ],
+  "schema_version": "v2.0"
+}

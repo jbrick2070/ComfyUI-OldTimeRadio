@@ -1,0 +1,34 @@
+{
+  "source_bank_id": "custom_source_bank",
+  "story_model_id": "simple_4_prompt_experimental",
+  "story_pipeline_id": "simple_4_prompt_experimental",
+  "label": "Simple 4-Prompt Experimental",
+  "status": "experimental",
+  "prompt_stages": {
+    "pass_1_creative_story": "Using the SOURCE MATERIAL and TONE GUARDRAILS provided in the run context below, write one complete radio-drama story. Hard limits: at most 8 scenes, 2-4 speaking characters, 250 words per scene. Prose only - do not output JSON in this pass.",
+    "pass_2_creative_ledger_fill": "Convert the story from the previous pass into the production story ledger. Emit ONLY valid JSON matching the LEDGER SCHEMA provided in the run context - use exactly its field names; do not invent fields. Include cast, lines, beats, source metadata, coda/source note, and visual directives.",
+    "pass_3_technical_schema_cleanup": "Repair the JSON from the previous pass so it satisfies the LEDGER SCHEMA in the run context exactly: required fields present, enum values legal, ids consistent, no extra fields. Emit ONLY the repaired JSON.",
+    "pass_4_technical_ledger_audit": "Audit the JSON from the previous pass: cast vs line speakers, character ids, beat ids, line ids, continuity, source note, visual directives. Emit ONLY the corrected JSON, or the single line AUDIT_FAILED: <reason> if it cannot be made valid."
+  },
+  "examples": [
+    "A stronger model writes a rich story first, then fills and repairs the ledger in technical passes."
+  ],
+  "tone_guardrails": [
+    "Python should validate and repair structure, not secretly co-write the story.",
+    "No fallback to legacy_many_pass if this experiment fails.",
+    "Adaptive cleanup may continue only under a hard max pass cap and deterministic validator failures."
+  ],
+  "forbidden_plot_patterns": [
+    "hidden fallback to science RSS",
+    "silent fallback to legacy builder"
+  ],
+  "forbidden_leakage_terms": [],
+  "source_requirements": [
+    "Any selected source bank must provide a valid source packet and story pack."
+  ],
+  "ledger_validation_notes": [
+    "Pass 4 must check cast vs line speakers, character ids, beat ids, line ids, source metadata, coda/source note, and visual directives.",
+    "Optional adaptive cleanup stops when deterministic validators pass or max_cleanup_passes is reached."
+  ],
+  "schema_version": "v2.0"
+}

@@ -1,0 +1,43 @@
+{
+  "source_bank_id": "public_domain_story",
+  "story_model_id": "chapter_digest_drama",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Chapter Digest Drama",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are compressing one public-domain chapter into a clear radio-drama episode. Preserve the chapter's arc, named characters, major turns, and ending.",
+    "pitch_room_system": "Generate compression plans, not unrelated story pitches.",
+    "dramatic_state_system": "Define conflict and ending change from the chapter itself.",
+    "line_grounding": "Ground this line in the selected chapter text and scene premise.",
+    "coda_system": "Write a short chapter/source attribution note.",
+    "title_system": "Title the chapter digest using a source-grounded detail.",
+    "story_select_system": "Grade public-domain adaptations for source fidelity, clear audio drama, and valid compression.",
+    "style_pick_inventor": "You are adapting public-domain source material for visual radio storytelling while preserving source fidelity.",
+    "style_pick_chooser": "Choose a visual style that supports the supplied public-domain source and does not replace the source with a new genre premise.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this public-domain adaptation: {story_summary}"
+  },
+  "examples": [
+    "A single chapter becomes a compact audio episode with narration compressed into character action."
+  ],
+  "tone_guardrails": [
+    "Do not imply the full book was adapted when only a chapter was supplied.",
+    "Do not change the chapter ending."
+  ],
+  "forbidden_plot_patterns": [
+    "whole-book summary when source is one chapter",
+    "invented ending"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "news facts",
+    "news report",
+    "RSS"
+  ],
+  "source_requirements": [
+    "Manifest with chapter id/title and public-domain source text."
+  ],
+  "ledger_validation_notes": [
+    "Ledger meta should identify source chapter or excerpt."
+  ],
+  "schema_version": "v2.0"
+}

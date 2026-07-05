@@ -1,0 +1,18 @@
+{
+  "source_id": "book_chapter_sample",
+  "source_bank_id": "public_domain_story",
+  "source_kind": "book_chapter",
+  "title": "Book Chapter Sample",
+  "author": "Public Domain Author",
+  "publication_year": 1900,
+  "rights_status": "public_domain",
+  "source_url": "",
+  "text_files": ["source.txt"],
+  "image_files": [],
+  "adaptation_mode": "chapter_digest_drama",
+  "required_fidelity": [
+    "preserve named characters",
+    "preserve major turns",
+    "preserve ending or clearly mark excerpt ending"
+  ]
+}

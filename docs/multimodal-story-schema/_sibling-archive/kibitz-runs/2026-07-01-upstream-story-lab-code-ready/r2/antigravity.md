@@ -1,0 +1,27 @@
+VERDICT: yes-with-fixes
+One line why: The scaffold builds and runs, but contains startup crash risks on missing fixtures/directories, I/O side effects at import time, and a performance bottleneck when hashing large raw public domain assets in the cache digest.
+
+MUST-FIX BEFORE BUILD:
+1. [nodes.py:L49-76] Defect: Unhandled startup crash risk. The helper functions `_story_pack_choice_map()` and `_story_model_choices()` are called during the class-level definition of `OTR_StoryPackPreview.INPUT_TYPES` at ComfyUI startup. If the fixtures folder or the `story_packs` directory is missing, empty, or contains unreadable files, these methods raise unhandled `RuntimeError`s or parsing exceptions, crashing ComfyUI startup entirely.
+   Concrete Fix: Wrap the directory creation, presence checks, and file lookups in try-except blocks. If directories are missing or files are unreadable, log a warning to console using standard Python logging and return a safe fallback list (e.g., `["ERROR: Story packs missing"]`) instead of throwing unhandled exceptions during node class registration.
+2. [catalogs.py:L386] Defect: Startup crash risk due to import-time file parsing. `VISUAL_STYLES.update(_load_visual_style_fixtures())` runs at the module level when `catalogs.py` is imported (which happens at startup via `_visual_style_choices()`). If any of the JSON style policies on disk are malformed, it throws a `json.JSONDecodeError` at import time, crashing ComfyUI startup.
+   Concrete Fix: Catch `json.JSONDecodeError` and `OSError` inside `_load_visual_style_fixtures()` and log a warning to console, or load the visual style catalog lazily on the first call to `get_visual_style_policy()` or `_visual_style_choices()`.
+3. [nodes.py:L84-101] Defect: Content-hashing performance bottleneck. `_lab_state_digest()` reads the full contents of all files in `src/` and `fixtures/` via `path.read_bytes()` on every single cache evaluation of `IS_CHANGED`. If a user places large public domain texts or comic page images in `fixtures/public_domain_sources/`, this will cause huge I/O latency and memory overhead.
+   Concrete Fix: Restrict `_state_files()` to only scan and hash metadata (like `path.stat().st_mtime` and `path.stat().st_size`) and filenames, or only read and hash `.json` configuration and pack files, skipping raw source files.
+4. [catalogs.py:L286-317] Defect: Missing style-picker parameters in prompt profile. `get_profile()` for the `"public_domain_story"` source bank builds a `StoryPromptProfile` but leaves `style_picker_inventor_system_prompt`, `style_picker_chooser_system_prompt`, and `style_picker_chooser_user_template` unset. This defaults them to empty strings, which will lead to empty system prompts in downstream visual style picking nodes.
+   Concrete Fix: Define and pass non-empty default values for these style picker prompt parameters inside the public domain section of `get_profile()`.
+
+SHOULD-FIX:
+1. [nodes.py:L290-296] Defect: High dropdown-mismatch error rate. The node raises a hard `RuntimeError` if the manual selections for `source_bank_id`, `story_model_id`, and `story_pipeline_id` do not exactly match the internally defined keys of the chosen `story_pack`. Since ComfyUI cannot automatically sync other widgets upon a dropdown change without custom UI scripts, this is extremely error-prone.
+   Concrete Fix: [ASSUMPTION] Instead of throwing a hard error, let the node override the individual dropdown values with the attributes of the selected `story_pack` (logging a warning) and return the pack's properties in the output preview JSON.
+2. [nodes.py:L55-66] Defect: Duplicate story packs overwritten silently. If two story pack JSON files define duplicate `(source_bank_id, story_model_id, story_pipeline_id)` keys, `_story_pack_choice_map()` silently overwrites the dict entry. The developer will not know why one of their packs is missing from the dropdown selection list.
+   Concrete Fix: Check `if key in choices` in `_story_pack_choice_map()` and log a warning or error about the collision, rather than silently overwriting.
+3. [nodes.py:L166-233] Defect: Missing public domain manifest validation in UI. The `OTR_UpstreamStoryLabValidator` node does not run the public domain manifest and file references verification (`_validate_public_domain_manifests`), meaning that manifest errors will go unnoticed in the ComfyUI interface.
+   Concrete Fix: Import and run `_validate_public_domain_manifests()` from `validate_lab.py` (or copy its logic) within `OTR_UpstreamStoryLabValidator.validate()`.
+
+OPTIONAL / NICE-TO-HAVE:
+1. [preview.py:L142-160] Visual policy prompt leakage check coverage gap. `render_prompt_preview()` does not include any properties from the visual policy. Thus, the leakage validation (`find_forbidden_media_archive_terms()`) cannot detect if forbidden sci-fi terms have leaked into visual styles prompts. We should update the preview renderer to also append the visual policy's prompt strings.
+
+CUT THESE (over-engineering):
+1. [nodes.py:L84-101] Full repository content-hashing in `_lab_state_digest()`. Computing content-level SHA-256 hashes for all files under `src/` and `fixtures/` to implement `IS_CHANGED` is over-engineered.
+   Why safe to cut: Hashing the concatenated string of all file paths, modification times (`st_mtime`), and file sizes is fully sufficient to detect when any file has been added, removed, or modified.

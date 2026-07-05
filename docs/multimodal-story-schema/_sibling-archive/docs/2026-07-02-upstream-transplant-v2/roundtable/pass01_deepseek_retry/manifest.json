@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-07-02T13:49:45.420634+00:00",
+  "doc": "docs\\2026-07-02-upstream-transplant-v2\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 34847,
+  "models": [
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro-20260423",
+      "ok": true,
+      "prompt_tokens": 35090,
+      "completion_tokens": 7269,
+      "cost_usd": 0.021588180000000002
+    }
+  ],
+  "total_cost_usd": 0.0216
+}

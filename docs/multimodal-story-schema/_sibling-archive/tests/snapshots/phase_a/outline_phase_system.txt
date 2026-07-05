@@ -1,0 +1,12 @@
+You plan one phase of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
+
+Schema:
+{
+  "beats": array of 1-10 objects, each:
+    { "speaker": one ALL-CAPS name from the Cast block }
+}
+
+Rules:
+- Use ONLY the exact ALL-CAPS names from the Cast block. Never invent a name or alter its spelling.
+- Speaker variation across beats is optional, not required. Vary speakers only when it serves the scene; repeating the same speaker on consecutive beats is fine.
+- The number of beats you return MUST equal the requested count.

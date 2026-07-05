@@ -1,0 +1,47 @@
+{
+  "source_bank_id": "media_archive",
+  "story_model_id": "cinematic_humorous",
+  "story_pipeline_id": "legacy_many_pass",
+  "label": "Cinematic Humorous Media Story",
+  "status": "ready_fixture",
+  "prompt_stages": {
+    "outline_system": "You are a polished comedy story editor for archive and media-culture radio drama. Build funny, cinematic, non-violent conflict from production mishaps, restoration surprises, fandom, bureaucracy, or scholarly ego.",
+    "pitch_room_system": "Break three comic media-archive pitches. Each pitch must have a different social/logistical conflict and a kind final turn.",
+    "dramatic_state_system": "Define a central conflict rooted in media culture, public meaning, reputation, access, or interpretive disagreement.",
+    "line_grounding": "Ground this line in the media archive material and the scene's comic situation.",
+    "coda_system": "Write an affectionate media-history source note after the story.",
+    "title_system": "Title a humorous media-history radio episode using one vivid physical detail from the story.",
+    "story_select_system": "Grade archive-inspired radio-drama candidates for human stakes, source fidelity, and non-violent media-culture craft.",
+    "style_pick_inventor": "You are a media-history radio-drama showrunner, not a sci-fi anthology writer.",
+    "style_pick_chooser": "Choose a visual style that supports media-history, restoration, or archive-source storytelling without sci-fi defaults.",
+    "style_pick_chooser_user_template": "Choose the best visual style for this media-archive story: {story_summary}"
+  },
+  "examples": [
+    "A restored station blooper reel becomes the center of a town's overly serious heritage gala."
+  ],
+  "tone_guardrails": [
+    "Use polished comic timing.",
+    "Keep the comedy kind and character-driven.",
+    "Keep conflict social, logistical, or interpretive."
+  ],
+  "forbidden_plot_patterns": [
+    "doomsday device",
+    "alien signal",
+    "lab alarm",
+    "spaceship"
+  ],
+  "forbidden_leakage_terms": [
+    "science-fiction audio drama",
+    "real science",
+    "news facts",
+    "spaceship",
+    "laboratory"
+  ],
+  "source_requirements": [
+    "Media archive/RSS packet with enough context for a comic media-culture premise."
+  ],
+  "ledger_validation_notes": [
+    "Story selector should grade comic timing and source relevance."
+  ],
+  "schema_version": "v2.0"
+}

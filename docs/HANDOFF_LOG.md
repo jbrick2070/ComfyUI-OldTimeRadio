@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (session) -- HEAD d572dd2e -> archive/handoff commit (v2.0-alpha) -- July-4 code-ready sprints SHIPPED; multi-modal story schema build plan LANDED; sibling repo archived + nuked
+Did:
+- Sprint 1 radio-face-logic @f8b6ebd2; Sprint 2 still_word @e821d6fd + follow-on @41f64185; Sprint 3 item-2 SFX-ledger residual @0ceaf1c2 -- all GREEN (full suite 6180, Bug Bible 16) + pushed.
+- Sprint 3 item-1 ("big LLM prompt update") re-scoped: the two-repo "transplant" shape was REJECTED (unanimous kibitz, HIGH). Brought the full multi-modal story/visual DESIGN + the lab's schema blueprints into THIS repo (docs/multimodal-story-schema/{design-reference,schema-examples}) and wrote the in-repo BUILD_PLAN (4 stages, clean-break, no fallbacks, into existing nodes/ -- no new package).
+- Archived the sibling ComfyUI-OTR-UpstreamStoryLab (all design + kibitz hardening + code drafts) into docs/multimodal-story-schema/_sibling-archive/, then DELETED the sibling folder. Its main history also remains on GitHub origin (jbrick2070/ComfyUI-OTR-UpstreamStoryLab).
+Current step: MULTI-MODAL STORY SCHEMA build -- STAGE 1 (Content->JSON foundation). Plan of record: docs/multimodal-story-schema/BUILD_PLAN.md.
+Next: on operator GO, write Stage 1's hardened sub-plan (pack schema + loader + canonical seam list + where packs live under nodes/), then code the first BYTE-IDENTICAL chunk (loader + current sci-fi prompts -> first pack). Reference the archived phase-a py-work.
+Commits: f8b6ebd2, e821d6fd, 41f64185, 0ceaf1c2, a7bdc42d, 1a3571e1, d572dd2e (+ archive/handoff)
+
 ## 2026-07-04 (overnight, cont.) -- HEAD fae7081f (v2.0-alpha) -- ELEVENLABS CAST-VOICE POOL FIXED + PUSHED; cloud babysit RUNNING
 Did (operator overnight mission = get cloud engines + credits GREEN e2e; priority 11labs + Sonilo cast mapping):
 - ElevenLabs "no provider_voice_id" root cause = the voice bank had ZERO elevenlabs rows, so CastLock never

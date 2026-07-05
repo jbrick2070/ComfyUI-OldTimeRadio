@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-07-02T13:47:09.412159+00:00",
+  "doc": "docs\\2026-07-02-upstream-transplant-v2\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 34847,
+  "models": [
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort"
+    },
+    {
+      "requested_model": "x-ai/grok-4.3",
+      "resolved_model": "x-ai/grok-4.3-20260430",
+      "ok": true,
+      "prompt_tokens": 31679,
+      "completion_tokens": 2773,
+      "cost_usd": 0.04653125
+    },
+    {
+      "requested_model": "moonshotai/kimi-k2.6",
+      "resolved_model": "moonshotai/kimi-k2.6-20260420",
+      "ok": true,
+      "prompt_tokens": 31999,
+      "completion_tokens": 15525,
+      "cost_usd": null
+    }
+  ],
+  "total_cost_usd": 0.0465
+}

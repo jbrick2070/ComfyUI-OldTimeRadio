@@ -1,0 +1,28 @@
+{
+  "packet_version": 1,
+  "source_bank_id": "media_archive",
+  "source_mode": "fixture",
+  "source_kind": "archive_item",
+  "source_label": "Media archive fixture",
+  "rights_status": "unknown",
+  "source_title": "The Missing Reel In Cabinet 14",
+  "source_author": "Fictional Archive Fixture",
+  "source_url": "https://example.invalid/archive/missing-reel-cabinet-14",
+  "source_hash": "fixture-media-archive-001",
+  "source_text_ref": "",
+  "source_summary": "A small-town archive discovers that a mislabeled reel may contain the only surviving record of a beloved local broadcast.",
+  "raw_text": "Fixture only. Shape this as a media-restoration adventure, not a sci-fi anthology plot.",
+  "fixture_casting_brief": "Characters orbit the care, recovery, and meaning of a media artifact: The Missing Reel In Cabinet 14",
+  "fixture_script_brief": "",
+  "fixture_close_brief": "Archive note: preservation work can change what a community remembers and who gets heard.",
+  "fixture_key_terms": [
+    "archive",
+    "restoration",
+    "broadcast history"
+  ],
+  "fixture_fidelity_rules": [
+    "Do not convert the archive object into a futuristic invention.",
+    "Keep conflict non-violent and media-cultural."
+  ],
+  "schema_version": "v2.0"
+}
