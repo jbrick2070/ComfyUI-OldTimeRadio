@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (session 2 -- multi-modal Stage 2 chunks 2A+2B SHIPPED @1d06f5c3, kibitz-hardened; CURRENT STEP = 2C widget, gated) | branch v2.0-alpha HEAD 6bba2190, 4 commits UNPUSHED | prod/main + tags operator-GATED.
+> Last updated 2026-07-05 (session 3 -- STAGE 2 COMPLETE: chunk 2C SHIPPED @78bee5d5, own kibitz r1-r4 arc converged; CURRENT STEP = STAGE 3 visual_style) | branch v2.0-alpha HEAD 78bee5d5, 6 commits UNPUSHED (operator gates the push this arc) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -69,7 +69,24 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = STAGE 2 CHUNK 2C (source_bank selector widget, GATED) -- then STAGE 3 (visual_style).**
+**CURRENT STEP = STAGE 3 (visual_style schema).** STAGE 2 is COMPLETE.
+
+**2C SHIPPED 2026-07-05 @78bee5d5** (kibitz r1-r4 CONVERGED, codex panel --
+antigravity credit-bugged/dropped -- Claude anchor+judge; artifacts + plan of
+record `kibitz-runs/2026-07-05-multimodal-2c/`): source_bank widget at slot 25
+(default science_news, registry-live choices, fail-loud INPUT_TYPES);
+require_runnable_bank is the FIRST statement of run() (zero side effects on a
+non-runnable pick); selection threads run() -> _resolve_inputs -> the 3 writer
+compose_line sites -> compose_line/draft (incl. all 3 recursive repair calls)
+-> resolve_creative_system_prompt(source_bank_id); meta.source_bank stamped;
+source_bank on both CREATIVE_WHITELISTs. BONUS root-cause fix BUG-LOCAL-416
+(refine _core locals() leak -> TypeError on every refine-enabled run since
+2026-06-24; kibitz-found). Suite 6247/0 (+15 2C tests), Bug Bible 16.
+NOTE: only `line_composer_system` is pack-routed today -- the LANE-ENABLEMENT
+CHECKLIST (STAGE2_SUBPLAN.md section 4b) gates any future runnable:true flip
+(outline seams, exchange seam, source payload, remaining seams).
+
+Prior context (2A+2B, shipped @1d06f5c3):
 STAGE 2 CHUNKS 2A+2B SHIPPED 2026-07-05 (@1d06f5c3; precondition @843ced43; sub-plan v3 @cda2076a),
 science lane byte-identical, zero episode change:
 - Precondition: `_otr_outline.py` outline-resolver `except Exception -> overlay=None` swallow REMOVED
@@ -92,8 +109,7 @@ the sub-plan; artifacts `kibitz-runs/2026-07-05-multimodal-stage2/`. Sub-plan of
 `docs/multimodal-story-schema/STAGE2_SUBPLAN.md` (v3 FINAL -- 2C spec lives there: widget appended at
 END slot 25 default science_news, guardrail test :673-733 updated SAME commit, run() threads selection
 explicitly, require_runnable_bank before story execution, NO fallback choice list at INPUT_TYPES).
-NEXT = 2C (own kibitz gate; touches workflows/otr_scifi_16gb_full.json) -> Stage 3 (visual_style) ->
-Stage 4 (asserts->JSON enforcer).
+NEXT = Stage 3 (visual_style schema; see BUILD_PLAN) -> Stage 4 (asserts->JSON enforcer).
 
 Prev step: WIDGET-SURFACE CLEANUP BUILD -- COMPLETE @82f39a23 (history in `docs/HANDOFF_LOG.md`).
 - Batch 1 @364a9278 -- surface-only removal (node 80 delivery_profile + 81/82/83 stereo_policy);
