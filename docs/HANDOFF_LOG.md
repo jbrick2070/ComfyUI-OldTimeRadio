@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (session 2) -- MULTI-MODAL STORY SCHEMA Stage 2 (2A+2B) SHIPPED -- v2.0-alpha
+Did:
+- Precondition @843ced43: removed the `_otr_outline.py` outline-resolver `except Exception -> overlay=None` swallow (Fable forward-note) + AST pin test.
+- STAGE2_SUBPLAN v3 @cda2076a: kibitz r1+r2 (codex+antigravity, Claude anchor+judge) CONVERGED -- path-is-coordinate, bank.runnable-only run gate, cache-safe loader split, lazy registries, exact lane key sets; rejected the panel's silent-fallback/placeholder-allowlist fixes.
+- 2A+2B @1d06f5c3: banks.json+pipelines.json registries + `nodes/_otr_story_routing.py` (lazy, sweep+cross-refs+precedence, typed errors, `_clear_caches`) + `load_pack_with_seams` split cache + router routed via `resolve_story_pack("science_news")` (byte-identical); 3 lane packs authored runnable:false (media_archive, public_domain_story, custom_source_bank/simple_4). Suite 6232/0, Bug Bible 16, no BOM, AST-parse clean.
+Current step: STAGE 2 CHUNK 2C (source_bank widget, GATED -- spec in STAGE2_SUBPLAN.md section 4; touches the real workflow JSON + guardrail test :673-733 same commit; own kibitz gate). Then Stage 3 visual_style.
+Next: operator go on 2C, or jump to Stage 3 planning; commits NOT pushed this session (kickoff said do not push unprompted).
+Commits: 843ced43, cda2076a, 1d06f5c3 (local, v2.0-alpha).
+
 ## 2026-07-05 (session) -- MULTI-MODAL STORY SCHEMA Stage 1b SHIPPED (first live consumer, byte-identical) -- v2.0-alpha
 Did:
 - Wired the science lane's `line_composer_system` creative seam to source from the JSON story pack via `_otr_creative_prompt_router.py` (get_pack_prompt), byte-identical to `_otr_line_composer._SYSTEM_PROMPT` -> zero episode-output change. Period branch checked first; `outline` left on its constant so the `_otr_outline.py:1847 resolved is _SYSTEM_PROMPT` sentinel is untouched (smaller blast radius).
@@ -13,7 +22,7 @@ Did:
 - GATES: reserved Fable §9 gate = SHIP (verified byte-identity live, no hidden object-identity dep, caller-count unchanged, fail-loud, no import cycle; forward-note: remove the _otr_outline.py:1851 `except Exception -> overlay=None` swallow BEFORE Stage 2 pack-sources outline). Codex cross-check (operator asked, cheapest) = SHIP, 0 must-fix. Suite 6200/0, Bug Bible 16.
 Current step: STAGE 2 -- story-path routing (banks.json/pipelines.json + source_bank/story_pipeline resolution, fail-loud) + author public-domain / media-archive / simple-4-LLM lanes (adapt schema-examples). Then Stage 3 (visual_style), Stage 4 (asserts->JSON enforcer).
 Next: Stage 2 sub-plan (kibitz if torn) then code the routing + first new lane, per-chunk green + push.
-Commits: <this chunk> (pushed to v2.0-alpha). Kibitz: kibitz-runs/2026-07-05-multimodal-stage1b/.
+Commits: c8a9be74 (pushed to v2.0-alpha, HEAD==origin). Kibitz: kibitz-runs/2026-07-05-multimodal-stage1b/.
 
 ## 2026-07-04 (session) -- MULTI-MODAL STORY SCHEMA Stage 1 Chunk 1 SHIPPED (dormant foundation) -- v2.0-alpha
 Did:
@@ -22,7 +31,7 @@ Did:
 - CODED Chunk 1 (dormant, byte-identical, ZERO production behavior change): nodes/_otr_story_pack.py (stdlib fail-loud loader) + nodes/story_packs/science_news/science_news_default.json (12 seams byte-identical by construction) + tests/test_story_pack_stage1.py (18 tests: byte-identity via runtime-import, fail-loud matrix, DORMANCY guard). Suite 6198/0, Bug Bible 16, B7 in-suite. Fable §9 gate RESERVED for Stage 1b (the make-or-break wiring).
 Current step: STAGE 1b -- wire the first live consumer (pilot line_composer_system) after migrating the object-identity `is`->`==` sites; Stage 1b gets its own kibitz + the reserved Fable gate.
 Next: Stage 1b precondition (identity migration + repo_id->pack-coords map in _otr_creative_prompt_router.py), then wire the pilot seam via get_pack_prompt.
-Commits: <this chunk> (pushed to v2.0-alpha). Kibitz artifacts: kibitz-runs/2026-07-04-multimodal-stage1/.
+Commits: 36e8b4cb (pushed to v2.0-alpha, HEAD==origin). Kibitz artifacts: kibitz-runs/2026-07-04-multimodal-stage1/.
 
 ## 2026-07-04 (session) -- HEAD d572dd2e -> archive/handoff commit (v2.0-alpha) -- July-4 code-ready sprints SHIPPED; multi-modal story schema build plan LANDED; sibling repo archived + nuked
 Did:

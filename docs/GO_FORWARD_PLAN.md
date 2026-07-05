@@ -69,22 +69,31 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = STAGE 2 (story-path routing: banks/pipelines + new lanes).** STAGE 1 CHUNK 1 (dormant
-foundation) + STAGE 1b (first live consumer) BOTH SHIPPED this session, byte-identical, zero episode
-change. Loader `nodes/_otr_story_pack.py` (stdlib fail-loud: strict validator, dup-key + whitespace
-reject, typed error hierarchy, load-once cache, get_pack_prompt[_or_none]) + `nodes/story_packs/
-science_news/science_news_default.json` (12 seams byte-identical to the live constants) + Stage 1b:
-`_otr_creative_prompt_router.py` now sources `line_composer_system` from the pack (period branch first;
-outline stays object-identical so the `_otr_outline.py:1847 is` sentinel is untouched; `is`->`==`
-migrated at router:62/:103 + c7-clamp). tests/test_story_pack_stage1.py (20 tests incl. router
-equivalence + fail-loud). Suite 6200/0, Bug Bible 16. GATES: kibitz r1+r2 (codex+antigravity) + 2
-Sonnet-5 subagents on Chunk 1; Fable §9 = SHIP + codex cross-check = SHIP on Stage 1b. Sub-plan of
-record: `docs/multimodal-story-schema/STAGE1_SUBPLAN.md` (v3). NEXT = STAGE 2: add banks.json +
-pipelines.json + source_bank/story_pipeline routing (fail-loud on unknown id) + author the
-public-domain / media-archive / simple-4-LLM lanes (adapt schema-examples). FORWARD-NOTE (Fable):
-before Stage 2 ever pack-sources `outline`, REMOVE the `_otr_outline.py:1851 except Exception -> overlay
-=None` swallow (it would become a silent fallback). Then Stage 3 (visual_style), Stage 4 (asserts->JSON
-enforcer). Kibitz artifacts: `kibitz-runs/2026-07-04-multimodal-stage1/` + `2026-07-05-multimodal-stage1b/`.
+**CURRENT STEP = STAGE 2 CHUNK 2C (source_bank selector widget, GATED) -- then STAGE 3 (visual_style).**
+STAGE 2 CHUNKS 2A+2B SHIPPED 2026-07-05 (@1d06f5c3; precondition @843ced43; sub-plan v3 @cda2076a),
+science lane byte-identical, zero episode change:
+- Precondition: `_otr_outline.py` outline-resolver `except Exception -> overlay=None` swallow REMOVED
+  (Fable forward-note) + AST pin test (no resolver call may sit in a try/except).
+- 2A routing: `nodes/story_packs/banks.json` + `pipelines.json` registries (LIST rows, element-level
+  id uniqueness) + `nodes/_otr_story_routing.py` (stdlib, LAZY -- zero import-time I/O, test-pinned;
+  sweep: every story_packs/ subdir must be a registered bank, every pack header triple must match its
+  path; cross-refs incl. pipeline-precedence equality + required_seams presence; typed StoryRoutingError
+  hierarchy). RUN GATE = `bank.runnable` ONLY (`pipeline.executable` is metadata, never consulted).
+  Cache-safe loader split: `load_pack` stays strict; `load_pack_with_seams(path, extra_seams)` has its
+  OWN cache keyed (path, seams) -- no strict-cache poisoning; sole caller = routing (test-pinned).
+  Router drops `_SCIENCE_PACK_PATH` -> `resolve_story_pack("science_news")` (bank binding transitional
+  until 2C threads the widget).
+- 2B lanes: `media_archive/media_restoration_adventure` + `public_domain_story/faithful_radio_adaptation`
+  (exact keys {line_composer_system, coda_system}) + `custom_source_bank/simple_4_prompt_experimental`
+  (exactly its 4 pipeline-declared pass seams; strict load_pack rejects it by design). All 3 banks
+  `runnable:false` -- run-intent raises StoryBankNotRunnableError, NEVER falls through to science.
+Suite 6232/0, Bug Bible 16. GATES: kibitz r1+r2 (codex+antigravity, Claude anchor+judge) CONVERGED on
+the sub-plan; artifacts `kibitz-runs/2026-07-05-multimodal-stage2/`. Sub-plan of record:
+`docs/multimodal-story-schema/STAGE2_SUBPLAN.md` (v3 FINAL -- 2C spec lives there: widget appended at
+END slot 25 default science_news, guardrail test :673-733 updated SAME commit, run() threads selection
+explicitly, require_runnable_bank before story execution, NO fallback choice list at INPUT_TYPES).
+NEXT = 2C (own kibitz gate; touches workflows/otr_scifi_16gb_full.json) -> Stage 3 (visual_style) ->
+Stage 4 (asserts->JSON enforcer).
 
 Prev step: WIDGET-SURFACE CLEANUP BUILD -- COMPLETE @82f39a23 (history in `docs/HANDOFF_LOG.md`).
 - Batch 1 @364a9278 -- surface-only removal (node 80 delivery_profile + 81/82/83 stereo_policy);
