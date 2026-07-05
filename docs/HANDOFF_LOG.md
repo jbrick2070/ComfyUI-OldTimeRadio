@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (night) -- TOTAL-COVERAGE CHUNK A1 SHIPPED (schema v2 + image lane) -- v2.0-alpha
+Did:
+- @2b4a481a (pushed, HEAD==origin): visual-style TOTAL-COVERAGE chunk A1 per STAGE3_TOTAL_COVERAGE_SUBPLAN v5. Schema v2 loader (11 str + 4 dict fields; {form}/{base}-once + mouth-vocab + 240-char motion + forbidden-terms-over-all-leaves lints; v1 pack fails LOUD naming path + "upgrade to v2"); ALL 5 packs v2 (sci_fi extraction BYTE-IDENTICAL -- 34-golden pre/post venv capture; non-defaults dormant sci-fi defaults). Image-lane re-routes: STYLE_ANCHOR* -> *_GEOMETRY + pack look; build_radio_host_prompt style->radio_host_style rename + pack subjects on all 3 arms (vstyle= threading); portrait_instruction_look + scene_instruction_look (only-when-non-empty); get_open_subject pack templates (announcer_visual->"announcer"); derive_image_prompts resolves style ONCE at entry. +54 tests incl. AST guards (fixture reads banned, style= threading pinned); 3B pins v1->v2 same commit.
+- Suite 6494/0 (was 6440), Bug Bible 16-pass, workflow JSON untouched. One replace_all over-match in test_brief_radio_host (_announcer_portrait_ledger helper) caught by the known-fail guard + fixed same session.
+Current step: TOTAL-COVERAGE chunk A2 (motion registers in build_request_from_shot + radio_object/plate look + emblem fallback + provenance keys).
+Next: build A2 per the v5 plan; then B (author 4 packs + delta tests) -> C (still_word).
+Commits: 2b4a481a (pushed) + docs.
+
 ## 2026-07-05 (evening) -- LANE CHUNK 3 SHIPPED + VISUAL-STYLE TOTAL-COVERAGE PLAN CONVERGED -- v2.0-alpha
 Did:
 - @d7ea448c (pushed, HEAD==origin): lane-enablement chunk 3 -- source-payload fetcher/interpreter contracts. New nodes/_otr_source_payload.py (typed errors, EXACT 7-key payload validator, interpreter-result validator w/ dual-surface coherence returning the dump = meta["news"], science_rss + news_interpreter verbatim wrappers, NIE->SourceInterpretError chained-only); pipelines.json requires_source_contract; sweep = dangling ids fail load + runnable needs a real lane; writer fetch + D.2.5 routed through the bank's contracts (halt stamps AND re-raises the NIE cause byte-identically); S31 B6 + paired-wiring pins re-pointed. 41 tests; suite 6440/0; Bug Bible 16. Kibitz r1-r4 (codex+antigravity) kibitz-runs/2026-07-05-multimodal-chunk3/. 4b item 3 DONE.
