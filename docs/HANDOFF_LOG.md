@@ -12,7 +12,7 @@ Did:
 - Authored the 4 non-default packs' still_word voices (anime manga/cel; cartoon rubber-hose outline; paper_origami folded-card; archival restored-print) -- every one of the 3 fields changed from the sci_fi defaults; backdrop stays color+light+atmosphere only; title-mood keeps "no lettering"; no pack violates its own forbidden_terms.
 - Tests: new test_visual_styles_c.py (deltas, sci_fi byte-identity through the re-route, provenance stamps, lettering-lock determinism, negative-vocab, AST re-route guard). Retired the A1 TestDormantDefaults still_word pin; re-pointed the A2 provenance pin + the test_still_word model-agnostic signature pin (now [meta,role,beat_line,style]; still NO engine arg). Suite 6614/0, Bug Bible 16, B7 in-suite green, workflow JSON untouched.
 Current step: TOTAL-COVERAGE COMPLETE (A1+A2+B+C) -> operator acceptance (anime episode's announcer/radio + music + still_word stills provably carry the anime fields via ledger stamps; operator eyeball gates the look).
-Next: operator acceptance render; promptless viz_* gap is a config choice (select promptable engines for announcer/music video roles), no code owed.
+Next: OPERATOR AT YOGA -- next window CODES AUTONOMOUSLY (do NOT wait): acceptance render is GPU-gated so skip it; drive the codeable items -- credits N1/N2/N3 nits, still_word `_engine_by_node_key` conformance debt, then S-C C1 audio_motion_profile -- regress + PUSH per green chunk (always push). Promptless viz_* gap is a config choice, no code owed.
 Commits: 3eced145 (pushed) + this docs commit.
 
 ## 2026-07-05 (late night, session end -- operator out of credits) -- TOTAL-COVERAGE CHUNK B SHIPPED (4 pack voices authored) -- v2.0-alpha

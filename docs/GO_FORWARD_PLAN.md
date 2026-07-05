@@ -80,6 +80,21 @@ PROMOTED from "deferred" to an ORDERED build item, queued immediately after
 lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
 needs promptable engines selectable/selected for announcer/music video roles.
 
+**OPERATOR DIRECTIVE 2026-07-05 (at yoga -- CODE AUTONOMOUSLY, DO NOT WAIT):**
+the operator is out; the next window must NOT stop for a go -- start coding
+IMMEDIATELY and keep coding as much as possible until it genuinely can't (needs
+the operator / GPU / cloud creds / a real fork). The anime ACCEPTANCE render
+below is OPERATOR/GPU-gated, so DON'T block on it -- skip straight to the
+CODEABLE, non-gated items and drive them in forward order: (1) the credits Fable-
+gate non-blocking follow-ups N1/N2/N3 (section 1 "NON-BLOCKING follow-ups": restore
+`from typing import Optional` in otr_post_upscale_procgen_blend.py; node-93 restamp
+final_video_path truthfully at 86/85; strip the stale node-93 caption log strings);
+(2) the still_word conformance debt (`_engine_by_node_key` last-wins -> iterate ALL
+engines per node_key, section "Conformance debt"); (3) S-C C1 shared
+`audio_motion_profile` (section 1A, NOT STARTED). Regress + commit + PUSH per green
+chunk (rule #1: always push, don't ask); update GO_FORWARD + HANDOFF_LOG each chunk;
+/kibitz if torn. Only escalate for GPU/cloud/operator-eyeball work.
+
 **CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD COMPLETE (all 4 chunks
 A1+A2+B+C shipped). NEXT = OPERATOR ACCEPTANCE (not code):** render an ANIME
 episode and confirm its announcer/radio + music stills AND still_word cards
