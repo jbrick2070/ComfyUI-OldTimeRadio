@@ -89,9 +89,10 @@ CODEABLE, non-gated items and drive them in forward order: (1) the credits Fable
 gate non-blocking follow-ups N1/N2/N3 (section 1 "NON-BLOCKING follow-ups": restore
 `from typing import Optional` in otr_post_upscale_procgen_blend.py; node-93 restamp
 final_video_path truthfully at 86/85; strip the stale node-93 caption log strings);
-(2) the still_word conformance debt (`_engine_by_node_key` last-wins -> iterate ALL
-engines per node_key, section "Conformance debt"); (3) S-C C1 shared
-`audio_motion_profile` (section 1A, NOT STARTED). Regress + commit + PUSH per green
+(1)+(2) DONE @2c1d22aa (credits nits: Optional import, node-85 truthful final_video_path
+restamp fail-soft, node-93 stale caption strings) + @7d7005c1 (conformance debt:
+`_engines_by_node_key` node_key->LIST, not last-wins). (3) S-C C1 shared
+`audio_motion_profile` (section 1A) = IN PROGRESS. Regress + commit + PUSH per green
 chunk (rule #1: always push, don't ask); update GO_FORWARD + HANDOFF_LOG each chunk;
 /kibitz if torn. Only escalate for GPU/cloud/operator-eyeball work.
 

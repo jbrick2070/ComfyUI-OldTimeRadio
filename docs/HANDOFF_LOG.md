@@ -6,6 +6,22 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (yoga, autonomous) -- CREDITS N1/N2/N3 + CONFORMANCE DEBT SHIPPED -- v2.0-alpha
+Did:
+- @2c1d22aa (pushed): credits Fable-gate nits. N1 restored `from typing import Optional` in
+  otr_post_upscale_procgen_blend.py. N2 node-85 OTR_MasterAudioMux now TRUTHFULLY restamps
+  ledger.final_video_path to the terminal deliverable (new `_stamp_final_video_path`, fail-soft,
+  never blocks the mux; also records meta.obs_final_path) -- node 93's stamp pointed at the
+  pre-credits/pre-mux blend. N3 stripped the stale "captioned blend"/"captions above" log +
+  comment strings in node 93 (captions_ass_path pinned None; caption owner is node 86).
+- @7d7005c1 (pushed): B5 conformance debt -- `_engine_by_node_key` -> `_engines_by_node_key`
+  returns node_key->LIST (not last-wins); test_emitted_kwargs_are_declared iterates EVERY buildable
+  adapter on a node_key so shared keys (ideo/ideo_word, elevenlabs tiers) all get verified.
+- Suite 6614/0 both chunks (targeted + full), Bug Bible 16, workflow JSON untouched, NOBOM verified.
+Current step: S-C C1 shared audio_motion_profile (extraction + ledger stamp; C2 consumers deferred).
+Next: build C1 (grounding first; kibitz if the producer-node design is a real fork).
+Commits: 2c1d22aa, 7d7005c1 (pushed) + this docs commit.
+
 ## 2026-07-05 (resume) -- TOTAL-COVERAGE CHUNK C SHIPPED -- VISUAL_STYLE TOTAL COVERAGE CODE-COMPLETE -- v2.0-alpha
 Did:
 - @3eced145 (pushed, HEAD==origin): chunk C -- still_word typography/backdrop/title-mood PACK OWNERSHIP. compose_still_word_prompt + the derive_image_prompts provenance stamp read the VALUES from the resolved VisualStyle (still_word_typography[genre]/still_word_backdrop[genre]/still_word_title_mood_style); the per-episode genre SELECTOR (_still_word_genre) + the per-episode lettering LOCK stay Python (operator 2026-07-04). Added an optional resolve-once `style=` kwarg to the composer (threaded from derive's _vstyle). The 3 module maps are now extraction FIXTURES (marked + AST-guarded out of production). Provenance re-stamped python:still_word_word:<g> -> still_word_typography:<g> and python:still_word_title_mood -> still_word_title_mood_style.
