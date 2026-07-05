@@ -449,6 +449,18 @@ OPEN_SUBJECT_ANNOUNCER_DEFAULT = ("{form} in a broadcast booth, glowing "
 OPEN_SUBJECT_DEFAULT_DEFAULT = "{form} glowing warmly, vacuum tubes and dials"
 
 
+def open_subject_key(role: str, synthetic: bool) -> str:
+    """The pack ``open_subjects`` key for a role: ``synthetic`` wins, role
+    "announcer_visual" maps to "announcer" (r4 AG M2), everything else is
+    "default". Shared by :func:`get_open_subject` and the chunk-A2
+    provenance stamps so the two can never disagree. Pure."""
+    if synthetic:
+        return "synthetic"
+    if str(role or "") == "announcer_visual":
+        return "announcer"
+    return "default"
+
+
 def get_open_subject(role: str, synthetic: bool, meta: Any = None,
                      style: Any = None) -> str:
     """The CONCRETE, FACELESS radio subject for an OPEN / bookend beat (r5b
@@ -471,15 +483,15 @@ def get_open_subject(role: str, synthetic: bool, meta: Any = None,
     callers pass the ALREADY-RESOLVED style (helpers never re-resolve --
     r2 codex S1 + AG M3)."""
     form = radio_form_from_meta(meta or {})
-    if synthetic:
-        template = (style.open_subjects["synthetic"] if style is not None
-                    else OPEN_SUBJECT_SYNTHETIC_DEFAULT)
-    elif str(role or "") == "announcer_visual":
-        template = (style.open_subjects["announcer"] if style is not None
-                    else OPEN_SUBJECT_ANNOUNCER_DEFAULT)
+    key = open_subject_key(role, synthetic)
+    if style is not None:
+        template = style.open_subjects[key]
     else:
-        template = (style.open_subjects["default"] if style is not None
-                    else OPEN_SUBJECT_DEFAULT_DEFAULT)
+        template = {
+            "synthetic": OPEN_SUBJECT_SYNTHETIC_DEFAULT,
+            "announcer": OPEN_SUBJECT_ANNOUNCER_DEFAULT,
+            "default": OPEN_SUBJECT_DEFAULT_DEFAULT,
+        }[key]
     return template.format(form=form)
 
 

@@ -216,9 +216,9 @@ class TestExtractionFixtures:
         assert (s.still_word_title_mood_style
                 == imgp._STILL_WORD_TITLE_MOOD_STYLE)
 
-    def test_a2_look_fields_match_their_pending_literals(self):
-        # radio_object_look / plate_look / emblem re-route in A2; the pack
-        # values must already equal the live literals they will replace.
+    def test_a2_look_fields_match_their_source_literals(self):
+        # radio_object_look / plate_look / emblem are consumed by chunk A2;
+        # the pack values equal the literals they replaced (fixtures).
         s = vs.resolve_visual_style("sci_fi_radio")
         assert s.radio_object_look in imgp._RADIO_OBJECT_ANCHOR
         assert s.radio_object_look in imgp._RADIO_OBJECT_ANCHOR_WIDE

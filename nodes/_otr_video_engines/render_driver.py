@@ -526,6 +526,14 @@ _OPENING_MUSIC_SUFFIX = "b000_music_open"
 #: refactor had diluted these into ~185-char scene-DESCRIPTIVE "brief+beat"
 #: prompts ("a 1940s radio station studio, glowing warmly..."), which the model
 #: reads as "render this set" -> flat pans on the conditioned still.
+# Chunk A2 (visual-style TOTAL COVERAGE, 2026-07-05): the console/music
+# motion VALUES are pack-owned (VisualStyle.motion_registers, exact keys
+# below); the role->key SELECTOR + the OTR_LTX_OPEN_MOTION_KEY env retarget
+# stay Python. This dict survives ONLY as the sci_fi_radio extraction
+# fixture (pack byte-identity pinned in tests) -- production reads the pack
+# in build_request_from_shot (AST-pinned).
+_MOTION_REGISTER_KEYS = frozenset(
+    {"announcer", "music_open", "music_close", "music_inter"})
 _LTX_MOTION_PROMPT_BY_ROLE = {
     "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
                   "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
@@ -595,8 +603,9 @@ def _ia2v_talking_register_active(engine_id):
 
 
 def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
-    """Map an OTR shot role + beat id to a :data:`_LTX_MOTION_PROMPT_BY_ROLE`
-    key, or ``""`` if the beat is not a radio-console motion beat. Pure."""
+    """Map an OTR shot role + beat id to a motion-register key (the pack's
+    ``motion_registers`` / :data:`_MOTION_REGISTER_KEYS`), or ``""`` if the
+    beat is not a radio-console motion beat. Pure."""
     sid = str(shot_id or "")
     role = str(shot_role or "")
     # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
@@ -611,7 +620,9 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         # open is RESTORED as the default (operator "moving grooving"). music_inter
         # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
         _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
-        return (_open_key if _open_key in _LTX_MOTION_PROMPT_BY_ROLE
+        # A2: membership check against the STATIC key set (the values moved
+        # to the style pack; the retired fixture dict is not consulted).
+        return (_open_key if _open_key in _MOTION_REGISTER_KEYS
                 else "music_inter")
     if role == "announcer_visual":
         return "announcer"
@@ -971,6 +982,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # pick is redirected here so every downstream resolution (init_image,
     # canvas, audio) already sees the corrected engine.
     _enforce_radio_is_host(shot)
+    # Chunk A2 (visual-style TOTAL COVERAGE): resolve the episode's visual
+    # style ONCE per shot, OUTSIDE any swallow (fail-loud law) -- the
+    # console/music motion registers below read pack VALUES; the style id is
+    # stamped on the request observability for the trace/history rows.
+    # ImportError shim only (3A pattern).
+    try:
+        from .._otr_visual_styles import get_visual_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_visual_styles import get_visual_style  # type: ignore
+    _vstyle = get_visual_style((ledger or {}).get("meta") or {})
     line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
     # Round 5 F5: the SHOT row carries the ShotLock-normalized char_id (the
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
@@ -1404,6 +1425,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                                                else "none")
     req["observability"]["init_image"] = (os.path.basename(init_image)
                                           if init_image else "")
+    # Chunk A2 provenance (r2 codex M5): ADDITIVE observability -- which
+    # visual style governed this request. prompt_field_source joins below
+    # only when a pack field actually fed the prompt text.
+    req["observability"]["visual_style"] = _vstyle.style_id
     # FULL-FRAME landscape for EVERY non-talking-head engine (operator look-QA
     # 2026-06-10 + 2026-06-14): build_request's default canvas is the HuMo
     # PORTRAIT (480x832, the accepted talking-head pillarbox). LTX/Wan were given
@@ -1653,8 +1678,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # AFTER the motion verbs, dropped if it breaks the 240-char budget.
             _motion_key = _ltx_motion_role_key(
                 _shot_role, shot.get("shot_id"), _is_synthetic_open)
-            scene_prompt = (_LTX_MOTION_PROMPT_BY_ROLE.get(_motion_key)
-                            or _LTX_MOTION_PROMPT_BY_ROLE["announcer"])
+            # Chunk A2: the motion VALUE comes from the style pack (exact-key
+            # indexing -- the loader guarantees the 4 console keys, and the
+            # old silent `or ...["announcer"]` fallback is RETIRED per r2
+            # codex S3: a missing key raises LOUD, never remaps to announcer).
+            # SUBSTITUTION ORDER (r3): pack motion value FIRST, THEN the
+            # _talking_swap override -- the probe-locked IA2V talking prompt
+            # is a VERBATIM Python constant (P8) and always outranks the pack.
+            scene_prompt = _vstyle.motion_registers[_motion_key]
+            _field_source = "motion_registers:%s" % _motion_key
             # ia2v TALKING register (lips-dont-talk fix, 2026-07-02): under
             # the canonical two-stage recipe the ANNOUNCER bookend narrates
             # TALKING so the audio conditioning has something to drive; the
@@ -1663,6 +1695,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _talking_swap = (_motion_key == "announcer" and _talking_register)
             if _talking_swap:
                 scene_prompt = _IA2V_TALKING_PROMPT_ANNOUNCER
+                _field_source = "python:ia2v_talking"
                 _LOG.warning(
                     "[OTR.render_driver] IA2V TALKING register: announcer "
                     "bookend %s prompt swapped to the lip-sync register",
@@ -1687,6 +1720,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _mc_override = _motion_clause_override(shot)
             if _mc_override and not _talking_swap:
                 scene_prompt = _mc_override
+                _field_source = "python:motion_clause_override"
             elif _mc_override and _talking_swap:
                 _LOG.warning(
                     "[OTR.render_driver] IA2V TALKING register: motion-clause "
@@ -1697,6 +1731,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                          _shot_role, shot.get("shot_id"), _motion_key,
                          len(scene_prompt), scene_prompt)
             req["text_prompt"] = scene_prompt
+            req["observability"]["prompt_field_source"] = _field_source
             _stamp_prompt_meta(req, "motion_role", scene_prompt,
                                beat=_beat_id_for_shot(shot))
         else:
@@ -2032,7 +2067,8 @@ def run_episode(ledger, *, oom_shot_id=None,
         obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
         for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
                     "prompt_chars", "init_source", "init_image",
-                    "i2v_still_missing", "video_seed"):
+                    "i2v_still_missing", "video_seed",
+                    "visual_style", "prompt_field_source"):
             if key in obs:
                 row[key] = obs[key]
             elif isinstance(request, dict) and ("_" + key) in request:

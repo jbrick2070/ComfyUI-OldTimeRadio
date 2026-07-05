@@ -211,11 +211,19 @@ _RADIO_CONSOLE_FACE = ("its glowing tuning dial forming an expressive stylized "
 _RADIO_OBJECT_SUBJECT = ("presented as a stylized tabletop radio set on its "
                          "plate, its bakelite cabinet, woven speaker grille and "
                          "a glowing tuning dial")
-_RADIO_OBJECT_ANCHOR = ("isolated tabletop still, the whole radio centered and "
-                        "fully visible, dramatic film lighting")
-_RADIO_OBJECT_ANCHOR_WIDE = ("isolated tabletop still, the whole radio centered "
-                             "and fully visible, wide shot, dramatic film "
-                             "lighting")
+# Chunk A2 geometry-vs-look split: the OBJECT anchors decompose into
+# isolation/composition GEOMETRY (Python, never in packs) + the pack-owned
+# lighting LOOK (VisualStyle.radio_object_look). The composed _RADIO_OBJECT_
+# ANCHOR* constants survive as extraction fixtures + the legacy no-style lane.
+RADIO_OBJECT_GEOMETRY = ("isolated tabletop still, the whole radio centered "
+                         "and fully visible")
+RADIO_OBJECT_GEOMETRY_WIDE = ("isolated tabletop still, the whole radio "
+                              "centered and fully visible, wide shot")
+RADIO_OBJECT_LOOK_DEFAULT = "dramatic film lighting"
+_RADIO_OBJECT_ANCHOR = "%s, %s" % (RADIO_OBJECT_GEOMETRY,
+                                   RADIO_OBJECT_LOOK_DEFAULT)
+_RADIO_OBJECT_ANCHOR_WIDE = "%s, %s" % (RADIO_OBJECT_GEOMETRY_WIDE,
+                                        RADIO_OBJECT_LOOK_DEFAULT)
 #: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
 #: style="ltx_radio_mouth" is used ONLY by the OTR_LTX_RADIO_FACE still mint
 #: (the init stills the EXISTING ltx_audio_in bookend engine receives -- no new
@@ -375,9 +383,12 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
         # returns face text) and NOT _style_anchor_for_aspect (it adds head/face/
         # costume/in-character person tokens). An OBJECT anchor instead, then the
         # SAME "still" era + grade finish as console_face below (a tense story
-        # reads as a tense-lit radio, never a person).
-        anchor = (_RADIO_OBJECT_ANCHOR_WIDE if str(aspect).lower() == "wide"
-                  else _RADIO_OBJECT_ANCHOR)
+        # reads as a tense-lit radio, never a person). Chunk A2: isolation
+        # GEOMETRY stays Python; the lighting LOOK comes from the pack.
+        geometry = (RADIO_OBJECT_GEOMETRY_WIDE
+                    if str(aspect).lower() == "wide"
+                    else RADIO_OBJECT_GEOMETRY)
+        anchor = "%s, %s" % (geometry, _style.radio_object_look)
         prompt = ", ".join(["%s, %s" % (form, _style.announcer_subject_object),
                             anchor])
     elif radio_host_style == "console_face":
@@ -545,10 +556,16 @@ MESH_FODDER_NEG_SCAFFOLD = (
     "scene, environment, props, text, watermark"
 )
 #: The BACKGROUND PLATE is the subject-free world the mesh stands in front of.
-BACKGROUND_PLATE_POS_SCAFFOLD = (
+#: Chunk A2 split: the no-subject/composition GEOMETRY stays Python; the
+#: "period-accurate set" LOOK is pack-owned (VisualStyle.plate_look). The
+#: composed scaffold survives as the extraction fixture + legacy lane.
+BACKGROUND_PLATE_GEOMETRY = (
     "empty establishing environment, no people, no subject, no characters, "
-    "wide 16:9 cinematic scene, atmospheric depth, period-accurate set"
+    "wide 16:9 cinematic scene, atmospheric depth"
 )
+PLATE_LOOK_DEFAULT = "period-accurate set"
+BACKGROUND_PLATE_POS_SCAFFOLD = "%s, %s" % (BACKGROUND_PLATE_GEOMETRY,
+                                            PLATE_LOOK_DEFAULT)
 #: Mesh fodder is rendered near-square/portrait (Hunyuan wants an isolated,
 #: fully-in-frame subject), independent of the beat's final video aspect.
 MESH_FODDER_W = PORTRAIT_W
@@ -1269,52 +1286,70 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     return prompt, source
 
 
-def _mesh_fodder_subject(meta, char_entry, line, setting, role) -> str:
-    """The SUBJECT phrase for a mesh_fodder still -> always a single, isolated
-    thing the mesher can carve cleanly. A character beat meshes the CHARACTER
-    (appearance); the announcer meshes the announcer figure (no studio gear, no
-    occlusion); a music beat meshes the RADIO ITSELF (2026-06-30 mesh-improve
-    item 1: "music bookend mesh = a 3D radio, not a character body" -- never
-    the old generic "object representing the story", which minted an
-    arbitrary, unrelated prop); any OTHER no-character beat meshes ONE
-    emblematic story object. Pure; never empty (a bare fallback keeps the
-    mesher fed)."""
+#: Chunk A2 extraction fixture: the general no-character emblem template is
+#: pack-owned (VisualStyle.non_character_emblem_fallback, {base} template);
+#: this survives ONLY as the sci_fi_radio fixture + the legacy no-style lane.
+NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT = (
+    "a single emblematic object representing {base}")
+
+
+def _mesh_fodder_subject_and_source(meta, char_entry, line, setting, role,
+                                    style=None) -> "tuple[str, str]":
+    """``(subject, prompt_field_source)`` for a mesh_fodder still -> always a
+    single, isolated thing the mesher can carve cleanly. A character beat
+    meshes the CHARACTER (appearance); the announcer meshes the announcer
+    figure (no studio gear, no occlusion); a music beat meshes the RADIO
+    ITSELF (2026-06-30 mesh-improve item 1: "music bookend mesh = a 3D radio,
+    not a character body" -- never the old generic "object representing the
+    story", which minted an arbitrary, unrelated prop); any OTHER
+    no-character beat meshes ONE emblematic story object -- chunk A2: that
+    emblem TEMPLATE is pack-owned (non_character_emblem_fallback, formatted
+    with {base}); music_visual keeps radio_form_from_meta (brief axis, r1
+    codex M2 + AG M3). ``style=None`` is the legacy fixture lane. Pure;
+    never empty (a bare fallback keeps the mesher fed). The source tag is
+    the chunk-A2 provenance value for the minted object."""
     appearance = ""
     if char_entry:
         appearance = _appearance_for_char(
             [char_entry], str((char_entry or {}).get("char_id") or ""))
     if appearance:
-        return appearance
+        return appearance, "cast:appearance"
     if str(role) == "announcer_visual":
         # C2 (2026-07-01): the announcer mesh is the FACELESS radio OBJECT (brief
         # -driven form), NOT a person-with-a-face -- "only HuMo gets a face". The
         # old "1940s radio announcer in a suit" put a human figure into the mesh,
         # violating that invariant AND hardcoding the era. Faceless + isolated.
-        return radio_form_from_meta(meta)
+        return radio_form_from_meta(meta), "brief:radio_form"
     if str(role) == "music_visual":
         # The music open/inter/close mesh IS the radio -- the recurring on-air
         # object, isolated and clean for the mesher. Brief-driven form (C2), no
-        # hardcoded 1940s set.
-        return radio_form_from_meta(meta)
+        # hardcoded 1940s set. NOT the emblem fallback (r1 codex M2 + AG M3).
+        return radio_form_from_meta(meta), "brief:radio_form"
     # No-character beat outside announcer/music: a single emblematic OBJECT
     # from the story world (chunk 6 refines the object_id policy; this keeps
     # the mesher fed cleanly).
     intent = str((line or {}).get("beat_intent") or "").strip()[:120]
     base = intent or setting or "the story"
-    return "a single emblematic object representing %s" % base
+    template = (style.non_character_emblem_fallback if style is not None
+                else NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT)
+    return template.format(base=base), "non_character_emblem_fallback"
 
 
-def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role) -> str:
-    """``"{subject}, {MESH_FODDER_POS_SCAFFOLD}"`` -- the isolated-subject still
+def _mesh_fodder_subject(meta, char_entry, line, setting, role,
+                         style=None) -> str:
+    """Subject-only wrapper of :func:`_mesh_fodder_subject_and_source`."""
+    return _mesh_fodder_subject_and_source(
+        meta, char_entry, line, setting, role, style=style)[0]
+
+
+def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role,
+                                style=None) -> str:
+    """``"{subject}, {scaffold}"`` -- the isolated-subject still
     Hunyuan3D meshes. Deterministic (no LLM): the subject identity comes from
     the cast appearance / announcer figure / story object, and the checked-in
-    scaffold enforces the neutral-plate isolation. Never empty."""
-    subject = _mesh_fodder_subject(meta, char_entry, line, setting, role)
-    out = "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
-    # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
-    # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
-    # brief carries through to the meshed object. The isolation scaffold above
-    # still governs silhouette/plate; the tail only tints the look.
+    scaffold enforces the neutral-plate isolation. Never empty. Chunk A2:
+    ``style`` is the resolved pack threaded from the image-prompt entry
+    (None => this IS the entry: fail-loud resolve)."""
     # Stage 3 de-swallow (kibitz r3 -- the seam ALL FOUR reviewers caught):
     # ImportError shim only; a style error RAISES.
     try:
@@ -1323,21 +1358,26 @@ def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role) -> str:
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import (  # type: ignore
             _resolve_style, get_era_tail)
-    tail = get_era_tail(meta, profile="still", style=_resolve_style(meta))
+    _vstyle = _resolve_style(meta, style)
+    subject = _mesh_fodder_subject(meta, char_entry, line, setting, role,
+                                   style=_vstyle)
+    out = "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
+    # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
+    # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
+    # brief carries through to the meshed object. The isolation scaffold above
+    # still governs silhouette/plate; the tail only tints the look.
+    tail = get_era_tail(meta, profile="still", style=_vstyle)
     if tail and tail not in out:
         out = "%s, %s" % (out, tail)
     return out
 
 
-def _compose_background_plate_prompt(meta, setting) -> str:
+def _compose_background_plate_prompt(meta, setting, style=None) -> str:
     """The subject-free 16:9 world plate the mesh stands in front of. Leads with
-    the story setting, then the checked-in 'no subject' scaffold. Deterministic;
-    never empty."""
-    parts = []
-    if setting:
-        parts.append("%s setting" % setting)
-    parts.append(BACKGROUND_PLATE_POS_SCAFFOLD)
-    plate = ", ".join(parts)
+    the story setting, then the 'no subject' GEOMETRY scaffold + the pack's
+    ``plate_look`` (chunk A2 split; sci_fi byte-identical by construction).
+    Deterministic; never empty. ``style`` threaded from the entry (None =>
+    fail-loud resolve here)."""
     # Era tail / grade so the plate matches the episode look. Stage 3
     # de-swallow (kibitz r2 M1): ImportError shim only; a style error RAISES.
     try:
@@ -1346,7 +1386,12 @@ def _compose_background_plate_prompt(meta, setting) -> str:
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import (  # type: ignore
             NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
-    _style = _resolve_style(meta)
+    _style = _resolve_style(meta, style)
+    parts = []
+    if setting:
+        parts.append("%s setting" % setting)
+    parts.append("%s, %s" % (BACKGROUND_PLATE_GEOMETRY, _style.plate_look))
+    plate = ", ".join(parts)
     plate = finish_visual_prompt(meta, plate, era_profile="still",
                                  style=_style)
     if _style.image_grade_tail and _style.image_grade_tail not in plate:
@@ -1828,6 +1873,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     "prompt": _wprompt,
                     "prompt_hash": _content_hash(_wprompt),
                     "source": "still_word",
+                    # Chunk A2 provenance (additive; r4 codex M3).
+                    "visual_style": _vstyle.style_id,
                 }
                 # Provenance for operator QA: the LOCKED per-episode lettering +
                 # backdrop family (music cards excluded -- they carry no lettering).
@@ -1835,6 +1882,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     _swg = _still_word_genre(meta)
                     _wobj["lettering_style"] = _STILL_WORD_TYPOGRAPHY[_swg]
                     _wobj["backdrop_family"] = _swg
+                    # word-card maps stay Python until chunk C consumes the
+                    # pack fields -- stamped truthfully.
+                    _wobj["prompt_field_source"] = (
+                        "python:still_word_word:%s" % _swg)
+                else:
+                    _wobj["prompt_field_source"] = (
+                        "python:still_word_title_mood")
                 if _cid:
                     _wobj["char_id"] = _cid
                 objects.append(_wobj)
@@ -1858,7 +1912,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     if str(tgt.get("role") or "") == "music_visual"
                     else "obj_%s" % _bid)
                 _fprompt = _compose_mesh_fodder_prompt(
-                    meta, _ce, _ln, setting, tgt["role"])
+                    meta, _ce, _ln, setting, tgt["role"], style=_vstyle)
+                # Chunk A2 provenance: which arm fed the mesh SUBJECT (the
+                # same pure decision the composer just made).
+                _ffield = _mesh_fodder_subject_and_source(
+                    meta, _ce, _ln, setting, tgt["role"], style=_vstyle)[1]
                 _fobj = {
                     "object_id": "meshfodder_%s" % _bid,
                     "kind": "mesh_fodder",
@@ -1870,11 +1928,14 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     "negative_prompt": MESH_FODDER_NEG_SCAFFOLD,
                     "prompt_hash": _content_hash(_fprompt),
                     "source": "mesh_fodder",
+                    "visual_style": _vstyle.style_id,
+                    "prompt_field_source": _ffield,
                 }
                 if _cid:
                     _fobj["char_id"] = _cid
                 objects.append(_fobj)
-                _pprompt = _compose_background_plate_prompt(meta, setting)
+                _pprompt = _compose_background_plate_prompt(meta, setting,
+                                                            style=_vstyle)
                 objects.append({
                     "object_id": "plate_%s" % _bid,
                     "kind": "scene_background_plate",
@@ -1884,6 +1945,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     "prompt": _pprompt,
                     "prompt_hash": _content_hash(_pprompt),
                     "source": "mesh_background_plate",
+                    "visual_style": _vstyle.style_id,
+                    "prompt_field_source": "plate_look",
                 })
                 continue
             if tgt["kind"] == "scene_character":
@@ -1893,10 +1956,22 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     meta, _ce, setting, _ln, llm_fn, warnings, _cid,
                     vstyle=_vstyle)
                 _src = _csrc
+                _sfield = "cast:appearance"
             else:
                 sprompt = compose_still_prompt(
                     meta, kind=tgt["kind"], role=tgt["role"],
                     beat_id=tgt["beat_id"], style=_vstyle)
+                # Chunk A2 provenance: the open/beat scene still leads with
+                # the pack open_subjects template -- stamp the exact key via
+                # the SAME pure selector compose_still_prompt used.
+                try:
+                    from ._otr_story_brief_helpers import (  # type: ignore
+                        open_subject_key)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_story_brief_helpers import (  # type: ignore
+                        open_subject_key)
+                _sfield = "open_subjects:%s" % open_subject_key(
+                    tgt["role"], tgt["kind"] == "scene_open")
             _obj = {
                 "object_id": f"still_{tgt['beat_id']}",
                 "kind": tgt["kind"],
@@ -1906,6 +1981,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "prompt": sprompt,
                 "prompt_hash": _content_hash(sprompt),
                 "source": _src,
+                "visual_style": _vstyle.style_id,
+                "prompt_field_source": _sfield,
             }
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
