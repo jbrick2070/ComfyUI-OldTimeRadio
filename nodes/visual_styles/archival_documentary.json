@@ -1,0 +1,17 @@
+{
+  "style_id": "archival_documentary",
+  "label": "Media Archive",
+  "positive_tail": "archival documentary still, careful restoration texture, tactile paper and film materials, grounded natural lighting",
+  "image_grade_tail": "subtle archival patina, clean readable composition",
+  "broadcast_tail": "broadcast-history atmosphere without futuristic equipment",
+  "allow_radio_tails": false,
+  "forbidden_terms": [
+    "spaceship",
+    "mission control",
+    "laboratory containment",
+    "35mm sci-fi film grain",
+    "futuristic console"
+  ],
+  "era_tail": "grounded archival documentary aesthetic",
+  "schema_version": "v1"
+}

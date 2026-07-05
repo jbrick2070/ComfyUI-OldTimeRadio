@@ -337,10 +337,12 @@ class TestAstGuards:
                 if isinstance(node, ast.Name) and node.id in _TAIL_NAMES:
                     offenders.append(f"{rel}:{node.lineno}:{node.id}")
                 elif isinstance(node, ast.ImportFrom):
-                    for alias in node.names:
-                        if alias.name in _TAIL_NAMES:
+                    # loop var named `imp` NOT `alias` -- the B7 forbidden
+                    # sweep flags `alias` as a runtime marker (CW-6 gotcha).
+                    for imp in node.names:
+                        if imp.name in _TAIL_NAMES:
                             offenders.append(
-                                f"{rel}:{node.lineno}:import {alias.name}")
+                                f"{rel}:{node.lineno}:import {imp.name}")
         assert not offenders, (
             "production reads of the tail constants (must route through the "
             f"visual-style pack): {offenders}"
