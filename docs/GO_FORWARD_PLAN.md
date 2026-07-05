@@ -91,9 +91,12 @@ gate non-blocking follow-ups N1/N2/N3 (section 1 "NON-BLOCKING follow-ups": rest
 final_video_path truthfully at 86/85; strip the stale node-93 caption log strings);
 (1)+(2) DONE @2c1d22aa (credits nits: Optional import, node-85 truthful final_video_path
 restamp fail-soft, node-93 stale caption strings) + @7d7005c1 (conformance debt:
-`_engines_by_node_key` node_key->LIST, not last-wins). (3) S-C C1: EXTRACTION CORE
-SHIPPED @d60bf371 (`nodes/_otr_audio_motion.py`, 8-field read-only analyzer + resolver +
-ledger stamp, 14 tests, byte-identity proven). The PRODUCER WIRING is a real fork that
+`_engines_by_node_key` node_key->LIST, not last-wins). (3) S-C C1 = COMPLETE: extraction
+core @d60bf371 + producer FOLDED IN @4308d663 (Option B, ZERO JSON, operator "just build it
+now" -- run_episode collects each shot's conditioning-WAV; OTR_VideoRenderBatch durably stamps
+the per-beat audio_motion_profiles fail-soft, read-only, byte-identity held; +6 tests, 6634/0).
+Option A dedicated node NOT needed (kibitz-r1 spec kept only for a future C2-on-procgen need).
+(`nodes/_otr_audio_motion.py`, 8-field read-only analyzer). SUPERSEDED note: the PRODUCER WIRING was a fork that
 edits the FROZEN production JSON = operator-gated -> HANDED BACK with a kibitz-r1-hardened
 build-ready spec (`docs/2026-07-05-audio-motion-c1/`): Option A = new OTR_AudioMotionProfile
 node inserted **91 ImageGenDispatcher -> [96] -> 92 VideoRenderBatch** (codex fixed my

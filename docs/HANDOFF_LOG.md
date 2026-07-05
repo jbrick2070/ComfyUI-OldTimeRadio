@@ -6,6 +6,27 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (operator back) -- S-C C1 COMPLETE (producer folded in, zero JSON) + anime bake-off running -- v2.0-alpha
+Did:
+- @4308d663 (pushed): S-C C1 producer FOLDED IN (Option B, operator "just build it now so I can
+  work my other stuff"). run_episode collects each shot's resolved conditioning-WAV rows (additive,
+  read-only, does NOT touch the pinned build_request_from_shot); OTR_VideoRenderBatch._stamp_audio_
+  motion_profiles durably stamps the per-beat audio_motion_profiles fail-soft (in_flight ledger +
+  save_ledger_safe, like nodes 93/85). ZERO workflow-JSON change -> no server restart, didn't disturb
+  the running render. +6 tests (test_audio_motion_foldin.py). Suite 6634/0, Bug Bible 16, byte-identity held.
+- Explained to operator: leaving C1 unwired is harmless (inert until C2), but built it anyway per his ask.
+  Option A (dedicated node + frozen-JSON edit) NOT needed; kibitz-r1 spec kept in docs/2026-07-05-audio-motion-c1/.
+- ANIME IMAGE-MODEL BAKE-OFF launched on a fresh FLOOR-lane headless server (box reset first). Operator
+  rule: announcer+music mint a still when the video engine is accepts_still (viz=no still) -- VERIFIED
+  already-intact (132 tests) + is exactly _still_needed_for_role. Driver scripts/_otr_anime_bakeoff.py
+  sweeps 5 LOCAL image models x anime x still_flat video. flux_gen1 SUCCESS (obs final
+  signal_lost_fingers_snap_of_discovery_...). z_image_turbo FAILED at OTR_ImageGenDispatcher (real
+  engine error -- root-cause TBD). flux2_klein/qwen/lumina in flight. Cloud models need OTR_COMFY_API_KEY.
+Current step: operator moving to NEW FEATURES. Queue: (a) z_image_turbo anime render failure root-cause;
+(b) eyeball the bake-off obs episodes to pick the best anime image model.
+Next: whatever feature the operator names; fold fixes into the queue.
+Commits: 4308d663 (pushed) + this docs commit.
+
 ## 2026-07-05 (yoga, autonomous) -- S-C C1 EXTRACTION CORE SHIPPED + WIRING FORK KIBITZ'd -- v2.0-alpha
 Did:
 - @d60bf371 (pushed): S-C C1 extraction core. `nodes/_otr_audio_motion.py` -- pure import-clean
