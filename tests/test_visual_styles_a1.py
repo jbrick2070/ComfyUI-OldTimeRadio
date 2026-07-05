@@ -508,18 +508,23 @@ class TestAstGuards:
 
 
 # ---------------------------------------------------------------------------
-# 6. Dormant-field pin (chunk B replaces this with authored delta tests)
+# 6. Dormant-field pin -- chunk B AUTHORED the A1/A2-consumed fields (delta
+# tests live in test_visual_styles_b.py); ONLY the chunk-C still_word fields
+# remain at the sci-fi defaults until chunk C wires their consumption.
 # ---------------------------------------------------------------------------
+_STILL_WORD_DORMANT_FIELDS = ("still_word_title_mood_style",
+                              "still_word_typography", "still_word_backdrop")
+
+
 class TestDormantDefaults:
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
-    def test_non_default_new_fields_equal_sci_fi_defaults(self, style_id):
+    def test_still_word_fields_equal_sci_fi_defaults(self, style_id):
         sci = _raw("sci_fi_radio")
         raw = _raw(style_id)
-        for name in _NEW_STR_FIELDS + _NEW_DICT_FIELDS:
+        for name in _STILL_WORD_DORMANT_FIELDS:
             assert raw[name] == sci[name], (
-                f"{style_id}.{name}: A1 ships the sci-fi DEFAULT values "
-                f"(dormant -- behavior identical to the tails-only delta); "
-                f"chunk B authors the style voices + delta tests")
+                f"{style_id}.{name}: the still_word fields stay at the "
+                f"sci-fi DEFAULT values until chunk C wires consumption")
 
 
 # ---------------------------------------------------------------------------
