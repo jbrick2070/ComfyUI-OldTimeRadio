@@ -670,13 +670,14 @@ class TestWriterB2aSurface:
         # (END of optional). 2026-06-01 (Comfy Credits) appended the sibling
         # pair comfy_slot_a_model + comfy_slot_b_model at slots 21/22, so the
         # vector is now 23 with [0..20] intact.
-        assert len(wv) == 25, (
-            f"writer widgets_values length drift: {len(wv)} (expected 25: "
+        assert len(wv) == 26, (
+            f"writer widgets_values length drift: {len(wv)} (expected 26: "
             f"the 2026-05-29 lean-down brought it to 19, S2 appended the "
             f"OpenRouter pair -> 21, Comfy Credits appended "
             f"comfy_slot_a_model + comfy_slot_b_model -> 23, the refine "
-            f"loop (2026-06-23) appended refine_target_grade -> 24, then the "
-            f"story-scaffold toggle (2026-06-24) appended story_scaffold -> 25)"
+            f"loop (2026-06-23) appended refine_target_grade -> 24, the "
+            f"story-scaffold toggle (2026-06-24) appended story_scaffold "
+            f"-> 25, then Stage 2C (2026-07-05) appended source_bank -> 26)"
         )
         # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -725,11 +726,24 @@ class TestWriterB2aSurface:
             f"refine_target_grade (slot 23) must ship 'Off' (the refine loop is "
             f"default-OFF in the shipped bake); got {wv[23]!r}"
         )
-        # Slot 24: story_scaffold (scaffold toggle, 2026-06-24) -- APPENDED at
-        # the END; ships "auto" (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
+        # Slot 24: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
+        # (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
         assert wv[24] == "auto", (
             f"story_scaffold (slot 24) must ship 'auto' (follow the env/default "
             f"scaffold setting in the shipped bake); got {wv[24]!r}"
+        )
+        # Slot 25: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
+        # -- APPENDED at the END; ships the production science lane AND must
+        # be a REGISTERED bank id (cross-checked against the live routing
+        # registry so a re-order / typo cannot ship silently).
+        assert wv[25] == "science_news", (
+            f"source_bank (slot 25) must ship 'science_news' (the production "
+            f"story lane); got {wv[25]!r}"
+        )
+        from nodes import _otr_story_routing as _routing
+        assert wv[25] in _routing.list_bank_ids(), (
+            f"source_bank (slot 25) value {wv[25]!r} is not a registered "
+            f"bank id: {_routing.list_bank_ids()!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

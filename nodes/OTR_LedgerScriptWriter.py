@@ -123,6 +123,13 @@ from pathlib import Path
 # transformers / GPU work -- safe at module-import time.
 from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
 
+# Stage 2C (multi-modal story schema, 2026-07-05): the story-routing layer
+# supplies the source_bank dropdown (list_bank_ids at INPUT_TYPES) and the
+# run-intent gate (require_runnable_bank, FIRST statement of run()). The
+# module is stdlib-only and LAZY (zero I/O at import; the registries load on
+# first call) -- safe at module-import time.
+from . import _otr_story_routing as _otr_story_routing
+
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
 # reflection call site below the K.5 visual_plan stamp. Module-level
@@ -1244,6 +1251,11 @@ def _resolve_inputs(
     openrouter_slot_b_model: str = "",
     comfy_slot_a_model: str = "",
     comfy_slot_b_model: str = "",
+    # Stage 2C (2026-07-05): the story-path source_bank widget selection.
+    # Threaded into the resolved dict as the ONE authoritative value for
+    # meta/ledger stamping + prompt threading. Already gated runnable by
+    # run() (require_runnable_bank fires before this call).
+    source_bank: str = "science_news",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1419,6 +1431,9 @@ def _resolve_inputs(
         "openrouter_slot_b_model": str(openrouter_slot_b_model or ""),
         "comfy_slot_a_model": str(comfy_slot_a_model or ""),
         "comfy_slot_b_model": str(comfy_slot_b_model or ""),
+        # Stage 2C: the ONE authoritative source_bank value for prompt
+        # threading + meta/ledger stamping (run() gated it runnable already).
+        "source_bank": str(source_bank or "science_news"),
     }
 
 
@@ -2210,6 +2225,34 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Stage 2C (multi-modal story schema, 2026-07-05) -- the
+                # story-path source_bank selector, APPENDED at the END of
+                # optional (widgets_values slot 25, BUG-LOCAL-097). Choices
+                # come LIVE from the lazy story-routing registry (stable bank
+                # IDS as values; labels belong in tooltips only). NOTE: this
+                # call may RAISE (StoryRoutingError) -- a DELIBERATE exception
+                # to the "INPUT_TYPES must never raise" convention used by the
+                # openrouter probe above (no-fallback law): a broken
+                # banks.json must fail node registration LOUD, never boot
+                # with a baked-in choice list. Non-runnable banks ARE listed
+                # -- picking one raises a loud StoryBankNotRunnableError at
+                # run() before any story work (honest error on use).
+                "source_bank": (
+                    list(_otr_story_routing.list_bank_ids()),
+                    {
+                        "default": "science_news",
+                        "tooltip": (
+                            "Story-path SOURCE BANK (multi-modal story "
+                            "schema). Selects which registered story pack "
+                            "supplies the pack-routed creative prompts and "
+                            "which lane the episode runs. science_news = the "
+                            "production sci-fi lane (default, "
+                            "byte-identical). Other banks are addressable "
+                            "but not yet runnable -- picking one FAILS LOUD "
+                            "before any story work (no fallback)."
+                        ),
+                    },
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -2496,6 +2539,11 @@ class OTR_LedgerScriptWriter:
         # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
         # top of the body). Default "auto" => env/default => byte-identical.
         story_scaffold="auto",
+        # Stage 2C (2026-07-05): the story-path source_bank selector,
+        # appended at the END of the widget surface (slot 25). Default
+        # science_news = the production lane, byte-identical. Gated FIRST
+        # in the body via require_runnable_bank (no fallback).
+        source_bank="science_news",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -2510,6 +2558,12 @@ class OTR_LedgerScriptWriter:
         The optional default-OFF iterative story-REVISION loop (v1, 2026-06-23)
         is delegated to ``_refine_loop`` on the INITIAL call; each refine pass
         re-enters this body with ``_refine_active=True`` and runs it directly."""
+        # Stage 2C run-intent gate -- the FIRST statement of the body, before
+        # the story-scaffold env mutation, the refine gate, the budget resets,
+        # and _resolve_inputs (RSS fetch): a non-runnable source_bank pick
+        # fails ONCE, LOUD and CHEAP, with zero side effects. bank.runnable is
+        # the ONLY runtime gate; unknown id = UnknownBankError (no fallback).
+        _otr_story_routing.require_runnable_bank(source_bank)
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -2535,12 +2589,25 @@ class OTR_LedgerScriptWriter:
                 creative_writing_model, widget_target=refine_target_grade,
             )
             if _rcfg.effective_passes >= 2:
+                # BUG-LOCAL-4xx root-cause fix (2026-07-05, kibitz r2): the old
+                # bare locals() capture also swept up NON-parameter locals
+                # created above this point (`os`, `_scaffold`), so
+                # `self.run(**_core)` inside _refine_loop raised TypeError on
+                # every refine-enabled run since the story_scaffold block
+                # (2026-06-24) introduced those locals. Filter against the
+                # ACTUAL run() signature so only real parameters are captured,
+                # and keep excluding the refine internals (re-set by
+                # _refine_loop per pass) + refine_target_grade (the loop must
+                # not re-trigger itself).
+                import inspect as _inspect
+                _run_params = _inspect.signature(type(self).run).parameters
+                _locals = locals()
                 _core = {
-                    k: v for k, v in locals().items()
-                    if k not in (
+                    k: _locals[k] for k in _run_params
+                    if k in _locals and k not in (
                         "self", "refine_target_grade", "_refine_active",
                         "_refine_prior_macro", "_refine_prior_critique",
-                        "_refine_forced_cast_seed", "_OTRSEL_GATE", "_rcfg",
+                        "_refine_forced_cast_seed",
                     )
                 }
                 return self._refine_loop(_rcfg, _core)
@@ -2619,6 +2686,8 @@ class OTR_LedgerScriptWriter:
             openrouter_slot_b_model=openrouter_slot_b_model,
             comfy_slot_a_model=comfy_slot_a_model,
             comfy_slot_b_model=comfy_slot_b_model,
+            # Stage 2C: the source_bank widget selection (gated above).
+            source_bank=source_bank,
         )
 
         log.info(
@@ -2734,6 +2803,9 @@ class OTR_LedgerScriptWriter:
         meta = led.data.setdefault("meta", {})
         meta["cast_status"] = "building"
         meta["requested_num_characters"] = resolved["num_characters"]
+        # Stage 2C: stamp the authoritative story-path selection (resolved
+        # dict is the single source; run() gated it runnable already).
+        meta["source_bank"] = resolved["source_bank"]
         # Story-quality v2 is BAKED IN (operator 2026-06-28): the dialogue-craft
         # spine (objective gate, body-gate text-score, cliche span-repair,
         # one-breath budget cap, news-coda bridge, two-principal scan + telemetry)
@@ -4584,6 +4656,7 @@ class OTR_LedgerScriptWriter:
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved["max_new_tokens_cap"],
                             creative_repo_id=resolved["creative_writing_model"],
+                            source_bank_id=resolved["source_bank"],  # 2C
                             **_w1b_s3_kwargs,
                         )
                     cleaned = line_res.text
@@ -4657,6 +4730,7 @@ class OTR_LedgerScriptWriter:
                                         "creative_writing_model"
                                     ],
                                     reroll_hint=_bg_hint,
+                                    source_bank_id=resolved["source_bank"],  # 2C
                                 )
                             _bg_res_ok, _ = _OTRSQL12.validate_composed_grounding(
                                 _bg_res.text, _bg_entry, _grounded_nouns,
@@ -4795,6 +4869,7 @@ class OTR_LedgerScriptWriter:
                             creative_repo_id=resolved[
                                 "creative_writing_model"
                             ],
+                            source_bank_id=resolved["source_bank"],  # 2C
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags

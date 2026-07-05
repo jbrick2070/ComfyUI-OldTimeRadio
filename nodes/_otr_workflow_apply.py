@@ -501,6 +501,11 @@ CREATIVE_WHITELIST = frozenset({
     # CREATIVE dial on node 1, not an engine/feature widget -- apply_profile never
     # manages it, so a headless soak may set the grade bar directly.
     "refine_target_grade",
+    # source_bank (Stage 2C multi-modal story schema) is the story-path
+    # selector on node 1 -- a pure creative/content dial; apply_profile never
+    # manages it. Headless drivers may set it; a non-runnable pick still
+    # fails LOUD at run() (require_runnable_bank, no fallback).
+    "source_bank",
 })
 
 

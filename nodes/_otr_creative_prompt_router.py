@@ -78,16 +78,20 @@ _MODERN_BY_PHASE: dict[str, str] = {
 # object identity).
 #
 # Stage 2: the pack is resolved through the ROUTING layer
-# (resolve_story_pack via banks.json), no fixed path. The literal
-# "science_news" bank binding is STILL transitional: threading the workflow
-# `source_bank` selection through to this call is chunk 2C.
+# (resolve_story_pack via banks.json), no fixed path. Stage 2C: the workflow
+# `source_bank` widget selection threads through `source_bank_id`; this
+# literal is now ONLY the parameter default (byte-identical science lane).
 _SCIENCE_BANK_ID = "science_news"
 _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "line_composer_system": "line_composer_system",
 }
 
 
-def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
+def resolve_creative_system_prompt(
+    repo_id: str,
+    phase: Phase,
+    source_bank_id: str = _SCIENCE_BANK_ID,
+) -> str:
     """Return the system-prompt string for a creative-phase call.
 
     Args:
@@ -95,6 +99,9 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
             creative slot (the same value the writer stamps at
             `meta.creative_model` in D2b).
         phase: one of the four creative-phase identifiers in `Phase`.
+        source_bank_id: the story-path bank whose pack supplies any
+            pack-routed seam (Stage 2C widget selection). Default is the
+            science lane -- all pre-2C callers stay byte-identical.
 
     Returns:
         The system-prompt string for that (model, phase) pair.
@@ -122,9 +129,12 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
         return OTR_PERIOD_SYSTEM_PROMPT
     seam = _PHASE_TO_PACK_SEAM.get(phase)
     if seam is not None:
-        # Byte-identical to _MODERN_BY_PHASE[phase]; routed through banks.json
-        # so JSON owns the prompt content. Fail-loud on unknown bank/model/seam.
-        return get_pack_prompt(resolve_story_pack(_SCIENCE_BANK_ID), seam)
+        # Byte-identical to _MODERN_BY_PHASE[phase] under the default
+        # (science_news) bank; routed through banks.json so JSON owns the
+        # prompt content. Fail-loud on unknown bank/model/seam. Stage 2C:
+        # the workflow `source_bank` widget selection threads here via
+        # `source_bank_id`; the science literal survives ONLY as the default.
+        return get_pack_prompt(resolve_story_pack(source_bank_id), seam)
     return _MODERN_BY_PHASE[phase]
 
 

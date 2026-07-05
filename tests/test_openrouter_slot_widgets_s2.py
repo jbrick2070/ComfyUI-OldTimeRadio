@@ -60,7 +60,8 @@ def test_widget_order_appends_slots_at_end():
     assert order[22] == "comfy_slot_b_model"
     assert order[23] == "refine_target_grade"   # refine loop v1 (2026-06-23)
     assert order[24] == "story_scaffold"          # scaffold toggle (2026-06-24)
-    assert len(order) == 25
+    assert order[25] == "source_bank"             # Stage 2C (2026-07-05)
+    assert len(order) == 26
 
 
 # --- conditional creative default; technical never flips --------------------

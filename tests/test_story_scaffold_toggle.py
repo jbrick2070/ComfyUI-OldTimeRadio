@@ -47,10 +47,14 @@ class TestWidgetSurface:
         assert choices == ["auto", "on", "off"]
         assert meta["default"] == "auto"
 
-    def test_story_scaffold_is_last_optional(self):
+    def test_story_scaffold_is_second_to_last_optional(self):
+        # Stage 2C (2026-07-05) appended source_bank at the END; the
+        # scaffold toggle now sits at -2 (positions are load-bearing --
+        # widgets_values binds by index).
         spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["optional"].keys())
-        assert order[-1] == "story_scaffold"
+        assert order[-2] == "story_scaffold"
+        assert order[-1] == "source_bank"
 
 
 class TestApplyScaffoldEnv:

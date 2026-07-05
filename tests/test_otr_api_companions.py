@@ -151,6 +151,12 @@ def _writer_schemas() -> dict:
                     "story_scaffold": (
                         ["auto", "on", "off"], {"default": "auto"},
                     ),
+                    # Stage 2C (2026-07-05): source_bank selector appended at
+                    # index 25 (END) to mirror the live INPUT_TYPES + the
+                    # canonical workflow node-1 vector.
+                    "source_bank": (
+                        ["science_news"], {"default": "science_news"},
+                    ),
                 },
                 "optional": {},
             }
@@ -201,6 +207,7 @@ def _writer_node_fixture() -> dict:
                     "deepseek/deepseek-v4-pro",               # 22 comfy_slot_b_model
                     "Off",                                    # 23 refine_target_grade
                     "auto",                                   # 24 story_scaffold
+                    "science_news",                           # 25 source_bank (2C)
                 ],
             }
         ],
@@ -449,7 +456,8 @@ def test_round_trip_canonical_node1_inputs_correct():
     are appended at the END so creative/technical stay at wv[3]/wv[4].
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 25, f"node 1 widgets_values length drift: {len(dump)}"
+    # 26 after Stage 2C (2026-07-05) appended source_bank at slot 25.
+    assert len(dump) == 26, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

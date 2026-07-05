@@ -2007,6 +2007,7 @@ def compose_line_draft(
     creative_repo_id: str | None = None,
     reroll_hint: str | None = None,  # Sprint 5C
     _stage_dir_repair_attempted: bool = False,  # D1 Tier-2 reroll guard
+    source_bank_id: str = "science_news",  # Stage 2C widget threading
 ) -> str:
     """Run the creative retry ladder and return ONE draft dialogue line.
 
@@ -2063,6 +2064,7 @@ def compose_line_draft(
         from ._otr_creative_prompt_router import resolve_creative_system_prompt
         system = resolve_creative_system_prompt(
             creative_repo_id, phase="line_composer_system",
+            source_bank_id=source_bank_id,
         )
     # D1 Tier-2: the user prompt is rebuilt from `current_req` so a bare
     # stage-direction reroll can overlay a hint mid-loop. With no hit this is
@@ -2390,6 +2392,7 @@ def compose_line(
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,  # Sprint D D2b
     reroll_hint: str | None = None,  # Sprint 5C
+    source_bank_id: str = "science_news",  # Stage 2C widget threading
     # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3
     # validators. When enable_stage3_validators=True AND both
     # stage3_plan + stage3_beat are provided, the final cleaned
@@ -2460,6 +2463,7 @@ def compose_line(
         # only tier that can reroll). Thread the guard so a recursive repair
         # cannot trigger a second stage-direction reroll.
         _stage_dir_repair_attempted=_stage_dir_repair_attempted,
+        source_bank_id=source_bank_id,  # Stage 2C
     )
     word_count = len(cleaned.split())
     word_cap, min_words, max_words = _word_bands(req.target_words)
@@ -2513,6 +2517,7 @@ def compose_line(
                     stop_strings=stop_strings,
                     creative_repo_id=creative_repo_id,
                     reroll_hint=_q_combined,
+                    source_bank_id=source_bank_id,  # Stage 2C
                     enable_stage3_validators=enable_stage3_validators,
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,
@@ -2670,6 +2675,7 @@ def compose_line(
                     stop_strings=stop_strings,
                     creative_repo_id=creative_repo_id,
                     reroll_hint=_leak_combined,
+                    source_bank_id=source_bank_id,  # Stage 2C
                     enable_stage3_validators=enable_stage3_validators,
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,
@@ -2766,8 +2772,9 @@ def compose_line(
                     base_temperature=base_temperature,
                     max_new_tokens_cap=max_new_tokens_cap,
                     stop_strings=stop_strings,
-                                    creative_repo_id=creative_repo_id,
+                    creative_repo_id=creative_repo_id,
                     reroll_hint=repair_hint,
+                    source_bank_id=source_bank_id,  # Stage 2C
                     enable_stage3_validators=True,
                     stage3_plan=stage3_plan,
                     stage3_beat=stage3_beat,

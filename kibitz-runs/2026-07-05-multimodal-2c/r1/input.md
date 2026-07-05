@@ -145,30 +145,6 @@ resolve_story_pack reaches each lane; science byte-identity + audio unchanged.
 - Gate: kibitz on the wiring + OTR_WorkflowValidator + JSON round-trip +
   link/widget audit before commit.
 
-## 4b. Lane-enablement checklist (2C kibitz r3/r4 -- GATES any future
-## `runnable:true` flip of a non-science bank)
-
-The 2C widget threads the selection to the ONLY pack-routed seam today
-(`line_composer_system`). Before ANY non-science bank flips `runnable:true`,
-each of these seams must be made bank-aware (or explicitly bypassed for the
-lane) -- the run-intent gate is what keeps the 2C contract honest until then:
-1. Outline seams: the three outline stage prompts are hard-wired constants
-   (`_otr_outline` :~1870/:~1998/:~2103); the science pack's
-   outline_macro/phase/beat_system seams exist but are UNCONSUMED. Migrate
-   them to pack routing (with the byte-identity pin) before lane enablement.
-2. Exchange seam: `_otr_compose_exchange.build_exchange_prompt` hard-codes
-   its system prompt (bank-agnostic, science included; `use_exchange` is ON
-   in the shipped bake). Make it pack-routable or bypass exchange for the lane.
-3. Source payload: RSS fetch (`_fetch_science_news`) + `news_interpreter.
-   build_news_briefs` are science-hardwired; banks' fetcher/interpreter
-   fields are metadata until their contract is built.
-4. Remaining seams: audit `_PHASE_TO_PACK_SEAM` coverage (announcer intro/
-   outro, coda, style-pick seams ship in packs but are not yet routed).
-
-2C judgment + arc record: `kibitz-runs/2026-07-05-multimodal-2c/` (r1-r4;
-antigravity credit-bugged and dropped -- panel = codex, Claude anchor+judge).
-Bug found by the gate: BUG-LOCAL-416 (refine locals() capture TypeError).
-
 ## 5. Invariants
 
 JSON owns content; Python owns validation/routing/execution; NO fallbacks;
