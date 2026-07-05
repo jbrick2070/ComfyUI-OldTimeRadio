@@ -1991,6 +1991,11 @@ def run_episode(ledger, *, oom_shot_id=None,
     ledger = copy.deepcopy(ledger)
     section = ledger["video"]
     clips, new_shots, trace = {}, [], []
+    # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
+    # (the per-line voice clip OR the read-only master slice) for the post-render
+    # profiling pass. Additive + read-only -- collecting a path NEVER affects the
+    # render; the frozen master is only ever read.
+    amp_rows = []
     vram_peak = 0
     # Stills-first VRAM discipline (operator 2026-06-12, "evict flux when all
     # stills are done"): every portrait + scene still is already minted to disk
@@ -2049,6 +2054,21 @@ def run_episode(ledger, *, oom_shot_id=None,
             request = request_builder(shot, ledger, canvas=canvas)
         else:
             request = build_request(shot, assets, frame_count, canvas)
+        # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
+        # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
+        # a collection hiccup must never perturb the render.
+        try:
+            _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
+            _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
+            if _amp_wav:
+                amp_rows.append({
+                    "id": str(shot.get("shot_id") or ""),
+                    "start_s": float(shot.get("start_s") or 0.0),
+                    "dur_s": float(shot.get("dur_s") or 0.0),
+                    "_wav": str(_amp_wav),
+                })
+        except Exception:  # noqa: BLE001 -- profiling collection is never fatal
+            pass
         clip, out_shot, attempts, used = render_shot(
             shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id)
         # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
@@ -2082,7 +2102,7 @@ def run_episode(ledger, *, oom_shot_id=None,
     section["shots"] = new_shots
     ledger["video"] = section
     return {"ledger": ledger, "clips": clips, "trace": trace,
-            "vram_peak_mb": vram_peak}
+            "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows}
 
 
 def run_real_episode(ledger, *, canvas=None,

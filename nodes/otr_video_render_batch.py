@@ -88,6 +88,44 @@ def _stamp_render_engines_meta(manifest, vram_peak_mb):
     )
 
 
+def _stamp_audio_motion_profiles(amp_rows):
+    """S-C C1: build + durably stamp the per-beat ``audio_motion_profiles``
+    onto the production ledger from the shots' resolved conditioning WAVs.
+
+    Read-only analysis (each WAV is a per-line voice clip or a read-only slice
+    of the FROZEN master -- the master is NEVER touched, so audio byte-identity
+    holds). FAIL-SOFT by design: unlike the render-engines receipt (which the
+    credits roll requires, so it stamps LOUD), NOTHING consumes this profile yet
+    (C2 deferred), so a load/save miss is logged and swallowed -- it must never
+    fail the render. Uses the same in-flight-ledger discovery + save_ledger_safe
+    seam as nodes 93/85; runs AFTER the render-engines durable stamp so the
+    on-disk ledger is already current."""
+    if not amp_rows:
+        return
+    try:
+        from ._otr_audio_motion import (build_audio_motion_profiles,
+                                        stamp_ledger_audio_motion)
+        from . import _otr_ledger as _OTRL
+        profiles = build_audio_motion_profiles(amp_rows, lambda r: r.get("_wav"))
+        ledger_p = _OTRL.in_flight_ledger_path()
+        if ledger_p is None:
+            log.info("[OTR_VideoRenderBatch] audio_motion: no in-flight ledger "
+                     "singleton; profile not persisted")
+            return
+        led = _OTRL.load_ledger_safe(ledger_p)
+        if led is None:
+            log.warning("[OTR_VideoRenderBatch] audio_motion: could not load "
+                        "ledger %s; profile not persisted", ledger_p.name)
+            return
+        stamp_ledger_audio_motion(led, profiles)
+        ok = _OTRL.save_ledger_safe(ledger_p, led)
+        log.warning("[OTR_VideoRenderBatch] audio_motion: stamped %d profile(s) "
+                    "(%d ok) -> %s saved=%s", len(profiles),
+                    sum(1 for p in profiles if p.get("ok")), ledger_p.name, ok)
+    except Exception as exc:  # noqa: BLE001 -- best-effort, never blocks the render
+        log.warning("[OTR_VideoRenderBatch] audio_motion stamp skipped: %s", exc)
+
+
 class OTRVideoRenderBatch:
     """Registered as ``OTR_VideoRenderBatch``. Walks the model-agnostic render
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
@@ -305,6 +343,12 @@ class OTRVideoRenderBatch:
         # save failure here would just move the crash to mux time with less
         # context. LedgerStampError propagates (no silent skip).
         _stamp_render_engines_meta(manifest, ep.get("vram_peak_mb"))
+        # S-C C1: stamp the per-beat audio_motion_profile onto the production
+        # ledger from the shots' resolved conditioning WAVs. Read-only analysis
+        # (the frozen master is never touched); fail-soft -- a profiling error
+        # must NEVER fail the render (unlike the render-engines receipt above,
+        # nothing consumes this yet -- C2 deferred).
+        _stamp_audio_motion_profiles(ep.get("audio_motion_rows") or [])
         return (report, json.dumps(manifest, ensure_ascii=True, default=str),
                 "node_episode_report.json")
 
