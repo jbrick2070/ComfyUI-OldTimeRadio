@@ -45,6 +45,14 @@ from ._otr_line_composer import (
     _SYSTEM_PROMPT as _MODERN_LINE_COMPOSER_SYSTEM,
 )
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
+# Lane-enablement chunk 1 (2026-07-06): the three outline STAGE prompts are
+# pack-routed; the constants below remain as the science extraction fixture
+# (byte-identity pinned by tests).
+from ._otr_outline import (
+    _BEAT_SYSTEM_PROMPT as _MODERN_OUTLINE_BEAT_SYSTEM,
+    _MACRO_SYSTEM_PROMPT as _MODERN_OUTLINE_MACRO_SYSTEM,
+    _PHASE_SYSTEM_PROMPT as _MODERN_OUTLINE_PHASE_SYSTEM,
+)
 from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
 from ._otr_story_pack import get_pack_prompt
 from ._otr_story_routing import resolve_story_pack
@@ -53,6 +61,11 @@ from ._otr_story_routing import resolve_story_pack
 Phase = Literal[
     "outline",
     "line_composer_system",
+    # Lane chunk 1: the three outline STAGE prompts (pack-routed; the plain
+    # "outline" phase above stays the period-overlay probe, object-identity).
+    "outline_macro_system",
+    "outline_phase_system",
+    "outline_beat_system",
 ]
 
 
@@ -64,6 +77,9 @@ Phase = Literal[
 _MODERN_BY_PHASE: dict[str, str] = {
     "outline":              _MODERN_OUTLINE_SYSTEM,
     "line_composer_system": _MODERN_LINE_COMPOSER_SYSTEM,
+    "outline_macro_system": _MODERN_OUTLINE_MACRO_SYSTEM,
+    "outline_phase_system": _MODERN_OUTLINE_PHASE_SYSTEM,
+    "outline_beat_system":  _MODERN_OUTLINE_BEAT_SYSTEM,
 }
 
 
@@ -84,6 +100,11 @@ _MODERN_BY_PHASE: dict[str, str] = {
 _SCIENCE_BANK_ID = "science_news"
 _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "line_composer_system": "line_composer_system",
+    # Lane chunk 1 (2026-07-06): the outline stage seams. A bank whose pack
+    # lacks them fails LOUD at get_pack_prompt (lane-enablement item).
+    "outline_macro_system": "outline_macro_system",
+    "outline_phase_system": "outline_phase_system",
+    "outline_beat_system":  "outline_beat_system",
 }
 
 

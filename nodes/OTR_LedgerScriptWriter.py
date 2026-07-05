@@ -3391,6 +3391,7 @@ class OTR_LedgerScriptWriter:
                     creative_generate_fn,
                     _req,
                     creative_repo_id=resolved["creative_writing_model"],
+                    source_bank_id=resolved["source_bank"],  # lane chunk 1
                 )
 
             def _bon_cost_probe():
@@ -3448,6 +3449,7 @@ class OTR_LedgerScriptWriter:
                     creative_generate_fn,
                     outline_req,
                     creative_repo_id=resolved["creative_writing_model"],
+                    source_bank_id=resolved["source_bank"],  # lane chunk 1
                 )
 
         # --- E. Word-budget integration check (WARN, do not fail) -----

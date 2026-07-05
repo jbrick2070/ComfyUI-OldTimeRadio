@@ -1773,6 +1773,11 @@ def generate_outline(
     base_temperature: float = 0.7,
     max_new_tokens: int = 1500,   # legacy parameter; ignored under Path C
     creative_repo_id: str | None = None,  # Sprint D D2b: routes via resolver
+    # Lane-enablement chunk 1 (2026-07-06): the episode's story-path bank.
+    # The three outline STAGE system prompts resolve from its pack seams
+    # (outline_macro/phase/beat_system) via the router's repo=None lane --
+    # science stays byte-identical (pack == constants, test-pinned).
+    source_bank_id: str = "science_news",
 ) -> Outline:
     """Generate a validated Outline via a tree of small LLM calls.
 
@@ -1858,6 +1863,24 @@ def generate_outline(
             return stage_system
         return period_system_overlay + "\n\n" + stage_system
 
+    # Lane-enablement chunk 1 (2026-07-06): the three STAGE system prompts
+    # resolve ONCE from the bank's pack seams via the router's repo=None lane
+    # (repo None skips the period branch -- the overlay above keeps owning
+    # period; the pack owns the stage text). Science is byte-identical (pack
+    # == the module constants, extraction-pinned). A bank whose pack lacks
+    # the outline seams FAILS LOUD here (its lane-enablement item). NO
+    # swallow -- a resolver/pack failure fails the episode (Fable
+    # forward-note law, AST-pinned).
+    from ._otr_creative_prompt_router import (
+        resolve_creative_system_prompt as _resolve_stage_prompt,
+    )
+    _macro_system = _resolve_stage_prompt(
+        None, phase="outline_macro_system", source_bank_id=source_bank_id)
+    _phase_system = _resolve_stage_prompt(
+        None, phase="outline_phase_system", source_bank_id=source_bank_id)
+    _beat_system = _resolve_stage_prompt(
+        None, phase="outline_beat_system", source_bank_id=source_bank_id)
+
     all_attempts: list[tuple[str, str]] = []
 
     # ----------------------------- Stage 1 ---------------------------------
@@ -1867,7 +1890,7 @@ def generate_outline(
         macro = structured_call(
             prompt=[
                 {"role": "system",
-                 "content": _make_system(_MACRO_SYSTEM_PROMPT)},
+                 "content": _make_system(_macro_system)},
                 {"role": "user", "content": macro_user},
             ],
             schema=_MacroShape,
@@ -1995,7 +2018,7 @@ def generate_outline(
             skeleton = structured_call(
                 prompt=[
                     {"role": "system",
-                     "content": _make_system(_PHASE_SYSTEM_PROMPT)},
+                     "content": _make_system(_phase_system)},
                     {"role": "user", "content": phase_user},
                 ],
                 schema=_PhaseSkeleton,
@@ -2100,7 +2123,7 @@ def generate_outline(
                 detail = structured_call(
                     prompt=[
                         {"role": "system",
-                         "content": _make_system(_BEAT_SYSTEM_PROMPT)},
+                         "content": _make_system(_beat_system)},
                         {"role": "user", "content": beat_user},
                     ],
                     schema=_BeatFleshout,
