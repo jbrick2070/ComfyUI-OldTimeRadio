@@ -138,8 +138,12 @@ def test_compose_is_deterministic():
 def test_compose_is_model_agnostic():
     # the composer takes NO engine argument -> the prompt is identical regardless
     # of which image engine mints it (operator priority: model-agnostic).
+    # Chunk C adds an OPTIONAL resolved-style kwarg (resolve-once threading);
+    # ``style`` is the visual STYLE, not the image ENGINE -- model-agnosticism
+    # is preserved (no engine arg anywhere).
     params = list(inspect.signature(ip.compose_still_word_prompt).parameters)
-    assert params == ["meta", "role", "beat_line"]
+    assert params[:3] == ["meta", "role", "beat_line"]
+    assert params == ["meta", "role", "beat_line", "style"]
     assert "engine" not in params
 
 

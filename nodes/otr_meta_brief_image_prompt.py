@@ -687,6 +687,11 @@ _STILL_WORD_GENRE_KEYWORDS = (
     ("pulp", ("pulp", "adventure", "jungle", "ray gun", "monster", "horror",
               "crime", "mystery", "swashbuckling")),
 )
+#: EXTRACTION FIXTURE (chunk C, 2026-07-05): production reads the visual-style
+#: pack (``VisualStyle.still_word_typography``); these three maps survive ONLY
+#: as the sci_fi_radio byte-identity fixtures (pinned by test_still_word_maps_
+#: match; an AST guard forbids production reads). Edit the PACK, not these.
+#:
 #: LOCKED per-episode lettering. Every phrase ENDS in "capitals" (Fable: lock the
 #: CASE, not just the family -- Ideogram mixes case between renders otherwise;
 #: "capitals" is the cheapest per-episode consistency lock). No era/period/
@@ -870,7 +875,7 @@ def _still_word_clean_line(beat_line: str) -> str:
     return s
 
 
-def compose_still_word_prompt(meta, role, beat_line):
+def compose_still_word_prompt(meta, role, beat_line, style=None):
     """The still_word base-still prompt (see the module note above). Pure,
     deterministic, MODEL-AGNOSTIC (no engine reference -- the composed prompt is
     identical regardless of which image engine mints it). Returns a flat ``str``.
@@ -885,10 +890,14 @@ def compose_still_word_prompt(meta, role, beat_line):
     POSITIVE text guard LAST. FAILS LOUD (``ValueError``, NO FALLBACK) on a BLANK
     line; an overflowing line is REDUCED (never aborted). MUSIC mode is the
     UNTOUCHED wordless abstract-title still. All raises precede any prompt hash."""
-    # Stage 3 (kibitz r2 M2): era + grade route through the visual-style pack
-    # (ImportError shim only; a style error RAISES). The typography/backdrop
-    # maps stay Python (STAGE3_SUBPLAN section 8; operator lettering-
-    # consistency directive 2026-07-04).
+    # Stage 3 TOTAL-COVERAGE chunk C (2026-07-05): era + grade + the
+    # typography / backdrop / title-mood LOOK VALUES all route through the
+    # visual-style pack (ImportError shim only; a style error RAISES). The
+    # per-episode genre SELECTOR (_still_word_genre) and the per-episode
+    # lettering LOCK stay Python (operator lettering-consistency directive
+    # 2026-07-04); only the pack-owned vocabulary moves. ``style`` is the
+    # ALREADY-RESOLVED VisualStyle when the composer entry threads it (resolve-
+    # once, r4 contract); style=None => fail-loud get_visual_style(meta).
     try:
         from ._otr_story_brief_helpers import (  # type: ignore
             get_era_tail, NO_TEXT_CLAUSE, _resolve_style)
@@ -896,7 +905,7 @@ def compose_still_word_prompt(meta, role, beat_line):
         from _otr_story_brief_helpers import (  # type: ignore
             get_era_tail, NO_TEXT_CLAUSE, _resolve_style)
     _role = str(role or "")
-    _style = _resolve_style(meta)
+    _style = _resolve_style(meta, style)
     era = (get_era_tail(meta, profile="still", style=_style) or "").strip()
     if _role == _STILL_WORD_MUSIC_ROLE:
         # UNTOUCHED music path (operator 2026-07-04: episode titles are proc-gen
@@ -908,7 +917,8 @@ def compose_still_word_prompt(meta, role, beat_line):
                 "BLANK episode title (meta['episode_title']/['title']) -- cannot "
                 "mint the abstract title still. NO FALLBACK.")
         pieces = ['an abstract picture evoking "%s"' % _fold_inner_dquotes(title),
-                  _STILL_WORD_TITLE_MOOD_STYLE, era, _style.image_grade_tail]
+                  _style.still_word_title_mood_style, era,
+                  _style.image_grade_tail]
         out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
         return "%s, %s" % (out, NO_TEXT_CLAUSE)         # music title = NO words
     # WORD mode (character_video / announcer_visual): the spoken line IS the card.
@@ -921,8 +931,12 @@ def compose_still_word_prompt(meta, role, beat_line):
             "word card. NO FALLBACK." % (_role or "word", beat_line))
     words = _still_word_fit_card(words)                 # deterministic reduction
     genre = _still_word_genre(meta)
-    lettering = _STILL_WORD_TYPOGRAPHY[genre]
-    backdrop = _STILL_WORD_BACKDROP[genre]
+    # Genre is the per-episode LOCKED selector (Python); the VALUE it indexes
+    # is pack-owned (chunk C). Exact-key indexing on the pack map -- the loader
+    # guarantees the {noir,sci-fi,western,pulp,default} key set, so a genre the
+    # selector can return always resolves; a broken pack KeyErrors (fail-loud).
+    lettering = _style.still_word_typography[genre]
+    backdrop = _style.still_word_backdrop[genre]
     # ONE beat mood adjective on CHARACTER cards only (announcer cards: no mood).
     mood = (_still_word_mood_from_line(beat_line)
             if _role == "character_video" else "")
@@ -1863,7 +1877,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 # beats ignore it (title-driven). Back-compat: a str also works.
                 _ln = _line_by_beat.get(_bid, {})
                 _wprompt = compose_still_word_prompt(
-                    meta, str(tgt.get("role") or ""), _ln)
+                    meta, str(tgt.get("role") or ""), _ln, style=_vstyle)
                 _wobj = {
                     "object_id": f"still_{_bid}",
                     "kind": tgt["kind"],
@@ -1880,15 +1894,16 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 # backdrop family (music cards excluded -- they carry no lettering).
                 if str(tgt.get("role") or "") != _STILL_WORD_MUSIC_ROLE:
                     _swg = _still_word_genre(meta)
-                    _wobj["lettering_style"] = _STILL_WORD_TYPOGRAPHY[_swg]
+                    # Chunk C: lettering VALUE is pack-owned (the per-episode
+                    # genre lock stays Python); stamped from the resolved style.
+                    _wobj["lettering_style"] = (
+                        _vstyle.still_word_typography[_swg])
                     _wobj["backdrop_family"] = _swg
-                    # word-card maps stay Python until chunk C consumes the
-                    # pack fields -- stamped truthfully.
                     _wobj["prompt_field_source"] = (
-                        "python:still_word_word:%s" % _swg)
+                        "still_word_typography:%s" % _swg)
                 else:
                     _wobj["prompt_field_source"] = (
-                        "python:still_word_title_mood")
+                        "still_word_title_mood_style")
                 if _cid:
                     _wobj["char_id"] = _cid
                 objects.append(_wobj)

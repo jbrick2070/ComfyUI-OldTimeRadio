@@ -22,7 +22,7 @@
   "radio_object_look": "soft diorama lighting, gentle paper shadows",
   "plate_look": "handmade folded-paper diorama set",
   "non_character_emblem_fallback": "a single emblematic object folded from paper representing {base}",
-  "still_word_title_mood_style": "abstract evocative mood image, atmospheric period illustration, symbolic non-literal composition, no lettering",
+  "still_word_title_mood_style": "abstract folded-paper mood composition, layered papercraft textures in a symbolic non-literal arrangement, no lettering",
   "open_subjects": {
     "synthetic": "{form} unfolding to life on a table in a paper diorama, creased dials and paper tubes, warm lamplight through card stock",
     "announcer": "{form} in a broadcast booth built from folded card stock, glowing warmly, paper dials and tubes",
@@ -35,17 +35,17 @@
     "music_inter": "Continuous shot, same console throughout. Paper dial steady. Pleats ripple with the rhythm. Paper strips bounce like equalizer bars. Slow orbit around the speaker."
   },
   "still_word_typography": {
-    "noir": "heavy condensed sans-serif capitals, tightly spaced",
-    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
-    "western": "bold wood-type slab-serif capitals, sturdy and squared",
-    "pulp": "heavy blocky display serif capitals, hard drop shadow",
-    "default": "bold clean sans-serif capitals, evenly spaced"
+    "noir": "sharply folded paper capitals, deep crease shadows",
+    "sci-fi": "crisp angular cut-paper capitals, clean beveled folds",
+    "western": "thick layered cardstock capitals, sturdy folded edges",
+    "pulp": "bold stacked paper-cut capitals, dramatic layered shadow",
+    "default": "clean folded-paper capitals, even crisp creases"
   },
   "still_word_backdrop": {
-    "noir": "smoky midnight-blue haze, dim slatted lamplight",
-    "sci-fi": "deep void-black gradient, cold teal horizon glow",
-    "western": "deep amber dusk haze, low golden horizon glow",
-    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
-    "default": "soft dark gradient haze, faint warm center glow"
+    "noir": "deep indigo paper-toned gradient, dim raking crease light",
+    "sci-fi": "cool slate-blue paper-toned gradient, crisp cold studio light",
+    "western": "warm sand-amber paper-toned gradient, low golden raking light",
+    "pulp": "rich crimson paper-toned gradient, bold dramatic side light",
+    "default": "soft dark paper-toned gradient, gentle even studio light"
   }
 }

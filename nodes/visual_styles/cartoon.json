@@ -22,7 +22,7 @@
   "radio_object_look": "bright cheerful cartoon lighting, soft round shadows",
   "plate_look": "flat colorful cartoon set",
   "non_character_emblem_fallback": "a single emblematic cartoon object with bold outlines representing {base}",
-  "still_word_title_mood_style": "abstract evocative mood image, atmospheric period illustration, symbolic non-literal composition, no lettering",
+  "still_word_title_mood_style": "abstract playful cartoon mood picture, bold flat-color symbolic composition, cheerful non-literal shapes, no lettering",
   "open_subjects": {
     "synthetic": "{form} bouncing to life on a table in a bright cartoon scene, glowing dials and tubes, warm cheery glow",
     "announcer": "{form} in a broadcast booth drawn with bold cartoon outlines, glowing warmly, lit dials and tubes",
@@ -35,17 +35,17 @@
     "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Cabinet sways side to side with the rhythm. Tubes bounce like piano keys. Slow orbit around the speaker."
   },
   "still_word_typography": {
-    "noir": "heavy condensed sans-serif capitals, tightly spaced",
-    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
-    "western": "bold wood-type slab-serif capitals, sturdy and squared",
-    "pulp": "heavy blocky display serif capitals, hard drop shadow",
-    "default": "bold clean sans-serif capitals, evenly spaced"
+    "noir": "chunky outlined cartoon capitals, bold black keyline",
+    "sci-fi": "rounded bouncy cartoon capitals, glossy beveled shine",
+    "western": "fat wooden cartoon slab capitals, thick friendly outline",
+    "pulp": "big bursting cartoon capitals, bold double outline",
+    "default": "cheerful rounded cartoon capitals, clean bold outline"
   },
   "still_word_backdrop": {
-    "noir": "smoky midnight-blue haze, dim slatted lamplight",
-    "sci-fi": "deep void-black gradient, cold teal horizon glow",
-    "western": "deep amber dusk haze, low golden horizon glow",
-    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
-    "default": "soft dark gradient haze, faint warm center glow"
+    "noir": "flat deep-navy cartoon gradient, soft dim key light",
+    "sci-fi": "flat deep-teal cartoon gradient, cool bright rim light",
+    "western": "flat warm-ochre cartoon gradient, low sunny side light",
+    "pulp": "flat bold-red cartoon gradient, punchy dramatic underlight",
+    "default": "flat dark cartoon gradient, soft cheerful center light"
   }
 }

@@ -22,7 +22,7 @@
   "radio_object_look": "dramatic anime rim lighting, flat cel shadows",
   "plate_look": "painterly anime background set",
   "non_character_emblem_fallback": "a single emblematic object drawn in cel-shaded anime style representing {base}",
-  "still_word_title_mood_style": "abstract evocative mood image, atmospheric period illustration, symbolic non-literal composition, no lettering",
+  "still_word_title_mood_style": "abstract evocative anime key-art, painterly cel-shaded mood illustration, symbolic non-literal composition, no lettering",
   "open_subjects": {
     "synthetic": "{form} warming up on a table in a cel-shaded anime scene, glowing dials and tubes, warm painted filament glow",
     "announcer": "{form} in a broadcast booth drawn in clean anime linework, glowing warmly, lit dials and tubes",
@@ -35,17 +35,17 @@
     "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Equalizer bars bounce in flat color. Speed lines pulse with the bass. Slow orbit around the speaker."
   },
   "still_word_typography": {
-    "noir": "heavy condensed sans-serif capitals, tightly spaced",
-    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
-    "western": "bold wood-type slab-serif capitals, sturdy and squared",
-    "pulp": "heavy blocky display serif capitals, hard drop shadow",
-    "default": "bold clean sans-serif capitals, evenly spaced"
+    "noir": "bold inked manga capitals, sharp tapered brush strokes",
+    "sci-fi": "sleek chrome anime title capitals, crisp beveled edges",
+    "western": "chunky hand-inked anime slab capitals, rugged bold outline",
+    "pulp": "explosive manga display capitals, thick action outline",
+    "default": "clean bold anime title capitals, confident even strokes"
   },
   "still_word_backdrop": {
-    "noir": "smoky midnight-blue haze, dim slatted lamplight",
-    "sci-fi": "deep void-black gradient, cold teal horizon glow",
-    "western": "deep amber dusk haze, low golden horizon glow",
-    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
-    "default": "soft dark gradient haze, faint warm center glow"
+    "noir": "flat midnight-indigo cel gradient, dim cool key light",
+    "sci-fi": "deep cel-black gradient, cold cyan rim light",
+    "western": "warm dusk-orange cel gradient, low amber side light",
+    "pulp": "bold crimson cel gradient, harsh dramatic underlight",
+    "default": "soft dark cel gradient, gentle warm center light"
   }
 }

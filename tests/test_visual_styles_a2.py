@@ -338,12 +338,16 @@ class TestImageObjectProvenance:
             assert o["prompt_field_source"] == "plate_look"
 
     def test_still_word_objects_stamped(self):
+        # Chunk C: still_word maps are pack-owned now, so the word-card
+        # provenance stamps the PACK field (still_word_typography:<genre>),
+        # not the retired "python:still_word_word:<genre>" literal.
         objs = self._payload(still_word_roles={"character_video"})
         cards = [o for o in objs.values() if o["source"] == "still_word"]
         assert cards
         for o in cards:
             assert o["visual_style"] == "sci_fi_radio"
-            assert o["prompt_field_source"].startswith("python:still_word")
+            assert o["prompt_field_source"].startswith(
+                "still_word_typography:")
 
 
 # ---------------------------------------------------------------------------
