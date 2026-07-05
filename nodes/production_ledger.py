@@ -1253,9 +1253,11 @@ class Ledger:
           radio_bookend_path, final_audio_path
 
         Per-row fields preserved (keyed by line_id / cue_id):
-          For each lines[i] / clips[i] / sfx[i] / music[i]: copy
-          forward any key present on disk that is missing or
-          empty/null in the in-mem row.
+          For each lines[i] / clips[i] / music[i]: copy forward any
+          key present on disk that is missing or empty/null in the
+          in-mem row. (The ``sfx[]`` array was ripped 2026-07-01
+          rip-sfx-broll / S27; it is no longer a copied row shape --
+          see the ROW_KEYED map below.)
         """
         try:
             if not os.path.exists(path):
