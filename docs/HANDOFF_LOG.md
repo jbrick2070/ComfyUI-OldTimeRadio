@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (late night, session end -- operator out of credits) -- TOTAL-COVERAGE CHUNK B SHIPPED (4 pack voices authored) -- v2.0-alpha
+Did:
+- @be42dc47 (pushed, HEAD==origin, post-push verify clean): chunk B -- anime/cartoon/paper_origami/archival_documentary AUTHOR the A1/A2-consumed field set (10 str incl. scene_instruction_look now non-empty + open_subjects + motion_registers, every key re-voiced; every authored field CHANGED from sci-fi defaults per r4). +48 tests (test_visual_styles_b.py): raw-field deltas, per-surface forced-meta deltas incl. motion via the REAL build_request_from_shot, per-pack negative-vocab smokes. A1 dormant pin narrowed to the 3 still_word fields.
+- Session total: A1 @2b4a481a (schema v2 + image lane, 34-golden byte-identity) + A2 @c265d48a (motion registers + object/plate look + emblem + provenance, 17-golden) + B @be42dc47. Suite 6440 -> 6567/0; Bug Bible 16 every chunk; workflow JSON untouched.
+Current step: TOTAL-COVERAGE chunk C (still_word typography/backdrop/title-mood pack ownership; selection + per-episode lettering lock stay Python; sci_fi byte-identical; then author the 4 packs' still_word voices + delta tests).
+Next: build C per the v5 plan; after C = the live anime-episode acceptance render (operator eyeball gates the look).
+Commits: 2b4a481a, d32f897e, c265d48a, 1caf97e3, be42dc47 + this docs commit (all pushed).
+
 ## 2026-07-05 (late night) -- TOTAL-COVERAGE CHUNK A2 SHIPPED (motion registers + object/plate look + emblem + provenance) -- v2.0-alpha
 Did:
 - @c265d48a (pushed, HEAD==origin): motion registers pack-routed IN build_request_from_shot (style resolved once per shot OUTSIDE any swallow; exact-key indexing; the :1656 silent or-announcer fallback RETIRED per r2 codex S3; _ltx_motion_role_key env check on the static _MOTION_REGISTER_KEYS set; pack value FIRST then _talking_swap -- the P8 verbatim ia2v talking prompt outranks every pack, hostile-pack no-leak test). RADIO_OBJECT/PLATE geometry-vs-look splits + the emblem {base} template at the real fallback (music/announcer keep radio_form). ADDITIVE provenance: visual_style + prompt_field_source on the 4 scene-family image objects + request observability + the run_episode trace allowlist. 17-golden pre/post capture through the REAL builder = byte-identical (only the additive obs key differs).

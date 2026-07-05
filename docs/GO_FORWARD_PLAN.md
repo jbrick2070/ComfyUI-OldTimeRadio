@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (TOTAL-COVERAGE CHUNKS A1+A2 SHIPPED) | branch v2.0-alpha HEAD c265d48a + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> Last updated 2026-07-05 (TOTAL-COVERAGE CHUNKS A1+A2+B SHIPPED) | branch v2.0-alpha HEAD be42dc47 + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -79,17 +79,37 @@ PROMOTED from "deferred" to an ORDERED build item, queued immediately after
 lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
 needs promptable engines selectable/selected for announcer/music video roles.
 
-**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk B (author the 9+2
-field set in the 4 non-default packs -- anime/cartoon/paper_origami/
-archival_documentary voices -- + forced-meta delta tests per surface +
-per-surface negative-vocab smokes; r1 codex OPT).**
+**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk C (still_word pack
+ownership): re-route the still_word typography/backdrop/title-mood maps
+(`otr_meta_brief_image_prompt.py` `_STILL_WORD_TYPOGRAPHY` /
+`_STILL_WORD_BACKDROP` / `_STILL_WORD_TITLE_MOOD_STYLE`, ~:631-664) to the
+pack fields (already loaded + lint-guarded since A1; exact case-sensitive
+keys incl. the hyphenated "sci-fi"); SELECTION logic + the per-episode
+lettering LOCK stay Python (operator 2026-07-04: consistent lettering per
+episode); sci_fi byte-identical; THEN author the 4 packs' still_word voices
++ delta tests (retiring the A1 TestDormantDefaults still_word pin).**
 Plan of record: `docs/multimodal-story-schema/STAGE3_TOTAL_COVERAGE_SUBPLAN.md`
 (v5 FINAL -- kibitz r1-r4 CONVERGED 2026-07-05, codex+antigravity panel, Claude
 anchor+judge; artifacts `kibitz-runs/2026-07-05-style-total-coverage/`). Build
-order A1+A2 DONE -> B -> C (still_word pack ownership). Commit+push per green
-chunk. The r4 header block in the sub-plan is the authoritative schema
-inventory. Chunk-B delta tests must assert every authored field CHANGED from
-the A1 sci-fi defaults (replacing test_visual_styles_a1 TestDormantDefaults).
+order A1+A2+B DONE -> C = the LAST chunk. Commit+push per green chunk. The r4
+header block in the sub-plan is the authoritative schema inventory. After C:
+operator acceptance = an anime episode's announcer/radio + music stills AND
+motion prompts provably carry the anime fields (ledger prompt-metadata
+stamps); operator eyeball gates the look. NOTE: procedural viz_* engines are
+promptless -- full coverage needs promptable engines selected for
+announcer/music video roles (documented limitation, config guidance only).
+
+**CHUNK B SHIPPED @be42dc47 (2026-07-05, pushed HEAD==origin):** the 4
+non-default packs AUTHORED in their own voice -- 10 str fields (the 1a nine +
+scene_instruction_look, now non-empty on all 4) + open_subjects +
+motion_registers (every key re-voiced; every authored field CHANGED from the
+sci-fi defaults, r4 requirement). Voices: anime = linework/cel/speed-lines;
+cartoon = rubber-hose/squash-and-stretch; paper_origami = card-stock/
+crease-and-pleat; archival = restored-photograph/natural-light. +48 tests
+(test_visual_styles_b.py): raw-field deltas, per-surface forced-meta deltas
+(incl. motion through the REAL build_request_from_shot), per-pack
+negative-vocab smokes. still_word fields stay sci-fi defaults (dormant pin
+narrowed to those 3). Suite 6567/0, Bug Bible 16.
 
 **CHUNK A1 SHIPPED @2b4a481a + CHUNK A2 SHIPPED @c265d48a (2026-07-05, pushed
 HEAD==origin):** A1 = schema v2 loader (11 str + 4 dict fields, full lint set,
