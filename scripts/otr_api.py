@@ -764,6 +764,9 @@ CREATIVE_WHITELIST = frozenset({
     # source_bank (Stage 2C) -- the story-path selector; mirror of the package
     # whitelist. Non-runnable picks still fail LOUD at run().
     "source_bank",
+    # visual_style (Stage 3C) -- the visual-style selector; mirror of the
+    # package whitelist. Unknown ids fail LOUD at run().
+    "visual_style",
 })
 
 

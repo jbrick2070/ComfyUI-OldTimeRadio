@@ -670,14 +670,15 @@ class TestWriterB2aSurface:
         # (END of optional). 2026-06-01 (Comfy Credits) appended the sibling
         # pair comfy_slot_a_model + comfy_slot_b_model at slots 21/22, so the
         # vector is now 23 with [0..20] intact.
-        assert len(wv) == 26, (
-            f"writer widgets_values length drift: {len(wv)} (expected 26: "
+        assert len(wv) == 27, (
+            f"writer widgets_values length drift: {len(wv)} (expected 27: "
             f"the 2026-05-29 lean-down brought it to 19, S2 appended the "
             f"OpenRouter pair -> 21, Comfy Credits appended "
             f"comfy_slot_a_model + comfy_slot_b_model -> 23, the refine "
             f"loop (2026-06-23) appended refine_target_grade -> 24, the "
             f"story-scaffold toggle (2026-06-24) appended story_scaffold "
-            f"-> 25, then Stage 2C (2026-07-05) appended source_bank -> 26)"
+            f"-> 25, Stage 2C (2026-07-05) appended source_bank -> 26, "
+            f"then Stage 3C (2026-07-06) appended visual_style -> 27)"
         )
         # Slot 16: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -744,6 +745,18 @@ class TestWriterB2aSurface:
         assert wv[25] in _routing.list_bank_ids(), (
             f"source_bank (slot 25) value {wv[25]!r} is not a registered "
             f"bank id: {_routing.list_bank_ids()!r}"
+        )
+        # Slot 26: visual_style (Stage 3C multi-modal story schema,
+        # 2026-07-06) -- APPENDED at the END; ships the production look AND
+        # must be a REGISTERED style id (live registry cross-check).
+        assert wv[26] == "sci_fi_radio", (
+            f"visual_style (slot 26) must ship 'sci_fi_radio' (the "
+            f"production look); got {wv[26]!r}"
+        )
+        from nodes import _otr_visual_styles as _vstyles
+        assert wv[26] in _vstyles.list_style_ids(), (
+            f"visual_style (slot 26) value {wv[26]!r} is not a registered "
+            f"style id: {_vstyles.list_style_ids()!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

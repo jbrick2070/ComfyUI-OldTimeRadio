@@ -157,6 +157,11 @@ def _writer_schemas() -> dict:
                     "source_bank": (
                         ["science_news"], {"default": "science_news"},
                     ),
+                    # Stage 3C (2026-07-06): visual_style selector appended
+                    # at index 26 (END), same mirroring contract.
+                    "visual_style": (
+                        ["sci_fi_radio"], {"default": "sci_fi_radio"},
+                    ),
                 },
                 "optional": {},
             }
@@ -208,6 +213,7 @@ def _writer_node_fixture() -> dict:
                     "Off",                                    # 23 refine_target_grade
                     "auto",                                   # 24 story_scaffold
                     "science_news",                           # 25 source_bank (2C)
+                    "sci_fi_radio",                           # 26 visual_style (3C)
                 ],
             }
         ],
@@ -456,8 +462,8 @@ def test_round_trip_canonical_node1_inputs_correct():
     are appended at the END so creative/technical stay at wv[3]/wv[4].
     """
     dump = _dump_canonical_node1()
-    # 26 after Stage 2C (2026-07-05) appended source_bank at slot 25.
-    assert len(dump) == 26, f"node 1 widgets_values length drift: {len(dump)}"
+    # 27 after Stage 2C appended source_bank (25) + Stage 3C visual_style (26).
+    assert len(dump) == 27, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

@@ -506,6 +506,10 @@ CREATIVE_WHITELIST = frozenset({
     # manages it. Headless drivers may set it; a non-runnable pick still
     # fails LOUD at run() (require_runnable_bank, no fallback).
     "source_bank",
+    # visual_style (Stage 3C) is the visual-style selector on node 1 -- a
+    # pure creative dial (prompt-tail deltas only); apply_profile never
+    # manages it. Unknown id fails LOUD at run() (resolve_visual_style).
+    "visual_style",
 })
 
 

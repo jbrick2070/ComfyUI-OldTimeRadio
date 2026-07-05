@@ -130,6 +130,11 @@ from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
 # first call) -- safe at module-import time.
 from . import _otr_story_routing as _otr_story_routing
 
+# Stage 3C (2026-07-06): the visual-style layer supplies the visual_style
+# dropdown (list_style_ids at INPUT_TYPES) and the fail-loud id gate
+# (resolve_visual_style, beside the bank gate). Same lazy/stdlib posture.
+from . import _otr_visual_styles as _otr_visual_styles
+
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
 # reflection call site below the K.5 visual_plan stamp. Module-level
@@ -1256,6 +1261,9 @@ def _resolve_inputs(
     # meta/ledger stamping + prompt threading. Already gated runnable by
     # run() (require_runnable_bank fires before this call).
     source_bank: str = "science_news",
+    # Stage 3C (2026-07-06): the visual_style widget selection; same
+    # authoritative-value contract (gated by resolve_visual_style in run()).
+    visual_style: str = "sci_fi_radio",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1434,6 +1442,8 @@ def _resolve_inputs(
         # Stage 2C: the ONE authoritative source_bank value for prompt
         # threading + meta/ledger stamping (run() gated it runnable already).
         "source_bank": str(source_bank or "science_news"),
+        # Stage 3C: the ONE authoritative visual_style value (gated in run()).
+        "visual_style": str(visual_style or "sci_fi_radio"),
     }
 
 
@@ -2253,6 +2263,30 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Stage 3C (2026-07-06) -- the VISUAL STYLE selector, APPENDED
+                # at the END (widgets_values slot 26, BUG-LOCAL-097). Choices
+                # LIVE from the lazy visual-style registry; may RAISE
+                # (VisualStyleError) -- the same deliberate INPUT_TYPES
+                # exception as source_bank above (no-fallback law; a broken
+                # pack dir fails node registration LOUD). Unlike story banks,
+                # every listed style is FULLY LIVE (styles rewrite prompt
+                # tails only -- no execution lane needed).
+                "visual_style": (
+                    list(_otr_visual_styles.list_style_ids()),
+                    {
+                        "default": "sci_fi_radio",
+                        "tooltip": (
+                            "VISUAL STYLE (multi-modal story schema). "
+                            "Rewrites ONLY the downstream still/video prompt "
+                            "style language (tails); story content is "
+                            "untouched. sci_fi_radio = the production look "
+                            "(default, byte-identical). anime / cartoon / "
+                            "paper_origami / archival_documentary are live "
+                            "immediately. Unknown id fails LOUD before any "
+                            "story work."
+                        ),
+                    },
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -2544,6 +2578,11 @@ class OTR_LedgerScriptWriter:
         # science_news = the production lane, byte-identical. Gated FIRST
         # in the body via require_runnable_bank (no fallback).
         source_bank="science_news",
+        # Stage 3C (2026-07-06): the visual-style selector, appended at the
+        # END of the widget surface (slot 26). Default sci_fi_radio = the
+        # production look, byte-identical. Validated fail-loud beside the
+        # bank gate; stamped at meta["visual_style"] (the threading channel).
+        visual_style="sci_fi_radio",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -2564,6 +2603,12 @@ class OTR_LedgerScriptWriter:
         # fails ONCE, LOUD and CHEAP, with zero side effects. bank.runnable is
         # the ONLY runtime gate; unknown id = UnknownBankError (no fallback).
         _otr_story_routing.require_runnable_bank(source_bank)
+        # Stage 3C visual-style gate -- beside the bank gate, same zero-side-
+        # effect contract: an unknown visual_style id raises
+        # UnknownVisualStyleError here, before ANY story work (no fallback).
+        # Every REGISTERED style is valid to run (styles are prompt-tail
+        # deltas; no execution lane to gate).
+        _otr_visual_styles.resolve_visual_style(visual_style)
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -2688,6 +2733,8 @@ class OTR_LedgerScriptWriter:
             comfy_slot_b_model=comfy_slot_b_model,
             # Stage 2C: the source_bank widget selection (gated above).
             source_bank=source_bank,
+            # Stage 3C: the visual_style widget selection (gated above).
+            visual_style=visual_style,
         )
 
         log.info(
@@ -2806,6 +2853,11 @@ class OTR_LedgerScriptWriter:
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        # Stage 3C: stamp the visual style -- THE threading channel: every
+        # downstream visual composer reads meta["visual_style"] via
+        # get_visual_style(meta) off the serialized ledger (stamp precedes
+        # all of them by construction -- verified 2026-07-05).
+        meta["visual_style"] = resolved["visual_style"]
         # Story-quality v2 is BAKED IN (operator 2026-06-28): the dialogue-craft
         # spine (objective gate, body-gate text-score, cliche span-repair,
         # one-breath budget cap, news-coda bridge, two-principal scan + telemetry)

@@ -58,10 +58,13 @@ _NON_RUNNABLE_BANK = "media_archive"  # runnable:false lane pack (2B)
 # 1. Widget surface
 # ---------------------------------------------------------------------------
 class TestWidgetSurface:
-    def test_source_bank_is_last_optional(self):
+    def test_source_bank_positional_pin(self):
+        # Stage 3C (2026-07-06) appended visual_style at the END;
+        # source_bank now sits at -2 (renamed from ..._is_last_optional).
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["optional"].keys())
-        assert order[-1] == "source_bank"
+        assert order[-2] == "source_bank"
+        assert order[-1] == "visual_style"
 
     def test_choices_are_exactly_the_registry_in_order(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -309,5 +312,6 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "source_bank", "science_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 26
+        # 27 after Stage 3C appended visual_style; source_bank stays slot 25.
+        assert len(node1["widgets_values"]) == 27
         assert node1["widgets_values"][25] == "science_news"
