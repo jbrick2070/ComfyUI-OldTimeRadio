@@ -91,8 +91,15 @@ gate non-blocking follow-ups N1/N2/N3 (section 1 "NON-BLOCKING follow-ups": rest
 final_video_path truthfully at 86/85; strip the stale node-93 caption log strings);
 (1)+(2) DONE @2c1d22aa (credits nits: Optional import, node-85 truthful final_video_path
 restamp fail-soft, node-93 stale caption strings) + @7d7005c1 (conformance debt:
-`_engines_by_node_key` node_key->LIST, not last-wins). (3) S-C C1 shared
-`audio_motion_profile` (section 1A) = IN PROGRESS. Regress + commit + PUSH per green
+`_engines_by_node_key` node_key->LIST, not last-wins). (3) S-C C1: EXTRACTION CORE
+SHIPPED @d60bf371 (`nodes/_otr_audio_motion.py`, 8-field read-only analyzer + resolver +
+ledger stamp, 14 tests, byte-identity proven). The PRODUCER WIRING is a real fork that
+edits the FROZEN production JSON = operator-gated -> HANDED BACK with a kibitz-r1-hardened
+build-ready spec (`docs/2026-07-05-audio-motion-c1/`): Option A = new OTR_AudioMotionProfile
+node inserted **91 ImageGenDispatcher -> [96] -> 92 VideoRenderBatch** (codex fixed my
+ShotLock insertion error), per-video-shot rows, resolver = render_driver._slice_master_audio
+(read-only), durable save_ledger_safe, NO custom IS_CHANGED v1. C2 consumers deferred ->
+no urgency to touch the frozen graph while operator away. Regress + commit + PUSH per green
 chunk (rule #1: always push, don't ask); update GO_FORWARD + HANDOFF_LOG each chunk;
 /kibitz if torn. Only escalate for GPU/cloud/operator-eyeball work.
 

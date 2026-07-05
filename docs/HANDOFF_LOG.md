@@ -6,6 +6,26 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (yoga, autonomous) -- S-C C1 EXTRACTION CORE SHIPPED + WIRING FORK KIBITZ'd -- v2.0-alpha
+Did:
+- @d60bf371 (pushed): S-C C1 extraction core. `nodes/_otr_audio_motion.py` -- pure import-clean
+  (numpy + lazy soundfile, no torch/comfy) READ-ONLY 8-field analyzer (duration/rms/peak/dynamic-range/
+  silence/onset/brightness/speech-vs-music) + `build_audio_motion_profiles(rows, resolver)` +
+  `stamp_ledger_audio_motion`. 14 tests incl. byte-identity (source wav sha unchanged). Suite 6628/0,
+  Bug Bible 16. NO consumer/JSON yet (C2 deferred).
+- Kibitz r1 on the PRODUCER WIRING fork (codex; antigravity hung at 0 bytes ~6min = agy credit bug,
+  treated tapped). Codex CAUGHT a real error: my Option A insertion was ShotLock->92 but the real chain
+  is ShotLock(90)->ImageGenDispatcher(91)->VideoRenderBatch(92); corrected to 91->[96]->92. Also closed
+  gaps: durable save_ledger_safe on the in-flight ledger path, per-video-shot row universe, resolver =
+  render_driver._slice_master_audio (read-only), NO custom IS_CHANGED v1. Artifacts + hardened spec:
+  docs/2026-07-05-audio-motion-c1/ + kibitz-runs/2026-07-05-audio-motion-c1/r1/final.md.
+- DECISION: Option A edits the FROZEN production JSON = operator-gated; sole consumer (C2) deferred = no
+  urgency. Producer wiring HANDED BACK build-ready = the "real fork + needs operator" stop condition.
+Current step: C1 producer-node wiring (Option A, build-ready spec) awaits operator JSON eyeball; OR the
+still-open anime acceptance render (operator cleared me to run GPU headless -- assess next).
+Next: on operator go, build node 96 + wire 91->96->92 + validator/round-trip/link-widget audit; run r2-r4.
+Commits: d60bf371 (pushed) + this docs commit.
+
 ## 2026-07-05 (yoga, autonomous) -- CREDITS N1/N2/N3 + CONFORMANCE DEBT SHIPPED -- v2.0-alpha
 Did:
 - @2c1d22aa (pushed): credits Fable-gate nits. N1 restored `from typing import Optional` in
