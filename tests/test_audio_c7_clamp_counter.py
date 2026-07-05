@@ -49,12 +49,14 @@ def test_default_config_both_slots_mistral_nemo_returns_modern_prompts_byte_stab
     }
     for phase in PHASES:
         actual = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)
-        assert actual is expected[phase], (
+        assert actual == expected[phase], (
             f"D2b audio C7 boundary failure at phase {phase!r}: "
-            f"resolver returned a different object than the legacy "
-            f"_SYSTEM_PROMPT direct reference. Object identity must "
-            f"hold for Prime Directive 1. If a future commit rebuilds "
-            f"these strings the audio baseline DRIFTS -- halt and "
+            f"resolver returned a different VALUE than the legacy "
+            f"_SYSTEM_PROMPT direct reference. Stage 1b sources "
+            f"line_composer_system from the JSON story pack, so the "
+            f"contract is byte-identical VALUE (pinned by "
+            f"tests/test_story_pack_stage1.py), not object identity. "
+            f"If this fails the audio baseline DRIFTS -- halt and "
             f"investigate before shipping."
         )
 

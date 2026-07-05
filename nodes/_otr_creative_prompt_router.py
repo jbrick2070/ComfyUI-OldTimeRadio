@@ -12,16 +12,16 @@ resolver dispatches on the catalog row's `prompt_profile`:
                                        from _otr_period_prompts for
                                        every creative phase
 
-The four phases the writer's creative slot covers:
-  outline
-  line_composer_system
-  polish_character
-  polish_announcer
+The creative phases the resolver currently covers (see `Phase`):
+  outline               -- returns the modern constant, OBJECT-IDENTICAL
+                           (_otr_outline's `resolved is _SYSTEM_PROMPT`
+                           sentinel depends on it)
+  line_composer_system  -- Stage 1b (multi-modal schema): sourced from the
+                           science JSON story pack, byte-identical VALUE
+                           (not object-identity)
 
-Sprint D D2a: helper defined, NOT wired. Caller-count tests enforce
-zero production callers at the D2a boundary. Sprint D D2b wires the
-resolver into the 4 phase sites; caller-count flips to exactly 4
-at the D2b boundary.
+Wired at exactly 2 production call sites (_otr_outline, _otr_line_composer);
+a caller-count test pins that count.
 
 Sprint D D2c few-shot decision: `render_few_shot_block` from
 `_otr_period_prompts` is documented as OMIT for v1 (saves ~600
@@ -29,14 +29,16 @@ tokens of context budget). The caller-count test pins
 render_few_shot_block at 0 production callers; re-introducing it
 fires the test and forces a deliberate scope decision.
 
-Audio C7 contract: at default config (both writer slots on
-Mistral-Nemo, prompt_profile = "modern" everywhere) the resolver
-returns the EXACT SAME object references as the pre-D2b direct
-constant lookups. Byte identity holds through D2a (no consumers
-yet) and D2b (consumers wired, but default path bit-identical).
+Audio C7 contract: at default config (writer on Mistral-Nemo,
+prompt_profile = "modern") the resolver returns prompts BYTE-IDENTICAL
+to the legacy direct-constant lookups. `outline` is object-identical;
+`line_composer_system` is value-identical (sourced from the JSON pack,
+pinned byte-for-byte by tests/test_story_pack_stage1.py). The audio
+baseline is unchanged either way.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from . import _otr_model_catalog
@@ -45,6 +47,7 @@ from ._otr_line_composer import (
 )
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
 from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
+from ._otr_story_pack import get_pack_prompt, load_pack
 
 
 Phase = Literal[
@@ -61,6 +64,25 @@ Phase = Literal[
 _MODERN_BY_PHASE: dict[str, str] = {
     "outline":              _MODERN_OUTLINE_SYSTEM,
     "line_composer_system": _MODERN_LINE_COMPOSER_SYSTEM,
+}
+
+
+# Stage 1b (multi-modal story schema): the science lane sources selected creative
+# seams from its JSON story pack instead of the local Python constant. The pack
+# value is BYTE-IDENTICAL to the constant (pinned by tests/test_story_pack_stage1.py);
+# object-identity is intentionally not preserved for a pack-sourced phase, so the
+# audio C7 contract now holds by VALUE, not object reference.
+#
+# Only `line_composer_system` is migrated in Stage 1b. `outline` stays on its
+# constant (its downstream `resolved is _SYSTEM_PROMPT` sentinel in _otr_outline
+# depends on object identity). The fixed science-pack path is the single
+# transitional binding; Stage 2 replaces it with source_bank -> pack-coordinate routing.
+_SCIENCE_PACK_PATH = (
+    Path(__file__).resolve().parent
+    / "story_packs" / "science_news" / "science_news_default.json"
+)
+_PHASE_TO_PACK_SEAM: dict[str, str] = {
+    "line_composer_system": "line_composer_system",
 }
 
 
@@ -97,6 +119,11 @@ def resolve_creative_system_prompt(repo_id: str, phase: Phase) -> str:
     row = rows.get(repo_id)
     if row is not None and row.prompt_profile == "otr_1940s_v1":
         return OTR_PERIOD_SYSTEM_PROMPT
+    seam = _PHASE_TO_PACK_SEAM.get(phase)
+    if seam is not None:
+        # Byte-identical to _MODERN_BY_PHASE[phase]; sourced from the science
+        # story pack so JSON owns the prompt content. Fail-loud if missing.
+        return get_pack_prompt(load_pack(_SCIENCE_PACK_PATH), seam)
     return _MODERN_BY_PHASE[phase]
 
 

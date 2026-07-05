@@ -49,9 +49,11 @@ PHASES: tuple[str, ...] = (
 
 
 def test_router_returns_modern_for_default_mistral_nemo() -> None:
-    """Every phase under Mistral-Nemo returns the corresponding
-    modern phase prompt (object-identity, not just equality, so
-    string-interning behavior cannot mask a drift).
+    """Every phase under Mistral-Nemo returns the corresponding modern
+    phase prompt VALUE. Stage 1b: line_composer_system is sourced from the
+    JSON story pack (byte-identical; drift pinned by
+    tests/test_story_pack_stage1.py), so value-equality is the contract now,
+    not object identity. outline stays object-identical (untouched).
     """
     expected_modern_by_phase = {
         "outline":              _otr_outline._SYSTEM_PROMPT,
@@ -59,10 +61,10 @@ def test_router_returns_modern_for_default_mistral_nemo() -> None:
     }
     for phase in PHASES:
         out = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)
-        assert out is expected_modern_by_phase[phase], (
+        assert out == expected_modern_by_phase[phase], (
             f"router({MISTRAL_NEMO!r}, {phase!r}) did NOT return the "
-            f"modern phase prompt by object identity; phase prompt "
-            f"may have been reassigned or the router rebuilt it"
+            f"modern phase prompt value; phase prompt may have been "
+            f"reassigned or the pack drifted from the constant"
         )
 
 
@@ -100,7 +102,7 @@ def test_router_returns_modern_for_remote_slot_handles() -> None:
                    "comfy:slot-a", "comfy:slot-b", "some/uncurated-model"):
         for phase in PHASES:
             out = router.resolve_creative_system_prompt(handle, phase)
-            assert out is expected_modern_by_phase[phase], (
+            assert out == expected_modern_by_phase[phase], (
                 f"router({handle!r}, {phase!r}) must return the modern prompt "
                 f"for a non-curated/remote slot, never KeyError or the period "
                 f"prompt"

@@ -203,17 +203,54 @@ def test_or_none_preserves_exact_content(tmp_path):
     assert sp.get_pack_prompt_or_none(p, "line_composer_system") == "  padded content  "
 
 
-# -- (e) dormancy guard -----------------------------------------------------
+# -- (e) sanctioned-consumer guard (Stage 1b) -------------------------------
 
-def test_stage1_is_dormant_no_production_consumer():
-    """No production node imports/calls the loader in Stage 1 -> the sci-fi run
-    is byte-for-byte unchanged. Only the module itself + tests may reference it."""
-    nodes_dir = REPO / "nodes"
+def test_only_sanctioned_consumer_uses_loader():
+    """Stage 1b wires exactly ONE production consumer: the creative prompt
+    router (line_composer_system). Any OTHER production file consuming the loader
+    is unexpected and must be reviewed (catches accidental scope creep)."""
+    allowed = {"_otr_story_pack.py", "_otr_creative_prompt_router.py"}
     offenders = []
-    for py in nodes_dir.rglob("*.py"):
-        if py.name == "_otr_story_pack.py":
+    for py in (REPO / "nodes").rglob("*.py"):
+        if py.name in allowed:
             continue
         text = py.read_text(encoding="utf-8", errors="replace")
         if "_otr_story_pack" in text or "get_pack_prompt" in text:
             offenders.append(str(py.relative_to(REPO)))
-    assert not offenders, f"Stage 1 must stay dormant; found consumers: {offenders}"
+    assert not offenders, f"unexpected loader consumers beyond {allowed}: {offenders}"
+
+
+# -- (f) Stage 1b wiring: router sources the seam from the pack -------------
+
+def test_stage1b_router_sources_line_composer_from_pack(pack):
+    """The router now returns line_composer_system from the JSON pack, and it is
+    byte-identical to the live constant -> the sci-fi episode is unchanged."""
+    from nodes import _otr_creative_prompt_router as router
+    from nodes import _otr_model_catalog as cat
+
+    modern = [m.repo_id for m in cat.CURATED_LLM_MODELS
+              if m.prompt_profile == "modern"]
+    assert modern, "expected at least one modern curated model"
+    out = router.resolve_creative_system_prompt(modern[0], "line_composer_system")
+    assert out == pack.prompt_stages["line_composer_system"] == L._SYSTEM_PROMPT
+    # outline stays object-identical (not pack-sourced in Stage 1b).
+    out_outline = router.resolve_creative_system_prompt(modern[0], "outline")
+    assert out_outline is O._SYSTEM_PROMPT
+
+
+def test_stage1b_router_fail_loud_on_missing_pack(monkeypatch):
+    """No fallback at the router: if the science pack is missing, resolving the
+    migrated seam RAISES (never silently reverts to a Python constant)."""
+    from nodes import _otr_creative_prompt_router as router
+    from nodes import _otr_model_catalog as cat
+
+    sp._PACK_CACHE.clear()
+    monkeypatch.setattr(
+        router, "_SCIENCE_PACK_PATH",
+        REPO / "nodes" / "story_packs" / "science_news" / "__missing__.json",
+    )
+    modern = next(m.repo_id for m in cat.CURATED_LLM_MODELS
+                  if m.prompt_profile == "modern")
+    with pytest.raises(sp.StoryPackError):
+        router.resolve_creative_system_prompt(modern, "line_composer_system")
+    sp._PACK_CACHE.clear()

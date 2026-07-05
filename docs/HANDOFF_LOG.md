@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (session) -- MULTI-MODAL STORY SCHEMA Stage 1b SHIPPED (first live consumer, byte-identical) -- v2.0-alpha
+Did:
+- Wired the science lane's `line_composer_system` creative seam to source from the JSON story pack via `_otr_creative_prompt_router.py` (get_pack_prompt), byte-identical to `_otr_line_composer._SYSTEM_PROMPT` -> zero episode-output change. Period branch checked first; `outline` left on its constant so the `_otr_outline.py:1847 resolved is _SYSTEM_PROMPT` sentinel is untouched (smaller blast radius).
+- Migrated the object-identity assertions to value-equality (`is`->`==`) at test_creative_prompt_router.py:62/:103 + test_audio_c7_clamp_counter.py; the byte-identity DRIFT guard now lives in tests/test_story_pack_stage1.py. Turned the Stage-1 dormancy guard into a sanctioned-consumer guard (router allowed) + added router equivalence + router fail-loud-on-missing-pack tests. Fixed stale router docstring (2 phases, value-identity).
+- GATES: reserved Fable §9 gate = SHIP (verified byte-identity live, no hidden object-identity dep, caller-count unchanged, fail-loud, no import cycle; forward-note: remove the _otr_outline.py:1851 `except Exception -> overlay=None` swallow BEFORE Stage 2 pack-sources outline). Codex cross-check (operator asked, cheapest) = SHIP, 0 must-fix. Suite 6200/0, Bug Bible 16.
+Current step: STAGE 2 -- story-path routing (banks.json/pipelines.json + source_bank/story_pipeline resolution, fail-loud) + author public-domain / media-archive / simple-4-LLM lanes (adapt schema-examples). Then Stage 3 (visual_style), Stage 4 (asserts->JSON enforcer).
+Next: Stage 2 sub-plan (kibitz if torn) then code the routing + first new lane, per-chunk green + push.
+Commits: <this chunk> (pushed to v2.0-alpha). Kibitz: kibitz-runs/2026-07-05-multimodal-stage1b/.
+
 ## 2026-07-04 (session) -- MULTI-MODAL STORY SCHEMA Stage 1 Chunk 1 SHIPPED (dormant foundation) -- v2.0-alpha
 Did:
 - Grounded the design + the archived phase-a lab impl; mapped the REAL live sci-fi prompt constants (subagent) -- design-doc seam NAMES are aspirational; real bytes live in _otr_outline/_otr_line_composer/_otr_style_picker.
