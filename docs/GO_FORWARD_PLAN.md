@@ -69,9 +69,12 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = LANE-ENABLEMENT CHUNK 1 (outline-seam migration: the 3 outline stage
-prompts -> pack routing, byte-identity pins) -- the first step toward runnable non-science
-banks.** Overnight 2026-07-05/06 (operator "EVERYTHING" directive; full detail in
+**CURRENT STEP = LANE-ENABLEMENT CHUNK 2 (exchange seam: make build_exchange_prompt
+pack-routable or bypass-per-lane -- STAGE3_SUBPLAN 4b item 2; then source-payload
+fetcher/interpreter contracts).** CHUNK 1 SHIPPED @69afbd83 (outline stage prompts
+pack-routed via the router repo=None lane; science byte-identical; bank-without-seams
+fails loud; 13 tests; suite 6387/0). Remaining outline-side seam coverage (announcer
+intro/coda/style-pick) rides the same pattern when a lane needs it. Overnight 2026-07-05/06 (operator "EVERYTHING" directive; full detail in
 docs/2026-07-06-overnight/MORNING_REPORT.md):
 - 3C @c24dc0fa: STAGE 3 COMPLETE (visual_style widget slot 26; all 5 styles LIVE).
 - LIVE SMOKE PASS x2 on the new code: sci-fi default (byte-identical stamps) + ANIME

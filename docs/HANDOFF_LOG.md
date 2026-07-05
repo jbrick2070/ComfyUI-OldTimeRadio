@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-06 (morning GO) -- LANE-ENABLEMENT CHUNK 1 SHIPPED (outline seams pack-routed) -- v2.0-alpha
+Did:
+- @69afbd83 (pushed, HEAD==origin): the 3 outline stage prompts (_MACRO/_PHASE/_BEAT_SYSTEM_PROMPT) resolve via resolve_creative_system_prompt repo=None lane from the bank's pack (3 new Phase entries + seam map rows); generate_outline gains source_bank_id (both writer call sites thread resolved["source_bank"]); plain "outline" phase untouched (period sentinel object-identity preserved); constants stay as the science extraction fixture.
+- Byte-identity CONFIRMED: the science pack's outline seams were already extracted byte-identical (router-pinned now). media_archive (no outline seams) fails loud -- pinned.
+- 13 new tests (tests/test_outline_seams_lane1.py); suite 6387/0; Bug Bible 16.
+Current step: LANE-ENABLEMENT CHUNK 2 (exchange seam), then source-payload contracts.
+Next: chunk 2 on go.
+Commits: 69afbd83 (pushed).
+
 ## 2026-07-06 (overnight, operator asleep -- "EVERYTHING" directive) -- STAGES 3+4-CORE DONE + LIVE-PROVEN -- v2.0-alpha
 Did:
 - 3C @c24dc0fa (Stage 3 COMPLETE: visual_style widget slot 26, gate beside bank gate, meta stamp, whitelists, all pins, 10 tests; suite 6347/0).
