@@ -1832,24 +1832,26 @@ def generate_outline(
     if creative_repo_id is None:
         period_system_overlay = None
     else:
-        try:
-            from ._otr_creative_prompt_router import (
-                resolve_creative_system_prompt,
-            )
-            resolved = resolve_creative_system_prompt(
-                creative_repo_id, phase="outline",
-            )
-            # If the resolver returned the legacy _SYSTEM_PROMPT
-            # verbatim (object identity), no overlay -- modern
-            # profile. Otherwise the period row is active and we
-            # surface its preamble at the start of every stage
-            # system prompt.
-            if resolved is _SYSTEM_PROMPT:
-                period_system_overlay = None
-            else:
-                period_system_overlay = resolved
-        except Exception:  # noqa: BLE001
+        # NO swallow here (multi-modal Stage 2 precondition, Fable
+        # forward-note 2026-07-05): a resolver/pack failure must FAIL
+        # THE EPISODE LOUD, never silently drop the overlay -- once the
+        # outline seam is pack-sourced, a swallowed error would become
+        # a hidden fallback to the bare stage prompts.
+        from ._otr_creative_prompt_router import (
+            resolve_creative_system_prompt,
+        )
+        resolved = resolve_creative_system_prompt(
+            creative_repo_id, phase="outline",
+        )
+        # If the resolver returned the legacy _SYSTEM_PROMPT
+        # verbatim (object identity), no overlay -- modern
+        # profile. Otherwise the period row is active and we
+        # surface its preamble at the start of every stage
+        # system prompt.
+        if resolved is _SYSTEM_PROMPT:
             period_system_overlay = None
+        else:
+            period_system_overlay = resolved
 
     def _make_system(stage_system: str) -> str:
         if period_system_overlay is None:

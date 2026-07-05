@@ -254,3 +254,38 @@ def test_stage1b_router_fail_loud_on_missing_pack(monkeypatch):
     with pytest.raises(sp.StoryPackError):
         router.resolve_creative_system_prompt(modern, "line_composer_system")
     sp._PACK_CACHE.clear()
+
+
+# -- (g) Stage 2 precondition: NO swallow around the outline resolver -------
+
+def test_outline_resolver_call_not_swallowed():
+    """Fable forward-note (2026-07-05): the old `except Exception ->
+    period_system_overlay = None` around the outline resolver call would become
+    a SILENT FALLBACK once the outline seam is pack-sourced. Pin its removal:
+    no resolve_creative_system_prompt call in _otr_outline.py may sit inside a
+    try/except."""
+    import ast
+
+    src = (REPO / "nodes" / "_otr_outline.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    # annotate parents
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            child._parent = node  # type: ignore[attr-defined]
+
+    swallowed = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "resolve_creative_system_prompt"):
+            anc = getattr(node, "_parent", None)
+            while anc is not None:
+                if isinstance(anc, ast.Try):
+                    swallowed.append(node.lineno)
+                    break
+                anc = getattr(anc, "_parent", None)
+    assert not swallowed, (
+        f"resolve_creative_system_prompt call(s) at line(s) {swallowed} in "
+        f"_otr_outline.py are wrapped in try/except -- the swallow is a "
+        f"hidden fallback; resolver/pack errors must fail the episode loud"
+    )
