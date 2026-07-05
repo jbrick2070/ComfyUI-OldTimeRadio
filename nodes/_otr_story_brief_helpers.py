@@ -224,6 +224,14 @@ def get_story_brief_music_mood(meta: Any) -> list[str]:
 # dedupe, no style presets (3-model panel consensus cuts).
 # ---------------------------------------------------------------------------
 
+# STAGE 3 (multi-modal story schema, 2026-07-05): the four tail constants
+# below are the EXTRACTION FIXTURE for the sci_fi_radio visual-style pack
+# (nodes/visual_styles/sci_fi_radio.json is pinned byte-identical to them by
+# tests/test_visual_styles_3a.py). PRODUCTION prompt composition reads the
+# PACK via _otr_visual_styles.get_visual_style(meta) -- an AST guard bans any
+# other production read of these names. They also back the legacy no-style
+# lane of get_era_tail (style=None) so pre-Stage-3 tests keep passing.
+
 #: Era-tail fallback when the brief is absent/failed/empty (legacy
 #: _DEFAULT_ERA_TAIL, otr_video_plan.py).
 ERA_TAIL_DEFAULT = "timeless cinematic aesthetic"
@@ -256,8 +264,31 @@ RADIO_BROADCAST_TAIL = ("35mm film grain, broadcast-distressed cinematic "
 NO_TEXT_CLAUSE = "no on-screen text"
 
 
-def get_era_tail(meta: Any, profile: str = "full") -> str:
-    """The brief-derived era/aesthetic tail; NEVER empty, never raises.
+def _resolve_style(meta: Any, style: Any = None):
+    """Stage 3: the one style-resolution helper the composer ENTRY seams
+    call. ``style`` already-resolved => returned as-is (helpers never
+    re-resolve, r4 contract). ``style=None`` => fail-loud
+    ``get_visual_style(meta)`` -- unknown meta["visual_style"] RAISES
+    (UnknownVisualStyleError); absent/empty resolves the sci_fi_radio
+    default byte-identically. NO swallow: a style-resolution error must
+    fail the episode loud (no-fallback law)."""
+    if style is not None:
+        return style
+    from ._otr_visual_styles import get_visual_style
+    return get_visual_style(meta)
+
+
+def get_era_tail(meta: Any, profile: str = "full", style: Any = None) -> str:
+    """The brief-derived era/aesthetic tail; NEVER empty*, never raises.
+
+    Stage 3: ``style`` is the RESOLVED VisualStyle whose ``era_tail``
+    replaces the :data:`ERA_TAIL_DEFAULT` fallback string EXACTLY --
+    including a pack-declared empty string ("never empty" is a
+    sci_fi_radio-pack property, not a helper invariant; r4 pin). This
+    function does NO loader lookup itself (the composer entry resolves once
+    and passes the style down); ``style=None`` is the LEGACY lane and keeps
+    the byte-identical ERA_TAIL_DEFAULT fallback -- production composers
+    always pass ``style`` (AST-pinned).
 
     ``profile="full"`` (default; every pre-still-spine call site, behavior
     unchanged) ports the legacy ``_resolve_era_tail`` precedence (Sprint
@@ -273,6 +304,7 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
     palette color (e.g. Mars = red) comes through HERE by design -- the
     still profile trims the tail, never deletes it.
     """
+    _era_default = style.era_tail if style is not None else ERA_TAIL_DEFAULT
     atmosphere_line = ""
     palette: list[str] = []
     try:
@@ -303,7 +335,7 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
             lighting = [str(t).strip() for t in (terms2.get("lighting") or [])
                         if str(t).strip()]
             parts.extend(lighting)
-        return ", ".join(parts) or ERA_TAIL_DEFAULT
+        return ", ".join(parts) or _era_default
     if profile == "still":
         m = _meta(meta)
         terms = m.get("story_brief_terms") or {}
@@ -316,7 +348,7 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
             parts.append(atmosphere_line)
         parts.extend(palette[:2])
         parts.extend(lighting)
-        out = ", ".join(parts) or ERA_TAIL_DEFAULT
+        out = ", ".join(parts) or _era_default
         if len(out) > 120:                 # word-boundary trim (~120 chars)
             cut = out[:120]
             idx = cut.rfind(" ")
@@ -330,7 +362,7 @@ def get_era_tail(meta: Any, profile: str = "full") -> str:
         parts.extend(palette)
     if v1_tail:
         parts.append(v1_tail)
-    return ", ".join(parts) or ERA_TAIL_DEFAULT
+    return ", ".join(parts) or _era_default
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +486,8 @@ STILL_FRAMING_SCENE_CHARACTER = (
 
 
 def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
-                         beat_id: str = "", char_entry: Any = None) -> str:
+                         beat_id: str = "", char_entry: Any = None,
+                         style: Any = None) -> str:
     """ONE still-image prompt in the legacy 5-layer order: subject /
     setting top-2 / framing hint / TRIMMED era tail (still profile) /
     style tail. Scene kinds append the :data:`NO_TEXT_CLAUSE` (a render
@@ -467,9 +500,14 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     still-only character beat -- still_flat/still_pan/ltx_video) and DROPS the
     radio-booth tail; every other scene kind (``scene_open`` / ``scene_beat``)
     leads with :func:`get_open_subject` (``synthetic`` = kind=="scene_open"
-    -- the b000 opening-music beat is the synthetic open). Pure; never
-    raises; never returns empty (the subject layer always exists).
+    -- the b000 opening-music beat is the synthetic open). Never returns
+    empty (the subject layer always exists). Stage 3: the tails come from
+    the resolved visual-style pack (``style`` param, or a fail-loud
+    ``get_visual_style(meta)`` when None -- a composer ENTRY seam); the
+    broadcast tail additionally gates on ``pack.allow_radio_tails``. A
+    style-resolution error RAISES (no-fallback law).
     """
+    _style = _resolve_style(meta, style)
     is_portrait = (kind == "portrait")
     is_char_scene = (kind == "scene_character")
     if is_portrait or is_char_scene:
@@ -500,21 +538,23 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     if setting:
         pieces.append(setting)
     pieces.append(framing)
-    pieces.append(get_era_tail(meta, profile="still"))
-    pieces.append(STYLE_TAIL_DEFAULT)
+    pieces.append(get_era_tail(meta, profile="still", style=_style))
+    pieces.append(_style.positive_tail)
     if not is_portrait:
         # BUG-411: restore the 6/5 cinematic grade + the radio broadcast-distress
         # identity the image-pipeline rewrite dropped. Scene stills are all radio
         # context (open/announcer/music), so both tails apply; appended AFTER the
-        # shared STYLE_TAIL_DEFAULT and BEFORE the NO_TEXT_CLAUSE so the 5-layer
+        # shared style tail and BEFORE the NO_TEXT_CLAUSE so the 5-layer
         # order and the no-text contract are preserved. Portraits are unchanged
         # (they keep their three-quarter framing + the shared style tail).
-        pieces.append(IMAGE_GRADE_TAIL)
+        # Stage 3: both come from the pack; empty strings vanish in the join.
+        pieces.append(_style.image_grade_tail)
         # BUG 1 (2026-06-20): the character SCENE still is NOT a radio booth --
         # it shows the character in their world, so the broadcast-booth tail
         # ("centered composition", broadcast-distress) is dropped for this kind.
-        if not is_char_scene:
-            pieces.append(RADIO_BROADCAST_TAIL)
+        # Stage 3: also gated by the pack's allow_radio_tails.
+        if not is_char_scene and _style.allow_radio_tails:
+            pieces.append(_style.broadcast_tail)
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"
@@ -523,15 +563,23 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
 
 def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
                          style_tail: bool = True,
-                         era_profile: str = "full") -> str:
-    """``prompt + ", " + era_tail [+ ", " + STYLE_TAIL_DEFAULT]`` -- the one
+                         era_profile: str = "full",
+                         style: Any = None) -> str:
+    """``prompt + ", " + era_tail [+ ", " + pack.positive_tail]`` -- the one
     shared finishing seam every visual prompt site calls.
+
+    Stage 3: the style tail + the era-tail default come from the resolved
+    visual-style pack (``style`` param; None => fail-loud
+    ``get_visual_style(meta)`` -- this IS a composer entry seam). A
+    style-resolution error RAISES; callers must NOT wrap this in a bare
+    except (AST-pinned, no-fallback law).
 
     ``max_chars`` (0 = uncapped): word-boundary trim of the FINISHED string
     for budgeted consumers (LTX motion budget is 220-240 chars); a trailing
     :data:`NO_TEXT_CLAUSE` present in ``prompt`` survives the trim (it is a
     render constraint, not flavor). Callers run their guards BEFORE this and
-    compute prompt hashes AFTER it. Pure; never raises; empty ``prompt``
+    compute prompt hashes AFTER it. Pure; raises ONLY on a visual-style
+    resolution failure (fail-loud by design); empty ``prompt``
     returns '' (finishing never invents a subject).
 
     ``era_profile`` (LTX-I2V ticket Part A, 2026-06-11): passed through to
@@ -544,14 +592,15 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
     base = (prompt or "").strip().rstrip(",")
     if not base:
         return ""
+    _style = _resolve_style(meta, style)
     # Preserve the clause only when TRAILING (pass-02 panel: an occurrence
     # mid-prompt is content, not a render constraint to relocate).
     keep_no_text = base.endswith(NO_TEXT_CLAUSE)
     if keep_no_text:
         base = base[: -len(NO_TEXT_CLAUSE)].strip().rstrip(",").strip()
-    pieces = [base, get_era_tail(meta, profile=era_profile)]
+    pieces = [base, get_era_tail(meta, profile=era_profile, style=_style)]
     if style_tail:
-        pieces.append(STYLE_TAIL_DEFAULT)
+        pieces.append(_style.positive_tail)
     out = ", ".join(p for p in pieces if p)
     if max_chars and len(out) > max_chars:
         budget = max_chars - (len(NO_TEXT_CLAUSE) + 2 if keep_no_text else 0)

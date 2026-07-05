@@ -348,23 +348,25 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
             "build_radio_host_prompt: unknown radio-host style %r; known "
             "styles: %r. (radio_head_person was retired 2026-07-04 -- "
             "radio-face logic.)" % (style, _RADIO_HOST_STYLES))
+    # Stage 3 de-swallow (kibitz r2 M1): the ImportError shim is the ONLY
+    # permitted catch here -- a visual-style resolution error must FAIL the
+    # episode LOUD, never silently ship an unstyled prompt (no-fallback law).
     try:
-        try:
-            from ._otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, finish_visual_prompt)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, finish_visual_prompt)
-        # STORY FLAIR (operator 2026-07-01: "all prompts respect the meta brief"):
-        # a radio console / radio object is an OBJECT, not a bare human face, so it
-        # takes the FULL "still" era tail (story palette + atmosphere + lighting)
-        # -- the palette-strip "portrait" profile (BUG-LOCAL-113, for human faces)
-        # is NOT wanted here; a tense story should read as a tense-lit radio.
-        prompt = finish_visual_prompt(meta, prompt, era_profile="still")
-        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
-            prompt = "%s, %s" % (prompt, IMAGE_GRADE_TAIL)
-    except Exception:  # noqa: BLE001
-        pass
+        from ._otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, finish_visual_prompt)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, finish_visual_prompt)
+    # STORY FLAIR (operator 2026-07-01: "all prompts respect the meta brief"):
+    # a radio console / radio object is an OBJECT, not a bare human face, so it
+    # takes the FULL "still" era tail (story palette + atmosphere + lighting)
+    # -- the palette-strip "portrait" profile (BUG-LOCAL-113, for human faces)
+    # is NOT wanted here; a tense story should read as a tense-lit radio.
+    _style = _resolve_style(meta)
+    prompt = finish_visual_prompt(meta, prompt, era_profile="still",
+                                  style=_style)
+    if _style.image_grade_tail and _style.image_grade_tail not in prompt:
+        prompt = "%s, %s" % (prompt, _style.image_grade_tail)
     return prompt
 
 
@@ -820,14 +822,19 @@ def compose_still_word_prompt(meta, role, beat_line):
     POSITIVE text guard LAST. FAILS LOUD (``ValueError``, NO FALLBACK) on a BLANK
     line; an overflowing line is REDUCED (never aborted). MUSIC mode is the
     UNTOUCHED wordless abstract-title still. All raises precede any prompt hash."""
+    # Stage 3 (kibitz r2 M2): era + grade route through the visual-style pack
+    # (ImportError shim only; a style error RAISES). The typography/backdrop
+    # maps stay Python (STAGE3_SUBPLAN section 8; operator lettering-
+    # consistency directive 2026-07-04).
     try:
         from ._otr_story_brief_helpers import (  # type: ignore
-            get_era_tail, IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE)
+            get_era_tail, NO_TEXT_CLAUSE, _resolve_style)
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import (  # type: ignore
-            get_era_tail, IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE)
+            get_era_tail, NO_TEXT_CLAUSE, _resolve_style)
     _role = str(role or "")
-    era = (get_era_tail(meta, profile="still") or "").strip()
+    _style = _resolve_style(meta)
+    era = (get_era_tail(meta, profile="still", style=_style) or "").strip()
     if _role == _STILL_WORD_MUSIC_ROLE:
         # UNTOUCHED music path (operator 2026-07-04: episode titles are proc-gen
         # elsewhere, so the music card stays a WORDLESS abstract mood still).
@@ -838,7 +845,7 @@ def compose_still_word_prompt(meta, role, beat_line):
                 "BLANK episode title (meta['episode_title']/['title']) -- cannot "
                 "mint the abstract title still. NO FALLBACK.")
         pieces = ['an abstract picture evoking "%s"' % _fold_inner_dquotes(title),
-                  _STILL_WORD_TITLE_MOOD_STYLE, era, IMAGE_GRADE_TAIL]
+                  _STILL_WORD_TITLE_MOOD_STYLE, era, _style.image_grade_tail]
         out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
         return "%s, %s" % (out, NO_TEXT_CLAUSE)         # music title = NO words
     # WORD mode (character_video / announcer_visual): the spoken line IS the card.
@@ -861,7 +868,7 @@ def compose_still_word_prompt(meta, role, beat_line):
     era = _scrub_still_word_era_tail(era)               # MANDATORY word-mode scrub
     pieces = ['a title card displaying the words "%s"' % words,
               _STILL_WORD_LEGIBILITY_GUARD, lettering, backdrop, era,
-              IMAGE_GRADE_TAIL, _STILL_WORD_TEXT_GUARD]
+              _style.image_grade_tail, _STILL_WORD_TEXT_GUARD]
     return ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
 
 
@@ -1168,20 +1175,21 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
                                      role="character_video", char_entry=ce),
                 source)
     # FINISH like a scene still: era tail + cinematic grade + the no-text clause.
+    # Stage 3 de-swallow (kibitz r2 M1): ImportError shim only; a style error
+    # RAISES (no silent unstyled prompt).
     try:
-        try:
-            from ._otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
-        prompt = finish_visual_prompt(meta, prompt, era_profile="portrait")
-        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
-            prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
-        if not prompt.endswith(NO_TEXT_CLAUSE):
-            prompt = f"{prompt}, {NO_TEXT_CLAUSE}"
-    except Exception:  # noqa: BLE001
-        pass
+        from ._otr_story_brief_helpers import (  # type: ignore
+            NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
+    _style = _resolve_style(meta)
+    prompt = finish_visual_prompt(meta, prompt, era_profile="portrait",
+                                  style=_style)
+    if _style.image_grade_tail and _style.image_grade_tail not in prompt:
+        prompt = f"{prompt}, {_style.image_grade_tail}"
+    if not prompt.endswith(NO_TEXT_CLAUSE):
+        prompt = f"{prompt}, {NO_TEXT_CLAUSE}"
     return prompt, source
 
 
@@ -1230,17 +1238,18 @@ def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role) -> str:
     # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
     # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
     # brief carries through to the meshed object. The isolation scaffold above
-    # still governs silhouette/plate; the tail only tints the look. Best-effort.
+    # still governs silhouette/plate; the tail only tints the look.
+    # Stage 3 de-swallow (kibitz r3 -- the seam ALL FOUR reviewers caught):
+    # ImportError shim only; a style error RAISES.
     try:
-        try:
-            from ._otr_story_brief_helpers import get_era_tail  # type: ignore
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_story_brief_helpers import get_era_tail  # type: ignore
-        tail = get_era_tail(meta, profile="still")
-        if tail and tail not in out:
-            out = "%s, %s" % (out, tail)
-    except Exception:  # noqa: BLE001
-        pass
+        from ._otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, get_era_tail)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, get_era_tail)
+    tail = get_era_tail(meta, profile="still", style=_resolve_style(meta))
+    if tail and tail not in out:
+        out = "%s, %s" % (out, tail)
     return out
 
 
@@ -1253,21 +1262,21 @@ def _compose_background_plate_prompt(meta, setting) -> str:
         parts.append("%s setting" % setting)
     parts.append(BACKGROUND_PLATE_POS_SCAFFOLD)
     plate = ", ".join(parts)
-    # Era tail / grade (best-effort) so the plate matches the episode look.
+    # Era tail / grade so the plate matches the episode look. Stage 3
+    # de-swallow (kibitz r2 M1): ImportError shim only; a style error RAISES.
     try:
-        try:
-            from ._otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_story_brief_helpers import (  # type: ignore
-                IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE, finish_visual_prompt)
-        plate = finish_visual_prompt(meta, plate, era_profile="still")
-        if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in plate:
-            plate = "%s, %s" % (plate, IMAGE_GRADE_TAIL)
-        if not plate.endswith(NO_TEXT_CLAUSE):
-            plate = "%s, %s" % (plate, NO_TEXT_CLAUSE)
-    except Exception:  # noqa: BLE001
-        pass
+        from ._otr_story_brief_helpers import (  # type: ignore
+            NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
+    _style = _resolve_style(meta)
+    plate = finish_visual_prompt(meta, plate, era_profile="still",
+                                 style=_style)
+    if _style.image_grade_tail and _style.image_grade_tail not in plate:
+        plate = "%s, %s" % (plate, _style.image_grade_tail)
+    if not plate.endswith(NO_TEXT_CLAUSE):
+        plate = "%s, %s" % (plate, NO_TEXT_CLAUSE)
     return plate
 
 
@@ -1529,30 +1538,33 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if "warm dramatic lighting" not in prompt:
                 prompt = f"{prompt}, warm dramatic lighting"
         else:
+            # Stage 3 de-swallow (kibitz r2 M1): ImportError shim only; a
+            # style-resolution error RAISES (never a silent unstyled portrait).
             try:
-                try:
-                    from ._otr_story_brief_helpers import (  # type: ignore
-                        IMAGE_GRADE_TAIL, finish_visual_prompt)
-                except ImportError:  # pragma: no cover -- flat test imports
-                    from _otr_story_brief_helpers import (  # type: ignore
-                        IMAGE_GRADE_TAIL, finish_visual_prompt)
-                # era_profile="portrait": never bleeds the episode's ambient
-                # colour palette into character faces (sci-fi = blue wash,
-                # period drama = red wash). Only the atmosphere mood line is
-                # safe; full palette is explicitly excluded (BUG-LOCAL-113).
-                prompt = finish_visual_prompt(meta, prompt,
-                                              era_profile="portrait")
-                # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
-                # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
-                # so a still_pan beat standing in for a HuMo portrait shows the same
-                # graded look as the scene stills/bookend (still_pan
-                # animates the minted PNG, so the PNG must carry the grade). The
-                # radio broadcast-distress tail stays scene-still-only (a person is
-                # not a radio set). Idempotent -- never duplicates.
-                if IMAGE_GRADE_TAIL and IMAGE_GRADE_TAIL not in prompt:
-                    prompt = f"{prompt}, {IMAGE_GRADE_TAIL}"
-            except Exception:  # noqa: BLE001
-                pass
+                from ._otr_story_brief_helpers import (  # type: ignore
+                    _resolve_style, finish_visual_prompt)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_story_brief_helpers import (  # type: ignore
+                    _resolve_style, finish_visual_prompt)
+            # era_profile="portrait": never bleeds the episode's ambient
+            # colour palette into character faces (sci-fi = blue wash,
+            # period drama = red wash). Only the atmosphere mood line is
+            # safe; full palette is explicitly excluded (BUG-LOCAL-113).
+            _style = _resolve_style(meta)
+            prompt = finish_visual_prompt(meta, prompt,
+                                          era_profile="portrait",
+                                          style=_style)
+            # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
+            # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
+            # so a still_pan beat standing in for a HuMo portrait shows the same
+            # graded look as the scene stills/bookend (still_pan
+            # animates the minted PNG, so the PNG must carry the grade). The
+            # radio broadcast-distress tail stays scene-still-only (a person is
+            # not a radio set). Idempotent -- never duplicates. Stage 3: the
+            # grade comes from the pack (empty string = no append).
+            if (_style.image_grade_tail
+                    and _style.image_grade_tail not in prompt):
+                prompt = f"{prompt}, {_style.image_grade_tail}"
         out[cid] = {
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
