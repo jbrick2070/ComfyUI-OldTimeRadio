@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (session 3b) -- STAGE 3 SUB-PLAN HARDENED (kibitz r1-r4 + Sonnet fan-out) -- v2.0-alpha
+Did:
+- Explore-agent grounded site map of every hard-coded visual-style prompt site (tails, anchors, motion registers, seam chokepoints).
+- STAGE3_SUBPLAN.md drafted then hardened across kibitz r1-r4 (codex gpt-5.5 panel; antigravity still credit-bugged; Claude anchor+judge). Operator-directed SONNET 3-LENS FAN-OUT at r3 (swallow-hunt / test-blast-radius / byte-identity+caching): all 4 r3 reviewers independently found the _compose_mesh_fodder_prompt swallow seam; blast-radius lens enumerated 5 tail-pin test files (incl. test_video_platform_aseam, missed by the plan) + both test_source_bank_widget_2c breaking pins.
+- Key decisions: v1 = tails+allow_radio_tails only (subjects/motion/anchors/still_word deferred, section 8); forbidden_terms = load-time lint only; constants stay as the extraction fixture w/ AST production-read guard; de-swallow all 6 composer seams; meta["visual_style"] is the threading channel (stamp timing verified safe); era_tail contract + producer-side hash tests pinned at r4.
+Current step: STAGE 3 CHUNK 3A (loader + sci_fi_radio + chokepoint routing, byte-identical).
+Next: build 3A per STAGE3_SUBPLAN v5; then 3B; 3C gated.
+Commits: this docs/kibitz-artifacts commit (see git).
+
 ## 2026-07-05 (session 3) -- MULTI-MODAL Stage 2 COMPLETE: chunk 2C (source_bank widget) SHIPPED -- v2.0-alpha
 Did:
 - Ran the 2C kibitz gate as a full r1-r4 arc (topic multimodal-2c; codex gpt-5.5 panel -- antigravity hung twice on its credit bug, dropped; Claude anchor+judge). Converged @r4; plan of record kibitz-runs/2026-07-05-multimodal-2c/r3/final.md (+r4 folds). Key catches: refine `_core = locals()` leak (os/_scaffold -> TypeError on every refine-enabled run since 2026-06-24, = BUG-LOCAL-416), gate must precede the scaffold env mutation + RSS, only line_composer_system is pack-routed (outline/exchange -> lane-enablement checklist), 3 recursive compose_line calls + both CREATIVE_WHITELISTs + 4 positional-pin test files in the blast radius.
