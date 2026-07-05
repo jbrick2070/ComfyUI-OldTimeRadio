@@ -1,0 +1,23 @@
+VERDICT: no. The plan has hidden ordering gaps and two source-bank paths that will still run with the science/default prompt or silently no-op.
+
+MUST-FIX BEFORE BUILD:
+1. [3] `stage3_banned_phrases=rules.banned_phrases` depends on `rules` before `compose_line` runs. The plan says `compose_line` resolves rules at entry, but `_w1b_s3_kwargs` is built in the writer before the call at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/OTR_LedgerScriptWriter.py:4689-4703. Concrete fix: resolve `story_rules = resolve_story_rules(resolved["source_bank"])` once in `run()` after `_resolve_inputs`/the runnable gate and before the beat loop, use it in `_w1b_s3_kwargs`, and pass the same object into `compose_line` via the private `_story_rules=` param.
+
+2. [3, BUG-LOCAL-417] Passing only `source_bank_id` to `_otr_reroll` and `_otr_story_spine` does not fix prompt routing. `compose_line_draft` ignores `source_bank_id` whenever `creative_repo_id is None`, returning `_SYSTEM_PROMPT` directly at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_line_composer.py:2061-2068. The two named gap sites currently call `compose_line` without `creative_repo_id`: C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_reroll.py:656-660 and C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_spine.py:170-174. Concrete fix: either pass a real prompt-profile repo id at both sites, or change `compose_line_draft` to route through `resolve_creative_system_prompt` when `source_bank_id != "science_news"` even if `creative_repo_id` is `None`.
+
+3. [3, BUG-LOCAL-417] The `_otr_story_spine` compose-line fix is sequenced against a variable that is not in scope. The plan says `meta.get("source_bank", "science_news")`, but `_make_recompose_fn` has `led`, then local `data = getattr(led, "data", led)` at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_spine.py:115-133; no `meta` exists in that nested function. If implemented literally, the broad catch at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_spine.py:177-178 will swallow it and return the original line. Concrete fix: derive `meta = data.get("meta", {}) if isinstance(data, dict) else {}` inside `_recompose` before calling `compose_line`.
+
+4. [3] The announcer outro caller map is incomplete unless `_otr_story_spine` passes the bank too. `_recompose_announcer_tagline` already has `meta` in scope at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_spine.py:183-187, but its `compose_announcer_outro` call passes no source bank at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_spine.py:215-221. Concrete fix: pass `source_bank_id=str(meta.get("source_bank") or "science_news")` there as well as in `OTR_LedgerScriptWriter`.
+
+SHOULD-FIX:
+1. [2,3] [ASSUMPTION] If `StoryRules.banned_phrases` is stored as an immutable tuple like the compiled regex fields, it mismatches current type contracts: `validate_banned_phrases(... banned: Optional[List[str]])` and `validate_line(... banned_phrases: Optional[List[str]])` at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_stage3_validators.py:404-408 and :623. Runtime iteration works, but the interface says list. Concrete fix: widen these to `Sequence[str]` or pass `list(rules.banned_phrases)` from the writer.
+
+2. [3] `scripts/story_quality_scan.py` will hide rules-loader failures if `get_story_rules(_meta(ledger))` is added inside `scan_ledger`: the CLI catches all exceptions per ledger and only prints “skip” at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/scripts/story_quality_scan.py:598-600. Concrete fix: treat `StoryRulesError` as fatal for the scan, not a skipped ledger.
+
+3. [2] verify: `_otr_story_rules.py` must reject duplicate JSON keys. The plan says exact schema but not duplicate-key handling; existing story-pack loading explicitly rejects duplicate keys at C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_story_pack.py:101-108. Concrete fix: use `json.loads(..., object_pairs_hook=...)` in the rules loader too.
+
+OPTIONAL / NICE-TO-HAVE:
+- [2] Add a loader lint rejecting control characters in regex source strings so a mistaken JSON `\b` escape fails immediately instead of relying only on corpus parity.
+
+CUT THESE (over-engineering):
+1. None. The proposed guards and parity tests are justified by the current broad-exception hygiene paths and JSON escape risk.

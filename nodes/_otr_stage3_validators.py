@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from ._otr_stage1_plan import Stage1Beat, Stage1CastMember, Stage1Plan
 
@@ -405,11 +405,16 @@ def validate_banned_phrases(
     beat: Stage1Beat,
     line_text: str,
     speaker_name: str,
-    banned: Optional[List[str]] = None,
+    banned: "Optional[Sequence[str]]" = None,
 ) -> Optional[ValidationFinding]:
     """Banned-phrase validator: simple substring check (case-
     insensitive) against the configurable list. First match fires a
     banned_phrase error.
+
+    Stage 4: production supplies ``banned`` from the bank's story_rules
+    pack (the writer's stage3_banned_phrases producer); ``None`` = the
+    DEFAULT_BANNED_PHRASES extraction fixture (tests / legacy callers).
+    Accepts any Sequence (the rules pack hands a tuple).
     """
     if not isinstance(line_text, str):
         return None
@@ -620,7 +625,7 @@ def validate_line(
     beat: Stage1Beat,
     line_text: str,
     *,
-    banned_phrases: Optional[List[str]] = None,
+    banned_phrases: "Optional[Sequence[str]]" = None,
     min_on_beat_ratio: float = 0.10,
 ) -> ValidationResult:
     """Run all six Stage 3 validators on a single line.
@@ -693,7 +698,7 @@ def validate_episode(
     plan: Stage1Plan,
     rendered_lines: List[dict],
     *,
-    banned_phrases: Optional[List[str]] = None,
+    banned_phrases: "Optional[Sequence[str]]" = None,
     min_on_beat_ratio: float = 0.10,
 ) -> dict[str, ValidationResult]:
     """Run all validators across every line of a rendered episode.

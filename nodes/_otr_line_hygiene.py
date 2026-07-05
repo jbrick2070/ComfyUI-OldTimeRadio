@@ -609,13 +609,18 @@ _BANNED_THESIS_RES = tuple(
 )
 
 
-def flag_thesis_close(text: Any) -> "tuple[bool, str]":
+def flag_thesis_close(text: Any, *, rules: Any = None) -> "tuple[bool, str]":
     """(flagged, reason): the announcer close states a moral / lesson /
     news-summary rather than showing a concrete final image. Pure; never
-    raises."""
+    raises.
+
+    Stage 4: ``rules`` is a resolved ``StoryRules`` whose ``banned_thesis``
+    compiled set replaces the module fixture constant; ``None`` = the
+    science_news fixture (byte-identical; tests + the AST-guard-B lane)."""
     try:
         s = str(text or "")
-        for rx in _BANNED_THESIS_RES:
+        for rx in (rules.banned_thesis if rules is not None
+                   else _BANNED_THESIS_RES):
             m = rx.search(s)
             if m:
                 return True, f"thesis/moral phrase {m.group(0)!r}"
@@ -663,11 +668,12 @@ _STAGE_BUSINESS_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
 ))
 
 
-def flag_cliche(text: Any) -> "tuple[bool, str]":
-    """(flagged, reason): the line leans on a worn cliche. Pure; never raises."""
+def flag_cliche(text: Any, *, rules: Any = None) -> "tuple[bool, str]":
+    """(flagged, reason): the line leans on a worn cliche. Pure; never raises.
+    Stage 4: ``rules.cliche`` replaces the fixture when provided."""
     try:
         s = str(text or "")
-        for rx in _CLICHE_RES:
+        for rx in (rules.cliche if rules is not None else _CLICHE_RES):
             m = rx.search(s)
             if m:
                 return True, f"cliche {m.group(0)!r}"
@@ -676,15 +682,15 @@ def flag_cliche(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
-def find_cliche_phrase(text: Any) -> str:
+def find_cliche_phrase(text: Any, *, rules: Any = None) -> str:
     """Return the EXACT matched cliche span (``m.group(0)``) from the first
     ``_CLICHE_RES`` hit, or ``""`` if none. Companion to ``flag_cliche`` (which
     returns only ``(bool, reason)``) -- used by S4 for exact-span replacement so
     the repair swaps just the worn phrase and never parses the reason string.
-    Pure; never raises."""
+    Pure; never raises. Stage 4: ``rules.cliche`` replaces the fixture."""
     try:
         s = str(text or "")
-        for rx in _CLICHE_RES:
+        for rx in (rules.cliche if rules is not None else _CLICHE_RES):
             m = rx.search(s)
             if m:
                 return m.group(0)
@@ -718,7 +724,7 @@ _CLICHE_REPLACEMENTS = tuple(
 )
 
 
-def repair_cliche_span(text: Any) -> str:
+def repair_cliche_span(text: Any, *, rules: Any = None) -> str:
     """C5 (S4): swap the FIRST worn-cliche span for a curated plain phrase,
     preserving a leading capital (and a pronoun-carrying form's pronoun). The
     deterministic LAST-RESORT repair when the LLM reroll could not shed a cliche,
@@ -729,7 +735,8 @@ def repair_cliche_span(text: Any) -> str:
         s = "" if text is None else str(text)
         if not s:
             return s
-        for rx, repl in _CLICHE_REPLACEMENTS:
+        for rx, repl in (rules.cliche_replacements if rules is not None
+                         else _CLICHE_REPLACEMENTS):
             if not rx.search(s):
                 continue
 
@@ -757,12 +764,14 @@ _ON_THE_NOSE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
 ))
 
 
-def flag_on_the_nose(text: Any) -> "tuple[bool, str]":
+def flag_on_the_nose(text: Any, *, rules: Any = None) -> "tuple[bool, str]":
     """(flagged, reason): the line NAMES an emotion / the stakes on the nose
-    instead of implying them. Pure; never raises."""
+    instead of implying them. Pure; never raises. Stage 4: ``rules.on_the_nose``
+    replaces the fixture when provided."""
     try:
         s = str(text or "")
-        for rx in _ON_THE_NOSE_RES:
+        for rx in (rules.on_the_nose if rules is not None
+                   else _ON_THE_NOSE_RES):
             m = rx.search(s)
             if m:
                 return True, f"on-the-nose emotion {m.group(0)!r}"
@@ -771,12 +780,14 @@ def flag_on_the_nose(text: Any) -> "tuple[bool, str]":
         return False, ""
 
 
-def flag_stage_business(text: Any) -> "tuple[bool, str]":
+def flag_stage_business(text: Any, *, rules: Any = None) -> "tuple[bool, str]":
     """(flagged, reason): the line is flat action-announce filler (an errand,
-    not a beat with stakes). Pure; never raises."""
+    not a beat with stakes). Pure; never raises. Stage 4: ``rules.
+    stage_business`` replaces the fixture when provided."""
     try:
         s = str(text or "")
-        for rx in _STAGE_BUSINESS_RES:
+        for rx in (rules.stage_business if rules is not None
+                   else _STAGE_BUSINESS_RES):
             m = rx.search(s)
             if m:
                 return True, f"flat stage-business {m.group(0)!r}"
@@ -1140,12 +1151,15 @@ _PERSONAL_COST_BOILERPLATE_RES = tuple(re.compile(p, re.IGNORECASE) for p in (
 ))
 
 
-def flag_personal_cost_boilerplate(text: Any) -> "tuple[bool, str]":
+def flag_personal_cost_boilerplate(
+        text: Any, *, rules: Any = None) -> "tuple[bool, str]":
     """(flagged, hint): the line leans on the generic L12 personal-cost
-    boilerplate instead of a concrete consequence. Pure; never raises."""
+    boilerplate instead of a concrete consequence. Pure; never raises.
+    Stage 4: ``rules.personal_cost`` replaces the fixture when provided."""
     try:
         s = str(text or "")
-        for rx in _PERSONAL_COST_BOILERPLATE_RES:
+        for rx in (rules.personal_cost if rules is not None
+                   else _PERSONAL_COST_BOILERPLATE_RES):
             m = rx.search(s)
             if m:
                 return True, (

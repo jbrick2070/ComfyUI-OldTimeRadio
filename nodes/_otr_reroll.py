@@ -653,10 +653,17 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
                 # compose_line (cast_strip / phantom gate / vocative
                 # strip) still runs, so the rerolled line gets the same
                 # cast-safety guards a first-pass line does.
+                # Stage 4 / BUG-LOCAL-417: pass the episode's bank so the
+                # reroll composes with the RIGHT lane's prompt + rule
+                # vocabulary (the old bare call silently rerolled every
+                # non-science episode through the science lane).
+                _sb = str((ledger_data.get("meta") or {}).get("source_bank")
+                          or "science_news")
                 result = compose_line(
                     creative_fn=generate_fn,
                     req=req,
                     reroll_hint=hint,
+                    source_bank_id=_sb,
                 )
             except LineCompositionFailedError as exc:
                 history.append({

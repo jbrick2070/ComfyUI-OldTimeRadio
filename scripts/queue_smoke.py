@@ -54,6 +54,13 @@ def main() -> int:
     ap.add_argument("--profile", default="",
                     help="committed capability profile id (config/profiles/)"
                          " to apply via the ONE applier before queueing")
+    # Stage 3C (2026-07-06): both multi-modal selectors are whitelisted
+    # CREATIVE widgets -- patchable directly. Empty = keep the saved JSON
+    # value (science_news / sci_fi_radio).
+    ap.add_argument("--visual-style", default="",
+                    help="visual_style id (e.g. anime); empty = saved value")
+    ap.add_argument("--source-bank", default="",
+                    help="source_bank id; empty = saved value")
     args = ap.parse_args()
 
     print(f"COMFYUI_URL = {COMFYUI_URL}", flush=True)
@@ -110,6 +117,10 @@ def main() -> int:
     patch_creative(wf, 1, "target_words", 30, schemas)
     patch_creative(wf, 1, "num_characters", 2, schemas)
     patch_creative(wf, 1, "act_count", "1", schemas)
+    if args.visual_style:
+        patch_creative(wf, 1, "visual_style", args.visual_style, schemas)
+    if args.source_bank:
+        patch_creative(wf, 1, "source_bank", args.source_bank, schemas)
 
     api = workflow_to_api_prompt(wf, schemas)
     prompt_id = submit_prompt(api)

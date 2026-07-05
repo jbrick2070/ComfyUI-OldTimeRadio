@@ -107,6 +107,26 @@ except Exception:  # noqa: BLE001
     def is_whole_line_stage_action(_t, **_k):  # type: ignore
         return False
 
+
+def _resolve_scan_rules(meta):
+    """Stage 4: the scan's OWN rules resolve (third resolve site -- offline,
+    reads meta from the frozen ledger). A StoryRulesError must be FATAL for
+    the whole scan (kibitz r3 S2): re-raised as SystemExit so main's
+    per-ledger `except Exception -> skip` cannot swallow it. Returns None
+    (fixture defaults) when the helpers import-guard is off."""
+    if not _HAS_R2_HELPERS:
+        return None
+    try:
+        from nodes._otr_story_rules import StoryRulesError, get_story_rules
+    except Exception:  # noqa: BLE001 -- pre-Stage-4 checkout; fixtures
+        return None
+    try:
+        return get_story_rules(meta)
+    except StoryRulesError as exc:
+        raise SystemExit(
+            f"[story_quality_scan] FATAL story-rules error (not a skip): "
+            f"{exc}") from exc
+
     def detect_mojibake(_t):  # type: ignore
         return False
 
@@ -298,11 +318,18 @@ def r2_lever_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
     specificity anchors / central object were derived, and voice distinctness.
     """
     m = _meta(ledger)
+    # Stage 4: score with the LEDGER's own bank vocabulary (third resolve
+    # site -- offline, serialized meta). A StoryRulesError is FATAL for the
+    # scan (see main's per-ledger catch carve-out), never a silent skip.
+    _rules = _resolve_scan_rules(m)
     char = [ln for ln in _lines(ledger)
             if str(ln.get("speaker_role") or "").strip() == "character"]
-    cliche = sum(1 for ln in char if flag_cliche(ln.get("text"))[0])
-    nose = sum(1 for ln in char if flag_on_the_nose(ln.get("text"))[0])
-    biz = sum(1 for ln in char if flag_stage_business(ln.get("text"))[0])
+    cliche = sum(1 for ln in char
+                 if flag_cliche(ln.get("text"), rules=_rules)[0])
+    nose = sum(1 for ln in char
+               if flag_on_the_nose(ln.get("text"), rules=_rules)[0])
+    biz = sum(1 for ln in char
+              if flag_stage_business(ln.get("text"), rules=_rules)[0])
     lead_sd = sum(1 for ln in char if detect_leading_stage_business(ln.get("text"))[0])
 
     # default-wants classifier over meta.dramatic_state (shim a state object)
@@ -324,7 +351,8 @@ def r2_lever_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
 
     anchors = m.get("specificity_anchors")
     return {
-        "thesis_close": bool(flag_thesis_close(find_outro_text(ledger))[0]),
+        "thesis_close": bool(flag_thesis_close(
+            find_outro_text(ledger), rules=_rules)[0]),
         "cliche_lines": cliche,
         "on_the_nose_lines": nose,
         "stage_business_lines": biz,
@@ -400,8 +428,11 @@ def r3_quality_metrics(ledger: Dict[str, Any]) -> Dict[str, Any]:
                            max_clause_markers=_ob_clause)[0])
     stage_action_leak = sum(
         1 for ln in char if is_whole_line_stage_action(ln.get("text")))
+    # Stage 4: bank-scoped vocabulary (fatal on a rules error).
+    _rules = _resolve_scan_rules(m)
     personal_cost = sum(
-        1 for ln in char if flag_personal_cost_boilerplate(ln.get("text"))[0])
+        1 for ln in char
+        if flag_personal_cost_boilerplate(ln.get("text"), rules=_rules)[0])
 
     quality_retry = sum(
         1 for ln in char if any(f.endswith("_retry") for f in _compose_flags(ln)))

@@ -80,8 +80,12 @@ No fallbacks. No hidden models. No hidden engines. Unknown id = hard error.
 
 ### Stage 4 -- Asserts -> JSON (LAST; has a real prerequisite)
 - Moving story-CONTENT validation asserts into JSON needs a NEW declarative-rule
-  ENFORCER node first (today's `_otr_workflow_validator.py` only audits litegraph
-  structure, not story-content rules). Build the enforcer, THEN move the rules.
+  ENFORCER first. AMENDED 2026-07-06 (kibitz r1, STAGE4_SUBPLAN v4): the enforcer
+  is a MODULE (`nodes/_otr_story_rules.py`), NOT a graph node -- the rules fire
+  inside per-line compose-time gates (mid-writer) where no graph seam exists;
+  `_otr_workflow_validator.py` remains the structural (litegraph) validator only.
+  Rule VOCABULARIES live at `nodes/story_rules/<bank>.json`; Python keeps the
+  engines + GLOBAL POLICY (SFW profanity is deliberately not pack-tunable).
 
 ## Process per stage
 Before coding each stage, write its hardened sub-plan (roundtable/kibitz if torn),

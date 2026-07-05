@@ -88,7 +88,7 @@ _PHASE_TO_PACK_SEAM: dict[str, str] = {
 
 
 def resolve_creative_system_prompt(
-    repo_id: str,
+    repo_id: "str | None",
     phase: Phase,
     source_bank_id: str = _SCIENCE_BANK_ID,
 ) -> str:
@@ -111,7 +111,9 @@ def resolve_creative_system_prompt(
             identifiers. Catches typos at the call site.
 
     A repo_id that is NOT a curated local model -- a remote slot handle
-    (``openrouter:slot-a/b``, ``comfy:slot-a/b``) or any other non-curated id --
+    (``openrouter:slot-a/b``, ``comfy:slot-a/b``), ``None`` (a legacy/
+    reroll caller with no writer slot in scope; BUG-LOCAL-417 routes those
+    through here for NON-science banks), or any other non-curated id --
     has no per-model ``prompt_profile``, so it resolves to the MODERN prompt
     (the default). The period prompt (``otr_1940s_v1``) is an opt-in property of
     specific CURATED local models only; it must never KeyError-crash an episode

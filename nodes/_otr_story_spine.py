@@ -167,10 +167,16 @@ def _make_recompose_fn(led: Any, creative_generate_fn: Callable[..., str]):
                 allowed_roster=roster,
                 speaker_role=(line.get("speaker_role") or "character"),
             )
+            # Stage 4 / BUG-LOCAL-417: derive the bank INSIDE the closure
+            # (no `meta` in this scope -- kibitz r3 M3; a NameError here
+            # would be swallowed by the fail-soft catch below).
+            _meta = data.get("meta", {}) if isinstance(data, dict) else {}
+            _sb = str((_meta or {}).get("source_bank") or "science_news")
             res = _LC.compose_line(
                 creative_fn=creative_generate_fn,
                 req=req,
                 reroll_hint=(hint or None),
+                source_bank_id=_sb,
             )
             text = getattr(res, "text", None)
             return text if (text and str(text).strip()) else original_text
@@ -218,6 +224,9 @@ def _recompose_announcer_tagline(
                 news_close_brief=news_close_brief,
                 intro_text=intro_text,
                 creative_repo_id=repo,
+                # Stage 4: the thesis gate scores with the bank's rules.
+                source_bank_id=str(
+                    meta.get("source_bank") or "science_news"),
             )
         text = getattr(res, "text", None)
         return str(text) if (text and str(text).strip()) else ""

@@ -2737,6 +2737,13 @@ class OTR_LedgerScriptWriter:
             visual_style=visual_style,
         )
 
+        # Stage 4 (2026-07-06): resolve the bank's story-content RULES once
+        # per episode, after the gates + input resolution and BEFORE the
+        # beat loop (fail-loud; kibitz r3 M1). One object feeds the stage3
+        # banned-phrase seed AND every compose_line call (_story_rules=).
+        from . import _otr_story_rules as _OTRRULES
+        story_rules = _OTRRULES.resolve_story_rules(resolved["source_bank"])
+
         log.info(
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
             "technical_model=%r, target_words=%d, num_characters=%d, "
@@ -4700,6 +4707,12 @@ class OTR_LedgerScriptWriter:
                             enable_stage3_validators=True,
                             stage3_plan=_w0_stage1_plan,
                             stage3_beat=_w1b_s3_beat,
+                            # Stage 4: the banned-phrase seed comes from the
+                            # bank's rules pack -- WITHOUT this producer the
+                            # JSON extraction would be runtime-dead (the
+                            # module default only fires on None).
+                            stage3_banned_phrases=list(
+                                story_rules.banned_phrases),
                         )
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
@@ -4709,6 +4722,7 @@ class OTR_LedgerScriptWriter:
                             max_new_tokens_cap=resolved["max_new_tokens_cap"],
                             creative_repo_id=resolved["creative_writing_model"],
                             source_bank_id=resolved["source_bank"],  # 2C
+                            _story_rules=story_rules,  # Stage 4
                             **_w1b_s3_kwargs,
                         )
                     cleaned = line_res.text
@@ -4783,6 +4797,7 @@ class OTR_LedgerScriptWriter:
                                     ],
                                     reroll_hint=_bg_hint,
                                     source_bank_id=resolved["source_bank"],  # 2C
+                                    _story_rules=story_rules,  # Stage 4
                                 )
                             _bg_res_ok, _ = _OTRSQL12.validate_composed_grounding(
                                 _bg_res.text, _bg_entry, _grounded_nouns,
@@ -4922,6 +4937,7 @@ class OTR_LedgerScriptWriter:
                                 "creative_writing_model"
                             ],
                             source_bank_id=resolved["source_bank"],  # 2C
+                            _story_rules=story_rules,  # Stage 4
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
@@ -5089,6 +5105,7 @@ class OTR_LedgerScriptWriter:
                         creative_repo_id=resolved["creative_writing_model"],
                         ending_change=_outro_ending_change,
                         final_character_line=_outro_final_char_line,
+                        source_bank_id=resolved["source_bank"],  # Stage 4
                     )
                 if _style_grammar_on:
                     # On-flag but no news brief -> mark it (text unchanged; frozen).

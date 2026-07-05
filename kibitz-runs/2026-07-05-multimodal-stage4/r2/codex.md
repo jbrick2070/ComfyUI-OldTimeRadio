@@ -1,0 +1,27 @@
+VERDICT: no. Open Q1/Q2 leave the call graph and data source undefined, and a naive implementation will either not thread rules to current consumers or will swallow fail-loud loader errors.
+
+MUST-FIX BEFORE BUILD:
+1. [3, 6/Q1] Rules access is not implementable as `get_story_rules(meta)` for current compose-time consumers. `compose_line` receives `source_bank_id`, not `meta`, and `_quality_flags_for_line(cleaned, req)` has no rules parameter (`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_line_composer.py:2385`, `:2395`, `:2309`). `compose_announcer_outro` has no `source_bank_id` at all (`...\nodes\_otr_line_composer.py:3444-3453`) while it calls `flag_thesis_close` (`:3592`, `:3616`). Concrete fix: expose `resolve_story_rules(source_bank_id)` plus optional `get_story_rules(meta)` wrapper; thread `source_bank_id` into `compose_announcer_outro` from `OTR_LedgerScriptWriter` (`...\nodes\OTR_LedgerScriptWriter.py:5084`) and pass a resolved immutable `StoryRules` object through `_quality_flags_for_line`, `line_quality_defect_score`, `flag_*`, `find_cliche_phrase`, and `repair_cliche_span`.
+
+2. [1, 3, 6/Q2] The plan points stage3 `banned_phrases` at a “writer call-site seed”, but the real seed is `DEFAULT_BANNED_PHRASES` in `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_stage3_validators.py:106`, consumed by fallback when `banned is None` at `:416`. The writer currently enables validators without passing `stage3_banned_phrases` (`...\nodes\OTR_LedgerScriptWriter.py:4699-4703`), so extracting only a call-site seed will miss production. Concrete fix: move `DEFAULT_BANNED_PHRASES` into `science_news.json`, keep the Python constant only as an extraction fixture, and pass `rules.banned_phrases` into `compose_line(... stage3_banned_phrases=...)` whenever Stage 3 validators are enabled.
+
+3. [3] Fail-loud rules will be silently disabled if the loader is called inside existing broad exception guards. `flag_cliche`, `flag_stage_business`, `flag_on_the_nose`, and `flag_personal_cost_boilerplate` all catch `Exception` and return no-hit (`...\nodes\_otr_line_hygiene.py:666-676`, `:774-785`, `:760-771`, `:1143-1157`); `_quality_flags_for_line` catches `Exception` and returns `[]` (`...\nodes\_otr_line_composer.py:2311-2352`). Concrete fix: resolve/validate rules outside those try blocks, pass already-compiled patterns into pure match helpers, and add a test proving malformed/unknown rules raise through `compose_line` and `compose_announcer_outro`.
+
+4. [3] Recursive compose paths must preserve the same rules contract. `compose_line` recursively calls itself from quality, leak, and Stage 3 repair branches while currently only forwarding `source_bank_id` (`...\nodes\_otr_line_composer.py:2511-2534`, `:2669-2690`, `:2768-2790`). Concrete fix: either resolve from `source_bank_id` at the top of every call or add a private `_story_rules` parameter forwarded through every recursive call. Do not introduce module-global mutable “current rules” in a resident server.
+
+5. [2, 3] Loader “verbatim `_otr_visual_styles.py` conventions” is underspecified for story rules because story rules need source-bank cross-reference and missing-pack semantics, unlike visual styles. Visual styles require every flat JSON pack to load and require the default style (`...\nodes\_otr_visual_styles.py:163-191`); story banks include non-runnable banks with no rules pack (`...\nodes\story_packs\banks.json`). Concrete fix: specify exact sweep: reject non-json/dirs under `nodes/story_rules`, require every file stem/rules_id to match a registered `source_bank_id`, require `science_news.json`, allow missing packs only for `runnable:false` banks, and raise `UnknownStoryRulesError` on explicit resolution of a bank without a pack.
+
+SHOULD-FIX:
+1. [2] Add schema validation for `cliche_replacements` as exact two-string pairs. Replacement strings use regex backrefs today (`...\nodes\_otr_line_hygiene.py:700-717`), so JSON extraction must preserve `"\\1"` semantics and tests must cover pronoun replacement.
+
+2. [5] Existing tests import the old Python-owned vocabulary APIs directly (`...\tests\test_story_quality_cliche.py:11-14`, `...\tests\test_stage3_validators.py:31-49`). Update tests to assert JSON extraction parity and production no-read guards, while keeping helper tests able to use the science rules fixture explicitly.
+
+3. [4] “Flag parity corpus” must compare reason strings and compose flags, not just booleans. Current reasons include matched spans (`...\nodes\_otr_line_hygiene.py:621`, `:673`, `:768`, `:782`, `:1151-1154`), and pattern ordering changes will alter output.
+
+4. [3] Add an AST guard for production callers using `flag_cliche`, `repair_cliche_span`, `flag_thesis_close`, or `validate_line` without a rules object or explicit `stage3_banned_phrases`; otherwise the Python fixture constants can drift back into production.
+
+OPTIONAL / NICE-TO-HAVE:
+Add `list_story_rule_ids()` for tests/dropdowns only if another caller needs it; this does not need workflow wiring.
+
+CUT THESE (over-engineering):
+1. [2] Cut “full ReDoS analysis deferred” from implementation scope entirely for 4A. The proposed max pattern length + compile-fail + repo-authored JSON fixture corpus is enough for this repo-authored pack path.

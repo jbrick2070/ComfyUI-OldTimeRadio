@@ -2056,9 +2056,13 @@ def compose_line_draft(
         raise ValueError("generate_fn must be callable")
 
     # Sprint D D2b: route via resolver. creative_repo_id is None for
-    # legacy callers + tests; resolver returns _SYSTEM_PROMPT by
-    # object identity at default config so audio C7 holds.
-    if creative_repo_id is None:
+    # legacy callers + tests; on the SCIENCE lane that returns
+    # _SYSTEM_PROMPT by object identity so audio C7 holds.
+    # BUG-LOCAL-417 (Stage 4, kibitz r3 M2): a NON-science bank must route
+    # through the resolver EVEN with repo None -- the old repo-None
+    # short-circuit made source_bank_id a silent no-op at the reroll/spine
+    # call sites (their rerolls composed with the science prompt).
+    if creative_repo_id is None and source_bank_id == "science_news":
         system = _SYSTEM_PROMPT
     else:
         from ._otr_creative_prompt_router import resolve_creative_system_prompt
@@ -2306,17 +2310,19 @@ _QUALITY_COLLAPSE_HINT_V2 = (
 )
 
 
-def _quality_flags_for_line(cleaned, req):
-    """Single per-line quality scorer. See the module note above. Pure."""
+def _quality_flags_for_line(cleaned, req, *, rules=None):
+    """Single per-line quality scorer. See the module note above. Pure.
+    Stage 4: ``rules`` (a resolved StoryRules) supplies the vocabulary sets;
+    None = the science fixture defaults (byte-identical)."""
     try:
         flags: list = []
-        _h, _r = flag_cliche(cleaned)
+        _h, _r = flag_cliche(cleaned, rules=rules)
         if _h:
             flags.append(("cliche", _r, "cliche"))
-        _h, _r = flag_stage_business(cleaned)
+        _h, _r = flag_stage_business(cleaned, rules=rules)
         if _h:
             flags.append(("stage_business", _r, "stage_business"))
-        _h, _r = flag_on_the_nose(cleaned)
+        _h, _r = flag_on_the_nose(cleaned, rules=rules)
         if _h:
             flags.append(("on_the_nose", _r, "on_the_nose"))
         if getattr(req, "speaker_role", "") == "character":
@@ -2338,7 +2344,7 @@ def _quality_flags_for_line(cleaned, req):
                 max_clause_markers=max(3, _ob_cap // 8))
             if _h:
                 flags.append(("one_breath", _r, "one_breath"))
-            _h, _r = flag_personal_cost_boilerplate(cleaned)
+            _h, _r = flag_personal_cost_boilerplate(cleaned, rules=rules)
             if _h:
                 flags.append(("personal_cost", _r, "personal_cost"))
             _obj = (getattr(req, "beat_objective", "") or "").strip()
@@ -2366,14 +2372,14 @@ def _quality_reroll_hint(flags) -> str:
     return ""
 
 
-def line_quality_defect_score(text, req) -> int:
+def line_quality_defect_score(text, req, *, rules=None) -> int:
     """G1 (story-quality v2, 2026-06-28) -- a single ordering used ONLY on the v2
     path to decide whether a reroll genuinely improved the line: the count of
     quality flags + a strong penalty for a truncated/mid-cut line + a mild penalty
     for excessive hard-clause nesting. LOWER wins; the ORIGINAL keeps a tie. Pure;
-    never raises."""
+    never raises. Stage 4: ``rules`` threads to the vocabulary sets."""
     try:
-        flags = _quality_flags_for_line(text, req)
+        flags = _quality_flags_for_line(text, req, rules=rules)
         score = len(flags) + 2 * int(is_truncated(text))
         if _hard_clauses(text) > 3:
             score += 1
@@ -2411,6 +2417,11 @@ def compose_line(
     _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
     _leak_repair_attempted: bool = False,  # leak-floor-v2 recompose guard
     _quality_repair_attempted: bool = False,  # clean-quality (3.2) reroll guard
+    # Stage 4 (2026-07-06): the resolved StoryRules for this episode's
+    # source_bank. None => resolved ONCE at entry from source_bank_id
+    # (fail-loud, OUTSIDE any swallow); forwarded on every recursive call so
+    # a repaired line is scored by the SAME bank vocabulary.
+    _story_rules=None,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -2448,6 +2459,21 @@ def compose_line(
     """
     if reroll_hint is not None:
         req = replace(req, reroll_hint=reroll_hint)
+
+    # Stage 4: resolve the rule vocabulary ONCE per entry, OUTSIDE every
+    # broad-catch scorer (a StoryRulesError must fail the episode LOUD --
+    # resolving inside the scorers' try blocks would silently disable
+    # fail-loud; kibitz r2 M3).
+    if _story_rules is None:
+        try:
+            from ._otr_story_rules import resolve_story_rules
+        except ImportError:  # pragma: no cover -- flat test imports; the
+            # rules module needs its package context (it imports the story
+            # routing layer relatively), so the fallback goes through the
+            # `nodes` package, never a bare flat copy.
+            from nodes._otr_story_rules import (  # type: ignore
+                resolve_story_rules)
+        _story_rules = resolve_story_rules(source_bank_id)
 
     # Stage 1 -- draft. The one creative job. Raises
     # LineCompositionFailedError on exhaustion (propagated unchanged).
@@ -2496,7 +2522,7 @@ def compose_line(
                 "%s -- character beat at tension %d carries no "
                 "beat_objective frame", req.speaker, req.beat_tension,
             )
-        _q_flags = _quality_flags_for_line(cleaned, req)
+        _q_flags = _quality_flags_for_line(cleaned, req, rules=_story_rules)
         if _q_flags:
             _q_hint = _quality_reroll_hint(_q_flags)
             _existing = getattr(req, "reroll_hint", "") or ""
@@ -2531,6 +2557,7 @@ def compose_line(
                     _stage_dir_repair_attempted=True,
                     _leak_repair_attempted=_leak_repair_attempted,
                     _quality_repair_attempted=True,
+                    _story_rules=_story_rules,  # Stage 4
                 )
                 # 3.4 (2026-06-27) re-verify: the gate used to ship the reroll
                 # UNCHECKED, so a reroll that swapped one cliche for another still
@@ -2539,14 +2566,17 @@ def compose_line(
                 # <code>_retry breadcrumb per ORIGINAL fired flag (MF-6: built
                 # once, appended once; the recursive call skips this gate).
                 _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
-                _after_flags = _quality_flags_for_line(_rr.text, req)
+                _after_flags = _quality_flags_for_line(
+                    _rr.text, req, rules=_story_rules)
                 # G1 (2026-06-28): v2 scores BOTH drafts on ONE defect ordering
                 # (flags + 2*truncation + clause-nesting) so a clean ~35-word line
                 # beats a 20-word fragment; v2-OFF keeps the legacy flag-count
                 # comparison byte-identical. Lower wins; ORIGINAL keeps a tie.
                 _keep_reroll = (
-                    line_quality_defect_score(_rr.text, req)
-                    < line_quality_defect_score(cleaned, req))
+                    line_quality_defect_score(
+                        _rr.text, req, rules=_story_rules)
+                    < line_quality_defect_score(
+                        cleaned, req, rules=_story_rules))
                 if _keep_reroll:
                     # the reroll genuinely reduced defects -> keep it. Any defect
                     # that SURVIVED the reroll is stamped quality_residual:<code>
@@ -2559,11 +2589,12 @@ def compose_line(
                     # the kept reroll -- it may have swapped one worn phrase for
                     # another. Repair the FIRST span; if a cliche still ships
                     # (unmapped / a second span), stamp cliche_shipped_after_reroll.
-                    _rr_fixed = repair_cliche_span(_rr.text)
+                    _rr_fixed = repair_cliche_span(
+                        _rr.text, rules=_story_rules)
                     if _rr_fixed != _rr.text:
                         _rr = replace(_rr, text=_rr_fixed)
                         _extra = _extra + ("cliche_repaired",)
-                    if find_cliche_phrase(_rr.text):
+                    if find_cliche_phrase(_rr.text, rules=_story_rules):
                         _extra = _extra + ("cliche_shipped_after_reroll",)
                     if _extra:
                         _rr = replace(
@@ -2602,12 +2633,12 @@ def compose_line(
     # kept-reroll repair). Only when the gate actually fired (_q_retry_flags
     # non-empty); a no-gate line is untouched.
     if _q_retry_flags:
-        _cl_fixed = repair_cliche_span(cleaned)
+        _cl_fixed = repair_cliche_span(cleaned, rules=_story_rules)
         if _cl_fixed != cleaned:
             cleaned = _cl_fixed
             word_count = len(cleaned.split())
             _q_retry_flags = _q_retry_flags + ("cliche_repaired",)
-        if find_cliche_phrase(cleaned):
+        if find_cliche_phrase(cleaned, rules=_story_rules):
             _q_retry_flags = _q_retry_flags + ("cliche_shipped_after_reroll",)
 
     compose_flags: tuple[str, ...] = _q_retry_flags
@@ -2687,6 +2718,7 @@ def compose_line(
                     _stage_dir_repair_attempted=_stage_dir_repair_attempted,
                     _leak_repair_attempted=True,
                     _quality_repair_attempted=_quality_repair_attempted,
+                    _story_rules=_story_rules,  # Stage 4
                 )
             except LineCompositionFailedError:
                 log.warning(
@@ -2787,6 +2819,7 @@ def compose_line(
                     _stage_dir_repair_attempted=_stage_dir_repair_attempted,
                     _leak_repair_attempted=_leak_repair_attempted,
                     _quality_repair_attempted=_quality_repair_attempted,
+                    _story_rules=_story_rules,  # Stage 4
                 )
                 cleaned = repaired.text
                 # Concat compose_flags from both passes; dedupe trivially
@@ -3450,6 +3483,10 @@ def compose_announcer_outro(
     creative_repo_id: str | None = None,
     ending_change: str = "",
     final_character_line: str = "",
+    # Stage 4 (2026-07-06): the episode's story-path bank; the thesis-close
+    # gate's vocabulary resolves from its rules pack (this function had NO
+    # bank-context slot at all -- the worst threading gap, kibitz r2).
+    source_bank_id: str = "science_news",
 ) -> LineResult:
     """Compose the episode's closing announcer line.
 
@@ -3485,6 +3522,16 @@ def compose_announcer_outro(
     def _hedges(t: str) -> bool:
         low = (t or "").lower()
         return any(p in low for p in HEDGE_LIST)
+
+    # Stage 4: resolve the rule vocabulary ONCE at entry, outside any
+    # swallow -- the thesis gate below scores with the bank's own patterns.
+    try:
+        from ._otr_story_rules import resolve_story_rules
+    except ImportError:  # pragma: no cover -- flat test imports (package
+        # fallback: the rules module needs its package context).
+        from nodes._otr_story_rules import (  # type: ignore
+            resolve_story_rules)
+    _story_rules = resolve_story_rules(source_bank_id)
 
     resolved = is_resolved_ending_change(ending_change)
     ending = clean_one_line(ending_change or "", max_chars=240)
@@ -3589,7 +3636,8 @@ def compose_announcer_outro(
         # Recompose ONCE for an image (mirrors the F3 hedge recompose). If it
         # still reads as thesis, keep the validated close (best-effort nudge --
         # no deterministic image template exists).
-        _thesis_hit, _thesis_reason = flag_thesis_close(validated)
+        _thesis_hit, _thesis_reason = flag_thesis_close(
+            validated, rules=_story_rules)
         if _thesis_hit:
             log.info(
                 "[OTR_AnnouncerPass] outro reads as thesis/moral (%s); "
@@ -3613,7 +3661,8 @@ def compose_announcer_outro(
                 min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
                 max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
             )
-            if ok3 and not flag_thesis_close(validated3)[0]:
+            if ok3 and not flag_thesis_close(
+                    validated3, rules=_story_rules)[0]:
                 log.info(
                     "[OTR_AnnouncerPass] outro image-recompose ok (model=%s).",
                     creative_repo_id,

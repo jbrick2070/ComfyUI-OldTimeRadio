@@ -215,11 +215,17 @@ class TestThreading:
             canon_header="",
             last_lines=[],
         )
+        # Stage 4: media_archive has no story_rules pack yet (lane-enablement
+        # item) -- pass the science rules explicitly so this test keeps
+        # targeting PROMPT threading, not the rules gate (which has its own
+        # fail-loud test in test_story_rules_4a.py).
+        from nodes._otr_story_rules import resolve_story_rules
         out = lc.compose_line(
             creative_fn=lambda *a, **k: "A quiet line about the machine.",
             req=req,
             creative_repo_id="mistralai/Mistral-Nemo-Instruct-2407",
             source_bank_id=_NON_RUNNABLE_BANK,
+            _story_rules=resolve_story_rules("science_news"),
         )
         assert out.text
         assert seen and all(s == _NON_RUNNABLE_BANK for s in seen)
