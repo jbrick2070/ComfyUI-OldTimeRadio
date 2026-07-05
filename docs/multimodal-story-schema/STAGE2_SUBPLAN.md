@@ -152,13 +152,15 @@ The 2C widget threads the selection to the ONLY pack-routed seam today
 (`line_composer_system`). Before ANY non-science bank flips `runnable:true`,
 each of these seams must be made bank-aware (or explicitly bypassed for the
 lane) -- the run-intent gate is what keeps the 2C contract honest until then:
-1. Outline seams: the three outline stage prompts are hard-wired constants
-   (`_otr_outline` :~1870/:~1998/:~2103); the science pack's
-   outline_macro/phase/beat_system seams exist but are UNCONSUMED. Migrate
-   them to pack routing (with the byte-identity pin) before lane enablement.
-2. Exchange seam: `_otr_compose_exchange.build_exchange_prompt` hard-codes
-   its system prompt (bank-agnostic, science included; `use_exchange` is ON
-   in the shipped bake). Make it pack-routable or bypass exchange for the lane.
+1. Outline seams -- DONE (lane chunk 1 @69afbd83, 2026-07-06): the three
+   outline stage prompts are pack-routed via the router repo=None lane;
+   science byte-identical (constants = extraction fixture, pinned); a bank
+   without the seams fails LOUD (media_archive pinned).
+2. Exchange seam -- DONE (lane chunk 2 @9809e36f, 2026-07-05): the STATIC
+   system prompt is pack-routed via the new `exchange_system` seam (router
+   repo=None lane, resolved OUTSIDE the prepass PD1 swallow -- a bank without
+   the seam fails the episode LOUD); dynamic craft bullets stay Python-owned.
+   Science byte-identical (EXCHANGE_SYSTEM_PROMPT extraction fixture, pinned).
 3. Source payload: RSS fetch (`_fetch_science_news`) + `news_interpreter.
    build_news_briefs` are science-hardwired; banks' fetcher/interpreter
    fields are metadata until their contract is built.

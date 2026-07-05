@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (day) -- LANE-ENABLEMENT CHUNK 2 SHIPPED (exchange seam pack-routed) + VISUAL-STYLE TOTAL directive -- v2.0-alpha
+Did:
+- @9809e36f (pushed, HEAD==origin): exchange seam -- new `exchange_system` production seam (allowlist + science pack byte-identical to the extracted EXCHANGE_SYSTEM_PROMPT fixture + exchange_compose pipeline pass row); system_prompt threaded run_exchange_prepass -> compose_exchange -> build_exchange_prompt (keyword-only, dynamic craft bullets stay Python-owned); writer resolves via router repo=None lane OUTSIDE the prepass PD1 swallow (bank without the seam fails the episode LOUD; media_archive + resolve-outside-try AST pin). 13 new tests; suite 6400/0; Bug Bible 16. Per-chunk kibitz SKIPPED by design (operator-approved leaner gating -- pattern-copy of chunk 1; panel reserved for chunk 3).
+- OPERATOR DIRECTIVE recorded in GO_FORWARD section 1: visual_style must impact ALL downstream prompts (stills/video/3D; announcer+music included) -- the anime episode was chars-only because v1 is tails-only + viz_*/procgen engines are promptless. Stage-3 section-8 slice PROMOTED to an ordered build item after lane enablement.
+Current step: LANE-ENABLEMENT CHUNK 3 (source-payload fetcher/interpreter contracts per bank -- last blocker before a non-science runnable:true), then the visual-style total-coverage slice.
+Next: chunk 3 (kibitz-gated -- genuinely new design).
+Commits: 9809e36f (pushed) + docs.
+
 ## 2026-07-06 (morning GO) -- LANE-ENABLEMENT CHUNK 1 SHIPPED (outline seams pack-routed) -- v2.0-alpha
 Did:
 - @69afbd83 (pushed, HEAD==origin): the 3 outline stage prompts (_MACRO/_PHASE/_BEAT_SYSTEM_PROMPT) resolve via resolve_creative_system_prompt repo=None lane from the bank's pack (3 new Phase entries + seam map rows); generate_outline gains source_bank_id (both writer call sites thread resolved["source_bank"]); plain "outline" phase untouched (period sentinel object-identity preserved); constants stay as the science extraction fixture.

@@ -69,9 +69,27 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = LANE-ENABLEMENT CHUNK 2 (exchange seam: make build_exchange_prompt
-pack-routable or bypass-per-lane -- STAGE3_SUBPLAN 4b item 2; then source-payload
-fetcher/interpreter contracts).** CHUNK 1 SHIPPED @69afbd83 (outline stage prompts
+**OPERATOR DIRECTIVE 2026-07-05 (visual style = TOTAL):** when a visual_style is
+selected it must impact ALL downstream prompts -- stills, video, 3D, every promptable
+surface (announcer_visual + music_visual included, not just character beats). The
+2026-07-05 anime episode proved the v1 tails-only slice is NOT enough (announcer/radio
+stayed classic visualizer). The Stage-3 section-8 checklist (subject overrides,
+portrait/scene style phrases, motion/talking registers, geometry-vs-look split) is
+PROMOTED from "deferred" to an ORDERED build item, queued immediately after
+lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
+needs promptable engines selectable/selected for announcer/music video roles.
+
+**CURRENT STEP = LANE-ENABLEMENT CHUNK 3 (source-payload fetcher/interpreter
+contracts per bank -- STAGE2_SUBPLAN 4b item 3; the last blocker before a
+non-science lane can flip runnable:true). THEN the visual-style total-coverage
+slice above.**
+CHUNK 2 SHIPPED @9809e36f (exchange seam: new `exchange_system` production seam --
+allowlist + science pack byte-identical to the extracted EXCHANGE_SYSTEM_PROMPT
+fixture + exchange_compose pass row; system_prompt threaded run_exchange_prepass ->
+compose_exchange -> build_exchange_prompt, dynamic craft bullets stay Python-owned;
+the writer resolves via the router repo=None lane OUTSIDE the prepass PD1 swallow so
+a bank without the seam fails the episode LOUD, media_archive pinned; 13 tests incl.
+a resolve-outside-try AST pin; suite 6400/0, Bug Bible 16). CHUNK 1 SHIPPED @69afbd83 (outline stage prompts
 pack-routed via the router repo=None lane; science byte-identical; bank-without-seams
 fails loud; 13 tests; suite 6387/0). Remaining outline-side seam coverage (announcer
 intro/coda/style-pick) rides the same pattern when a lane needs it. Overnight 2026-07-05/06 (operator "EVERYTHING" directive; full detail in
