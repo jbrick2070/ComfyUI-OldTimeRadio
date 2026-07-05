@@ -46,6 +46,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Ensure sibling node modules (e.g. _otr_paths) resolve when this file is
 # loaded by ComfyUI's custom-node loader. Mirrors the pattern used in
@@ -935,10 +936,11 @@ class PostUpscaleProcgenBlend:
 
         # BUG 4: the ALWAYS-ON audio bars are a SEPARATE second pass so the
         # (historically fragile) procgen/scopes blend is untouched. When ON the
-        # main blend produces an UN-captioned composite, then a second pass
-        # lighten-blends the bars layer and burns captions ON TOP (captions stay
-        # above the bars). 'off' -> the legacy single-pass blend (captions in the
-        # main pass), byte-identical to today.
+        # main blend produces the composite, then a second pass lighten-blends the
+        # bars layer on top. 'off' -> the legacy single-pass blend, byte-identical
+        # to today. NOTE: captions_ass_path is pinned None above (caption ownership
+        # migrated to node 86 OTR_CaptionBurn, upstream), so neither pass burns
+        # captions -- the bars cmd builders take their no-caption path.
         want_bars = (str(audio_bars or "off").lower() == "bottom"
                      and pgn is not None)
         run_cwd = str(Path(captions_ass_path).parent) if captions_ass_path else None
@@ -994,20 +996,20 @@ class PostUpscaleProcgenBlend:
                         cwd=run_cwd)
                     _bars_ok = True
                     report_lines.append(
-                        "audio_bars: bottom overlay (lighten @%.2f, captions above)"
+                        "audio_bars: bottom overlay (lighten @%.2f)"
                         % _BARS_OPACITY)
                 except subprocess.CalledProcessError as exc:
                     _se = exc.stderr.decode("utf-8", "replace") if exc.stderr else ""
                     log.warning("[PostUpscaleProcgenBlend] audio_bars: overlay pass "
-                                "failed (%s); re-running the normal captioned blend",
+                                "failed (%s); re-running the normal blend",
                                 _se[:200])
             if not _bars_ok:
-                # LOUD degrade: ship the NORMAL captioned blend so the deliverable
-                # still has its captions (never silently drop them).
+                # LOUD degrade: ship the NORMAL blend so the deliverable still
+                # exists (captions are burned upstream at node 86, not here).
                 try:
                     _run_blend(output_path, captions_ass_path)
                     report_lines.append("audio_bars: SKIPPED (bars layer "
-                                        "unavailable); shipped normal captioned blend")
+                                        "unavailable); shipped normal blend")
                 except subprocess.CalledProcessError:
                     try:
                         shutil.copy2(src, output_path)

@@ -363,6 +363,41 @@ class OTRMasterAudioMux:
                     dst, os.path.getsize(dst), final)
         return dst
 
+    def _stamp_final_video_path(self, final_path: str, obs_path: str) -> str:
+        """Truthfully restamp ``ledger.final_video_path`` to THIS terminal deliverable.
+
+        The tail chain grew a credits roll (node 95) + this mux (node 85) AFTER
+        the procgen blend (node 93), whose ``_stamp_ledger_final_video_path``
+        left the ledger pointing at the pre-credits / pre-mux intermediate blend.
+        This node is the terminal stage, so it owns the truthful pointer.
+        Best-effort -- a stamp failure must NEVER block the deliverable, so it is
+        caught and reported, never raised. Returns a single report line.
+        """
+        try:
+            try:
+                from . import _otr_ledger as _OTRL  # type: ignore
+            except ImportError:  # pragma: no cover -- direct-script fallback
+                import sys as _sys
+                _here = os.path.dirname(os.path.abspath(__file__))
+                if _here not in _sys.path:
+                    _sys.path.insert(0, _here)
+                import _otr_ledger as _OTRL  # type: ignore
+            ledger_p = _OTRL.in_flight_ledger_path()
+            if ledger_p is None:
+                return "final_video_path stamp skipped: no in-flight ledger singleton"
+            led = _OTRL.load_ledger_safe(ledger_p)
+            if led is None:
+                return f"final_video_path stamp skipped: could not load {ledger_p.name}"
+            led["final_video_path"] = str(final_path)
+            meta = led.setdefault("meta", {})
+            meta["obs_final_path"] = str(obs_path)
+            if not _OTRL.save_ledger_safe(ledger_p, led):
+                return f"final_video_path stamp failed: save returned False for {ledger_p.name}"
+            return (f"stamped ledger {ledger_p.name}: final_video_path -> "
+                    f"{os.path.basename(str(final_path))}")
+        except Exception as exc:  # noqa: BLE001 -- best-effort, never blocks the mux
+            return f"final_video_path stamp failed: {type(exc).__name__}: {exc}"
+
     def mux(self, silent_video_path, master_audio_path, audio_done="", fps=25,
             ffmpeg="ffmpeg", output_path="", declared_credits_tail_s=0.0):
         master_audio_path = _reresolve_master_audio(master_audio_path)
@@ -374,6 +409,9 @@ class OTRMasterAudioMux:
             )
             obs_copy = self._publish_to_obs(final)
             report.append("obs_publish OK -> " + obs_copy)
+            # N2 (truthful ledger): this terminal node restamps
+            # final_video_path over node 93's pre-credits/pre-mux blend.
+            report.append(self._stamp_final_video_path(final, obs_copy))
             # OH-3 (output-tree contract 2026-06-11): post-publish janitor
             # pass over episodes/_shared/tmp -- the ONE sanctioned
             # auto-delete; fully fail-soft (PD1, never blocks the mux).
