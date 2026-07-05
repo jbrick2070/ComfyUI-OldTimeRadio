@@ -578,13 +578,189 @@ def _still_word_roles_from_policy(policy_json):
 #: it composes only the PROMPT string; whichever image engine the role's image
 #: slot selects mints it, and the still_word VIDEO engine holds it flat.
 _STILL_WORD_MUSIC_ROLE = "music_visual"
-_STILL_WORD_CARD_STYLE = (
-    "vintage typographic title card, the words rendered in large bold clean "
-    "legible period lettering, hand-set letterpress type, high contrast, "
-    "centered composition, letters sharp and fully readable")
+
+# still_word PROMPT v2 (2026-07-04) -- R1 roundtable + kibitz + Fable-final.
+# The word card is: quoted words -> legibility guard -> per-EPISODE locked
+# lettering -> per-episode COOL backdrop (+ ONE beat mood on character cards) ->
+# scrubbed era tail -> grade -> POSITIVE text guard LAST. The per-episode
+# lettering + backdrop are LOCKED per episode (deterministic, no LLM) so every
+# word card in an episode reads as ONE consistent typographic set; only the beat
+# MOOD adjective varies per character card (the operator's consistency ask).
+
+#: Genre classifier over the SAME haystack radio_form uses (meta.style + brief
+#: setting/atmosphere). First match wins; an absent/failed brief OR no keyword
+#: match -> "default". The genre KEY (noir|sci-fi|western|pulp|default) is the
+#: provenance ``backdrop_family`` value AND the key into both maps below.
+_STILL_WORD_GENRE_KEYWORDS = (
+    ("noir", ("noir", "detective", "deco", "art deco", "1930s", "1940s",
+              "prohibition", "hardboiled", "gumshoe")),
+    ("sci-fi", ("space", "orbital", "docking", "spacecraft", "starship",
+                "space station", "sci-fi", "science fiction", "futuristic",
+                "galactic", "interstellar", "robot", "android", "cybernetic")),
+    ("western", ("western", "frontier", "old west", "dustbowl", "prairie",
+                 "cowboy", "saloon", "outlaw", "gunslinger")),
+    ("pulp", ("pulp", "adventure", "jungle", "ray gun", "monster", "horror",
+              "crime", "mystery", "swashbuckling")),
+)
+#: LOCKED per-episode lettering. Every phrase ENDS in "capitals" (Fable: lock the
+#: CASE, not just the family -- Ideogram mixes case between renders otherwise;
+#: "capitals" is the cheapest per-episode consistency lock). No era/period/
+#: letterpress words here (era-bias + ink-squash distress moved OUT of the guard).
+_STILL_WORD_TYPOGRAPHY = {
+    "noir": "heavy condensed sans-serif capitals, tightly spaced",
+    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
+    "western": "bold wood-type slab-serif capitals, sturdy and squared",
+    "pulp": "heavy blocky display serif capitals, hard drop shadow",
+    "default": "bold clean sans-serif capitals, evenly spaced",
+}
+#: COOL backdrop -- COLOR + LIGHT DIRECTION + ATMOSPHERE DENSITY only, NEVER an
+#: OBJECT / PARTICLE / PLACE (any countable noun becomes high-frequency texture
+#: inside the letter counters). Kept in the DARK value register (the value gap,
+#: not saturation, keeps caps legible under the grade).
+_STILL_WORD_BACKDROP = {
+    "noir": "smoky midnight-blue haze, dim slatted lamplight",
+    "sci-fi": "deep void-black gradient, cold teal horizon glow",
+    "western": "deep amber dusk haze, low golden horizon glow",
+    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
+    "default": "soft dark gradient haze, faint warm center glow",
+}
+#: SPLIT out of the old _STILL_WORD_CARD_STYLE: the genre-NEUTRAL legibility /
+#: composition tokens stay fixed; the per-episode lettering supplies the idiom.
+#: "filling the frame" is a literal instruction the model acts on; "clear space
+#: behind the words" is the counterweight to the grade's vignette.
+_STILL_WORD_LEGIBILITY_GUARD = (
+    "huge high-contrast lettering, razor-sharp edges, centered, filling the "
+    "frame, clear space behind the words")
+#: POSITIVE text guard, appended LAST (same seam music mode uses for
+#: NO_TEXT_CLAUSE). "no captions" earns its slot -- Ideogram's signature card
+#: failure is an invented subtitle line.
+_STILL_WORD_TEXT_GUARD = (
+    "only the quoted words, no other text, no logos, no captions")
+#: WORDLESS abstract-title styling for the music card (UNTOUCHED path).
 _STILL_WORD_TITLE_MOOD_STYLE = (
     "abstract evocative mood image, atmospheric period illustration, symbolic "
     "non-literal composition, no lettering")
+
+#: Beat-mood ALLOWLIST (the load-bearing safety property, Fable). ONLY these
+#: lemmas emit a mood; everything else (voice descriptors, novel LLM adjectives,
+#: typos, "neutral", None, empty) -> NO TOKEN. Buckets scanned in PRIORITY order
+#: (danger-forward); first bucket with any hit wins. Output token set is exactly
+#: {urgent, tense, somber, hopeful, calm}; "frantic" is a KEYWORD -> urgent.
+_STILL_WORD_MOOD_BUCKETS = (
+    ("urgent", ("urgent", "urgency", "panic", "panicked", "panicking", "alarm",
+                "alarmed", "frantic", "desperate", "hurried", "rushed", "racing")),
+    ("tense", ("tense", "tension", "nervous", "anxious", "worried", "afraid",
+               "fear", "fearful", "frightened", "terrified", "scared", "dread",
+               "uneasy", "suspicious", "angry", "furious", "hostile", "menacing",
+               "ominous", "agitated")),
+    ("somber", ("somber", "sombre", "sad", "grim", "grief", "grieving",
+                "mourning", "melancholy", "solemn", "tragic", "regretful",
+                "defeated", "bitter", "haunted")),
+    ("hopeful", ("hopeful", "hope", "optimistic", "welcoming", "cheerful",
+                 "joyful", "happy", "excited", "eager", "relieved",
+                 "triumphant", "upbeat")),
+    ("calm", ("calm", "reflective", "thoughtful", "serene", "peaceful",
+              "gentle", "measured", "steady", "wistful", "quiet")),
+)
+#: A title card cannot hold a paragraph, but real dialogue runs 15-30 words --
+#: NO hard abort (it would propagate out of derive_image_prompts and kill EVERY
+#: episode the first time still_word meets a normal line). On overflow: a
+#: DETERMINISTIC REDUCTION (first clause, else first N words / chars), applied
+#: BEFORE the hash so the composer stays pure. Blank line still fails LOUD.
+STILL_WORD_MAX_WORDS = 12
+STILL_WORD_MAX_CHARS = 60
+#: era-tail text summoners scrubbed (word mode ONLY, MANDATORY -- not a QA-watch):
+#: a "flickering neon signs" atmosphere leaks extra glowing text onto the card.
+_STILL_WORD_TEXT_SUMMONERS = (
+    "marquee", "poster", "magazine", "newspaper", "neon", "sign", "signs",
+    "signage", "label", "labels", "theatrical", "billboard", "banner")
+
+
+def _still_word_genre(meta) -> str:
+    """The locked per-episode genre KEY (noir|sci-fi|western|pulp|default) for the
+    still_word lettering + backdrop. Absent/failed brief OR no keyword match ->
+    "default" (one neutral look everywhere). Deterministic; no LLM; tolerant."""
+    try:
+        try:
+            from ._otr_story_brief_helpers import (  # type: ignore
+                get_story_brief_status, _radio_form_haystack)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import (  # type: ignore
+                get_story_brief_status, _radio_form_haystack)
+        if get_story_brief_status(meta) != "ok":
+            return "default"
+        hay = _radio_form_haystack(meta)
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return "default"
+    for genre, keys in _STILL_WORD_GENRE_KEYWORDS:
+        if any(k in hay for k in keys):
+            return genre
+    return "default"
+
+
+def _still_word_mood_from_line(line) -> str:
+    """The beat MOOD token from a line's free-form ``traits`` (a NULLABLE string,
+    NOT an enum) via the strict ALLOWLIST. None / non-dict / non-str traits /
+    "neutral" / voice-only -> "" (NO token; a wrong mood is a visible lie, silence
+    is the consistent look). Word-boundary lemma match (never raw substring);
+    buckets scanned danger-forward, first bucket with any hit wins. Pure."""
+    if not isinstance(line, dict):
+        return ""
+    traits = line.get("traits")
+    if not isinstance(traits, str):
+        return ""
+    lemmas = {t for t in re.split(r"[^a-z]+", traits.lower()) if t}
+    for mood, keys in _STILL_WORD_MOOD_BUCKETS:
+        if lemmas.intersection(keys):
+            return mood
+    return ""
+
+
+def _fold_inner_dquotes(s) -> str:
+    """Fold every inner double-quote (straight + curly + guillemets) to a single
+    quote so the ONLY double-quote pair in a still_word card is the template's
+    outer ``"%s"`` boundary. Closes the nested-quote ambiguity AND the semantic
+    prompt-injection where a stray ``", ...`` closes the span early and injects a
+    sibling clause. Keeps apostrophes / em-dash / ellipsis / unicode. Pure."""
+    return re.sub(r'[\"“”„‟«»]', "'", str(s or ""))
+
+
+def _still_word_fit_card(words: str) -> str:
+    """DETERMINISTIC card-length reduction (fail-SOFT): a title card cannot hold a
+    paragraph, so an overflowing line is trimmed to the first clause, else the
+    first ``STILL_WORD_MAX_WORDS`` words, then a ``STILL_WORD_MAX_CHARS`` word-
+    boundary cap. Under both caps -> returned unchanged. Applied BEFORE the hash
+    (pure). NEVER an abort (that would kill every episode -- the §4D class)."""
+    s = str(words or "")
+    if len(s.split()) <= STILL_WORD_MAX_WORDS and len(s) <= STILL_WORD_MAX_CHARS:
+        return s
+    first = re.split(r"[.!?;:]", s, maxsplit=1)[0].strip()
+    if (first and len(first.split()) <= STILL_WORD_MAX_WORDS
+            and len(first) <= STILL_WORD_MAX_CHARS):
+        s = first
+    if len(s.split()) > STILL_WORD_MAX_WORDS:
+        s = " ".join(s.split()[:STILL_WORD_MAX_WORDS])
+    if len(s) > STILL_WORD_MAX_CHARS:
+        cut = s[:STILL_WORD_MAX_CHARS]
+        idx = cut.rfind(" ")
+        s = cut[:idx] if idx > 0 else cut
+    return s.strip()
+
+
+def _scrub_still_word_era_tail(era) -> str:
+    """Strip text-SUMMONING comma-segments (sign / marquee / newspaper / neon /
+    poster / label ...) from the still-word era tail ONLY (word mode). A whole
+    comma-segment mentioning a summoner is dropped -- MANDATORY, not a QA-watch
+    (a "flickering neon signs" atmosphere would summon extra glowing card text).
+    Pure; word-boundary match."""
+    kept = []
+    for seg in str(era or "").split(","):
+        low = seg.lower()
+        if seg.strip() and not any(
+                re.search(r"\b%s\b" % re.escape(t), low)
+                for t in _STILL_WORD_TEXT_SUMMONERS):
+            kept.append(seg.strip())
+    return ", ".join(kept)
 
 
 def _episode_title(meta) -> str:
@@ -597,12 +773,14 @@ def _episode_title(meta) -> str:
 def _still_word_clean_line(beat_line: str) -> str:
     """The spoken words for a word card: bracketed ``[stage direction]`` /
     parenthetical ``(aside)`` scrubbed, a leading ``SPEAKER:`` label removed,
-    whitespace collapsed. Quotes / ellipsis / em-dash inside the words are KEPT
-    (they belong to the line). Pure."""
+    inner double-quotes FOLDED to single (§7 -- so the template's outer ``"%s"``
+    is the only double-quote pair), whitespace collapsed. Apostrophes / ellipsis /
+    em-dash inside the words are KEPT (they belong to the line). Pure."""
     s = str(beat_line or "")
     s = re.sub(r"\[[^\]]*\]", " ", s)                      # [stage direction]
     s = re.sub(r"\([^)]*\)", " ", s)                        # (aside)
     s = re.sub(r"^\s*[A-Z0-9 .'\-]{1,40}:\s+", "", s)       # leading SPEAKER:
+    s = _fold_inner_dquotes(s)                              # §7 quote-fold
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -610,9 +788,18 @@ def _still_word_clean_line(beat_line: str) -> str:
 def compose_still_word_prompt(meta, role, beat_line):
     """The still_word base-still prompt (see the module note above). Pure,
     deterministic, MODEL-AGNOSTIC (no engine reference -- the composed prompt is
-    identical regardless of which image engine mints it). FAILS LOUD (raises
-    ``ValueError``, NO FALLBACK) on a blank spoken line (word mode) or a blank
-    episode title (music/title mode) -- both computed BEFORE any prompt hash."""
+    identical regardless of which image engine mints it). Returns a flat ``str``.
+
+    ``beat_line`` accepts a DICT (the frozen ledger line -- its ``text`` is the
+    words, its free-form ``traits`` drives the beat mood on CHARACTER cards) OR a
+    raw STRING (back-compat; no mood). The third param NAME is pinned by a test.
+
+    WORD mode (character_video / announcer_visual): quoted words -> legibility
+    guard -> per-episode LOCKED lettering -> per-episode COOL backdrop (+ one
+    ``"<mood> mood"`` on character cards) -> SCRUBBED era tail -> grade ->
+    POSITIVE text guard LAST. FAILS LOUD (``ValueError``, NO FALLBACK) on a BLANK
+    line; an overflowing line is REDUCED (never aborted). MUSIC mode is the
+    UNTOUCHED wordless abstract-title still. All raises precede any prompt hash."""
     try:
         from ._otr_story_brief_helpers import (  # type: ignore
             get_era_tail, IMAGE_GRADE_TAIL, NO_TEXT_CLAUSE)
@@ -622,25 +809,39 @@ def compose_still_word_prompt(meta, role, beat_line):
     _role = str(role or "")
     era = (get_era_tail(meta, profile="still") or "").strip()
     if _role == _STILL_WORD_MUSIC_ROLE:
+        # UNTOUCHED music path (operator 2026-07-04: episode titles are proc-gen
+        # elsewhere, so the music card stays a WORDLESS abstract mood still).
         title = _episode_title(meta)
         if not title:
             raise ValueError(
                 "compose_still_word_prompt: music-role still_word beat has a "
                 "BLANK episode title (meta['episode_title']/['title']) -- cannot "
                 "mint the abstract title still. NO FALLBACK.")
-        pieces = ['an abstract picture evoking "%s"' % title,
+        pieces = ['an abstract picture evoking "%s"' % _fold_inner_dquotes(title),
                   _STILL_WORD_TITLE_MOOD_STYLE, era, IMAGE_GRADE_TAIL]
         out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
         return "%s, %s" % (out, NO_TEXT_CLAUSE)         # music title = NO words
     # WORD mode (character_video / announcer_visual): the spoken line IS the card.
-    words = _still_word_clean_line(beat_line)
+    _text = beat_line.get("text") if isinstance(beat_line, dict) else beat_line
+    words = _still_word_clean_line(_text)
     if not words:
         raise ValueError(
             "compose_still_word_prompt: %s still_word beat has a BLANK spoken "
             "line after the stage-direction scrub (raw=%r) -- cannot mint the "
             "word card. NO FALLBACK." % (_role or "word", beat_line))
+    words = _still_word_fit_card(words)                 # deterministic reduction
+    genre = _still_word_genre(meta)
+    lettering = _STILL_WORD_TYPOGRAPHY[genre]
+    backdrop = _STILL_WORD_BACKDROP[genre]
+    # ONE beat mood adjective on CHARACTER cards only (announcer cards: no mood).
+    mood = (_still_word_mood_from_line(beat_line)
+            if _role == "character_video" else "")
+    if mood:
+        backdrop = "%s, %s mood" % (backdrop, mood)
+    era = _scrub_still_word_era_tail(era)               # MANDATORY word-mode scrub
     pieces = ['a title card displaying the words "%s"' % words,
-              _STILL_WORD_CARD_STYLE, era, IMAGE_GRADE_TAIL]
+              _STILL_WORD_LEGIBILITY_GUARD, lettering, backdrop, era,
+              IMAGE_GRADE_TAIL, _STILL_WORD_TEXT_GUARD]
     return ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
 
 
@@ -1489,10 +1690,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 # prompt. Fail-LOUD (blank line / blank title raises) is inside
                 # compose_still_word_prompt. Image-model AGNOSTIC: only the PROMPT
                 # is set here; the role's chosen image engine mints it.
+                # Pass the LINE DICT (not just the text) so the composer can
+                # derive the beat mood from the line's free-form traits; music
+                # beats ignore it (title-driven). Back-compat: a str also works.
                 _ln = _line_by_beat.get(_bid, {})
                 _wprompt = compose_still_word_prompt(
-                    meta, str(tgt.get("role") or ""),
-                    str((_ln or {}).get("text") or ""))
+                    meta, str(tgt.get("role") or ""), _ln)
                 _wobj = {
                     "object_id": f"still_{_bid}",
                     "kind": tgt["kind"],
@@ -1503,6 +1706,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     "prompt_hash": _content_hash(_wprompt),
                     "source": "still_word",
                 }
+                # Provenance for operator QA: the LOCKED per-episode lettering +
+                # backdrop family (music cards excluded -- they carry no lettering).
+                if str(tgt.get("role") or "") != _STILL_WORD_MUSIC_ROLE:
+                    _swg = _still_word_genre(meta)
+                    _wobj["lettering_style"] = _STILL_WORD_TYPOGRAPHY[_swg]
+                    _wobj["backdrop_family"] = _swg
                 if _cid:
                     _wobj["char_id"] = _cid
                 objects.append(_wobj)
