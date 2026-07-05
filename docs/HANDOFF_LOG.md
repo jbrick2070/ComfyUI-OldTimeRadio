@@ -6,6 +6,18 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-06 (overnight, operator asleep -- "EVERYTHING" directive) -- STAGES 3+4-CORE DONE + LIVE-PROVEN -- v2.0-alpha
+Did:
+- 3C @c24dc0fa (Stage 3 COMPLETE: visual_style widget slot 26, gate beside bank gate, meta stamp, whitelists, all pins, 10 tests; suite 6347/0).
+- LIVE 30w SMOKE x2 on the new code: sci-fi default PASS (stamps verified in the ledger) + ANIME PASS (obs final signal_lost_neons_flicker_20260705_044421; portrait eyeballed = cel-shaded lineart -- axis proven to pixels). queue_smoke gained --visual-style/--source-bank.
+- Stage 4 kibitz r1-r4 (codex + operator-directed 3-lens Sonnet fan-out at r2) CONVERGED; STAGE4_SUBPLAN v4 FINAL; BUILD_PLAN amended (module enforcer).
+- 4A @8da76394: _otr_story_rules.py + science_news.json (generated, 33 pat + 15 repl + 13 phrases) + 7 wrappers pack-routed (155 pinned tests UNCHANGED) + compose_line/outro/reroll/spine threading + stage3 seed producer (was dead) + scan fatal lane + 27 tests w/ AST guards A/B. Suite 6374/0, Bug Bible 16.
+- Bugs: BUG-LOCAL-416 + BUG-LOCAL-417 fixed at root + logged; a self-inflicted Set-Content BOM caught by the 3A AST guard and stripped.
+- Box reset (selective kill; :8000 empty, VRAM 1.2GB). ALL commits pushed same-session, HEAD==origin.
+Current step: LANE-ENABLEMENT CHUNK 1 (outline-seam migration -> pack routing, byte-identity pins).
+Next: operator eyeball the anime episode; then chunk 1 on go (or straight per the standing directive).
+Commits: c24dc0fa, 2e59d76b, 0b297d0a, 8da76394 (+ session-3 chain 78bee5d5/746ec5f6/e80dc3d4/4f611cb3/09f158c9) -- all pushed.
+
 ## 2026-07-05 (session 3d) -- STAGE 3 CHUNK 3B SHIPPED (4 style packs, dormant) -- v2.0-alpha
 Did:
 - 3B @2e59d76b (pushed, HEAD==origin): anime/cartoon/paper_origami/archival_documentary authored at nodes/visual_styles/ (exact v1 schema; the lab's subject/motion/ledger_directives fields stripped; schema_version v1); 45 forced-meta delta tests (every tail seam changes; allow_radio_tails=false drops broadcast; empty tails clean; default byte-identical).

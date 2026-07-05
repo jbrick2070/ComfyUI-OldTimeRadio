@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (session 3 -- STAGE 2 COMPLETE: chunk 2C SHIPPED @78bee5d5, own kibitz r1-r4 arc converged; CURRENT STEP = STAGE 3 visual_style) | branch v2.0-alpha HEAD 78bee5d5, 6 commits UNPUSHED (operator gates the push this arc) | prod/main + tags operator-GATED.
+> Last updated 2026-07-06 (OVERNIGHT "EVERYTHING" mission -- STAGES 3+4-CORE COMPLETE + LIVE-PROVEN; see docs/2026-07-06-overnight/MORNING_REPORT.md) | branch v2.0-alpha HEAD 8da76394, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -69,10 +69,22 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = STAGE 3 CHUNK 3C (visual_style widget slot 26, GATED -- the 2C playbook).**
-3B SHIPPED @2e59d76b (4 packs addressable/dormant, 45 delta tests + the B7 alias->imp fix;
-suite 6337/0). After 3C: a NON-DEFAULT visual style is fully LIVE (no execution lane needed)
--- first new-capability 30w smoke = an anime/origami/archival episode. Then Stage 4.
+**CURRENT STEP = LANE-ENABLEMENT CHUNK 1 (outline-seam migration: the 3 outline stage
+prompts -> pack routing, byte-identity pins) -- the first step toward runnable non-science
+banks.** Overnight 2026-07-05/06 (operator "EVERYTHING" directive; full detail in
+docs/2026-07-06-overnight/MORNING_REPORT.md):
+- 3C @c24dc0fa: STAGE 3 COMPLETE (visual_style widget slot 26; all 5 styles LIVE).
+- LIVE SMOKE PASS x2 on the new code: sci-fi default (byte-identical stamps) + ANIME
+  episode in otr/obs (signal_lost_neons_flicker_20260705_044421; portrait visually
+  cel-shaded -- widget->meta->composers->pixels proven).
+- STAGE 4 CORE @8da76394: rules packs (nodes/story_rules/science_news.json generated
+  from the constants) + _otr_story_rules.py loader + all 7 hygiene wrappers pack-routed
+  (155 pinned tests unchanged) + the stage3 seed producer (was DEAD) + scan third resolve
+  site. Kibitz r1-r4 + 3-lens Sonnet fan-out. BUILD_PLAN amended: module enforcer, no node.
+- BUG-LOCAL-416 (refine TypeError) + BUG-LOCAL-417 (reroll bank mismatch + repo-None
+  no-op trap) root-caused, fixed, regression-tested, logged.
+- Suite 6374/0, Bug Bible 16, box reset. Remaining Stage-4 tail: the 3 non-science rules
+  packs ride each bank's lane-enablement (deliberate; no fake curation).
 Sub-plan of record: `docs/multimodal-story-schema/STAGE3_SUBPLAN.md` (v5 FINAL -- kibitz
 r1-r4 CONVERGED 2026-07-05; r3 = codex + a 3-lens Sonnet grounded fan-out per operator).
 **3A SHIPPED @4f611cb3** (suite 6294/0, Bug Bible 16): `nodes/_otr_visual_styles.py`
