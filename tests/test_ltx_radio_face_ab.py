@@ -53,18 +53,18 @@ def test_radio_face_stills_minted_wide_when_toggle_on(monkeypatch):
     out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
                                        lines=_bookend_lines())
     objs = {o["object_id"]: o for o in out["objects"]}
-    for role in ("announcer_visual", "music_visual"):
+    # radio-face logic 2026-07-04 (C2): ANNOUNCER-ONLY -- the dead music
+    # radio-face mint is pruned (the music bookend stays faceless).
+    assert "still_music_visual_radio_face_169" not in objs
+    for role in ("announcer_visual",):
         oid = "still_%s_radio_face_169" % role
         o = objs[oid]
         assert o["kind"] == "portrait" and o["role"] == role
         assert o["w"] > o["h"], "must be WIDE (never a portrait -> pillarbox)"
         assert "space-station communications console" in o["prompt"]
-    # LTX-ONLY mouth-forward styling (talking-radio kibitz r1, SUPERSEDES the
-    # earlier per-role HuMo parity): BOTH bookend stills lead with the rubbery
-    # grille-mouth -- the radio IS the host -- and keep humans OUT
-    # (RADIO_CONSOLE_NEG; no baby line needed, no person in frame).
-    for role in ("announcer_visual", "music_visual"):
-        o = objs["still_%s_radio_face_169" % role]
+        # LTX-ONLY mouth-forward styling (talking-radio kibitz r1): the bookend
+        # still leads with the rubbery grille-mouth -- the radio IS the host --
+        # and keeps humans OUT (RADIO_CONSOLE_NEG; no person in frame).
         assert "rubbery mouth" in o["prompt"]
         assert "speaker grille" in o["prompt"]
         assert "human" in o["negative_prompt"]
@@ -72,8 +72,10 @@ def test_radio_face_stills_minted_wide_when_toggle_on(monkeypatch):
 
 
 def test_radio_face_still_seed_is_pinned():
+    # announcer-only after the C2 prune (2026-07-04): pin the seed on the
+    # announcer radio-face id (the music id is no longer minted).
     s = disp.resolve_object_seed({"request_seed": 7, "mode": "request_hash"},
-                                 "still_music_visual_radio_face_169", "h",
+                                 "still_announcer_visual_radio_face_169", "h",
                                  kind="portrait")
     assert s == 4242
 

@@ -142,8 +142,10 @@ def test_radio_face_mints_for_talking_bookends_without_env(monkeypatch):
         _CAST, _META, llm_fn=None,
         talking_roles={"announcer_visual": True, "music_visual": True})
     ids = _radio_face_ids(payload)
+    # radio-face logic 2026-07-04 (C2): the MUSIC radio-face mint is pruned
+    # (announcer-only since 2026-07-03; the music bookend stays faceless).
     assert "still_announcer_visual_radio_face_169" in ids
-    assert "still_music_visual_radio_face_169" in ids
+    assert "still_music_visual_radio_face_169" not in ids
 
 
 def test_radio_face_absent_without_talking_or_env(monkeypatch):

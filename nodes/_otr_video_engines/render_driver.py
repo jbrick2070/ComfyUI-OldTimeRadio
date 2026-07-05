@@ -384,6 +384,27 @@ def _portrait_index(ledger):
     return out
 
 
+def _portrait_style_index(ledger):
+    """``{object_id: radio_host_style}`` over the portrait rows of
+    ``ledger['images']['images']`` (radio-face logic 2026-07-04). The image node
+    stamps ``radio_host_style`` on the announcer portrait ("console_face" when a
+    HuMo/audio_driven_face engine will animate it, else the FACELESS
+    "radio_object"); the dispatcher copies it onto the ledger row. The render
+    guard reads it to fail CLOSED before feeding a faceless still to a HuMo
+    announcer init. Old/frozen ledgers carry no field -> absent (missing), which
+    the guard treats as NOT console_face. Pure, tolerant."""
+    out = {}
+    imgs = ((ledger or {}).get("images") or {}).get("images") or []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        cid = str(im.get("object_id") or im.get("char_id") or "")
+        style = str(im.get("radio_host_style") or "")
+        if cid and style:
+            out.setdefault(cid, style)
+    return out
+
+
 def _still_index(ledger):
     """``{beat_id: still_path}`` over ``ledger['images']['images']`` rows with
     ``kind=scene_*`` (the still-spine ST-3 dispatcher write-back). The NEWEST
@@ -960,6 +981,30 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     portrait = _portrait_index(ledger).get(char_id, "")
     init_image = portrait
     init_source = "portrait" if portrait else "none"
+    # RADIO FACE LOGIC (2026-07-04) -- cross-node provenance guard, fail CLOSED.
+    # The image node and this driver each read OTR_ENABLE_HUMO_HOSTS independently.
+    # A ledger minted HUMO-OFF stamps the announcer portrait as the FACELESS
+    # "radio_object"; if it is later RENDERED HUMO-ON (e.g. the visual-quicktest
+    # harness REUSES a frozen ledger across runs), that faceless still would feed
+    # HuMo -- the BUG-LOCAL-129 face-only failure. Guard on the POSITIVE: an
+    # announcer_visual + audio_driven_face + char_id=="announcer" init MUST carry
+    # radio_host_style=="console_face"; anything else (radio_object OR a missing
+    # field on an old/frozen ledger) RAISES rather than hand HuMo a faceless init.
+    if (portrait
+            and char_id == "announcer"
+            and _family == "audio_driven_face"
+            and _role_of_shot(shot) == "announcer_visual"):
+        _rh_style = _portrait_style_index(ledger).get(char_id, "")
+        if _rh_style != "console_face":
+            raise RenderError(
+                "RADIO FACE LOGIC: announcer_visual shot %s on a HuMo "
+                "(audio_driven_face) engine %r would consume the announcer "
+                "portrait as its init, but that still is radio_host_style=%r "
+                "(need 'console_face'). A faceless radio_object minted HUMO-OFF "
+                "must NOT drive HuMo (BUG-LOCAL-129 face-only failure). Re-mint "
+                "the image phase with OTR_ENABLE_HUMO_HOSTS=1 so the announcer "
+                "portrait is the animatable dial-face. NO FALLBACK." % (
+                    shot.get("shot_id"), _eng_id, _rh_style or "<missing>"))
     # 3D-image-streams (2026-06-21): a requires_mesh_fodder engine (mesh_stage)
     # meshes a SINGLE isolated subject, so it must be fed the clean mesh_fodder
     # still -- NOT the cinematic scene still. The engine_id on the shot is the

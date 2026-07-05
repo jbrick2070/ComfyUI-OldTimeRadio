@@ -989,7 +989,10 @@ def test_meta_brief_announcer_prompt_added_radio_style():
     assert ann["prompt"], "announcer prompt must never be empty"
     assert ann["source"].startswith("announcer_")
     low = ann["prompt"].lower()
-    assert "radio" in low and "microphone" in low, \
+    # radio-face logic (2026-07-04): default env (HUMO off) -> the FACELESS
+    # radio_object still (a stylized radio; no "microphone"/person). Just assert
+    # the radio styling survives.
+    assert "radio" in low, \
         "announcer portrait must be radio-styled (operator directive)"
     assert ann["prompt_hash"]
 
@@ -1028,7 +1031,10 @@ def test_meta_brief_announcer_skips_llm_refine_brief_driven():
     ann = _by_id(out)["announcer"]
     assert ann["source"] == "announcer_template"
     assert "radio" in ann["prompt"].lower()
-    assert ann.get("negative_prompt") and "baby" in ann["negative_prompt"]
+    # radio-face logic: the faceless radio_object still shares the console
+    # negative (humans OUT); no baby line (that was the retired radio_head_person).
+    assert ann.get("negative_prompt") and "human" in ann["negative_prompt"]
+    assert "baby" not in ann["negative_prompt"]
 
 
 def test_meta_brief_announcer_is_brief_driven_radio_not_llm_flavor():
@@ -1046,9 +1052,12 @@ def test_meta_brief_announcer_is_brief_driven_radio_not_llm_flavor():
     assert ann["source"] == "announcer_template", \
         "the announcer must be brief-driven + skip-LLM (got %r)" % ann["source"]
     low = ann["prompt"].lower()
-    # ANNOUNCER -> a brief-driven RADIO-HEAD PERSON (operator 2026-07-01)
-    assert "radio-head" in low
-    assert ann.get("negative_prompt") and "baby" in ann["negative_prompt"]
+    # ANNOUNCER -> a brief-driven FACELESS radio_object (radio-face logic
+    # 2026-07-04; default env, static bookend). Radio styling survives; no person.
+    assert "radio" in low
+    assert "radio-head" not in low and "presenter" not in low
+    assert ann.get("negative_prompt") and "human" in ann["negative_prompt"]
+    assert "baby" not in ann["negative_prompt"]
     # a CHARACTER with the same setting-grounded line still passes via the LLM
     cast = [{"char_id": "c1", "portrait_prompt": "a flight controller"}]
     out2, _w2 = mbp.derive_image_prompts(
@@ -1087,7 +1096,8 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(
         _pobj("c1", "a keeper, harbor", "ph1"),
-        _pobj("announcer", mbp.ANNOUNCER_PORTRAIT_ANCHOR, "ph-ann",
+        _pobj("announcer", "a vintage tabletop tube radio, warm broadcast lighting",
+              "ph-ann",
               source="announcer_template", role="announcer_visual"),
     )
     led, done, _r, warns = disp.dispatch_images(
@@ -1105,6 +1115,42 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
     from nodes._otr_video_engines import render_driver as rd
     idx = rd._portrait_index(led)
     assert idx.get("announcer") == by_id["announcer"]["path"]
+
+
+def test_dispatch_persists_radio_host_style_fresh_and_cache_hit(
+        clean_image_registry, tmp_path):
+    """radio-face logic (2026-07-04): the announcer portrait's radio_host_style
+    must SURVIVE image dispatch onto the ledger row (the render guard reads the
+    dispatched row, not the pre-dispatch prompt object) -- for BOTH a freshly
+    generated image AND a subsequent cache-hit materialization."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_test", "cast": []}
+    policy = {"image_models": {
+                  "character_image_model": {"engine_id": "flux_gen1"},
+                  "announcer_image_model": {"engine_id": "flux_gen1"}},
+              "seed": {"request_seed": 0}, "granularity": {}}
+    ann_obj = {"object_id": "announcer", "kind": "portrait",
+               "role": "announcer_visual", "char_id": "announcer",
+               "w": 832, "h": 1216, "prompt": "a console dial-face radio",
+               "prompt_hash": "ph-ann", "source": "announcer_template",
+               "radio_host_style": "console_face"}
+    prompts = _payload(ann_obj)
+    led, _d, _r, _w = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=lambda _req: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir")
+    fresh = next(i for i in led["images"]["images"]
+                 if i["object_id"] == "announcer")
+    assert fresh.get("radio_host_style") == "console_face"   # fresh generated row
+    # second dispatch on the SAME ledger -> cache-hit materialization must also
+    # carry the style onto the freshly appended row.
+    led2, _d2, _r2, _w2 = disp.dispatch_images(
+        led, policy, prompts, gen_fn=lambda _req: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir")
+    ann_rows = [i for i in led2["images"]["images"]
+                if i["object_id"] == "announcer"]
+    assert ann_rows and all(
+        r.get("radio_host_style") == "console_face" for r in ann_rows)
 
 
 # --------------------------------------------------------------------------- #

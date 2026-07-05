@@ -137,18 +137,6 @@ def _style_anchor_for_aspect(aspect, talking=False) -> str:
 #: matches the ``char_id`` the writer stamps on announcer lines.
 ANNOUNCER_CHAR_ID = "announcer"
 
-#: Radio-style announcer portrait anchor (operator-directed 2026-06-09:
-#: "announcer should get a 'radio' style image"). A human face stays in
-#: frame so the audio_driven_face family can drive the mouth. LEGACY FALLBACK
-#: (2026-07-01 brief-driven radio-host): the live synthetic-announcer prompt now
-#: comes from :func:`build_radio_host_prompt` (brief-driven form); this static
-#: default is retained only as the fail-soft anchor and is deliberately
-#: era-neutral (no hardcoded "1940s" -- the era texture rides get_era_tail).
-ANNOUNCER_PORTRAIT_ANCHOR = (
-    "a human radio host with a clearly visible adult face, presenting at a "
-    "vintage tabletop tube radio microphone, warm broadcast lighting"
-)
-
 
 # BRIEF-DRIVEN RADIO FORM (2026-07-01): the deterministic brief -> radio-form
 # resolver lives in the PURE brief helper (_otr_story_brief_helpers) so both this
@@ -162,28 +150,43 @@ except ImportError:  # pragma: no cover -- flat test imports
         radio_form_from_meta, _RADIO_FORM_DEFAULT)
 
 
-#: HuMo radio-HOST FACE styling (operator look direction 2026-07-01). TWO looks,
-#: both give HuMo an animatable radio "face" (the dial/needle is the mouth):
-#:   style="console_face"  (MUSIC beats): an ANTHROPOMORPHIC RADIO CONSOLE whose
-#:     glowing tuning dial forms an expressive face -- dial-eyes + a radiating
-#:     needle-fan mouth. "The radio IS the host"; NO human present.
-#:   style="radio_head_person" (ANNOUNCER beats): a period-dressed presenter at a
-#:     microphone whose HEAD is the radio set, the dial + speaker grille forming
-#:     the animatable face.
+#: Radio-HOST FACE styling. The FACE-BEARING looks are for AUDIO-DRIVEN engines
+#: only (something animates a mouth); a static/forced bookend uses the FACELESS
+#: ``radio_object`` style below (radio-face logic 2026-07-04, operator: "a
+#: bookend needs a face only when something animates it").
+#:   style="console_face": an ANTHROPOMORPHIC RADIO CONSOLE whose glowing tuning
+#:     dial forms an expressive face -- dial-eyes + a radiating needle-fan mouth.
+#:     "The radio IS the host"; NO human present. Used for the HuMo radio-host
+#:     FACE object AND the HuMo-driven synthetic-announcer portrait.
+#:   style="ltx_radio_mouth": the LTX-ONLY mouth-forward dial-face (below).
+#:   style="radio_object": a FACELESS stylized radio on its plate -- no dial-face,
+#:     no person -- for a static/i2v or force-mapped announcer (nothing drives a
+#:     mouth, so no face). Facelessness is carried by the POSITIVE prompt.
 #: Overtness is BRIEF-DRIVEN (operator: "brief-driven mix"): subtle/period for
 #: noir/deco, more overt/playful for retro-futurist / sci-fi briefs.
 _RADIO_CONSOLE_FACE = ("its glowing tuning dial forming an expressive stylized "
                        "face -- two round dial-eyes and a radiating needle-fan "
                        "mouth, an anthropomorphic radio that hosts the broadcast")
-_RADIO_HEAD_PERSON = ("a radio-head presenter: a period-dressed figure seated at "
-                      "a vintage microphone whose HEAD IS %s, the glowing dial "
-                      "and speaker grille forming the expressive animatable face "
-                      "(dial eyes, a moving needle mouth)")
+#: FACELESS radio-object subject + anchors (radio-face logic 2026-07-04). The
+#: person anchors (_style_anchor_for_aspect -> STYLE_ANCHOR*) carry "full head
+#: and face", "period-accurate costume", "in-character" -- anatomy/person tokens
+#: that would defeat facelessness. radio_object leans on OBJECT/material language
+#: only (zero anatomy tokens; the still dispatcher has NO negative channel) and
+#: an OBJECT anchor, and it never appends _radio_face_overtness (which returns
+#: face-bearing text). Exact anchor strings pinned (r3) so devs don't drift.
+_RADIO_OBJECT_SUBJECT = ("presented as a stylized tabletop radio set on its "
+                         "plate, its bakelite cabinet, woven speaker grille and "
+                         "a glowing tuning dial")
+_RADIO_OBJECT_ANCHOR = ("isolated tabletop still, the whole radio centered and "
+                        "fully visible, dramatic film lighting")
+_RADIO_OBJECT_ANCHOR_WIDE = ("isolated tabletop still, the whole radio centered "
+                             "and fully visible, wide shot, dramatic film "
+                             "lighting")
 #: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
 #: style="ltx_radio_mouth" is used ONLY by the OTR_LTX_RADIO_FACE still mint
 #: (the init stills the EXISTING ltx_audio_in bookend engine receives -- no new
-#: video model / path). NEVER used by the HuMo hosts: the console_face /
-#: radio_head_person looks above stay byte-unchanged (a mouth-tuned change
+#: video model / path). NEVER used by the HuMo hosts: the console_face look
+#: above stays byte-unchanged (a mouth-tuned change
 #: could hurt HuMo face-readability -- the Codex MUST-FIX #4 split). LTX-2.3
 #: has no face/landmark detector; it drives whatever READS as a mouth, so the
 #: subject puts a PROMINENT rubbery grille-mouth right after the form noun
@@ -209,21 +212,31 @@ _RADIO_CONSOLE_MOUTH = ("%s as a living cartoon appliance face: its wide "
 _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship",
                           "sci-fi", "science fiction", "futuristic",
                           "retro-futuristic", "atomic age", "galactic")
-#: Per-style negatives populated on the object row (schemas.py negative_prompt;
-#: NO schema change). console_face keeps humans OUT; radio_head keeps it an adult
-#: radio-head, never a baby / plain human head. ltx_radio_mouth is a pure radio
-#: (no person in frame) so it SHARES RADIO_CONSOLE_NEG (no baby needed).
+#: Per-style negative populated on the object row (schemas.py negative_prompt;
+#: NO schema change). All three live styles (console_face / ltx_radio_mouth /
+#: radio_object) are pure radios with NO person in frame, so they SHARE
+#: RADIO_CONSOLE_NEG (humans OUT). The still dispatcher has no negative channel,
+#: so this is COSMETIC for the still engines -- facelessness rides the POSITIVE.
 RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
-RADIO_HEAD_PERSON_NEG = ("baby, infant, child, plain ordinary human head, "
-                         "normal human face instead of a radio")
-#: Back-compat alias (default = the music console look).
+#: Back-compat alias (default = the console look).
 RADIO_HOST_FACE_NEG = RADIO_CONSOLE_NEG
+
+#: The live radio-host styles. build_radio_host_prompt + radio_host_negative
+#: dispatch EXPLICITLY over this set and raise on anything else, so a typo or a
+#: stale ``radio_head_person`` caller fails LOUD instead of silently defaulting
+#: to a dial-face (radio-face logic 2026-07-04).
+_RADIO_HOST_STYLES = ("console_face", "ltx_radio_mouth", "radio_object")
 
 
 def radio_host_negative(style: str = "console_face") -> str:
-    """The negative_prompt for a radio-host still by style."""
-    return (RADIO_HEAD_PERSON_NEG if style == "radio_head_person"
-            else RADIO_CONSOLE_NEG)
+    """The negative_prompt for a radio-host still by style. Fail-loud on an
+    unknown style (the retired ``radio_head_person`` now RAISES here)."""
+    if style in _RADIO_HOST_STYLES:
+        return RADIO_CONSOLE_NEG
+    raise ValueError(
+        "radio_host_negative: unknown radio-host style %r; known styles: %r. "
+        "(radio_head_person was retired 2026-07-04 -- radio-face logic.)"
+        % (style, _RADIO_HOST_STYLES))
 
 #: The ONE animatable radio-HOST FACE object minted per episode under
 #: OTR_ENABLE_HUMO_HOSTS (its own object_id, NOT a cast char_id). render_driver
@@ -241,10 +254,14 @@ def _humo_hosts_enabled() -> bool:
 
 
 #: ADDENDUM A/B (OTR_LTX_RADIO_FACE, SEPARATE from the HuMo-hosts feature): the
-#: bookend roles that get a WIDE radio-FACE still for ltx_audio_in I2V init when
-#: the A/B toggle is ON. Object_id pattern MUST match render_driver's
+#: bookend role that gets a WIDE radio-FACE still for ltx_audio_in I2V init when
+#: the A/B toggle is ON. ANNOUNCER-ONLY (operator 2026-07-03): the MUSIC bookend
+#: stays faceless (ltx would lip-sync a mouth to music), so render_driver only
+#: ever consumes the announcer face (render_driver.py:1145-1155) -- minting a
+#: music radio-face still was a dead FLUX render every talking episode, pruned
+#: 2026-07-04 (radio-face logic C2). Object_id pattern MUST match render_driver's
 #: _ltx_radio_face_object_id (still_<role>_radio_face_169).
-_LTX_RADIO_FACE_ROLES = ("announcer_visual", "music_visual")
+_LTX_RADIO_FACE_ROLES = ("announcer_visual",)
 
 
 def _ltx_radio_face_object_id(role: str) -> str:
@@ -279,38 +296,58 @@ def _radio_face_overtness(meta) -> str:
 
 def build_radio_host_prompt(meta, aspect: str = "portrait",
                             style: str = "console_face") -> str:
-    """FULL prompt for the animatable radio-HOST FACE still (ONLY HuMo hosts).
+    """FULL prompt for a radio-host still, dispatched by ``style``.
 
-    ``style="console_face"`` (MUSIC beats): an ANTHROPOMORPHIC RADIO CONSOLE
-    (the brief-driven form) whose glowing dial forms an expressive face -- "the
-    radio IS the host", no human. ``style="radio_head_person"`` (ANNOUNCER
-    beats): a period presenter whose HEAD is the radio set.
+    ``style="console_face"``: an ANTHROPOMORPHIC RADIO CONSOLE (the brief-driven
+    form) whose glowing dial forms an expressive face -- "the radio IS the host",
+    no human. The animatable dial-face; used for the HuMo radio-host FACE object
+    AND the HuMo-driven synthetic-announcer portrait.
     ``style="ltx_radio_mouth"`` (talking-radio kibitz r1): the LTX-ONLY
-    mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint -- leads
-    with the PROMINENT rubbery grille-mouth; never used by HuMo. All styles are
-    brief-driven (:func:`radio_form_from_meta`), overtness brief-driven
-    (:func:`_radio_face_overtness`), framed for the slot's ``aspect``, era
-    texture via :func:`get_era_tail` (portrait profile = no palette bleed).
-    Deterministic; never empty. The matching negative
-    (:func:`radio_host_negative`) is populated on the object row by the caller."""
+    mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint -- leads with
+    the PROMINENT rubbery grille-mouth; never used by HuMo.
+    ``style="radio_object"`` (radio-face logic 2026-07-04): a FACELESS stylized
+    radio on its plate -- no dial-face, no person -- for a static / force-mapped
+    announcer bookend (nothing animates a mouth, so no face). Facelessness is
+    carried by the POSITIVE prompt (the still dispatcher has NO negative
+    channel): object/material language only, an OBJECT anchor (NOT the
+    person anchor), and NO overtness clause.
+    All styles are brief-driven (:func:`radio_form_from_meta`); the face styles'
+    overtness is brief-driven (:func:`_radio_face_overtness`), framed for the
+    slot's ``aspect``, era texture via :func:`finish_visual_prompt`. Deterministic;
+    never empty. FAIL-LOUD on an unknown style (retired ``radio_head_person``
+    raises). The matching negative (:func:`radio_host_negative`) is populated on
+    the object row by the caller."""
     form = radio_form_from_meta(meta)
-    overt = _radio_face_overtness(meta)
-    if style == "radio_head_person":
-        subject = "%s, %s" % (_RADIO_HEAD_PERSON % form, overt)
+    if style == "radio_object":
+        # FACELESS: object/material language only. NO _radio_face_overtness (it
+        # returns face text) and NOT _style_anchor_for_aspect (it adds head/face/
+        # costume/in-character person tokens). An OBJECT anchor instead, then the
+        # SAME "still" era + grade finish as console_face below (a tense story
+        # reads as a tense-lit radio, never a person).
+        anchor = (_RADIO_OBJECT_ANCHOR_WIDE if str(aspect).lower() == "wide"
+                  else _RADIO_OBJECT_ANCHOR)
+        prompt = ", ".join(["%s, %s" % (form, _RADIO_OBJECT_SUBJECT), anchor])
+    elif style == "console_face":
+        subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE,
+                                  _radio_face_overtness(meta))
+        prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
     elif style == "ltx_radio_mouth":
-        subject = "%s, %s" % (_RADIO_CONSOLE_MOUTH % form, overt)
-    else:
-        subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE, overt)
-    prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
-    if style == "ltx_radio_mouth":
+        subject = "%s, %s" % (_RADIO_CONSOLE_MOUTH % form,
+                              _radio_face_overtness(meta))
+        prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
         # CANONICAL WARM LOOK (operator look direction 2026-07-02, the
         # side-by-side catch: the brief palette -- e.g. "cold blue panel
         # glow" -- plus the grade tail's "heavy vignette, muted color grade"
         # rendered the talking-radio bookend DARK, BLUE and murky). The ltx
         # lip-sync still skips the era palette AND the grade tail entirely
-        # and pins the canonical demo's lighting. HuMo styles below keep the
-        # full brief-driven tail (their goldens are byte-pinned).
+        # and pins the canonical demo's lighting. The console/object styles
+        # below keep the full brief-driven tail (console goldens are byte-pinned).
         return "%s, warm dramatic lighting" % prompt
+    else:
+        raise ValueError(
+            "build_radio_host_prompt: unknown radio-host style %r; known "
+            "styles: %r. (radio_head_person was retired 2026-07-04 -- "
+            "radio-face logic.)" % (style, _RADIO_HOST_STYLES))
     try:
         try:
             from ._otr_story_brief_helpers import (  # type: ignore
@@ -319,7 +356,7 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
             from _otr_story_brief_helpers import (  # type: ignore
                 IMAGE_GRADE_TAIL, finish_visual_prompt)
         # STORY FLAIR (operator 2026-07-01: "all prompts respect the meta brief"):
-        # a radio console / radio-head is an OBJECT, not a bare human face, so it
+        # a radio console / radio object is an OBJECT, not a bare human face, so it
         # takes the FULL "still" era tail (story palette + atmosphere + lighting)
         # -- the palette-strip "portrait" profile (BUG-LOCAL-113, for human faces)
         # is NOT wanted here; a tense story should read as a tense-lit radio.
@@ -347,6 +384,62 @@ def _landscape_still_dims():
     except (ValueError, AttributeError):
         w, h = 1472, 832
     return max(32, (w // 32) * 32), max(32, (h // 32) * 32)
+
+
+def _video_models_from_policy(policy_json):
+    """The ``video_models`` map from an image_policy_json (OTR_ImageDirector
+    forwards the resolved per-role video engines here). Missing/malformed -> {}.
+    Pure, tolerant."""
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return {}
+    if isinstance(pol, dict) and isinstance(pol.get("video_models"), dict):
+        return pol["video_models"]
+    return {}
+
+
+def _effective_announcer_family(video_models) -> str:
+    """The RESOLVED ``announcer_visual`` engine FAMILY, AFTER OTR_FORCE_ENGINE_MAP.
+
+    The radio-face rule keys the announcer portrait on this, NOT the bare
+    OTR_ENABLE_HUMO_HOSTS flag: HUMO on but the announcer FORCED to a static
+    engine (OTR_FORCE_ENGINE_MAP=announcer_visual=still_flat) still means a
+    faceless radio. Resolves the role's engine via the shared role_slots join,
+    applies the SAME force-map the dispatcher/render-time override uses
+    (:func:`otr_image_gen_dispatcher._effective_engine_after_force_map`), then
+    reads the family via :func:`render_driver.engine_family`. Tolerant: any
+    resolution/import failure -> "" (the caller then defaults to the FACELESS
+    radio_object -- fail SAFE toward faceless). Pure except the env read inside
+    the force-map resolver."""
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+        eng_id = _rs.engine_id_for_role(video_models or {}, "announcer_visual")
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return ""
+    if not eng_id:
+        return ""
+    try:
+        try:
+            from .otr_image_gen_dispatcher import (  # type: ignore
+                _effective_engine_after_force_map)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from otr_image_gen_dispatcher import (  # type: ignore
+                _effective_engine_after_force_map)
+        eng_id = _effective_engine_after_force_map("announcer_visual", eng_id)
+    except Exception:  # noqa: BLE001 -- unforced run: keep the director pick
+        pass
+    try:
+        try:
+            from ._otr_video_engines.render_driver import engine_family  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_video_engines.render_driver import engine_family  # type: ignore
+        return str(engine_family(eng_id, "") or "")
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _still_aspects_from_policy(policy_json):
@@ -1032,7 +1125,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                          consistency_gate_warn_only: bool = False, lines=None,
                          fps: int = 25, still_aspects=None,
                          mesh_fodder_roles=None, talking_roles=None,
-                         still_word_roles=None):
+                         still_word_roles=None, video_models=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -1067,7 +1160,6 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             continue                      # a real cast row already covers it
         roster.append({
             "char_id": cid,
-            "portrait_prompt": ANNOUNCER_PORTRAIT_ANCHOR,
             "_synthetic_announcer": True,
         })
     for char in roster:
@@ -1096,20 +1188,32 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # mention radios, microphones, studios") CONTRADICTS a radio-styled host,
         # so a refined prompt strips the radio tokens, fails _passes_consistency,
         # and reverts to the (old 1940s) template. build_radio_host_prompt already
-        # finishes (era tail + grade) and depicts an ADULT person, so the loop's
-        # LLM / consistency / person-guard / gear-scrub / finish steps are all
-        # bypassed for this row (also saves an LLM call). The no-baby negative is
-        # populated on the object row.
+        # finishes (era tail + grade), so the loop's LLM / consistency /
+        # gear-scrub / finish steps are all bypassed for this row (also saves an
+        # LLM call). The negative is populated on the object row.
         if char.get("_synthetic_announcer"):
-            # ANNOUNCER -> a RADIO-HEAD PERSON (operator 2026-07-01).
-            _aprompt = build_radio_host_prompt(meta, _aspect,
-                                               style="radio_head_person")
+            # RADIO FACE LOGIC (2026-07-04): the announcer portrait gets a FACE
+            # only when an AUDIO-DRIVEN engine will animate it -- i.e. HuMo hosts
+            # opted ON AND the RESOLVED announcer engine family (after
+            # OTR_FORCE_ENGINE_MAP) is audio_driven_face. Otherwise (default env,
+            # static/i2v engine, or a force-map to a static engine) it is the
+            # FACELESS radio_object. The env flag stays a conjunct because it
+            # gates whether HuMo survives to the announcer at render (else
+            # _enforce_radio_is_host redirects it to ltx_audio_in). The chosen
+            # style is STAMPED (radio_host_style) so the cross-node render guard
+            # can fail CLOSED on a stale ledger (BUG-LOCAL-129 face-only failure).
+            _humo_face = (_humo_hosts_enabled()
+                          and _effective_announcer_family(video_models)
+                          == "audio_driven_face")
+            _astyle = "console_face" if _humo_face else "radio_object"
+            _aprompt = build_radio_host_prompt(meta, _aspect, style=_astyle)
             out[cid] = {
                 "prompt": _aprompt,
                 "prompt_hash": _content_hash(_aprompt),
                 "source": "announcer_template",
                 "_role": "announcer_visual",
-                "negative_prompt": radio_host_negative("radio_head_person"),
+                "negative_prompt": radio_host_negative(_astyle),
+                "radio_host_style": _astyle,
             }
             continue
         prompt = ""
@@ -1263,6 +1367,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # no schema change) when set -- e.g. the radio-host "no baby" negative.
         if pinfo.get("negative_prompt"):
             _pobj["negative_prompt"] = pinfo["negative_prompt"]
+        # RADIO FACE LOGIC (2026-07-04): carry the announcer portrait's chosen
+        # radio-host style onto the object so it survives image dispatch to the
+        # ledger row, where the render-side guard fails CLOSED if a faceless
+        # radio_object is about to feed a HuMo (audio_driven_face) announcer init.
+        if pinfo.get("radio_host_style"):
+            _pobj["radio_host_style"] = pinfo["radio_host_style"]
         objects.append(_pobj)
 
     # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable human
@@ -1308,13 +1418,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             or any(_talk.get(r) for r in _LTX_RADIO_FACE_ROLES)):
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
-            # Talking-radio kibitz r1 (2026-07-01, SUPERSEDES the earlier "same
-            # per-role styling as HuMo hosts" note): BOTH ltx bookend stills use
-            # the LTX-ONLY mouth-forward style. The radio IS the host for both
-            # bookend types, and ltx_audio_in (no face detector) needs the
-            # biggest, clearest mouth region to drive -- the Sub-plan-C probe
-            # lever. The HuMo console_face / radio_head_person looks themselves
-            # are byte-unchanged (the split); no new video model / path.
+            # Talking-radio kibitz r1 (2026-07-01): the ltx bookend still uses the
+            # LTX-ONLY mouth-forward style. The radio IS the host, and ltx_audio_in
+            # (no face detector) needs the biggest, clearest mouth region to drive
+            # -- the Sub-plan-C probe lever. ANNOUNCER-ONLY since 2026-07-03 (music
+            # stays faceless; the dead music mint was pruned 2026-07-04). The HuMo
+            # console_face look is byte-unchanged (the split); no new model / path.
             _fprompt = build_radio_host_prompt(meta, "wide",
                                                style="ltx_radio_mouth")
             objects.append({
@@ -1551,7 +1660,8 @@ class OTRMetaBriefImagePromptGen:
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
             talking_roles=_talking_roles_from_policy(image_policy_json),
             still_word_roles=_still_word_roles_from_policy(image_policy_json),
-        )  # aspects + mesh-fodder + talking + still_word roles ride in image_policy_json
+            video_models=_video_models_from_policy(image_policy_json),
+        )  # aspects + mesh-fodder + talking + still_word roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []

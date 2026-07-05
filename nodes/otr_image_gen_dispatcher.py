@@ -471,6 +471,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         role = str(obj.get("role") or "character_video")
         char_id = str(obj.get("char_id") or "")
         beat_id = str(obj.get("beat_id") or "")
+        # RADIO FACE LOGIC (2026-07-04): the announcer portrait's chosen radio-host
+        # style rides onto the dispatched ledger row so the render-side guard can
+        # fail CLOSED on a faceless still about to feed a HuMo announcer init.
+        radio_host_style = str(obj.get("radio_host_style") or "")
         prompt = str(obj.get("prompt") or "")
         prompt_hash = str(obj.get("prompt_hash") or "")
         obj_w = int(obj.get("w") or 0)
@@ -558,6 +562,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     fresh["char_id"] = char_id
                 if beat_id:
                     fresh["beat_id"] = beat_id
+                if radio_host_style:
+                    fresh["radio_host_style"] = radio_host_style
                 images.append(fresh)
                 ep_rows.append(fresh)
                 reused += 1
@@ -659,6 +665,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             row["char_id"] = char_id
         if beat_id:
             row["beat_id"] = beat_id
+        if radio_host_style:
+            row["radio_host_style"] = radio_host_style
         # 3D image streams (2026-06-21): carry the mesh subject identity onto the
         # row (additive) so the mesh cache keys on a STABLE per-subject id (the
         # mesh_fodder file), not the per-beat still hash. Absent on non-3D rows.

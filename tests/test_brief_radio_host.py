@@ -95,13 +95,49 @@ def test_console_face_is_anthropomorphic_radio_no_human():
     assert "human" not in p and "person" not in p  # no human in a pure console
 
 
-def test_radio_head_person_is_a_figure_with_a_radio_head():
-    # ANNOUNCER style: a person whose HEAD is the radio set.
-    p = mbp.build_radio_host_prompt(_SPACE_META, style="radio_head_person")
-    assert "radio-head" in p and "HEAD IS" in p
+import re
+
+
+def test_radio_head_person_style_is_retired_and_raises():
+    # radio-face logic 2026-07-04: the person-with-a-radio-head style is RETIRED.
+    # Both the prompt builder and the negative dispatcher now fail LOUD on it
+    # (an explicit closed-set dispatch, never a silent dial-face default).
+    with pytest.raises(ValueError):
+        mbp.build_radio_host_prompt(_SPACE_META, style="radio_head_person")
+    with pytest.raises(ValueError):
+        mbp.radio_host_negative("radio_head_person")
+
+
+def test_radio_object_is_faceless_no_anatomy():
+    # The FACELESS static-bookend style: a stylized radio object, carrying the
+    # brief-driven form, with ZERO anatomy tokens (facelessness is positive-side
+    # -- the still dispatcher has no negative channel). Scope the no-anatomy
+    # assertion to the constructed subject + anchor (the era/grade tails are
+    # controlled, not sanitized).
+    subj = "%s, %s" % (mbp.radio_form_from_meta(_SPACE_META),
+                       mbp._RADIO_OBJECT_SUBJECT)
+    for anchor in (mbp._RADIO_OBJECT_ANCHOR, mbp._RADIO_OBJECT_ANCHOR_WIDE):
+        wording = (subj + ", " + anchor).lower()
+        assert not re.search(r"\b(person|man|woman|presenter|figure|face)\b",
+                             wording), wording
+    p = mbp.build_radio_host_prompt(_SPACE_META, style="radio_object")
     assert "space-station communications console" in p   # brief-driven form
-    # (person/face DETECTOR removed 2026-07-04 -- the prompt is verified by its
-    # radio-head + brief-form tokens above, not by an automated person analyzer.)
+    assert "tabletop" in p                                # object framing
+    # a radio_object still shares the console negative (humans OUT, cosmetic)
+    assert mbp.radio_host_negative("radio_object") == mbp.RADIO_CONSOLE_NEG
+
+
+def test_radio_object_aspect_uses_object_anchor_not_person_anchor():
+    wide = mbp.build_radio_host_prompt(_SPACE_META, aspect="wide",
+                                       style="radio_object")
+    portrait = mbp.build_radio_host_prompt(_SPACE_META, aspect="portrait",
+                                           style="radio_object")
+    assert "wide shot" in wide and "wide shot" not in portrait
+    # never the person framing anchors
+    for p in (wide, portrait):
+        assert "head and shoulders" not in p
+        assert "three-quarter" not in p
+        assert "in-character" not in p
 
 
 def test_overtness_is_brief_driven():
@@ -127,9 +163,13 @@ def test_host_prompt_never_empty_on_bare_meta():
 
 
 def test_negatives_by_style():
-    # console keeps humans OUT; radio-head keeps it an adult radio-head (no baby).
+    # every live style is a pure radio (no person in frame) -> shares the console
+    # negative (humans OUT); the retired radio_head_person now RAISES.
     assert "human" in mbp.radio_host_negative("console_face")
-    assert "baby" in mbp.radio_host_negative("radio_head_person")
+    assert "human" in mbp.radio_host_negative("radio_object")
+    assert "human" in mbp.radio_host_negative("ltx_radio_mouth")
+    with pytest.raises(ValueError):
+        mbp.radio_host_negative("radio_head_person")
 
 
 # --------------------------------------------------------------------------- #
@@ -226,29 +266,6 @@ _GOLDEN_CONSOLE_WIDE = (
     "film lighting, cold blue panel glow, cinematic, 35mm film look, subtle "
     "film grain, volumetric lighting, anamorphic lens, heavy vignette, muted "
     "color grade, sharp focus")
-_GOLDEN_HEAD_PORTRAIT = (
-    "a radio-head presenter: a period-dressed figure seated at a vintage "
-    "microphone whose HEAD IS a sleek space-station communications console, "
-    "the glowing dial and speaker grille forming the expressive animatable "
-    "face (dial eyes, a moving needle mouth), bold playful cartoon "
-    "expression, clearly a face, in-character cinematic three-quarter "
-    "portrait, full head and face clearly visible with natural headroom "
-    "above the head (never crop the top of the head), period-accurate "
-    "costume and environment, dramatic film lighting, cold blue panel glow, "
-    "cinematic, 35mm film look, subtle film grain, volumetric lighting, "
-    "anamorphic lens, heavy vignette, muted color grade, sharp focus")
-_GOLDEN_HEAD_WIDE = (
-    "a radio-head presenter: a period-dressed figure seated at a vintage "
-    "microphone whose HEAD IS a sleek space-station communications console, "
-    "the glowing dial and speaker grille forming the expressive animatable "
-    "face (dial eyes, a moving needle mouth), bold playful cartoon "
-    "expression, clearly a face, in-character cinematic medium shot, head "
-    "and shoulders, face clearly visible, subject centred with natural "
-    "headroom above the head (never crop the top of the head), "
-    "period-accurate costume and environment, dramatic film lighting, cold "
-    "blue panel glow, cinematic, 35mm film look, subtle film grain, "
-    "volumetric lighting, anamorphic lens, heavy vignette, muted color "
-    "grade, sharp focus")
 _GOLDEN_BARE_CONSOLE_PORTRAIT = (
     "a vintage tabletop tube radio receiver, its glowing tuning dial forming "
     "an expressive stylized face -- two round dial-eyes and a radiating "
@@ -271,29 +288,29 @@ def test_humo_console_face_prompts_byte_unchanged():
         {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
 
 
-def test_humo_radio_head_person_prompts_byte_unchanged():
-    assert mbp.build_radio_host_prompt(
-        _SPACE_META, "portrait", "radio_head_person") == _GOLDEN_HEAD_PORTRAIT
-    assert mbp.build_radio_host_prompt(
-        _SPACE_META, "wide", "radio_head_person") == _GOLDEN_HEAD_WIDE
-
-
 def test_mint_split_ltx_mouth_humo_untouched(monkeypatch):
-    # BOTH toggles on at MINT time (precedence is a render_driver concern):
-    # the ltx radio-face stills carry the mouth style; the HuMo radio_host
-    # portrait and the announcer portrait row do NOT.
+    # BOTH toggles on at MINT time (precedence is a render_driver concern): the
+    # ltx radio-face still (announcer-only since 2026-07-03; the music mint was
+    # pruned 2026-07-04) carries the mouth style; the HuMo radio_host portrait
+    # does NOT. With the announcer engine resolving to HuMo (audio_driven_face),
+    # the announcer portrait row is the console dial-face, never the mouth style.
     monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
-    out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
-                                       lines=_bookend_lines())
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        video_models={"announcer_video_model": {"engine_id": "humo"}})
     objs = {o["object_id"]: o for o in out["objects"]}
-    for role in ("announcer_visual", "music_visual"):
-        assert "rubbery mouth" in objs["still_%s_radio_face_169" % role]["prompt"]
+    assert "rubbery mouth" in objs["still_announcer_visual_radio_face_169"]["prompt"]
+    # the pruned music radio-face id is never minted
+    assert "still_music_visual_radio_face_169" not in objs
     assert "rubbery" not in objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"]
     assert objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "console_face")     # the golden-pinned look
+    # announcer portrait -> console dial-face (HuMo drives it), not the mouth style
     assert "rubbery" not in objs["announcer"]["prompt"]
-    assert "radio-head" in objs["announcer"]["prompt"]
+    assert objs["announcer"]["radio_host_style"] == "console_face"
+    assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "console_face")
 
 
 # --------------------------------------------------------------------------- #
@@ -444,3 +461,130 @@ def test_build_request_off_redirect_renders_on_single_pass(tmp_path, monkeypatch
     shot = _humo_bookend_shot()
     rd.build_request_from_shot(shot, led)          # must NOT raise
     assert shot["engine_id"] == "ltx_audio_in"
+
+
+# --------------------------------------------------------------------------- #
+# RADIO FACE LOGIC (2026-07-04): the synthetic-announcer portrait row is FACELESS
+# (radio_object) when static, the animatable console dial-face when a HuMo
+# (audio_driven_face) engine will drive it. The signal is the RESOLVED announcer
+# engine family (after OTR_FORCE_ENGINE_MAP), not the bare HUMO flag.
+# --------------------------------------------------------------------------- #
+def _announcer_row(video_models=None, **kw):
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        video_models=video_models, **kw)
+    return {o["object_id"]: o for o in out["objects"]}["announcer"]
+
+
+def test_announcer_faceless_radio_object_when_humo_off(monkeypatch):
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
+    assert ann["radio_host_style"] == "radio_object"
+    assert ann["prompt"] == mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "radio_object")
+    # faceless: no person tokens in the announcer prompt subject/anchor
+    assert "presenter" not in ann["prompt"] and "radio-head" not in ann["prompt"]
+    assert ann["negative_prompt"] == mbp.RADIO_CONSOLE_NEG
+
+
+def test_announcer_console_face_when_humo_on_and_audio_driven(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
+    assert ann["radio_host_style"] == "console_face"
+    assert ann["prompt"] == mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "console_face")
+
+
+def test_announcer_faceless_when_humo_on_but_engine_static(monkeypatch):
+    # HUMO on but the announcer engine is a STATIC engine -> nothing animates a
+    # mouth -> faceless radio_object (the family signal, not the bare flag).
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    ann = _announcer_row(
+        video_models={"announcer_video_model": {"engine_id": "still_flat"}})
+    assert ann["radio_host_style"] == "radio_object"
+
+
+def test_announcer_faceless_when_humo_on_but_no_video_models(monkeypatch):
+    # No policy forwarded -> family unresolved -> fail SAFE toward faceless.
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    ann = _announcer_row(video_models=None)
+    assert ann["radio_host_style"] == "radio_object"
+
+
+def test_announcer_force_map_overrides_to_faceless(monkeypatch):
+    # HUMO on + policy selects HuMo for the announcer, but OTR_FORCE_ENGINE_MAP
+    # forces announcer_visual to a static engine -> the RESOLVED family is
+    # static -> faceless radio_object (r4 must-fix: honor the force map).
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=still_flat")
+    ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
+    assert ann["radio_host_style"] == "radio_object"
+
+
+def test_announcer_no_force_with_humo_is_console_face(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
+    assert ann["radio_host_style"] == "console_face"
+
+
+# --------------------------------------------------------------------------- #
+# Cross-node provenance guard (fail CLOSED): a ledger minted HUMO-OFF (faceless
+# radio_object announcer portrait) but RENDERED HUMO-ON must NOT feed HuMo the
+# faceless still (the visual-quicktest frozen-ledger reuse path is real).
+# --------------------------------------------------------------------------- #
+def _announcer_humo_shot():
+    return {"shot_id": "shot_b001", "beat_id": "b001", "engine_id": "humo",
+            "role": "announcer_visual", "family": "audio_driven_face",
+            "target_frame_count": 25, "source_line_ids": ["b001"],
+            "char_id": "announcer", "creative": {}}
+
+
+def _announcer_portrait_ledger(tmp_path, style):
+    p = tmp_path / "announcer.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+    row = {"object_id": "announcer", "kind": "portrait", "path": str(p)}
+    if style is not None:
+        row["radio_host_style"] = style
+    return {"video": {"video_revision": 1, "shots": []},
+            "lines": [{"line_id": "b001", "char_id": "announcer",
+                       "start_s": 0.0, "dur_s": 2.0}],
+            "images": {"images": [row]}}
+
+
+def test_render_guard_raises_on_stale_faceless_announcer_init(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _announcer_portrait_ledger(tmp_path, style="radio_object")
+    with pytest.raises(rd.RenderError, match="RADIO FACE LOGIC"):
+        rd.build_request_from_shot(_announcer_humo_shot(), led)
+
+
+def test_render_guard_raises_on_missing_style_frozen_ledger(tmp_path, monkeypatch):
+    # An old/frozen ledger carries NO radio_host_style -> treated as NOT
+    # console_face -> fail closed (never only when it equals radio_object).
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _announcer_portrait_ledger(tmp_path, style=None)
+    with pytest.raises(rd.RenderError, match="RADIO FACE LOGIC"):
+        rd.build_request_from_shot(_announcer_humo_shot(), led)
+
+
+def test_render_guard_passes_when_console_face(tmp_path, monkeypatch):
+    # console_face is the animatable dial-face -> the guard does NOT fire; the
+    # announcer portrait is consumed as the HuMo init.
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _announcer_portrait_ledger(tmp_path, style="console_face")
+    req = rd.build_request_from_shot(_announcer_humo_shot(), led)
+    assert req["observability"]["init_source"] == "portrait"
+    assert req["observability"]["init_image"] == "announcer.png"
+
+
+def test_render_guard_inert_when_humo_off(tmp_path, monkeypatch):
+    # HUMO off: _enforce_radio_is_host redirects the announcer off HuMo before
+    # the guard's family check, so a faceless radio_object never trips it.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    led = _announcer_portrait_ledger(tmp_path, style="radio_object")
+    rd.build_request_from_shot(_announcer_humo_shot(), led)   # must NOT raise
