@@ -11,5 +11,41 @@
     "film grain"
   ],
   "era_tail": "",
-  "schema_version": "v1"
+  "schema_version": "v2",
+  "portrait_look": "period-accurate costume and environment, dramatic film lighting",
+  "portrait_look_talking": "period-accurate costume, warm dramatic lighting",
+  "portrait_instruction_look": "photographic and period-consistent",
+  "scene_instruction_look": "",
+  "announcer_subject_face": "its glowing tuning dial forming an expressive stylized face -- two round dial-eyes and a radiating needle-fan mouth, an anthropomorphic radio that hosts the broadcast",
+  "announcer_subject_ltx_mouth": "{form} as a living cartoon appliance face: its wide woven speaker grille bends into a huge expressive rubbery mouth, big cartoon lips molded from grille cloth and wood, open mid-speech, and its two round glass tuning dials are its eyes -- a face-forward anthropomorphic radio made entirely of bakelite, wood, grille fabric and chrome, the radio cabinet itself filling the frame",
+  "announcer_subject_object": "presented as a stylized tabletop radio set on its plate, its bakelite cabinet, woven speaker grille and a glowing tuning dial",
+  "radio_object_look": "dramatic film lighting",
+  "plate_look": "period-accurate set",
+  "non_character_emblem_fallback": "a single emblematic object representing {base}",
+  "still_word_title_mood_style": "abstract evocative mood image, atmospheric period illustration, symbolic non-literal composition, no lettering",
+  "open_subjects": {
+    "synthetic": "{form} warming up on a table, glowing dials and tubes, warm filament glow",
+    "announcer": "{form} in a broadcast booth, glowing warmly, lit dials and tubes",
+    "default": "{form} glowing warmly, vacuum tubes and dials"
+  },
+  "motion_registers": {
+    "announcer": "Continuous shot, same console throughout. Tuning dial needle sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille trembles. Dust motes drift. Slow handheld dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial whip-pans across frequencies. Tube filaments ignite from cold to white-hot. Speaker grille vibrates aggressively. Dynamic dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Tube filaments cool from white through deep amber. Smoke trails from cooling tubes. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Oscilloscope dances to the rhythm. VU meters bounce. Tubes pulse with the bass. Slow orbit around the speaker."
+  },
+  "still_word_typography": {
+    "noir": "heavy condensed sans-serif capitals, tightly spaced",
+    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
+    "western": "bold wood-type slab-serif capitals, sturdy and squared",
+    "pulp": "heavy blocky display serif capitals, hard drop shadow",
+    "default": "bold clean sans-serif capitals, evenly spaced"
+  },
+  "still_word_backdrop": {
+    "noir": "smoky midnight-blue haze, dim slatted lamplight",
+    "sci-fi": "deep void-black gradient, cold teal horizon glow",
+    "western": "deep amber dusk haze, low golden horizon glow",
+    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
+    "default": "soft dark gradient haze, faint warm center glow"
+  }
 }

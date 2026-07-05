@@ -436,7 +436,21 @@ def radio_form_from_meta(meta: Any) -> str:
     return _RADIO_FORM_DEFAULT
 
 
-def get_open_subject(role: str, synthetic: bool, meta: Any = None) -> str:
+# Chunk A1 (visual-style TOTAL COVERAGE, 2026-07-05): the open-subject
+# TEMPLATES are pack-owned (VisualStyle.open_subjects, keys
+# {synthetic, announcer, default}, each a {form} template). These constants
+# are the sci_fi_radio EXTRACTION FIXTURES (r1 AG S1: inline literals
+# extracted FIRST) + the legacy no-style lane of get_open_subject --
+# production callers always pass style= (AST-pinned).
+OPEN_SUBJECT_SYNTHETIC_DEFAULT = ("{form} warming up on a table, glowing "
+                                  "dials and tubes, warm filament glow")
+OPEN_SUBJECT_ANNOUNCER_DEFAULT = ("{form} in a broadcast booth, glowing "
+                                  "warmly, lit dials and tubes")
+OPEN_SUBJECT_DEFAULT_DEFAULT = "{form} glowing warmly, vacuum tubes and dials"
+
+
+def get_open_subject(role: str, synthetic: bool, meta: Any = None,
+                     style: Any = None) -> str:
     """The CONCRETE, FACELESS radio subject for an OPEN / bookend beat (r5b
     operator catch: image models render narrative loglines as murk -- opens lead
     with a picture, never a sentence).
@@ -446,14 +460,27 @@ def get_open_subject(role: str, synthetic: bool, meta: Any = None) -> str:
     longer opens on the hardcoded 1940s set. FACELESS by contract -- ONLY HuMo
     gets a face; this still is what ltx_audio_in / still_pan / still_flat show for
     the bookends. Pure; never empty. ``meta`` optional (bare -> neutral tube
-    radio form)."""
+    radio form).
+
+    Chunk A1: the subject TEMPLATE comes from the resolved ``style`` pack's
+    ``open_subjects`` map -- ``synthetic`` -> key "synthetic", role
+    "announcer_visual" -> key "announcer" (r4 AG M2), everything else -> key
+    "default". The FORM stays a brief-axis value interpolated here (style x
+    form would double the authoring matrix). ``style=None`` is the LEGACY
+    fixture lane (the extracted constants above, byte-identical); production
+    callers pass the ALREADY-RESOLVED style (helpers never re-resolve --
+    r2 codex S1 + AG M3)."""
     form = radio_form_from_meta(meta or {})
     if synthetic:
-        return ("%s warming up on a table, glowing dials and tubes, "
-                "warm filament glow" % form)
-    if str(role or "") == "announcer_visual":
-        return "%s in a broadcast booth, glowing warmly, lit dials and tubes" % form
-    return "%s glowing warmly, vacuum tubes and dials" % form
+        template = (style.open_subjects["synthetic"] if style is not None
+                    else OPEN_SUBJECT_SYNTHETIC_DEFAULT)
+    elif str(role or "") == "announcer_visual":
+        template = (style.open_subjects["announcer"] if style is not None
+                    else OPEN_SUBJECT_ANNOUNCER_DEFAULT)
+    else:
+        template = (style.open_subjects["default"] if style is not None
+                    else OPEN_SUBJECT_DEFAULT_DEFAULT)
+    return template.format(form=form)
 
 
 #: Framing hints (layer 3 of the 5-layer still composer). The macro framing
@@ -519,7 +546,8 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         if not subject:
             subject = "a period-dressed character, face clearly visible"
     else:
-        subject = get_open_subject(role, synthetic=(kind == "scene_open"), meta=meta)
+        subject = get_open_subject(role, synthetic=(kind == "scene_open"),
+                                   meta=meta, style=_style)
     m = _meta(meta)
     terms = m.get("story_brief_terms") or {}
     if not isinstance(terms, dict):

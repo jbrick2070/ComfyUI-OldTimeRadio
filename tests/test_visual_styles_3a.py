@@ -258,7 +258,7 @@ class TestByteIdentityMatrix:
 
     def test_radio_host_and_plate_and_mesh_unchanged(self):
         host = imgp.build_radio_host_prompt(_META_BRIEF, "portrait",
-                                            style="radio_object")
+                                            radio_host_style="radio_object")
         assert helpers.IMAGE_GRADE_TAIL in host
         plate = imgp._compose_background_plate_prompt(_META_BRIEF, "mars post")
         assert helpers.IMAGE_GRADE_TAIL in plate
@@ -287,7 +287,7 @@ class TestFailLoudThroughComposers:
     def test_radio_host_raises(self):
         with pytest.raises(vs.UnknownVisualStyleError):
             imgp.build_radio_host_prompt(_BAD_META, "portrait",
-                                         style="radio_object")
+                                         radio_host_style="radio_object")
 
     def test_background_plate_raises(self):
         with pytest.raises(vs.UnknownVisualStyleError):

@@ -89,7 +89,7 @@ def test_host_prompt_carries_the_brief_form_noun():
 def test_console_face_is_anthropomorphic_radio_no_human():
     # MUSIC style (default): the RADIO is the host -- an anthropomorphic console
     # with a dial-face, NOT a human presenter.
-    p = mbp.build_radio_host_prompt(_SPACE_META, style="console_face")
+    p = mbp.build_radio_host_prompt(_SPACE_META, radio_host_style="console_face")
     assert "dial" in p and "face" in p            # dial-face (has face/eyes tokens)
     assert "human radio host" not in p            # never the old human host
     assert "human" not in p and "person" not in p  # no human in a pure console
@@ -103,7 +103,8 @@ def test_radio_head_person_style_is_retired_and_raises():
     # Both the prompt builder and the negative dispatcher now fail LOUD on it
     # (an explicit closed-set dispatch, never a silent dial-face default).
     with pytest.raises(ValueError):
-        mbp.build_radio_host_prompt(_SPACE_META, style="radio_head_person")
+        mbp.build_radio_host_prompt(_SPACE_META,
+                                    radio_host_style="radio_head_person")
     with pytest.raises(ValueError):
         mbp.radio_host_negative("radio_head_person")
 
@@ -120,7 +121,7 @@ def test_radio_object_is_faceless_no_anatomy():
         wording = (subj + ", " + anchor).lower()
         assert not re.search(r"\b(person|man|woman|presenter|figure|face)\b",
                              wording), wording
-    p = mbp.build_radio_host_prompt(_SPACE_META, style="radio_object")
+    p = mbp.build_radio_host_prompt(_SPACE_META, radio_host_style="radio_object")
     assert "space-station communications console" in p   # brief-driven form
     assert "tabletop" in p                                # object framing
     # a radio_object still shares the console negative (humans OUT, cosmetic)
@@ -129,9 +130,9 @@ def test_radio_object_is_faceless_no_anatomy():
 
 def test_radio_object_aspect_uses_object_anchor_not_person_anchor():
     wide = mbp.build_radio_host_prompt(_SPACE_META, aspect="wide",
-                                       style="radio_object")
+                                       radio_host_style="radio_object")
     portrait = mbp.build_radio_host_prompt(_SPACE_META, aspect="portrait",
-                                           style="radio_object")
+                                           radio_host_style="radio_object")
     assert "wide shot" in wide and "wide shot" not in portrait
     # never the person framing anchors
     for p in (wide, portrait):
@@ -142,10 +143,10 @@ def test_radio_object_aspect_uses_object_anchor_not_person_anchor():
 
 def test_overtness_is_brief_driven():
     # sci-fi brief -> overt cartoon face; a plain brief -> subtle.
-    overt = mbp.build_radio_host_prompt(_SPACE_META, style="console_face")
+    overt = mbp.build_radio_host_prompt(_SPACE_META, radio_host_style="console_face")
     subtle = mbp.build_radio_host_prompt(
         {"story_brief_terms": {"setting": ["a quiet village kitchen"]}},
-        style="console_face")
+        radio_host_style="console_face")
     assert "cartoon" in overt
     assert "subtle" in subtle and "cartoon" not in subtle
 
@@ -190,13 +191,13 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
 
 # --------------------------------------------------------------------------- #
 # Talking-radio kibitz r1 (Sub-plan B): the LTX-ONLY mouth-forward style
-# (style="ltx_radio_mouth") -- used ONLY by the OTR_LTX_RADIO_FACE still mint
+# (radio_host_style="ltx_radio_mouth") -- used ONLY by the OTR_LTX_RADIO_FACE still mint
 # (the init stills the EXISTING ltx_audio_in engine receives; no new video
 # model / path). The HuMo console_face / radio_head_person looks must stay
 # BYTE-UNCHANGED (goldens below, captured pre-split @ 5cce9c2).
 # --------------------------------------------------------------------------- #
 def test_ltx_radio_mouth_leads_with_prominent_mouth():
-    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="ltx_radio_mouth")
+    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", radio_host_style="ltx_radio_mouth")
     # explicit MOUTH token (contract acceptance), grille-mouth phrasing intact
     assert "rubbery mouth" in p and "speaker grille" in p
     assert "anthropomorphic radio" in p
@@ -213,12 +214,12 @@ def test_ltx_radio_mouth_still_is_warm_not_brief_blue():
     # operator look direction 2026-07-02 (side-by-side catch): the lip-sync
     # still pins the canonical WARM look -- no brief palette ("cold blue
     # panel glow"), no grade tail ("heavy vignette, muted color grade").
-    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="ltx_radio_mouth")
+    p = mbp.build_radio_host_prompt(_SPACE_META, "wide", radio_host_style="ltx_radio_mouth")
     assert "warm dramatic lighting" in p
     assert "cold blue" not in p
     assert "heavy vignette" not in p and "muted color grade" not in p
     # HuMo styles KEEP the brief-driven tail (golden-pinned elsewhere)
-    hp = mbp.build_radio_host_prompt(_SPACE_META, "wide", style="console_face")
+    hp = mbp.build_radio_host_prompt(_SPACE_META, "wide", radio_host_style="console_face")
     assert "cold blue panel glow" in hp
 
 
@@ -232,10 +233,10 @@ def test_ltx_radio_mouth_overtness_is_brief_driven():
     # NOTE: the mouth constant itself says "cartoon appliance face" by design
     # (material anchoring, 2026-07-02) -- so the overtness discriminator is
     # the _radio_face_overtness PHRASE, not the bare "cartoon" token.
-    overt = mbp.build_radio_host_prompt(_SPACE_META, style="ltx_radio_mouth")
+    overt = mbp.build_radio_host_prompt(_SPACE_META, radio_host_style="ltx_radio_mouth")
     subtle = mbp.build_radio_host_prompt(
         {"story_brief_terms": {"setting": ["a quiet village kitchen"]}},
-        style="ltx_radio_mouth")
+        radio_host_style="ltx_radio_mouth")
     assert "bold playful" in overt and "subtle period-authentic" not in overt
     assert "subtle period-authentic" in subtle and "bold playful" not in subtle
 

@@ -34,9 +34,18 @@ _ALL_IDS = ("anime", "archival_documentary", "cartoon", "paper_origami",
             "sci_fi_radio")
 _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 
-_V1_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
+# Chunk A1 (2026-07-05): the schema is v2 -- the v1 tail keys PLUS the 11
+# look/subject str fields + 4 dict fields (r4 authoritative inventory).
+_V2_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
             "broadcast_tail", "allow_radio_tails", "forbidden_terms",
-            "era_tail", "schema_version"}
+            "era_tail", "schema_version",
+            "portrait_look", "portrait_look_talking",
+            "portrait_instruction_look", "scene_instruction_look",
+            "announcer_subject_face", "announcer_subject_ltx_mouth",
+            "announcer_subject_object", "radio_object_look", "plate_look",
+            "non_character_emblem_fallback", "still_word_title_mood_style",
+            "open_subjects", "motion_registers", "still_word_typography",
+            "still_word_backdrop"}
 
 _META_BRIEF = {
     "story_brief_terms": {
@@ -68,13 +77,14 @@ class TestRegistry:
         assert vs.list_style_ids() == _ALL_IDS
 
     @pytest.mark.parametrize("style_id", _ALL_IDS)
-    def test_v1_exact_keys_on_disk(self, style_id):
+    def test_v2_exact_keys_on_disk(self, style_id):
         raw = json.loads(
             (_STYLES_DIR / f"{style_id}.json").read_text(encoding="utf-8"))
-        assert set(raw) == _V1_KEYS, (
-            f"{style_id}: v1 schema is exact; the lab's subject/motion/"
-            f"ledger_directives fields are NOT in v1 (section 8)")
-        assert raw["schema_version"] == "v1"
+        assert set(raw) == _V2_KEYS, (
+            f"{style_id}: v2 schema is exact; the lab's subject/motion/"
+            f"ledger_directives fields are NOT schema fields "
+            f"(STAGE3_TOTAL_COVERAGE_SUBPLAN section 1a)")
+        assert raw["schema_version"] == "v2"
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_non_default_flags(self, style_id):
@@ -153,9 +163,9 @@ class TestForcedMetaDeltas:
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_radio_host_delta(self, style_id):
         d = imgp.build_radio_host_prompt(dict(_META_BRIEF), "portrait",
-                                         style="radio_object")
+                                         radio_host_style="radio_object")
         s = imgp.build_radio_host_prompt(_meta_for(style_id), "portrait",
-                                         style="radio_object")
+                                         radio_host_style="radio_object")
         assert d != s
         assert helpers.IMAGE_GRADE_TAIL not in s
 

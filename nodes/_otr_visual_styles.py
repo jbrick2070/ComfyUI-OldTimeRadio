@@ -12,20 +12,32 @@ LAZY: importing this module performs ZERO file I/O (ComfyUI custom-node import
 isolation). The style directory sweep runs on the first resolve call, then
 caches. `_clear_caches()` is the test hook.
 
-v1 slice: tails + allow_radio_tails only. Subject overrides, motion-register
-overrides, and STYLE_ANCHOR styling are NOT in the v1 schema (STAGE3_SUBPLAN
-section 8 checklist).
+SCHEMA v2 (TOTAL-COVERAGE slice, STAGE3_TOTAL_COVERAGE_SUBPLAN v5 FINAL,
+kibitz r1-r4 converged 2026-07-05): the v1 tail fields stay, PLUS 11 new str
+fields + 4 new dict fields carrying every pack-owned LOOK/SUBJECT surface
+(geometry-vs-look law: framing/headroom/mouth-safety GEOMETRY stays Python;
+only LOOK/SUBJECT text lives here). The v2 schema is FINAL from chunk A1 --
+A2/C surfaces LOAD now and are consumed by their own chunks. A v1 pack fails
+load LOUD naming the path (no back-compat defaults -- fail-loud law).
 
-forbidden_terms is LOAD-TIME LINT ONLY in v1 (case-insensitive substring over
-the pack's own four tail fields -- a pack must not violate its own bans). No
-compose-time scrub, no compose-time warn state (r1 M1 + r2 CUT-1).
+Non-empty rule: every NEW str field must be non-empty EXCEPT
+`scene_instruction_look` (the char-scene builder has no existing look text,
+so sci_fi ships "" and the composer appends only-when-non-empty -- r4 AG M1).
+Template fields carry EXACTLY one placeholder and no other brace tokens:
+`announcer_subject_ltx_mouth` + every `open_subjects` value take `{form}`;
+`non_character_emblem_fallback` takes `{base}`. `announcer_subject_ltx_mouth`
+must additionally carry mouth-prominence vocabulary (the ia2v lip-sync
+contract). `motion_registers` values are budgeted at 240 chars at LOAD
+(BUG-LOCAL-112). The forbidden-terms lint sweeps the 4 tail fields plus ALL
+new string leaves + dict values (r2 codex S2).
 
-The byte-identity contract: sci_fi_radio.json's four tails are byte-identical
-to the extraction-fixture constants in _otr_story_brief_helpers.py
-(ERA_TAIL_DEFAULT / STYLE_TAIL_DEFAULT / IMAGE_GRADE_TAIL /
-RADIO_BROADCAST_TAIL) -- pinned by tests/test_visual_styles_3a.py. Production
-code reads the PACK; the constants survive only as that fixture + the
-legacy no-style lane of get_era_tail.
+The byte-identity contract: sci_fi_radio.json's fields are byte-identical to
+the extraction-fixture constants (tails in _otr_story_brief_helpers.py; look/
+subject fixtures in otr_meta_brief_image_prompt.py + the open-subject
+templates in _otr_story_brief_helpers.py; motion registers in
+render_driver.py; still_word maps in otr_meta_brief_image_prompt.py) --
+pinned by tests. Production code reads the PACK; the constants survive only
+as those fixtures + the designated legacy no-style lanes.
 """
 from __future__ import annotations
 
@@ -33,18 +45,19 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 _VISUAL_STYLES_ROOT = Path(__file__).resolve().parent / "visual_styles"
 
 #: The production default -- the lane every pre-Stage-3 episode ran.
 DEFAULT_STYLE_ID = "sci_fi_radio"
 
-KNOWN_STYLE_SCHEMA_VERSIONS = frozenset({"v1"})
+KNOWN_STYLE_SCHEMA_VERSIONS = frozenset({"v2"})
 
 _STYLE_ID_RE = re.compile(r"^[a-z0-9_]+$")
 
-#: Exact v1 row schema: field name -> required python type.
-_REQUIRED_FIELDS: "dict[str, type]" = {
+#: v1 tail fields (kept in v2; empty-string stays legal on the 4 tails).
+_V1_FIELDS: "dict[str, type]" = {
     "style_id": str,
     "label": str,
     "positive_tail": str,
@@ -56,9 +69,58 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
     "schema_version": str,
 }
 
-#: The four tail fields the load-time forbidden-terms lint sweeps.
+#: NEW v2 str fields (r4 authoritative inventory). All REQUIRED; all
+#: non-empty except scene_instruction_look (r4 AG M1 exemption).
+_V2_STR_FIELDS = (
+    "portrait_look",
+    "portrait_look_talking",
+    "portrait_instruction_look",
+    "scene_instruction_look",
+    "announcer_subject_face",
+    "announcer_subject_ltx_mouth",
+    "announcer_subject_object",
+    "radio_object_look",
+    "plate_look",
+    "non_character_emblem_fallback",
+    "still_word_title_mood_style",
+)
+_V2_EMPTY_LEGAL_STR_FIELDS = frozenset({"scene_instruction_look"})
+
+#: NEW v2 dict fields -> their EXACT (case-sensitive) key sets.
+_V2_DICT_FIELDS: "dict[str, frozenset]" = {
+    "open_subjects": frozenset({"synthetic", "announcer", "default"}),
+    "motion_registers": frozenset(
+        {"announcer", "music_open", "music_close", "music_inter"}),
+    "still_word_typography": frozenset(
+        {"noir", "sci-fi", "western", "pulp", "default"}),
+    "still_word_backdrop": frozenset(
+        {"noir", "sci-fi", "western", "pulp", "default"}),
+}
+
+_REQUIRED_FIELDS: "dict[str, type]" = dict(_V1_FIELDS)
+_REQUIRED_FIELDS.update({name: str for name in _V2_STR_FIELDS})
+_REQUIRED_FIELDS.update({name: dict for name in _V2_DICT_FIELDS})
+
+#: The four tail fields the load-time forbidden-terms lint has always swept;
+#: v2 extends the sweep over all new string leaves + dict values.
 _LINTED_TAIL_FIELDS = ("positive_tail", "image_grade_tail",
                        "broadcast_tail", "era_tail")
+
+#: Template fields: field -> the exactly-once placeholder name.
+_TEMPLATE_STR_FIELDS = {
+    "announcer_subject_ltx_mouth": "form",
+    "non_character_emblem_fallback": "base",
+}
+#: open_subjects values are {form} templates too (each value exactly once).
+_OPEN_SUBJECTS_PLACEHOLDER = "form"
+
+#: Mouth-prominence vocabulary the ltx_mouth subject must carry (ia2v
+#: lip-sync contract: LTX drives whatever READS as a mouth).
+_MOUTH_VOCAB = ("mouth", "lips")
+
+#: BUG-LOCAL-112: motion prompts are budgeted; enforced at LOAD on pack
+#: motion_registers values (mirrors render_driver._LTX_MOTION_PROMPT_MAX).
+_MOTION_REGISTER_MAX_CHARS = 240
 
 
 class VisualStyleError(Exception):
@@ -70,12 +132,13 @@ class UnknownVisualStyleError(VisualStyleError):
 
 
 class VisualStyleValidationError(VisualStyleError):
-    """A pack file violates the v1 schema / lint / path contract."""
+    """A pack file violates the v2 schema / lint / path contract."""
 
 
 @dataclass(frozen=True)
 class VisualStyle:
-    """One loaded, validated style pack (attribute access only -- r2 OPT)."""
+    """One loaded, validated style pack (attribute access only -- r2 OPT).
+    Dict fields are immutable mappings (r2 codex OPT)."""
     style_id: str
     label: str
     positive_tail: str
@@ -85,10 +148,37 @@ class VisualStyle:
     forbidden_terms: "tuple[str, ...]"
     era_tail: str
     schema_version: str
+    # -- v2 LOOK/SUBJECT surfaces (geometry stays Python) --
+    portrait_look: str
+    portrait_look_talking: str
+    portrait_instruction_look: str
+    scene_instruction_look: str
+    announcer_subject_face: str
+    announcer_subject_ltx_mouth: str
+    announcer_subject_object: str
+    radio_object_look: str
+    plate_look: str
+    non_character_emblem_fallback: str
+    still_word_title_mood_style: str
+    open_subjects: "MappingProxyType"
+    motion_registers: "MappingProxyType"
+    still_word_typography: "MappingProxyType"
+    still_word_backdrop: "MappingProxyType"
 
 
 # Lazy singleton -- built on first access, never at import time.
 _STYLES: "dict[str, VisualStyle] | None" = None
+
+
+def _lint_template(path: Path, label: str, value: str,
+                   placeholder: str) -> None:
+    """EXACTLY one ``{placeholder}`` and no other brace tokens (a stray
+    ``{x}`` would KeyError at compose time -- fail at load instead)."""
+    token = "{%s}" % placeholder
+    if value.count("{") != 1 or value.count("}") != 1 or token not in value:
+        raise VisualStyleValidationError(
+            f"visual style {path}: {label} must contain the placeholder "
+            f"{token} exactly once and no other brace tokens; got {value!r}")
 
 
 def _validate_row(raw: dict, path: Path) -> VisualStyle:
@@ -96,12 +186,20 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
         raise VisualStyleValidationError(
             f"visual style {path}: top level must be an object, "
             f"got {type(raw).__name__}")
+    declared = raw.get("schema_version")
+    if declared == "v1":
+        raise VisualStyleValidationError(
+            f"visual style {path}: schema_version 'v1' is retired -- "
+            f"upgrade to v2 (total-coverage slice 2026-07-05: add the "
+            f"{len(_V2_STR_FIELDS)} look/subject str fields + "
+            f"{len(_V2_DICT_FIELDS)} dict fields; see "
+            f"STAGE3_TOTAL_COVERAGE_SUBPLAN.md section 1a)")
     unknown = sorted(set(raw) - set(_REQUIRED_FIELDS))
     if unknown:
         raise VisualStyleValidationError(
-            f"visual style {path}: unknown key(s) {unknown!r} -- the v1 "
-            f"schema is exact (subject/motion/anchor overrides are NOT in "
-            f"v1; see STAGE3_SUBPLAN section 8)")
+            f"visual style {path}: unknown key(s) {unknown!r} -- the v2 "
+            f"schema is exact (subject/motion/ledger_directives lab fields "
+            f"are NOT schema fields; see STAGE3_TOTAL_COVERAGE_SUBPLAN)")
     missing = sorted(set(_REQUIRED_FIELDS) - set(raw))
     if missing:
         raise VisualStyleValidationError(
@@ -131,6 +229,45 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
             f"visual style {path}: unknown schema_version "
             f"{raw['schema_version']!r}; known: "
             f"{sorted(KNOWN_STYLE_SCHEMA_VERSIONS)}")
+    # -- v2 str fields: non-empty (one exemption) --
+    for name in _V2_STR_FIELDS:
+        if (name not in _V2_EMPTY_LEGAL_STR_FIELDS
+                and not str(raw[name]).strip()):
+            raise VisualStyleValidationError(
+                f"visual style {path}: {name} must be non-empty (only "
+                f"scene_instruction_look may be empty -- r4 AG M1)")
+    # -- template lints --
+    for name, placeholder in _TEMPLATE_STR_FIELDS.items():
+        _lint_template(path, name, raw[name], placeholder)
+    if not any(w in raw["announcer_subject_ltx_mouth"].lower()
+               for w in _MOUTH_VOCAB):
+        raise VisualStyleValidationError(
+            f"visual style {path}: announcer_subject_ltx_mouth must carry "
+            f"mouth-prominence vocabulary ({'/'.join(_MOUTH_VOCAB)}) -- the "
+            f"ia2v lip-sync contract drives whatever READS as a mouth")
+    # -- dict fields: exact keys, non-empty str values --
+    dict_values: "list[tuple[str, str]]" = []
+    for name, keys in _V2_DICT_FIELDS.items():
+        got = raw[name]
+        if set(got) != keys:
+            raise VisualStyleValidationError(
+                f"visual style {path}: {name} keys must be EXACTLY "
+                f"{sorted(keys)} (case-sensitive); got {sorted(got)}")
+        for k, v in got.items():
+            if not isinstance(v, str) or not v.strip():
+                raise VisualStyleValidationError(
+                    f"visual style {path}: {name}[{k!r}] must be a "
+                    f"non-empty string")
+            dict_values.append((f"{name}[{k!r}]", v))
+    for k, v in raw["open_subjects"].items():
+        _lint_template(path, f"open_subjects[{k!r}]", v,
+                       _OPEN_SUBJECTS_PLACEHOLDER)
+    for k, v in raw["motion_registers"].items():
+        if len(v) > _MOTION_REGISTER_MAX_CHARS:
+            raise VisualStyleValidationError(
+                f"visual style {path}: motion_registers[{k!r}] is "
+                f"{len(v)} chars, over the {_MOTION_REGISTER_MAX_CHARS}-char "
+                f"motion budget (BUG-LOCAL-112)")
     terms: "list[str]" = []
     for i, t in enumerate(raw["forbidden_terms"]):
         if not isinstance(t, str) or not t.strip():
@@ -138,14 +275,20 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
                 f"visual style {path}: forbidden_terms[{i}] must be a "
                 f"non-empty string")
         terms.append(t)
-    # Load-time lint (r4: case-insensitive substring over the 4 tail fields).
+    # Load-time lint (r2 codex S2): case-insensitive substring over the 4
+    # tail fields + ALL new string leaves + dict values -- a pack must not
+    # violate its own bans anywhere.
+    linted: "list[tuple[str, str]]" = [
+        (fld, str(raw[fld])) for fld in _LINTED_TAIL_FIELDS]
+    linted.extend((name, str(raw[name])) for name in _V2_STR_FIELDS)
+    linted.extend(dict_values)
     for term in terms:
         needle = term.lower()
-        for fld in _LINTED_TAIL_FIELDS:
-            if needle in str(raw[fld]).lower():
+        for label, text in linted:
+            if needle in text.lower():
                 raise VisualStyleValidationError(
                     f"visual style {path}: forbidden term {term!r} appears "
-                    f"in its own {fld} -- a pack must not violate its own "
+                    f"in its own {label} -- a pack must not violate its own "
                     f"bans")
     return VisualStyle(
         style_id=style_id,
@@ -157,6 +300,23 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
         forbidden_terms=tuple(terms),
         era_tail=raw["era_tail"],
         schema_version=raw["schema_version"],
+        portrait_look=raw["portrait_look"],
+        portrait_look_talking=raw["portrait_look_talking"],
+        portrait_instruction_look=raw["portrait_instruction_look"],
+        scene_instruction_look=raw["scene_instruction_look"],
+        announcer_subject_face=raw["announcer_subject_face"],
+        announcer_subject_ltx_mouth=raw["announcer_subject_ltx_mouth"],
+        announcer_subject_object=raw["announcer_subject_object"],
+        radio_object_look=raw["radio_object_look"],
+        plate_look=raw["plate_look"],
+        non_character_emblem_fallback=raw["non_character_emblem_fallback"],
+        still_word_title_mood_style=raw["still_word_title_mood_style"],
+        open_subjects=MappingProxyType(dict(raw["open_subjects"])),
+        motion_registers=MappingProxyType(dict(raw["motion_registers"])),
+        still_word_typography=MappingProxyType(
+            dict(raw["still_word_typography"])),
+        still_word_backdrop=MappingProxyType(
+            dict(raw["still_word_backdrop"])),
     )
 
 

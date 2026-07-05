@@ -89,20 +89,45 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
 # recording studio" NEGATIONS are gone -- negative phrasing PLANTS the tokens
 # in the image embedding (the c01 giant-mic catch); gear words are instead
 # scrubbed from the OUTPUT (see _GEAR_WORDS) and banned in the instruction.
-STYLE_ANCHOR = ("in-character cinematic three-quarter portrait, full head and face "
-                "clearly visible with natural headroom above the head (never crop "
-                "the top of the head), period-accurate costume and environment, "
-                "dramatic film lighting")
+# GEOMETRY-vs-LOOK split (visual-style TOTAL COVERAGE chunk A1, 2026-07-05):
+# the *_GEOMETRY constants below are ENGINE-SAFETY framing contracts
+# (framing / headroom / face-visibility / mouth-safety) and NEVER move into
+# style packs; the LOOK segment (costume/environment/lighting vocabulary) is
+# pack-owned (VisualStyle.portrait_look / portrait_look_talking). The
+# *_LOOK_DEFAULT constants survive ONLY as the sci_fi_radio extraction
+# fixtures + the legacy no-style lane of _style_anchor_for_aspect --
+# production callers always pass style= (AST-pinned).
+PORTRAIT_GEOMETRY = ("in-character cinematic three-quarter portrait, full head and face "
+                     "clearly visible with natural headroom above the head (never crop "
+                     "the top of the head)")
+WIDE_PORTRAIT_GEOMETRY = ("in-character cinematic medium shot, head and shoulders, face "
+                          "clearly visible, subject centred with natural headroom above "
+                          "the head (never crop the top of the head)")
+TALKING_PORTRAIT_GEOMETRY = (
+    "in-character face-forward frontal close-up bust, looking directly at the "
+    "camera, the whole face and mouth clearly visible and unobstructed, the "
+    "face brightly lit and filling much of the frame, subject centred with "
+    "natural headroom above the head (never crop the top of the head)")
+
+#: Extraction fixtures (pack byte-identity pins; sci_fi_radio.json values).
+PORTRAIT_LOOK_DEFAULT = ("period-accurate costume and environment, "
+                         "dramatic film lighting")
+TALKING_PORTRAIT_LOOK_DEFAULT = "period-accurate costume, warm dramatic lighting"
+#: The LLM-facing look language _build_char_prompt_request used to hard-code
+#: (chunk A1: production reads the pack's portrait_instruction_look; this
+#: survives ONLY as the sci_fi_radio extraction fixture).
+PORTRAIT_INSTRUCTION_LOOK_DEFAULT = "photographic and period-consistent"
+
+#: The composed legacy anchors -- BYTE-IDENTICAL by construction (fixtures for
+#: pre-A1 pins; production reads go through _style_anchor_for_aspect(style=)).
+STYLE_ANCHOR = "%s, %s" % (PORTRAIT_GEOMETRY, PORTRAIT_LOOK_DEFAULT)
 
 #: WIDE (16:9) framing anchor. A three-quarter body shot cannot fit a short
 #: landscape still without cropping the head, so wide character stills use a
 #: head-and-shoulders MEDIUM shot, subject centred with headroom (operator framing
 #: catch 2026-06-17: the wide character beats were decapitating the subject).
 #: Portrait stills keep the three-quarter look (operator KEEPER 2026-06-10).
-STYLE_ANCHOR_WIDE = ("in-character cinematic medium shot, head and shoulders, face "
-                     "clearly visible, subject centred with natural headroom above "
-                     "the head (never crop the top of the head), period-accurate "
-                     "costume and environment, dramatic film lighting")
+STYLE_ANCHOR_WIDE = "%s, %s" % (WIDE_PORTRAIT_GEOMETRY, PORTRAIT_LOOK_DEFAULT)
 
 
 #: TALKING-lane portrait anchor (S4b, 2026-07-02). The ia2v lip-sync recipe
@@ -112,22 +137,31 @@ STYLE_ANCHOR_WIDE = ("in-character cinematic medium shot, head and shoulders, fa
 #: face-forward close-up (scene-init 0.57 vs face-forward 2.86). Mirrors the
 #: ltx_radio_mouth split that fixed the radio bookends: frontal, mouth
 #: visible, warm light; the era/grade/palette tails are SKIPPED for these
-#: portraits (see derive_image_prompts).
-STYLE_ANCHOR_TALKING = (
-    "in-character face-forward frontal close-up bust, looking directly at the "
-    "camera, the whole face and mouth clearly visible and unobstructed, the "
-    "face brightly lit and filling much of the frame, subject centred with "
-    "natural headroom above the head (never crop the top of the head), "
-    "period-accurate costume, warm dramatic lighting")
+#: portraits (see derive_image_prompts). Talking portraits' ONLY style
+#: surface is the pack's portrait_look_talking (S4b lip-sync law) -- packs
+#: author it conservatively.
+STYLE_ANCHOR_TALKING = "%s, %s" % (TALKING_PORTRAIT_GEOMETRY,
+                                   TALKING_PORTRAIT_LOOK_DEFAULT)
 
 
-def _style_anchor_for_aspect(aspect, talking=False) -> str:
+def _style_anchor_for_aspect(aspect, talking=False, style=None) -> str:
     """Framing anchor for a still's aspect: head-and-shoulders for WIDE (16:9) so
     the head is not cropped by the short frame, three-quarter for PORTRAIT.
-    ``talking`` overrides both with the face-forward lip-sync anchor (S4b)."""
+    ``talking`` overrides both with the face-forward lip-sync anchor (S4b).
+
+    Chunk A1: geometry stays Python; the LOOK segment comes from the resolved
+    ``style`` pack, appended at the SAME position the legacy anchors carried
+    it (sci_fi_radio is byte-identical by construction). ``style=None`` is
+    the LEGACY fixture lane (tests) -- production callers pass style=
+    (AST-pinned); helpers never re-resolve."""
     if talking:
-        return STYLE_ANCHOR_TALKING
-    return STYLE_ANCHOR_WIDE if str(aspect).lower() == "wide" else STYLE_ANCHOR
+        look = (style.portrait_look_talking if style is not None
+                else TALKING_PORTRAIT_LOOK_DEFAULT)
+        return "%s, %s" % (TALKING_PORTRAIT_GEOMETRY, look)
+    look = style.portrait_look if style is not None else PORTRAIT_LOOK_DEFAULT
+    geometry = (WIDE_PORTRAIT_GEOMETRY if str(aspect).lower() == "wide"
+                else PORTRAIT_GEOMETRY)
+    return "%s, %s" % (geometry, look)
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
 #: owns ``ledger['cast']``; the announcer is the station voice, never a cast
@@ -295,30 +329,48 @@ def _radio_face_overtness(meta) -> str:
 
 
 def build_radio_host_prompt(meta, aspect: str = "portrait",
-                            style: str = "console_face") -> str:
-    """FULL prompt for a radio-host still, dispatched by ``style``.
+                            radio_host_style: str = "console_face",
+                            vstyle=None) -> str:
+    """FULL prompt for a radio-host still, dispatched by ``radio_host_style``
+    (renamed from ``style`` in chunk A1 -- r3: the visual-style pack now
+    travels as ``vstyle=``, so the DISPATCH arg needed a non-colliding name).
 
-    ``style="console_face"``: an ANTHROPOMORPHIC RADIO CONSOLE (the brief-driven
-    form) whose glowing dial forms an expressive face -- "the radio IS the host",
-    no human. The animatable dial-face; used for the HuMo radio-host FACE object
-    AND the HuMo-driven synthetic-announcer portrait.
-    ``style="ltx_radio_mouth"`` (talking-radio kibitz r1): the LTX-ONLY
-    mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint -- leads with
-    the PROMINENT rubbery grille-mouth; never used by HuMo.
-    ``style="radio_object"`` (radio-face logic 2026-07-04): a FACELESS stylized
-    radio on its plate -- no dial-face, no person -- for a static / force-mapped
-    announcer bookend (nothing animates a mouth, so no face). Facelessness is
-    carried by the POSITIVE prompt (the still dispatcher has NO negative
-    channel): object/material language only, an OBJECT anchor (NOT the
-    person anchor), and NO overtness clause.
+    ``radio_host_style="console_face"``: an ANTHROPOMORPHIC RADIO CONSOLE (the
+    brief-driven form) whose glowing dial forms an expressive face -- "the radio
+    IS the host", no human. The animatable dial-face; used for the HuMo
+    radio-host FACE object AND the HuMo-driven synthetic-announcer portrait.
+    ``radio_host_style="ltx_radio_mouth"`` (talking-radio kibitz r1): the
+    LTX-ONLY mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint --
+    leads with the PROMINENT rubbery grille-mouth; never used by HuMo.
+    ``radio_host_style="radio_object"`` (radio-face logic 2026-07-04): a
+    FACELESS stylized radio on its plate -- no dial-face, no person -- for a
+    static / force-mapped announcer bookend (nothing animates a mouth, so no
+    face). Facelessness is carried by the POSITIVE prompt (the still dispatcher
+    has NO negative channel): object/material language only, an OBJECT anchor
+    (NOT the person anchor), and NO overtness clause.
     All styles are brief-driven (:func:`radio_form_from_meta`); the face styles'
     overtness is brief-driven (:func:`_radio_face_overtness`), framed for the
     slot's ``aspect``, era texture via :func:`finish_visual_prompt`. Deterministic;
     never empty. FAIL-LOUD on an unknown style (retired ``radio_head_person``
     raises). The matching negative (:func:`radio_host_negative`) is populated on
-    the object row by the caller."""
+    the object row by the caller.
+
+    Chunk A1: the three SUBJECT texts come from the resolved visual-style pack
+    (announcer_subject_face / announcer_subject_ltx_mouth /
+    announcer_subject_object); ``vstyle`` is the resolved pack threaded from the
+    image-prompt entry (None => this IS the entry: fail-loud resolve)."""
+    # Stage 3 de-swallow (kibitz r2 M1): the ImportError shim is the ONLY
+    # permitted catch here -- a visual-style resolution error must FAIL the
+    # episode LOUD, never silently ship an unstyled prompt (no-fallback law).
+    try:
+        from ._otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, finish_visual_prompt)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import (  # type: ignore
+            _resolve_style, finish_visual_prompt)
+    _style = _resolve_style(meta, vstyle)
     form = radio_form_from_meta(meta)
-    if style == "radio_object":
+    if radio_host_style == "radio_object":
         # FACELESS: object/material language only. NO _radio_face_overtness (it
         # returns face text) and NOT _style_anchor_for_aspect (it adds head/face/
         # costume/in-character person tokens). An OBJECT anchor instead, then the
@@ -326,15 +378,19 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
         # reads as a tense-lit radio, never a person).
         anchor = (_RADIO_OBJECT_ANCHOR_WIDE if str(aspect).lower() == "wide"
                   else _RADIO_OBJECT_ANCHOR)
-        prompt = ", ".join(["%s, %s" % (form, _RADIO_OBJECT_SUBJECT), anchor])
-    elif style == "console_face":
-        subject = "%s, %s, %s" % (form, _RADIO_CONSOLE_FACE,
+        prompt = ", ".join(["%s, %s" % (form, _style.announcer_subject_object),
+                            anchor])
+    elif radio_host_style == "console_face":
+        subject = "%s, %s, %s" % (form, _style.announcer_subject_face,
                                   _radio_face_overtness(meta))
-        prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
-    elif style == "ltx_radio_mouth":
-        subject = "%s, %s" % (_RADIO_CONSOLE_MOUTH % form,
-                              _radio_face_overtness(meta))
-        prompt = ", ".join([subject, _style_anchor_for_aspect(aspect)])
+        prompt = ", ".join([subject,
+                            _style_anchor_for_aspect(aspect, style=_style)])
+    elif radio_host_style == "ltx_radio_mouth":
+        subject = "%s, %s" % (
+            _style.announcer_subject_ltx_mouth.format(form=form),
+            _radio_face_overtness(meta))
+        prompt = ", ".join([subject,
+                            _style_anchor_for_aspect(aspect, style=_style)])
         # CANONICAL WARM LOOK (operator look direction 2026-07-02, the
         # side-by-side catch: the brief palette -- e.g. "cold blue panel
         # glow" -- plus the grade tail's "heavy vignette, muted color grade"
@@ -347,22 +403,12 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
         raise ValueError(
             "build_radio_host_prompt: unknown radio-host style %r; known "
             "styles: %r. (radio_head_person was retired 2026-07-04 -- "
-            "radio-face logic.)" % (style, _RADIO_HOST_STYLES))
-    # Stage 3 de-swallow (kibitz r2 M1): the ImportError shim is the ONLY
-    # permitted catch here -- a visual-style resolution error must FAIL the
-    # episode LOUD, never silently ship an unstyled prompt (no-fallback law).
-    try:
-        from ._otr_story_brief_helpers import (  # type: ignore
-            _resolve_style, finish_visual_prompt)
-    except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_story_brief_helpers import (  # type: ignore
-            _resolve_style, finish_visual_prompt)
+            "radio-face logic.)" % (radio_host_style, _RADIO_HOST_STYLES))
     # STORY FLAIR (operator 2026-07-01: "all prompts respect the meta brief"):
     # a radio console / radio object is an OBJECT, not a bare human face, so it
     # takes the FULL "still" era tail (story palette + atmosphere + lighting)
     # -- the palette-strip "portrait" profile (BUG-LOCAL-113, for human faces)
     # is NOT wanted here; a tense story should read as a tense-lit radio.
-    _style = _resolve_style(meta)
     prompt = finish_visual_prompt(meta, prompt, era_profile="still",
                                   style=_style)
     if _style.image_grade_tail and _style.image_grade_tail not in prompt:
@@ -1005,13 +1051,20 @@ def announcer_line_char_ids(lines) -> list:
 
 
 def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrait",
-                                  talking: bool = False) -> str:
+                                  talking: bool = False, style=None) -> str:
     """Deterministic brief-composed portrait prompt -- NEVER empty.
 
     ``"{appearance}, {setting} setting, {style anchor}"`` with empty parts
     dropped; degrades to the style anchor alone if the brief + cast are bare.
     ``talking`` swaps in the face-forward lip-sync anchor (S4b).
+    Chunk A1: ``style`` is the resolved visual-style pack threaded from the
+    image-prompt entry (None => this IS the entry: fail-loud resolve).
     """
+    try:
+        from ._otr_story_brief_helpers import _resolve_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import _resolve_style  # type: ignore
+    _vstyle = _resolve_style(meta, style)
     # Same key chain as _appearance_for_char incl. character_description
     # (2026-06-10): this fallback is what actually runs whenever the LLM is
     # unavailable, and it read only the two empty keys -- every character got
@@ -1026,13 +1079,14 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
         parts.append(appearance)
     if setting:
         parts.append(f"{setting} setting")
-    parts.append(_style_anchor_for_aspect(aspect, talking=talking))
+    parts.append(_style_anchor_for_aspect(aspect, talking=talking,
+                                          style=_vstyle))
     return ", ".join(parts)
 
 
 def _build_char_prompt_request(char: dict, meta: dict, setting: str,
                                aspect: str = "portrait",
-                               talking: bool = False) -> str:
+                               talking: bool = False, style=None) -> str:
     """The instruction handed to the writer LLM (temp=0) for one character.
 
     ``aspect`` ('wide'|'portrait') drives the framing clause so a 16:9 still asks
@@ -1041,7 +1095,15 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     the head is never cropped (operator framing catch 2026-06-17). ``talking``
     (S4b) overrides both with the face-forward lip-sync framing: the ia2v
     recipe drives the mouth on THIS still, so a profile / distant / dim face
-    is unusable (proof8 catch 2026-07-02)."""
+    is unusable (proof8 catch 2026-07-02). Chunk A1: the LLM-facing LOOK
+    language (the old hard-coded "photographic and period-consistent") comes
+    from the pack's ``portrait_instruction_look``; ``style`` is the resolved
+    pack threaded from the entry (None => fail-loud resolve here)."""
+    try:
+        from ._otr_story_brief_helpers import _resolve_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import _resolve_style  # type: ignore
+    _vstyle = _resolve_style(meta, style)
     appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
     if talking:
         framing = (
@@ -1065,10 +1127,11 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
         f"{framing} -- IN CHARACTER "
         "inside the story's world. NEVER an empty room, an object, or scenery "
         "alone. Ground it in the appearance and the story setting; keep it "
-        "photographic and period-consistent.\n"
+        f"{_vstyle.portrait_instruction_look}.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
-        f"style_anchor: {_style_anchor_for_aspect(aspect, talking=talking)}\n"
+        "style_anchor: "
+        f"{_style_anchor_for_aspect(aspect, talking=talking, style=_vstyle)}\n"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
@@ -1079,13 +1142,24 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
 
 
 def _build_char_scene_request(char: dict, meta: dict, setting: str,
-                              line: dict) -> str:
+                              line: dict, style=None) -> str:
     """BUG 1 follow-up (2026-06-20 operator): the per-beat character still must be
     SHOT/BEAT AWARE -- the character IN the moment of THIS beat -- regardless of
     image model (the video lane conditions on the SAME still). Mirrors
     :func:`_build_char_prompt_request` but WIDE 16:9 and grounded in the beat's
     own ``beat_intent`` / ``traits`` / spoken ``text`` so each character beat
-    yields a DISTINCT still. Temp=0 like the portrait path -> deterministic."""
+    yields a DISTINCT still. Temp=0 like the portrait path -> deterministic.
+    Chunk A1: this builder has NO existing look text, so the pack's
+    ``scene_instruction_look`` is appended ONLY when non-empty (sci_fi ships
+    "" -- byte-identity by construction, r4 AG M1); ``style`` is the resolved
+    pack threaded from the entry (None => fail-loud resolve here)."""
+    try:
+        from ._otr_story_brief_helpers import _resolve_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import _resolve_style  # type: ignore
+    _vstyle = _resolve_style(meta, style)
+    _look_line = (f"style_look: {_vstyle.scene_instruction_look}\n"
+                  if _vstyle.scene_instruction_look else "")
     appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
     ln = line if isinstance(line, dict) else {}
     intent = str(ln.get("beat_intent") or "").strip()[:240]
@@ -1106,7 +1180,8 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
         f"emotion: {mood or '(unspecified)'}\n"
         f"they_are_saying: {said or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
-        f"style_anchor: {_style_anchor_for_aspect('wide')}\n"
+        f"style_anchor: {_style_anchor_for_aspect('wide', style=_vstyle)}\n"
+        f"{_look_line}"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
@@ -1116,7 +1191,7 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
 
 
 def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
-                               warnings, cid, max_reseed=2):
+                               warnings, cid, max_reseed=2, vstyle=None):
     """Beat-aware 16:9 character still prompt -> ``(prompt, source)``. LLM-refined
     (the beat's action/emotion) when a writer LLM is available -- so each beat
     differs -- else the deterministic per-character ``scene_character`` composer.
@@ -1133,7 +1208,7 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     # dialogue-less beat is the legit template lane, not a failure.
     _llm_attempted = llm_fn is not None and bool(said)
     if _llm_attempted:
-        req = _build_char_scene_request(ce, meta, setting, line)
+        req = _build_char_scene_request(ce, meta, setting, line, style=vstyle)
         for attempt in range(max_reseed + 1):
             try:
                 raw = llm_fn(req)
@@ -1172,7 +1247,8 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
         # No writer LLM (or a dialogue-less beat): the deterministic per-character
         # scene composer is the PRIMARY local-lane output, not a fallback.
         return (compose_still_prompt(meta, kind="scene_character",
-                                     role="character_video", char_entry=ce),
+                                     role="character_video", char_entry=ce,
+                                     style=vstyle),
                 source)
     # FINISH like a scene still: era tail + cinematic grade + the no-text clause.
     # Stage 3 de-swallow (kibitz r2 M1): ImportError shim only; a style error
@@ -1183,7 +1259,7 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import (  # type: ignore
             NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
-    _style = _resolve_style(meta)
+    _style = _resolve_style(meta, vstyle)
     prompt = finish_visual_prompt(meta, prompt, era_profile="portrait",
                                   style=_style)
     if _style.image_grade_tail and _style.image_grade_tail not in prompt:
@@ -1382,6 +1458,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     """
     warnings: list = []
     setting = _read_setting(meta)
+    # Chunk A1 (r3 threading): resolve the visual style ONCE at the image-
+    # prompt ENTRY and thread it down (helpers never re-resolve). Fail-loud:
+    # an unknown meta["visual_style"] stops the episode HERE, before any
+    # prompt is composed. ImportError shim only (3A pattern).
+    try:
+        from ._otr_story_brief_helpers import _resolve_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import _resolve_style  # type: ignore
+    _vstyle = _resolve_style(meta)
     out: dict = {}
     roster = list(cast or [])
     cast_ids = {str(c.get("char_id") or "") for c in roster if isinstance(c, dict)}
@@ -1436,7 +1521,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                           and _effective_announcer_family(video_models)
                           == "audio_driven_face")
             _astyle = "console_face" if _humo_face else "radio_object"
-            _aprompt = build_radio_host_prompt(meta, _aspect, style=_astyle)
+            _aprompt = build_radio_host_prompt(meta, _aspect,
+                                               radio_host_style=_astyle,
+                                               vstyle=_vstyle)
             out[cid] = {
                 "prompt": _aprompt,
                 "prompt_hash": _content_hash(_aprompt),
@@ -1450,7 +1537,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         source = "template"
         if llm_fn is not None:
             req = _build_char_prompt_request(char, meta, setting, _aspect,
-                                             talking=_talking)
+                                             talking=_talking, style=_vstyle)
             for attempt in range(max_reseed + 1):
                 try:
                     raw = llm_fn(req)
@@ -1475,7 +1562,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # No writer LLM configured: the deterministic template IS the primary
             # local-lane portrait, not a fallback.
             prompt = compose_image_prompt_fallback(meta, char, _aspect,
-                                                   talking=_talking)
+                                                   talking=_talking,
+                                                   style=_vstyle)
             source = "template"
         # Story-consistency gate (schema assertion, v1). The synthetic
         # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM
@@ -1522,7 +1610,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                         "fallback (no-fallback rip 2026-07-03)." % cid
                     )
                 prompt = _scrubbed or compose_image_prompt_fallback(
-                    meta, char, talking=_talking)
+                    meta, char, talking=_talking, style=_vstyle)
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
         # FINISH the prompt (gap-audit F3, 2026-06-10): era tail + film style
@@ -1542,18 +1630,18 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # style-resolution error RAISES (never a silent unstyled portrait).
             try:
                 from ._otr_story_brief_helpers import (  # type: ignore
-                    _resolve_style, finish_visual_prompt)
+                    finish_visual_prompt)
             except ImportError:  # pragma: no cover -- flat test imports
                 from _otr_story_brief_helpers import (  # type: ignore
-                    _resolve_style, finish_visual_prompt)
+                    finish_visual_prompt)
             # era_profile="portrait": never bleeds the episode's ambient
             # colour palette into character faces (sci-fi = blue wash,
             # period drama = red wash). Only the atmosphere mood line is
             # safe; full palette is explicitly excluded (BUG-LOCAL-113).
-            _style = _resolve_style(meta)
+            # Chunk A1: _vstyle is the ONE entry-resolved pack (no re-resolve).
             prompt = finish_visual_prompt(meta, prompt,
                                           era_profile="portrait",
-                                          style=_style)
+                                          style=_vstyle)
             # BUG-411 (operator 2026-06-14: "keep ALL flux consistent with the
             # 6/5 aesthetic"): append the cinematic GRADE tail to PORTRAITS too,
             # so a still_pan beat standing in for a HuMo portrait shows the same
@@ -1562,9 +1650,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # radio broadcast-distress tail stays scene-still-only (a person is
             # not a radio set). Idempotent -- never duplicates. Stage 3: the
             # grade comes from the pack (empty string = no append).
-            if (_style.image_grade_tail
-                    and _style.image_grade_tail not in prompt):
-                prompt = f"{prompt}, {_style.image_grade_tail}"
+            if (_vstyle.image_grade_tail
+                    and _vstyle.image_grade_tail not in prompt):
+                prompt = f"{prompt}, {_vstyle.image_grade_tail}"
         out[cid] = {
             "prompt": prompt,
             "prompt_hash": _content_hash(prompt),   # hash AFTER the call
@@ -1621,7 +1709,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _rh_aspect = (_role_aspects.get("music_visual")
                       or _role_aspects.get("announcer_visual") or "portrait")
         # MUSIC bookends -> the ANTHROPOMORPHIC RADIO CONSOLE face (operator 2026-07-01).
-        _rh_prompt = build_radio_host_prompt(meta, _rh_aspect, style="console_face")
+        _rh_prompt = build_radio_host_prompt(meta, _rh_aspect,
+                                             radio_host_style="console_face",
+                                             vstyle=_vstyle)
         _rhw, _rhh = still_dims_for_aspect(_rh_aspect, PORTRAIT_W, PORTRAIT_H)
         objects.append({
             "object_id": RADIO_HOST_PORTRAIT_ID,
@@ -1657,8 +1747,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # -- the Sub-plan-C probe lever. ANNOUNCER-ONLY since 2026-07-03 (music
             # stays faceless; the dead music mint was pruned 2026-07-04). The HuMo
             # console_face look is byte-unchanged (the split); no new model / path.
-            _fprompt = build_radio_host_prompt(meta, "wide",
-                                               style="ltx_radio_mouth")
+            _fprompt = build_radio_host_prompt(
+                meta, "wide", radio_host_style="ltx_radio_mouth",
+                vstyle=_vstyle)
             objects.append({
                 "object_id": _ltx_radio_face_object_id(_abrole),
                 "kind": "portrait",
@@ -1799,12 +1890,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 _ce = _cast_by_id.get(_cid)
                 _ln = _line_by_beat.get(tgt["beat_id"], {})
                 sprompt, _csrc = _compose_char_scene_prompt(
-                    meta, _ce, setting, _ln, llm_fn, warnings, _cid)
+                    meta, _ce, setting, _ln, llm_fn, warnings, _cid,
+                    vstyle=_vstyle)
                 _src = _csrc
             else:
                 sprompt = compose_still_prompt(
                     meta, kind=tgt["kind"], role=tgt["role"],
-                    beat_id=tgt["beat_id"])
+                    beat_id=tgt["beat_id"], style=_vstyle)
             _obj = {
                 "object_id": f"still_{tgt['beat_id']}",
                 "kind": tgt["kind"],
