@@ -1,6 +1,6 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-06 (OVERNIGHT "EVERYTHING" mission -- STAGES 3+4-CORE COMPLETE + LIVE-PROVEN; see docs/2026-07-06-overnight/MORNING_REPORT.md) | branch v2.0-alpha HEAD 8da76394, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> Last updated 2026-07-05 (LANE CHUNK 3 SHIPPED + visual-style TOTAL-COVERAGE plan CONVERGED) | branch v2.0-alpha HEAD d7ea448c + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -79,10 +79,22 @@ PROMOTED from "deferred" to an ORDERED build item, queued immediately after
 lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
 needs promptable engines selectable/selected for announcer/music video roles.
 
-**CURRENT STEP = LANE-ENABLEMENT CHUNK 3 (source-payload fetcher/interpreter
-contracts per bank -- STAGE2_SUBPLAN 4b item 3; the last blocker before a
-non-science lane can flip runnable:true). THEN the visual-style total-coverage
-slice above.**
+**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk A1 (image lane).**
+Plan of record: `docs/multimodal-story-schema/STAGE3_TOTAL_COVERAGE_SUBPLAN.md`
+(v5 FINAL -- kibitz r1-r4 CONVERGED 2026-07-05, codex+antigravity panel, Claude
+anchor+judge; artifacts `kibitz-runs/2026-07-05-style-total-coverage/`). Build
+order A1 (schema v2 ALL 5 packs + image-lane re-routes, sci_fi byte-identical)
+-> A2 (motion registers + object/plate look + emblem + provenance) -> B (author
+the 4 non-default packs + delta tests) -> C (still_word pack ownership).
+Commit+push per green chunk. The r4 header block in the sub-plan is the
+authoritative schema inventory.
+
+LANE-ENABLEMENT CHUNK 3 SHIPPED @d7ea448c (2026-07-05): the banks'
+fetcher/interpreter ids are LIVE routing coordinates (`nodes/_otr_source_payload.py`;
+science byte-identical incl. halt re-raise identity; sweep forbids a runnable flip
+without a real lane; pipelines.json `requires_source_contract`; 41 tests; suite 6440/0;
+kibitz r1-r4 `kibitz-runs/2026-07-05-multimodal-chunk3/`). 4b item 3 DONE -- a
+non-science runnable flip now needs only per-lane curation + the item-4 seam audit.
 CHUNK 2 SHIPPED @9809e36f (exchange seam: new `exchange_system` production seam --
 allowlist + science pack byte-identical to the extracted EXCHANGE_SYSTEM_PROMPT
 fixture + exchange_compose pass row; system_prompt threaded run_exchange_prepass ->

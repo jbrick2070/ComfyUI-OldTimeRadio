@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (evening) -- LANE CHUNK 3 SHIPPED + VISUAL-STYLE TOTAL-COVERAGE PLAN CONVERGED -- v2.0-alpha
+Did:
+- @d7ea448c (pushed, HEAD==origin): lane-enablement chunk 3 -- source-payload fetcher/interpreter contracts. New nodes/_otr_source_payload.py (typed errors, EXACT 7-key payload validator, interpreter-result validator w/ dual-surface coherence returning the dump = meta["news"], science_rss + news_interpreter verbatim wrappers, NIE->SourceInterpretError chained-only); pipelines.json requires_source_contract; sweep = dangling ids fail load + runnable needs a real lane; writer fetch + D.2.5 routed through the bank's contracts (halt stamps AND re-raises the NIE cause byte-identically); S31 B6 + paired-wiring pins re-pointed. 41 tests; suite 6440/0; Bug Bible 16. Kibitz r1-r4 (codex+antigravity) kibitz-runs/2026-07-05-multimodal-chunk3/. 4b item 3 DONE.
+- Visual-style TOTAL-COVERAGE slice (operator directive): grounded fan-out audit (~21 uncontrolled sites) -> STAGE3_TOTAL_COVERAGE_SUBPLAN.md hardened across kibitz r1-r4 to v5 FINAL BUILD-READY (schema v2 = 11 new str + 4 new dict fields, geometry-vs-look split, all-5-packs syntactic upgrade in A1, motion registers via build_request_from_shot, probe-locked ia2v talking prompts stay Python, provenance additive keys). Artifacts kibitz-runs/2026-07-05-style-total-coverage/.
+Current step: VISUAL-STYLE TOTAL-COVERAGE BUILD chunk A1 (image lane; then A2 -> B -> C).
+Next: build A1 per the v5 plan (extraction + schema v2 loader + all-packs upgrade + image-lane re-routes, sci_fi byte-identical).
+Commits: d7ea448c + docs (pushed).
+
 ## 2026-07-05 (day) -- LANE-ENABLEMENT CHUNK 2 SHIPPED (exchange seam pack-routed) + VISUAL-STYLE TOTAL directive -- v2.0-alpha
 Did:
 - @9809e36f (pushed, HEAD==origin): exchange seam -- new `exchange_system` production seam (allowlist + science pack byte-identical to the extracted EXCHANGE_SYSTEM_PROMPT fixture + exchange_compose pipeline pass row); system_prompt threaded run_exchange_prepass -> compose_exchange -> build_exchange_prompt (keyword-only, dynamic craft bullets stay Python-owned); writer resolves via router repo=None lane OUTSIDE the prepass PD1 swallow (bank without the seam fails the episode LOUD; media_archive + resolve-outside-try AST pin). 13 new tests; suite 6400/0; Bug Bible 16. Per-chunk kibitz SKIPPED by design (operator-approved leaner gating -- pattern-copy of chunk 1; panel reserved for chunk 3).

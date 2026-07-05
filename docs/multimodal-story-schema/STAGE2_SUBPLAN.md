@@ -161,9 +161,12 @@ lane) -- the run-intent gate is what keeps the 2C contract honest until then:
    repo=None lane, resolved OUTSIDE the prepass PD1 swallow -- a bank without
    the seam fails the episode LOUD); dynamic craft bullets stay Python-owned.
    Science byte-identical (EXCHANGE_SYSTEM_PROMPT extraction fixture, pinned).
-3. Source payload: RSS fetch (`_fetch_science_news`) + `news_interpreter.
-   build_news_briefs` are science-hardwired; banks' fetcher/interpreter
-   fields are metadata until their contract is built.
+3. Source payload -- DONE (lane chunk 3 @d7ea448c, 2026-07-05): the banks'
+   fetcher/interpreter ids are LIVE routing coordinates behind the
+   `_otr_source_payload` contract (science byte-identical; empty-id bank
+   fails LOUD; sweep forbids a runnable flip without a real lane). Plan:
+   CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md (v5, kibitz r1-r4). Each non-science
+   lane still needs its CONCRETE fetcher/interpreter (per-lane curation).
 4. Remaining seams: audit `_PHASE_TO_PACK_SEAM` coverage (announcer intro/
    outro, coda, style-pick seams ship in packs but are not yet routed).
 
