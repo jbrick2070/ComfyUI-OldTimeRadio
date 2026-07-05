@@ -6,6 +6,14 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (session 3d) -- STAGE 3 CHUNK 3B SHIPPED (4 style packs, dormant) -- v2.0-alpha
+Did:
+- 3B @2e59d76b (pushed, HEAD==origin): anime/cartoon/paper_origami/archival_documentary authored at nodes/visual_styles/ (exact v1 schema; the lab's subject/motion/ledger_directives fields stripped; schema_version v1); 45 forced-meta delta tests (every tail seam changes; allow_radio_tails=false drops broadcast; empty tails clean; default byte-identical).
+- Fixed the B7 regression the 3A commit introduced (AST-guard loop var `alias` -> `imp`, the CW-6 forbidden-sweep marker; 3A's suite run missed it because untracked files are invisible to `git diff s29..`). Suite 6337/0, Bug Bible 16.
+Current step: STAGE 3 CHUNK 3C (visual_style widget slot 26, GATED -- 2C playbook; after it, non-default styles are fully LIVE and smokeable).
+Next: 3C on operator go; then Stage 4.
+Commits: 2e59d76b (pushed).
+
 ## 2026-07-05 (session 3c) -- STAGE 3 CHUNK 3A SHIPPED (visual-style loader + byte-identical routing) -- v2.0-alpha
 Did:
 - 3A @4f611cb3 (pushed, HEAD==origin): _otr_visual_styles.py (stdlib, lazy, frozen dataclass, sweep, typed errors, v1 schema pin, style_id regex+path coordinate, forbidden-terms load lint, _clear_caches) + visual_styles/sci_fi_radio.json byte-identical to the extraction-fixture constants.

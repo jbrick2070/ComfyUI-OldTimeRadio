@@ -69,7 +69,10 @@ STAGES (see BUILD_PLAN): 1 Content->JSON foundation (loader on existing nodes + 
 prompts to the first pack, byte-identical start) -> 2 story-path routing + packs -> 3 visual_style
 schema -> 4 asserts->JSON (LAST; needs a declarative-rule enforcer node built first).
 
-**CURRENT STEP = STAGE 3 CHUNK 3B (author the 4 non-default packs, addressable/DORMANT).**
+**CURRENT STEP = STAGE 3 CHUNK 3C (visual_style widget slot 26, GATED -- the 2C playbook).**
+3B SHIPPED @2e59d76b (4 packs addressable/dormant, 45 delta tests + the B7 alias->imp fix;
+suite 6337/0). After 3C: a NON-DEFAULT visual style is fully LIVE (no execution lane needed)
+-- first new-capability 30w smoke = an anime/origami/archival episode. Then Stage 4.
 Sub-plan of record: `docs/multimodal-story-schema/STAGE3_SUBPLAN.md` (v5 FINAL -- kibitz
 r1-r4 CONVERGED 2026-07-05; r3 = codex + a 3-lens Sonnet grounded fan-out per operator).
 **3A SHIPPED @4f611cb3** (suite 6294/0, Bug Bible 16): `nodes/_otr_visual_styles.py`
