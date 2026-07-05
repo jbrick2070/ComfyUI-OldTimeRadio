@@ -1423,8 +1423,8 @@ def _load_news_history() -> set[str]:
     return fresh
 
 
-def _record_news_usage(url: str, headline: str, style: str = "") -> None:
-    """Append (url, headline, genre, timestamp) to news_history.json.
+def _record_news_usage(url: str, headline: str) -> None:
+    """Append (url, headline, timestamp) to news_history.json.
 
     Cap at _NEWS_HISTORY_MAX_ENTRIES rolling. Older entries drop off so the
     file never grows unbounded but recent picks are remembered.
@@ -1446,7 +1446,6 @@ def _record_news_usage(url: str, headline: str, style: str = "") -> None:
         data.append({
             "url":          str(url),
             "headline":     str(headline)[:240],
-            "style": str(style),
             "timestamp":    datetime.now().isoformat(timespec="seconds"),
         })
         if len(data) > _NEWS_HISTORY_MAX_ENTRIES:
@@ -1462,7 +1461,6 @@ def _record_news_usage(url: str, headline: str, style: str = "") -> None:
 
 def _llm_rank_news_candidates(
     pool: list[dict],
-    style: str,
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
     top_k: int = 5,
@@ -1487,10 +1485,9 @@ def _llm_rank_news_candidates(
             f"{i + 1}. {(p.get('headline') or '').strip()[:160]}"
             for i, p in enumerate(candidates)
         )
-        genre_human = (style or "sci-fi").replace("_", " ")
         prompt = (
-            f"You are picking news headlines for a {genre_human} radio "
-            f"drama episode. From the numbered list below, choose the {top_k} "
+            f"You are picking news headlines for a radio drama episode. "
+            f"From the numbered list below, choose the {top_k} "
             f"headlines with the strongest narrative potential -- prefer "
             f"specific events, mysteries, breakthroughs, or human stakes "
             f"over generic announcements or PR pieces.\n\n"
@@ -1557,8 +1554,7 @@ def _llm_rank_news_candidates(
                         str(response)[:120])
             return list(pool[:top_k])
         ranked = [candidates[i] for i in indices]
-        log.info("[NewsFetcher] LLM-ranked top %d candidates for '%s':",
-                 len(ranked), genre_human)
+        log.info("[NewsFetcher] LLM-ranked top %d candidates:", len(ranked))
         for r in ranked:
             log.info("[NewsFetcher]   - %s", (r.get("headline") or "")[:80])
         return ranked
@@ -1570,7 +1566,6 @@ def _llm_rank_news_candidates(
 
 def _llm_rerank_with_bodies(
     candidates_with_body: list[dict],
-    style: str,
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
 ) -> list[dict]:
@@ -1602,10 +1597,9 @@ def _llm_rerank_with_bodies(
                 f"{i + 1}. HEADLINE: {headline}\n   ARTICLE: {body_preview}"
             )
         text = "\n\n".join(blocks)
-        genre_human = (style or "sci-fi").replace("_", " ")
         prompt = (
-            f"You are picking ONE news story to seed a {genre_human} radio "
-            f"drama. You have already shortlisted {len(candidates_with_body)} "
+            f"You are picking ONE news story to seed a radio drama. "
+            f"You have already shortlisted {len(candidates_with_body)} "
             f"candidates by headline. Now you can read each article body. "
             f"Choose the SINGLE story with the strongest narrative bones "
             f"for an audio drama: specific human stakes, "
@@ -1667,19 +1661,24 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
-def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
+def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard"):
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
     config/news_history.json, (b) calls the LLM to rank remaining
-    candidates by narrative fit for the requested style, and
-    (c) records the chosen article to history after selection.
+    candidates by narrative fit, and (c) records the chosen article to
+    history after selection.
+
+    Style-engine consolidation (2026-07-05): this stage runs BEFORE the
+    single style engine (which needs script_brief, not yet produced) --
+    ranking is style-agnostic by design; the `style` parameter and its
+    hardcoded "mission_control_procedural" fallback are removed entirely.
 
     Original fast-path behaviour (shuffle + first-with-enough-body) is
     preserved when model_id is None or LLM ranking fails -- the dedup
-    still works regardless. Shipped behind style + model_id so
-    legacy callers without those args fall back to the simple path.
+    still works regardless. Shipped behind model_id so legacy callers
+    without it fall back to the simple path.
 
     Uses ThreadPoolExecutor to hit all feeds simultaneously, dramatically
     reducing the wait time when feeds are slow or unresponsive. Each feed
@@ -1843,7 +1842,6 @@ def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kep
     if model_id and len(pool) > 5:
         ranked = _llm_rank_news_candidates(
             pool,
-            style=style,
             model_id=model_id,
             optimization_profile=optimization_profile,
             top_k=5,
@@ -1934,7 +1932,6 @@ def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kep
         if model_id and len(rich) > 1:
             rich = _llm_rerank_with_bodies(
                 rich,
-                style=style,
                 model_id=model_id,
                 optimization_profile=optimization_profile,
             )
@@ -1960,7 +1957,6 @@ def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kep
         _record_news_usage(
             url=chosen.get("link", ""),
             headline=chosen.get("headline", ""),
-            style=style,
         )
     except Exception as _hist_exc:  # noqa: BLE001
         log.warning("[NewsFetcher] history record failed (non-fatal): %s",
@@ -1981,7 +1977,6 @@ def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kep
             "url":          str(chosen.get("link", "")),
             "date":         str(chosen.get("date", "")),
             "body_chars":   len(chosen.get("full_text", "") or ""),
-            "style": str(style),
             "selected_at":  datetime.now().isoformat(timespec="seconds"),
         }
         _led.save()
@@ -2443,7 +2438,7 @@ def _extract_title_from_script_text(text):
     return cand
 
 
-def _derive_title_from_script_lines(lines, style=""):
+def _derive_title_from_script_lines(lines):
     """Deterministic fallback title when the LLM didn't emit one.
 
     Strategy: take the first 'environment' token's description, pick the
@@ -2475,8 +2470,7 @@ def _derive_title_from_script_lines(lines, style=""):
         pass
     # Final fallback: timestamped derivative so each run is unique and
     # the filename layer never regresses to a stuck default.
-    _style_label = (style or "transmission").replace("_", " ").title()
-    return f"{_style_label} Transmission {int(time.time()) % 100000}"
+    return f"Transmission {int(time.time()) % 100000}"
 
 
 def _extract_all_dialogue(text):

@@ -760,9 +760,9 @@ class LineRequest:
     composer's previous "speaker + intent + mood + canon header +
     last 3 lines" diet:
 
-      style_descriptor          full snake_case style for the episode
-                                (from _otr_style_picker). Empty string
-                                skips the STYLE block entirely.
+      style_descriptor          the episode's style label (from the
+                                style engine's StoryContract). Empty
+                                string skips the STYLE block entirely.
       outline_spine             one-line-per-beat compact rendering
                                 of the whole outline so the composer
                                 can see the arc it is participating

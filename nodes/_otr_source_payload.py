@@ -216,21 +216,24 @@ def validate_interpreter_result(result, origin: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_science_rss(*, bank, style_slug: str, technical_model: str) -> dict:
+def _fetch_science_rss(*, bank, technical_model: str) -> dict:
     """science_rss: verbatim wrapper around the writer's RSS fetcher.
 
-    Forwards (style_slug, technical_model) POSITIONALLY -- the S31 B6
-    slot-label/id agreement invariant (technical model routes the technical
-    re-rank slot) survives here, test-pinned."""
+    Forwards technical_model POSITIONALLY -- the S31 B6 slot-label/id
+    agreement invariant (technical model routes the technical re-rank
+    slot) survives here, test-pinned. Style-engine consolidation
+    (2026-07-05): style_slug removed -- the fetch/rerank chain is
+    style-agnostic now, there is no style value yet at this pre-contract
+    sourcing stage."""
     del bank  # science fetch needs no bank fields; contract signature only
     try:
         from . import OTR_LedgerScriptWriter as _writer
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import OTR_LedgerScriptWriter as _writer  # type: ignore
-    return _writer._fetch_rss_seed_or_die(style_slug, technical_model)
+    return _writer._fetch_rss_seed_or_die(technical_model)
 
 
-def _interpret_news(*, bank, payload: dict, technical_fn, style: str,
+def _interpret_news(*, bank, payload: dict, technical_fn,
                     model_id: str):
     """news_interpreter: verbatim wrapper around build_news_briefs.
 
@@ -239,6 +242,11 @@ def _interpret_news(*, bank, payload: dict, technical_fn, style: str,
     news-interpreter cache key stable (the seed widget was removed,
     BUG-LOCAL-269/270). Translates ONLY NewsInterpreterError ->
     SourceInterpretError (chained); ANY other exception propagates untouched.
+
+    Style-engine consolidation (2026-07-05): this stage runs BEFORE the
+    single style engine (build_story_contract needs script_brief, which
+    this call produces) -- there is no style value to feed it, and none
+    is needed; news interpretation is style-agnostic by design now.
     """
     del bank  # science interpret needs no bank fields; contract signature only
     try:
@@ -253,7 +261,6 @@ def _interpret_news(*, bank, payload: dict, technical_fn, style: str,
             summary=payload["summary"],
             outlet=payload["source"],
             pub_date=payload["date"],
-            style=style,
             seed=0,
             model_id=model_id,
         )
@@ -272,7 +279,7 @@ class FetcherEntry:
 
     seed_source is REGISTRY metadata (kibitz r1: the payload shape stays
     frozen; "rss_fetch" keeps the science ledger stamps byte-identical)."""
-    fetch: object  # callable(*, bank, style_slug, technical_model) -> dict
+    fetch: object  # callable(*, bank, technical_model) -> dict
     seed_source: str
 
 

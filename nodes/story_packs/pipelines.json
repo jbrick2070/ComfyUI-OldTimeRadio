@@ -9,8 +9,6 @@
       "declared_seams": [],
       "passes": [
         {"pass_id": "source_interpret", "slot": "technical", "seam_refs": [], "description": "Source brain -> briefs (science: news_interpreter.build_news_briefs; generated content fields, not templates)."},
-        {"pass_id": "style_pick_inventor", "slot": "creative", "seam_refs": ["style_pick_inventor_system", "style_pick_inventor_user"], "description": "Descriptor inventor (writer D.2 pass 1)."},
-        {"pass_id": "style_pick_chooser", "slot": "technical", "seam_refs": ["style_pick_chooser_system", "style_pick_chooser_user"], "description": "Descriptor chooser (writer D.2 pass 2)."},
         {"pass_id": "outline", "slot": "creative", "seam_refs": ["outline_macro_system", "outline_phase_system", "outline_beat_system"], "description": "Macro/phase/beat outline passes."},
         {"pass_id": "pitch_room", "slot": "creative", "seam_refs": [], "description": "Divergent pitch generation (prompt not pack-sourced yet)."},
         {"pass_id": "story_select", "slot": "technical", "seam_refs": [], "description": "Candidate grading/selection (prompt not pack-sourced yet)."},

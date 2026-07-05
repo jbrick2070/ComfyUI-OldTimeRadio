@@ -24,7 +24,9 @@ Pins:
      every recursive compose_line self-call forwards it (AST pin).
   6. _resolve_inputs carries source_bank as the one authoritative value.
   7. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
-     patch_widget_by_name lands it at slot 25 of the canonical workflow.
+     patch_widget_by_name lands it at slot 23 of the canonical workflow
+     (shifted -2 by the 2026-07-05 style-engine consolidation, which
+     deleted the style / style_custom widgets).
 """
 from __future__ import annotations
 
@@ -318,6 +320,7 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "source_bank", "science_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # 27 after Stage 3C appended visual_style; source_bank stays slot 25.
-        assert len(node1["widgets_values"]) == 27
-        assert node1["widgets_values"][25] == "science_news"
+        # 25 after the style-engine consolidation removed 2 widgets;
+        # source_bank stays at slot 23 (was 25 pre-rip-out).
+        assert len(node1["widgets_values"]) == 25
+        assert node1["widgets_values"][23] == "science_news"

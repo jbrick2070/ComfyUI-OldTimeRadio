@@ -259,23 +259,27 @@ def test_shipped_pipeline_flags():
 # ---------------------------------------------------------------------------
 
 def test_science_rss_wrapper_forwards_exact_args(monkeypatch):
+    """Style-engine consolidation (2026-07-05): the fetch/rerank chain is
+    style-agnostic now -- _fetch_rss_seed_or_die takes only model_id, and
+    the wrapper forwards it POSITIONALLY (single-arg call)."""
     calls = {}
 
-    def _fake(style, model_id):
-        calls["args"] = (style, model_id)
+    def _fake(model_id):
+        calls["args"] = (model_id,)
         return _payload()
 
     import nodes.OTR_LedgerScriptWriter as writer
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
     bank = routing.get_bank("science_news")
     entry = osp.resolve_fetcher(bank)
-    out = entry.fetch(bank=bank, style_slug="mission_control_procedural",
-                      technical_model="tm-id")
-    assert calls["args"] == ("mission_control_procedural", "tm-id")
+    out = entry.fetch(bank=bank, technical_model="tm-id")
+    assert calls["args"] == ("tm-id",)
     assert out == _payload()
 
 
 def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
+    """Style-engine consolidation (2026-07-05): news interpretation is
+    style-agnostic -- build_news_briefs no longer takes a style kwarg."""
     seen = {}
 
     def _fake(**kw):
@@ -288,7 +292,7 @@ def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
     interp = osp.resolve_interpreter(bank)
     payload = _payload()
     out = interp(bank=bank, payload=payload, technical_fn="TFN",
-                 style="styleX", model_id="m-id")
+                 model_id="m-id")
     assert out == "briefs-sentinel"
     # EXACT kwarg set incl. the RENAME mapping (source->outlet, date->pub_date)
     # and the constant seed=0 (cache-key stability, BUG-LOCAL-269/270).
@@ -299,7 +303,6 @@ def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
         "summary": payload["summary"],
         "outlet": payload["source"],
         "pub_date": payload["date"],
-        "style": "styleX",
         "seed": 0,
         "model_id": "m-id",
     }
@@ -320,7 +323,7 @@ def test_wrapper_translates_only_news_interpreter_error(monkeypatch):
     monkeypatch.setattr(ni, "build_news_briefs", _raise_nie)
     with pytest.raises(osp.SourceInterpretError, match="boom-nie") as ei:
         interp(bank=bank, payload=_payload(), technical_fn=None,
-               style="s", model_id="m")
+               model_id="m")
     assert isinstance(ei.value.__cause__, ni.NewsInterpreterError)
 
     def _raise_other(**kw):
@@ -329,7 +332,7 @@ def test_wrapper_translates_only_news_interpreter_error(monkeypatch):
     monkeypatch.setattr(ni, "build_news_briefs", _raise_other)
     with pytest.raises(ValueError, match="not-a-nie"):
         interp(bank=bank, payload=_payload(), technical_fn=None,
-               style="s", model_id="m")
+               model_id="m")
 
 
 # ---------------------------------------------------------------------------

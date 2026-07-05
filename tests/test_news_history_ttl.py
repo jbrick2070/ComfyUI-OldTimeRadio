@@ -227,7 +227,6 @@ def test_record_seeds_new_path_from_legacy_on_first_save(
     m._record_news_usage(
         url="https://newly-used.example/b",
         headline="freshly recorded",
-        style="noir",
     )
 
     # New path now contains BOTH entries: legacy seed + new append.

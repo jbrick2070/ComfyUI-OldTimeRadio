@@ -37,10 +37,10 @@ PRODUCTION_SEAM_ALLOWLIST = frozenset({
     "announcer_intro_system",
     "announcer_intro_safe_system",
     "announcer_outro_system",
-    "style_pick_inventor_system",
-    "style_pick_inventor_user",
-    "style_pick_chooser_system",
-    "style_pick_chooser_user",
+    # style_pick_inventor_system/_user and style_pick_chooser_system/_user
+    # REMOVED (style-engine consolidation, 2026-07-05): the two-pass LLM
+    # style picker they seamed is deleted; style is the single
+    # deterministic engine call now, with no pack-overridable prompts.
 })
 
 _REQUIRED_TOP_LEVEL = (

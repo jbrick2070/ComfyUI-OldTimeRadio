@@ -37,19 +37,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # ---------------------------------------------------------------------------
 
 
-def test_pick_style_accepts_paired_generators():
-    from nodes._otr_style_picker import pick_style
-
-    sig = inspect.signature(pick_style)
-    assert "creative_fn" in sig.parameters
-    assert "technical_fn" in sig.parameters
-    # Both must be keyword-only.
-    assert sig.parameters["creative_fn"].kind == inspect.Parameter.KEYWORD_ONLY
-    assert sig.parameters["technical_fn"].kind == inspect.Parameter.KEYWORD_ONLY
-    # Legacy positional `generate_fn` must be gone.
-    assert "generate_fn" not in sig.parameters
-
-
 def test_lock_cast_accepts_creative_fn_only():
     from nodes._otr_casting import lock_cast
 
@@ -106,70 +93,6 @@ def test_build_news_briefs_accepts_technical_fn_only():
 # `tests/test_pick_style_routing.py::_VALID_INVENTOR_RESPONSE`. Using
 # valid data makes the inventor pass genuinely succeed so the chooser
 # (pass 2) pass is actually exercised.
-_VALID_INVENTOR_RESPONSE = (
-    "1. closed_room_suspense\n"
-    "2. noir_interrogation\n"
-    "3. arctic_research_horror\n"
-    "4. desert_outpost_thriller\n"
-    "5. jungle_expedition_mystery\n"
-)
-
-
-def test_pick_style_routes_inventor_creative_and_chooser_technical():
-    """S32 B2 per-sub-pass routing: pick_style dispatches each pass
-    to its own slot. Pass 1 (inventor -- a narrative style-invention
-    pass) routes to `creative_fn`; pass 2 (chooser -- a structured
-    short-output index pick) routes to `technical_fn`.
-
-    The mock `creative_fn` returns five distinct valid snake_case
-    descriptors so the inventor pass genuinely succeeds -- only then
-    does control reach the chooser, letting us confirm pass 2 lands
-    on `technical_fn`. With both fns call-tracked independently, the
-    assertions below pin that the B2 flip is live.
-    """
-    from nodes import _otr_style_picker as sp
-
-    creative_calls: list[dict] = []
-    technical_calls: list[dict] = []
-
-    def creative_fn(messages, *, temperature, max_new_tokens):
-        creative_calls.append({"temperature": temperature, "max_new_tokens": max_new_tokens})
-        # Pass 1 inventor: five distinct valid descriptors.
-        return _VALID_INVENTOR_RESPONSE
-
-    def technical_fn(messages, *, temperature, max_new_tokens):
-        technical_calls.append({"temperature": temperature, "max_new_tokens": max_new_tokens})
-        # Pass 2 chooser: returns one candidate STRING (not an index).
-        return "closed_room_suspense"
-
-    rng = random.Random(42)
-    try:
-        sp.pick_style(
-            creative_fn=creative_fn,
-            technical_fn=technical_fn,
-            article_text="A test article about radio drama production.",
-            seed_pool=["s1", "s2", "s3", "s4", "s5", "s6"],
-            rng=rng,
-            model_id="test/model",
-        )
-    except Exception:
-        # The picker may fail validation downstream of our mocks;
-        # that's OK -- the routing assertions below are what we test.
-        pass
-
-    assert len(creative_calls) >= 1, (
-        "Pass 1 (inventor) must call creative_fn at least once "
-        f"(S32 B2 per-sub-pass routing); got {len(creative_calls)} "
-        f"creative call(s)."
-    )
-    assert len(technical_calls) >= 1, (
-        "Pass 2 (chooser) must call technical_fn at least once "
-        f"after the S32 B2 flip; got {len(technical_calls)} "
-        f"technical call(s). The inventor pass must succeed first "
-        f"so the chooser is actually reached."
-    )
-
-
 def test_lock_cast_internally_uses_creative_fn():
     """lock_cast runs every casting attempt on creative_fn -- the
     structured_call ladder has a single slot (S32 B3's technical-slot
@@ -272,7 +195,6 @@ def test_build_news_briefs_internally_uses_technical_fn():
             summary="A summary.",
             outlet="The Outlet",
             pub_date="2026-05-14",
-            style="noir",
             seed=42,
         )
     except Exception:
@@ -312,7 +234,6 @@ def test_build_news_briefs_all_retries_use_technical():
             summary="A summary.",
             outlet="The Outlet",
             pub_date="2026-05-14",
-            style="noir",
             seed=42,
             max_attempts=3,
         )

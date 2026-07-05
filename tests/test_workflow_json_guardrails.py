@@ -322,80 +322,17 @@ class TestWorkflowJson:
 
 
 # ---------------------------------------------------------------------------
-# Saved-default binding: the OTR_LedgerScriptWriter style widget MUST be
-# saved as the auto-derive sentinel so a fresh load runs the LLM-derives-
-# style-from-news path with no user intervention.
-#
-# History (2026-05-10): the sentinel mechanism was authored in commit
-# de34c95 but the saved workflow value drifted away from it through two
-# realignments (7077e54 + the post-fix), leaving the auto path dormant
-# for every production run. This test guards against re-drift.
-#
-# Slot layout (post-control_after_generate fix, 17-slot writer widget):
-#   [11] style  (combo with auto-sentinel as the canonical default)
-#
-# Hardcoded for the canonical workflow + the canonical writer slot. If
-# the writer's INPUT_TYPES order changes, this test must be updated in
-# lockstep with the workflow JSON (Prime Directive 3 — wire every change
-# into the workflow JSON).
+# Saved-default binding for the OTR_LedgerScriptWriter style widget was
+# RETIRED (2026-07-05, style-engine consolidation): style/style_custom
+# no longer exist as widgets at all -- the single deterministic engine
+# call (build_story_contract()) supplies style, with no dropdown/
+# sentinel/LLM-derive path left to drift. TestWriterStyleSentinelDefault
+# and its _WRITER_STYLE_SENTINEL / _WRITER_STYLE_SLOT constants are
+# deleted rather than repointed at a widget that no longer exists. See
+# docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.
 # ---------------------------------------------------------------------------
 
-# Mirror of nodes/OTR_LedgerScriptWriter._STYLE_AUTO_SENTINEL. Hardcoded
-# (not imported) so this test stays free of torch / transformers and
-# can run in any CI environment.
-_WRITER_STYLE_SENTINEL = "let the story decide"
-# Slot of OTR_LedgerScriptWriter.widgets_values holding the `style`
-# widget, in the current widget order (post BUG-LOCAL-269/270, which
-# removed the `seed` widget and its control_after_generate companion):
-#   0 episode_title / 1 target_words / 2 num_characters
-#   3 creative_writing_model / 4 technical_model / 5 custom_premise
-#   6 include_act_breaks / 7 act_count / 8 style  <- this slot
-#   9 style_custom / 10 creativity / 11 perfect_run_spacesaver
-#   12 min_p / 13 repetition_penalty / 14 max_new_tokens_cap
-#   15 enable_polish_pass / 16 lemmy_cameo
-# If the writer's INPUT_TYPES order changes, update this constant
-# in lockstep so the drift guard keeps catching the real regression.
-_WRITER_STYLE_SLOT = 8
 _CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
-
-
-class TestWriterStyleSentinelDefault:
-    def test_writer_style_widget_saved_as_auto_sentinel(self):
-        """The canonical workflow's OTR_LedgerScriptWriter node MUST
-        bind its style widget to the auto-derive sentinel. Any other
-        value silently disables the LLM-derives-style-from-news path
-        and freezes every run to one preset.
-        """
-        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
-        assert wf_path.is_file(), (
-            f"Canonical workflow {_CANONICAL_WORKFLOW!r} is missing "
-            f"from {WORKFLOWS_DIR}"
-        )
-        doc = _load_json(wf_path)
-        writers = [
-            n for n in doc.get("nodes", [])
-            if n.get("type") == "OTR_LedgerScriptWriter"
-        ]
-        assert len(writers) == 1, (
-            f"Expected exactly one OTR_LedgerScriptWriter node in "
-            f"{_CANONICAL_WORKFLOW}; found {len(writers)}"
-        )
-        wv = writers[0].get("widgets_values") or []
-        assert _WRITER_STYLE_SLOT < len(wv), (
-            f"OTR_LedgerScriptWriter widgets_values has only {len(wv)} "
-            f"entries; expected slot {_WRITER_STYLE_SLOT} for the "
-            f"style widget. Widget surface drift — re-check the writer "
-            f"INPUT_TYPES order vs the saved layout."
-        )
-        actual = wv[_WRITER_STYLE_SLOT]
-        assert actual == _WRITER_STYLE_SENTINEL, (
-            f"OTR_LedgerScriptWriter widgets_values[{_WRITER_STYLE_SLOT}] "
-            f"is {actual!r}; expected the auto-derive sentinel "
-            f"{_WRITER_STYLE_SENTINEL!r}. If you intentionally saved a "
-            f"specific preset as the default, update _WRITER_STYLE_SENTINEL "
-            f"in this test in lockstep — but be aware the auto-derive "
-            f"path will not fire on default runs."
-        )
 
 
 class TestVoicePathCleanbreakWiring:
@@ -633,10 +570,11 @@ class TestWriterB2aSurface:
     def test_writer_widget_migration_preserves_values(self):
         """Pin the writer's widgets_values layout. Post BUG-LOCAL-269/270
         the `seed` widget (and its control_after_generate companion) was
-        removed -- the vector dropped 19 -> 17 and every slot from
-        creative_writing_model onward shifted down by 2. Sprint 10A
-        step 3-C (2026-05-26) appends enable_stage1_shadow_pass at slot
-        17, raising the vector 17 -> 18.
+        removed. The 2026-07-05 style-engine consolidation then deleted
+        the `style` / `style_custom` widgets outright (slots 8/9) -- style
+        is no longer a widget at all, it comes from the single
+        deterministic build_story_contract() engine call -- shifting
+        every slot from `creativity` onward down by 2.
         """
         writer = self._writer()
         wv = writer.get("widgets_values", [])
@@ -649,113 +587,114 @@ class TestWriterB2aSurface:
         #   5  custom_premise             ""
         #   6  include_act_breaks         True
         #   7  act_count                  "auto"
-        #   8  style                      "let the story decide"
-        #   9  style_custom               ""
-        #  10  creativity                 "balanced"
-        #  11  perfect_run_spacesaver     False
-        #  12  min_p                      0.05
-        #  13  repetition_penalty         1.03
-        #  14  max_new_tokens_cap         200
-        #  15  lemmy_cameo                "roll (~11% chance)"
-        #  16  use_exchange                       True      (Build 4)
-        #  17  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
-        #  18  news_briefs_required               True      (Sprint 2.2)
-        # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270)
-        # -- vector 19 -> 17; the 2026-05-29 lean-down removed
-        # use_multiturn_dialogue (step 5), enable_stage1_shadow_pass +
-        # use_stage1_fanout (step 7), and enable_polish_pass (step 9) --
-        # vector 23 -> 19. use_exchange / Stage 3 validators / news briefs
-        # are the surviving optional flags. S2 (2026-06-01) appended
-        # openrouter_slot_a_model + openrouter_slot_b_model at slots 19/20
-        # (END of optional). 2026-06-01 (Comfy Credits) appended the sibling
-        # pair comfy_slot_a_model + comfy_slot_b_model at slots 21/22, so the
-        # vector is now 23 with [0..20] intact.
-        assert len(wv) == 27, (
-            f"writer widgets_values length drift: {len(wv)} (expected 27: "
-            f"the 2026-05-29 lean-down brought it to 19, S2 appended the "
-            f"OpenRouter pair -> 21, Comfy Credits appended "
-            f"comfy_slot_a_model + comfy_slot_b_model -> 23, the refine "
-            f"loop (2026-06-23) appended refine_target_grade -> 24, the "
-            f"story-scaffold toggle (2026-06-24) appended story_scaffold "
-            f"-> 25, Stage 2C (2026-07-05) appended source_bank -> 26, "
-            f"then Stage 3C (2026-07-06) appended visual_style -> 27)"
+        #   8  creativity                 "balanced"
+        #   9  perfect_run_spacesaver     False
+        #  10  min_p                      0.05
+        #  11  repetition_penalty         1.03
+        #  12  max_new_tokens_cap         200
+        #  13  lemmy_cameo                "roll (~11% chance)"
+        #  14  use_exchange                       True      (Build 4)
+        #  15  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
+        #  16  news_briefs_required               True      (Sprint 2.2)
+        #  17  openrouter_slot_a_model
+        #  18  openrouter_slot_b_model
+        #  19  comfy_slot_a_model
+        #  20  comfy_slot_b_model
+        #  21  refine_target_grade
+        #  22  story_scaffold
+        #  23  source_bank
+        #  24  visual_style
+        # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
+        # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
+        # appended the OpenRouter pair; Comfy Credits appended its sibling
+        # pair; the refine loop (2026-06-23) appended refine_target_grade;
+        # the story-scaffold toggle (2026-06-24) appended story_scaffold;
+        # Stage 2C (2026-07-05) appended source_bank; Stage 3C (2026-07-06)
+        # appended visual_style -- bringing the vector to 27. The 2026-07-05
+        # style-engine consolidation then DELETED style + style_custom
+        # (slots 8/9), dropping the vector to 25 and shifting every
+        # subsequent slot down by 2.
+        assert len(wv) == 25, (
+            f"writer widgets_values length drift: {len(wv)} (expected 25 "
+            f"post style-engine consolidation: 27 minus the deleted "
+            f"style/style_custom pair)"
         )
-        # Slot 16: use_exchange -- the live grouped-exchange dialogue path
+        # Slot 14: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
-        assert wv[16] is True, (
-            f"use_exchange (slot 16) must be ON in the shipped bake; "
-            f"got {wv[16]!r}"
+        assert wv[14] is True, (
+            f"use_exchange (slot 14) must be ON in the shipped bake; "
+            f"got {wv[14]!r}"
         )
-        # Slot 17: enable_production_stage3_validators (ON in the shipped
+        # Slot 15: enable_production_stage3_validators (ON in the shipped
         # bake).
-        assert wv[17] is True, (
-            f"enable_production_stage3_validators (slot 17); got {wv[17]!r}"
+        assert wv[15] is True, (
+            f"enable_production_stage3_validators (slot 15); got {wv[15]!r}"
         )
-        # Slot 18: news_briefs_required (ON in the shipped bake).
-        assert wv[18] is True, (
-            f"news_briefs_required (slot 18); got {wv[18]!r}"
+        # Slot 16: news_briefs_required (ON in the shipped bake).
+        assert wv[16] is True, (
+            f"news_briefs_required (slot 16); got {wv[16]!r}"
         )
-        # Slots 19/20: the S2 OpenRouter slot-slug pickers, appended at the
+        # Slots 17/18: the S2 OpenRouter slot-slug pickers, appended at the
         # END. PRODUCTION RESTORE 2026-06-10: the shipped bake previously
         # pinned the recommended slugs, but ComfyUI's /prompt validator
         # REJECTS an out-of-catalog value whenever the remote lane is OFF
         # (value_not_in_list) -- the saved file would not queue AS-IS. The
         # bake now ships the DISABLED SENTINELS; an operator who enables a
         # lane picks a slug in the UI and the preservation rule keeps it.
-        assert wv[19] == "(enable OpenRouter)", (
-            f"openrouter_slot_a_model (slot 19) must ship the disabled "
+        assert wv[17] == "(enable OpenRouter)", (
+            f"openrouter_slot_a_model (slot 17) must ship the disabled "
             f"sentinel (the saved file must queue with lanes off); got "
-            f"{wv[19]!r}"
+            f"{wv[17]!r}"
         )
-        assert wv[20] == "(enable OpenRouter)", (
-            f"openrouter_slot_b_model (slot 20) must ship the disabled "
-            f"sentinel; got {wv[20]!r}"
+        assert wv[18] == "(enable OpenRouter)", (
+            f"openrouter_slot_b_model (slot 18) must ship the disabled "
+            f"sentinel; got {wv[18]!r}"
         )
-        # Slots 21/22: the Comfy Credits slot-slug pickers -- same sentinel
-        # rule as 19/20.
-        assert wv[21] == "(enable Comfy Credits)", (
-            f"comfy_slot_a_model (slot 21) must ship the disabled sentinel; "
-            f"got {wv[21]!r}"
+        # Slots 19/20: the Comfy Credits slot-slug pickers -- same sentinel
+        # rule as 17/18.
+        assert wv[19] == "(enable Comfy Credits)", (
+            f"comfy_slot_a_model (slot 19) must ship the disabled sentinel; "
+            f"got {wv[19]!r}"
         )
-        assert wv[22] == "(enable Comfy Credits)", (
-            f"comfy_slot_b_model (slot 22) must ship the disabled sentinel; "
-            f"got {wv[22]!r}"
+        assert wv[20] == "(enable Comfy Credits)", (
+            f"comfy_slot_b_model (slot 20) must ship the disabled sentinel; "
+            f"got {wv[20]!r}"
         )
-        # Slot 23: refine_target_grade (refine loop v1, 2026-06-23) -- APPENDED
+        # Slot 21: refine_target_grade (refine loop v1, 2026-06-23) -- APPENDED
         # at the END; ships "Off" (the loop is default-OFF / byte-identical).
-        assert wv[23] == "Off", (
-            f"refine_target_grade (slot 23) must ship 'Off' (the refine loop is "
-            f"default-OFF in the shipped bake); got {wv[23]!r}"
+        assert wv[21] == "Off", (
+            f"refine_target_grade (slot 21) must ship 'Off' (the refine loop is "
+            f"default-OFF in the shipped bake); got {wv[21]!r}"
         )
-        # Slot 24: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
+        # Slot 22: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
         # (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
-        assert wv[24] == "auto", (
-            f"story_scaffold (slot 24) must ship 'auto' (follow the env/default "
-            f"scaffold setting in the shipped bake); got {wv[24]!r}"
+        assert wv[22] == "auto", (
+            f"story_scaffold (slot 22) must ship 'auto' (follow the env/default "
+            f"scaffold setting in the shipped bake); got {wv[22]!r}"
         )
-        # Slot 25: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
+        # Slot 23: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
         # -- APPENDED at the END; ships the production science lane AND must
         # be a REGISTERED bank id (cross-checked against the live routing
         # registry so a re-order / typo cannot ship silently).
-        assert wv[25] == "science_news", (
-            f"source_bank (slot 25) must ship 'science_news' (the production "
-            f"story lane); got {wv[25]!r}"
+        assert wv[23] == "science_news", (
+            f"source_bank (slot 23) must ship 'science_news' (the production "
+            f"story lane); got {wv[23]!r}"
         )
         from nodes import _otr_story_routing as _routing
-        assert wv[25] in _routing.list_bank_ids(), (
-            f"source_bank (slot 25) value {wv[25]!r} is not a registered "
+        assert wv[23] in _routing.list_bank_ids(), (
+            f"source_bank (slot 23) value {wv[23]!r} is not a registered "
             f"bank id: {_routing.list_bank_ids()!r}"
         )
-        # Slot 26: visual_style (Stage 3C multi-modal story schema,
+        # Slot 24: visual_style (Stage 3C multi-modal story schema,
         # 2026-07-06) -- APPENDED at the END; ships the production look AND
         # must be a REGISTERED style id (live registry cross-check).
-        assert wv[26] == "sci_fi_radio", (
-            f"visual_style (slot 26) must ship 'sci_fi_radio' (the "
-            f"production look); got {wv[26]!r}"
+        assert wv[24] == "sci_fi_radio", (
+            f"visual_style (slot 24) must ship 'sci_fi_radio' (the "
+            f"production look); got {wv[24]!r}"
         )
         from nodes import _otr_visual_styles as _vstyles
-        assert wv[26] in _vstyles.list_style_ids(), (
-            f"visual_style (slot 26) value {wv[26]!r} is not a registered "
+        assert wv[24] in _vstyles.list_style_ids(), (
+            f"visual_style (slot 24) value {wv[24]!r} is not a registered "
             f"style id: {_vstyles.list_style_ids()!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
@@ -767,14 +706,11 @@ class TestWriterB2aSurface:
             f"technical_model widget value not a non-empty string: "
             f"{wv[4]!r}"
         )
-        assert wv[8] == "let the story decide", (
-            f"style widget drifted from canonical default: {wv[8]!r}"
+        assert wv[8] == "balanced", (
+            f"creativity widget drifted: {wv[8]!r}"
         )
-        assert wv[10] == "balanced", (
-            f"creativity widget drifted: {wv[10]!r}"
-        )
-        assert wv[11] is False, (
-            f"perfect_run_spacesaver widget drifted from slot 11: {wv[11]!r}"
+        assert wv[9] is False, (
+            f"perfect_run_spacesaver widget drifted from slot 9: {wv[9]!r}"
         )
 
     def test_writer_broadcasts_normalized_model_ids(self):

@@ -1,7 +1,9 @@
 """nodes/news_interpreter.py -- agnostic news-article distillation stage.
 
-Inserts ONE control-plane LLM call between style-resolution (D.2) and
-cast-lock (D.3) in OTR_LedgerScriptWriter. Reads the full article body,
+Inserts ONE control-plane LLM call before cast-lock (D.3) in
+OTR_LedgerScriptWriter, ahead of the style engine (which needs
+script_brief and cannot run yet at this pre-contract sourcing stage).
+Reads the full article body,
 emits four purpose-specific briefs that downstream consumers read
 INSTEAD of raw `news_seed`:
 
@@ -26,8 +28,8 @@ Key rules:
     Mistral/Gemma/Qwen names anywhere in this file. Loader-side
     integration (Gemma 4 + MTP, llama.cpp + GBNF, vLLM, HF Trans-
     formers) is opaque to this module.
-  - No hardcoded period literals. Era flavor lives in `style` only.
-  - Validator + reroll is the safety net. The V0-V3 LLM call routes
+  - No hardcoded period literals.
+  - Validator + reroll is the safety net. The V0-V2 LLM call routes
     through the shared `structured_call` retry ladder (base ->
     structural retry -> typed repair); a structural re-roll LOWERS
     temperature rather than raising it (the Sprint 2B principle).
@@ -49,7 +51,6 @@ Public surface
   v1_validate(brief, *, source_text)  -- key_terms word-boundary check.
   v2_validate(brief, *, source_text)  -- period literals with source-
                                          context allowance.
-  v3_validate(brief, *, style)        -- formulaic style-mention only.
   build_source_wrapper(...)           -- inert-source prompt wrapper.
   compute_cache_key(...)              -- sha256 over the cache axes.
   extract_json_block(raw)             -- fence-tolerant JSON extractor.
@@ -466,44 +467,6 @@ def v2_validate(
     return failures
 
 
-def v3_validate(
-    brief: NewsBriefs,
-    *,
-    style: str,
-) -> list[str]:
-    """V3 -- reject formulaic style-mention phrasing, not bare style
-    word occurrence.
-
-    Per ADR section 4.3. A brief for a "noir mystery" episode can
-    legitimately say "the central mystery" -- that's noun usage. It
-    cannot say "in a noir style", "as a noir story", "make this
-    noir", or "noir-style detective" -- the LLM telling instead of
-    showing.
-
-    Empty / missing style short-circuits to no failures.
-    """
-    failures: list[str] = []
-    style_clean = (style or "").strip()
-    if not style_clean:
-        return failures
-    style_escaped = re.escape(style_clean)
-    formulaic_patterns = (
-        rf"\bin\s+a\s+{style_escaped}\s+(?:style|tone|register)\b",
-        rf"\bas\s+a\s+{style_escaped}\s+(?:story|drama|piece)\b",
-        rf"\bmake\s+this\s+(?:into\s+)?a?\s*{style_escaped}\b",
-        rf"\b{style_escaped}-style\b",
-    )
-    fields = ("casting_brief", "script_brief", "news_close_brief")
-    for field_name in fields:
-        text = getattr(brief, field_name)
-        for pat in formulaic_patterns:
-            if re.search(pat, text, re.IGNORECASE):
-                failures.append(
-                    f"V3: formulaic style phrasing {pat!r} in {field_name}"
-                )
-    return failures
-
-
 # ---------------------------------------------------------------------------
 # Source wrapper (prompt-injection defense)
 # ---------------------------------------------------------------------------
@@ -578,7 +541,6 @@ def build_source_wrapper(
 def compute_cache_key(
     *,
     source_hash: str,
-    style: str,
     prompt_version: str,
     schema_version: str,
     model_id: str,
@@ -589,14 +551,13 @@ def compute_cache_key(
 
     Stored at ``ledger.meta.news.cache_key``. Lookup hits only when
     every field matches. Any change to article body (-> source_hash),
-    style, prompt version, schema, model, decoder profile, or seed
-    forces regeneration.
+    prompt version, schema, model, decoder profile, or seed forces
+    regeneration.
 
     Per ADR section 3.3.
     """
     joined = "|".join((
         source_hash or "",
-        style or "",
         prompt_version or "",
         schema_version or "",
         model_id or "",
@@ -687,7 +648,6 @@ def _build_user_prompt(
     outlet: str,
     pub_date: str,
     cleaned_body: str,
-    style: str,
 ) -> str:
     """Compose the lean prompt body.
 
@@ -716,8 +676,6 @@ def _build_user_prompt(
         "short strings; people, places, technology verbatim from "
         "the source -- singular or plural must match the source).\n"
         "\n"
-        f"Style: {style}\n"
-        "\n"
         f"{wrapper}\n"
         "Return ONE JSON object. No prose. No code fences.\n"
     )
@@ -736,7 +694,6 @@ def build_news_briefs(
     summary: str = "",
     outlet: str = "",
     pub_date: str = "",
-    style: str,
     seed: int,
     model_id: str = "",
     decoder_profile: str = DEFAULT_DECODER_PROFILE,
@@ -797,7 +754,6 @@ def build_news_briefs(
         outlet=outlet,
         pub_date=pub_date,
         cleaned_body=cleaned_body,
-        style=style,
     )
     messages = [{"role": "user", "content": user_prompt}]
 
@@ -821,7 +777,6 @@ def build_news_briefs(
             judge_fn=_counting_slot_fn,
         ))
         v_failures.extend(v2_validate(brief, source_text=source_text_full))
-        v_failures.extend(v3_validate(brief, style=style))
         return v_failures
 
     def _content_validator(brief: NewsBriefs) -> str | None:

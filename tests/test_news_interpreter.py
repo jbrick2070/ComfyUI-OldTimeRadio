@@ -1,9 +1,13 @@
 """tests/test_news_interpreter.py -- unit tests for the news_interpreter
 canary stage.
 
-Covers ADR docs/news_interpreter_adr.md section 8 cases 3, 4, 5, 6, 7,
-8, 9, 11 (the module-level subset; integration cases 1, 2, 12 live in
-test_downstream_prompt_contract.py).
+Covers ADR docs/news_interpreter_adr.md section 8 cases 3, 4, 5, 8, 9,
+11 (the module-level subset; integration cases 1, 2, 12 live in
+test_downstream_prompt_contract.py). Cases 6 and 7 (V3 formulaic-style
+rejection and style-keyed cache invalidation) were retired with the
+style-engine consolidation (2026-07-05): v3_validate and the style
+axis of compute_cache_key no longer exist -- style is no longer a
+brief-level concept resolved from a widget/picker.
 
 Status (2026-05-10)
 -------------------
@@ -473,84 +477,15 @@ class TestBugLocal264SemanticFallback:
 
 
 # ---------------------------------------------------------------------------
-# ADR Case 6 -- V3 formulaic-only style rejection
+# ADR Cases 6 and 7 retired -- style-engine consolidation (2026-07-05)
 # ---------------------------------------------------------------------------
-
-
-def test_v3_allows_common_noun_overlap_with_style_label():
-    """V3 must not reject 'mystery' just because the style is 'noir
-    mystery'. Common nouns ('mystery', 'horror', 'space', 'newsroom')
-    overlap style labels and would false-reject if V3 was a bare
-    substring check.
-
-    ADR section 4.3 -- formulaic-pattern-only rejection.
-    """
-    brief = news_interpreter.NewsBriefs(
-        casting_brief=(
-            "A detective and a witness who disagree on the central "
-            "mystery."
-        ),
-        script_brief="A mystery unfolds across one night in the newsroom.",
-        news_close_brief="The discovery raises new questions tonight.",
-        key_terms=["detective", "newsroom"],
-    )
-    failures = news_interpreter.v3_validate(brief, style="noir mystery")
-    assert failures == [], (
-        "V3 must not reject 'mystery' as a noun usage even when style "
-        f"is 'noir mystery'; failures: {failures!r}"
-    )
-
-
-def test_v3_rejects_formulaic_style_phrasing():
-    brief = news_interpreter.NewsBriefs(
-        casting_brief="A detective in a noir style and a skeptical witness.",
-        script_brief="A standard plot setup.",
-        news_close_brief="A standard close.",
-        key_terms=["detective"],
-    )
-    failures = news_interpreter.v3_validate(brief, style="noir")
-    assert any("V3" in f for f in failures), (
-        f"V3 must reject 'in a noir style' phrasing; failures: {failures!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# ADR Case 7 -- cache invalidation on style change
-# ---------------------------------------------------------------------------
-
-
-def test_cache_key_changes_with_style():
-    base_kwargs = dict(
-        source_hash="abc123",
-        prompt_version="news_interpreter_v1",
-        schema_version="l3-2026-05-14",
-        model_id="mistral-nemo",
-        decoder_profile="default_v1",
-        seed=42,
-    )
-    key_a = news_interpreter.compute_cache_key(style="noir", **base_kwargs)
-    key_b = news_interpreter.compute_cache_key(
-        style="cosmic horror", **base_kwargs,
-    )
-    assert key_a != key_b, (
-        "Cache key must change when style changes; otherwise a style "
-        "swap would silently reuse stale briefs."
-    )
-
-
-def test_cache_key_stable_under_no_change():
-    kwargs = dict(
-        source_hash="abc123", style="noir",
-        prompt_version="news_interpreter_v1",
-        schema_version="l3-2026-05-14",
-        model_id="mistral-nemo",
-        decoder_profile="default_v1",
-        seed=42,
-    )
-    assert (
-        news_interpreter.compute_cache_key(**kwargs)
-        == news_interpreter.compute_cache_key(**kwargs)
-    )
+#
+# v3_validate (formulaic style-mention rejection) and the style axis of
+# compute_cache_key were removed: style is no longer a brief-level
+# concept threaded from a widget/picker into news_interpreter. The
+# single deterministic StoryContract now supplies style downstream of
+# the writer, not as an input to the news-brief validators or cache
+# key. See docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.
 
 
 # ---------------------------------------------------------------------------
@@ -610,7 +545,6 @@ def test_byte_identical_with_mocked_generate_fn():
             full_text=_GOOD_SOURCE,
             headline="Signal detected",
             summary=_GOOD_SOURCE[:120],
-            style="noir",
             seed=42,
         )
         # Pydantic v2: model_dump_json. Older v1 code uses .json().

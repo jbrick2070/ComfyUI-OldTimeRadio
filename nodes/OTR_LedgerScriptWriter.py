@@ -6,9 +6,10 @@ Pipeline (unchanged from v2.0 LPL):
     2. Resolve effective values:
        - news_seed = custom_premise verbatim if non-empty,
          else RSS auto-fetch via story_orchestrator._fetch_science_news.
-       - style = style_custom if non-empty, else style combo (with
-         "let the story decide" sentinel deferred to a two-pass
-         picker once the LLM is loaded, see _otr_style_picker).
+       - style = the single deterministic engine call,
+         _otr_style_catalog.build_story_contract(), made once cast_seed
+         and script_brief both exist (style-engine consolidation,
+         2026-07-05). No widget, no LLM picker.
        - target_words from widget, optionally overridden by smoke
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
@@ -79,10 +80,6 @@ Widget surface (current as of 2026-05-23):
                                     beats between acts; False -> continuous)
         act_count         combo   ('auto' derives the act count from
                                    target_words; '1'-'7' set it explicitly)
-        style             combo   (tonal preset; "let the story decide"
-                                   defers to two-pass LLM picker)
-        style_custom      STRING  (free-text override; empty falls back
-                                   to style combo)
         creativity        combo   (maps to temperature + top_p preset)
         perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for
                                         RTXUpscale spacesaver)
@@ -249,63 +246,13 @@ _LEMMY_CAMEO_FORCE = {
 
 
 # ---------------------------------------------------------------------------
-# Style widget surface — three-way (Jeffrey 2026-05-10):
-#   1. Free-text override (`style_custom`) wins when non-empty.
-#   2. `style` combo set to "let the story decide" -> LLM analyzes the
-#      news story and proposes a 3-6 word tonal descriptor; that
-#      descriptor flows into both character generation and script
-#      generation. This is the SAVED DEFAULT in
-#      workflows/otr_scifi_16gb_full.json so a fresh load runs the
-#      auto-derive path with no user intervention.
-#   3. Any other combo entry -> used verbatim.
-# Both axes — story (custom_premise/RSS) AND style (combo/auto/custom) —
-# drive story content; the user wants both selectable.
+# Style engine (style-engine consolidation, 2026-07-05): there is no
+# widget-level style surface anymore. Every episode's style comes from
+# exactly ONE call, `_otr_style_catalog.build_story_contract()`, made in
+# run() once cast_seed and script_brief both exist. The old `style` /
+# `style_custom` widgets, the three-way resolver, the two-pass LLM
+# picker (`_otr_style_picker.py`), and the 10-slug seed pool are gone.
 # ---------------------------------------------------------------------------
-
-_STYLE_AUTO_SENTINEL = "let the story decide"
-
-_STYLE_CHOICES = [
-    _STYLE_AUTO_SENTINEL,
-    "closed room suspense",
-    "detective case file",
-    "pulp serial cliffhanger",
-    "mission control procedural",
-    "deep space distress call",
-    "noir interrogation",
-    "small town uncanny",
-    "radio newsroom emergency",
-    "haunted broadcast signal",
-    "laboratory containment",
-]
-
-_LLM_STYLE_FALLBACK = "mission control procedural"
-"""Hardcoded slug used by the RSS reranker (`_fetch_rss_seed_or_die`)
-ONLY, when style is still pending (sentinel selected, picker hasn't
-fired yet — chicken-and-egg: RSS fetch happens BEFORE the style
-picker since the picker needs the article to derive style from).
-NOT used as a fallback by the picker itself — see
-`_otr_style_picker.pick_style`, which raises
-`StyleGenerationFailedError` on any failure path per Jeffrey
-2026-05-10: a failed picker fails the workflow."""
-
-
-# Pool fed to the two-pass style picker as "seed flavors" (inspiration
-# only; not echoed back). Same 10 slugs as the user-facing dropdown
-# minus the auto-sentinel — the sentinel is a UX label, not a style.
-# Random sample of 5 per call (deterministic via writer's seed RNG
-# for C7 byte-identity).
-_STYLE_PICKER_SEED_POOL: tuple[str, ...] = (
-    "closed_room_suspense",
-    "detective_case_file",
-    "pulp_serial_cliffhanger",
-    "mission_control_procedural",
-    "deep_space_distress_call",
-    "noir_interrogation",
-    "small_town_uncanny",
-    "radio_newsroom_emergency",
-    "haunted_broadcast_signal",
-    "laboratory_containment",
-)
 
 
 # Sprint C C3 (2026-05-15): _GENRE_BY_STYLE table + _resolve_genre +
@@ -803,18 +750,6 @@ def _build_truncating_generate_fn(
 # ---------------------------------------------------------------------------
 
 
-# NOTE: the prior single-shot picker `_generate_style_via_llm` was
-# replaced by the two-pass picker in `nodes/_otr_style_picker.py`
-# (commit landing 2026-05-10). The two-pass design (Pass 1 inventor
-# producing 5 distinct candidates + Pass 2 chooser picking one)
-# fixed the mode-collapse problem the single-shot picker suffered
-# from -- every Mistral-Nemo run defaulted to "tense industrial
-# procedural" or close. The fail-loud policy from commit 62e85f2
-# carries through: any picker failure raises
-# `_otr_style_picker.StyleGenerationFailedError` and halts the
-# workflow. See the picker module for design rationale.
-
-
 def _build_title_excerpt_set(
     assembled_script: str,
     *,
@@ -1114,34 +1049,15 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
     return random.SystemRandom().getrandbits(32), "OS entropy"
 
 
-def _resolve_style_rng_seed() -> tuple[int, str]:
-    """Return (seed, source) for the per-episode style-picker RNG.
-
-    BUG-LOCAL-270 (twin of BUG-LOCAL-269): the style picker's Pass-1
-    inventor samples 5 "seed flavors" from the inspiration pool; that
-    sampling RNG was seeded from the `seed` widget, so a fixed seed
-    sampled the identical 5 flavors every episode. Production now draws
-    a fresh OS-entropy seed each episode so the sampled flavors vary.
-
-    The OTR_STYLE_SEED environment variable forces a fixed seed -- the
-    C7 audio byte-identity reproducibility path. Set it in ComfyUI's
-    environment before a baseline-capture or regression run.
-    """
-    import os
-    import random
-    env = os.environ.get("OTR_STYLE_SEED", "").strip()
-    if env:
-        return int(env), "OTR_STYLE_SEED override"
-    return random.SystemRandom().getrandbits(32), "OS entropy"
-
-
-def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
+def _fetch_rss_seed_or_die(model_id: str) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
-    Lifts the exact path the legacy writer used. `style` is mapped to
-    the closest legacy slug for the LLM re-rank step; if the fetcher
-    returns None (every feed failed) we raise loudly -- the legacy
-    writer behaved the same.
+    Lifts the exact path the legacy writer used; if the fetcher returns
+    None (every feed failed) we raise loudly -- the legacy writer behaved
+    the same. Style-engine consolidation (2026-07-05): the old style ->
+    slug normalization (with a hardcoded "mission_control_procedural"
+    fallback) is removed -- the fetch/rerank chain is style-agnostic now,
+    there is no style value yet at this pre-contract sourcing stage.
 
     Return shape (commit 3 of the news_interpreter sprint, ADR
     docs/news_interpreter_adr.md section 9.1): a dict with keys
@@ -1157,24 +1073,8 @@ def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
             from . import story_orchestrator as _so
         except ImportError:
             import story_orchestrator as _so  # type: ignore
-        # Style normalization: re-ranker expects a slug like "hard_sci_fi";
-        # use the closest match or fall back to the canonical default.
-        slug = (style or "").lower().replace(" ", "_").replace("-", "_")
-        if slug not in {
-            "closed_room_suspense",
-            "detective_case_file",
-            "pulp_serial_cliffhanger",
-            "mission_control_procedural",
-            "deep_space_distress_call",
-            "noir_interrogation",
-            "small_town_uncanny",
-            "radio_newsroom_emergency",
-            "haunted_broadcast_signal",
-            "laboratory_containment",
-        }:
-            slug = "mission_control_procedural"
         news = _so._fetch_science_news(
-            max_feeds=10, style=slug, model_id=model_id,
+            max_feeds=10, model_id=model_id,
             optimization_profile="Standard",
         )
         if not news:
@@ -1236,8 +1136,6 @@ def _resolve_inputs(
     custom_premise: str = "",
     include_act_breaks: bool = True,
     act_count: str = "auto",
-    style: str = _STYLE_AUTO_SENTINEL,
-    style_custom: str = "",
     creativity: str = "balanced",
     optimization_profile: str = "Standard",
     perfect_run_spacesaver: bool = False,
@@ -1275,24 +1173,15 @@ def _resolve_inputs(
     """Resolve raw widget values into the effective set used by the run.
 
     Returns a single dict. Logs at INFO for branches that override the
-    widget value (RSS fetch, smoke preset, style_custom override).
+    widget value (RSS fetch, smoke preset).
 
-    Both story and style follow the same dual-axis pattern (per Jeffrey
-    2026-05-10 "there is the story, and the style — those two drive
-    story content so we need both"):
+    Story: custom_premise verbatim > RSS auto-fetch.
 
-      - story:   custom_premise verbatim > RSS auto-fetch.
-      - style:   style_custom verbatim > `style` combo verbatim, EXCEPT
-                 when combo == `_STYLE_AUTO_SENTINEL`, in which case
-                 the writer defers to ``_generate_style_via_llm``
-                 once the model is loaded. This helper returns
-                 ``style_pending=True`` on the dict in that case so
-                 the caller knows to call the LLM.
-
-    Resolution order for the final style string:
-      1. style_custom (free-text, takes precedence)
-      2. style combo verbatim if != _STYLE_AUTO_SENTINEL
-      3. LLM-generated (caller fills `resolved["style"]` post-load)
+    Style-engine consolidation (2026-07-05): there is no `style` widget
+    input anymore. Every episode's style comes from exactly ONE call --
+    ``_otr_style_catalog.build_story_contract()`` -- made later in
+    ``run()`` once cast_seed and script_brief both exist. The old
+    three-way style_custom/combo/LLM-picker resolver is gone.
     """
     # S30 B2a: normalize each model id by stripping the [NOT DOWNLOADED]
     # dropdown suffix. Raw widget values never reach a consumer / meta
@@ -1342,22 +1231,6 @@ def _resolve_inputs(
     temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
 
-    sc = (style_custom or "").strip()
-    style_combo = (style or "").strip()
-    if sc:
-        resolved_style = sc
-        style_source = "style_custom"
-        style_pending = False
-    elif style_combo and style_combo != _STYLE_AUTO_SENTINEL:
-        resolved_style = style_combo
-        style_source = "style_combo"
-        style_pending = False
-    else:
-        # auto / empty -> defer to LLM post-load.
-        resolved_style = ""        # caller fills
-        style_source = "llm_auto"
-        style_pending = True
-
     if custom:
         # Custom premise path: synthesize the same dict shape RSS
         # would produce so news_interpreter sees a uniform article
@@ -1374,11 +1247,6 @@ def _resolve_inputs(
         news_seed = custom
         seed_source = "custom_premise"
     else:
-        # Best-effort RSS re-rank slug. If style is still pending
-        # (auto/LLM), use the hardcoded fallback only for the slug --
-        # the writer's final style still gets LLM-proposed from the
-        # ACTUAL fetched article below.
-        rss_style_slug = resolved_style or _LLM_STYLE_FALLBACK
         # S31 B6 Fix 1: pass `technical_model`. Post-S31 B3, the RSS
         # rerank path inside `_fetch_rss_seed_or_die` routes through
         # `_otr_model_loader.request_slot("technical", model_id)` (both
@@ -1398,12 +1266,14 @@ def _resolve_inputs(
         # built fetcher lane raises SourceContractMissingError LOUD here --
         # never a silent slide into the science path. Resolution sits OUTSIDE
         # any try/except by design (no swallow).
+        # Style-engine consolidation (2026-07-05): the fetch is
+        # style-agnostic now -- there is no style value yet at this
+        # pre-contract sourcing stage, and none is needed for rerank.
         _fetch_bank = _otr_story_routing.get_bank(source_bank or "science_news")
         _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
         news_article = _otr_source_payload.validate_source_payload(
             _fetch_entry.fetch(
                 bank=_fetch_bank,
-                style_slug=rss_style_slug,
                 technical_model=technical_model,
             ),
             origin=(
@@ -1418,11 +1288,6 @@ def _resolve_inputs(
         "news_seed":            news_seed,
         "news_article":         news_article,
         "seed_source":          seed_source,
-        "style":                resolved_style,
-        "style_source":         style_source,
-        "style_pending":        style_pending,
-        "style_combo":          style_combo,
-        "style_custom":         sc,
         "target_words":         target_words,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
@@ -1742,7 +1607,9 @@ class OTR_LedgerScriptWriter:
     _otr_line_composer, _otr_model_loader) plus production_ledger
     into the legacy 4-slot output contract. Widget set restored 2026-05-10
     so users get back episode_title / target_words / num_characters /
-    creativity / target_length / style / style_custom / model controls.
+    creativity / target_length / model controls. Style is no longer a
+    widget -- it comes from the single deterministic engine call
+    (style-engine consolidation, 2026-07-05).
     """
 
     @classmethod
@@ -1916,37 +1783,6 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
-                "style": (_STYLE_CHOICES, {
-                    "default": _STYLE_AUTO_SENTINEL,
-                    "tooltip": (
-                        "Tonal preset for the outline. Three-way "
-                        "resolution:\n"
-                        f"  - '{_STYLE_AUTO_SENTINEL}' (default) -> the "
-                        "LLM proposes a 3-6 word style descriptor "
-                        "from the resolved news_seed during the run. "
-                        "Each episode gets a unique tonal direction "
-                        "matched to its article.\n"
-                        "  - Any other entry in this dropdown -> used "
-                        "verbatim as the style descriptor.\n"
-                        "  - style_custom (next widget, when non-"
-                        "empty) overrides BOTH paths above."
-                    ),
-                }),
-                "style_custom": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": (
-                        "(optional) free-form tonal descriptor — "
-                        "overrides the style dropdown above"
-                    ),
-                    "tooltip": (
-                        "Free-form style descriptor. Non-empty value "
-                        "overrides the style combo above AND disables "
-                        "the LLM 'auto' path. Examples: 'rust-belt "
-                        "cyber-noir', 'pulp adventure with comic "
-                        "timing', 'cosmic horror procedural'."
-                    ),
-                }),
                 "creativity": (_CREATIVITY_CHOICES, {
                     "default": "balanced",
                     "tooltip": (
@@ -2548,8 +2384,6 @@ class OTR_LedgerScriptWriter:
         custom_premise="",
         include_act_breaks=True,
         act_count=0,
-        style=_STYLE_AUTO_SENTINEL,
-        style_custom="",
         creativity="balanced",
         optimization_profile="Standard",
         perfect_run_spacesaver=False,
@@ -2736,8 +2570,6 @@ class OTR_LedgerScriptWriter:
             custom_premise=custom_premise,
             include_act_breaks=include_act_breaks,
             act_count=act_count,
-            style=style,
-            style_custom=style_custom,
             creativity=creativity,
             optimization_profile=optimization_profile,
             perfect_run_spacesaver=perfect_run_spacesaver,
@@ -2772,15 +2604,13 @@ class OTR_LedgerScriptWriter:
         log.info(
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
             "technical_model=%r, target_words=%d, num_characters=%d, "
-            "style_source=%s (pending=%s, value=%r), creativity=%r "
-            "(temp=%.2f top_p=%.2f), seed_source=%s, episode_title=%r, "
-            "perfect_run_spacesaver=%s",
+            "creativity=%r (temp=%.2f top_p=%.2f), seed_source=%s, "
+            "episode_title=%r, perfect_run_spacesaver=%s",
             resolved["creative_writing_model"],
             resolved["technical_model"],
             resolved["target_words"],
             resolved["num_characters"],
-            resolved["style_source"], resolved["style_pending"],
-            resolved["style"], resolved["creativity"],
+            resolved["creativity"],
             resolved["temperature"], resolved["top_p"],
             resolved["seed_source"], resolved["episode_title"],
             resolved["perfect_run_spacesaver"],
@@ -2794,7 +2624,6 @@ class OTR_LedgerScriptWriter:
         from . import _otr_model_loader as _OTRML
         from . import _otr_ledger as _OTRL
         from . import _otr_casting as _OTRCAST
-        from . import _otr_style_picker as _OTRSP
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
         from . import _otr_continuity as _OTRCONT
@@ -2867,7 +2696,8 @@ class OTR_LedgerScriptWriter:
         # Inversion landed 2026-05-10 per the cast contract
         # architecture target. Order is now:
         #   D.1  new_ledger() up front, stamp cast_status="building"
-        #   D.2  optional style LLM-suggest (when style_pending)
+        #   D.2  news interpretation (script_brief), THEN the style
+        #        engine (build_story_contract, needs script_brief)
         #   D.3  lock_cast() -- ANNOUNCER first, LEMMY 11%, then
         #        per-character LLM call for description+gender+voice
         #   D.4  led.set_cast() + stamp cast_status="locked"
@@ -2940,79 +2770,7 @@ class OTR_LedgerScriptWriter:
                 type(_sweep_exc).__name__, str(_sweep_exc)[:200],
             )
 
-        # D.2 Two-pass style picker (when "let the story decide" is
-        # selected or combo is blank AND no style_custom override).
-        # Pass 1 inventor produces 5 distinct snake_case style
-        # descriptors grounded in the news article + 5 sampled seed
-        # flavors. Pass 2 chooser picks the single best one.
-        #
-        # BUG-LOCAL-270 (twin of BUG-LOCAL-269): the seed-flavor sample
-        # RNG is NO LONGER tied to the `seed` widget -- a fixed seed
-        # sampled the identical 5 inspiration flavors every episode.
-        # _resolve_style_rng_seed() draws a fresh OS-entropy seed per
-        # episode; set OTR_STYLE_SEED to force a fixed sample for the
-        # C7 audio byte-identity regression.
-        # See nodes/_otr_style_picker.py for full design.
-        #
-        # The widget-typed style_custom and the verbatim combo entries
-        # bypass this branch.
-        if resolved["style_pending"]:
-            style_rng_seed, style_rng_source = _resolve_style_rng_seed()
-            picker_rng = _random.Random(style_rng_seed)
-            log.info(
-                "[OTR_LedgerScriptWriter] style picker RNG seed=%d (%s) "
-                "-- seed-flavor sampling randomized per episode "
-                "(BUG-LOCAL-270)",
-                style_rng_seed, style_rng_source,
-            )
-            # LLM slot: per-sub-pass -- style picker pass 1 (inventor)
-            # -> creative_fn (style invention is a narrative pass that
-            # recombines seed flavors creatively); pass 2 (chooser)
-            # -> technical_fn (index/grammar-checked short-output
-            # structured pass). This per-sub-pass routing landed in
-            # S32 B2 inside pick_style itself (nodes/_otr_style_picker.py);
-            # the writer no longer routes both passes through one fn.
-            # S32 B1 paired-contract wiring: pass BOTH generators.
-            # S32 B6: `helper_context` attributes all slot calls
-            # inside the block to "pick_style" so per-helper /
-            # per-phase meta tracking gets a clean phase label.
-            # Resolve the creative slot to its effective model slug for
-            # style-pass telemetry (over/under-generation per model). The
-            # inventor (pass 1) runs on the creative slot, so this is the
-            # model whose draw the counts describe. Only an OpenRouter
-            # handle needs resolving (-> its bound remote slug); a local
-            # model id is recorded verbatim. Telemetry label only -- never
-            # break the run over it.
-            _creative_model = str(resolved["creative_writing_model"])
-            _creative_slug = _creative_model
-            if _creative_model.startswith("openrouter:"):
-                try:
-                    from . import _otr_openrouter_backend as _orb_slug
-                    _creative_slug = _orb_slug.resolve_slug(_creative_model)
-                except Exception:  # noqa: BLE001 -- telemetry label only
-                    _creative_slug = _creative_model
-            with slot_scheduler.helper_context("pick_style"):
-                style_pick = _OTRSP.pick_style(
-                    creative_fn=creative_generate_fn,
-                    technical_fn=technical_generate_fn,
-                    article_text=resolved["news_seed"],
-                    seed_pool=list(_STYLE_PICKER_SEED_POOL),
-                    rng=picker_rng,
-                    model_id=_creative_model,
-                    model_slug=_creative_slug,
-                )
-            resolved["style"] = style_pick.chosen
-            meta["style_pick"] = style_pick.model_dump()
-            log.info(
-                "[OTR_LedgerScriptWriter] style picker: chosen=%r "
-                "(from candidates %r, %d inventor attempt(s), "
-                "pass1=%dms pass2=%dms)",
-                style_pick.chosen, style_pick.candidates,
-                style_pick.pass1_attempts,
-                style_pick.pass1_duration_ms, style_pick.pass2_duration_ms,
-            )
-
-        # D.2.5 News interpretation. Read the full article (currently
+        # D.2 News interpretation. Read the full article (currently
         # discarded after RSS fetch -- see _fetch_rss_seed_or_die change
         # in this commit) and emit four purpose-specific briefs that
         # cast / outline / announcer / line-composer consume INSTEAD
@@ -3036,12 +2794,13 @@ class OTR_LedgerScriptWriter:
         _interp = _otr_source_payload.resolve_interpreter(_source_bank_row)
         try:
             # LLM slot: technical -- news_interpreter emits GBNF +
-            # pydantic-validated briefs (V0-V3 schema). Structured-
+            # pydantic-validated briefs (V0-V2 schema). Structured-
             # output pass; routes to the technical_model slot.
-            # slot-interleave: creative (style picker) -> technical
-            # (here). One transition when the two slot ids differ.
-            # build_news_briefs runs every V0-V3 sub-pass on the
-            # technical slot -- structured-output JSON.
+            # build_news_briefs runs every V0-V2 sub-pass on the
+            # technical slot -- structured-output JSON. Style-engine
+            # consolidation (2026-07-05): this stage runs BEFORE the
+            # single style engine (build_story_contract needs
+            # script_brief, produced here) -- style-agnostic by design.
             # S32 B6: helper_context attribution. Label string KEPT
             # ("build_news_briefs") -- meta["slot_calls_by_helper"]
             # telemetry stays byte-identical across the chunk-3 reroute.
@@ -3050,7 +2809,6 @@ class OTR_LedgerScriptWriter:
                     bank=_source_bank_row,
                     payload=article,
                     technical_fn=technical_generate_fn,
-                    style=resolved["style"],
                     model_id=str(resolved["technical_model"]),
                 )
             # Contract enforcement: validates the direct attrs AND the dump
@@ -3177,6 +2935,55 @@ class OTR_LedgerScriptWriter:
             "randomized per episode (BUG-LOCAL-269)",
             cast_seed, cast_seed_source,
         )
+
+        # THE style engine (style-engine consolidation, 2026-07-05): build
+        # ONE StoryContract here -- the earliest point where BOTH cast_seed
+        # and script_brief exist -- so the SAME radio style steers casting,
+        # the macro prompt, the climax shape, and the body. This call site
+        # moved up from just before the outline build (was ~150 lines
+        # later, after lock_cast) because lock_cast's casting prompt also
+        # needs the style label; a single style source per episode, used
+        # everywhere, replacing the old three-way manual/LLM-picker/
+        # combo resolver. OFF (story_scaffold=off) => contract stays None
+        # => no style anywhere => byte-identical. build_story_contract
+        # never raises on a missing style, but the call is wrapped LOUD
+        # per CLAUDE.md so a defect can never break the writer.
+        contract = None
+        if _style_grammar_on:
+            try:
+                contract = _OTRSTYLE.build_story_contract(
+                    cast_seed,
+                    script_brief,
+                    str(resolved.get("news_seed", "") or ""),
+                    meta,
+                )
+                meta.setdefault("story_quality", {})
+                meta["story_contract"] = {
+                    "slug": contract.slug,
+                    "label": contract.label,
+                    "ending_tag": contract.ending_tag,
+                    # 2026-06-25: carry the selected style's sound_world into the
+                    # ledger meta. It was DROPPED here before, so the episode
+                    # canon's sound_palette (derived from it) was always empty
+                    # even though the style had a rich audio world.
+                    "sound_world": contract.sound_world,
+                }
+            except Exception as _contract_exc:  # noqa: BLE001 -- never break the writer
+                log.warning(
+                    "[OTR_LedgerScriptWriter] story-contract build failed (%s); "
+                    "style stays unset for this episode.", _contract_exc,
+                )
+                contract = None
+        # Canonical meta.style: derived from the contract so the freeze
+        # validator, _otr_story_brief.py, and meta.visual_plan.style keep
+        # working without a separate resolver. Ledger/meta-facing fields use
+        # the SLUG (controlled, snake_case); prompt-facing fields elsewhere
+        # use contract.label (prose). Absent when scaffold is off or the
+        # contract build failed -- the freeze validator already treats a
+        # missing meta.style as a warning, not an error.
+        if contract is not None:
+            meta["style"] = contract.slug
+
         # LLM slot: creative -- cast lock generates per-character
         # narrative descriptions (gender + character_description).
         # slot-interleave: technical (news_interpreter) -> creative
@@ -3195,7 +3002,7 @@ class OTR_LedgerScriptWriter:
                 num_characters=resolved["num_characters"],
                 news_seed=resolved["news_seed"],
                 casting_brief=casting_brief,
-                style=resolved["style"],
+                style=(contract.label if contract else ""),
                 rng=cast_rng,
                 cast_seed=cast_seed,
                 force_lemmy=lemmy_force,
@@ -3328,42 +3135,13 @@ class OTR_LedgerScriptWriter:
         meta["words_per_beat_range"] = list(
             episode_budget.words_per_beat_range)
 
-        # KILL 2 (2026-06-24): build ONE StoryContract pre-outline (cast_seed-keyed,
-        # selected from script_brief/news_seed) so the SAME radio style steers the
-        # macro prompt, the climax shape, and the body. OFF => contract stays None
-        # => no style fields on OutlineRequest, no meta.story_contract => byte-
-        # identical. build_story_contract never raises on a missing style, but the
-        # call is wrapped LOUD per CLAUDE.md so a defect can never break the writer.
-        contract = None
-        if _style_grammar_on:
-            try:
-                contract = _OTRSTYLE.build_story_contract(
-                    cast_seed,
-                    script_brief,
-                    str(resolved.get("news_seed", "") or ""),
-                    meta,
-                )
-                meta.setdefault("story_quality", {})
-                meta["story_contract"] = {
-                    "slug": contract.slug,
-                    "label": contract.label,
-                    "ending_tag": contract.ending_tag,
-                    # 2026-06-25: carry the selected style's sound_world into the
-                    # ledger meta. It was DROPPED here before, so the episode
-                    # canon's sound_palette (derived from it) was always empty
-                    # even though the style had a rich audio world.
-                    "sound_world": contract.sound_world,
-                }
-            except Exception as _contract_exc:  # noqa: BLE001 -- never break the writer
-                log.warning(
-                    "[OTR_LedgerScriptWriter] story-contract build skipped (%s); "
-                    "style falls back to the premise-keyed draw", _contract_exc,
-                )
-                contract = None
-
+        # The StoryContract (`contract`) was already built earlier in this
+        # function, right after cast_seed -- before lock_cast -- so its
+        # style-label threads into the casting prompt too (style-engine
+        # consolidation, 2026-07-05). Reused here for the outline.
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
-            style=resolved["style"],
+            style=(contract.label if contract else ""),
             character_cast=character_cast,
             target_words=resolved["target_words"],
             script_brief=script_brief,
@@ -3574,26 +3352,20 @@ class OTR_LedgerScriptWriter:
         _climax_role = _OTRSQL12.BEAT_ROLE_IRREVERSIBLE_CHOICE
         _style_slug = ""
         _ending_tag = ""
-        if _style_grammar_on:
+        if _style_grammar_on and contract is not None:
             try:
-                if contract is not None:
-                    # KILL 2 (2026-06-24): the climax SHAPE comes from the ONE
-                    # pre-outline StoryContract (selected from script_brief/
-                    # news_seed BEFORE generate_outline), not a second premise-keyed
-                    # select_style draw here -- one style source per episode.
-                    _style_slug = contract.slug
-                    _ending_tag = contract.ending_tag
-                    _ending_template = contract.ending_template
-                else:
-                    # Defensive: flag on but the contract build raised (already
-                    # LOUD-logged) -> fall back to the original premise-keyed draw
-                    # so the climax shape is still chosen.
-                    _premise_str = str(getattr(outline, "premise", "") or "")
-                    _style_slug = _OTRSTYLE.select_style(_premise_str, meta, cast_seed)
-                    _ending_tag = str(
-                        (_OTRSTYLE.get_style(_style_slug) or {}).get("ending_tag", "")
-                    )
-                    _ending_template = _OTRSTYLE.ending_template_for(_style_slug)
+                # KILL 2 (2026-06-24): the climax SHAPE comes from the ONE
+                # pre-outline StoryContract (selected from script_brief/
+                # news_seed, built right after cast_seed) -- one style
+                # source per episode, no second draw. Style-engine
+                # consolidation (2026-07-05): the old defensive fallback
+                # to a second select_style() draw when the contract build
+                # failed is REMOVED -- an invalid contract state fails
+                # loud (climax stays irreversible_choice), per the
+                # no-fallback rule, rather than silently re-drawing.
+                _style_slug = contract.slug
+                _ending_tag = contract.ending_tag
+                _ending_template = contract.ending_template
                 if _ending_tag in _OTRSQL12.CLIMAX_CLASS_ROLES:
                     _climax_role = _ending_tag
             except Exception as exc:  # noqa: BLE001 -- grammar must never break audio
@@ -4331,10 +4103,12 @@ class OTR_LedgerScriptWriter:
             )
             return f"{this_phase}, beat {beat_n} of {beat_total}.{tail}"
 
-        # Style descriptor for the composer's STATIC prefix. Empty
-        # string flips the STYLE block off in _build_user_prompt --
-        # back-compat for callers without a style picked yet.
-        style_descriptor = str(resolved.get("style") or "").strip()
+        # Style descriptor for the composer's STATIC prefix -- prompt-
+        # facing, so it uses the contract's prose label (style-engine
+        # consolidation, 2026-07-05). Empty string flips the STYLE
+        # block off in _build_user_prompt when scaffold is off / no
+        # contract.
+        style_descriptor = str(contract.label if contract else "").strip()
 
         # --- Sprint 5C (2026-05-25): stamp the composer's static-prefix
         # context onto meta so a LATER node (OTR_LedgerFreezeCascade)
@@ -5502,10 +5276,6 @@ class OTR_LedgerScriptWriter:
             # explicitly (B3 onward).
             "creative_writing_model": resolved["creative_writing_model"],
             "technical_model":        resolved["technical_model"],
-            "style":                 resolved["style"],
-            "style_combo":           resolved["style_combo"],
-            "style_custom":          resolved["style_custom"],
-            "style_source":          resolved["style_source"],
             "creativity":            resolved["creativity"],
             "temperature":           resolved["temperature"],
             "top_p":                 resolved["top_p"],
@@ -5542,11 +5312,11 @@ class OTR_LedgerScriptWriter:
         # (top_p / min_p / repetition_penalty) for the creative
         # phases. Technical phases use the same closure sampling.
         gen_params_by_phase: dict[str, dict] = {}
-        if resolved["style_pending"]:
-            gen_params_by_phase["style_picker"] = {
-                "slot":  "creative",
-                "model": resolved["creative_writing_model"],
-            }
+        # Style-engine consolidation (2026-07-05): the style engine
+        # (build_story_contract) is a deterministic sha256(cast_seed)
+        # hash draw, not an LLM phase -- no slot/model row to record
+        # here (the old "style_picker" LLM-phase entry is retired
+        # along with the picker itself).
         if meta.get("news") is not None:
             gen_params_by_phase["news_interpreter"] = {
                 "slot":  "technical",
@@ -5631,9 +5401,13 @@ class OTR_LedgerScriptWriter:
         meta["visual_plan"] = {
             "characters": _visual_chars,
             "scenes":     [],
-            "style":      resolved["style"],
+            # Ledger-facing: the controlled slug (style-engine
+            # consolidation, 2026-07-05), consistent with the canonical
+            # meta.style stamp set right after the contract was built.
+            "style":      (contract.slug if contract else ""),
         }
-        meta["style"] = resolved["style"]
+        if contract is not None:
+            meta["style"] = contract.slug
 
         # --- K.5.5. meta.story_brief reflection pass ------------------
         # Per Sprint C final plan Q1 lock (K.5.5, E-01). Writes to meta
@@ -5884,10 +5658,9 @@ if __name__ == "__main__":
             f"required widget order drift: {req_keys}"
         # Optional block: the clean set after Phase 0-3 cleanup + B2a
         # two-widget split.
-        for k in ("seed", "creative_writing_model", "technical_model",
+        for k in ("creative_writing_model", "technical_model",
                   "custom_premise", "include_act_breaks", "act_count",
-                  "style", "style_custom", "creativity",
-                  "perfect_run_spacesaver", "lemmy_cameo"):
+                  "creativity", "perfect_run_spacesaver", "lemmy_cameo"):
             assert k in spec["optional"], f"optional missing key: {k}"
         # Legacy widgets MUST be absent post-cleanup. `model_id` joins
         # the legacy list at B2a (replaced by the two slot widgets).
@@ -5933,32 +5706,13 @@ if __name__ == "__main__":
             f"act_count combo drift: {ac_choices!r}"
         assert ac_meta["default"] == "auto", \
             f"act_count default drift: {ac_meta['default']!r}"
-        # style combo: first entry is the LLM-auto sentinel.
-        st_choices, st_meta = spec["optional"]["style"]
-        assert isinstance(st_choices, list) and len(st_choices) >= 4
-        assert st_choices[0] == _STYLE_AUTO_SENTINEL, \
-            f"style[0] drift: {st_choices[0]!r}"
-        assert st_meta.get("default") == _STYLE_AUTO_SENTINEL
-        # style_custom is multiline STRING free-text override
-        sc_type, sc_meta = spec["optional"]["style_custom"]
-        assert sc_type == "STRING"
-        assert sc_meta.get("multiline") is True
-        assert sc_meta.get("default") == ""
-        n_optional = len(spec["optional"])
-        # optimization_profile widget removed 2026-05-23 (UI
-        # simplification, ROADMAP PRIORITY 2): of its VRAM tiers only
-        # "Standard" was ever validated. _resolve_inputs keeps its
-        # "Standard" default + meta plumbing, so the value still flows.
-        # `lemmy_cameo` widget added (BUG-LOCAL-260) -- ungated cameo
-        # toggle, defaults False. Optional count history: 15 (pre-
-        # removal) -> 14 (optimization_profile removed) -> 15
-        # (lemmy_cameo added). Current: 11 widget-surface + 4 Phase 4
-        # v4 sampling knobs.
-        assert n_optional == 16, (
-            f"optional widget count drift: {n_optional} "
-            f"(expected 16: 11 widget-surface + 4 Phase 4 v4 "
-            f"sampling knobs + story_scaffold appended 2026-06-24)"
-        )
+        # Style-engine consolidation (2026-07-05): the `style` combo and
+        # `style_custom` free-text widgets are DELETED -- style comes
+        # from the single deterministic engine call now, not a widget.
+        assert "style" not in spec["optional"], \
+            "style widget resurrected -- style is engine-only now"
+        assert "style_custom" not in spec["optional"], \
+            "style_custom widget resurrected -- style is engine-only now"
         # S30 B2a: both model widgets carry the catalog dropdown_choices()
         # output (list of labels). DEFAULT must match catalog.DEFAULT_LLM.
         for slot_key in ("creative_writing_model", "technical_model"):
@@ -5970,7 +5724,7 @@ if __name__ == "__main__":
             assert meta["default"] == _D, (
                 f"{slot_key} default drift: {meta['default']!r} != {_D!r}"
             )
-        print("[2/9] PASS: INPUT_TYPES schema (16 optional widgets)")
+        print("[2/9] PASS: INPUT_TYPES schema")
     except Exception:
         failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
         print("[2/9] FAIL: INPUT_TYPES schema")
@@ -6033,126 +5787,28 @@ if __name__ == "__main__":
         failures.append(("5/9 resolver helpers", traceback.format_exc()))
         print("[5/9] FAIL: resolver helpers")
 
-    # 6. _resolve_inputs 3-way style resolution (custom_premise path).
+    # 6. _resolve_inputs (custom_premise path). Style-engine consolidation
+    #    (2026-07-05): style/style_custom are no longer _resolve_inputs
+    #    parameters -- the old 3-way style resolution smoke is retired
+    #    along with the resolver branch it pinned.
     try:
-        # 6a. style_custom non-empty wins over combo.
         out = _resolve_inputs(
             target_words=350, num_characters=2,
             custom_premise="A real seed for testing.",
-            style="noir mystery",
-            style_custom="rust-belt cyber-noir",
             creativity="balanced",
         )
         assert out["news_seed"] == "A real seed for testing."
         assert out["seed_source"] == "custom_premise"
-        assert out["style"] == "rust-belt cyber-noir", out["style"]
-        assert out["style_source"] == "style_custom"
-        assert out["style_pending"] is False
+        assert "style" not in out, "style must not appear in resolved dict"
         assert out["target_words"] == 350
         assert "target_seconds" not in out, \
             f"target_seconds must not appear in resolved dict (words-only contract per Jeffrey 2026-05-10)"
         assert out["temperature"] == 0.85 and out["top_p"] == 0.95
 
-        # 6b. Combo (non-auto, non-empty) used verbatim when style_custom blank.
-        out = _resolve_inputs(
-            target_words=350, num_characters=2,
-            custom_premise="seed",
-            style="noir mystery",
-            style_custom="",
-        )
-        assert out["style"] == "noir mystery"
-        assert out["style_source"] == "style_combo"
-        assert out["style_pending"] is False
-
-        # 6c. Auto sentinel -> style_pending=True, style stays empty.
-        out = _resolve_inputs(
-            target_words=350, num_characters=2,
-            custom_premise="seed",
-            style=_STYLE_AUTO_SENTINEL,
-            style_custom="",
-        )
-        assert out["style"] == ""
-        assert out["style_source"] == "llm_auto"
-        assert out["style_pending"] is True
-
-        # 6d. Empty style combo also routes to LLM auto.
-        out = _resolve_inputs(
-            target_words=350, num_characters=2,
-            custom_premise="seed",
-            style="",
-            style_custom="",
-        )
-        assert out["style_pending"] is True
-        assert out["style_source"] == "llm_auto"
-
-        print("[6/9] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
+        print("[6/9] PASS: _resolve_inputs (custom_premise)")
     except Exception:
-        failures.append(("6/8_resolve_inputs custom + style 3-way", traceback.format_exc()))
-        print("[6/9] FAIL: _resolve_inputs(custom_premise + style 3-way)")
-
-    # 7. Two-pass style picker smoke. The picker module
-    #    (nodes/_otr_style_picker.py) has its own dedicated test
-    #    file (tests/test_otr_style_picker.py) with 45 cases
-    #    covering grammar / parse / chooser / model / end-to-end.
-    #    This in-writer smoke only proves the picker module is
-    #    importable AND produces a StylePick model on a happy path,
-    #    so writer-only refactors can't ship a stale picker
-    #    integration.
-    try:
-        import random as _random_smoke
-        from nodes import _otr_style_picker as _OTRSP_smoke
-
-        _five = [
-            "decommissioned_dish_signal",
-            "midnight_newsroom_emergency",
-            "vacuum_chamber_breach",
-            "haunted_repeater_loop",
-            "frozen_telemetry_archive",
-        ]
-        _responses = ["\n".join(_five), "vacuum_chamber_breach"]
-        _idx = [0]
-
-        def _smoke_gen(messages, *, temperature, max_new_tokens):
-            r = _responses[_idx[0]]
-            _idx[0] += 1
-            return r
-
-        # S32 B1 paired-contract: smoke test passes the same fn to
-        # both slots since the mock doesn't distinguish.
-        pick = _OTRSP_smoke.pick_style(
-            creative_fn=_smoke_gen,
-            technical_fn=_smoke_gen,
-            article_text="Smoke test article body about a real science story.",
-            seed_pool=list(_STYLE_PICKER_SEED_POOL),
-            rng=_random_smoke.Random(42),
-            model_id="smoke",
-        )
-        assert pick.chosen == "vacuum_chamber_breach", \
-            f"expected chooser pick, got {pick.chosen!r}"
-        assert pick.candidates == _five, \
-            f"expected canned candidates, got {pick.candidates!r}"
-        assert pick.pass1_attempts == 1
-        assert len(pick.seed_sample) == 5
-        assert len(pick.article_hash) == 64
-
-        # Fail-loud check: empty article precondition raises.
-        try:
-            _OTRSP_smoke.pick_style(
-                creative_fn=_smoke_gen, technical_fn=_smoke_gen,
-                article_text="",
-                seed_pool=list(_STYLE_PICKER_SEED_POOL),
-                rng=_random_smoke.Random(0), model_id="smoke",
-            )
-            raise AssertionError(
-                "expected StyleGenerationFailedError on empty article"
-            )
-        except _OTRSP_smoke.StyleGenerationFailedError:
-            pass  # expected
-
-        print("[7/9] PASS: _otr_style_picker integration smoke (happy + precondition)")
-    except Exception:
-        failures.append(("7/9 _otr_style_picker integration smoke", traceback.format_exc()))
-        print("[7/9] FAIL: _otr_style_picker integration smoke")
+        failures.append(("6/9 _resolve_inputs custom_premise", traceback.format_exc()))
+        print("[6/9] FAIL: _resolve_inputs(custom_premise)")
 
     # 8. _generate_title_from_script -- Sprint 3E scratchpad title pass.
     try:

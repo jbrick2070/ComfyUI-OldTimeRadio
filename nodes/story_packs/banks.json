@@ -27,11 +27,7 @@
         "coda_system",
         "announcer_intro_system",
         "announcer_intro_safe_system",
-        "announcer_outro_system",
-        "style_pick_inventor_system",
-        "style_pick_inventor_user",
-        "style_pick_chooser_system",
-        "style_pick_chooser_user"
+        "announcer_outro_system"
       ],
       "runnable": true,
       "guide_ref": ""

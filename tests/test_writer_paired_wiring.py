@@ -4,10 +4,14 @@ The S32 B1 "paired contract" had the writer pass BOTH `creative_fn=`
 and `technical_fn=` to all four helpers. Sprint 2A/2D removed the
 unused params, so each call site now carries only the slot kwargs its
 helper accepts:
-  - pick_style        -- creative_fn + technical_fn (uses both)
   - lock_cast         -- creative_fn only
   - compose_line      -- creative_fn only
   - build_news_briefs -- technical_fn only
+
+pick_style was RETIRED by the 2026-07-05 style-engine consolidation:
+style is now a pure sha256(cast_seed) deterministic draw
+(build_story_contract()), with zero creative_fn/technical_fn calls --
+there is no LLM-driven picker left to pin here.
 
 Test:
 * `test_writer_passes_expected_slot_kwargs` -- AST scan over
@@ -36,9 +40,9 @@ SOURCE_PAYLOAD_PATH = REPO / "nodes" / "_otr_source_payload.py"
 
 
 # helper -> (the file that owns its call site, the slot kwargs its signature
-# accepts post-Sprint 2A/2D).
+# accepts post-Sprint 2A/2D). pick_style retired 2026-07-05 (style-engine
+# consolidation) -- see module docstring.
 _EXPECTED_KWARGS = {
-    "pick_style":        (WRITER_PATH, {"creative_fn", "technical_fn"}),
     "lock_cast":         (WRITER_PATH, {"creative_fn"}),
     "compose_line":      (WRITER_PATH, {"creative_fn"}),
     "build_news_briefs": (SOURCE_PAYLOAD_PATH, {"technical_fn"}),

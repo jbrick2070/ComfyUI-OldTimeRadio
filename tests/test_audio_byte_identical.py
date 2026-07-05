@@ -253,97 +253,17 @@ def _capture_baseline():
 
 
 # ---------------------------------------------------------------------------
-# S32 B5: differing-slots audio baseline (separate from default-config)
+# S32 B5 differing-slots style-routing baseline RETIRED (2026-07-05)
 # ---------------------------------------------------------------------------
 #
-# Default config (creative == technical, both = DEFAULT_LLM) gets the
-# existing baseline above. S32's per-sub-pass routing means
-# differing-slots config (creative != technical) exercises a DIFFERENT
-# code path -- pass 2 of pick_style hits technical, lock_cast repair
-# hits technical, etc. Audio output under differing-slots will NOT be
-# byte-identical to default-config audio; it gets its OWN baseline
-# established at B5 close and verified at B6.
-#
-# Like the default-config baseline, the runtime byte-comparison
-# requires ComfyUI + GPU and is operator-driven. The pytest proxy
-# below pins the STRUCTURE: a differing-slots invocation must be
-# reachable through the writer's slot scheduler, and the
-# `meta.slot_transitions` count must be > 0 when creative != technical.
-# Implementation lives in B6.
-
-
-class TestDifferingSlotsBaseline:
-    """S32 B5: differing-slots audio baseline structural pin.
-
-    The runtime byte-identical check for differing-slots audio is
-    operator-driven (same as default-config). This class pins the
-    pytest-side proxy: assert the per-sub-pass routing helpers are
-    wired such that distinct creative_fn / technical_fn produce
-    distinct dispatch patterns (which they must, for the audio to
-    diverge in a controlled way from default-config).
-    """
-
-    def test_pick_style_pass2_routes_distinct_in_differing_slots(self):
-        """Differing-slots: pass 2 routes through technical_fn while
-        pass 1 routes through creative_fn. The two fns get DIFFERENT
-        call counts, proving the dispatch landed.
-        """
-        import random
-        from nodes import _otr_style_picker as sp
-
-        c_calls: list[float] = []
-        t_calls: list[float] = []
-
-        def creative_fn(messages, *, temperature, max_new_tokens):
-            c_calls.append(temperature)
-            return (
-                "1. closed_room_suspense\n"
-                "2. noir_interrogation\n"
-                "3. arctic_research_horror\n"
-                "4. desert_outpost_thriller\n"
-                "5. jungle_expedition_mystery\n"
-            )
-
-        def technical_fn(messages, *, temperature, max_new_tokens):
-            t_calls.append(temperature)
-            return "closed_room_suspense"
-
-        try:
-            sp.pick_style(
-                creative_fn=creative_fn,
-                technical_fn=technical_fn,
-                article_text="A test article about radio drama production.",
-                seed_pool=["s1", "s2", "s3", "s4", "s5", "s6"],
-                rng=random.Random(42),
-                model_id="differing/slots/test",
-            )
-        except Exception:
-            pass
-
-        # Differing-slots invariant: pass 1 and pass 2 hit DIFFERENT
-        # fns, producing distinct call counts.
-        assert len(c_calls) >= 1, "creative_fn must fire (pass 1)"
-        assert len(t_calls) >= 1, "technical_fn must fire (pass 2)"
-
-    def test_audio_differing_slots_baseline_b5_marker_exists(self):
-        """B5 establishes a DIFFERING-SLOTS audio baseline distinct
-        from the default-config baseline at the top of this file.
-        The runtime byte-comparison is operator-driven; this test
-        asserts the marker comment + class exists in this file so
-        a future regression that drops the differing-slots tracking
-        trips loud at pytest time.
-        """
-        from pathlib import Path
-        src = Path(__file__).read_text(encoding="utf-8")
-        assert "TestDifferingSlotsBaseline" in src, (
-            "S32 B5 marker missing: TestDifferingSlotsBaseline class "
-            "must exist in this file as the differing-slots audio "
-            "baseline pin."
-        )
-        assert "differing-slots audio baseline" in src.lower(), (
-            "S32 B5 marker missing: documentation of differing-slots "
-            "audio baseline."
-        )
+# The differing-slots pin above tracked pick_style's two-pass
+# creative/technical dispatch (pass 1 inventor, pass 2 chooser). The
+# style-engine consolidation replaced that LLM-driven picker with
+# build_story_contract() -- a pure sha256(cast_seed) deterministic
+# draw with zero creative_fn/technical_fn calls. There is no longer a
+# style-routing dispatch to diverge under differing slots, so this
+# baseline pin is retired rather than repointed at a non-existent
+# module. See docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.
 
 
 if __name__ == "__main__":

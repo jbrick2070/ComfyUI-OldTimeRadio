@@ -16,7 +16,8 @@ Pins:
   4. Refine capture carries visual_style (the 2C signature-filtered fix).
   5. _resolve_inputs carries visual_style as the authoritative value.
   6. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
-     slot 26.
+     slot 24 (shifted -2 by the 2026-07-05 style-engine consolidation,
+     which deleted the style / style_custom widgets).
 """
 from __future__ import annotations
 
@@ -169,6 +170,6 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 27
-        assert node1["widgets_values"][26] == "anime"
-        assert node1["widgets_values"][25] == "science_news"
+        assert len(node1["widgets_values"]) == 25
+        assert node1["widgets_values"][24] == "anime"
+        assert node1["widgets_values"][23] == "science_news"

@@ -21,7 +21,10 @@ These tests exercise:
 The OTR_LedgerScriptWriter schema in the fixtures mirrors node 1's
 widgets_values dump from `workflows/otr_scifi_16gb_full.json`. The
 `seed` widget was removed (BUG-LOCAL-269/270), so the writer no longer
-carries a seed value or a control_after_generate companion:
+carries a seed value or a control_after_generate companion. The
+`style` / `style_custom` widgets were later deleted outright by the
+2026-07-05 style-engine consolidation (style now comes from the single
+deterministic build_story_contract() engine call, never a widget):
 
   0  episode_title           STRING        ''
   1  target_words            INT           350
@@ -31,20 +34,17 @@ carries a seed value or a control_after_generate companion:
   5  custom_premise          STRING        ''
   6  include_act_breaks      BOOL          True
   7  act_count               INT           3
-  8  style                   COMBO         'let the story decide'
-  9  style_custom            STRING        ''
-  10 creativity              COMBO         'balanced'
-  11 perfect_run_spacesaver  BOOL          False
-  12 min_p                   FLOAT         0.05
-  13 repetition_penalty      FLOAT         1.03
-  14 max_new_tokens_cap      INT           200
-  15 enable_polish_pass      BOOL          False
-  16 lemmy_cameo             COMBO         'roll (~11% chance)'
+  8  creativity              COMBO         'balanced'
+  9  perfect_run_spacesaver  BOOL          False
+  10 min_p                   FLOAT         0.05
+  11 repetition_penalty      FLOAT         1.03
+  12 max_new_tokens_cap      INT           200
+  13 lemmy_cameo             COMBO         'roll (~11% chance)'
 
-The writer has NO seed widget. The mapper's control_after_generate
-companion logic is still load-bearing for other nodes (HuMo / Bark
-seeds) and is exercised below with synthetic seed-bearing nodes
-(MiniNode / OneSeedNode).
+The writer has NO seed widget and NO style widget. The mapper's
+control_after_generate companion logic is still load-bearing for other
+nodes (HuMo / Bark seeds) and is exercised below with synthetic
+seed-bearing nodes (MiniNode / OneSeedNode).
 """
 from __future__ import annotations
 
@@ -94,11 +94,6 @@ def _writer_schemas() -> dict:
                     "custom_premise": ("STRING", {"default": ""}),
                     "include_act_breaks": ("BOOLEAN", {"default": True}),
                     "act_count": ("INT", {"default": 3}),
-                    "style": (
-                        ["let the story decide", "mission_control_procedural"],
-                        {"default": "let the story decide"},
-                    ),
-                    "style_custom": ("STRING", {"default": ""}),
                     "creativity": (
                         ["balanced", "high", "low"],
                         {"default": "balanced"},
@@ -130,35 +125,36 @@ def _writer_schemas() -> dict:
                         "BOOLEAN", {"default": True},
                     ),
                     # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
-                    # appended at the END (indices 19/20) to mirror the live
-                    # INPUT_TYPES + the canonical workflow node-1 vector.
+                    # appended at the END (indices 17/18 post the 2026-07-05
+                    # style-widget deletion) to mirror the live INPUT_TYPES +
+                    # the canonical workflow node-1 vector.
                     "openrouter_slot_a_model": ("STRING", {"default": ""}),
                     "openrouter_slot_b_model": ("STRING", {"default": ""}),
                     # Comfy Credits (2026-06-01): the sibling slot-slug pickers,
-                    # appended at indices 21/22 to mirror the live INPUT_TYPES +
+                    # appended at indices 19/20 to mirror the live INPUT_TYPES +
                     # the canonical workflow node-1 vector.
                     "comfy_slot_a_model": ("STRING", {"default": ""}),
                     "comfy_slot_b_model": ("STRING", {"default": ""}),
                     # Refine loop v1 (2026-06-23): the refine_target_grade
-                    # dropdown appended at index 23 (END) to mirror the live
+                    # dropdown appended at index 21 (END) to mirror the live
                     # INPUT_TYPES + the canonical workflow node-1 vector.
                     "refine_target_grade": (
                         ["Off", "C+", "B", "B+", "A"], {"default": "Off"},
                     ),
-                    # Story-scaffold toggle (2026-06-24): appended at index 24
+                    # Story-scaffold toggle (2026-06-24): appended at index 22
                     # (END) to mirror the live INPUT_TYPES + the canonical
                     # workflow node-1 vector.
                     "story_scaffold": (
                         ["auto", "on", "off"], {"default": "auto"},
                     ),
                     # Stage 2C (2026-07-05): source_bank selector appended at
-                    # index 25 (END) to mirror the live INPUT_TYPES + the
+                    # index 23 (END) to mirror the live INPUT_TYPES + the
                     # canonical workflow node-1 vector.
                     "source_bank": (
                         ["science_news"], {"default": "science_news"},
                     ),
                     # Stage 3C (2026-07-06): visual_style selector appended
-                    # at index 26 (END), same mirroring contract.
+                    # at index 24 (END), same mirroring contract.
                     "visual_style": (
                         ["sci_fi_radio"], {"default": "sci_fi_radio"},
                     ),
@@ -170,15 +166,14 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 19-entry widgets_values
-    layout dumped from workflows/otr_scifi_16gb_full.json. The `seed`
-    widget + its companion were removed in BUG-LOCAL-269/270 (vector
-    19 -> 17). Sprint 10A step 3-C (2026-05-26) appended
-    enable_stage1_shadow_pass at slot 17 (vector 17 -> 18). Sprint 10B
-    Wave 0 (2026-05-27) appended use_multiturn_dialogue at slot 18
-    (vector 18 -> 19). The string model ids reflect the slot-2
-    reconciliation -- 'mistralai/Mistral-Nemo-Instruct-2407' is the
-    canonical default.
+    """Workflow fixture with node 1 carrying the widgets_values layout
+    dumped from workflows/otr_scifi_16gb_full.json. The `seed` widget +
+    its companion were removed in BUG-LOCAL-269/270. The `style` /
+    `style_custom` widgets were later deleted outright by the
+    2026-07-05 style-engine consolidation, shifting every slot from
+    `creativity` onward down by 2. The string model ids reflect the
+    slot-2 reconciliation -- 'mistralai/Mistral-Nemo-Instruct-2407' is
+    the canonical default.
     """
     return {
         "nodes": [
@@ -195,25 +190,23 @@ def _writer_node_fixture() -> dict:
                     "",                                       # 5  custom_premise
                     True,                                     # 6  include_act_breaks
                     3,                                        # 7  act_count
-                    "let the story decide",                   # 8  style
-                    "",                                       # 9  style_custom
-                    "balanced",                               # 10 creativity
-                    False,                                    # 11 perfect_run_spacesaver
-                    0.05,                                     # 12 min_p
-                    1.03,                                     # 13 repetition_penalty
-                    200,                                      # 14 max_new_tokens_cap
-                    "roll (~11% chance)",                     # 15 lemmy_cameo
-                    False,                                    # 16 use_exchange
-                    False,                                    # 17 enable_production_stage3_validators
-                    True,                                     # 18 news_briefs_required
-                    "anthropic/claude-opus-4.8",              # 19 openrouter_slot_a_model
-                    "deepseek/deepseek-v4-pro",               # 20 openrouter_slot_b_model
-                    "anthropic/claude-opus-4.7",              # 21 comfy_slot_a_model
-                    "deepseek/deepseek-v4-pro",               # 22 comfy_slot_b_model
-                    "Off",                                    # 23 refine_target_grade
-                    "auto",                                   # 24 story_scaffold
-                    "science_news",                           # 25 source_bank (2C)
-                    "sci_fi_radio",                           # 26 visual_style (3C)
+                    "balanced",                               # 8  creativity
+                    False,                                    # 9  perfect_run_spacesaver
+                    0.05,                                     # 10 min_p
+                    1.03,                                     # 11 repetition_penalty
+                    200,                                      # 12 max_new_tokens_cap
+                    "roll (~11% chance)",                     # 13 lemmy_cameo
+                    False,                                    # 14 use_exchange
+                    False,                                    # 15 enable_production_stage3_validators
+                    True,                                     # 16 news_briefs_required
+                    "anthropic/claude-opus-4.8",              # 17 openrouter_slot_a_model
+                    "deepseek/deepseek-v4-pro",               # 18 openrouter_slot_b_model
+                    "anthropic/claude-opus-4.7",              # 19 comfy_slot_a_model
+                    "deepseek/deepseek-v4-pro",               # 20 comfy_slot_b_model
+                    "Off",                                    # 21 refine_target_grade
+                    "auto",                                   # 22 story_scaffold
+                    "science_news",                           # 23 source_bank (2C)
+                    "sci_fi_radio",                           # 24 visual_style (3C)
                 ],
             }
         ],
@@ -456,14 +449,18 @@ def test_round_trip_canonical_node1_inputs_correct():
     vector length to 20.
 
     S2 (2026-06-01) appended openrouter_slot_a_model +
-    openrouter_slot_b_model at slots 19/20, bringing the vector length
-    to 21. Comfy Credits (2026-06-01) appended comfy_slot_a_model +
-    comfy_slot_b_model at slots 21/22, bringing it to 23. The new slots
-    are appended at the END so creative/technical stay at wv[3]/wv[4].
+    openrouter_slot_b_model, Comfy Credits (2026-06-01) appended
+    comfy_slot_a_model + comfy_slot_b_model, the refine loop, the
+    story-scaffold toggle, Stage 2C (source_bank), and Stage 3C
+    (visual_style) all appended at the END so creative/technical stay
+    at wv[3]/wv[4]. The 2026-07-05 style-engine consolidation then
+    deleted the `style` / `style_custom` widgets outright (they used to
+    sit at slots 8/9), dropping the vector from 27 to 25.
     """
     dump = _dump_canonical_node1()
-    # 27 after Stage 2C appended source_bank (25) + Stage 3C visual_style (26).
-    assert len(dump) == 27, f"node 1 widgets_values length drift: {len(dump)}"
+    # 25 post style-engine consolidation (27 minus the deleted
+    # style/style_custom pair).
+    assert len(dump) == 25, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

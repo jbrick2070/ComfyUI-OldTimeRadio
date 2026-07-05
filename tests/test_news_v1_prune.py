@@ -81,7 +81,6 @@ def _build(key_terms, **overrides):
         full_text=_SOURCE,
         headline="Signal detected",
         summary=_SOURCE[:120],
-        style="noir",
         seed=42,
     )
 
@@ -111,17 +110,9 @@ def test_all_grounded_terms_pass_unchanged():
     assert set(briefs.key_terms) == {"telescope", "signal", "researchers"}
 
 
-def test_prune_does_not_rescue_non_keyterm_failure():
-    """When the failure is V3 (formulaic style phrasing), not a
-    fabricated key_term, pruning cannot clear it and the run still
-    halts -- A2b never silently ships a brief that fails a validator.
-    Both key_terms are grounded, so the prune path early-returns the
-    failure (nothing to prune) rather than masking the V3 problem."""
-    with pytest.raises(news_interpreter.NewsInterpreterError):
-        _build(
-            ["telescope", "signal"],
-            script_brief=(
-                "A noir-style detective hears an unexplained signal "
-                "through a telescope and starts asking questions."
-            ),
-        )
+# test_prune_does_not_rescue_non_keyterm_failure RETIRED (2026-07-05):
+# it pinned pruning's inability to rescue a V3 (formulaic style
+# phrasing) failure. The style-engine consolidation deleted v3_validate
+# entirely -- style is no longer threaded into news_interpreter at all,
+# so there is no formulaic-style validator left to fail non-key-term.
+# See docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.

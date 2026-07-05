@@ -31,7 +31,6 @@ def test_resolve_inputs_default_threads_true():
     and the resolved dict carries True (production behaviour)."""
     resolved = _resolve_inputs(
         custom_premise="placeholder premise for unit test only",
-        style_custom="solo-test",
     )
     assert resolved.get("news_briefs_required") is True
 
@@ -40,7 +39,6 @@ def test_resolve_inputs_threads_false_when_overridden():
     """Operator opt-out (graceful-degrade back-compat)."""
     resolved = _resolve_inputs(
         custom_premise="placeholder premise for unit test only",
-        style_custom="solo-test",
         news_briefs_required=False,
     )
     assert resolved.get("news_briefs_required") is False

@@ -16,7 +16,6 @@ from nodes import _otr_story_pack as sp
 from nodes import _otr_compose_exchange as EX
 from nodes import _otr_line_composer as L
 from nodes import _otr_outline as O
-from nodes import _otr_style_picker as S
 
 REPO = Path(__file__).resolve().parents[1]
 PACK_PATH = REPO / "nodes" / "story_packs" / "science_news" / "science_news_default.json"
@@ -25,8 +24,6 @@ EXPECTED_SEAMS = frozenset({
     "outline_macro_system", "outline_phase_system", "outline_beat_system",
     "line_composer_system", "exchange_system", "coda_system",
     "announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system",
-    "style_pick_inventor_system", "style_pick_inventor_user",
-    "style_pick_chooser_system", "style_pick_chooser_user",
 })
 
 
@@ -45,10 +42,6 @@ def _expected_live() -> "dict[str, str]":
         "announcer_intro_system": L._ANNOUNCER_INTRO_SYSTEM,
         "announcer_intro_safe_system": L._ANNOUNCER_INTRO_SYSTEM_SAFE,
         "announcer_outro_system": L._ANNOUNCER_OUTRO_SYSTEM,
-        "style_pick_inventor_system": S._INVENTOR_SYSTEM,
-        "style_pick_inventor_user": S._INVENTOR_USER_TEMPLATE,
-        "style_pick_chooser_system": S._CHOOSER_SYSTEM,
-        "style_pick_chooser_user": S._CHOOSER_USER_TEMPLATE,
     }
 
 

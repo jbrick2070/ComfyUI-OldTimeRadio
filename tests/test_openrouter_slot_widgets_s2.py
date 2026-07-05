@@ -1,8 +1,10 @@
 """S2 -- the writer's four-dropdown router surface + migration.
 
-Pins the 2026-06-01 go-forward plan S2 contract:
+Pins the 2026-06-01 go-forward plan S2 contract (indices shifted -2 by
+the 2026-07-05 style-engine consolidation, which deleted the style /
+style_custom widgets that used to sit at [8, 9]):
   * openrouter_slot_a_model / openrouter_slot_b_model are APPENDED at the
-    END of the optional block (indices 19/20); the existing [0..18] widget
+    END of the optional block (indices 17/18); the existing [0..16] widget
     order is byte-for-byte unchanged (saved workflows bind by index --
     the BUG-LOCAL-258/253 index-drift trap).
   * creative_writing_model's default is CONDITIONAL: openrouter:slot-a when
@@ -19,11 +21,12 @@ from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 
 
-# The frozen widget order for indices [0..18] -- must never shift.
+# The frozen widget order for indices [0..16] -- must never shift.
+# style / style_custom retired 2026-07-05 (style-engine consolidation).
 _EXPECTED_0_18 = [
     "episode_title", "target_words", "num_characters",
     "creative_writing_model", "technical_model", "custom_premise",
-    "include_act_breaks", "act_count", "style", "style_custom",
+    "include_act_breaks", "act_count",
     "creativity", "perfect_run_spacesaver", "min_p",
     "repetition_penalty", "max_new_tokens_cap", "lemmy_cameo",
     "use_exchange", "enable_production_stage3_validators",
@@ -49,20 +52,22 @@ def remote_on(monkeypatch):
 
 
 def test_widget_order_appends_slots_at_end():
-    """The widget KEYS are env-independent: [0..18] frozen, OpenRouter slots
-    at 19/20, Comfy Credits slots appended at 21/22 (2026-06-01)."""
+    """The widget KEYS are env-independent: [0..16] frozen, OpenRouter slots
+    at 17/18, Comfy Credits slots appended at 19/20 (2026-06-01). Indices
+    shifted -2 by the 2026-07-05 style-engine consolidation (style /
+    style_custom widgets deleted)."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[:19] == _EXPECTED_0_18, f"index drift in [0..18]: {order[:19]}"
-    assert order[19] == "openrouter_slot_a_model"
-    assert order[20] == "openrouter_slot_b_model"
-    assert order[21] == "comfy_slot_a_model"
-    assert order[22] == "comfy_slot_b_model"
-    assert order[23] == "refine_target_grade"   # refine loop v1 (2026-06-23)
-    assert order[24] == "story_scaffold"          # scaffold toggle (2026-06-24)
-    assert order[25] == "source_bank"             # Stage 2C (2026-07-05)
-    assert order[26] == "visual_style"            # Stage 3C (2026-07-06)
-    assert len(order) == 27
+    assert order[:17] == _EXPECTED_0_18, f"index drift in [0..16]: {order[:17]}"
+    assert order[17] == "openrouter_slot_a_model"
+    assert order[18] == "openrouter_slot_b_model"
+    assert order[19] == "comfy_slot_a_model"
+    assert order[20] == "comfy_slot_b_model"
+    assert order[21] == "refine_target_grade"   # refine loop v1 (2026-06-23)
+    assert order[22] == "story_scaffold"          # scaffold toggle (2026-06-24)
+    assert order[23] == "source_bank"             # Stage 2C (2026-07-05)
+    assert order[24] == "visual_style"            # Stage 3C (2026-07-06)
+    assert len(order) == 25
 
 
 # --- conditional creative default; technical never flips --------------------

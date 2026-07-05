@@ -43,9 +43,14 @@ def test_resolve_inputs_rss_uses_technical_model():
     the resolved fetcher entry's `.fetch(...)` as the
     `technical_model=` kwarg (and no longer calls
     `_fetch_rss_seed_or_die` directly); (b) the science_rss wrapper
-    forwards it as `_fetch_rss_seed_or_die`'s SECOND POSITIONAL arg.
+    forwards it as `_fetch_rss_seed_or_die`'s SOLE POSITIONAL arg.
     Together the technical model still routes the technical re-rank
     slot.
+
+    Style-engine consolidation (2026-07-05): the wrapper used to pass
+    (style_slug, technical_model) as two positionals; style_slug was
+    removed -- the fetch/rerank chain is style-agnostic now -- so the
+    wrapper's only positional is technical_model.
     """
     tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
     resolve_fn = _find_function(tree, "_resolve_inputs")
@@ -79,7 +84,9 @@ def test_resolve_inputs_rss_uses_technical_model():
         "`creative_writing_model`."
     )
 
-    # (b) wrapper side: 2nd positional into _fetch_rss_seed_or_die.
+    # (b) wrapper side: sole positional into _fetch_rss_seed_or_die
+    # (style_slug retired 2026-07-05; the fetch/rerank chain is
+    # style-agnostic now).
     sp_tree = ast.parse(SOURCE_PAYLOAD_PATH.read_text(encoding="utf-8"))
     wrapper = _find_function(sp_tree, "_fetch_science_rss")
     target_call = None
@@ -92,12 +99,13 @@ def test_resolve_inputs_rss_uses_technical_model():
     assert target_call is not None, (
         "science_rss wrapper must call _fetch_rss_seed_or_die."
     )
-    assert len(target_call.args) >= 2, (
-        "wrapper must pass (style_slug, technical_model) positionally."
+    assert len(target_call.args) == 1, (
+        "wrapper must pass technical_model as the sole positional arg "
+        "(style_slug retired 2026-07-05)."
     )
-    second_arg = target_call.args[1]
-    assert isinstance(second_arg, ast.Name) and second_arg.id == "technical_model", (
-        "S31 B6 Fix 1: the wrapper's 2nd positional must be "
+    first_arg = target_call.args[0]
+    assert isinstance(first_arg, ast.Name) and first_arg.id == "technical_model", (
+        "S31 B6 Fix 1: the wrapper's sole positional must be "
         "technical_model."
     )
 
