@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-05 (resume) -- TOTAL-COVERAGE CHUNK C SHIPPED -- VISUAL_STYLE TOTAL COVERAGE CODE-COMPLETE -- v2.0-alpha
+Did:
+- @3eced145 (pushed, HEAD==origin): chunk C -- still_word typography/backdrop/title-mood PACK OWNERSHIP. compose_still_word_prompt + the derive_image_prompts provenance stamp read the VALUES from the resolved VisualStyle (still_word_typography[genre]/still_word_backdrop[genre]/still_word_title_mood_style); the per-episode genre SELECTOR (_still_word_genre) + the per-episode lettering LOCK stay Python (operator 2026-07-04). Added an optional resolve-once `style=` kwarg to the composer (threaded from derive's _vstyle). The 3 module maps are now extraction FIXTURES (marked + AST-guarded out of production). Provenance re-stamped python:still_word_word:<g> -> still_word_typography:<g> and python:still_word_title_mood -> still_word_title_mood_style.
+- Authored the 4 non-default packs' still_word voices (anime manga/cel; cartoon rubber-hose outline; paper_origami folded-card; archival restored-print) -- every one of the 3 fields changed from the sci_fi defaults; backdrop stays color+light+atmosphere only; title-mood keeps "no lettering"; no pack violates its own forbidden_terms.
+- Tests: new test_visual_styles_c.py (deltas, sci_fi byte-identity through the re-route, provenance stamps, lettering-lock determinism, negative-vocab, AST re-route guard). Retired the A1 TestDormantDefaults still_word pin; re-pointed the A2 provenance pin + the test_still_word model-agnostic signature pin (now [meta,role,beat_line,style]; still NO engine arg). Suite 6614/0, Bug Bible 16, B7 in-suite green, workflow JSON untouched.
+Current step: TOTAL-COVERAGE COMPLETE (A1+A2+B+C) -> operator acceptance (anime episode's announcer/radio + music + still_word stills provably carry the anime fields via ledger stamps; operator eyeball gates the look).
+Next: operator acceptance render; promptless viz_* gap is a config choice (select promptable engines for announcer/music video roles), no code owed.
+Commits: 3eced145 (pushed) + this docs commit.
+
 ## 2026-07-05 (late night, session end -- operator out of credits) -- TOTAL-COVERAGE CHUNK B SHIPPED (4 pack voices authored) -- v2.0-alpha
 Did:
 - @be42dc47 (pushed, HEAD==origin, post-push verify clean): chunk B -- anime/cartoon/paper_origami/archival_documentary AUTHOR the A1/A2-consumed field set (10 str incl. scene_instruction_look now non-empty + open_subjects + motion_registers, every key re-voiced; every authored field CHANGED from sci-fi defaults per r4). +48 tests (test_visual_styles_b.py): raw-field deltas, per-surface forced-meta deltas incl. motion via the REAL build_request_from_shot, per-pack negative-vocab smokes. A1 dormant pin narrowed to the 3 still_word fields.

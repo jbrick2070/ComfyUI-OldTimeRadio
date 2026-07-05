@@ -1,6 +1,7 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (TOTAL-COVERAGE CHUNKS A1+A2+B SHIPPED) | branch v2.0-alpha HEAD be42dc47 + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> Last updated 2026-07-05 (TOTAL-COVERAGE COMPLETE -- CHUNK C SHIPPED) | branch v2.0-alpha HEAD 3eced145 + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> CHUNK C @3eced145: still_word typography/backdrop/title-mood are pack-owned now (composer + derive provenance read the resolved VisualStyle; genre SELECTOR + per-episode lettering LOCK stay Python -- operator 2026-07-04); sci_fi byte-identical (extraction constants survive as fixtures + AST-guarded out of production); 4 packs authored their still_word voices (all 3 fields changed from sci_fi). test_visual_styles_c.py (+59 tests: deltas, sci_fi byte-identity, provenance stamps still_word_typography:<genre>/still_word_title_mood_style, lettering-lock determinism, negative-vocab, AST re-route guard); A1 TestDormantDefaults RETIRED, A2 provenance pin + still_word signature pin re-pointed. Suite 6614/0, Bug Bible 16, workflow JSON untouched. ALL FOUR chunks (A1+A2+B+C) done -> visual_style TOTAL COVERAGE is CODE-COMPLETE. NEXT = operator acceptance: an ANIME episode's announcer/radio + music stills AND still_word cards provably carry the anime fields (ledger prompt-metadata stamps); operator eyeball gates the look. Documented limitation unchanged: procedural viz_* engines are promptless -> full coverage needs promptable engines selected for announcer/music video roles.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
 > completed to obs). cv1 word_razzle x ideo = obs PASS. NEXT: cv2 kling_avatar FAIL root-cause; image-engine
@@ -79,25 +80,18 @@ PROMOTED from "deferred" to an ORDERED build item, queued immediately after
 lane-enablement. NOTE: procedural viz_* engines have no prompts -- full coverage also
 needs promptable engines selectable/selected for announcer/music video roles.
 
-**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD, chunk C (still_word pack
-ownership): re-route the still_word typography/backdrop/title-mood maps
-(`otr_meta_brief_image_prompt.py` `_STILL_WORD_TYPOGRAPHY` /
-`_STILL_WORD_BACKDROP` / `_STILL_WORD_TITLE_MOOD_STYLE`, ~:631-664) to the
-pack fields (already loaded + lint-guarded since A1; exact case-sensitive
-keys incl. the hyphenated "sci-fi"); SELECTION logic + the per-episode
-lettering LOCK stay Python (operator 2026-07-04: consistent lettering per
-episode); sci_fi byte-identical; THEN author the 4 packs' still_word voices
-+ delta tests (retiring the A1 TestDormantDefaults still_word pin).**
+**CURRENT STEP = VISUAL-STYLE TOTAL-COVERAGE BUILD COMPLETE (all 4 chunks
+A1+A2+B+C shipped). NEXT = OPERATOR ACCEPTANCE (not code):** render an ANIME
+episode and confirm its announcer/radio + music stills AND still_word cards
+provably carry the anime fields via the ledger prompt-metadata stamps
+(`visual_style` + `prompt_field_source`), then eyeball the look. If the
+operator wants the remaining promptless-engine gap closed, that is a config
+choice (select promptable engines for the announcer/music video roles -- the
+procedural viz_* engines take no prompt; documented limitation, no code owed).
 Plan of record: `docs/multimodal-story-schema/STAGE3_TOTAL_COVERAGE_SUBPLAN.md`
 (v5 FINAL -- kibitz r1-r4 CONVERGED 2026-07-05, codex+antigravity panel, Claude
-anchor+judge; artifacts `kibitz-runs/2026-07-05-style-total-coverage/`). Build
-order A1+A2+B DONE -> C = the LAST chunk. Commit+push per green chunk. The r4
-header block in the sub-plan is the authoritative schema inventory. After C:
-operator acceptance = an anime episode's announcer/radio + music stills AND
-motion prompts provably carry the anime fields (ledger prompt-metadata
-stamps); operator eyeball gates the look. NOTE: procedural viz_* engines are
-promptless -- full coverage needs promptable engines selected for
-announcer/music video roles (documented limitation, config guidance only).
+anchor+judge; artifacts `kibitz-runs/2026-07-05-style-total-coverage/`). The r4
+header block in the sub-plan is the authoritative schema inventory.
 
 **CHUNK B SHIPPED @be42dc47 (2026-07-05, pushed HEAD==origin):** the 4
 non-default packs AUTHORED in their own voice -- 10 str fields (the 1a nine +
