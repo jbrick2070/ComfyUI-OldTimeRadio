@@ -49,21 +49,28 @@ def _billed_rows():
     return {k: r for k, r in partner_rows().items() if r.get("api_node")}
 
 
-def _engine_by_node_key():
-    """node_key -> engine object across ALL cloud registries (image + video +
+def _engines_by_node_key():
+    """node_key -> LIST of engines across ALL cloud registries (image + video +
     audio). The audio registry exposes its map as ``_REGISTRY`` (name -> engine),
-    the image/video registries via ``all_engine_names()`` + ``get_engine()``."""
+    the image/video registries via ``all_engine_names()`` + ``get_engine()``.
+
+    A dict-of-LISTS, NOT last-wins: when two adapters legitimately share a
+    node_key (e.g. ``ideo`` + a future ``ideo_word`` both on cloud_ideogram_v4,
+    or the ElevenLabs tier variants both on cloud_elevenlabs_tts), EVERY adapter
+    on that key gets its emitted kwargs verified -- not just whichever registered
+    last (the B5 conformance debt, 2026-07-03)."""
     out = {}
-    for reg in (ireg, vreg):
-        for name in reg.all_engine_names():
-            eng = reg.get_engine(name)
-            nk = getattr(eng, "node_key", None)
-            if nk:
-                out[nk] = eng
-    for eng in areg._REGISTRY.values():           # cloud-audio adapters (elevenlabs)
+
+    def _add(eng):
         nk = getattr(eng, "node_key", None)
         if nk:
-            out[nk] = eng
+            out.setdefault(nk, []).append(eng)
+
+    for reg in (ireg, vreg):
+        for name in reg.all_engine_names():
+            _add(reg.get_engine(name))
+    for eng in areg._REGISTRY.values():           # cloud-audio adapters (elevenlabs)
+        _add(eng)
     return out
 
 
@@ -88,7 +95,7 @@ def _fixture_request(tmp_path):
 
 @pytest.mark.parametrize("node_key", sorted(_billed_rows()))
 def test_billed_row_has_adapter_or_explicit_xfail(node_key):
-    engines = _engine_by_node_key()
+    engines = _engines_by_node_key()
     if node_key in engines:
         return
     if node_key in KNOWN_UNADAPTERED:
@@ -100,26 +107,30 @@ def test_billed_row_has_adapter_or_explicit_xfail(node_key):
 
 @pytest.mark.parametrize("node_key", sorted(_billed_rows()))
 def test_emitted_kwargs_are_declared(node_key, tmp_path, monkeypatch):
-    engines = _engine_by_node_key()
-    eng = engines.get(node_key)
-    if eng is None or not hasattr(eng, "_partner_inputs"):
+    # EVERY buildable adapter sharing this node_key is verified (dict-of-lists),
+    # not just whichever registered last (B5 conformance debt fixed 2026-07-05).
+    engines = [e for e in _engines_by_node_key().get(node_key, [])
+               if hasattr(e, "_partner_inputs")]
+    if not engines:
         pytest.skip(f"{node_key}: no buildable adapter (coverage test owns this)")
     # give the V3 video rows the env they demand so they can build offline.
     monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan-2.2-i2v")
     row = partner_rows()[node_key]
     declared = set((row["inputs"].get("required") or {})) \
         | set((row["inputs"].get("optional") or {}))
-    try:
-        emitted = set(eng._partner_inputs(_fixture_request(tmp_path)))
-    except (RuntimeError, ImportError):
-        assert node_key in KNOWN_NONBUILDABLE, (
-            f"{node_key}: _partner_inputs raised offline but is not in "
-            f"KNOWN_NONBUILDABLE -- pin it or fix the adapter")
-        return
-    undeclared = emitted - declared
-    assert not undeclared, (
-        f"{node_key}: adapter emits kwargs NOT in the pinned schema: "
-        f"{sorted(undeclared)} (declared: {sorted(declared)})")
+    for eng in engines:
+        try:
+            emitted = set(eng._partner_inputs(_fixture_request(tmp_path)))
+        except (RuntimeError, ImportError):
+            assert node_key in KNOWN_NONBUILDABLE, (
+                f"{node_key} ({type(eng).__name__}): _partner_inputs raised "
+                f"offline but is not in KNOWN_NONBUILDABLE -- pin it or fix it")
+            continue
+        undeclared = emitted - declared
+        assert not undeclared, (
+            f"{node_key} ({type(eng).__name__}): adapter emits kwargs NOT in "
+            f"the pinned schema: {sorted(undeclared)} "
+            f"(declared: {sorted(declared)})")
 
 
 def test_v3_model_ids_never_forward_placeholder():
