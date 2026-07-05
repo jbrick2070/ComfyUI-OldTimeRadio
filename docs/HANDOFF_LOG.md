@@ -6,6 +6,15 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-04 (session) -- MULTI-MODAL STORY SCHEMA Stage 1 Chunk 1 SHIPPED (dormant foundation) -- v2.0-alpha
+Did:
+- Grounded the design + the archived phase-a lab impl; mapped the REAL live sci-fi prompt constants (subagent) -- design-doc seam NAMES are aspirational; real bytes live in _otr_outline/_otr_line_composer/_otr_style_picker.
+- Wrote STAGE1_SUBPLAN.md; ran /kibitz r1+r2 (codex + antigravity, Claude anchor+judge) -- CONVERGED. Panel caught: `_otr_outline._SYSTEM_PROMPT` is a LEGACY object-identity SENTINEL (real outline = macro/phase/beat), object-identity coupling (`is <const>` at router:62/:103 + _otr_outline.py:1847 + test_audio_c7_clamp:52), composite coda (system+V2_examples), pydantic undeclared. Folded all -> v3. 2 Sonnet-5 low consistency subagents (operator-requested) clean.
+- CODED Chunk 1 (dormant, byte-identical, ZERO production behavior change): nodes/_otr_story_pack.py (stdlib fail-loud loader) + nodes/story_packs/science_news/science_news_default.json (12 seams byte-identical by construction) + tests/test_story_pack_stage1.py (18 tests: byte-identity via runtime-import, fail-loud matrix, DORMANCY guard). Suite 6198/0, Bug Bible 16, B7 in-suite. Fable §9 gate RESERVED for Stage 1b (the make-or-break wiring).
+Current step: STAGE 1b -- wire the first live consumer (pilot line_composer_system) after migrating the object-identity `is`->`==` sites; Stage 1b gets its own kibitz + the reserved Fable gate.
+Next: Stage 1b precondition (identity migration + repo_id->pack-coords map in _otr_creative_prompt_router.py), then wire the pilot seam via get_pack_prompt.
+Commits: <this chunk> (pushed to v2.0-alpha). Kibitz artifacts: kibitz-runs/2026-07-04-multimodal-stage1/.
+
 ## 2026-07-04 (session) -- HEAD d572dd2e -> archive/handoff commit (v2.0-alpha) -- July-4 code-ready sprints SHIPPED; multi-modal story schema build plan LANDED; sibling repo archived + nuked
 Did:
 - Sprint 1 radio-face-logic @f8b6ebd2; Sprint 2 still_word @e821d6fd + follow-on @41f64185; Sprint 3 item-2 SFX-ledger residual @0ceaf1c2 -- all GREEN (full suite 6180, Bug Bible 16) + pushed.
