@@ -80,6 +80,61 @@ _DEFAULT_CLIP_TYPE = "qwen_image"       # CLIPLoader type for the Qwen3-4B TE (v
 _DEFAULT_LATENT_NODE = "EmptySD3LatentImage"   # 16-ch (matches the Flux ae VAE; verified)
 
 
+def _installed_unets():
+    """The installed ``z_image_turbo*.safetensors`` basenames in the
+    ``diffusion_models`` folder, RANKED nvfp4 > fp8 > bf16 > other and sorted
+    deterministically WITHIN each tier. ``[]`` when none are installed (or
+    ``folder_paths`` is unavailable). Blackwell-native nvfp4 is preferred (this
+    box + every boot script uses it); the LOUD log at the call site names the
+    pick, so a non-Blackwell mirror that only has nvfp4 is self-diagnosing."""
+    try:
+        import folder_paths  # ComfyUI runtime; stubbed in tests (returns [])
+        names = folder_paths.get_filename_list("diffusion_models") or []
+    except Exception:  # noqa: BLE001 -- absent folder_paths -> nothing discoverable
+        return []
+    cands = [os.path.basename(n) for n in names
+             if os.path.basename(n).lower().startswith("z_image_turbo")
+             and str(n).lower().endswith(".safetensors")]
+
+    def _rank(n):
+        low = n.lower()
+        tier = (0 if "nvfp4" in low else 1 if "fp8" in low
+                else 2 if "bf16" in low else 3)
+        return (tier, low)                       # deterministic within a tier
+
+    return sorted(set(cands), key=_rank)
+
+
+def _resolve_unet_name():
+    """Resolve the Z-Image UNET basename + whether it is VERIFIED installed.
+
+    ONE truth shared by ``_zimage_params`` (needs a name to hand the loader) and
+    ``assert_usable`` (needs a real installed/not-installed answer), so the two
+    can never diverge again (the 2026-07-05 landmine: assert_usable required the
+    env while render fell back to an absent bf16 default). Order:
+      1. ``OTR_ZIMAGE_UNET`` override -> validated against folder_paths /
+         os.path.isfile; verified iff the file actually resolves.
+      2. else the best-ranked INSTALLED ``z_image_turbo*.safetensors`` (verified).
+      3. else ``_DEFAULT_UNET`` (UNVERIFIED -> assert_usable greys the engine, and
+         the loader still raises a CLEAR error if it is ever reached).
+    Returns ``(basename, verified: bool)``."""
+    env = os.environ.get(MODEL_ENV, "").strip()
+    installed = _installed_unets()
+    if env:
+        base = os.path.basename(env)
+        verified = (base in installed) or os.path.isfile(env)
+        if not verified:
+            try:
+                import folder_paths
+                verified = bool(folder_paths.get_full_path("diffusion_models", base))
+            except Exception:  # noqa: BLE001
+                pass
+        return base, bool(verified)
+    if installed:
+        return installed[0], True
+    return _DEFAULT_UNET, False
+
+
 def _role_of(profile) -> str:
     if isinstance(profile, dict):
         return str(profile.get("role") or "")
@@ -123,8 +178,11 @@ class ZImageTurboEngine:
             except (TypeError, ValueError):
                 return float(default)
 
+        _unet_name, _unet_ok = _resolve_unet_name()
+        log.info("[OTR.image.z_image_turbo] unet resolved -> %s (verified=%s; "
+                 "installed=%s)", _unet_name, _unet_ok, _installed_unets())
         return {
-            "unet_name": os.path.basename(os.environ.get(MODEL_ENV, "") or _DEFAULT_UNET),
+            "unet_name": _unet_name,
             "clip_name": os.path.basename(os.environ.get(CLIP_ENV, "") or _DEFAULT_CLIP),
             "vae_name": os.path.basename(os.environ.get(VAE_ENV, "") or _DEFAULT_VAE),
             "clip_type": os.environ.get("OTR_ZIMAGE_CLIP_TYPE", _DEFAULT_CLIP_TYPE),
@@ -222,30 +280,24 @@ class ZImageTurboEngine:
         self._loaded = False
 
     def assert_usable(self, host_caps, profile, request_template=None):
-        """FAIL CLOSED until the Z-Image diffusion model exists (BUG-046):
-        ABSENT/greyed, never a stub. The registry already gates on
-        ``requires_flag``; this is the deeper disk check (the diffusion WEIGHTS
-        file). The TE + VAE loaders fail LOUD at render if their files are
-        absent. The model path is the env value if set, else the default basename
-        resolved via ComfyUI folder_paths at render."""
-        ckpt = os.getenv(MODEL_ENV, "").strip()
-        if ckpt and not os.path.isfile(ckpt):
+        """FAIL CLOSED until a Z-Image diffusion model is INSTALLED (BUG-046):
+        ABSENT/greyed, never a stub. Shares ``_resolve_unet_name()`` with
+        ``_zimage_params`` so the usability gate and the render path can NEVER
+        disagree (the 2026-07-05 landmine: the gate required ``OTR_ZIMAGE_UNET``
+        while render fell back to an absent bf16 default -> deep FileNotFoundError
+        instead of an early grey-out). Usable iff the resolver VERIFIES an
+        installed model (env override that resolves, OR an auto-discovered
+        ``z_image_turbo*.safetensors``). The CLIP + VAE loaders still fail LOUD at
+        render if their files are absent (their defaults are present on this box)."""
+        _name, verified = _resolve_unet_name()
+        if not verified:
             raise EngineUnusable(
                 self.name, _role_of(profile),
                 EngineUsabilityReason.MISSING_MODEL,
-                f"z_image_turbo diffusion model not found at {MODEL_ENV}={ckpt!r}; "
-                f"point it at the downloaded fp8/bf16 z_image_turbo diffusion "
-                f"model (and {CLIP_ENV}/{VAE_ENV} for the Qwen3-4B TE + ae VAE)",
-                kind="image",
-            )
-        if not ckpt:
-            raise EngineUnusable(
-                self.name, _role_of(profile),
-                EngineUsabilityReason.MISSING_MODEL,
-                f"z_image_turbo diffusion model not configured; set {MODEL_ENV} to "
-                f"the downloaded z_image_turbo diffusion model (fp8 for low VRAM) "
-                f"after enabling {ENABLE_FLAG}=1, plus {CLIP_ENV} (Qwen3-4B TE) "
-                f"and {VAE_ENV} (Flux ae)",
+                f"z_image_turbo diffusion model not found (resolved {_name!r}, not "
+                f"installed): install a z_image_turbo*.safetensors in "
+                f"diffusion_models (nvfp4 for Blackwell) or point {MODEL_ENV} at "
+                f"one (+ {CLIP_ENV} Qwen3-4B TE / {VAE_ENV} Flux ae)",
                 kind="image",
             )
         return self.name

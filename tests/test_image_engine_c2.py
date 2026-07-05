@@ -68,11 +68,70 @@ def test_z_image_adapter_assert_usable_fail_closed(monkeypatch):
     diffusion-model file is configured -- ABSENT/greyed, never a stub (BUG-046).
     2026-06-18: in-process now (the stale cu128 sidecar was dropped), so the gate
     is the WEIGHTS env (MODEL_ENV), mirroring lumina_image."""
+    # env UNSET + nothing installed (conftest folder_paths stub -> []) -> greyed.
     monkeypatch.delenv(zit.MODEL_ENV, raising=False)
     eng = ireg.get_engine("z_image_turbo")
     with pytest.raises(ireg.EngineUnusable) as ei:
         eng.assert_usable({}, {"role": "character_video"})
     assert ei.value.reason is ireg.EngineUsabilityReason.MISSING_MODEL
+
+
+def _set_installed(monkeypatch, names):
+    """Point the conftest folder_paths stub's diffusion_models listing at `names`."""
+    import sys as _sys
+    fp = _sys.modules["folder_paths"]
+    monkeypatch.setattr(fp, "get_filename_list", lambda *a, **k: list(names))
+    return fp
+
+
+def test_z_image_autodiscovers_installed_unet_when_env_unset(monkeypatch):
+    """2026-07-05 root fix: env UNSET but a z_image_turbo*.safetensors IS installed
+    -> USABLE (no hand-set env required) + the resolver picks the installed file.
+    This is the exact bake-off failure (nvfp4 on disk, bf16 default, env unset)."""
+    monkeypatch.delenv(zit.MODEL_ENV, raising=False)
+    _set_installed(monkeypatch, ["z_image_turbo_nvfp4.safetensors"])
+    eng = ireg.get_engine("z_image_turbo")
+    assert eng.assert_usable({}, {"role": "character_video"}) == "z_image_turbo"
+    assert zit._resolve_unet_name() == ("z_image_turbo_nvfp4.safetensors", True)
+
+
+def test_z_image_ranks_nvfp4_over_bf16(monkeypatch):
+    """When both quants are installed, nvfp4 (Blackwell) wins the default -- the
+    bf16 default must NOT beat an installed nvfp4 (codex should-fix)."""
+    monkeypatch.delenv(zit.MODEL_ENV, raising=False)
+    _set_installed(monkeypatch, ["z_image_turbo_bf16.safetensors",
+                                 "z_image_turbo_nvfp4.safetensors"])
+    assert zit._resolve_unet_name()[0] == "z_image_turbo_nvfp4.safetensors"
+
+
+def test_z_image_env_basename_visible_is_usable(monkeypatch):
+    """A basename OTR_ZIMAGE_UNET (as every boot script sets it) that folder_paths
+    lists is verified usable -- not rejected by a raw os.path.isfile (codex #1)."""
+    monkeypatch.setenv(zit.MODEL_ENV, "z_image_turbo_nvfp4.safetensors")
+    _set_installed(monkeypatch, ["z_image_turbo_nvfp4.safetensors"])
+    eng = ireg.get_engine("z_image_turbo")
+    assert eng.assert_usable({}, {"role": "character_video"}) == "z_image_turbo"
+
+
+def test_z_image_env_pointing_at_absent_file_greys_out(monkeypatch):
+    """env set to a file that is NOT installed -> greyed EARLY (MISSING_MODEL),
+    not a deep FileNotFoundError at render."""
+    monkeypatch.setenv(zit.MODEL_ENV, "z_image_turbo_bf16.safetensors")
+    _set_installed(monkeypatch, [])
+    eng = ireg.get_engine("z_image_turbo")
+    with pytest.raises(ireg.EngineUnusable) as ei:
+        eng.assert_usable({}, {"role": "character_video"})
+    assert ei.value.reason is ireg.EngineUsabilityReason.MISSING_MODEL
+
+
+def test_z_image_params_use_the_resolved_unet(monkeypatch):
+    """_zimage_params + assert_usable share ONE resolution -> the render graph's
+    unet_name is the auto-discovered installed file (contracts can't diverge)."""
+    monkeypatch.delenv(zit.MODEL_ENV, raising=False)
+    _set_installed(monkeypatch, ["z_image_turbo_nvfp4.safetensors"])
+    eng = ireg.get_engine("z_image_turbo")
+    params = eng._zimage_params({"prompt": "p", "seed": 1, "width": 512, "height": 512})
+    assert params["unet_name"] == "z_image_turbo_nvfp4.safetensors"
 
 
 def test_z_image_graph_is_well_formed():
