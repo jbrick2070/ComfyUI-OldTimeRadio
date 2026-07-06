@@ -156,6 +156,10 @@ class _CloudImageBase:
         return int(_req_get(request, "seed")
                    or _req_get(request, "request_seed") or 0)
 
+    def _seed_i32(self, request) -> int:
+        """Provider-safe deterministic seed for APIs capped at signed int32."""
+        return self._seed(request) & 0x7fffffff
+
     def _canvas_wh(self, request):
         w = int(_req_get(request, "width") or _req_get(request, "w")
                 or _eint(_DEF_W_ENV, _DEF_W))
@@ -290,12 +294,14 @@ class CloudSeedream2ImageEngine(_CloudImageBase):
         # slug: ByteDanceSeedreamNodeV2.execute (nodes_bytedance.py:790+) reads
         # model["model"] (KeyError/"string indices must be integers" on a bare
         # string), while size_preset/width/height use model.get(...) with safe
-        # defaults (2048/2048), so only the "model" key is required.
+        # defaults (2048/2048), so only the "model" key is required. The
+        # ByteDance schema caps seed at signed int32; OTR request seeds are
+        # 64-bit, so fold deterministically into provider range.
         from .._otr_shared.cloud_model_ids import resolve_model_id
         return {
             "model": {"model": resolve_model_id(self.node_key)},
             "prompt": self._prompt(request),
-            "seed": self._seed(request),
+            "seed": self._seed_i32(request),
             "watermark": False,
         }
 

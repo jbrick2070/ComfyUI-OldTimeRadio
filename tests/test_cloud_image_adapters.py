@@ -107,8 +107,12 @@ def test_seedream_inputs_resolve_model(monkeypatch):
     assert set(ins) == {"model", "prompt", "seed", "watermark"}
     # ByteDanceSeedreamNodeV2.execute bracket-reads model["model"] (a bare string
     # raises "string indices must be integers"); size_preset/width/height use
-    # model.get(default) so only "model" is required (2026-07-05 fix).
+    # model.get(default) so only "model" is required (2026-07-05 fix). Its
+    # Pydantic request model also caps seed at signed int32; OTR's 64-bit render
+    # seeds are folded deterministically into that range.
     assert ins["model"] == {"model": "sd-test-model"} and ins["watermark"] is False
+    high = eci.Seedream2._partner_inputs(_req(seed=3736360535))
+    assert high["seed"] == 1588876887
 
 
 def test_ideo_registered_and_inputs(monkeypatch):

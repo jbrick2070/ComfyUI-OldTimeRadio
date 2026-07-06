@@ -77,3 +77,10 @@ full model dicts (updated this commit).
   `seed` into `generationConfig`; Vertex treats that field as INT32 while OTR
   request seeds are 64-bit, causing rejects such as
   `Invalid value at 'generation_config.seed' (TYPE_INT32), 2573885473`.
+- 2026-07-05 style smoke with `cloud_seedream_2 + still_word + cartoon + 30
+  words` found the same provider-contract class in the ByteDance row: the
+  pinned Seedream request schema rejects seeds above signed INT32. Root fix:
+  Seedream still seeds are folded deterministically into signed INT32 range
+  before partner invocation. Live rerun minted all Seedream stills and published
+  `signal_lost_signals_echo_20260705_192453_silent_procgen_blended_captioned_with_credits_final.mp4`
+  to OBS.
