@@ -186,7 +186,9 @@ def test_workflow_json_node87_matches_live_widget_model():
     pin = n87["widgets_values"][2]
     from nodes._otr_video_engines import registry as vreg
     assert vreg.is_registered(pin), pin
-    # node 3: sfx overlay gone, script_json link landed on slot 2
+    # node 3: sfx overlay gone, script_json input stays on slot 2.
+    # The source is CastLock.ledger_json so SceneSequencer sees the same
+    # role-repaired ledger as the pre-rendered voice buses.
     names3 = [i.get("name") for i in n3["inputs"]]
     assert "sfx_audio_clips" not in names3
     assert "sfx_offset_ms" not in names3
@@ -194,5 +196,10 @@ def test_workflow_json_node87_matches_live_widget_model():
     # script_json, start_line, end_line, output_dir, dialogue_offset_ms.
     assert "default_tts" not in names3
     assert len(n3["widgets_values"]) == 5
-    lk2 = next(l for l in d["links"] if l[0] == 2)
-    assert lk2[3] == 3 and lk2[4] == names3.index("script_json")
+    script_link_id = n3["inputs"][names3.index("script_json")]["link"]
+    script_link = next(l for l in d["links"] if l[0] == script_link_id)
+    src_node = next(n for n in d["nodes"] if n["id"] == script_link[1])
+    assert script_link[3] == 3
+    assert script_link[4] == names3.index("script_json")
+    assert src_node["type"] == "OTR_CastLock"
+    assert src_node["outputs"][script_link[2]]["name"] == "ledger_json"

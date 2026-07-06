@@ -13,6 +13,11 @@ pin the D0d rewires against regression:
       FreezeCascade.script_json. Catches missed rewires + future
       regressions.
 
+  test_scene_sequencer_reads_cast_locked_ledger
+      SceneSequencer must consume CastLock.ledger_json, not the raw
+      FreezeCascade.script_json, so its dialogue routing matches the
+      pre-rendered character/announcer audio buses.
+
   test_audio_gate_does_not_source_from_signal_lost_video_path
       VideoPlan.audio_gate must NOT source from SignalLostVideo.video_path
       (which forced FLUX planning to wait on 1080p procgen).
@@ -192,6 +197,32 @@ def test_audio_gate_does_not_source_from_signal_lost_video_path(
     assert not violations, (
         "audio_gate inputs miswired to SignalLostVideo.video_path:\n  "
         + "\n  ".join(violations)
+    )
+
+
+def test_scene_sequencer_reads_cast_locked_ledger(
+    workflow: dict, nodes_by_id: dict, links_by_id: dict,
+) -> None:
+    """SceneSequencer consumes the same role-repaired ledger as the
+    pre-rendered voice nodes. A raw FreezeCascade feed can leave
+    mis-stamped ANNOUNCER lines on the character bus while CastLock has
+    already routed their audio to OTR_AnnouncerVoice.
+    """
+    sequencers = [
+        n for n in workflow["nodes"]
+        if n.get("type") == "OTR_SceneSequencer"
+    ]
+    assert len(sequencers) == 1, (
+        f"expected exactly one OTR_SceneSequencer; got {len(sequencers)}"
+    )
+    link_id = _find_input_link_id(sequencers[0], "script_json")
+    assert link_id is not None, "SceneSequencer.script_json is not linked"
+
+    src_type, src_out = _resolve_link_source(link_id, links_by_id, nodes_by_id)
+    assert (src_type, src_out) == ("OTR_CastLock", "ledger_json"), (
+        f"SceneSequencer.script_json wired from {src_type}.{src_out}; "
+        "expected OTR_CastLock.ledger_json so dialogue routing matches "
+        "the character/announcer pre-rendered clip buses"
     )
 
 

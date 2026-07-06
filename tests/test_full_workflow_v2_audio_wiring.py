@@ -245,14 +245,16 @@ def test_scene_sequencer_audio_inputs(by_id, links_by_id):
     <- Announcer. rip-sfx-broll (2026-07-01): the sfx_audio_clips /
     sfx_offset_ms inputs were REMOVED outright (they were never wired to a
     producer), and script_json shifted up to the freed slot -- verify the
-    link landed on the right input NAME (slot semantics, r3 codex MF1)."""
+    link landed on the right input NAME (slot semantics, r3 codex MF1).
+    SceneSequencer consumes CastLock.ledger_json so its role routing matches
+    the pre-rendered character/announcer buses."""
     node = by_id[3]
     assert _src(links_by_id, _in_link(node, "tts_audio_clips")) == (81, 0)
     assert _src(links_by_id, _in_link(node, "announcer_audio_clips")) == (82, 0)
     names = [i.get("name") for i in node.get("inputs", [])]
     assert "sfx_audio_clips" not in names
     assert "sfx_offset_ms" not in names
-    assert _src(links_by_id, _in_link(node, "script_json")) == (62, 1)
+    assert _src(links_by_id, _in_link(node, "script_json")) == (80, 0)
 
 
 def test_done_gate_chain_orders_the_engines(by_id, links_by_id):
@@ -262,5 +264,4 @@ def test_done_gate_chain_orders_the_engines(by_id, links_by_id):
     assert char_done == [(82, "gate_in")]
     ann_done = [_dst(links_by_id, by_id, i) for i in _out_links(by_id[82], "done")]
     assert ann_done == [(83, "gate_in")]
-
 
