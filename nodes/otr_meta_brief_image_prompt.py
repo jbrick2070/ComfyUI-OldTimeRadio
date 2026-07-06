@@ -225,7 +225,7 @@ _RADIO_OBJECT_ANCHOR = "%s, %s" % (RADIO_OBJECT_GEOMETRY,
 _RADIO_OBJECT_ANCHOR_WIDE = "%s, %s" % (RADIO_OBJECT_GEOMETRY_WIDE,
                                         RADIO_OBJECT_LOOK_DEFAULT)
 #: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
-#: style="ltx_radio_mouth" is used ONLY by the OTR_LTX_RADIO_FACE still mint
+#: style="ltx_radio_mouth" is used ONLY by the ltx talking radio-face still mint
 #: (the init stills the EXISTING ltx_audio_in bookend engine receives -- no new
 #: video model / path). NEVER used by the HuMo hosts: the console_face look
 #: above stays byte-unchanged (a mouth-tuned change
@@ -295,28 +295,21 @@ def _humo_hosts_enabled() -> bool:
     return os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
 
 
-#: ADDENDUM A/B (OTR_LTX_RADIO_FACE, SEPARATE from the HuMo-hosts feature): the
-#: bookend role that gets a WIDE radio-FACE still for ltx_audio_in I2V init when
-#: the A/B toggle is ON. ANNOUNCER-ONLY (operator 2026-07-03): the MUSIC bookend
-#: stays faceless (ltx would lip-sync a mouth to music), so render_driver only
-#: ever consumes the announcer face (render_driver.py:1145-1155) -- minting a
-#: music radio-face still was a dead FLUX render every talking episode, pruned
-#: 2026-07-04 (radio-face logic C2). Object_id pattern MUST match render_driver's
+#: ADDENDUM (ltx talking radio-face, SEPARATE from the HuMo-hosts feature): the
+#: bookend role that gets a WIDE radio-FACE still for ltx_audio_in I2V init.
+#: ANNOUNCER-ONLY (operator 2026-07-03): the MUSIC bookend stays faceless
+#: (ltx would lip-sync a mouth to music), so render_driver only ever consumes
+#: the announcer face (render_driver.py:1145-1155) -- minting a music radio-face
+#: still was a dead FLUX render every talking episode, pruned 2026-07-04
+#: (radio-face logic C2). Object_id pattern MUST match render_driver's
 #: _ltx_radio_face_object_id (still_<role>_radio_face_169).
 _LTX_RADIO_FACE_ROLES = ("announcer_visual",)
 
 
 def _ltx_radio_face_object_id(role: str) -> str:
-    """object_id of the WIDE radio-face still for ``role`` (ltx_audio_in A/B).
+    """object_id of the WIDE radio-face still for ``role`` (ltx talking radio-face).
     Matches render_driver._ltx_radio_face_object_id."""
     return "still_%s_radio_face_169" % str(role or "")
-
-
-def _ltx_radio_face_enabled() -> bool:
-    """True iff OTR_LTX_RADIO_FACE is opted ON (default OFF). The A/B applies only
-    when the routed bookend engine is ltx_audio_in (enforced in render_driver)."""
-    import os
-    return os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
 
 
 def _radio_face_overtness(meta) -> str:
@@ -348,7 +341,7 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
     IS the host", no human. The animatable dial-face; used for the HuMo
     radio-host FACE object AND the HuMo-driven synthetic-announcer portrait.
     ``radio_host_style="ltx_radio_mouth"`` (talking-radio kibitz r1): the
-    LTX-ONLY mouth-forward radio face for the OTR_LTX_RADIO_FACE still mint --
+    LTX-ONLY mouth-forward radio face for the ltx talking radio-face still mint --
     leads with the PROMINENT rubbery grille-mouth; never used by HuMo.
     ``radio_host_style="radio_object"`` (radio-face logic 2026-07-04): a
     FACELESS stylized radio on its plate -- no dial-face, no person -- for a
@@ -1783,21 +1776,17 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "source": "radio_host_portrait",
         })
 
-    # ADDENDUM A/B (OTR_LTX_RADIO_FACE) -- the WIDE radio-FACE stills for the
-    # ltx_audio_in bookends (option b: ltx animates an AMBIENT face, not lip-sync).
-    # SEPARATE, opt-in; GATED so default 0 is byte-identical (no extra objects).
-    # WIDE by construction (aspect="wide") so the wide ltx_audio_in engine is never
-    # fed a pillarboxed portrait -- the exact trap the kibitz flagged. Per-role
-    # object_id matches render_driver._ltx_radio_face_object_id; seed-pinned in the
-    # dispatcher (shares the bookend seed). No-baby negative populated.
-    # S4c (operator eyeball 2026-07-02, "should be talking lips?"): the A/B is
-    # RETIRED into DEFAULT-ON for the ia2v talking lane -- when a bookend
-    # role's engine lip-syncs (talking_roles via the director policy), the
-    # radio-face still ALWAYS mints; the env toggle remains only for the
-    # single-pass (non-talking) recipes.
+    # ADDENDUM -- the WIDE ltx talking radio-face stills for the
+    # ltx_audio_in bookends. WIDE by construction (aspect="wide") so the wide
+    # ltx_audio_in engine is never fed a pillarboxed portrait -- the exact trap
+    # the kibitz flagged. Per-role object_id matches
+    # render_driver._ltx_radio_face_object_id; seed-pinned in the dispatcher
+    # (shares the bookend seed). No-baby negative populated.
+    # When a bookend role's engine lip-syncs (talking_roles via the director
+    # policy), the radio-face still mints; a non-talking single-pass announcer
+    # is faceless.
     _talk = talking_roles or {}
-    if (_ltx_radio_face_enabled()
-            or any(_talk.get(r) for r in _LTX_RADIO_FACE_ROLES)):
+    if any(_talk.get(r) for r in _LTX_RADIO_FACE_ROLES):
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
             # Talking-radio kibitz r1 (2026-07-01): the ltx bookend still uses the

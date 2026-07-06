@@ -131,7 +131,7 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
     # run-to-run and open/inter/close share ONE canonical face.
     _oid = str(object_id or "")
     if (str(kind or "") == "scene_open" or _oid == "radio_host_portrait"
-            or _oid.endswith("_radio_face_169")):   # ADDENDUM OTR_LTX_RADIO_FACE A/B
+            or _oid.endswith("_radio_face_169")):   # ltx talking radio-face
         try:
             return int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))
         except (TypeError, ValueError):

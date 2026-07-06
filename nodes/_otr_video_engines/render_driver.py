@@ -1195,37 +1195,31 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "synthesizes its dark floor; a still-REQUIRED engine (still_word/"
                 "ltx_audio_in) fails LOUD in render_clip (no fallbacks). Investigate "
                 "the image phase for beat %s.", _eng, _bid, _bid)
-    # ADDENDUM A/B (OTR_LTX_RADIO_FACE, 2026-07-01, SEPARATE from the main
-    # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER/MUSIC bookend,
-    # OPTIONALLY swap the FACELESS brief-driven scene still for the WIDE radio-FACE
-    # still (option b). Under a SINGLE-PASS recipe ltx does AMBIENT motion, NOT
-    # lip-sync. Default 0 = faceless (the scene still resolved just above,
-    # unchanged). Applies ONLY when the FINAL routed bookend engine is
-    # ltx_audio_in. PRECEDENCE: if the main feature's OTR_ENABLE_HUMO_HOSTS is
-    # ON, HuMo owns the bookends -> this A/B is rejected LOUD (never a silent
-    # double-route).
+    # ADDENDUM (ltx talking radio-face, 2026-07-01, SEPARATE from the main
+    # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER bookend,
+    # swap the FACELESS brief-driven scene still for the WIDE radio-FACE
+    # still. Applies ONLY when the FINAL routed bookend engine is ltx_audio_in.
+    # PRECEDENCE: if the main feature's OTR_ENABLE_HUMO_HOSTS is
+    # ON, HuMo owns the bookends -> rejected LOUD (never a silent double-route).
     # S4c (operator eyeball 2026-07-02, "should be talking lips?"): under the
-    # ia2v TALKING register the A/B is RETIRED into DEFAULT-ON -- the mouth
-    # face IS the host and the recipe lip-syncs it, so a bookend must never
-    # ship faceless again (the pinprick b005/b001 miss: env unset -> faceless
-    # scene still -> nothing to articulate). The env toggle still A/Bs the
-    # single-pass recipes only.
+    # ia2v TALKING register the mouth face IS the host and the recipe lip-syncs
+    # it, so a bookend must never ship faceless again (the pinprick b005/b001
+    # miss: faceless scene still -> nothing to articulate).
     # OPERATOR DIRECTIVE 2026-07-03: the MUSIC bookend stays FACELESS. This swap
     # is now ANNOUNCER-ONLY. ltx_audio_in is audio-conditioned, so feeding a
     # radio-FACE still on a MUSIC beat makes the ia2v lip-sync graph articulate a
     # mouth to the MUSIC (wrong -- music has no speech; "ltx makes the lips move
     # so we don't need them"). Music keeps the faceless scene still resolved just
     # above -> no mouth to animate. Only the ANNOUNCER bookend gets the talking
-    # radio-face. (This narrows the S4c default-on note above to announcer only.)
-    if ((os.environ.get("OTR_LTX_RADIO_FACE", "0") == "1"
-         or _ia2v_talking_register_active("ltx_audio_in"))
+    # radio-face.
+    if (_ia2v_talking_register_active("ltx_audio_in")
             and str(shot.get("engine_id") or "") == "ltx_audio_in"
             and _role_of_shot(shot) == "announcer_visual"):
         _abrole = _role_of_shot(shot)
         if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
             raise RenderError(
-                "OTR_LTX_RADIO_FACE=1 AND OTR_ENABLE_HUMO_HOSTS=1 on %s bookend "
-                "shot %s: HuMo owns the bookends, so the LTX radio-face A/B is "
+                "talking ltx_audio_in announcer AND OTR_ENABLE_HUMO_HOSTS=1 on %s bookend "
+                "shot %s: HuMo owns the bookends, so the LTX radio-face is "
                 "rejected (never a silent double-route). Turn ONE toggle off."
                 % (_abrole, shot.get("shot_id")))
         _fid = _ltx_radio_face_object_id(_abrole)
@@ -1236,26 +1230,26 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _fpath = str((_frow or {}).get("path") or "")
         if not _fpath:
             raise RenderError(
-                "OTR_LTX_RADIO_FACE=1 but no wide radio-face still %r in the ledger "
+                "a talking ltx_audio_in announcer REQUIRES the minted wide radio-face still "
+                "(MetaBrief mints it when the engine lip-syncs). Missing still %r in the ledger "
                 "for %s bookend shot %s -- NO FALLBACK (never black, never a portrait "
-                "pillarbox). Confirm MetaBrief minted it (toggle ON at the image "
-                "phase) + the dispatcher rendered it." % (_fid, _abrole,
+                "pillarbox). Confirm MetaBrief minted it + the dispatcher rendered it." % (_fid, _abrole,
                                                           shot.get("shot_id")))
         _fw = int((_frow or {}).get("w") or 0)
         _fh = int((_frow or {}).get("h") or 0)
         if _fw and _fh and _fw <= _fh:
             raise RenderError(
-                "OTR_LTX_RADIO_FACE=1: radio-face still %r is %dx%d (NOT wide) for "
+                "a talking ltx_audio_in announcer REQUIRES the minted wide radio-face still. "
+                "radio-face still %r is %dx%d (NOT wide) for "
                 "the wide ltx_audio_in %s bookend -- feeding it would pillarbox. NO "
                 "FALLBACK: mint a WIDE radio-face still (aspect-follows the bookend "
                 "slot)." % (_fid, _fw, _fh, _abrole))
         init_image = _fpath
         init_source = "ltx_radio_face"
         _LOG.warning(
-            "[OTR.render_driver] LTX-RADIO-FACE (A/B): role=%s shot %s conditioning "
+            "[OTR.render_driver] LTX-RADIO-FACE: role=%s shot %s conditioning "
             "ltx_audio_in on the WIDE radio-face still %s (LIP-SYNC under the "
-            "ia2v_canonical recipe since 2026-07-02; ambient-only on the "
-            "single-pass recipes)", _abrole, shot.get("shot_id"),
+            "ia2v_canonical recipe since 2026-07-02)", _abrole, shot.get("shot_id"),
             os.path.basename(_fpath))
     # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
     # look restoration): every ltx_video shot conditions on the beat's

@@ -145,7 +145,7 @@ def test_ia2v_render_canvas_defaults_canonical_native(ia2v_env, tmp_path,
     # VRAM math -> 2.9x upscale mush); single-pass recipes keep 512x288.
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
     assert (req["canvas"]["w"], req["canvas"]["h"]) == (832, 480)
@@ -221,7 +221,7 @@ def _ltx_ledger(tmp_path):
     imgs.append({"object_id": "c01", "kind": "portrait", "path": str(p),
                  "w": 832, "h": 1216})
     # WIDE radio-face stills -- S4c: talking bookends REQUIRE them (the
-    # OTR_LTX_RADIO_FACE A/B retired into default-on under ia2v).
+    # toggle retired into default-on under ia2v).
     f = tmp_path / "face.png"
     f.write_bytes(_PNG)
     for _r in ("announcer_visual", "music_visual"):
@@ -270,7 +270,7 @@ def _char_face_shot():
 def test_announcer_bookend_gets_talking_register(ia2v_env, tmp_path,
                                                  monkeypatch):
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
@@ -283,7 +283,7 @@ def test_music_bookend_keeps_console_register(ia2v_env, tmp_path, monkeypatch):
     # P2: LTX cannot lip-sync to music -- the music bookends deliberately
     # KEEP the console-motion register even under the talking recipe.
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_music_open_shot(), _ltx_ledger(tmp_path))
     assert "Dial whip-pans" in req["text_prompt"]
     assert "lips" not in req["text_prompt"]
@@ -296,7 +296,7 @@ def test_announcer_bookend_unchanged_on_single_pass_recipe(tmp_path,
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
     assert "Tuning dial needle" in req["text_prompt"]   # byte-unchanged
@@ -306,7 +306,7 @@ def test_announcer_bookend_unchanged_on_single_pass_recipe(tmp_path,
 def test_char_face_beat_gets_compact_talking_prompt(ia2v_env, tmp_path,
                                                     monkeypatch):
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
     p = req["text_prompt"]
     assert "lips opening and closing naturally in sync" in p
@@ -321,7 +321,7 @@ def test_announcer_with_m4_still_gets_talking_register(ia2v_env, tmp_path,
     # must STILL swap to the talking register under ia2v (M4 outranked on
     # announcer bookends only).
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     shot = _announcer_open_shot()
     shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
@@ -340,7 +340,7 @@ def test_announcer_with_m4_keeps_m4_on_single_pass_recipe(tmp_path,
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     shot = _announcer_open_shot()
     shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
                                        "on the window", "source": "m4"}
@@ -354,7 +354,7 @@ def test_char_face_no_m4_fallback_talks_under_ia2v(ia2v_env, tmp_path,
     # kibitz r3 must-fix: the ShotLock seam-gap fallback (char beat, NO M4)
     # must be a TALKING prompt under ia2v, never the scene-register fallback.
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     shot = _char_face_shot()
     shot["creative"] = {}
     req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
@@ -368,7 +368,7 @@ def test_char_face_no_m4_fallback_unchanged_on_single_pass(tmp_path,
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     shot = _char_face_shot()
     shot["creative"] = {}
     req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
@@ -381,7 +381,7 @@ def test_char_face_beat_keeps_m4_on_single_pass_recipe(tmp_path, monkeypatch):
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
     p = req["text_prompt"]
     assert "xxxx" in p                              # full M4 kept
@@ -399,7 +399,7 @@ def test_char_face_beat_keeps_m4_on_single_pass_recipe(tmp_path, monkeypatch):
 def test_char_beat_inits_on_portrait_under_ia2v(ia2v_env, tmp_path,
                                                 monkeypatch):
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
     obs = req["observability"]
     assert obs["init_source"] == "character_portrait_ia2v"
@@ -409,7 +409,7 @@ def test_char_beat_inits_on_portrait_under_ia2v(ia2v_env, tmp_path,
 def test_char_beat_missing_portrait_fails_loud_under_ia2v(ia2v_env, tmp_path,
                                                           monkeypatch):
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     led = _ltx_ledger(tmp_path)
     led["images"]["images"] = [im for im in led["images"]["images"]
                                if im.get("kind") != "portrait"]
@@ -423,7 +423,7 @@ def test_announcer_bookend_takes_radio_face_by_default_under_ia2v(
     # WIDE radio-face still -- env toggle NOT required (operator eyeball
     # 2026-07-02, the pinprick faceless-announcer miss).
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
@@ -437,7 +437,7 @@ def test_announcer_bookend_missing_face_fails_loud_under_ia2v(
     # S4c fail-loud: a talking bookend with NO minted radio-face still is a
     # hard error (the faceless proof8 announcer must never silently recur).
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _ltx_ledger(tmp_path)
     led["images"]["images"] = [
@@ -456,7 +456,7 @@ def test_char_beat_keeps_scene_still_on_single_pass_recipe(tmp_path,
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+
     req = rd.build_request_from_shot(_char_face_shot(), _ltx_ledger(tmp_path))
     obs = req["observability"]
     assert obs["init_source"] == "scene_still"

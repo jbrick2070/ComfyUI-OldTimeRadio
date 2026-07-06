@@ -191,7 +191,7 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
 
 # --------------------------------------------------------------------------- #
 # Talking-radio kibitz r1 (Sub-plan B): the LTX-ONLY mouth-forward style
-# (radio_host_style="ltx_radio_mouth") -- used ONLY by the OTR_LTX_RADIO_FACE still mint
+# (radio_host_style="ltx_radio_mouth") -- used ONLY by the talking radio face still mint
 # (the init stills the EXISTING ltx_audio_in engine receives; no new video
 # model / path). The HuMo console_face / radio_head_person looks must stay
 # BYTE-UNCHANGED (goldens below, captured pre-split @ 5cce9c2).
@@ -289,25 +289,41 @@ def test_humo_console_face_prompts_byte_unchanged():
         {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
 
 
-def test_mint_split_ltx_mouth_humo_untouched(monkeypatch):
-    # BOTH toggles on at MINT time (precedence is a render_driver concern): the
-    # ltx radio-face still (announcer-only since 2026-07-03; the music mint was
-    # pruned 2026-07-04) carries the mouth style; the HuMo radio_host portrait
-    # does NOT. With the announcer engine resolving to HuMo (audio_driven_face),
-    # the announcer portrait row is the console dial-face, never the mouth style.
-    monkeypatch.setenv("OTR_LTX_RADIO_FACE", "1")
+def test_mint_ltx_audio_in_gets_mouth_still(monkeypatch):
+    # The talking_roles (computed from policy by the director) determines the mouth still.
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={"announcer_visual": True},
+        video_models={"announcer_video_model": {"engine_id": "ltx_audio_in"}})
+    objs = {o["object_id"]: o for o in out["objects"]}
+    
+    # 1) The WIDE still gets the rubbery mouth
+    assert "rubbery mouth" in objs["still_announcer_visual_radio_face_169"]["prompt"]
+    assert "still_music_visual_radio_face_169" not in objs
+    
+    # 2) The 'announcer' row (which points to the portrait) stays radio_object
+    assert "rubbery" not in objs["announcer"]["prompt"]
+    assert objs["announcer"]["radio_host_style"] == "radio_object"
+    assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
+        _SPACE_META, "portrait", "radio_object")
+
+def test_mint_humo_no_mouth_still(monkeypatch):
+    # If the announcer engine is HuMo (and not talking), the mouth still is not minted.
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={},
         video_models={"announcer_video_model": {"engine_id": "humo"}})
     objs = {o["object_id"]: o for o in out["objects"]}
-    assert "rubbery mouth" in objs["still_announcer_visual_radio_face_169"]["prompt"]
-    # the pruned music radio-face id is never minted
-    assert "still_music_visual_radio_face_169" not in objs
-    assert "rubbery" not in objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"]
+    
+    # 1) NO wide mouth still
+    assert "still_announcer_visual_radio_face_169" not in objs
+    
+    # 2) The PORTRAIT gets console_face because HuMo is enabled
     assert objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"] == mbp.build_radio_host_prompt(
-        _SPACE_META, "portrait", "console_face")     # the golden-pinned look
-    # announcer portrait -> console dial-face (HuMo drives it), not the mouth style
+        _SPACE_META, "portrait", "console_face")
+        
+    # 3) The 'announcer' row gets console_face
     assert "rubbery" not in objs["announcer"]["prompt"]
     assert objs["announcer"]["radio_host_style"] == "console_face"
     assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
@@ -440,7 +456,6 @@ def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypat
     # without one fails LOUD (never a silent faceless bookend again), but
     # the redirect itself must already be stamped on the shot.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
     led = _bookend_ledger(tmp_path, with_face=False)
     shot = _humo_bookend_shot(role="announcer_visual")
     with pytest.raises(rd.RenderError, match="radio-face"):
@@ -453,7 +468,6 @@ def test_build_request_off_redirect_renders_on_single_pass(tmp_path, monkeypatch
     # register, no face requirement -- the redirected bookend renders from
     # its scene still exactly as before.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
     monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
