@@ -370,6 +370,8 @@ class MotionEngineBase:
 
     declared_isolation = ISOLATION_IN_PROCESS
     binds_seed = True
+    invocable = True
+    invocability_reason = ""
 
     #: Dynamic-VRAM frame budget, exposed on the base so every motion engine can
     #: PREDICT (never react-to-OOM) how many of a beat's frames fit the live VRAM

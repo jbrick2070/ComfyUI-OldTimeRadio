@@ -704,3 +704,26 @@ def test_bug264_clean_payload_unchanged():
     assert brief.script_brief == "A telescope picks up an unexplained signal."
     assert brief.news_close_brief == "Researchers reported an unexplained signal."
     assert brief.key_terms == ["telescope", "signal", "researchers"]
+
+
+def test_plural_singular_parenthetical_matching():
+    """Verify that _term_in_source_strict handles parenthetical pluralization and singular/plural variants."""
+    fn = news_interpreter._term_in_source_strict
+
+    # 1. Parenthetical plurals
+    assert fn("pylon(s)", "There is a pylon in the field.") is True
+    assert fn("pylon(s)", "There are pylons in the field.") is True
+    assert fn("pylon(s)", "A futuristic pylone stands tall.") is False
+
+    # 2. Singular to plural match
+    assert fn("pylon", "Pylons are tall structures.") is True
+    assert fn("pylons", "A pylon is a tall structure.") is True
+
+    # 3. Exact matches
+    assert fn("pylon", "A pylon stands there.") is True
+    assert fn("pylons", "Pylons stand there.") is True
+
+    # 4. Word boundary enforcement (should not match inside words)
+    assert fn("pylon", "The micropylons are small.") is False
+    assert fn("pylons", "The micropylon is small.") is False
+

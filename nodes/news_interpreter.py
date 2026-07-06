@@ -259,12 +259,20 @@ def _term_in_source_strict(term: str, source_text: str) -> bool:
     key_term -- the deterministic half of V1 (no LLM judge). Shared by
     ``v1_validate`` and the A2b prune-to-floor path so the two never drift.
     """
-    pattern = (
-        r"(?<![A-Za-z0-9])"
-        + re.escape(term)
-        + r"(?![A-Za-z0-9])"
-    )
-    return re.search(pattern, source_text, re.IGNORECASE) is not None
+    # Clean parenthetical plurals: e.g. pylon(s) -> pylon
+    t = re.sub(r"\((s|es)\)$", "", term).strip()
+    # Also derive singular form if term ends with s/es
+    t_sing = re.sub(r"(s|es)$", "", t).strip() if t.lower().endswith(('s', 'es')) else t
+    
+    for cand in (t, t_sing):
+        pattern = (
+            r"(?<![A-Za-z0-9])"
+            + re.escape(cand)
+            + r"(?:s|es)?(?![A-Za-z0-9])"
+        )
+        if re.search(pattern, source_text, re.IGNORECASE) is not None:
+            return True
+    return False
 
 
 def v1_validate(

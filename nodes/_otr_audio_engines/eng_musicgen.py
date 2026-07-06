@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from .registry import register
 
-_MUSICGEN_MODEL_ID = "facebook/musicgen-medium"
+_MUSICGEN_MODEL_ID = "facebook/musicgen-small"
 _MUSICGEN_TOKENS_PER_SEC = 50  # ~50 audio tokens per second at 32 kHz
 
 

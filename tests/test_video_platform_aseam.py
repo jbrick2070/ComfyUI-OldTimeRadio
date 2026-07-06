@@ -788,3 +788,60 @@ def test_clip_budget_empty_script_radio_floor():
     assert out["video"]["shots"] == []
     assert out["video"]["clip_budget"]["total_frames"] == 0
     assert done.startswith("shot_lock:done:")
+
+
+def test_engine_non_invocable_preflight_check():
+    """Verify that OTRVideoDirector raises EngineNotRunnableError for unrunnable/non-invocable engines."""
+    from nodes.otr_video_director import OTRVideoDirector
+    from nodes._otr_shared.engine_registry_base import EngineNotRunnableError
+
+    # Mock descriptors
+    descriptors = [
+        {"engine_id": "cloud_seedance_2", "family": "audio_conditioned_video", "roles": ("music_visual",), "required_inputs": ()},
+        {"engine_id": "cloud_wan_i2v", "family": "image_to_video", "roles": ("character_video",), "required_inputs": ()},
+        {"engine_id": "still_pan", "family": "static_image_gen", "roles": ("music_visual",), "required_inputs": ()}
+    ]
+
+    # Pick non-invocable model cloud_seedance_2
+    with pytest.raises(EngineNotRunnableError) as excinfo:
+        OTRVideoDirector._resolve_and_validate(
+            slot="music_video_model", picked="cloud_seedance_2", custom={}, descriptors=descriptors, warnings=[]
+        )
+    assert "not runnable: the pinned row's media" in str(excinfo.value)
+
+    # Pick non-invocable model cloud_wan_i2v
+    with pytest.raises(EngineNotRunnableError) as excinfo:
+        OTRVideoDirector._resolve_and_validate(
+            slot="character_video_model", picked="cloud_wan_i2v", custom={}, descriptors=descriptors, warnings=[]
+        )
+    assert "not runnable: the model input must be a V3 DICT" in str(excinfo.value)
+
+    # Pick invocable model still_pan
+    res = OTRVideoDirector._resolve_and_validate(
+        slot="music_video_model", picked="still_pan", custom={}, descriptors=descriptors, warnings=[]
+    )
+    assert res["engine_id"] == "still_pan"
+
+
+def test_preflight_family_compatibility_gate():
+    """Verify that build_execution_plan raises FamilyInputGap at cast time if required inputs are missing."""
+    from nodes._otr_video_engines.render_driver import FamilyInputGap
+
+    beats = [{"beat_id": "b1", "role": "music_visual", "char_id": ""}]
+    budget = {"total_frames": 25, "per_beat": {"b1": 25}}
+    creative = {}
+    # Select cloud_kling_lipsync (lipsync_overlay family) which requires base_clip_ref
+    policy = {"video_models": {"music_video_model": "cloud_kling_lipsync"}}
+    
+    # Ledger with no base clip and OTR_LSYNC_BASE_ENGINE not set:
+    import os
+    if "OTR_LSYNC_BASE_ENGINE" in os.environ:
+        del os.environ["OTR_LSYNC_BASE_ENGINE"]
+        
+    ledger = {"images": {"images": []}}
+
+    with pytest.raises(FamilyInputGap) as excinfo:
+        sl.build_execution_plan(beats, budget, creative, policy, ledger=ledger)
+    assert "requires input(s)" in str(excinfo.value)
+    assert "base_clip_ref" in str(excinfo.value)
+

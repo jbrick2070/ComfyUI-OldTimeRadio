@@ -78,7 +78,24 @@ def post_assembly_keyterm_check(
     for term in key_terms:
         if not term:
             continue
-        if re.search(_word_boundary_pattern(term), full_text, re.IGNORECASE):
+        
+        # Clean parenthetical plurals: e.g. pylon(s) -> pylon
+        t = re.sub(r"\((s|es)\)$", "", term).strip()
+        # Also derive singular form if term ends with s/es
+        t_sing = re.sub(r"(s|es)$", "", t).strip() if t.lower().endswith(('s', 'es')) else t
+        
+        matched = False
+        for cand in (t, t_sing):
+            pattern = (
+                r"(?<![A-Za-z0-9])"
+                + re.escape(cand)
+                + r"(?:s|es)?(?![A-Za-z0-9])"
+            )
+            if re.search(pattern, full_text, re.IGNORECASE):
+                matched = True
+                break
+                
+        if matched:
             landed.append(term)
         else:
             missing.append(term)

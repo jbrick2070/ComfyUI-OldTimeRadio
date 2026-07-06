@@ -105,6 +105,8 @@ class _CloudVideoBase:
     # Operator directive 2026-07-02: no hidden enable switch either -- the
     # dropdown pick IS the enable; auth fails LOUD at invoke if missing.
     requires_flag = None
+    invocable = True
+    invocability_reason = ""
 
     # --- row identity (subclasses) ---
     name = ""
@@ -287,6 +289,8 @@ class CloudSeedance2Engine(_CloudVideoBase):
     family = "audio_conditioned_video"
     required_inputs = ("init_image", "audio_ref")
     reactivity = "required_audio_ref"
+    invocable = False
+    invocability_reason = "the pinned row's media inputs ride the DYNAMICCOMBO_V3 model schema (static pin is shallow) -- V3-expansion pin lands with cloud S1"
 
     def _partner_inputs(self, request):
         # PINNED static inputs are ONLY (model COMBO, seed, watermark) -- the
@@ -309,6 +313,8 @@ class CloudWanI2VEngine(_CloudVideoBase):
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
+    invocable = False
+    invocability_reason = "the model input must be a V3 DICT, not the bare string the shallow pin sends (awaiting the S1 V3-expansion pin)"
 
     def _partner_inputs(self, request):
         # Pinned STATIC inputs: first_frame IMAGE, model DYNAMICCOMBO_V3,

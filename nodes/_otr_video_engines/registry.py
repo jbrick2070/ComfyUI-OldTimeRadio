@@ -27,6 +27,7 @@ from .._otr_shared.engine_registry_base import (
     EngineRegistry,
     EngineUnusable,
     EngineUsabilityReason,
+    EngineNotRunnableError,
 )
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "VideoEngineRegistry",
     "EngineUnusable",
     "EngineUsabilityReason",
+    "EngineNotRunnableError",
     "register",
     "get_engine",
     "is_registered",
@@ -43,6 +45,7 @@ __all__ = [
     "assert_usable",
     "descriptor_for_engine",
 ]
+
 
 
 @runtime_checkable
@@ -83,6 +86,8 @@ class VideoEngine(Protocol):
     # --- video-specific identity ---
     family: str
     required_inputs: tuple
+    invocable: bool
+    invocability_reason: str
 
     # --- render lifecycle (CW-4+ adapters implement; not called by registry) ---
     def assert_usable(self, host_caps, profile, request_template=None): ...

@@ -385,6 +385,12 @@ class OTRVideoDirector:
         # land). A known engine that fits NONE of the slot's roles fails closed.
         known = {d["engine_id"] for d in descriptors}
         if engine_id in known:
+            if _vreg.is_registered(engine_id):
+                eng = _vreg.get_engine(engine_id)
+                if not getattr(eng, "invocable", True):
+                    reason = getattr(eng, "invocability_reason", "not runnable")
+                    raise _vreg.EngineNotRunnableError(engine_id, reason, slot)
+
             roles = VIDEO_SLOT_ROLES[slot]
             fits_any = any(
                 _rc.engine_fits_role(

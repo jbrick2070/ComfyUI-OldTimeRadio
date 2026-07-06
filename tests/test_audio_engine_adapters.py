@@ -80,10 +80,38 @@ def test_kokoro_is_per_line_after_cleanbreak_1b():
     assert AE.get_engine("kokoro").interface == "per_line"
 
 
+def test_kokoro_device_falls_back_to_cpu_without_cuda_or_mps(monkeypatch):
+    from nodes._otr_audio_engines import eng_kokoro
+
+    class _Cuda:
+        @staticmethod
+        def is_available():
+            return False
+
+    class _Mps:
+        @staticmethod
+        def is_available():
+            return False
+
+    class _Torch:
+        cuda = _Cuda()
+        backends = type("_Backends", (), {"mps": _Mps()})()
+
+    monkeypatch.setitem(__import__("sys").modules, "torch", _Torch)
+    assert eng_kokoro._kokoro_device() == "cpu"
+
+
 def test_musicgen_is_clip_after_cleanbreak_1c():
     # Audio clean-break (1c): musicgen flipped from batch delegation to a
     # self-contained clip engine (eng_musicgen.py).
     assert AE.get_engine("musicgen").interface == "clip"
+
+
+def test_musicgen_uses_small_model_for_no_cuda_floor():
+    from nodes._otr_audio_engines import eng_musicgen
+
+    assert eng_musicgen._MUSICGEN_MODEL_ID == "facebook/musicgen-small"
+    assert AE.get_engine("musicgen").model_id == "facebook/musicgen-small"
 
 
 def test_no_batch_interface_engines_remain():

@@ -40,6 +40,8 @@ class _CheapFamilyBase:
     render_aspect = "wide"
     commercial_clean = True
     requires_flag = None            # cheap families are always available (no opt-in)
+    invocable = True
+    invocability_reason = ""
     family = "abstract"
     required_inputs: tuple = ()
     engine_version = "1"

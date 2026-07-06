@@ -224,3 +224,18 @@ class EngineRegistry:
         # manual process, never a code gate. Disk/token/commercial checks require
         # IO and are enforced downstream (this method does no IO).
         return name
+
+
+class EngineNotRunnableError(RuntimeError):
+    """Raised at cast/graph-build time when the selected engine is not runnable/invocable.
+
+    Carries the engine + reason so the node can fail loud and clear before rendering.
+    """
+
+    def __init__(self, engine: str, reason: str, role: str = ""):
+        self.engine = engine
+        self.reason = reason
+        self.role = role
+        msg = f"Video engine '{engine}' is not runnable: {reason}. Pick a runnable engine for this role; there is no fallback."
+        super().__init__(msg)
+

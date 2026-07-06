@@ -28,6 +28,27 @@ KOKORO_SAMPLE_RATE = 24000
 _KOKORO_MODEL_SUBDIR = os.path.join("TTS", "KokoroTTS")
 
 
+def _kokoro_device() -> str:
+    """Best available Kokoro device.
+
+    The portable floor must run without CUDA (Mac/AMD/CPU variants). Prefer CUDA
+    when present for the NVIDIA configs, then MPS when PyTorch exposes it, else
+    CPU. Never import torch at module scope.
+    """
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        mps = getattr(getattr(torch, "backends", None), "mps", None)
+        if mps is not None and callable(getattr(mps, "is_available", None)):
+            if mps.is_available():
+                return "mps"
+    except Exception:  # noqa: BLE001
+        pass
+    return "cpu"
+
+
 def _kokoro_model_dir() -> str:
     """Absolute path to ComfyUI models/TTS/KokoroTTS (no network)."""
     try:
@@ -108,7 +129,7 @@ class KokoroEngine:
             ) from exc
         # lang_code 'b' = British English; pin repo_id to suppress migration noise.
         self._pipeline = KPipeline(
-            lang_code="b", device="cuda", repo_id="hexgrad/Kokoro-82M",
+            lang_code="b", device=_kokoro_device(), repo_id="hexgrad/Kokoro-82M",
         )
 
     def unload(self):
