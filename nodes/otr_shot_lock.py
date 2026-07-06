@@ -700,10 +700,24 @@ def _resolve_writer_llm(meta: dict, warnings: list):
 def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, policy):
     import os
     try:
-        from ._otr_video_engines.render_driver import engine_family, FamilyInputGap
+        from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
+    except ImportError:
+        from _otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
+
+    if is_registered(engine_name):
+        eng = get_engine(engine_name)
+        if not getattr(eng, "invocable", True):
+            reason = getattr(eng, "invocability_reason", "not currently invocable")
+            raise EngineNotRunnableError(
+                f"engine {engine_name!r} is not runnable: {reason} "
+                f"-- pick a runnable engine for this role"
+            )
+
+    try:
+        from ._otr_video_engines.render_driver import build_request_from_shot, _present_request_tokens, engine_family, FamilyInputGap, _line_index
         from ._otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
     except ImportError:
-        from _otr_video_engines.render_driver import engine_family, FamilyInputGap
+        from _otr_video_engines.render_driver import build_request_from_shot, _present_request_tokens, engine_family, FamilyInputGap, _line_index
         from _otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
 
     fam = engine_family(engine_name, "")
@@ -711,91 +725,36 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
     if not required and fam != "static_image_gen":
         return
 
-    # Determine present tokens for this beat at cast time
-    present = set()
-    
-    # 1. text_prompt: always present at cast time
-    present.add("text_prompt")
+    shot = {
+        "shot_id": beat.get("beat_id", ""),
+        "role": beat.get("role", ""),
+        "engine_id": engine_name,
+        "char_id": beat.get("char_id", ""),
+        "source_line_ids": [beat.get("beat_id", "")],
+    }
 
-    # 2. init_image: does it have a portrait or still?
-    char_id = beat.get("char_id", "")
-    beat_id = beat.get("beat_id", "")
-    role = beat.get("role", "")
-    
-    imgs = ledger.get("images", {}).get("images", [])
-    portraits = {}
-    stills = {}
-    for im in imgs:
-        if not isinstance(im, dict):
-            continue
-        kind = str(im.get("kind") or "")
-        path = str(im.get("path") or "")
-        if not path:
-            continue
-        if kind == "portrait":
-            cid = str(im.get("object_id") or im.get("char_id") or "")
-            if cid:
-                portraits[cid] = path
-        elif kind.startswith("scene_"):
-            bid = str(im.get("beat_id") or "")
-            if bid:
-                stills[bid] = path
-
-    # Check for fodder if engine requires it:
     try:
-        from ._otr_video_engines.registry import get_engine, is_registered
-    except ImportError:
-        from _otr_video_engines.registry import get_engine, is_registered
+        req = build_request_from_shot(shot, ledger, master_audio_path="")
+    except Exception as exc:
+        if type(exc).__name__ == "RenderError":
+            raise
+        log.warning("[OTR_ShotLock] cast-time build_request_from_shot failed: %s", exc)
+        return
 
-    requires_fodder = False
-    if is_registered(engine_name):
-        try:
-            eng = get_engine(engine_name)
-            requires_fodder = getattr(eng, "requires_mesh_fodder", False)
-        except Exception:
-            pass
+    line = _line_index(ledger).get(beat.get("beat_id", ""), {})
+    is_timed = (
+        (line.get("start_s") is not None and line.get("dur_s") is not None)
+        or (shot.get("start_s") is not None and shot.get("dur_s") is not None)
+        or beat.get("dur_s") is not None
+    )
+    if is_timed:
+        if req.get("audio_ref") is None:
+            req["audio_ref"] = {"path": "__cast_time_master_slice__"}
 
-    has_init = False
-    if requires_fodder:
-        fodder = {}
-        for im in imgs:
-            if isinstance(im, dict) and im.get("kind") == "mesh_fodder":
-                path = str(im.get("path") or "")
-                if path:
-                    for key in (im.get("mesh_subject_id"), im.get("object_id"),
-                                im.get("char_id"), im.get("beat_id")):
-                        k = str(key or "")
-                        if k:
-                            fodder[k] = path
-        fodder_path = fodder.get(char_id, "") or fodder.get(beat_id, "")
-        has_init = bool(fodder_path)
-    elif fam == "audio_driven_face":
-        has_init = bool(portraits.get(char_id, ""))
-    elif fam in ("image_to_video", "static_motion") or engine_name in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
-        # For ltx_audio_in under IA2V talking:
-        is_talking = False
-        if is_registered(engine_name):
-            try:
-                eng = get_engine(engine_name)
-                fn = getattr(eng, "wants_talking_prompt", None)
-                is_talking = bool(fn()) if callable(fn) else False
-            except Exception:
-                pass
-        s4_portrait = (engine_name == "ltx_audio_in" and role == "character_video" and is_talking)
-        if s4_portrait:
-            has_init = bool(portraits.get(char_id, ""))
-        else:
-            has_init = bool(stills.get(beat_id, ""))
-    
-    if has_init:
-        present.add("init_image")
-
-    # 3. audio_ref: always present since all roles supply voice audio reference
-    present.add("audio_ref")
-
-    # 4. base_clip_ref:
     if os.environ.get("OTR_LSYNC_BASE_ENGINE", "").strip():
-        present.add("base_clip_ref")
+        req["base_clip_ref"] = {"path": "__cast_time_base_clip__"}
+
+    present = _present_request_tokens(req)
 
     if fam == "static_image_gen":
         if not ({"text_prompt", "init_image"} & present):
