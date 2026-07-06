@@ -1,0 +1,7 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
+
+[KNOWN-FAIL-GUARD] NEW failures (REGRESSION) -- the following nodeids failed but are not in EXPECTED_FAILED_NODEIDS:
+  - tests/test_cloud_image_adapters.py::test_nano_banana_inputs_resolve_model
+  - tests/test_cloud_image_adapters.py::test_seedream_inputs_resolve_model
+If these are intentional new known-fails, add them to EXPECTED_FAILED_NODEIDS + docs/known-failures.md in the same commit. Otherwise fix the regression.
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

@@ -92,18 +92,23 @@ def test_nano_banana_inputs_resolve_model(monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL", "nb-test-model")
     ins = eci.NanoBanana2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "response_modalities", "seed"}
-    # DYNAMICCOMBO_V3 value is a DICT -- the Gemini node reads model["model"]
-    # (a bare slug raises "string indices must be integers"). ByteDance seedream
-    # differs (model: str) -- see test_seedream_inputs_resolve_model below.
-    assert ins["model"] == {"model": "nb-test-model"}
-    assert ins["model"] != "COMFY_DYNAMICCOMBO_V3"
+    # DYNAMICCOMBO_V3 value is a DICT -- GeminiNanoBanana2V2.execute bracket-reads
+    # model["model"]/["resolution"]/["aspect_ratio"]/["thinking_level"], so ALL
+    # FOUR must be present (the 2026-07-05 fix; a missing key KeyErrors ->
+    # provider_rejected). response_modalities must be "IMAGE" (compared == "IMAGE").
+    assert ins["model"] == {"model": "nb-test-model", "resolution": "1K",
+                            "aspect_ratio": "auto", "thinking_level": "LOW"}
+    assert ins["response_modalities"] == "IMAGE"
 
 
 def test_seedream_inputs_resolve_model(monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_SEEDREAM_MODEL", "sd-test-model")
     ins = eci.Seedream2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "seed", "watermark"}
-    assert ins["model"] == "sd-test-model" and ins["watermark"] is False
+    # ByteDanceSeedreamNodeV2.execute bracket-reads model["model"] (a bare string
+    # raises "string indices must be integers"); size_preset/width/height use
+    # model.get(default) so only "model" is required (2026-07-05 fix).
+    assert ins["model"] == {"model": "sd-test-model"} and ins["watermark"] is False
 
 
 def test_ideo_registered_and_inputs(monkeypatch):

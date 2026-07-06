@@ -251,17 +251,30 @@ class CloudNanoBanana2ImageEngine(_CloudImageBase):
 
     def _partner_inputs(self, request):
         # pinned required: model DYNAMICCOMBO_V3, prompt STRING,
-        # response_modalities COMBO, seed INT. model resolves via the single
-        # source of truth (never the placeholder). A DYNAMICCOMBO_V3 value is a
-        # DICT (the Gemini node reads model["model"] + optional images/files),
-        # NOT a bare slug -- passing a string raises "string indices must be
-        # integers" in nodes_gemini.execute.
+        # response_modalities COMBO, seed INT. The DYNAMICCOMBO_V3 value is a
+        # DICT -- NOT a bare slug (a string raises "string indices must be
+        # integers"). GeminiNanoBanana2V2.execute (nodes_gemini.py:1528+) reads
+        # model["model"] AND model["resolution"] AND model["aspect_ratio"] AND
+        # model["thinking_level"] (nodes_gemini.py:1528/812), so ALL FOUR MUST be
+        # present or it KeyErrors -> provider_rejected 'resolution' (the
+        # 2026-07-05 bake-off failure; the wiring fan-out caught thinking_level as
+        # the missing 4th key). resolution options ["1K","2K","4K"] (pro price
+        # 1K=$0.134/2K/4K=$0.24); aspect_ratio "auto"; thinking_level options are
+        # ["LOW","HIGH"] (LOW = cheaper/faster for image gen). response_modalities
+        # is compared `== "IMAGE"` (:1024) -> MUST be uppercase "IMAGE" for
+        # image-only; anything else silently requests IMAGE+TEXT. All env-overridable.
         from .._otr_shared.cloud_model_ids import resolve_model_id
         return {
-            "model": {"model": resolve_model_id(self.node_key)},
+            "model": {
+                "model": resolve_model_id(self.node_key),
+                "resolution": os.environ.get("OTR_CLOUD_NANO_RESOLUTION", "1K"),
+                "aspect_ratio": os.environ.get("OTR_CLOUD_NANO_ASPECT", "auto"),
+                "thinking_level": os.environ.get(
+                    "OTR_CLOUD_NANO_THINKING", "LOW"),
+            },
             "prompt": self._prompt(request),
             "response_modalities": os.environ.get(
-                "OTR_CLOUD_NANO_MODALITIES", "Image"),
+                "OTR_CLOUD_NANO_MODALITIES", "IMAGE"),
             "seed": self._seed(request),
         }
 
@@ -276,10 +289,14 @@ class CloudSeedream2ImageEngine(_CloudImageBase):
 
     def _partner_inputs(self, request):
         # pinned required: model DYNAMICCOMBO_V3, prompt STRING, seed INT,
-        # watermark BOOLEAN.
+        # watermark BOOLEAN. The DYNAMICCOMBO_V3 value is a DICT -- NOT a bare
+        # slug: ByteDanceSeedreamNodeV2.execute (nodes_bytedance.py:790+) reads
+        # model["model"] (KeyError/"string indices must be integers" on a bare
+        # string), while size_preset/width/height use model.get(...) with safe
+        # defaults (2048/2048), so only the "model" key is required.
         from .._otr_shared.cloud_model_ids import resolve_model_id
         return {
-            "model": resolve_model_id(self.node_key),
+            "model": {"model": resolve_model_id(self.node_key)},
             "prompt": self._prompt(request),
             "seed": self._seed(request),
             "watermark": False,
