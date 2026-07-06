@@ -92,12 +92,12 @@ def test_nano_banana_inputs_resolve_model(monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL", "nb-test-model")
     ins = eci.NanoBanana2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "response_modalities", "seed"}
-    # DYNAMICCOMBO_V3 value is a DICT -- GeminiNanoBanana2V2.execute bracket-reads
-    # model["model"]/["resolution"]/["aspect_ratio"]/["thinking_level"], so ALL
-    # FOUR must be present (the 2026-07-05 fix; a missing key KeyErrors ->
-    # provider_rejected). response_modalities must be "IMAGE" (compared == "IMAGE").
+    # DYNAMICCOMBO_V3 value is a DICT. model/resolution/aspect_ratio are required
+    # by the live row; thinking_level is deliberately omitted because Vertex
+    # rejects thinkingConfig for this image model, and OTR's bridge has a scoped
+    # GeminiNanoBanana2V2 override that omits it from the provider request.
     assert ins["model"] == {"model": "nb-test-model", "resolution": "1K",
-                            "aspect_ratio": "auto", "thinking_level": "LOW"}
+                            "aspect_ratio": "auto"}
     assert ins["response_modalities"] == "IMAGE"
 
 

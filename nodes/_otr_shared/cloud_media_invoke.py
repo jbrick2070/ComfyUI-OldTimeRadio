@@ -346,6 +346,8 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
         else:
             real_inputs[key] = val
     clone = node_cls.PREPARE_CLASS_CLONE({"hidden_inputs": hidden_inputs})
+    if row.get("class_name") == "GeminiNanoBanana2V2":
+        return await _call_gemini_nano_banana2_v2(clone, real_inputs)
     entry = fn_name or getattr(clone, "FUNCTION", "EXECUTE_NORMALIZED_ASYNC")
     fn = getattr(clone, entry, None)
     if fn is None:
@@ -358,6 +360,103 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
     if inspect.isawaitable(result):
         result = await result
     return result
+
+
+async def _call_gemini_nano_banana2_v2(cls, inputs: dict) -> Any:
+    """Invoke Gemini Nano Banana 2 without the partner node's invalid
+    thinkingConfig.
+
+    The live V2 partner node requires model["thinking_level"] and always sends
+    generationConfig.thinkingConfig. Vertex rejects that field for the currently
+    pinned Nano Banana image models, after accepting the same request shape with
+    model/resolution/aspect_ratio. Keep the pinned auth/session/sync_op path,
+    but omit thinkingConfig from the request body.
+    """
+    from comfy_api.latest import IO
+    from comfy_api_nodes.apis.gemini import (
+        GeminiContent,
+        GeminiGenerateContentResponse,
+        GeminiImageConfig,
+        GeminiImageGenerateContentRequest,
+        GeminiImageGenerationConfig,
+        GeminiPart,
+        GeminiRole,
+        GeminiSystemInstructionContent,
+        GeminiTextPart,
+    )
+    from comfy_api_nodes.nodes_gemini import (
+        calculate_tokens_price,
+        create_image_parts,
+        get_image_from_response,
+        get_text_from_response,
+    )
+    from comfy_api_nodes.util import (
+        ApiEndpoint,
+        get_number_of_images,
+        sync_op,
+        validate_string,
+    )
+
+    prompt = str(inputs.get("prompt") or "")
+    model = inputs.get("model") or {}
+    response_modalities = str(inputs.get("response_modalities") or "IMAGE")
+    system_prompt = str(inputs.get("system_prompt") or "")
+    temperature = float(inputs.get("temperature", 1.0))
+    top_p = float(inputs.get("top_p", 0.95))
+
+    validate_string(prompt, strip_whitespace=True, min_length=1)
+    model_choice = model["model"]
+    if model_choice == "Nano Banana 2 (Gemini 3.1 Flash Image)":
+        model_id = "gemini-3.1-flash-image-preview"
+    elif model_choice == "Nano Banana 2 Lite":
+        model_id = "gemini-3.1-flash-lite-image"
+    else:
+        model_id = model_choice
+
+    images = model.get("images") or {}
+    parts = [GeminiPart(text=prompt)]
+    if images:
+        image_tensors = [t for t in images.values() if t is not None]
+        if image_tensors:
+            if sum(get_number_of_images(t) for t in image_tensors) > 14:
+                raise ValueError(
+                    "The current maximum number of supported images is 14.")
+            parts.extend(await create_image_parts(cls, image_tensors))
+    files = model.get("files")
+    if files is not None:
+        parts.extend(files)
+
+    image_config = GeminiImageConfig(imageSize=model["resolution"])
+    if model["aspect_ratio"] != "auto":
+        image_config.aspectRatio = model["aspect_ratio"]
+
+    gemini_system_prompt = None
+    if system_prompt:
+        gemini_system_prompt = GeminiSystemInstructionContent(
+            parts=[GeminiTextPart(text=system_prompt)], role=None)
+
+    response = await sync_op(
+        cls,
+        ApiEndpoint(path=f"/proxy/vertexai/gemini/{model_id}", method="POST"),
+        data=GeminiImageGenerateContentRequest(
+            contents=[GeminiContent(role=GeminiRole.user, parts=parts)],
+            generationConfig=GeminiImageGenerationConfig(
+                responseModalities=(["IMAGE"] if response_modalities == "IMAGE"
+                                    else ["TEXT", "IMAGE"]),
+                imageConfig=image_config,
+                temperature=temperature,
+                topP=top_p,
+            ),
+            systemInstruction=gemini_system_prompt,
+        ),
+        response_model=GeminiGenerateContentResponse,
+        price_extractor=calculate_tokens_price,
+    )
+    return IO.NodeOutput(
+        await get_image_from_response(response),
+        get_text_from_response(response),
+        None,
+    )
 
 
 def _inject_hidden_inputs(row: dict, inputs: dict, session) -> dict:

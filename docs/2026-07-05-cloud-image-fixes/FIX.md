@@ -58,3 +58,22 @@ full model dicts (updated this commit).
   VIDEO adapters for the same bare-string-vs-dict V3 landmine.
 - Live re-run nano_banana_2 + seedream_2 -> obs episode, no KeyError/TypeError.
 - Full suite + Bug Bible + B7 green; NOBOM; push.
+
+## Live proof follow-up (Codex continuation)
+- 2026-07-05 quick probe with `cloud_nano_banana_2 + viz_green + 30 words`
+  succeeded and published to OBS, but `viz_green` ignores init images, so it did
+  NOT exercise the cloud still adapter.
+- 2026-07-05 quick probe with `cloud_nano_banana_2 + word_razzle + 30 words`
+  DID exercise stills and found the real remaining provider issue:
+  `thinking_level` reached Vertex as `thinkingConfig.thinkingLevel`, and Vertex
+  rejected it for the pinned Nano Banana image model:
+  "thinking_level is not supported by this model."
+- Root fix: OTR's `invoke_partner_node` bridge now has a scoped
+  `GeminiNanoBanana2V2` path that preserves the pinned Comfy auth/session/sync
+  machinery but builds the Gemini image request without `thinkingConfig`. The
+  adapter no longer emits `thinking_level`; it emits the required
+  model/resolution/aspect_ratio dict plus uppercase `IMAGE`.
+- The scoped bridge path also mirrors the partner node by NOT forwarding
+  `seed` into `generationConfig`; Vertex treats that field as INT32 while OTR
+  request seeds are 64-bit, causing rejects such as
+  `Invalid value at 'generation_config.seed' (TYPE_INT32), 2573885473`.

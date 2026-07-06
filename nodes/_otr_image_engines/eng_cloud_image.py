@@ -253,24 +253,21 @@ class CloudNanoBanana2ImageEngine(_CloudImageBase):
         # pinned required: model DYNAMICCOMBO_V3, prompt STRING,
         # response_modalities COMBO, seed INT. The DYNAMICCOMBO_V3 value is a
         # DICT -- NOT a bare slug (a string raises "string indices must be
-        # integers"). GeminiNanoBanana2V2.execute (nodes_gemini.py:1528+) reads
-        # model["model"] AND model["resolution"] AND model["aspect_ratio"] AND
-        # model["thinking_level"] (nodes_gemini.py:1528/812), so ALL FOUR MUST be
-        # present or it KeyErrors -> provider_rejected 'resolution' (the
-        # 2026-07-05 bake-off failure; the wiring fan-out caught thinking_level as
-        # the missing 4th key). resolution options ["1K","2K","4K"] (pro price
-        # 1K=$0.134/2K/4K=$0.24); aspect_ratio "auto"; thinking_level options are
-        # ["LOW","HIGH"] (LOW = cheaper/faster for image gen). response_modalities
-        # is compared `== "IMAGE"` (:1024) -> MUST be uppercase "IMAGE" for
-        # image-only; anything else silently requests IMAGE+TEXT. All env-overridable.
+        # integers"). The live V2 partner row needs model/resolution/aspect_ratio,
+        # but its own execute() always adds a thinkingConfig that Vertex rejects
+        # for this image model. The OTR invoke bridge therefore uses a scoped
+        # GeminiNanoBanana2V2 override that preserves the pinned auth/session path
+        # while omitting thinkingConfig. resolution options ["1K","2K","4K"]
+        # (pro price 1K=$0.134/2K/4K=$0.24); aspect_ratio "auto".
+        # response_modalities is compared `== "IMAGE"` (:1024) -> MUST be
+        # uppercase "IMAGE" for image-only; anything else silently requests
+        # IMAGE+TEXT. All env-overridable.
         from .._otr_shared.cloud_model_ids import resolve_model_id
         return {
             "model": {
                 "model": resolve_model_id(self.node_key),
                 "resolution": os.environ.get("OTR_CLOUD_NANO_RESOLUTION", "1K"),
                 "aspect_ratio": os.environ.get("OTR_CLOUD_NANO_ASPECT", "auto"),
-                "thinking_level": os.environ.get(
-                    "OTR_CLOUD_NANO_THINKING", "LOW"),
             },
             "prompt": self._prompt(request),
             "response_modalities": os.environ.get(
