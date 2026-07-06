@@ -307,6 +307,59 @@ def test_mint_ltx_audio_in_gets_mouth_still(monkeypatch):
     assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "radio_object")
 
+
+def test_redirected_humo_announcer_mints_ltx_mouth_still(monkeypatch):
+    # Render redirects announcer_visual HuMo picks to ltx_audio_in when HuMo hosts
+    # are off. MetaBrief must plan against that effective engine, or the render
+    # driver later fails on the missing still_announcer_visual_radio_face_169 row.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={},
+        video_models={"announcer_video_model": {"engine_id": "humo"}})
+    objs = {o["object_id"]: o for o in out["objects"]}
+    face = objs["still_announcer_visual_radio_face_169"]
+    assert face["role"] == "announcer_visual"
+    assert face["w"] > face["h"]
+    assert "rubbery mouth" in face["prompt"]
+
+
+def test_force_map_to_ltx_announcer_mints_mouth_still(monkeypatch):
+    # The saved workflow can carry a non-still-consuming announcer slot; a smoke
+    # leg can then force announcer_visual to ltx_audio_in. MetaBrief must honor the
+    # same effective engine as render/dispatcher, not the stale saved slot.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={},
+        video_models={"announcer_video_model": {"engine_id": "viz_green"}})
+    objs = {o["object_id"]: o for o in out["objects"]}
+    assert "still_announcer_visual_radio_face_169" in objs
+
+
+def test_force_map_to_single_pass_ltx_does_not_mint_mouth_still(monkeypatch):
+    # The radio-face still is required by the ia2v lip-sync graph only. A forced
+    # single-pass ltx_audio_in smoke keeps the old faceless scene-still contract.
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
+    monkeypatch.setenv(
+        "OTR_LTX_AV_UNET",
+        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={},
+        video_models={"announcer_video_model": {"engine_id": "viz_green"}})
+    objs = {o["object_id"] for o in out["objects"]}
+    assert "still_announcer_visual_radio_face_169" not in objs
+
+
 def test_mint_humo_no_mouth_still(monkeypatch):
     # If the announcer engine is HuMo (and not talking), the mouth still is not minted.
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")

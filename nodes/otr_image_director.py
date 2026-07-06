@@ -188,14 +188,12 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
     policy dict; tolerant (a non-fodder / unknown engine just drops out)."""
     vm = (video_policy or {}).get("video_models") or {}
     roles = set()
-    # Honor OTR_FORCE_ENGINE_MAP (operator 2026-07-01): the render-time force map
-    # re-routes video per role, but this image-phase fodder decision runs BEFORE
-    # that override -- without resolving it, forcing *=mesh_stage mints NO fodder
-    # and the mesh render fails b000 with FamilyInputGap (requires init_image).
-    # Same seam _still_needed_for_role uses. Env unset -> unchanged (byte-identical).
+    # Honor render-time engine rewrites (force-map + radio-is-host redirect): this
+    # image-phase fodder decision runs BEFORE render mutates shot engines. Same
+    # seam _still_needed_for_role uses. Env unset/no-redirect -> unchanged.
     try:
         from .otr_image_gen_dispatcher import (  # type: ignore
-            _effective_engine_after_force_map as _eff)
+            _effective_video_engine_for_role as _eff)
     except Exception:  # noqa: BLE001 -- never block on the override resolver
         _eff = None
     for role in _role_slots.ROLE_TO_VIDEO_SLOT:

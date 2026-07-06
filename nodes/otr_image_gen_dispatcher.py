@@ -349,6 +349,35 @@ def _effective_engine_after_force_map(role: str, eng_id: str) -> str:
     return forced or eng_id
 
 
+def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
+    """Resolve the VIDEO engine the render phase will actually use for ``role``.
+
+    The image phase runs before ShotLock/video dispatch, so it cannot read the
+    final mutated shot row. It still has to mint exactly the stills that final
+    render will require. Mirror the render order:
+
+    1. ``OTR_FORCE_ENGINE_MAP`` rewrites planned shot engines.
+    2. ``render_driver._enforce_radio_is_host`` redirects announcer/music
+       HuMo-family bookends to ``ltx_audio_in`` when ``OTR_ENABLE_HUMO_HOSTS`` is
+       off.
+
+    Unknown engines or import failures keep the input id (fail-safe: mint the
+    still rather than quietly skipping an asset that render might need)."""
+    role_s = str(role or "")
+    eff = _effective_engine_after_force_map(role_s, str(eng_id or ""))
+    if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
+        return eff
+    if role_s not in ("announcer_visual", "music_visual"):
+        return eff
+    try:
+        from ._otr_video_engines.render_driver import engine_family
+        if engine_family(eff, "") == "audio_driven_face":
+            return "ltx_audio_in"
+    except Exception:  # noqa: BLE001 -- fail-safe: keep the selected id
+        return eff
+    return eff
+
+
 def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     """True if the SELECTED video engine for ``role`` consumes the role's still.
     When the role's video engine IGNORES the still (the visualizer / abstract /
@@ -371,10 +400,11 @@ def _still_needed_for_role(image_policy: dict, role: str) -> bool:
     eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
     if not eng_id:
         return True
-    # Honor OTR_FORCE_ENGINE_MAP: resolve the SAME effective engine the render-time
-    # override will use, so an all-one-engine force to a no-still visualizer skips
-    # the unused Flux still instead of wasting an image-gen pass (operator 2026-07-01).
-    eng_id = _effective_engine_after_force_map(str(role), eng_id)
+    # Honor render-time engine rewrites (force-map + radio-is-host redirect): the
+    # image phase must mint/skip against the same engine build_request_from_shot
+    # will see, or a redirected talking ltx_audio_in announcer can reach render
+    # without its mandatory wide radio-face still.
+    eng_id = _effective_video_engine_for_role(str(role), eng_id)
     try:
         from ._otr_video_engines import registry as _vreg
         eng = _vreg.get_engine(eng_id)

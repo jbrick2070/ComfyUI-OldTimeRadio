@@ -464,26 +464,9 @@ def _effective_announcer_family(video_models) -> str:
     resolution/import failure -> "" (the caller then defaults to the FACELESS
     radio_object -- fail SAFE toward faceless). Pure except the env read inside
     the force-map resolver."""
-    try:
-        try:
-            from ._otr_shared import role_slots as _rs  # type: ignore
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_shared import role_slots as _rs  # type: ignore
-        eng_id = _rs.engine_id_for_role(video_models or {}, "announcer_visual")
-    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
-        return ""
+    eng_id = _effective_prompt_engine_for_role(video_models, "announcer_visual")
     if not eng_id:
         return ""
-    try:
-        try:
-            from .otr_image_gen_dispatcher import (  # type: ignore
-                _effective_engine_after_force_map)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from otr_image_gen_dispatcher import (  # type: ignore
-                _effective_engine_after_force_map)
-        eng_id = _effective_engine_after_force_map("announcer_visual", eng_id)
-    except Exception:  # noqa: BLE001 -- unforced run: keep the director pick
-        pass
     try:
         try:
             from ._otr_video_engines.render_driver import engine_family  # type: ignore
@@ -492,6 +475,82 @@ def _effective_announcer_family(video_models) -> str:
         return str(engine_family(eng_id, "") or "")
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _effective_prompt_engine_for_role(video_models, role: str) -> str:
+    """VIDEO engine MetaBrief should plan stills against for ``role``.
+
+    This mirrors the image dispatcher's effective-engine seam: selected per-role
+    engine, then force-map, then the radio-is-host HuMo redirect. A failure keeps
+    the selected id (or empty), which is the fail-safe image-prompt behavior."""
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+        eng_id = str(_rs.engine_id_for_role(video_models or {}, role) or "")
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return ""
+    if not eng_id:
+        return ""
+    try:
+        try:
+            from .otr_image_gen_dispatcher import (  # type: ignore
+                _effective_video_engine_for_role)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from otr_image_gen_dispatcher import (  # type: ignore
+                _effective_video_engine_for_role)
+        return str(_effective_video_engine_for_role(role, eng_id) or eng_id)
+    except Exception:  # noqa: BLE001 -- legacy/unforced run: keep the pick
+        return eng_id
+
+
+def _engine_wants_talking_prompt(engine_id: str) -> bool:
+    """Whether a registered video engine currently wants talking init prompts.
+
+    Mirrors ``OTR_VideoDirector._role_talking`` but runs inside MetaBrief so old
+    or override-mutated policies cannot leave the image payload missing a still
+    that final render will require. Misconfigured engines return False here; the
+    render engine remains the loud hard gate."""
+    if not engine_id:
+        return False
+    try:
+        try:
+            from ._otr_video_engines import registry as _vreg  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_video_engines import registry as _vreg  # type: ignore
+        if not _vreg.is_registered(engine_id):
+            return False
+        eng = _vreg.get_engine(engine_id)
+        fn = getattr(eng, "wants_talking_prompt", None)
+        return bool(fn()) if callable(fn) else False
+    except Exception:  # noqa: BLE001 -- render path owns the hard failure
+        return False
+
+
+def _effective_talking_roles(talking_roles, video_models):
+    """Merge forwarded talking policy with render-effective engine truth.
+
+    ``policy["talking"]`` is correct for a fresh, unforced graph. This helper
+    upgrades it when a render-time force-map or radio-is-host redirect means the
+    final engine is a talking engine, which is the missing-radio-face failure
+    mode for ltx_audio_in announcer bookends."""
+    out = {str(k): bool(v) for k, v in (talking_roles or {}).items()}
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+        roles = tuple(_rs.ROLE_TO_VIDEO_SLOT)
+    except Exception:  # noqa: BLE001
+        roles = ("announcer_visual", "music_visual", "character_video")
+    for role in roles:
+        if out.get(role):
+            continue
+        eng_id = _effective_prompt_engine_for_role(video_models, role)
+        if _engine_wants_talking_prompt(eng_id):
+            out[role] = True
+    return out
 
 
 def _still_aspects_from_policy(policy_json):
@@ -602,12 +661,12 @@ def _still_word_roles_from_policy(policy_json):
     a role_slots import failure in an odd flat-test context, yields an empty set
     -> NO word/title branch (the legacy cinematic scene still). Pure, tolerant.
 
-    OTR_FORCE_ENGINE_MAP seam (r3): the render-time override rewrites the engine
-    BEFORE render, and the still dispatcher honors it for still-consumption; so a
-    run that FORCES a role to still_word must ALSO mint the word/title prompt (else
-    it renders legacy SCENE prompts on a word card). Resolve the EFFECTIVE engine
-    via ``_effective_engine_after_force_map`` before the compare. Env-unset (no
-    force map) -> the resolver returns the id unchanged -> byte-identical."""
+    Render-effective seam (r3 + radio-is-host): the render-time override/redirect
+    rewrites the engine BEFORE render, and the still dispatcher honors it for
+    still-consumption; so a run that FORCES or redirects a role to still_word must
+    ALSO mint the word/title prompt (else it renders legacy SCENE prompts on a
+    word card). Env-unset/no-redirect -> the resolver returns the id unchanged
+    -> byte-identical."""
     try:
         pol = json.loads(policy_json or "{}")
     except (ValueError, TypeError):
@@ -627,19 +686,7 @@ def _still_word_roles_from_policy(policy_json):
     roles = set()
     for role in _rs.ROLE_TO_VIDEO_SLOT:
         try:
-            eng_id = str(_rs.engine_id_for_role(vm, role))
-            # Honor OTR_FORCE_ENGINE_MAP (its OWN try so an import failure falls
-            # back to the unforced id -- never silently eaten by the outer except).
-            try:
-                try:
-                    from .otr_image_gen_dispatcher import (  # type: ignore
-                        _effective_engine_after_force_map)
-                except ImportError:  # pragma: no cover -- flat test imports
-                    from otr_image_gen_dispatcher import (  # type: ignore
-                        _effective_engine_after_force_map)
-                eng_id = str(_effective_engine_after_force_map(role, eng_id))
-            except Exception:  # noqa: BLE001 -- unforced run stays byte-identical
-                pass
+            eng_id = _effective_prompt_engine_for_role(vm, role)
             if eng_id == "still_word":
                 roles.add(role)
         except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
@@ -1519,6 +1566,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import _resolve_style  # type: ignore
     _vstyle = _resolve_style(meta)
+    talking_roles = _effective_talking_roles(talking_roles, video_models)
     out: dict = {}
     roster = list(cast or [])
     cast_ids = {str(c.get("char_id") or "") for c in roster if isinstance(c, dict)}
