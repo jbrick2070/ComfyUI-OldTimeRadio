@@ -413,10 +413,10 @@ def test_shotlock_derives_orphans_from_beat():
     assert "grim resolve" in c["text_prompt"] and "spacer" in c["text_prompt"]
 
 
-def test_passpm_empty_json_reseed_then_raises():
-    """NO-FALLBACK rip (2026-07-04): an ATTEMPTED derivation LLM that collapses to
-    empty after every reseed now FAILS LOUD -- no deterministic-template swap. The
-    reseed loop still runs (initial + max_reseed) before the raise."""
+def test_passpm_empty_json_reseed_then_templates():
+    """An ATTEMPTED derivation LLM that collapses to empty after every reseed
+    still spends the reseed budget, then the deterministic collapse guard
+    carries the beat instead of aborting the episode."""
     led = _char_ledger()
     calls = {"n": 0}
 
@@ -424,18 +424,23 @@ def test_passpm_empty_json_reseed_then_raises():
         calls["n"] += 1
         return ""  # always collapses
 
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        sl.derive_creative_directives(
-            _char_beat("hello there"), led["meta"], led, llm_fn=empty_llm,
-            max_reseed=2,
-        )
-    assert calls["n"] == 3  # initial + 2 reseeds ran before the raise
+    creative, warns = sl.derive_creative_directives(
+        _char_beat("hello there"), led["meta"], led, llm_fn=empty_llm,
+        max_reseed=2,
+    )
+    assert calls["n"] == 3  # initial + 2 reseeds ran before templating
+    c = creative["b1"]
+    assert c["source"] == "template_after_llm_miss"
+    assert "spacer" in c["text_prompt"]
+    assert "station" in c["text_prompt"]
+    assert "hello there" in c["text_prompt"]
+    assert any("no usable directive for beat b1" in w for w in warns)
 
 
-def test_passpm_partial_batch_spends_reseeds_then_raises():
-    """NO-FALLBACK rip (2026-07-04): a PARTIAL batch reply (one beat missing) must
-    spend its FULL reseed budget before the missing beat hits the fail-loud raise
-    -- the reseed loop breaks only on full coverage, not any non-empty parse."""
+def test_passpm_partial_batch_spends_reseeds_then_templates_missing_beat():
+    """A PARTIAL batch reply (one beat missing) must spend its FULL reseed
+    budget, then template only the missing beat while keeping the valid LLM
+    directive."""
     led = _char_ledger()
     beats = [
         {"beat_id": "b1", "role": "character_video", "char_id": "c1",
@@ -453,10 +458,13 @@ def test_passpm_partial_batch_spends_reseeds_then_raises():
                             "text_prompt": "a tall weathered spacer with a scar, "
                                            "facing the camera, on the station"}])
 
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        sl.derive_creative_directives(
-            beats, led["meta"], led, llm_fn=partial_llm, max_reseed=2)
+    creative, warns = sl.derive_creative_directives(
+        beats, led["meta"], led, llm_fn=partial_llm, max_reseed=2)
     assert calls["n"] == 3  # the partial reply spent the full reseed budget
+    assert creative["b1"]["source"] == "llm"
+    assert creative["b2"]["source"] == "template_after_llm_miss"
+    assert "second" in creative["b2"]["text_prompt"]
+    assert any("no usable directive for beat b2" in w for w in warns)
 
 
 def test_passpm_no_llm_is_template_lane():
@@ -480,10 +488,9 @@ def test_passpm_no_llm_is_template_lane():
     assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])
 
 
-def test_story_consistency_gate_warn_only_keeps_else_raises():
-    """NO-FALLBACK rip (2026-07-04): a hallucinated (inconsistent/faceless) LLM
-    prompt FAILS LOUD by default; consistency_gate_warn_only=True KEEPS the AI
-    prompt (operator toggle) instead of swapping to the deterministic template."""
+def test_story_consistency_gate_templates_or_warn_only_keeps():
+    """A hallucinated (inconsistent/faceless) LLM prompt templates by default;
+    consistency_gate_warn_only=True KEEPS the AI prompt (operator toggle)."""
     led = _char_ledger()
 
     def halluc_llm(_prompt):
@@ -491,10 +498,15 @@ def test_story_consistency_gate_warn_only_keeps_else_raises():
         return json.dumps([{"beat_id": "b1", "expression": "x",
                             "text_prompt": "bright sunny flower meadow"}])
 
-    # default (warn_only=False): the LLM prompt fails the gate -> raise loud
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        sl.derive_creative_directives(
-            _char_beat(), led["meta"], led, llm_fn=halluc_llm)
+    # default (warn_only=False): the LLM prompt fails the gate -> template guard
+    creative, warns = sl.derive_creative_directives(
+        _char_beat(), led["meta"], led, llm_fn=halluc_llm)
+    c = creative["b1"]
+    assert c["source"] == "template_after_consistency_miss"
+    assert "bright sunny flower meadow" not in c["text_prompt"]
+    assert "spacer" in c["text_prompt"]
+    assert "station" in c["text_prompt"]
+    assert any("deterministic template collapse guard" in w for w in warns)
 
     # warn_only=True keeps the AI prompt (source stays "llm"), logs the miss
     creative, warns = sl.derive_creative_directives(

@@ -6,6 +6,26 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-06 -- ShotLock M4 collapse guard restored -- v2.0-alpha
+Did:
+- Fixed `nodes/otr_shot_lock.py::derive_creative_directives`: an attempted writer LLM that returns
+  empty, partial, or story-inconsistent M4 directives no longer aborts the episode. The reseed budget
+  still runs first; any uncovered beat stamps a deterministic, anchored, finished prompt with
+  `source=template_after_llm_miss`, and consistency misses stamp
+  `source=template_after_consistency_miss`. Both paths emit loud `video.warnings`/report entries.
+- Updated the ShotLock tooltip/docstring/comments to describe the collapse guard accurately. No
+  workflow JSON change: INPUT_TYPES shape, widgets, sockets, and wiring are unchanged.
+- Regression coverage updated in `test_video_platform_aseam.py` and `test_look_qa_round5.py`: empty
+  batch, partial batch with one missing beat, default consistency-template behavior, and warn-only
+  AI-prompt retention are pinned.
+Verification:
+- Focused ShotLock/look tests: 5 passed.
+- Full repo suite: 6568 passed, 34 skipped, 2 xfailed.
+- Bug Bible: 16 passed, 7 skipped, 3 xfailed.
+Current step: same as before; this is a production hotfix for the M4 derivation collapse path.
+Next: push this green chunk to `v2.0-alpha` and verify HEAD==origin / hygiene.
+Commits: this commit.
+
 ## 2026-07-05 (operator back) -- S-C C1 COMPLETE (producer folded in, zero JSON) + anime bake-off running -- v2.0-alpha
 Did:
 - @4308d663 (pushed): S-C C1 producer FOLDED IN (Option B, operator "just build it now so I can

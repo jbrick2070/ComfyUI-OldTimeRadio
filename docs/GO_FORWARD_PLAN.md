@@ -1,6 +1,7 @@
 # OTR GO-FORWARD PLAN -- SINGLE SOURCE OF TRUTH (what's LEFT)
 
-> Last updated 2026-07-05 (TOTAL-COVERAGE COMPLETE -- CHUNK C SHIPPED) | branch v2.0-alpha HEAD 3eced145 + docs, ALL PUSHED (HEAD==origin) | prod/main + tags operator-GATED.
+> Last updated 2026-07-06 (SHOTLOCK M4 HOTFIX GREEN: writer-LLM directive collapse templates instead of aborting; full suite 6568/0, Bug Bible 16) | branch v2.0-alpha | prod/main + tags operator-GATED.
+> HOTFIX this session: OTR_ShotLock derive_creative_directives now spends reseeds, then uses a deterministic anchored prompt collapse guard for empty/partial writer-LLM batches (`template_after_llm_miss`) and story-inconsistent AI prompts (`template_after_consistency_miss`) instead of stopping the episode. Workflow JSON untouched; no node shape/wiring/widget-slot change.
 > CHUNK C @3eced145: still_word typography/backdrop/title-mood are pack-owned now (composer + derive provenance read the resolved VisualStyle; genre SELECTOR + per-episode lettering LOCK stay Python -- operator 2026-07-04); sci_fi byte-identical (extraction constants survive as fixtures + AST-guarded out of production); 4 packs authored their still_word voices (all 3 fields changed from sci_fi). test_visual_styles_c.py (+59 tests: deltas, sci_fi byte-identity, provenance stamps still_word_typography:<genre>/still_word_title_mood_style, lettering-lock determinism, negative-vocab, AST re-route guard); A1 TestDormantDefaults RETIRED, A2 provenance pin + still_word signature pin re-pointed. Suite 6614/0, Bug Bible 16, workflow JSON untouched. ALL FOUR chunks (A1+A2+B+C) done -> visual_style TOTAL COVERAGE is CODE-COMPLETE. NEXT = operator acceptance: an ANIME episode's announcer/radio + music stills AND still_word cards provably carry the anime fields (ledger prompt-metadata stamps); operator eyeball gates the look. Documented limitation unchanged: procedural viz_* engines are promptless -> full coverage needs promptable engines selected for announcer/music video roles.
 > DONE + PROVEN LIVE this session: (1) credits col-3 scroll @b89a30ca; (2) ElevenLabs cast-voice @fae7081f
 > (voices render on elevenlabs, real provider ids); (3) Sonilo music @8f146394 (min-duration floor+trim, episode
@@ -270,9 +271,12 @@ DONE + pushed to v2.0-alpha this arc (all suite 6138-6142 + Bug Bible green, 0 r
 
 **NO-FALLBACK RIP COMPLETE -- ALL 10 SITES RIPPED + GREEN + Fable SHIP.** chunks 1-3 (audio/image/
 casting/writer) + chunk-4 (`otr_shot_lock.derive_creative_directives`, the 10th site operator ordered
-ripped). Every attempted-model failure across the stack now fails LOUD with a named raise carrying
-"no-fallback rip"; the deterministic template survives ONLY as the `llm_fn=None` 100%-local lane +
-`consistency_gate_warn_only` keep. Suite 6141/0, Bug Bible 16. Chunk-4 @26b236e6 + @432cb576.
+ripped). Every attempted-model failure across the stack then failed LOUD with a named raise carrying
+"no-fallback rip"; at that point the deterministic template was limited to the `llm_fn=None`
+100%-local lane + `consistency_gate_warn_only` keep. Suite 6141/0, Bug Bible 16.
+Chunk-4 @26b236e6 + @432cb576.
+SUPERSEDED 2026-07-06 for ShotLock M4 only: creative-directive collapse is a prompt-level guard, not
+an engine/model fallback; it now templates after reseeds or consistency miss instead of aborting.
 KEPT (NOT fallbacks, unchanged): title->outline.title (primary AI title), news degrade (gated by
 news_briefs_required toggle), J2 outline speaker round-robin (structural), the "no news input" degrade,
 the shared `_resolve_writer_llm` None-on-load-fail seam (same in both lanes; out of scope, flag if reopened).

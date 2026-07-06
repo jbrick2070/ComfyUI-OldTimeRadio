@@ -373,9 +373,7 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# M4 per-beat creative derivation (LLM; NO-FALLBACK -- fail loud on an attempted
-# writer-LLM failure; the deterministic template is the lane ONLY when no writer
-# LLM is configured. no-fallback rip 2026-07-04)
+# M4 per-beat creative derivation (LLM with deterministic collapse guard)
 # ---------------------------------------------------------------------------
 
 _DIRECTIVE_KEYS = ("expression", "motion", "camera")
@@ -516,11 +514,11 @@ def derive_creative_directives(
     ``callable(prompt:str) -> str`` (injectable for tests); when None it is
     resolved lazily from the writer's slot and, if unavailable (llm_fn stays
     None), the deterministic template carries every beat -- the legit local lane.
-    NO-FALLBACK (rip 2026-07-04): when a writer LLM WAS attempted and it yields
-    no usable directive after ``max_reseed`` reseeds, OR the LLM prompt fails the
-    story-consistency/person gate, this FAILS LOUD (RuntimeError) instead of
-    swapping to the deterministic template; ``consistency_gate_warn_only`` keeps
-    the AI prompt. Never touches audio.
+    If an attempted writer LLM yields no usable directive after ``max_reseed``
+    reseeds, or authors a prompt that fails the story-consistency gate, the
+    deterministic template carries that beat with a loud warning. This is a
+    prompt collapse guard, not an engine/model fallback, and it never touches
+    frozen audio.
     """
     warnings: list = []
     char_beats = [b for b in beats if b["role"] in CHARACTER_BEARING_ROLES]
@@ -548,10 +546,9 @@ def derive_creative_directives(
                     warnings.append(f"derivation llm_fn raised ({exc}); reseed {attempt}")
                     raw = ""
                 directives = _parse_directives(raw, expected)
-                # Break only on FULL batch coverage -- a partial reply (e.g. 14 of
-                # 15 beats) must spend its remaining reseed budget rather than let
-                # the one missing beat hit the fail-loud raise below with retries
-                # unused (no-fallback rip 2026-07-04).
+                # Break only on FULL batch coverage -- a partial reply (e.g. 14
+                # of 15 beats) must spend its remaining reseed budget before
+                # the missing beats drop to the deterministic collapse guard.
                 if directives and all(bid in directives for bid in expected):
                     break
                 if attempt < max_reseed:
@@ -576,14 +573,13 @@ def derive_creative_directives(
                 )
                 source = "llm"
             elif llm_fn is not None:
-                # A writer LLM WAS attempted but produced no usable directive for
-                # this beat after all reseeds -> fail loud (no-fallback rip
-                # 2026-07-04); no silent deterministic-template swap.
-                raise RuntimeError(
-                    "[OTR_ShotLock] derive_creative_directives: the writer LLM "
-                    "produced no usable directive for beat %s after %d reseeds -- "
-                    "NO deterministic template fallback (no-fallback rip "
-                    "2026-07-04); a failed derivation LLM stops the episode."
+                text_prompt = _deterministic_template(
+                    appearance, setting, b["text"])
+                source = "template_after_llm_miss"
+                d = {k: "" for k in _DIRECTIVE_KEYS}
+                warnings.append(
+                    "writer LLM produced no usable directive for beat %s after "
+                    "%d reseeds; using deterministic template collapse guard"
                     % (b["beat_id"], max_reseed)
                 )
             else:
@@ -604,21 +600,21 @@ def derive_creative_directives(
             # person-anchor detector gates or annotates the prompt. The
             # _subject_anchor prepended below still leads every talking-head prompt
             # with face/framing tokens (prompt COMPOSITION, not analysis), and the
-            # operator QAs faces visually. Only the story-consistency gate remains
-            # -- it fails loud on an attempted-LLM miss (no-fallback rip 2026-07-04);
-            # consistency_gate_warn_only keeps the AI prompt.
+            # operator QAs faces visually. Only the story-consistency gate
+            # remains; by default an inconsistent AI prompt drops to the
+            # deterministic collapse guard, while consistency_gate_warn_only
+            # keeps the AI prompt.
             if not _prompt_is_consistent(text_prompt, appearance, setting):
                 msg = (f"consistency gate for beat {b['beat_id']}: prompt missing "
                        f"cast/setting trait")
                 if consistency_gate_warn_only or source != "llm":
                     warnings.append(msg + " (kept; warn-only or template path)")
                 else:
-                    raise RuntimeError(
-                        "[OTR_ShotLock] derive_creative_directives: the writer LLM "
-                        "prompt for beat %s failed the story-consistency gate -- NO "
-                        "template fallback (no-fallback rip 2026-07-04)."
-                        % b["beat_id"]
-                    )
+                    warnings.append(
+                        msg + "; using deterministic template collapse guard")
+                    text_prompt = _deterministic_template(
+                        appearance, setting, b["text"])
+                    source = "template_after_consistency_miss"
             # The subject anchor leads EVERY talking-head prompt path (llm,
             # composed, template): face/framing tokens first, bounded
             # appearance after -- prepended AFTER the gates, BEFORE finishing.
@@ -844,10 +840,10 @@ class OTRShotLock:
                 "consistency_gate_warn_only": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "M4 story-consistency gate. Default (fail-closed): an "
-                        "inconsistent/faceless writer-LLM prompt ABORTS the "
-                        "episode loud (no-fallback rip 2026-07-04). warn-only: "
-                        "keep the AI prompt and log the miss instead of aborting."
+                        "M4 story-consistency gate. Default: an inconsistent "
+                        "writer-LLM prompt is replaced by the deterministic "
+                        "template collapse guard with a loud warning. warn-only: "
+                        "keep the AI prompt and log the miss."
                     ),
                 }),
                 "gate_in": ("STRING", {

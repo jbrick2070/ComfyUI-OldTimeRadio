@@ -278,12 +278,11 @@ class TestPersonAnchor:
         a = _sl._subject_anchor("x" * 400)
         assert len(a) < 200
 
-    def test_object_only_llm_prompt_raises(self):
-        """NO-FALLBACK rip (2026-07-04): the b002 shape -- an LLM prompt describing
-        PROPS without the cast trait -- FAILS LOUD at the story-CONSISTENCY gate
-        (missing the 'stocky engineer' appearance token), not swapping to the
-        anchored template. (The person/face DETECTOR was removed 2026-07-04; this
-        prompt still raises because it also drops the cast trait -> consistency.)"""
+    def test_object_only_llm_prompt_templates(self):
+        """The b002 shape -- an LLM prompt describing PROPS without the cast
+        trait -- drops to the deterministic collapse guard at the
+        story-CONSISTENCY gate. The person/face DETECTOR remains removed; this
+        is the text-level cast/setting consistency guard."""
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
@@ -295,8 +294,14 @@ class TestPersonAnchor:
                '[{"beat_id": "b1", "expression": "", "motion": "", '
                '"camera": "", "text_prompt": "fingers dancing across the '
                'console, sparks flying over the foundry floor"}]')
-        with pytest.raises(RuntimeError, match="no-fallback rip"):
-            _sl.derive_creative_directives(beats, meta, led, llm_fn=llm)
+        creative, warnings = _sl.derive_creative_directives(
+            beats, meta, led, llm_fn=llm)
+        row = creative["b1"]
+        assert row["source"] == "template_after_consistency_miss"
+        assert "stocky engineer" in row["text_prompt"]
+        assert "foundry" in row["text_prompt"]
+        assert "fingers dancing" not in row["text_prompt"]
+        assert any("consistency gate" in w for w in warnings)
 
     def test_person_grounded_llm_prompt_kept_and_anchored(self):
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
