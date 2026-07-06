@@ -704,41 +704,103 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
     except ImportError:
         from _otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
 
-    if is_registered(engine_name):
-        eng = get_engine(engine_name)
+    try:
+        from ._otr_video_engines.render_driver import (
+            FamilyInputGap, RenderError, _is_never_humo_video_role, _line_index,
+            _present_request_tokens, build_request, build_request_from_shot,
+            engine_family, parse_engine_override)
+        from ._otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
+    except ImportError:
+        from _otr_video_engines.render_driver import (
+            FamilyInputGap, RenderError, _is_never_humo_video_role, _line_index,
+            _present_request_tokens, build_request, build_request_from_shot,
+            engine_family, parse_engine_override)
+        from _otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
+
+    def _effective_cast_time_engine(role: str, eng_id: str) -> str:
+        eff = str(eng_id or "")
+        spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
+        if spec:
+            try:
+                mapping = parse_engine_override(spec)
+                eff = mapping.get(str(role or "")) or mapping.get("*") or eff
+            except Exception as exc:  # noqa: BLE001 - render logs the same parse issue
+                log.warning("[OTR_ShotLock] OTR_FORCE_ENGINE_MAP ignored in "
+                            "cast-time preflight: %s", exc)
+        if (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") != "1"
+                and _is_never_humo_video_role(str(role or ""))
+                and engine_family(eff, "") == "audio_driven_face"):
+            return "ltx_audio_in"
+        return eff
+
+    def _is_deferred_image_gap(exc):
+        msg = str(exc)
+        image_gap_needles = (
+            "Missing still",
+            "no radio_host_portrait FACE still",
+            "NO portrait in the ledger",
+            "NO scene still in the ledger",
+        )
+        return any(n in msg for n in image_gap_needles)
+
+    def _cast_time_image_gap_request(shot):
+        frame_count = int(beat.get("target_frame_count") or 1)
+        return build_request(
+            shot,
+            {"init_image": "__cast_time_image__"},
+            frame_count if frame_count > 0 else 1,
+        )
+
+    role = str(beat.get("role") or "")
+    effective_engine = _effective_cast_time_engine(role, engine_name)
+    if is_registered(effective_engine):
+        eng = get_engine(effective_engine)
         if not getattr(eng, "invocable", True):
             reason = getattr(eng, "invocability_reason", "not currently invocable")
             raise EngineNotRunnableError(
-                f"engine {engine_name!r} is not runnable: {reason} "
+                f"engine {effective_engine!r} is not runnable: {reason} "
                 f"-- pick a runnable engine for this role"
             )
 
-    try:
-        from ._otr_video_engines.render_driver import build_request_from_shot, _present_request_tokens, engine_family, FamilyInputGap, _line_index
-        from ._otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
-    except ImportError:
-        from _otr_video_engines.render_driver import build_request_from_shot, _present_request_tokens, engine_family, FamilyInputGap, _line_index
-        from _otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
-
-    fam = engine_family(engine_name, "")
-    required = FAMILY_REQUIRED_INPUTS.get(fam, ())
-    if not required and fam != "static_image_gen":
-        return
-
     shot = {
         "shot_id": beat.get("beat_id", ""),
-        "role": beat.get("role", ""),
-        "engine_id": engine_name,
+        "role": role,
+        "engine_id": effective_engine,
         "char_id": beat.get("char_id", ""),
         "source_line_ids": [beat.get("beat_id", "")],
     }
 
     try:
         req = build_request_from_shot(shot, ledger, master_audio_path="")
-    except Exception as exc:
-        if type(exc).__name__ == "RenderError":
+    except RenderError as exc:
+        if _is_deferred_image_gap(exc):
+            req = _cast_time_image_gap_request(shot)
+            log.warning(
+                "[OTR_ShotLock] cast-time image input deferred to "
+                "ImageGenDispatcher/render gate for engine %r beat %s: %s",
+                effective_engine, beat.get("beat_id", ""), exc)
+        else:
             raise
+    except ValueError as exc:
+        if _is_deferred_image_gap(exc):
+            req = _cast_time_image_gap_request(shot)
+            log.warning(
+                "[OTR_ShotLock] cast-time image input deferred to "
+                "ImageGenDispatcher/render gate for engine %r beat %s: %s",
+                effective_engine, beat.get("beat_id", ""), exc)
+        else:
+            log.warning("[OTR_ShotLock] cast-time build_request_from_shot failed: %s", exc)
+            return
+    except Exception as exc:
         log.warning("[OTR_ShotLock] cast-time build_request_from_shot failed: %s", exc)
+        return
+
+    # build_request_from_shot may still apply an in-place structural redirect;
+    # validate the engine that would actually receive this request.
+    effective_engine = str(shot.get("engine_id") or effective_engine or "")
+    fam = engine_family(effective_engine, "")
+    required = FAMILY_REQUIRED_INPUTS.get(fam, ())
+    if not required and fam != "static_image_gen":
         return
 
     line = _line_index(ledger).get(beat.get("beat_id", ""), {})
@@ -761,15 +823,27 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             raise FamilyInputGap(
                 "candidate %r (family %s) needs text_prompt or init_image; "
                 "the request carries neither -- LOUD skip down the chain"
-                % (engine_name, fam))
+                % (effective_engine, fam))
         return
 
     missing = [t for t in required if t not in present]
+    if missing == ["init_image"]:
+        # ShotLock runs BEFORE OTR_ImageGenDispatcher in the real workflow; the
+        # dispatcher mints portraits, scene stills, radio-face stills, and mesh
+        # fodder after this plan is stamped. Keep render-time strict (the driver
+        # still refuses a wrong-shaped request), but do not freeze-halt a
+        # renderable plan merely because the image-phase output is not in the
+        # ledger yet.
+        log.warning(
+            "[OTR_ShotLock] cast-time init_image for candidate %r beat %s is "
+            "deferred to ImageGenDispatcher/render-time validation",
+            effective_engine, beat.get("beat_id", ""))
+        return
     if missing:
         raise FamilyInputGap(
             "candidate %r (family %s) requires input(s) %s the request does "
             "not carry -- LOUD skip down the chain (never feed a wrong-shaped "
-            "request to an engine)" % (engine_name, fam, missing))
+            "request to an engine)" % (effective_engine, fam, missing))
 
 
 def build_execution_plan(beats, budget, creative, policy, ledger=None):

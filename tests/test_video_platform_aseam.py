@@ -854,3 +854,94 @@ def test_preflight_family_compatibility_gate():
         sl.build_execution_plan(beats, budget, creative, policy, ledger=ledger)
     assert "requires input(s)" in str(excinfo.value)
     assert "base_clip_ref" in str(excinfo.value)
+
+
+def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch):
+    """A HuMo policy pick for music/announcer bookends is structurally routed
+    by build_request_from_shot before render. Cast-time preflight must validate
+    that effective ltx_audio_in request, not the raw HuMo candidate, or it
+    falsely halts on missing HuMo init_image."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    beats = [{"beat_id": "b1", "role": "music_visual", "char_id": "",
+              "dur_s": 2.0}]
+    budget = {"total_frames": 50, "per_beat": {"b1": 50}}
+    policy = {"video_models": {"music_video_model": "humo_1.7B_169"}}
+    ledger = {
+        "lines": [{"line_id": "b1", "char_id": "",
+                   "start_s": 0.0, "dur_s": 2.0}],
+        "images": {"images": [
+            {"object_id": "still_b1", "kind": "scene_open", "beat_id": "b1",
+             "path": "X:/episode/stills/b1.png"},
+        ]},
+        "meta": {"story_brief_terms": {"setting": ["an orbital relay room"]}},
+        "video": {"fps": 25, "shots": []},
+    }
+
+    groups, shots = sl.build_execution_plan(beats, budget, {}, policy, ledger=ledger)
+
+    assert groups[0]["engine_id"] == "humo_1.7B_169"
+    assert shots[0]["engine_id"] == "humo_1.7B_169"
+
+
+def test_preflight_defers_redirected_announcer_radio_face(monkeypatch):
+    """The redirected ltx_audio_in announcer may require the wide radio-face
+    still, but ShotLock runs before MetaBrief/dispatcher materialize it."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
+    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+    beats = [{"beat_id": "b3", "role": "announcer_visual", "char_id": "",
+              "dur_s": 2.0}]
+    budget = {"total_frames": 50, "per_beat": {"b3": 50}}
+    policy = {"video_models": {"announcer_video_model": "humo_1.7B_169"}}
+    ledger = {
+        "lines": [{"line_id": "b3", "char_id": "",
+                   "start_s": 0.0, "dur_s": 2.0}],
+        "images": {"images": [
+            {"object_id": "still_b3", "kind": "scene_open", "beat_id": "b3",
+             "path": "X:/episode/stills/b3.png"},
+        ]},
+        "meta": {"story_brief_terms": {"setting": ["a transmitter room"]}},
+        "video": {"fps": 25, "shots": []},
+    }
+
+    _groups, shots = sl.build_execution_plan(beats, budget, {}, policy, ledger=ledger)
+    assert shots[0]["engine_id"] == "humo_1.7B_169"
+
+
+def test_preflight_defers_humo_init_image_to_image_phase(monkeypatch):
+    """ShotLock runs before OTR_ImageGenDispatcher, so a character HuMo pick
+    must not freeze-halt just because the portrait row has not been written
+    into the ledger yet."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    beats = [{"beat_id": "b2", "role": "character_video", "char_id": "c2",
+              "dur_s": 2.0}]
+    budget = {"total_frames": 50, "per_beat": {"b2": 50}}
+    policy = {"video_models": {"character_video_model": "humo_1.7B_169"}}
+    ledger = {
+        "lines": [{"line_id": "b2", "char_id": "c2",
+                   "start_s": 0.0, "dur_s": 2.0}],
+        "images": {"images": []},
+        "meta": {},
+        "video": {"fps": 25, "shots": []},
+    }
+
+    _groups, shots = sl.build_execution_plan(beats, budget, {}, policy, ledger=ledger)
+    assert shots[0]["engine_id"] == "humo_1.7B_169"
+
+
+def test_render_time_humo_init_image_gap_is_terminal():
+    """The cast-time deferral is not a fallback: a final HuMo render request
+    without init_image still fails LOUD as a RenderError."""
+    from nodes._otr_video_engines import render_driver as rd
+
+    shot = {"shot_id": "shot_b2", "role": "character_video",
+            "engine_id": "humo_1.7B_169", "family": "audio_driven_face",
+            "target_frame_count": 25}
+    req = rd.build_request(shot, {"audio_ref": "X:/voice.wav"}, 25,
+                           canvas=(832, 480))
+
+    with pytest.raises(rd.RenderError) as excinfo:
+        rd.render_shot(shot, req)
+    msg = str(excinfo.value)
+    assert "humo_1.7B_169" in msg
+    assert "init_image" in msg
