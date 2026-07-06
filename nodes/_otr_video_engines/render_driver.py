@@ -854,7 +854,7 @@ _RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 
 def _ltx_radio_face_object_id(role: str) -> str:
     """The object_id of the WIDE radio-FACE still for an ltx_audio_in bookend
-    (ADDENDUM OTR_LTX_RADIO_FACE A/B). Per-role so announcer/music each carry
+    (ltx talking radio-face). Per-role so announcer/music each carry
     their own wide face still; must match otr_meta_brief_image_prompt's mint.
     NOTE: this still is an LTX init asset (ambient motion), NOT a HuMo render --
     the name reserves 'radio_face', not 'humo'."""

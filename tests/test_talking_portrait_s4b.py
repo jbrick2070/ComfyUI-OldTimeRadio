@@ -6,9 +6,10 @@ brief-styled portrait mint produced dark profile/wide compositions (mouth
 not visible) -- the lip-sync coupling had nothing to drive. S4b threads a
 per-role ``talking`` map through the director policy chain and mints those
 portraits face-forward + warm, skipping the era/grade tails (the exact
-ltx_radio_mouth split that fixed the radio). S4c retires the
-OTR_LTX_RADIO_FACE A/B into default-on for talking bookends (operator
-eyeball: "should be talking lips?").
+ltx_radio_mouth split that fixed the radio). S4c makes talking bookends
+default-face -- the legacy A/B env toggle is gone; the face is purely
+auto-derived from the lip-syncing engine (operator eyeball: "should be
+talking lips?").
 """
 import json
 
@@ -136,8 +137,7 @@ def _radio_face_ids(payload):
             if str(o.get("object_id", "")).endswith("_radio_face_169")}
 
 
-def test_radio_face_mints_for_talking_bookends_without_env(monkeypatch):
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+def test_radio_face_mints_for_talking_bookends_without_env():
     payload, _w = derive_image_prompts(
         _CAST, _META, llm_fn=None,
         talking_roles={"announcer_visual": True, "music_visual": True})
@@ -148,7 +148,6 @@ def test_radio_face_mints_for_talking_bookends_without_env(monkeypatch):
     assert "still_music_visual_radio_face_169" not in ids
 
 
-def test_radio_face_absent_without_talking_or_env(monkeypatch):
-    monkeypatch.delenv("OTR_LTX_RADIO_FACE", raising=False)
+def test_radio_face_absent_without_talking_or_env():
     payload, _w = derive_image_prompts(_CAST, _META, llm_fn=None)
     assert _radio_face_ids(payload) == set()
