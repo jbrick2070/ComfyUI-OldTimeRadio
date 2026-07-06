@@ -42,6 +42,24 @@ _LOG = logging.getLogger("OTR.video.eng_cloud_video")
 _KLING_MODE_ENV = "OTR_CLOUD_KLING_MODE"
 _KLING_MODE_DEFAULT = "std"
 
+_SEEDANCE_MODEL_ALIASES = {
+    # The installed ByteDance2ReferenceNode indexes SEEDANCE_MODELS by UI label.
+    # Accept provider ids too so older operator env overrides keep failing loud
+    # only when the value is genuinely unknown.
+    "dreamina-seedance-2-0-260128": "Seedance 2.0",
+    "dreamina-seedance-2-0-fast-260128": "Seedance 2.0 Fast",
+    "dreamina-seedance-2-0-mini": "Seedance 2.0 Mini",
+}
+_SEEDANCE_RESOLUTIONS = {
+    "Seedance 2.0": ("480p", "720p", "1080p", "4k"),
+    "Seedance 2.0 Fast": ("480p", "720p"),
+    "Seedance 2.0 Mini": ("480p", "720p"),
+}
+_SEEDANCE_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
+
+_WAN_MODELS = ("wan2.7-i2v",)
+_WAN_RESOLUTIONS = ("720P", "1080P")
+
 
 def _est_usd() -> float:
     try:
@@ -55,6 +73,17 @@ def _timeout_s() -> float:
         return float(os.environ.get("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"))
     except ValueError:
         return 900.0
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"{name} must be boolean-like (true/false, 1/0)")
 
 
 def _req_get(request, key, default=None):
@@ -205,6 +234,52 @@ class _CloudVideoBase:
             lambda k, d=None: getattr(seeds, k, d))
         return int(s_get("request_seed", 0) or 0)
 
+    def _seed_i32(self, request) -> int:
+        """Partner V3 video nodes declare seed max=2147483647."""
+        return self._seed(request) & 0x7FFFFFFF
+
+    def _text_prompt_input(self, request) -> str:
+        prompt = str(_req_get(request, "text_prompt")
+                     or _req_get(request, "prompt") or "").strip()
+        if not prompt:
+            raise RuntimeError(
+                f"{self.name}: text_prompt missing/blank -- the partner V3 "
+                f"model schema requires model['prompt']; NO FALLBACK")
+        return prompt
+
+    def _duration_seconds(self, request, *, env: str, default: int,
+                          min_s: int, max_s: int) -> int:
+        raw = os.environ.get(env, "").strip()
+        if raw:
+            try:
+                secs = int(raw)
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"{self.name}: {env} must be an integer number of seconds"
+                ) from exc
+        else:
+            canvas = _req_get(request, "canvas") or {}
+            c_get = canvas.get if isinstance(canvas, dict) else (
+                lambda k, d=None: getattr(canvas, k, d))
+            fps = int(c_get("fps", 25) or 25) or 25
+            timing = _req_get(request, "timing") or {}
+            t_get = timing.get if isinstance(timing, dict) else (
+                lambda k, d=None: getattr(timing, k, d))
+            n = int(t_get("target_frame_count", 0) or 0)
+            secs = int(round(n / fps)) if n else default
+        return max(min_s, min(max_s, secs))
+
+    def _choice(self, env: str, default: str, allowed: tuple[str, ...],
+                *, transform=None) -> str:
+        value = os.environ.get(env, "").strip() or default
+        if transform is not None:
+            value = transform(value)
+        if value not in allowed:
+            raise RuntimeError(
+                f"{self.name}: {env}={value!r} is unsupported; expected one "
+                f"of {allowed}")
+        return value
+
     def _init_image_ref(self, request):
         """Resolve the init-image ref. Real ``render_driver.build_request()``
         output carries it under ``asset_refs["init_image"]`` (the scene/word
@@ -287,22 +362,48 @@ class CloudSeedance2Engine(_CloudVideoBase):
     name = "cloud_seedance_2"
     node_key = "cloud_seedance_2"
     family = "audio_conditioned_video"
-    required_inputs = ("init_image", "audio_ref")
+    required_inputs = ("init_image", "audio_ref", "text_prompt")
     reactivity = "required_audio_ref"
     invocable = False
-    invocability_reason = "the pinned row's media inputs ride the DYNAMICCOMBO_V3 model schema (static pin is shallow) -- V3-expansion pin lands with cloud S1"
+    invocability_reason = (
+        "schema-grounded V3 payload builds offline; awaiting one paid live "
+        "Seedance render smoke before enabling")
+
+    def _model_label(self) -> str:
+        from .._otr_shared.cloud_model_ids import resolve_model_id
+        value = resolve_model_id(self.node_key)
+        label = _SEEDANCE_MODEL_ALIASES.get(value, value)
+        if label not in _SEEDANCE_RESOLUTIONS:
+            raise RuntimeError(
+                f"{self.name}: unsupported Seedance model selector {value!r}; "
+                f"expected one of {tuple(_SEEDANCE_RESOLUTIONS)} or known "
+                f"provider-id aliases")
+        return label
 
     def _partner_inputs(self, request):
-        # PINNED static inputs are ONLY (model COMBO, seed, watermark) -- the
-        # reference image + audio + prompt hide inside the DYNAMICCOMBO_V3
-        # model schema (docs-window gotcha 2026-07-02: the static pin is
-        # SHALLOW for V3 rows). Sending guessed kwargs would TypeError at the
-        # partner node, so this row stays an HONEST dark row until the
-        # V3-expansion pin (ships with S1) names the real dynamic inputs.
-        raise RuntimeError(
-            f"{self.name}: the pinned row's media inputs ride the "
-            f"DYNAMICCOMBO_V3 model schema (static pin is shallow) -- "
-            f"V3-expansion pin lands with cloud S1; row not yet invocable")
+        model_label = self._model_label()
+        return {
+            "model": {
+                "model": model_label,
+                "prompt": self._text_prompt_input(request),
+                "resolution": self._choice(
+                    "OTR_CLOUD_SEEDANCE_RESOLUTION", "720p",
+                    _SEEDANCE_RESOLUTIONS[model_label], transform=str.lower),
+                "ratio": self._choice(
+                    "OTR_CLOUD_SEEDANCE_RATIO", "adaptive",
+                    _SEEDANCE_RATIOS),
+                "duration": self._duration_seconds(
+                    request, env="OTR_CLOUD_SEEDANCE_DURATION",
+                    default=7, min_s=4, max_s=15),
+                # OTR always strips provider audio at canonicalize; do not ask
+                # Seedance to synthesize a second mix just to discard it.
+                "generate_audio": False,
+                "reference_images": {"image_1": self._init_image_input(request)},
+                "reference_audios": {"audio_1": self._audio_input(request)},
+            },
+            "seed": self._seed_i32(request),
+            "watermark": False,
+        }
 
 
 class CloudWanI2VEngine(_CloudVideoBase):
@@ -314,25 +415,33 @@ class CloudWanI2VEngine(_CloudVideoBase):
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
     invocable = False
-    invocability_reason = "the model input must be a V3 DICT, not the bare string the shallow pin sends (awaiting the S1 V3-expansion pin)"
+    invocability_reason = (
+        "schema-grounded V3 payload builds offline; awaiting one paid live Wan "
+        "render smoke before enabling")
 
     def _partner_inputs(self, request):
-        # Pinned STATIC inputs: first_frame IMAGE, model DYNAMICCOMBO_V3,
-        # prompt_extend BOOL, seed INT, watermark BOOL (+ optional audio,
-        # NOT sent -- this is the mute opt-down row). There is NO top-level
-        # prompt input (docs-window catch 2026-07-02): the text prompt rides
-        # the dynamic model schema and lands with the S1 V3-expansion pin.
-        model = os.environ.get("OTR_CLOUD_WAN_MODEL", "")
-        if not model:
+        from .._otr_shared.cloud_model_ids import resolve_model_id
+        model = resolve_model_id(self.node_key)
+        if model not in _WAN_MODELS:
             raise RuntimeError(
-                f"{self.name}: OTR_CLOUD_WAN_MODEL unset -- the pinned row's "
-                f"model COMBO is dynamic (pin excludes options); set the env "
-                f"to the provider's model id")
+                f"{self.name}: unsupported Wan model selector {model!r}; "
+                f"expected one of {_WAN_MODELS}")
         return {
             "first_frame": self._init_image_input(request),
-            "model": model,
-            "prompt_extend": False,
-            "seed": self._seed(request),
+            "model": {
+                "model": model,
+                "prompt": self._text_prompt_input(request),
+                "negative_prompt": os.environ.get(
+                    "OTR_CLOUD_WAN_NEGATIVE_PROMPT", "").strip(),
+                "resolution": self._choice(
+                    "OTR_CLOUD_WAN_RESOLUTION", "720P",
+                    _WAN_RESOLUTIONS, transform=str.upper),
+                "duration": self._duration_seconds(
+                    request, env="OTR_CLOUD_WAN_DURATION", default=5,
+                    min_s=2, max_s=15),
+            },
+            "prompt_extend": _bool_env("OTR_CLOUD_WAN_PROMPT_EXTEND", False),
+            "seed": self._seed_i32(request),
             "watermark": False,
         }
 

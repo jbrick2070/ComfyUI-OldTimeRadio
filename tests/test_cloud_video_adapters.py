@@ -62,6 +62,16 @@ def test_reactivity_descriptors_match_pass04():
                (ecv.KlingAvatar, ecv.KlingLipsync, ecv.Seedance2, ecv.WanI2V))
 
 
+def test_schema_grounded_v3_video_rows_wait_for_paid_smoke():
+    # Request-shape construction is fixed and tested below; selectable render
+    # enablement still follows verify-before-flip, so a paid live smoke owns the
+    # final invocable=True change.
+    assert ecv.Seedance2.invocable is False
+    assert ecv.WanI2V.invocable is False
+    assert "paid live Seedance render smoke" in ecv.Seedance2.invocability_reason
+    assert "paid live Wan render smoke" in ecv.WanI2V.invocability_reason
+
+
 def test_assert_usable_no_enable_flag(monkeypatch):
     """Operator directive 2026-07-02: the dropdown pick is the enable --
     assert_usable must NOT gate on OTR_ENABLE_COMFY_CLOUD_MEDIA (only
@@ -131,27 +141,55 @@ def test_kling_avatar_missing_audio_fails_loud(tmp_path):
         ecv.KlingAvatar._partner_inputs(req)
 
 
-def test_wan_i2v_sends_only_pinned_static_inputs(tmp_path, monkeypatch):
-    # the pinned wan row has NO top-level prompt input (docs-window catch
-    # 2026-07-02) -- the adapter sends EXACTLY the static pinned set.
-    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan-2.2-i2v")
-    ins = ecv.WanI2V._partner_inputs(_request(tmp_path))
+def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
+    # The pinned Wan row has NO top-level prompt input; prompt/negative/duration
+    # ride inside the DYNAMICCOMBO_V3 model dict accepted by Wan2ImageToVideoApi.
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    monkeypatch.setenv("OTR_CLOUD_WAN_RESOLUTION", "1080p")
+    monkeypatch.setenv("OTR_CLOUD_WAN_DURATION", "6")
+    req = _request(tmp_path, seed_bundle={"request_seed": 2147483655})
+    ins = ecv.WanI2V._partner_inputs(req)
     assert set(ins) == {"first_frame", "model", "prompt_extend",
                         "seed", "watermark"}
-    assert "prompt" not in ins and ins["model"] == "wan-2.2-i2v"
+    assert "prompt" not in ins and "audio" not in ins
+    assert set(ins["model"]) == {
+        "model", "prompt", "negative_prompt", "resolution", "duration"}
+    assert ins["model"]["model"] == "wan2.7-i2v"
+    assert ins["model"]["prompt"].startswith("a person")
+    assert ins["model"]["negative_prompt"] == ""
+    assert ins["model"]["resolution"] == "1080P"
+    assert ins["model"]["duration"] == 6
+    assert ins["prompt_extend"] is False
+    assert ins["seed"] == 7
 
 
-def test_wan_i2v_requires_model_env(tmp_path, monkeypatch):
-    monkeypatch.delenv("OTR_CLOUD_WAN_MODEL", raising=False)
-    with pytest.raises(RuntimeError, match="OTR_CLOUD_WAN_MODEL"):
+def test_wan_i2v_rejects_v3_placeholder_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "COMFY_DYNAMICCOMBO_V3")
+    with pytest.raises(CloudMediaError, match="placeholder"):
         ecv.WanI2V._partner_inputs(_request(tmp_path))
 
 
-def test_seedance_is_an_honest_dark_row_until_v3_expansion(tmp_path):
-    # DYNAMICCOMBO_V3 hides the media inputs; guessed kwargs would TypeError
-    # at the partner node -- the adapter refuses LOUDLY instead.
-    with pytest.raises(RuntimeError, match="V3-expansion"):
-        ecv.Seedance2._partner_inputs(_request(tmp_path))
+def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "OTR_CLOUD_SEEDANCE_MODEL", "dreamina-seedance-2-0-fast-260128")
+    monkeypatch.setenv("OTR_CLOUD_SEEDANCE_DURATION", "5")
+    req = _request(tmp_path, seed_bundle={"request_seed": 2147483656})
+    ins = ecv.Seedance2._partner_inputs(req)
+    assert set(ins) == {"model", "seed", "watermark"}
+    assert ins["seed"] == 8
+    assert ins["watermark"] is False
+    model = ins["model"]
+    assert model["model"] == "Seedance 2.0 Fast"
+    assert model["prompt"].startswith("a person")
+    assert model["resolution"] == "720p"
+    assert model["ratio"] == "adaptive"
+    assert model["duration"] == 5
+    assert model["generate_audio"] is False
+    assert set(model["reference_images"]) == {"image_1"}
+    assert set(model["reference_audios"]) == {"audio_1"}
+    assert hasattr(model["reference_images"]["image_1"], "ndim")
+    assert set(model["reference_audios"]["audio_1"]) == {
+        "waveform", "sample_rate"}
 
 
 def test_lipsync_requires_base_clip(tmp_path):

@@ -790,31 +790,41 @@ def test_clip_budget_empty_script_radio_floor():
     assert done.startswith("shot_lock:done:")
 
 
-def test_engine_non_invocable_preflight_check():
+def test_engine_non_invocable_preflight_check(monkeypatch):
     """Verify that OTRVideoDirector raises EngineNotRunnableError for unrunnable/non-invocable engines."""
     from nodes.otr_video_director import OTRVideoDirector
     from nodes._otr_shared.engine_registry_base import EngineNotRunnableError
+    from nodes._otr_video_engines import registry as vreg
+
+    class NonInvocableFixture:
+        name = "test_non_invocable_video"
+        roles = ()
+        default_roles = ()
+        commercial_clean = True
+        requires_flag = None
+        family = "static_image_gen"
+        required_inputs = ()
+        invocable = False
+        invocability_reason = "fixture non-invocable reason"
+
+    monkeypatch.setitem(
+        vreg._VIDEO_REGISTRY._registry,
+        "test_non_invocable_video",
+        NonInvocableFixture(),
+    )
 
     # Mock descriptors
     descriptors = [
-        {"engine_id": "cloud_seedance_2", "family": "audio_conditioned_video", "roles": ("music_visual",), "required_inputs": ()},
-        {"engine_id": "cloud_wan_i2v", "family": "image_to_video", "roles": ("character_video",), "required_inputs": ()},
+        {"engine_id": "test_non_invocable_video", "family": "static_image_gen", "roles": ("music_visual",), "required_inputs": ()},
         {"engine_id": "still_pan", "family": "static_image_gen", "roles": ("music_visual",), "required_inputs": ()}
     ]
 
-    # Pick non-invocable model cloud_seedance_2
+    # Pick a deliberately non-invocable fixture.
     with pytest.raises(EngineNotRunnableError) as excinfo:
         OTRVideoDirector._resolve_and_validate(
-            slot="music_video_model", picked="cloud_seedance_2", custom={}, descriptors=descriptors, warnings=[]
+            slot="music_video_model", picked="test_non_invocable_video", custom={}, descriptors=descriptors, warnings=[]
         )
-    assert "not runnable: the pinned row's media" in str(excinfo.value)
-
-    # Pick non-invocable model cloud_wan_i2v
-    with pytest.raises(EngineNotRunnableError) as excinfo:
-        OTRVideoDirector._resolve_and_validate(
-            slot="character_video_model", picked="cloud_wan_i2v", custom={}, descriptors=descriptors, warnings=[]
-        )
-    assert "not runnable: the model input must be a V3 DICT" in str(excinfo.value)
+    assert "not runnable: fixture non-invocable reason" in str(excinfo.value)
 
     # Pick invocable model still_pan
     res = OTRVideoDirector._resolve_and_validate(
@@ -844,4 +854,3 @@ def test_preflight_family_compatibility_gate():
         sl.build_execution_plan(beats, budget, creative, policy, ledger=ledger)
     assert "requires input(s)" in str(excinfo.value)
     assert "base_clip_ref" in str(excinfo.value)
-

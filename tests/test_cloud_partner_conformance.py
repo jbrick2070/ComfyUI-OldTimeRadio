@@ -40,7 +40,6 @@ KNOWN_UNADAPTERED = {
 # a live comfy_api input type). Conformance for these is pinned in the
 # per-lane suites (test_cloud_video_adapters.py).
 KNOWN_NONBUILDABLE = {
-    "cloud_seedance_2": "honest dark row until the V3-expansion pin",
     "cloud_kling_lipsync": "needs comfy_api VideoFromFile (offline-unavailable)",
 }
 
@@ -113,8 +112,10 @@ def test_emitted_kwargs_are_declared(node_key, tmp_path, monkeypatch):
                if hasattr(e, "_partner_inputs")]
     if not engines:
         pytest.skip(f"{node_key}: no buildable adapter (coverage test owns this)")
-    # give the V3 video rows the env they demand so they can build offline.
-    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan-2.2-i2v")
+    # Keep V3 video rows on explicit schema-grounded selectors while building
+    # offline; the paid live smoke is separate from request-shape conformance.
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    monkeypatch.setenv("OTR_CLOUD_SEEDANCE_MODEL", "Seedance 2.0 Fast")
     row = partner_rows()[node_key]
     declared = set((row["inputs"].get("required") or {})) \
         | set((row["inputs"].get("optional") or {}))
@@ -134,9 +135,12 @@ def test_emitted_kwargs_are_declared(node_key, tmp_path, monkeypatch):
 
 
 def test_v3_model_ids_never_forward_placeholder():
-    """The V3 image rows must resolve a real model id, never the placeholder."""
+    """V3 rows must resolve a real model selector, never the placeholder."""
     from nodes._otr_shared.cloud_model_ids import (
         DYNAMICCOMBO_PLACEHOLDER, resolve_model_id)
-    for node_key in ("cloud_nano_banana_2", "cloud_seedream_2"):
+    for node_key in (
+        "cloud_nano_banana_2", "cloud_seedream_2",
+        "cloud_seedance_2", "cloud_wan_i2v",
+    ):
         rid = resolve_model_id(node_key)
         assert rid and rid != DYNAMICCOMBO_PLACEHOLDER

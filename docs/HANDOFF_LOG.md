@@ -6,6 +6,31 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-06 -- Cloud Wan/Seedance V3 payload builders grounded -- v2.0-alpha
+Did:
+- Read the installed partner node source for `Wan2ImageToVideoApi` and
+  `ByteDance2ReferenceNode` under `C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\comfy_api_nodes`.
+- Fixed `cloud_wan_i2v` to send a nested V3 `model` dict (`model`, `prompt`,
+  `negative_prompt`, `resolution`, `duration`) instead of the old bare string
+  that caused `string indices must be integers`; still sends no audio and no
+  top-level prompt.
+- Fixed `cloud_seedance_2` to send the real reference-node V3 dict (`prompt`,
+  `resolution`, `ratio`, `duration`, `generate_audio=False`, reference image,
+  reference audio), with Seedance provider-id aliases normalized to the UI labels
+  the installed node indexes.
+- Added schema-grounded defaults in `cloud_model_ids.py`: `wan2.7-i2v` and
+  `Seedance 2.0 Fast`. Both rows remain `invocable=False` by design until a
+  paid live one-shot smoke renders successfully; this is verify-before-flip, not
+  a request-shape blocker.
+Verification:
+- Focused cloud/director tests: 79 passed, 2 skipped, 2 xfailed.
+- Partner pin / registry menu / role eligibility tests: 81 passed.
+- Full repo suite: 6559 passed, 34 skipped, 2 xfailed.
+- Bug Bible: 16 passed, 7 skipped, 3 xfailed.
+Next: run one paid Wan smoke and one paid Seedance smoke when credits are
+available; after each asset lands, flip only that engine to `invocable=True`.
+Commits: this commit.
+
 ## 2026-07-06 -- ShotLock M4 collapse guard restored -- v2.0-alpha
 Did:
 - Fixed `nodes/otr_shot_lock.py::derive_creative_directives`: an attempted writer LLM that returns
