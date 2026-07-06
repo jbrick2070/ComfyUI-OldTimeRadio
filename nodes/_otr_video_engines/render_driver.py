@@ -1989,6 +1989,7 @@ def run_episode(ledger, *, oom_shot_id=None,
     ledger, canvas=canvas)`` is called per shot for a per-beat portrait + audio
     + prompt request (see :func:`run_real_episode`)."""
     ledger = copy.deepcopy(ledger)
+    _apply_render_plan_to_episode_shots(ledger)
     section = ledger["video"]
     clips, new_shots, trace = {}, [], []
     # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
@@ -2103,6 +2104,60 @@ def run_episode(ledger, *, oom_shot_id=None,
     ledger["video"] = section
     return {"ledger": ledger, "clips": clips, "trace": trace,
             "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows}
+
+
+def _apply_render_plan_to_episode_shots(ledger):
+    """Honor ``meta.render_plan`` in the generic episode renderer.
+
+    The freeze cascade has stamped this plan for years, but the retired HuMo
+    batch was the only consumer. Keep non-character coverage (bookends and
+    announcer rows) so the visual spine remains intact, and filter only
+    character-video shots by the selected line ids.
+    """
+    meta = (ledger or {}).get("meta") or {}
+    plan = meta.get("render_plan") or {}
+    if not isinstance(plan, dict):
+        return ledger
+    line_ids = plan.get("line_ids")
+    if line_ids is None and not plan.get("blocked"):
+        return ledger
+    selected = {str(x) for x in (line_ids or []) if str(x)}
+    section = (ledger or {}).get("video") or {}
+    shots = section.get("shots") or []
+    if not isinstance(shots, list):
+        return ledger
+    lines = _line_index(ledger)
+    kept = []
+    dropped = []
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        source_ids = shot.get("source_line_ids") or [shot.get("beat_id")]
+        if not isinstance(source_ids, (list, tuple)):
+            source_ids = [source_ids]
+        role = str(shot.get("role") or "")
+        if not role:
+            role = next((
+                str((lines.get(str(src)) or {}).get("speaker_role") or "")
+                for src in source_ids
+                if lines.get(str(src))
+            ), "")
+        if role not in ("character_video", "character"):
+            kept.append(shot)
+            continue
+        if selected and any(str(src) in selected for src in source_ids):
+            kept.append(shot)
+        else:
+            dropped.append(str(shot.get("shot_id") or "?"))
+    if dropped:
+        _LOG.warning(
+            "[OTR video] render_plan applied: kept %d/%d shot(s), dropped %d "
+            "character_video shot(s) outside plan (mode=%s applied_max_n=%s)",
+            len(kept), len(shots), len(dropped),
+            plan.get("selection_mode"), plan.get("applied_max_n"))
+    section["shots"] = kept
+    ledger["video"] = section
+    return ledger
 
 
 def run_real_episode(ledger, *, canvas=None,

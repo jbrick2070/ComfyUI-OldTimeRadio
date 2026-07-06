@@ -404,6 +404,38 @@ def test_run_episode_request_builder_overrides_default(record_registry):
     assert calls == ["shot_b001", "shot_b002"]   # the builder drove every shot
 
 
+def test_run_episode_honors_render_plan_for_character_shots(record_registry):
+    led = _real_ledger()
+    led["lines"].append(
+        {"line_id": "b003", "char_id": "c03", "speaker_role": "character",
+         "start_s": 3.6, "dur_s": 1.2, "bark_wav_path": "X:/a/seg_b003.wav"}
+    )
+    led["video"]["shots"].append(
+        {"shot_id": "shot_b003", "source_line_ids": ["b003"],
+         "engine_id": "stub_record", "family": "", "group_id": "grp_d",
+         "target_frame_count": 30, "degradation_trail": [],
+         "render_request_hash": "hash_b003",
+         "cache_keys": {"request_hash": "hash_b003"},
+         "creative": {"text_prompt": "c03 listens to the static"}}
+    )
+    led["meta"] = {"render_plan": {
+        "line_ids": ["b002"],
+        "selection_mode": "all",
+        "blocked": False,
+        "applied_max_n": 1,
+    }}
+    calls = []
+
+    def rb(shot, ledger, *, canvas=None):
+        calls.append(shot["shot_id"])
+        return rd.build_request_from_shot(shot, ledger, canvas=canvas)
+
+    out = rd.run_episode(led, request_builder=rb)
+    assert calls == ["shot_b001", "shot_b002"]
+    assert [s["shot_id"] for s in out["ledger"]["video"]["shots"]] == [
+        "shot_b001", "shot_b002"]
+
+
 # --------------------------------------------------------------------------- #
 # build_clip_manifest + the OTR_VideoRenderBatch mode="episode" entry (Chunk B).
 # The manifest is the beat-ordered STRING contract OTR_SilentComposite consumes;
