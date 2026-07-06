@@ -61,6 +61,7 @@ ENGINE_FAMILY = {
     "viz_green": "abstract", "still_pan": "static_image_gen",   # renamed from "visualizer" 2026-06-30, item 2
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala, pycairo (2026-06-30)
+    "viz_camera": "abstract",        # Golden Flicker camera visualizer (2026-07-05)
     "still_flat": "static_image_gen",
     # still_word (Sprint B, 2026-07-03): a still_flat sibling (word/title still,
     # held flat) -- same static_image_gen family, so it uses the explicit
@@ -812,7 +813,8 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
             and _is_never_humo_video_role(str(role or ""))):
         return True
     return (str(family) == "audio_conditioned_video"
-            or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"))
+            or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
+                                  "viz_camera"))
 
 
 def _role_of_shot(shot) -> str:

@@ -257,6 +257,10 @@ CAPABILITIES = {
     # without system libcairo never breaks any OTHER engine's install).
     "viz_mxc_mandala": {"required_toolchain": None,
                         "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # viz_camera (2026-07-05): OTR-native Golden Flicker camera visualizer --
+    # pure numpy/PIL/ffmpeg, audio-optional, no external golden-flicker import.
+    "viz_camera": {"required_toolchain": None,
+                   "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_flat": {"required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "still_pan": {"required_toolchain": None,

@@ -57,6 +57,7 @@ _FAMILY_FALLBACK: dict = {
     "viz_green": "abstract",         # renamed from "visualizer" 2026-06-30, item 2
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer -- motion-exempt (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala -- motion-exempt (2026-06-30)
+    "viz_camera": "abstract",        # Golden Flicker camera visualizer -- motion-exempt (2026-07-05)
 }
 
 #: Default mean-luma floor (0..255). A clip whose mean YAVG is at/below this reads

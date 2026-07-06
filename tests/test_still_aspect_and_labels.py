@@ -126,7 +126,7 @@ def test_label_descriptor_suffix_is_family_derived():
     # NO scene image) carries a plain-language caveat so a music/announcer/scene
     # pick of it is obviously scene-still-ignoring. DERIVED from family +
     # accepts_still, never a hand-maintained per-engine string.
-    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"):
+    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala", "viz_camera"):
         assert vd._descriptor_suffix(name) == " (audio-reactive, no scene image)"
         assert vd._label_for(name).endswith(" (audio-reactive, no scene image)")
     # a non-abstract / still-consuming engine gets NO descriptor
@@ -139,7 +139,7 @@ def test_label_descriptor_suffix_is_family_derived():
 def test_descriptor_label_still_round_trips_to_bare_id():
     # The descriptor suffix starts with ' (' so it strips with the aspect
     # suffix -> the saved value stays the bare engine id.
-    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala"):
+    for name in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala", "viz_camera"):
         assert vd._engine_id_from_pick(vd._label_for(name)) == name
 
 

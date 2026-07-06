@@ -378,6 +378,203 @@ def paint_rainbow_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     return img
 
 
+def _golden_mix(a, b, t):
+    t = max(0.0, min(1.0, float(t)))
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def _golden_scale(col, k):
+    return tuple(max(0, min(255, int(c * float(k)))) for c in col)
+
+
+def _golden_camera_body(draw, cx, cy, s, vol, signal):
+    """Draw the centered movie camera icon used by viz_camera."""
+    gold = (231, 165, 30)
+    amber = (255, 205, 92)
+    ember = (225, 57, 31)
+    shadow = (43, 25, 13)
+    body_w = int(s * 1.38)
+    body_h = int(s * 0.62)
+    body = (cx - body_w // 2, cy - body_h // 2, cx + body_w // 2, cy + body_h // 2)
+    glow = min(1.0, 0.28 + float(vol) * 0.55 + float(signal) * 0.25)
+
+    for pad, alpha in ((16, 0.16), (9, 0.25), (4, 0.34)):
+        col = _golden_scale(amber, alpha + glow * 0.22)
+        draw.rounded_rectangle(
+            (body[0] - pad, body[1] - pad, body[2] + pad, body[3] + pad),
+            radius=max(4, s // 9), outline=col, width=max(1, s // 32))
+
+    draw.rounded_rectangle(body, radius=max(5, s // 10), fill=shadow,
+                           outline=_golden_scale(gold, 0.92), width=max(2, s // 34))
+    draw.rectangle((body[0] + s // 14, body[1] + s // 9,
+                    body[2] - s // 14, cy + s // 16),
+                   fill=(68, 39, 18), outline=_golden_scale(gold, 0.48))
+
+    lens_r = max(8, s // 5)
+    lens_cx = body[2] - lens_r // 3
+    draw.ellipse((lens_cx - lens_r, cy - lens_r, lens_cx + lens_r, cy + lens_r),
+                 fill=(18, 13, 10), outline=amber, width=max(2, s // 32))
+    draw.ellipse((lens_cx - lens_r // 2, cy - lens_r // 2,
+                  lens_cx + lens_r // 2, cy + lens_r // 2),
+                 fill=(49, 75, 63), outline=_golden_scale(gold, 0.6))
+    draw.ellipse((lens_cx - lens_r // 5, cy - lens_r // 5,
+                  lens_cx + lens_r // 5, cy + lens_r // 5),
+                 fill=_golden_mix((15, 50, 45), ember, glow))
+
+    reel_y = body[1] - s // 3
+    reel_r = max(10, s // 4)
+    for off in (-s // 3, s // 3):
+        rcx = cx + off
+        draw.ellipse((rcx - reel_r, reel_y - reel_r, rcx + reel_r, reel_y + reel_r),
+                     fill=(21, 14, 9), outline=gold, width=max(2, s // 36))
+        spin = float(signal) * math.pi * 2.0
+        for k in range(6):
+            a = spin + k * math.pi / 3.0
+            rr = reel_r * 0.72
+            x1 = rcx + int(rr * math.cos(a))
+            y1 = reel_y + int(rr * math.sin(a))
+            draw.line((rcx, reel_y, x1, y1), fill=_golden_scale(amber, 0.78),
+                      width=max(1, s // 48))
+        hole = max(3, reel_r // 5)
+        draw.ellipse((rcx - hole, reel_y - hole, rcx + hole, reel_y + hole),
+                     fill=(8, 6, 5), outline=_golden_scale(gold, 0.55))
+
+    cone = [(body[2] - s // 12, cy - s // 6), (body[2] + s // 2, cy - s // 3),
+            (body[2] + s // 2, cy + s // 3), (body[2] - s // 12, cy + s // 6)]
+    draw.polygon(cone, fill=(56, 31, 15), outline=_golden_scale(gold, 0.82))
+    draw.line((cx, body[3], cx, body[3] + s // 2), fill=_golden_scale(gold, 0.78),
+              width=max(2, s // 35))
+    draw.line((cx, body[3] + s // 5, cx - s // 2, body[3] + s // 2),
+              fill=_golden_scale(gold, 0.58), width=max(2, s // 42))
+    draw.line((cx, body[3] + s // 5, cx + s // 2, body[3] + s // 2),
+              fill=_golden_scale(gold, 0.58), width=max(2, s // 42))
+
+
+def paint_golden_camera_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
+                              scanlines, vignette, rng_key="viz_camera",
+                              font_small=None):
+    """Paint ONE full 16:9 Golden Flicker camera visualizer frame.
+
+    This is an OTR-native PIL implementation inspired by the operator-approved
+    camera centerpiece: twin spinning reels, a warm projector beam, mandala-like
+    gold rings, audio-reactive spectrum spokes, CRT scanlines/vignette/grain.
+    It has the same signature and silent-clip contract as paint_rainbow_frame.
+    """
+    del font_small
+    cx0, cy0, base_r, pad, ly = ring_geom(w, h)
+    t = fi / float(fps or 25)
+    bg = (10, 7, 5)
+    gold = (231, 165, 30)
+    amber = (255, 205, 92)
+    ember = (225, 57, 31)
+    deep = (38, 22, 12)
+    img = Image.new("RGB", (w, h), bg)
+    draw = ImageDraw.Draw(img, "RGBA")
+    cx = cx0
+    cy = cy0 + int(h * 0.02)
+    r = base_r + int(base_r * (0.08 + float(vol) * 0.22))
+    rng = _rng(rng_key, fi, "golden-camera")
+
+    draw.line([(pad, ly), (w - pad, ly)], fill=(*_golden_scale(gold, 0.2), 120),
+              width=1)
+
+    # Soft projector cone from the left, widening around the camera.
+    beam_y = cy - int(r * 0.05)
+    for i in range(8):
+        spread = int((i + 1) * h * 0.022)
+        alpha = max(8, 58 - i * 6)
+        draw.polygon([(pad, beam_y - spread // 3),
+                      (cx - r // 3, beam_y - spread),
+                      (cx + r, beam_y + spread // 2),
+                      (pad, beam_y + spread // 3)],
+                     fill=(255, 185, 62, alpha))
+
+    # Film gate / occult mandala rings.
+    pulse = 0.6 + float(signal) * 0.4
+    for j in range(8):
+        rr = int(r * (0.42 + j * 0.115) + math.sin(t * 0.8 + j) * r * 0.015)
+        col = _golden_mix(deep, gold, 0.28 + 0.08 * j + float(vol) * 0.2)
+        width = max(1, int(w / 560) + (1 if j % 3 == 0 else 0))
+        draw.ellipse((cx - rr, cy - rr, cx + rr, cy + rr),
+                     outline=(*col, int(74 + 70 * pulse)), width=width)
+
+    n = min(32, len(freq))
+    spin = t * 0.35 + float(signal) * 0.35
+    for i in range(max(1, n)):
+        mag = max(0.0, min(1.0, float(freq[i]) if n else 0.0))
+        a = 2 * math.pi * i / max(1, n) - math.pi / 2 + spin
+        inner = r * (0.52 + 0.04 * math.sin(i + t))
+        outer = r * (0.82 + mag * 0.46)
+        col = _golden_mix(gold, ember, min(1.0, mag * 0.75 + float(vol) * 0.25))
+        draw.line((cx + int(inner * math.cos(a)), cy + int(inner * math.sin(a)),
+                   cx + int(outer * math.cos(a)), cy + int(outer * math.sin(a))),
+                  fill=(*col, int(105 + mag * 120)), width=max(1, w // 520))
+
+    # Petal lattice, camera as the machine inside the mandala.
+    petals = 18
+    for i in range(petals):
+        a = 2 * math.pi * i / petals + spin * 0.55
+        a2 = a + math.pi / petals
+        p0 = (cx + int(r * 0.36 * math.cos(a)), cy + int(r * 0.36 * math.sin(a)))
+        p1 = (cx + int(r * 0.86 * math.cos(a2)), cy + int(r * 0.86 * math.sin(a2)))
+        p2 = (cx + int(r * 0.36 * math.cos(a + 2 * math.pi / petals)),
+              cy + int(r * 0.36 * math.sin(a + 2 * math.pi / petals)))
+        draw.line((p0, p1, p2), fill=(*_golden_scale(amber, 0.55), 80),
+                  width=max(1, w // 700))
+
+    # Perforated film loop around the outer ring.
+    holes = 44
+    for i in range(holes):
+        a = 2 * math.pi * i / holes - spin * 0.9
+        rr = r * 1.04
+        x = cx + int(rr * math.cos(a))
+        y = cy + int(rr * math.sin(a))
+        hw = max(2, w // 420)
+        hh = max(2, h // 350)
+        alpha = 70 + int(80 * (0.5 + 0.5 * math.sin(i + t * 2.0)))
+        draw.rectangle((x - hw, y - hh, x + hw, y + hh),
+                       outline=(*_golden_scale(gold, 0.72), alpha), width=1)
+
+    _golden_camera_body(draw, cx, cy, max(42, int(base_r * 0.78)), vol, signal)
+
+    # Wave glints under the camera: subtle, so it stays OTR-noir rather than EDM.
+    if wave is not None and len(wave) > 1:
+        samples = np.asarray(wave, dtype=np.float32)
+        count = min(120, len(samples))
+        idx = np.linspace(0, len(samples) - 1, count, dtype=int)
+        pts = []
+        y0 = int(h * 0.77)
+        amp = max(4, int(h * 0.045 * (0.35 + float(vol))))
+        for k, j in enumerate(idx):
+            x = pad + int(k * (w - pad * 2) / max(1, count - 1))
+            y = y0 + int(float(samples[j]) * amp)
+            pts.append((x, y))
+        draw.line(pts, fill=(*_golden_scale(amber, 0.62), 130), width=max(1, w // 520))
+
+    # Deterministic dust and scratches before CRT post.
+    for _ in range(max(12, w // 55)):
+        x = int(rng.integers(0, max(1, w)))
+        y = int(rng.integers(0, max(1, h)))
+        a = int(rng.integers(22, 88))
+        draw.point((x, y), fill=(255, 216, 130, a))
+    for _ in range(3):
+        x = int(rng.integers(pad, max(pad + 1, w - pad)))
+        y0 = int(rng.integers(pad, max(pad + 1, h - pad)))
+        y1 = min(h - pad, y0 + int(rng.integers(h // 12, max(h // 12 + 1, h // 4))))
+        draw.line((x, y0, x + int(rng.integers(-2, 3)), y1),
+                  fill=(255, 210, 110, int(rng.integers(22, 58))), width=1)
+
+    img = Image.alpha_composite(img.convert("RGBA"), scanlines).convert("RGB")
+    arr = np.array(img, dtype=np.float32)
+    arr *= vignette[:, :, np.newaxis]
+    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    a = np.array(img, dtype=np.int16)
+    intensity = int(4 + float(vol) * 10)
+    noise = _rng(rng_key, fi, "grain").integers(
+        -intensity, intensity + 1, size=a.shape, dtype=np.int16)
+    return Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
+
+
 # --------------------------------------------------------------------------- #
 # Cosmic Radio Mandala (viz_mxc_mandala, 2026-06-30) -- pycairo painter +
 # cairo->numpy conversion + the shared CRT post applied AFTER conversion (the

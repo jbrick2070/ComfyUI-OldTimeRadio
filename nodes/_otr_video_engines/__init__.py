@@ -151,6 +151,16 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# viz_camera (2026-07-05): the OTR-native Golden Flicker camera visualizer --
+# warm gold projector-camera centerpiece, spectrum spokes, and CRT post, copied
+# into this repo as first-party PIL/numpy code with NO runtime dependency on the
+# separate golden-flicker repo. Audio-optional, accepts_still=False, selectable
+# per role like the other abstract visualizers.
+try:  # pragma: no cover - trivial guard
+    from . import eng_viz_camera as _eng_viz_camera  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # CLOUD partner video rows (S3 core, 2026-07-02): kling_avatar / kling_lipsync
 # / seedance_2 / wan_i2v via the S0 invoke_partner_node bridge, conformed by
 # canonicalize_video (provider audio ALWAYS stripped, strip-proven). Register
