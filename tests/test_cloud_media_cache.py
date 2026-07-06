@@ -21,8 +21,8 @@ def cache_root(tmp_path):
 
 def _key(seed=7, **over):
     kwargs = dict(
-        row_id="cloud_recraft",
-        resolved_slug="recraft/v3",
+        row_id="cloud_flux_pro",
+        resolved_slug="flux_pro/v1",
         params={"prompt": "a 1940s radio", "size": "1472x832"},
         input_hashes={"init_image": "ab" * 32},
         seed=seed,
@@ -45,7 +45,7 @@ def _manifest():
     return {
         "media_type": "image",
         "canonicalizer_version": CANONICALIZER_VERSION,
-        "row_id": "cloud_recraft",
+        "row_id": "cloud_flux_pro",
     }
 
 

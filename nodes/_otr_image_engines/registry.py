@@ -137,8 +137,6 @@ CAPABILITIES = {
     # VRAM, CPU-side (the provider does the compute; canonicalize_image is a
     # pure PIL op). The registry-consistency invariant (test_capability_profiles
     # :217) requires ONE row per registered engine and vice versa.
-    "cloud_recraft": {"required_toolchain": None,
-                      "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "cloud_flux_pro": {"required_toolchain": None,
                        "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "cloud_nano_banana_2": {"required_toolchain": None,

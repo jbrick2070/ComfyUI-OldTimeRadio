@@ -72,7 +72,7 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): recraft / flux_pro
+# Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): flux_pro
 # / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
 # engines. Register unconditionally with EMPTY default_roles (selectable, never
 # automatic; the dropdown pick is the enable). Cold-import clean (the bridge /

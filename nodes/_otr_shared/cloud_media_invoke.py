@@ -305,7 +305,7 @@ async def _call_partner(row: dict, kwargs: dict) -> Any:
     # are NOT execute() kwargs -- the framework delivers them via
     # PREPARE_CLASS_CLONE(v3_data) -> cls.hidden (a HiddenHolder). Passing them as
     # kwargs makes execute() raise "unexpected keyword argument 'api_key_comfy_org'"
-    # (every comfy_api_nodes partner is a V3 node: Ideogram/Recraft/Flux/Kling/
+    # (every comfy_api_nodes partner is a V3 node: Ideogram/Flux/Kling/
     # Seedream/Pixverse ...). Route hidden through the clone; only the real inputs
     # go to EXECUTE_NORMALIZED_ASYNC. Legacy V1 nodes keep the kwargs path.
     if hasattr(node_cls, "PREPARE_CLASS_CLONE"):

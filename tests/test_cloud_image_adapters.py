@@ -14,7 +14,7 @@ from nodes._otr_shared.cloud_media_canonical import (
 from nodes._otr_image_engines import eng_cloud_image as eci
 from nodes._otr_image_engines import registry as ireg
 
-_CLOUD_ROWS = ("cloud_recraft", "cloud_flux_pro",
+_CLOUD_ROWS = ("cloud_flux_pro",
                "cloud_nano_banana_2", "cloud_seedream_2")
 
 
@@ -36,7 +36,7 @@ def test_capabilities_match_registry_exactly():
 
 
 def test_cloud_image_rows_never_default():
-    for eng in (eci.Recraft, eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = ireg.default_engine_for_role(role)
@@ -44,19 +44,19 @@ def test_cloud_image_rows_never_default():
 
 
 def test_required_inputs_is_text_prompt():
-    for eng in (eci.Recraft, eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
         assert eng.required_inputs == ("text_prompt",)
 
 
 def test_prepare_does_not_crash_on_none_triple():
     # the dispatcher calls prepare(None, None, None).
-    for eng in (eci.Recraft, eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
         assert eng.prepare(None, None, None) == {}
 
 
 def test_assert_usable_ok_with_healthy_pin(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", raising=False)
-    assert eci.Recraft.assert_usable({}, {}) == "cloud_recraft"
+    assert eci.FluxPro.assert_usable({}, {}) == "cloud_flux_pro"
 
 
 # --------------------------------------------------------------------------- #
@@ -68,12 +68,6 @@ def _req(**over):
     r = {"prompt": "an old radio", "seed": 7, "width": 832, "height": 448}
     r.update(over)
     return r
-
-
-def test_recraft_inputs():
-    ins = eci.Recraft._partner_inputs(_req())
-    assert set(ins) == {"prompt", "n", "seed", "size"}
-    assert ins["n"] == 1 and ins["seed"] == 7
 
 
 def test_flux_pro_inputs(monkeypatch):
@@ -212,10 +206,10 @@ def test_render_image_returns_canonical_png_path(tmp_path, monkeypatch):
     # TRUE 1080p cloud stills: the canonical PNG conforms to the cloud delivery
     # canvas (landscape 1920x1080 here), NOT the raw role-request 640x360.
     monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "1920x1080")
-    out = eci.Recraft.render_image(_req(width=640, height=360), {})
+    out = eci.FluxPro.render_image(_req(width=640, height=360), {})
     assert isinstance(out, str) and out.endswith(".canon.png")
     assert Path(out).is_file()
-    assert captured["node_key"] == "cloud_recraft"
+    assert captured["node_key"] == "cloud_flux_pro"
     assert captured["estimated_usd"] > 0     # budget machine needs nonzero
     from PIL import Image
     with Image.open(out) as im:

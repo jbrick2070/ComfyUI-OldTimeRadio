@@ -281,38 +281,6 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
-  cloud_recraft:
-    api_node: true
-    auth_hidden_present:
-    - auth_token_comfy_org
-    - api_key_comfy_org
-    category: partner/image/Recraft
-    class_name: RecraftTextToImageNode
-    function: EXECUTE_NORMALIZED_ASYNC
-    import_path: comfy_api_nodes.nodes_recraft
-    inputs:
-      hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
-      optional:
-        negative_prompt: STRING
-        recraft_controls: RECRAFT_CONTROLS
-        recraft_style: RECRAFT_V3_STYLE
-      required:
-        n: INT
-        prompt: STRING
-        seed: INT
-        size: COMBO
-    is_async: true
-    notes: CHEAP-cand stills
-    provider_id: RECRAFT
-    return_types:
-    - IMAGE
-    seed_supported: true
-    selected_output: 0
-    status: OK
   cloud_seedance_2:
     api_node: true
     auth_hidden_present:

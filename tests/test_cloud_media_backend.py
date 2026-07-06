@@ -101,7 +101,7 @@ def test_provider_id_invalid_fails():
 
 def test_semaphore_defaults():
     assert cmb.provider_semaphore_size("kling") == 1  # pinned default
-    assert cmb.provider_semaphore_size("recraft") == 2  # global default
+    assert cmb.provider_semaphore_size("seedream") == 2  # global default
 
 
 def test_semaphore_env_override(monkeypatch):

@@ -1,7 +1,7 @@
 """S0 live smokes for the invoke_partner_node bridge (pass04 sec 3).
 
-Leg 1 -- headless auth proof on the cheapest pinned image row
-         (cloud_recraft): one small still, PartnerResult validated.
+Leg 1 -- headless auth proof on a pinned image row
+         (cloud_flux_pro): one small still, PartnerResult validated.
 Leg 2 -- the whole point: a Kling avatar clip actually CONDITIONED by
          episode audio (cloud_kling_avatar with the checked-in
          tests/fixtures/baseline_v1.5.wav + a radio still).
@@ -25,7 +25,7 @@ Env knobs:
                             C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI)
     OTR_CLOUD_SMOKE_EST_USD per-leg budget estimate (default 0.15)
     OTR_CLOUD_SMOKE_TIMEOUT_S  provider timeout (default 600)
-    OTR_CLOUD_SMOKE_SIZE    leg-1 recraft size combo (default 1024x1024)
+    OTR_CLOUD_SMOKE_SIZE    leg-1 flux_pro square size in px (default 1024)
     OTR_CLOUD_SMOKE_IMAGE   leg-2 still path (default: placeholder
                             radio-cabinet gradient generated on the fly)
     OTR_CLOUD_SMOKE_MODE    leg-2 kling mode combo (default: first
@@ -143,13 +143,19 @@ def _run_leg(node_key: str, inputs: dict, est_usd: float,
 
 
 def leg1(est_usd: float, timeout_s: float) -> int:
-    size = os.environ.get("OTR_CLOUD_SMOKE_SIZE", "1024x1024").strip()
-    return _run_leg("cloud_recraft", {
+    # /32-aligned square (BFL requires request dims divisible by 32).
+    try:
+        px = int(os.environ.get("OTR_CLOUD_SMOKE_SIZE", "1024").split("x")[0])
+    except (TypeError, ValueError):
+        px = 1024
+    px = max(32, (px // 32) * 32)
+    return _run_leg("cloud_flux_pro", {
         "prompt": "a 1946 bakelite tabletop radio on a wooden desk, warm "
                   "dramatic lighting, product still",
-        "n": 1,
+        "width": px,
+        "height": px,
+        "prompt_upsampling": False,
         "seed": 7,
-        "size": size,
     }, est_usd, timeout_s)
 
 

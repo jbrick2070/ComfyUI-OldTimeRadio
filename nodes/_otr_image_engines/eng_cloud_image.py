@@ -4,7 +4,6 @@ sprints PLAN.md Sprint B; operator GO 2026-07-03 "S1").
 Four rows from the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_image``:
 
-    cloud_recraft        text2img   CHEAP
     cloud_flux_pro       text2img   BEST (prompt continuity with flux_gen1)
     cloud_nano_banana_2  text2img   BEST (V3 model row; reference consistency)
     cloud_seedream_2     text2img   cheapest stylization tier (V3 model row)
@@ -200,24 +199,6 @@ class _CloudImageBase:
         return str(asset.path)
 
 
-class CloudRecraftImageEngine(_CloudImageBase):
-    """Recraft text-to-image: the CHEAP stills row."""
-
-    name = "cloud_recraft"
-    node_key = "cloud_recraft"
-    est_usd_env = "OTR_CLOUD_RECRAFT_EST_USD"
-    est_usd_default = 0.04
-
-    def _partner_inputs(self, request):
-        # pinned required: n INT, prompt STRING, seed INT, size COMBO.
-        return {
-            "prompt": self._prompt(request),
-            "n": 1,
-            "seed": self._seed(request),
-            "size": os.environ.get("OTR_CLOUD_RECRAFT_SIZE", "1024x1024"),
-        }
-
-
 class CloudFluxProImageEngine(_CloudImageBase):
     """BFL Flux.2 Pro: the BEST stills row (prompt continuity w/ flux_gen1)."""
 
@@ -334,17 +315,16 @@ class CloudIdeoImageEngine(_CloudImageBase):
         }
 
 
-Recraft = CloudRecraftImageEngine()
 FluxPro = CloudFluxProImageEngine()
 NanoBanana2 = CloudNanoBanana2ImageEngine()
 Seedream2 = CloudSeedream2ImageEngine()
 Ideo = CloudIdeoImageEngine()
 
-for _eng in (Recraft, FluxPro, NanoBanana2, Seedream2, Ideo):
+for _eng in (FluxPro, NanoBanana2, Seedream2, Ideo):
     register(_eng)
 
 __all__ = [
-    "CloudRecraftImageEngine", "CloudFluxProImageEngine",
+    "CloudFluxProImageEngine",
     "CloudNanoBanana2ImageEngine", "CloudSeedream2ImageEngine",
     "CloudIdeoImageEngine",
 ]

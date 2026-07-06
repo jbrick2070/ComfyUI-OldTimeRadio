@@ -74,8 +74,6 @@ CURATED_ROWS = {
                                "CHEAP-cand music"),
     "cloud_sonilo_music":     ("SoniloTextToMusic", "SONILO", 0,
                                "BEST music"),
-    "cloud_recraft":          ("RecraftTextToImageNode", "RECRAFT", 0,
-                               "CHEAP-cand stills"),
     "cloud_flux_pro":         ("Flux2ProImageNode", "BFL", 0,
                                "BEST stills; prompt continuity w/ flux_gen1"),
     "cloud_nano_banana_2":    ("GeminiNanoBanana2V2", "GEMINI", 0,
