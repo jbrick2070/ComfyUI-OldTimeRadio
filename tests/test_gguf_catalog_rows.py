@@ -24,7 +24,7 @@ def test_virtual_row_schema():
     assert row.vram_fit_tier == "PASS"
     assert row.approx_safetensors_gb == 13.4
     assert row.requires_auth is False
-    assert row.context_window == 8192
+    assert row.context_window == 4096
 
 
 def test_dropdown_label_has_no_download_suffix(tmp_path):

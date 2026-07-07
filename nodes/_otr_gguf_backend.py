@@ -27,7 +27,7 @@ ROW_ID = "unsloth/gemma-4-12b-it-GGUF"
 
 DEFAULT_GGUF_FILENAME = "gemma-4-12b-it-Q8_0.gguf"
 EXPECTED_Q8_0_SIZE_BYTES = 12_669_646_240
-DEFAULT_CONTEXT_WINDOW = 8192
+DEFAULT_CONTEXT_WINDOW = 4096
 DEFAULT_OUTPUT_TOKENS_CAP = 512
 DEFAULT_N_BATCH = 512
 DEFAULT_N_GPU_LAYERS = -1
@@ -117,6 +117,7 @@ def _prepare_windows_llama_dll_runtime() -> None:
     _DLL_RUNTIME_PREPARED = True
     import ctypes  # imported lazily so non-Windows test imports stay light
 
+    log.info("[GGUFNative] Preparing Windows DLL search paths and preloading CUDA runtime dependencies...")
     for site_packages in _site_packages_candidates():
         dll_dirs = [
             site_packages / "nvidia" / "cuda_runtime" / "bin",
@@ -126,7 +127,11 @@ def _prepare_windows_llama_dll_runtime() -> None:
         ]
         for dll_dir in dll_dirs:
             if dll_dir.exists() and hasattr(os, "add_dll_directory"):
-                _DLL_DIR_HANDLES.append(os.add_dll_directory(str(dll_dir)))
+                log.info("[GGUFNative] Adding DLL directory to search path: %s", dll_dir)
+                try:
+                    _DLL_DIR_HANDLES.append(os.add_dll_directory(str(dll_dir)))
+                except Exception as exc:
+                    log.warning("[GGUFNative] Failed to add DLL directory %s: %s", dll_dir, exc)
         preload_names = [
             site_packages / "nvidia" / "cuda_runtime" / "bin" / "cudart64_12.dll",
             site_packages / "nvidia" / "cublas" / "bin" / "cublas64_12.dll",
@@ -139,7 +144,12 @@ def _prepare_windows_llama_dll_runtime() -> None:
         ]
         for dll_path in preload_names:
             if dll_path.exists():
-                _PRELOADED_DLLS.append(ctypes.WinDLL(str(dll_path)))
+                log.info("[GGUFNative] Preloading dependency DLL: %s", dll_path.name)
+                try:
+                    _PRELOADED_DLLS.append(ctypes.WinDLL(str(dll_path)))
+                except Exception as exc:
+                    log.error("[GGUFNative] Failed to preload DLL %s: %s", dll_path, exc)
+                    raise exc
 
 
 def _import_llama_cpp():
@@ -249,14 +259,61 @@ class GGUFNativeBackend:
                 f"{EXPECTED_Q8_0_SIZE_BYTES}. Let the download finish or "
                 "delete the partial file and retry."
             )
+
+        # 1. Nuclear Power Wash: Evict ComfyUI models & empty PyTorch CUDA cache
+        log.info("[GGUFNative] Running pre-load VRAM eviction to clean resident PyTorch models...")
+        try:
+            from ._otr_vram_levers import free_otr_pipeline_residue
+            free_otr_pipeline_residue(reason="GGUFNative load preflight")
+        except Exception as exc:
+            log.warning("[GGUFNative] VRAM eviction failed (non-fatal): %s", exc)
+
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
             or DEFAULT_CONTEXT_WINDOW
         )
         n_ctx = _int_env("GEMMA4_12B_N_CTX", context_window)
+
+        # 2. VRAM Gate Preflight Check
+        import torch
+        if torch.cuda.is_available() and not _bool_env("OTR_TEST_MODE", False):
+            try:
+                free_bytes, total_bytes = torch.cuda.mem_get_info()
+                free_gb = free_bytes / (1024 ** 3)
+                # Estimation: weights (12.07 GB) + SWA KV Cache (~0.7 GB per 1024 context cells) + safety overhead
+                # At 4096 context, total needed is ~14.9 GB. At 2048 context, total is ~13.5 GB.
+                estimated_needed_gb = 12.07 + (n_ctx / 1024.0) * 0.7 + 0.1
+                log.info(
+                    "[GGUFNative] VRAM Preflight: Free=%.2f GB | Estimated Needed=%.2f GB (n_ctx=%d)",
+                    free_gb, estimated_needed_gb, n_ctx
+                )
+                if free_gb < estimated_needed_gb:
+                    if n_ctx > 2048 and free_gb >= 13.5:
+                        log.warning(
+                            "[GGUFNative] Tight VRAM (Free=%.2f GB < Needed=%.2f GB). "
+                            "Dynamically downgrading context window from %d to 2048 to fit 16GB GPU.",
+                            free_gb, estimated_needed_gb, n_ctx
+                        )
+                        n_ctx = 2048
+                    elif free_gb < 13.0:
+                        raise GGUFNativeConfigError(
+                            f"Insufficient VRAM for GGUF loading. Free VRAM is {free_gb:.2f} GB, "
+                            f"but {estimated_needed_gb:.2f} GB is needed for Q8_0 weights. "
+                            f"Evict other resident CUDA processes or free display RAM."
+                        )
+            except GGUFNativeConfigError:
+                raise
+            except Exception as exc:
+                log.warning("[GGUFNative] VRAM preflight check failed (proceeding anyway): %s", exc)
+
         n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
         n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", DEFAULT_N_GPU_LAYERS)
         verbose = _bool_env("GEMMA4_12B_VERBOSE", False)
+
+        log.info(
+            "[GGUFNative] Initializing llama.cpp Llama instance: n_ctx=%d, n_gpu_layers=%d, n_batch=%d",
+            n_ctx, n_gpu_layers, n_batch
+        )
         model = _load_llama(
             model_path=model_path,
             n_ctx=n_ctx,
