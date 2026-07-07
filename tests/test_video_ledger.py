@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import re
 from unittest.mock import MagicMock, patch
 
@@ -37,6 +38,92 @@ from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 # ---------------------------------------------------------------------------
 # Helper-level tests (module-level functions, no class instantiation)
 # ---------------------------------------------------------------------------
+
+def test_in_flight_ledger_test_mode_never_mtime_walks_live_outputs(monkeypatch):
+    """Tests must not fall through to the live ComfyUI output tree.
+
+    A node that stamps via ``in_flight_ledger_path()`` without an active saved
+    singleton used to mtime-walk ``output/otr/episodes`` and could overwrite the
+    newest production ledger with pytest temp paths.
+    """
+    from nodes import _otr_ledger as ol
+    from nodes import production_ledger as pl
+
+    saved = pl._CURRENT
+    calls = []
+
+    def _record_walker(roots):
+        calls.append(list(roots))
+        return Path("C:/should/not/be/read_ledger.json")
+
+    try:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = None
+        monkeypatch.setenv("OTR_TEST_MODE", "1")
+        monkeypatch.setattr(ol, "find_most_recent_ledger", _record_walker)
+
+        assert ol.in_flight_ledger_path() is None
+        assert calls == []
+        assert pl._CURRENT is None
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved
+
+
+def test_in_flight_ledger_test_mode_allows_saved_singleton(tmp_path, monkeypatch):
+    """Explicitly injected temp ledgers still work under ``OTR_TEST_MODE``."""
+    from nodes import _otr_ledger as ol
+    from nodes import production_ledger as pl
+
+    saved = pl._CURRENT
+    calls = []
+
+    def _record_walker(roots):
+        calls.append(list(roots))
+        return None
+
+    try:
+        monkeypatch.setenv("OTR_TEST_MODE", "1")
+        led = pl.new_ledger("ep_guard", str(tmp_path))
+        Path(led.path).write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(ol, "find_most_recent_ledger", _record_walker)
+
+        assert ol.in_flight_ledger_path() == Path(led.path)
+        assert calls == []
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved
+
+
+def test_in_flight_ledger_production_mode_keeps_headless_fallback(
+    tmp_path, monkeypatch
+):
+    """Standalone/headless production paths may still use the mtime walker."""
+    from nodes import _otr_ledger as ol
+    from nodes import production_ledger as pl
+
+    saved = pl._CURRENT
+    fallback = tmp_path / "ep_headless" / "audio" / "ep_headless_ledger.json"
+    fallback.parent.mkdir(parents=True)
+    fallback.write_text("{}", encoding="utf-8")
+    calls = []
+
+    def _record_walker(roots):
+        calls.append(list(roots))
+        return fallback
+
+    try:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = None
+        monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+        monkeypatch.setattr(ol, "find_most_recent_ledger", _record_walker)
+
+        assert ol.in_flight_ledger_path() == fallback
+        assert len(calls) == 1
+        assert pl._CURRENT is None
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved
 
 def test_video_hud_telemetry_from_ledger():
     """_parse_hud_data with a stub ledger produces the expected
